@@ -6,6 +6,7 @@
 
 use crate::config::CONFIG;
 use crate::server::app_data::AppData;
+use crate::server::indexer::get_current_timestamp_rpc;
 use crate::server::models::{
     CTRequest, ComputeProviderParams, JsonResponse, PKRequest, RoundRequest,
     RoundRequestWithRequester,
@@ -14,7 +15,6 @@ use crate::server::models::{
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
 use alloy::sol_types::SolValue;
-use chrono::Utc;
 use e3_fhe_params::default_param_set;
 use e3_fhe_params::{build_bfv_params_from_set_arc, encode_bfv_params};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
@@ -209,8 +209,14 @@ pub async fn initialize_crisp_round(
 
     info!("Requesting E3...");
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
-    
-    let input_window = [U256::from(Utc::now().timestamp()), U256::from(Utc::now().timestamp()) + U256::from(CONFIG.e3_duration)];
+
+    let current_timestamp = get_current_timestamp_rpc().await?;
+    // Buffer so tx can mine before window opens; end = start + duration so voting window equals e3_duration
+    let window_start = current_timestamp + 20;
+    let input_window: [U256; 2] = [
+        U256::from(window_start),
+        U256::from(window_start + CONFIG.e3_duration),
+    ];
     let e3_params = Bytes::from(params);
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.clone(),

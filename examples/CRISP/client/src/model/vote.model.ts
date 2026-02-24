@@ -60,7 +60,7 @@ export interface VoteStateLite {
   credits?: number
 }
 
-export type Vote = bigint[]
+export type Vote = number[]
 
 export interface EligibleVoter {
   address: string

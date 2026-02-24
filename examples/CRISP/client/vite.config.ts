@@ -24,7 +24,13 @@ export default defineConfig({
   },
   optimizeDeps: {
     esbuildOptions: { target: 'esnext' },
-    exclude: ['@rollup/browser', '@noir-lang/noirc_abi', '@noir-lang/acvm_js', '@noir-lang/noir_js'],
+    exclude: [
+      '@rollup/browser',
+      '@noir-lang/noirc_abi',
+      '@noir-lang/acvm_js',
+      '@noir-lang/noir_js',
+      '@aztec/bb.js', // Pre-bundling breaks worker URLs (thread.worker.js, main.worker.js)
+    ],
   },
   resolve: {
     alias: {
@@ -53,5 +59,9 @@ export default defineConfig({
     // this sets a default port to 3000
     port: 3000,
     hmr: !process.env.NO_HOT,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
   },
 })

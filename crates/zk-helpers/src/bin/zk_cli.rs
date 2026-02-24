@@ -334,10 +334,8 @@ fn main() -> Result<()> {
                 circuit.codegen(preset, &sample)?
             }
             name if name == <DecryptedSharesAggregationCircuit as Circuit>::NAME => {
-                let sample = DecryptedSharesAggregationCircuitData::generate_sample(
-                    preset,
-                    CiphernodesCommitteeSize::Small.values(),
-                )?;
+                let sample =
+                    DecryptedSharesAggregationCircuitData::generate_sample(preset, committee)?;
 
                 let circuit = DecryptedSharesAggregationCircuit;
                 circuit.codegen(preset, &sample)?

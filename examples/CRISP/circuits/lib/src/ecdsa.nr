@@ -10,13 +10,15 @@ use keccak256::keccak256;
 ///
 /// This function validates that a signature was created by the holder of the private key
 /// corresponding to the provided public key, and that it signs the given hashed message.
-/// The function asserts internally, ensuring the signature is valid.
 ///
 /// # Arguments
 /// * `hashed_message` - The Keccak256 hash of the message being signed (32 bytes)
 /// * `pub_key_x` - The x-coordinate of the public key (32 bytes, big-endian)
 /// * `pub_key_y` - The y-coordinate of the public key (32 bytes, big-endian)
 /// * `signature` - The ECDSA signature (64 bytes: r || s, both 32 bytes big-endian)
+///
+/// # Returns
+/// Returns `true` if the signature is valid, `false` otherwise.
 ///
 /// # Note
 /// The signature is verified using secp256k1 curve (same as Ethereum). The message
@@ -26,10 +28,8 @@ pub fn validate_signature(
     pub_key_x: [u8; 32],
     pub_key_y: [u8; 32],
     signature: [u8; 64],
-) {
-    let is_valid =
-        std::ecdsa_secp256k1::verify_signature(pub_key_x, pub_key_y, signature, hashed_message);
-    assert(is_valid == true);
+) -> bool {
+    std::ecdsa_secp256k1::verify_signature(pub_key_x, pub_key_y, signature, hashed_message)
 }
 
 /// Derives an Ethereum address from a secp256k1 public key.
@@ -124,7 +124,7 @@ fn test_validate_signature() {
         124, 118, 143, 228, 126, 216, 173, 160, 231, 62, 52, 188, 154, 110, 230, 183, 71, 36, 161,
         171, 163, 213, 62, 223, 152,
     ];
-    validate_signature(hashed_message, pub_key_x, pub_key_y, signature);
+    assert(validate_signature(hashed_message, pub_key_x, pub_key_y, signature));
 }
 
 #[test]
@@ -149,7 +149,7 @@ fn test_validate_signature_sdk_input() {
         236, 18,
     ];
 
-    validate_signature(hashed_message, pub_key_x, pub_key_y, signature);
+    assert(validate_signature(hashed_message, pub_key_x, pub_key_y, signature));
 }
 
 #[test(should_fail)]
@@ -177,7 +177,7 @@ fn test_fail_validate_signature() {
     ];
 
     // This call should fail (assertion failure) because the signature is invalid
-    validate_signature(hashed_message, pub_key_x, pub_key_y, signature);
+    assert(validate_signature(hashed_message, pub_key_x, pub_key_y, signature));
 }
 
 #[test]

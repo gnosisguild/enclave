@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::math::commitments::compute_pk_aggregation_commitment;
+use crate::math::commitments::{compute_pk_aggregation_commitment, compute_threshold_pk_commitment};
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
@@ -67,7 +67,7 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> PkAggregation<N, H, L,
     fn verify_pk_commitments(self) {
         for i in 0..H {
             assert(
-                compute_pk_aggregation_commitment::<N, L, BIT_PK>(self.pk0[i], self.pk1[i])
+                compute_threshold_pk_commitment::<N, L, BIT_PK>(self.pk0[i], self.pk1[i])
                     == self.expected_threshold_pk_commitments[i],
                 "PK commitment mismatch",
             );

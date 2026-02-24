@@ -21,8 +21,8 @@ env:
   CIPHERNODE_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ciphernode
   NODE_VERSION: 22
   RUST_TOOLCHAIN: 1.86.0
-  NOIR_TOOLCHAIN: v1.0.0-beta.15
-  BB_VERSION: 3.0.0-nightly.20251104
+  NOIR_TOOLCHAIN: v1.0.0-beta.16
+  BB_VERSION: 3.0.0-nightly.20260102
   HARDHAT_VAR_MNEMONIC: 'test test test test test test test test test test test junk'
   HARDHAT_VAR_INFURA_API_KEY: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
   PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -462,7 +462,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: crisp-sdk-artifacts
-          path: ./examples/CRISP
+          path: .
 
       - name: Run Noir tests
         working-directory: ./examples/CRISP
@@ -501,6 +501,9 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
           sudo chown -R $USER_UID:$USER_GID $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
           sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -551,7 +554,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: crisp-sdk-artifacts
-          path: ./examples/CRISP
+          path: .
 
       - name: Install Playwright browsers
         working-directory: ./examples/CRISP
@@ -732,6 +735,11 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
 
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: ${{ env.NOIR_TOOLCHAIN }}
+
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
 
@@ -761,6 +769,8 @@ jobs:
             packages/enclave-contracts/cache
             packages/enclave-contracts/types
             crates/wasm/dist
+            circuits/bin/recursive_aggregation/wrapper/threshold/target
+            circuits/bin/threshold/target
           retention-days: 1
           if-no-files-found: warn
 
@@ -806,7 +816,10 @@ jobs:
           path: |
             examples/CRISP/packages/crisp-sdk/dist
             examples/CRISP/packages/crisp-zk-inputs/dist
-            examples/CRISP/circuits/target
+            examples/CRISP/circuits/bin/crisp/target
+            examples/CRISP/circuits/bin/fold/target
+            circuits/bin/threshold/target
+            circuits/bin/recursive_aggregation/wrapper/threshold/target
           retention-days: 1
           if-no-files-found: warn
 

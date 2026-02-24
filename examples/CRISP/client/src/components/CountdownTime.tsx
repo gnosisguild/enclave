@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import React, { useEffect, useState } from 'react'
+import { usePublicClient } from 'wagmi'
 import LoadingAnimation from '@/components/LoadingAnimation'
 
 interface CountdownTimerProps {
@@ -19,13 +20,25 @@ type RemainingTime = {
 }
 
 const CountdownTimer: React.FC<CountdownTimerProps> = ({ endTime }) => {
+  const client = usePublicClient()
   const [remainingTime, setRemainingTime] = useState<RemainingTime | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date()
-      const difference = endTime.getTime() - now.getTime()
+    const timer = setInterval(async () => {
+      // Use chain block timestamp so countdown matches when poll actually ends (block.timestamp > end_time)
+      let nowMs: number
+      if (client) {
+        try {
+          const block = await client.getBlock()
+          nowMs = Number(block.timestamp) * 1000
+        } catch {
+          nowMs = Date.now()
+        }
+      } else {
+        nowMs = Date.now()
+      }
+      const difference = endTime.getTime() - nowMs
       if (difference <= 0) {
         clearInterval(timer)
         setLoading(false)
@@ -42,7 +55,7 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ endTime }) => {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [endTime])
+  }, [endTime, client])
 
   return (
     <div className='flex flex-col items-center justify-center space-y-2'>

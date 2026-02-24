@@ -7,6 +7,7 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSignMessage } from 'wagmi'
+import { CrispSDK, encodeSolidityProof } from '@crisp-e3/sdk'
 
 import { useVoteManagementContext } from '@/context/voteManagement'
 import { useNotificationAlertContext } from '@/context/NotificationAlert/NotificationAlert.context.tsx'
@@ -15,6 +16,10 @@ import { BroadcastVoteRequest, Vote, VoteStateLite, VotingRound } from '@/model/
 import { hashMessage } from 'viem'
 import { useEnclaveServer } from '../enclave/useEnclaveServer'
 import { getRandomVoterToMask } from '@/utils/voters'
+import { handleGenericError } from '@/utils/handle-generic-error'
+import { NUM_OPTIONS } from '@/utils/constants'
+
+const ENCLAVE_API = import.meta.env.VITE_ENCLAVE_API
 
 export type VotingStep = 'idle' | 'signing' | 'encrypting' | 'generating_proof' | 'broadcasting' | 'confirming' | 'complete' | 'error'
 
@@ -58,7 +63,6 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
     user,
     roundState: contextRoundState,
     votingRound: contextVotingRound,
-    generateProof,
     broadcastVote,
     setTxUrl,
     markVotedInRound,
@@ -87,21 +91,42 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
       messageHash: `0x${string}`,
       isAMask: boolean,
       merkleLeaves: bigint[],
-    ) => {
+    ): Promise<string | undefined> => {
       if (!votingRound) throw new Error('No voting round available for proof generation')
-      return generateProof(
-        votingRound.round_id,
-        vote,
-        new Uint8Array(votingRound.pk_bytes),
-        address,
-        balance,
-        signature,
-        messageHash,
-        isAMask,
-        merkleLeaves,
-      )
+
+      try {
+        const sdk = new CrispSDK(ENCLAVE_API)
+        const publicKey = new Uint8Array(votingRound.pk_bytes)
+
+        const proof = isAMask
+          ? await sdk.generateMaskVoteProof({
+              e3Id: votingRound.round_id,
+              publicKey,
+              balance,
+              slotAddress: address,
+              merkleLeaves,
+              numOptions: NUM_OPTIONS,
+            })
+          : await sdk.generateVoteProof({
+              vote,
+              e3Id: votingRound.round_id,
+              publicKey,
+              signature: signature as `0x${string}`,
+              merkleLeaves,
+              balance,
+              messageHash,
+              slotAddress: address,
+            })
+
+        return encodeSolidityProof(proof)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        showToast({ type: 'danger', message })
+        handleGenericError('generateProof', error instanceof Error ? error : new Error(message))
+        throw error
+      }
     },
-    [generateProof, votingRound],
+    [votingRound, showToast],
   )
 
   const resetVotingState = useCallback(() => {
@@ -130,7 +155,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
       const randomVoterToMask = getRandomVoterToMask(eligibleVoters)
 
       return {
-        vote: [0n, 0n],
+        vote: [0, 0],
         slotAddress: randomVoterToMask.address,
         balance: BigInt(randomVoterToMask.balance),
         signature: '',
@@ -138,7 +163,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
       }
     } catch (error) {
       return {
-        vote: [0n, 0n],
+        vote: [0, 0],
         slotAddress: '',
         balance: 0n,
         signature: '',
@@ -167,7 +192,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
 
       // vote is either 0 or 1, so we need to encode the vote accordingly.
       const balance = 1n
-      const vote = pollSelected.value === 0 ? [balance, 0n] : [0n, balance]
+      const vote = pollSelected.value === 0 ? [Number(balance), 0] : [0, Number(balance)]
 
       let signature: string
       try {
@@ -185,7 +210,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         return {
           signature: '',
           messageHash: '' as `0x${string}`,
-          vote: [0n, 0n],
+          vote: [0, 0],
           slotAddress: '',
           balance: 0n,
           error: 'User rejected signature or signing failed',

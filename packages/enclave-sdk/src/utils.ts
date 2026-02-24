@@ -194,3 +194,13 @@ export function decodePlaintextOutput(plaintextOutput: string): number | null {
     return null
   }
 }
+
+// Helper function to convert proof bytes to field elements
+export function proofToFields(proof: Uint8Array): string[] {
+  const fields: string[] = []
+  for (let i = 0; i < proof.length; i += 32) {
+    const chunk = proof.slice(i, i + 32)
+    fields.push('0x' + Buffer.from(chunk).toString('hex'))
+  }
+  return fields
+}
