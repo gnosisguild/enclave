@@ -15,19 +15,11 @@ use common::test_backend;
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
 use e3_zk_prover::{test_utils::get_tempdir, BbTarget, Provable, SetupStatus, ZkConfig, ZkProver};
-use std::{env, path::PathBuf};
-
-fn versions_json_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("versions.json")
-}
+use std::env;
 
 #[tokio::test]
 async fn test_full_flow_download_circuits_prove_and_verify() {
-    eprintln!(">>> Loading config...");
-    let config = ZkConfig::load(&versions_json_path())
-        .await
-        .expect("versions.json should exist");
-    eprintln!(">>> Config loaded");
+    let config = ZkConfig::default();
 
     let temp = get_tempdir().unwrap();
     let backend = test_backend(temp.path(), config);
@@ -162,9 +154,7 @@ async fn test_download_bb_rejects_wrong_checksum() {
         return;
     }
 
-    let mut config = ZkConfig::load(&versions_json_path())
-        .await
-        .expect("versions.json should exist");
+    let mut config = ZkConfig::default();
 
     for checksum in config.bb_checksums.values_mut() {
         *checksum = "0".repeat(64);

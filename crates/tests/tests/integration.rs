@@ -31,7 +31,7 @@ use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::rand_eth_addr;
 use e3_utils::utility_types::ArcBytes;
 use e3_zk_prover::test_utils::get_tempdir;
-use e3_zk_prover::{ZkBackend, ZkConfig};
+use e3_zk_prover::ZkBackend;
 use fhe::bfv::PublicKey;
 use fhe_traits::{DeserializeParametrized, Serialize};
 use num_bigint::BigUint;
@@ -168,21 +168,11 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
 
-        let backend = ZkBackend::new(
-            BBPath::Default(bb_binary),
-            circuits_dir,
-            work_dir,
-            ZkConfig::default(),
-        );
+        let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
         (backend, temp)
     } else {
         println!("bb binary not found locally, downloading via ensure_installed()...");
-        let backend = ZkBackend::new(
-            BBPath::Default(bb_binary),
-            circuits_dir,
-            work_dir,
-            ZkConfig::default(),
-        );
+        let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
         backend
             .ensure_installed()
             .await

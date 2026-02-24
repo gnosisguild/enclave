@@ -39,7 +39,13 @@ pub struct ZkBackend {
 }
 
 impl ZkBackend {
-    pub fn new(
+    pub fn new(bb_binary: BBPath, circuits_dir: PathBuf, work_dir: PathBuf) -> Self {
+        Self::with_config(bb_binary, circuits_dir, work_dir, ZkConfig::default())
+    }
+
+    /// Construct with an explicit config — primarily for tests that need to
+    /// override versions or checksums.
+    pub fn with_config(
         bb_binary: BBPath,
         circuits_dir: PathBuf,
         work_dir: PathBuf,
@@ -60,7 +66,7 @@ impl ZkBackend {
         }
     }
 
-    pub async fn with_default_dir(node_name: &str) -> Result<Self, ZkError> {
+    pub fn with_default_dir(node_name: &str) -> Result<Self, ZkError> {
         let base_dirs = directories::BaseDirs::new().ok_or_else(|| {
             ZkError::IoError(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -74,8 +80,7 @@ impl ZkBackend {
         let circuits_dir = noir_dir.join("circuits");
         let work_dir = noir_dir.join("work").join(node_name);
 
-        let config = ZkConfig::fetch_or_default().await;
-        Ok(Self::new(bb_binary, circuits_dir, work_dir, config))
+        Ok(Self::new(bb_binary, circuits_dir, work_dir))
     }
 
     fn sanitize_e3_id(e3_id: &str) -> Result<&str, ZkError> {
