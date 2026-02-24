@@ -60,7 +60,11 @@ get_zk_args() {
             echo "share-decryption secret-key"
             return
             ;;
-        threshold/user_data_encryption)
+        threshold/user_data_encryption_ct0)
+            echo "user-data-encryption"
+            return
+            ;;
+        threshold/user_data_encryption_ct1)
             echo "user-data-encryption"
             return
             ;;

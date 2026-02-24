@@ -21,7 +21,7 @@
     "ciphernode:add:self": "pnpm -C packages/crisp-contracts ciphernode:add:self",
     "deploy:contracts": "pnpm -C packages/crisp-contracts deploy:contracts",
     "test": "pnpm test:e2e",
-    "test:circuits": "cd circuits && nargo test",
+    "test:circuits": "cd circuits/lib && nargo test",
     "compile:circuits": "bash ./scripts/compile_circuits.sh",
     "test:sdk": "pnpm -C packages/crisp-sdk test",
     "build:sdk": "pnpm -C packages/crisp-sdk build",

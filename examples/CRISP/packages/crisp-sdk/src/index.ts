@@ -13,7 +13,7 @@ export {
   generateVoteProof,
   generateMaskVoteProof,
   verifyProof,
-  generatePublicKey,
+  generateBFVKeys,
   encryptVote,
   encodeSolidityProof,
   validateVote,
