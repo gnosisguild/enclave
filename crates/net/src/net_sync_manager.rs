@@ -21,7 +21,7 @@ use tracing::{debug, info, warn};
 
 use crate::events::{
     await_event, call_and_await_response, GossipData, IncomingRequest, NetCommand, NetEvent,
-    OutgoingRequestSucceeded, ResponsePayload,
+    OutgoingRequestSucceeded, PeerTarget,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,7 +43,7 @@ pub struct NetSyncManager {
     /// NetEvents receiver to receive events
     rx: Arc<broadcast::Receiver<NetEvent>>,
     eventstore: Recipient<EventStoreQueryBy<TsAgg>>,
-    requests: HashMap<CorrelationId, OnceTake<ResponseChannel<ResponsePayload>>>,
+    requests: HashMap<CorrelationId, OnceTake<ResponseChannel<Vec<u8>>>>,
     peers_ready: bool,
 }
 
@@ -255,6 +255,7 @@ async fn sync_request(
         NetCommand::OutgoingRequest {
             correlation_id: id,
             payload,
+            target: PeerTarget::Random,
         },
         |e| match e.clone() {
             NetEvent::OutgoingRequestSucceeded(value) => Some(Ok(value)),

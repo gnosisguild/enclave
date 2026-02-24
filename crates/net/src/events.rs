@@ -28,8 +28,13 @@ use std::{
 use tokio::sync::{broadcast, mpsc};
 use tracing::{error, trace, warn};
 
-pub type RequestPayload = Vec<u8>;
-pub type ResponsePayload = Vec<u8>;
+use libp2p::PeerId;
+
+#[derive(Clone, Debug)]
+pub enum PeerTarget {
+    Random,
+    Specific(PeerId),
+}
 
 /// Incoming/Outgoing GossipData. We disambiguate on concerns relative to the net package.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -74,14 +79,14 @@ impl TryFrom<GossipData> for EnclaveEvent<Unsequenced> {
 #[rtype("()")]
 pub struct IncomingRequest {
     pub request_id: InboundRequestId,
-    pub payload: RequestPayload,
-    pub channel: OnceTake<ResponseChannel<ResponsePayload>>,
+    pub payload: Vec<u8>,
+    pub channel: OnceTake<ResponseChannel<Vec<u8>>>,
 }
 
 #[derive(Message, Clone, Debug)]
 #[rtype("()")]
 pub struct OutgoingRequestSucceeded {
-    pub payload: ResponsePayload,
+    pub payload: Vec<u8>,
     pub correlation_id: CorrelationId,
 }
 
@@ -121,12 +126,12 @@ pub enum NetCommand {
     /// Send a request to a peer and await response
     OutgoingRequest {
         correlation_id: CorrelationId,
-        payload: RequestPayload,
+        payload: Vec<u8>,
+        target: PeerTarget,
     },
-    /// Send response back to a peer that made a request
     Response {
-        payload: ResponsePayload,
-        channel: OnceTake<ResponseChannel<ResponsePayload>>,
+        payload: Vec<u8>,
+        channel: OnceTake<ResponseChannel<Vec<u8>>>,
     },
 }
 
