@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { BackendType, Barretenberg, UltraHonkBackend, type ProofData } from '@aztec/bb.js'
+import { Barretenberg, UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import userDataEncryptionCt0Circuit from '../../../circuits/bin/threshold/target/user_data_encryption_ct0.json'
 import userDataEncryptionCt1Circuit from '../../../circuits/bin/threshold/target/user_data_encryption_ct1.json'
 import userDataEncryptionCircuit from '../../../circuits/bin/recursive_aggregation/wrapper/threshold/target/user_data_encryption.json'
