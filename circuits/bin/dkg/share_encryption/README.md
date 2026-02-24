@@ -1,9 +1,9 @@
 # [C3a & C3b] Share Encryption (`share_encryption`)
 
 The Share Encryption circuit verifies that each ciphernode correctly encrypted a secret share under
-the recipient's BFV public key. After shares are verified in _C2a/C2b_, they must be encrypted for
-secure peer-to-peer transmission — this circuit proves the encryption was formed correctly without
-revealing the plaintext share or the encryption randomness.
+the recipient's BFV public key. After shares are verified and committed in _C2a/C2b_, they must be
+encrypted for secure peer-to-peer transmission — this circuit proves the encryption was formed
+correctly without revealing the plaintext share or the encryption randomness.
 
 This is a single circuit used for both variants: **C3a** encrypts secret key (`sk`) shares, taking
 its message commitment from _C2a_; **C3b** encrypts smudging noise (`e_sm`) shares, taking its

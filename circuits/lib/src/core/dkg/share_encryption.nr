@@ -84,24 +84,26 @@ impl<let L: u32> Configs<L> {
 ///
 /// Verifies that a secret share was correctly encrypted under a recipient's BFV public key.
 /// This circuit runs twice in parallel per ciphernode per recipient:
-/// - C3a: encrypts a secret key (sk) share
-/// - C3b: encrypts a smudging noise (e_sm) share
+/// - C3a: encrypts a secret key (sk) share, consuming commit(sk_share) from C2a
+/// - C3b: encrypts a smudging noise (e_sm) share, consuming commit(e_sm_share) from C2b
 ///
-/// Both variants use identical verification logic. The plaintext being encrypted
-/// is the respective share committed in C2a (for C3a) or C2b (for C3b).
+/// The key insight is that the commitment to the plaintext being encrypted must equal
+/// the commitment to the share produced in C2a/C2b. This binds the encryption to the
+/// previously verified share, we know the ciphertext contains the correct share without
+/// ever seeing it in plaintext.
 ///
 /// Outputs:
-/// - None
-/// The output ciphertexts (ct0, ct1) are broadcasted to the intended recipient for decryption in C4a/C4b.
+/// No new commitments are produced. The output ciphertexts (ct0, ct1) are broadcast
+/// to the intended recipient for decryption in C4a/C4b.
 pub struct ShareEncryption<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     /// Circuit parameters
     configs: Configs<L>,
     /// Expected commitment to the BFV public key (from C0: pk).
     /// (public witness)
     expected_pk_commitment: Field,
-    /// Expected commitment to the message (share) being encrypted.
-    /// commit(sk_share[party_idx][mod_idx]) from C2a, or
-    /// commit(e_sm_share[party_idx][mod_idx]) from C2b.
+    /// Expected commitment to the share (message) being encrypted.
+    /// - C3a: commit(sk_share[party_idx][mod_idx]) produced by C2a
+    /// - C3b: commit(e_sm_share[party_idx][mod_idx]) produced by C2b
     /// (public witness)
     expected_message_commitment: Field,
     /// Public key component 0 for each CRT basis (committed witnesses)
@@ -177,7 +179,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
 
     /// Verifies that the BFV public key hashes to the expected commitment from C0.
     ///
-    /// Ensures the ciphernode encrypted under the same key they committed to earlier,
+    /// Ensures the ciphernode encrypted under the same key they committed to in C0,
     /// preventing key substitution attacks.
     fn verify_pk_commitment(self) {
         assert(
@@ -187,10 +189,12 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         );
     }
 
-    /// Verifies that the message (share) polynomial hashes to the expected commitment from C2a/C2b.
+    /// Verifies that the message (share) polynomial hashes to the expected commitment
+    /// produced in C2a (for C3a) or C2b (for C3b).
     ///
-    /// Ensures the plaintext being encrypted matches the share that was verified
-    /// in the previous circuit, maintaining the chain of accountability.
+    /// This is the binding check: the plaintext being encrypted must be exactly the share
+    /// that was verified in C2. Any deviation, encrypting a different value, substituting
+    /// a forged share, will cause this assertion to fail.
     fn verify_message_commitment(self) {
         assert(
             compute_share_encryption_commitment_from_message::<N, BIT_MSG>(self.message)
@@ -204,9 +208,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// Each coefficient is transformed as:
     ///   k1[i] = (Q_mod_t * message[i]) mod t
     /// then centered to [-t/2, t/2) to produce the BFV plaintext encoding.
-    ///
-    /// This scaling embeds the plaintext into ciphertext space, and the
-    /// centering maps values in (t/2, t) to their negative equivalents.
     fn compute_scaled_message(self) -> Polynomial<N> {
         let t = self.configs.t;
         let t_mod = ModU128::new(t);
