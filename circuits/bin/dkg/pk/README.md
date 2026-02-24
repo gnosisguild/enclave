@@ -32,7 +32,7 @@ flowchart TD
 ```
 
 - **Phase**: P1 (DKG).
-- **Runs**: 1 x Ciphernode (at the start of key generation).
+- **Runs**: N_PARTIES = 1 x Ciphernode (at the start of key generation).
 - **Requires**: [`config`](../../config) circuit from P0 (Configs Verification).
 - **Output(s)**: `commit(pk_bfv)` consumed by C3a / C3b
   ([`dkg/share_encryption`](../share_encryption))
