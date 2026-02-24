@@ -131,13 +131,6 @@ pub async fn initialize_crisp_round(
     );
 
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
-    let mut current_timestamp = get_current_timestamp().await?;
-    // Buffer so tx can mine before window opens; end = start + duration so voting window equals e3_duration
-    let window_start = current_timestamp + 20;
-    let input_window: [U256; 2] = [
-        U256::from(window_start),
-        U256::from(window_start + CONFIG.e3_duration),
-    ];
     let e3_params = Bytes::from(encode_bfv_params(&generate_bfv_parameters()));
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.to_string(),
@@ -146,11 +139,20 @@ pub async fn initialize_crisp_round(
     };
     let compute_provider_params_bytes = Bytes::from(serde_json::to_vec(&compute_provider_params)?);
 
+    info!("Getting fee quote...");
+
+    let mut current_timestamp = get_current_timestamp().await?;
     info!(
         "Debug Before Fee Quote - current timestamp: {:?}",
         current_timestamp
     );
-    info!("Getting fee quote...");
+    // Buffer so tx can mine before window opens; end = start + duration so voting window equals e3_duration
+    let window_start = current_timestamp + 20;
+    let input_window: [U256; 2] = [
+        U256::from(window_start),
+        U256::from(window_start + CONFIG.e3_duration),
+    ];
+
     let fee_amount = contract
         .get_e3_quote(
             threshold,
@@ -185,6 +187,16 @@ pub async fn initialize_crisp_round(
         "Debug - Checking ciphernode registry at: {}",
         CONFIG.ciphernode_registry_address
     );
+
+    // Recompute the current timestamp to ensure it's as up-to-date as possible before sending the transaction, 
+    // since there are multiple steps (fee quote, token approval) that could take time.
+    let mut current_timestamp = get_current_timestamp().await?;
+    // Buffer so tx can mine before window opens; end = start + duration so voting window equals e3_duration
+    let window_start = current_timestamp + 20;
+    let input_window: [U256; 2] = [
+        U256::from(window_start),
+        U256::from(window_start + CONFIG.e3_duration),
+    ];
 
     let (res, e3_id) = contract
         .request_e3(

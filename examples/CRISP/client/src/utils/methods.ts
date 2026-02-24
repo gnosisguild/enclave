@@ -6,8 +6,7 @@
 
 import { PollOption, PollRequestResult, PollResult } from '@/model/poll.model'
 import { VoteStateLite } from '@/model/vote.model'
-import { Chain, sepolia } from 'viem/chains'
-import { hardhat } from 'viem/chains'
+import { Chain, sepolia, anvil } from 'viem/chains'
 
 export const markWinner = (options: PollOption[]) => {
   const highestVoteCount = Math.max(...options.map((o) => o.votes))
@@ -24,7 +23,7 @@ export const convertTimestampToDate = (timestamp: number, secondsToAdd: number =
 }
 
 export const getChain = (): Chain => {
-  return import.meta.env.DEV ? hardhat : sepolia
+  return import.meta.env.DEV ? anvil : sepolia
 }
 
 export const formatDate = (isoDateString: string): string => {
