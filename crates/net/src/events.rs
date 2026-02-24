@@ -30,7 +30,7 @@ use tracing::{error, trace, warn};
 
 use libp2p::PeerId;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum PeerTarget {
     Random,
     Specific(PeerId),

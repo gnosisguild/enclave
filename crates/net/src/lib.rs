@@ -7,8 +7,10 @@
 mod cid;
 mod correlator;
 mod dialer;
+pub mod direct_requester;
 mod document_publisher;
 pub mod events;
+mod net_event_batch;
 mod net_event_buffer;
 mod net_event_translator;
 mod net_interface;
