@@ -48,7 +48,6 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
-        # We must install foundry in order to be able to test anvil
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
@@ -840,34 +839,45 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+
       - name: Install node dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
       - name: Download enclave binary
         uses: actions/download-artifact@v4
         with:
           name: enclave-binary
           path: ~/.cargo/bin/
+
       - name: Download support scripts artifacts
         uses: actions/download-artifact@v4
         with:
           name: support-scripts-artifacts
           path: templates/default/target/
+
       - name: Download SDK artifacts
         uses: actions/download-artifact@v4
         with:
           name: sdk-artifacts
           path: ./
+
       - name: Make binaries executable
         run: |
           chmod +x ~/.cargo/bin/enclave
           chmod +x templates/default/target/debug/e3-support-scripts-dev
+
       - name: Setup ZK prover
         run: |
           enclave noir setup
+
       - name: Verify downloaded artifacts
         run: |
           echo "Checking downloaded artifacts:"
@@ -877,6 +887,7 @@ jobs:
           ls -la crates/wasm/dist || echo "WASM dist not found"
           echo "Support scripts permissions:"
           ls -la templates/default/target/debug/e3-support-scripts-dev
+
       - name: Test Template
         run: |
           cd templates/default
