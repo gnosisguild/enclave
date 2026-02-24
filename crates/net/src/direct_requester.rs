@@ -460,4 +460,30 @@ mod tests {
         assert_eq!(r1, b"world");
         assert_eq!(r2, b"pong");
     }
+
+    #[tokio::test]
+    async fn test_request_failure() {
+        let (net_cmds_tx, net_cmds_rx) = mpsc::channel::<NetCommand>(16);
+        let (net_events_tx, net_events_rx) = broadcast::channel::<NetEvent>(16);
+        let net_events = Arc::new(net_events_rx);
+
+        let requester = DirectRequester::builder(net_cmds_tx, net_events)
+            .max_retries(0)
+            .build();
+
+        let handle = DirectRequesterTester::new(net_cmds_rx, net_events_tx)
+            .error_with("connection refused")
+            .num_requests(1)
+            .spawn();
+
+        let result: std::result::Result<Vec<u8>, _> = requester
+            .to(PeerTarget::Random)
+            .request(b"hello".to_vec())
+            .await;
+
+        handle.await.unwrap();
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("connection refused"));
+    }
 }
