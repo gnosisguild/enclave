@@ -8,6 +8,8 @@ use crate::error::ZkError;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::path::Path;
+use tokio::fs;
 use tracing::debug;
 
 const VERSIONS_JSON: &str = include_str!("../versions.json");
@@ -161,6 +163,7 @@ pub fn verify_checksum(file: &str, data: &[u8], expected: Option<&str>) -> Resul
 #[cfg(test)]
 mod tests {
     use crate::test_utils::get_tempdir;
+    use std::time::Duration;
 
     use super::*;
 
@@ -353,30 +356,8 @@ mod tests {
             return;
         };
 
-        // Known good checksums for bb v0.82.2
-        // Update these when bumping BB_VERSION
-        let checksums: HashMap<&str, &str> = [
-            (
-                "amd64-linux",
-                "9740013d1aa0eb1b0bb2d71484c8b3debc5050a409bd5f12f8454fbfc7cb5419",
-            ),
-            (
-                "amd64-darwin",
-                "7874494dd1238655993a44b85d94e9dcc3589d29980eff8b03a7f167a45c32e4",
-            ),
-            (
-                "arm64-linux",
-                "ae6bf8518998523b4e135cd638f305a802f52e8dfa5ea9b1c210de7d04c55343",
-            ),
-            (
-                "arm64-darwin",
-                "6d353c05dbecc573d1b0ca992c8b222db8e873853b7910b792915629347f6789",
-            ),
-        ]
-        .into_iter()
-        .collect();
-
-        let version = BB_VERSION;
+        let config = ZkConfig::default();
+        let version = &config.required_bb_version;
         let (arch, os) = target.url_parts();
         let url = format!(
             "https://github.com/AztecProtocol/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz"
@@ -404,12 +385,10 @@ mod tests {
             .expect("failed to read response body");
         println!("downloaded {} bytes", bytes.len());
 
-        // Verify checksum
-        let expected = checksums
-            .get(target.as_str())
+        let expected = config
+            .bb_checksum_for(target)
             .expect("no checksum for target");
         let result = verify_checksum(&format!("bb-{}", target), &bytes, Some(expected));
-
         assert!(result.is_ok(), "checksum verification failed: {:?}", result);
         println!("checksum verified for {}", target);
 
@@ -422,15 +401,13 @@ mod tests {
             .expect("failed to write tarball");
         assert!(tarball_path.exists());
 
-        // Verify VersionInfo checksum method works
         let info = VersionInfo {
-            bb_version: Some(version.to_string()),
+            bb_version: Some(version.clone()),
             bb_checksum: Some(expected.to_string()),
             ..Default::default()
         };
         assert!(info.verify_bb_checksum(&bytes).is_ok());
 
-        // Cleanup happens automatically when temp goes out of scope
         println!("test passed, temp dir cleaned up");
     }
 
@@ -442,7 +419,8 @@ mod tests {
             return;
         };
 
-        let version = BB_VERSION;
+        let config = ZkConfig::default();
+        let version = &config.required_bb_version;
         let (arch, os) = target.url_parts();
         let url = format!(
             "https://github.com/AztecProtocol/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz"
