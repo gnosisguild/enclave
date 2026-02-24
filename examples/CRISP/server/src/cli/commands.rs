@@ -132,10 +132,11 @@ pub async fn initialize_crisp_round(
 
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
     let mut current_timestamp = get_current_timestamp().await?;
+    // Buffer so tx can mine before window opens; end = start + duration so voting window equals e3_duration
+    let window_start = current_timestamp + 20;
     let input_window: [U256; 2] = [
-        // give a little buffer 
-        U256::from(current_timestamp) + U256::from(20),
-        U256::from(current_timestamp + CONFIG.e3_duration),
+        U256::from(window_start),
+        U256::from(window_start + CONFIG.e3_duration),
     ];
     let e3_params = Bytes::from(encode_bfv_params(&generate_bfv_parameters()));
     let compute_provider_params = ComputeProviderParams {
