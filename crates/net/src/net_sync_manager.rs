@@ -15,13 +15,13 @@ use e3_utils::{retry_with_backoff, to_retry, OnceTake, MAILBOX_LIMIT};
 use futures::TryFutureExt;
 use libp2p::request_response::ResponseChannel;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, convert::TryInto, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, info, warn};
 
 use crate::events::{
     await_event, call_and_await_response, GossipData, IncomingRequest, NetCommand, NetEvent,
-    OutgoingRequestSucceeded, PeerTarget,
+    OutgoingRequest,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,10 +29,39 @@ pub struct SyncRequestValue {
     pub since: HashMap<AggregateId, u128>,
 }
 
+impl TryInto<Vec<u8>> for SyncRequestValue {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
+        bincode::serialize(&self).context("failed to serialize sync request")
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncResponseValue {
     pub events: Vec<GossipData>,
     pub ts: u128,
+}
+
+impl TryInto<Vec<u8>> for SyncResponseValue {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
+        bincode::serialize(&self).context("failed to serialize sync response")
+    }
+}
+
+impl TryFrom<Vec<u8>> for SyncResponseValue {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        bincode::deserialize(&value).context("failed to deserialize sync response")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncRequestSucceeded {
+    pub response: SyncResponseValue,
 }
 
 pub struct NetSyncManager {
@@ -140,17 +169,16 @@ impl Handler<TypedEvent<HistoricalNetSyncStart>> for NetSyncManager {
 }
 
 /// We have received the sync response from the remote peer
-impl Handler<TypedEvent<OutgoingRequestSucceeded>> for NetSyncManager {
+impl Handler<TypedEvent<SyncRequestSucceeded>> for NetSyncManager {
     type Result = ();
     fn handle(
         &mut self,
-        msg: TypedEvent<OutgoingRequestSucceeded>,
+        msg: TypedEvent<SyncRequestSucceeded>,
         _: &mut Self::Context,
     ) -> Self::Result {
         trap(EType::Net, &self.bus.with_ec(msg.get_ctx()), || {
             let (msg, ctx) = msg.into_components();
-            let response: SyncResponseValue = bincode::deserialize(&msg.payload)
-                .context("failed to deserialize sync response")?;
+            let response = msg.response;
             self.bus.publish_from_remote_as_response(
                 NetSyncEventsReceived {
                     events: response
@@ -210,10 +238,9 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
                     .filter(|e| e.source() == EventSource::Net)
                     .map(|ev| ev.try_into())
                     .collect::<Result<_>>()?,
-                ts: self.bus.ts()?, // NOTE: We are storing a local timestamp on this response
+                ts: self.bus.ts()?,
             };
-            let payload =
-                bincode::serialize(&response).context("failed to serialize sync response")?;
+            let payload: Vec<u8> = response.try_into()?;
             if let Err(e) = self.tx.try_send(NetCommand::Response {
                 payload,
                 channel: channel.to_owned(),
@@ -244,19 +271,12 @@ async fn sync_request(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
     since: HashMap<AggregateId, u128>,
-) -> Result<OutgoingRequestSucceeded> {
+) -> Result<SyncRequestSucceeded> {
     info!("RUNNING sync request...");
-    let id = CorrelationId::new();
-    let payload = bincode::serialize(&SyncRequestValue { since })
-        .context("failed to serialize sync request")?;
-    call_and_await_response(
+    let response = call_and_await_response(
         net_cmds,
         net_events,
-        NetCommand::OutgoingRequest {
-            correlation_id: id,
-            payload,
-            target: PeerTarget::Random,
-        },
+        NetCommand::OutgoingRequest(OutgoingRequest::to_random_peer(SyncRequestValue { since })?),
         |e| match e.clone() {
             NetEvent::OutgoingRequestSucceeded(value) => Some(Ok(value)),
             NetEvent::OutgoingRequestFailed(error) => {
@@ -266,14 +286,16 @@ async fn sync_request(
         },
         SYNC_REQUEST_TIMEOUT,
     )
-    .await
+    .await?;
+    let response: SyncResponseValue = response.payload.try_into()?;
+    Ok(SyncRequestSucceeded { response })
 }
 
 async fn handle_sync_request_event(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
     event: TypedEvent<HistoricalNetSyncStart>,
-    address: impl Into<Recipient<TypedEvent<OutgoingRequestSucceeded>>>,
+    address: impl Into<Recipient<TypedEvent<SyncRequestSucceeded>>>,
     wait_for_event: bool,
 ) -> Result<()> {
     info!("Sync request event received");

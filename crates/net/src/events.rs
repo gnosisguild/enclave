@@ -6,7 +6,7 @@
 
 use crate::ContentHash;
 use actix::Message;
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use e3_events::{
     CorrelationId, DocumentMeta, EnclaveEvent, EventContextAccessors, EventSource, Sequenced,
     Unsequenced,
@@ -83,6 +83,38 @@ pub struct IncomingRequest {
     pub channel: OnceTake<ResponseChannel<Vec<u8>>>,
 }
 
+#[derive(Debug, Clone)]
+pub struct OutgoingRequest {
+    pub correlation_id: CorrelationId,
+    pub payload: Vec<u8>,
+    pub target: PeerTarget,
+}
+
+impl OutgoingRequest {
+    pub fn new_with_correlation(
+        id: CorrelationId,
+        target: PeerTarget,
+        payload: impl TryInto<Vec<u8>>,
+    ) -> Result<Self> {
+        Ok(Self {
+            correlation_id: id,
+            payload: payload.try_into().map_err(|_| {
+                anyhow!(
+                    "could not serialize payload for outgoing request with correlation_id={id} and target={target:?}."
+                )
+            })?,
+            target,
+        })
+    }
+    pub fn to_random_peer(payload: impl TryInto<Vec<u8>>) -> Result<Self> {
+        Self::new_with_correlation(CorrelationId::new(), PeerTarget::Random, payload)
+    }
+
+    pub fn new(target: PeerId, payload: impl TryInto<Vec<u8>>) -> Result<Self> {
+        Self::new_with_correlation(CorrelationId::new(), PeerTarget::Specific(target), payload)
+    }
+}
+
 #[derive(Message, Clone, Debug)]
 #[rtype("()")]
 pub struct OutgoingRequestSucceeded {
@@ -124,11 +156,7 @@ pub enum NetCommand {
     /// Shutdown signal
     Shutdown,
     /// Send a request to a peer and await response
-    OutgoingRequest {
-        correlation_id: CorrelationId,
-        payload: Vec<u8>,
-        target: PeerTarget,
-    },
+    OutgoingRequest(OutgoingRequest),
     Response {
         payload: Vec<u8>,
         channel: OnceTake<ResponseChannel<Vec<u8>>>,
@@ -142,7 +170,7 @@ impl NetCommand {
             N::DhtPutRecord { correlation_id, .. } => Some(*correlation_id),
             N::DhtGetRecord { correlation_id, .. } => Some(*correlation_id),
             N::GossipPublish { correlation_id, .. } => Some(*correlation_id),
-            N::OutgoingRequest { correlation_id, .. } => Some(*correlation_id),
+            N::OutgoingRequest(OutgoingRequest { correlation_id, .. }) => Some(*correlation_id),
             _ => None,
         }
     }

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::correlator::Correlator;
+use crate::{correlator::Correlator, events::OutgoingRequest};
 use anyhow::{Context, Result};
 use e3_events::CorrelationId;
 use e3_utils::{ArcBytes, OnceTake};
@@ -549,11 +549,11 @@ async fn process_swarm_command(
             handle_remove_records(swarm, keys);
             Ok(())
         }
-        NetCommand::OutgoingRequest {
+        NetCommand::OutgoingRequest(OutgoingRequest {
             correlation_id,
             payload,
             target,
-        } => {
+        }) => {
             handle_outgoing_request(swarm, correlator, correlation_id, payload, target)?;
             Ok(())
         }
