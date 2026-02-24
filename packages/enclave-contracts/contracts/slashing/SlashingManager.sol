@@ -213,18 +213,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
     ///         uint256 chainId,
     ///         uint256 proofType,
     ///         address verifier)`
-    ///      The operator must have signed:
-    ///      `keccak256(abi.encode(PROOF_PAYLOAD_TYPEHASH,
-    ///         chainId,
-    ///         e3Id,
-    ///         proofType,
-    ///         keccak256(zkProof),
-    ///         keccak256(abi.encodePacked(publicInputs))))`
-    ///      This prevents:
-    ///        - Arbitrary proof submission (attacker can't forge operator's signature)
-    ///        - Cross-E3 replay (e3Id is in the signed message)`
-    ///        - Cross-chain replay (chainId is in the signed message)`
-    ///        - Verifier-upgrade attacks (verifier in evidence must match policy's current verifier)`
+    ///      Operator must sign the EIP-191 prefixed payload hash via `personal_sign`/`signMessage()`
+    ///      (NOT raw `eth_signHash`): `personal_sign(keccak256(abi.encode(PROOF_PAYLOAD_TYPEHASH,
+    ///         chainId, e3Id, proofType, keccak256(zkProof), keccak256(abi.encodePacked(publicInputs)))))`
     function proposeSlash(
         uint256 e3Id,
         address operator,
@@ -358,14 +349,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // Internal Execution
     // ======================
 
-    /// @dev Decodes evidence, verifies operator signature, committee membership,
-    ///      and that the ZK proof is invalid (fault confirmed).
-    ///      Evidence format:
-    ///      `abi.encode(bytes zkProof, bytes32[] publicInputs,
-    ///         bytes signature,
-    ///         uint256 chainId,
-    ///         uint256 proofType,
-    ///         address verifier)`
+    /// @dev Decodes and verifies: verifier match, chainId, operator EIP-191 signature, committee
+    ///      membership, and that the ZK proof is invalid (fault confirmed). Same evidence format as
+    ///      `proposeSlash` — see its `@dev` for the `abi.encode` layout.
     function _verifyProofEvidence(
         bytes calldata proof,
         uint256 e3Id,
@@ -425,16 +411,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(!proofValid, ProofIsValid());
     }
 
-    /**
-     * @notice Internal function that executes a slash and handles committee expulsion
-     * @dev For Lane B (delayed execution), the operator may have deregistered during the appeal
-     *      window. BondingRegistry.slashTicketBalance and slashLicenseBond use Math.min(requested,
-     *      available), so zero-balance operators receive a zero slash gracefully. The exit queue's
-     *      slashPendingAssets(includeLockedAssets=true) covers operators mid-exit. If the operator
-     *      has already claimed their exit, funds are gone and the slash amount becomes 0. This is
-     *      an accepted tradeoff for the appeal window design.
-     * @param proposalId ID of the proposal to execute
-     */
+    /// @dev Executes a slash: applies financial penalties, optional ban, and committee expulsion.
+    ///      Lane B: if the operator deregistered or exited during the appeal window, penalties
+    ///      gracefully become 0 (BondingRegistry uses min(requested, available)). Accepted tradeoff.
     function _executeSlash(uint256 proposalId) internal {
         SlashProposal storage p = _proposals[proposalId];
         p.executed = true;
@@ -491,10 +470,8 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // ======================
 
     /// @inheritdoc ISlashingManager
-    /// @dev Only the accused operator can file an appeal. No delegate, multi-sig, or representative
-    ///      patterns exist. If the operator has lost access to their key or been banned, they cannot
-    ///      appeal. Consider adding an appealDelegate mapping for production to allow a designated
-    ///      representative to appeal on behalf of the operator.
+    /// @dev Only the accused operator may appeal (no delegate support). Consider an `appealDelegate`
+    ///      mapping for production to handle lost-key or banned-operator scenarios.
     function fileAppeal(uint256 proposalId, string calldata evidence) external {
         require(proposalId < totalProposals, InvalidProposal());
         SlashProposal storage p = _proposals[proposalId];
