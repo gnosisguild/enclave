@@ -4,14 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::{fmt, sync::Arc, time::Duration};
+use std::{fmt, marker::PhantomData, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Result};
 use e3_events::CorrelationId;
 use e3_utils::{retry_with_backoff, to_retry};
 use tokio::sync::{broadcast, mpsc};
 
-use crate::events::{call_and_await_response, NetCommand, NetEvent, OutgoingRequest, PeerTarget};
+use crate::events::{
+    call_and_await_response, NetCommand, NetEvent, OutgoingRequest, OutgoingRequestFailed,
+    OutgoingRequestSucceeded, PeerTarget,
+};
 
 pub trait DirectRequesterOutput: TryFrom<Vec<u8>> + Send + Sync + 'static {}
 
@@ -27,65 +30,48 @@ impl<T> DirectRequesterInput for T where
 {
 }
 
-pub struct DirectRequester {
+pub struct WithoutPeer;
+pub struct WithPeer(PeerTarget);
+
+pub struct DirectRequester<State> {
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
     request_timeout: Duration,
     max_retries: u32,
     retry_timeout: Duration,
+    peer: PeerTarget,
+    _state: PhantomData<State>,
 }
 
-impl DirectRequester {
-    /// Creates a new DirectRequester with custom timeouts.
-    ///
-    /// # Arguments
-    /// * `net_cmds` - Channel to send network commands
-    /// * `net_events` - Channel to receive network events
-    /// * `request_timeout` - Timeout for each individual request attempt
-    /// * `max_retries` - Maximum number of retry attempts
-    /// * `retry_timeout` - Total timeout budget for all retries (used for backoff calculation)
-    pub fn new(
+impl DirectRequester<WithoutPeer> {
+    pub fn builder(
         net_cmds: mpsc::Sender<NetCommand>,
         net_events: Arc<broadcast::Receiver<NetEvent>>,
-        request_timeout: Duration,
-        max_retries: u32,
-        retry_timeout: Duration,
-    ) -> Self {
-        Self {
-            net_cmds,
-            net_events,
-            request_timeout,
-            max_retries,
-            retry_timeout,
+    ) -> DirectRequesterBuilder {
+        DirectRequesterBuilder {
+            net_cmds: Some(net_cmds),
+            net_events: Some(net_events),
+            request_timeout: Some(Duration::from_secs(30)),
+            max_retries: Some(4),
+            retry_timeout: Some(Duration::from_millis(5000)),
         }
     }
 
-    /// Creates a new DirectRequester with default timeouts (30s request, 4 retries, 5s total retry budget).
-    pub fn with_defaults(
-        net_cmds: mpsc::Sender<NetCommand>,
-        net_events: Arc<broadcast::Receiver<NetEvent>>,
-    ) -> Self {
-        Self::new(
-            net_cmds,
-            net_events,
-            Duration::from_secs(30),
-            4,
-            Duration::from_millis(5000),
-        )
+    pub fn to(&self, peer: PeerTarget) -> DirectRequester<WithPeer> {
+        DirectRequester {
+            net_cmds: self.net_cmds.clone(),
+            net_events: self.net_events.clone(),
+            request_timeout: self.request_timeout,
+            max_retries: self.max_retries,
+            retry_timeout: self.retry_timeout,
+            peer,
+            _state: PhantomData,
+        }
     }
+}
 
-    /// Sends a request to a peer and retries on failure.
-    ///
-    /// Uses exponential backoff with the configured `max_retries` and `retry_timeout_ms`.
-    /// Each attempt times out after `request_timeout`.
-    ///
-    /// # Arguments
-    /// * `request` - The request payload (must implement `DirectRequesterInput`)
-    /// * `peer` - The target peer to send the request to
-    ///
-    /// # Returns
-    /// The response deserialized as type `T` (must implement `DirectRequesterOutput`)
-    pub async fn request<T, R>(&self, request: R, peer: PeerTarget) -> Result<T>
+impl DirectRequester<WithPeer> {
+    pub async fn request<T, R>(&self, request: R) -> Result<T>
     where
         T: DirectRequesterOutput,
         R: DirectRequesterInput,
@@ -95,7 +81,7 @@ impl DirectRequester {
             .try_into()
             .map_err(|_| anyhow!("Request serialization failed for request: {:?}", request))?;
 
-        let response = self.request_with_retry(payload, peer).await?;
+        let response = self.request_with_retry(payload).await?;
 
         let response: T = response
             .try_into()
@@ -104,8 +90,9 @@ impl DirectRequester {
         Ok(response)
     }
 
-    async fn request_with_retry(&self, payload: Vec<u8>, peer: PeerTarget) -> Result<Vec<u8>> {
+    async fn request_with_retry(&self, payload: Vec<u8>) -> Result<Vec<u8>> {
         let request_timeout = self.request_timeout;
+        let peer = self.peer;
         retry_with_backoff(
             || {
                 let net_cmds = self.net_cmds.clone();
@@ -122,6 +109,43 @@ impl DirectRequester {
             self.retry_timeout.as_millis() as u64,
         )
         .await
+    }
+}
+
+pub struct DirectRequesterBuilder {
+    net_cmds: Option<mpsc::Sender<NetCommand>>,
+    net_events: Option<Arc<broadcast::Receiver<NetEvent>>>,
+    request_timeout: Option<Duration>,
+    max_retries: Option<u32>,
+    retry_timeout: Option<Duration>,
+}
+
+impl DirectRequesterBuilder {
+    pub fn request_timeout(mut self, request_timeout: Duration) -> Self {
+        self.request_timeout = Some(request_timeout);
+        self
+    }
+
+    pub fn max_retries(mut self, max_retries: u32) -> Self {
+        self.max_retries = Some(max_retries);
+        self
+    }
+
+    pub fn retry_timeout(mut self, retry_timeout: Duration) -> Self {
+        self.retry_timeout = Some(retry_timeout);
+        self
+    }
+
+    pub fn build(self) -> DirectRequester<WithoutPeer> {
+        DirectRequester {
+            net_cmds: self.net_cmds.expect("net_cmds is required"),
+            net_events: self.net_events.expect("net_events is required"),
+            request_timeout: self.request_timeout.unwrap_or(Duration::from_secs(30)),
+            max_retries: self.max_retries.unwrap_or(4),
+            retry_timeout: self.retry_timeout.unwrap_or(Duration::from_millis(5000)),
+            peer: PeerTarget::Random,
+            _state: PhantomData,
+        }
     }
 }
 
@@ -167,72 +191,273 @@ async fn do_request(
     Ok(response)
 }
 
+struct Expectation {
+    expected_request: Vec<u8>,
+    response: Result<Vec<u8>, String>,
+}
+
+pub(crate) struct DirectRequesterTester {
+    net_cmds_rx: mpsc::Receiver<NetCommand>,
+    net_events_tx: broadcast::Sender<NetEvent>,
+    respond_with: Option<Vec<u8>>,
+    responses: Vec<Vec<u8>>,
+    expectations: Vec<Expectation>,
+    error_on: Option<String>,
+    num_requests: Option<usize>,
+}
+
+pub(crate) struct ExpectationBuilder {
+    tester: DirectRequesterTester,
+    expected_request: Vec<u8>,
+}
+
+impl ExpectationBuilder {
+    pub fn respond_with<T: TryInto<Vec<u8>>>(mut self, payload: T) -> DirectRequesterTester
+    where
+        <T as TryInto<Vec<u8>>>::Error: std::fmt::Debug,
+    {
+        self.tester.expectations.push(Expectation {
+            expected_request: self.expected_request,
+            response: Ok(payload.try_into().unwrap()),
+        });
+        self.tester
+    }
+
+    pub fn error_with(mut self, error: impl Into<String>) -> DirectRequesterTester {
+        self.tester.expectations.push(Expectation {
+            expected_request: self.expected_request,
+            response: Err(error.into()),
+        });
+        self.tester
+    }
+}
+
+impl DirectRequesterTester {
+    pub fn new(
+        net_cmds_rx: mpsc::Receiver<NetCommand>,
+        net_events_tx: broadcast::Sender<NetEvent>,
+    ) -> Self {
+        Self {
+            net_cmds_rx,
+            net_events_tx,
+            respond_with: None,
+            responses: Vec::new(),
+            expectations: Vec::new(),
+            error_on: None,
+            num_requests: None,
+        }
+    }
+
+    pub fn expect_request<T: TryInto<Vec<u8>>>(self, payload: T) -> ExpectationBuilder
+    where
+        <T as TryInto<Vec<u8>>>::Error: std::fmt::Debug,
+    {
+        ExpectationBuilder {
+            tester: self,
+            expected_request: payload.try_into().unwrap(),
+        }
+    }
+
+    pub fn respond_with<T: TryInto<Vec<u8>>>(mut self, payload: T) -> Self
+    where
+        <T as TryInto<Vec<u8>>>::Error: std::fmt::Debug,
+    {
+        self.respond_with = Some(payload.try_into().unwrap());
+        self
+    }
+
+    pub fn respond_with_each<T: TryInto<Vec<u8>>>(
+        mut self,
+        payloads: impl IntoIterator<Item = T>,
+    ) -> Self
+    where
+        <T as TryInto<Vec<u8>>>::Error: std::fmt::Debug,
+    {
+        self.responses = payloads
+            .into_iter()
+            .map(|p| p.try_into().unwrap())
+            .collect();
+        self
+    }
+
+    pub fn error_with(mut self, error: impl Into<String>) -> Self {
+        self.error_on = Some(error.into());
+        self
+    }
+
+    pub fn num_requests(mut self, n: usize) -> Self {
+        self.num_requests = Some(n);
+        self
+    }
+
+    pub fn spawn(mut self) -> tokio::task::JoinHandle<()> {
+        let num_requests = self.num_requests.unwrap_or_else(|| {
+            if !self.expectations.is_empty() {
+                self.expectations.len()
+            } else {
+                usize::MAX
+            }
+        });
+        // Reverse expectations so we can pop from the back in order.
+        self.expectations.reverse();
+
+        tokio::spawn(async move {
+            let mut remaining = num_requests;
+            while remaining > 0 {
+                if let Some(cmd) = self.net_cmds_rx.recv().await {
+                    if let NetCommand::OutgoingRequest(req) = cmd {
+                        let response = if let Some(expectation) = self.expectations.pop() {
+                            assert_eq!(
+                                req.payload, expectation.expected_request,
+                                "DirectRequesterTester: expected request {:?} but got {:?}",
+                                expectation.expected_request, req.payload,
+                            );
+                            match expectation.response {
+                                Ok(payload) => {
+                                    NetEvent::OutgoingRequestSucceeded(OutgoingRequestSucceeded {
+                                        payload,
+                                        correlation_id: req.correlation_id,
+                                    })
+                                }
+                                Err(error) => {
+                                    NetEvent::OutgoingRequestFailed(OutgoingRequestFailed {
+                                        error,
+                                        correlation_id: req.correlation_id,
+                                    })
+                                }
+                            }
+                        } else if let Some(payload) = self.respond_with.clone() {
+                            NetEvent::OutgoingRequestSucceeded(OutgoingRequestSucceeded {
+                                payload,
+                                correlation_id: req.correlation_id,
+                            })
+                        } else if let Some(payload) = self.responses.pop() {
+                            NetEvent::OutgoingRequestSucceeded(OutgoingRequestSucceeded {
+                                payload,
+                                correlation_id: req.correlation_id,
+                            })
+                        } else if let Some(error) = self.error_on.clone() {
+                            NetEvent::OutgoingRequestFailed(OutgoingRequestFailed {
+                                error,
+                                correlation_id: req.correlation_id,
+                            })
+                        } else {
+                            panic!("DirectRequesterTester: no response configured");
+                        };
+                        let _ = self.net_events_tx.send(response);
+                    }
+                    remaining -= 1;
+                } else {
+                    break;
+                }
+            }
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::events::{OutgoingRequestSucceeded, PeerTarget};
+    use crate::events::PeerTarget;
     use tokio::sync::broadcast;
 
     #[tokio::test]
     async fn test_successful_request() {
-        let (net_cmds_tx, mut net_cmds_rx) = mpsc::channel::<NetCommand>(16);
+        let (net_cmds_tx, net_cmds_rx) = mpsc::channel::<NetCommand>(16);
         let (net_events_tx, net_events_rx) = broadcast::channel::<NetEvent>(16);
         let net_events = Arc::new(net_events_rx);
 
-        let requester = DirectRequester::with_defaults(net_cmds_tx.clone(), net_events.clone());
+        let requester = DirectRequester::builder(net_cmds_tx, net_events).build();
 
-        let net_events_tx_clone = net_events_tx.clone();
-        let handle = tokio::spawn(async move {
-            let cmd = net_cmds_rx.recv().await.unwrap();
-            if let NetCommand::OutgoingRequest(req) = cmd {
-                let response = OutgoingRequestSucceeded {
-                    payload: vec![2, 2, 2],
-                    correlation_id: req.correlation_id,
-                };
-                net_events_tx_clone
-                    .send(NetEvent::OutgoingRequestSucceeded(response))
-                    .unwrap();
-            }
-        });
+        let handle = DirectRequesterTester::new(net_cmds_rx, net_events_tx)
+            .respond_with(b"world".to_vec())
+            .num_requests(1)
+            .spawn();
 
         let response: Vec<u8> = requester
-            .request(vec![1, 1, 1], PeerTarget::Random)
+            .to(PeerTarget::Random)
+            .request(b"hello".to_vec())
             .await
             .unwrap();
 
         handle.await.unwrap();
 
-        assert_eq!(response, vec![2, 2, 2]);
+        assert_eq!(response, b"world");
     }
 
     #[tokio::test]
     async fn test_request_with_peer_target() {
-        let (net_cmds_tx, mut net_cmds_rx) = mpsc::channel::<NetCommand>(16);
+        let (net_cmds_tx, net_cmds_rx) = mpsc::channel::<NetCommand>(16);
         let (net_events_tx, net_events_rx) = broadcast::channel::<NetEvent>(16);
         let net_events = Arc::new(net_events_rx);
 
-        let requester = DirectRequester::with_defaults(net_cmds_tx, net_events);
+        let requester = DirectRequester::builder(net_cmds_tx, net_events).build();
 
-        let net_events_tx_clone = net_events_tx.clone();
-        let handle = tokio::spawn(async move {
-            let cmd = net_cmds_rx.recv().await.unwrap();
-            if let NetCommand::OutgoingRequest(req) = cmd {
-                assert!(matches!(req.target, PeerTarget::Random));
-                let response = OutgoingRequestSucceeded {
-                    payload: vec![],
-                    correlation_id: req.correlation_id,
-                };
-                net_events_tx_clone
-                    .send(NetEvent::OutgoingRequestSucceeded(response))
-                    .unwrap();
-            }
-        });
+        let handle = DirectRequesterTester::new(net_cmds_rx, net_events_tx)
+            .respond_with(b"pong".to_vec())
+            .num_requests(1)
+            .spawn();
 
         let _: Vec<u8> = requester
-            .request(vec![1], PeerTarget::Random)
+            .to(PeerTarget::Random)
+            .request(b"ping".to_vec())
             .await
             .unwrap();
 
         handle.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_peer_requester_reuse_across_requests() {
+        let (net_cmds_tx, net_cmds_rx) = mpsc::channel::<NetCommand>(16);
+        let (net_events_tx, net_events_rx) = broadcast::channel::<NetEvent>(16);
+        let net_events = Arc::new(net_events_rx);
+
+        let requester = DirectRequester::builder(net_cmds_tx, net_events)
+            .request_timeout(Duration::from_secs(10))
+            .max_retries(3)
+            .retry_timeout(Duration::from_secs(5))
+            .build();
+
+        let peer_requester = requester.to(PeerTarget::Random);
+
+        let handle = DirectRequesterTester::new(net_cmds_rx, net_events_tx)
+            .respond_with(b"ok".to_vec())
+            .num_requests(2)
+            .spawn();
+
+        let response1: Vec<u8> = peer_requester.request(b"first".to_vec()).await.unwrap();
+        let response2: Vec<u8> = peer_requester.request(b"second".to_vec()).await.unwrap();
+
+        handle.await.unwrap();
+
+        assert_eq!(response1, b"ok");
+        assert_eq!(response2, b"ok");
+    }
+
+    #[tokio::test]
+    async fn test_expect_request() {
+        let (net_cmds_tx, net_cmds_rx) = mpsc::channel::<NetCommand>(16);
+        let (net_events_tx, net_events_rx) = broadcast::channel::<NetEvent>(16);
+        let net_events = Arc::new(net_events_rx);
+
+        let requester = DirectRequester::builder(net_cmds_tx, net_events).build();
+
+        let handle = DirectRequesterTester::new(net_cmds_rx, net_events_tx)
+            .expect_request(b"hello".to_vec())
+            .respond_with(b"world".to_vec())
+            .expect_request(b"ping".to_vec())
+            .respond_with(b"pong".to_vec())
+            .spawn();
+
+        let peer = requester.to(PeerTarget::Random);
+
+        let r1: Vec<u8> = peer.request(b"hello".to_vec()).await.unwrap();
+        let r2: Vec<u8> = peer.request(b"ping".to_vec()).await.unwrap();
+
+        handle.await.unwrap();
+
+        assert_eq!(r1, b"world");
+        assert_eq!(r2, b"pong");
     }
 }
