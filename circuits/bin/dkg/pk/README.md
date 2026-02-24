@@ -13,8 +13,8 @@ flowchart TD
     %% Input from Phase 0
     Input0["P0<br>Configs Verification"] -.->|"verified configs"| C0
 
-    subgraph Focus["Circuit C0"]
-        C0["C0: pk<br/><i>Commit to BFV public key</i>"]
+    subgraph Focus["C0"]
+        C0["<i>Commit to BFV public key</i>"]
     end
 
     %% Output to C3a and C3b
@@ -39,6 +39,3 @@ flowchart TD
 - **Data Flow**: `P0 (configs) → C0 → commit(pk_bfv) → C3a, C3b`
 - **Commitment Function**: [`math/commitments.nr`](../../../lib/src/math/commitments.nr) -
   `compute_dkg_pk_commitment()`
-- **Related Circuits**:
-  - C3a, C3b [`dkg/share_encryption`](../share_encryption),
-  - C4a, C4b [`dkg/share_decryption`](../share_decryption)
