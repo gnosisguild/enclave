@@ -34,7 +34,7 @@ flowchart TD
 ### Metadata
 
 - **Phase**: P1 (DKG).
-- **Runs**: N_PARTIES × Ciphernode (after threshold key generation in C1).
+- **Runs**: (N_PARTIES -1) × Ciphernode (after threshold key generation in C1).
 - **Requires**: `commit(e_sm)` from C1 ([`threshold/pk_generation`](../../threshold/pk_generation))
 - **Output(s)**:
   - `commit(e_sm_share[party_idx][mod_idx])` for each party and modulus → C3b
