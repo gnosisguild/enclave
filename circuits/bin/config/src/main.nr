@@ -4,8 +4,19 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-// This circuit verifies all the configuration parameters used in the secure configs
-// Only re-run if parameters change (new deployment)
+/// Configuration Verification Circuit (Phase 0).
+///
+/// This circuit verifies all cryptographic parameters used across both BFV (for DKG share encryption)
+/// and Threshold BFV (for user data encryption) schemes. It runs once per deployment to establish
+/// the mathematical foundation that all subsequent circuits depend on.
+///
+/// Rather than trusting parameter configuration, this circuit provides public proof that:
+///
+/// - CRT moduli products are correctly computed
+/// - Error bounds satisfy security requirements
+/// - Scaling factors have correct multiplicative inverses
+/// - Reed-Solomon parity matrices for Shamir sharing are properly constructed
+/// - BFV and Threshold BFV parameter sets are mutually consistent
 
 use lib::configs::default::{N_PARTIES, T};
 use lib::configs::secure::dkg::{
@@ -30,7 +41,7 @@ use lib::configs::secure::threshold::{
     PK_GENERATION_R1_BOUNDS, PK_GENERATION_R2_BOUNDS, PK_GENERATION_B_ENC,
     // share_decryption bounds
     THRESHOLD_SHARE_DECRYPTION_R1_BOUNDS, THRESHOLD_SHARE_DECRYPTION_R2_BOUNDS,
-    // user_data_encryption (Greco) bounds
+    // user_data_encryption bounds
     USER_DATA_ENCRYPTION_K0IS, USER_DATA_ENCRYPTION_PK_BOUNDS, USER_DATA_ENCRYPTION_E0_BOUND,
     USER_DATA_ENCRYPTION_E1_BOUND, USER_DATA_ENCRYPTION_U_BOUND, USER_DATA_ENCRYPTION_K1_LOW_BOUND,
     USER_DATA_ENCRYPTION_K1_UP_BOUND, USER_DATA_ENCRYPTION_R1_LOW_BOUNDS,
@@ -40,10 +51,14 @@ use lib::configs::secure::threshold::{
 
 use lib::math::modulo::U128::ModU128;
 
-/// Center a value from [0, modulus) to [-modulus/2, modulus/2).
-/// For odd modulus use (raw > t/2).
-/// For even use (raw >= t/2).
-/// Precondition: raw is in [0, modulus).
+/// Centers a value from [0, modulus) to [-modulus/2, modulus/2).
+///
+/// This function converts values from standard representation [0, modulus) to
+/// centered representation [-modulus/2, modulus/2), which is used in BFV for
+/// efficient arithmetic and correct decoding.
+///
+/// - For odd modulus: center if raw > modulus/2
+/// - For even modulus: center if raw >= modulus/2
 pub fn center(raw: Field, modulus: Field) -> Field {
     let needs_centering = if (modulus as u128 % 2) == 1 {
         raw as u128 > modulus as u128 / 2
@@ -58,6 +73,16 @@ pub fn center(raw: Field, modulus: Field) -> Field {
     }
 }
 
+/// Main entry point for configuration verification circuit.
+///
+/// Verifies all cryptographic parameters across four categories:
+/// 1. DKG (BFV) derived values and bounds
+/// 2. Threshold BFV derived values and bounds
+/// 3. User data encryption bounds
+/// 4. Cross-configuration consistency
+///
+/// This function will panic if any verification fails, preventing deployment
+/// with incorrect parameters.
 fn main() {
     // DKG (BFV) Verification
     verify_dkg_derived_values();
@@ -68,21 +93,27 @@ fn main() {
     verify_threshold_bounds();
 
     // user_data_encryption Verification
-    verify_greco_bounds();
+    verify_user_data_encryption_bounds();
 
     // Cross-Config Consistency
     verify_cross_config_consistency();
 }
 
-//DKG Derived Values
+// === DKG Derived Values ===
 
+/// Verifies DKG-specific derived values.
+///
+/// Checks:
+/// - Q_MOD_T computation (product of CRT moduli mod t)
+/// - Q_MOD_T_CENTERED (centered representation)
+/// - Reed-Solomon parity matrices for Shamir sharing
 fn verify_dkg_derived_values() {
     verify_dkg_q_mod_t();
     verify_dkg_q_mod_t_centered();
     verify_dkg_parity_matrix();
 }
 
-// Verifies DKG: Q_MOD_T = (product of QIS) mod t
+/// Verifies DKG: Q_MOD_T = (product of QIS) mod t.
 fn verify_dkg_q_mod_t() {
     let t = DKG_PLAINTEXT_MODULUS;
     let m = ModU128::new(t);
@@ -95,14 +126,23 @@ fn verify_dkg_q_mod_t() {
     assert(product == DKG_Q_MOD_T, "DKG Q_MOD_T verification failed");
 }
 
-// Verifies DKG: Q_MOD_T_CENTERED = center(Q_MOD_T)
+/// Verifies DKG: Q_MOD_T_CENTERED = center(Q_MOD_T).
 fn verify_dkg_q_mod_t_centered() {
     assert(
         center(DKG_Q_MOD_T, DKG_PLAINTEXT_MODULUS) == DKG_Q_MOD_T_CENTERED,
         "DKG Q_MOD_T_CENTERED verification failed",
     );
 }
-// Verify parity matrix : H * G^T = 0 (mod q_l) for each modulus
+
+/// Verifies Reed-Solomon parity matrix: H * G^T = 0 (mod q_l) for each modulus.
+///
+/// For Shamir Secret Sharing with threshold T, shares must satisfy the parity check
+/// equation H * shares^T = 0, where H is the parity check matrix. This function
+/// verifies that the precomputed PARITY_MATRIX is correct by checking it against
+/// the Vandermonde generator matrix G.
+///
+/// The generator matrix G is constructed as G[i][j] = j^i mod q_l (Vandermonde structure).
+/// For valid Shamir shares, H * G^T must equal zero for all entries.
 fn verify_dkg_parity_matrix() {
     // For each CRT modulus
     for l in 0..L_THRESHOLD {
@@ -139,9 +179,18 @@ fn verify_dkg_parity_matrix() {
         }
     }
 }
-//DKG Bounds
 
-// Verifies share_encryption bounds (Circuit 3)
+// === DKG Bounds ===
+
+/// Verifies all DKG share encryption bounds (used in circuits C3a/C3b).
+///
+/// Checks bounds for:
+/// - Encryption randomness u (ternary, bound = 1)
+/// - Error terms e0, e1 (bound = 20)
+/// - Message bound (t - 1)
+/// - Public key bounds per CRT modulus
+/// - Quotient bounds r1, r2, p1, p2
+/// - Scaling factors k0[i] satisfy k0[i] * t == -1 (mod q_i)
 fn verify_dkg_bounds() {
     let n: u128 = DKG_N as u128;
     let t: u128 = DKG_PLAINTEXT_MODULUS as u128;
@@ -227,15 +276,21 @@ fn verify_dkg_bounds() {
     }
 }
 
-//Threshold Derived Values
+// === Threshold Derived Values ===
 
+/// Verifies Threshold BFV-specific derived values.
+///
+/// Checks:
+/// - Q_MOD_T computation
+/// - Q_MOD_T_CENTERED (centered representation)
+/// - Q_INVERSE_MOD_T (multiplicative inverse for decoding)
 fn verify_threshold_derived_values() {
     verify_threshold_q_mod_t();
     verify_threshold_q_mod_t_centered();
     verify_threshold_q_inverse_mod_t();
 }
 
-// Verifies Threshold: Q_MOD_T = (product of QIS) mod t
+/// Verifies Threshold: Q_MOD_T = (product of QIS) mod t.
 fn verify_threshold_q_mod_t() {
     let t = THRESHOLD_PLAINTEXT_MODULUS;
     let m = ModU128::new(t);
@@ -248,7 +303,7 @@ fn verify_threshold_q_mod_t() {
     assert(product == THRESHOLD_Q_MOD_T, "Threshold Q_MOD_T verification failed");
 }
 
-// Verifies Threshold: Q_MOD_T_CENTERED = center(Q_MOD_T)
+/// Verifies Threshold: Q_MOD_T_CENTERED = center(Q_MOD_T).
 fn verify_threshold_q_mod_t_centered() {
     assert(
         center(THRESHOLD_Q_MOD_T, THRESHOLD_PLAINTEXT_MODULUS) == THRESHOLD_Q_MOD_T_CENTERED,
@@ -256,7 +311,10 @@ fn verify_threshold_q_mod_t_centered() {
     );
 }
 
-// Verifies Threshold: Q * Q_INVERSE_MOD_T = 1 mod t
+/// Verifies Threshold: Q * Q_INVERSE_MOD_T == 1 (mod t).
+///
+/// This inverse is used in circuit C7 for final decoding:
+/// message = -Q^{-1} * (t * u_global)_Q mod t
 fn verify_threshold_q_inverse_mod_t() {
     let t = THRESHOLD_PLAINTEXT_MODULUS;
     let m = ModU128::new(t);
@@ -266,14 +324,25 @@ fn verify_threshold_q_inverse_mod_t() {
     assert(product == 1, "Threshold Q_INVERSE_MOD_T verification failed");
 }
 
-//Threshold Bounds
+// === Threshold Bounds ===
 
+/// Verifies Threshold BFV bounds for key generation and decryption.
+///
+/// Checks:
+/// - Public key generation bounds
+/// - Share decryption bounds
 fn verify_threshold_bounds() {
     verify_pk_generation_bounds();
     verify_share_decryption_bounds();
 }
 
-// Verifies pk_generation bounds (Circuit 1)
+/// Verifies pk_generation bounds (Circuit C1).
+///
+/// Checks bounds for:
+/// - Secret key sk (ternary, bound = 1)
+/// - Error eek (bound = 20)
+/// - Smudging noise e_sm (large bound for 80-bit statistical security)
+/// - Quotients r1, r2 for each CRT modulus
 fn verify_pk_generation_bounds() {
     let n: u128 = THRESHOLD_N as u128;
     let eek: u128 = PK_GENERATION_EEK_BOUND as u128;
@@ -303,7 +372,14 @@ fn verify_pk_generation_bounds() {
     verify_e_sm_bound();
 }
 
-// Verifies e_sm_bound (smudging noise bound)
+/// Verifies e_sm_bound (smudging noise bound).
+///
+/// The smudging noise bound is critical for threshold decryption security.
+/// It's computed as: e_sm_bound = 2^lambda * N_CIPHERTEXTS * (b_fresh + Q_MOD_T)
+/// where b_fresh = N * e_norm + b_enc + N * b_e * sk_norm and lambda = 80.
+///
+/// The 2^80 factor provides 80 bits of statistical security, ensuring that
+/// decryption shares don't leak secret key information.
 fn verify_e_sm_bound() {
     let n: Field = THRESHOLD_N as Field;
     let e_norm: Field = 20;
@@ -326,7 +402,9 @@ fn verify_e_sm_bound() {
     assert(expected_e_sm_bound == PK_GENERATION_E_SM_BOUND, "PK_GENERATION_E_SM_BOUND mismatch");
 }
 
-// Verifies share_decryption bounds (Circuit 6)
+/// Verifies share_decryption bounds (Circuit C6).
+///
+/// Checks quotient bounds r1, r2 used in the threshold decryption share equation.
 fn verify_share_decryption_bounds() {
     let n: u128 = THRESHOLD_N as u128;
 
@@ -349,11 +427,14 @@ fn verify_share_decryption_bounds() {
     }
 }
 
-//user_data_encryption Bounds
+// === User Data Encryption Bounds ===
 
-// Verifies user_data_encryption (Greco) bounds
-// Uses THRESHOLD parameters
-fn verify_greco_bounds() {
+/// Verifies user_data_encryption bounds.
+///
+/// These bounds are used in Phase 3 when users encrypt data to the aggregated
+/// threshold public key. Uses Threshold BFV parameters with specific constraints
+/// for the user data encryption zero-knowledge proof.
+fn verify_user_data_encryption_bounds() {
     let n: u128 = THRESHOLD_N as u128;
     let t: u128 = THRESHOLD_PLAINTEXT_MODULUS as u128;
     let u_bound: u128 = USER_DATA_ENCRYPTION_U_BOUND as u128;
@@ -454,8 +535,9 @@ fn verify_greco_bounds() {
     }
 }
 
-//Cross-Config Consistency
+// === Cross-Config Consistency ===
 
+/// Verifies consistency between BFV and Threshold BFV parameter sets.
 fn verify_cross_config_consistency() {
     // N is consistent
     assert(DKG_N == THRESHOLD_N, "N mismatch between DKG and Threshold configs");
