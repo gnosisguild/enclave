@@ -10,7 +10,7 @@ use crate::{
     TrBFVConfig,
 };
 use anyhow::{Context, Result};
-use e3_crypto::Cipher;
+use e3_crypto::{Cipher, SensitiveBytes};
 use e3_utils::{utility_types::ArcBytes, SharedRng};
 use fhe::trbfv::ShareManager;
 use serde::{Deserialize, Serialize};
@@ -20,8 +20,8 @@ use tracing::info;
 pub struct GenEsiSssRequest {
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
-    /// This is pre-generated smudging noise.
-    pub e_sm_raw: ArcBytes,
+    /// Pre-generated smudging noise polynomial (private witness, encrypted at rest).
+    pub e_sm_raw: SensitiveBytes,
 }
 
 struct InnerRequest {
@@ -29,12 +29,12 @@ struct InnerRequest {
     pub e_sm_raw: ArcBytes,
 }
 
-impl TryFrom<GenEsiSssRequest> for InnerRequest {
-    type Error = anyhow::Error;
-    fn try_from(value: GenEsiSssRequest) -> std::result::Result<Self, Self::Error> {
+impl GenEsiSssRequest {
+    fn into_inner(self, cipher: &Cipher) -> Result<InnerRequest> {
+        let e_sm_decrypted = self.e_sm_raw.access(cipher)?;
         Ok(InnerRequest {
-            trbfv_config: value.trbfv_config,
-            e_sm_raw: value.e_sm_raw,
+            trbfv_config: self.trbfv_config,
+            e_sm_raw: ArcBytes::from_bytes(&e_sm_decrypted),
         })
     }
 }
@@ -74,7 +74,7 @@ pub fn gen_esi_sss(
     req: GenEsiSssRequest,
 ) -> Result<GenEsiSssResponse> {
     info!("gen_esi_sss");
-    let req: InnerRequest = req.try_into()?;
+    let req: InnerRequest = req.into_inner(cipher)?;
 
     let params = req.trbfv_config.params();
     let threshold = req.trbfv_config.threshold() as usize;
@@ -85,7 +85,7 @@ pub fn gen_esi_sss(
     let e_sm_poly = try_poly_from_bytes(&e_sm_raw, &params)?;
     let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
 
-    info!("gen_esi_sss:generate_smudging_error...");
+    info!("gen_esi_sss:generate_secret_shares_from_poly...");
 
     let esi_sss = vec![SharedSecret::from(
         share_manager

@@ -74,7 +74,7 @@ export const generateMerkleProof = (balance: bigint, address: string, leaves: bi
  * @param number The number to convert to binary
  * @returns The binary representation of the number as a string
  */
-export const toBinary = (number: bigint): string => {
+export const toBinary = (number: number): string => {
   if (number < 0) {
     throw new Error('Value cannot be negative')
   }
@@ -125,44 +125,15 @@ export const getAddressFromSignature = async (signature: `0x${string}`, messageH
 }
 
 /**
- * Get optimal number of threads for proof generation.
- * Leaves at least 1 core free for other operations.
- * Works in both Node.js and browser environments.
- */
-export async function getOptimalThreadCount(): Promise<number> {
-  // Browser environment - check first to avoid Node.js imports in browser builds
-  if (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) {
-    return Math.max(1, navigator.hardwareConcurrency - 1)
-  }
-
-  // Node.js environment - use os module if available
-  // Check for Node.js without directly accessing process to avoid polyfill detection
-  if (typeof window === 'undefined' && typeof globalThis !== 'undefined' && typeof globalThis.process !== 'undefined') {
-    try {
-      const os = await import('os')
-
-      const cpuCount = typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length
-
-      return Math.max(1, cpuCount - 1)
-    } catch {
-      // Fall through to fallback
-    }
-  }
-
-  // Fallback
-  return 5
-}
-
-/**
  * Get the maximum vote value for a given number of choices.
  * @param numChoices Number of choices.
  * @returns Maximum value per choice.
  */
-export const getMaxVoteValue = (numChoices: number): bigint => {
+export const getMaxVoteValue = (numChoices: number): number => {
   const bfvParams = ZKInputsGenerator.withDefaults().getBFVParams()
   const segmentSize = Math.floor(bfvParams.degree / numChoices)
   const effectiveBits = Math.min(segmentSize, MAX_VOTE_BITS)
-  return (1n << BigInt(effectiveBits)) - 1n
+  return 2 ** effectiveBits - 1
 }
 
 /**
@@ -170,6 +141,45 @@ export const getMaxVoteValue = (numChoices: number): bigint => {
  * @param numChoices Number of choices.
  * @returns A zero vote with the given number of choices.
  */
-export const getZeroVote = (numChoices: number): bigint[] => {
-  return Array(numChoices).fill(0n)
+export const getZeroVote = (numChoices: number): number[] => {
+  return Array(numChoices).fill(0)
+}
+
+/**
+ * Decode bytes to bigint array (little-endian, 8 bytes per value).
+ * @param data The bytes to decode (must be multiple of 8).
+ * @returns Array of numbers.
+ */
+export const decodeBytesToNumbers = (data: Uint8Array): number[] => {
+  if (data.length % 8 !== 0) {
+    throw new Error('Data length must be multiple of 8')
+  }
+
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
+  const arrayLength = data.length / 8
+  const result: bigint[] = []
+
+  for (let i = 0; i < arrayLength; i++) {
+    result.push(view.getBigUint64(i * 8, true)) // true = little-endian
+  }
+
+  return result.map(Number)
+}
+
+export const bigInt64ArrayToNumberArray = (bigInt64Array: BigInt64Array): number[] => {
+  return Array.from(bigInt64Array).map(Number)
+}
+
+export const numberArrayToBigInt64Array = (numberArray: number[]): BigInt64Array => {
+  return BigInt64Array.from(numberArray.map(BigInt))
+}
+
+// Helper function to convert proof bytes to field elements
+export const proofToFields = (proof: Uint8Array): string[] => {
+  const fields: string[] = []
+  for (let i = 0; i < proof.length; i += 32) {
+    const chunk = proof.slice(i, i + 32)
+    fields.push('0x' + Buffer.from(chunk).toString('hex'))
+  }
+  return fields
 }

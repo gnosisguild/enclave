@@ -7,7 +7,7 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: ['src/index.ts', 'src/workers/generateCircuitInputs.worker.ts'],
   include: ['src/**/*.ts'],
   splitting: false,
   sourcemap: true,

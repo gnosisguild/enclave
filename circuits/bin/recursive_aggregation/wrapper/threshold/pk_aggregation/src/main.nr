@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_ultrahonk_proof};
+use bb_proof_verification::{UltraHonkVerificationKey, UltraHonkZKProof, verify_honk_proof};
 use lib::{configs::default::H, math::commitments::compute_recursive_aggregation_commitment};
 
 // Number of proofs.
@@ -14,12 +14,12 @@ pub global N_PUBLIC_INPUTS: u32 = H + 1;
 
 fn main(
     verification_key: UltraHonkVerificationKey,
-    proofs: [UltraHonkProof; N_PROOFS],
+    proofs: [UltraHonkZKProof; N_PROOFS],
     public_inputs: pub [[Field; N_PUBLIC_INPUTS]; N_PROOFS],
-    key_hash: Field,
+    key_hash: pub Field,
 ) -> pub Field {
     for i in 0..N_PROOFS {
-        verify_ultrahonk_proof(verification_key, proofs[i], public_inputs[i], key_hash);
+        verify_honk_proof(verification_key, proofs[i], public_inputs[i], key_hash);
     }
 
     let mut aggregated_public_inputs = Vec::new();

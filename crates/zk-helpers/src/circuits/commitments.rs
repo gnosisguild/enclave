@@ -325,15 +325,20 @@ pub fn compute_pk_aggregation_commitment(
     pk1: &CrtPolynomial,
     bit_pk: u32,
 ) -> BigInt {
-    let mut payload = Vec::new();
-    payload = flatten(payload, &pk0.limbs, bit_pk);
-    payload = flatten(payload, &pk1.limbs, bit_pk);
+    let mut payload0 = Vec::new();
+    payload0 = flatten(payload0, &pk0.limbs, bit_pk);
+    let io = [0x80000000 | payload0.len() as u32, 1];
+    let commit_pk0 = compute_commitments(payload0, DS_PK_AGGREGATION, io)[0];
 
-    let input_size = payload.len() as u32;
-    let io_pattern = [0x80000000 | input_size, 1];
+    let mut payload1 = Vec::new();
+    payload1 = flatten(payload1, &pk1.limbs, bit_pk);
+    let commit_pk1 = compute_commitments(payload1, DS_PK_AGGREGATION, io)[0];
 
-    let commitment_field = compute_commitments(payload, DS_PK_AGGREGATION, io_pattern)[0];
+    let inputs = vec![commit_pk0, commit_pk1];
+    let io = [0x80000000 | inputs.len() as u32, 1];
+    let commitment_field = compute_commitments(inputs, DS_PK_AGGREGATION, io)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
+
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
@@ -357,6 +362,9 @@ pub fn compute_recursive_aggregation_commitment(payload: Vec<Field>) -> BigInt {
 
 /// Compute CRISP ciphertext commitment.
 ///
+/// Matches the Noir `compute_ciphertext_commitment` exactly: commits ct0 and ct1
+/// separately, then hashes the two commitments together.
+///
 /// # Arguments
 /// * `ct0` - First component of the ciphertext (CRT limbs)
 /// * `ct1` - Second component of the ciphertext (CRT limbs)
@@ -369,15 +377,18 @@ pub fn compute_ciphertext_commitment(
     ct1: &CrtPolynomial,
     bit_ct: u32,
 ) -> BigInt {
-    let mut payload = Vec::new();
-    payload = flatten(payload, &ct0.limbs, bit_ct);
-    payload = flatten(payload, &ct1.limbs, bit_ct);
+    let payload0 = flatten(Vec::new(), &ct0.limbs, bit_ct);
+    let io = [0x80000000 | payload0.len() as u32, 1];
+    let commit_ct0 = compute_commitments(payload0, DS_CIPHERTEXT, io)[0];
 
-    let input_size = payload.len() as u32;
-    let io_pattern = [0x80000000 | input_size, 1];
+    let payload1 = flatten(Vec::new(), &ct1.limbs, bit_ct);
+    let commit_ct1 = compute_commitments(payload1, DS_CIPHERTEXT, io)[0];
 
-    let commitment_field = compute_commitments(payload, DS_CIPHERTEXT, io_pattern)[0];
+    let inputs = vec![commit_ct0, commit_ct1];
+    let io = [0x80000000 | inputs.len() as u32, 1];
+    let commitment_field = compute_commitments(inputs, DS_CIPHERTEXT, io)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
+
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
@@ -534,13 +545,19 @@ mod tests {
         let ct0 = CrtPolynomial::from_bigint_vectors(vec![vec![BigInt::from(1), BigInt::from(2)]]);
         let ct1 = CrtPolynomial::from_bigint_vectors(vec![vec![BigInt::from(3), BigInt::from(4)]]);
 
-        let mut payload = Vec::new();
-        payload = flatten(payload, &ct0.limbs, bit_ct);
-        payload = flatten(payload, &ct1.limbs, bit_ct);
+        let mut payload0 = Vec::new();
+        payload0 = flatten(payload0, &ct0.limbs, bit_ct);
+        let io = [0x80000000 | payload0.len() as u32, 1];
+        let commit_ct0 = compute_commitments(payload0, DS_CIPHERTEXT, io)[0];
 
-        let input_size = payload.len() as u32;
-        let io_pattern = [0x80000000 | input_size, 1];
-        let expected = field_to_bigint(compute_commitments(payload, DS_CIPHERTEXT, io_pattern)[0]);
+        let mut payload1 = Vec::new();
+        payload1 = flatten(payload1, &ct1.limbs, bit_ct);
+        let io = [0x80000000 | payload1.len() as u32, 1];
+        let commit_ct1 = compute_commitments(payload1, DS_CIPHERTEXT, io)[0];
+
+        let inputs = vec![commit_ct0, commit_ct1];
+        let io = [0x80000000 | inputs.len() as u32, 1];
+        let expected = field_to_bigint(compute_commitments(inputs, DS_CIPHERTEXT, io)[0]);
 
         let actual = compute_ciphertext_commitment(&ct0, &ct1, bit_ct);
         assert_eq!(actual, expected);

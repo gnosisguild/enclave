@@ -21,8 +21,8 @@ env:
   CIPHERNODE_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ciphernode
   NODE_VERSION: 22
   RUST_TOOLCHAIN: 1.86.0
-  NOIR_TOOLCHAIN: v1.0.0-beta.15
-  BB_VERSION: 3.0.0-nightly.20251104
+  NOIR_TOOLCHAIN: v1.0.0-beta.16
+  BB_VERSION: 3.0.0-nightly.20260102
   HARDHAT_VAR_MNEMONIC: 'test test test test test test test test test test test junk'
   HARDHAT_VAR_INFURA_API_KEY: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
   PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -34,7 +34,9 @@ permissions:
 
 jobs:
   rust_tests:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
 
@@ -80,7 +82,9 @@ jobs:
         run: 'cargo test --test integration -- --nocapture'
 
   zk_prover_integration:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
 
@@ -109,7 +113,9 @@ jobs:
         run: 'cargo test -p e3-zk-prover --features integration-tests --test integration_tests -- --nocapture'
 
   build_e3_support_risc0:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
       - name: Generate tags
@@ -146,7 +152,9 @@ jobs:
             type=gha,mode=max,scope=e3-support
 
   build_ciphernode_image:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
 
@@ -186,7 +194,9 @@ jobs:
             type=gha,mode=max,scope=ciphernode
 
   test_contracts:
-    runs-on: 'ubuntu-latest'
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -221,7 +231,9 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   test_net:
-    runs-on: 'ubuntu-latest'
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -234,7 +246,9 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   integration_prebuild:
-    runs-on: 'ubuntu-latest'
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -291,7 +305,9 @@ jobs:
 
   ciphernode_integration_test:
     needs: [integration_prebuild, build_enclave_cli, build_sdk]
-    runs-on: 'ubuntu-latest'
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     strategy:
       matrix:
         test-suite: [base, persist]
@@ -353,7 +369,9 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   build_enclave_cli:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -384,7 +402,9 @@ jobs:
           retention-days: 1
 
   crisp_unit:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     needs: [build_crisp_sdk]
     steps:
       - uses: actions/checkout@v6
@@ -442,7 +462,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: crisp-sdk-artifacts
-          path: ./examples/CRISP
+          path: .
 
       - name: Run Noir tests
         working-directory: ./examples/CRISP
@@ -457,7 +477,9 @@ jobs:
         run: 'pnpm test:contracts'
 
   crisp_e2e:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     needs: [build_enclave_cli, build_crisp_sdk]
     steps:
       - uses: actions/checkout@v6
@@ -479,6 +501,9 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
           sudo chown -R $USER_UID:$USER_GID $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
           sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -529,7 +554,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: crisp-sdk-artifacts
-          path: ./examples/CRISP
+          path: .
 
       - name: Install Playwright browsers
         working-directory: ./examples/CRISP
@@ -565,7 +590,9 @@ jobs:
           retention-days: 30
 
   build_circuits:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -618,7 +645,9 @@ jobs:
           if-no-files-found: error
 
   zk_prover_e2e:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     needs: [build_circuits]
     steps:
       - uses: actions/checkout@v6
@@ -657,7 +686,9 @@ jobs:
         run: cargo test -p e3-zk-prover --test local_e2e_tests -- --nocapture
 
   build_e3_support_dev:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -686,7 +717,9 @@ jobs:
           if-no-files-found: error
 
   build_sdk:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -701,6 +734,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
@@ -731,11 +769,15 @@ jobs:
             packages/enclave-contracts/cache
             packages/enclave-contracts/types
             crates/wasm/dist
+            circuits/bin/recursive_aggregation/wrapper/threshold/target
+            circuits/bin/threshold/target
           retention-days: 1
           if-no-files-found: warn
 
   build_crisp_sdk:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
 
@@ -774,12 +816,17 @@ jobs:
           path: |
             examples/CRISP/packages/crisp-sdk/dist
             examples/CRISP/packages/crisp-zk-inputs/dist
-            examples/CRISP/circuits/target
+            examples/CRISP/circuits/bin/crisp/target
+            examples/CRISP/circuits/bin/fold/target
+            circuits/bin/threshold/target
+            circuits/bin/recursive_aggregation/wrapper/threshold/target
           retention-days: 1
           if-no-files-found: warn
 
   template_integration:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     needs: [build_enclave_cli, build_e3_support_dev, build_sdk]
     steps:
       - uses: actions/checkout@v6
@@ -839,7 +886,9 @@ jobs:
           pnpm test:integration
 
   test_enclave_init:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     needs: [build_enclave_cli, build_e3_support_dev]
     steps:
       - name: Install pnpm
@@ -876,7 +925,9 @@ jobs:
           enclave init mycitest --verbose --template=${{ github.server_url }}/${{ github.repository }}.git#${BRANCH}:templates/default
 
   contrib-readme-job:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     name: Populate Contributors List
     # Only run on main branch to avoid branch conflicts
     if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, 'contrib-readme-action')

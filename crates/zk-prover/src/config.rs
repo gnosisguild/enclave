@@ -14,9 +14,9 @@ use tokio::fs;
 use tracing::{debug, warn};
 
 const VERSIONS_MANIFEST_URL: &str =
-    "https://raw.githubusercontent.com/gnosisguild/enclave/main/crates/zk-prover/versions.json";
+    "https://raw.githubusercontent.com/gnosisguild/enclave/refactor/recursion-proof-crisp/crates/zk-prover/versions.json";
 
-const BB_VERSION: &str = "3.0.0-nightly.20251104";
+const BB_VERSION: &str = "3.0.0-nightly.20260102";
 const CIRCUITS_VERSION: &str = "0.1.15";
 
 /// Supported bb binary targets
@@ -410,19 +410,19 @@ mod tests {
         let checksums: HashMap<&str, &str> = [
             (
                 "amd64-linux",
-                "9740013d1aa0eb1b0bb2d71484c8b3debc5050a409bd5f12f8454fbfc7cb5419",
+                "4847ae82a1d25f9489057da2c33d1abdee3ba457e8219028a2c2336f850f8cd7",
             ),
             (
                 "amd64-darwin",
-                "7874494dd1238655993a44b85d94e9dcc3589d29980eff8b03a7f167a45c32e4",
+                "9137b49be56bfea5b62203b7ae4cb67c9ecc12fe1692a89badf2cf4b57323fdc",
             ),
             (
                 "arm64-linux",
-                "ae6bf8518998523b4e135cd638f305a802f52e8dfa5ea9b1c210de7d04c55343",
+                "a675221a823f6fada6d01b09a1c26c0f7356567f31a912a2475b6e3b63d438a2",
             ),
             (
                 "arm64-darwin",
-                "6d353c05dbecc573d1b0ca992c8b222db8e873853b7910b792915629347f6789",
+                "6a448b089b43918787dbfd201b32a757f562c80bf542d1b75aaf6fc9dba42b0c",
             ),
         ]
         .into_iter()

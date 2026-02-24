@@ -9,6 +9,10 @@ import { testWithSynpress } from '@synthetixio/synpress'
 import { MetaMask, metaMaskFixtures } from '@synthetixio/synpress/playwright'
 import basicSetup from './wallet-setup/basic.setup'
 import { execSync } from 'child_process'
+import { config } from 'dotenv'
+import path from 'path'
+
+config({ path: path.join(process.cwd(), 'server', '.env') })
 
 async function runCliInit(): Promise<number> {
   try {
@@ -44,7 +48,7 @@ async function checkE3Ready(e3id: number): Promise<boolean> {
   }
 }
 
-async function waitForE3Ready(e3id: number, maxWaitMs: number = 30000): Promise<void> {
+async function waitForE3Ready(e3id: number, maxWaitMs: number = 80000): Promise<void> {
   const startTime = Date.now()
   while (Date.now() - startTime < maxWaitMs) {
     const isActivated = await checkE3Ready(e3id)
@@ -110,8 +114,8 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
   await page.locator('button:has-text("Cast Vote")').click()
   log(`confirming MetaMask signature request...`)
   await metamask.confirmSignature()
-  const WAIT = 130_000
-  log(`waiting for ${WAIT}ms...`)
+  const WAIT = parseInt(process.env.E3_DURATION as string, 10) * 1000 + 45_000 // A small buffer for decryption
+  log(`waiting ${WAIT}ms...`)
   await page.waitForTimeout(WAIT)
   log(`clicking historic polls button...`)
   await page.locator('a:has-text("Historic polls")').click()

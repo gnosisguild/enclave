@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 actix = { workspace = true }
 anyhow = { workspace = true }
+bincode = { workspace = true }
 e3-data = { workspace = true }
 e3-fhe-params = { workspace = true }
 e3-trbfv = { workspace = true }
@@ -20,6 +21,8 @@ e3-utils = { workspace = true }
 e3-zk-prover = { workspace = true }
 fhe = { workspace = true }
 fhe-traits = { workspace = true }
+ndarray = { workspace = true }
+num-bigint = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 tokio = { workspace = true }
