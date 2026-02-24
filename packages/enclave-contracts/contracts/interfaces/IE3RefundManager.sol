@@ -34,6 +34,7 @@ interface IE3RefundManager {
         uint256 honestNodeCount; // Number of honest nodes
         bool calculated; // Whether distribution is calculated
         IERC20 feeToken; // The fee token used for this E3's payment (stored per-E3 to survive token rotations)
+        uint256 originalPayment; // Original E3 payment amount (for making requester whole)
     }
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -57,6 +58,12 @@ interface IE3RefundManager {
     );
     /// @notice Emitted when slashed funds are routed to E3
     event SlashedFundsRouted(uint256 indexed e3Id, uint256 amount);
+    /// @notice Emitted when slashed funds are applied to refund distribution
+    event SlashedFundsApplied(
+        uint256 indexed e3Id,
+        uint256 toRequester,
+        uint256 toHonestNodes
+    );
     /// @notice Emitted when work allocation is updated
     event WorkAllocationUpdated(WorkValueAllocation allocation);
     ////////////////////////////////////////////////////////////

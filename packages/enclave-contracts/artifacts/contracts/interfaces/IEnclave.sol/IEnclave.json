@@ -438,6 +438,25 @@
       "inputs": [
         {
           "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "SlashedFundsRouted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
           "internalType": "address",
           "name": "slashingManager",
           "type": "address"
@@ -1109,6 +1128,24 @@
     {
       "inputs": [
         {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "routeSlashedFunds",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "contract IBondingRegistry",
           "name": "_bondingRegistry",
           "type": "address"
@@ -1226,5 +1263,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-70641a62ef471f613aadde1ccfd9fba9a3e44fb0"
+  "buildInfoId": "solc-0_8_28-5311703a5d5fd8087d15f5c6957555cc4c2bf8c5"
 }

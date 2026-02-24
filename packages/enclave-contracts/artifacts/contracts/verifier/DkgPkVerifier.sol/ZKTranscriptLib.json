@@ -396,5 +396,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/verifier/DkgPkVerifier.sol",
-  "buildInfoId": "solc-0_8_28-15d7734d5573c9c7fd167defb7acf0fe3bbd3190"
+  "buildInfoId": "solc-0_8_28-5311703a5d5fd8087d15f5c6957555cc4c2bf8c5"
 }

@@ -164,6 +164,11 @@ interface IEnclave {
     /// @param slashingManager The address of the SlashingManager contract.
     event SlashingManagerSet(address indexed slashingManager);
 
+    /// @notice Emitted when slashed funds are routed to E3 refund pool
+    /// @param e3Id The E3 ID.
+    /// @param amount The amount of slashed funds routed.
+    event SlashedFundsRouted(uint256 indexed e3Id, uint256 amount);
+
     /// @notice Emitted when a failed E3 is processed for refunds.
     /// @param e3Id The ID of the failed E3.
     /// @param paymentAmount The original payment amount being refunded.
@@ -371,6 +376,12 @@ interface IEnclave {
     /// @param e3Id ID of the E3.
     /// @param reason The failure reason from FailureReason enum.
     function onE3Failed(uint256 e3Id, uint8 reason) external;
+
+    /// @notice Routes slashed ticket funds to the E3 refund pool
+    /// @dev Called by SlashingManager. Proxies to E3RefundManager.routeSlashedFunds.
+    /// @param e3Id The E3 ID.
+    /// @param amount Amount of slashed funds to route.
+    function routeSlashedFunds(uint256 e3Id, uint256 amount) external;
 
     ////////////////////////////////////////////////////////////
     //                                                        //

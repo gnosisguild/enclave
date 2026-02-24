@@ -15,6 +15,7 @@ import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken"
 import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
 import MockDecryptionVerifierModule from "../../ignition/modules/mockDecryptionVerifier";
 import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
+import MockCircuitVerifierModule from "../../ignition/modules/mockSlashingVerifier";
 import MockStableTokenModule from "../../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../../ignition/modules/slashingManager";
 import {
@@ -23,9 +24,11 @@ import {
   E3RefundManager__factory as E3RefundManagerFactory,
   Enclave__factory as EnclaveFactory,
   EnclaveToken__factory as EnclaveTokenFactory,
+  MockCircuitVerifier__factory as MockCircuitVerifierFactory,
   MockDecryptionVerifier__factory as MockDecryptionVerifierFactory,
   MockE3Program__factory as MockE3ProgramFactory,
   MockUSDC__factory as MockUSDCFactory,
+  SlashingManager__factory as SlashingManagerFactory,
 } from "../../types";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
@@ -70,6 +73,51 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
   const encryptionSchemeId =
     "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
+
+  // Slash-related constants for E2E tests
+  const REASON_BAD_PROOF = ethers.keccak256(
+    ethers.toUtf8Bytes("E3_BAD_PROOF"),
+  );
+  const PROOF_PAYLOAD_TYPEHASH = ethers.keccak256(
+    ethers.toUtf8Bytes(
+      "ProofPayload(uint256 chainId,uint256 e3Id,uint256 proofType,bytes zkProof,bytes publicSignals)",
+    ),
+  );
+
+  /**
+   * Helper to create a signed proof evidence bundle for proposeSlash.
+   */
+  async function signAndEncodeProof(
+    signer: Signer,
+    e3Id: number,
+    verifierAddress: string,
+    zkProof: string = "0x1234",
+    publicInputs: string[] = [ethers.ZeroHash],
+    chainId: number = 31337,
+    proofType: number = 0,
+  ): Promise<string> {
+    const messageHash = ethers.keccak256(
+      abiCoder.encode(
+        ["bytes32", "uint256", "uint256", "uint256", "bytes32", "bytes32"],
+        [
+          PROOF_PAYLOAD_TYPEHASH,
+          chainId,
+          e3Id,
+          proofType,
+          ethers.keccak256(zkProof),
+          ethers.keccak256(
+            ethers.solidityPacked(["bytes32[]"], [publicInputs]),
+          ),
+        ],
+      ),
+    );
+    const signature = await signer.signMessage(ethers.getBytes(messageHash));
+    return abiCoder.encode(
+      ["bytes", "bytes32[]", "bytes", "uint256", "uint256", "address"],
+      [zkProof, publicInputs, signature, chainId, proofType, verifierAddress],
+    );
+  }
+
   const setup = async () => {
     // ── Signers ────────────────────────────────────────────────────────────────
     const [owner, requester, treasury, operator1, operator2, computeProvider] =
@@ -211,8 +259,24 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       owner,
     );
 
+    // ── Mock Circuit Verifier (for SlashingManager proof-based slashes) ────────
+    const { mockCircuitVerifier } = await ignition.deploy(
+      MockCircuitVerifierModule,
+    );
+    const circuitVerifier = MockCircuitVerifierFactory.connect(
+      await mockCircuitVerifier.getAddress(),
+      owner,
+    );
+
+    // ── SlashingManager typed factory ──────────────────────────────────────────
+    const slashingManagerTyped = SlashingManagerFactory.connect(
+      await slashingManager.getAddress(),
+      owner,
+    );
+
     // ── Wire Up Contracts ──────────────────────────────────────────────────────
     await enclave.setE3RefundManager(e3RefundManagerAddress);
+    await enclave.setSlashingManager(await slashingManager.getAddress());
     await enclave.enableE3Program(await e3Program.getAddress());
     await enclave.setDecryptionVerifier(
       encryptionSchemeId,
@@ -229,12 +293,26 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     );
     await slashingManager.setCiphernodeRegistry(ciphernodeRegistryAddress);
     await slashingManager.setEnclave(enclaveAddress);
+    await slashingManager.setE3RefundManager(e3RefundManagerAddress);
 
     await registry.setEnclave(enclaveAddress);
     await registry.setBondingRegistry(await bondingRegistry.getAddress());
     await registry.setSlashingManager(await slashingManager.getAddress());
 
     await enclaveTicketToken.setRegistry(await bondingRegistry.getAddress());
+
+    // ── Slash Policy (for E2E routing tests) ───────────────────────────────────
+    await slashingManagerTyped.setSlashPolicy(REASON_BAD_PROOF, {
+      ticketPenalty: ethers.parseUnits("50", 6),
+      licensePenalty: ethers.parseEther("100"),
+      requiresProof: true,
+      proofVerifier: await circuitVerifier.getAddress(),
+      banNode: false,
+      appealWindow: 0,
+      enabled: true,
+      affectsCommittee: false,
+      failureReason: 0,
+    });
 
     // ── Mint Tokens ────────────────────────────────────────────────────────────
     await usdcToken.mint(requesterAddress, ethers.parseUnits("10000", 6));
@@ -301,6 +379,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       e3RefundManager,
       bondingRegistry,
       registry,
+      slashingManager: slashingManagerTyped,
+      circuitVerifier,
       usdcToken,
       enclToken,
       e3Program,
@@ -693,7 +773,188 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
   });
 
   describe("Slashed Funds Routing", function () {
-    it("routes slashed funds 50/50 to requester and honest nodes", async function () {
+    it("E2E: slash via SlashingManager routes actual USDC to refund manager and requester can claim", async function () {
+      const {
+        enclave,
+        e3RefundManager,
+        registry,
+        slashingManager,
+        circuitVerifier,
+        bondingRegistry,
+        usdcToken,
+        makeRequest,
+        requester,
+        operator1,
+        operator2,
+        setupOperator,
+      } = await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
+
+      // 1. Request E3, form committee, publish key
+      await makeRequest();
+      await registry.connect(operator1).submitTicket(0, 1);
+      await registry.connect(operator2).submitTicket(0, 1);
+      await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
+      await registry.finalizeCommittee(0);
+
+      const nodes = [
+        await operator1.getAddress(),
+        await operator2.getAddress(),
+      ];
+      const publicKey = "0x1234567890abcdef1234567890abcdef";
+      const publicKeyHash = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, publicKeyHash);
+
+      // 2. Wait past compute deadline → mark as failed
+      const e3 = await enclave.getE3(0);
+      const computeDeadline =
+        Number(e3.inputWindow[1]) + defaultTimeoutConfig.computeWindow;
+      await time.increaseTo(computeDeadline + 1);
+      await enclave.markE3Failed(0);
+
+      // 3. Process failure → distribution calculated, funds transferred to refund manager
+      await enclave.processE3Failure(0);
+      const distributionBefore = await e3RefundManager.getRefundDistribution(0);
+      expect(distributionBefore.calculated).to.be.true;
+
+      // Record refund manager USDC balance before slash routing
+      const refundManagerBalanceBefore = await usdcToken.balanceOf(
+        await e3RefundManager.getAddress(),
+      );
+
+      // Record BondingRegistry's slashedTicketBalance before slash
+      const slashedBalanceBefore = await bondingRegistry.slashedTicketBalance();
+
+      // 4. Slash operator1 via proposeSlash (Lane A) — real on-chain flow
+      //    This triggers: _executeSlash → slashTicketBalance → redirectSlashedTicketFunds
+      //    → ticketToken.payout(refundManager, amount) → enclave.routeSlashedFunds → e3RefundManager.routeSlashedFunds
+      const proof = await signAndEncodeProof(
+        operator1,
+        0,
+        await circuitVerifier.getAddress(),
+      );
+
+      await slashingManager.proposeSlash(
+        0,
+        await operator1.getAddress(),
+        REASON_BAD_PROOF,
+        proof,
+      );
+
+      // 5. Verify actual USDC moved to the refund manager
+      const refundManagerBalanceAfter = await usdcToken.balanceOf(
+        await e3RefundManager.getAddress(),
+      );
+      const actualSlashedAmount =
+        refundManagerBalanceAfter - refundManagerBalanceBefore;
+      expect(actualSlashedAmount).to.be.gt(0);
+
+      // Verify BondingRegistry's slashedTicketBalance was decremented
+      const slashedBalanceAfter = await bondingRegistry.slashedTicketBalance();
+      expect(slashedBalanceAfter).to.equal(
+        slashedBalanceBefore, // slash added then redirect removed the same amount
+      );
+
+      // 6. Verify distribution was updated with requester-first priority
+      const distributionAfter = await e3RefundManager.getRefundDistribution(0);
+      expect(distributionAfter.totalSlashed).to.equal(actualSlashedAmount);
+      expect(distributionAfter.requesterAmount).to.be.gte(
+        distributionBefore.requesterAmount,
+      );
+
+      // 7. Verify requester can actually claim and receives the correct USDC
+      const requesterBalanceBefore = await usdcToken.balanceOf(
+        await requester.getAddress(),
+      );
+      await e3RefundManager.connect(requester).claimRequesterRefund(0);
+      const requesterBalanceAfter = await usdcToken.balanceOf(
+        await requester.getAddress(),
+      );
+      expect(requesterBalanceAfter - requesterBalanceBefore).to.equal(
+        distributionAfter.requesterAmount,
+      );
+    });
+
+    it("E2E: honest nodes can claim their share after slashed funds are routed", async function () {
+      const {
+        enclave,
+        e3RefundManager,
+        registry,
+        slashingManager,
+        circuitVerifier,
+        usdcToken,
+        makeRequest,
+        operator1,
+        operator2,
+        setupOperator,
+      } = await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
+
+      // 1. Request E3, form committee, publish key
+      await makeRequest();
+      await registry.connect(operator1).submitTicket(0, 1);
+      await registry.connect(operator2).submitTicket(0, 1);
+      await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
+      await registry.finalizeCommittee(0);
+
+      const nodes = [
+        await operator1.getAddress(),
+        await operator2.getAddress(),
+      ];
+      const publicKey = "0x1234567890abcdef1234567890abcdef";
+      const publicKeyHash = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, publicKeyHash);
+
+      // 2. Fail via compute timeout
+      const e3 = await enclave.getE3(0);
+      const computeDeadline =
+        Number(e3.inputWindow[1]) + defaultTimeoutConfig.computeWindow;
+      await time.increaseTo(computeDeadline + 1);
+      await enclave.markE3Failed(0);
+      await enclave.processE3Failure(0);
+
+      // 3. Record distribution BEFORE slash to verify it actually changes
+      const distributionBefore = await e3RefundManager.getRefundDistribution(0);
+      const honestNodeAmountBefore = distributionBefore.honestNodeAmount;
+
+      // 4. Slash operator1 — this routes funds into the refund pool
+      const proof = await signAndEncodeProof(
+        operator1,
+        0,
+        await circuitVerifier.getAddress(),
+      );
+      await slashingManager.proposeSlash(
+        0,
+        await operator1.getAddress(),
+        REASON_BAD_PROOF,
+        proof,
+      );
+
+      const distribution = await e3RefundManager.getRefundDistribution(0);
+      expect(distribution.honestNodeCount).to.be.gt(0);
+      // Verify that honestNodeAmount INCREASED due to slashed funds routing
+      expect(distribution.honestNodeAmount).to.be.gt(honestNodeAmountBefore);
+      expect(distribution.totalSlashed).to.be.gt(0);
+
+      // 5. operator2 (honest node) claims their share
+      const op2BalanceBefore = await usdcToken.balanceOf(
+        await operator2.getAddress(),
+      );
+      await e3RefundManager.connect(operator2).claimHonestNodeReward(0);
+      const op2BalanceAfter = await usdcToken.balanceOf(
+        await operator2.getAddress(),
+      );
+
+      const perNodeAmount =
+        distribution.honestNodeAmount / BigInt(distribution.honestNodeCount);
+      expect(op2BalanceAfter - op2BalanceBefore).to.equal(perNodeAmount);
+    });
+
+    it("requester-first priority: requester gets filled before honest nodes", async function () {
       const {
         enclave,
         e3RefundManager,
@@ -709,7 +970,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       await makeRequest();
 
-      // Fail the E3
+      // Fail the E3 at committee formation stage (no honest nodes, requester gets 95%)
       await time.increase(defaultTimeoutConfig.committeeFormationWindow + 1);
       await enclave.markE3Failed(0);
       await enclave.processE3Failure(0);
@@ -717,8 +978,11 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const distributionBefore = await e3RefundManager.getRefundDistribution(0);
       const slashedAmount = ethers.parseUnits("100", 6);
 
-      // Route slashed funds (normally called by SlashingManager through Enclave)
-      // For testing, temporarily set enclave to owner to call this permissioned function
+      // requesterGap = originalPayment - requesterAmount (how much more needed to be whole)
+      const requesterGap =
+        distributionBefore.originalPayment - distributionBefore.requesterAmount;
+
+      // Route slashed funds via the enclave proxy (swap enclave address for test)
       const originalEnclave = await e3RefundManager.enclave();
       await e3RefundManager.setEnclave(await owner.getAddress());
       await e3RefundManager.connect(owner).routeSlashedFunds(0, slashedAmount);
@@ -726,14 +990,64 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       const distributionAfter = await e3RefundManager.getRefundDistribution(0);
 
-      // Verify slashed funds are split 50/50 between requester and honest nodes
+      const expectedToRequester =
+        slashedAmount >= requesterGap ? requesterGap : slashedAmount;
+      const expectedToHonestNodes = slashedAmount - expectedToRequester;
+
       expect(distributionAfter.requesterAmount).to.equal(
-        distributionBefore.requesterAmount + slashedAmount / 2n,
+        distributionBefore.requesterAmount + expectedToRequester,
       );
       expect(distributionAfter.honestNodeAmount).to.equal(
-        distributionBefore.honestNodeAmount + slashedAmount / 2n,
+        distributionBefore.honestNodeAmount + expectedToHonestNodes,
       );
       expect(distributionAfter.totalSlashed).to.equal(slashedAmount);
+    });
+
+    it("queues slashed funds arriving before processE3Failure and applies on calculate", async function () {
+      const {
+        enclave,
+        e3RefundManager,
+        makeRequest,
+        owner,
+        operator1,
+        operator2,
+        setupOperator,
+      } = await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
+
+      await makeRequest();
+
+      // Fail E3 but DON'T call processE3Failure yet
+      await time.increase(defaultTimeoutConfig.committeeFormationWindow + 1);
+      await enclave.markE3Failed(0);
+
+      const slashedAmount = ethers.parseUnits("50", 6);
+
+      // Route slashed funds BEFORE processE3Failure — should be queued
+      const originalEnclave = await e3RefundManager.enclave();
+      await e3RefundManager.setEnclave(await owner.getAddress());
+      await e3RefundManager.connect(owner).routeSlashedFunds(0, slashedAmount);
+      await e3RefundManager.setEnclave(originalEnclave);
+
+      // Distribution should not exist yet
+      const distBefore = await e3RefundManager.getRefundDistribution(0);
+      expect(distBefore.calculated).to.be.false;
+
+      // Now process the failure — pending funds should be applied
+      await enclave.processE3Failure(0);
+
+      const distAfter = await e3RefundManager.getRefundDistribution(0);
+      expect(distAfter.calculated).to.be.true;
+      expect(distAfter.totalSlashed).to.equal(slashedAmount);
+
+      // Invariant: all funds accounted for
+      expect(
+        distAfter.requesterAmount +
+          distAfter.honestNodeAmount +
+          distAfter.protocolAmount,
+      ).to.equal(distAfter.originalPayment + slashedAmount);
     });
   });
 

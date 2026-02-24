@@ -337,7 +337,7 @@ interface IBondingRegistry {
         address operator,
         uint256 amount,
         bytes32 reason
-    ) external;
+    ) external returns (uint256 actualAmount);
 
     /**
      * @notice Slash operator's license bond by absolute amount
@@ -351,6 +351,15 @@ interface IBondingRegistry {
         uint256 amount,
         bytes32 reason
     ) external;
+
+    /**
+     * @notice Redirect slashed ticket funds to a specified address
+     * @param to Address to receive the slashed funds (underlying stablecoin)
+     * @param amount Amount of slashed ticket balance to redirect
+     * @dev Only callable by authorized slashing manager. Pays out underlying stablecoin
+     *      from burned ticket tokens. Assumes underlying stablecoin matches the E3 fee token.
+     */
+    function redirectSlashedTicketFunds(address to, uint256 amount) external;
 
     // ======================
     // Reward Distribution Functions

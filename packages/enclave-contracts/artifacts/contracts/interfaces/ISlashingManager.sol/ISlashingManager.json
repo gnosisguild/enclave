@@ -228,6 +228,25 @@
         {
           "indexed": true,
           "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "RoutingFailed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
           "name": "proposalId",
           "type": "uint256"
         },
@@ -390,6 +409,25 @@
         }
       ],
       "name": "SlashProposed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "SlashedFundsRoutedToRefund",
       "type": "event"
     },
     {
@@ -747,12 +785,43 @@
     {
       "inputs": [
         {
-          "internalType": "address",
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "routeSlashedFundsToRefund",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IBondingRegistry",
           "name": "newBondingRegistry",
           "type": "address"
         }
       ],
       "name": "setBondingRegistry",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IE3RefundManager",
+          "name": "newRefundManager",
+          "type": "address"
+        }
+      ],
+      "name": "setE3RefundManager",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -865,5 +934,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ISlashingManager.sol",
-  "buildInfoId": "solc-0_8_28-70641a62ef471f613aadde1ccfd9fba9a3e44fb0"
+  "buildInfoId": "solc-0_8_28-5311703a5d5fd8087d15f5c6957555cc4c2bf8c5"
 }

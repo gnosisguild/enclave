@@ -290,6 +290,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     );
     await slashingManager.setCiphernodeRegistry(registryAddress);
     await slashingManager.setEnclave(enclaveAddress);
+    await slashingManager.setE3RefundManager(addressOne);
 
     await ticketToken.setRegistry(await bondingRegistry.getAddress());
     await usdcToken.mint(requesterAddress, ethers.parseUnits("100000", 6));

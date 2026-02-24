@@ -225,6 +225,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         _;
     }
 
+    /// @notice Restricts function to SlashingManager contract only
+    modifier onlySlashingManager() {
+        require(msg.sender == address(slashingManager), "Only SlashingManager");
+        _;
+    }
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Initialization                       //
@@ -726,6 +732,15 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
 
         emit E3FailureProcessed(e3Id, payment, honestNodes.length);
+    }
+
+    /// @inheritdoc IEnclave
+    function routeSlashedFunds(
+        uint256 e3Id,
+        uint256 amount
+    ) external onlySlashingManager {
+        e3RefundManager.routeSlashedFunds(e3Id, amount);
+        emit SlashedFundsRouted(e3Id, amount);
     }
 
     /// @inheritdoc IEnclave

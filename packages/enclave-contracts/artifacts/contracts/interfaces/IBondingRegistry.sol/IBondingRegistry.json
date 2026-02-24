@@ -611,6 +611,24 @@
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "redirectSlashedTicketFunds",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "registerOperator",
       "outputs": [],
@@ -828,7 +846,13 @@
         }
       ],
       "name": "slashTicketBalance",
-      "outputs": [],
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "actualAmount",
+          "type": "uint256"
+        }
+      ],
       "stateMutability": "nonpayable",
       "type": "function"
     },
@@ -922,5 +946,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IBondingRegistry.sol",
-  "buildInfoId": "solc-0_8_28-70641a62ef471f613aadde1ccfd9fba9a3e44fb0"
+  "buildInfoId": "solc-0_8_28-5311703a5d5fd8087d15f5c6957555cc4c2bf8c5"
 }

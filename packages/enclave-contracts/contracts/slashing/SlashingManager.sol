@@ -17,6 +17,7 @@ import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IEnclave } from "../interfaces/IEnclave.sol";
+import { IE3RefundManager } from "../interfaces/IE3RefundManager.sol";
 import { ICircuitVerifier } from "../interfaces/ICircuitVerifier.sol";
 
 /**
@@ -50,6 +51,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
     /// @notice Reference to the Enclave contract for E3 failure signaling
     IEnclave public enclave;
+
+    /// @notice Reference to the E3 Refund Manager for routing slashed funds
+    IE3RefundManager public e3RefundManager;
 
     /// @notice Mapping from slash reason hash to its configured policy
     mapping(bytes32 reason => SlashPolicy policy) public slashPolicies;
@@ -163,28 +167,36 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
     /// @inheritdoc ISlashingManager
     function setBondingRegistry(
-        address newBondingRegistry
+        IBondingRegistry newBondingRegistry
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newBondingRegistry != address(0), ZeroAddress());
-        bondingRegistry = IBondingRegistry(newBondingRegistry);
+        require(address(newBondingRegistry) != address(0), ZeroAddress());
+        bondingRegistry = newBondingRegistry;
     }
 
-    /// @notice Updates the ciphernode registry contract address
-    /// @param newCiphernodeRegistry Address of the new ICiphernodeRegistry contract
+    /// @notice Updates the ciphernode registry contract
+    /// @param newCiphernodeRegistry The new ICiphernodeRegistry contract
     function setCiphernodeRegistry(
-        address newCiphernodeRegistry
+        ICiphernodeRegistry newCiphernodeRegistry
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newCiphernodeRegistry != address(0), ZeroAddress());
-        ciphernodeRegistry = ICiphernodeRegistry(newCiphernodeRegistry);
+        require(address(newCiphernodeRegistry) != address(0), ZeroAddress());
+        ciphernodeRegistry = newCiphernodeRegistry;
     }
 
-    /// @notice Updates the Enclave contract address
-    /// @param newEnclave Address of the new IEnclave contract
+    /// @notice Updates the Enclave contract
+    /// @param newEnclave The new IEnclave contract
     function setEnclave(
-        address newEnclave
+        IEnclave newEnclave
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newEnclave != address(0), ZeroAddress());
-        enclave = IEnclave(newEnclave);
+        require(address(newEnclave) != address(0), ZeroAddress());
+        enclave = newEnclave;
+    }
+
+    /// @inheritdoc ISlashingManager
+    function setE3RefundManager(
+        IE3RefundManager newRefundManager
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(address(newRefundManager) != address(0), ZeroAddress());
+        e3RefundManager = newRefundManager;
     }
 
     /// @inheritdoc ISlashingManager
@@ -418,9 +430,11 @@ contract SlashingManager is ISlashingManager, AccessControl {
         SlashProposal storage p = _proposals[proposalId];
         p.executed = true;
 
+        uint256 actualTicketSlashed = 0;
+
         // Execute financial penalties
         if (p.ticketAmount > 0) {
-            bondingRegistry.slashTicketBalance(
+            actualTicketSlashed = bondingRegistry.slashTicketBalance(
                 p.operator,
                 p.ticketAmount,
                 p.reason
@@ -449,8 +463,35 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
             // If active count drops below M, fail the E3
             if (activeCount < thresholdM && p.failureReason > 0) {
-                // solhint-disable-next-line no-empty-blocks
-                try enclave.onE3Failed(p.e3Id, p.failureReason) {} catch {}
+                // NOTE: catch block must not be empty (solc optimizer bug, see below)
+                try enclave.onE3Failed(p.e3Id, p.failureReason) {
+                    // Side effects occur in the external call
+                } catch {
+                    // E3 already failed or other error — slash still proceeds
+                    emit RoutingFailed(p.e3Id, 0);
+                }
+            }
+        }
+
+        // Route slashed ticket funds to E3 refund pool for requester/honest node compensation.
+        // Uses self-call pattern for try/catch atomicity: if either the BondingRegistry redirect
+        // or the E3RefundManager accounting fails, both revert together and slashed funds remain
+        // in BondingRegistry for treasury withdrawal. The slash itself still proceeds.
+        if (actualTicketSlashed > 0) {
+            IEnclave.E3Stage stage = enclave.getE3Stage(p.e3Id);
+            if (stage == IEnclave.E3Stage.Failed) {
+                // NOTE: The catch block must not be empty — solc >=0.8.28 with
+                // optimizer enabled will eliminate the external call when both
+                // try and catch blocks are empty (compiler optimization bug).
+                try
+                    this.routeSlashedFundsToRefund(p.e3Id, actualTicketSlashed)
+                {
+                    // Side effects occur in the external call
+                } catch {
+                    // Routing failed — slashed funds stay in BondingRegistry for
+                    // treasury withdrawal.  The slash itself still proceeds.
+                    emit RoutingFailed(p.e3Id, actualTicketSlashed);
+                }
             }
         }
 
@@ -463,6 +504,18 @@ contract SlashingManager is ISlashingManager, AccessControl {
             p.licenseAmount,
             true
         );
+    }
+
+    /// @inheritdoc ISlashingManager
+    /// @dev Atomically redirects slashed ticket funds from BondingRegistry to E3RefundManager
+    ///      and updates the refund distribution. External with self-only access for try/catch.
+    function routeSlashedFundsToRefund(uint256 e3Id, uint256 amount) external {
+        require(msg.sender == address(this), Unauthorized());
+        address refundManager = address(e3RefundManager);
+        require(refundManager != address(0), ZeroAddress());
+        bondingRegistry.redirectSlashedTicketFunds(refundManager, amount);
+        enclave.routeSlashedFunds(e3Id, amount);
+        emit SlashedFundsRoutedToRefund(e3Id, amount);
     }
 
     // ======================

@@ -192,6 +192,9 @@ export const deployEnclave = async (withMocks?: boolean) => {
   console.log("Setting CiphernodeRegistry address in SlashingManager...");
   await slashingManager.setCiphernodeRegistry(ciphernodeRegistryAddress);
 
+  console.log("Setting E3RefundManager address in SlashingManager...");
+  await slashingManager.setE3RefundManager(e3RefundManagerAddress);
+
   console.log("Setting SlashingManager address in Enclave...");
   await enclave.setSlashingManager(slashingManagerAddress);
 

@@ -270,6 +270,8 @@ describe("SlashingManager", function () {
     );
     await slashingManager.addSlasher(await slasher.getAddress());
     await slashingManager.setCiphernodeRegistry(mockCiphernodeRegistryAddress);
+    await slashingManager.setEnclave(addressOne);
+    await slashingManager.setE3RefundManager(addressOne);
 
     // ── Return ─────────────────────────────────────────────────────────────────
     return {

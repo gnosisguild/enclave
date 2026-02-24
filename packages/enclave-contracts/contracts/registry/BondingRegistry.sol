@@ -471,7 +471,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         address operator,
         uint256 requestedSlashAmount,
         bytes32 slashReason
-    ) external onlySlashingManager {
+    ) external onlySlashingManager returns (uint256) {
         require(requestedSlashAmount != 0, ZeroAmount());
 
         (uint256 pendingTicketBalance, ) = _exits.getPendingAmounts(operator);
@@ -484,7 +484,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         );
 
         if (actualSlashAmount == 0) {
-            return;
+            return 0;
         }
 
         // Slash from active balance first
@@ -516,6 +516,8 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         );
 
         _updateOperatorStatus(operator);
+
+        return actualSlashAmount;
     }
 
     /// @inheritdoc IBondingRegistry
@@ -566,6 +568,19 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         );
 
         _updateOperatorStatus(operator);
+    }
+
+    /// @inheritdoc IBondingRegistry
+    function redirectSlashedTicketFunds(
+        address to,
+        uint256 amount
+    ) external onlySlashingManager {
+        require(to != address(0), ZeroAddress());
+        require(amount > 0, ZeroAmount());
+        require(amount <= slashedTicketBalance, InsufficientBalance());
+
+        slashedTicketBalance -= amount;
+        ticketToken.payout(to, amount);
     }
 
     // ======================

@@ -7,6 +7,7 @@
 pragma solidity >=0.8.27;
 
 import { IBondingRegistry } from "./IBondingRegistry.sol";
+import { IE3RefundManager } from "./IE3RefundManager.sol";
 
 /**
  * @title ISlashingManager
@@ -259,6 +260,20 @@ interface ISlashingManager {
         address updater
     );
 
+    /**
+     * @notice Emitted when slashed ticket funds are routed to the E3 refund pool
+     * @param e3Id ID of the E3 computation
+     * @param amount Amount of slashed funds routed (underlying stablecoin)
+     */
+    event SlashedFundsRoutedToRefund(uint256 indexed e3Id, uint256 amount);
+
+    /**
+     * @notice Emitted when routing slashed funds fails (funds remain in BondingRegistry)
+     * @param e3Id ID of the E3 computation
+     * @param amount Amount that failed to route
+     */
+    event RoutingFailed(uint256 indexed e3Id, uint256 amount);
+
     // ======================
     // View Functions
     // ======================
@@ -326,11 +341,18 @@ interface ISlashingManager {
     ) external;
 
     /**
-     * @notice Updates the bonding registry contract address
+     * @notice Updates the bonding registry contract
      * @dev Only callable by DEFAULT_ADMIN_ROLE. Used to execute actual slashing of funds
-     * @param newBondingRegistry Address of the new IBondingRegistry contract (must be non-zero)
+     * @param newBondingRegistry The new IBondingRegistry contract (must be non-zero)
      */
-    function setBondingRegistry(address newBondingRegistry) external;
+    function setBondingRegistry(IBondingRegistry newBondingRegistry) external;
+
+    /**
+     * @notice Updates the E3 Refund Manager contract
+     * @dev Only callable by DEFAULT_ADMIN_ROLE
+     * @param newRefundManager The new IE3RefundManager contract (must be non-zero)
+     */
+    function setE3RefundManager(IE3RefundManager newRefundManager) external;
 
     /**
      * @notice Grants SLASHER_ROLE to an address
@@ -400,6 +422,16 @@ interface ISlashingManager {
      * @param proposalId ID of the proposal to execute (must exist and not be already executed)
      */
     function executeSlash(uint256 proposalId) external;
+
+    /**
+     * @notice Atomically redirects slashed ticket funds and updates E3 refund distribution
+     * @dev Only callable by this contract (self-call pattern for try/catch atomicity).
+     *      Transfers underlying stablecoin from BondingRegistry to E3RefundManager
+     *      and calls Enclave.routeSlashedFunds to update the distribution.
+     * @param e3Id ID of the E3 computation
+     * @param amount Amount of slashed ticket balance to route
+     */
+    function routeSlashedFundsToRefund(uint256 e3Id, uint256 amount) external;
 
     // ======================
     // Appeal Functions
