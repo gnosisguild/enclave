@@ -350,8 +350,8 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // ======================
 
     /// @dev Decodes and verifies: verifier match, chainId, operator EIP-191 signature, committee
-    ///      membership, and that the ZK proof is invalid (fault confirmed). Same evidence format as
-    ///      `proposeSlash` — see its `@dev` for the `abi.encode` layout.
+    ///      membership, and that the ZK proof is invalid (fault confirmed). Evidence encoding
+    ///      matches proposeSlash — see that function's dev note for the abi.encode layout.
     function _verifyProofEvidence(
         bytes calldata proof,
         uint256 e3Id,
