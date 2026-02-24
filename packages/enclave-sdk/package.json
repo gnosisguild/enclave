@@ -25,7 +25,11 @@
     "directory": "packages/enclave-sdk"
   },
   "scripts": {
-    "prebuild": "pnpm -C ../enclave-contracts build && pnpm -C ../../ wasm:build",
+    "compile:circuits": "pnpm compile:user_data_encryption_ct0 && pnpm compile:user_data_encryption_ct1 && pnpm compile:user_data_encryption",
+    "compile:user_data_encryption_ct0": "cd ../../circuits/bin/threshold/user_data_encryption_ct0 && nargo compile",
+    "compile:user_data_encryption_ct1": "cd ../../circuits/bin/threshold/user_data_encryption_ct1 && nargo compile",
+    "compile:user_data_encryption": "cd ../../circuits/bin/recursive_aggregation/wrapper/threshold/user_data_encryption && nargo compile",
+    "prebuild": "pnpm -C ../enclave-contracts build && pnpm -C ../../ wasm:build && pnpm compile:circuits",
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
@@ -42,8 +46,8 @@
     "vite-plugin-dts": "^4.5.3"
   },
   "dependencies": {
-    "@aztec/bb.js": "3.0.0-nightly.20251104",
-    "@noir-lang/noir_js": "1.0.0-beta.15",
+    "@aztec/bb.js": "3.0.0-nightly.20260102",
+    "@noir-lang/noir_js": "1.0.0-beta.16",
     "@enclave-e3/wasm": "workspace:*",
     "@enclave-e3/contracts": "workspace:*",
     "comlink": "^4.4.2",

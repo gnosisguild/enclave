@@ -35,7 +35,6 @@ import {
   get_bfv_params,
 } from '@enclave-e3/wasm'
 import { generateProof } from './greco'
-import { CompiledCircuit } from '@noir-lang/noir_js'
 
 export class EnclaveSDK {
   public static readonly chains = {
@@ -205,16 +204,11 @@ export class EnclaveSDK {
    * Encrypt a number using the configured protocol and generate a zk-SNARK proof using Greco
    * @param data - The number to encrypt
    * @param publicKey - The public key to use for encryption
-   * @param circuit - The circuit to use for proof generation
    * @returns The encrypted number and the proof
    */
-  public async encryptNumberAndGenProof(
-    data: bigint,
-    publicKey: Uint8Array,
-    circuit: CompiledCircuit,
-  ): Promise<VerifiableEncryptionResult> {
+  public async encryptNumberAndGenProof(data: bigint, publicKey: Uint8Array): Promise<VerifiableEncryptionResult> {
     const { circuitInputs: publicInputs, encryptedData } = await this.encryptNumberAndGenInputs(data, publicKey)
-    const proof = await generateProof(publicInputs, circuit)
+    const proof = await generateProof(publicInputs)
 
     return {
       encryptedData,
@@ -250,17 +244,12 @@ export class EnclaveSDK {
    * Encrypt a vector using the configured protocol and generate a zk-SNARK proof using Greco
    * @param data - The vector to encrypt
    * @param publicKey - The public key to use for encryption
-   * @param circuit - The circuit to use for proof generation
    * @returns The encrypted vector and the proof
    */
-  public async encryptVectorAndGenProof(
-    data: BigUint64Array,
-    publicKey: Uint8Array,
-    circuit: CompiledCircuit,
-  ): Promise<VerifiableEncryptionResult> {
+  public async encryptVectorAndGenProof(data: BigUint64Array, publicKey: Uint8Array): Promise<VerifiableEncryptionResult> {
     const { circuitInputs: publicInputs, encryptedData } = await this.encryptVectorAndGenInputs(data, publicKey)
 
-    const proof = await generateProof(publicInputs, circuit)
+    const proof = await generateProof(publicInputs)
 
     return {
       encryptedData,

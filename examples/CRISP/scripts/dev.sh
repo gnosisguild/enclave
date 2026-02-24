@@ -33,8 +33,8 @@ echo "DEV SCRIPT STARTING..."
 
 pnpm concurrently \
   -ks first \
-  --names "HARDHAT,DEPLOY" \
+  --names "ANVIL,DEPLOY" \
   --prefix-colors "blue,green" \
-  "cd packages/crisp-contracts && pnpm hardhat node" \
+  "anvil --host 0.0.0.0 --chain-id 31337 --block-time 1 --mnemonic 'test test test test test test test test test test test junk'" \
   "./scripts/crisp_deploy.sh && ./scripts/dev_services.sh"
 

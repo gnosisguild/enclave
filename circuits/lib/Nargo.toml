@@ -2,7 +2,6 @@
 name = "lib"
 type = "lib"
 authors = ["Gnosis Guild / Enclave"]
-version = "1.0.0-beta.15"
 
 [dependencies]
 poseidon = { tag = "v0.1.1", git = "https://github.com/noir-lang/poseidon" }
