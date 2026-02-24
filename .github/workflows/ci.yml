@@ -36,7 +36,7 @@ jobs:
   rust_tests:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     steps:
       - uses: actions/checkout@v6
 
@@ -54,9 +54,16 @@ jobs:
 
       - name: Install solc
         run: |
-          sudo add-apt-repository ppa:ethereum/ethereum \
-          && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+          if command -v solc &> /dev/null; then
+            echo "solc already installed: $(solc --version | head -1)"
+          else
+            echo "Installing solc to ~/.local/bin..."
+            mkdir -p ~/.local/bin
+            curl -fsSL "https://github.com/ethereum/solidity/releases/download/v0.8.28/solc-static-linux" -o ~/.local/bin/solc
+            chmod +x ~/.local/bin/solc
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+            echo "solc installed: $(~/.local/bin/solc --version | head -1)"
+          fi
 
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
@@ -84,7 +91,7 @@ jobs:
   zk_prover_integration:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     steps:
       - uses: actions/checkout@v6
 
@@ -115,7 +122,7 @@ jobs:
   build_e3_support_risc0:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     steps:
       - uses: actions/checkout@v6
       - name: Generate tags
@@ -154,7 +161,7 @@ jobs:
   build_ciphernode_image:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     steps:
       - uses: actions/checkout@v6
 
@@ -196,7 +203,7 @@ jobs:
   test_contracts:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -233,7 +240,7 @@ jobs:
   test_net:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -248,7 +255,7 @@ jobs:
   integration_prebuild:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -278,9 +285,16 @@ jobs:
 
       - name: Install solc
         run: |
-          sudo add-apt-repository ppa:ethereum/ethereum \
-          && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+          if command -v solc &> /dev/null; then
+            echo "solc already installed: $(solc --version | head -1)"
+          else
+            echo "Installing solc to ~/.local/bin..."
+            mkdir -p ~/.local/bin
+            curl -fsSL "https://github.com/ethereum/solidity/releases/download/v0.8.28/solc-static-linux" -o ~/.local/bin/solc
+            chmod +x ~/.local/bin/solc
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+            echo "solc installed: $(~/.local/bin/solc --version | head -1)"
+          fi
 
       - name: 'Install the dependencies'
         run: 'pnpm install --frozen-lockfile'
@@ -307,7 +321,7 @@ jobs:
     needs: [integration_prebuild, build_enclave_cli, build_sdk]
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     strategy:
       matrix:
         test-suite: [base, persist]
@@ -371,7 +385,7 @@ jobs:
   build_enclave_cli:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -387,9 +401,16 @@ jobs:
 
       - name: Install solc
         run: |
-          sudo add-apt-repository ppa:ethereum/ethereum \
-          && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+          if command -v solc &> /dev/null; then
+            echo "solc already installed: $(solc --version | head -1)"
+          else
+            echo "Installing solc to ~/.local/bin..."
+            mkdir -p ~/.local/bin
+            curl -fsSL "https://github.com/ethereum/solidity/releases/download/v0.8.28/solc-static-linux" -o ~/.local/bin/solc
+            chmod +x ~/.local/bin/solc
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+            echo "solc installed: $(~/.local/bin/solc --version | head -1)"
+          fi
 
       - name: Build enclave CLI
         run: cargo install --locked --path crates/cli --bin enclave
@@ -404,7 +425,7 @@ jobs:
   crisp_unit:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     needs: [build_crisp_sdk]
     steps:
       - uses: actions/checkout@v6
@@ -450,9 +471,16 @@ jobs:
 
       - name: Install solc
         run: |
-          sudo add-apt-repository ppa:ethereum/ethereum \
-          && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+          if command -v solc &> /dev/null; then
+            echo "solc already installed: $(solc --version | head -1)"
+          else
+            echo "Installing solc to ~/.local/bin..."
+            mkdir -p ~/.local/bin
+            curl -fsSL "https://github.com/ethereum/solidity/releases/download/v0.8.28/solc-static-linux" -o ~/.local/bin/solc
+            chmod +x ~/.local/bin/solc
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+            echo "solc installed: $(~/.local/bin/solc --version | head -1)"
+          fi
 
       - name: Run Rust tests
         working-directory: ./examples/CRISP
@@ -479,7 +507,7 @@ jobs:
   crisp_e2e:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     needs: [build_enclave_cli, build_crisp_sdk]
     steps:
       - uses: actions/checkout@v6
@@ -495,12 +523,11 @@ jobs:
       - name: Prepare test environment
         run: |
           mkdir -p $GITHUB_WORKSPACE/examples/CRISP/test-results
-          sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/test-results
+          chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/test-results
           mkdir -p $GITHUB_WORKSPACE/examples/CRISP/playwright-report
-          sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/playwright-report
+          chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/playwright-report
           mkdir -p $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
-          sudo chown -R $USER_UID:$USER_GID $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
-          sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
+          chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -514,13 +541,29 @@ jobs:
 
       - name: Install solc
         run: |
-          sudo add-apt-repository ppa:ethereum/ethereum \
-          && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+          if command -v solc &> /dev/null; then
+            echo "solc already installed: $(solc --version | head -1)"
+          else
+            echo "Installing solc to ~/.local/bin..."
+            mkdir -p ~/.local/bin
+            curl -fsSL "https://github.com/ethereum/solidity/releases/download/v0.8.28/solc-static-linux" -o ~/.local/bin/solc
+            chmod +x ~/.local/bin/solc
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+            echo "solc installed: $(~/.local/bin/solc --version | head -1)"
+          fi
 
       - name: Install yq
         run: |
-          sudo wget -qO- https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64.tar.gz | sudo tar xz -C /usr/local/bin --transform='s|yq_linux_amd64|yq|' --no-same-owner
+          if command -v yq &> /dev/null; then
+            echo "yq already installed: $(yq --version)"
+          else
+            echo "Installing yq to ~/.local/bin..."
+            mkdir -p ~/.local/bin
+            curl -fsSL "https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64" -o ~/.local/bin/yq
+            chmod +x ~/.local/bin/yq
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+            echo "yq installed: $(~/.local/bin/yq --version)"
+          fi
 
       - name: Install dependencies
         working-directory: .
@@ -589,7 +632,7 @@ jobs:
   build_circuits:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -602,12 +645,20 @@ jobs:
 
       - name: Install Barretenberg (bb)
         run: |
-          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
-          mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
-          BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
-          sudo mv "$BB_BIN" /usr/local/bin/bb
-          chmod +x /usr/local/bin/bb
-          bb --version
+          if command -v bb &> /dev/null; then
+            echo "bb already installed: $(bb --version)"
+          else
+            echo "Installing bb to ~/.local/bin..."
+            mkdir -p ~/.local/bin
+            curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+            mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
+            BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
+            mv "$BB_BIN" ~/.local/bin/bb
+            chmod +x ~/.local/bin/bb
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+            rm -rf bb.tar.gz bb_extract
+            echo "bb installed: $(~/.local/bin/bb --version)"
+          fi
 
       - name: Check formatting
         run: ./scripts/lint-circuits.sh
@@ -644,7 +695,7 @@ jobs:
   zk_prover_e2e:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     needs: [build_circuits]
     steps:
       - uses: actions/checkout@v6
@@ -659,12 +710,20 @@ jobs:
 
       - name: Install Barretenberg (bb)
         run: |
-          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
-          mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
-          BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
-          sudo mv "$BB_BIN" /usr/local/bin/bb
-          chmod +x /usr/local/bin/bb
-          bb --version
+          if command -v bb &> /dev/null; then
+            echo "bb already installed: $(bb --version)"
+          else
+            echo "Installing bb to ~/.local/bin..."
+            mkdir -p ~/.local/bin
+            curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+            mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
+            BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
+            mv "$BB_BIN" ~/.local/bin/bb
+            chmod +x ~/.local/bin/bb
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+            rm -rf bb.tar.gz bb_extract
+            echo "bb installed: $(~/.local/bin/bb --version)"
+          fi
 
       - name: Download compiled circuit artifacts
         uses: actions/download-artifact@v4
@@ -685,7 +744,7 @@ jobs:
   build_e3_support_dev:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -716,7 +775,7 @@ jobs:
   build_sdk:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -767,7 +826,7 @@ jobs:
   build_crisp_sdk:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     steps:
       - uses: actions/checkout@v6
 
@@ -813,7 +872,7 @@ jobs:
   template_integration:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     needs: [build_enclave_cli, build_e3_support_dev, build_sdk]
     steps:
       - uses: actions/checkout@v6
@@ -875,7 +934,7 @@ jobs:
   test_enclave_init:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     needs: [build_enclave_cli, build_e3_support_dev]
     steps:
       - name: Install pnpm
@@ -914,7 +973,7 @@ jobs:
   contrib-readme-job:
     runs-on:
       group: enclave-ci
-      labels: [enclave-ci-runner]
+      labels: [self-hosted]
     name: Populate Contributors List
     # Only run on main branch to avoid branch conflicts
     if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, 'contrib-readme-action')
