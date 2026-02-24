@@ -23,7 +23,7 @@ import assert from 'assert'
 import { describe, expect, it } from 'vitest'
 import { publishInput } from '../server/input'
 import { privateKeyToAccount } from 'viem/accounts'
-import { hardhat } from 'viem/chains'
+import { anvil } from 'viem/chains'
 
 export function getContractAddresses() {
   return {
@@ -154,7 +154,7 @@ describe('Integration', () => {
 
   const walletClient = createWalletClient({
     account,
-    chain: hardhat,
+    chain: anvil,
     transport: http('http://localhost:8545'),
   })
 

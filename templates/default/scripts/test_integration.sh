@@ -19,14 +19,14 @@ failed_message() {
   exit 1
 }
 
-export $(enclave print-env --chain hardhat)
+export $(enclave print-env --chain localhost)
 (pnpm concurrently \
   --names "TEST,EVM,CIPHER,SERVER,PROGRAM" \
   --prefix-colors "blue,cyan,magenta,yellow,green" \
   --kill-others \
   --success first \
   "wait-on http://localhost:13151/health && pnpm vitest run ./tests/integration.spec.ts" \
-  "pnpm dev:evm" \
+  "anvil --host 0.0.0.0 --chain-id 31337 --block-time 1 --mnemonic 'test test test test test test test test test test test junk'" \
   "pnpm dev:ciphernodes" \
   "TEST_MODE=1 pnpm dev:server" \
   "pnpm dev:program" && passed_message) || failed_message
