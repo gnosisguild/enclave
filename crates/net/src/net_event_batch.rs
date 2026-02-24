@@ -97,7 +97,8 @@ pub async fn fetch_all_batched_events<E: Debug>(
     requester: DirectRequester<WithoutPeer>,
     peer: PeerTarget,
     aggregate_id: AggregateId,
-    since: i128,
+    since: u128,
+    batch_size: u16,
 ) -> Result<Vec<E>>
 where
     E: TryFrom<Vec<u8>> + Send + Sync + 'static,
@@ -105,11 +106,10 @@ where
 {
     let requester = requester.to(peer);
     let mut all_events = Vec::new();
-    let mut cursor: u128 = since as u128;
-    let limit = u16::MAX;
+    let mut cursor = since;
 
     loop {
-        let request = FetchEventsSince::new(aggregate_id, cursor, limit);
+        let request = FetchEventsSince::new(aggregate_id, cursor, batch_size);
         let batch: EventBatch<E> = requester.request(request).await?;
 
         all_events.extend(batch.events);
@@ -151,14 +151,14 @@ mod tests {
         };
 
         let handle = DirectRequesterTester::new(net_cmds_rx, net_events_tx)
-            .expect_request(FetchEventsSince::new(AggregateId::new(1), 0, u16::MAX))
+            .expect_request(FetchEventsSince::new(AggregateId::new(1), 0, 100))
             .respond_with(batch1)
-            .expect_request(FetchEventsSince::new(AggregateId::new(1), 100, u16::MAX))
+            .expect_request(FetchEventsSince::new(AggregateId::new(1), 100, 100))
             .respond_with(batch2)
             .spawn();
 
         let events: Vec<Vec<u8>> =
-            fetch_all_batched_events(requester, PeerTarget::Random, AggregateId::new(1), 0)
+            fetch_all_batched_events(requester, PeerTarget::Random, AggregateId::new(1), 0, 100)
                 .await
                 .unwrap();
 
