@@ -100,12 +100,7 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
-    fn payload(
-        self,
-        sk_commitment: Field,
-        pk_commitment: Field,
-        e_sm_commitment: Field,
-    ) -> Vec<Field> {
+    fn payload(self, sk_commitment: Field, pk_commitment: Field) -> Vec<Field> {
         let mut inputs = Vec::new();
 
         // Flatten CRS polynomials a (L polynomials of degree N)
@@ -117,7 +112,6 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         // Use commitments instead of full polynomials
         inputs.push(sk_commitment);
         inputs.push(pk_commitment);
-        inputs.push(e_sm_commitment);
 
         // Flatten quotient polynomials (L polynomials each)
         inputs = flatten::<_, _, BIT_R1>(inputs, self.r1);
@@ -129,38 +123,24 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
     /// Main execution function
     /// Returns (commit(threshold_sk), commit(threshold_pk), commit(e_sm))
     pub fn execute(self) -> (Field, Field, Field) {
-        // Step 1: Perform range checks on all secret witness values
         self.perform_range_checks();
 
-        // Step 2: Compute commitments
         let sk_commitment = compute_share_computation_sk_commitment::<N, BIT_SK>(self.sk);
         let e_sm_commitment =
             compute_share_computation_e_sm_commitment::<N, L, BIT_E_SM>(self.e_sm);
         let pk_commitment = compute_threshold_pk_commitment::<N, L, BIT_PK>(self.pk0, self.pk1);
 
-        // Step 3: Generate Fiat-Shamir challenges using commitments
-        let gammas = self.generate_challenge(sk_commitment, pk_commitment, e_sm_commitment);
+        let gamma = self.generate_challenge(sk_commitment, pk_commitment);
+        self.verify_evaluations(gamma);
 
-        // Step 4: Verify public key equations for each modulus
-        for i in 0..L {
-            let gamma = gammas.get(i);
-            self.verify_public_key_for_modulus(i, gamma);
-        }
-
-        // Step 5: Return all commitments
         (sk_commitment, pk_commitment, e_sm_commitment)
     }
 
     /// Generates Fiat-Shamir challenge values using the SAFE cryptographic sponge
-    fn generate_challenge(
-        self,
-        sk_commitment: Field,
-        pk_commitment: Field,
-        e_sm_commitment: Field,
-    ) -> Vec<Field> {
-        let inputs = self.payload(sk_commitment, pk_commitment, e_sm_commitment);
+    fn generate_challenge(self, sk_commitment: Field, pk_commitment: Field) -> Field {
+        let inputs = self.payload(sk_commitment, pk_commitment);
 
-        compute_threshold_pk_challenge::<L>(inputs)
+        compute_threshold_pk_challenge(inputs)
     }
 
     /// Performs range checks on all secret witness values
@@ -190,32 +170,22 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         }
     }
 
-    /// Verifies the threshold public key generation equations for a specific CRT basis
-    fn verify_public_key_for_modulus(self, i: u32, gamma: Field) {
-        // Evaluate all polynomials at the random challenge point gamma
-        let a_at_gamma = self.a.map(|a_poly| a_poly.eval(gamma));
-
-        let eek_at_gamma = self.eek.eval(gamma);
-        let sk_at_gamma = self.sk.eval(gamma);
-
-        let r1_at_gamma = self.r1.map(|r1_poly| r1_poly.eval(gamma));
-        let r2_at_gamma = self.r2.map(|r2_poly| r2_poly.eval(gamma));
-
-        let pk0_at_gamma = self.pk0.map(|pk0_poly| pk0_poly.eval(gamma));
-        let pk1_at_gamma = self.pk1.map(|pk1_poly| pk1_poly.eval(gamma));
-
-        // Evaluate the cyclotomic polynomial X^N + 1 at gamma
+    fn verify_evaluations(self, gamma: Field) {
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
+        let sk_at_gamma = self.sk.eval(gamma);
+        let eek_at_gamma = self.eek.eval(gamma);
 
-        // pk0_i = -a_i * sk + eek + r2_i * (X^N + 1) + r1_i * q_i
-        let expected_pk0 = -a_at_gamma[i] * sk_at_gamma
-            + eek_at_gamma
-            + r2_at_gamma[i] * cyclo_at_gamma
-            + r1_at_gamma[i] * self.configs.qis[i];
+        for i in 0..L {
+            let expected_pk0 = -self.a[i].eval(gamma) * sk_at_gamma
+                + eek_at_gamma
+                + self.r2[i].eval(gamma) * cyclo_at_gamma
+                + self.r1[i].eval(gamma) * self.configs.qis[i];
 
-        assert(pk0_at_gamma[i] == expected_pk0, "Public key equation 1 failed");
-
-        // Equation 2: pk1_i = a_i
-        assert(pk1_at_gamma[i] == a_at_gamma[i], "Public key equation 2 failed");
+            assert(self.pk0[i].eval(gamma) == expected_pk0, "Public key equation 1 failed");
+            assert(
+                self.pk1[i].eval(gamma) == self.a[i].eval(gamma),
+                "Public key equation 2 failed",
+            );
+        }
     }
 }
