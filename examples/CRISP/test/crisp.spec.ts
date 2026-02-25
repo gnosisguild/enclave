@@ -142,7 +142,7 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
   await page.locator('button:has-text("Cast Vote")').click()
   log(`confirming MetaMask signature request...`)
   await metamask.confirmSignature()
-  const WAIT = parseInt(process.env.E3_DURATION as string, 10) * 1000 + 45_000 // A small buffer for decryption
+  const WAIT = parseInt(process.env.E3_DURATION as string, 10) * 1000 + 25_000 // A small buffer for decryption
   log(`waiting ${WAIT}ms...`)
   await page.waitForTimeout(WAIT)
   log(`clicking historic polls button...`)

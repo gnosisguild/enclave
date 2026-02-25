@@ -4,19 +4,19 @@ chains:
     contracts:
       enclave:
         address: "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
-        deploy_block: 18
+        deploy_block: 19
       ciphernode_registry:
+        address: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+        deploy_block: 17
+      bonding_registry:
         address: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
         deploy_block: 14
-      bonding_registry:
-        address: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
-        deploy_block: 15
       fee_token:
         address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-        deploy_block: 9
+        deploy_block: 10
       e3_program:
-        address: "0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8"
-        deploy_block: 30
+        address: "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E"
+        deploy_block: 32
 program:
   dev: true
 nodes:
