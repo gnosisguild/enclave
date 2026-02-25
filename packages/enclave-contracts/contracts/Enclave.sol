@@ -501,16 +501,29 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         uint256 totalAmount = e3Payments[e3Id];
         e3Payments[e3Id] = 0;
-        if (totalAmount == 0) return;
 
         // Use the per-E3 fee token (not the global one, which may have been rotated)
         IERC20 paymentToken = _e3FeeTokens[e3Id];
+
+        if (totalAmount == 0) {
+            e3RefundManager.distributeSlashedFundsOnSuccess(
+                e3Id,
+                activeNodes,
+                paymentToken
+            );
+            return;
+        }
 
         if (activeLength == 0) {
             address requester = _e3Requesters[e3Id];
             if (requester != address(0)) {
                 paymentToken.safeTransfer(requester, totalAmount);
             }
+            e3RefundManager.distributeSlashedFundsOnSuccess(
+                e3Id,
+                activeNodes,
+                paymentToken
+            );
             return;
         }
 
@@ -535,6 +548,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         paymentToken.forceApprove(address(bondingRegistry), 0);
 
         emit RewardsDistributed(e3Id, activeNodes, amounts);
+
+        e3RefundManager.distributeSlashedFundsOnSuccess(
+            e3Id,
+            activeNodes,
+            paymentToken
+        );
     }
 
     /// @notice Retrieves the honest committee nodes for a given E3.
@@ -735,12 +754,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     /// @inheritdoc IEnclave
-    function routeSlashedFunds(
+    function escrowSlashedFunds(
         uint256 e3Id,
         uint256 amount
     ) external onlySlashingManager {
-        e3RefundManager.routeSlashedFunds(e3Id, amount);
-        emit SlashedFundsRouted(e3Id, amount);
+        e3RefundManager.escrowSlashedFunds(e3Id, amount);
+        emit SlashedFundsEscrowed(e3Id, amount);
     }
 
     /// @inheritdoc IEnclave

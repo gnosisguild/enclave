@@ -24,6 +24,7 @@ interface IE3RefundManager {
         uint16 dkgBps;
         uint16 decryptionBps;
         uint16 protocolBps;
+        uint16 successSlashedNodeBps;
     }
     /// @notice Refund distribution for a failed E3
     struct RefundDistribution {
@@ -56,13 +57,19 @@ interface IE3RefundManager {
         uint256 amount,
         bytes32 claimType
     );
-    /// @notice Emitted when slashed funds are routed to E3
-    event SlashedFundsRouted(uint256 indexed e3Id, uint256 amount);
-    /// @notice Emitted when slashed funds are applied to refund distribution
+    /// @notice Emitted when slashed funds are escrowed for an E3
+    event SlashedFundsEscrowed(uint256 indexed e3Id, uint256 amount);
+    /// @notice Emitted when slashed funds are applied to a failed E3's refund distribution
     event SlashedFundsApplied(
         uint256 indexed e3Id,
         uint256 toRequester,
         uint256 toHonestNodes
+    );
+    /// @notice Emitted when escrowed slashed funds are distributed on success
+    event SlashedFundsDistributedOnSuccess(
+        uint256 indexed e3Id,
+        uint256 toNodes,
+        uint256 toProtocol
     );
     /// @notice Emitted when work allocation is updated
     event WorkAllocationUpdated(WorkValueAllocation allocation);
@@ -117,10 +124,20 @@ interface IE3RefundManager {
         uint256 e3Id
     ) external returns (uint256 amount);
 
-    /// @notice Route slashed funds to E3 refund pool
+    /// @notice Escrow slashed funds — destination decided at terminal state
     /// @param e3Id The E3 ID
     /// @param amount The slashed amount
-    function routeSlashedFunds(uint256 e3Id, uint256 amount) external;
+    function escrowSlashedFunds(uint256 e3Id, uint256 amount) external;
+
+    /// @notice Distribute escrowed slashed funds on success
+    /// @param e3Id The E3 ID
+    /// @param honestNodes Honest node addresses
+    /// @param paymentToken The fee token for this E3
+    function distributeSlashedFundsOnSuccess(
+        uint256 e3Id,
+        address[] calldata honestNodes,
+        IERC20 paymentToken
+    ) external;
 
     /// @notice Get refund distribution for an E3
     /// @param e3Id The E3 ID

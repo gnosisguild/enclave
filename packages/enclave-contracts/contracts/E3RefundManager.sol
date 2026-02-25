@@ -52,7 +52,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     mapping(uint256 e3Id => uint256 amount) internal _totalHonestNodePaid;
     /// @notice Maps E3 ID to honest node addresses
     mapping(uint256 e3Id => address[] nodes) internal _honestNodes;
-    /// @notice Tracks pending slashed funds for E3s whose refund hasn't been calculated yet
+    /// @notice Pending slashed funds awaiting E3 terminal state
     mapping(uint256 e3Id => uint256 amount) internal _pendingSlashedFunds;
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -98,7 +98,8 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
             committeeFormationBps: 1000,
             dkgBps: 3000,
             decryptionBps: 5500,
-            protocolBps: 500
+            protocolBps: 500,
+            successSlashedNodeBps: 5000
         });
 
         if (_owner != owner()) transferOwnership(_owner);
@@ -325,23 +326,61 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     }
 
     /// @inheritdoc IE3RefundManager
-    function routeSlashedFunds(
+    function escrowSlashedFunds(
         uint256 e3Id,
         uint256 amount
     ) external onlyEnclave {
         require(amount > 0, "Zero amount");
 
         RefundDistribution storage dist = _distributions[e3Id];
-        if (!dist.calculated) {
-            // Distribution not yet calculated; queue for later application
-            // when processE3Failure -> calculateRefund is called.
+        if (dist.calculated) {
+            require(_claimCount[e3Id] == 0, "Claims already started");
+            _applySlashedFunds(e3Id, amount);
+        } else {
             _pendingSlashedFunds[e3Id] += amount;
-            emit SlashedFundsRouted(e3Id, amount);
-            return;
         }
 
-        require(_claimCount[e3Id] == 0, "Claims already started");
-        _applySlashedFunds(e3Id, amount);
+        emit SlashedFundsEscrowed(e3Id, amount);
+    }
+
+    /// @inheritdoc IE3RefundManager
+    function distributeSlashedFundsOnSuccess(
+        uint256 e3Id,
+        address[] calldata honestNodes,
+        IERC20 paymentToken
+    ) external onlyEnclave {
+        uint256 escrowed = _pendingSlashedFunds[e3Id];
+        if (escrowed == 0) return;
+        _pendingSlashedFunds[e3Id] = 0;
+
+        require(address(paymentToken) != address(0), "Invalid fee token");
+
+        uint256 toNodes = (escrowed * _workAllocation.successSlashedNodeBps) /
+            10000;
+        uint256 toProtocol = escrowed - toNodes;
+
+        if (toProtocol > 0) {
+            paymentToken.safeTransfer(treasury, toProtocol);
+        }
+
+        if (toNodes > 0 && honestNodes.length > 0) {
+            uint256 perNode = toNodes / honestNodes.length;
+            uint256 distributed = 0;
+            for (uint256 i = 0; i < honestNodes.length; i++) {
+                uint256 nodeAmount = perNode;
+                if (i == honestNodes.length - 1) {
+                    nodeAmount = toNodes - distributed;
+                }
+                if (nodeAmount > 0) {
+                    paymentToken.safeTransfer(honestNodes[i], nodeAmount);
+                }
+                distributed += nodeAmount;
+            }
+        } else if (toNodes > 0) {
+            paymentToken.safeTransfer(treasury, toNodes);
+        }
+
+        emit SlashedFundsDistributedOnSuccess(e3Id, toNodes, toProtocol);
     }
 
     /// @notice Apply slashed funds to an E3's refund distribution
@@ -365,7 +404,6 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         dist.honestNodeAmount += toHonestNodes;
         dist.totalSlashed += amount;
 
-        emit SlashedFundsRouted(e3Id, amount);
         emit SlashedFundsApplied(e3Id, toRequester, toHonestNodes);
     }
 
@@ -412,6 +450,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
             uint256(allocation.decryptionBps) +
             uint256(allocation.protocolBps);
         require(total == 10000, "Must sum to 10000");
+        require(allocation.successSlashedNodeBps <= 10000, "Invalid BPS");
 
         _workAllocation = allocation;
 

@@ -473,25 +473,14 @@ contract SlashingManager is ISlashingManager, AccessControl {
             }
         }
 
-        // Route slashed ticket funds to E3 refund pool for requester/honest node compensation.
-        // Uses self-call pattern for try/catch atomicity: if either the BondingRegistry redirect
-        // or the E3RefundManager accounting fails, both revert together and slashed funds remain
-        // in BondingRegistry for treasury withdrawal. The slash itself still proceeds.
+        // Escrow slashed ticket funds for deferred distribution.
+        // Self-call for try/catch atomicity — on failure, funds stay in BondingRegistry.
         if (actualTicketSlashed > 0) {
-            IEnclave.E3Stage stage = enclave.getE3Stage(p.e3Id);
-            if (stage == IEnclave.E3Stage.Failed) {
-                // NOTE: The catch block must not be empty — solc >=0.8.28 with
-                // optimizer enabled will eliminate the external call when both
-                // try and catch blocks are empty (compiler optimization bug).
-                try
-                    this.routeSlashedFundsToRefund(p.e3Id, actualTicketSlashed)
-                {
-                    // Side effects occur in the external call
-                } catch {
-                    // Routing failed — slashed funds stay in BondingRegistry for
-                    // treasury withdrawal.  The slash itself still proceeds.
-                    emit RoutingFailed(p.e3Id, actualTicketSlashed);
-                }
+            // NOTE: catch must not be empty — solc >=0.8.28 optimizer bug.
+            try
+                this.escrowSlashedFundsToRefund(p.e3Id, actualTicketSlashed)
+            {} catch {
+                emit RoutingFailed(p.e3Id, actualTicketSlashed);
             }
         }
 
@@ -507,15 +496,15 @@ contract SlashingManager is ISlashingManager, AccessControl {
     }
 
     /// @inheritdoc ISlashingManager
-    /// @dev Atomically redirects slashed ticket funds from BondingRegistry to E3RefundManager
-    ///      and updates the refund distribution. External with self-only access for try/catch.
-    function routeSlashedFundsToRefund(uint256 e3Id, uint256 amount) external {
+    /// @dev Atomically redirects slashed funds to E3RefundManager escrow.
+    ///      External with self-only access for try/catch atomicity.
+    function escrowSlashedFundsToRefund(uint256 e3Id, uint256 amount) external {
         require(msg.sender == address(this), Unauthorized());
         address refundManager = address(e3RefundManager);
         require(refundManager != address(0), ZeroAddress());
         bondingRegistry.redirectSlashedTicketFunds(refundManager, amount);
-        enclave.routeSlashedFunds(e3Id, amount);
-        emit SlashedFundsRoutedToRefund(e3Id, amount);
+        enclave.escrowSlashedFunds(e3Id, amount);
+        emit SlashedFundsEscrowedToRefund(e3Id, amount);
     }
 
     // ======================

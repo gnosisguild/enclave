@@ -261,11 +261,11 @@ interface ISlashingManager {
     );
 
     /**
-     * @notice Emitted when slashed ticket funds are routed to the E3 refund pool
+     * @notice Emitted when slashed ticket funds are escrowed in the E3 refund pool
      * @param e3Id ID of the E3 computation
-     * @param amount Amount of slashed funds routed (underlying stablecoin)
+     * @param amount Amount of slashed funds escrowed (underlying stablecoin)
      */
-    event SlashedFundsRoutedToRefund(uint256 indexed e3Id, uint256 amount);
+    event SlashedFundsEscrowedToRefund(uint256 indexed e3Id, uint256 amount);
 
     /**
      * @notice Emitted when routing slashed funds fails (funds remain in BondingRegistry)
@@ -424,14 +424,14 @@ interface ISlashingManager {
     function executeSlash(uint256 proposalId) external;
 
     /**
-     * @notice Atomically redirects slashed ticket funds and updates E3 refund distribution
+     * @notice Atomically redirects slashed ticket funds to E3RefundManager escrow
      * @dev Only callable by this contract (self-call pattern for try/catch atomicity).
      *      Transfers underlying stablecoin from BondingRegistry to E3RefundManager
-     *      and calls Enclave.routeSlashedFunds to update the distribution.
+     *      and calls Enclave.escrowSlashedFunds to update the escrow balance.
      * @param e3Id ID of the E3 computation
-     * @param amount Amount of slashed ticket balance to route
+     * @param amount Amount of slashed ticket balance to escrow
      */
-    function routeSlashedFundsToRefund(uint256 e3Id, uint256 amount) external;
+    function escrowSlashedFundsToRefund(uint256 e3Id, uint256 amount) external;
 
     // ======================
     // Appeal Functions
