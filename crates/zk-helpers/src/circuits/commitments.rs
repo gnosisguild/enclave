@@ -424,21 +424,16 @@ pub fn compute_aggregated_shares_commitment(agg_shares: &CrtPolynomial, bit_msg:
 ///
 /// # Arguments
 /// * `payload` - Prepared payload as a vector of field elements
-/// * `l` - Number of moduli
 ///
 /// # Returns
-/// A vector of `BigInt` challenges (2*L elements)
-pub fn compute_threshold_pk_challenge(payload: Vec<Field>, l: usize) -> Vec<BigInt> {
+/// A `BigInt` representing the commitment hash value
+pub fn compute_threshold_pk_challenge(payload: Vec<Field>) -> BigInt {
     let input_size = payload.len() as u32;
-    let io_pattern = [0x80000000 | input_size, (2 * l as u32)];
+    let io_pattern = [0x80000000 | input_size, 1];
 
-    compute_commitments(payload, DS_CLG_PK_GENERATION, io_pattern)
-        .into_iter()
-        .map(|challenge_field| {
-            let challenge_bytes = challenge_field.into_bigint().to_bytes_le();
-            BigInt::from_bytes_le(num_bigint::Sign::Plus, &challenge_bytes)
-        })
-        .collect()
+    let challenge_field = compute_commitments(payload, DS_CLG_PK_GENERATION, io_pattern)[0];
+    let challenge_bytes = challenge_field.into_bigint().to_bytes_le();
+    BigInt::from_bytes_le(num_bigint::Sign::Plus, &challenge_bytes)
 }
 
 /// Compute share encryption challenge.
@@ -600,12 +595,16 @@ mod tests {
     }
 
     #[test]
-    fn compute_threshold_pk_challenge_returns_2l_elements() {
+    fn compute_threshold_pk_challenge_returns_single_bigint() {
         let payload = vec![Field::from(1u64), Field::from(2u64)];
-        let l = 3;
+        let input_size = payload.len() as u32;
+        let io_pattern = [0x80000000 | input_size, 1];
+        let expected_challenge = field_to_bigint(
+            compute_commitments(payload.clone(), DS_CLG_PK_GENERATION, io_pattern)[0],
+        );
 
-        let challenges = compute_threshold_pk_challenge(payload, l);
-        assert_eq!(challenges.len(), 2 * l);
+        let challenge = compute_threshold_pk_challenge(payload);
+        assert_eq!(challenge, expected_challenge);
     }
 
     #[test]
