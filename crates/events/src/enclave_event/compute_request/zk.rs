@@ -27,6 +27,8 @@ pub enum ZkRequest {
     DkgShareDecryption(DkgShareDecryptionProofRequest),
     /// Batch-verify C2/C3 proofs from other parties.
     VerifyShareProofs(VerifyShareProofsRequest),
+    /// Batch-verify C4 proofs from DecryptionKeyShared events.
+    VerifyC4Proofs(VerifyC4ProofsRequest),
 }
 
 /// Request to generate a proof for share computation (C2a or C2b).
@@ -172,6 +174,8 @@ pub enum ZkResponse {
     DkgShareDecryption(DkgShareDecryptionProofResponse),
     /// Batch verification results for C2/C3 proofs.
     VerifyShareProofs(VerifyShareProofsResponse),
+    /// Batch verification results for C4 proofs.
+    VerifyC4Proofs(VerifyC4ProofsResponse),
 }
 
 /// Response containing a generated share computation proof.
@@ -277,6 +281,42 @@ pub struct PartyVerificationResult {
     pub failed_proof_type: Option<ProofType>,
     /// If any proof failed: the signed payload for fault attribution.
     pub failed_signed_payload: Option<SignedProofPayload>,
+}
+
+/// Request to batch-verify C4 proofs from DecryptionKeyShared events.
+///
+/// Grouped by sender so the verifier can report honest/dishonest per party.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct VerifyC4ProofsRequest {
+    /// C4 proofs grouped by sender party_id.
+    pub party_proofs: Vec<PartyC4ProofsToVerify>,
+}
+
+/// C4 proofs from a single sender to verify.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PartyC4ProofsToVerify {
+    /// The party that generated these proofs.
+    pub sender_party_id: u64,
+    /// C4a proof (SecretKey decryption).
+    pub c4a_proof: Proof,
+    /// C4b proofs (SmudgingNoise decryption), one per smudging noise index.
+    pub c4b_proofs: Vec<Proof>,
+}
+
+/// Batch verification results for C4 proofs.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct VerifyC4ProofsResponse {
+    /// Per-party verification results.
+    pub party_results: Vec<PartyC4VerificationResult>,
+}
+
+/// Verification result for C4 proofs from a single sender.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PartyC4VerificationResult {
+    /// The party whose C4 proofs were verified.
+    pub sender_party_id: u64,
+    /// Whether ALL C4 proofs from this party verified successfully.
+    pub all_verified: bool,
 }
 
 /// ZK-specific error variants.

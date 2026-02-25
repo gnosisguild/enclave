@@ -6,21 +6,20 @@ chains:
         address: "0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8"
         deploy_block: 1 # Set to actual deploy block
       enclave:
-        address: '0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e'
-        deploy_block: 16
+        address: "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+        deploy_block: 18
       ciphernode_registry:
-        address: '0xa513E6E4b8f2a923D98304ec87F64353C4D5C853'
-        deploy_block: 14
+        address: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+        deploy_block: 16
       bonding_registry:
-        address: '0x8A791620dd6260079BF849Dc5567aDC3F2FdC318'
-        deploy_block: 10
-      slashing_manager:
-        address: '0x5FC8d32690cc91D4c39d9d3abcBD16989F875707'
-        deploy_block: 10
+        address: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
+        deploy_block: 13
       fee_token:
-        address: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
-        deploy_block: 6
-
+        address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+        deploy_block: 9
+      e3_program:
+        address: "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E"
+        deploy_block: 30
 program:
   dev: true
 nodes:

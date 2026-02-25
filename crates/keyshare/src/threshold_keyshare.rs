@@ -15,11 +15,12 @@ use e3_events::{
     DkgShareDecryptionProofResponse, E3Failed, E3RequestComplete, E3Stage, E3id, EType,
     EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed,
     EncryptionKeyCreated, EncryptionKeyPending, EventContext, FailureReason, KeyshareCreated,
-    PartyId, PartyProofsToVerify, PkGenerationProofRequest, PkGenerationProofSigned, Proof,
-    ProofType, Sequenced, ShareComputationProofRequest, ShareEncryptionProofRequest,
-    SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated,
-    ThresholdSharePending, TypedEvent, VerifyShareProofsRequest, VerifyShareProofsResponse,
-    ZkRequest, ZkResponse,
+    PartyC4ProofsToVerify, PartyId, PartyProofsToVerify, PkGenerationProofRequest,
+    PkGenerationProofSigned, Proof, ProofType, Sequenced, ShareComputationProofRequest,
+    ShareEncryptionProofRequest, SignedProofPayload, ThresholdShare,
+    ThresholdShareCollectionFailed, ThresholdShareCreated, ThresholdSharePending, TypedEvent,
+    VerifyC4ProofsRequest, VerifyC4ProofsResponse, VerifyShareProofsRequest,
+    VerifyShareProofsResponse, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::{build_pair_for_preset, BfvParamSet, BfvPreset};
@@ -40,15 +41,18 @@ use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
-use rand::{rngs::OsRng, SeedableRng};
-use rand_chacha::ChaCha20Rng;
+use rand::rngs::OsRng;
 use std::{
     collections::{HashMap, HashSet},
     mem,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 use tracing::{error, info, trace, warn};
 
+use crate::decryption_key_shared_collector::{
+    AllDecryptionKeySharesCollected, DecryptionKeySharedCollectionFailed,
+    DecryptionKeySharedCollector,
+};
 use crate::encryption_key_collector::{AllEncryptionKeysCollected, EncryptionKeyCollector};
 use crate::threshold_share_collector::{ReceivedShareProofs, ThresholdShareCollector};
 
@@ -356,6 +360,8 @@ pub struct ThresholdKeyshare {
     cipher: Arc<Cipher>,
     decryption_key_collector: Option<Addr<ThresholdShareCollector>>,
     encryption_key_collector: Option<Addr<EncryptionKeyCollector>>,
+    /// Collector for incoming DecryptionKeyShared events (Exchange #3).
+    decryption_key_shared_collector: Option<Addr<DecryptionKeySharedCollector>>,
     state: Persistable<ThresholdKeyshareState>,
     share_enc_preset: BfvPreset,
     /// Temporarily holds shares + proofs while C2/C3 proof verification is in flight.
@@ -372,6 +378,8 @@ pub struct ThresholdKeyshare {
     no_proof_dishonest_parties: Option<HashSet<u64>>,
     /// Party IDs sent for C2/C3 verification — used to detect missing results in the response.
     expected_verification_parties: Option<HashSet<u64>>,
+    /// Honest party IDs after C2/C3 verification — used by DecryptionKeySharedCollector and C4.
+    honest_parties: Option<HashSet<u64>>,
 }
 
 impl ThresholdKeyshare {
@@ -381,6 +389,7 @@ impl ThresholdKeyshare {
             cipher: params.cipher,
             decryption_key_collector: None,
             encryption_key_collector: None,
+            decryption_key_shared_collector: None,
             state: params.state,
             share_enc_preset: params.share_enc_preset,
             pending_verification_shares: None,
@@ -390,6 +399,7 @@ impl ThresholdKeyshare {
             c4b_correlation_map: HashMap::new(),
             no_proof_dishonest_parties: None,
             expected_verification_parties: None,
+            honest_parties: None,
         }
     }
 }
@@ -439,6 +449,32 @@ impl ThresholdKeyshare {
         let addr = self
             .encryption_key_collector
             .get_or_insert_with(|| EncryptionKeyCollector::setup(self_addr, threshold_n, e3_id));
+        Ok(addr.clone())
+    }
+
+    pub fn ensure_decryption_key_shared_collector(
+        &mut self,
+        self_addr: Addr<Self>,
+    ) -> Result<Addr<DecryptionKeySharedCollector>> {
+        let Some(state) = self.state.get() else {
+            bail!("State not found on threshold keyshare.");
+        };
+
+        let honest = self
+            .honest_parties
+            .as_ref()
+            .ok_or_else(|| anyhow!("Honest parties not yet defined"))?;
+
+        let expected: HashSet<u64> = honest
+            .iter()
+            .filter(|&&pid| pid != state.party_id)
+            .copied()
+            .collect();
+
+        let e3_id = state.e3_id.clone();
+        let addr = self
+            .decryption_key_shared_collector
+            .get_or_insert_with(|| DecryptionKeySharedCollector::setup(self_addr, expected, e3_id));
         Ok(addr.clone())
     }
 
@@ -580,6 +616,7 @@ impl ThresholdKeyshare {
             ComputeResponseKind::Zk(zk) => match zk {
                 ZkResponse::VerifyShareProofs(_) => self.handle_verify_share_proofs_response(msg),
                 ZkResponse::DkgShareDecryption(_) => self.handle_c4_proof_response(msg),
+                ZkResponse::VerifyC4Proofs(_) => self.handle_verify_c4_proofs_response(msg),
                 _ => Ok(()),
             },
         }
@@ -1328,6 +1365,10 @@ impl ThresholdKeyshare {
             })
             .collect();
 
+        // Store honest party IDs for later use by DecryptionKeySharedCollector
+        let honest_party_ids: HashSet<u64> = honest_shares.iter().map(|s| s.party_id).collect();
+        self.honest_parties = Some(honest_party_ids);
+
         let num_honest = honest_shares.len();
         info!(
             "Decrypting shares from {} honest parties for E3 {}",
@@ -1424,6 +1465,12 @@ impl ThresholdKeyshare {
         self.c4b_correlation_map.clear();
         self.expected_c4b_count = num_esi;
 
+        // Resolve threshold preset for C4 proof requests
+        let threshold_preset = self
+            .share_enc_preset
+            .threshold_counterpart()
+            .ok_or_else(|| anyhow!("No threshold counterpart for {:?}", self.share_enc_preset))?;
+
         // Dispatch C4a proof generation (SecretKey decryption)
         info!(
             "Dispatching C4a DkgShareDecryption proof (SecretKey) for E3 {} ({} honest, {} moduli)",
@@ -1436,7 +1483,7 @@ impl ThresholdKeyshare {
                 num_honest_parties: num_honest,
                 num_moduli: num_moduli_sk,
                 dkg_input_type: DkgInputType::SecretKey,
-                params_preset: self.share_enc_preset.clone(),
+                params_preset: threshold_preset,
             }),
             CorrelationId::new(),
             e3_id.clone(),
@@ -1458,7 +1505,7 @@ impl ThresholdKeyshare {
                     num_honest_parties: num_honest,
                     num_moduli: num_moduli_esi,
                     dkg_input_type: DkgInputType::SmudgingNoise,
-                    params_preset: self.share_enc_preset.clone(),
+                    params_preset: threshold_preset,
                 }),
                 correlation_id,
                 e3_id.clone(),
@@ -1628,10 +1675,139 @@ impl ThresholdKeyshare {
             s.new_state(next)
         })?;
 
+        // KeyshareCreated (Exchange #4) is deferred until after C4 proof verification
+        // from all honest parties. Check if C4 proofs are already ready for Exchange #3.
+        self.try_publish_decryption_key_shared(ec)?;
+
+        Ok(())
+    }
+
+    /// Handle all DecryptionKeyShared events collected from honest parties.
+    /// Build VerifyC4ProofsRequest and dispatch for verification.
+    pub fn handle_all_decryption_key_shares_collected(
+        &mut self,
+        msg: TypedEvent<AllDecryptionKeySharesCollected>,
+    ) -> Result<()> {
+        let (msg, ec) = msg.into_components();
+        let state = self.state.try_get()?;
+        let e3_id = state.get_e3_id();
+
+        info!(
+            "AllDecryptionKeySharesCollected for E3 {} ({} shares)",
+            e3_id,
+            msg.shares.len()
+        );
+
+        // Build C4 proof verification requests from collected shares
+        let party_proofs: Vec<PartyC4ProofsToVerify> = msg
+            .shares
+            .iter()
+            .map(|(&party_id, share)| PartyC4ProofsToVerify {
+                sender_party_id: party_id,
+                c4a_proof: share.c4a_proof.clone(),
+                c4b_proofs: share.c4b_proofs.clone(),
+            })
+            .collect();
+
+        if party_proofs.is_empty() {
+            info!("No C4 proofs to verify — publishing KeyshareCreated directly");
+            return self.publish_keyshare_created(ec);
+        }
+
+        info!(
+            "Dispatching C4 proof verification for E3 {} ({} parties)",
+            e3_id,
+            party_proofs.len()
+        );
+
+        let event = ComputeRequest::zk(
+            ZkRequest::VerifyC4Proofs(VerifyC4ProofsRequest { party_proofs }),
+            CorrelationId::new(),
+            e3_id.clone(),
+        );
+        self.bus.publish(event, ec)?;
+        Ok(())
+    }
+
+    /// Handle C4 proof verification results — update honest set H and publish KeyshareCreated.
+    fn handle_verify_c4_proofs_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
+        let (msg, ec) = msg.into_components();
+        let resp: VerifyC4ProofsResponse = match msg.response {
+            ComputeResponseKind::Zk(ZkResponse::VerifyC4Proofs(r)) => r,
+            _ => bail!("Expected VerifyC4Proofs response"),
+        };
+
+        let state = self.state.try_get()?;
+        let e3_id = state.get_e3_id();
+
+        // Partition into honest and dishonest
+        let mut c4_dishonest: HashSet<u64> = HashSet::new();
+        for result in &resp.party_results {
+            if result.all_verified {
+                info!(
+                    "Party {} passed C4 verification for E3 {}",
+                    result.sender_party_id, e3_id
+                );
+            } else {
+                warn!(
+                    "Party {} FAILED C4 verification for E3 {}",
+                    result.sender_party_id, e3_id
+                );
+                c4_dishonest.insert(result.sender_party_id);
+            }
+        }
+
+        // Update honest parties set
+        if !c4_dishonest.is_empty() {
+            if let Some(ref mut honest) = self.honest_parties {
+                honest.retain(|pid| !c4_dishonest.contains(pid));
+
+                let threshold = state.threshold_m;
+                let honest_count = honest.len() as u64;
+                if honest_count < threshold {
+                    warn!(
+                        "Too few honest parties after C4 verification for E3 {} ({} honest < {} threshold)",
+                        e3_id, honest_count, threshold
+                    );
+                    if let Err(err) = self.bus.publish(
+                        E3Failed {
+                            e3_id: e3_id.clone(),
+                            failed_at_stage: E3Stage::CommitteeFinalized,
+                            reason: FailureReason::InsufficientCommitteeMembers,
+                        },
+                        ec,
+                    ) {
+                        error!("Failed to publish E3Failed: {err}");
+                    }
+                    return Ok(());
+                }
+
+                info!(
+                    "Updated honest set after C4 verification for E3 {}: {} honest ({} removed)",
+                    e3_id,
+                    honest.len(),
+                    c4_dishonest.len()
+                );
+            }
+        } else {
+            info!(
+                "All parties passed C4 verification for E3 {} — publishing KeyshareCreated",
+                e3_id
+            );
+        }
+
+        // Exchange #4: Publish KeyshareCreated
+        self.publish_keyshare_created(ec)
+    }
+
+    /// Publish KeyshareCreated (Exchange #4) with pk_share and signed C1 proof.
+    fn publish_keyshare_created(&mut self, ec: EventContext<Sequenced>) -> Result<()> {
         let state = self.state.try_get()?;
         let e3_id = state.get_e3_id();
         let address = state.get_address().to_owned();
         let current: ReadyForDecryption = state.clone().try_into()?;
+
+        info!("Publishing Exchange #4 (KeyshareCreated) for E3 {}", e3_id);
 
         self.bus.publish(
             KeyshareCreated {
@@ -1640,11 +1816,8 @@ impl ThresholdKeyshare {
                 node: address,
                 signed_pk_generation_proof: current.signed_pk_generation_proof,
             },
-            ec.clone(),
+            ec,
         )?;
-
-        // Check if C4 proofs are already ready — if so, publish Exchange #3 now
-        self.try_publish_decryption_key_shared(ec)?;
 
         Ok(())
     }
@@ -1789,7 +1962,10 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
                         "Received DecryptionKeyShared from party {} for E3 {}",
                         data.party_id, data.e3_id
                     );
-                    // TODO: Verify C4 proofs and store for threshold decryption
+                    match self.ensure_decryption_key_shared_collector(ctx.address()) {
+                        Ok(collector) => collector.do_send(TypedEvent::new(data, ec)),
+                        Err(e) => warn!("Cannot forward DecryptionKeyShared: {}", e),
+                    }
                 }
             }
             EnclaveEventData::ComputeResponse(data) => {
@@ -1853,6 +2029,51 @@ impl Handler<TypedEvent<AllThresholdSharesCollected>> for ThresholdKeyshare {
             &self.bus.with_ec(msg.get_ctx()),
             || self.handle_all_threshold_shares_collected(msg),
         )
+    }
+}
+
+impl Handler<TypedEvent<AllDecryptionKeySharesCollected>> for ThresholdKeyshare {
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: TypedEvent<AllDecryptionKeySharesCollected>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        trap(
+            EType::KeyGeneration,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_all_decryption_key_shares_collected(msg),
+        )
+    }
+}
+
+impl Handler<DecryptionKeySharedCollectionFailed> for ThresholdKeyshare {
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: DecryptionKeySharedCollectionFailed,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        trap(EType::KeyGeneration, &self.bus.clone(), || {
+            warn!(
+                e3_id = %msg.e3_id,
+                missing_parties = ?msg.missing_parties,
+                "DecryptionKeyShared collection failed: {}",
+                msg.reason
+            );
+
+            // Clear the collector reference since it's stopped
+            self.decryption_key_shared_collector = None;
+
+            if let Err(err) = self.bus.publish_without_context(E3Failed {
+                e3_id: msg.e3_id.clone(),
+                failed_at_stage: E3Stage::CommitteeFinalized,
+                reason: FailureReason::InsufficientCommitteeMembers,
+            }) {
+                error!("Failed to publish E3Failed: {err}");
+            }
+            Ok(())
+        })
     }
 }
 
@@ -1931,6 +2152,7 @@ impl Handler<E3RequestComplete> for ThresholdKeyshare {
     fn handle(&mut self, _: E3RequestComplete, ctx: &mut Self::Context) -> Self::Result {
         self.encryption_key_collector = None;
         self.decryption_key_collector = None;
+        self.decryption_key_shared_collector = None;
         self.notify_sync(ctx, Die);
     }
 }
