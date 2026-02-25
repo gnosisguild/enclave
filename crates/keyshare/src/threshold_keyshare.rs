@@ -16,10 +16,12 @@ use e3_events::{
     EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed,
     EncryptionKeyCreated, EncryptionKeyPending, EventContext, FailureReason, KeyshareCreated,
     PartyId, PartyProofsToVerify, PartyShareDecryptionProofsToVerify, PkGenerationProofRequest,
-    PkGenerationProofSigned, ProofType, Sequenced, ShareComputationProofRequest,
+    PkGenerationProofSigned, Proof, ProofType, Sequenced, ShareComputationProofRequest,
     ShareEncryptionProofRequest, ShareVerificationComplete, ShareVerificationDispatched,
     SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated,
-    ThresholdSharePending, TypedEvent, VerificationKind,
+    ThresholdShareDecryptionProofRequest, ThresholdSharePending, TypedEvent, VerificationKind,
+    VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
+    VerifyShareProofsRequest, VerifyShareProofsResponse, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::{build_pair_for_preset, BfvParamSet, BfvPreset};
@@ -155,6 +157,19 @@ pub struct Decrypting {
     pk_share: ArcBytes,
     sk_poly_sum: SensitiveBytes,
     es_poly_sum: Vec<SensitiveBytes>,
+    /// Ciphertext bytes from CiphertextOutputPublished, needed for C6 proof generation.
+    ciphertext_output: Vec<ArcBytes>,
+    signed_pk_generation_proof: Option<SignedProofPayload>,
+    signed_sk_share_computation_proof: Option<SignedProofPayload>,
+    signed_e_sm_share_computation_proof: Option<SignedProofPayload>,
+    signed_sk_share_encryption_proofs: Vec<SignedProofPayload>,
+    signed_e_sm_share_encryption_proofs: Vec<SignedProofPayload>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct GeneratingDecryptionProof {
+    pk_share: ArcBytes,
+    decryption_share: Vec<ArcBytes>,
     signed_pk_generation_proof: Option<SignedProofPayload>,
     signed_sk_share_computation_proof: Option<SignedProofPayload>,
     signed_e_sm_share_computation_proof: Option<SignedProofPayload>,
@@ -176,6 +191,8 @@ pub enum KeyshareState {
     ReadyForDecryption(ReadyForDecryption),
     // Decrypting something
     Decrypting(Decrypting),
+    // Generating C6 proof of correct decryption
+    GeneratingDecryptionProof(GeneratingDecryptionProof),
     // Finished
     Completed,
 }
@@ -195,7 +212,8 @@ impl KeyshareState {
                     (K::GeneratingThresholdShare(_), K::AggregatingDecryptionKey(_)) => true,
                     (K::AggregatingDecryptionKey(_), K::ReadyForDecryption(_)) => true,
                     (K::ReadyForDecryption(_), K::Decrypting(_)) => true,
-                    (K::Decrypting(_), K::Completed) => true,
+                    (K::Decrypting(_), K::GeneratingDecryptionProof(_)) => true,
+                    (K::GeneratingDecryptionProof(_), K::Completed) => true,
                     _ => false,
                 }
             }
@@ -219,6 +237,7 @@ impl KeyshareState {
             Self::AggregatingDecryptionKey(_) => "AggregatingDecryptionKey",
             Self::ReadyForDecryption(_) => "ReadyForDecryption",
             Self::Decrypting(_) => "Decrypting",
+            Self::GeneratingDecryptionProof(_) => "GeneratingDecryptionProof",
             Self::Completed => "Completed",
         }
     }
@@ -347,6 +366,16 @@ impl TryInto<Decrypting> for ThresholdKeyshareState {
     }
 }
 
+impl TryInto<GeneratingDecryptionProof> for ThresholdKeyshareState {
+    type Error = anyhow::Error;
+    fn try_into(self) -> std::result::Result<GeneratingDecryptionProof, Self::Error> {
+        match self.state {
+            KeyshareState::GeneratingDecryptionProof(s) => Ok(s),
+            _ => Err(anyhow!("Invalid state: expected GeneratingDecryptionProof")),
+        }
+    }
+}
+
 pub struct ThresholdKeyshareParams {
     pub bus: BusHandle,
     pub cipher: Arc<Cipher>,
@@ -372,8 +401,10 @@ pub struct ThresholdKeyshare {
     )>,
     /// Honest party IDs determined by C2/C3 verification, narrowed by C4.
     honest_parties: Option<HashSet<u64>>,
-    /// DecryptionKeyShared events arriving before ReadyForDecryption.
-    early_decryption_key_shares: HashMap<u64, DecryptionKeyShared>,
+    /// Temporarily stores DecryptionKeyShared while C4 verification is in flight.
+    pending_c4_verification_shares: Option<HashMap<u64, DecryptionKeyShared>>,
+    /// Aggregated public key bytes, captured from PublicKeyAggregated event for C6 proof.
+    aggregated_pk: Option<ArcBytes>,
 }
 
 impl ThresholdKeyshare {
@@ -389,7 +420,8 @@ impl ThresholdKeyshare {
             pending_shares: Vec::new(),
             pending_share_decryption_data: None,
             honest_parties: None,
-            early_decryption_key_shares: HashMap::new(),
+            pending_c4_verification_shares: None,
+            aggregated_pk: None,
         }
     }
 }
@@ -608,9 +640,17 @@ impl ThresholdKeyshare {
                 }
                 _ => Ok(()),
             },
-            // ZK responses (C4 proofs, share/decryption verification) are now
-            // handled by ProofRequestActor and ShareVerificationActor respectively.
-            _ => Ok(()),
+            ComputeResponseKind::Zk(zk) => match zk {
+                ZkResponse::VerifyShareProofs(_) => self.handle_verify_share_proofs_response(msg),
+                ZkResponse::DkgShareDecryption(_) => {
+                    self.handle_share_decryption_proof_response(msg)
+                }
+                ZkResponse::VerifyShareDecryptionProofs(_) => {
+                    self.handle_verify_share_decryption_proofs_response(msg)
+                }
+                ZkResponse::ThresholdShareDecryption(_) => self.handle_c6_proof_response(msg),
+                _ => Ok(()),
+            },
         }
     }
 
@@ -1879,7 +1919,9 @@ impl ThresholdKeyshare {
         msg: TypedEvent<CiphertextOutputPublished>,
     ) -> Result<()> {
         let (msg, ec) = msg.into_components();
-        // Set state to decrypting
+        let ciphertext_output = msg.ciphertext_output;
+
+        // Set state to decrypting, storing ciphertext for later C6 proof generation
         self.state.try_mutate(&ec, |s| {
             use KeyshareState as K;
 
@@ -1889,6 +1931,7 @@ impl ThresholdKeyshare {
                 pk_share: current.pk_share,
                 sk_poly_sum: current.sk_poly_sum,
                 es_poly_sum: current.es_poly_sum,
+                ciphertext_output: ciphertext_output.clone(),
                 signed_pk_generation_proof: current.signed_pk_generation_proof,
                 signed_sk_share_computation_proof: current.signed_sk_share_computation_proof,
                 signed_e_sm_share_computation_proof: current.signed_e_sm_share_computation_proof,
@@ -1899,7 +1942,6 @@ impl ThresholdKeyshare {
             s.new_state(next)
         })?;
 
-        let ciphertext_output = msg.ciphertext_output;
         let state = self.state.try_get()?;
         let e3_id = state.get_e3_id();
         let decrypting: Decrypting = state.clone().try_into()?;
@@ -1922,7 +1964,7 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// CalculateDecryptionShareResponse
+    /// CalculateDecryptionShareResponse — dispatch C6 proof generation
     pub fn handle_calculate_decryption_share_response(
         &mut self,
         res: TypedEvent<ComputeResponse>,
@@ -1930,26 +1972,101 @@ impl ThresholdKeyshare {
         let (res, ec) = res.into_components();
         let msg: CalculateDecryptionShareResponse = res.try_into()?;
         let state = self.state.try_get()?;
+        let e3_id = state.e3_id.clone();
+        let decrypting: Decrypting = state.clone().try_into()?;
+        let d_share_poly = msg.d_share_poly;
+
+        let aggregated_pk_bytes = self
+            .aggregated_pk
+            .clone()
+            .ok_or_else(|| anyhow!("Aggregated public key not available for C6 proof"))?;
+
+        let threshold_preset = self
+            .share_enc_preset
+            .clone()
+            .threshold_counterpart()
+            .ok_or_else(|| {
+                anyhow!(
+                    "No threshold counterpart for preset {:?}",
+                    self.share_enc_preset
+                )
+            })?;
+
+        info!("Dispatching C6 proof generation (threshold share decryption)...");
+
+        // Transition to GeneratingDecryptionProof state
+        self.state.try_mutate(&ec, |s| {
+            use KeyshareState as K;
+            s.new_state(K::GeneratingDecryptionProof(GeneratingDecryptionProof {
+                pk_share: decrypting.pk_share.clone(),
+                decryption_share: d_share_poly.clone(),
+                signed_pk_generation_proof: decrypting.signed_pk_generation_proof.clone(),
+                signed_sk_share_computation_proof: decrypting
+                    .signed_sk_share_computation_proof
+                    .clone(),
+                signed_e_sm_share_computation_proof: decrypting
+                    .signed_e_sm_share_computation_proof
+                    .clone(),
+                signed_sk_share_encryption_proofs: decrypting
+                    .signed_sk_share_encryption_proofs
+                    .clone(),
+                signed_e_sm_share_encryption_proofs: decrypting
+                    .signed_e_sm_share_encryption_proofs
+                    .clone(),
+            }))
+        })?;
+
+        // Dispatch C6 proof request
+        let request = ComputeRequest::zk(
+            ZkRequest::ThresholdShareDecryption(ThresholdShareDecryptionProofRequest {
+                ciphertext_bytes: decrypting.ciphertext_output,
+                aggregated_pk_bytes,
+                sk_poly_sum: decrypting.sk_poly_sum,
+                es_poly_sum: decrypting.es_poly_sum,
+                d_share_bytes: d_share_poly,
+                params_preset: threshold_preset,
+            }),
+            CorrelationId::new(),
+            e3_id,
+        );
+        self.bus.publish(request, ec)?;
+        Ok(())
+    }
+
+    /// Handle C6 proof response — publish DecryptionshareCreated with proofs
+    pub fn handle_c6_proof_response(&mut self, res: TypedEvent<ComputeResponse>) -> Result<()> {
+        let (res, ec) = res.into_components();
+        let zk_response = res.try_into_zk()?;
+        let proofs = match zk_response {
+            ZkResponse::ThresholdShareDecryption(data) => data.proofs,
+            _ => bail!("Expected ThresholdShareDecryptionProofResponse"),
+        };
+
+        let state = self.state.try_get()?;
         let party_id = state.party_id;
-        let node = state.address;
-        let e3_id = state.e3_id;
-        let decryption_share = msg.d_share_poly;
+        let node = state.address.clone();
+        let e3_id = state.e3_id.clone();
+        let gen_proof: GeneratingDecryptionProof = state.clone().try_into()?;
+
+        info!(
+            "C6 proof generated ({} proofs), publishing DecryptionshareCreated",
+            proofs.len()
+        );
 
         let event = DecryptionshareCreated {
             party_id,
             node,
             e3_id,
-            decryption_share,
+            decryption_share: gen_proof.decryption_share,
+            decryption_proofs: proofs,
         };
 
-        // send the decryption share
         self.bus.publish(event, ec.clone())?;
 
         // mark as complete
         self.state.try_mutate(&ec, |s| {
             use KeyshareState as K;
             info!("Decryption share sending process is complete");
-
             s.new_state(K::Completed)
         })?;
 
@@ -1968,6 +2085,9 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
             }
             EnclaveEventData::CiphertextOutputPublished(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::PublicKeyAggregated(data) => {
+                self.aggregated_pk = Some(ArcBytes::from_bytes(&data.pubkey));
             }
             EnclaveEventData::ThresholdShareCreated(data) => {
                 let _ =
