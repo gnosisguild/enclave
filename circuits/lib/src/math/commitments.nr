@@ -244,8 +244,8 @@ pub fn compute_ciphertext_commitment<let N: u32, let L: u32, let BIT_CT: u32>(
 
 /// COMMITMENTS FOR CHALLENGES
 
-pub fn compute_threshold_pk_challenge<let L: u32>(payload: Vec<Field>) -> Vec<Field> {
-    compute_challenge::<L>(payload, DS_CLG_PK_GENERATION)
+pub fn compute_threshold_pk_challenge(payload: Vec<Field>) -> Field {
+    compute_commitment(payload, DS_CLG_PK_GENERATION)
 }
 
 pub fn compute_share_encryption_challenge<let L: u32>(payload: Vec<Field>) -> Vec<Field> {
