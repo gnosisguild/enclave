@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::Proof;
+use crate::{Proof, ProofType, SignedProofPayload};
 use derivative::Derivative;
 use e3_crypto::SensitiveBytes;
 use e3_fhe_params::BfvPreset;
@@ -23,6 +23,10 @@ pub enum ZkRequest {
     ShareComputation(ShareComputationProofRequest),
     /// Generate proof for share encryption (C3a/C3b).
     ShareEncryption(ShareEncryptionProofRequest),
+    /// Generate proof for DKG share decryption (C4a/C4b).
+    DkgShareDecryption(DkgShareDecryptionProofRequest),
+    /// Batch-verify C2/C3 proofs from other parties.
+    VerifyShareProofs(VerifyShareProofsRequest),
 }
 
 /// Request to generate a proof for share computation (C2a or C2b).
@@ -71,6 +75,28 @@ pub struct ShareEncryptionProofRequest {
     pub row_index: usize,
     /// ESI index (for C3b only; 0 for C3a). Disambiguates proofs across multiple ESI entries.
     pub esi_index: usize,
+}
+
+/// Request to generate a proof for DKG share decryption (C4a or C4b).
+///
+/// Proves that a node correctly decrypted H honest parties' BFV-encrypted
+/// Shamir shares using its own BFV secret key.
+#[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derivative(Debug)]
+pub struct DkgShareDecryptionProofRequest {
+    /// BFV secret key used for decryption (witness — encrypted at rest).
+    pub sk_bfv: SensitiveBytes,
+    /// Serialized BFV Ciphertext bytes from H honest parties, flattened as [H * L].
+    /// Layout: party 0 mod 0, party 0 mod 1, ..., party 1 mod 0, ...
+    pub honest_ciphertexts_raw: Vec<ArcBytes>,
+    /// Number of honest parties (H).
+    pub num_honest_parties: usize,
+    /// Number of CRT moduli (L).
+    pub num_moduli: usize,
+    /// SecretKey or SmudgingNoise.
+    pub dkg_input_type: DkgInputType,
+    /// BFV preset for parameter resolution.
+    pub params_preset: BfvPreset,
 }
 
 /// Request to generate a proof for BFV public key generation (C0).
@@ -142,6 +168,10 @@ pub enum ZkResponse {
     ShareComputation(ShareComputationProofResponse),
     /// Proof for share encryption (C3a/C3b).
     ShareEncryption(ShareEncryptionProofResponse),
+    /// Proof for DKG share decryption (C4a/C4b).
+    DkgShareDecryption(DkgShareDecryptionProofResponse),
+    /// Batch verification results for C2/C3 proofs.
+    VerifyShareProofs(VerifyShareProofsResponse),
 }
 
 /// Response containing a generated share computation proof.
@@ -174,6 +204,22 @@ pub struct PkGenerationProofResponse {
     pub proof: Proof,
 }
 
+/// Response containing a generated DKG share decryption proof.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DkgShareDecryptionProofResponse {
+    pub proof: Proof,
+    pub dkg_input_type: DkgInputType,
+}
+
+impl DkgShareDecryptionProofResponse {
+    pub fn new(proof: Proof, dkg_input_type: DkgInputType) -> Self {
+        Self {
+            proof,
+            dkg_input_type,
+        }
+    }
+}
+
 impl ShareComputationProofResponse {
     pub fn new(proof: Proof, dkg_input_type: DkgInputType) -> Self {
         Self {
@@ -193,6 +239,44 @@ impl PkGenerationProofResponse {
     pub fn new(proof: Proof) -> Self {
         Self { proof }
     }
+}
+
+/// Request to batch-verify C2/C3 proofs received from other parties.
+///
+/// Grouped by sender so the verifier can report honest/dishonest per party.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct VerifyShareProofsRequest {
+    /// Proofs grouped by sender party_id.
+    pub party_proofs: Vec<PartyProofsToVerify>,
+}
+
+/// All signed proofs from a single sender to verify.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PartyProofsToVerify {
+    /// The party that generated these proofs.
+    pub sender_party_id: u64,
+    /// Signed proofs to verify (C2a, C2b, C3a×L, C3b×L).
+    pub signed_proofs: Vec<SignedProofPayload>,
+}
+
+/// Batch verification results for C2/C3 proofs.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct VerifyShareProofsResponse {
+    /// Per-party verification results.
+    pub party_results: Vec<PartyVerificationResult>,
+}
+
+/// Verification result for all proofs from a single sender.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PartyVerificationResult {
+    /// The party whose proofs were verified.
+    pub sender_party_id: u64,
+    /// Whether ALL proofs from this party verified successfully.
+    pub all_verified: bool,
+    /// If any proof failed: the proof type that failed.
+    pub failed_proof_type: Option<ProofType>,
+    /// If any proof failed: the signed payload for fault attribution.
+    pub failed_signed_payload: Option<SignedProofPayload>,
 }
 
 /// ZK-specific error variants.

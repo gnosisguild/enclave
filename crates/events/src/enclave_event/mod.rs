@@ -14,6 +14,7 @@ mod committee_published;
 mod committee_requested;
 mod compute_request;
 mod configuration_updated;
+mod decryption_key_shared;
 mod decryptionshare_created;
 mod die;
 mod e3_failed;
@@ -61,6 +62,7 @@ pub use committee_published::*;
 pub use committee_requested::*;
 pub use compute_request::*;
 pub use configuration_updated::*;
+pub use decryption_key_shared::*;
 pub use decryptionshare_created::*;
 pub use die::*;
 pub use e3_failed::*;
@@ -200,6 +202,7 @@ pub enum EnclaveEventData {
     E3Requested(E3Requested),
     PublicKeyAggregated(PublicKeyAggregated),
     CiphertextOutputPublished(CiphertextOutputPublished),
+    DecryptionKeyShared(DecryptionKeyShared),
     DecryptionshareCreated(DecryptionshareCreated),
     PlaintextAggregated(PlaintextAggregated),
     PublishDocumentRequested(PublishDocumentRequested),
@@ -468,6 +471,7 @@ impl EnclaveEventData {
             EnclaveEventData::E3Requested(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::PublicKeyAggregated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::CiphertextOutputPublished(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::DecryptionKeyShared(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::DecryptionshareCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::PlaintextAggregated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::PkGenerationProofSigned(ref data) => Some(data.e3_id.clone()),
@@ -519,6 +523,7 @@ impl_event_types!(
     E3Requested,
     PublicKeyAggregated,
     CiphertextOutputPublished,
+    DecryptionKeyShared,
     DecryptionshareCreated,
     PlaintextAggregated,
     PublishDocumentRequested,
