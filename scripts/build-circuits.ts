@@ -106,6 +106,10 @@ class NoirCircuitBuilder {
 
       result.releaseDir = this.copyArtifacts(result.compiled)
       console.log(`\n✅ Built ${result.compiled.length} circuits`)
+      if (result.errors.length > 0) {
+        console.error('\n❌ Failed circuits:')
+        for (const err of result.errors) console.error(`   ${err}`)
+      }
     } catch (error: any) {
       result.success = false
       result.errors.push(error.message)
@@ -158,16 +162,48 @@ class NoirCircuitBuilder {
       const groupDir = join(this.circuitsDir, group)
       if (!existsSync(groupDir)) continue
 
-      for (const entry of readdirSync(groupDir)) {
-        const circuitPath = join(groupDir, entry)
-        if (statSync(circuitPath).isDirectory() && existsSync(join(circuitPath, 'Nargo.toml'))) {
-          if (!this.options.circuits || this.options.circuits.includes(entry)) {
-            circuits.push({ name: entry, group, path: circuitPath })
-          }
-        }
-      }
+      this.findCircuitsInDir(groupDir, '', group, circuits)
     }
     return circuits
+  }
+
+  private findCircuitsInDir(dir: string, relativePath: string, group: CircuitGroup, out: CircuitInfo[]): void {
+    for (const entry of readdirSync(dir)) {
+      const fullPath = join(dir, entry)
+      if (!statSync(fullPath).isDirectory()) continue
+
+      const name = relativePath ? `${relativePath}/${entry}` : entry
+      const nargoPath = join(fullPath, 'Nargo.toml')
+      if (!existsSync(nargoPath)) {
+        this.findCircuitsInDir(fullPath, name, group, out)
+        continue
+      }
+      // Workspace roots ([workspace]) are not circuits; recurse to find leaf packages
+      if (this.isWorkspaceOnly(nargoPath)) {
+        this.findCircuitsInDir(fullPath, name, group, out)
+      } else if (!this.options.circuits || this.options.circuits.includes(name)) {
+        out.push({ name, group, path: fullPath })
+      }
+    }
+  }
+
+  private isWorkspaceOnly(nargoPath: string): boolean {
+    const content = readFileSync(nargoPath, 'utf-8')
+    return /^\s*\[workspace\]/m.test(content) && !/^\s*\[package\]/m.test(content)
+  }
+
+  /** Search dirs for compiled JSON; include parent targets (workspace members output to workspace root). */
+  private getTargetSearchDirs(circuitPath: string, groupDir: string): string[] {
+    const dirs = [join(circuitPath, 'target')]
+    let dir = circuitPath
+    while (dir !== groupDir) {
+      const parent = resolve(dir, '..')
+      if (parent === dir) break
+      dirs.push(join(parent, 'target'))
+      dir = parent
+    }
+    dirs.push(join(groupDir, 'target'), join(this.circuitsDir, 'target'))
+    return dirs
   }
 
   private buildCircuit(circuit: CircuitInfo): CompiledCircuit {
@@ -182,7 +218,7 @@ class NoirCircuitBuilder {
     execSync('nargo compile', { cwd: circuit.path, stdio: 'pipe' })
 
     const groupDir = join(this.circuitsDir, circuit.group)
-    const targetDirs = [join(groupDir, 'target'), join(this.circuitsDir, 'target'), join(circuit.path, 'target')]
+    const targetDirs = this.getTargetSearchDirs(circuit.path, groupDir)
 
     let jsonFile: string | null = null
     let targetDir: string | null = null
