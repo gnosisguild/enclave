@@ -95,12 +95,7 @@ pub async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, TempDir) {
     let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
-    let backend = ZkBackend::new(
-        bb_binary.clone(),
-        circuits_dir.clone(),
-        work_dir.clone(),
-        ZkConfig::default(),
-    );
+    let backend = ZkBackend::new(bb_binary.clone(), circuits_dir.clone(), work_dir.clone());
 
     fs::create_dir_all(&backend.circuits_dir).await.unwrap();
     fs::create_dir_all(backend.circuits_dir.join("vk"))
@@ -117,7 +112,7 @@ pub async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, TempDir) {
     (backend, temp)
 }
 
-/// Lightweight backend for tests that don't need a real bb binary.
+/// Lightweight backend for tests that need to override config (e.g. inject bad checksums).
 pub fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
     let noir_dir = temp_path.join("noir");
     let bb_binary = match env::var("E3_CUSTOM_BB") {
@@ -126,5 +121,5 @@ pub fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend 
     };
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
-    ZkBackend::new(bb_binary, circuits_dir, work_dir, config)
+    ZkBackend::with_config(bb_binary, circuits_dir, work_dir, config)
 }

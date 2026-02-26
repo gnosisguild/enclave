@@ -219,7 +219,7 @@ impl ZkProver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::ZkConfig, test_utils::get_tempdir};
+    use crate::test_utils::get_tempdir;
     use e3_config::BBPath;
 
     #[test]
@@ -230,12 +230,7 @@ mod tests {
         let bb_binary = noir_dir.join("bin").join("bb");
         let circuits_dir = noir_dir.join("circuits");
         let work_dir = noir_dir.join("work").join("test_node");
-        let backend = ZkBackend::new(
-            BBPath::Default(bb_binary),
-            circuits_dir,
-            work_dir,
-            ZkConfig::default(),
-        );
+        let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
         let prover = ZkProver::new(&backend);
 
         let result = prover.generate_proof(CircuitName::PkBfv, b"witness", "e3-1");
