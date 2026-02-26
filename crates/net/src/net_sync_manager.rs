@@ -11,13 +11,12 @@ use e3_events::{
     EnclaveEventData, EventSource, EventStoreQueryBy, EventStoreQueryResponse, EventType,
     HistoricalNetSyncStart, NetSyncEventsReceived, TsAgg, TypedEvent, Unsequenced,
 };
-use e3_utils::{retry_with_backoff, to_retry, OnceTake, MAILBOX_LIMIT};
+use e3_utils::{retry_with_backoff, to_retry, MAILBOX_LIMIT};
 use futures::TryFutureExt;
-use libp2p::request_response::ResponseChannel;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryInto, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::{
     direct_responder::DirectResponder,
