@@ -30,32 +30,35 @@ use std::fmt::{self, Display};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ProofType {
     /// T0 — BFV public key proof (Proof 0).
-    T0PkBfv = 0,
-    /// T1 — TrBFV public key generation proof (Proof 1).
-    T1PkGeneration = 1,
-    /// T1 — Secret key share computation proof (Proof 2a).
-    T1SkShareComputation = 2,
-    /// T1 — Smudging noise share computation proof (Proof 2b).
-    T1ESmShareComputation = 3,
-    /// T1 — Share encryption proof (Proof 3).
-    T1ShareEncryption = 4,
+    C0PkBfv = 0,
+    /// C1 — TrBFV public key generation proof (Proof 1).
+    C1PkGeneration = 1,
+    /// C2a — Secret key share computation proof (Proof 2a).
+    C2aSkShareComputation = 2,
+    /// C2b — Smudging noise share computation proof (Proof 2b).
+    C2bESmShareComputation = 3,
+    /// C3a — Share encryption proof (Proof 3a).
+    C3aSkShareEncryption = 4,
+    /// C3b — Smudging noise share encryption proof (Proof 3b).
+    C3bESmShareEncryption = 5,
     /// T2 — DKG share decryption proof (Proof 4).
-    T2DkgShareDecryption = 5,
+    T2DkgShareDecryption = 6,
     /// T5 — Threshold share decryption proof (Proof 6).
-    T5ShareDecryption = 6,
+    T5ShareDecryption = 7,
     /// T6 — Decrypted shares aggregation proof (Proof 7).
-    T6DecryptedSharesAggregation = 7,
+    T6DecryptedSharesAggregation = 8,
 }
 
 impl ProofType {
     /// Map this proof type to its corresponding circuit names.
     pub fn circuit_names(&self) -> Vec<CircuitName> {
         match self {
-            ProofType::T0PkBfv => vec![CircuitName::PkBfv],
-            ProofType::T1PkGeneration => vec![CircuitName::PkGeneration],
-            ProofType::T1SkShareComputation => vec![CircuitName::SkShareComputation],
-            ProofType::T1ESmShareComputation => vec![CircuitName::ESmShareComputation],
-            ProofType::T1ShareEncryption => vec![CircuitName::ShareEncryption],
+            ProofType::C0PkBfv => vec![CircuitName::PkBfv],
+            ProofType::C1PkGeneration => vec![CircuitName::PkGeneration],
+            ProofType::C2aSkShareComputation => vec![CircuitName::SkShareComputation],
+            ProofType::C2bESmShareComputation => vec![CircuitName::ESmShareComputation],
+            ProofType::C3aSkShareEncryption => vec![CircuitName::ShareEncryption],
+            ProofType::C3bESmShareEncryption => vec![CircuitName::ShareEncryption],
             ProofType::T2DkgShareDecryption => vec![CircuitName::DkgShareDecryption],
             ProofType::T5ShareDecryption => vec![CircuitName::ThresholdShareDecryption],
             ProofType::T6DecryptedSharesAggregation => vec![
@@ -68,11 +71,12 @@ impl ProofType {
     /// Slash reason identifier for on-chain policies.
     pub fn slash_reason(&self) -> &'static str {
         match self {
-            ProofType::T0PkBfv
-            | ProofType::T1PkGeneration
-            | ProofType::T1SkShareComputation
-            | ProofType::T1ESmShareComputation
-            | ProofType::T1ShareEncryption
+            ProofType::C0PkBfv
+            | ProofType::C1PkGeneration
+            | ProofType::C2aSkShareComputation
+            | ProofType::C2bESmShareComputation
+            | ProofType::C3aSkShareEncryption
+            | ProofType::C3bESmShareEncryption
             | ProofType::T2DkgShareDecryption => "E3_BAD_DKG_PROOF",
             ProofType::T5ShareDecryption => "E3_BAD_DECRYPTION_PROOF",
             ProofType::T6DecryptedSharesAggregation => "E3_BAD_AGGREGATION_PROOF",
@@ -220,7 +224,7 @@ mod tests {
     fn test_payload() -> ProofPayload {
         ProofPayload {
             e3_id: E3id::new("1", 42),
-            proof_type: ProofType::T0PkBfv,
+            proof_type: ProofType::C0PkBfv,
             proof: Proof::new(
                 CircuitName::PkBfv,
                 ArcBytes::from_bytes(&[10, 20, 30]),
@@ -271,7 +275,7 @@ mod tests {
     fn different_payloads_produce_different_digests() {
         let p1 = test_payload();
         let mut p2 = test_payload();
-        p2.proof_type = ProofType::T1PkGeneration;
+        p2.proof_type = ProofType::C1PkGeneration;
 
         assert_ne!(
             p1.digest().expect("digest should succeed"),
@@ -287,7 +291,7 @@ mod tests {
         let mut signed =
             SignedProofPayload::sign(payload, &signer).expect("signing should succeed");
         // Tamper with the payload after signing
-        signed.payload.proof_type = ProofType::T1PkGeneration;
+        signed.payload.proof_type = ProofType::C1PkGeneration;
 
         let recovered = signed.recover_address().expect("recovery should succeed");
         // Recovered address won't match the signer because payload was tampered
@@ -296,13 +300,17 @@ mod tests {
 
     #[test]
     fn proof_type_circuit_names_mapping() {
-        assert_eq!(ProofType::T0PkBfv.circuit_names(), vec![CircuitName::PkBfv]);
+        assert_eq!(ProofType::C0PkBfv.circuit_names(), vec![CircuitName::PkBfv]);
         assert_eq!(
-            ProofType::T1PkGeneration.circuit_names(),
+            ProofType::C1PkGeneration.circuit_names(),
             vec![CircuitName::PkGeneration]
         );
         assert_eq!(
-            ProofType::T1ShareEncryption.circuit_names(),
+            ProofType::C3aSkShareEncryption.circuit_names(),
+            vec![CircuitName::ShareEncryption]
+        );
+        assert_eq!(
+            ProofType::C3bESmShareEncryption.circuit_names(),
             vec![CircuitName::ShareEncryption]
         );
         assert_eq!(

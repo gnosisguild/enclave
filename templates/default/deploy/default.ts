@@ -4,10 +4,25 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { readDeploymentArgs, storeDeploymentArgs } from '@enclave-e3/contracts/scripts'
+import { readDeploymentArgs, storeDeploymentArgs, updateE3Config } from '@enclave-e3/contracts/scripts'
 import { Enclave__factory as EnclaveFactory } from '@enclave-e3/contracts/types'
 import { MyProgram__factory as MyProgramFactory } from '../types/factories/contracts'
 import hre from 'hardhat'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+// Map contract names to config keys
+const contractMapping: Record<string, string> = {
+  MyProgram: 'e3_program',
+  Enclave: 'enclave',
+  CiphernodeRegistryOwnable: 'ciphernode_registry',
+  BondingRegistry: 'bonding_registry',
+  MockUSDC: 'fee_token',
+}
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 export const deployTemplate = async () => {
   const { ethers } = await hre.network.connect()
@@ -35,6 +50,7 @@ export const deployTemplate = async () => {
   storeDeploymentArgs(
     {
       address: await imageId.getAddress(),
+      blockNumber: await ethers.provider.getBlockNumber(),
     },
     'ImageID',
     chain,
@@ -64,4 +80,16 @@ export const deployTemplate = async () => {
       Deployed MockRISC0Verifier at address: ${await verifier.getAddress()}
     `,
   )
+
+  storeDeploymentArgs(
+    {
+      address: await e3Program.getAddress(),
+      blockNumber: await ethers.provider.getBlockNumber(),
+    },
+    'MyProgram',
+    chain,
+  )
+
+  // this expects you to run it from CRISP's root
+  updateE3Config(chain, path.join(__dirname, '..', 'enclave.config.yaml'), contractMapping)
 }

@@ -11,15 +11,15 @@ use e3_data::Persistable;
 use e3_events::{
     prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
     ComputeResponse, ComputeResponseKind, CorrelationId, DecryptionshareCreated, Die,
-    E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, EncryptionKey,
+    DkgProofSigned, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, EncryptionKey,
     EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending, EventContext,
     KeyshareCreated, PartyId, PkGenerationProofRequest, PkGenerationProofSigned, ProofType,
-    Sequenced, ShareComputationProofRequest, ShareComputationProofSigned, SignedProofPayload,
+    Sequenced, ShareComputationProofRequest, ShareEncryptionProofRequest, SignedProofPayload,
     ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated, ThresholdSharePending,
     TypedEvent,
 };
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
-use e3_fhe_params::{BfvParamSet, BfvPreset};
+use e3_fhe_params::{build_pair_for_preset, BfvParamSet, BfvPreset};
 use e3_trbfv::{
     calculate_decryption_key::{CalculateDecryptionKeyRequest, CalculateDecryptionKeyResponse},
     calculate_decryption_share::{
@@ -37,8 +37,13 @@ use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
-use rand::rngs::OsRng;
-use std::{collections::HashMap, mem, sync::Arc};
+use rand::{rngs::OsRng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
+use std::{
+    collections::HashMap,
+    mem,
+    sync::{Arc, Mutex},
+};
 use tracing::{info, trace, warn};
 
 use crate::encryption_key_collector::{AllEncryptionKeysCollected, EncryptionKeyCollector};
@@ -103,6 +108,8 @@ pub struct AggregatingDecryptionKey {
     signed_pk_generation_proof: Option<SignedProofPayload>,
     signed_sk_share_computation_proof: Option<SignedProofPayload>,
     signed_e_sm_share_computation_proof: Option<SignedProofPayload>,
+    signed_sk_share_encryption_proofs: Vec<SignedProofPayload>,
+    signed_e_sm_share_encryption_proofs: Vec<SignedProofPayload>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -113,6 +120,8 @@ pub struct ReadyForDecryption {
     signed_pk_generation_proof: Option<SignedProofPayload>,
     signed_sk_share_computation_proof: Option<SignedProofPayload>,
     signed_e_sm_share_computation_proof: Option<SignedProofPayload>,
+    signed_sk_share_encryption_proofs: Vec<SignedProofPayload>,
+    signed_e_sm_share_encryption_proofs: Vec<SignedProofPayload>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -123,6 +132,8 @@ pub struct Decrypting {
     signed_pk_generation_proof: Option<SignedProofPayload>,
     signed_sk_share_computation_proof: Option<SignedProofPayload>,
     signed_e_sm_share_computation_proof: Option<SignedProofPayload>,
+    signed_sk_share_encryption_proofs: Vec<SignedProofPayload>,
+    signed_e_sm_share_encryption_proofs: Vec<SignedProofPayload>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -421,7 +432,7 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// Handle PkGenerationProofSigned - stores the signed T1 proof in state
+    /// Handle PkGenerationProofSigned - stores the signed C1 proof in state
     pub fn handle_pk_generation_proof_signed(
         &mut self,
         msg: TypedEvent<PkGenerationProofSigned>,
@@ -453,10 +464,10 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// Handle ShareComputationProofSigned - stores the signed proof in state based on proof type (C1, C2a or C2b)
+    /// Handle DkgProofSigned - stores the signed proof in state based on proof type (C2a, C2b, C3a or C3b)
     pub fn handle_share_computation_proof_signed(
         &mut self,
-        msg: TypedEvent<ShareComputationProofSigned>,
+        msg: TypedEvent<DkgProofSigned>,
     ) -> Result<()> {
         let (msg, ec) = msg.into_components();
         let state = self.state.try_get()?;
@@ -467,26 +478,37 @@ impl ThresholdKeyshare {
 
         let proof_type = msg.signed_proof.payload.proof_type;
         info!(
-            "Received ShareComputationProofSigned ({:?}) for party {} E3 {}",
+            "Received DkgProofSigned ({:?}) for party {} E3 {}",
             proof_type, msg.party_id, msg.e3_id
         );
 
         self.state.try_mutate(&ec, |s| {
             let current: AggregatingDecryptionKey = s.clone().try_into()?;
             let updated = match proof_type {
-                ProofType::T1SkShareComputation => AggregatingDecryptionKey {
+                ProofType::C2aSkShareComputation => AggregatingDecryptionKey {
                     signed_sk_share_computation_proof: Some(msg.signed_proof),
                     ..current
                 },
-                ProofType::T1ESmShareComputation => AggregatingDecryptionKey {
+                ProofType::C2bESmShareComputation => AggregatingDecryptionKey {
                     signed_e_sm_share_computation_proof: Some(msg.signed_proof),
                     ..current
                 },
+                ProofType::C3aSkShareEncryption => {
+                    let mut updated = current;
+                    updated
+                        .signed_sk_share_encryption_proofs
+                        .push(msg.signed_proof);
+                    updated
+                }
+                ProofType::C3bESmShareEncryption => {
+                    let mut updated = current;
+                    updated
+                        .signed_e_sm_share_encryption_proofs
+                        .push(msg.signed_proof);
+                    updated
+                }
                 other => {
-                    warn!(
-                        "Unexpected proof type {:?} in ShareComputationProofSigned",
-                        other
-                    );
+                    warn!("Unexpected proof type {:?} in DkgProofSigned", other);
                     current
                 }
             };
@@ -771,6 +793,8 @@ impl ThresholdKeyshare {
                         signed_pk_generation_proof: None,
                         signed_sk_share_computation_proof: None,
                         signed_e_sm_share_computation_proof: None,
+                        signed_sk_share_encryption_proofs: Vec::new(),
+                        signed_e_sm_share_encryption_proofs: Vec::new(),
                     },
                 ))
             })?;
@@ -802,8 +826,12 @@ impl ThresholdKeyshare {
         // Get collected BFV public keys from all parties (from persisted state)
         let encryption_keys = &collected_encryption_keys;
 
-        // Convert to BFV public keys
-        let params = BfvParamSet::from(self.share_enc_preset.clone()).build_arc();
+        // Convert to BFV public keys using DKG params
+        let threshold_preset = self
+            .share_enc_preset
+            .threshold_counterpart()
+            .ok_or_else(|| anyhow!("No threshold counterpart for {:?}", self.share_enc_preset))?;
+        let (_, params) = build_pair_for_preset(threshold_preset)?;
         let recipient_pks: Vec<PublicKey> = encryption_keys
             .iter()
             .map(|k| {
@@ -819,7 +847,7 @@ impl ThresholdKeyshare {
             .map(|s| s.decrypt(&self.cipher))
             .collect::<Result<_>>()?;
 
-        // Serialize for T2a/T2b proof requests (encrypted at rest)
+        // Serialize for C2a/C2b proof requests (encrypted at rest)
         let sk_sss_raw = SensitiveBytes::new(
             bincode::serialize(&decrypted_sk_sss)
                 .map_err(|e| anyhow!("Failed to serialize sk_sss: {}", e))?,
@@ -834,15 +862,23 @@ impl ThresholdKeyshare {
             })
             .collect::<Result<_>>()?;
 
-        // Encrypt shares for all recipients using BFV
+        // Encrypt shares for all recipients using BFV (extended to capture randomness for C3 proofs)
         let mut rng = OsRng;
-        let encrypted_sk_sss =
-            BfvEncryptedShares::encrypt_all(&decrypted_sk_sss, &recipient_pks, &params, &mut rng)?;
+        let (encrypted_sk_sss, sk_witnesses) = BfvEncryptedShares::encrypt_all_extended(
+            &decrypted_sk_sss,
+            &recipient_pks,
+            &params,
+            &mut rng,
+        )?;
 
-        let encrypted_esi_sss: Vec<BfvEncryptedShares> = decrypted_esi_sss
+        let (encrypted_esi_sss, esi_witnesses): (Vec<_>, Vec<_>) = decrypted_esi_sss
             .iter()
-            .map(|esi| BfvEncryptedShares::encrypt_all(esi, &recipient_pks, &params, &mut rng))
-            .collect::<Result<_>>()?;
+            .map(|esi| {
+                BfvEncryptedShares::encrypt_all_extended(esi, &recipient_pks, &params, &mut rng)
+            })
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .unzip();
 
         // Create the full share with all parties' encrypted data
         let full_share = ThresholdShare {
@@ -852,13 +888,7 @@ impl ThresholdKeyshare {
             esi_sss: encrypted_esi_sss,
         };
 
-        // Build the proof request
-        let threshold_preset = self
-            .share_enc_preset
-            .threshold_counterpart()
-            .ok_or_else(|| anyhow!("No threshold counterpart for {:?}", self.share_enc_preset))?;
-
-        // Build T1 request (PkGenerationProof)
+        // Build C1 request (PkGenerationProof)
         let proof_request = PkGenerationProofRequest::new(
             proof_request_data.pk0_share_raw.clone(),
             proof_request_data.sk_raw.clone(),
@@ -868,16 +898,16 @@ impl ThresholdKeyshare {
             CiphernodesCommitteeSize::Small, // TODO: derive from config
         );
 
-        // Build T2a request (SkShareComputation)
+        // Build C2a request (SkShareComputation)
         let sk_share_computation_request = ShareComputationProofRequest {
             secret_raw: proof_request_data.sk_raw.clone(),
             secret_sss_raw: sk_sss_raw,
             dkg_input_type: DkgInputType::SecretKey,
             params_preset: threshold_preset,
-            committee_size: CiphernodesCommitteeSize::Small,
+            committee_size: CiphernodesCommitteeSize::Small, // TODO: derive from config
         };
 
-        // Build T2b request (ESmShareComputation)
+        // Build C2b request (ESmShareComputation)
         let e_sm_share_computation_request = ShareComputationProofRequest {
             secret_raw: e_sm_raw.clone(),
             secret_sss_raw: esi_sss_raw
@@ -886,12 +916,72 @@ impl ThresholdKeyshare {
                 .ok_or_else(|| anyhow!("esi_sss_raw is empty — expected at least one entry"))?,
             dkg_input_type: DkgInputType::SmudgingNoise,
             params_preset: threshold_preset,
-            committee_size: CiphernodesCommitteeSize::Small,
+            committee_size: CiphernodesCommitteeSize::Small, // TODO: derive from config
         };
 
+        // Build C3a proof requests (SK share encryption) from witnesses
+        let mut sk_share_encryption_requests = Vec::new();
+        for (recipient_idx, recipient_witnesses) in sk_witnesses.iter().enumerate() {
+            for (row_idx, witness) in recipient_witnesses.iter().enumerate() {
+                sk_share_encryption_requests.push(ShareEncryptionProofRequest {
+                    share_row_raw: SensitiveBytes::new(
+                        bincode::serialize(&witness.share_row)
+                            .map_err(|e| anyhow!("Failed to serialize share_row: {}", e))?,
+                        &self.cipher,
+                    )?,
+                    ciphertext_raw: ArcBytes::from_bytes(&witness.ciphertext.to_bytes()),
+                    recipient_pk_raw: ArcBytes::from_bytes(
+                        &recipient_pks[recipient_idx].to_bytes(),
+                    ),
+                    u_rns_raw: SensitiveBytes::new(witness.u_rns.to_bytes(), &self.cipher)?,
+                    e0_rns_raw: SensitiveBytes::new(witness.e0_rns.to_bytes(), &self.cipher)?,
+                    e1_rns_raw: SensitiveBytes::new(witness.e1_rns.to_bytes(), &self.cipher)?,
+                    dkg_input_type: DkgInputType::SecretKey,
+                    params_preset: threshold_preset,
+                    committee_size: CiphernodesCommitteeSize::Small,
+                    recipient_party_id: recipient_idx,
+                    row_index: row_idx,
+                    esi_index: 0,
+                });
+            }
+        }
+
+        // Build C3b proof requests (E_SM share encryption) from witnesses
+        let mut e_sm_share_encryption_requests = Vec::new();
+        for (esi_idx, esi_recipient_witnesses) in esi_witnesses.iter().enumerate() {
+            for (recipient_idx, recipient_witnesses) in esi_recipient_witnesses.iter().enumerate() {
+                for (row_idx, witness) in recipient_witnesses.iter().enumerate() {
+                    e_sm_share_encryption_requests.push(ShareEncryptionProofRequest {
+                        share_row_raw: SensitiveBytes::new(
+                            bincode::serialize(&witness.share_row)
+                                .map_err(|e| anyhow!("Failed to serialize share_row: {}", e))?,
+                            &self.cipher,
+                        )?,
+                        ciphertext_raw: ArcBytes::from_bytes(&witness.ciphertext.to_bytes()),
+                        recipient_pk_raw: ArcBytes::from_bytes(
+                            &recipient_pks[recipient_idx].to_bytes(),
+                        ),
+                        u_rns_raw: SensitiveBytes::new(witness.u_rns.to_bytes(), &self.cipher)?,
+                        e0_rns_raw: SensitiveBytes::new(witness.e0_rns.to_bytes(), &self.cipher)?,
+                        e1_rns_raw: SensitiveBytes::new(witness.e1_rns.to_bytes(), &self.cipher)?,
+                        dkg_input_type: DkgInputType::SmudgingNoise,
+                        params_preset: threshold_preset,
+                        committee_size: CiphernodesCommitteeSize::Small,
+                        recipient_party_id: recipient_idx,
+                        row_index: row_idx,
+                        esi_index: esi_idx,
+                    });
+                }
+            }
+        }
+
+        let total_proofs =
+            3 + sk_share_encryption_requests.len() + e_sm_share_encryption_requests.len();
         info!(
-            "Publishing ThresholdSharePending for E3 {} (3 proofs: T1, T2a, T2b)",
-            e3_id
+            "Publishing ThresholdSharePending for E3 {} ({} proofs: C1, C2a, C2b + {} C3a + {} C3b)",
+            e3_id, total_proofs,
+            sk_share_encryption_requests.len(),
+            e_sm_share_encryption_requests.len()
         );
 
         // Publish ThresholdSharePending - ProofRequestActor will generate proof, sign, and publish ThresholdShareCreated
@@ -902,6 +992,8 @@ impl ThresholdKeyshare {
                 proof_request,
                 sk_share_computation_request,
                 e_sm_share_computation_request,
+                sk_share_encryption_requests,
+                e_sm_share_encryption_requests,
             },
             ec.clone(),
         )?;
@@ -1008,6 +1100,8 @@ impl ThresholdKeyshare {
                 signed_pk_generation_proof: current.signed_pk_generation_proof,
                 signed_sk_share_computation_proof: current.signed_sk_share_computation_proof,
                 signed_e_sm_share_computation_proof: current.signed_e_sm_share_computation_proof,
+                signed_sk_share_encryption_proofs: current.signed_sk_share_encryption_proofs,
+                signed_e_sm_share_encryption_proofs: current.signed_e_sm_share_encryption_proofs,
             });
 
             s.new_state(next)
@@ -1050,6 +1144,8 @@ impl ThresholdKeyshare {
                 signed_pk_generation_proof: current.signed_pk_generation_proof,
                 signed_sk_share_computation_proof: current.signed_sk_share_computation_proof,
                 signed_e_sm_share_computation_proof: current.signed_e_sm_share_computation_proof,
+                signed_sk_share_encryption_proofs: current.signed_sk_share_encryption_proofs,
+                signed_e_sm_share_encryption_proofs: current.signed_e_sm_share_encryption_proofs,
             });
 
             s.new_state(next)
@@ -1136,7 +1232,7 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
             EnclaveEventData::PkGenerationProofSigned(data) => {
                 let _ = self.handle_pk_generation_proof_signed(TypedEvent::new(data, ec));
             }
-            EnclaveEventData::ShareComputationProofSigned(data) => {
+            EnclaveEventData::DkgProofSigned(data) => {
                 let _ = self.handle_share_computation_proof_signed(TypedEvent::new(data, ec));
             }
             EnclaveEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
