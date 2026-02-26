@@ -57,7 +57,7 @@ pub struct FetchEventsSince {
 }
 
 impl FetchEventsSince {
-    pub fn new(aggregate_id: AggregateId, since: u128, limit: u16) -> Self {
+    pub fn new(aggregate_id: AggregateId, since: u128, limit: usize) -> Self {
         Self {
             aggregate_id,
             since,
@@ -110,7 +110,7 @@ pub async fn fetch_all_batched_events<E: Debug>(
     peer: PeerTarget,
     aggregate_id: AggregateId,
     since: u128,
-    batch_size: u16,
+    batch_size: usize,
 ) -> Result<Vec<E>>
 where
     E: TryFrom<Vec<u8>> + Send + Sync + 'static,
