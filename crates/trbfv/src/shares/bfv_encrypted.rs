@@ -8,6 +8,7 @@ use anyhow::{Context, Result};
 use derivative::Derivative;
 use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
+use fhe_math::rq::Poly;
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
     Serialize as FheSerialize,
@@ -33,6 +34,20 @@ pub struct BfvEncryptedShare {
     /// BFV ciphertexts, one per modulus level
     #[derivative(Debug(format_with = "debug_vec_arcbytes"))]
     ciphertexts: Vec<ArcBytes>,
+}
+
+/// Per-row encryption witness needed for C3 ZK proofs.
+pub struct BfvEncryptionWitness {
+    /// The share row coefficients that were encrypted.
+    pub share_row: Vec<u64>,
+    /// The BFV ciphertext produced.
+    pub ciphertext: Ciphertext,
+    /// Encryption randomness u (RNS form).
+    pub u_rns: Poly,
+    /// Encryption error e0 (RNS form).
+    pub e0_rns: Poly,
+    /// Encryption error e1 (RNS form).
+    pub e1_rns: Poly,
 }
 
 /// Debug helper for Vec<ArcBytes>
@@ -82,6 +97,46 @@ impl BfvEncryptedShare {
         }
 
         Ok(Self { ciphertexts })
+    }
+
+    /// Encrypt a Shamir share and return encryption randomness for ZK proofs.
+    ///
+    /// Same as `encrypt` but uses `try_encrypt_extended` to capture the
+    /// encryption randomness (u, e0, e1) needed for C3a/C3b share encryption proofs.
+    pub fn encrypt_extended<R: RngCore + CryptoRng>(
+        share: &ShamirShare,
+        recipient_pk: &PublicKey,
+        params: &Arc<BfvParameters>,
+        rng: &mut R,
+    ) -> Result<(Self, Vec<BfvEncryptionWitness>)> {
+        let data: &Array2<u64> = share.deref();
+        let num_moduli = data.nrows();
+
+        let mut ciphertexts = Vec::with_capacity(num_moduli);
+        let mut witnesses = Vec::with_capacity(num_moduli);
+
+        for m in 0..num_moduli {
+            let row = data.row(m);
+            let share_vec: Vec<u64> = row.to_vec();
+
+            let pt = Plaintext::try_encode(&share_vec, Encoding::poly(), params)
+                .context("Failed to encode share as plaintext")?;
+
+            let (ct, u_rns, e0_rns, e1_rns) = recipient_pk
+                .try_encrypt_extended(&pt, rng)
+                .context("Failed to encrypt share (extended)")?;
+
+            ciphertexts.push(ArcBytes::from_bytes(&ct.to_bytes()));
+            witnesses.push(BfvEncryptionWitness {
+                share_row: share_vec,
+                ciphertext: ct,
+                u_rns,
+                e0_rns,
+                e1_rns,
+            });
+        }
+
+        Ok((Self { ciphertexts }, witnesses))
     }
 
     /// Decrypt an encrypted share using the recipient's secret key.
@@ -171,6 +226,35 @@ impl BfvEncryptedShares {
         }
 
         Ok(Self { shares })
+    }
+
+    /// Encrypt shares for all recipients and return encryption randomness for ZK proofs.
+    ///
+    /// Same as `encrypt_all` but captures encryption randomness (u, e0, e1) per row per recipient.
+    /// Returns `(encrypted_shares, witnesses)` where `witnesses[recipient_idx][row_idx]`.
+    pub fn encrypt_all_extended<R: RngCore + CryptoRng>(
+        secret: &SharedSecret,
+        recipient_pks: &[PublicKey],
+        params: &Arc<BfvParameters>,
+        rng: &mut R,
+    ) -> Result<(Self, Vec<Vec<BfvEncryptionWitness>>)> {
+        let num_parties = recipient_pks.len();
+        let mut shares = Vec::with_capacity(num_parties);
+        let mut all_witnesses = Vec::with_capacity(num_parties);
+
+        for party_id in 0..num_parties {
+            let share = secret
+                .extract_party_share(party_id)
+                .context(format!("Failed to extract share for party {}", party_id))?;
+
+            let (encrypted, witnesses) =
+                BfvEncryptedShare::encrypt_extended(&share, &recipient_pks[party_id], params, rng)?;
+
+            shares.push(encrypted);
+            all_witnesses.push(witnesses);
+        }
+
+        Ok((Self { shares }, all_witnesses))
     }
 
     /// Get the encrypted share for a specific recipient.
