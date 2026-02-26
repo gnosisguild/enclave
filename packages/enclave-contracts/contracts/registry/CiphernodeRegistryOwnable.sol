@@ -277,10 +277,6 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         Committee storage c = committees[e3Id];
 
         require(
-            c.stage != ICiphernodeRegistry.CommitteeStage.None,
-            CommitteeNotRequested()
-        );
-        require(
             c.stage == ICiphernodeRegistry.CommitteeStage.Finalized,
             CommitteeNotFinalized()
         );
@@ -413,16 +409,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         }
 
         c.stage = ICiphernodeRegistry.CommitteeStage.Finalized;
-        // Mark every finalized member as Active.
-        // Active  → counts toward viability, earns rewards.
-        // Expelled → was a member (enables re-slash via Lane A) but no longer counts.
-        uint256 committeeLen = c.topNodes.length;
-        for (uint256 i = 0; i < committeeLen; ++i) {
-            c.memberStatus[c.topNodes[i]] = ICiphernodeRegistry
-                .MemberStatus
-                .Active;
-        }
-        c.activeCount = committeeLen;
+        c.activeCount = c.topNodes.length;
 
         enclave.onCommitteeFinalized(e3Id);
         emit CommitteeFinalized(e3Id, c.topNodes);
@@ -742,6 +729,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         if (top.length < cap) {
             top.push(node);
             c.scoreOf[node] = score;
+            c.memberStatus[node] = ICiphernodeRegistry.MemberStatus.Active;
             return true;
         }
 
@@ -757,8 +745,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         if (score >= worstScore) return false;
 
+        c.memberStatus[top[worstIdx]] = ICiphernodeRegistry.MemberStatus.None;
         top[worstIdx] = node;
         c.scoreOf[node] = score;
+        c.memberStatus[node] = ICiphernodeRegistry.MemberStatus.Active;
 
         return true;
     }

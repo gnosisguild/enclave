@@ -384,7 +384,8 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     }
 
     /// @notice Apply slashed funds to an E3's refund distribution
-    /// @dev Priority: make requester whole first, then distribute remainder to honest nodes.
+    /// @dev This function is ONLY called on the failure path.Priority: make requester whole first,
+    ///      then distribute remainder to honest nodes.
     ///      The requester is filled up to their original E3 payment before honest nodes receive
     ///      any portion, ensuring the party who paid for the computation is compensated first.
     /// @param e3Id The E3 ID

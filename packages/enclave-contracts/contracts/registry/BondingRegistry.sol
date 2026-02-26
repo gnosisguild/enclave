@@ -131,6 +131,12 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         _;
     }
 
+    /// @dev Restricts function access to authorized reward distributors
+    modifier onlyAuthorizedDistributor() {
+        require(authorizedDistributors[msg.sender], OnlyRewardDistributor());
+        _;
+    }
+
     /// @dev Reverts if operator has an exit in progress that hasn't unlocked yet
     /// @param operator Address of the operator to check
     modifier noExitInProgress(address operator) {
@@ -592,8 +598,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         IERC20 rewardToken,
         address[] calldata recipients,
         uint256[] calldata amounts
-    ) external {
-        require(authorizedDistributors[msg.sender], OnlyRewardDistributor());
+    ) external onlyAuthorizedDistributor {
         require(recipients.length == amounts.length, ArrayLengthMismatch());
 
         uint256 len = recipients.length;
