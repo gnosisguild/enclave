@@ -4,18 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::ContentHash;
+use crate::{direct_responder::DirectResponder, ContentHash};
 use actix::Message;
 use anyhow::{anyhow, bail, Context, Result};
 use e3_events::{
     CorrelationId, DocumentMeta, EnclaveEvent, EventContextAccessors, EventSource, Sequenced,
     Unsequenced,
 };
-use e3_utils::{ArcBytes, OnceTake};
+use e3_utils::ArcBytes;
 use libp2p::{
     gossipsub::{MessageId, PublishError, TopicHash},
     kad::{store, GetRecordError, PutRecordError},
-    request_response::{InboundRequestId, ResponseChannel},
+    request_response::ResponseChannel,
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 use serde::{Deserialize, Serialize};
@@ -75,12 +75,31 @@ impl TryFrom<GossipData> for EnclaveEvent<Unsequenced> {
     }
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum ProtocolResponse {
+    Ok(Vec<u8>),
+    BadRequest(String),
+    Error(String),
+}
+
+pub type ProtocolResponseChannel = ResponseChannel<ProtocolResponse>;
+
 #[derive(Message, Clone, Debug)]
 #[rtype("()")]
 pub struct IncomingRequest {
-    pub request_id: InboundRequestId,
-    pub payload: Vec<u8>,
-    pub channel: OnceTake<ResponseChannel<Vec<u8>>>,
+    pub responder: DirectResponder,
+    pub request: Vec<u8>,
+}
+
+#[derive(Clone, Debug)]
+pub struct IncomingResponse<C = ResponseChannel<Vec<u8>>> {
+    pub responder: DirectResponder<C>,
+}
+
+impl<C> IncomingResponse<C> {
+    pub fn new(responder: DirectResponder<C>) -> Self {
+        Self { responder }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -118,7 +137,7 @@ impl OutgoingRequest {
 #[derive(Message, Clone, Debug)]
 #[rtype("()")]
 pub struct OutgoingRequestSucceeded {
-    pub payload: Vec<u8>,
+    pub payload: ProtocolResponse,
     pub correlation_id: CorrelationId,
 }
 
@@ -130,7 +149,11 @@ pub struct OutgoingRequestFailed {
 
 /// NetInterface Commands are sent to the network peer over a mspc channel
 #[derive(Debug)]
-pub enum NetCommand {
+// The generics here aid testing allowing us to avoid constructing complex types
+// This is probably not an issue aside from complex types that are actively hidden from
+// clone such as passing around a response channel which we don't control.
+// Basically this helps us test and I don't expect this list to grow much.
+pub enum NetCommand<C = ProtocolResponseChannel> {
     /// Publish message to gossipsub
     GossipPublish {
         topic: String,
@@ -152,15 +175,14 @@ pub enum NetCommand {
         key: ContentHash,
     },
     /// Remove DHT records associated with a completed E3
-    DhtRemoveRecords { keys: Vec<ContentHash> },
+    DhtRemoveRecords {
+        keys: Vec<ContentHash>,
+    },
     /// Shutdown signal
     Shutdown,
     /// Send a request to a peer and await response
     OutgoingRequest(OutgoingRequest),
-    Response {
-        payload: Vec<u8>,
-        channel: OnceTake<ResponseChannel<Vec<u8>>>,
-    },
+    IncomingResponse(IncomingResponse<C>),
 }
 
 impl NetCommand {

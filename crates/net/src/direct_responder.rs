@@ -1,0 +1,194 @@
+use crate::events::{IncomingResponse, NetCommand, ProtocolResponse, ProtocolResponseChannel};
+use anyhow::{anyhow, Context, Result};
+use e3_utils::OnceTake;
+use libp2p::request_response::InboundRequestId;
+use tokio::sync::mpsc;
+
+/// Helper trait to extract id from libp2p things like InboundRequestId
+pub trait IntoId {
+    fn into_id(self) -> u64;
+}
+
+impl IntoId for u64 {
+    fn into_id(self) -> u64 {
+        self
+    }
+}
+
+impl IntoId for InboundRequestId {
+    fn into_id(self) -> u64 {
+        format!("{:?}", self)
+            .chars()
+            .filter(|c| c.is_ascii_digit())
+            .collect::<String>()
+            .parse::<u64>()
+            .expect("Failed to extract u64 from InboundRequestId")
+    }
+}
+#[derive(Debug)]
+/// DirectResponder is used to respond to incoming libp2p requests.
+///
+/// # Example
+///
+/// ```
+/// # use tokio::sync::mpsc;
+/// use e3_net::direct_responder::DirectResponder;
+/// # fn main() -> anyhow::Result<()> {
+/// # let request_id = 6;
+/// # let channel_orig = String::from("channel");
+/// # let channel = channel_orig.clone();
+/// let (cmd_tx, _) = mpsc::channel(16);
+///
+/// // We create a responder and send it over our event channel
+/// let responder = DirectResponder::new(
+///   // request_id comes from libp2p anything that looks like a u64 will work
+///   request_id,
+///   // Likely ResponseChannel<ProtocolResponse> from libp2p event but does not matter will just get passed on
+///   channel,
+///   // Our NetCommand channel Sender
+///   &cmd_tx
+/// );
+///
+/// // Now in our handlers we can respond with ok() or bad_request() this will consume the responder
+/// responder.ok(String::from("Something that implements TryInto<Vec<u8>>"))?;
+/// // or:
+/// # let responder = DirectResponder::new(request_id,channel_orig,&cmd_tx);
+/// responder.bad_request("Hey something went wrong!")?;
+/// # Ok(())
+/// # }
+/// ```
+pub struct DirectResponder<C = ProtocolResponseChannel> {
+    id: u64,
+    response: Option<ProtocolResponse>,
+    channel: OnceTake<C>,
+    net_cmds: mpsc::Sender<NetCommand<C>>,
+}
+
+impl<C> Clone for DirectResponder<C> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            response: self.response.clone(),
+            channel: self.channel.clone(),
+            net_cmds: self.net_cmds.clone(),
+        }
+    }
+}
+
+impl<C> DirectResponder<C> {
+    /// Creates a new responder for an incoming request.
+    ///
+    /// * `id` - is the request identifier used for debugging (e.g., `InboundRequestId` or `u64`).
+    /// * `channel` - is usually the response channel provided by libp2p but can be anything that is passed along with the response
+    /// * `net_cmds` - sender is used to send the response back to the net interface.
+    pub fn new(id: impl IntoId, channel: C, net_cmds: &mpsc::Sender<NetCommand<C>>) -> Self {
+        Self {
+            id: id.into_id(),
+            response: None,
+            channel: OnceTake::new(channel),
+            net_cmds: net_cmds.clone(),
+        }
+    }
+
+    /// Extract the payload information to send to swarm
+    pub fn to_response(mut self) -> Result<(C, ProtocolResponse)> {
+        let channel = self.channel.try_take()?;
+        let response = self
+            .response
+            .take()
+            .context("No response found on responder")?;
+        Ok((channel, response))
+    }
+
+    /// Consumes self and responds
+    pub fn respond(mut self, value: ProtocolResponse) -> Result<()> {
+        let response = value;
+        self.response = Some(response);
+        let cmds = self.net_cmds.clone();
+        let incoming = IncomingResponse::<C>::new(self);
+        Ok(cmds
+            .clone()
+            .try_send(NetCommand::<C>::IncomingResponse(incoming))
+            .map_err(|_| anyhow!("Failed to send response command"))?)
+    }
+
+    /// Request is ok returning response
+    pub fn ok<T: TryInto<Vec<u8>>>(self, data: T) -> Result<()> {
+        let bytes: Vec<u8> = data
+            .try_into()
+            .map_err(|_| anyhow!("Could not serialize response."))?;
+        self.respond(ProtocolResponse::Ok(bytes))
+    }
+
+    /// Return a bad request
+    pub fn bad_request(self, reason: impl Into<String>) -> Result<()> {
+        self.respond(ProtocolResponse::BadRequest(reason.into()))
+    }
+
+    /// Get the id (for logging purposes)
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::sync::mpsc;
+
+    fn make_responder() -> (DirectResponder<String>, mpsc::Receiver<NetCommand<String>>) {
+        let (tx, rx) = mpsc::channel::<NetCommand<String>>(16);
+        let responder = DirectResponder::new(42u64, "test_channel".to_string(), &tx);
+        (responder, rx)
+    }
+
+    fn extract_response(
+        rx: &mut mpsc::Receiver<NetCommand<String>>,
+    ) -> Result<(String, ProtocolResponse)> {
+        let cmd = rx.try_recv().unwrap();
+        match cmd {
+            NetCommand::IncomingResponse(incoming) => incoming.responder.to_response(),
+            other => panic!("Expected IncomingResponse, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn to_response_fails_without_response_set() {
+        let (responder, _rx) = make_responder();
+        assert!(responder.to_response().is_err());
+    }
+
+    #[test]
+    fn channel_can_only_be_taken_once() {
+        let (mut responder, _rx) = make_responder();
+        responder.response = Some(ProtocolResponse::Ok(Vec::new()));
+        let cloned = responder.clone();
+        let _ = responder.to_response().unwrap();
+        assert!(cloned.to_response().is_err());
+    }
+
+    #[test]
+    fn ok_sends_serialized_payload() {
+        let (responder, mut rx) = make_responder();
+        responder.ok(b"foo".to_vec()).unwrap();
+        let (channel, response) = extract_response(&mut rx).unwrap();
+        assert_eq!(channel, "test_channel");
+        assert!(matches!(response, ProtocolResponse::Ok(v) if v == b"foo"));
+    }
+
+    #[test]
+    fn respond_sends_bad_request() {
+        let (responder, mut rx) = make_responder();
+        responder.bad_request("bad").unwrap();
+        let (channel, response) = extract_response(&mut rx).unwrap();
+        assert_eq!(channel, "test_channel");
+        assert!(matches!(response, ProtocolResponse::BadRequest(r) if r == "bad"));
+    }
+
+    #[test]
+    fn respond_fails_when_receiver_dropped() {
+        let (responder, rx) = make_responder();
+        drop(rx);
+        assert!(responder.respond(ProtocolResponse::Ok(vec![])).is_err());
+    }
+}

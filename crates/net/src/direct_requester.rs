@@ -13,7 +13,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use crate::events::{
     call_and_await_response, NetCommand, NetEvent, OutgoingRequest, OutgoingRequestFailed,
-    OutgoingRequestSucceeded, PeerTarget,
+    OutgoingRequestSucceeded, PeerTarget, ProtocolResponse,
 };
 
 pub trait DirectRequesterOutput: TryFrom<Vec<u8>> + Send + Sync + 'static {}
@@ -33,6 +33,28 @@ impl<T> DirectRequesterInput for T where
 pub struct WithoutPeer;
 pub struct WithPeer(PeerTarget);
 
+/// DirectRequester is used to send direct requests to a specific peer.
+///
+/// # Example
+///
+/// ```ignore
+/// use crate::net::direct_requester::DirectRequester;
+/// use crate::events::PeerTarget;
+/// use libp2p::PeerId;
+///
+/// // Create a requester with default settings
+/// let requester = DirectRequester::builder(net_cmds, net_events)
+///     .request_timeout(Duration::from_secs(30))
+///     .max_retries(4)
+///     .build();
+///
+/// // Target a specific peer (use Random to pick a random peer)
+/// let peer_id: PeerId = "12D3KooWEZiPVmEZkwCFEWYxPL6xts6LnPHRFqsSEDGmt1vQ17By".parse().unwrap();
+/// let peer_requester = requester.to(PeerTarget::Specific(peer_id));
+///
+/// // Make a request (any type implementing TryInto<Vec<u8>> and TryFrom<Vec<u8>> works)
+/// let response: MyResponse = peer_requester.request(my_request).await?;
+/// ```
 pub struct DirectRequester<State> {
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
@@ -44,6 +66,12 @@ pub struct DirectRequester<State> {
 }
 
 impl DirectRequester<WithoutPeer> {
+    /// Creates a new DirectRequester builder.
+    ///
+    /// Default settings:
+    /// - request_timeout: 30 seconds
+    /// - max_retries: 4
+    /// - retry_timeout: 5 seconds
     pub fn builder(
         net_cmds: mpsc::Sender<NetCommand>,
         net_events: Arc<broadcast::Receiver<NetEvent>>,
@@ -57,6 +85,10 @@ impl DirectRequester<WithoutPeer> {
         }
     }
 
+    /// Sets the target peer for requests.
+    ///
+    /// Use `PeerTarget::Random` to send to a random peer, or
+    /// `PeerTarget::Specific(peer_id)` to target a specific peer.
     pub fn to(&self, peer: PeerTarget) -> DirectRequester<WithPeer> {
         DirectRequester {
             net_cmds: self.net_cmds.clone(),
@@ -71,6 +103,15 @@ impl DirectRequester<WithoutPeer> {
 }
 
 impl DirectRequester<WithPeer> {
+    /// Sends a direct request to the peer and waits for a response.
+    ///
+    /// The request type must implement `TryInto<Vec<u8>>` with `Clone + Send + Sync + Debug`.
+    /// The response type must implement `TryFrom<Vec<u8>>`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if request serialization fails, the peer responds with an error,
+    /// or if the request times out after retries.
     pub async fn request<T, R>(&self, request: R) -> Result<T>
     where
         T: DirectRequesterOutput,
@@ -83,14 +124,16 @@ impl DirectRequester<WithPeer> {
 
         let response = self.request_with_retry(payload).await?;
 
-        let response: T = response
-            .try_into()
-            .map_err(|_| anyhow!("Response conversion failed"))?;
-
-        Ok(response)
+        match response {
+            ProtocolResponse::Ok(data) => Ok(data
+                .try_into()
+                .map_err(|_| anyhow!("Could not deserialize ProtocolResponse"))?),
+            ProtocolResponse::BadRequest(msg) => Err(anyhow!("BadRequest: {}", msg)),
+            ProtocolResponse::Error(msg) => Err(anyhow!("ProtocolError: {}", msg)),
+        }
     }
 
-    async fn request_with_retry(&self, payload: Vec<u8>) -> Result<Vec<u8>> {
+    async fn request_with_retry(&self, payload: Vec<u8>) -> Result<ProtocolResponse> {
         let request_timeout = self.request_timeout;
         let peer = self.peer;
         retry_with_backoff(
@@ -121,16 +164,19 @@ pub struct DirectRequesterBuilder {
 }
 
 impl DirectRequesterBuilder {
+    /// Sets the timeout for each request attempt.
     pub fn request_timeout(mut self, request_timeout: Duration) -> Self {
         self.request_timeout = Some(request_timeout);
         self
     }
 
+    /// Sets the maximum number of retry attempts.
     pub fn max_retries(mut self, max_retries: u32) -> Self {
         self.max_retries = Some(max_retries);
         self
     }
 
+    /// Sets the timeout between retry attempts.
     pub fn retry_timeout(mut self, retry_timeout: Duration) -> Self {
         self.retry_timeout = Some(retry_timeout);
         self
@@ -155,10 +201,10 @@ async fn do_request(
     target: PeerTarget,
     payload: Vec<u8>,
     timeout: Duration,
-) -> Result<Vec<u8>> {
+) -> Result<ProtocolResponse> {
     let correlation_id = CorrelationId::new();
 
-    let response: Vec<u8> = call_and_await_response(
+    let response = call_and_await_response(
         net_cmds,
         net_events,
         NetCommand::OutgoingRequest(OutgoingRequest {
@@ -315,7 +361,7 @@ impl DirectRequesterTester {
                             match expectation.response {
                                 Ok(payload) => {
                                     NetEvent::OutgoingRequestSucceeded(OutgoingRequestSucceeded {
-                                        payload,
+                                        payload: ProtocolResponse::Ok(payload),
                                         correlation_id: req.correlation_id,
                                     })
                                 }
@@ -328,12 +374,12 @@ impl DirectRequesterTester {
                             }
                         } else if let Some(payload) = self.respond_with.clone() {
                             NetEvent::OutgoingRequestSucceeded(OutgoingRequestSucceeded {
-                                payload,
+                                payload: ProtocolResponse::Ok(payload),
                                 correlation_id: req.correlation_id,
                             })
                         } else if let Some(payload) = self.responses.pop() {
                             NetEvent::OutgoingRequestSucceeded(OutgoingRequestSucceeded {
-                                payload,
+                                payload: ProtocolResponse::Ok(payload),
                                 correlation_id: req.correlation_id,
                             })
                         } else if let Some(error) = self.error_on.clone() {

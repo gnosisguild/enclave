@@ -19,9 +19,12 @@ use std::{collections::HashMap, convert::TryInto, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, info, warn};
 
-use crate::events::{
-    await_event, call_and_await_response, GossipData, IncomingRequest, NetCommand, NetEvent,
-    OutgoingRequest,
+use crate::{
+    direct_responder::DirectResponder,
+    events::{
+        await_event, call_and_await_response, GossipData, IncomingRequest, NetCommand, NetEvent,
+        OutgoingRequest, ProtocolResponse,
+    },
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,7 +36,15 @@ impl TryInto<Vec<u8>> for SyncRequestValue {
     type Error = anyhow::Error;
 
     fn try_into(self) -> Result<Vec<u8>, Self::Error> {
-        bincode::serialize(&self).context("failed to serialize sync request")
+        bincode::serialize(&self).context("failed to serialize SyncRequestValue")
+    }
+}
+
+impl TryFrom<Vec<u8>> for SyncRequestValue {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        bincode::deserialize(&value).context("failed to deserialize SyncRequestValue")
     }
 }
 
@@ -72,7 +83,7 @@ pub struct NetSyncManager {
     /// NetEvents receiver to receive events
     rx: Arc<broadcast::Receiver<NetEvent>>,
     eventstore: Recipient<EventStoreQueryBy<TsAgg>>,
-    requests: HashMap<CorrelationId, OnceTake<ResponseChannel<Vec<u8>>>>,
+    requests: HashMap<CorrelationId, DirectResponder>,
     peers_ready: bool,
 }
 
@@ -204,13 +215,13 @@ impl Handler<IncomingRequest> for NetSyncManager {
     type Result = ();
     fn handle(&mut self, msg: IncomingRequest, ctx: &mut Self::Context) -> Self::Result {
         trap(EType::Net, &self.bus, || {
-            info!("GOT SyncRequestReceived");
-            let request: SyncRequestValue =
-                bincode::deserialize(&msg.payload).context("failed to deserialize sync request")?;
             let id = CorrelationId::new();
-            info!("STORING channel in requests map...");
-            self.requests.insert(id, msg.channel);
-            info!("QUERYING eventstore...");
+            info!("Processing incoming request with correlation={}", id);
+            let request: SyncRequestValue = msg
+                .request
+                .try_into()
+                .context("Failed to parse SyncRequestValue for id={id}")?;
+            self.requests.insert(id, msg.responder);
             self.eventstore.try_send(EventStoreQueryBy::<TsAgg>::new(
                 id,
                 request.since,
@@ -227,11 +238,11 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
     fn handle(&mut self, msg: EventStoreQueryResponse, _: &mut Self::Context) -> Self::Result {
         trap(EType::Net, &self.bus.clone(), || {
             info!("Received response from eventstore.");
-            let Some(channel) = self.requests.get(&msg.id()) else {
-                bail!("request not found with {}", msg.id());
+            let Some(responder) = self.requests.remove(&msg.id()) else {
+                bail!("responder not found for {}", msg.id());
             };
-            debug!("Sending SyncResponse with channel={:?}", channel);
-            let response = SyncResponseValue {
+
+            responder.ok(SyncResponseValue {
                 events: msg
                     .into_events()
                     .into_iter()
@@ -239,14 +250,7 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
                     .map(|ev| ev.try_into())
                     .collect::<Result<_>>()?,
                 ts: self.bus.ts()?,
-            };
-            let payload: Vec<u8> = response.try_into()?;
-            if let Err(e) = self.tx.try_send(NetCommand::Response {
-                payload,
-                channel: channel.to_owned(),
-            }) {
-                warn!("Failed to send SyncResponse (channel full or closed): {e}");
-            }
+            })?;
 
             Ok(())
         })
@@ -287,8 +291,14 @@ async fn sync_request(
         SYNC_REQUEST_TIMEOUT,
     )
     .await?;
-    let response: SyncResponseValue = response.payload.try_into()?;
-    Ok(SyncRequestSucceeded { response })
+    match response.payload {
+        ProtocolResponse::Ok(data) => {
+            let response: SyncResponseValue = data.try_into()?;
+            Ok(SyncRequestSucceeded { response })
+        }
+        ProtocolResponse::BadRequest(msg) => Err(anyhow!("BadRequest: {}", msg)),
+        ProtocolResponse::Error(msg) => Err(anyhow!("ProtocolError: {}", msg)),
+    }
 }
 
 async fn handle_sync_request_event(

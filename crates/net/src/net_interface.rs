@@ -4,10 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{correlator::Correlator, events::OutgoingRequest};
+use crate::{
+    correlator::Correlator,
+    direct_responder::DirectResponder,
+    events::{IncomingResponse, OutgoingRequest, ProtocolResponse},
+};
 use anyhow::{Context, Result};
 use e3_events::CorrelationId;
-use e3_utils::{ArcBytes, OnceTake};
+use e3_utils::ArcBytes;
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
@@ -22,7 +26,7 @@ use libp2p::{
     },
     request_response::{
         self, cbor, Event as RequestResponseEvent, Message as RequestResponseMessage,
-        ProtocolSupport, ResponseChannel,
+        ProtocolSupport,
     },
     swarm::{dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent},
     PeerId, StreamProtocol, Swarm,
@@ -58,7 +62,8 @@ pub struct NodeBehaviour {
     kademlia: KademliaBehaviour<MemoryStore>,
     connection_limits: connection_limits::Behaviour,
     identify: IdentifyBehaviour,
-    request_response: cbor::Behaviour<Vec<u8>, Vec<u8>>,
+    /// Send bytes reply with enumeration for errors
+    request_response: cbor::Behaviour<Vec<u8>, ProtocolResponse>,
 }
 
 /// Manage the peer to peer connection. This struct wraps a libp2p Swarm and enables communication
@@ -145,6 +150,7 @@ impl NetInterface {
         trace!("Peers to dial: {:?}", self.peers);
         tokio::spawn({
             let event_tx = event_tx.clone();
+            let cmd_tx = cmd_tx.clone();
             let peers = self.peers.clone();
             async move {
                 dial_peers(&cmd_tx, &event_tx, &peers).await?;
@@ -170,7 +176,7 @@ impl NetInterface {
                 }
                 // Process events
                 event = self.swarm.select_next_some() =>  {
-                    match process_swarm_event(&mut self.swarm, &event_tx, &mut correlator, &mut peer_failures, event).await {
+                    match process_swarm_event(&mut self.swarm, &event_tx, &cmd_tx, &mut correlator, &mut peer_failures, event).await {
                         Ok(_) => (),
                         Err(e) => error!("Error processing NetEvent: {e}")
                     }
@@ -209,7 +215,7 @@ fn create_behaviour(
     let request_response_config =
         request_response::Config::default().with_request_timeout(Duration::from_secs(30));
 
-    let request_response = cbor::Behaviour::<Vec<u8>, Vec<u8>>::new(
+    let request_response = cbor::Behaviour::<Vec<u8>, ProtocolResponse>::new(
         [(
             StreamProtocol::new("/enclave/sync/0.0.1"),
             ProtocolSupport::Full,
@@ -243,6 +249,7 @@ fn create_behaviour(
 async fn process_swarm_event(
     swarm: &mut Swarm<NodeBehaviour>,
     event_tx: &broadcast::Sender<NetEvent>,
+    cmd_tx: &mpsc::Sender<NetCommand>,
     correlator: &mut Correlator,
     peer_failures: &mut PeerFailureTracker,
     event: SwarmEvent<NodeBehaviourEvent>,
@@ -426,12 +433,12 @@ async fn process_swarm_event(
             },
         )) => {
             debug!("Incoming request received (id={})", request_id);
+            let responder = DirectResponder::new(request_id, channel, &cmd_tx);
 
             // received a request for events
             event_tx.send(NetEvent::IncomingRequest(IncomingRequest {
-                request_id,
-                channel: OnceTake::new(channel),
-                payload: request,
+                responder,
+                request,
             }))?;
         }
 
@@ -557,8 +564,8 @@ async fn process_swarm_command(
             handle_outgoing_request(swarm, correlator, correlation_id, payload, target)?;
             Ok(())
         }
-        NetCommand::Response { payload, channel } => {
-            handle_response(swarm, channel, payload)?;
+        NetCommand::IncomingResponse(IncomingResponse { responder }) => {
+            handle_response(swarm, responder)?;
             Ok(())
         }
         NetCommand::Shutdown => {
@@ -784,20 +791,14 @@ fn handle_outgoing_request(
     Ok(())
 }
 
-fn handle_response(
-    swarm: &mut Swarm<NodeBehaviour>,
-    channel: OnceTake<ResponseChannel<Vec<u8>>>,
-    payload: Vec<u8>,
-) -> Result<()> {
-    debug!("Sending response");
-    let channel = channel.try_take()?;
-    if let Err(payload) = swarm
+fn handle_response(swarm: &mut Swarm<NodeBehaviour>, responder: DirectResponder) -> Result<()> {
+    debug!("Sending response to {}", responder.id());
+    let (channel, response) = responder.to_response()?;
+    swarm
         .behaviour_mut()
         .request_response
-        .send_response(channel, payload)
-    {
-        error!("Failed to send response: {:?}", payload);
-    }
+        .send_response(channel, response)
+        .map_err(|payload| anyhow::anyhow!("Failed to send response: {:?}", payload))?;
     Ok(())
 }
 
