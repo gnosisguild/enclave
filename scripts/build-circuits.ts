@@ -19,8 +19,20 @@ interface CircuitInfo {
 interface CompiledCircuit {
   name: string
   group: CircuitGroup
-  artifacts: { json?: string; vk?: string; vkHash?: string }
-  checksums: { json?: string; vk?: string; vkHash?: string }
+  artifacts: {
+    json?: string
+    vk?: string
+    vkHash?: string
+    vkRecursive?: string
+    vkRecursiveHash?: string
+  }
+  checksums: {
+    json?: string
+    vk?: string
+    vkHash?: string
+    vkRecursive?: string
+    vkRecursiveHash?: string
+  }
 }
 interface BuildOptions {
   groups?: CircuitGroup[]
@@ -244,14 +256,22 @@ class NoirCircuitBuilder {
     result.checksums.json = this.checksum(jsonFile)
 
     if (!this.options.skipVk) {
-      const { vk: vkFile, vkHash: vkHashFile } = this.generateVk(jsonFile, targetDir, packageName)
-      if (vkFile) {
-        result.artifacts.vk = vkFile
-        result.checksums.vk = this.checksum(vkFile)
+      const vkArtifacts = this.generateVk(jsonFile, targetDir, packageName)
+      if (vkArtifacts.vk) {
+        result.artifacts.vk = vkArtifacts.vk
+        result.checksums.vk = this.checksum(vkArtifacts.vk)
       }
-      if (vkHashFile && existsSync(vkHashFile)) {
-        result.artifacts.vkHash = vkHashFile
-        result.checksums.vkHash = this.checksum(vkHashFile)
+      if (vkArtifacts.vkHash && existsSync(vkArtifacts.vkHash)) {
+        result.artifacts.vkHash = vkArtifacts.vkHash
+        result.checksums.vkHash = this.checksum(vkArtifacts.vkHash)
+      }
+      if (vkArtifacts.vkRecursive) {
+        result.artifacts.vkRecursive = vkArtifacts.vkRecursive
+        result.checksums.vkRecursive = this.checksum(vkArtifacts.vkRecursive)
+      }
+      if (vkArtifacts.vkRecursiveHash && existsSync(vkArtifacts.vkRecursiveHash)) {
+        result.artifacts.vkRecursiveHash = vkArtifacts.vkRecursiveHash
+        result.checksums.vkRecursiveHash = this.checksum(vkArtifacts.vkRecursiveHash)
       }
     }
     console.log(`   ✓ ${circuit.group}/${circuit.name}`)
@@ -263,29 +283,51 @@ class NoirCircuitBuilder {
     jsonFile: string,
     targetDir: string,
     packageName: string,
-  ): { vk: string | null; vkHash: string | null } {
+  ): {
+    vk: string | null
+    vkHash: string | null
+    vkRecursive: string | null
+    vkRecursiveHash: string | null
+  } {
+    const result = { vk: null as string | null, vkHash: null as string | null, vkRecursive: null as string | null, vkRecursiveHash: null as string | null }
+
+    const runWriteVk = (verifierTarget: string, vkOut: string, vkHashOut: string): boolean => {
+      try {
+        execSync(`bb write_vk -b "${jsonFile}" -o "${targetDir}" -t ${verifierTarget}`, { stdio: 'pipe' })
+        const defaultVk = join(targetDir, 'vk')
+        const defaultVkHash = join(targetDir, 'vk_hash')
+        if (existsSync(defaultVk)) {
+          if (existsSync(vkOut)) rmSync(vkOut)
+          copyFileSync(defaultVk, vkOut)
+          rmSync(defaultVk)
+        }
+        if (existsSync(defaultVkHash)) {
+          if (existsSync(vkHashOut)) rmSync(vkHashOut)
+          copyFileSync(defaultVkHash, vkHashOut)
+          rmSync(defaultVkHash)
+        }
+        return true
+      } catch (err) {
+        console.error(`Error generating VK (${verifierTarget}) for ${jsonFile}:`, err)
+        return false
+      }
+    }
+
     const vkFile = join(targetDir, `${packageName}.vk`)
     const vkHashFile = join(targetDir, `${packageName}.vk_hash`)
-    try {
-      const oracleFlag = this.options.oracleHash ? ` --oracle_hash ${this.options.oracleHash}` : ''
-      execSync(`bb write_vk -b "${jsonFile}" -o "${targetDir}"${oracleFlag}`, { stdio: 'pipe' })
-      const defaultVk = join(targetDir, 'vk')
-      const defaultVkHash = join(targetDir, 'vk_hash')
-      if (existsSync(defaultVk)) {
-        if (existsSync(vkFile)) rmSync(vkFile)
-        copyFileSync(defaultVk, vkFile)
-        rmSync(defaultVk)
-      }
-      if (existsSync(defaultVkHash)) {
-        if (existsSync(vkHashFile)) rmSync(vkHashFile)
-        copyFileSync(defaultVkHash, vkHashFile)
-        rmSync(defaultVkHash)
-      }
-      return { vk: existsSync(vkFile) ? vkFile : null, vkHash: existsSync(vkHashFile) ? vkHashFile : null }
-    } catch (err) {
-      console.error(`Error generating VK for ${jsonFile}:`, err)
-      return { vk: null, vkHash: null }
+    const vkRecursiveFile = join(targetDir, `${packageName}.vk_recursive`)
+    const vkRecursiveHashFile = join(targetDir, `${packageName}.vk_recursive_hash`)
+
+    if (runWriteVk('evm', vkFile, vkHashFile)) {
+      result.vk = existsSync(vkFile) ? vkFile : null
+      result.vkHash = existsSync(vkHashFile) ? vkHashFile : null
     }
+    if (runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
+      result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
+      result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
+    }
+
+    return result
   }
 
   private getPackageName(circuitPath: string): string {
@@ -336,6 +378,16 @@ class NoirCircuitBuilder {
         checksums[f] = c.checksums.vkHash
         lines.push(`${c.checksums.vkHash}  ${f}`)
       }
+      if (c.checksums.vkRecursive && c.artifacts.vkRecursive) {
+        const f = `${prefix}/${basename(c.artifacts.vkRecursive)}`
+        checksums[f] = c.checksums.vkRecursive
+        lines.push(`${c.checksums.vkRecursive}  ${f}`)
+      }
+      if (c.checksums.vkRecursiveHash && c.artifacts.vkRecursiveHash) {
+        const f = `${prefix}/${basename(c.artifacts.vkRecursiveHash)}`
+        checksums[f] = c.checksums.vkRecursiveHash
+        lines.push(`${c.checksums.vkRecursiveHash}  ${f}`)
+      }
     }
 
     const outputDir = this.options.outputDir!
@@ -356,6 +408,9 @@ class NoirCircuitBuilder {
       if (c.artifacts.json) copyFileSync(c.artifacts.json, join(dir, basename(c.artifacts.json)))
       if (c.artifacts.vk) copyFileSync(c.artifacts.vk, join(dir, basename(c.artifacts.vk)))
       if (c.artifacts.vkHash) copyFileSync(c.artifacts.vkHash, join(dir, basename(c.artifacts.vkHash)))
+      if (c.artifacts.vkRecursive) copyFileSync(c.artifacts.vkRecursive, join(dir, basename(c.artifacts.vkRecursive)))
+      if (c.artifacts.vkRecursiveHash)
+        copyFileSync(c.artifacts.vkRecursiveHash, join(dir, basename(c.artifacts.vkRecursiveHash)))
     }
     return outputDir
   }
