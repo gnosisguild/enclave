@@ -36,20 +36,73 @@ impl ZkProver {
         &self.work_dir
     }
 
+    pub fn bb_binary(&self) -> &PathBuf {
+        &self.bb_binary
+    }
+
     pub fn generate_proof(
         &self,
         circuit: CircuitName,
         witness_data: &[u8],
         e3_id: &str,
     ) -> Result<Proof, ZkError> {
+        self.generate_proof_impl(circuit, witness_data, e3_id, &circuit.dir_path(), None)
+    }
+
+    /// Generates a proof for recursive aggregation (poseidon2, noir-recursive-no-zk).
+    /// Uses inner circuit dir and `.vk_recursive`.
+    pub fn generate_recursive_proof(
+        &self,
+        circuit: CircuitName,
+        witness_data: &[u8],
+        e3_id: &str,
+    ) -> Result<Proof, ZkError> {
+        self.generate_proof_impl(
+            circuit,
+            witness_data,
+            e3_id,
+            &circuit.dir_path(),
+            Some("noir-recursive-no-zk"),
+        )
+    }
+
+    /// Generates a proof of the wrapper circuit (for aggregation output).
+    /// Uses wrapper dir; verifier_target determines proof format and VK suffix.
+    pub fn generate_wrapper_proof(
+        &self,
+        circuit: CircuitName,
+        witness_data: &[u8],
+        e3_id: &str,
+    ) -> Result<Proof, ZkError> {
+        self.generate_proof_impl(
+            circuit,
+            witness_data,
+            e3_id,
+            &circuit.wrapper_dir_path(),
+            Some("noir-recursive-no-zk"),
+        )
+    }
+
+    fn generate_proof_impl(
+        &self,
+        circuit: CircuitName,
+        witness_data: &[u8],
+        e3_id: &str,
+        dir_path: &str,
+        verifier_target: Option<&str>,
+    ) -> Result<Proof, ZkError> {
         if !self.bb_binary.exists() {
             return Err(ZkError::BbNotInstalled);
         }
 
-        // Circuits are organized as: circuits/{group}/{name}/{name}.json
-        let circuit_dir = self.circuits_dir.join(circuit.dir_path());
+        let vk_suffix = match verifier_target {
+            Some("noir-recursive") | Some("noir-recursive-no-zk") => "_recursive",
+            _ => "",
+        };
+
+        let circuit_dir = self.circuits_dir.join(dir_path);
         let circuit_path = circuit_dir.join(format!("{}.json", circuit.as_str()));
-        let vk_path = circuit_dir.join(format!("{}.vk", circuit.as_str()));
+        let vk_path = circuit_dir.join(format!("{}.vk{vk_suffix}", circuit.as_str()));
 
         if !circuit_path.exists() {
             return Err(ZkError::CircuitNotFound(format!(
@@ -80,23 +133,31 @@ impl ZkProver {
             vk_path.display()
         );
 
-        let output = StdCommand::new(&self.bb_binary)
-            .args([
-                "prove",
-                "--scheme",
-                "ultra_honk",
-                "--oracle_hash",
-                "keccak",
-                "-b",
-                &circuit_path.to_string_lossy(),
-                "-w",
-                &witness_path.to_string_lossy(),
-                "-k",
-                &vk_path.to_string_lossy(),
-                "-o",
-                &output_dir.to_string_lossy(),
-            ])
-            .output()?;
+        let circuit_path_s = circuit_path.to_string_lossy();
+        let witness_path_s = witness_path.to_string_lossy();
+        let vk_path_s = vk_path.to_string_lossy();
+        let output_dir_s = output_dir.to_string_lossy();
+
+        let mut args = vec![
+            "prove",
+            "--scheme",
+            "ultra_honk",
+            "-b",
+            circuit_path_s.as_ref(),
+            "-w",
+            witness_path_s.as_ref(),
+            "-k",
+            vk_path_s.as_ref(),
+            "-o",
+            output_dir_s.as_ref(),
+        ];
+        if let Some(t) = verifier_target {
+            args.extend(["-t", t]);
+        } else {
+            args.extend(["--oracle_hash", "keccak"]);
+        }
+
+        let output = StdCommand::new(&self.bb_binary).args(&args).output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -124,32 +185,58 @@ impl ZkProver {
         ))
     }
 
-    pub fn verify(&self, proof: &Proof, e3_id: &str, party_id: u64) -> Result<bool, ZkError> {
-        self.verify_proof(
+    pub fn verify_proof(&self, proof: &Proof, e3_id: &str, party_id: u64) -> Result<bool, ZkError> {
+        self.verify_proof_impl(
             proof.circuit,
             &proof.data,
             &proof.public_signals,
+            proof.circuit.dir_path(),
             e3_id,
             party_id,
+            None,
         )
     }
 
-    pub fn verify_proof(
+    /// Verifies a wrapper/aggregation proof using the wrapper circuit's recursive VK.
+    pub fn verify_wrapper_proof(
+        &self,
+        proof: &Proof,
+        e3_id: &str,
+        party_id: u64,
+    ) -> Result<bool, ZkError> {
+        self.verify_proof_impl(
+            proof.circuit,
+            &proof.data,
+            &proof.public_signals,
+            proof.circuit.wrapper_dir_path(),
+            e3_id,
+            party_id,
+            Some("noir-recursive-no-zk"),
+        )
+    }
+
+    fn verify_proof_impl(
         &self,
         circuit: CircuitName,
         proof_data: &[u8],
         public_signals: &[u8],
+        dir_path: String,
         e3_id: &str,
         party_id: u64,
+        verifier_target: Option<&str>,
     ) -> Result<bool, ZkError> {
         if !self.bb_binary.exists() {
             return Err(ZkError::BbNotInstalled);
         }
 
+        let vk_suffix = match verifier_target {
+            Some("noir-recursive") | Some("noir-recursive-no-zk") => "_recursive",
+            _ => "",
+        };
         let vk_path = self
             .circuits_dir
-            .join(circuit.dir_path())
-            .join(format!("{}.vk", circuit.as_str()));
+            .join(&dir_path)
+            .join(format!("{}.vk{vk_suffix}", circuit.as_str()));
         if !vk_path.exists() {
             return Err(ZkError::CircuitNotFound(format!(
                 "VK not found: {}",
@@ -176,21 +263,28 @@ impl ZkProver {
         fs::write(&proof_path, proof_data)?;
         fs::write(&public_inputs_path, public_signals)?;
 
-        let output = StdCommand::new(&self.bb_binary)
-            .args([
-                "verify",
-                "--scheme",
-                "ultra_honk",
-                "--oracle_hash",
-                "keccak",
-                "-i",
-                &public_inputs_path.to_string_lossy(),
-                "-p",
-                &proof_path.to_string_lossy(),
-                "-k",
-                &vk_path.to_string_lossy(),
-            ])
-            .output()?;
+        let public_inputs_s = public_inputs_path.to_string_lossy();
+        let proof_s = proof_path.to_string_lossy();
+        let vk_s = vk_path.to_string_lossy();
+
+        let mut args = vec![
+            "verify",
+            "--scheme",
+            "ultra_honk",
+            "-i",
+            public_inputs_s.as_ref(),
+            "-p",
+            proof_s.as_ref(),
+            "-k",
+            vk_s.as_ref(),
+        ];
+        if let Some(t) = verifier_target {
+            args.extend(["-t", t]);
+        } else {
+            args.extend(["--oracle_hash", "keccak"]);
+        }
+
+        let output = StdCommand::new(&self.bb_binary).args(&args).output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
