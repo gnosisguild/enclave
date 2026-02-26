@@ -65,12 +65,16 @@ pub struct ThresholdShareCreated {
     pub target_party_id: u64,
     pub external: bool,
     /// Signed C2a proof (sk share computation) from the sender.
+    #[serde(default)]
     pub signed_c2a_proof: Option<SignedProofPayload>,
     /// Signed C2b proof (e_sm share computation) from the sender.
+    #[serde(default)]
     pub signed_c2b_proof: Option<SignedProofPayload>,
     /// Signed C3a proofs (sk share encryption per modulus row) for this recipient.
+    #[serde(default)]
     pub signed_c3a_proofs: Vec<SignedProofPayload>,
     /// Signed C3b proofs (e_sm share encryption per modulus row) for this recipient.
+    #[serde(default)]
     pub signed_c3b_proofs: Vec<SignedProofPayload>,
 }
 
