@@ -169,11 +169,11 @@ pub trait SequenceIndex: Unpin + 'static {
 }
 
 /// Store and retrieve events from a write ahead log
-pub trait EventLog: Unpin + 'static {
+pub trait EventLog<E: Event + Clone = EnclaveEvent<Unsequenced>>: Unpin + 'static {
     /// Append an event to the log, returning its sequence number
-    fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64>;
+    fn append(&mut self, event: &E) -> Result<u64>;
     /// Read all events starting from the given sequence number (inclusive)
-    fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>>;
+    fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, E)>>;
 }
 
 /// EventContext allows consumers to extract infrastructure metadata from event objects

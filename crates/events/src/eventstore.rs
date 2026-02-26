@@ -6,8 +6,8 @@
 
 use crate::{
     events::{StoreEventRequested, StoreEventResponse},
-    EventContextAccessors, EventLog, EventStoreQueryBy, EventStoreQueryResponse, Seq,
-    SequenceIndex, Ts,
+    EnclaveEvent, EventContextAccessors, EventLog, EventStoreFilter, EventStoreQueryBy,
+    EventStoreQueryResponse, Seq, SequenceIndex, Sequenced, Ts, Unsequenced,
 };
 use actix::{Actor, Handler};
 use anyhow::{bail, Result};
@@ -15,13 +15,13 @@ use tracing::{error, warn};
 
 const MAX_STORAGE_ERRORS: u64 = 10;
 
-pub struct EventStore<I: SequenceIndex, L: EventLog> {
+pub struct EventStore<I: SequenceIndex, L: EventLog<EnclaveEvent<Unsequenced>>> {
     index: I,
     log: L,
     storage_errors: u64,
 }
 
-impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
+impl<I: SequenceIndex, L: EventLog<EnclaveEvent<Unsequenced>>> EventStore<I, L> {
     pub fn handle_store_event_requested(&mut self, msg: StoreEventRequested) -> Result<()> {
         let event = msg.event;
         let sender = msg.sender;
@@ -43,39 +43,57 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         Ok(())
     }
 
+    fn query_events(
+        &self,
+        iter: Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>>,
+        filter: Option<EventStoreFilter>,
+        limit: Option<u64>,
+    ) -> Vec<EnclaveEvent<Sequenced>> {
+        let iter = iter.map(|(s, e)| e.into_sequenced(s));
+
+        match filter {
+            Some(EventStoreFilter::Source(source)) => {
+                let iter = iter.filter(move |e| e.get_ctx().source() == source);
+                match limit {
+                    Some(lim) => iter.take(lim as usize).collect(),
+                    None => iter.collect(),
+                }
+            }
+            None => match limit {
+                Some(lim) => iter.take(lim as usize).collect(),
+                None => iter.collect(),
+            },
+        }
+    }
+
     pub fn handle_event_store_query_ts(&mut self, msg: EventStoreQueryBy<Ts>) -> Result<()> {
-        // if there are no events after the timestamp return an empty vector
         let id = msg.id();
-        let Some(seq) = self.index.seek(msg.query())? else {
-            msg.sender()
-                .try_send(EventStoreQueryResponse::new(id, vec![]))?;
+        let query = msg.query();
+        let filter = msg.filter().cloned();
+        let limit = msg.limit();
+        let sender = msg.sender();
+
+        let Some(seq) = self.index.seek(query)? else {
+            sender.try_send(EventStoreQueryResponse::new(id, vec![]))?;
             return Ok(());
         };
-        // read and return the events
-        let evts = self
-            .log
-            .read_from(seq)
-            .map(|(s, e)| e.into_sequenced(s))
-            .collect::<Vec<_>>();
 
-        msg.sender()
-            .try_send(EventStoreQueryResponse::new(id, evts))?;
+        let evts = self.query_events(self.log.read_from(seq), filter, limit);
+
+        sender.try_send(EventStoreQueryResponse::new(id, evts))?;
         Ok(())
     }
 
     pub fn handle_event_store_query_seq(&mut self, msg: EventStoreQueryBy<Seq>) -> Result<()> {
-        // if there are no events after the timestamp return an empty vector
         let id = msg.id();
+        let query = msg.query();
+        let filter = msg.filter().cloned();
+        let limit = msg.limit();
+        let sender = msg.sender();
 
-        // read and return the events
-        let evts = self
-            .log
-            .read_from(msg.query())
-            .map(|(s, e)| e.into_sequenced(s))
-            .collect::<Vec<_>>();
+        let evts = self.query_events(self.log.read_from(query), filter, limit);
 
-        msg.sender()
-            .try_send(EventStoreQueryResponse::new(id, evts))?;
+        sender.try_send(EventStoreQueryResponse::new(id, evts))?;
         Ok(())
     }
 }
@@ -90,11 +108,13 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
     }
 }
 
-impl<I: SequenceIndex, L: EventLog> Actor for EventStore<I, L> {
+impl<I: SequenceIndex, L: EventLog<EnclaveEvent<Unsequenced>>> Actor for EventStore<I, L> {
     type Context = actix::Context<Self>;
 }
 
-impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStore<I, L> {
+impl<I: SequenceIndex, L: EventLog<EnclaveEvent<Unsequenced>>> Handler<StoreEventRequested>
+    for EventStore<I, L>
+{
     type Result = ();
     fn handle(&mut self, msg: StoreEventRequested, _: &mut Self::Context) -> Self::Result {
         if let Err(e) = self.handle_store_event_requested(msg) {
@@ -105,7 +125,9 @@ impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStore<
     }
 }
 
-impl<I: SequenceIndex, L: EventLog> Handler<EventStoreQueryBy<Ts>> for EventStore<I, L> {
+impl<I: SequenceIndex, L: EventLog<EnclaveEvent<Unsequenced>>> Handler<EventStoreQueryBy<Ts>>
+    for EventStore<I, L>
+{
     type Result = ();
     fn handle(&mut self, msg: EventStoreQueryBy<Ts>, _: &mut Self::Context) -> Self::Result {
         if let Err(e) = self.handle_event_store_query_ts(msg) {
@@ -114,7 +136,9 @@ impl<I: SequenceIndex, L: EventLog> Handler<EventStoreQueryBy<Ts>> for EventStor
     }
 }
 
-impl<I: SequenceIndex, L: EventLog> Handler<EventStoreQueryBy<Seq>> for EventStore<I, L> {
+impl<I: SequenceIndex, L: EventLog<EnclaveEvent<Unsequenced>>> Handler<EventStoreQueryBy<Seq>>
+    for EventStore<I, L>
+{
     type Result = ();
     fn handle(&mut self, msg: EventStoreQueryBy<Seq>, _: &mut Self::Context) -> Self::Result {
         if let Err(e) = self.handle_event_store_query_seq(msg) {

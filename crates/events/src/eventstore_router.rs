@@ -8,7 +8,9 @@ use crate::{
     events::{EventStoreQueryResponse, StoreEventRequested},
     AggregateId, EventContextAccessors, EventLog, SequenceIndex,
 };
-use crate::{CorrelationId, Die, EnclaveEvent, EventStoreQueryBy, Seq, SeqAgg, Ts, TsAgg};
+use crate::{
+    CorrelationId, Die, EnclaveEvent, EventStoreQueryBy, Seq, SeqAgg, Ts, TsAgg, Unsequenced,
+};
 use actix::{Actor, ActorContext, Addr, AsyncContext, Context, Handler, Recipient};
 use anyhow::Result;
 use e3_utils::MAILBOX_LIMIT_LARGE;
@@ -84,11 +86,11 @@ impl Handler<Die> for QueryAggregator {
 }
 
 /// EventStoreRouter - routes events and spawns query aggregators to handle eventstore queries
-pub struct EventStoreRouter<I: SequenceIndex, L: EventLog> {
+pub struct EventStoreRouter<I: SequenceIndex, L: EventLog<EnclaveEvent<Unsequenced>>> {
     stores: HashMap<AggregateId, Addr<EventStore<I, L>>>,
 }
 
-impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
+impl<I: SequenceIndex, L: EventLog<EnclaveEvent<Unsequenced>>> EventStoreRouter<I, L> {
     pub fn new(stores: HashMap<usize, Addr<EventStore<I, L>>>) -> Self {
         debug!("Making eventstore router...");
         let stores = stores
@@ -199,7 +201,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
     }
 }
 
-impl<I: SequenceIndex, L: EventLog> Actor for EventStoreRouter<I, L> {
+impl<I: SequenceIndex, L: EventLog<EnclaveEvent<Unsequenced>>> Actor for EventStoreRouter<I, L> {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
@@ -207,7 +209,9 @@ impl<I: SequenceIndex, L: EventLog> Actor for EventStoreRouter<I, L> {
     }
 }
 
-impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStoreRouter<I, L> {
+impl<I: SequenceIndex, L: EventLog<EnclaveEvent<Unsequenced>>> Handler<StoreEventRequested>
+    for EventStoreRouter<I, L>
+{
     type Result = ();
 
     fn handle(&mut self, msg: StoreEventRequested, _: &mut Self::Context) -> Self::Result {
@@ -215,7 +219,9 @@ impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStoreR
     }
 }
 
-impl<I: SequenceIndex, L: EventLog> Handler<EventStoreQueryBy<TsAgg>> for EventStoreRouter<I, L> {
+impl<I: SequenceIndex, L: EventLog<EnclaveEvent<Unsequenced>>> Handler<EventStoreQueryBy<TsAgg>>
+    for EventStoreRouter<I, L>
+{
     type Result = ();
 
     fn handle(&mut self, msg: EventStoreQueryBy<TsAgg>, ctx: &mut Self::Context) -> Self::Result {
@@ -225,7 +231,9 @@ impl<I: SequenceIndex, L: EventLog> Handler<EventStoreQueryBy<TsAgg>> for EventS
     }
 }
 
-impl<I: SequenceIndex, L: EventLog> Handler<EventStoreQueryBy<SeqAgg>> for EventStoreRouter<I, L> {
+impl<I: SequenceIndex, L: EventLog<EnclaveEvent<Unsequenced>>> Handler<EventStoreQueryBy<SeqAgg>>
+    for EventStoreRouter<I, L>
+{
     type Result = ();
 
     fn handle(&mut self, msg: EventStoreQueryBy<SeqAgg>, ctx: &mut Self::Context) -> Self::Result {
