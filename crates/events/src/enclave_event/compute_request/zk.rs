@@ -73,6 +73,8 @@ pub struct ShareEncryptionProofRequest {
     pub recipient_party_id: usize,
     /// Modulus row index (for correlation tracking).
     pub row_index: usize,
+    /// ESI index (for C3b only; 0 for C3a). Disambiguates proofs across multiple ESI entries.
+    pub esi_index: usize,
 }
 
 /// Request to generate a proof for BFV public key generation (C0).
@@ -160,6 +162,8 @@ pub struct ShareEncryptionProofResponse {
     pub dkg_input_type: DkgInputType,
     pub recipient_party_id: usize,
     pub row_index: usize,
+    /// ESI index (for C3b only; 0 for C3a).
+    pub esi_index: usize,
 }
 
 /// Response containing a generated BFV public key proof.

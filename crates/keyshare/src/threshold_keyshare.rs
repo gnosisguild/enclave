@@ -940,13 +940,14 @@ impl ThresholdKeyshare {
                     committee_size: CiphernodesCommitteeSize::Small,
                     recipient_party_id: recipient_idx,
                     row_index: row_idx,
+                    esi_index: 0,
                 });
             }
         }
 
         // Build C3b proof requests (E_SM share encryption) from witnesses
         let mut e_sm_share_encryption_requests = Vec::new();
-        for esi_recipient_witnesses in esi_witnesses.iter() {
+        for (esi_idx, esi_recipient_witnesses) in esi_witnesses.iter().enumerate() {
             for (recipient_idx, recipient_witnesses) in esi_recipient_witnesses.iter().enumerate() {
                 for (row_idx, witness) in recipient_witnesses.iter().enumerate() {
                     e_sm_share_encryption_requests.push(ShareEncryptionProofRequest {
@@ -966,6 +967,7 @@ impl ThresholdKeyshare {
                         committee_size: CiphernodesCommitteeSize::Small,
                         recipient_party_id: recipient_idx,
                         row_index: row_idx,
+                        esi_index: esi_idx,
                     });
                 }
             }

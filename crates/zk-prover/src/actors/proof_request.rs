@@ -30,6 +30,7 @@ enum ThresholdProofKind {
         row_index: usize,
     },
     ESmShareEncryption {
+        esi_index: usize,
         recipient_party_id: usize,
         row_index: usize,
     },
@@ -52,8 +53,8 @@ struct PendingThresholdProofs {
     /// C3a proofs: keyed by (recipient_party_id, row_index)
     sk_share_encryption_proofs: HashMap<(usize, usize), Proof>,
     expected_sk_enc_count: usize,
-    /// C3b proofs: keyed by (recipient_party_id, row_index)
-    e_sm_share_encryption_proofs: HashMap<(usize, usize), Proof>,
+    /// C3b proofs: keyed by (esi_index, recipient_party_id, row_index)
+    e_sm_share_encryption_proofs: HashMap<(usize, usize, usize), Proof>,
     expected_e_sm_enc_count: usize,
 }
 
@@ -102,11 +103,12 @@ impl PendingThresholdProofs {
                     .insert((*recipient_party_id, *row_index), proof);
             }
             ThresholdProofKind::ESmShareEncryption {
+                esi_index,
                 recipient_party_id,
                 row_index,
             } => {
                 self.e_sm_share_encryption_proofs
-                    .insert((*recipient_party_id, *row_index), proof);
+                    .insert((*esi_index, *recipient_party_id, *row_index), proof);
             }
         }
     }
@@ -310,6 +312,7 @@ impl ProofRequestActor {
                 (
                     e3_id.clone(),
                     ThresholdProofKind::ESmShareEncryption {
+                        esi_index: req.esi_index,
                         recipient_party_id: req.recipient_party_id,
                         row_index: req.row_index,
                     },
@@ -496,7 +499,7 @@ impl ProofRequestActor {
         }
 
         // Sign and publish C3b proofs (ESmShareEncryption)
-        for ((_recipient, _row), proof) in &pending.e_sm_share_encryption_proofs {
+        for ((_esi, _recipient, _row), proof) in &pending.e_sm_share_encryption_proofs {
             let Some(signed) =
                 self.sign_proof(e3_id, ProofType::C3bESmShareEncryption, proof.clone())
             else {

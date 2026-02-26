@@ -682,6 +682,7 @@ fn handle_share_encryption_proof(
             dkg_input_type: req.dkg_input_type,
             recipient_party_id: req.recipient_party_id,
             row_index: req.row_index,
+            esi_index: req.esi_index,
         }),
         request.correlation_id,
         request.e3_id,
