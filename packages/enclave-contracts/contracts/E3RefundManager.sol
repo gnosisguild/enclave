@@ -39,11 +39,21 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     /// @notice Work value allocation configuration
     WorkValueAllocation internal _workAllocation;
     /// @notice Maps E3 ID to refund distribution
-    mapping(uint256 e3Id => RefundDistribution) internal _distributions;
+    mapping(uint256 e3Id => RefundDistribution distribution)
+        internal _distributions;
     /// @notice Tracks claims per E3 per address
-    mapping(uint256 e3Id => mapping(address => bool)) internal _claimed;
+    mapping(uint256 e3Id => mapping(address claimer => bool hasClaimed))
+        internal _claimed;
+    /// @notice Tracks number of claims made per E3
+    mapping(uint256 e3Id => uint256 count) internal _claimCount;
+    /// @notice Tracks number of honest node claims made per E3
+    mapping(uint256 e3Id => uint256 count) internal _honestNodeClaimCount;
+    /// @notice Tracks total amount paid to honest nodes per E3
+    mapping(uint256 e3Id => uint256 amount) internal _totalHonestNodePaid;
     /// @notice Maps E3 ID to honest node addresses
-    mapping(uint256 e3Id => address[]) internal _honestNodes;
+    mapping(uint256 e3Id => address[] nodes) internal _honestNodes;
+    /// @notice Pending slashed funds awaiting E3 terminal state
+    mapping(uint256 e3Id => uint256 amount) internal _pendingSlashedFunds;
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                       Modifiers                        //
@@ -88,7 +98,8 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
             committeeFormationBps: 1000,
             dkgBps: 3000,
             decryptionBps: 5500,
-            protocolBps: 500
+            protocolBps: 500,
+            successSlashedNodeBps: 5000
         });
 
         if (_owner != owner()) transferOwnership(_owner);
@@ -103,10 +114,12 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     function calculateRefund(
         uint256 e3Id,
         uint256 originalPayment,
-        address[] calldata honestNodes
+        address[] calldata honestNodes,
+        IERC20 paymentToken
     ) external onlyEnclave {
         require(!_distributions[e3Id].calculated, "Already calculated");
         require(originalPayment > 0, "No payment");
+        require(address(paymentToken) != address(0), "Invalid fee token");
 
         // Calculate work value based on stage
         IEnclave.E3Stage failedAt = _getFailedAtStage(e3Id);
@@ -121,14 +134,16 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
             honestNodeAmount -
             requesterAmount;
 
-        // Store distribution
+        // Store distribution with the actual token used for this E3
         _distributions[e3Id] = RefundDistribution({
             requesterAmount: requesterAmount,
             honestNodeAmount: honestNodeAmount,
             protocolAmount: protocolAmount,
             totalSlashed: 0,
             honestNodeCount: honestNodes.length,
-            calculated: true
+            calculated: true,
+            feeToken: paymentToken,
+            originalPayment: originalPayment
         });
 
         // Store honest nodes
@@ -138,7 +153,14 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
 
         // Transfer protocol fee to treasury immediately
         if (protocolAmount > 0) {
-            feeToken.safeTransfer(treasury, protocolAmount);
+            paymentToken.safeTransfer(treasury, protocolAmount);
+        }
+
+        // Apply any slashed funds that arrived before the distribution was calculated
+        uint256 pending = _pendingSlashedFunds[e3Id];
+        if (pending > 0) {
+            _pendingSlashedFunds[e3Id] = 0;
+            _applySlashedFunds(e3Id, pending);
         }
 
         emit RefundDistributionCalculated(
@@ -229,6 +251,12 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         RefundDistribution storage dist = _distributions[e3Id];
         if (!dist.calculated) revert RefundNotCalculated(e3Id);
 
+        // Guard against pre-upgrade records where feeToken was not yet stored
+        require(
+            address(dist.feeToken) != address(0),
+            "feeToken not initialized"
+        );
+
         address requester = enclave.getRequester(e3Id);
         if (msg.sender != requester) revert NotRequester(e3Id, msg.sender);
 
@@ -238,8 +266,10 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         if (amount == 0) revert NoRefundAvailable(e3Id);
 
         _claimed[e3Id][msg.sender] = true;
+        _claimCount[e3Id]++;
 
-        feeToken.safeTransfer(msg.sender, amount);
+        // Use the per-E3 fee token (not the global one, which may have been rotated)
+        dist.feeToken.safeTransfer(msg.sender, amount);
 
         emit RefundClaimed(e3Id, msg.sender, amount, "REQUESTER");
     }
@@ -250,6 +280,13 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     ) external returns (uint256 amount) {
         RefundDistribution storage dist = _distributions[e3Id];
         require(dist.calculated, RefundNotCalculated(e3Id));
+
+        // Guard against pre-upgrade records where feeToken was not yet stored
+        require(
+            address(dist.feeToken) != address(0),
+            "feeToken not initialized"
+        );
+
         require(!_claimed[e3Id][msg.sender], AlreadyClaimed(e3Id, msg.sender));
 
         // Check if caller is honest node
@@ -261,43 +298,114 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         require(isHonest, NotHonestNode(e3Id, msg.sender));
 
         require(dist.honestNodeCount > 0, NoRefundAvailable(e3Id));
-        amount = dist.honestNodeAmount / dist.honestNodeCount;
-        require(amount > 0, NoRefundAvailable(e3Id));
+        uint256 perNodeAmount = dist.honestNodeAmount / dist.honestNodeCount;
+        require(perNodeAmount > 0, NoRefundAvailable(e3Id));
+
+        amount = perNodeAmount;
+        _honestNodeClaimCount[e3Id]++;
+        if (_honestNodeClaimCount[e3Id] == dist.honestNodeCount) {
+            // Route rounding remainder (dust) to protocol treasury.
+            uint256 dust = dist.honestNodeAmount -
+                (_totalHonestNodePaid[e3Id] + perNodeAmount);
+            if (dust > 0) {
+                dist.feeToken.safeTransfer(treasury, dust);
+            }
+        }
+        _totalHonestNodePaid[e3Id] += amount;
 
         _claimed[e3Id][msg.sender] = true;
+        _claimCount[e3Id]++;
 
-        // Distribute reward through bonding registry
-        feeToken.approve(address(bondingRegistry), amount);
-
-        address[] memory nodeArray = new address[](1);
-        nodeArray[0] = msg.sender;
-        uint256[] memory amountArray = new uint256[](1);
-        amountArray[0] = amount;
-
-        bondingRegistry.distributeRewards(feeToken, nodeArray, amountArray);
+        // Transfer directly to the honest node. Using distributeRewards would require
+        // this contract to be an authorized distributor in BondingRegistry, and the node
+        // must be registered. Direct transfer is simpler and more reliable for refunds.
+        IERC20 token = dist.feeToken;
+        token.safeTransfer(msg.sender, amount);
 
         emit RefundClaimed(e3Id, msg.sender, amount, "HONEST_NODE");
     }
 
     /// @inheritdoc IE3RefundManager
-    function routeSlashedFunds(
+    function escrowSlashedFunds(
         uint256 e3Id,
         uint256 amount
     ) external onlyEnclave {
-        RefundDistribution storage dist = _distributions[e3Id];
-        require(dist.calculated, "Not calculated");
+        require(amount > 0, "Zero amount");
 
-        // Add slashed funds to distribution
-        // Note: slashing should be finalized before claims are made.
-        // 50% to requester, 50% to honest nodes for non-participation
-        uint256 toRequester = amount / 2;
+        RefundDistribution storage dist = _distributions[e3Id];
+        if (dist.calculated) {
+            require(_claimCount[e3Id] == 0, "Claims already started");
+            _applySlashedFunds(e3Id, amount);
+        } else {
+            _pendingSlashedFunds[e3Id] += amount;
+        }
+
+        emit SlashedFundsEscrowed(e3Id, amount);
+    }
+
+    /// @inheritdoc IE3RefundManager
+    function distributeSlashedFundsOnSuccess(
+        uint256 e3Id,
+        address[] calldata honestNodes,
+        IERC20 paymentToken
+    ) external onlyEnclave {
+        uint256 escrowed = _pendingSlashedFunds[e3Id];
+        if (escrowed == 0) return;
+        _pendingSlashedFunds[e3Id] = 0;
+
+        require(address(paymentToken) != address(0), "Invalid fee token");
+
+        uint256 toNodes = (escrowed * _workAllocation.successSlashedNodeBps) /
+            10000;
+        uint256 toProtocol = escrowed - toNodes;
+
+        if (toProtocol > 0) {
+            paymentToken.safeTransfer(treasury, toProtocol);
+        }
+
+        if (toNodes > 0 && honestNodes.length > 0) {
+            uint256 perNode = toNodes / honestNodes.length;
+            uint256 distributed = 0;
+            for (uint256 i = 0; i < honestNodes.length; i++) {
+                uint256 nodeAmount = perNode;
+                if (i == honestNodes.length - 1) {
+                    nodeAmount = toNodes - distributed;
+                }
+                if (nodeAmount > 0) {
+                    paymentToken.safeTransfer(honestNodes[i], nodeAmount);
+                }
+                distributed += nodeAmount;
+            }
+        } else if (toNodes > 0) {
+            paymentToken.safeTransfer(treasury, toNodes);
+        }
+
+        emit SlashedFundsDistributedOnSuccess(e3Id, toNodes, toProtocol);
+    }
+
+    /// @notice Apply slashed funds to an E3's refund distribution
+    /// @dev This function is ONLY called on the failure path.Priority: make requester whole first,
+    ///      then distribute remainder to honest nodes.
+    ///      The requester is filled up to their original E3 payment before honest nodes receive
+    ///      any portion, ensuring the party who paid for the computation is compensated first.
+    /// @param e3Id The E3 ID
+    /// @param amount The slashed amount to apply
+    function _applySlashedFunds(uint256 e3Id, uint256 amount) internal {
+        RefundDistribution storage dist = _distributions[e3Id];
+
+        // Priority: make requester whole first
+        // requesterGap = how much more the requester needs to reach their original payment
+        uint256 requesterGap = dist.originalPayment > dist.requesterAmount
+            ? dist.originalPayment - dist.requesterAmount
+            : 0;
+        uint256 toRequester = amount >= requesterGap ? requesterGap : amount;
         uint256 toHonestNodes = amount - toRequester;
 
         dist.requesterAmount += toRequester;
         dist.honestNodeAmount += toHonestNodes;
         dist.totalSlashed += amount;
 
-        emit SlashedFundsRouted(e3Id, amount);
+        emit SlashedFundsApplied(e3Id, toRequester, toHonestNodes);
     }
 
     ////////////////////////////////////////////////////////////
@@ -343,6 +451,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
             uint256(allocation.decryptionBps) +
             uint256(allocation.protocolBps);
         require(total == 10000, "Must sum to 10000");
+        require(allocation.successSlashedNodeBps <= 10000, "Invalid BPS");
 
         _workAllocation = allocation;
 

@@ -85,4 +85,5 @@ const NotificationAlertProvider = ({ children }: NotificationAlertProviderProps)
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export { useNotificationAlertContext, NotificationAlertProvider }

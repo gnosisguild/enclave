@@ -23,8 +23,6 @@ interface IEnclave {
         None,
         Requested,
         CommitteeFinalized,
-        // Once a key is published, it is possible to then accept inputs
-        // as long as we are within the input deadline (start and end)
         KeyPublished,
         CiphertextReady,
         Complete,
@@ -32,6 +30,7 @@ interface IEnclave {
     }
 
     /// @notice Reasons why an E3 failed
+    /// @dev Any new failure reason should be added before _MAX_FAILURE_REASON.
     enum FailureReason {
         None,
         CommitteeFormationTimeout,
@@ -45,7 +44,8 @@ interface IEnclave {
         RequesterCancelled,
         DecryptionTimeout,
         DecryptionInvalidShares,
-        VerificationFailed
+        VerificationFailed,
+        _MAX_FAILURE_REASON
     }
 
     ////////////////////////////////////////////////////////////
@@ -59,7 +59,6 @@ interface IEnclave {
         uint256 dkgWindow;
         uint256 computeWindow;
         uint256 decryptionWindow;
-        uint256 gracePeriod;
     }
 
     /// @notice Deadlines for each E3
@@ -153,9 +152,22 @@ interface IEnclave {
     /// @param e3ProgramParams Array of encoded encryption scheme parameters (e.g, for BFV)
     event AllowedE3ProgramsParamsSet(bytes[] e3ProgramParams);
 
+    /// @notice Emitted when E3 program parameter sets are removed.
+    /// @param e3ProgramParams Array of removed encryption scheme parameters.
+    event E3ProgramsParamsRemoved(bytes[] e3ProgramParams);
+
     /// @notice Emitted when E3RefundManager contract is set.
     /// @param e3RefundManager The address of the E3RefundManager contract.
     event E3RefundManagerSet(address indexed e3RefundManager);
+
+    /// @notice Emitted when the SlashingManager contract is set.
+    /// @param slashingManager The address of the SlashingManager contract.
+    event SlashingManagerSet(address indexed slashingManager);
+
+    /// @notice Emitted when slashed funds are escrowed for an E3
+    /// @param e3Id The E3 ID.
+    /// @param amount The amount of slashed funds escrowed.
+    event SlashedFundsEscrowed(uint256 indexed e3Id, uint256 amount);
 
     /// @notice Emitted when a failed E3 is processed for refunds.
     /// @param e3Id The ID of the failed E3.
@@ -307,6 +319,11 @@ interface IEnclave {
     /// @param _e3ProgramsParams Array of ABI encoded parameter sets to allow.
     function setE3ProgramsParams(bytes[] memory _e3ProgramsParams) external;
 
+    /// @notice Removes previously allowed E3 program parameter sets.
+    /// @dev This function revokes specific parameter sets that should no longer be allowed.
+    /// @param _e3ProgramsParams Array of ABI encoded parameter sets to remove.
+    function removeE3ProgramsParams(bytes[] memory _e3ProgramsParams) external;
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Get Functions                        //
@@ -359,6 +376,12 @@ interface IEnclave {
     /// @param e3Id ID of the E3.
     /// @param reason The failure reason from FailureReason enum.
     function onE3Failed(uint256 e3Id, uint8 reason) external;
+
+    /// @notice Escrow slashed funds for deferred distribution
+    /// @dev Called by SlashingManager. Proxies to E3RefundManager.
+    /// @param e3Id The E3 ID.
+    /// @param amount Amount of slashed funds to escrow.
+    function escrowSlashedFunds(uint256 e3Id, uint256 amount) external;
 
     ////////////////////////////////////////////////////////////
     //                                                        //

@@ -6,7 +6,6 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 export default buildModule("CiphernodeRegistry", (m) => {
-  const enclaveAddress = m.getParameter("enclaveAddress");
   const owner = m.getParameter("owner");
   const submissionWindow = m.getParameter("submissionWindow");
 
@@ -20,7 +19,6 @@ export default buildModule("CiphernodeRegistry", (m) => {
 
   const initData = m.encodeFunctionCall(cipherNodeRegistryImpl, "initialize", [
     owner,
-    enclaveAddress,
     submissionWindow,
   ]);
 

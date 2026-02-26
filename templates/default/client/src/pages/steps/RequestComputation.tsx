@@ -75,7 +75,7 @@ const RequestComputation: React.FC = () => {
       off(EnclaveEventType.E3_REQUESTED, handleE3Requested)
       off(RegistryEventType.COMMITTEE_PUBLISHED, handleCommitteePublished)
     }
-  }, [isInitialized, onEnclaveEvent, off, EnclaveEventType, RegistryEventType])
+  }, [isInitialized, onEnclaveEvent, off, EnclaveEventType, RegistryEventType, setE3State])
 
   // Auto-advance to next step when committee publishes
   useEffect(() => {
