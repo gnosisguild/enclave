@@ -268,4 +268,14 @@ impl<Q: QueryKind> EventStoreQueryBy<Q> {
     pub fn sender(self) -> Recipient<EventStoreQueryResponse> {
         self.sender
     }
+
+    pub fn with_options(mut self, limit: Option<u64>, filter: Option<EventStoreFilter>) -> Self {
+        if let Some(l) = limit {
+            self.limit = Some(l);
+        }
+        if let Some(f) = filter {
+            self.filter = Some(f);
+        }
+        self
+    }
 }
