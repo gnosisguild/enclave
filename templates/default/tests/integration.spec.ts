@@ -162,7 +162,7 @@ describe('Integration', () => {
     const { waitForEvent } = await setupEventListeners(sdk, store)
 
     const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
-    const duration = 300
+    const duration = 180
     const inputWindow = await calculateInputWindow(publicClient, duration)
     const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
     const e3ProgramParams = encodeBfvParams(thresholdBfvParams)
@@ -221,20 +221,23 @@ describe('Integration', () => {
     const enc1 = await sdk.encryptNumber(num1, publicKeyBytes)
     const enc2 = await sdk.encryptNumber(num2, publicKeyBytes)
 
-    await publishInput(
+    let txHash = await publishInput(
       walletClient,
       e3Id,
       `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`,
       account.address,
       contracts.e3Program,
     )
-    await publishInput(
+    await publicClient.waitForTransactionReceipt({ hash: txHash })
+    txHash = await publishInput(
       walletClient,
       e3Id,
       `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`,
       account.address,
       contracts.e3Program,
     )
+    await publicClient.waitForTransactionReceipt({ hash: txHash })
+
     const plaintextEvent = await waitForEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED)
 
     const parsed = hexToUint8Array(plaintextEvent.data.plaintextOutput)
