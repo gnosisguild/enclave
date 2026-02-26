@@ -53,7 +53,7 @@ where
 pub struct FetchEventsSince {
     aggregate_id: AggregateId,
     since: u128,
-    limit: u16,
+    limit: usize,
 }
 
 impl FetchEventsSince {
@@ -63,6 +63,18 @@ impl FetchEventsSince {
             since,
             limit,
         }
+    }
+
+    pub fn aggregate_id(&self) -> AggregateId {
+        self.aggregate_id
+    }
+
+    pub fn since(&self) -> u128 {
+        self.since
+    }
+
+    pub fn limit(&self) -> usize {
+        self.limit
     }
 }
 

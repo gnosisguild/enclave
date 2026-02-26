@@ -65,6 +65,7 @@ impl IntoId for InboundRequestId {
 /// ```
 pub struct DirectResponder<C = ProtocolResponseChannel> {
     id: u64,
+    request: Vec<u8>,
     response: Option<ProtocolResponse>,
     channel: OnceTake<C>,
     net_cmds: mpsc::Sender<NetCommand<C>>,
@@ -74,6 +75,7 @@ impl<C> Clone for DirectResponder<C> {
     fn clone(&self) -> Self {
         Self {
             id: self.id.clone(),
+            request: self.request.clone(),
             response: self.response.clone(),
             channel: self.channel.clone(),
             net_cmds: self.net_cmds.clone(),
@@ -90,10 +92,36 @@ impl<C> DirectResponder<C> {
     pub fn new(id: impl IntoId, channel: C, net_cmds: &mpsc::Sender<NetCommand<C>>) -> Self {
         Self {
             id: id.into_id(),
+            request: Vec::new(),
             response: None,
             channel: OnceTake::new(channel),
             net_cmds: net_cmds.clone(),
         }
+    }
+
+    /// Sets the request data on the responder.
+    ///
+    /// This should be called when creating a responder for an incoming request,
+    /// passing the raw request bytes.
+    pub fn with_request(mut self, request: Vec<u8>) -> Self {
+        self.request = request;
+        self
+    }
+
+    /// Get the request data
+    pub fn request(&self) -> Vec<u8> {
+        self.request.clone()
+    }
+
+    /// Get the request data
+    pub fn try_request_into<T>(&self) -> Result<T>
+    where
+        T: TryFrom<Vec<u8>>,
+    {
+        self.request
+            .clone()
+            .try_into()
+            .map_err(|_| anyhow!("Could not serialize request bytes"))
     }
 
     /// Extract the payload information to send to swarm

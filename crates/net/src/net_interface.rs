@@ -433,13 +433,10 @@ async fn process_swarm_event(
             },
         )) => {
             debug!("Incoming request received (id={})", request_id);
-            let responder = DirectResponder::new(request_id, channel, &cmd_tx);
+            let responder = DirectResponder::new(request_id, channel, &cmd_tx).with_request(request);
 
             // received a request for events
-            event_tx.send(NetEvent::IncomingRequest(IncomingRequest {
-                responder,
-                request,
-            }))?;
+            event_tx.send(NetEvent::IncomingRequest(IncomingRequest { responder }))?;
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::RequestResponse(

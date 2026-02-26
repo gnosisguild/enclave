@@ -86,12 +86,13 @@ pub type ProtocolResponseChannel = ResponseChannel<ProtocolResponse>;
 
 #[derive(Message, Clone, Debug)]
 #[rtype("()")]
+/// Remote has sent us a request
 pub struct IncomingRequest {
     pub responder: DirectResponder,
-    pub request: Vec<u8>,
 }
 
 #[derive(Clone, Debug)]
+/// We are responding to a remote request
 pub struct IncomingResponse<C = ResponseChannel<Vec<u8>>> {
     pub responder: DirectResponder<C>,
 }

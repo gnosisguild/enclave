@@ -24,6 +24,7 @@ use crate::{
         await_event, call_and_await_response, GossipData, IncomingRequest, NetCommand, NetEvent,
         OutgoingRequest, ProtocolResponse,
     },
+    net_event_batch::{BatchCursor, EventBatch, FetchEventsSince},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -216,14 +217,13 @@ impl Handler<IncomingRequest> for NetSyncManager {
         trap(EType::Net, &self.bus, || {
             let id = CorrelationId::new();
             info!("Processing incoming request with correlation={}", id);
-            let request: SyncRequestValue = msg
-                .request
-                .try_into()
-                .context("Failed to parse SyncRequestValue for id={id}")?;
+            let fetch_request: FetchEventsSince = msg.responder.try_request_into()?;
             self.requests.insert(id, msg.responder);
+            let query: HashMap<AggregateId, u128> =
+                HashMap::from([(fetch_request.aggregate_id(), fetch_request.since())]);
             self.eventstore.try_send(EventStoreQueryBy::<TsAgg>::new(
                 id,
-                request.since,
+                query,
                 ctx.address().recipient(),
             ))?;
             Ok(())
@@ -241,14 +241,28 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
                 bail!("responder not found for {}", msg.id());
             };
 
-            responder.ok(SyncResponseValue {
-                events: msg
-                    .into_events()
-                    .into_iter()
-                    .filter(|e| e.source() == EventSource::Net)
-                    .map(|ev| ev.try_into())
-                    .collect::<Result<_>>()?,
-                ts: self.bus.ts()?,
+            let fetch_request: FetchEventsSince = responder.try_request_into()?;
+            let limit = fetch_request.limit();
+            let aggregate_id = fetch_request.aggregate_id();
+            let events: Vec<EnclaveEvent<Unsequenced>> = msg
+                .into_events()
+                .into_iter()
+                .filter(|e| e.source() == EventSource::Net)
+                .take(limit)
+                .map(|ev| ev.clone_unsequenced())
+                .collect();
+
+            let next = if events.len() == limit {
+                let last_event_ts = events.get(limit - 1).map(|e| e.ts()).unwrap_or(0);
+                BatchCursor::Next(last_event_ts)
+            } else {
+                BatchCursor::Done
+            };
+
+            responder.ok(EventBatch {
+                events,
+                next,
+                aggregate_id,
             })?;
 
             Ok(())
