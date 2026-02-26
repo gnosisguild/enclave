@@ -13,7 +13,7 @@ fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
     let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
-    ZkBackend::new(bb_binary, circuits_dir, work_dir, config)
+    ZkBackend::with_config(bb_binary, circuits_dir, work_dir, config)
 }
 
 #[tokio::test]
