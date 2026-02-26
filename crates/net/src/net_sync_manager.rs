@@ -5,52 +5,28 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Addr, AsyncContext, Handler, Message, Recipient, ResponseFuture};
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use e3_events::{
     prelude::*, trap, trap_fut, AggregateId, BusHandle, CorrelationId, EType, EnclaveEvent,
     EnclaveEventData, EventSource, EventStoreQueryBy, EventStoreQueryResponse, EventType,
     HistoricalNetSyncStart, NetSyncEventsReceived, TsAgg, TypedEvent, Unsequenced,
 };
-use e3_utils::{retry_with_backoff, to_retry, MAILBOX_LIMIT};
-use futures::TryFutureExt;
+use e3_utils::MAILBOX_LIMIT;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryInto, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, info};
 
 use crate::{
+    direct_requester::DirectRequester,
     direct_responder::DirectResponder,
-    events::{
-        await_event, call_and_await_response, GossipData, IncomingRequest, NetCommand, NetEvent,
-        OutgoingRequest, ProtocolResponse,
-    },
-    net_event_batch::{BatchCursor, EventBatch, FetchEventsSince},
+    events::{await_event, IncomingRequest, NetCommand, NetEvent, PeerTarget},
+    net_event_batch::{fetch_all_batched_events, BatchCursor, EventBatch, FetchEventsSince},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncRequestValue {
-    pub since: HashMap<AggregateId, u128>,
-}
-
-impl TryInto<Vec<u8>> for SyncRequestValue {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
-        bincode::serialize(&self).context("failed to serialize SyncRequestValue")
-    }
-}
-
-impl TryFrom<Vec<u8>> for SyncRequestValue {
-    type Error = anyhow::Error;
-
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        bincode::deserialize(&value).context("failed to deserialize SyncRequestValue")
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncResponseValue {
-    pub events: Vec<GossipData>,
+    pub events: Vec<EnclaveEvent<Unsequenced>>,
     pub ts: u128,
 }
 
@@ -192,12 +168,7 @@ impl Handler<TypedEvent<SyncRequestSucceeded>> for NetSyncManager {
             let response = msg.response;
             self.bus.publish_from_remote_as_response(
                 NetSyncEventsReceived {
-                    events: response
-                        .events
-                        .iter()
-                        .cloned()
-                        .map(|data| data.try_into())
-                        .collect::<Result<Vec<EnclaveEvent<Unsequenced>>>>()?,
+                    events: response.events.iter().cloned().collect(),
                 },
                 response.ts,
                 ctx,
@@ -282,38 +253,6 @@ impl Handler<AllPeersDialed> for NetSyncManager {
 #[rtype(result = "()")]
 struct AllPeersDialed;
 
-const SYNC_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
-
-async fn sync_request(
-    net_cmds: mpsc::Sender<NetCommand>,
-    net_events: Arc<broadcast::Receiver<NetEvent>>,
-    since: HashMap<AggregateId, u128>,
-) -> Result<SyncRequestSucceeded> {
-    info!("RUNNING sync request...");
-    let response = call_and_await_response(
-        net_cmds,
-        net_events,
-        NetCommand::OutgoingRequest(OutgoingRequest::to_random_peer(SyncRequestValue { since })?),
-        |e| match e.clone() {
-            NetEvent::OutgoingRequestSucceeded(value) => Some(Ok(value)),
-            NetEvent::OutgoingRequestFailed(error) => {
-                Some(Err(anyhow!("Outgoing sync request failed: {:?}", error)))
-            }
-            _ => None,
-        },
-        SYNC_REQUEST_TIMEOUT,
-    )
-    .await?;
-    match response.payload {
-        ProtocolResponse::Ok(data) => {
-            let response: SyncResponseValue = data.try_into()?;
-            Ok(SyncRequestSucceeded { response })
-        }
-        ProtocolResponse::BadRequest(msg) => Err(anyhow!("BadRequest: {}", msg)),
-        ProtocolResponse::Error(msg) => Err(anyhow!("ProtocolError: {}", msg)),
-    }
-}
-
 async fn handle_sync_request_event(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
@@ -341,24 +280,48 @@ async fn handle_sync_request_event(
     }
     info!("handle_sync_request_event: All peers have been dialed.");
 
-    // Make the sync request
-    // value returned includes the timestamp from the remote peer
-    let value = retry_with_backoff(
-        || {
-            info!("Running SYNC REQUEST!!");
-            sync_request(
-                net_cmds.clone(),
-                net_events.clone(),
-                event.since.clone().into_iter().collect(),
-            )
-            .map_err(to_retry)
-        },
-        4,
-        5000,
-    )
-    .await?;
+    let mut all_events: Vec<EnclaveEvent<Unsequenced>> = Vec::new();
+    let mut latest_timestamp: u128 = 0;
 
-    // send the sync request succeeded to ourselves
+    for (aggregate_id, since) in event.since.iter() {
+        info!(
+            "Requesting batched events for aggregate_id={} since={}",
+            aggregate_id, since
+        );
+        let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone()).build();
+        let events: Vec<EnclaveEvent<Unsequenced>> =
+            fetch_all_batched_events(requester, PeerTarget::Random, *aggregate_id, *since, 100)
+                .await?;
+
+        info!(
+            "Received {} events for aggregate_id={}",
+            events.len(),
+            aggregate_id
+        );
+
+        for enclave_event in events {
+            let ts = enclave_event.ts();
+            if ts > latest_timestamp {
+                latest_timestamp = ts;
+            }
+            all_events.push(enclave_event);
+        }
+    }
+
+    info!(
+        "Sync complete: collected {} events across {} aggregates, latest_timestamp={}",
+        all_events.len(),
+        event.since.len(),
+        latest_timestamp
+    );
+
+    let value = SyncRequestSucceeded {
+        response: SyncResponseValue {
+            events: all_events,
+            ts: latest_timestamp,
+        },
+    };
+
     address.into().try_send(TypedEvent::new(value, ctx))?;
     Ok(())
 }

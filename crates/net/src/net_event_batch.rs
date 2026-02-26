@@ -8,6 +8,7 @@ use std::fmt::Debug;
 
 use anyhow::{Context, Result};
 use e3_events::AggregateId;
+use tracing::info;
 
 use crate::{
     direct_requester::{DirectRequester, WithPeer, WithoutPeer},
@@ -95,7 +96,7 @@ impl TryFrom<Vec<u8>> for FetchEventsSince {
 }
 
 pub async fn fetch_events_since<E: Debug>(
-    requester: DirectRequester<WithPeer>,
+    requester: &DirectRequester<WithPeer>,
     request: FetchEventsSince,
 ) -> Result<EventBatch<E>>
 where
@@ -122,7 +123,17 @@ where
 
     loop {
         let request = FetchEventsSince::new(aggregate_id, cursor, batch_size);
-        let batch: EventBatch<E> = requester.request(request).await?;
+        info!(
+            "Fetching batch aggregate={} cursor={} batch_size={}",
+            aggregate_id, cursor, batch_size
+        );
+        let batch = fetch_events_since(&requester, request).await?;
+        info!(
+            "Batch received with {} events for aggregate={} cursor={}",
+            batch.events.len(),
+            aggregate_id,
+            cursor
+        );
 
         all_events.extend(batch.events);
 
@@ -131,6 +142,8 @@ where
             BatchCursor::Next(next_cursor) => cursor = next_cursor,
         }
     }
+
+    info!("Batch is done returning {} events", all_events.len());
 
     Ok(all_events)
 }

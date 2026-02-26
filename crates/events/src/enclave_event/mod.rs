@@ -373,6 +373,14 @@ impl EnclaveEvent<Unsequenced> {
     }
 }
 
+impl TryFrom<Vec<u8>> for EnclaveEvent<Unsequenced> {
+    type Error = bincode::Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        EnclaveEvent::from_bytes(&value)
+    }
+}
+
 #[cfg(feature = "test-helpers")]
 impl EnclaveEvent<Sequenced> {
     /// test-helpers only utility function to create a new sequenced event
