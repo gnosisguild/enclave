@@ -412,7 +412,7 @@ fn handle_zk_request(
             handle_share_computation_proof(&prover, &cipher, req, request.clone())
         }),
         ZkRequest::ShareEncryption(req) => timefunc("zk_share_encryption", id, || {
-            handle_share_encryption_proof(&prover, req, request.clone())
+            handle_share_encryption_proof(&prover, &cipher, req, request.clone())
         }),
     }
 }
@@ -624,6 +624,7 @@ fn handle_pk_bfv_proof(
 
 fn handle_share_encryption_proof(
     prover: &ZkProver,
+    cipher: &Cipher,
     req: ShareEncryptionProofRequest,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
@@ -631,22 +632,40 @@ fn handle_share_encryption_proof(
     let (_threshold_params, dkg_params) = build_pair_for_preset(req.params_preset)
         .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
 
-    // 2. Deserialize share row and re-encode as Plaintext
-    let share_row: Vec<u64> = bincode::deserialize(&req.share_row_raw)
+    // 2. Decrypt sensitive witness data
+    let share_row_bytes = req
+        .share_row_raw
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("share_row decrypt: {}", e)))?;
+    let u_rns_bytes = req
+        .u_rns_raw
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("u_rns decrypt: {}", e)))?;
+    let e0_rns_bytes = req
+        .e0_rns_raw
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("e0_rns decrypt: {}", e)))?;
+    let e1_rns_bytes = req
+        .e1_rns_raw
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("e1_rns decrypt: {}", e)))?;
+
+    // 3. Deserialize share row and re-encode as Plaintext
+    let share_row: Vec<u64> = bincode::deserialize(&share_row_bytes)
         .map_err(|e| make_zk_error(&request, format!("share_row: {}", e)))?;
     let plaintext = Plaintext::try_encode(&share_row, Encoding::poly(), &dkg_params)
         .map_err(|e| make_zk_error(&request, format!("plaintext encode: {:?}", e)))?;
 
-    // 3. Deserialize ciphertext, public key, polys using DKG params
+    // 4. Deserialize ciphertext, public key, polys using DKG params
     let ciphertext = Ciphertext::from_bytes(&req.ciphertext_raw, &dkg_params)
         .map_err(|e| make_zk_error(&request, format!("ciphertext: {:?}", e)))?;
     let public_key = PublicKey::from_bytes(&req.recipient_pk_raw, &dkg_params)
         .map_err(|e| make_zk_error(&request, format!("recipient_pk: {:?}", e)))?;
-    let u_rns = try_poly_from_bytes(&req.u_rns_raw, &dkg_params)
+    let u_rns = try_poly_from_bytes(&u_rns_bytes, &dkg_params)
         .map_err(|e| make_zk_error(&request, format!("u_rns: {}", e)))?;
-    let e0_rns = try_poly_from_bytes(&req.e0_rns_raw, &dkg_params)
+    let e0_rns = try_poly_from_bytes(&e0_rns_bytes, &dkg_params)
         .map_err(|e| make_zk_error(&request, format!("e0_rns: {}", e)))?;
-    let e1_rns = try_poly_from_bytes(&req.e1_rns_raw, &dkg_params)
+    let e1_rns = try_poly_from_bytes(&e1_rns_bytes, &dkg_params)
         .map_err(|e| make_zk_error(&request, format!("e1_rns: {}", e)))?;
 
     // 4. Dummy SecretKey (not used by Inputs::compute)

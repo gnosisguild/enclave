@@ -924,17 +924,18 @@ impl ThresholdKeyshare {
         for (recipient_idx, recipient_witnesses) in sk_witnesses.iter().enumerate() {
             for (row_idx, witness) in recipient_witnesses.iter().enumerate() {
                 sk_share_encryption_requests.push(ShareEncryptionProofRequest {
-                    share_row_raw: ArcBytes::from_bytes(
-                        &bincode::serialize(&witness.share_row)
+                    share_row_raw: SensitiveBytes::new(
+                        bincode::serialize(&witness.share_row)
                             .map_err(|e| anyhow!("Failed to serialize share_row: {}", e))?,
-                    ),
+                        &self.cipher,
+                    )?,
                     ciphertext_raw: ArcBytes::from_bytes(&witness.ciphertext.to_bytes()),
                     recipient_pk_raw: ArcBytes::from_bytes(
                         &recipient_pks[recipient_idx].to_bytes(),
                     ),
-                    u_rns_raw: ArcBytes::from_bytes(&witness.u_rns.to_bytes()),
-                    e0_rns_raw: ArcBytes::from_bytes(&witness.e0_rns.to_bytes()),
-                    e1_rns_raw: ArcBytes::from_bytes(&witness.e1_rns.to_bytes()),
+                    u_rns_raw: SensitiveBytes::new(witness.u_rns.to_bytes(), &self.cipher)?,
+                    e0_rns_raw: SensitiveBytes::new(witness.e0_rns.to_bytes(), &self.cipher)?,
+                    e1_rns_raw: SensitiveBytes::new(witness.e1_rns.to_bytes(), &self.cipher)?,
                     dkg_input_type: DkgInputType::SecretKey,
                     params_preset: threshold_preset,
                     committee_size: CiphernodesCommitteeSize::Small,
@@ -951,17 +952,18 @@ impl ThresholdKeyshare {
             for (recipient_idx, recipient_witnesses) in esi_recipient_witnesses.iter().enumerate() {
                 for (row_idx, witness) in recipient_witnesses.iter().enumerate() {
                     e_sm_share_encryption_requests.push(ShareEncryptionProofRequest {
-                        share_row_raw: ArcBytes::from_bytes(
-                            &bincode::serialize(&witness.share_row)
+                        share_row_raw: SensitiveBytes::new(
+                            bincode::serialize(&witness.share_row)
                                 .map_err(|e| anyhow!("Failed to serialize share_row: {}", e))?,
-                        ),
+                            &self.cipher,
+                        )?,
                         ciphertext_raw: ArcBytes::from_bytes(&witness.ciphertext.to_bytes()),
                         recipient_pk_raw: ArcBytes::from_bytes(
                             &recipient_pks[recipient_idx].to_bytes(),
                         ),
-                        u_rns_raw: ArcBytes::from_bytes(&witness.u_rns.to_bytes()),
-                        e0_rns_raw: ArcBytes::from_bytes(&witness.e0_rns.to_bytes()),
-                        e1_rns_raw: ArcBytes::from_bytes(&witness.e1_rns.to_bytes()),
+                        u_rns_raw: SensitiveBytes::new(witness.u_rns.to_bytes(), &self.cipher)?,
+                        e0_rns_raw: SensitiveBytes::new(witness.e0_rns.to_bytes(), &self.cipher)?,
+                        e1_rns_raw: SensitiveBytes::new(witness.e1_rns.to_bytes(), &self.cipher)?,
                         dkg_input_type: DkgInputType::SmudgingNoise,
                         params_preset: threshold_preset,
                         committee_size: CiphernodesCommitteeSize::Small,

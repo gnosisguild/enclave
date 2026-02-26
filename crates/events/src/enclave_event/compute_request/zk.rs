@@ -45,24 +45,20 @@ pub struct ShareComputationProofRequest {
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct ShareEncryptionProofRequest {
-    /// Bincode-serialized Vec<u64> share row coefficients.
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub share_row_raw: ArcBytes,
+    /// Bincode-serialized Vec<u64> share row coefficients (witness — encrypted at rest).
+    pub share_row_raw: SensitiveBytes,
     /// Serialized BFV Ciphertext bytes (via fhe_traits::Serialize).
     #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub ciphertext_raw: ArcBytes,
     /// Serialized recipient BFV PublicKey bytes.
     #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub recipient_pk_raw: ArcBytes,
-    /// Serialized u_rns Poly bytes.
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub u_rns_raw: ArcBytes,
-    /// Serialized e0_rns Poly bytes.
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub e0_rns_raw: ArcBytes,
-    /// Serialized e1_rns Poly bytes.
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub e1_rns_raw: ArcBytes,
+    /// Serialized u_rns Poly bytes (witness — encrypted at rest).
+    pub u_rns_raw: SensitiveBytes,
+    /// Serialized e0_rns Poly bytes (witness — encrypted at rest).
+    pub e0_rns_raw: SensitiveBytes,
+    /// Serialized e1_rns Poly bytes (witness — encrypted at rest).
+    pub e1_rns_raw: SensitiveBytes,
     /// SecretKey or SmudgingNoise.
     pub dkg_input_type: DkgInputType,
     /// Threshold BFV preset (handler derives DKG params via build_pair_for_preset).
