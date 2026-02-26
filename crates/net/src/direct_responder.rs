@@ -43,7 +43,7 @@ impl IntoId for InboundRequestId {
 /// # let request_id = 6;
 /// # let channel_orig = String::from("channel");
 /// # let channel = channel_orig.clone();
-/// let (cmd_tx, _) = mpsc::channel(16);
+/// # let (cmd_tx, _rx) = mpsc::channel(400);
 ///
 /// // We create a responder and send it over our event channel
 /// let responder = DirectResponder::new(
@@ -57,9 +57,9 @@ impl IntoId for InboundRequestId {
 ///
 /// // Now in our handlers we can respond with ok() or bad_request() this will consume the responder
 /// responder.ok(String::from("Something that implements TryInto<Vec<u8>>"))?;
-/// // or:
-/// # let responder = DirectResponder::new(request_id,channel_orig,&cmd_tx);
-/// responder.bad_request("Hey something went wrong!")?;
+/// # let responder = DirectResponder::new(request_id, channel_orig, &cmd_tx);
+/// // or
+/// responder.bad_request("It was pretty bad.")?;
 /// # Ok(())
 /// # }
 /// ```
@@ -70,7 +70,6 @@ pub struct DirectResponder<C = ProtocolResponseChannel> {
     channel: OnceTake<C>,
     net_cmds: mpsc::Sender<NetCommand<C>>,
 }
-
 impl<C> Clone for DirectResponder<C> {
     fn clone(&self) -> Self {
         Self {
@@ -143,7 +142,7 @@ impl<C> DirectResponder<C> {
         Ok(cmds
             .clone()
             .try_send(NetCommand::<C>::IncomingResponse(incoming))
-            .map_err(|_| anyhow!("Failed to send response command"))?)
+            .map_err(|e| anyhow!("Failed to send response command {:?}", e))?)
     }
 
     /// Request is ok returning response
