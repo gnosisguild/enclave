@@ -30,8 +30,8 @@ pub fn load_vk_artifacts(
     let vk_path = circuit_dir.join(format!("{}.vk_recursive", circuit.as_str()));
     let vk_hash_path = circuit_dir.join(format!("{}.vk_recursive_hash", circuit.as_str()));
 
-    let vk_bytes =
-        fs::read(&vk_path).map_err(|e| ZkError::CircuitNotFound(format!("{}: {}", vk_path.display(), e)))?;
+    let vk_bytes = fs::read(&vk_path)
+        .map_err(|e| ZkError::CircuitNotFound(format!("{}: {}", vk_path.display(), e)))?;
     let vk_hash_bytes = fs::read(&vk_hash_path)
         .map_err(|e| ZkError::CircuitNotFound(format!("{}: {}", vk_hash_path.display(), e)))?;
 
