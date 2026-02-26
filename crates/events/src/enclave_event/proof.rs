@@ -92,6 +92,11 @@ impl CircuitName {
     pub fn dir_path(&self) -> String {
         format!("{}/{}", self.group(), self.as_str())
     }
+
+    /// Wrapper circuit path: `recursive_aggregation/wrapper/{group}/{name}`.
+    pub fn wrapper_dir_path(&self) -> String {
+        format!("recursive_aggregation/wrapper/{}", self.dir_path())
+    }
 }
 
 impl fmt::Display for CircuitName {

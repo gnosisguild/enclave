@@ -79,6 +79,30 @@ pub trait Provable: Send + Sync {
         prover.generate_proof(resolved_name, &witness, e3_id)
     }
 
+    /// Proves for recursive aggregation (poseidon2); uses `.vk_recursive`.
+    fn prove_for_recursion(
+        &self,
+        prover: &ZkProver,
+        params: &Self::Params,
+        input: &Self::Input,
+        e3_id: &str,
+    ) -> Result<Proof, ZkError>
+    where
+        Self::Inputs: Computation<Preset = Self::Params, Data = Self::Input> + serde::Serialize,
+        <Self::Inputs as Computation>::Error: Display,
+    {
+        let inputs = self.build_inputs(params, input)?;
+        let resolved_name = self.resolve_circuit_name(params, input);
+        let circuit_path = prover
+            .circuits_dir()
+            .join(resolved_name.dir_path())
+            .join(format!("{}.json", resolved_name.as_str()));
+        let circuit = CompiledCircuit::from_file(&circuit_path)?;
+        let witness_gen = WitnessGenerator::new();
+        let witness = witness_gen.generate_witness(&circuit, inputs)?;
+        prover.generate_recursive_proof(resolved_name, &witness, e3_id)
+    }
+
     fn verify(
         &self,
         prover: &ZkProver,
@@ -98,6 +122,6 @@ pub trait Provable: Send + Sync {
             "Verifying proof for circuit {} with e3_id {} and party_id {}",
             proof.circuit, e3_id, party_id
         );
-        prover.verify(proof, e3_id, party_id)
+        prover.verify_proof(proof, e3_id, party_id)
     }
 }

@@ -65,4 +65,7 @@ pub enum ZkError {
 
     #[error("checksum missing for {0}")]
     ChecksumMissing(String),
+
+    #[error("Invalid proof input: {0}")]
+    InvalidInput(String),
 }
