@@ -1,36 +1,24 @@
 chains:
-  - name: "hardhat"
+  - name: "localhost"
     rpc_url: "ws://localhost:8545"
     contracts:
-      e3_program:
-        address: "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690"
-        deploy_block: 1 # Set to actual deploy block
       enclave:
-        address: "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0"
-        deploy_block: 1 # Set to actual deploy block
+        address: "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+        deploy_block: 16
       ciphernode_registry:
-        address: "0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
-        deploy_block: 1 # Set to actual deploy block
+        address: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+        deploy_block: 14
       bonding_registry:
-        address: "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
-        deploy_block: 1 # Set to actual deploy block
+        address: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
+        deploy_block: 11
       fee_token:
-        address: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
-        deploy_block: 1 # Set to actual deploy block
-
+        address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+        deploy_block: 7
+      e3_program:
+        address: "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E"
+        deploy_block: 28
 program:
   dev: true
-  # risc0:
-  #   risc0_dev_mode: 1  # 0 = production (Boundless), 1 = dev mode (fake proofs)
-  #
-  #   # Boundless configuration (for production)
-  #   boundless:
-  #     rpc_url: "https://sepolia.infura.io/v3/YOUR_KEY"
-  #     private_key: "PRIVATE_KEY"  # Use env vars for secrets
-  #     pinata_jwt: "PINATA_JWT"  # For uploading programs
-  #     program_url: "https://gateway.pinata.cloud/ipfs/YOUR_CID"  # Pre-uploaded program
-  #     onchain: true  # true = onchain requests, false = offchain
-
 nodes:
   cn1:
     address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
@@ -63,4 +51,5 @@ nodes:
     autonetkey: true
     autopassword: true
     role:
-      type: aggregator
+      type: "aggregator"
+

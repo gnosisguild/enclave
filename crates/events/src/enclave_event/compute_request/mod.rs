@@ -84,6 +84,7 @@ impl ToString for ComputeRequest {
                 ZkRequest::PkBfv(_) => "ZkPkBfv",
                 ZkRequest::PkGeneration(_) => "ZkPkGeneration",
                 ZkRequest::ShareComputation(_) => "ZkShareComputation",
+                ZkRequest::ShareEncryption(_) => "ZkShareEncryption",
             },
         }
         .to_string()

@@ -223,6 +223,8 @@ export const updateE3Config = (
   const yamlStr = yaml.dump(config, {
     indent: 2,
     lineWidth: -1, // Don't wrap lines
+    quotingType: '"',
+    forceQuotes: true,
   });
 
   fs.writeFileSync(pathToConfigFile, yamlStr + "\n", "utf8");

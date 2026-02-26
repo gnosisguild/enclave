@@ -4,7 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{E3id, PkGenerationProofRequest, ShareComputationProofRequest, ThresholdShare};
+use crate::{
+    E3id, PkGenerationProofRequest, ShareComputationProofRequest, ShareEncryptionProofRequest,
+    ThresholdShare,
+};
 use actix::Message;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
@@ -22,6 +25,10 @@ pub struct ThresholdSharePending {
     pub sk_share_computation_request: ShareComputationProofRequest,
     /// The proof request for C2b (ESmShareComputation)
     pub e_sm_share_computation_request: ShareComputationProofRequest,
+    /// C3a: SK share encryption proof requests (one per recipient per modulus row)
+    pub sk_share_encryption_requests: Vec<ShareEncryptionProofRequest>,
+    /// C3b: E_SM share encryption proof requests (per ESI, per recipient, per modulus row)
+    pub e_sm_share_encryption_requests: Vec<ShareEncryptionProofRequest>,
 }
 
 impl Display for ThresholdSharePending {

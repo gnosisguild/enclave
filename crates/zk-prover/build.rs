@@ -7,6 +7,7 @@ use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=FORCE_BUILD");
+    println!("cargo:rerun-if-changed=versions.json");
 
     assert!(Command::new("bash")
         .arg("./scripts/build_fixtures.sh")
