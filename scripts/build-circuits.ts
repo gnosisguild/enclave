@@ -19,8 +19,8 @@ interface CircuitInfo {
 interface CompiledCircuit {
   name: string
   group: CircuitGroup
-  artifacts: { json?: string; vk?: string }
-  checksums: { json?: string; vk?: string }
+  artifacts: { json?: string; vk?: string; vkHash?: string }
+  checksums: { json?: string; vk?: string; vkHash?: string }
 }
 interface BuildOptions {
   groups?: CircuitGroup[]
@@ -244,10 +244,14 @@ class NoirCircuitBuilder {
     result.checksums.json = this.checksum(jsonFile)
 
     if (!this.options.skipVk) {
-      const vkFile = this.generateVk(jsonFile, targetDir, packageName)
+      const { vk: vkFile, vkHash: vkHashFile } = this.generateVk(jsonFile, targetDir, packageName)
       if (vkFile) {
         result.artifacts.vk = vkFile
         result.checksums.vk = this.checksum(vkFile)
+      }
+      if (vkHashFile && existsSync(vkHashFile)) {
+        result.artifacts.vkHash = vkHashFile
+        result.checksums.vkHash = this.checksum(vkHashFile)
       }
     }
     console.log(`   ✓ ${circuit.group}/${circuit.name}`)
@@ -255,21 +259,32 @@ class NoirCircuitBuilder {
     return result
   }
 
-  private generateVk(jsonFile: string, targetDir: string, packageName: string): string | null {
+  private generateVk(
+    jsonFile: string,
+    targetDir: string,
+    packageName: string,
+  ): { vk: string | null; vkHash: string | null } {
     const vkFile = join(targetDir, `${packageName}.vk`)
+    const vkHashFile = join(targetDir, `${packageName}.vk_hash`)
     try {
       const oracleFlag = this.options.oracleHash ? ` --oracle_hash ${this.options.oracleHash}` : ''
       execSync(`bb write_vk -b "${jsonFile}" -o "${targetDir}"${oracleFlag}`, { stdio: 'pipe' })
       const defaultVk = join(targetDir, 'vk')
+      const defaultVkHash = join(targetDir, 'vk_hash')
       if (existsSync(defaultVk)) {
         if (existsSync(vkFile)) rmSync(vkFile)
         copyFileSync(defaultVk, vkFile)
         rmSync(defaultVk)
       }
-      return existsSync(vkFile) ? vkFile : null
+      if (existsSync(defaultVkHash)) {
+        if (existsSync(vkHashFile)) rmSync(vkHashFile)
+        copyFileSync(defaultVkHash, vkHashFile)
+        rmSync(defaultVkHash)
+      }
+      return { vk: existsSync(vkFile) ? vkFile : null, vkHash: existsSync(vkHashFile) ? vkHashFile : null }
     } catch (err) {
       console.error(`Error generating VK for ${jsonFile}:`, err)
-      return null
+      return { vk: null, vkHash: null }
     }
   }
 
@@ -316,6 +331,11 @@ class NoirCircuitBuilder {
         checksums[f] = c.checksums.vk
         lines.push(`${c.checksums.vk}  ${f}`)
       }
+      if (c.checksums.vkHash && c.artifacts.vkHash) {
+        const f = `${prefix}/${basename(c.artifacts.vkHash)}`
+        checksums[f] = c.checksums.vkHash
+        lines.push(`${c.checksums.vkHash}  ${f}`)
+      }
     }
 
     const outputDir = this.options.outputDir!
@@ -335,6 +355,7 @@ class NoirCircuitBuilder {
       mkdirSync(dir, { recursive: true })
       if (c.artifacts.json) copyFileSync(c.artifacts.json, join(dir, basename(c.artifacts.json)))
       if (c.artifacts.vk) copyFileSync(c.artifacts.vk, join(dir, basename(c.artifacts.vk)))
+      if (c.artifacts.vkHash) copyFileSync(c.artifacts.vkHash, join(dir, basename(c.artifacts.vkHash)))
     }
     return outputDir
   }
