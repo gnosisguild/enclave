@@ -32,7 +32,7 @@ flowchart TD
     linkStyle 2 stroke:#808080,stroke-width:2px
 ```
 
-### Metadata
+## Metadata
 
 - **Phase**: P1 (DKG).
 - **Runs**: (N_PARTIES - 1) × Ciphernode (after threshold key generation in C1).
@@ -43,7 +43,7 @@ flowchart TD
   - `commit(sk_share)` → C4a ([`dkg/share_decryption`](../share_decryption))
 - **Data Flow**: `C1 → C2a → {C3a (encryption), C4a (decryption)}`
 - **Secret Structure**: `sk` is trinary (uniform across all CRT moduli)
-- **Commitment Functions**: [`math/commitments.nr`](../../../lib//src/math/commitments.nr) -
+- **Commitment Functions**: [`math/commitments.nr`](../../../lib/src/math/commitments.nr) -
   `compute_share_computation_sk_commitment()`, `compute_share_encryption_commitment_from_shares()`
 - **Related Circuits**:
   - C1 [`threshold/pk_generation`](../../threshold/pk_generation)
