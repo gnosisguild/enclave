@@ -14,7 +14,7 @@ flowchart TD
         C6["<i>Verify sk & e_sm commitments,<br/>verify decryption share computation</i>"]
     end
 
-    C6 -->|"d[l] (public)"| Output1["→ C7<br>dec-result-trbfv"]
+    C6 -->|"d[l] (public)"| Output1["→ C7<br>decrypted-shares-agg"]
 
     style Focus fill:#E06666,stroke:#C00000,stroke-width:3px
     style Input1 fill:#000000,stroke:#999,stroke-width:2px,stroke-dasharray: 5 5
@@ -32,8 +32,8 @@ flowchart TD
 
 **Requires:**
 
-- `commit(agg_sk)` from C4a (`threshold/dec-bfv-sk`)
-- `commit(agg_e_sm)` from C4b (`threshold/dec-bfv-e-sm`)
+- `commit(agg_sk)` from C4a ([`dkg/share_decryption`](../../dkg/share_decryption))
+- `commit(agg_e_sm)` from C4b ([`dkg/share_decryption`](../../dkg/share_decryption))
 - `(ct0, ct1)` — homomorphic result ciphertext from P3
 
 **Output(s):**
@@ -47,6 +47,7 @@ flowchart TD
 
 **Related Circuits:**
 
-- C4a `threshold/dec-bfv-sk`
-- C4b `threshold/dec-bfv-e-sm`
-- C7 `threshold/dec-result-trbfv`
+- C4a [`dkg/share_decryption`](../../dkg/share_decryption)
+- C4b [`dkg/share_decryption`](../../dkg/share_decryption)
+- C7 [`threshold/decrypted_shares_aggregation_bn`](../decrypted_shares_aggregation_bn) /
+  [`threshold/decrypted_shares_aggregation_mod`](../decrypted_shares_aggregation_mod)

@@ -12,7 +12,7 @@ value of `expected_message_commitment` differs between the two instantiations.
 
 ```mermaid
 flowchart TD
-    Input0["C0<br>pk"] -.->|"commit(pk_bfv)"| C3
+    Input0["C0<br>pk"] -.->|"commit(pk_dkg)"| C3
     Input2a["C2a<br>share-computation-sk"] -.->|"commit(sk_share[i][j])"| C3
     Input2b["C2b<br>share-computation-e-sm"] -.->|"commit(e_sm_share[i][j])"| C3
 
@@ -42,7 +42,7 @@ flowchart TD
 - **Phase**: P1 (DKG).
 - **Runs**: (N_PARTIES - 1) × Ciphernode per variant (once per recipient per share type).
 - **Requires**:
-  - `commit(pk_bfv)` from C0 ([`dkg/pk`](../pk))
+  - `commit(pk_dkg)` from C0 ([`dkg/pk`](../pk))
   - C3a: `commit(sk_share[party_idx][mod_idx])` from C2a
     ([`dkg/sk_share_computation`](../sk_share_computation))
   - C3b: `commit(e_sm_share[party_idx][mod_idx])` from C2b

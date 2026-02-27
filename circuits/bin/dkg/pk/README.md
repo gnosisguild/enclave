@@ -18,8 +18,8 @@ flowchart TD
     end
 
     %% Output to C3a and C3b
-    C0 -->|"commit(pk_bfv)"| Output1["→ C3a<br>share-encryption-sk"]
-    C0 -->|"commit(pk_bfv)"| Output2["→ C3b<br>share-encryption-e-sm"]
+    C0 -->|"commit(pk_dkg)"| Output1["→ C3a<br>share-encryption-sk"]
+    C0 -->|"commit(pk_dkg)"| Output2["→ C3b<br>share-encryption-e-sm"]
 
     style Focus fill:#E8A87C,stroke:#C97A4A,stroke-width:3px
     style Input0 fill:#000000,stroke:#999,stroke-width:2px,stroke-dasharray: 5 5
@@ -34,8 +34,8 @@ flowchart TD
 - **Phase**: P1 (DKG).
 - **Runs**: N_PARTIES = 1 x Ciphernode (at the start of key generation).
 - **Requires**: [`config`](../../config) circuit from P0 (Configs Verification).
-- **Output(s)**: `commit(pk_bfv)` consumed by C3a / C3b
+- **Output(s)**: `commit(pk_dkg)` consumed by C3a / C3b
   ([`dkg/share_encryption`](../share_encryption))
-- **Data Flow**: `P0 (configs) → C0 → commit(pk_bfv) → C3a, C3b`
+- **Data Flow**: `P0 (configs) → C0 → commit(pk_dkg) → C3a, C3b`
 - **Commitment Function**: [`math/commitments.nr`](../../../lib/src/math/commitments.nr) -
   `compute_dkg_pk_commitment()`
