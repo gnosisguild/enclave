@@ -36,7 +36,7 @@ impl<let L: u32> Configs<L> {
 /// Use this variant when Q (the product of all CRT moduli) exceeds 128 bits,
 /// as is the case for cryptographically secure parameter sets. For smaller parameter
 /// sets where Q fits within 128 bits, use DecryptedSharesAggregationModular instead.
-pub struct DecryptedSharesAggregationBigNum<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> {
+pub struct DecryptedSharesAggregationBigNum<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32> {
     configs: Configs<L>,
 
     /// Public decryption shares from T+1 ciphernodes, as produced by C6.
@@ -72,7 +72,7 @@ pub struct DecryptedSharesAggregationBigNum<let MAX_MSG_NON_ZERO_COEFFS: u32, le
 /// when Q (the product of all CRT moduli) fits within 128 bits, e.g. for smaller
 /// or non-production parameter sets. For cryptographically secure parameter sets
 /// where Q exceeds 128 bits, use DecryptedSharesAggregationBigNum instead.
-pub struct DecryptedSharesAggregationModular<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> {
+pub struct DecryptedSharesAggregationModular<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32> {
     configs: Configs<L>,
 
     /// Public decryption shares from T+1 ciphernodes, as produced by C6.
@@ -101,7 +101,7 @@ pub struct DecryptedSharesAggregationModular<let MAX_MSG_NON_ZERO_COEFFS: u32, l
     crt_quotients: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
 }
 
-impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptedSharesAggregationBigNum<MAX_MSG_NON_ZERO_COEFFS, L, T, BIT_NOISE> {
+impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32> DecryptedSharesAggregationBigNum<MAX_MSG_NON_ZERO_COEFFS, L, T> {
     pub fn new(
         configs: Configs<L>,
         decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
@@ -208,7 +208,7 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u3
     }
 }
 
-impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptedSharesAggregationModular<MAX_MSG_NON_ZERO_COEFFS, L, T, BIT_NOISE> {
+impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32> DecryptedSharesAggregationModular<MAX_MSG_NON_ZERO_COEFFS, L, T> {
     pub fn new(
         configs: Configs<L>,
         decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
