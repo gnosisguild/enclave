@@ -129,6 +129,11 @@ mod tests {
     use e3_config::BBPath;
     use e3_fhe_params::BfvPreset;
     use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
+    use e3_zk_helpers::circuits::dkg::share_decryption::{
+        ShareDecryptionCircuit, ShareDecryptionCircuitData,
+    };
+    use e3_zk_helpers::computation::DkgInputType;
+    use e3_zk_helpers::CiphernodesCommitteeSize;
     use std::env;
     use std::path::PathBuf;
 
@@ -198,8 +203,11 @@ mod tests {
             .prove_for_recursion(&prover, &preset, &sample, e3_id)
             .expect("inner proof generation should succeed");
 
+        let start = std::time::Instant::now();
         let wrapper_proof = generate_wrapper_proof(&prover, &[inner_proof], e3_id)
             .expect("wrapper proof generation should succeed");
+        let elapsed = start.elapsed();
+        eprintln!("1-proof wrapper generation: {:?}", elapsed);
 
         assert!(!wrapper_proof.data.is_empty());
         assert!(!wrapper_proof.public_signals.is_empty());
@@ -209,6 +217,81 @@ mod tests {
             .expect("verification should not error");
         assert!(verified, "wrapper proof should verify successfully");
 
+        prover.cleanup(e3_id).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_generate_and_verify_wrapper_proof_2_proofs() {
+        let temp = get_tempdir().unwrap();
+        let mut backend = test_backend(temp.path());
+
+        backend.ensure_installed().await.expect("ensure_installed");
+
+        let dist = dist_circuits_path();
+        let wrapper_src = dist
+            .join("recursive_aggregation")
+            .join("wrapper")
+            .join("dkg")
+            .join("share_decryption");
+        if wrapper_src.join("share_decryption.json").exists()
+            && wrapper_src.join("share_decryption.vk_recursive").exists()
+        {
+            backend.circuits_dir = dist.clone();
+        }
+
+        let prover = ZkProver::new(&backend);
+
+        let wrapper_dir = backend
+            .circuits_dir
+            .join("recursive_aggregation")
+            .join("wrapper")
+            .join("dkg")
+            .join("share_decryption");
+        if !wrapper_dir.join("share_decryption.json").exists()
+            || !wrapper_dir.join("share_decryption.vk_recursive").exists()
+        {
+            panic!(
+                "2-proof wrapper circuit not found at {} — run pnpm build:circuits and set circuits_dir to dist/circuits",
+                wrapper_dir.display()
+            );
+        }
+
+        let preset = BfvPreset::InsecureThreshold512;
+        let committee = CiphernodesCommitteeSize::Small.values();
+        let sample_a = ShareDecryptionCircuitData::generate_sample(
+            preset,
+            committee.clone(),
+            DkgInputType::SecretKey,
+        )
+        .expect("sample A generation should succeed");
+        let sample_b =
+            ShareDecryptionCircuitData::generate_sample(preset, committee, DkgInputType::SecretKey)
+                .expect("sample B generation should succeed");
+
+        let inner_proof_a = ShareDecryptionCircuit
+            .prove_for_recursion(&prover, &preset, &sample_a, "aggregation-2proof-inner-a")
+            .expect("inner proof A generation should succeed");
+        let inner_proof_b = ShareDecryptionCircuit
+            .prove_for_recursion(&prover, &preset, &sample_b, "aggregation-2proof-inner-b")
+            .expect("inner proof B generation should succeed");
+
+        let e3_id = "aggregation-2proof-wrapper";
+        let start = std::time::Instant::now();
+        let wrapper_proof = generate_wrapper_proof(&prover, &[inner_proof_a, inner_proof_b], e3_id)
+            .expect("2-proof wrapper generation should succeed");
+        let elapsed = start.elapsed();
+        eprintln!("2-proof wrapper generation: {:?}", elapsed);
+
+        assert!(!wrapper_proof.data.is_empty());
+        assert!(!wrapper_proof.public_signals.is_empty());
+
+        let verified = prover
+            .verify_wrapper_proof(&wrapper_proof, e3_id, 0)
+            .expect("verification should not error");
+        assert!(verified, "2-proof wrapper should verify successfully");
+
+        prover.cleanup("aggregation-2proof-inner-a").unwrap();
+        prover.cleanup("aggregation-2proof-inner-b").unwrap();
         prover.cleanup(e3_id).unwrap();
     }
 }
