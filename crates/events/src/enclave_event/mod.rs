@@ -40,6 +40,7 @@ mod publish_document;
 mod share_computation_proof_signed;
 mod shutdown;
 mod signed_proof;
+mod slash_executed;
 mod sync_effect;
 mod sync_end;
 mod sync_start;
@@ -89,6 +90,7 @@ pub use publish_document::*;
 pub use share_computation_proof_signed::*;
 pub use shutdown::*;
 pub use signed_proof::*;
+pub use slash_executed::*;
 use strum::IntoStaticStr;
 pub use sync_effect::*;
 pub use sync_end::*;
@@ -238,6 +240,8 @@ pub enum EnclaveEventData {
     ComputeResponse(ComputeResponse),         // ComputeResponseReceived
     ComputeRequestError(ComputeRequestError), // ComputeRequestFailed
     SignedProofFailed(SignedProofFailed),
+    SlashExecuted(SlashExecuted),
+    CommitteeMemberExpelled(CommitteeMemberExpelled),
     OutgoingSyncRequested(OutgoingSyncRequested),
     NetSyncEventsReceived(NetSyncEventsReceived),
     HistoricalEvmSyncStart(HistoricalEvmSyncStart),
@@ -492,6 +496,8 @@ impl EnclaveEventData {
             EnclaveEventData::ComputeResponse(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::TestEvent(ref data) => data.e3_id.clone(),
             EnclaveEventData::SignedProofFailed(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::SlashExecuted(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::CommitteeMemberExpelled(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3Failed(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3StageChanged(ref data) => Some(data.e3_id.clone()),
             _ => None,
@@ -560,6 +566,8 @@ impl_event_types!(
     ComputeResponse,
     ComputeRequestError,
     SignedProofFailed,
+    SlashExecuted,
+    CommitteeMemberExpelled,
     OutgoingSyncRequested,
     NetSyncEventsReceived,
     HistoricalEvmSyncStart,

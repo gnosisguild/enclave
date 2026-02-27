@@ -4,20 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Core business logic actor for verifying received encryption keys.
-//!
-//! This actor verifies `EncryptionKeyReceived` events and converts them
-//! to `EncryptionKeyCreated` events after validation.
-//!
-//! ## Signature Verification
-//!
-//! Every received key must carry a [`SignedProofPayload`]. This actor:
-//! 1. Recovers the address from the ECDSA signature.
-//! 2. Delegates the ZK proof to `ZkActor` for verification.
-//! 3. On ZK failure, emits [`SignedProofFailed`] with the full evidence bundle
-//!    and [`E3Failed`] to stop the E3 computation.
-//!
-//! Keys without a signed proof are rejected outright.
+//! Verifies `EncryptionKeyReceived` events: recovers ECDSA address, delegates
+//! ZK proof to `ZkActor`, and on failure emits [`SignedProofFailed`] for
+//! on-chain fault attribution.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -25,14 +14,13 @@ use std::sync::Arc;
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, Recipient};
 use alloy::primitives::Address;
 use e3_events::{
-    BusHandle, E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCreated, EncryptionKeyReceived, EventContext, EventPublisher, EventSubscriber,
-    EventType, FailureReason, Proof, Sequenced, SignedProofFailed, SignedProofPayload, TypedEvent,
+    BusHandle, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated,
+    EncryptionKeyReceived, EventContext, EventPublisher, EventSubscriber, EventType, Proof,
+    Sequenced, SignedProofFailed, SignedProofPayload, TypedEvent,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
 
-/// Request to verify a ZK proof.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct ZkVerificationRequest {
@@ -42,7 +30,6 @@ pub struct ZkVerificationRequest {
     pub sender: Recipient<TypedEvent<ZkVerificationResponse>>,
 }
 
-/// Response from ZK proof verification with context.
 #[derive(Debug, Clone, Message)]
 #[rtype(result = "()")]
 pub struct ZkVerificationResponse {
@@ -52,23 +39,15 @@ pub struct ZkVerificationResponse {
     pub key: Arc<EncryptionKey>,
 }
 
-/// Tracks a pending verification including the signed payload for fault evidence.
 #[derive(Clone, Debug)]
 struct PendingVerification {
     signed_payload: SignedProofPayload,
     recovered_signer: Address,
 }
 
-/// Core actor that handles encryption key verification.
-///
-/// Requires every received key to carry a [`SignedProofPayload`].
-/// On ZK verification failure, emits both [`SignedProofFailed`] (for fault
-/// attribution) and [`E3Failed`] (to stop the E3 computation).
 pub struct ProofVerificationActor {
     bus: BusHandle,
     verifier: Recipient<TypedEvent<ZkVerificationRequest>>,
-    /// Tracks signed payloads for keys currently being verified,
-    /// keyed by `(e3_id, party_id)`.
     pending: HashMap<(E3id, u64), PendingVerification>,
 }
 
@@ -104,7 +83,6 @@ impl ProofVerificationActor {
             return;
         };
 
-        // Signed proofs are mandatory — reject keys without a signed payload
         let signed = match &msg.key.signed_payload {
             Some(signed) => signed.clone(),
             None => {
@@ -116,7 +94,6 @@ impl ProofVerificationActor {
             }
         };
 
-        // Recover the address from the signature
         let recovered_address = match signed.recover_address() {
             Ok(addr) => {
                 info!(
@@ -134,7 +111,6 @@ impl ProofVerificationActor {
             }
         };
 
-        // Store the signed payload so we can reference it in the verification response
         self.pending.insert(
             (msg.e3_id.clone(), msg.key.party_id),
             PendingVerification {
@@ -230,7 +206,6 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
                 msg.key.party_id, error_msg
             );
 
-            // Emit SignedProofFailed for fault attribution
             if let Some(PendingVerification {
                 signed_payload,
                 recovered_signer,
@@ -253,17 +228,11 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
                 }
             }
 
-            // Stop the E3 computation — proof verification failure is fatal
-            if let Err(err) = self.bus.publish(
-                E3Failed {
-                    e3_id: msg.e3_id,
-                    failed_at_stage: E3Stage::CommitteeFinalized,
-                    reason: FailureReason::VerificationFailed,
-                },
-                ec,
-            ) {
-                error!("Failed to publish E3Failed: {err}");
-            }
+            // NOTE: We do NOT emit E3Failed here. The on-chain SlashingManager
+            // will expel the faulting node and check if the committee drops below
+            // threshold. If it does, the contract emits E3Failed on-chain, which
+            // the EVM reader picks up and propagates to all actors. If the committee
+            // is still above threshold, the DKG continues with N-1 nodes.
         }
     }
 }

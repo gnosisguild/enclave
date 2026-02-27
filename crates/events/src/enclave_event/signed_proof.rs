@@ -13,7 +13,7 @@
 
 use crate::{CircuitName, E3id, Proof};
 use actix::Message;
-use alloy::primitives::{keccak256, Address, Bytes, Signature, U256};
+use alloy::primitives::{keccak256, Address, FixedBytes, Signature, U256};
 use alloy::signers::{local::PrivateKeySigner, SignerSync};
 use alloy::sol_types::SolValue;
 use anyhow::{anyhow, Result};
@@ -108,11 +108,36 @@ pub struct ProofPayload {
 }
 
 impl ProofPayload {
+    /// The typehash that domain-separates the signed message.
+    ///
+    /// Must match `PROOF_PAYLOAD_TYPEHASH` in `SlashingManager.sol`:
+    /// `keccak256("ProofPayload(uint256 chainId,uint256 e3Id,uint256 proofType,bytes zkProof,bytes publicSignals)")`
+    pub fn typehash() -> [u8; 32] {
+        keccak256(
+            "ProofPayload(uint256 chainId,uint256 e3Id,uint256 proofType,bytes zkProof,bytes publicSignals)",
+        )
+        .into()
+    }
+
     /// Compute the keccak256 digest of the canonical encoding.
     ///
-    /// Uses standard ABI encoding (`abi.encode`) which includes offsets and
-    /// lengths for dynamic types, avoiding collision between the two
-    /// variable-length `Bytes` fields (`proof` and `publicSignals`).
+    /// Uses structured hashing with a typehash prefix for domain separation,
+    /// and keccak256-hashes the dynamic fields (`zkProof`, `publicSignals`)
+    /// for gas efficiency on the Solidity verification side.
+    ///
+    /// The encoding is:
+    /// ```text
+    /// keccak256(abi.encode(
+    ///     PROOF_PAYLOAD_TYPEHASH,   // bytes32
+    ///     chainId,                   // uint256
+    ///     e3Id,                      // uint256
+    ///     proofType,                 // uint256
+    ///     keccak256(zkProof),        // bytes32
+    ///     keccak256(publicSignals)   // bytes32
+    /// ))
+    /// ```
+    ///
+    /// This matches the reconstruction in `SlashingManager.proposeSlash()`.
     pub fn digest(&self) -> Result<[u8; 32]> {
         let e3_id_u256: U256 = self
             .e3_id
@@ -120,13 +145,17 @@ impl ProofPayload {
             .try_into()
             .map_err(|_| anyhow!("E3id cannot be converted to U256"))?;
 
-        // keccak256(abi.encode(chainId, e3Id, proofType, proof, publicSignals))
+        let typehash = Self::typehash();
+
+        // keccak256(abi.encode(typehash, chainId, e3Id, proofType, keccak256(proof), keccak256(publicSignals)))
+        // All fields are bytes32/uint256 → pure static ABI encoding (6 × 32 = 192 bytes)
         let encoded = (
+            typehash,
             U256::from(self.e3_id.chain_id()),
             e3_id_u256,
             U256::from(self.proof_type as u8),
-            Bytes::copy_from_slice(&self.proof.data),
-            Bytes::copy_from_slice(&self.proof.public_signals),
+            keccak256(&*self.proof.data),
+            keccak256(&*self.proof.public_signals),
         )
             .abi_encode();
 
@@ -208,6 +237,47 @@ impl Display for SignedProofFailed {
             self.e3_id, self.faulting_node, self.proof_type
         )
     }
+}
+
+/// Encode a [`SignedProofFailed`] event into the ABI-encoded evidence bytes
+/// expected by `SlashingManager.proposeSlash()`.
+///
+/// Returns: `abi.encode(bytes zkProof, bytes32[] publicInputs, bytes signature, uint256 chainId, uint256 proofType, address verifier)`
+///
+/// The `verifier` is the current on-chain verifier contract address for this
+/// proof type's slash policy. The `FaultSubmitter` actor must look this up
+/// before calling this function.
+pub fn encode_fault_evidence(failed: &SignedProofFailed, verifier: Address) -> Vec<u8> {
+    use alloy::primitives::Bytes;
+
+    let proof = &failed.signed_payload.payload.proof;
+
+    // Convert raw public_signals bytes → Vec<FixedBytes<32>> (one per 32-byte field)
+    let public_inputs: Vec<FixedBytes<32>> = proof
+        .public_signals
+        .chunks(32)
+        .map(|chunk| {
+            let mut buf = [0u8; 32];
+            buf[..chunk.len()].copy_from_slice(chunk);
+            FixedBytes::from(buf)
+        })
+        .collect();
+
+    // Must match the decode in SlashingManager.proposeSlash():
+    // (bytes zkProof, bytes32[] publicInputs, bytes signature, uint256 chainId, uint256 proofType, address verifier)
+    //
+    // IMPORTANT: Use abi_encode_params() (not abi_encode()) because abi_encode()
+    // wraps dynamic tuples in an outer offset word, but Solidity's abi.decode()
+    // expects flat parameter encoding — the same as abi.encode(a, b, c, ...).
+    (
+        Bytes::copy_from_slice(&proof.data),
+        public_inputs,
+        Bytes::copy_from_slice(&failed.signed_payload.signature),
+        U256::from(failed.e3_id.chain_id()),
+        U256::from(failed.signed_payload.payload.proof_type as u8),
+        verifier,
+    )
+        .abi_encode_params()
 }
 
 #[cfg(test)]

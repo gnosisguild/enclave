@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 mod bus_handle;
+mod committee;
 mod correlation_id;
 mod data_events;
 mod e3id;
@@ -29,6 +30,7 @@ mod sync;
 mod traits;
 
 pub use bus_handle::*;
+pub use committee::*;
 pub use correlation_id::*;
 pub use data_events::*;
 pub use e3id::*;

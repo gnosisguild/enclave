@@ -137,6 +137,50 @@ impl PublicKeyAggregator {
             })
         })
     }
+
+    pub fn handle_member_expelled(
+        &mut self,
+        node: &str,
+        ec: &EventContext<Sequenced>,
+    ) -> Result<()> {
+        self.state.try_mutate(ec, |mut state| {
+            let PublicKeyAggregatorState::Collecting {
+                threshold_n,
+                keyshares,
+                nodes,
+                ..
+            } = &mut state
+            else {
+                return Ok(state);
+            };
+
+            // Remove the expelled node from the nodes set so it won't appear in
+            // PublicKeyAggregated.nodes (forwarded on-chain for reward distribution).
+            // Note: the corresponding keyshare cannot be removed because the
+            // keyshares OrderedSet is keyed by raw bytes with no node mapping.
+            // This is acceptable because BFV public key aggregation is additive
+            // and works correctly with any superset of valid keys.
+            nodes.remove(&node.to_string());
+
+            if *threshold_n > 0 {
+                *threshold_n -= 1;
+                info!(
+                    "PublicKeyAggregator: reduced threshold_n to {} after expelling {}",
+                    threshold_n, node
+                );
+            }
+
+            if keyshares.len() == *threshold_n && *threshold_n > 0 {
+                info!("PublicKeyAggregator: enough keyshares after expulsion, computing aggregate");
+                return Ok(PublicKeyAggregatorState::Computing {
+                    keyshares: std::mem::take(keyshares),
+                    nodes: std::mem::take(nodes),
+                });
+            }
+
+            Ok(state)
+        })
+    }
 }
 
 impl Actor for PublicKeyAggregator {
@@ -155,6 +199,50 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
+            EnclaveEventData::CommitteeMemberExpelled(data) => {
+                // Only process raw events from chain (party_id not yet resolved).
+                if data.party_id.is_some() {
+                    return;
+                }
+
+                let node_addr = data.node.to_string();
+
+                if data.e3_id != self.e3_id {
+                    error!("Wrong e3_id sent to PublicKeyAggregator for expulsion. This should not happen.");
+                    return;
+                }
+
+                info!(
+                    "PublicKeyAggregator: committee member expelled: {} for e3_id={}",
+                    node_addr, data.e3_id
+                );
+                trap(EType::PublickeyAggregation, &self.bus.with_ec(&ec), || {
+                    let was_collecting = matches!(
+                        self.state.get(),
+                        Some(PublicKeyAggregatorState::Collecting { .. })
+                    );
+
+                    self.handle_member_expelled(&node_addr, &ec)?;
+
+                    if was_collecting {
+                        if let Some(PublicKeyAggregatorState::Computing { keyshares, .. }) =
+                            &self.state.get()
+                        {
+                            self.notify_sync(
+                                ctx,
+                                TypedEvent::new(
+                                    ComputeAggregate {
+                                        keyshares: keyshares.clone(),
+                                        e3_id: data.e3_id,
+                                    },
+                                    ec.clone(),
+                                ),
+                            );
+                        }
+                    }
+                    Ok(())
+                });
+            }
             _ => (),
         };
     }
@@ -217,7 +305,6 @@ impl Handler<TypedEvent<ComputeAggregate>> for PublicKeyAggregator {
                 self.fhe.params.moduli().to_vec(),
             )?;
 
-            // Update the local state
             self.set_pubkey(pubkey, &ec)?;
 
             if let Some(PublicKeyAggregatorState::Complete {
