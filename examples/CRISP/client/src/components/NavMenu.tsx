@@ -35,16 +35,19 @@ const NavMenu: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
 
-  const handleClickOutside = (event: MouseEvent) => {
-    if (
-      isOpen &&
-      menuRef.current &&
-      !menuRef.current.contains(event.target as Node) &&
-      !buttonRef.current?.contains(event.target as Node)
-    ) {
-      setIsOpen(false)
-    }
-  }
+  const handleClickOutside = React.useCallback(
+    (event: MouseEvent) => {
+      if (
+        isOpen &&
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node) &&
+        !buttonRef.current?.contains(event.target as Node)
+      ) {
+        setIsOpen(false)
+      }
+    },
+    [isOpen],
+  )
 
   const toggleMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation()
@@ -59,7 +62,7 @@ const NavMenu: React.FC = () => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [isOpen])
+  }, [isOpen, handleClickOutside])
 
   const handleNavigation = (path: string) => {
     navigate(path)

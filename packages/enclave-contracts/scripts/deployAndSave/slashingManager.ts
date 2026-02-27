@@ -16,7 +16,6 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
  */
 export interface SlashingManagerArgs {
   admin?: string;
-  bondingRegistry?: string;
   hre: HardhatRuntimeEnvironment;
 }
 
@@ -27,7 +26,6 @@ export interface SlashingManagerArgs {
  */
 export const deployAndSaveSlashingManager = async ({
   admin,
-  bondingRegistry,
   hre,
 }: SlashingManagerArgs): Promise<{
   slashingManager: SlashingManager;
@@ -38,12 +36,7 @@ export const deployAndSaveSlashingManager = async ({
 
   const preDeployedArgs = readDeploymentArgs("SlashingManager", chain);
 
-  if (
-    !admin ||
-    !bondingRegistry ||
-    (preDeployedArgs?.constructorArgs?.admin === admin &&
-      preDeployedArgs?.constructorArgs?.bondingRegistry === bondingRegistry)
-  ) {
+  if (!admin || preDeployedArgs?.constructorArgs?.admin === admin) {
     if (!preDeployedArgs?.address) {
       throw new Error(
         "SlashingManager address not found, it must be deployed first",
@@ -58,10 +51,7 @@ export const deployAndSaveSlashingManager = async ({
 
   const slashingManagerFactory =
     await ethers.getContractFactory("SlashingManager");
-  const slashingManager = await slashingManagerFactory.deploy(
-    admin,
-    bondingRegistry,
-  );
+  const slashingManager = await slashingManagerFactory.deploy(admin);
 
   await slashingManager.waitForDeployment();
 
@@ -73,7 +63,6 @@ export const deployAndSaveSlashingManager = async ({
     {
       constructorArgs: {
         admin,
-        bondingRegistry,
       },
       blockNumber,
       address: slashingManagerAddress,

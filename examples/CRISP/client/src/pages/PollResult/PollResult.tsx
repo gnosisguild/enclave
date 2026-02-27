@@ -45,12 +45,14 @@ const PollResult: React.FC = () => {
         setLoading(false)
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pastPolls, roundId, roundState, activeTotalCount])
 
   useEffect(() => {
     if (pollResult && loading) {
       setLoading(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pollResult])
 
   return (

@@ -4,17 +4,23 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { memo } from 'react'
+import { memo, useEffect, useState } from 'react'
 import CircularTile from './CircularTile'
 
+const generateRotations = (count: number) => [...Array(count)].map(() => [0, 90, 180, 270][Math.floor(Math.random() * 4)])
+
 const CircularTiles = ({ count = 1, className }: { count?: number; className?: string }) => {
+  const [rotations, setRotations] = useState(() => generateRotations(count))
+
+  useEffect(() => {
+    setRotations(generateRotations(count))
+  }, [count])
+
   return (
     <>
-      {[...Array(count)].map((_i, index) => {
-        const rand_index = Math.floor(Math.random() * 4)
-        const rotation = [0, 90, 180, 270][rand_index]
-        return <CircularTile key={index} className={className} rotation={rotation} />
-      })}
+      {rotations.map((rotation, index) => (
+        <CircularTile key={index} className={className} rotation={rotation} />
+      ))}
     </>
   )
 }

@@ -72,6 +72,36 @@ function log(msg: string) {
   console.log(`[playwright] ${msg}`)
 }
 
+// ConnectKit modal animations + app initialization (initialLoad/switchChain)
+// can cause the MetaMask button to be detached from the DOM or the page to
+// navigate while the modal is opening. Retry the whole flow up to 3 times.
+async function connectWalletWithRetry(page: Page, maxAttempts = 3) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await page.waitForLoadState('load')
+
+      const connectWalletBtn = page.locator('button:has-text("Connect Wallet")')
+      const metamaskBtn = page.locator('button:has-text("MetaMask")')
+
+      // Only open the modal if MetaMask option isn't already visible
+      if (!(await metamaskBtn.isVisible().catch(() => false))) {
+        log(`clicking Connect Wallet (attempt ${attempt})...`)
+        await connectWalletBtn.click({ timeout: 10_000 })
+      }
+
+      log(`clicking MetaMask (attempt ${attempt})...`)
+      await metamaskBtn.click({ timeout: 15_000 })
+      return
+    } catch (error) {
+      if (attempt === maxAttempts) throw error
+      log(`wallet connect attempt ${attempt} failed, retrying...`)
+      // Dismiss any open modal before retrying
+      await page.keyboard.press('Escape').catch(() => {})
+      await page.waitForTimeout(2_000)
+    }
+  }
+}
+
 test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) => {
   page.on('console', (msg: ConsoleMessage) => {
     console.log(msg.text())
@@ -94,10 +124,8 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
   log(`ensureHomePageLoaded...`)
   await ensureHomePageLoaded(page)
 
-  log(`searching for connect button...`)
-  await page.locator('button:has-text("Connect Wallet")').click()
-  log(`searching for MetaMask button...`)
-  await page.locator('button:has-text("MetaMask")').click()
+  log(`connecting wallet via ConnectKit...`)
+  await connectWalletWithRetry(page)
   log(`connecting to dapp...`)
   await metamask.connectToDapp()
   log(`clicking try demo...`)
