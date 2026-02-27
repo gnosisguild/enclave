@@ -294,7 +294,12 @@ class NoirCircuitBuilder {
     vkRecursive: string | null
     vkRecursiveHash: string | null
   } {
-    const result = { vk: null as string | null, vkHash: null as string | null, vkRecursive: null as string | null, vkRecursiveHash: null as string | null }
+    const result = {
+      vk: null as string | null,
+      vkHash: null as string | null,
+      vkRecursive: null as string | null,
+      vkRecursiveHash: null as string | null,
+    }
     const isWrapper = this.isWrapper(circuit)
 
     const runWriteVk = (verifierTarget: string, vkOut: string, vkHashOut: string): boolean => {
@@ -422,8 +427,7 @@ class NoirCircuitBuilder {
       if (c.artifacts.vk) copyFileSync(c.artifacts.vk, join(dir, basename(c.artifacts.vk)))
       if (c.artifacts.vkHash) copyFileSync(c.artifacts.vkHash, join(dir, basename(c.artifacts.vkHash)))
       if (c.artifacts.vkRecursive) copyFileSync(c.artifacts.vkRecursive, join(dir, basename(c.artifacts.vkRecursive)))
-      if (c.artifacts.vkRecursiveHash)
-        copyFileSync(c.artifacts.vkRecursiveHash, join(dir, basename(c.artifacts.vkRecursiveHash)))
+      if (c.artifacts.vkRecursiveHash) copyFileSync(c.artifacts.vkRecursiveHash, join(dir, basename(c.artifacts.vkRecursiveHash)))
     }
     return outputDir
   }

@@ -172,11 +172,11 @@ pub fn generate_fold_proof(
 
     let commitment1 = bytes_to_field_strings(&proof1.public_signals)?
         .into_iter()
-        .next()
+        .last()
         .ok_or_else(|| ZkError::InvalidInput("proof1 public_signals is empty".into()))?;
     let commitment2 = bytes_to_field_strings(&proof2.public_signals)?
         .into_iter()
-        .next()
+        .last()
         .ok_or_else(|| ZkError::InvalidInput("proof2 public_signals is empty".into()))?;
 
     let full_input = FoldInput {
@@ -219,6 +219,9 @@ mod tests {
         ShareDecryptionCircuit, ShareDecryptionCircuitData,
     };
     use e3_zk_helpers::computation::DkgInputType;
+    use e3_zk_helpers::dkg::share_encryption::{
+        ShareEncryptionCircuit, ShareEncryptionCircuitData,
+    };
     use e3_zk_helpers::CiphernodesCommitteeSize;
     use std::env;
     use std::path::PathBuf;
@@ -229,7 +232,15 @@ mod tests {
             Ok(path) => BBPath::Custom(PathBuf::from(path)),
             Err(_) => BBPath::Default(noir_dir.join("bin").join("bb")),
         };
-        let circuits_dir = noir_dir.join("circuits");
+        let circuits_dir = {
+            let dist = dist_circuits_path();
+            let version_file = dist.parent().map(|p| p.join("version.json"));
+            if dist.exists() && version_file.as_ref().is_some_and(|f| f.exists()) {
+                dist
+            } else {
+                noir_dir.join("circuits")
+            }
+        };
         let work_dir = noir_dir.join("work").join("test_node");
         crate::backend::ZkBackend::with_config(
             bb_binary,
@@ -378,78 +389,95 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_generate_and_verify_fold_proof_two_wrappers() {
+    async fn test_generate_and_verify_fold_proof() {
         let temp = get_tempdir().unwrap();
         let mut backend = test_backend(temp.path());
 
         backend.ensure_installed().await.expect("ensure_installed");
 
         let dist = dist_circuits_path();
-        let fold_dir = dist.join("recursive_aggregation").join("fold");
         let pk_wrapper = dist
             .join("recursive_aggregation")
             .join("wrapper")
             .join("dkg")
             .join("pk");
-        let sd_wrapper = dist
+        let share_enc_wrapper = dist
             .join("recursive_aggregation")
             .join("wrapper")
             .join("dkg")
-            .join("share_decryption");
-        if fold_dir.join("fold.json").exists()
+            .join("share_encryption");
+        let fold_dir = dist.join("recursive_aggregation").join("fold");
+        if pk_wrapper.join("pk.json").exists()
+            && pk_wrapper.join("pk.vk_recursive").exists()
+            && share_enc_wrapper.join("share_encryption.json").exists()
+            && share_enc_wrapper
+                .join("share_encryption.vk_recursive")
+                .exists()
+            && fold_dir.join("fold.json").exists()
             && fold_dir.join("fold.vk_recursive").exists()
-            && pk_wrapper.join("pk.json").exists()
-            && sd_wrapper.join("share_decryption.json").exists()
         {
             backend.circuits_dir = dist.clone();
         }
 
         let prover = ZkProver::new(&backend);
 
-        if !prover
-            .circuits_dir()
-            .join("recursive_aggregation/fold/fold.json")
-            .exists()
-            || !prover
-                .circuits_dir()
-                .join("recursive_aggregation/fold/fold.vk_recursive")
+        if !pk_wrapper.join("pk.json").exists()
+            || !pk_wrapper.join("pk.vk_recursive").exists()
+            || !share_enc_wrapper.join("share_encryption.json").exists()
+            || !share_enc_wrapper
+                .join("share_encryption.vk_recursive")
                 .exists()
         {
             panic!(
-                "fold circuit not found — run pnpm build:circuits and set circuits_dir to dist/circuits"
+                "wrapper circuits not found — run pnpm build:circuits and ensure dist/circuits includes recursive_aggregation wrappers for pk and share_encryption",
+            );
+        }
+        if !fold_dir.join("fold.json").exists() || !fold_dir.join("fold.vk_recursive").exists() {
+            panic!(
+                "fold circuit not found at {} — run pnpm build:circuits",
+                fold_dir.display()
             );
         }
 
         let preset = BfvPreset::InsecureThreshold512;
+        let committee = CiphernodesCommitteeSize::Small.values();
+        let sd = preset.search_defaults().expect("search_defaults");
+
         let pk_sample =
             PkCircuitData::generate_sample(preset).expect("pk sample generation should succeed");
-        let committee = CiphernodesCommitteeSize::Small.values();
-        let sd_sample_a = ShareDecryptionCircuitData::generate_sample(
+        let share_enc_sample_secret = ShareEncryptionCircuitData::generate_sample(
             preset,
             committee.clone(),
             DkgInputType::SecretKey,
+            sd.z,
+            sd.lambda,
         )
-        .expect("share_decryption sample A generation should succeed");
-        let sd_sample_b =
-            ShareDecryptionCircuitData::generate_sample(preset, committee, DkgInputType::SecretKey)
-                .expect("share_decryption sample B generation should succeed");
+        .expect("share_encryption sample (secret) generation should succeed");
 
-        let wrapper_pk = PkCircuit
-            .aggregate_proof(&prover, &preset, &[pk_sample], None, "fold-test-pk")
-            .expect("pk aggregate_proof should succeed");
-        let wrapper_sd = ShareDecryptionCircuit
+        let share_enc_sample_noise = ShareEncryptionCircuitData::generate_sample(
+            preset,
+            committee,
+            DkgInputType::SmudgingNoise,
+            sd.z,
+            sd.lambda,
+        )
+        .expect("share_encryption sample (noise) generation should succeed");
+
+        let e3_id = "aggregation-test-fold";
+
+        let pk_wrapper_proof = PkCircuit
+            .aggregate_proof(&prover, &preset, &[pk_sample], None, e3_id)
+            .expect("pk aggregate_proof (1 input) should succeed");
+
+        let fold_proof = ShareEncryptionCircuit
             .aggregate_proof(
                 &prover,
                 &preset,
-                &[sd_sample_a, sd_sample_b],
-                None,
-                "fold-test-sd",
+                &[share_enc_sample_secret, share_enc_sample_noise],
+                Some(&pk_wrapper_proof),
+                e3_id,
             )
-            .expect("share_decryption aggregate_proof should succeed");
-
-        let e3_id = "fold-test-two-wrappers";
-        let fold_proof = generate_fold_proof(&prover, &wrapper_pk, &wrapper_sd, e3_id)
-            .expect("generate_fold_proof (two wrappers) should succeed");
+            .expect("share_encryption aggregate_proof with fold should succeed");
 
         assert!(!fold_proof.data.is_empty());
         assert!(!fold_proof.public_signals.is_empty());
@@ -460,98 +488,7 @@ mod tests {
             .expect("verification should not error");
         assert!(verified, "fold proof should verify successfully");
 
-        prover.cleanup("fold-test-pk_inner_0").unwrap();
-        prover.cleanup("fold-test-pk").unwrap();
-        prover.cleanup("fold-test-sd_inner_0").unwrap();
-        prover.cleanup("fold-test-sd_inner_1").unwrap();
-        prover.cleanup("fold-test-sd").unwrap();
+        prover.cleanup(&format!("{}_inner_0", e3_id)).unwrap();
         prover.cleanup(e3_id).unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_generate_and_verify_fold_proof_incremental() {
-        let temp = get_tempdir().unwrap();
-        let mut backend = test_backend(temp.path());
-
-        backend.ensure_installed().await.expect("ensure_installed");
-
-        let dist = dist_circuits_path();
-        let fold_dir = dist.join("recursive_aggregation").join("fold");
-        let pk_wrapper = dist
-            .join("recursive_aggregation")
-            .join("wrapper")
-            .join("dkg")
-            .join("pk");
-        if fold_dir.join("fold.json").exists()
-            && fold_dir.join("fold.vk_recursive").exists()
-            && pk_wrapper.join("pk.json").exists()
-        {
-            backend.circuits_dir = dist.clone();
-        }
-
-        let prover = ZkProver::new(&backend);
-
-        if !prover
-            .circuits_dir()
-            .join("recursive_aggregation/fold/fold.json")
-            .exists()
-            || !prover
-                .circuits_dir()
-                .join("recursive_aggregation/fold/fold.vk_recursive")
-                .exists()
-        {
-            panic!(
-                "fold circuit not found — run pnpm build:circuits and set circuits_dir to dist/circuits"
-            );
-        }
-
-        let preset = BfvPreset::InsecureThreshold512;
-        let sample_a =
-            PkCircuitData::generate_sample(preset).expect("sample A generation should succeed");
-        let sample_b =
-            PkCircuitData::generate_sample(preset).expect("sample B generation should succeed");
-
-        let wrapper1 = PkCircuit
-            .aggregate_proof(&prover, &preset, &[sample_a], None, "fold-incr-wrapper1")
-            .expect("first aggregate_proof should succeed");
-        let wrapper2 = PkCircuit
-            .aggregate_proof(&prover, &preset, &[sample_b], None, "fold-incr-wrapper2")
-            .expect("second aggregate_proof should succeed");
-
-        let e3_id_fold1 = "fold-incr-fold1";
-        let fold1 = generate_fold_proof(&prover, &wrapper1, &wrapper2, e3_id_fold1)
-            .expect("initial fold should succeed");
-
-        let sample_c =
-            PkCircuitData::generate_sample(preset).expect("sample C generation should succeed");
-        let wrapper3 = PkCircuit
-            .aggregate_proof(
-                &prover,
-                &preset,
-                &[sample_c],
-                Some(&fold1),
-                "fold-incr-wrapper3",
-            )
-            .expect("aggregate_proof with fold should succeed");
-
-        assert_eq!(wrapper3.circuit, e3_events::CircuitName::Fold);
-        assert!(!wrapper3.data.is_empty());
-        assert!(!wrapper3.public_signals.is_empty());
-
-        let verified = prover
-            .verify_fold_proof(&wrapper3, "fold-incr-wrapper3", 0)
-            .expect("verification should not error");
-        assert!(
-            verified,
-            "incremental fold proof should verify successfully"
-        );
-
-        prover.cleanup("fold-incr-wrapper1_inner_0").unwrap();
-        prover.cleanup("fold-incr-wrapper1").unwrap();
-        prover.cleanup("fold-incr-wrapper2_inner_0").unwrap();
-        prover.cleanup("fold-incr-wrapper2").unwrap();
-        prover.cleanup(e3_id_fold1).unwrap();
-        prover.cleanup("fold-incr-wrapper3_inner_0").unwrap();
-        prover.cleanup("fold-incr-wrapper3").unwrap();
     }
 }

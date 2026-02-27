@@ -89,7 +89,7 @@ pub trait Provable: Send + Sync {
         prover: &ZkProver,
         params: &Self::Params,
         inputs: &[Self::Input],
-        fold_proof: Option<&Proof>,
+        aggregated_proof: Option<&Proof>,
         e3_id: &str,
     ) -> Result<Proof, ZkError>
     where
@@ -130,8 +130,8 @@ pub trait Provable: Send + Sync {
 
         let wrapper_proof = generate_wrapper_proof(prover, &recursive_proofs, e3_id)?;
 
-        match fold_proof {
-            Some(acc) => generate_fold_proof(prover, &wrapper_proof, acc, e3_id),
+        match aggregated_proof {
+            Some(ap) => generate_fold_proof(prover, &wrapper_proof, ap, e3_id),
             None => Ok(wrapper_proof),
         }
     }
