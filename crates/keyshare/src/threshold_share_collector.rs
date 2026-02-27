@@ -255,8 +255,11 @@ impl Handler<ExpelPartyFromShareCollection> for ThresholdShareCollector {
                 ctx.cancel_future(handle);
             }
 
-            let event: TypedEvent<crate::AllThresholdSharesCollected> =
-                TypedEvent::new(self.shares.clone().into(), msg.ec);
+            let proofs = std::mem::take(&mut self.share_proofs);
+            let event: TypedEvent<AllThresholdSharesCollected> = TypedEvent::new(
+                AllThresholdSharesCollected::new(self.shares.clone(), proofs),
+                msg.ec,
+            );
             self.parent.do_send(event);
         }
     }

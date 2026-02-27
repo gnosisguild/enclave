@@ -50,7 +50,7 @@ use std::{
 use tracing::{error, info, trace, warn};
 
 use crate::encryption_key_collector::{
-    AllEncryptionKeysCollected, EncryptionKeyCollector, ExpelPartyFromShareCollection,
+    AllEncryptionKeysCollected, EncryptionKeyCollector, ExpelPartyFromKeyCollection,
 };
 use crate::threshold_share_collector::{
     ExpelPartyFromShareCollection, ReceivedShareProofs, ThresholdShareCollector,
