@@ -107,8 +107,8 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation.
     ///
-    /// Uses commitments for sk, pk, and e_sm rather than full polynomials to reduce
-    /// constraint count while maintaining binding properties.
+    /// Uses commitments for sk and pk rather than full polynomials to reduce constraint
+    /// count while maintaining binding properties. e_sm is not included in the payload.
     fn payload(self, sk_commitment: Field, pk_commitment: Field) -> Vec<Field> {
         let mut inputs = Vec::new();
 
@@ -145,7 +145,7 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
             compute_share_computation_e_sm_commitment::<N, L, BIT_E_SM>(self.e_sm);
         let pk_commitment = compute_threshold_pk_commitment::<N, L, BIT_PK>(self.pk0, self.pk1);
 
-        // 3. Generate Fiat-Shamir challenges (one per CRT modulus)
+        // 3. Generate a single Fiat-Shamir challenge point (gamma)
         let gamma = self.generate_challenge(sk_commitment, pk_commitment);
         self.verify_evaluations(gamma);
 
