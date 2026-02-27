@@ -16,8 +16,10 @@ pub struct Configs<let L: u32> {
     pub qis: [Field; L],
     /// Plaintext modulus (typically denoted as `t`)
     pub plaintext_modulus: Field,
-    /// Precomputed value: -Q^{-1} mod t, where Q = q_0 * q_1 * ... * q_{L-1}.
-    /// Used in the final decoding step to recover the message from u_global.
+    /// Precomputed value: Q^{-1} mod t (the positive modular inverse of Q modulo t),
+    /// where Q = q_0 * q_1 * ... * q_{L-1}. The negation required by the BFV decoding
+    /// formula (-Q^{-1}) is applied separately in verify_decoding: via `t - product`
+    /// in the non-centering branch and via `Q - (t*u mod Q)` in the centering branch.
     pub q_inverse_mod_t: Field,
 }
 
