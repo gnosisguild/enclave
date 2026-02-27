@@ -148,6 +148,16 @@ impl BfvEncryptedShare {
     ///
     /// # Returns
     /// The decrypted Shamir share
+    /// Get the raw ciphertext bytes (one per CRT modulus).
+    pub fn ciphertext_bytes(&self) -> &[ArcBytes] {
+        &self.ciphertexts
+    }
+
+    /// Number of CRT moduli (ciphertexts per share).
+    pub fn num_moduli(&self) -> usize {
+        self.ciphertexts.len()
+    }
+
     pub fn decrypt(
         self,
         sk: &SecretKey,
