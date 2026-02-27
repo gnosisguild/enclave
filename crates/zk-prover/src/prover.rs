@@ -83,6 +83,30 @@ impl ZkProver {
         )
     }
 
+    /// Generates a proof of the fold circuit (for aggregation output).
+    /// The fold circuit is independent; uses fixed path `recursive_aggregation/fold`.
+    /// Verifier target: `noir-recursive-no-zk`.
+    pub fn generate_fold_proof(&self, witness_data: &[u8], e3_id: &str) -> Result<Proof, ZkError> {
+        let dir = CircuitName::Fold.dir_path();
+        self.generate_proof_impl(
+            CircuitName::Fold,
+            witness_data,
+            e3_id,
+            &dir,
+            Some("noir-recursive-no-zk"),
+        )
+    }
+
+    /// Generates the final fold proof for on-chain verification (evm target).
+    pub fn generate_final_fold_proof(
+        &self,
+        witness_data: &[u8],
+        e3_id: &str,
+    ) -> Result<Proof, ZkError> {
+        let dir = CircuitName::Fold.dir_path();
+        self.generate_proof_impl(CircuitName::Fold, witness_data, e3_id, &dir, Some("evm"))
+    }
+
     fn generate_proof_impl(
         &self,
         circuit: CircuitName,
@@ -209,6 +233,31 @@ impl ZkProver {
             &proof.data,
             &proof.public_signals,
             proof.circuit.wrapper_dir_path(),
+            e3_id,
+            party_id,
+            Some("noir-recursive-no-zk"),
+        )
+    }
+
+    /// Verifies a fold proof using the fold circuit's recursive VK.
+    pub fn verify_fold_proof(
+        &self,
+        proof: &Proof,
+        e3_id: &str,
+        party_id: u64,
+    ) -> Result<bool, ZkError> {
+        use e3_events::CircuitName;
+        if proof.circuit != CircuitName::Fold {
+            return Err(ZkError::InvalidInput(format!(
+                "expected Fold proof, got {}",
+                proof.circuit
+            )));
+        }
+        self.verify_proof_impl(
+            proof.circuit,
+            &proof.data,
+            &proof.public_signals,
+            proof.circuit.dir_path(),
             e3_id,
             party_id,
             Some("noir-recursive-no-zk"),
