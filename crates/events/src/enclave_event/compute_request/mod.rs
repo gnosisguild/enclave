@@ -90,6 +90,8 @@ impl ToString for ComputeRequest {
                 ZkRequest::VerifyShareDecryptionProofs(_) => "ZkVerifyShareDecryptionProofs",
                 ZkRequest::PkAggregation(_) => "ZkPkAggregation",
                 ZkRequest::ThresholdShareDecryption(_) => "ZkThresholdShareDecryption",
+                ZkRequest::VerifyC6Proofs(_) => "ZkVerifyC6Proofs",
+                ZkRequest::DecryptedSharesAggregation(_) => "ZkDecryptedSharesAggregation",
             },
         }
         .to_string()

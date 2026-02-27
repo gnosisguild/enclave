@@ -222,8 +222,44 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
 
-        let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
+        // Copy C6 (threshold/share_decryption) circuit for C6 verification
+        let threshold_share_dec_circuit_dir =
+            circuits_dir.join("threshold").join("share_decryption");
+        tokio::fs::create_dir_all(&threshold_share_dec_circuit_dir)
+            .await
+            .unwrap();
+        tokio::fs::copy(
+            threshold_target.join("share_decryption.json"),
+            threshold_share_dec_circuit_dir.join("share_decryption.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            threshold_target.join("share_decryption.vk"),
+            threshold_share_dec_circuit_dir.join("share_decryption.vk"),
+        )
+        .await
+        .unwrap();
 
+        // Copy C7 (decrypted_shares_aggregation_mod) circuit
+        let dsa_circuit_dir = circuits_dir
+            .join("threshold")
+            .join("decrypted_shares_aggregation_mod");
+        tokio::fs::create_dir_all(&dsa_circuit_dir).await.unwrap();
+        tokio::fs::copy(
+            threshold_target.join("decrypted_shares_aggregation_mod.json"),
+            dsa_circuit_dir.join("decrypted_shares_aggregation_mod.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            threshold_target.join("decrypted_shares_aggregation_mod.vk"),
+            dsa_circuit_dir.join("decrypted_shares_aggregation_mod.vk"),
+        )
+        .await
+        .unwrap();
+
+        let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
         (backend, temp)
     } else {
         println!("bb binary not found locally, downloading via ensure_installed()...");
@@ -719,13 +755,17 @@ async fn test_trbfv_actor() -> Result<()> {
     // The collector sees:
     // - 1 CiphertextOutputPublished (from shared bus)
     // - 5 DecryptionshareCreated (from simulate_libp2p, passes is_forwardable_event)
-    // - 1 ComputeRequest (PlaintextAggregation on node 0's own bus)
-    // - 1 ComputeResponse (PlaintextAggregation on node 0's own bus)
-    // - 1 PlaintextAggregated (from node 0's own aggregation actor)
+    // - 1 ComputeRequest (VerifyC6Proofs)
+    // - 1 ComputeResponse (VerifyC6Proofs)
+    // - 1 ComputeRequest (TrBFV CalculateThresholdDecryption)
+    // - 1 ComputeResponse (TrBFV CalculateThresholdDecryption)
+    // - 1 ComputeRequest (DecryptedSharesAggregation C7)
+    // - 1 ComputeResponse (DecryptedSharesAggregation C7)
+    // - 1 PlaintextAggregated (with C7 proofs)
     // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
     // stay on their local buses.
-    // Total: 1 + 5 + 1 + 1 + 1 = 9 events
-    let expected_count = 1 + 5 + 1 + 1 + 1;
+    // Total: 1 + 5 + 2 + 2 + 2 + 1 = 13 events
+    let expected_count = 1 + 5 + 2 + 2 + 2 + 1;
 
     let h = nodes
         .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))
@@ -738,6 +778,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let Some(EnclaveEventData::PlaintextAggregated(PlaintextAggregated {
         decrypted_output: plaintext,
+        aggregation_proofs,
         ..
     })) = h.last().map(|e| e.get_data())
     else {
@@ -746,6 +787,11 @@ async fn test_trbfv_actor() -> Result<()> {
             h.event_types()
         )
     };
+
+    assert!(
+        !aggregation_proofs.is_empty(),
+        "C7 proofs should be present in PlaintextAggregated"
+    );
 
     let results = plaintext
         .into_iter()
@@ -835,11 +881,13 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     let evt_1 = PlaintextAggregated {
         e3_id: E3id::new("1235", 1),
         decrypted_output: vec![ArcBytes::from_bytes(&[1, 2, 3, 4])],
+        aggregation_proofs: vec![],
     };
 
     let evt_2 = PlaintextAggregated {
         e3_id: E3id::new("1236", 1),
         decrypted_output: vec![ArcBytes::from_bytes(&[1, 2, 3, 4])],
+        aggregation_proofs: vec![],
     };
 
     let local_evt_3 = CiphernodeSelected {

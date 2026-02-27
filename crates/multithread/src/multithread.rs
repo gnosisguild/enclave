@@ -24,15 +24,17 @@ use e3_events::EType;
 use e3_events::EffectsEnabled;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
-    ComputeResponse, DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, EnclaveEvent,
-    EnclaveEventData, EventPublisher, EventSubscriber, EventType, PartyVerificationResult,
+    ComputeResponse, DecryptedSharesAggregationProofRequest,
+    DecryptedSharesAggregationProofResponse, DkgShareDecryptionProofRequest,
+    DkgShareDecryptionProofResponse, EnclaveEvent, EnclaveEventData, EventPublisher,
+    EventSubscriber, EventType, PartyC6VerificationResult, PartyVerificationResult,
     PkAggregationProofRequest, PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse,
     PkGenerationProofRequest, PkGenerationProofResponse, ShareComputationProofRequest,
     ShareComputationProofResponse, ShareEncryptionProofRequest, ShareEncryptionProofResponse,
     ThresholdShareDecryptionProofRequest, ThresholdShareDecryptionProofResponse, TypedEvent,
-    VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
-    VerifyShareProofsRequest, VerifyShareProofsResponse, ZkError as ZkEventError, ZkRequest,
-    ZkResponse,
+    VerifyC6ProofsRequest, VerifyC6ProofsResponse, VerifyShareDecryptionProofsRequest,
+    VerifyShareDecryptionProofsResponse, VerifyShareProofsRequest, VerifyShareProofsResponse,
+    ZkError as ZkEventError, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
@@ -50,6 +52,9 @@ use e3_utils::SharedRng;
 use e3_utils::MAILBOX_LIMIT;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
 use e3_zk_helpers::circuits::dkg::share_computation::utils::compute_parity_matrix;
+use e3_zk_helpers::circuits::threshold::decrypted_shares_aggregation::circuit::{
+    DecryptedSharesAggregationCircuit, DecryptedSharesAggregationCircuitData,
+};
 use e3_zk_helpers::circuits::threshold::pk_generation::circuit::{
     PkGenerationCircuit, PkGenerationCircuitData,
 };
@@ -360,9 +365,12 @@ fn handle_threshold_share_decryption_proof(
                 make_zk_error(&request, format!("ciphertext[{}] deserialize: {:?}", i, e))
             })?;
 
-        // Decrypt es_poly_sum[i] → Poly → CrtPolynomial (e)
+        // Decrypt es_poly_sum → Poly → CrtPolynomial (e)
+        // Currently there is a single smudging noise polynomial shared across all
+        // ciphertexts (see calculate_decryption_share.rs).
+        let es_idx = i % req.es_poly_sum.len();
         let e_poly = e3_trbfv::helpers::try_poly_from_sensitive_bytes(
-            req.es_poly_sum[i].clone(),
+            req.es_poly_sum[es_idx].clone(),
             threshold_params.clone(),
             cipher,
         )
@@ -586,6 +594,14 @@ fn handle_zk_request(
         ZkRequest::ThresholdShareDecryption(req) => {
             timefunc("zk_threshold_share_decryption", id, || {
                 handle_threshold_share_decryption_proof(&prover, &cipher, req, request.clone())
+            })
+        }
+        ZkRequest::VerifyC6Proofs(req) => timefunc("zk_verify_c6_proofs", id, || {
+            handle_verify_c6_proofs(&prover, req, request.clone())
+        }),
+        ZkRequest::DecryptedSharesAggregation(req) => {
+            timefunc("zk_decrypted_shares_aggregation", id, || {
+                handle_decrypted_shares_aggregation_proof(&prover, req, request.clone())
             })
         }
     }
@@ -1117,6 +1133,126 @@ fn handle_verify_share_decryption_proofs(
         ZkResponse::VerifyShareDecryptionProofs(VerifyShareDecryptionProofsResponse {
             party_results,
         }),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
+fn handle_verify_c6_proofs(
+    prover: &ZkProver,
+    req: VerifyC6ProofsRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    let e3_id_str = request.e3_id.to_string();
+
+    let party_results: Vec<PartyC6VerificationResult> = req
+        .party_proofs
+        .into_iter()
+        .map(|party| {
+            let sender = party.sender_party_id;
+
+            for c6_proof in &party.c6_proofs {
+                let result = prover.verify_proof(c6_proof, &e3_id_str, sender);
+                match result {
+                    Ok(true) => continue,
+                    Ok(false) | Err(_) => {
+                        return PartyC6VerificationResult {
+                            sender_party_id: sender,
+                            all_verified: false,
+                        };
+                    }
+                }
+            }
+
+            PartyC6VerificationResult {
+                sender_party_id: sender,
+                all_verified: true,
+            }
+        })
+        .collect();
+
+    Ok(ComputeResponse::zk(
+        ZkResponse::VerifyC6Proofs(VerifyC6ProofsResponse { party_results }),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
+fn handle_decrypted_shares_aggregation_proof(
+    prover: &ZkProver,
+    mut req: DecryptedSharesAggregationProofRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    // 1. Build threshold BFV parameters from preset
+    let (threshold_params, _dkg_params) = build_pair_for_preset(req.params_preset.clone())
+        .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
+
+    // 2. Sort d_share_polys by party ID — the Noir circuit requires
+    //    party_ids in strictly increasing order for Lagrange sign computation.
+    req.d_share_polys.sort_by_key(|(id, _)| *id);
+
+    // 3. Determine dimensions
+    let num_indices = req.plaintext.len();
+    let num_parties = req.d_share_polys.len();
+    let mut proofs = Vec::with_capacity(num_indices);
+
+    // 4. For each ciphertext index, build circuit data and generate proof
+    for i in 0..num_indices {
+        // a. Extract per-party shares for index i, deserialize to Poly
+        let d_share_polys: Vec<fhe_math::rq::Poly> = req
+            .d_share_polys
+            .iter()
+            .map(|(_, shares)| try_poly_from_bytes(&shares[i], &threshold_params))
+            .collect::<std::result::Result<_, _>>()
+            .map_err(|e| {
+                make_zk_error(&request, format!("d_share_polys[{}] deserialize: {}", i, e))
+            })?;
+
+        // b. Get party IDs (convert 0-based to 1-based for circuit)
+        let reconstructing_parties: Vec<usize> = req
+            .d_share_polys
+            .iter()
+            .map(|(id, _)| (*id as usize) + 1)
+            .collect();
+
+        // c. Decode plaintext at index i to Vec<u64>
+        let message_vec = e3_bfv_client::decode_bytes_to_vec_u64(&req.plaintext[i].extract_bytes())
+            .map_err(|e| make_zk_error(&request, format!("plaintext[{}] decode: {:?}", i, e)))?;
+
+        // d. Build committee
+        let committee = e3_zk_helpers::CiphernodesCommittee {
+            n: req.threshold_n as usize,
+            h: num_parties,
+            threshold: req.threshold_m as usize,
+        };
+
+        // e. Build circuit data and generate proof
+        let circuit_data = DecryptedSharesAggregationCircuitData {
+            committee,
+            d_share_polys,
+            reconstructing_parties,
+            message_vec,
+        };
+
+        let circuit = DecryptedSharesAggregationCircuit;
+        let e3_id_str = request.e3_id.to_string();
+        let proof = circuit
+            .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+            .map_err(|e| {
+                ComputeRequestError::new(
+                    ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                        "C7 proof[{}]: {}",
+                        i, e
+                    ))),
+                    request.clone(),
+                )
+            })?;
+        proofs.push(proof);
+    }
+
+    // 4. Return response
+    Ok(ComputeResponse::zk(
+        ZkResponse::DecryptedSharesAggregation(DecryptedSharesAggregationProofResponse { proofs }),
         request.correlation_id,
         request.e3_id,
     ))

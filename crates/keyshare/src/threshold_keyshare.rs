@@ -16,12 +16,11 @@ use e3_events::{
     EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed,
     EncryptionKeyCreated, EncryptionKeyPending, EventContext, FailureReason, KeyshareCreated,
     PartyId, PartyProofsToVerify, PartyShareDecryptionProofsToVerify, PkGenerationProofRequest,
-    PkGenerationProofSigned, Proof, ProofType, Sequenced, ShareComputationProofRequest,
+    PkGenerationProofSigned, ProofType, Sequenced, ShareComputationProofRequest,
     ShareEncryptionProofRequest, ShareVerificationComplete, ShareVerificationDispatched,
     SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated,
     ThresholdShareDecryptionProofRequest, ThresholdSharePending, TypedEvent, VerificationKind,
-    VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
-    VerifyShareProofsRequest, VerifyShareProofsResponse, ZkRequest, ZkResponse,
+    ZkRequest, ZkResponse,
 };
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::{build_pair_for_preset, BfvParamSet, BfvPreset};
@@ -640,14 +639,10 @@ impl ThresholdKeyshare {
                 }
                 _ => Ok(()),
             },
+            // ZK responses: C4 proofs and share verification are handled by
+            // ProofRequestActor and ShareVerificationActor respectively.
+            // Only C6 (ThresholdShareDecryption) is handled here.
             ComputeResponseKind::Zk(zk) => match zk {
-                ZkResponse::VerifyShareProofs(_) => self.handle_verify_share_proofs_response(msg),
-                ZkResponse::DkgShareDecryption(_) => {
-                    self.handle_share_decryption_proof_response(msg)
-                }
-                ZkResponse::VerifyShareDecryptionProofs(_) => {
-                    self.handle_verify_share_decryption_proofs_response(msg)
-                }
                 ZkResponse::ThresholdShareDecryption(_) => self.handle_c6_proof_response(msg),
                 _ => Ok(()),
             },
@@ -1693,7 +1688,10 @@ impl ThresholdKeyshare {
             .ok_or_else(|| anyhow!("No pending share decryption data — CalculateDecryptionKey responded before proof requests were built"))?;
 
         // Take early shares from the actor before transitioning
-        let early_shares = std::mem::take(&mut self.early_decryption_key_shares);
+        let early_shares = self
+            .pending_c4_verification_shares
+            .take()
+            .unwrap_or_default();
 
         // Transition to ReadyForDecryption
         self.state.try_mutate(&ec, |s| {
@@ -1785,7 +1783,9 @@ impl ThresholdKeyshare {
             "Storing early DecryptionKeyShared from party {} (state: AggregatingDecryptionKey)",
             party_id
         );
-        self.early_decryption_key_shares.insert(party_id, data);
+        self.pending_c4_verification_shares
+            .get_or_insert_with(HashMap::new)
+            .insert(party_id, data);
         Ok(())
     }
 
@@ -2399,7 +2399,7 @@ impl Handler<E3RequestComplete> for ThresholdKeyshare {
         self.pending_shares.clear();
         self.pending_share_decryption_data = None;
         self.honest_parties = None;
-        self.early_decryption_key_shares.clear();
+        self.pending_c4_verification_shares = None;
         self.notify_sync(ctx, Die);
     }
 }
