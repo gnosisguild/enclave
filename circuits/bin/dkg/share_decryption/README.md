@@ -12,8 +12,8 @@ _C2b_. The verification logic and all input types are identical — only the sou
 
 ```mermaid
 flowchart TD
-    Input2a["C2a<br>share-computation-sk"] -.->|"commit(sk_share[i][j])"| C4
-    Input2b["C2b<br>share-computation-e-sm"] -.->|"commit(e_sm_share[i][j])"| C4
+    Input2a["C2a<br>share-computation-sk"] -.->|"commit(sk_share)"| C4
+    Input2b["C2b<br>share-computation-e-sm"] -.->|"commit(e_sm_share)"| C4
 
     subgraph Focus["C4a & C4b"]
         C4["<i>Verify decrypted shares & aggregate</i>"]
@@ -38,9 +38,9 @@ flowchart TD
 - **Phase**: P1 (DKG).
 - **Runs**: (N_PARTIES - 1) × Ciphernode per variant (once per recipient per share type).
 - **Requires**:
-  - C4a: `commit(sk_share[party_idx][mod_idx])` from C2a
+  - C4a: `commit(sk_share)` from C2a
     ([`dkg/sk_share_computation`](../sk_share_computation))
-  - C4b: `commit(e_sm_share[party_idx][mod_idx])` from C2b
+  - C4b: `commit(e_sm_share)` from C2b
     ([`dkg/e_sm_share_computation`](../e_sm_share_computation))
 - **Output(s)**:
   - C4a: `commit(agg_sk)` → C6 ([`threshold/share_decryption`](../../threshold/share_decryption))
