@@ -273,7 +273,7 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u3
         let q_half = q_modulus as u128 / 2;
 
         for coeff_idx in 0..MAX_MSG_NON_ZERO_COEFFS {
-            // Compute (t * u_global) mod Q using BigNum
+            // Compute (t * u_global) mod Q using ModU128
             let q_mod = ModU128::new(q_modulus);
             let t_mod = ModU128::new(t);
 
