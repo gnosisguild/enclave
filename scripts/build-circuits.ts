@@ -256,7 +256,7 @@ class NoirCircuitBuilder {
     result.checksums.json = this.checksum(jsonFile)
 
     if (!this.options.skipVk) {
-      const vkArtifacts = this.generateVk(jsonFile, targetDir, packageName)
+      const vkArtifacts = this.generateVk(circuit, jsonFile, targetDir, packageName)
       if (vkArtifacts.vk) {
         result.artifacts.vk = vkArtifacts.vk
         result.checksums.vk = this.checksum(vkArtifacts.vk)
@@ -279,7 +279,12 @@ class NoirCircuitBuilder {
     return result
   }
 
+  private isWrapper(circuit: CircuitInfo): boolean {
+    return circuit.name.startsWith('wrapper/')
+  }
+
   private generateVk(
+    circuit: CircuitInfo,
     jsonFile: string,
     targetDir: string,
     packageName: string,
@@ -290,6 +295,7 @@ class NoirCircuitBuilder {
     vkRecursiveHash: string | null
   } {
     const result = { vk: null as string | null, vkHash: null as string | null, vkRecursive: null as string | null, vkRecursiveHash: null as string | null }
+    const isWrapper = this.isWrapper(circuit)
 
     const runWriteVk = (verifierTarget: string, vkOut: string, vkHashOut: string): boolean => {
       try {
@@ -318,13 +324,20 @@ class NoirCircuitBuilder {
     const vkRecursiveFile = join(targetDir, `${packageName}.vk_recursive`)
     const vkRecursiveHashFile = join(targetDir, `${packageName}.vk_recursive_hash`)
 
-    if (runWriteVk('evm', vkFile, vkHashFile)) {
-      result.vk = existsSync(vkFile) ? vkFile : null
-      result.vkHash = existsSync(vkHashFile) ? vkHashFile : null
-    }
-    if (runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
-      result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
-      result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
+    if (!isWrapper) {
+      if (runWriteVk('evm', vkFile, vkHashFile)) {
+        result.vk = existsSync(vkFile) ? vkFile : null
+        result.vkHash = existsSync(vkHashFile) ? vkHashFile : null
+      }
+      if (runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
+        result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
+        result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
+      }
+    } else {
+      if (runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
+        result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
+        result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
+      }
     }
 
     return result
