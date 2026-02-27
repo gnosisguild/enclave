@@ -12,13 +12,14 @@ use e3_events::{
     prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
     ComputeResponse, ComputeResponseKind, CorrelationId, DecryptionKeyShared,
     DecryptionshareCreated, Die, DkgProofSigned, DkgShareDecryptionProofRequest,
-    DkgShareDecryptionProofResponse, E3RequestComplete, E3id, EType, EnclaveEvent,
-    EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated,
-    EncryptionKeyPending, EventContext, KeyshareCreated, PartyId, PartyProofsToVerify,
-    PkGenerationProofRequest, PkGenerationProofSigned, Proof, ProofType, Sequenced,
-    ShareComputationProofRequest, ShareEncryptionProofRequest, SignedProofPayload, ThresholdShare,
-    ThresholdShareCollectionFailed, ThresholdShareCreated, ThresholdSharePending, TypedEvent,
-    VerifyShareProofsRequest, VerifyShareProofsResponse, ZkRequest, ZkResponse,
+    DkgShareDecryptionProofResponse, E3Failed, E3RequestComplete, E3Stage, E3id, EType,
+    EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed,
+    EncryptionKeyCreated, EncryptionKeyPending, EventContext, FailureReason, KeyshareCreated,
+    PartyId, PartyProofsToVerify, PkGenerationProofRequest, PkGenerationProofSigned, Proof,
+    ProofType, Sequenced, ShareComputationProofRequest, ShareEncryptionProofRequest,
+    SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated,
+    ThresholdSharePending, TypedEvent, VerifyShareProofsRequest, VerifyShareProofsResponse,
+    ZkRequest, ZkResponse,
 };
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::{build_pair_for_preset, BfvParamSet, BfvPreset};
@@ -46,7 +47,7 @@ use std::{
     mem,
     sync::{Arc, Mutex},
 };
-use tracing::{info, trace, warn};
+use tracing::{error, info, trace, warn};
 
 use crate::encryption_key_collector::{AllEncryptionKeysCollected, EncryptionKeyCollector};
 use crate::threshold_share_collector::{ReceivedShareProofs, ThresholdShareCollector};
@@ -369,6 +370,8 @@ pub struct ThresholdKeyshare {
     c4b_correlation_map: HashMap<CorrelationId, usize>,
     /// Parties that provided no C2/C3 proofs (treated as dishonest when others did provide proofs).
     no_proof_dishonest_parties: Option<HashSet<u64>>,
+    /// Party IDs sent for C2/C3 verification — used to detect missing results in the response.
+    expected_verification_parties: Option<HashSet<u64>>,
 }
 
 impl ThresholdKeyshare {
@@ -386,6 +389,7 @@ impl ThresholdKeyshare {
             expected_c4b_count: 0,
             c4b_correlation_map: HashMap::new(),
             no_proof_dishonest_parties: None,
+            expected_verification_parties: None,
         }
     }
 }
@@ -1054,68 +1058,129 @@ impl ThresholdKeyshare {
         let e3_id = state.get_e3_id();
         let own_party_id = state.party_id;
 
+        // Derive expected proof counts from our own share (trusted source).
+        // All parties use the same BFV params, so moduli counts are identical.
+        // Using the sender's share would let a malicious party manipulate expected counts.
+        let own_share = msg
+            .shares
+            .iter()
+            .find(|s| s.party_id == own_party_id)
+            .ok_or_else(|| anyhow!("Own share not found in AllThresholdSharesCollected"))?;
+        let expected_c3a = own_share
+            .sk_sss
+            .get_share(0)
+            .map(|s| s.num_moduli())
+            .unwrap_or(0);
+        let expected_c3b: usize = own_share
+            .esi_sss
+            .iter()
+            .map(|esi| esi.get_share(0).map(|s| s.num_moduli()).unwrap_or(0))
+            .sum();
+        let expected_num_esi = own_share.esi_sss.len();
+
         // Build verification requests for other parties' proofs
         let mut party_proofs_to_verify: Vec<PartyProofsToVerify> = Vec::new();
         let mut no_proof_parties: HashSet<u64> = HashSet::new();
+        let mut incomplete_proof_parties: HashSet<u64> = HashSet::new();
         for (share, proofs) in msg.shares.iter().zip(msg.share_proofs.iter()) {
-            // Skip our own proofs — we generated them
             if share.party_id == own_party_id {
                 continue;
             }
 
+            let has_any_proof = proofs.signed_c2a_proof.is_some()
+                || proofs.signed_c2b_proof.is_some()
+                || !proofs.signed_c3a_proofs.is_empty()
+                || !proofs.signed_c3b_proofs.is_empty();
+
+            if !has_any_proof {
+                no_proof_parties.insert(share.party_id);
+                continue;
+            }
+
+            // Validate proof set completeness against trusted expected counts.
+            // A malicious sender could omit proofs that would fail verification,
+            // so we must check that all expected proofs are present.
+            let is_complete = proofs.signed_c2a_proof.is_some()
+                && proofs.signed_c2b_proof.is_some()
+                && proofs.signed_c3a_proofs.len() == expected_c3a
+                && proofs.signed_c3b_proofs.len() == expected_c3b
+                && share.esi_sss.len() == expected_num_esi;
+
+            if !is_complete {
+                warn!(
+                    "Party {} has incomplete proof set (c2a={}, c2b={}, c3a={}/{}, c3b={}/{}, esi={}/{}), treating as dishonest",
+                    share.party_id,
+                    proofs.signed_c2a_proof.is_some(),
+                    proofs.signed_c2b_proof.is_some(),
+                    proofs.signed_c3a_proofs.len(), expected_c3a,
+                    proofs.signed_c3b_proofs.len(), expected_c3b,
+                    share.esi_sss.len(), expected_num_esi,
+                );
+                incomplete_proof_parties.insert(share.party_id);
+                continue;
+            }
+
+            // Complete proof set — collect for verification
             let mut signed_proofs = Vec::new();
-            if let Some(c2a) = &proofs.signed_c2a_proof {
-                signed_proofs.push(c2a.clone());
-            }
-            if let Some(c2b) = &proofs.signed_c2b_proof {
-                signed_proofs.push(c2b.clone());
-            }
+            // SAFETY: is_complete guarantees c2a and c2b are Some
+            signed_proofs.push(proofs.signed_c2a_proof.clone().unwrap());
+            signed_proofs.push(proofs.signed_c2b_proof.clone().unwrap());
             signed_proofs.extend(proofs.signed_c3a_proofs.iter().cloned());
             signed_proofs.extend(proofs.signed_c3b_proofs.iter().cloned());
 
-            if signed_proofs.is_empty() {
-                // Track parties that provided no proofs
-                no_proof_parties.insert(share.party_id);
-            } else {
-                party_proofs_to_verify.push(PartyProofsToVerify {
-                    sender_party_id: share.party_id,
-                    signed_proofs,
-                });
-            }
+            party_proofs_to_verify.push(PartyProofsToVerify {
+                sender_party_id: share.party_id,
+                signed_proofs,
+            });
         }
 
         // Store shares for use after verification completes
         self.pending_verification_shares = Some(msg.shares);
 
-        if party_proofs_to_verify.is_empty() && no_proof_parties.is_empty() {
-            // No proofs to verify and no missing proofs — all parties trusted (backward compatibility)
+        // Backward compat: only when ALL non-self parties have zero proofs
+        // AND none have incomplete proofs (incomplete proofs are always dishonest)
+        if party_proofs_to_verify.is_empty() && incomplete_proof_parties.is_empty() {
+            if no_proof_parties.is_empty() {
+                info!(
+                    "No C2/C3 proofs to verify for E3 {} — proceeding with all parties",
+                    e3_id
+                );
+                return self.proceed_with_decryption_key_calculation(None, ec);
+            }
             info!(
-                "No C2/C3 proofs to verify for E3 {} — proceeding with all parties",
+                "No C2/C3 proofs from any party for E3 {} — proceeding with all parties (backward compat)",
                 e3_id
             );
             return self.proceed_with_decryption_key_calculation(None, ec);
         }
 
-        // If some parties provided proofs but others didn't, treat the no-proof parties as dishonest
-        if !no_proof_parties.is_empty() {
-            if party_proofs_to_verify.is_empty() {
-                // All parties lack proofs — backward compatibility (no proofs expected)
-                info!(
-                    "No C2/C3 proofs from any party for E3 {} — proceeding with all parties (backward compat)",
-                    e3_id
-                );
-                return self.proceed_with_decryption_key_calculation(None, ec);
-            }
+        // Merge no-proof and incomplete-proof parties — both are dishonest
+        let mut unverified_dishonest: HashSet<u64> = incomplete_proof_parties;
+        unverified_dishonest.extend(no_proof_parties);
+        if !unverified_dishonest.is_empty() {
             warn!(
-                "{} parties provided no C2/C3 proofs for E3 {} — marking as dishonest: {:?}",
-                no_proof_parties.len(),
+                "{} parties have missing/incomplete C2/C3 proofs for E3 {} — marking as dishonest: {:?}",
+                unverified_dishonest.len(),
                 e3_id,
-                no_proof_parties
+                unverified_dishonest
             );
         }
 
-        // Store no-proof parties so we can merge them with verification failures later
-        self.no_proof_dishonest_parties = Some(no_proof_parties);
+        if party_proofs_to_verify.is_empty() {
+            // All non-self parties are dishonest (missing or incomplete proofs), none to verify
+            return self.proceed_with_decryption_key_calculation(Some(unverified_dishonest), ec);
+        }
+
+        // Store dishonest parties so we can merge them with verification failures later
+        self.no_proof_dishonest_parties = Some(unverified_dishonest);
+
+        // Track which party IDs we're sending for verification so we can detect missing results
+        self.expected_verification_parties = Some(
+            party_proofs_to_verify
+                .iter()
+                .map(|p| p.sender_party_id)
+                .collect(),
+        );
 
         info!(
             "Dispatching C2/C3 proof verification for E3 {} ({} parties)",
@@ -1156,7 +1221,11 @@ impl ThresholdKeyshare {
             dishonest_parties.extend(no_proof);
         }
 
+        let expected_parties = self.expected_verification_parties.take();
+        let mut seen_parties: HashSet<u64> = HashSet::new();
+
         for result in &resp.party_results {
+            seen_parties.insert(result.sender_party_id);
             if result.all_verified {
                 info!(
                     "Party {} passed C2/C3 verification for E3 {}",
@@ -1168,6 +1237,19 @@ impl ThresholdKeyshare {
                     result.sender_party_id, e3_id, result.failed_proof_type
                 );
                 dishonest_parties.insert(result.sender_party_id);
+            }
+        }
+
+        // Any party we sent for verification but got no result back is treated as dishonest
+        if let Some(expected) = expected_parties {
+            for party_id in &expected {
+                if !seen_parties.contains(party_id) {
+                    warn!(
+                        "Party {} missing from C2/C3 verification results for E3 {} — treating as dishonest",
+                        party_id, e3_id
+                    );
+                    dishonest_parties.insert(*party_id);
+                }
             }
         }
 
@@ -1187,7 +1269,16 @@ impl ThresholdKeyshare {
                     "Too few honest parties for E3 {} ({} honest < {} threshold) — cannot proceed",
                     e3_id, honest_count, threshold
                 );
-                // TODO: emit E3Failed event
+                if let Err(err) = self.bus.publish(
+                    E3Failed {
+                        e3_id: msg.e3_id,
+                        failed_at_stage: E3Stage::CommitteeFinalized,
+                        reason: FailureReason::InsufficientCommitteeMembers,
+                    },
+                    ec,
+                ) {
+                    error!("Failed to publish E3Failed: {err}");
+                }
                 self.pending_verification_shares = None;
                 return Ok(());
             }
