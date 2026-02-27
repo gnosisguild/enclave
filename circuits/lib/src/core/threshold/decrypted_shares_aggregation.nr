@@ -31,13 +31,14 @@ impl<let L: u32> Configs<L> {
 /// Decrypted Shares Aggregation Circuit (Circuit 7).
 /// Uses BigNum for Q values (works for both insecure and secure parameter sets).
 ///
-/// Verifies:
-/// 0. Each party's decryption share matches the corresponding C6 public `d` commitment
-/// 1. Lagrange interpolation to compute u^{(l)} for each CRT basis
-/// 2. CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
-/// 3. Decoding verification: message = -Q^{-1} * (t * u_global)_Q mod t
-pub struct DecryptedSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32, let BIT_D: u32> {
-    /// Circuit parameters including crypto constants
+/// Combines T+1 public decryption shares (from C6) into the final plaintext via
+/// Lagrange interpolation, CRT reconstruction, and BFV decoding. This is the last
+/// circuit in the Enclave protocol.
+///
+/// Use this variant when Q (the product of all CRT moduli) exceeds 128 bits,
+/// as is the case for cryptographically secure parameter sets. For smaller parameter
+/// sets where Q fits within 128 bits, use DecryptedSharesAggregationModular instead.
+pub struct DecryptedSharesAggregationBigNum<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32> {
     configs: Configs<L>,
 
     /// Public `d` commitments from circuit 6 (one per reconstructing party), same order as `decryption_shares`
@@ -67,7 +68,43 @@ pub struct DecryptedSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u
     crt_quotients: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
 }
 
-impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32, let BIT_D: u32> DecryptedSharesAggregation<MAX_MSG_NON_ZERO_COEFFS, L, T, BIT_NOISE, BIT_D> {
+/// Decryption Share Aggregation Circuit - Modular variant (C7).
+///
+/// Identical verification logic to DecryptedSharesAggregationBigNum, but uses
+/// ModU128 arithmetic for the decoding step instead of BigNum. More efficient
+/// when Q (the product of all CRT moduli) fits within 128 bits, e.g. for smaller
+/// or non-production parameter sets. For cryptographically secure parameter sets
+/// where Q exceeds 128 bits, use DecryptedSharesAggregationBigNum instead.
+pub struct DecryptedSharesAggregationModular<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32> {
+    configs: Configs<L>,
+
+    /// Public decryption shares from T+1 ciphernodes, as produced by C6.
+    /// decryption_shares[party_idx][basis_idx] is party i's share for CRT basis l.
+    /// (public witnesses)
+    decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
+
+    /// Shamir x-coordinates for the T+1 participating parties.
+    /// Must be in strictly increasing order, the sign computation in Lagrange
+    /// interpolation depends on this ordering.
+    /// (public witnesses)
+    party_ids: [Field; T + 1],
+
+    /// Claimed output plaintext polynomial.
+    /// (public witness)
+    message: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
+
+    /// Global decryption value lifted from CRT representation.
+    /// Verified against u^{(l)} via CRT reconstruction check.
+    /// (secret witness)
+    u_global: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
+
+    /// Quotient polynomials witnessing the CRT lift:
+    /// u^{(l)} + crt_quotients[l] * q_l == u_global for each basis l.
+    /// (secret witnesses)
+    crt_quotients: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
+}
+
+impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32> DecryptedSharesAggregationBigNum<MAX_MSG_NON_ZERO_COEFFS, L, T> {
     pub fn new(
         configs: Configs<L>,
         expected_d_commitments: [Field; T + 1],
@@ -180,7 +217,114 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u3
     }
 }
 
-/// Computes all Lagrange coefficients using optimized modular arithmetic
+impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32> DecryptedSharesAggregationModular<MAX_MSG_NON_ZERO_COEFFS, L, T> {
+    pub fn new(
+        configs: Configs<L>,
+        decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
+        party_ids: [Field; T + 1],
+        message: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
+        u_global: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
+        crt_quotients: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
+    ) -> Self {
+        DecryptedSharesAggregationModular {
+            configs,
+            decryption_shares,
+            party_ids,
+            message,
+            u_global,
+            crt_quotients,
+        }
+    }
+
+    /// Executes the decryption share aggregation circuit.
+    ///
+    /// Runs all four verification steps in order: Lagrange coefficient computation,
+    /// interpolation, CRT reconstruction, and decoding.
+    pub fn execute(self) {
+        // Step 1: Compute Lagrange coefficients in-circuit
+        let lagrange_coeffs = compute_all_lagrange_coeffs::<T, L>(self.configs.qis, self.party_ids);
+
+        // Step 2: Compute u^{(l)} for each CRT basis via Lagrange interpolation
+        let u_crts = compute_crt_components::<MAX_MSG_NON_ZERO_COEFFS, L, T>(
+            self.configs.qis,
+            self.decryption_shares,
+            lagrange_coeffs,
+        );
+
+        // Step 3: Verify CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
+        verify_crt_reconstruction::<MAX_MSG_NON_ZERO_COEFFS, L>(
+            self.configs.qis,
+            self.u_global,
+            self.crt_quotients,
+            u_crts,
+        );
+        // Step 4: Verify decoding
+        self.verify_decoding();
+    }
+
+    /// Verifies the BFV decoding step using ModU128 arithmetic.
+    ///
+    /// For each coefficient, computes message = -Q^{-1} * (t * u_global)_Q mod t
+    /// using u128 modular arithmetic. Only valid when Q fits within 128 bits.
+    ///
+    /// Centered representation: if (t * u_global) mod Q >= Q/2, the value is treated
+    /// as negative, flipping the sign of the -Q^{-1} multiplication. Only non-zero
+    /// message coefficients are checked, zero coefficients are unconstrained.
+    fn verify_decoding(self) {
+        let t: Field = self.configs.plaintext_modulus;
+        // Compute Q as product of all CRT moduli
+        let mut q_modulus = 1;
+        for l in 0..L {
+            q_modulus *= self.configs.qis[l];
+        }
+
+        // For centered arithmetic
+        let q_half = q_modulus as u128 / 2;
+
+        for coeff_idx in 0..MAX_MSG_NON_ZERO_COEFFS {
+            // Compute (t * u_global) mod Q using ModU128
+            let q_mod = ModU128::new(q_modulus);
+            let t_mod = ModU128::new(t);
+
+            // Compute (t * u_global) mod Q using modular arithmetic functions
+            let t_times_u_mod_q = q_mod.mul_mod(t, self.u_global.coefficients[coeff_idx]);
+            let needs_centering = (t_times_u_mod_q as u128) > q_half;
+
+            let computed_message = if needs_centering {
+                // (t*u) mod Q >= Q/2: centered value is negative
+                // -Q^{-1} * (Q - (t*u) mod Q) mod t
+                let centered_positive = q_modulus - t_times_u_mod_q;
+                let centered_positive_mod_t = t_mod.reduce_mod(centered_positive);
+
+                t_mod.mul_mod(self.configs.q_inverse_mod_t, centered_positive_mod_t)
+            } else {
+                // (t*u) mod Q < Q/2: centered value is positive
+                // t - (-Q^{-1} * (t*u) mod Q mod t)
+                let t_times_u_mod_t = t_mod.reduce_mod(t_times_u_mod_q);
+                let product = t_mod.mul_mod(self.configs.q_inverse_mod_t, t_times_u_mod_t);
+                if product == 0 {
+                    0
+                } else {
+                    t - product
+                }
+            };
+
+            // Verify: only check non-zero coefficients
+            if self.message.coefficients[coeff_idx] != 0 {
+                assert(computed_message == self.message.coefficients[coeff_idx]);
+            }
+        }
+    }
+}
+
+/// Computes all Lagrange basis coefficients L_i(0) for each CRT basis.
+///
+/// For each CRT basis l and each party i, computes:
+///   L_i(0) = PROD_{j!=i} (-x_j) / (x_i - x_j)  mod q_l
+///
+/// IMPORTANT: party_ids must be in strictly increasing order. The sign of each
+/// Lagrange coefficient depends on this ordering, out-of-order IDs will silently
+/// produce incorrect signs and produce wrong decryption results.
 pub fn compute_all_lagrange_coeffs<let T: u32, let L: u32>(
     qis: [Field; L],
     party_ids: [Field; T + 1],
