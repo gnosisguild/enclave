@@ -31,7 +31,7 @@ flowchart TD
     linkStyle 2 stroke:#808080,stroke-width:2px
 ```
 
-### Metadata
+## Metadata
 
 - **Phase**: P1 (DKG).
 - **Runs**: (N_PARTIES -1) × Ciphernode (after threshold key generation in C1).
