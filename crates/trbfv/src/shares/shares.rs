@@ -21,6 +21,10 @@ impl SharedSecret {
         Self { moduli_data }
     }
 
+    pub fn moduli_data(&self) -> &Vec<Array2<u64>> {
+        &self.moduli_data
+    }
+
     /// Extract one party's complete share across all moduli.
     pub fn extract_party_share(&self, party_id: usize) -> Result<ShamirShare> {
         let Some(first) = self.moduli_data.get(0) else {

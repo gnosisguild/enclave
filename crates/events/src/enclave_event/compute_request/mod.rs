@@ -83,6 +83,10 @@ impl ToString for ComputeRequest {
             ComputeRequestKind::Zk(req) => match req {
                 ZkRequest::PkBfv(_) => "ZkPkBfv",
                 ZkRequest::PkGeneration(_) => "ZkPkGeneration",
+                ZkRequest::ShareComputation(_) => "ZkShareComputation",
+                ZkRequest::ShareEncryption(_) => "ZkShareEncryption",
+                ZkRequest::DkgShareDecryption(_) => "ZkDkgShareDecryption",
+                ZkRequest::VerifyShareProofs(_) => "ZkVerifyShareProofs",
             },
         }
         .to_string()

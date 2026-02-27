@@ -21,7 +21,6 @@ export interface E3TimeoutConfig {
   dkgWindow: number;
   computeWindow: number;
   decryptionWindow: number;
-  gracePeriod: number;
 }
 
 /**

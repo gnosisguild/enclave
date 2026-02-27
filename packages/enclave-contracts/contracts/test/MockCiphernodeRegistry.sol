@@ -10,6 +10,20 @@ import { IEnclave } from "../interfaces/IEnclave.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 
 contract MockCiphernodeRegistry is ICiphernodeRegistry {
+    /// @notice Configurable committee members per E3 for testing
+    mapping(uint256 e3Id => address[] nodes) private _committeeNodes;
+
+    /// @notice Set committee members for an E3 (test helper)
+    function setCommitteeNodes(
+        uint256 e3Id,
+        address[] calldata nodes
+    ) external {
+        delete _committeeNodes[e3Id];
+        for (uint256 i = 0; i < nodes.length; i++) {
+            _committeeNodes[e3Id].push(nodes[i]);
+        }
+    }
+
     function requestCommittee(
         uint256,
         uint256,
@@ -52,10 +66,9 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     ) external pure {} // solhint-disable-line no-empty-blocks
 
     function getCommitteeNodes(
-        uint256
-    ) external pure returns (address[] memory) {
-        address[] memory nodes = new address[](0);
-        return nodes;
+        uint256 e3Id
+    ) external view returns (address[] memory) {
+        return _committeeNodes[e3Id];
     }
 
     function root() external pure returns (uint256) {
@@ -93,6 +106,49 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 
     function isOpen(uint256) external pure returns (bool) {
         return false;
+    }
+
+    // solhint-disable-next-line no-empty-blocks
+    function expelCommitteeMember(
+        uint256,
+        address,
+        bytes32
+    ) external pure returns (uint256, uint32) {
+        return (0, 0);
+    }
+
+    function isCommitteeMemberActive(
+        uint256 e3Id,
+        address node
+    ) external view returns (bool) {
+        address[] storage nodes = _committeeNodes[e3Id];
+        for (uint256 i = 0; i < nodes.length; i++) {
+            if (nodes[i] == node) return true;
+        }
+        return false;
+    }
+
+    function isCommitteeMember(
+        uint256 e3Id,
+        address node
+    ) external view returns (bool) {
+        address[] storage nodes = _committeeNodes[e3Id];
+        for (uint256 i = 0; i < nodes.length; i++) {
+            if (nodes[i] == node) return true;
+        }
+        return false;
+    }
+
+    function getActiveCommitteeNodes(
+        uint256
+    ) external pure returns (address[] memory) {
+        return new address[](0);
+    }
+
+    function getCommitteeViability(
+        uint256
+    ) external pure returns (uint256, uint32, uint32, bool) {
+        return (0, 0, 0, false);
     }
 }
 
@@ -178,5 +234,37 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
 
     function isOpen(uint256) external pure returns (bool) {
         return false;
+    }
+
+    // solhint-disable-next-line no-empty-blocks
+    function expelCommitteeMember(
+        uint256,
+        address,
+        bytes32
+    ) external pure returns (uint256, uint32) {
+        return (0, 0);
+    }
+
+    function isCommitteeMemberActive(
+        uint256,
+        address
+    ) external pure returns (bool) {
+        return false;
+    }
+
+    function isCommitteeMember(uint256, address) external pure returns (bool) {
+        return false;
+    }
+
+    function getActiveCommitteeNodes(
+        uint256
+    ) external pure returns (address[] memory) {
+        return new address[](0);
+    }
+
+    function getCommitteeViability(
+        uint256
+    ) external pure returns (uint256, uint32, uint32, bool) {
+        return (0, 0, 0, false);
     }
 }

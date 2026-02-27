@@ -8,7 +8,8 @@ use crate::core::threshold::decrypted_shares_aggregation::Configs as DecryptedSh
 use crate::core::threshold::pk_aggregation::Configs as PkAggregationConfigs;
 use crate::core::threshold::pk_generation::Configs as PkGenerationConfigs;
 use crate::core::threshold::share_decryption::Configs as ShareDecryptionConfigs;
-use crate::core::threshold::user_data_encryption::Configs as UserDataEncryptionConfigs;
+use crate::core::threshold::user_data_encryption_ct0::Configs as UserDataEncryptionCt0Configs;
+use crate::core::threshold::user_data_encryption_ct1::Configs as UserDataEncryptionCt1Configs;
 use crate::math::polynomial::Polynomial;
 
 /// Threshold BFV parameter set search defaults configurations.
@@ -32881,20 +32882,24 @@ pub global USER_DATA_ENCRYPTION_P1_BOUNDS: [Field; L] = [4096, 4096, 4096, 4096]
 pub global USER_DATA_ENCRYPTION_P2_BOUNDS: [Field; L] =
     [1125899911102464, 2251799813881856, 2251799815716864, 2251799817289728];
 
-pub global USER_DATA_ENCRYPTION_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfigs::new(
+pub global USER_DATA_ENCRYPTION_CT0_CONFIGS: UserDataEncryptionCt0Configs<N, L> = UserDataEncryptionCt0Configs::new(
     QIS,
     USER_DATA_ENCRYPTION_K0IS,
-    USER_DATA_ENCRYPTION_PK_BOUNDS,
     USER_DATA_ENCRYPTION_E0_BOUND,
-    USER_DATA_ENCRYPTION_E1_BOUND,
     USER_DATA_ENCRYPTION_U_BOUND,
     USER_DATA_ENCRYPTION_R1_LOW_BOUNDS,
     USER_DATA_ENCRYPTION_R1_UP_BOUNDS,
     USER_DATA_ENCRYPTION_R2_BOUNDS,
-    USER_DATA_ENCRYPTION_P1_BOUNDS,
-    USER_DATA_ENCRYPTION_P2_BOUNDS,
     USER_DATA_ENCRYPTION_K1_LOW_BOUND,
     USER_DATA_ENCRYPTION_K1_UP_BOUND,
+);
+
+pub global USER_DATA_ENCRYPTION_CT1_CONFIGS: UserDataEncryptionCt1Configs<N, L> = UserDataEncryptionCt1Configs::new(
+    QIS,
+    USER_DATA_ENCRYPTION_E1_BOUND,
+    USER_DATA_ENCRYPTION_U_BOUND,
+    USER_DATA_ENCRYPTION_P1_BOUNDS,
+    USER_DATA_ENCRYPTION_P2_BOUNDS,
 );
 
 /************************************
@@ -32911,7 +32916,7 @@ pub global THRESHOLD_SHARE_DECRYPTION_BIT_R2: u32 = 52;
 pub global THRESHOLD_SHARE_DECRYPTION_BIT_D: u32 = 52;
 
 pub global THRESHOLD_SHARE_DECRYPTION_R1_BOUNDS: [Field; L] =
-    [4611686035875690497, 9223372037660080129, 9223372045176272897, 9223372051618723841];
+    [4611686035875690498, 9223372037660080130, 9223372045176272898, 9223372051618723842];
 pub global THRESHOLD_SHARE_DECRYPTION_R2_BOUNDS: [Field; L] =
     [1125899911102464, 2251799813881856, 2251799815716864, 2251799817289728];
 

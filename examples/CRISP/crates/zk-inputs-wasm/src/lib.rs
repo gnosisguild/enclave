@@ -8,28 +8,9 @@
 //!
 //! This crate provides JavaScript bindings for the CRISP ZK inputs generator using WASM.
 
-use e3_polynomial::CrtPolynomial;
 use js_sys;
-use num_bigint::BigInt;
 use wasm_bindgen::prelude::*;
 use zk_inputs::ZKInputsGenerator as CoreZKInputsGenerator;
-
-/// Converts a JsValue (string, number, or JS BigInt) to a string suitable for BigInt parsing.
-/// Circuit inputs may serialize coefficients as JSON numbers when they fit in i64,
-/// or pass them as JavaScript BigInt values.
-fn js_value_to_bigint_string(val: JsValue) -> Option<String> {
-    if let Some(s) = val.as_string() {
-        return Some(s);
-    }
-    if let Some(n) = val.as_f64() {
-        return Some(format!("{:.0}", n));
-    }
-    // JS BigInt: convert via js_sys::BigInt::toString(10)
-    val.dyn_into::<js_sys::BigInt>()
-        .ok()
-        .and_then(|b| b.to_string(10).ok())
-        .and_then(|js| JsValue::from(js).as_string())
-}
 
 /// JavaScript-compatible CRISP ZK inputs generator.
 #[wasm_bindgen]
@@ -136,72 +117,25 @@ impl ZKInputsGenerator {
         }
     }
 
-    /// Generate a public key from JavaScript.
-    #[wasm_bindgen(js_name = "generatePublicKey")]
-    pub fn generate_public_key(&self) -> Result<Vec<u8>, JsValue> {
-        match self.generator.generate_public_key() {
-            Ok(public_key_bytes) => Ok(public_key_bytes),
+    /// Generate a public/secret key pair from JavaScript.
+    #[wasm_bindgen(js_name = "generateKeys")]
+    pub fn generate_keys(&self) -> Result<JsValue, JsValue> {
+        match self.generator.generate_keys() {
+            Ok((secret_key, public_key)) => {
+                let result = js_sys::Object::new();
+
+                // Set secretKey as Uint8Array
+                let secret_key_array = js_sys::Uint8Array::from(&secret_key[..]);
+                js_sys::Reflect::set(&result, &"secretKey".into(), &secret_key_array.into())?;
+
+                // Set publicKey as Uint8Array
+                let public_key_array = js_sys::Uint8Array::from(&public_key[..]);
+                js_sys::Reflect::set(&result, &"publicKey".into(), &public_key_array.into())?;
+
+                Ok(result.into())
+            }
             Err(e) => Err(JsValue::from_str(&e.to_string())),
         }
-    }
-
-    /// Compute the commitment to a set of ciphertext polynomials from JavaScript.
-    #[wasm_bindgen(js_name = "computeCiphertextCommitment")]
-    pub fn compute_ciphertext_commitment(
-        &self,
-        ct0is: JsValue,
-        ct1is: JsValue,
-    ) -> Result<String, JsValue> {
-        // Parse nested arrays: ct0is and ct1is are arrays of arrays (one array per CRT limb).
-        // Coefficients may be strings or numbers (JSON can emit numbers when values fit in i64).
-        let ct0is_array: js_sys::Array = js_sys::Array::from(&ct0is);
-        let ct1is_array: js_sys::Array = js_sys::Array::from(&ct1is);
-
-        let mut ct0is_vec: Vec<Vec<BigInt>> = Vec::new();
-        for i in 0..ct0is_array.length() {
-            let inner_array = ct0is_array
-                .get(i)
-                .dyn_into::<js_sys::Array>()
-                .map_err(|_| JsValue::from_str("Expected array of arrays for ct0is"))?;
-
-            let mut coefficients: Vec<BigInt> = Vec::new();
-            for j in 0..inner_array.length() {
-                let s = js_value_to_bigint_string(inner_array.get(j))
-                    .ok_or_else(|| JsValue::from_str("Expected string, number, or BigInt in inner array"))?;
-                let bigint = s
-                    .parse::<BigInt>()
-                    .map_err(|e| JsValue::from_str(&format!("Failed to parse BigInt: {}", e)))?;
-                coefficients.push(bigint);
-            }
-            ct0is_vec.push(coefficients);
-        }
-
-        let mut ct1is_vec: Vec<Vec<BigInt>> = Vec::new();
-        for i in 0..ct1is_array.length() {
-            let inner_array = ct1is_array
-                .get(i)
-                .dyn_into::<js_sys::Array>()
-                .map_err(|_| JsValue::from_str("Expected array of arrays for ct1is"))?;
-
-            let mut coefficients: Vec<BigInt> = Vec::new();
-            for j in 0..inner_array.length() {
-                let s = js_value_to_bigint_string(inner_array.get(j))
-                    .ok_or_else(|| JsValue::from_str("Expected string, number, or BigInt in inner array"))?;
-                let bigint = s
-                    .parse::<BigInt>()
-                    .map_err(|e| JsValue::from_str(&format!("Failed to parse BigInt: {}", e)))?;
-                coefficients.push(bigint);
-            }
-            ct1is_vec.push(coefficients);
-        }
-
-        let ct0 = CrtPolynomial::from_bigint_vectors(ct0is_vec);
-        let ct1 = CrtPolynomial::from_bigint_vectors(ct1is_vec);
-
-        Ok(self
-            .generator
-            .compute_ciphertext_commitment(&ct0, &ct1)
-            .to_string())
     }
 
     /// Encrypt a vote from JavaScript.
@@ -211,6 +145,19 @@ impl ZKInputsGenerator {
 
         match self.generator.encrypt_vote(public_key, vote_vec) {
             Ok(ciphertext_bytes) => Ok(ciphertext_bytes),
+            Err(e) => Err(JsValue::from_str(&e.to_string())),
+        }
+    }
+
+    /// Decrypt a vote from JavaScript.
+    #[wasm_bindgen(js_name = "decryptVote")]
+    pub fn decrypt_vote(&self, secret_key: &[u8], ciphertext: &[u8]) -> Result<Vec<i64>, JsValue> {
+        match self.generator.decrypt_vote(secret_key, ciphertext) {
+            Ok(vote_vec) => {
+                // Convert Vec<u64> to Vec<i64> for JavaScript compatibility
+                let vote_i64: Vec<i64> = vote_vec.into_iter().map(|v| v as i64).collect();
+                Ok(vote_i64)
+            }
             Err(e) => Err(JsValue::from_str(&e.to_string())),
         }
     }
@@ -264,6 +211,36 @@ mod tests {
 
     wasm_bindgen_test_configure!(run_in_browser);
 
+    // Regular Rust tests that can run with `cargo test`
+    // These test the underlying Rust functionality directly
+    #[test]
+    fn test_rust_generate_keys() {
+        use zk_inputs::ZKInputsGenerator;
+        let generator = ZKInputsGenerator::with_defaults();
+        let result = generator.generate_keys();
+        assert!(result.is_ok());
+        let (secret_key, public_key) = result.unwrap();
+        assert!(!secret_key.is_empty());
+        assert!(!public_key.is_empty());
+    }
+
+    #[test]
+    fn test_rust_encrypt_decrypt_roundtrip() {
+        use zk_inputs::ZKInputsGenerator;
+        let generator = ZKInputsGenerator::with_defaults();
+        let (secret_key, public_key) = generator.generate_keys().unwrap();
+
+        let vote: Vec<u64> = (0..DEFAULT_DEGREE).map(|i| (i % 2) as u64).collect();
+
+        // Encrypt
+        let ciphertext = generator.encrypt_vote(&public_key, vote.clone()).unwrap();
+        assert!(!ciphertext.is_empty());
+
+        // Decrypt
+        let decrypted = generator.decrypt_vote(&secret_key, &ciphertext).unwrap();
+        assert_eq!(decrypted, vote);
+    }
+
     /// Helper function to create a vote vector with alternating 0s and 1s (deterministic).
     fn create_vote_vector() -> Vec<i64> {
         (0..DEFAULT_DEGREE).map(|i| (i % 2) as i64).collect()
@@ -273,7 +250,19 @@ mod tests {
     fn test_js_inputs_generation_with_defaults() {
         // Create generator with default parameters.
         let generator = ZKInputsGenerator::with_defaults().unwrap();
-        let public_key = generator.generate_public_key().unwrap();
+        let keys_obj = generator.generate_keys().unwrap();
+
+        // Extract secretKey and publicKey from the JavaScript object
+        let secret_key_js = js_sys::Reflect::get(&keys_obj, &"secretKey".into()).unwrap();
+        let public_key_js = js_sys::Reflect::get(&keys_obj, &"publicKey".into()).unwrap();
+
+        let secret_key_array = secret_key_js.dyn_into::<js_sys::Uint8Array>().unwrap();
+        let public_key_array = public_key_js.dyn_into::<js_sys::Uint8Array>().unwrap();
+
+        // Convert Uint8Array to Vec<u8>
+        let _secret_key: Vec<u8> = secret_key_array.to_vec();
+        let public_key: Vec<u8> = public_key_array.to_vec();
+
         let vote = create_vote_vector();
         let old_ciphertext = generator.encrypt_vote(&public_key, vote.clone()).unwrap();
         let result = generator.generate_inputs(&old_ciphertext, &public_key, vote);
@@ -310,7 +299,10 @@ mod tests {
 
         // Create generator with custom parameters.
         let generator = ZKInputsGenerator::new(degree, plaintext_modulus, moduli).unwrap();
-        let public_key = generator.generate_public_key().unwrap();
+        let keys_obj = generator.generate_keys().unwrap();
+        let public_key_js = js_sys::Reflect::get(&keys_obj, &"publicKey".into()).unwrap();
+        let public_key_array = public_key_js.dyn_into::<js_sys::Uint8Array>().unwrap();
+        let public_key: Vec<u8> = public_key_array.to_vec();
         let vote = create_vote_vector();
         let old_ciphertext = generator.encrypt_vote(&public_key, vote.clone()).unwrap();
         let result = generator.generate_inputs(&old_ciphertext, &public_key, vote);

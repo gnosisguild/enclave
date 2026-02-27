@@ -18,7 +18,7 @@ rm -rf $SIGNAL_FILE
 trap cleanup INT TERM
 
 echo "Waiting for local evm node..."
-pnpm wait-on http://localhost:8545
+pnpm wait-on tcp:localhost:8545
 
 # nuke past installations as we are adding these nodes to the contract
 rm -rf .enclave/data
@@ -54,27 +54,12 @@ CN5=$(grep -A 1 'cn5:' enclave.config.yaml | grep 'address:' | sed 's/.*address:
 
 # Add ciphernodes using variables from config.sh
 pnpm run deploy && sleep 2
+
 pnpm hardhat ciphernode:admin-add --ciphernode-address $CN1 --network localhost
 pnpm hardhat ciphernode:admin-add --ciphernode-address $CN2 --network localhost
 pnpm hardhat ciphernode:admin-add --ciphernode-address $CN3 --network localhost
 pnpm hardhat ciphernode:admin-add --ciphernode-address $CN4 --network localhost
 pnpm hardhat ciphernode:admin-add --ciphernode-address $CN5 --network localhost
-
-# Function to send RPC request.
-send_rpc() {
-    local method="$1"
-    local params="$2"
-    curl -X POST \
-        -H "Content-Type: application/json" \
-        -d "{\"jsonrpc\":\"2.0\",\"method\":\"$method\",\"params\":$params,\"id\":1}" \
-        http://localhost:8545 > /dev/null 2>&1
-}
-
-# Configure mining settings for development environment
-# Disable automatic mining and set interval mining to 1 second for predictable block times.
-send_rpc "evm_setAutomine" "[false]"
-send_rpc "evm_increaseTime" "[10]"
-send_rpc "evm_setIntervalMining" "[1000]"
 
 touch $SIGNAL_FILE
 

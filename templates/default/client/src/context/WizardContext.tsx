@@ -13,6 +13,7 @@ import { getEnclaveSDKConfig } from '@/utils/sdk-config'
 // TYPES & ENUMS
 // ============================================================================
 
+// eslint-disable-next-line react-refresh/only-export-components
 export enum WizardStep {
   CONNECT_WALLET = 1,
   REQUEST_COMPUTATION = 2,
@@ -31,6 +32,17 @@ export interface E3State {
   expiresAt: bigint | null
   plaintextOutput: string | null
   hasPlaintextOutput: boolean
+}
+
+const INITIAL_E3_STATE: E3State = {
+  id: null,
+  isRequested: false,
+  isCommitteePublished: false,
+  isActivated: false,
+  publicKey: null,
+  expiresAt: null,
+  plaintextOutput: null,
+  hasPlaintextOutput: false,
 }
 
 interface WizardContextType {
@@ -61,6 +73,7 @@ interface WizardContextType {
 
 const WizardContext = createContext<WizardContextType | undefined>(undefined)
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useWizard = () => {
   const context = useContext(WizardContext)
   if (!context) {
@@ -92,44 +105,33 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children }) => {
   const [inputPublishError, setInputPublishError] = useState<string | null>(null)
   const [inputPublishSuccess, setInputPublishSuccess] = useState<boolean>(false)
   const [result, setResult] = useState<number | null>(null)
-  const [e3State, setE3State] = useState<E3State>({
-    id: null,
-    isRequested: false,
-    isCommitteePublished: false,
-    isActivated: false,
-    publicKey: null,
-    expiresAt: null,
-    plaintextOutput: null,
-    hasPlaintextOutput: false,
-  })
+  const [e3State, setE3State] = useState<E3State>(INITIAL_E3_STATE)
 
-  // Auto-advance steps based on state.
-  useEffect(() => {
-    if (!isConnected) {
-      setCurrentStep(WizardStep.CONNECT_WALLET)
-    } else if (sdk.isInitialized && currentStep === WizardStep.CONNECT_WALLET) {
-      setCurrentStep(WizardStep.REQUEST_COMPUTATION)
-    }
-  }, [isConnected, sdk.isInitialized, currentStep])
-
-  const handleReset = useCallback(() => {
-    setCurrentStep(WizardStep.CONNECT_WALLET)
+  const resetWizardState = useCallback((step: WizardStep) => {
+    setCurrentStep(step)
     setSubmittedInputs(null)
     setLastTransactionHash(undefined)
     setInputPublishError(null)
     setInputPublishSuccess(false)
     setResult(null)
-    setE3State({
-      id: null,
-      isRequested: false,
-      isCommitteePublished: false,
-      isActivated: false,
-      publicKey: null,
-      expiresAt: null,
-      plaintextOutput: null,
-      hasPlaintextOutput: false,
-    })
+    setE3State(INITIAL_E3_STATE)
   }, [])
+
+  // Auto-advance steps based on connection & SDK state.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!isConnected) {
+      resetWizardState(WizardStep.CONNECT_WALLET)
+    } else if (sdk.isInitialized && currentStep === WizardStep.CONNECT_WALLET) {
+      setCurrentStep(WizardStep.REQUEST_COMPUTATION)
+    }
+  }, [isConnected, sdk.isInitialized, currentStep, resetWizardState])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const handleReset = useCallback(() => {
+    const step = isConnected && sdk.isInitialized ? WizardStep.REQUEST_COMPUTATION : WizardStep.CONNECT_WALLET
+    resetWizardState(step)
+  }, [isConnected, sdk.isInitialized, resetWizardState])
 
   const handleTryAgain = useCallback(() => {
     setCurrentStep(WizardStep.ENTER_INPUTS)

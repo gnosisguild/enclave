@@ -178,6 +178,25 @@
         {
           "indexed": true,
           "internalType": "address",
+          "name": "distributor",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "authorized",
+          "type": "bool"
+        }
+      ],
+      "name": "RewardDistributorUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
           "name": "to",
           "type": "address"
         },
@@ -592,6 +611,24 @@
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "redirectSlashedTicketFunds",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "registerOperator",
       "outputs": [],
@@ -607,6 +644,19 @@
         }
       ],
       "name": "removeTicketBalance",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "distributor",
+          "type": "address"
+        }
+      ],
+      "name": "revokeRewardDistributor",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -796,7 +846,13 @@
         }
       ],
       "name": "slashTicketBalance",
-      "outputs": [],
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "actualAmount",
+          "type": "uint256"
+        }
+      ],
       "stateMutability": "nonpayable",
       "type": "function"
     },
@@ -890,5 +946,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IBondingRegistry.sol",
-  "buildInfoId": "solc-0_8_28-e60a5d7c133605edcf61acdd5ba43ab44ee0928e"
+  "buildInfoId": "solc-0_8_28-8c7470711e670529b6d5512dcaf5896399b39260"
 }

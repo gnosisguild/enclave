@@ -26,7 +26,6 @@ const DEFAULT_TIMEOUT_CONFIG = {
   dkgWindow: 7200,
   computeWindow: 86400,
   decryptionWindow: 3600,
-  gracePeriod: 600,
 };
 
 /**
@@ -101,18 +100,27 @@ export const deployEnclave = async (withMocks?: boolean) => {
   console.log("Deploying SlashingManager...");
   const { slashingManager } = await deployAndSaveSlashingManager({
     admin: ownerAddress,
-    bondingRegistry: addressOne,
     hre,
   });
   const slashingManagerAddress = await slashingManager.getAddress();
   console.log("SlashingManager deployed to:", slashingManagerAddress);
+
+  console.log("Deploying CiphernodeRegistry...");
+  const { ciphernodeRegistry } = await deployAndSaveCiphernodeRegistryOwnable({
+    poseidonT3Address: poseidonT3,
+    owner: ownerAddress,
+    submissionWindow: SORTITION_SUBMISSION_WINDOW,
+    hre,
+  });
+  const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
+  console.log("CiphernodeRegistry deployed to:", ciphernodeRegistryAddress);
 
   console.log("Deploying BondingRegistry...");
   const { bondingRegistry } = await deployAndSaveBondingRegistry({
     owner: ownerAddress,
     ticketToken: enclaveTicketTokenAddress,
     licenseToken: enclaveTokenAddress,
-    registry: addressOne,
+    registry: ciphernodeRegistryAddress,
     slashedFundsTreasury: ownerAddress,
     ticketPrice: ethers.parseUnits("10", 6).toString(),
     licenseRequiredBond: ethers.parseEther("100").toString(),
@@ -122,17 +130,6 @@ export const deployEnclave = async (withMocks?: boolean) => {
   });
   const bondingRegistryAddress = await bondingRegistry.getAddress();
   console.log("BondingRegistry deployed to:", bondingRegistryAddress);
-
-  console.log("Deploying CiphernodeRegistry...");
-  const { ciphernodeRegistry } = await deployAndSaveCiphernodeRegistryOwnable({
-    poseidonT3Address: poseidonT3,
-    enclaveAddress: addressOne,
-    owner: ownerAddress,
-    submissionWindow: SORTITION_SUBMISSION_WINDOW,
-    hre,
-  });
-  const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
-  console.log("CiphernodeRegistry deployed to:", ciphernodeRegistryAddress);
 
   console.log("Deploying Enclave...");
   const { enclave } = await deployAndSaveEnclave({
@@ -186,11 +183,26 @@ export const deployEnclave = async (withMocks?: boolean) => {
   console.log("Setting CiphernodeRegistry address in BondingRegistry...");
   await bondingRegistry.setRegistry(ciphernodeRegistryAddress);
 
+  console.log("Setting Enclave address in SlashingManager...");
+  await slashingManager.setEnclave(enclaveAddress);
+
   console.log("Setting BondingRegistry address in SlashingManager...");
   await slashingManager.setBondingRegistry(bondingRegistryAddress);
 
+  console.log("Setting CiphernodeRegistry address in SlashingManager...");
+  await slashingManager.setCiphernodeRegistry(ciphernodeRegistryAddress);
+
+  console.log("Setting E3RefundManager address in SlashingManager...");
+  await slashingManager.setE3RefundManager(e3RefundManagerAddress);
+
+  console.log("Setting SlashingManager address in Enclave...");
+  await enclave.setSlashingManager(slashingManagerAddress);
+
   console.log("Setting SlashingManager address in BondingRegistry...");
   await bondingRegistry.setSlashingManager(slashingManagerAddress);
+
+  console.log("Setting SlashingManager address in CiphernodeRegistry...");
+  await ciphernodeRegistry.setSlashingManager(slashingManagerAddress);
 
   console.log("Setting Enclave as reward distributor in BondingRegistry...");
   await bondingRegistry.setRewardDistributor(enclaveAddress);

@@ -6,7 +6,7 @@
 
 import {
   hashLeaf,
-  generatePublicKey,
+  generateBFVKeys,
   SIGNATURE_MESSAGE,
   generateVoteProof,
   getAddressFromSignature,
@@ -18,7 +18,8 @@ import {
 import { expect } from 'chai'
 import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, ethers } from './utils'
 
-let publicKey = generatePublicKey()
+let keys = generateBFVKeys()
+let publicKey = keys.publicKey
 
 describe('CRISP Contracts', function () {
   describe('decode tally', () => {
@@ -43,12 +44,12 @@ describe('CRISP Contracts', function () {
   describe('validate input', () => {
     it('should verify the proof correctly with the crisp verifier', async function () {
       // It needs some time to generate the proof.
-      this.timeout(60000)
+      this.timeout(300000)
 
       const honkVerifier = await deployHonkVerifier()
       const [signer] = await ethers.getSigners()
 
-      const vote = [10n, 0n]
+      const vote = [10, 0]
       const balance = 100n
       const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
       const address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
@@ -71,7 +72,7 @@ describe('CRISP Contracts', function () {
 
     it('should verify the proof for a vote mask', async function () {
       // It needs some time to generate the proof.
-      this.timeout(60000)
+      this.timeout(300000)
 
       const honkVerifier = await deployHonkVerifier()
       const [signer] = await ethers.getSigners()
@@ -96,7 +97,7 @@ describe('CRISP Contracts', function () {
 
     it('should validate input correctly', async function () {
       // It needs some time to generate the proof.
-      this.timeout(60000)
+      this.timeout(300000)
 
       const mockEnclave = await deployMockEnclave()
       const crispProgram = await deployCRISPProgram({ mockEnclave })
@@ -107,7 +108,7 @@ describe('CRISP Contracts', function () {
 
       await mockEnclave.request(await crispProgram.getAddress())
 
-      const vote = [10n, 0n]
+      const vote = [10, 0]
       const balance = 100n
       const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
       const address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
@@ -124,7 +125,7 @@ describe('CRISP Contracts', function () {
         slotAddress: address,
       })
 
-      await mockEnclave.setCommitteePublicKey(proof.publicInputs[1])
+      await mockEnclave.setCommitteePublicKey(proof.publicInputs[6])
 
       const encodedProof = encodeSolidityProof(proof)
 

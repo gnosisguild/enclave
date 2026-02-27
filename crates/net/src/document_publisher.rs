@@ -15,10 +15,11 @@ use anyhow::Context;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
-    prelude::*, trap, trap_fut, BusHandle, CiphernodeSelected, CorrelationId, DocumentKind,
-    DocumentMeta, DocumentReceived, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData,
-    EncryptionKeyCreated, EncryptionKeyReceived, Event, EventContext, EventSource, EventType,
-    Filter, PartyId, PublishDocumentRequested, Sequenced, ThresholdShareCreated, TypedEvent,
+    prelude::*, trap, trap_fut, BusHandle, CiphernodeSelected, CorrelationId, DecryptionKeyShared,
+    DocumentKind, DocumentMeta, DocumentReceived, E3RequestComplete, E3id, EType, EnclaveEvent,
+    EnclaveEventData, EncryptionKeyCreated, EncryptionKeyReceived, Event, EventContext,
+    EventSource, EventType, Filter, PartyId, PublishDocumentRequested, Sequenced,
+    ThresholdShareCreated, TypedEvent,
 };
 use e3_utils::ArcBytes;
 use e3_utils::NotifySync;
@@ -85,6 +86,7 @@ impl DocumentPublisher {
             EnclaveEventData::PublishDocumentRequested(_) => true,
             EnclaveEventData::ThresholdShareCreated(_) => true,
             EnclaveEventData::EncryptionKeyCreated(_) => true,
+            EnclaveEventData::DecryptionKeyShared(_) => true,
             _ => false,
         }
     }
@@ -430,6 +432,7 @@ pub struct EventConverter {
 enum ReceivableDocument {
     ThresholdShareCreated(ThresholdShareCreated),
     EncryptionKeyCreated(EncryptionKeyCreated),
+    DecryptionKeyShared(DecryptionKeyShared),
 }
 
 impl ReceivableDocument {
@@ -451,6 +454,7 @@ impl EventConverter {
         let addr = Self::new(bus).start();
         bus.subscribe(EventType::ThresholdShareCreated, addr.clone().into());
         bus.subscribe(EventType::EncryptionKeyCreated, addr.clone().into());
+        bus.subscribe(EventType::DecryptionKeyShared, addr.clone().into());
         bus.subscribe(EventType::DocumentReceived, addr.clone().into());
         addr
     }
@@ -517,6 +521,20 @@ impl EventConverter {
         Ok(())
     }
 
+    fn handle_decryption_key_shared(&self, msg: TypedEvent<DecryptionKeyShared>) -> Result<()> {
+        let (msg, ctx) = msg.into_components();
+        if msg.external {
+            return Ok(());
+        }
+
+        let meta = DocumentMeta::new(msg.e3_id.clone(), DocumentKind::TrBFV, vec![], None);
+        let receivable = ReceivableDocument::DecryptionKeyShared(msg);
+        let value = ArcBytes::from_bytes(&receivable.to_bytes()?);
+        self.bus
+            .publish(PublishDocumentRequested::new(meta, value), ctx)?;
+        Ok(())
+    }
+
     /// Convert received document to internal events.
     /// Note: Filtering already happened in DocumentPublisher before DHT fetch.
     fn handle_document_received(&self, msg: TypedEvent<DocumentReceived>) -> Result<()> {
@@ -535,6 +553,10 @@ impl EventConverter {
                         e3_id: evt.e3_id,
                         share: evt.share,
                         target_party_id: evt.target_party_id,
+                        signed_c2a_proof: evt.signed_c2a_proof,
+                        signed_c2b_proof: evt.signed_c2b_proof,
+                        signed_c3a_proofs: evt.signed_c3a_proofs,
+                        signed_c3b_proofs: evt.signed_c3b_proofs,
                     },
                     ctx.clone(),
                 )?;
@@ -548,6 +570,16 @@ impl EventConverter {
                     EncryptionKeyReceived {
                         e3_id: evt.e3_id,
                         key: evt.key,
+                    },
+                    ctx,
+                )?;
+            }
+            ReceivableDocument::DecryptionKeyShared(evt) => {
+                debug!("Received DecryptionKeyShared from party {}", evt.party_id);
+                self.bus.publish(
+                    DecryptionKeyShared {
+                        external: true,
+                        ..evt
                     },
                     ctx,
                 )?;
@@ -570,6 +602,9 @@ impl Handler<EnclaveEvent> for EventConverter {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::EncryptionKeyCreated(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::DecryptionKeyShared(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::DocumentReceived(data) => {
@@ -606,6 +641,21 @@ impl Handler<TypedEvent<EncryptionKeyCreated>> for EventConverter {
             EType::DocumentPublishing,
             &self.bus.with_ec(msg.get_ctx()),
             || self.handle_encryption_key_created(msg),
+        )
+    }
+}
+
+impl Handler<TypedEvent<DecryptionKeyShared>> for EventConverter {
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: TypedEvent<DecryptionKeyShared>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(
+            EType::DocumentPublishing,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_decryption_key_shared(msg),
         )
     }
 }

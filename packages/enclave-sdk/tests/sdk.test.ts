@@ -5,11 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { describe, expect, it } from 'vitest'
-import { CompiledCircuit } from '@noir-lang/noir_js'
 
 import { EnclaveSDK } from '../src/enclave-sdk'
 import { zeroAddress } from 'viem'
-import demoCircuit from './fixtures/demo_circuit.json'
 
 describe('encryptNumber', () => {
   describe('trbfv', () => {
@@ -36,7 +34,7 @@ describe('encryptNumber', () => {
     it('should encrypt a number and generate a proof without crashing in a node environent', async () => {
       const publicKey = await sdk.generatePublicKey()
 
-      const value = await sdk.encryptNumberAndGenProof(1n, publicKey, demoCircuit as unknown as CompiledCircuit)
+      const value = await sdk.encryptNumberAndGenProof(1n, publicKey)
 
       expect(value).to.be.an.instanceof(Object)
       expect(value.encryptedData).to.be.an.instanceof(Uint8Array)
@@ -53,7 +51,7 @@ describe('encryptNumber', () => {
     it('should encrypt a vector and generate a proof without crashing in a node environent', async () => {
       const publicKey = await sdk.generatePublicKey()
 
-      const value = await sdk.encryptVectorAndGenProof(new BigUint64Array([1n, 2n]), publicKey, demoCircuit as unknown as CompiledCircuit)
+      const value = await sdk.encryptVectorAndGenProof(new BigUint64Array([1n, 2n]), publicKey)
 
       expect(value).to.be.an.instanceof(Object)
       expect(value.encryptedData).to.be.an.instanceof(Uint8Array)

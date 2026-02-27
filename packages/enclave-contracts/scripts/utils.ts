@@ -39,6 +39,7 @@ export interface EnclaveConfig {
       enclave?: { address: string; deploy_block: number };
       ciphernode_registry?: { address: string; deploy_block: number };
       bonding_registry?: { address: string; deploy_block: number };
+      slashing_manager?: { address: string; deploy_block: number };
       fee_token?: { address: string; deploy_block: number };
     };
   }>;
@@ -223,6 +224,8 @@ export const updateE3Config = (
   const yamlStr = yaml.dump(config, {
     indent: 2,
     lineWidth: -1, // Don't wrap lines
+    quotingType: '"',
+    forceQuotes: true,
   });
 
   fs.writeFileSync(pathToConfigFile, yamlStr + "\n", "utf8");

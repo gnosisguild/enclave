@@ -16,7 +16,6 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
  * The arguments for the deployAndSaveCiphernodeRegistryOwnable function
  */
 export interface CiphernodeRegistryOwnableArgs {
-  enclaveAddress?: string;
   owner?: string;
   submissionWindow?: number;
   poseidonT3Address: string;
@@ -29,7 +28,6 @@ export interface CiphernodeRegistryOwnableArgs {
  * @returns The deployed CiphernodeRegistryOwnable contract
  */
 export const deployAndSaveCiphernodeRegistryOwnable = async ({
-  enclaveAddress,
   owner,
   submissionWindow,
   poseidonT3Address,
@@ -47,11 +45,9 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
   );
 
   if (
-    !enclaveAddress ||
     !owner ||
     !submissionWindow ||
-    (preDeployedArgs?.constructorArgs?.enclaveAddress === enclaveAddress &&
-      preDeployedArgs?.constructorArgs?.owner === owner &&
+    (preDeployedArgs?.constructorArgs?.owner === owner &&
       preDeployedArgs?.constructorArgs?.submissionWindow ===
         submissionWindow.toString())
   ) {
@@ -83,7 +79,7 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
 
   const initData = ciphernodeRegistryFactory.interface.encodeFunctionData(
     "initialize",
-    [owner, enclaveAddress, submissionWindow],
+    [owner, submissionWindow],
   );
 
   const ProxyCF = await ethers.getContractFactory(
@@ -103,7 +99,6 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
     {
       constructorArgs: {
         owner,
-        enclaveAddress: enclaveAddress,
         submissionWindow: submissionWindow.toString(),
       },
       proxyRecords: {

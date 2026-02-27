@@ -11,7 +11,7 @@
 
 use crate::bigint_1d_to_json_values;
 use crate::compute_modulus_bit;
-use crate::compute_pk_aggregation_commitment;
+use crate::compute_threshold_pk_commitment;
 use crate::crt_polynomial_to_toml_json;
 use crate::threshold::pk_aggregation::circuit::PkAggregationCircuit;
 use crate::threshold::pk_aggregation::circuit::PkAggregationCircuitData;
@@ -186,7 +186,7 @@ impl Computation for Inputs {
             pk1[party_index].reverse();
 
             let commitment =
-                compute_pk_aggregation_commitment(&pk0[party_index], &pk1[party_index], bit_pk);
+                compute_threshold_pk_commitment(&pk0[party_index], &pk1[party_index], bit_pk);
 
             expected_threshold_pk_commitments.push(commitment);
         }

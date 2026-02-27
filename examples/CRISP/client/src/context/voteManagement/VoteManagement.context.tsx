@@ -6,7 +6,6 @@
 
 import { createGenericContext } from '@/utils/create-generic-context'
 import { VoteManagementContextType, VoteManagementProviderProps, VoteStatus } from '@/context/voteManagement'
-import { useSDKWorkerHook } from '@/hooks/voting/useSDKWorker'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { VoteStateLite, VotingRound } from '@/model/vote.model'
@@ -59,7 +58,6 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   /**
    * Voting Management Methods
    **/
-  const { isLoading: workerLoading, generateProof } = useSDKWorkerHook()
   const {
     isLoading: enclaveLoading,
     getRoundStateLite: getRoundStateLiteRequest,
@@ -167,11 +165,11 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   }
 
   useEffect(() => {
-    if ([workerLoading, enclaveLoading].includes(true)) {
+    if (enclaveLoading) {
       return setIsLoading(true)
     }
     setIsLoading(false)
-  }, [workerLoading, enclaveLoading])
+  }, [enclaveLoading])
 
   useEffect(() => {
     if (isConnected && address) {
@@ -229,7 +227,6 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
         broadcastVote,
         setVotingRound,
         setUser,
-        generateProof,
         checkVoteStatus,
         markVotedInRound,
       }}
@@ -239,4 +236,5 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export { useVoteManagementContext, VoteManagementProvider }

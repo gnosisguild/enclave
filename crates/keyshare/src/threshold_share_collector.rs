@@ -12,8 +12,8 @@ use std::{
 
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, SpawnHandle};
 use e3_events::{
-    E3id, EventContext, Sequenced, ThresholdShare, ThresholdShareCollectionFailed,
-    ThresholdShareCreated, TypedEvent,
+    E3id, EventContext, Sequenced, SignedProofPayload, ThresholdShare,
+    ThresholdShareCollectionFailed, ThresholdShareCreated, TypedEvent,
 };
 use e3_trbfv::PartyId;
 use e3_utils::MAILBOX_LIMIT;
@@ -21,7 +21,20 @@ use tracing::{info, warn};
 
 use crate::{AllThresholdSharesCollected, ThresholdKeyshare};
 
-const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(120);
+/// Proofs received alongside a threshold share from a sender.
+#[derive(Clone, Debug)]
+pub struct ReceivedShareProofs {
+    /// Signed C2a proof (sk share computation) from the sender.
+    pub signed_c2a_proof: Option<SignedProofPayload>,
+    /// Signed C2b proof (e_sm share computation) from the sender.
+    pub signed_c2b_proof: Option<SignedProofPayload>,
+    /// Signed C3a proofs (sk share encryption per modulus row).
+    pub signed_c3a_proofs: Vec<SignedProofPayload>,
+    /// Signed C3b proofs (e_sm share encryption per modulus row).
+    pub signed_c3b_proofs: Vec<SignedProofPayload>,
+}
+
+const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(600);
 
 pub(crate) enum CollectorState {
     Collecting,
@@ -54,6 +67,8 @@ pub struct ThresholdShareCollector {
     state: CollectorState,
     /// The shares collected
     shares: HashMap<PartyId, Arc<ThresholdShare>>,
+    /// Proofs received alongside each party's shares
+    share_proofs: HashMap<PartyId, ReceivedShareProofs>,
     /// A timeout handle for when this collector will report failure
     timeout_handle: Option<SpawnHandle>,
 }
@@ -66,6 +81,7 @@ impl ThresholdShareCollector {
             parent,
             state: CollectorState::Collecting,
             shares: HashMap::new(),
+            share_proofs: HashMap::new(),
             timeout_handle: None,
         };
         collector.start()
@@ -122,6 +138,15 @@ impl Handler<TypedEvent<ThresholdShareCreated>> for ThresholdShareCollector {
             return;
         };
         info!("Inserting... waiting on: {}", self.todo.len());
+        self.share_proofs.insert(
+            pid,
+            ReceivedShareProofs {
+                signed_c2a_proof: msg.signed_c2a_proof,
+                signed_c2b_proof: msg.signed_c2b_proof,
+                signed_c3a_proofs: msg.signed_c3a_proofs,
+                signed_c3b_proofs: msg.signed_c3b_proofs,
+            },
+        );
         self.shares.insert(pid, msg.share);
 
         if self.todo.is_empty() {
@@ -133,8 +158,11 @@ impl Handler<TypedEvent<ThresholdShareCreated>> for ThresholdShareCollector {
                 ctx.cancel_future(handle);
             }
 
-            let event: TypedEvent<AllThresholdSharesCollected> =
-                TypedEvent::new(self.shares.clone().into(), ec);
+            let proofs = std::mem::take(&mut self.share_proofs);
+            let event: TypedEvent<AllThresholdSharesCollected> = TypedEvent::new(
+                AllThresholdSharesCollected::new(self.shares.clone(), proofs),
+                ec,
+            );
             self.parent.do_send(event);
         }
         info!(

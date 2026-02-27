@@ -9,15 +9,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::Path;
-use std::time::Duration;
 use tokio::fs;
-use tracing::{debug, warn};
+use tracing::debug;
 
-const VERSIONS_MANIFEST_URL: &str =
-    "https://raw.githubusercontent.com/gnosisguild/enclave/main/crates/zk-prover/versions.json";
-
-const BB_VERSION: &str = "3.0.0-nightly.20251104";
-const CIRCUITS_VERSION: &str = "0.1.15";
+const VERSIONS_JSON: &str = include_str!("../versions.json");
 
 /// Supported bb binary targets
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -80,66 +75,13 @@ pub struct ZkConfig {
 
 impl Default for ZkConfig {
     fn default() -> Self {
-        Self {
-            bb_download_url: "https://github.com/AztecProtocol/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz".to_string(),
-            circuits_download_url: "https://github.com/gnosisguild/enclave/releases/download/v{version}/circuits-{version}.tar.gz".to_string(),
-            bb_checksums: HashMap::new(),
-            circuits_checksums: HashMap::new(),
-            required_bb_version: BB_VERSION.to_string(),
-            required_circuits_version: CIRCUITS_VERSION.to_string(),
-        }
+        serde_json::from_str(VERSIONS_JSON)
+            .expect("versions.json is invalid — this is a build-time bug")
     }
 }
 
 impl ZkConfig {
-    pub async fn fetch_latest() -> Result<Self, ZkError> {
-        let client = reqwest::Client::new();
-        let response = client
-            .get(VERSIONS_MANIFEST_URL)
-            .timeout(Duration::from_secs(10))
-            .send()
-            .await
-            .map_err(|e| {
-                ZkError::DownloadFailed(VERSIONS_MANIFEST_URL.to_string(), e.to_string())
-            })?;
-
-        if !response.status().is_success() {
-            return Err(ZkError::DownloadFailed(
-                VERSIONS_MANIFEST_URL.to_string(),
-                format!("HTTP {}", response.status()),
-            ));
-        }
-
-        let config: ZkConfig = response.json().await.map_err(|e| {
-            ZkError::DownloadFailed(VERSIONS_MANIFEST_URL.to_string(), e.to_string())
-        })?;
-
-        Ok(config)
-    }
-
-    pub async fn fetch_or_default() -> Self {
-        match Self::fetch_latest().await {
-            Ok(config) => {
-                debug!(
-                    "fetched versions manifest: bb={}, circuits={}",
-                    config.required_bb_version, config.required_circuits_version
-                );
-                config
-            }
-            Err(e) => {
-                warn!("could not fetch versions manifest ({}), using defaults", e);
-                Self::default()
-            }
-        }
-    }
-
-    pub async fn load(path: &Path) -> std::io::Result<Self> {
-        let contents = fs::read_to_string(path).await?;
-        serde_json::from_str(&contents)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
-    }
-
-    /// Get checksum for a specific target from the remote manifest
+    /// Get checksum for a specific target
     pub fn bb_checksum_for(&self, target: BbTarget) -> Option<&str> {
         self.bb_checksums.get(target.as_str()).map(|s| s.as_str())
     }
@@ -221,6 +163,7 @@ pub fn verify_checksum(file: &str, data: &[u8], expected: Option<&str>) -> Resul
 #[cfg(test)]
 mod tests {
     use crate::test_utils::get_tempdir;
+    use std::time::Duration;
 
     use super::*;
 
@@ -393,8 +336,16 @@ mod tests {
         let config = ZkConfig::default();
 
         assert!(config.bb_download_url.contains("{version}"));
-        assert!(config.bb_checksums.is_empty());
-        assert_eq!(config.required_bb_version, BB_VERSION);
+        assert!(!config.bb_checksums.is_empty());
+        assert!(!config.required_bb_version.is_empty());
+    }
+
+    #[test]
+    fn test_default_matches_versions_json() {
+        let config = ZkConfig::default();
+        assert!(!config.required_bb_version.is_empty());
+        assert!(!config.required_circuits_version.is_empty());
+        assert!(!config.bb_checksums.is_empty());
     }
 
     /// Integration test that downloads a real bb binary and verifies checksum.
@@ -405,30 +356,8 @@ mod tests {
             return;
         };
 
-        // Known good checksums for bb v0.82.2
-        // Update these when bumping BB_VERSION
-        let checksums: HashMap<&str, &str> = [
-            (
-                "amd64-linux",
-                "9740013d1aa0eb1b0bb2d71484c8b3debc5050a409bd5f12f8454fbfc7cb5419",
-            ),
-            (
-                "amd64-darwin",
-                "7874494dd1238655993a44b85d94e9dcc3589d29980eff8b03a7f167a45c32e4",
-            ),
-            (
-                "arm64-linux",
-                "ae6bf8518998523b4e135cd638f305a802f52e8dfa5ea9b1c210de7d04c55343",
-            ),
-            (
-                "arm64-darwin",
-                "6d353c05dbecc573d1b0ca992c8b222db8e873853b7910b792915629347f6789",
-            ),
-        ]
-        .into_iter()
-        .collect();
-
-        let version = BB_VERSION;
+        let config = ZkConfig::default();
+        let version = &config.required_bb_version;
         let (arch, os) = target.url_parts();
         let url = format!(
             "https://github.com/AztecProtocol/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz"
@@ -456,12 +385,10 @@ mod tests {
             .expect("failed to read response body");
         println!("downloaded {} bytes", bytes.len());
 
-        // Verify checksum
-        let expected = checksums
-            .get(target.as_str())
+        let expected = config
+            .bb_checksum_for(target)
             .expect("no checksum for target");
         let result = verify_checksum(&format!("bb-{}", target), &bytes, Some(expected));
-
         assert!(result.is_ok(), "checksum verification failed: {:?}", result);
         println!("checksum verified for {}", target);
 
@@ -474,15 +401,13 @@ mod tests {
             .expect("failed to write tarball");
         assert!(tarball_path.exists());
 
-        // Verify VersionInfo checksum method works
         let info = VersionInfo {
-            bb_version: Some(version.to_string()),
+            bb_version: Some(version.clone()),
             bb_checksum: Some(expected.to_string()),
             ..Default::default()
         };
         assert!(info.verify_bb_checksum(&bytes).is_ok());
 
-        // Cleanup happens automatically when temp goes out of scope
         println!("test passed, temp dir cleaned up");
     }
 
@@ -494,7 +419,8 @@ mod tests {
             return;
         };
 
-        let version = BB_VERSION;
+        let config = ZkConfig::default();
+        let version = &config.required_bb_version;
         let (arch, os) = target.url_parts();
         let url = format!(
             "https://github.com/AztecProtocol/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz"

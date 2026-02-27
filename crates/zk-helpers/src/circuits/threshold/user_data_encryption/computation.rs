@@ -10,14 +10,11 @@
 //! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
 use crate::calculate_bit_width;
-use crate::commitments::compute_pk_aggregation_commitment;
-use crate::compute_ciphertext_commitment;
 use crate::get_zkp_modulus;
 use crate::math::compute_k0is;
 use crate::math::{cyclotomic_polynomial, decompose_residue};
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
-use crate::utils::compute_modulus_bit;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
@@ -122,8 +119,6 @@ pub struct Inputs {
     pub e1: Polynomial,
     pub u: Polynomial,
     pub k1: Polynomial,
-    pub pk_commitment: BigInt,
-    pub ct_commitment: BigInt,
     pub ciphertext: Vec<u8>,
 }
 
@@ -535,10 +530,6 @@ impl Computation for Inputs {
         let zkp_modulus = get_zkp_modulus();
         e0_mod_q.reduce(&zkp_modulus);
 
-        let pk_bit = compute_modulus_bit(&threshold_params);
-        let pk_commitment = compute_pk_aggregation_commitment(&pk0is, &pk1is, pk_bit);
-        let ct_commitment = compute_ciphertext_commitment(&ct0is, &ct1is, pk_bit);
-
         Ok(Inputs {
             pk0is,
             pk1is,
@@ -554,8 +545,6 @@ impl Computation for Inputs {
             e1,
             u,
             k1: k1,
-            pk_commitment,
-            ct_commitment,
             ciphertext: ct.to_bytes(),
         })
     }
@@ -579,7 +568,6 @@ impl Computation for Inputs {
         let r2is = crt_polynomial_to_toml_json(&self.r2is);
         let p1is = crt_polynomial_to_toml_json(&self.p1is);
         let p2is = crt_polynomial_to_toml_json(&self.p2is);
-        let pk_commitment = self.pk_commitment.to_string();
 
         let json = serde_json::json!({
             "pk0is": pk0is,
@@ -596,7 +584,6 @@ impl Computation for Inputs {
             "r2is": r2is,
             "p1is": p1is,
             "p2is": p2is,
-            "pk_commitment": pk_commitment
         });
 
         Ok(json)

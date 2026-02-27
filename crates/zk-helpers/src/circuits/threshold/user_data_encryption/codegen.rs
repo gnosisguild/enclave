@@ -17,8 +17,6 @@ use crate::CircuitsErrors;
 use crate::{Artifacts, CodegenConfigs, CodegenToml};
 
 use e3_fhe_params::BfvPreset;
-use serde::{Deserialize, Serialize};
-use serde_json;
 
 /// Implementation of [`CircuitCodegen`] for [`UserDataEncryptionCircuit`].
 impl CircuitCodegen for UserDataEncryptionCircuit {
@@ -35,25 +33,6 @@ impl CircuitCodegen for UserDataEncryptionCircuit {
 
         Ok(Artifacts { toml, configs })
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TomlJson {
-    pub pk0is: Vec<serde_json::Value>,
-    pub pk1is: Vec<serde_json::Value>,
-    pub ct0is: Vec<serde_json::Value>,
-    pub ct1is: Vec<serde_json::Value>,
-    pub u: serde_json::Value,
-    pub e0: serde_json::Value,
-    pub e0is: Vec<serde_json::Value>,
-    pub e0_quotients: Vec<serde_json::Value>,
-    pub e1: serde_json::Value,
-    pub k1: serde_json::Value,
-    pub r1is: Vec<serde_json::Value>,
-    pub r2is: Vec<serde_json::Value>,
-    pub p1is: Vec<serde_json::Value>,
-    pub p2is: Vec<serde_json::Value>,
-    pub pk_commitment: String,
 }
 
 pub fn generate_toml(inputs: Inputs) -> Result<CodegenToml, CircuitsErrors> {
@@ -75,7 +54,8 @@ pub fn generate_configs(_: BfvPreset, configs: &Configs) -> CodegenConfigs {
     let p2_bounds_str = join_display(&configs.bounds.p2_bounds, ", ");
 
     format!(
-        r#"use crate::core::threshold::user_data_encryption::Configs as UserDataEncryptionConfigs;
+        r#"use crate::core::threshold::user_data_encryption_ct0::Configs as UserDataEncryptionCt0Configs;
+use crate::core::threshold::user_data_encryption_ct1::Configs as UserDataEncryptionCt1Configs;
 
 // Global configs for User Data Encryption circuit
 pub global N: u32 = {};
@@ -112,20 +92,36 @@ pub global {}_R2_BOUNDS: [Field; L] = [{}];
 pub global {}_P1_BOUNDS: [Field; L] = [{}];
 pub global {}_P2_BOUNDS: [Field; L] = [{}];
 
-pub global {}_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfigs::new(
+/************************************
+-------------------------------------
+user_data_encryption_ct0 (CIRCUIT A - CT0 ENCRYPTION)
+-------------------------------------
+************************************/
+
+pub global {}_CT0_CONFIGS: UserDataEncryptionCt0Configs<N, L> = UserDataEncryptionCt0Configs::new(
     QIS,
     {}_K0IS,
-    {}_PK_BOUNDS,
     {}_E0_BOUND,
-    {}_E1_BOUND,
     {}_U_BOUND,
     {}_R1_LOW_BOUNDS,
     {}_R1_UP_BOUNDS,
     {}_R2_BOUNDS,
+    {}_K1_LOW_BOUND,
+    {}_K1_UP_BOUND,
+);
+
+/************************************
+-------------------------------------
+user_data_encryption_ct1 (CIRCUIT B - CT1 ENCRYPTION)
+-------------------------------------
+************************************/
+
+pub global {}_CT1_CONFIGS: UserDataEncryptionCt1Configs<N, L> = UserDataEncryptionCt1Configs::new(
+    QIS,
+    {}_E1_BOUND,
+    {}_U_BOUND,
     {}_P1_BOUNDS,
     {}_P2_BOUNDS,
-    {}_K1_LOW_BOUND,
-    {}_K1_UP_BOUND
 );
 "#,
         configs.n, // N
@@ -175,6 +171,7 @@ pub global {}_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfi
         p1_bounds_str, // P1_BOUNDS array
         prefix,
         p2_bounds_str, // P2_BOUNDS array
+        prefix,
         prefix,
         prefix,
         prefix,

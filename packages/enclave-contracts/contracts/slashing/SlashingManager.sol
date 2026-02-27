@@ -9,25 +9,32 @@ pragma solidity >=0.8.27;
 import {
     AccessControl
 } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {
+    MessageHashUtils
+} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
-import { ISlashVerifier } from "../interfaces/ISlashVerifier.sol";
+import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
+import { IEnclave } from "../interfaces/IEnclave.sol";
+import { IE3RefundManager } from "../interfaces/IE3RefundManager.sol";
+import { ICircuitVerifier } from "../interfaces/ICircuitVerifier.sol";
 
 /**
  * @title SlashingManager
- * @notice Implementation of slashing management with proposal, appeal, and execution workflows
- * @dev Role-based access control for slashers, verifiers, and governance with configurable slash policies
+ * @notice Implementation of slashing management with two-lane architecture:
+ *         Lane A (proof-based): permissionless, atomic propose+execute, no appeals
+ *         Lane B (evidence-based): SLASHER_ROLE required, appeal window, separate execute
+ * @dev Role-based access control for slashers and governance with configurable slash policies.
+ *      Integrates with CiphernodeRegistry for committee expulsion and Enclave for E3 failure.
  */
 contract SlashingManager is ISlashingManager, AccessControl {
     // ======================
     // Constants & Roles
     // ======================
 
-    /// @notice Role identifier for accounts authorized to propose and execute slashes
+    /// @notice Role identifier for accounts authorized to propose evidence-based slashes
     bytes32 public constant SLASHER_ROLE = keccak256("SLASHER_ROLE");
-
-    /// @notice Role identifier for accounts authorized to verify cryptographic proofs in slash proposals
-    bytes32 public constant VERIFIER_ROLE = keccak256("VERIFIER_ROLE");
 
     /// @notice Role identifier for governance accounts that can configure policies, resolve appeals, and manage bans
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
@@ -37,45 +44,57 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // ======================
 
     /// @notice Reference to the bonding registry contract where slash penalties are executed
-    /// @dev Used to call slashTicketBalance() and slashLicenseBond() when executing slashes
     IBondingRegistry public bondingRegistry;
 
+    /// @notice Reference to the ciphernode registry for committee expulsion
+    ICiphernodeRegistry public ciphernodeRegistry;
+
+    /// @notice Reference to the Enclave contract for E3 failure signaling
+    IEnclave public enclave;
+
+    /// @notice Reference to the E3 Refund Manager for routing slashed funds
+    IE3RefundManager public e3RefundManager;
+
     /// @notice Mapping from slash reason hash to its configured policy
-    /// @dev Stores penalty amounts, proof requirements, and appeal settings for each slash type
     mapping(bytes32 reason => SlashPolicy policy) public slashPolicies;
 
     /// @notice Internal storage for all slash proposals indexed by proposal ID
-    /// @dev Sequentially indexed starting from 0, accessed via getSlashProposal()
     mapping(uint256 proposalId => SlashProposal proposal) internal _proposals;
 
     /// @notice Counter for total number of slash proposals ever created
-    /// @dev Also serves as the next proposal ID to be assigned
     uint256 public totalProposals;
 
     /// @notice Mapping tracking which nodes are currently banned from the network
-    /// @dev Set to true when a node is banned (either via executeSlash or banNode), false when unbanned
     mapping(address node => bool banned) public banned;
+
+    /// @notice Evidence replay protection: tracks consumed evidence keys
+    /// @dev Key is keccak256(abi.encode(e3Id, operator, keccak256(proof))) — reason-independent
+    ///      to prevent the same proof/evidence from being used to slash under multiple reasons.
+    mapping(bytes32 evidenceKey => bool consumed) public evidenceConsumed;
+
+    // ======================
+    // Constants
+    // ======================
+
+    /// @notice EIP-712 style typehash for the operator's signed proof payload.
+    /// @dev Must match `ProofPayload::typehash()` in `crates/events/src/enclave_event/signed_proof.rs`.
+    ///      Prevents cross-chain, cross-E3, and cross-proof-type replay of signed proofs.
+    bytes32 public constant PROOF_PAYLOAD_TYPEHASH =
+        keccak256(
+            "ProofPayload(uint256 chainId,uint256 e3Id,uint256 proofType,bytes zkProof,bytes publicSignals)"
+        );
 
     // ======================
     // Modifiers
     // ======================
 
     /// @notice Restricts function access to accounts with SLASHER_ROLE
-    /// @dev Reverts with Unauthorized() if caller lacks the role
     modifier onlySlasher() {
         if (!hasRole(SLASHER_ROLE, msg.sender)) revert Unauthorized();
         _;
     }
 
-    /// @notice Restricts function access to accounts with VERIFIER_ROLE
-    /// @dev Reverts with Unauthorized() if caller lacks the role
-    modifier onlyVerifier() {
-        if (!hasRole(VERIFIER_ROLE, msg.sender)) revert Unauthorized();
-        _;
-    }
-
     /// @notice Restricts function access to accounts with GOVERNANCE_ROLE
-    /// @dev Reverts with Unauthorized() if caller lacks the role
     modifier onlyGovernance() {
         if (!hasRole(GOVERNANCE_ROLE, msg.sender)) revert Unauthorized();
         _;
@@ -86,20 +105,11 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // ======================
 
     /**
-     * @notice Initializes the SlashingManager contract with admin and bonding registry
-     * @dev Sets up initial role assignments and bonding registry reference
+     * @notice Initializes the SlashingManager contract
      * @param admin Address to receive DEFAULT_ADMIN_ROLE and GOVERNANCE_ROLE
-     * @param _bondingRegistry Address of the bonding registry contract for executing slashes
-     * Requirements:
-     * - admin must not be zero address
-     * - _bondingRegistry must not be zero address
      */
-    constructor(address admin, address _bondingRegistry) {
+    constructor(address admin) {
         require(admin != address(0), ZeroAddress());
-        require(_bondingRegistry != address(0), ZeroAddress());
-
-        bondingRegistry = IBondingRegistry(_bondingRegistry);
-
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(GOVERNANCE_ROLE, admin);
     }
@@ -146,7 +156,6 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
         if (policy.requiresProof) {
             require(policy.proofVerifier != address(0), VerifierNotSet());
-            // TODO: Should we allow appeal window for proof required?
             require(policy.appealWindow == 0, InvalidPolicy());
         } else {
             require(policy.appealWindow > 0, InvalidPolicy());
@@ -158,10 +167,36 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
     /// @inheritdoc ISlashingManager
     function setBondingRegistry(
-        address newBondingRegistry
+        IBondingRegistry newBondingRegistry
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newBondingRegistry != address(0), ZeroAddress());
-        bondingRegistry = IBondingRegistry(newBondingRegistry);
+        require(address(newBondingRegistry) != address(0), ZeroAddress());
+        bondingRegistry = newBondingRegistry;
+    }
+
+    /// @notice Updates the ciphernode registry contract
+    /// @param newCiphernodeRegistry The new ICiphernodeRegistry contract
+    function setCiphernodeRegistry(
+        ICiphernodeRegistry newCiphernodeRegistry
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(address(newCiphernodeRegistry) != address(0), ZeroAddress());
+        ciphernodeRegistry = newCiphernodeRegistry;
+    }
+
+    /// @notice Updates the Enclave contract
+    /// @param newEnclave The new IEnclave contract
+    function setEnclave(
+        IEnclave newEnclave
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(address(newEnclave) != address(0), ZeroAddress());
+        enclave = newEnclave;
+    }
+
+    /// @inheritdoc ISlashingManager
+    function setE3RefundManager(
+        IE3RefundManager newRefundManager
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(address(newRefundManager) != address(0), ZeroAddress());
+        e3RefundManager = newRefundManager;
     }
 
     /// @inheritdoc ISlashingManager
@@ -177,48 +212,105 @@ contract SlashingManager is ISlashingManager, AccessControl {
         _revokeRole(SLASHER_ROLE, slasher);
     }
 
-    /// @inheritdoc ISlashingManager
-    function addVerifier(
-        address verifier
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(verifier != address(0), ZeroAddress());
-        _grantRole(VERIFIER_ROLE, verifier);
-    }
-
-    /// @inheritdoc ISlashingManager
-    function removeVerifier(
-        address verifier
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _revokeRole(VERIFIER_ROLE, verifier);
-    }
-
     // ======================
     // Slashing Functions
     // ======================
 
     /// @inheritdoc ISlashingManager
+    /// @dev Lane A: Permissionless proof-based slash. Anyone can call.
+    ///      Atomically proposes, verifies operator signature + ZK proof, and executes slash.
+    ///      Evidence format:
+    ///      `abi.encode(bytes zkProof, bytes32[] publicInputs,
+    ///         bytes signature,
+    ///         uint256 chainId,
+    ///         uint256 proofType,
+    ///         address verifier)`
+    ///      Operator must sign the EIP-191 prefixed payload hash via `personal_sign`/`signMessage()`
+    ///      (NOT raw `eth_signHash`): `personal_sign(keccak256(abi.encode(PROOF_PAYLOAD_TYPEHASH,
+    ///         chainId, e3Id, proofType, keccak256(zkProof), keccak256(abi.encodePacked(publicInputs)))))`
     function proposeSlash(
+        uint256 e3Id,
         address operator,
         bytes32 reason,
         bytes calldata proof
-    )
-        external
-        // TODO: Do we need an onlySlasher modifier?
-        // Can anyone propose a slash?
-        onlySlasher
-        returns (uint256 proposalId)
-    {
+    ) external returns (uint256 proposalId) {
         require(operator != address(0), ZeroAddress());
 
         SlashPolicy memory policy = slashPolicies[reason];
         require(policy.enabled, SlashReasonDisabled());
+        require(policy.requiresProof, InvalidPolicy());
+        require(proof.length != 0, ProofRequired());
+
+        // Evidence replay protection — reason-independent to prevent cross-reason replay
+        bytes32 evidenceKey = keccak256(
+            abi.encode(e3Id, operator, keccak256(proof))
+        );
+        require(!evidenceConsumed[evidenceKey], DuplicateEvidence());
+        evidenceConsumed[evidenceKey] = true;
+
+        // Verify evidence: signature, committee membership, and ZK proof
+        _verifyProofEvidence(proof, e3Id, operator, policy.proofVerifier);
+
+        // Create proposal
+        proposalId = totalProposals;
+        totalProposals = proposalId + 1;
+
+        SlashProposal storage p = _proposals[proposalId];
+        p.e3Id = e3Id;
+        p.operator = operator;
+        p.reason = reason;
+        p.ticketAmount = policy.ticketPenalty;
+        p.licenseAmount = policy.licensePenalty;
+        p.proposedAt = block.timestamp;
+        p.executableAt = block.timestamp;
+        p.proposer = msg.sender;
+        p.proofHash = keccak256(proof);
+        p.proofVerified = true;
+        p.banNode = policy.banNode;
+        p.affectsCommittee = policy.affectsCommittee;
+        p.failureReason = policy.failureReason;
+
+        emit SlashProposed(
+            proposalId,
+            e3Id,
+            operator,
+            reason,
+            policy.ticketPenalty,
+            policy.licensePenalty,
+            block.timestamp,
+            msg.sender
+        );
+
+        _executeSlash(proposalId);
+    }
+
+    /// @inheritdoc ISlashingManager
+    /// @dev Lane B: Evidence-based slash with appeal window. SLASHER_ROLE required.
+    function proposeSlashEvidence(
+        uint256 e3Id,
+        address operator,
+        bytes32 reason,
+        bytes calldata evidence
+    ) external onlySlasher returns (uint256 proposalId) {
+        require(operator != address(0), ZeroAddress());
+
+        SlashPolicy memory policy = slashPolicies[reason];
+        require(policy.enabled, SlashReasonDisabled());
+        require(!policy.requiresProof, InvalidPolicy());
+
+        // Evidence replay protection — reason-independent to prevent cross-reason replay
+        bytes32 evidenceKey = keccak256(
+            abi.encode(e3Id, operator, keccak256(evidence))
+        );
+        require(!evidenceConsumed[evidenceKey], DuplicateEvidence());
+        evidenceConsumed[evidenceKey] = true;
 
         proposalId = totalProposals;
         totalProposals = proposalId + 1;
 
         uint256 executableAt = block.timestamp + policy.appealWindow;
         SlashProposal storage p = _proposals[proposalId];
-
+        p.e3Id = e3Id;
         p.operator = operator;
         p.reason = reason;
         p.ticketAmount = policy.ticketPenalty;
@@ -226,20 +318,16 @@ contract SlashingManager is ISlashingManager, AccessControl {
         p.proposedAt = block.timestamp;
         p.executableAt = executableAt;
         p.proposer = msg.sender;
-        p.proofHash = keccak256(proof);
-
-        if (policy.requiresProof) {
-            require(proof.length != 0, ProofRequired());
-            bool ok = ISlashVerifier(policy.proofVerifier).verify(
-                proposalId,
-                proof
-            );
-            require(ok, InvalidProof());
-            p.proofVerified = true;
-        }
+        p.proofHash = keccak256(evidence);
+        // Snapshot behavioral flags from policy at proposal time
+        // to prevent execution drift if policy is modified during appeal window
+        p.banNode = policy.banNode;
+        p.affectsCommittee = policy.affectsCommittee;
+        p.failureReason = policy.failureReason;
 
         emit SlashProposed(
             proposalId,
+            e3Id,
             operator,
             reason,
             policy.ticketPenalty,
@@ -250,30 +338,103 @@ contract SlashingManager is ISlashingManager, AccessControl {
     }
 
     /// @inheritdoc ISlashingManager
+    /// @dev Only for evidence-based slashes (Lane B). Proof-based slashes execute atomically.
     function executeSlash(uint256 proposalId) external {
         require(proposalId < totalProposals, InvalidProposal());
         SlashProposal storage p = _proposals[proposalId];
-
-        // Has already been executed?
         require(!p.executed, AlreadyExecuted());
-        p.executed = true;
 
-        SlashPolicy memory policy = slashPolicies[p.reason];
+        // Use snapshotted requiresProof state: proof-based slashes are already executed atomically in proposeSlash
+        require(!p.proofVerified, InvalidPolicy());
 
-        if (policy.requiresProof) {
-            // Appeal window is 0 by policy validation, so we dont check for appeal gating
-            require(p.proofVerified, InvalidProof());
-        } else {
-            // Evidence mode with appeals
-            require(block.timestamp >= p.executableAt, AppealWindowActive());
-            if (p.appealed) {
-                require(p.resolved, AppealPending());
-                require(!p.appealUpheld, AppealUpheld()); // approved = appeal upheld => cancel slash, return?
-            }
+        // Evidence mode: check appeal window
+        require(block.timestamp >= p.executableAt, AppealWindowActive());
+        if (p.appealed) {
+            require(p.resolved, AppealPending());
+            require(!p.appealUpheld, AppealUpheld());
         }
 
+        _executeSlash(proposalId);
+    }
+
+    // ======================
+    // Internal Execution
+    // ======================
+
+    /// @dev Decodes and verifies: verifier match, chainId, operator EIP-191 signature, committee
+    ///      membership, and that the ZK proof is invalid (fault confirmed). Evidence encoding
+    ///      matches proposeSlash — see that function's dev note for the abi.encode layout.
+    function _verifyProofEvidence(
+        bytes calldata proof,
+        uint256 e3Id,
+        address operator,
+        address policyVerifier
+    ) internal view {
+        (
+            bytes memory zkProof,
+            bytes32[] memory publicInputs,
+            bytes memory signature,
+            uint256 chainId,
+            uint256 proofType,
+            address signedVerifier
+        ) = abi.decode(
+                proof,
+                (bytes, bytes32[], bytes, uint256, uint256, address)
+            );
+
+        // 1. Verify verifier in evidence matches policy's current verifier.
+        require(signedVerifier == policyVerifier, VerifierMismatch());
+
+        // 1b. Verify chainId matches current chain to prevent cross-chain replay.
+        require(chainId == block.chainid, ChainIdMismatch());
+
+        // 2. Verify the operator signed this exact proof payload.
+        bytes32 messageHash = keccak256(
+            abi.encode(
+                PROOF_PAYLOAD_TYPEHASH,
+                chainId,
+                e3Id,
+                proofType,
+                keccak256(zkProof),
+                keccak256(abi.encodePacked(publicInputs))
+            )
+        );
+        bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(
+            messageHash
+        );
+        address recoveredSigner = ECDSA.recover(ethSignedHash, signature);
+        require(recoveredSigner == operator, SignerIsNotOperator());
+
+        // 3. Verify the operator was ever a committee member for this E3.
+        require(
+            ciphernodeRegistry.isCommitteeMember(e3Id, operator),
+            OperatorNotInCommittee()
+        );
+
+        // 4. Re-verify the ZK proof on-chain (INVERTED: must FAIL to confirm fault).
+        //    The staticcall MUST succeed — if the verifier reverts or doesn't exist,
+        //    we cannot determine fault and must not slash.
+        (bool callSuccess, bytes memory returnData) = policyVerifier.staticcall(
+            abi.encodeCall(ICircuitVerifier.verify, (zkProof, publicInputs))
+        );
+        require(callSuccess, VerifierCallFailed());
+        require(returnData.length >= 32, VerifierCallFailed());
+        bool proofValid = abi.decode(returnData, (bool));
+        require(!proofValid, ProofIsValid());
+    }
+
+    /// @dev Executes a slash: applies financial penalties, optional ban, and committee expulsion.
+    ///      Lane B: if the operator deregistered or exited during the appeal window, penalties
+    ///      gracefully become 0 (BondingRegistry uses min(requested, available)). Accepted tradeoff.
+    function _executeSlash(uint256 proposalId) internal {
+        SlashProposal storage p = _proposals[proposalId];
+        p.executed = true;
+
+        uint256 actualTicketSlashed = 0;
+
+        // Execute financial penalties
         if (p.ticketAmount > 0) {
-            bondingRegistry.slashTicketBalance(
+            actualTicketSlashed = bondingRegistry.slashTicketBalance(
                 p.operator,
                 p.ticketAmount,
                 p.reason
@@ -288,19 +449,62 @@ contract SlashingManager is ISlashingManager, AccessControl {
             );
         }
 
-        if (policy.banNode) {
+        // Ban node if snapshotted policy requires it
+        if (p.banNode) {
             banned[p.operator] = true;
-            emit NodeBanUpdated(p.operator, true, p.reason, msg.sender);
+            emit NodeBanUpdated(p.operator, true, p.reason, address(this));
+        }
+
+        // Committee expulsion for E3-scoped slashes (uses snapshotted behavioral flags)
+        // expelCommitteeMember returns (activeCount, thresholdM) — one call instead of three
+        if (p.affectsCommittee) {
+            (uint256 activeCount, uint32 thresholdM) = ciphernodeRegistry
+                .expelCommitteeMember(p.e3Id, p.operator, p.reason);
+
+            // If active count drops below M, fail the E3
+            if (activeCount < thresholdM && p.failureReason > 0) {
+                // NOTE: catch block must not be empty (solc optimizer bug, see below)
+                try enclave.onE3Failed(p.e3Id, p.failureReason) {
+                    // Side effects occur in the external call
+                } catch {
+                    // E3 already failed or other error — slash still proceeds
+                    emit RoutingFailed(p.e3Id, 0);
+                }
+            }
+        }
+
+        // Escrow slashed ticket funds for deferred distribution.
+        // Self-call for try/catch atomicity — on failure, funds stay in BondingRegistry.
+        if (actualTicketSlashed > 0) {
+            // NOTE: catch must not be empty — solc >=0.8.28 optimizer bug.
+            try
+                this.escrowSlashedFundsToRefund(p.e3Id, actualTicketSlashed)
+            {} catch {
+                emit RoutingFailed(p.e3Id, actualTicketSlashed);
+            }
         }
 
         emit SlashExecuted(
             proposalId,
+            p.e3Id,
             p.operator,
             p.reason,
             p.ticketAmount,
             p.licenseAmount,
-            p.executed
+            true
         );
+    }
+
+    /// @inheritdoc ISlashingManager
+    /// @dev Atomically redirects slashed funds to E3RefundManager escrow.
+    ///      External with self-only access for try/catch atomicity.
+    function escrowSlashedFundsToRefund(uint256 e3Id, uint256 amount) external {
+        require(msg.sender == address(this), Unauthorized());
+        address refundManager = address(e3RefundManager);
+        require(refundManager != address(0), ZeroAddress());
+        bondingRegistry.redirectSlashedTicketFunds(refundManager, amount);
+        enclave.escrowSlashedFunds(e3Id, amount);
+        emit SlashedFundsEscrowedToRefund(e3Id, amount);
     }
 
     // ======================
@@ -308,17 +512,20 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // ======================
 
     /// @inheritdoc ISlashingManager
+    /// @dev Only the accused operator may appeal (no delegate support). Consider an `appealDelegate`
+    ///      mapping for production to handle lost-key or banned-operator scenarios.
     function fileAppeal(uint256 proposalId, string calldata evidence) external {
         require(proposalId < totalProposals, InvalidProposal());
-        // TODO: Should we reject the appeal if the proposal has a cryptographic proof?
         SlashProposal storage p = _proposals[proposalId];
 
         // Only the accused can appeal
         require(msg.sender == p.operator, Unauthorized());
-        // Only in the window
+        // Only within the appeal window
         require(block.timestamp < p.executableAt, AppealWindowExpired());
         // Only once
         require(!p.appealed, AlreadyAppealed());
+        // Cannot appeal proof-verified slashes (they have no appeal window)
+        require(!p.proofVerified, InvalidProposal());
 
         p.appealed = true;
 
@@ -338,7 +545,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(!p.resolved, AlreadyResolved());
 
         p.resolved = true;
-        p.appealUpheld = appealUpheld; // true => cancel slash, false => slash stands
+        p.appealUpheld = appealUpheld;
 
         emit AppealResolved(
             proposalId,
