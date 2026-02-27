@@ -49,5 +49,5 @@ downstream circuit
 
 **Related Circuits:**
 
-- C6 `threshold/share_decryption`
-- BigNum variant `threshold/dec_share_agg_trbfv_bignum`
+- C6 [`threshold/share_decryption`](../share_decryption)
+- BigNum variant [`threshold/decrypted_shares_aggregation_bn`](../decrypted_shares_aggregation_bn)
