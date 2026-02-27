@@ -52,7 +52,8 @@ impl<let L: u32> Configs<L> {
 ///
 /// Outputs:
 ///
-/// d[l] -> public decryption share per CRT basis, consumed by C7 (dec-result-trbfv).
+/// d[l] -> public decryption share per CRT basis, consumed by C7
+///         (decrypted_shares_aggregation_bn or decrypted_shares_aggregation_mod).
 pub struct ShareDecryption<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> {
     /// Circuit parameters including bounds and cryptographic constants
     configs: Configs<L>,

@@ -50,13 +50,13 @@ impl<let N: u32, let L: u32> Configs<N, L> {
 /// Verifies:
 /// 1. Range checks on all secret witnesses (sk, eek, e_sm, quotients)
 /// 2. Compute commitments to sk, pk, and e_sm
-/// 3. Generate Fiat-Shamir challenges (one per CRT modulus)
+/// 3. Generate a single Fiat-Shamir challenge point (gamma) used for all CRT moduli
 /// 4. Verify BFV key generation equations at challenge points (Schwartz-Zippel)
 ///
-/// Outputs:
+/// Outputs (in return order):
 /// - commit(sk) -> C2a (secret key share verification)
-/// - commit(e_sm) -> C2b (smudging noise share verification)
 /// - commit(pk_trbfv) -> C5 (public key aggregation)
+/// - commit(e_sm) -> C2b (smudging noise share verification)
 pub struct PkGeneration<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_PK: u32> {
     /// Cryptographic parameters including bounds, moduli, and constants.
     configs: Configs<N, L>,
@@ -131,10 +131,10 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
 
     /// Executes the threshold public key generation circuit.
     ///
-    /// Returns a tuple of three commitments:
+    /// Returns a tuple of three commitments in the following order:
     /// - commit(sk) -> C2a (secret key share verification)
-    /// - commit(e_sm) -> C2b (smudging noise share verification)
     /// - commit(pk_trbfv) -> C5 (public key aggregation)
+    /// - commit(e_sm) -> C2b (smudging noise share verification)
     pub fn execute(self) -> (Field, Field, Field) {
         // 1. Perform range checks on all secret witness values
         self.perform_range_checks();

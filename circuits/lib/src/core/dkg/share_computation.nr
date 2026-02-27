@@ -31,7 +31,8 @@ impl<let L: u32> Configs<L> {
 /// reconstruction properties).
 ///
 /// Outputs:
-/// - commit(shares[party_idx][mod_idx]) -> C3a (share encryption)
+/// - commit(sk_share[party_idx][mod_idx]) -> C3a (share encryption, per-party commitment)
+/// - commit(sk_share[party_idx][mod_idx]) -> C4a (share decryption, same per-party commitments)
 pub struct SecretKeyShareComputation<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let BIT_SHARE: u32> {
     configs: Configs<L>,
     /// Expected commitment to secret (from C1)
@@ -59,7 +60,8 @@ pub struct SecretKeyShareComputation<let N: u32, let L: u32, let N_PARTIES: u32,
 /// different structure (CRT representation, one polynomial per modulus).
 ///
 /// Outputs:
-/// - commit(shares[party_idx][mod_idx]) -> C3b (share encryption)
+/// - commit(e_sm_share[party_idx][mod_idx]) -> C3b (share encryption, per-party commitment)
+/// - commit(e_sm_share[party_idx][mod_idx]) -> C4b (share decryption, same per-party commitments)
 pub struct SmudgingNoiseShareComputation<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let BIT_SHARE: u32> {
     configs: Configs<L>,
     /// Expected commitment to secret (from C1)
