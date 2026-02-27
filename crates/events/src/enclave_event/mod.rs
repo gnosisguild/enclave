@@ -641,12 +641,11 @@ impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
     }
 }
 
-// Add a test_event function on the EnclaveEvent for testing. This is available in production code
-// for now as we cannot expose for other packages without setting up a feature flag although we
-// should limit this with a feature flag
+#[cfg(feature = "test-helpers")]
 impl<S: SeqState> EnclaveEvent<S> {
+    /// Create a test event using the TestEventBuilder struct
     pub fn test_event(label: &str) -> TestEventBuilder<Unsequenced> {
-        TestEventBuilder::<Unsequenced>::test_event(label)
+        TestEventBuilder::<Unsequenced>::new(label)
     }
 }
 
@@ -662,7 +661,8 @@ pub struct TestEventBuilder<S: SeqState> {
 }
 
 impl TestEventBuilder<Unsequenced> {
-    pub fn test_event(label: &str) -> Self {
+    /// Create a new test event
+    pub fn new(label: &str) -> Self {
         Self {
             label: label.to_owned(),
             seq: (),
@@ -673,6 +673,8 @@ impl TestEventBuilder<Unsequenced> {
             ts: None,
         }
     }
+
+    /// make it a sequenced event
     pub fn seq(self, seq: u64) -> TestEventBuilder<Sequenced> {
         TestEventBuilder::<Sequenced> {
             seq,
@@ -687,31 +689,38 @@ impl TestEventBuilder<Unsequenced> {
 }
 
 impl<S: SeqState> TestEventBuilder<S> {
+    /// Add an e3_id based on a u64 this takes preference over e3_id()
     pub fn id(mut self, id: u64) -> Self {
         self.id = Some(id);
         self
     }
 
+    /// Ensure the event holds the given aggregate_id this takes preference over e3_id()
     pub fn aggregate_id(mut self, id: u64) -> Self {
         self.aggregate_id = Some(id);
         self
     }
 
+    /// Ensure the event holds the given e3_id.
     pub fn e3_id(mut self, e3_id: E3id) -> Self {
         self.e3_id = Some(e3_id);
         self
     }
 
+    /// Ensure the event holds a ts
     pub fn ts(mut self, ts: u128) -> Self {
         self.ts = Some(ts);
         self
     }
+
+    /// Ensure the event holds the given EnclaveEventData object. This overrides all other params
+    /// aiside from seq(n)
     pub fn data(mut self, data: impl Into<EnclaveEventData>) -> Self {
         self.data = Some(data.into());
         self
     }
 
-    pub fn get_built_event(self) -> EnclaveEvent<Unsequenced> {
+    fn get_built_event(self) -> EnclaveEvent<Unsequenced> {
         let event = self.data.unwrap_or(
             TestEvent {
                 msg: self.label,
@@ -732,11 +741,14 @@ impl<S: SeqState> TestEventBuilder<S> {
 }
 
 impl TestEventBuilder<Unsequenced> {
+    /// Build the event
     pub fn build(self) -> EnclaveEvent<Unsequenced> {
         self.get_built_event()
     }
 }
+
 impl TestEventBuilder<Sequenced> {
+    /// Build the event
     pub fn build(self) -> EnclaveEvent<Sequenced> {
         let seq = self.seq;
         let unseq = self.get_built_event();
