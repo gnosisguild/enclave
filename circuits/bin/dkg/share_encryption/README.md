@@ -37,7 +37,7 @@ flowchart TD
     linkStyle 4 stroke:#808080,stroke-width:2px
 ```
 
-### Metadata
+## Metadata
 
 - **Phase**: P1 (DKG).
 - **Runs**: (N_PARTIES - 1) × Ciphernode per variant (once per recipient per share type).
