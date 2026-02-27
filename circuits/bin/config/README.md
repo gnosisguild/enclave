@@ -23,7 +23,7 @@ flowchart TD
     linkStyle 0 stroke:#808080,stroke-width:2px
 ```
 
-### Metadata
+## Metadata
 
 - **Phase**: P0 (Configuration Verification).
 - **Runs**: 1 x Ciphernode (one-time program verification).
