@@ -52,10 +52,10 @@ impl<let N: u32, let L: u32> Configs<N, L> {
 /// 2. Correct public key generation: pk0_i = -a_i * sk + eek + r2_i * (X^N + 1) + r1_i * q_i
 ///    (pk1 is a_i from the hardcoded CRS `a`, not a separate witness)
 ///
-/// Outputs:
+/// Outputs (in return order):
 /// - commit(sk) -> C2a (secret key share verification)
-/// - commit(e_sm) -> C2b (smudging noise share verification)
 /// - commit(pk_trbfv) -> C5 (public key aggregation)
+/// - commit(e_sm) -> C2b (smudging noise share verification)
 pub struct PkGeneration<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_PK: u32> {
     /// Cryptographic parameters including bounds, moduli, and constants.
     configs: Configs<N, L>,
@@ -126,10 +126,10 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
 
     /// Executes the threshold public key generation circuit.
     ///
-    /// Returns a tuple of three commitments:
+    /// Returns a tuple of three commitments in the following order:
     /// - commit(sk) -> C2a (secret key share verification)
-    /// - commit(e_sm) -> C2b (smudging noise share verification)
     /// - commit(pk_trbfv) -> C5 (public key aggregation)
+    /// - commit(e_sm) -> C2b (smudging noise share verification)
     pub fn execute(self) -> (Field, Field, Field) {
         // 1. Perform range checks on all secret witness values
         self.perform_range_checks();

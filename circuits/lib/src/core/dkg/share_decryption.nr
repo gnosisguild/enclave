@@ -68,8 +68,12 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32> ShareDecryption<N, L,
     /// Aggregates all verified shares by summing coefficient-wise across honest parties.
     ///
     /// For each CRT modulus and each coefficient position, computes:
-    ///   aggregated[mod_idx][coeff] = sum(decrypted_shares[party_idx][mod_idx][coeff])
+    ///   aggregated[mod_idx][coeff] = sum(decrypted_shares[party_idx][mod_idx][coeff]) mod q_l
     ///                                  for party_idx in 0..H
+    ///
+    /// Note: explicit modular reduction is omitted here because shares are verified to be in
+    /// [0, q_l) by C2 range checks, and the sum fits in the circuit field. The modular
+    /// reduction is enforced implicitly via the quotient polynomials in the downstream C6 circuit.
     ///
     /// This reflects the threshold key construction: sk = sum(sk_i) for i in H.
     /// Each ciphernode now holds a share of this sum, used during threshold decryption in P4.

@@ -14,7 +14,7 @@ use crate::math::polynomial::Polynomial;
 /// the Distributed Key Generation (DKG) phase.
 ///
 /// Outputs:
-/// - commit(pk0, pk1) -> C3a / C3b (share encryption)
+/// - commit(pk_dkg) -> C3a / C3b (share encryption)
 pub struct Pk<let N: u32, let L: u32, let BIT_PK: u32> {
     /// BFV public key first component for each CRT modulus.
     /// pk0[i] is a degree N-1 polynomial for modulus q_i.
