@@ -216,6 +216,10 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
 /// Verifies that all shares `y[i][j][k]` for `k >= 1` (party shares, not the secret at `k=0`)
 /// are in the valid range [0, q_j) for each CRT modulus q_j.
 ///
+/// The secret at `k=0` is intentionally exempt: it is range-checked by C1 (pk_generation)
+/// and bound to this circuit via the commitment `expected_secret_commitment`. Commitment
+/// binding guarantees the value is unchanged, so re-checking it here is redundant.
+///
 /// These bounds are critical for security-shares outside this range could:
 /// - Leak information about the secret
 /// - Break the reconstruction process via Lagrange interpolation
