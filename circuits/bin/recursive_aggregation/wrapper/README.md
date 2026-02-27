@@ -25,7 +25,7 @@ Every wrapper follows the same structure. What varies between circuits:
 | `threshold/pk_aggregation`               | 1          | `H + 1`                                                                     |
 | `threshold/share_decryption`             | 1          | `2 + (3 × L × N)`                                                           |
 | `threshold/decrypted_shares_aggregation` | 1          | `((T+1) × L × MAX_MSG_NON_ZERO_COEFFS) + (T + 1 + MAX_MSG_NON_ZERO_COEFFS)` |
-| `threshold/user_data_encryption`         | —          | — (see below)                                                               |
+| `threshold/user_data_encryption`         | 2          | 4 (ct0) · 3 (ct1) — asymmetric, see below                                  |
 
 ## Special Case: `threshold/user_data_encryption`
 

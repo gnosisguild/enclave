@@ -26,13 +26,13 @@ pub struct Configs<let L: u32> {
     pub pk_bounds: [Field; L],
     /// Coefficient bound for the global error polynomial e0
     pub e0_bound: Field,
-    /// Coefficient bound for the ternary randomness polynomial u (= 1)
+    /// Coefficient bound for the error polynomial e1
     pub e1_bound: Field,
     /// Coefficient bound for the ternary randomness polynomial u (= 1)
     pub u_bound: Field,
-    /// Lower bounds for r1 quotient polynomials per CRT modulus
+    /// Lower bounds for r1 modulus switching quotient coefficients per CRT modulus
     pub r1_low_bounds: [Field; L],
-    /// Coefficient bounds for r2 cyclotomic reduction quotients per CRT modulus
+    /// Upper bounds for r1 modulus switching quotient coefficients per CRT modulus
     pub r1_up_bounds: [Field; L],
     /// Coefficient bounds for r2 cyclotomic reduction quotients per CRT modulus
     pub r2_bounds: [Field; L],
@@ -356,8 +356,9 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
 
     /// Generates Fiat-Shamir challenge values using the SAFE cryptographic sponge.
     ///
-    /// Returns L+1 challenge values: one primary gamma for evaluating all polynomials,
-    /// and L additional weights used to batch the per-modulus verification equations.
+    /// Returns 2*L challenge values: one primary gamma at index 0 for evaluating all
+    /// polynomials, L-1 weights at indices 1..L-1 for batching ct0 equations across
+    /// moduli, and L weights at indices L..2L-1 for batching ct1 equations.
     fn generate_challenge(self, k1: Polynomial<N>) -> Vec<Field> {
         let inputs = self.payload(k1);
 

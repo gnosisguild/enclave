@@ -4,7 +4,7 @@ Noir library shared by all circuits in the Enclave protocol. It provides the mat
 primitives, cryptographic circuit logic, and parameter configurations that the binary circuits
 (`circuits/bin/`) compose and instantiate.
 
-```
+```text
 lib/src/
 ├── math/       — polynomial arithmetic, hashing, modular arithmetic
 ├── core/       — circuit logic for DKG and threshold protocols
@@ -130,7 +130,7 @@ encryption (P3).
 Cryptographic parameter presets. All binary circuits import from `configs::default`, which is the
 single place to switch between parameter sets.
 
-```
+```text
 configs/
 ├── default/mod.nr      ← change this to switch preset
 ├── committee/
