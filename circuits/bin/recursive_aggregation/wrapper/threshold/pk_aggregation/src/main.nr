@@ -15,8 +15,8 @@ pub global N_PUBLIC_INPUTS: u32 = H + 1;
 fn main(
     verification_key: UltraHonkVerificationKey,
     proofs: [UltraHonkProof; N_PROOFS],
-    public_inputs: pub [[Field; N_PUBLIC_INPUTS]; N_PROOFS],
-    key_hash: pub Field,
+    public_inputs: [[Field; N_PUBLIC_INPUTS]; N_PROOFS],
+    key_hash: Field,
 ) -> pub Field {
     for i in 0..N_PROOFS {
         verify_honk_proof_non_zk(verification_key, proofs[i], public_inputs[i], key_hash);

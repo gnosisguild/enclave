@@ -164,8 +164,6 @@ impl ZkProver {
 
         let mut args = vec![
             "prove",
-            "--scheme",
-            "ultra_honk",
             "-b",
             circuit_path_s.as_ref(),
             "-w",
@@ -174,6 +172,7 @@ impl ZkProver {
             vk_path_s.as_ref(),
             "-o",
             output_dir_s.as_ref(),
+            "-v",
         ];
         if let Some(t) = verifier_target {
             args.extend(["-t", t]);
