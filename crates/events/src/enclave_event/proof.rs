@@ -56,6 +56,8 @@ pub enum CircuitName {
     DecryptedSharesAggregationBn,
     /// Decrypted shares aggregation proof — Modular variant (C7b).
     DecryptedSharesAggregationMod,
+    /// Recursive aggregation fold circuit (independent; lives at recursive_aggregation/fold).
+    Fold,
 }
 
 impl CircuitName {
@@ -71,6 +73,7 @@ impl CircuitName {
             CircuitName::ThresholdShareDecryption => "share_decryption",
             CircuitName::DecryptedSharesAggregationBn => "decrypted_shares_aggregation_bn",
             CircuitName::DecryptedSharesAggregationMod => "decrypted_shares_aggregation_mod",
+            CircuitName::Fold => "fold",
         }
     }
 
@@ -86,6 +89,7 @@ impl CircuitName {
             CircuitName::PkAggregation => "threshold",
             CircuitName::DecryptedSharesAggregationBn => "threshold",
             CircuitName::DecryptedSharesAggregationMod => "threshold",
+            CircuitName::Fold => "recursive_aggregation",
         }
     }
 

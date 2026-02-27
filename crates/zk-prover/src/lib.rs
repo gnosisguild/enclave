@@ -20,7 +20,7 @@ pub use actors::{
 };
 
 pub use backend::{SetupStatus, ZkBackend};
-pub use circuits::recursive_aggregation::generate_wrapper_proof;
+pub use circuits::recursive_aggregation::{generate_fold_proof, generate_wrapper_proof};
 pub use config::{verify_checksum, BbTarget, CircuitInfo, VersionInfo, ZkConfig};
 pub use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 pub use error::ZkError;
