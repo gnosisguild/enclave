@@ -24,11 +24,12 @@ use e3_events::EffectsEnabled;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
     ComputeResponse, DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, EnclaveEvent,
-    EnclaveEventData, EventPublisher, EventSubscriber, EventType, PartyC4VerificationResult,
-    PartyVerificationResult, PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest,
-    PkGenerationProofResponse, ShareComputationProofRequest, ShareComputationProofResponse,
-    ShareEncryptionProofRequest, ShareEncryptionProofResponse, TypedEvent, VerifyC4ProofsRequest,
-    VerifyC4ProofsResponse, VerifyShareProofsRequest, VerifyShareProofsResponse,
+    EnclaveEventData, EventPublisher, EventSubscriber, EventType,
+    PartyShareDecryptionVerificationResult, PartyVerificationResult, PkBfvProofRequest,
+    PkBfvProofResponse, PkGenerationProofRequest, PkGenerationProofResponse,
+    ShareComputationProofRequest, ShareComputationProofResponse, ShareEncryptionProofRequest,
+    ShareEncryptionProofResponse, TypedEvent, VerifyShareDecryptionProofsRequest,
+    VerifyShareDecryptionProofsResponse, VerifyShareProofsRequest, VerifyShareProofsResponse,
     ZkError as ZkEventError, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::build_pair_for_preset;
@@ -425,9 +426,11 @@ fn handle_zk_request(
         ZkRequest::VerifyShareProofs(req) => timefunc("zk_verify_share_proofs", id, || {
             handle_verify_share_proofs(&prover, req, request.clone())
         }),
-        ZkRequest::VerifyC4Proofs(req) => timefunc("zk_verify_c4_proofs", id, || {
-            handle_verify_c4_proofs(&prover, req, request.clone())
-        }),
+        ZkRequest::VerifyShareDecryptionProofs(req) => {
+            timefunc("zk_verify_share_decryption_proofs", id, || {
+                handle_verify_share_decryption_proofs(&prover, req, request.clone())
+            })
+        }
     }
 }
 
@@ -864,38 +867,38 @@ fn handle_verify_share_proofs(
     ))
 }
 
-fn handle_verify_c4_proofs(
+fn handle_verify_share_decryption_proofs(
     prover: &ZkProver,
-    req: VerifyC4ProofsRequest,
+    req: VerifyShareDecryptionProofsRequest,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     let e3_id_str = request.e3_id.to_string();
 
-    let party_results: Vec<PartyC4VerificationResult> = req
+    let party_results: Vec<PartyShareDecryptionVerificationResult> = req
         .party_proofs
         .into_iter()
         .map(|party| {
             let sender = party.sender_party_id;
 
-            // Verify C4a proof
-            let c4a_result = prover.verify(&party.c4a_proof, &e3_id_str, sender);
-            match c4a_result {
+            // Verify SK decryption proof
+            let sk_result = prover.verify(&party.sk_decryption_proof, &e3_id_str, sender);
+            match sk_result {
                 Ok(true) => {}
                 Ok(false) | Err(_) => {
-                    return PartyC4VerificationResult {
+                    return PartyShareDecryptionVerificationResult {
                         sender_party_id: sender,
                         all_verified: false,
                     };
                 }
             }
 
-            // Verify all C4b proofs
-            for c4b_proof in &party.c4b_proofs {
-                let result = prover.verify(c4b_proof, &e3_id_str, sender);
+            // Verify all ESM decryption proofs
+            for esm_proof in &party.esm_decryption_proofs {
+                let result = prover.verify(esm_proof, &e3_id_str, sender);
                 match result {
                     Ok(true) => continue,
                     Ok(false) | Err(_) => {
-                        return PartyC4VerificationResult {
+                        return PartyShareDecryptionVerificationResult {
                             sender_party_id: sender,
                             all_verified: false,
                         };
@@ -903,7 +906,7 @@ fn handle_verify_c4_proofs(
                 }
             }
 
-            PartyC4VerificationResult {
+            PartyShareDecryptionVerificationResult {
                 sender_party_id: sender,
                 all_verified: true,
             }
@@ -911,7 +914,9 @@ fn handle_verify_c4_proofs(
         .collect();
 
     Ok(ComputeResponse::zk(
-        ZkResponse::VerifyC4Proofs(VerifyC4ProofsResponse { party_results }),
+        ZkResponse::VerifyShareDecryptionProofs(VerifyShareDecryptionProofsResponse {
+            party_results,
+        }),
         request.correlation_id,
         request.e3_id,
     ))

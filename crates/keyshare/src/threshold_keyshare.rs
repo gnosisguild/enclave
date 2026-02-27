@@ -15,12 +15,12 @@ use e3_events::{
     DkgShareDecryptionProofResponse, E3Failed, E3RequestComplete, E3Stage, E3id, EType,
     EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed,
     EncryptionKeyCreated, EncryptionKeyPending, EventContext, FailureReason, KeyshareCreated,
-    PartyC4ProofsToVerify, PartyId, PartyProofsToVerify, PkGenerationProofRequest,
+    PartyId, PartyProofsToVerify, PartyShareDecryptionProofsToVerify, PkGenerationProofRequest,
     PkGenerationProofSigned, Proof, ProofType, Sequenced, ShareComputationProofRequest,
     ShareEncryptionProofRequest, SignedProofPayload, ThresholdShare,
     ThresholdShareCollectionFailed, ThresholdShareCreated, ThresholdSharePending, TypedEvent,
-    VerifyC4ProofsRequest, VerifyC4ProofsResponse, VerifyShareProofsRequest,
-    VerifyShareProofsResponse, ZkRequest, ZkResponse,
+    VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
+    VerifyShareProofsRequest, VerifyShareProofsResponse, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::{build_pair_for_preset, BfvParamSet, BfvPreset};
@@ -367,13 +367,13 @@ pub struct ThresholdKeyshare {
     /// Temporarily holds shares + proofs while C2/C3 proof verification is in flight.
     pending_verification_shares: Option<Vec<Arc<ThresholdShare>>>,
     /// C4a proof (SecretKey decryption) — stored after generation, used in Exchange #3.
-    c4a_proof: Option<Proof>,
+    sk_decryption_proof: Option<Proof>,
     /// C4b proofs (SmudgingNoise decryption) — keyed by esi_idx for deterministic ordering.
-    c4b_proofs: HashMap<usize, Proof>,
+    esm_decryption_proofs: HashMap<usize, Proof>,
     /// Expected number of C4b proofs (one per smudging noise index).
-    expected_c4b_count: usize,
+    expected_esm_decryption_count: usize,
     /// Maps correlation IDs to esi_idx for C4b proof ordering.
-    c4b_correlation_map: HashMap<CorrelationId, usize>,
+    esm_decryption_correlation_map: HashMap<CorrelationId, usize>,
     /// Parties that provided no C2/C3 proofs (treated as dishonest when others did provide proofs).
     no_proof_dishonest_parties: Option<HashSet<u64>>,
     /// Party IDs sent for C2/C3 verification — used to detect missing results in the response.
@@ -393,10 +393,10 @@ impl ThresholdKeyshare {
             state: params.state,
             share_enc_preset: params.share_enc_preset,
             pending_verification_shares: None,
-            c4a_proof: None,
-            c4b_proofs: HashMap::new(),
-            expected_c4b_count: 0,
-            c4b_correlation_map: HashMap::new(),
+            sk_decryption_proof: None,
+            esm_decryption_proofs: HashMap::new(),
+            expected_esm_decryption_count: 0,
+            esm_decryption_correlation_map: HashMap::new(),
             no_proof_dishonest_parties: None,
             expected_verification_parties: None,
             honest_parties: None,
@@ -615,8 +615,12 @@ impl ThresholdKeyshare {
             },
             ComputeResponseKind::Zk(zk) => match zk {
                 ZkResponse::VerifyShareProofs(_) => self.handle_verify_share_proofs_response(msg),
-                ZkResponse::DkgShareDecryption(_) => self.handle_c4_proof_response(msg),
-                ZkResponse::VerifyC4Proofs(_) => self.handle_verify_c4_proofs_response(msg),
+                ZkResponse::DkgShareDecryption(_) => {
+                    self.handle_share_decryption_proof_response(msg)
+                }
+                ZkResponse::VerifyShareDecryptionProofs(_) => {
+                    self.handle_verify_share_decryption_proofs_response(msg)
+                }
                 _ => Ok(()),
             },
         }
@@ -1459,11 +1463,11 @@ impl ThresholdKeyshare {
         );
         self.bus.publish(event, ec.clone())?;
 
-        // Reset C4 proof storage and set expected count
-        self.c4a_proof = None;
-        self.c4b_proofs.clear();
-        self.c4b_correlation_map.clear();
-        self.expected_c4b_count = num_esi;
+        // Reset share decryption proof storage and set expected count
+        self.sk_decryption_proof = None;
+        self.esm_decryption_proofs.clear();
+        self.esm_decryption_correlation_map.clear();
+        self.expected_esm_decryption_count = num_esi;
 
         // Resolve threshold preset for C4 proof requests
         let threshold_preset = self
@@ -1476,7 +1480,7 @@ impl ThresholdKeyshare {
             "Dispatching C4a DkgShareDecryption proof (SecretKey) for E3 {} ({} honest, {} moduli)",
             e3_id, num_honest, num_moduli_sk
         );
-        let c4a_request = ComputeRequest::zk(
+        let sk_decryption_request = ComputeRequest::zk(
             ZkRequest::DkgShareDecryption(DkgShareDecryptionProofRequest {
                 sk_bfv: current.sk_bfv.clone(),
                 honest_ciphertexts_raw: sk_ciphertexts_raw,
@@ -1488,7 +1492,7 @@ impl ThresholdKeyshare {
             CorrelationId::new(),
             e3_id.clone(),
         );
-        self.bus.publish(c4a_request, ec.clone())?;
+        self.bus.publish(sk_decryption_request, ec.clone())?;
 
         // Dispatch C4b proof generation for each smudging noise index
         for (esi_idx, esi_cts) in esi_ciphertexts_raw.into_iter().enumerate() {
@@ -1497,8 +1501,9 @@ impl ThresholdKeyshare {
                 esi_idx, e3_id, num_honest, num_moduli_esi
             );
             let correlation_id = CorrelationId::new();
-            self.c4b_correlation_map.insert(correlation_id, esi_idx);
-            let c4b_request = ComputeRequest::zk(
+            self.esm_decryption_correlation_map
+                .insert(correlation_id, esi_idx);
+            let esm_decryption_request = ComputeRequest::zk(
                 ZkRequest::DkgShareDecryption(DkgShareDecryptionProofRequest {
                     sk_bfv: current.sk_bfv.clone(),
                     honest_ciphertexts_raw: esi_cts,
@@ -1510,14 +1515,17 @@ impl ThresholdKeyshare {
                 correlation_id,
                 e3_id.clone(),
             );
-            self.bus.publish(c4b_request, ec.clone())?;
+            self.bus.publish(esm_decryption_request, ec.clone())?;
         }
 
         Ok(())
     }
 
     /// Handle C4 (DkgShareDecryption) proof responses — store for Exchange #3.
-    fn handle_c4_proof_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
+    fn handle_share_decryption_proof_response(
+        &mut self,
+        msg: TypedEvent<ComputeResponse>,
+    ) -> Result<()> {
         let (msg, _ec) = msg.into_components();
         let correlation_id = msg.correlation_id;
         let resp: DkgShareDecryptionProofResponse = match msg.response {
@@ -1530,35 +1538,37 @@ impl ThresholdKeyshare {
 
         match resp.dkg_input_type {
             DkgInputType::SecretKey => {
-                info!("Received C4a proof (SecretKey decryption) for E3 {}", e3_id);
-                self.c4a_proof = Some(resp.proof);
+                info!("Received SK share decryption proof for E3 {}", e3_id);
+                self.sk_decryption_proof = Some(resp.proof);
             }
             DkgInputType::SmudgingNoise => {
                 let esi_idx = self
-                    .c4b_correlation_map
+                    .esm_decryption_correlation_map
                     .remove(&correlation_id)
                     .ok_or_else(|| {
                         anyhow!(
-                            "Unknown correlation ID {} for C4b proof in E3 {}",
+                            "Unknown correlation ID {} for ESM share decryption proof in E3 {}",
                             correlation_id,
                             e3_id
                         )
                     })?;
                 info!(
-                    "Received C4b proof (SmudgingNoise[{}] decryption) for E3 {} ({}/{})",
+                    "Received ESM share decryption proof (SmudgingNoise[{}]) for E3 {} ({}/{})",
                     esi_idx,
                     e3_id,
-                    self.c4b_proofs.len() + 1,
-                    self.expected_c4b_count
+                    self.esm_decryption_proofs.len() + 1,
+                    self.expected_esm_decryption_count
                 );
-                self.c4b_proofs.insert(esi_idx, resp.proof);
+                self.esm_decryption_proofs.insert(esi_idx, resp.proof);
             }
         }
 
-        if self.c4a_proof.is_some() && self.c4b_proofs.len() == self.expected_c4b_count {
+        if self.sk_decryption_proof.is_some()
+            && self.esm_decryption_proofs.len() == self.expected_esm_decryption_count
+        {
             info!(
-                "All C4 proofs received for E3 {} (1 C4a + {} C4b)",
-                e3_id, self.expected_c4b_count
+                "All share decryption proofs received for E3 {} (1 SK + {} ESM)",
+                e3_id, self.expected_esm_decryption_count
             );
             self.try_publish_decryption_key_shared(_ec)?;
         }
@@ -1581,16 +1591,16 @@ impl ThresholdKeyshare {
             }
         };
 
-        // Need all C4 proofs
-        let c4a = match &self.c4a_proof {
+        // Need all share decryption proofs
+        let sk_proof = match &self.sk_decryption_proof {
             Some(p) => p.clone(),
             None => {
-                trace!("C4a proof not yet received — deferring Exchange #3");
+                trace!("SK share decryption proof not yet received — deferring Exchange #3");
                 return Ok(());
             }
         };
-        if self.c4b_proofs.len() != self.expected_c4b_count {
-            trace!("Not all C4b proofs received — deferring Exchange #3");
+        if self.esm_decryption_proofs.len() != self.expected_esm_decryption_count {
+            trace!("Not all ESM share decryption proofs received — deferring Exchange #3");
             return Ok(());
         }
 
@@ -1613,15 +1623,16 @@ impl ThresholdKeyshare {
             e3_id, party_id
         );
 
-        // Assemble C4b proofs in esi_idx order to align with es_poly_sum
-        let mut c4b_ordered: Vec<Proof> = Vec::with_capacity(self.expected_c4b_count);
-        for idx in 0..self.expected_c4b_count {
+        // Assemble ESM decryption proofs in esi_idx order to align with es_poly_sum
+        let mut esm_proofs_ordered: Vec<Proof> =
+            Vec::with_capacity(self.expected_esm_decryption_count);
+        for idx in 0..self.expected_esm_decryption_count {
             let proof = self
-                .c4b_proofs
+                .esm_decryption_proofs
                 .get(&idx)
-                .ok_or_else(|| anyhow!("Missing C4b proof for esi_idx {}", idx))?
+                .ok_or_else(|| anyhow!("Missing ESM share decryption proof for esi_idx {}", idx))?
                 .clone();
-            c4b_ordered.push(proof);
+            esm_proofs_ordered.push(proof);
         }
 
         self.bus.publish(
@@ -1631,8 +1642,8 @@ impl ThresholdKeyshare {
                 node,
                 sk_poly_sum: ArcBytes::from_bytes(&sk_poly_sum_bytes),
                 es_poly_sum: es_poly_sum_bytes,
-                c4a_proof: c4a,
-                c4b_proofs: c4b_ordered,
+                sk_decryption_proof: sk_proof,
+                esm_decryption_proofs: esm_proofs_ordered,
                 external: false,
             },
             ec,
@@ -1698,30 +1709,32 @@ impl ThresholdKeyshare {
             msg.shares.len()
         );
 
-        // Build C4 proof verification requests from collected shares
-        let party_proofs: Vec<PartyC4ProofsToVerify> = msg
+        // Build share decryption proof verification requests from collected shares
+        let party_proofs: Vec<PartyShareDecryptionProofsToVerify> = msg
             .shares
             .iter()
-            .map(|(&party_id, share)| PartyC4ProofsToVerify {
+            .map(|(&party_id, share)| PartyShareDecryptionProofsToVerify {
                 sender_party_id: party_id,
-                c4a_proof: share.c4a_proof.clone(),
-                c4b_proofs: share.c4b_proofs.clone(),
+                sk_decryption_proof: share.sk_decryption_proof.clone(),
+                esm_decryption_proofs: share.esm_decryption_proofs.clone(),
             })
             .collect();
 
         if party_proofs.is_empty() {
-            info!("No C4 proofs to verify — publishing KeyshareCreated directly");
+            info!("No share decryption proofs to verify — publishing KeyshareCreated directly");
             return self.publish_keyshare_created(ec);
         }
 
         info!(
-            "Dispatching C4 proof verification for E3 {} ({} parties)",
+            "Dispatching share decryption proof verification for E3 {} ({} parties)",
             e3_id,
             party_proofs.len()
         );
 
         let event = ComputeRequest::zk(
-            ZkRequest::VerifyC4Proofs(VerifyC4ProofsRequest { party_proofs }),
+            ZkRequest::VerifyShareDecryptionProofs(VerifyShareDecryptionProofsRequest {
+                party_proofs,
+            }),
             CorrelationId::new(),
             e3_id.clone(),
         );
@@ -1729,19 +1742,22 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// Handle C4 proof verification results — update honest set H and publish KeyshareCreated.
-    fn handle_verify_c4_proofs_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
+    /// Handle share decryption proof verification results — update honest set H and publish KeyshareCreated.
+    fn handle_verify_share_decryption_proofs_response(
+        &mut self,
+        msg: TypedEvent<ComputeResponse>,
+    ) -> Result<()> {
         let (msg, ec) = msg.into_components();
-        let resp: VerifyC4ProofsResponse = match msg.response {
-            ComputeResponseKind::Zk(ZkResponse::VerifyC4Proofs(r)) => r,
-            _ => bail!("Expected VerifyC4Proofs response"),
+        let resp: VerifyShareDecryptionProofsResponse = match msg.response {
+            ComputeResponseKind::Zk(ZkResponse::VerifyShareDecryptionProofs(r)) => r,
+            _ => bail!("Expected VerifyShareDecryptionProofs response"),
         };
 
         let state = self.state.try_get()?;
         let e3_id = state.get_e3_id();
 
         // Partition into honest and dishonest
-        let mut c4_dishonest: HashSet<u64> = HashSet::new();
+        let mut share_decryption_dishonest: HashSet<u64> = HashSet::new();
         for result in &resp.party_results {
             if result.all_verified {
                 info!(
@@ -1753,14 +1769,14 @@ impl ThresholdKeyshare {
                     "Party {} FAILED C4 verification for E3 {}",
                     result.sender_party_id, e3_id
                 );
-                c4_dishonest.insert(result.sender_party_id);
+                share_decryption_dishonest.insert(result.sender_party_id);
             }
         }
 
         // Update honest parties set
-        if !c4_dishonest.is_empty() {
+        if !share_decryption_dishonest.is_empty() {
             if let Some(ref mut honest) = self.honest_parties {
-                honest.retain(|pid| !c4_dishonest.contains(pid));
+                honest.retain(|pid| !share_decryption_dishonest.contains(pid));
 
                 let threshold = state.threshold_m;
                 let honest_count = honest.len() as u64;
@@ -1786,7 +1802,7 @@ impl ThresholdKeyshare {
                     "Updated honest set after C4 verification for E3 {}: {} honest ({} removed)",
                     e3_id,
                     honest.len(),
-                    c4_dishonest.len()
+                    share_decryption_dishonest.len()
                 );
             }
         } else {
