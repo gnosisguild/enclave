@@ -23,7 +23,7 @@ flowchart TD
     linkStyle 1 stroke:#808080,stroke-width:2px
 ```
 
-### Metadata
+## Metadata
 
 - **Phase**: P2 (Aggregation).
 - **Runs**: 1 × Aggregator (once after all honest parties' pk shares are collected).
