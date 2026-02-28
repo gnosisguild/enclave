@@ -24,10 +24,12 @@ use e3_events::EffectsEnabled;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
     ComputeResponse, DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, EnclaveEvent,
-    EnclaveEventData, EventPublisher, EventSubscriber, EventType, PartyVerificationResult,
-    PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest, PkGenerationProofResponse,
+    EnclaveEventData, EventPublisher, EventSubscriber, EventType,
+    PartyShareDecryptionVerificationResult, PartyVerificationResult, PkBfvProofRequest,
+    PkBfvProofResponse, PkGenerationProofRequest, PkGenerationProofResponse,
     ShareComputationProofRequest, ShareComputationProofResponse, ShareEncryptionProofRequest,
-    ShareEncryptionProofResponse, TypedEvent, VerifyShareProofsRequest, VerifyShareProofsResponse,
+    ShareEncryptionProofResponse, TypedEvent, VerifyShareDecryptionProofsRequest,
+    VerifyShareDecryptionProofsResponse, VerifyShareProofsRequest, VerifyShareProofsResponse,
     ZkError as ZkEventError, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::build_pair_for_preset;
@@ -424,6 +426,11 @@ fn handle_zk_request(
         ZkRequest::VerifyShareProofs(req) => timefunc("zk_verify_share_proofs", id, || {
             handle_verify_share_proofs(&prover, req, request.clone())
         }),
+        ZkRequest::VerifyShareDecryptionProofs(req) => {
+            timefunc("zk_verify_share_decryption_proofs", id, || {
+                handle_verify_share_decryption_proofs(&prover, req, request.clone())
+            })
+        }
     }
 }
 
@@ -855,6 +862,61 @@ fn handle_verify_share_proofs(
 
     Ok(ComputeResponse::zk(
         ZkResponse::VerifyShareProofs(VerifyShareProofsResponse { party_results }),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
+fn handle_verify_share_decryption_proofs(
+    prover: &ZkProver,
+    req: VerifyShareDecryptionProofsRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    let e3_id_str = request.e3_id.to_string();
+
+    let party_results: Vec<PartyShareDecryptionVerificationResult> = req
+        .party_proofs
+        .into_iter()
+        .map(|party| {
+            let sender = party.sender_party_id;
+
+            // Verify SK decryption proof
+            let sk_result = prover.verify(&party.sk_decryption_proof, &e3_id_str, sender);
+            match sk_result {
+                Ok(true) => {}
+                Ok(false) | Err(_) => {
+                    return PartyShareDecryptionVerificationResult {
+                        sender_party_id: sender,
+                        all_verified: false,
+                    };
+                }
+            }
+
+            // Verify all ESM decryption proofs
+            for esm_proof in &party.esm_decryption_proofs {
+                let result = prover.verify(esm_proof, &e3_id_str, sender);
+                match result {
+                    Ok(true) => continue,
+                    Ok(false) | Err(_) => {
+                        return PartyShareDecryptionVerificationResult {
+                            sender_party_id: sender,
+                            all_verified: false,
+                        };
+                    }
+                }
+            }
+
+            PartyShareDecryptionVerificationResult {
+                sender_party_id: sender,
+                all_verified: true,
+            }
+        })
+        .collect();
+
+    Ok(ComputeResponse::zk(
+        ZkResponse::VerifyShareDecryptionProofs(VerifyShareDecryptionProofsResponse {
+            party_results,
+        }),
         request.correlation_id,
         request.e3_id,
     ))

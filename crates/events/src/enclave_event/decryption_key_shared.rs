@@ -28,9 +28,9 @@ pub struct DecryptionKeyShared {
     /// Lagrange-interpolated aggregated E_SM polynomials (serialized), one per smudging noise.
     pub es_poly_sum: Vec<ArcBytes>,
     /// C4a proof (SecretKey decryption).
-    pub c4a_proof: Proof,
+    pub sk_decryption_proof: Proof,
     /// C4b proofs (SmudgingNoise decryption), one per smudging noise index.
-    pub c4b_proofs: Vec<Proof>,
+    pub esm_decryption_proofs: Vec<Proof>,
     /// Whether this was received from the network.
     pub external: bool,
 }

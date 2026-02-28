@@ -22,7 +22,7 @@ export const publishInput = async (
   sender: `0x${string}`,
   programAddress: `0x${string}`,
 ): Promise<`0x${string}`> => {
-  return await walletClient.writeContract({
+  return walletClient.writeContract({
     address: programAddress as `0x${string}`,
     abi: MyProgram.abi,
     functionName: 'publishInput',
