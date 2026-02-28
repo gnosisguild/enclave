@@ -878,6 +878,16 @@ impl ProofRequestActor {
                 .retain(|_, (eid, _)| *eid != e3_id);
             self.pending_threshold.remove(&e3_id);
         }
+
+        if let Some((e3_id, kind)) = self.decryption_correlation.remove(msg.correlation_id()) {
+            error!(
+                "C4 {:?} proof request failed for E3 {}: {err} — DecryptionKeyShared will not be published",
+                kind, e3_id
+            );
+            self.decryption_correlation
+                .retain(|_, (eid, _)| *eid != e3_id);
+            self.pending_decryption.remove(&e3_id);
+        }
     }
 }
 

@@ -1198,6 +1198,27 @@ impl ThresholdKeyshare {
 
         if party_proofs_to_verify.is_empty() {
             // All non-self parties are dishonest (missing or incomplete proofs), none to verify
+            let threshold = state.threshold_m;
+            let total = state.threshold_n;
+            let honest_count = total - pre_dishonest.len() as u64;
+
+            if honest_count < threshold {
+                warn!(
+                    "Too few honest parties for E3 {} ({} honest < {} threshold) after C2/C3 pre-dishonest filtering — cannot proceed",
+                    e3_id, honest_count, threshold
+                );
+                self.pending_shares.clear();
+                self.bus.publish(
+                    E3Failed {
+                        e3_id: e3_id.clone(),
+                        failed_at_stage: E3Stage::CommitteeFinalized,
+                        reason: FailureReason::InsufficientCommitteeMembers,
+                    },
+                    ec,
+                )?;
+                return Ok(());
+            }
+
             let dishonest_set: HashSet<u64> = pre_dishonest.into_iter().collect();
             return self.proceed_with_decryption_key_calculation(Some(dishonest_set), ec);
         }
@@ -1356,7 +1377,109 @@ impl ThresholdKeyshare {
             })
             .collect();
 
-        // Store honest party IDs in state
+        // Derive expected dimensions from our own share (trusted source).
+        // All parties use the same on-chain BFV params, so dimensions must be identical.
+        let own_share = honest_shares
+            .iter()
+            .find(|ts| ts.party_id == state.party_id as u64)
+            .ok_or_else(|| anyhow!("Own share not found in honest shares"))?;
+
+        let expected_num_esi = own_share.esi_sss.len();
+        let own_sk_share = own_share
+            .sk_sss
+            .clone_share(if own_share.sk_sss.len() == 1 {
+                0
+            } else {
+                party_id
+            })
+            .ok_or(anyhow!("No own sk_sss share"))?;
+        let expected_num_moduli_sk = own_sk_share.num_moduli();
+        let expected_num_moduli_esi = if expected_num_esi > 0 {
+            own_share.esi_sss[0]
+                .clone_share(if own_share.esi_sss[0].len() == 1 {
+                    0
+                } else {
+                    party_id
+                })
+                .map(|s| s.num_moduli())
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
+        // Validate per-party dimensions and exclude mismatched parties.
+        // This prevents a malicious party with wrong-sized shares from
+        // causing a panic or opaque error in downstream matrix building.
+        let mut dimension_excluded: Vec<u64> = Vec::new();
+        let honest_shares: Vec<_> = honest_shares
+            .into_iter()
+            .filter(|ts| {
+                // Own share is always valid
+                if ts.party_id == state.party_id as u64 {
+                    return true;
+                }
+                // Check esi count
+                if ts.esi_sss.len() != expected_num_esi {
+                    warn!(
+                        "Party {} has wrong esi_sss count ({} vs expected {}) — excluding from honest set",
+                        ts.party_id, ts.esi_sss.len(), expected_num_esi
+                    );
+                    dimension_excluded.push(ts.party_id);
+                    return false;
+                }
+                // Check sk moduli count
+                let idx = if ts.sk_sss.len() == 1 { 0 } else { party_id };
+                if let Some(share) = ts.sk_sss.clone_share(idx) {
+                    if share.num_moduli() != expected_num_moduli_sk {
+                        warn!(
+                            "Party {} has wrong sk num_moduli ({} vs expected {}) — excluding from honest set",
+                            ts.party_id, share.num_moduli(), expected_num_moduli_sk
+                        );
+                        dimension_excluded.push(ts.party_id);
+                        return false;
+                    }
+                }
+                // Check esi moduli counts
+                for (esi_idx, esi_shares) in ts.esi_sss.iter().enumerate() {
+                    let idx = if esi_shares.len() == 1 { 0 } else { party_id };
+                    if let Some(share) = esi_shares.clone_share(idx) {
+                        if share.num_moduli() != expected_num_moduli_esi {
+                            warn!(
+                                "Party {} has wrong esi num_moduli at index {} ({} vs expected {}) — excluding from honest set",
+                                ts.party_id, esi_idx, share.num_moduli(), expected_num_moduli_esi
+                            );
+                            dimension_excluded.push(ts.party_id);
+                            return false;
+                        }
+                    }
+                }
+                true
+            })
+            .collect();
+
+        if !dimension_excluded.is_empty() {
+            warn!(
+                "Excluded {} parties with dimension mismatches: {:?}",
+                dimension_excluded.len(),
+                dimension_excluded
+            );
+            // Re-check threshold after exclusion
+            let threshold = state.threshold_m;
+            if (honest_shares.len() as u64) < threshold {
+                self.pending_shares.clear();
+                self.bus.publish(
+                    E3Failed {
+                        e3_id: e3_id.clone(),
+                        failed_at_stage: E3Stage::CommitteeFinalized,
+                        reason: FailureReason::InsufficientCommitteeMembers,
+                    },
+                    ec,
+                )?;
+                return Ok(());
+            }
+        }
+
+        // Store honest party IDs in state (after dimension exclusion)
         let honest_party_ids: HashSet<u64> = honest_shares.iter().map(|s| s.party_id).collect();
 
         let num_honest = honest_shares.len();
@@ -1366,74 +1489,36 @@ impl ThresholdKeyshare {
         );
 
         // Collect ciphertext bytes for C4 proof requests (built here, sent after CalculateDecryptionKey)
+        // Dimensions are validated per-party above, so all shares are consistent.
         // C4a: sk_sss ciphertexts from honest parties [H * L]
+        let num_moduli_sk = expected_num_moduli_sk;
         let mut sk_ciphertexts_raw = Vec::new();
-        let mut num_moduli_sk: Option<usize> = None;
         for ts in &honest_shares {
             let idx = if ts.sk_sss.len() == 1 { 0 } else { party_id };
             let share = ts
                 .sk_sss
                 .clone_share(idx)
                 .ok_or(anyhow!("No sk_sss share at index {}", idx))?;
-            let moduli = share.num_moduli();
-            match num_moduli_sk {
-                Some(expected) if expected != moduli => {
-                    bail!(
-                        "Party {} has inconsistent sk num_moduli ({} vs expected {})",
-                        ts.party_id,
-                        moduli,
-                        expected
-                    );
-                }
-                None => num_moduli_sk = Some(moduli),
-                _ => {}
-            }
             for ct_bytes in share.ciphertext_bytes() {
                 sk_ciphertexts_raw.push(ct_bytes.clone());
             }
         }
-        let num_moduli_sk = num_moduli_sk.unwrap_or(0);
 
         // C4b: esi_sss ciphertexts from honest parties — one set per smudging noise
-        let num_esi = honest_shares
-            .first()
-            .map(|ts| ts.esi_sss.len())
-            .unwrap_or(0);
-        for ts in &honest_shares {
-            if ts.esi_sss.len() != num_esi {
-                bail!(
-                    "Party {} has inconsistent esi_sss count ({} vs expected {})",
-                    ts.party_id,
-                    ts.esi_sss.len(),
-                    num_esi
-                );
-            }
-        }
+        let num_esi = expected_num_esi;
+        let num_moduli_esi = expected_num_moduli_esi;
         let mut esi_ciphertexts_raw: Vec<Vec<ArcBytes>> = vec![Vec::new(); num_esi];
-        let mut num_moduli_esi: Option<usize> = None;
         for ts in &honest_shares {
             for (esi_idx, esi_shares) in ts.esi_sss.iter().enumerate() {
                 let idx = if esi_shares.len() == 1 { 0 } else { party_id };
                 let share = esi_shares
                     .clone_share(idx)
                     .ok_or(anyhow!("No esi_sss share at index {}", idx))?;
-                let moduli = share.num_moduli();
-                match num_moduli_esi {
-                    Some(expected) if expected != moduli => {
-                        bail!(
-                            "Party {} has inconsistent esi num_moduli at esi_idx {} ({} vs expected {})",
-                            ts.party_id, esi_idx, moduli, expected
-                        );
-                    }
-                    None => num_moduli_esi = Some(moduli),
-                    _ => {}
-                }
                 for ct_bytes in share.ciphertext_bytes() {
                     esi_ciphertexts_raw[esi_idx].push(ct_bytes.clone());
                 }
             }
         }
-        let num_moduli_esi = num_moduli_esi.unwrap_or(0);
 
         // Decrypt our share from each honest sender using BFV
         let sk_sss_collected: Vec<ShamirShare> = honest_shares
@@ -1685,6 +1770,30 @@ impl ThresholdKeyshare {
         }
 
         if party_proofs.is_empty() {
+            // Check threshold viability after removing pre-dishonest parties
+            let threshold = state.threshold_m;
+            let honest_count = self
+                .honest_parties
+                .as_ref()
+                .map(|h| h.len() as u64)
+                .unwrap_or(0);
+
+            if honest_count < threshold {
+                warn!(
+                    "Too few honest parties after C4 pre-filtering for E3 {} ({} honest < {} threshold)",
+                    e3_id, honest_count, threshold
+                );
+                self.bus.publish(
+                    E3Failed {
+                        e3_id: e3_id.clone(),
+                        failed_at_stage: E3Stage::CommitteeFinalized,
+                        reason: FailureReason::InsufficientCommitteeMembers,
+                    },
+                    ec,
+                )?;
+                return Ok(());
+            }
+
             info!("No C4 proofs to verify — publishing KeyshareCreated directly");
             return self.publish_keyshare_created(ec);
         }

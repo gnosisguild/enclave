@@ -53,6 +53,8 @@ struct PendingVerification {
     ecdsa_dishonest: HashSet<u64>,
     /// Pre-dishonest parties from the dispatch (missing/incomplete proofs).
     pre_dishonest: BTreeSet<u64>,
+    /// Party IDs dispatched for ZK verification (for cross-checking results).
+    dispatched_party_ids: HashSet<u64>,
     /// Signed payloads for each party, indexed by party_id.
     /// Used for SignedProofFailed emission when ZK also fails.
     party_signed_payloads: HashMap<u64, Vec<SignedProofPayload>>,
@@ -161,6 +163,10 @@ impl ShareVerificationActor {
 
         // Dispatch ZK-only verification to multithread
         let correlation_id = CorrelationId::new();
+        let dispatched_party_ids: HashSet<u64> = ecdsa_passed_parties
+            .iter()
+            .map(|p| p.sender_party_id)
+            .collect();
         self.pending.insert(
             correlation_id,
             PendingVerification {
@@ -169,6 +175,7 @@ impl ShareVerificationActor {
                 ec: ec.clone(),
                 ecdsa_dishonest,
                 pre_dishonest,
+                dispatched_party_ids,
                 party_signed_payloads,
                 party_addresses,
             },
@@ -179,12 +186,18 @@ impl ShareVerificationActor {
                 party_proofs: ecdsa_passed_parties,
             }),
             correlation_id,
-            e3_id,
+            e3_id.clone(),
         );
 
-        if let Err(err) = self.bus.publish(request, ec) {
+        if let Err(err) = self.bus.publish(request, ec.clone()) {
             error!("Failed to dispatch ZK verification: {err}");
-            self.pending.remove(&correlation_id);
+            if let Some(pending) = self.pending.remove(&correlation_id) {
+                let mut all_dishonest: BTreeSet<u64> = pending.pre_dishonest;
+                all_dishonest.extend(pending.ecdsa_dishonest);
+                // Dispatched parties were never ZK-verified — treat as dishonest
+                all_dishonest.extend(pending.dispatched_party_ids);
+                self.publish_complete(e3_id, VerificationKind::ShareProofs, all_dishonest, ec);
+            }
         }
     }
 
@@ -249,6 +262,10 @@ impl ShareVerificationActor {
         }
 
         let correlation_id = CorrelationId::new();
+        let dispatched_party_ids: HashSet<u64> = ecdsa_passed_parties
+            .iter()
+            .map(|p| p.sender_party_id)
+            .collect();
         self.pending.insert(
             correlation_id,
             PendingVerification {
@@ -257,6 +274,7 @@ impl ShareVerificationActor {
                 ec: ec.clone(),
                 ecdsa_dishonest,
                 pre_dishonest,
+                dispatched_party_ids,
                 party_signed_payloads,
                 party_addresses,
             },
@@ -267,12 +285,18 @@ impl ShareVerificationActor {
                 party_proofs: ecdsa_passed_parties,
             }),
             correlation_id,
-            e3_id,
+            e3_id.clone(),
         );
 
-        if let Err(err) = self.bus.publish(request, ec) {
+        if let Err(err) = self.bus.publish(request, ec.clone()) {
             error!("Failed to dispatch C4 ZK verification: {err}");
-            self.pending.remove(&correlation_id);
+            if let Some(pending) = self.pending.remove(&correlation_id) {
+                let mut all_dishonest: BTreeSet<u64> = pending.pre_dishonest;
+                all_dishonest.extend(pending.ecdsa_dishonest);
+                // Dispatched parties were never ZK-verified — treat as dishonest
+                all_dishonest.extend(pending.dispatched_party_ids);
+                self.publish_complete(e3_id, VerificationKind::DecryptionProofs, all_dishonest, ec);
+            }
         }
     }
 
@@ -385,6 +409,20 @@ impl ShareVerificationActor {
 
         let mut all_dishonest: BTreeSet<u64> = pending.pre_dishonest;
         all_dishonest.extend(&pending.ecdsa_dishonest);
+
+        // Cross-check: every dispatched party must appear in results.
+        // If any party is missing from the ZK response, treat as dishonest (defense-in-depth).
+        let returned_party_ids: HashSet<u64> =
+            zk_results.iter().map(|r| r.sender_party_id).collect();
+        for &dispatched_pid in &pending.dispatched_party_ids {
+            if !returned_party_ids.contains(&dispatched_pid) {
+                warn!(
+                    "Party {} was dispatched for ZK verification but missing from results — treating as dishonest",
+                    dispatched_pid
+                );
+                all_dishonest.insert(dispatched_pid);
+            }
+        }
 
         for result in &zk_results {
             if !result.all_verified {
