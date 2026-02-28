@@ -2020,7 +2020,7 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
                                     Ok(())
                                 } else {
                                     warn!(
-                                        "DecryptionKeyShared from party {} in ReadyForDecryption but no collector",
+                                        "DecryptionKeyShared from party {} dropped — no collector (sole honest party)",
                                         data.party_id
                                     );
                                     Ok(())

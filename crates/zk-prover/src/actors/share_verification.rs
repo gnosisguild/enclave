@@ -26,12 +26,12 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use actix::{Actor, Addr, Context, Handler};
 use alloy::primitives::Address;
 use e3_events::{
-    BusHandle, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId, E3id,
-    EnclaveEvent, EnclaveEventData, EventContext, EventPublisher, EventSubscriber, EventType,
-    PartyProofsToVerify, PartyShareDecryptionProofsToVerify, PartyVerificationResult, Sequenced,
-    ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed, SignedProofPayload,
-    TypedEvent, VerificationKind, VerifyShareDecryptionProofsRequest, VerifyShareProofsRequest,
-    ZkRequest, ZkResponse,
+    BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind,
+    CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EventContext, EventPublisher,
+    EventSubscriber, EventType, PartyProofsToVerify, PartyShareDecryptionProofsToVerify,
+    PartyVerificationResult, Sequenced, ShareVerificationComplete, ShareVerificationDispatched,
+    SignedProofFailed, SignedProofPayload, TypedEvent, VerificationKind,
+    VerifyShareDecryptionProofsRequest, VerifyShareProofsRequest, ZkRequest, ZkResponse,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
@@ -86,6 +86,7 @@ impl ShareVerificationActor {
         let addr = Self::new(bus).start();
         bus.subscribe(EventType::ShareVerificationDispatched, addr.clone().into());
         bus.subscribe(EventType::ComputeResponse, addr.clone().into());
+        bus.subscribe(EventType::ComputeRequestError, addr.clone().into());
         addr
     }
 
@@ -395,7 +396,11 @@ impl ShareVerificationActor {
                 ComputeResponseKind::Zk(ZkResponse::VerifyShareDecryptionProofs(r)),
             ) => r.party_results,
             _ => {
-                error!("Unexpected ComputeResponse kind for verification");
+                error!("Unexpected ComputeResponse kind for verification — treating all dispatched parties as dishonest");
+                let mut all_dishonest: BTreeSet<u64> = pending.pre_dishonest;
+                all_dishonest.extend(pending.ecdsa_dishonest);
+                all_dishonest.extend(pending.dispatched_party_ids);
+                self.publish_complete(pending.e3_id, pending.kind, all_dishonest, pending.ec);
                 return;
             }
         };
@@ -466,6 +471,27 @@ impl ShareVerificationActor {
         }
     }
 
+    /// Handle computation error from multithread — clean up pending state and
+    /// publish ShareVerificationComplete treating all dispatched parties as dishonest.
+    fn handle_compute_request_error(&mut self, msg: TypedEvent<ComputeRequestError>) {
+        let (msg, _ec) = msg.into_components();
+
+        let correlation_id = msg.correlation_id();
+        let Some(pending) = self.pending.remove(correlation_id) else {
+            return;
+        };
+
+        error!(
+            "ZK verification computation failed for E3 {} ({:?}): {} — treating all dispatched parties as dishonest",
+            pending.e3_id, pending.kind, msg
+        );
+
+        let mut all_dishonest: BTreeSet<u64> = pending.pre_dishonest;
+        all_dishonest.extend(pending.ecdsa_dishonest);
+        all_dishonest.extend(pending.dispatched_party_ids);
+        self.publish_complete(pending.e3_id, pending.kind, all_dishonest, pending.ec);
+    }
+
     fn publish_complete(
         &self,
         e3_id: E3id,
@@ -502,6 +528,9 @@ impl Handler<EnclaveEvent> for ShareVerificationActor {
             EnclaveEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
+            EnclaveEventData::ComputeRequestError(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             _ => (),
         }
     }
@@ -528,5 +557,17 @@ impl Handler<TypedEvent<ComputeResponse>> for ShareVerificationActor {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         self.handle_compute_response(msg)
+    }
+}
+
+impl Handler<TypedEvent<ComputeRequestError>> for ShareVerificationActor {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ComputeRequestError>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.handle_compute_request_error(msg)
     }
 }
