@@ -16,31 +16,31 @@ use crate::math::polynomial::Polynomial;
 pub struct Configs<let L: u32> {
     /// Plaintext modulus t
     pub t: Field,
-    /// Q mod t (for scaling message)
+    /// Q mod t: product of all CRT moduli modulo the plaintext modulus, used for message scaling
     pub q_mod_t: Field,
-    /// CRT moduli for each basis: [q_0, q_1, ..., q_{L-1}]
+    /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
-    /// Scaling factors for each basis: [k0_0, k0_1, ..., k0_{L-1}]
+    /// Scaling factors k0[i] satisfying `k0[i] * t == -1 (mod q_i)` for each CRT modulus
     pub k0is: [Field; L],
-    /// Bounds for public key polynomials for each CRT basis
+    /// Coefficient bounds for public key polynomials per CRT modulus: (q_i - 1) / 2
     pub pk_bounds: [Field; L],
-    /// Bounds for error polynomials (e0)
+    /// Coefficient bound for the global error polynomial e0
     pub e0_bound: Field,
-    /// Bounds for error polynomials (e1)
+    /// Coefficient bound for the error polynomial e1
     pub e1_bound: Field,
-    /// Bound for secret polynomial u (ternary distribution)
+    /// Coefficient bound for the ternary randomness polynomial u (= 1)
     pub u_bound: Field,
-    /// Lower bounds for r1 polynomials (modulus switching quotients)
+    /// Lower bounds for r1 modulus switching quotient coefficients per CRT modulus
     pub r1_low_bounds: [Field; L],
-    /// Upper bounds for r1 polynomials (modulus switching quotients)
+    /// Upper bounds for r1 modulus switching quotient coefficients per CRT modulus
     pub r1_up_bounds: [Field; L],
-    /// Bounds for r2 polynomials (cyclotomic reduction quotients)
+    /// Coefficient bounds for r2 cyclotomic reduction quotients per CRT modulus
     pub r2_bounds: [Field; L],
-    /// Bounds for p1 polynomials (modulus switching quotients)
+    /// Coefficient bounds for p1 modulus switching quotients per CRT modulus
     pub p1_bounds: [Field; L],
-    /// Bounds for p2 polynomials (cyclotomic reduction quotients)
+    /// Coefficient bounds for p2 cyclotomic reduction quotients per CRT modulus
     pub p2_bounds: [Field; L],
-    /// Bound for message polynomial (m)
+    /// Bound for the raw message (share) polynomial coefficients: t - 1
     pub msg_bound: Field,
 }
 
@@ -80,20 +80,30 @@ impl<let L: u32> Configs<L> {
     }
 }
 
-/// DKG Share Encryption Circuit (Circuit 3).
+/// DKG Share Encryption Circuit (C3a / C3b).
 ///
-/// Verifies:
-/// 1. Public key commitment matches expected (from Circuit 0)
-/// 2. Message commitment matches expected (from SK shares circuit)
-/// 3. Correct DKG share encryption: ct0[l] = pk0[l] * u + e0[l] + k1 * k0[l] + r1[l] * q[l] + r2[l] * (X^N + 1)
-///    and ct1[l] = pk1[l] * u + e1 + p2[l] * (X^N + 1) + p1[l] * q[l]
+/// Verifies that a secret share was correctly encrypted under a recipient's BFV public key.
+/// This circuit runs twice in parallel per ciphernode per recipient:
+/// - C3a: encrypts a secret key (sk) share, consuming commit(sk_share) from C2a
+/// - C3b: encrypts a smudging noise (e_sm) share, consuming commit(e_sm_share) from C2b
+///
+/// The key insight is that the commitment to the plaintext being encrypted must equal
+/// the commitment to the share produced in C2a/C2b. This binds the encryption to the
+/// previously verified share, we know the ciphertext contains the correct share without
+/// ever seeing it in plaintext.
+///
+/// Outputs:
+/// No new commitments are produced. The output ciphertexts (ct0, ct1) are broadcast
+/// to the intended recipient for decryption in C4a/C4b.
 pub struct ShareEncryption<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     /// Circuit parameters
     configs: Configs<L>,
-    /// Expected commitment to public key (from Circuit 0)
+    /// Expected commitment to the BFV public key (from C0: pk).
     /// (public witness)
     expected_pk_commitment: Field,
-    /// Expected commitment to message (from SK shares verification circuit)
+    /// Expected commitment to the share (message) being encrypted.
+    /// - C3a: commit(sk_share[party_idx][mod_idx]) produced by C2a
+    /// - C3b: commit(e_sm_share[party_idx][mod_idx]) produced by C2b
     /// (public witness)
     expected_message_commitment: Field,
     /// Public key component 0 for each CRT basis (committed witnesses)
@@ -167,7 +177,10 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         }
     }
 
-    /// Verifies that the public key hashes to the expected commitment
+    /// Verifies that the BFV public key hashes to the expected commitment from C0.
+    ///
+    /// Ensures the ciphernode encrypted under the same key they committed to in C0,
+    /// preventing key substitution attacks.
     fn verify_pk_commitment(self) {
         assert(
             compute_dkg_pk_commitment::<N, L, BIT_PK>(self.pk0is, self.pk1is)
@@ -176,7 +189,12 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         );
     }
 
-    /// Verifies that the message polynomial hashes to the expected commitment
+    /// Verifies that the message (share) polynomial hashes to the expected commitment
+    /// produced in C2a (for C3a) or C2b (for C3b).
+    ///
+    /// This is the binding check: the plaintext being encrypted must be exactly the share
+    /// that was verified in C2. Any deviation, encrypting a different value, substituting
+    /// a forged share, will cause this assertion to fail.
     fn verify_message_commitment(self) {
         assert(
             compute_share_encryption_commitment_from_message::<N, BIT_MSG>(self.message)
@@ -185,8 +203,11 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         );
     }
 
-    /// Computes the scaled message k1 from the raw message in centered form
-    /// k1[i] = (q_mod_t * message[i]) mod t, centered to [-t/2, t/2)
+    /// Computes the scaled message polynomial k1 from the raw share.
+    ///
+    /// Each coefficient is transformed as:
+    ///   k1[i] = (Q_mod_t * message[i]) mod t
+    /// then centered to [-t/2, t/2) to produce the BFV plaintext encoding.
     fn compute_scaled_message(self) -> Polynomial<N> {
         let t = self.configs.t;
         let t_mod = ModU128::new(t);
@@ -217,7 +238,11 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         Polynomial { coefficients: k1_coeffs }
     }
 
-    /// Flattens all polynomial coefficients into a single array for Fiat-Shamir challenge generation
+    /// Flattens all witness data into a single array for Fiat-Shamir challenge generation.
+    ///
+    /// Uses commitments in place of full pk and message polynomials to reduce
+    /// constraint count while preserving binding properties. The computed k1 is
+    /// included explicitly since it is derived, not directly committed.
     fn payload(self, k1: Polynomial<N>) -> Vec<Field> {
         let mut inputs = Vec::new();
 
@@ -247,7 +272,13 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         inputs
     }
 
-    /// Performs coefficient-wise CRT consistency check for the e0 error polynomial
+    /// Verifies CRT consistency for the e0 error polynomial.
+    ///
+    /// Confirms that each per-modulus representation e0is[l] is correctly derived
+    /// from the global e0 via:
+    ///   e0[j] == e0is[l][j] + e0_quotients[l][j] * q_l
+    ///
+    /// This ensures the error is consistently decomposed across all CRT moduli.
     fn check_e0_crt_consistency(self) {
         for i in 0..L {
             for j in 0..N {
@@ -260,7 +291,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         }
     }
 
-    /// Main verification function
+    /// Executes the share encryption circuit.
     pub fn execute(self) {
         // Step 1: Verify public key commitment matches expected
         self.verify_pk_commitment();
@@ -284,7 +315,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         self.verify_evaluations(gammas, k1)
     }
 
-    /// Performs range checks on all secret witness polynomial coefficients
+    /// Performs range checks on all secret witness polynomial coefficients.
     fn check_range_bounds(self) {
         self.u.range_check_2bounds::<BIT_U>(self.configs.u_bound, self.configs.u_bound);
         self.e0.range_check_2bounds::<BIT_E0>(self.configs.e0_bound, self.configs.e0_bound);
@@ -323,14 +354,27 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         }
     }
 
-    /// Generates Fiat-Shamir challenge values using the SAFE cryptographic sponge
+    /// Generates Fiat-Shamir challenge values using the SAFE cryptographic sponge.
+    ///
+    /// Returns 2*L challenge values: one primary gamma at index 0 for evaluating all
+    /// polynomials, L-1 weights at indices 1..L-1 for batching ct0 equations across
+    /// moduli, and L weights at indices L..2L-1 for batching ct1 equations.
     fn generate_challenge(self, k1: Polynomial<N>) -> Vec<Field> {
         let inputs = self.payload(k1);
 
         compute_share_encryption_challenge::<L>(inputs)
     }
 
-    /// Verifies DKG encryption constraints using Fiat-Shamir challenges and the Schwartz-Zippel lemma
+    /// Verifies BFV encryption equations using Schwartz-Zippel with batched modulus verification.
+    ///
+    /// For each CRT modulus l, checks at the primary challenge point gamma:
+    ///   ct0[l](gamma) = pk0[l](gamma)*u(gamma) + e0[l](gamma) + k1(gamma)*k0[l] + r1[l](gamma)*q_l + r2[l](gamma)*(gamma^N + 1)
+    ///   ct1[l](gamma) = pk1[l](gamma)*u(gamma) + e1(gamma) + p2[l](gamma)*(gamma^N + 1) + p1[l](gamma)*q_l
+    ///
+    /// Rather than asserting each equation independently, both sides are accumulated
+    /// into a weighted batch sum using additional challenge values as weights.
+    /// A deviation in any single equation will cause the accumulated sums to diverge
+    /// with overwhelming probability (Schwartz-Zippel soundness).
     fn verify_evaluations(self, gammas: Vec<Field>, k1: Polynomial<N>) {
         let gamma = gammas.get(0);
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
@@ -345,14 +389,14 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             let r2i_at_gamma = self.r2is[i].eval(gamma);
             let e0is_at_gamma = self.e0is[i].eval(gamma);
 
-            // Verify ct0 equation: ct0[i] = pk0[i]*u + e0[i] + k1*k0[i] + r1[i]*q[i] + r2[i]*cyclo
+            // ct0[l] = pk0[l]*u + e0[l] + k1*k0[l] + r1[l]*q_l + r2[l]*(gamma^N + 1)
             let mut ct0_rhs = (pk0is_at_gamma * u_at_gamma) + e0is_at_gamma;
             ct0_rhs += k1_at_gamma * self.configs.k0is[i];
             ct0_rhs += r1i_at_gamma * self.configs.qis[i];
             ct0_rhs += r2i_at_gamma * cyclo_at_gamma;
             let ct0_lhs = self.ct0is[i].eval(gamma);
 
-            // Verify ct1 equation: ct1[i] = pk1[i]*u + e1 + p2[i]*cyclo + p1[i]*q[i]
+            // ct1[l] = pk1[l]*u + e1 + p2[l]*(gamma^N + 1) + p1[l]*q_l
             let pk1is_at_gamma = self.pk1is[i].eval(gamma);
             let p1is_at_gamma = self.p1is[i].eval(gamma);
             let p2is_at_gamma = self.p2is[i].eval(gamma);
@@ -361,7 +405,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             ct1_rhs += p1is_at_gamma * self.configs.qis[i];
             let ct1_lhs = self.ct1is[i].eval(gamma);
 
-            // Accumulate weighted sums for batch verification
+            // Accumulate into batched sum using per-modulus challenge weights
             let gamma_i = if i == 0 { 1 } else { gammas.get(i) };
             sum = (
                 sum.0 + ct0_lhs * gamma_i + ct1_lhs * gammas.get(i + L),

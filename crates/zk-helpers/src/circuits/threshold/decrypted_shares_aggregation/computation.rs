@@ -11,7 +11,6 @@
 //! with [`e3_polynomial::CrtPolynomial::reduce`]; all input coefficients are reduced to
 //! [0, zkp_modulus) with [`e3_polynomial::reduce`] inside [`Inputs::compute`].
 
-use crate::calculate_bit_width;
 use crate::compute_q_mod_t;
 use crate::compute_q_mod_t_centered;
 use crate::get_zkp_modulus;
@@ -62,11 +61,9 @@ pub struct Bounds {
     pub delta_half: BigUint,
 }
 
-/// Bit widths used by the circuit (e.g. noise bit for range checks).
+/// Bit widths used by the circuit.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Bits {
-    pub noise_bit: u32,
-}
+pub struct Bits {}
 
 /// Circuit config: moduli count, plaintext modulus, q_inverse_mod_t, bits, bounds, and message polynomial length.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -123,9 +120,8 @@ impl Computation for Bits {
     type Data = Bounds;
     type Error = CircuitsErrors;
 
-    fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
-        let noise_bit = calculate_bit_width(BigInt::from(data.delta_half.clone()));
-        Ok(Bits { noise_bit })
+    fn compute(_: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
+        Ok(Bits {})
     }
 }
 
@@ -354,12 +350,10 @@ mod tests {
     fn test_bounds_and_bits_consistency() {
         let preset = BfvPreset::InsecureThreshold512;
         let bounds = Bounds::compute(preset, &()).unwrap();
-        let bits = Bits::compute(preset, &bounds).unwrap();
 
         assert!(!bounds.delta.is_zero());
         assert!(!bounds.delta_half.is_zero());
         assert!(bounds.delta_half < bounds.delta);
-        assert!(bits.noise_bit > 0);
     }
 
     #[test]
@@ -397,6 +391,5 @@ mod tests {
             out.inputs.crt_quotients.limb(0).coefficients().len(),
             configs.max_msg_non_zero_coeffs
         );
-        assert!(out.bits.noise_bit > 0);
     }
 }

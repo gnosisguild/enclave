@@ -40,17 +40,23 @@ impl<let N: u32, let L: u32> Configs<N, L> {
     }
 }
 
-/// Correct Threshold Public Key Generation Circuit (Circuit 1).
+/// Correct Threshold Public Key Contribution Generation Circuit (C1).
+///
+/// This circuit proves that a contribution to the threshold BFV public key was generated correctly
+/// from secret values without revealing those secrets. Each ciphernode generates
+/// their own key contribution, and this circuit ensures the generation followed
+/// the BFV key generation equations.
 ///
 /// Verifies:
-/// 1. Range checks on all secret witnesses (secret key, error, smudging noise, quotients)
-/// 2. Correct public key generation: pk0_i = -a_i * sk + eek + r2_i * (X^N + 1) + r1_i * q_i
-///    and pk1_i = a_i
+/// 1. Range checks on all secret witnesses (sk, eek, e_sm, quotients)
+/// 2. Compute commitments to sk, pk, and e_sm
+/// 3. Generate a single Fiat-Shamir challenge point (gamma) used for all CRT moduli
+/// 4. Verify BFV key generation equations at challenge points (Schwartz-Zippel)
 ///
-/// Outputs:
-/// - commit(threshold_sk)
-/// - commit(threshold_pk)
-/// - commit(e_sm)
+/// Outputs (in return order):
+/// - commit(sk) -> C2a (secret key share verification)
+/// - commit(pk_trbfv) -> C5 (public key aggregation)
+/// - commit(e_sm) -> C2b (smudging noise share verification)
 pub struct PkGeneration<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_PK: u32> {
     /// Cryptographic parameters including bounds, moduli, and constants.
     configs: Configs<N, L>,
@@ -99,7 +105,10 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         PkGeneration { configs, a, eek, sk, e_sm, r1, r2, pk0, pk1 }
     }
 
-    /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
+    /// Flattens all witness data into a single array for Fiat-Shamir challenge generation.
+    ///
+    /// Uses commitments for sk and pk rather than full polynomials to reduce constraint
+    /// count while maintaining binding properties. e_sm is not included in the payload.
     fn payload(self, sk_commitment: Field, pk_commitment: Field) -> Vec<Field> {
         let mut inputs = Vec::new();
 
@@ -120,30 +129,44 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         inputs
     }
 
-    /// Main execution function
-    /// Returns (commit(threshold_sk), commit(threshold_pk), commit(e_sm))
+    /// Executes the threshold public key generation circuit.
+    ///
+    /// Returns a tuple of three commitments in the following order:
+    /// - commit(sk) -> C2a (secret key share verification)
+    /// - commit(pk_trbfv) -> C5 (public key aggregation)
+    /// - commit(e_sm) -> C2b (smudging noise share verification)
     pub fn execute(self) -> (Field, Field, Field) {
+        // 1. Perform range checks on all secret witness values
         self.perform_range_checks();
 
+        // 2. Compute commitments
         let sk_commitment = compute_share_computation_sk_commitment::<N, BIT_SK>(self.sk);
         let e_sm_commitment =
             compute_share_computation_e_sm_commitment::<N, L, BIT_E_SM>(self.e_sm);
         let pk_commitment = compute_threshold_pk_commitment::<N, L, BIT_PK>(self.pk0, self.pk1);
 
+        // 3. Generate a single Fiat-Shamir challenge point (gamma)
         let gamma = self.generate_challenge(sk_commitment, pk_commitment);
         self.verify_evaluations(gamma);
 
+        // 4. Return all commitments
         (sk_commitment, pk_commitment, e_sm_commitment)
     }
 
-    /// Generates Fiat-Shamir challenge values using the SAFE cryptographic sponge
+    /// Generates Fiat-Shamir challenge values using the SAFE cryptographic sponge.
+    ///
+    /// Returns a single challenge point `gamma` used to verify key generation
+    /// equations for all CRT moduli via the Schwartz-Zippel lemma.
     fn generate_challenge(self, sk_commitment: Field, pk_commitment: Field) -> Field {
         let inputs = self.payload(sk_commitment, pk_commitment);
 
         compute_threshold_pk_challenge(inputs)
     }
 
-    /// Performs range checks on all secret witness values
+    /// Performs range checks on all secret witness values.
+    ///
+    /// These bounds are critical for BFV security-large coefficients would
+    /// break the scheme's hardness assumptions (Ring-LWE).
     fn perform_range_checks(self) {
         // Check that error polynomial has small coefficients
         self.eek.range_check_2bounds::<BIT_EEK>(self.configs.eek_bound, self.configs.eek_bound);
@@ -170,6 +193,14 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         }
     }
 
+    /// Verifies BFV key generation equations for all CRT moduli using Schwartz-Zippel.
+    ///
+    /// For each CRT modulus i, verifies at the challenge point gamma:
+    /// - `pk0[i](gamma) = -a[i](gamma) * sk(gamma) + eek(gamma) + r2[i](gamma) * (gamma^N + 1) + r1[i](gamma) * q_i`
+    /// - `pk1[i](gamma) = a[i](gamma)`
+    ///
+    /// The Schwartz-Zippel lemma states that if these polynomial equations hold at a
+    /// random point, they hold for all coefficients with overwhelming probability.
     fn verify_evaluations(self, gamma: Field) {
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
         let sk_at_gamma = self.sk.eval(gamma);

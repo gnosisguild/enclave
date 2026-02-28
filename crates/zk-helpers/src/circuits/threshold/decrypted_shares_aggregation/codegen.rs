@@ -71,8 +71,6 @@ decrypted_shares_aggregation (CIRCUIT 7)
 -------------------------------------
 ************************************/
 
-pub global {}_BIT_NOISE: u32 = {};
-
 pub global {}_CONFIGS: DecryptedSharesAggregationConfigs<L> =
     DecryptedSharesAggregationConfigs::new(QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);
 "#,
@@ -82,8 +80,6 @@ pub global {}_CONFIGS: DecryptedSharesAggregationConfigs<L> =
         configs.q_mod_t,
         configs.q_mod_t_centered,
         configs.q_inverse_mod_t,
-        prefix,
-        configs.bits.noise_bit,
         prefix,
     )
 }
@@ -102,10 +98,6 @@ mod tests {
         let codegen_configs = generate_configs(preset, &configs);
 
         assert!(codegen_configs.contains("decrypted_shares_aggregation"));
-        assert!(codegen_configs.contains(&format!(
-            "{}_BIT_NOISE: u32 = {}",
-            prefix, configs.bits.noise_bit
-        )));
         assert!(codegen_configs.contains(&format!("{}_CONFIGS:", prefix)));
         assert!(codegen_configs.contains(
             "DecryptedSharesAggregationConfigs::new(QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T)"
@@ -123,9 +115,6 @@ mod tests {
         let artifacts = circuit.codegen(preset, &input).unwrap();
 
         assert!(!artifacts.toml.is_empty());
-        assert!(artifacts
-            .configs
-            .contains("DECRYPTED_SHARES_AGGREGATION_BIT_NOISE"));
         assert!(artifacts
             .configs
             .contains("DECRYPTED_SHARES_AGGREGATION_CONFIGS"));
