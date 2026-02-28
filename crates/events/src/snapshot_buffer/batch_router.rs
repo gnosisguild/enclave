@@ -16,7 +16,7 @@ use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Context;
 use e3_utils::MAILBOX_LIMIT;
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use tracing::{debug, info, trace, warn};
+use tracing::debug;
 
 type Seq = u64;
 

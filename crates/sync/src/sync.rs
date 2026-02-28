@@ -12,8 +12,7 @@ use e3_events::{
     AggregateConfig, AggregateId, BusHandle, CorrelationId, EffectsEnabled, EnclaveEvent,
     EnclaveEventData, Event, EventContextAccessors, EventPublisher, EventStoreQueryBy,
     EventStoreQueryResponse, EvmEventConfig, EvmEventConfigChain, HistoricalEvmEventsReceived,
-    HistoricalEvmSyncStart, HistoricalNetEventsReceived, HistoricalNetSyncStart, SeqAgg, SyncEnded,
-    Unsequenced,
+    HistoricalEvmSyncStart, SeqAgg, SyncEnded, Unsequenced,
 };
 use e3_utils::actix::channel as actix_toolbox;
 use std::{

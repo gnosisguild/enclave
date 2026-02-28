@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use alloy::primitives::Address;
 use anyhow::Result;
 use e3_ciphernode_builder::{CiphernodeBuilder, CiphernodeHandle};
 use e3_config::AppConfig;

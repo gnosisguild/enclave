@@ -30,8 +30,7 @@ use e3_events::{
     EnclaveEvent, EnclaveEventData, EventContext, EventPublisher, EventSubscriber, EventType,
     PartyProofsToVerify, PartyShareDecryptionProofsToVerify, PartyVerificationResult, Sequenced,
     ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed, SignedProofPayload,
-    TypedEvent, VerificationKind, VerifyShareDecryptionProofsRequest,
-    VerifyShareDecryptionProofsResponse, VerifyShareProofsRequest, VerifyShareProofsResponse,
+    TypedEvent, VerificationKind, VerifyShareDecryptionProofsRequest, VerifyShareProofsRequest,
     ZkRequest, ZkResponse,
 };
 use e3_utils::NotifySync;
