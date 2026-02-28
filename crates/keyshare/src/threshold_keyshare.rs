@@ -2012,6 +2012,51 @@ impl Handler<TypedEvent<AllThresholdSharesCollected>> for ThresholdKeyshare {
     }
 }
 
+impl Handler<TypedEvent<AllDecryptionKeySharesCollected>> for ThresholdKeyshare {
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: TypedEvent<AllDecryptionKeySharesCollected>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        trap(
+            EType::KeyGeneration,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_all_decryption_key_shares_collected(msg),
+        )
+    }
+}
+
+impl Handler<DecryptionKeySharedCollectionFailed> for ThresholdKeyshare {
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: DecryptionKeySharedCollectionFailed,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        trap(EType::KeyGeneration, &self.bus.clone(), || {
+            warn!(
+                e3_id = %msg.e3_id,
+                missing_parties = ?msg.missing_parties,
+                "DecryptionKeyShared collection failed: {}",
+                msg.reason
+            );
+
+            // Clear the collector reference since it's stopped
+            self.decryption_key_shared_collector = None;
+
+            if let Err(err) = self.bus.publish_without_context(E3Failed {
+                e3_id: msg.e3_id.clone(),
+                failed_at_stage: E3Stage::CommitteeFinalized,
+                reason: FailureReason::InsufficientCommitteeMembers,
+            }) {
+                error!("Failed to publish E3Failed: {err}");
+            }
+            Ok(())
+        })
+    }
+}
+
 impl Handler<TypedEvent<CiphertextOutputPublished>> for ThresholdKeyshare {
     type Result = ();
     fn handle(

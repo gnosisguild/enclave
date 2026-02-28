@@ -25,8 +25,9 @@ use e3_events::EffectsEnabled;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
     ComputeResponse, DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, EnclaveEvent,
-    EnclaveEventData, EventPublisher, EventSubscriber, EventType, PartyVerificationResult,
-    PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest, PkGenerationProofResponse,
+    EnclaveEventData, EventPublisher, EventSubscriber, EventType,
+    PartyShareDecryptionVerificationResult, PartyVerificationResult, PkBfvProofRequest,
+    PkBfvProofResponse, PkGenerationProofRequest, PkGenerationProofResponse,
     ShareComputationProofRequest, ShareComputationProofResponse, ShareEncryptionProofRequest,
     ShareEncryptionProofResponse, TypedEvent, VerifyShareDecryptionProofsRequest,
     VerifyShareDecryptionProofsResponse, VerifyShareProofsRequest, VerifyShareProofsResponse,
