@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{E3id, OrderedSet};
+use crate::{E3id, OrderedSet, Proof};
 use actix::Message;
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
@@ -19,6 +19,8 @@ pub struct PublicKeyAggregated {
     pub public_key_hash: [u8; 32],
     pub e3_id: E3id,
     pub nodes: OrderedSet<String>,
+    /// C5 proof: proof of correct pk aggregation.
+    pub pk_aggregation_proof: Option<Proof>,
 }
 
 impl Display for PublicKeyAggregated {

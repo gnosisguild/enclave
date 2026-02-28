@@ -26,11 +26,12 @@ use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
     ComputeResponse, DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, EnclaveEvent,
     EnclaveEventData, EventPublisher, EventSubscriber, EventType, PartyVerificationResult,
-    PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest, PkGenerationProofResponse,
-    ShareComputationProofRequest, ShareComputationProofResponse, ShareEncryptionProofRequest,
-    ShareEncryptionProofResponse, TypedEvent, VerifyShareDecryptionProofsRequest,
-    VerifyShareDecryptionProofsResponse, VerifyShareProofsRequest, VerifyShareProofsResponse,
-    ZkError as ZkEventError, ZkRequest, ZkResponse,
+    PkAggregationProofRequest, PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse,
+    PkGenerationProofRequest, PkGenerationProofResponse, ShareComputationProofRequest,
+    ShareComputationProofResponse, ShareEncryptionProofRequest, ShareEncryptionProofResponse,
+    TypedEvent, VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
+    VerifyShareProofsRequest, VerifyShareProofsResponse, ZkError as ZkEventError, ZkRequest,
+    ZkResponse,
 };
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
@@ -258,6 +259,71 @@ async fn handle_compute_request_event(
     Ok(())
 }
 
+fn handle_pk_aggregation_proof(
+    prover: &ZkProver,
+    req: PkAggregationProofRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    // 1. Build threshold BFV parameters from preset
+    let (threshold_params, _dkg_params) = build_pair_for_preset(req.params_preset.clone())
+        .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
+
+    // 2. Create deterministic CRP
+    let crp = e3_fhe_params::create_deterministic_crp_from_default_seed(&threshold_params);
+
+    // 3. Deserialize each keyshare as PublicKeyShare and extract pk0
+    let mut pk0_shares = Vec::with_capacity(req.keyshare_bytes.len());
+    for (i, ks_bytes) in req.keyshare_bytes.iter().enumerate() {
+        let pk_share =
+            fhe::mbfv::PublicKeyShare::deserialize(ks_bytes, &threshold_params, crp.clone())
+                .map_err(|e| {
+                    make_zk_error(&request, format!("keyshare[{}] deserialize: {:?}", i, e))
+                })?;
+        pk0_shares.push(CrtPolynomial::from_fhe_polynomial(&pk_share.p0_share()));
+    }
+
+    // 4. Deserialize aggregated PublicKey
+    let public_key = PublicKey::from_bytes(&req.aggregated_pk_bytes, &threshold_params)
+        .map_err(|e| make_zk_error(&request, format!("aggregated_pk deserialize: {:?}", e)))?;
+
+    // 5. Get 'a' (CRP) as CrtPolynomial
+    let a = CrtPolynomial::from_fhe_polynomial(&crp.poly());
+
+    // 6. Build committee and circuit data
+    let committee = e3_zk_helpers::CiphernodesCommittee {
+        n: req.committee_n,
+        h: req.committee_h,
+        threshold: req.committee_threshold,
+    };
+
+    let circuit_data =
+        e3_zk_helpers::circuits::threshold::pk_aggregation::circuit::PkAggregationCircuitData {
+            committee,
+            public_key,
+            pk0_shares,
+            a,
+        };
+
+    // 7. Generate proof via Provable trait
+    let circuit = e3_zk_helpers::circuits::threshold::pk_aggregation::circuit::PkAggregationCircuit;
+    let e3_id_str = request.e3_id.to_string();
+    let proof = circuit
+        .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
+    // 8. Return response
+    Ok(ComputeResponse::zk(
+        ZkResponse::PkAggregation(PkAggregationProofResponse { proof }),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
 fn timefunc<F>(
     name: &str,
     id: u8,
@@ -431,6 +497,9 @@ fn handle_zk_request(
                 handle_verify_share_decryption_proofs(&prover, req, request.clone())
             })
         }
+        ZkRequest::PkAggregation(req) => timefunc("zk_pk_aggregation", id, || {
+            handle_pk_aggregation_proof(&prover, req, request.clone())
+        }),
     }
 }
 

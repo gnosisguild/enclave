@@ -925,9 +925,12 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         addr: &str,
         store: Option<actix::Addr<InMemStore>>,
         cipher: &Arc<Cipher>,
+        zk_backend: ZkBackend,
     ) -> Result<e3_ciphernode_builder::CiphernodeHandle> {
         let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
             .with_trbfv()
+            .with_zkproof(zk_backend)
+            .testmode_with_signer(PrivateKeySigner::random())
             .testmode_with_forked_bus(bus.event_bus())
             .testmode_with_history()
             .testmode_with_errors()
@@ -952,23 +955,29 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         rng: &e3_utils::SharedRng,
         count: u32,
         cipher: &Arc<Cipher>,
+        zk_backend: ZkBackend,
     ) -> Result<Vec<e3_ciphernode_builder::CiphernodeHandle>> {
         let eth_addrs = create_random_eth_addrs(count);
         let mut result = vec![];
         for addr in &eth_addrs {
             println!("Setting up eth addr: {}", addr);
-            let tuple = setup_local_ciphernode(&bus, &rng, true, addr, None, cipher).await?;
+            let tuple =
+                setup_local_ciphernode(&bus, &rng, true, addr, None, cipher, zk_backend.clone())
+                    .await?;
             result.push(tuple);
         }
         simulate_libp2p_net(&result);
         Ok(result)
     }
 
+    let (zk_backend, _zk_temp) = setup_test_zk_backend().await;
+
     let e3_id = E3id::new("1234", 1);
     let (rng, cn1_address, cn1_data, cn2_address, cn2_data, cipher, history, params, crpoly) = {
         let (bus, rng, seed, params, crpoly, _, _) = get_common_setup(None)?;
         let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
-        let ciphernodes = create_local_ciphernodes(&bus, &rng, 2, &cipher).await?;
+        let ciphernodes =
+            create_local_ciphernodes(&bus, &rng, 2, &cipher, zk_backend.clone()).await?;
         let eth_addrs = ciphernodes.iter().map(|n| n.address()).collect::<Vec<_>>();
 
         setup_score_sortition_environment(&bus, &eth_addrs, 1).await?;
@@ -1038,6 +1047,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         &cn1_address,
         Some(InMemStore::from_dump(cn1_data, true)?.start()),
         &cipher,
+        zk_backend.clone(),
     )
     .await?;
     let cn2 = setup_local_ciphernode(
@@ -1047,6 +1057,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         &cn2_address,
         Some(InMemStore::from_dump(cn2_data, true)?.start()),
         &cipher,
+        zk_backend.clone(),
     )
     .await?;
     let history_collector = cn1.history().unwrap();
@@ -1132,9 +1143,12 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         addr: &str,
         store: Option<actix::Addr<e3_data::InMemStore>>,
         cipher: &Arc<Cipher>,
+        zk_backend: ZkBackend,
     ) -> Result<e3_ciphernode_builder::CiphernodeHandle> {
         let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
             .with_trbfv()
+            .with_zkproof(zk_backend)
+            .testmode_with_signer(PrivateKeySigner::random())
             .testmode_with_forked_bus(bus.event_bus())
             .testmode_with_history()
             .testmode_with_errors()
@@ -1159,12 +1173,15 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         rng: &e3_utils::SharedRng,
         count: u32,
         cipher: &Arc<Cipher>,
+        zk_backend: ZkBackend,
     ) -> Result<Vec<e3_ciphernode_builder::CiphernodeHandle>> {
         let eth_addrs = create_random_eth_addrs(count);
         let mut result = vec![];
         for addr in &eth_addrs {
             println!("Setting up eth addr: {}", addr);
-            let tuple = setup_local_ciphernode(&bus, &rng, true, addr, None, cipher).await?;
+            let tuple =
+                setup_local_ciphernode(&bus, &rng, true, addr, None, cipher, zk_backend.clone())
+                    .await?;
             result.push(tuple);
         }
         simulate_libp2p_net(&result);
@@ -1206,9 +1223,10 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     // Setup
     let (bus, rng, seed, params, crpoly, _, _) = get_common_setup(None)?;
     let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
+    let (zk_backend, _zk_temp) = setup_test_zk_backend().await;
 
     // Setup actual ciphernodes and dispatch add events
-    let ciphernodes = create_local_ciphernodes(&bus, &rng, 3, &cipher).await?;
+    let ciphernodes = create_local_ciphernodes(&bus, &rng, 3, &cipher, zk_backend.clone()).await?;
     let eth_addrs = ciphernodes.iter().map(|tup| tup.address()).collect();
 
     setup_score_sortition_environment(&bus, &eth_addrs, 1).await?;
@@ -1254,6 +1272,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
             public_key_hash,
             e3_id: E3id::new("1234", 1),
             nodes: OrderedSet::from(eth_addrs.clone()),
+            pk_aggregation_proof: None,
         }
         .into()
     );
@@ -1296,6 +1315,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
             public_key_hash,
             e3_id: E3id::new("1234", 2),
             nodes: OrderedSet::from(eth_addrs.clone()),
+            pk_aggregation_proof: None,
         }
         .into()
     );

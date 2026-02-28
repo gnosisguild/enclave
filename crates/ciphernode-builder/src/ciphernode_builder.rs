@@ -463,7 +463,16 @@ impl CiphernodeBuilder {
 
         if self.pubkey_agg {
             info!("Setting up PublicKeyAggregationExtension");
-            e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(&bus))
+            // Ensure multithread worker is available for C1 verification and C5 proof generation
+            let _ = self.ensure_multithread(&bus);
+            // TODO: Make BfvPreset configurable via builder method.
+            // Currently hardcoded to InsecureThreshold512 for C5 proof generation.
+            // Production deployments should use the appropriate threshold preset.
+            let aggregator_preset = BfvPreset::InsecureThreshold512;
+            e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(
+                &bus,
+                aggregator_preset,
+            ))
         }
 
         if self.threshold_plaintext_agg {
