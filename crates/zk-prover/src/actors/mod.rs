@@ -13,6 +13,7 @@
 //! ### Core Actors (Business Logic - No IO)
 //! - [`ProofRequestActor`]: Converts `EncryptionKeyPending` → `ComputeRequest` and handles responses
 //! - [`ProofVerificationActor`]: Verifies `EncryptionKeyReceived` and converts to `EncryptionKeyCreated`
+//! - [`ShareVerificationActor`]: Handles ECDSA + ZK verification for C2/C3/C4 share proofs
 //!
 //! ### IO Actors (File System Operations)
 //! - [`ZkActor`]: Performs actual proof generation/verification using disk-based circuits and bb binary
@@ -34,12 +35,14 @@
 
 pub mod proof_request;
 pub mod proof_verification;
+pub mod share_verification;
 pub mod zk_actor;
 
 pub use proof_request::ProofRequestActor;
 pub use proof_verification::{
     ProofVerificationActor, ZkVerificationRequest, ZkVerificationResponse,
 };
+pub use share_verification::ShareVerificationActor;
 pub use zk_actor::ZkActor;
 
 use actix::{Actor, Addr};
@@ -58,11 +61,13 @@ pub fn setup_zk_actors(bus: &BusHandle, backend: &ZkBackend, signer: PrivateKeyS
 
     let proof_request = ProofRequestActor::setup(bus, signer);
     let proof_verification = ProofVerificationActor::setup(bus, verifier);
+    let share_verification = ShareVerificationActor::setup(bus);
 
     ZkActors {
         zk_actor,
         proof_request,
         proof_verification,
+        share_verification,
     }
 }
 
@@ -71,4 +76,5 @@ pub struct ZkActors {
     pub zk_actor: Addr<ZkActor>,
     pub proof_request: Addr<ProofRequestActor>,
     pub proof_verification: Addr<ProofVerificationActor>,
+    pub share_verification: Addr<ShareVerificationActor>,
 }
