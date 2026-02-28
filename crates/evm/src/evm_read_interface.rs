@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::events::{EnclaveEvmEvent, EvmEventProcessor, EvmLog};
+use crate::events::{EnclaveEvmEvent, EvmEventProcessor};
 use crate::helpers::EthProvider;
 use crate::log_fetcher::{backfill_to_head, fetch_logs_chunked, process_log, TimestampTracker};
 use crate::HistoricalSyncComplete;
@@ -16,14 +16,14 @@ use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
 use alloy_primitives::Address;
 use anyhow::anyhow;
-use e3_events::{BusHandle, CorrelationId, ErrorDispatcher, Event, EventSubscriber, EventType};
+use e3_events::{BusHandle, ErrorDispatcher, Event, EventSubscriber, EventType};
 use e3_events::{EType, EnclaveEvent, EnclaveEventData, EventId};
 use e3_utils::MAILBOX_LIMIT;
 use futures_util::stream::StreamExt;
 use std::collections::{HashMap, HashSet};
 use tokio::select;
 use tokio::sync::oneshot;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{error, info, instrument, warn};
 
 const MAX_RECONNECT_DELAY_SECS: u64 = 60;
 

@@ -8,14 +8,11 @@ use std::mem::replace;
 
 use actix::Actor;
 use alloy::{primitives::Address, providers::Provider};
-use e3_events::{
-    run_once, BusHandle, EventExtractor, EventSubscriber, EventType, HistoricalEvmSyncStart,
-};
+use e3_events::{run_once, BusHandle, EventSubscriber, EventType, HistoricalEvmSyncStart};
 use e3_evm::{
     EthProvider, EvmChainGateway, EvmEventProcessor, EvmReadInterface, EvmRouter, Filters,
-    FixHistoricalOrder, SyncStartExtractor,
+    FixHistoricalOrder,
 };
-use e3_utils::actix::oneshot_runner::OneShotRunner;
 
 pub trait RouteFn: FnOnce(EvmEventProcessor) -> EvmEventProcessor + Send {}
 impl<F> RouteFn for F where F: FnOnce(EvmEventProcessor) -> EvmEventProcessor + Send {}

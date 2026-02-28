@@ -4,7 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{Proof, ProofType, SignedProofPayload};
+use crate::{Proof, SignedProofPayload};
+use alloy::primitives::Address;
 use derivative::Derivative;
 use e3_crypto::SensitiveBytes;
 use e3_fhe_params::BfvPreset;
@@ -271,16 +272,18 @@ pub struct VerifyShareProofsResponse {
 }
 
 /// Verification result for all proofs from a single sender.
+///
+/// Used for both C2/C3 and C4 verification results.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PartyVerificationResult {
     /// The party whose proofs were verified.
     pub sender_party_id: u64,
     /// Whether ALL proofs from this party verified successfully.
     pub all_verified: bool,
-    /// If any proof failed: the proof type that failed.
-    pub failed_proof_type: Option<ProofType>,
     /// If any proof failed: the signed payload for fault attribution.
     pub failed_signed_payload: Option<SignedProofPayload>,
+    /// ECDSA-recovered address of the signer (set during verification).
+    pub recovered_address: Option<Address>,
 }
 
 /// Request to batch-verify C4 proofs from DecryptionKeyShared events.
@@ -297,26 +300,17 @@ pub struct VerifyShareDecryptionProofsRequest {
 pub struct PartyShareDecryptionProofsToVerify {
     /// The party that generated these proofs.
     pub sender_party_id: u64,
-    /// C4a proof (SecretKey decryption).
-    pub sk_decryption_proof: Proof,
-    /// C4b proofs (SmudgingNoise decryption), one per smudging noise index.
-    pub esm_decryption_proofs: Vec<Proof>,
+    /// Signed C4a proof (SecretKey decryption).
+    pub signed_sk_decryption_proof: SignedProofPayload,
+    /// Signed C4b proofs (SmudgingNoise decryption), one per smudging noise index.
+    pub signed_esm_decryption_proofs: Vec<SignedProofPayload>,
 }
 
 /// Batch verification results for C4 proofs.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct VerifyShareDecryptionProofsResponse {
     /// Per-party verification results.
-    pub party_results: Vec<PartyShareDecryptionVerificationResult>,
-}
-
-/// Verification result for C4 proofs from a single sender.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct PartyShareDecryptionVerificationResult {
-    /// The party whose C4 proofs were verified.
-    pub sender_party_id: u64,
-    /// Whether ALL C4 proofs from this party verified successfully.
-    pub all_verified: bool,
+    pub party_results: Vec<PartyVerificationResult>,
 }
 
 /// ZK-specific error variants.

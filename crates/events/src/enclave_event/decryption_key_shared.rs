@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{E3id, Proof};
+use crate::{E3id, SignedProofPayload};
 use actix::Message;
 use derivative::Derivative;
 use e3_utils::utility_types::ArcBytes;
@@ -27,10 +27,10 @@ pub struct DecryptionKeyShared {
     pub sk_poly_sum: ArcBytes,
     /// Lagrange-interpolated aggregated E_SM polynomials (serialized), one per smudging noise.
     pub es_poly_sum: Vec<ArcBytes>,
-    /// C4a proof (SecretKey decryption).
-    pub sk_decryption_proof: Proof,
-    /// C4b proofs (SmudgingNoise decryption), one per smudging noise index.
-    pub esm_decryption_proofs: Vec<Proof>,
+    /// ECDSA-signed C4a proof (SecretKey decryption) for verification and fault attribution.
+    pub signed_sk_decryption_proof: SignedProofPayload,
+    /// ECDSA-signed C4b proofs (SmudgingNoise decryption), one per smudging noise index.
+    pub signed_esm_decryption_proofs: Vec<SignedProofPayload>,
     /// Whether this was received from the network.
     pub external: bool,
 }
