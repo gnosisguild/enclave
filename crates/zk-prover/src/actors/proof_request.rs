@@ -20,7 +20,7 @@ use e3_events::{
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[derive(Clone, Debug)]
 enum ThresholdProofKind {
@@ -153,7 +153,9 @@ struct PendingDecryptionProofs {
 
 impl PendingDecryptionProofs {
     fn is_complete(&self) -> bool {
-        self.sk_proof.is_some() && self.esm_proofs.len() == self.expected_esm_count
+        self.sk_proof.is_some()
+            && self.esm_proofs.len() == self.expected_esm_count
+            && (0..self.expected_esm_count).all(|i| self.esm_proofs.contains_key(&i))
     }
 }
 
@@ -403,6 +405,14 @@ impl ProofRequestActor {
         let (msg, ec) = msg.into_components();
         let e3_id = msg.e3_id.clone();
         let esm_count = msg.esm_requests.len();
+
+        if self.pending_decryption.contains_key(&e3_id) {
+            warn!(
+                "Duplicate DecryptionShareProofsPending for E3 {} — ignoring",
+                e3_id
+            );
+            return;
+        }
 
         self.pending_decryption.insert(
             e3_id.clone(),

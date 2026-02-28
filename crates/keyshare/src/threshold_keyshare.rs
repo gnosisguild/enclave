@@ -364,9 +364,9 @@ pub struct ThresholdKeyshare {
     share_enc_preset: BfvPreset,
     /// Transient coordination data bridging async gaps — not persisted.
     /// Shares pending C2/C3 verification, consumed in `proceed_with_decryption_key_calculation`.
-    pending_shares: Vec<ThresholdShare>,
-    /// C4 proof data built during aggregation, consumed after CalculateDecryptionKey.
-    pending_c4_proof_data: Option<(
+    pending_shares: Vec<Arc<ThresholdShare>>,
+    /// Share decryption proof data built during aggregation, consumed after CalculateDecryptionKey.
+    pending_share_decryption_data: Option<(
         DkgShareDecryptionProofRequest,
         Vec<DkgShareDecryptionProofRequest>,
     )>,
@@ -387,7 +387,7 @@ impl ThresholdKeyshare {
             state: params.state,
             share_enc_preset: params.share_enc_preset,
             pending_shares: Vec::new(),
-            pending_c4_proof_data: None,
+            pending_share_decryption_data: None,
             honest_parties: None,
             early_decryption_key_shares: HashMap::new(),
         }
@@ -1163,8 +1163,8 @@ impl ThresholdKeyshare {
             });
         }
 
-        // Store shares on the actor for use after verification completes
-        self.pending_shares = msg.shares.iter().map(|arc| (**arc).clone()).collect();
+        // Store shares on the actor for use after verification completes (keep Arc to avoid deep clone)
+        self.pending_shares = msg.shares.iter().cloned().collect();
 
         // Backward compat: only when ALL non-self parties have zero proofs
         // AND none have incomplete proofs (incomplete proofs are always dishonest)
@@ -1427,10 +1427,10 @@ impl ThresholdKeyshare {
                     dimension_excluded.push(ts.party_id);
                     return false;
                 }
-                // Check sk moduli count
+                // Check sk share exists and moduli count
                 let idx = if ts.sk_sss.len() == 1 { 0 } else { party_id };
-                if let Some(share) = ts.sk_sss.clone_share(idx) {
-                    if share.num_moduli() != expected_num_moduli_sk {
+                match ts.sk_sss.clone_share(idx) {
+                    Some(share) if share.num_moduli() != expected_num_moduli_sk => {
                         warn!(
                             "Party {} has wrong sk num_moduli ({} vs expected {}) — excluding from honest set",
                             ts.party_id, share.num_moduli(), expected_num_moduli_sk
@@ -1438,12 +1438,21 @@ impl ThresholdKeyshare {
                         dimension_excluded.push(ts.party_id);
                         return false;
                     }
+                    None => {
+                        warn!(
+                            "Party {} has no sk_sss share at index {} — excluding from honest set",
+                            ts.party_id, idx
+                        );
+                        dimension_excluded.push(ts.party_id);
+                        return false;
+                    }
+                    _ => {}
                 }
-                // Check esi moduli counts
+                // Check esi shares exist and moduli counts
                 for (esi_idx, esi_shares) in ts.esi_sss.iter().enumerate() {
                     let idx = if esi_shares.len() == 1 { 0 } else { party_id };
-                    if let Some(share) = esi_shares.clone_share(idx) {
-                        if share.num_moduli() != expected_num_moduli_esi {
+                    match esi_shares.clone_share(idx) {
+                        Some(share) if share.num_moduli() != expected_num_moduli_esi => {
                             warn!(
                                 "Party {} has wrong esi num_moduli at index {} ({} vs expected {}) — excluding from honest set",
                                 ts.party_id, esi_idx, share.num_moduli(), expected_num_moduli_esi
@@ -1451,6 +1460,15 @@ impl ThresholdKeyshare {
                             dimension_excluded.push(ts.party_id);
                             return false;
                         }
+                        None => {
+                            warn!(
+                                "Party {} has no esi_sss share at index {} (esi {}) — excluding from honest set",
+                                ts.party_id, idx, esi_idx
+                            );
+                            dimension_excluded.push(ts.party_id);
+                            return false;
+                        }
+                        _ => {}
                     }
                 }
                 true
@@ -1533,7 +1551,8 @@ impl ThresholdKeyshare {
             })
             .collect::<Result<_>>()?;
 
-        let esi_sss_collected: Vec<Vec<ShamirShare>> = honest_shares
+        // Decrypt per-party ESI shares: shape [party][esm_idx]
+        let per_party_esi: Vec<Vec<ShamirShare>> = honest_shares
             .iter()
             .map(|ts| {
                 ts.esi_sss
@@ -1548,6 +1567,16 @@ impl ThresholdKeyshare {
                     .collect::<Result<Vec<_>>>()
             })
             .collect::<Result<_>>()?;
+
+        // Transpose to [esm_idx][party] — CalculateDecryptionKey aggregates per smudging noise
+        let esi_sss_collected: Vec<Vec<ShamirShare>> = (0..num_esi)
+            .map(|esm_idx| {
+                per_party_esi
+                    .iter()
+                    .map(|party_esi| party_esi[esm_idx].clone())
+                    .collect()
+            })
+            .collect();
 
         // Publish CalculateDecryptionKey request
         let request = CalculateDecryptionKeyRequest {
@@ -1595,7 +1624,7 @@ impl ThresholdKeyshare {
 
         // Store honest parties and C4 data on the actor (transient coordination)
         self.honest_parties = Some(honest_party_ids);
-        self.pending_c4_proof_data = Some((sk_request, esm_requests));
+        self.pending_share_decryption_data = Some((sk_request, esm_requests));
 
         Ok(())
     }
@@ -1617,9 +1646,9 @@ impl ThresholdKeyshare {
 
         // Extract C4 data from the actor (stored by proceed_with_decryption_key_calculation)
         let (sk_request, esm_requests) = self
-            .pending_c4_proof_data
+            .pending_share_decryption_data
             .take()
-            .ok_or_else(|| anyhow!("No pending C4 proof data — CalculateDecryptionKey responded before proof requests were built"))?;
+            .ok_or_else(|| anyhow!("No pending share decryption data — CalculateDecryptionKey responded before proof requests were built"))?;
 
         // Take early shares from the actor before transitioning
         let early_shares = std::mem::take(&mut self.early_decryption_key_shares);
@@ -2246,7 +2275,7 @@ impl Handler<E3RequestComplete> for ThresholdKeyshare {
         self.decryption_key_collector = None;
         self.decryption_key_shared_collector = None;
         self.pending_shares.clear();
-        self.pending_c4_proof_data = None;
+        self.pending_share_decryption_data = None;
         self.honest_parties = None;
         self.early_decryption_key_shares.clear();
         self.notify_sync(ctx, Die);

@@ -243,7 +243,6 @@ pub enum EnclaveEventData {
     ComputeRequestError(ComputeRequestError), // ComputeRequestFailed
     SignedProofFailed(SignedProofFailed),
     DecryptionShareProofsPending(DecryptionShareProofsPending),
-    DecryptionShareProofsSigned(DecryptionShareProofsSigned),
     ShareVerificationDispatched(ShareVerificationDispatched),
     ShareVerificationComplete(ShareVerificationComplete),
     OutgoingSyncRequested(OutgoingSyncRequested),
@@ -501,7 +500,6 @@ impl EnclaveEventData {
             EnclaveEventData::TestEvent(ref data) => data.e3_id.clone(),
             EnclaveEventData::SignedProofFailed(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::DecryptionShareProofsPending(ref data) => Some(data.e3_id.clone()),
-            EnclaveEventData::DecryptionShareProofsSigned(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ShareVerificationDispatched(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ShareVerificationComplete(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3Failed(ref data) => Some(data.e3_id.clone()),
@@ -573,7 +571,6 @@ impl_event_types!(
     ComputeRequestError,
     SignedProofFailed,
     DecryptionShareProofsPending,
-    DecryptionShareProofsSigned,
     ShareVerificationDispatched,
     ShareVerificationComplete,
     OutgoingSyncRequested,

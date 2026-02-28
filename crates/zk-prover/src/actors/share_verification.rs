@@ -130,12 +130,8 @@ impl ShareVerificationActor {
             party_signed_payloads.insert(party.sender_party_id, party.signed_proofs.clone());
             if result.passed {
                 ecdsa_passed_parties.push(party.clone());
-                if let Some((_, Some(addr))) = &result.failed_payload {
-                    party_addresses.insert(party.sender_party_id, *addr);
-                }
             } else {
                 ecdsa_dishonest.insert(party.sender_party_id);
-                // Emit SignedProofFailed for ECDSA failure
                 if let Some((ref signed, addr)) = result.failed_payload {
                     self.emit_signed_proof_failed(&e3_id, signed, addr, &ec);
                 }
@@ -234,9 +230,6 @@ impl ShareVerificationActor {
 
             if result.passed {
                 ecdsa_passed_parties.push(party.clone());
-                if let Some((_, Some(addr))) = &result.failed_payload {
-                    party_addresses.insert(party.sender_party_id, *addr);
-                }
             } else {
                 ecdsa_dishonest.insert(party.sender_party_id);
                 if let Some((ref signed, addr)) = result.failed_payload {
