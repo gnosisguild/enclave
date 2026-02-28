@@ -3,11 +3,11 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { Vote } from '../src/types'
 import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE } from '../src/constants'
 import { getZeroVote } from '../src/utils'
-import { decodeTally, verifyProof, encodeVote, generateBFVKeys, encryptVote, decryptVote } from '../src/vote'
+import { decodeTally, verifyProof, encodeVote, generateBFVKeys, encryptVote, decryptVote, destroyBBApi } from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
 import { Hex, recoverPublicKey } from 'viem'
 import { CRISP_SERVER_URL, ECDSA_PRIVATE_KEY, SLOT_ADDRESS } from './constants'
@@ -46,6 +46,10 @@ describe('Vote', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  afterAll(() => {
+    destroyBBApi()
   })
 
   beforeAll(async () => {
