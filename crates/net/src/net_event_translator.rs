@@ -11,13 +11,13 @@ use anyhow::Result;
 use bloom::{BloomFilter, ASMS};
 use e3_events::{
     prelude::*, trap, BusHandle, CorrelationId, EType, EnclaveEvent, EnclaveEventData, Event,
-    EventContextAccessors, EventSource, EventType, Unsequenced,
+    EventContextAccessors, EventSource, EventType, NetReady, Unsequenced,
 };
 use e3_utils::MAILBOX_LIMIT;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
-use tracing::{trace, warn};
+use tracing::{info, trace, warn};
 
 // TODO: store event filtering here on this actor instead of is_local_only() on the event. We
 // should do this as this functionality is not global and ramifications should stay local to here
@@ -65,7 +65,7 @@ impl NetEventTranslator {
 
         // Listen on all events
         bus.subscribe(EventType::All, addr.clone().recipient());
-
+        info!("NetEventTranslator is running");
         tokio::spawn({
             let addr = addr.clone();
             async move {

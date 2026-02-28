@@ -28,7 +28,7 @@ mod encryption_key_created;
 mod encryption_key_pending;
 mod encryption_key_received;
 mod keyshare_created;
-mod net_sync_events_received;
+mod net_ready;
 mod operator_activation_changed;
 mod outgoing_sync_requested;
 mod pk_generation_proof_signed;
@@ -77,7 +77,7 @@ pub use encryption_key_created::*;
 pub use encryption_key_pending::*;
 pub use encryption_key_received::*;
 pub use keyshare_created::*;
-pub use net_sync_events_received::*;
+pub use net_ready::*;
 pub use operator_activation_changed::*;
 pub use outgoing_sync_requested::*;
 pub use pk_generation_proof_signed::*;
@@ -239,12 +239,13 @@ pub enum EnclaveEventData {
     ComputeRequestError(ComputeRequestError), // ComputeRequestFailed
     SignedProofFailed(SignedProofFailed),
     OutgoingSyncRequested(OutgoingSyncRequested),
-    NetSyncEventsReceived(NetSyncEventsReceived),
     HistoricalEvmSyncStart(HistoricalEvmSyncStart),
     HistoricalNetSyncStart(HistoricalNetSyncStart),
+    HistoricalNetSyncEventsReceived(HistoricalNetSyncEventsReceived),
     SyncEffect(SyncEffect),
     SyncEnded(SyncEnded),
     EffectsEnabled(EffectsEnabled),
+    NetReady(NetReady),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -569,12 +570,13 @@ impl_event_types!(
     ComputeRequestError,
     SignedProofFailed,
     OutgoingSyncRequested,
-    NetSyncEventsReceived,
     HistoricalEvmSyncStart,
     HistoricalNetSyncStart,
+    HistoricalNetSyncEventsReceived,
     SyncEffect,
     SyncEnded,
-    EffectsEnabled
+    EffectsEnabled,
+    NetReady
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {

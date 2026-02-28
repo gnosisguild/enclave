@@ -7,8 +7,8 @@
 use actix::{Actor, Addr, Handler, Recipient};
 use anyhow::Result;
 use derivative::Derivative;
-use e3_utils::MAILBOX_LIMIT;
-use std::marker::PhantomData;
+use e3_utils::{actix::channel::oneshot, MAILBOX_LIMIT};
+use std::{future::Future, marker::PhantomData, pin::Pin};
 use tracing::error;
 
 use crate::{
@@ -286,6 +286,15 @@ impl<S> EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle<S> {
     fn unsubscribe(&self, event_type: &str, recipient: Recipient<EnclaveEvent<Sequenced>>) {
         self.event_bus
             .do_send(Unsubscribe::new(event_type, recipient));
+    }
+
+    fn wait_for(
+        &self,
+        event_type: EventType,
+    ) -> Pin<Box<dyn Future<Output = Result<EnclaveEvent<Sequenced>>> + Send>> {
+        let (addr, rx) = oneshot::<EnclaveEvent<Sequenced>>();
+        self.subscribe(event_type, addr.clone());
+        Box::pin(async move { Ok(rx.await?) })
     }
 }
 

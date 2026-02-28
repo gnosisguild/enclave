@@ -9,7 +9,8 @@ use anyhow::{bail, Context, Result};
 use e3_events::{
     prelude::*, trap, trap_fut, AggregateId, BusHandle, CorrelationId, EType, EnclaveEvent,
     EnclaveEventData, EventSource, EventStoreQueryBy, EventStoreQueryResponse, EventType,
-    HistoricalNetSyncStart, NetSyncEventsReceived, TsAgg, TypedEvent, Unsequenced,
+    HistoricalNetSyncEventsReceived, HistoricalNetSyncStart, NetReady, TsAgg, TypedEvent,
+    Unsequenced,
 };
 use e3_utils::MAILBOX_LIMIT;
 use serde::{Deserialize, Serialize};
@@ -164,10 +165,11 @@ impl Handler<TypedEvent<SyncRequestSucceeded>> for NetSyncManager {
         _: &mut Self::Context,
     ) -> Self::Result {
         trap(EType::Net, &self.bus.with_ec(msg.get_ctx()), || {
+            info!("SYNC REQUEST SUCCEEDED");
             let (msg, ctx) = msg.into_components();
             let response = msg.response;
             self.bus.publish_from_remote_as_response(
-                NetSyncEventsReceived {
+                HistoricalNetSyncEventsReceived {
                     events: response.events.iter().cloned().collect(),
                 },
                 response.ts,
@@ -244,8 +246,12 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
 impl Handler<AllPeersDialed> for NetSyncManager {
     type Result = ();
     fn handle(&mut self, _: AllPeersDialed, _: &mut Self::Context) -> Self::Result {
-        info!("Received handler: All peers dialed");
-        self.peers_ready = true;
+        trap(EType::Sync, &self.bus.clone(), || {
+            info!("NetSyncManager: AllPeersDialed");
+            self.peers_ready = true;
+            self.bus.publish_without_context(NetReady::new())?;
+            Ok(())
+        })
     }
 }
 
@@ -262,7 +268,7 @@ async fn handle_sync_request_event(
 ) -> Result<()> {
     info!("Sync request event received");
     let (event, ctx) = event.into_components();
-    info!("Waiting for peers to have been contacted...");
+    info!("Checking for AllPeersDialed...");
     if wait_for_event {
         await_event(
             &net_events,
@@ -278,7 +284,7 @@ async fn handle_sync_request_event(
         )
         .await?;
     }
-    info!("handle_sync_request_event: All peers have been dialed.");
+    info!("handle_sync_request_event: AllPeersDialed");
 
     let mut all_events: Vec<EnclaveEvent<Unsequenced>> = Vec::new();
     let mut latest_timestamp: u128 = 0;

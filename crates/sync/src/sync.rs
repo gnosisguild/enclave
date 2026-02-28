@@ -6,13 +6,13 @@
 
 use crate::SyncRepositoryFactory;
 use actix::{Message, Recipient};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use e3_data::Repositories;
 use e3_events::{
     AggregateConfig, AggregateId, BusHandle, CorrelationId, E3id, EffectsEnabled, EnclaveEvent,
     EnclaveEventData, Event, EventContextAccessors, EventPublisher, EventStoreQueryBy,
-    EventStoreQueryResponse, EvmEventConfig, EvmEventConfigChain, HistoricalEvmEventsReceived,
-    HistoricalEvmSyncStart, HistoricalNetEventsReceived, HistoricalNetSyncStart, SeqAgg, SyncEnded,
+    EventStoreQueryResponse, EventSubscriber, EventType, EvmEventConfig, EvmEventConfigChain,
+    HistoricalEvmEventsReceived, HistoricalEvmSyncStart, HistoricalNetSyncStart, SeqAgg, SyncEnded,
     Unsequenced,
 };
 use e3_utils::actix::channel as actix_toolbox;
@@ -39,6 +39,9 @@ pub async fn sync(
     aggregate_config: &AggregateConfig,
     eventstore: &Recipient<EventStoreQueryBy<SeqAgg>>,
 ) -> Result<()> {
+    // 0. start listening early for net ready
+    let net_ready = bus.wait_for(EventType::NetReady);
+
     // 1. Load snapsshot metadata
     info!("Loading snapshot metadata...");
     let snapshot =
@@ -94,10 +97,19 @@ pub async fn sync(
     );
     let net_config = find_net_hlc(&historical_evm_events);
     // 6. Load the historical libp2p events to memory
+    info!("Waiting until NetReady...");
+    net_ready.await?;
+    info!("NetReady!");
     info!("Loading historical libp2p events...");
-    let (addr, rx) = actix_toolbox::oneshot::<HistoricalNetEventsReceived>();
-    bus.publish_without_context(HistoricalNetSyncStart::new(addr, net_config.clone()))?;
-    let historical_net_events = rx.await?.events;
+    // let (addr, rx) = actix_toolbox::oneshot::<HistoricalNetSyncEventsReceived>();
+    let events_received = bus.wait_for(EventType::HistoricalNetSyncEventsReceived);
+    bus.publish_without_context(HistoricalNetSyncStart::new(net_config.clone()))?;
+    let EnclaveEventData::HistoricalNetSyncEventsReceived(event) =
+        events_received.await?.into_data()
+    else {
+        bail!("failed to get HistoricalNetSyncEventsReceived");
+    };
+    let historical_net_events = event.events;
     info!(
         "{} historical libp2p events loaded.",
         historical_net_events.len()

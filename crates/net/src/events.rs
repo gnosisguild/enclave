@@ -148,6 +148,10 @@ pub struct OutgoingRequestFailed {
     pub error: String,
 }
 
+#[derive(Message, Debug, Clone)]
+#[rtype("()")]
+pub struct AllPeersDialed;
+
 /// NetInterface Commands are sent to the network peer over a mspc channel
 #[derive(Debug)]
 // The generics here aid testing allowing us to avoid constructing complex types
