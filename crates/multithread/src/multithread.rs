@@ -23,10 +23,12 @@ use e3_events::EType;
 use e3_events::EffectsEnabled;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
-    ComputeResponse, EnclaveEvent, EnclaveEventData, EventPublisher, EventSubscriber, EventType,
+    ComputeResponse, DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, EnclaveEvent,
+    EnclaveEventData, EventPublisher, EventSubscriber, EventType, PartyVerificationResult,
     PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest, PkGenerationProofResponse,
     ShareComputationProofRequest, ShareComputationProofResponse, ShareEncryptionProofRequest,
-    ShareEncryptionProofResponse, TypedEvent, ZkError as ZkEventError, ZkRequest, ZkResponse,
+    ShareEncryptionProofResponse, TypedEvent, VerifyShareProofsRequest, VerifyShareProofsResponse,
+    ZkError as ZkEventError, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
@@ -36,6 +38,7 @@ use e3_trbfv::calculate_decryption_share::calculate_decryption_share;
 use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
 use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
+use e3_trbfv::helpers::deserialize_secret_key;
 use e3_trbfv::helpers::try_poly_from_bytes;
 use e3_trbfv::shares::SharedSecret;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
@@ -48,6 +51,7 @@ use e3_zk_helpers::circuits::threshold::pk_generation::circuit::{
 };
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComputationCircuitData};
+use e3_zk_helpers::dkg::share_decryption::{ShareDecryptionCircuit, ShareDecryptionCircuitData};
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_prover::{Provable, ZkBackend, ZkProver};
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
@@ -414,6 +418,12 @@ fn handle_zk_request(
         ZkRequest::ShareEncryption(req) => timefunc("zk_share_encryption", id, || {
             handle_share_encryption_proof(&prover, &cipher, req, request.clone())
         }),
+        ZkRequest::DkgShareDecryption(req) => timefunc("zk_dkg_share_decryption", id, || {
+            handle_dkg_share_decryption_proof(&prover, &cipher, req, request.clone())
+        }),
+        ZkRequest::VerifyShareProofs(req) => timefunc("zk_verify_share_proofs", id, || {
+            handle_verify_share_proofs(&prover, req, request.clone())
+        }),
     }
 }
 
@@ -703,6 +713,148 @@ fn handle_share_encryption_proof(
             row_index: req.row_index,
             esi_index: req.esi_index,
         }),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
+fn handle_dkg_share_decryption_proof(
+    prover: &ZkProver,
+    cipher: &Cipher,
+    req: DkgShareDecryptionProofRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    // 1. Build DKG params from preset
+    let (_threshold_params, dkg_params) = build_pair_for_preset(req.params_preset)
+        .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
+
+    // 2. Decrypt BFV secret key from SensitiveBytes
+    let sk_bytes = req
+        .sk_bfv
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("sk_bfv decrypt: {}", e)))?;
+    let secret_key = deserialize_secret_key(&sk_bytes, &dkg_params)
+        .map_err(|e| make_zk_error(&request, format!("sk_bfv deserialize: {}", e)))?;
+
+    // 3. Deserialize ciphertexts from raw bytes [H * L] → Vec<Vec<Ciphertext>> [H][L]
+    let h = req.num_honest_parties;
+    let l = req.num_moduli;
+    if req.honest_ciphertexts_raw.len() != h * l {
+        return Err(make_zk_error(
+            &request,
+            format!(
+                "Expected {} ciphertexts (H={} * L={}), got {}",
+                h * l,
+                h,
+                l,
+                req.honest_ciphertexts_raw.len()
+            ),
+        ));
+    }
+
+    let mut honest_ciphertexts: Vec<Vec<Ciphertext>> = Vec::with_capacity(h);
+    for party_idx in 0..h {
+        let mut party_cts = Vec::with_capacity(l);
+        for mod_idx in 0..l {
+            let raw = &req.honest_ciphertexts_raw[party_idx * l + mod_idx];
+            let ct = Ciphertext::from_bytes(raw, &dkg_params).map_err(|e| {
+                make_zk_error(
+                    &request,
+                    format!(
+                        "ciphertext[{}][{}] deserialize: {:?}",
+                        party_idx, mod_idx, e
+                    ),
+                )
+            })?;
+            party_cts.push(ct);
+        }
+        honest_ciphertexts.push(party_cts);
+    }
+
+    // 4. Build circuit data
+    let circuit_data = ShareDecryptionCircuitData {
+        secret_key,
+        honest_ciphertexts,
+        dkg_input_type: req.dkg_input_type,
+    };
+
+    // 5. Generate proof
+    let circuit = ShareDecryptionCircuit;
+    let e3_id_str = request.e3_id.to_string();
+    let proof = circuit
+        .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
+    // 6. Return response
+    Ok(ComputeResponse::zk(
+        ZkResponse::DkgShareDecryption(DkgShareDecryptionProofResponse {
+            proof,
+            dkg_input_type: req.dkg_input_type,
+        }),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
+fn handle_verify_share_proofs(
+    prover: &ZkProver,
+    req: VerifyShareProofsRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    let e3_id_str = request.e3_id.to_string();
+
+    let party_results: Vec<PartyVerificationResult> = req
+        .party_proofs
+        .into_iter()
+        .map(|party| {
+            let sender = party.sender_party_id;
+            for signed_proof in &party.signed_proofs {
+                let proof = &signed_proof.payload.proof;
+                let result = prover.verify(proof, &e3_id_str, sender);
+                match result {
+                    Ok(true) => continue,
+                    Ok(false) => {
+                        info!(
+                            "Proof verification failed for party {} ({:?})",
+                            sender, signed_proof.payload.proof_type
+                        );
+                        return PartyVerificationResult {
+                            sender_party_id: sender,
+                            all_verified: false,
+                            failed_proof_type: Some(signed_proof.payload.proof_type),
+                            failed_signed_payload: Some(signed_proof.clone()),
+                        };
+                    }
+                    Err(e) => {
+                        info!(
+                            "Proof verification error for party {} ({:?}): {}",
+                            sender, signed_proof.payload.proof_type, e
+                        );
+                        return PartyVerificationResult {
+                            sender_party_id: sender,
+                            all_verified: false,
+                            failed_proof_type: Some(signed_proof.payload.proof_type),
+                            failed_signed_payload: Some(signed_proof.clone()),
+                        };
+                    }
+                }
+            }
+            PartyVerificationResult {
+                sender_party_id: sender,
+                all_verified: true,
+                failed_proof_type: None,
+                failed_signed_payload: None,
+            }
+        })
+        .collect();
+
+    Ok(ComputeResponse::zk(
+        ZkResponse::VerifyShareProofs(VerifyShareProofsResponse { party_results }),
         request.correlation_id,
         request.e3_id,
     ))

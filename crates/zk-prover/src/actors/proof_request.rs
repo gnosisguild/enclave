@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use actix::{Actor, Addr, Context, Handler};
@@ -346,6 +346,9 @@ impl ProofRequestActor {
             ComputeResponseKind::Zk(ZkResponse::ShareEncryption(resp)) => {
                 self.handle_threshold_proof_response(&msg.correlation_id, resp.proof.clone());
             }
+            ComputeResponseKind::Zk(ZkResponse::DkgShareDecryption(resp)) => {
+                self.handle_threshold_proof_response(&msg.correlation_id, resp.proof.clone());
+            }
             _ => {}
         }
     }
@@ -408,6 +411,7 @@ impl ProofRequestActor {
         let party_id = pending.full_share.party_id;
         let ec = &pending.ec;
 
+        // Sign C1 (PkGeneration)
         let Some(signed_pk_gen) = self.sign_proof(
             e3_id,
             ProofType::C1PkGeneration,
@@ -417,7 +421,8 @@ impl ProofRequestActor {
             return;
         };
 
-        let Some(signed_sk_share) = self.sign_proof(
+        // Sign C2a (SkShareComputation)
+        let Some(signed_c2a) = self.sign_proof(
             e3_id,
             ProofType::C2aSkShareComputation,
             pending.sk_share_computation_proof.expect("checked"),
@@ -426,7 +431,8 @@ impl ProofRequestActor {
             return;
         };
 
-        let Some(signed_e_sm_share) = self.sign_proof(
+        // Sign C2b (ESmShareComputation)
+        let Some(signed_c2b) = self.sign_proof(
             e3_id,
             ProofType::C2bESmShareComputation,
             pending.e_sm_share_computation_proof.expect("checked"),
@@ -435,6 +441,38 @@ impl ProofRequestActor {
             return;
         };
 
+        // Sign C3a proofs (SkShareEncryption) — keyed by (recipient, row)
+        let mut signed_c3a_map: BTreeMap<usize, Vec<SignedProofPayload>> = BTreeMap::new();
+        for ((_recipient, _row), proof) in &pending.sk_share_encryption_proofs {
+            if let Some(signed) =
+                self.sign_proof(e3_id, ProofType::C3aSkShareEncryption, proof.clone())
+            {
+                signed_c3a_map.entry(*_recipient).or_default().push(signed);
+            } else {
+                error!(
+                    "Failed to sign C3a proof for recipient {} — shares will not be published",
+                    _recipient
+                );
+                return;
+            }
+        }
+
+        // Sign C3b proofs (ESmShareEncryption) — keyed by (esi_index, recipient, row)
+        let mut signed_c3b_map: BTreeMap<usize, Vec<SignedProofPayload>> = BTreeMap::new();
+        for ((_esi, _recipient, _row), proof) in &pending.e_sm_share_encryption_proofs {
+            if let Some(signed) =
+                self.sign_proof(e3_id, ProofType::C3bESmShareEncryption, proof.clone())
+            {
+                signed_c3b_map.entry(*_recipient).or_default().push(signed);
+            } else {
+                error!(
+                    "Failed to sign C3b proof for recipient {} — shares will not be published",
+                    _recipient
+                );
+                return;
+            }
+        }
+
         info!(
             "All proofs signed for E3 {} party {} (signer: {})",
             e3_id,
@@ -442,9 +480,7 @@ impl ProofRequestActor {
             self.signer.address()
         );
 
-        let share = &pending.full_share;
-        let num_parties = share.num_parties();
-
+        // Publish local proof events for the node's own state tracking
         if let Err(err) = self.bus.publish(
             PkGenerationProofSigned {
                 e3_id: e3_id.clone(),
@@ -460,7 +496,7 @@ impl ProofRequestActor {
             DkgProofSigned {
                 e3_id: e3_id.clone(),
                 party_id,
-                signed_proof: signed_sk_share,
+                signed_proof: signed_c2a.clone(),
             },
             ec.clone(),
         ) {
@@ -471,52 +507,48 @@ impl ProofRequestActor {
             DkgProofSigned {
                 e3_id: e3_id.clone(),
                 party_id,
-                signed_proof: signed_e_sm_share,
+                signed_proof: signed_c2b.clone(),
             },
             ec.clone(),
         ) {
             error!("Failed to publish ESmDkgProofSigned: {err}");
         }
 
-        // Sign and publish C3a proofs (SkShareEncryption)
-        for ((_recipient, _row), proof) in &pending.sk_share_encryption_proofs {
-            let Some(signed) =
-                self.sign_proof(e3_id, ProofType::C3aSkShareEncryption, proof.clone())
-            else {
-                error!("Failed to sign C3a proof — shares will not be published");
-                return;
-            };
-            if let Err(err) = self.bus.publish(
-                DkgProofSigned {
-                    e3_id: e3_id.clone(),
-                    party_id,
-                    signed_proof: signed,
-                },
-                ec.clone(),
-            ) {
-                error!("Failed to publish SkShareEncryptionProofSigned: {err}");
+        // Publish C3a signed proofs (reuse already-signed proofs from signed_c3a_map)
+        for signed_proofs in signed_c3a_map.values() {
+            for signed in signed_proofs {
+                if let Err(err) = self.bus.publish(
+                    DkgProofSigned {
+                        e3_id: e3_id.clone(),
+                        party_id,
+                        signed_proof: signed.clone(),
+                    },
+                    ec.clone(),
+                ) {
+                    error!("Failed to publish SkShareEncryptionProofSigned: {err}");
+                }
             }
         }
 
-        // Sign and publish C3b proofs (ESmShareEncryption)
-        for ((_esi, _recipient, _row), proof) in &pending.e_sm_share_encryption_proofs {
-            let Some(signed) =
-                self.sign_proof(e3_id, ProofType::C3bESmShareEncryption, proof.clone())
-            else {
-                error!("Failed to sign C3b proof — shares will not be published");
-                return;
-            };
-            if let Err(err) = self.bus.publish(
-                DkgProofSigned {
-                    e3_id: e3_id.clone(),
-                    party_id,
-                    signed_proof: signed,
-                },
-                ec.clone(),
-            ) {
-                error!("Failed to publish ESmShareEncryptionProofSigned: {err}");
+        // Publish C3b signed proofs (reuse already-signed proofs from signed_c3b_map)
+        for signed_proofs in signed_c3b_map.values() {
+            for signed in signed_proofs {
+                if let Err(err) = self.bus.publish(
+                    DkgProofSigned {
+                        e3_id: e3_id.clone(),
+                        party_id,
+                        signed_proof: signed.clone(),
+                    },
+                    ec.clone(),
+                ) {
+                    error!("Failed to publish ESmShareEncryptionProofSigned: {err}");
+                }
             }
         }
+
+        // Publish ThresholdShareCreated with proofs attached for each recipient
+        let share = &pending.full_share;
+        let num_parties = share.num_parties();
 
         info!(
             "Publishing ThresholdShareCreated for E3 {} to {} parties",
@@ -525,12 +557,25 @@ impl ProofRequestActor {
 
         for recipient_party_id in 0..num_parties {
             if let Some(party_share) = share.extract_for_party(recipient_party_id) {
+                let c3a_proofs = signed_c3a_map
+                    .get(&recipient_party_id)
+                    .cloned()
+                    .unwrap_or_default();
+                let c3b_proofs = signed_c3b_map
+                    .get(&recipient_party_id)
+                    .cloned()
+                    .unwrap_or_default();
+
                 if let Err(err) = self.bus.publish(
                     ThresholdShareCreated {
                         e3_id: e3_id.clone(),
                         share: Arc::new(party_share),
                         target_party_id: recipient_party_id as u64,
                         external: false,
+                        signed_c2a_proof: Some(signed_c2a.clone()),
+                        signed_c2b_proof: Some(signed_c2b.clone()),
+                        signed_c3a_proofs: c3a_proofs,
+                        signed_c3b_proofs: c3b_proofs,
                     },
                     ec.clone(),
                 ) {
