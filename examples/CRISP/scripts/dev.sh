@@ -35,6 +35,6 @@ pnpm concurrently \
   -ks first \
   --names "ANVIL,DEPLOY" \
   --prefix-colors "blue,green" \
-  "anvil --host 0.0.0.0 --chain-id 31337 --block-time 1 --mnemonic 'test test test test test test test test test test test junk'" \
+  "anvil --host 0.0.0.0 --chain-id 31337 --block-time 1 --mnemonic 'test test test test test test test test test test test junk' --silent" \
   "./scripts/crisp_deploy.sh && ./scripts/dev_services.sh"
 

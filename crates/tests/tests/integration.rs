@@ -186,6 +186,24 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
 
+        // Copy C4 (share_decryption) circuit — used for DKG share decryption proofs (Exchange #3)
+        let share_dec_circuit_dir = circuits_dir.join("dkg").join("share_decryption");
+        tokio::fs::create_dir_all(&share_dec_circuit_dir)
+            .await
+            .unwrap();
+        tokio::fs::copy(
+            dkg_target.join("share_decryption.json"),
+            share_dec_circuit_dir.join("share_decryption.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            dkg_target.join("share_decryption.vk"),
+            share_dec_circuit_dir.join("share_decryption.vk"),
+        )
+        .await
+        .unwrap();
+
         let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
 
         (backend, temp)
@@ -397,7 +415,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // Actor system setup
     // Seems like you cannot send more than one job at a time to rayon
-    let concurrent_jobs = 1; // leaving at 1
+    let concurrent_jobs = 1;
     let max_threadroom = Multithread::get_max_threads_minus(1);
     let task_pool = Multithread::create_taskpool(max_threadroom, concurrent_jobs);
     let multithread_report = MultithreadReport::new(max_threadroom, concurrent_jobs).start();
@@ -575,10 +593,25 @@ async fn test_trbfv_actor() -> Result<()> {
         .await?;
     report.push(("All ThresholdShareCreated events", shares_timer.elapsed()));
 
+    // Wait for DecryptionKeyShared (Exchange #3) events
+    // - DecryptionKeyShared × 5 (passes is_document_publisher_event filter)
+    // Each committee node publishes DecryptionKeyShared after computing its decryption key
+    // and generating C4 (share decryption) proofs.
+    let decryption_key_shared_timer = Instant::now();
+    let expected: Vec<&str> = (0..5).map(|_| "DecryptionKeyShared").collect();
+    let _ = nodes
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
+        .await?;
+    report.push((
+        "All DecryptionKeyShared events",
+        decryption_key_shared_timer.elapsed(),
+    ));
+
     // Wait for KeyshareCreated + PublicKeyAggregated
     // - KeyshareCreated × 5 (passes is_forwardable_event filter)
     // - PublicKeyAggregated × 1 (passes is_forwardable_event filter)
-    // Internal events (ComputeRequest/Response for CalculateDecryptionKey) stay on local buses.
+    // After DecryptionKeySharedCollector collects all shares and C4 proofs are verified,
+    // each party publishes KeyshareCreated.
     let shares_to_pubkey_agg_timer = Instant::now();
     let expected = vec![
         "KeyshareCreated",

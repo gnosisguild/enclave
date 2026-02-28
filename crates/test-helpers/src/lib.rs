@@ -15,8 +15,9 @@ use alloy::primitives::Address;
 use anyhow::*;
 use e3_ciphernode_builder::{CiphernodeHandle, EventSystem};
 use e3_events::{
-    BusHandle, CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
-    EventPublisher, EventType, HistoryCollector, Seed, Subscribe,
+    BusHandle, CiphernodeAdded, Enabled, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
+    EventContextAccessors, EventPublisher, EventSubscriber, EventType, HistoryCollector, Seed,
+    Sequenced, Subscribe,
 };
 use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::DEFAULT_BFV_PRESET;
@@ -94,6 +95,38 @@ pub fn get_common_setup(
     Ok((handle, rng, seed, params, crpoly, errors, history))
 }
 
+/// Actor that pipes events between buses, filtering for broadcastable events
+/// and transforming document-publisher events to simulate network receipt
+/// (e.g. setting `external: true` on `DecryptionKeyShared`).
+struct SimulatedNetPipe {
+    dest: BusHandle<Enabled>,
+}
+
+impl Actor for SimulatedNetPipe {
+    type Context = actix::Context<Self>;
+}
+
+impl Handler<EnclaveEvent<Sequenced>> for SimulatedNetPipe {
+    type Result = ();
+    fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
+        let should_forward = NetEventTranslator::is_forwardable_event(&msg)
+            || DocumentPublisher::is_document_publisher_event(&msg);
+
+        if should_forward {
+            let source = msg.source();
+            let (mut data, ts) = msg.split();
+
+            // Simulate network receive: in production, DocumentPublisher
+            // sets external=true when reconstructing events from the network.
+            if let EnclaveEventData::DecryptionKeyShared(ref mut dks) = data {
+                dks.external = true;
+            }
+
+            let _ = self.dest.publish_from_remote(data, ts, None, source);
+        }
+    }
+}
+
 /// Simulate libp2p by taking output events on each local bus and filter for !is_local_only() and forward remaining events back to the event bus
 /// deduplication will remove previously seen events.
 /// This sets up a set of cyphernodes without libp2p.
@@ -108,7 +141,7 @@ pub fn get_common_setup(
 ///          ┌────────────┼────────────┐
 ///          │            │            │
 ///          ▼            ▼            ▼
-///       ┌────┐       ┌────┐       ┌────┐               
+///       ┌────┐       ┌────┐       ┌────┐
 ///       │ B1 │       │ B2 │       │ B3 │◀──┐
 ///       └────┘       └────┘       └────┘   │
 ///          │            │            │     │
@@ -116,8 +149,8 @@ pub fn get_common_setup(
 ///          └────────────┼────────────┘     │
 ///                       │                  │
 ///                       ▼                  │
-///                    ┌─────┐               │               
-///                    │ FIL │───────────────┘                 
+///                    ┌─────┐               │
+///                    │ FIL │───────────────┘
 ///                    └─────┘
 /// ```
 pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
@@ -126,13 +159,8 @@ pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
         for (_, node) in nodes.iter().enumerate() {
             let dest = node.bus();
             if source != dest {
-                source.pipe_to(dest, |e: &EnclaveEvent| {
-                    // TODO: Document publisher events need to be
-                    // converted to DocumentReceived events
-
-                    NetEventTranslator::is_forwardable_event(e)
-                        || DocumentPublisher::is_document_publisher_event(e)
-                });
+                let pipe = SimulatedNetPipe { dest: dest.clone() }.start();
+                source.subscribe(EventType::All, pipe.into());
             } else {
                 trace!("Source = Dest! Not piping bus to itself");
             }
