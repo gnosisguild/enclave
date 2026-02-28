@@ -49,13 +49,9 @@ impl Handler<TypedEvent<ZkVerificationRequest>> for ZkActor {
         );
 
         let e3_id_str = msg.e3_id.to_string();
-        let result = self.prover.verify_proof(
-            msg.proof.circuit,
-            &msg.proof.data,
-            &msg.proof.public_signals,
-            &e3_id_str,
-            msg.key.party_id,
-        );
+        let result = self
+            .prover
+            .verify_proof(&msg.proof, &e3_id_str, msg.key.party_id);
 
         let response = TypedEvent::new(
             match result {

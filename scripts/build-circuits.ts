@@ -19,8 +19,20 @@ interface CircuitInfo {
 interface CompiledCircuit {
   name: string
   group: CircuitGroup
-  artifacts: { json?: string; vk?: string }
-  checksums: { json?: string; vk?: string }
+  artifacts: {
+    json?: string
+    vk?: string
+    vkHash?: string
+    vkRecursive?: string
+    vkRecursiveHash?: string
+  }
+  checksums: {
+    json?: string
+    vk?: string
+    vkHash?: string
+    vkRecursive?: string
+    vkRecursiveHash?: string
+  }
 }
 interface BuildOptions {
   groups?: CircuitGroup[]
@@ -106,6 +118,10 @@ class NoirCircuitBuilder {
 
       result.releaseDir = this.copyArtifacts(result.compiled)
       console.log(`\n✅ Built ${result.compiled.length} circuits`)
+      if (result.errors.length > 0) {
+        console.error('\n❌ Failed circuits:')
+        for (const err of result.errors) console.error(`   ${err}`)
+      }
     } catch (error: any) {
       result.success = false
       result.errors.push(error.message)
@@ -158,16 +174,48 @@ class NoirCircuitBuilder {
       const groupDir = join(this.circuitsDir, group)
       if (!existsSync(groupDir)) continue
 
-      for (const entry of readdirSync(groupDir)) {
-        const circuitPath = join(groupDir, entry)
-        if (statSync(circuitPath).isDirectory() && existsSync(join(circuitPath, 'Nargo.toml'))) {
-          if (!this.options.circuits || this.options.circuits.includes(entry)) {
-            circuits.push({ name: entry, group, path: circuitPath })
-          }
-        }
-      }
+      this.findCircuitsInDir(groupDir, '', group, circuits)
     }
     return circuits
+  }
+
+  private findCircuitsInDir(dir: string, relativePath: string, group: CircuitGroup, out: CircuitInfo[]): void {
+    for (const entry of readdirSync(dir)) {
+      const fullPath = join(dir, entry)
+      if (!statSync(fullPath).isDirectory()) continue
+
+      const name = relativePath ? `${relativePath}/${entry}` : entry
+      const nargoPath = join(fullPath, 'Nargo.toml')
+      if (!existsSync(nargoPath)) {
+        this.findCircuitsInDir(fullPath, name, group, out)
+        continue
+      }
+      // Workspace roots ([workspace]) are not circuits; recurse to find leaf packages
+      if (this.isWorkspaceOnly(nargoPath)) {
+        this.findCircuitsInDir(fullPath, name, group, out)
+      } else if (!this.options.circuits || this.options.circuits.includes(name)) {
+        out.push({ name, group, path: fullPath })
+      }
+    }
+  }
+
+  private isWorkspaceOnly(nargoPath: string): boolean {
+    const content = readFileSync(nargoPath, 'utf-8')
+    return /^\s*\[workspace\]/m.test(content) && !/^\s*\[package\]/m.test(content)
+  }
+
+  /** Search dirs for compiled JSON; include parent targets (workspace members output to workspace root). */
+  private getTargetSearchDirs(circuitPath: string, groupDir: string): string[] {
+    const dirs = [join(circuitPath, 'target')]
+    let dir = circuitPath
+    while (dir !== groupDir) {
+      const parent = resolve(dir, '..')
+      if (parent === dir) break
+      dirs.push(join(parent, 'target'))
+      dir = parent
+    }
+    dirs.push(join(groupDir, 'target'), join(this.circuitsDir, 'target'))
+    return dirs
   }
 
   private buildCircuit(circuit: CircuitInfo): CompiledCircuit {
@@ -182,7 +230,7 @@ class NoirCircuitBuilder {
     execSync('nargo compile', { cwd: circuit.path, stdio: 'pipe' })
 
     const groupDir = join(this.circuitsDir, circuit.group)
-    const targetDirs = [join(groupDir, 'target'), join(this.circuitsDir, 'target'), join(circuit.path, 'target')]
+    const targetDirs = this.getTargetSearchDirs(circuit.path, groupDir)
 
     let jsonFile: string | null = null
     let targetDir: string | null = null
@@ -208,10 +256,22 @@ class NoirCircuitBuilder {
     result.checksums.json = this.checksum(jsonFile)
 
     if (!this.options.skipVk) {
-      const vkFile = this.generateVk(jsonFile, targetDir, packageName)
-      if (vkFile) {
-        result.artifacts.vk = vkFile
-        result.checksums.vk = this.checksum(vkFile)
+      const vkArtifacts = this.generateVk(circuit, jsonFile, targetDir, packageName)
+      if (vkArtifacts.vk) {
+        result.artifacts.vk = vkArtifacts.vk
+        result.checksums.vk = this.checksum(vkArtifacts.vk)
+      }
+      if (vkArtifacts.vkHash && existsSync(vkArtifacts.vkHash)) {
+        result.artifacts.vkHash = vkArtifacts.vkHash
+        result.checksums.vkHash = this.checksum(vkArtifacts.vkHash)
+      }
+      if (vkArtifacts.vkRecursive) {
+        result.artifacts.vkRecursive = vkArtifacts.vkRecursive
+        result.checksums.vkRecursive = this.checksum(vkArtifacts.vkRecursive)
+      }
+      if (vkArtifacts.vkRecursiveHash && existsSync(vkArtifacts.vkRecursiveHash)) {
+        result.artifacts.vkRecursiveHash = vkArtifacts.vkRecursiveHash
+        result.checksums.vkRecursiveHash = this.checksum(vkArtifacts.vkRecursiveHash)
       }
     }
     console.log(`   ✓ ${circuit.group}/${circuit.name}`)
@@ -219,22 +279,73 @@ class NoirCircuitBuilder {
     return result
   }
 
-  private generateVk(jsonFile: string, targetDir: string, packageName: string): string | null {
-    const vkFile = join(targetDir, `${packageName}.vk`)
-    try {
-      const oracleFlag = this.options.oracleHash ? ` --oracle_hash ${this.options.oracleHash}` : ''
-      execSync(`bb write_vk -b "${jsonFile}" -o "${targetDir}"${oracleFlag}`, { stdio: 'pipe' })
-      const defaultVk = join(targetDir, 'vk')
-      if (existsSync(defaultVk)) {
-        if (existsSync(vkFile)) rmSync(vkFile)
-        copyFileSync(defaultVk, vkFile)
-        rmSync(defaultVk)
-      }
-      return existsSync(vkFile) ? vkFile : null
-    } catch (err) {
-      console.error(`Error generating VK for ${jsonFile}:`, err)
-      return null
+  private isWrapper(circuit: CircuitInfo): boolean {
+    return circuit.name.startsWith('wrapper/')
+  }
+
+  private generateVk(
+    circuit: CircuitInfo,
+    jsonFile: string,
+    targetDir: string,
+    packageName: string,
+  ): {
+    vk: string | null
+    vkHash: string | null
+    vkRecursive: string | null
+    vkRecursiveHash: string | null
+  } {
+    const result = {
+      vk: null as string | null,
+      vkHash: null as string | null,
+      vkRecursive: null as string | null,
+      vkRecursiveHash: null as string | null,
     }
+    const isWrapper = this.isWrapper(circuit)
+
+    const runWriteVk = (verifierTarget: string, vkOut: string, vkHashOut: string): boolean => {
+      try {
+        execSync(`bb write_vk -b "${jsonFile}" -o "${targetDir}" -t ${verifierTarget}`, { stdio: 'pipe' })
+        const defaultVk = join(targetDir, 'vk')
+        const defaultVkHash = join(targetDir, 'vk_hash')
+        if (existsSync(defaultVk)) {
+          if (existsSync(vkOut)) rmSync(vkOut)
+          copyFileSync(defaultVk, vkOut)
+          rmSync(defaultVk)
+        }
+        if (existsSync(defaultVkHash)) {
+          if (existsSync(vkHashOut)) rmSync(vkHashOut)
+          copyFileSync(defaultVkHash, vkHashOut)
+          rmSync(defaultVkHash)
+        }
+        return true
+      } catch (err) {
+        console.error(`Error generating VK (${verifierTarget}) for ${jsonFile}:`, err)
+        return false
+      }
+    }
+
+    const vkFile = join(targetDir, `${packageName}.vk`)
+    const vkHashFile = join(targetDir, `${packageName}.vk_hash`)
+    const vkRecursiveFile = join(targetDir, `${packageName}.vk_recursive`)
+    const vkRecursiveHashFile = join(targetDir, `${packageName}.vk_recursive_hash`)
+
+    if (!isWrapper) {
+      if (runWriteVk('evm', vkFile, vkHashFile)) {
+        result.vk = existsSync(vkFile) ? vkFile : null
+        result.vkHash = existsSync(vkHashFile) ? vkHashFile : null
+      }
+      if (runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
+        result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
+        result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
+      }
+    } else {
+      if (runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
+        result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
+        result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
+      }
+    }
+
+    return result
   }
 
   private getPackageName(circuitPath: string): string {
@@ -280,6 +391,21 @@ class NoirCircuitBuilder {
         checksums[f] = c.checksums.vk
         lines.push(`${c.checksums.vk}  ${f}`)
       }
+      if (c.checksums.vkHash && c.artifacts.vkHash) {
+        const f = `${prefix}/${basename(c.artifacts.vkHash)}`
+        checksums[f] = c.checksums.vkHash
+        lines.push(`${c.checksums.vkHash}  ${f}`)
+      }
+      if (c.checksums.vkRecursive && c.artifacts.vkRecursive) {
+        const f = `${prefix}/${basename(c.artifacts.vkRecursive)}`
+        checksums[f] = c.checksums.vkRecursive
+        lines.push(`${c.checksums.vkRecursive}  ${f}`)
+      }
+      if (c.checksums.vkRecursiveHash && c.artifacts.vkRecursiveHash) {
+        const f = `${prefix}/${basename(c.artifacts.vkRecursiveHash)}`
+        checksums[f] = c.checksums.vkRecursiveHash
+        lines.push(`${c.checksums.vkRecursiveHash}  ${f}`)
+      }
     }
 
     const outputDir = this.options.outputDir!
@@ -299,6 +425,9 @@ class NoirCircuitBuilder {
       mkdirSync(dir, { recursive: true })
       if (c.artifacts.json) copyFileSync(c.artifacts.json, join(dir, basename(c.artifacts.json)))
       if (c.artifacts.vk) copyFileSync(c.artifacts.vk, join(dir, basename(c.artifacts.vk)))
+      if (c.artifacts.vkHash) copyFileSync(c.artifacts.vkHash, join(dir, basename(c.artifacts.vkHash)))
+      if (c.artifacts.vkRecursive) copyFileSync(c.artifacts.vkRecursive, join(dir, basename(c.artifacts.vkRecursive)))
+      if (c.artifacts.vkRecursiveHash) copyFileSync(c.artifacts.vkRecursiveHash, join(dir, basename(c.artifacts.vkRecursiveHash)))
     }
     return outputDir
   }
