@@ -423,6 +423,17 @@ impl ShareVerificationActor {
         }
 
         for result in &zk_results {
+            // Ignore results for parties we never dispatched (defense-in-depth)
+            if !pending
+                .dispatched_party_ids
+                .contains(&result.sender_party_id)
+            {
+                warn!(
+                    "ZK result for party {} was not dispatched — ignoring",
+                    result.sender_party_id
+                );
+                continue;
+            }
             if !result.all_verified {
                 all_dishonest.insert(result.sender_party_id);
 

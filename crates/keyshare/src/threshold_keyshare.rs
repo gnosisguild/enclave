@@ -1200,7 +1200,8 @@ impl ThresholdKeyshare {
             // All non-self parties are dishonest (missing or incomplete proofs), none to verify
             let threshold = state.threshold_m;
             let total = state.threshold_n;
-            let honest_count = total - pre_dishonest.len() as u64;
+            let dishonest_count = (pre_dishonest.len() as u64).min(total);
+            let honest_count = total - dishonest_count;
 
             if honest_count < threshold {
                 warn!(
@@ -1265,7 +1266,8 @@ impl ThresholdKeyshare {
                 } else {
                     let threshold = state.threshold_m;
                     let total = state.threshold_n;
-                    let honest_count = total - msg.dishonest_parties.len() as u64;
+                    let dishonest_count = (msg.dishonest_parties.len() as u64).min(total);
+                    let honest_count = total - dishonest_count;
 
                     if honest_count < threshold {
                         warn!(
