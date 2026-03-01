@@ -220,7 +220,7 @@ mod tests {
             history: Some(history),
             errors: Some(errors),
             peer_id: PeerId::random(),
-            net_simulate_adaptor: None,
+            channel_bridge: None,
         })
     }
 
