@@ -17,8 +17,9 @@ export {
   encryptVote,
   encodeSolidityProof,
   validateVote,
+  destroyBBApi,
 } from './vote'
 export { CrispSDK } from './sdk'
 
-export type { RoundDetails, RoundDetailsResponse, TokenDetails, Vote, MaskVoteProofInputs, VoteProofInputs } from './types'
+export type { RoundDetails, RoundDetailsResponse, TokenDetails, Vote, MaskVoteProofInputs, VoteProofInputs, ProofData } from './types'
 export { CreditMode } from './types'
