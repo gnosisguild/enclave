@@ -4,16 +4,21 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::correlator::Correlator;
-use anyhow::{bail, Result};
+use crate::{
+    correlator::Correlator,
+    direct_responder::{ChannelType, DirectResponder},
+    events::{IncomingResponse, OutgoingRequest, ProtocolResponse},
+    net_interface_handle::NetInterfaceHandle,
+};
+use anyhow::{bail, Context, Result};
 use e3_events::CorrelationId;
-use e3_utils::{ArcBytes, OnceTake};
+use e3_utils::ArcBytes;
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
     gossipsub,
     identify::{Behaviour as IdentifyBehaviour, Config as IdentifyConfig},
-    identity::Keypair,
+    identity::{ed25519, Keypair},
     kad::{
         self,
         store::{MemoryStore, MemoryStoreConfig, RecordStore},
@@ -21,8 +26,8 @@ use libp2p::{
         Record, RecordKey,
     },
     request_response::{
-        self, cbor::Behaviour as CborRequestResponse, Event as RequestResponseEvent,
-        Message as RequestResponseMessage, ProtocolSupport, ResponseChannel,
+        self, cbor, Event as RequestResponseEvent, Message as RequestResponseMessage,
+        ProtocolSupport,
     },
     swarm::{dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent},
     PeerId, StreamProtocol, Swarm,
@@ -34,7 +39,10 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{select, sync::broadcast, sync::mpsc};
+use tokio::{
+    select,
+    sync::{broadcast, mpsc},
+};
 use tracing::{debug, error, info, trace, warn};
 
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/enclave/kad/1.0.0");
@@ -46,9 +54,8 @@ const MAX_CONSECUTIVE_DIAL_FAILURES: u32 = 3;
 use crate::{
     dialer::dial_peers,
     events::{
-        estimate_hashmap_size, GossipData, NetCommand, NetEvent, OutgoingSyncRequestFailed,
-        OutgoingSyncRequestSucceeded, PutOrStoreError, SyncRequestReceived, SyncRequestValue,
-        SyncResponseValue,
+        GossipData, IncomingRequest, NetCommand, NetEvent, OutgoingRequestFailed,
+        OutgoingRequestSucceeded, PeerTarget, PutOrStoreError,
     },
     ContentHash,
 };
@@ -59,12 +66,13 @@ pub struct NodeBehaviour {
     kademlia: KademliaBehaviour<MemoryStore>,
     connection_limits: connection_limits::Behaviour,
     identify: IdentifyBehaviour,
-    sync: CborRequestResponse<SyncRequestValue, SyncResponseValue>,
+    /// Send bytes reply with enumeration for errors
+    request_response: cbor::Behaviour<Vec<u8>, ProtocolResponse>,
 }
 
 /// Manage the peer to peer connection. This struct wraps a libp2p Swarm and enables communication
 /// with it using channels.
-pub struct NetInterface {
+pub struct Libp2pNetInterface {
     /// The Libp2p Swarm instance
     swarm: Swarm<NodeBehaviour>,
     /// A list of peers to automatically dial
@@ -75,15 +83,15 @@ pub struct NetInterface {
     topic: gossipsub::IdentTopic,
     /// Broadcast channel to report NetEvents to listeners
     event_tx: broadcast::Sender<NetEvent>,
-    /// Transmission channel to send NetCommands to the NetInterface
+    /// Transmission channel to send NetCommands to the Libp2pNetInterface
     cmd_tx: mpsc::Sender<NetCommand>,
     /// Local receiver to process NetCommands from
     cmd_rx: mpsc::Receiver<NetCommand>,
 }
 
-impl NetInterface {
+impl Libp2pNetInterface {
     pub fn new(
-        id: &Keypair,
+        id: Libp2pKeypair,
         peers: Vec<String>,
         udp_port: Option<u16>,
         topic: &str,
@@ -91,7 +99,7 @@ impl NetInterface {
         let (event_tx, _) = broadcast::channel(1000); // TODO : tune this param
         let (cmd_tx, cmd_rx) = mpsc::channel(1000); // TODO : tune this param
 
-        let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
+        let swarm = libp2p::SwarmBuilder::with_existing_identity(id.into_keypair())
             .with_tokio()
             .with_quic()
             .with_dns()
@@ -113,12 +121,8 @@ impl NetInterface {
         })
     }
 
-    pub fn rx(&mut self) -> broadcast::Receiver<NetEvent> {
-        self.event_tx.subscribe()
-    }
-
-    pub fn tx(&self) -> mpsc::Sender<NetCommand> {
-        self.cmd_tx.clone()
+    pub fn handle(&self) -> NetInterfaceHandle {
+        NetInterfaceHandle::new(self.cmd_tx.clone(), self.event_tx.subscribe())
     }
 
     pub async fn start(&mut self) -> Result<()> {
@@ -146,6 +150,7 @@ impl NetInterface {
         trace!("Peers to dial: {:?}", self.peers);
         tokio::spawn({
             let event_tx = event_tx.clone();
+            let cmd_tx = cmd_tx.clone();
             let peers = self.peers.clone();
             async move {
                 dial_peers(&cmd_tx, &event_tx, &peers).await?;
@@ -171,7 +176,7 @@ impl NetInterface {
                 }
                 // Process events
                 event = self.swarm.select_next_some() =>  {
-                    match process_swarm_event(&mut self.swarm, &event_tx, &mut correlator, &mut peer_failures, event).await {
+                    match process_swarm_event(&mut self.swarm, &event_tx, &cmd_tx, &mut correlator, &mut peer_failures, event).await {
                         Ok(_) => (),
                         Err(e) => error!("Error processing NetEvent: {e}")
                     }
@@ -185,6 +190,33 @@ impl NetInterface {
     }
 }
 
+pub struct Libp2pKeypair {
+    keypair: libp2p::identity::Keypair,
+}
+
+impl Libp2pKeypair {
+    pub fn new(keypair: libp2p::identity::Keypair) -> Self {
+        Self { keypair }
+    }
+
+    pub fn generate() -> Self {
+        let id = libp2p::identity::Keypair::generate_ed25519();
+        Self::new(id)
+    }
+
+    pub fn try_from_bytes(bytes: &mut [u8]) -> Result<Self> {
+        let keypair: libp2p::identity::Keypair =
+            ed25519::Keypair::try_from_bytes(bytes)?.try_into()?;
+        Ok(Self { keypair })
+    }
+
+    pub fn into_keypair(self) -> libp2p::identity::Keypair {
+        self.keypair
+    }
+    pub fn peer_id(&self) -> PeerId {
+        self.keypair.public().to_peer_id()
+    }
+}
 /// Create the libp2p behaviour
 fn create_behaviour(
     key: &Keypair,
@@ -210,7 +242,7 @@ fn create_behaviour(
     let request_response_config =
         request_response::Config::default().with_request_timeout(Duration::from_secs(30));
 
-    let sync = CborRequestResponse::<SyncRequestValue, SyncResponseValue>::new(
+    let request_response = cbor::Behaviour::<Vec<u8>, ProtocolResponse>::new(
         [(
             StreamProtocol::new("/enclave/sync/0.0.1"),
             ProtocolSupport::Full,
@@ -228,9 +260,6 @@ fn create_behaviour(
         max_provided_keys: DHT_MAX_RECORDS,
     };
     let store = MemoryStore::with_config(peer_id, store_config);
-    // Force Server mode: in a private network all nodes should fully participate
-    // in DHT routing. Auto-detect (None) would classify containerized/NAT'd nodes
-    // as Clients, preventing peer discovery and record replication.
     let mut kademlia = KademliaBehaviour::with_config(peer_id, store, config);
     kademlia.set_mode(Some(kad::Mode::Server));
 
@@ -239,7 +268,7 @@ fn create_behaviour(
         kademlia,
         connection_limits,
         identify,
-        sync,
+        request_response,
     })
 }
 
@@ -247,6 +276,7 @@ fn create_behaviour(
 async fn process_swarm_event(
     swarm: &mut Swarm<NodeBehaviour>,
     event_tx: &broadcast::Sender<NetEvent>,
+    cmd_tx: &mpsc::Sender<NetCommand>,
     correlator: &mut Correlator,
     peer_failures: &mut PeerFailureTracker,
     event: SwarmEvent<NodeBehaviourEvent>,
@@ -418,46 +448,49 @@ async fn process_swarm_event(
             event_tx.send(NetEvent::GossipSubscribed { count, topic })?;
         }
 
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::Message {
-            message:
-                RequestResponseMessage::Request {
-                    request,
-                    channel,
-                    request_id,
-                },
-            ..
-        })) => {
-            debug!("Incoming sync request received (id={})", request_id);
+        SwarmEvent::Behaviour(NodeBehaviourEvent::RequestResponse(
+            RequestResponseEvent::Message {
+                message:
+                    RequestResponseMessage::Request {
+                        request,
+                        channel,
+                        request_id,
+                    },
+                ..
+            },
+        )) => {
+            debug!("Incoming request received (id={})", request_id);
+            let responder =
+                DirectResponder::new(request_id, ChannelType::Channel(channel), &cmd_tx)
+                    .with_request(request);
 
             // received a request for events
-            event_tx.send(NetEvent::SyncRequestReceived(SyncRequestReceived {
-                request_id,
-                channel: OnceTake::new(channel),
-                value: request,
-            }))?;
+            event_tx.send(NetEvent::IncomingRequest(IncomingRequest { responder }))?;
         }
 
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::Message {
-            message:
-                RequestResponseMessage::Response {
-                    request_id,
-                    response,
-                    ..
-                },
-            ..
-        })) => {
-            debug!("Outgoing sync response received (id={request_id})");
+        SwarmEvent::Behaviour(NodeBehaviourEvent::RequestResponse(
+            RequestResponseEvent::Message {
+                message:
+                    RequestResponseMessage::Response {
+                        request_id,
+                        response,
+                        ..
+                    },
+                ..
+            },
+        )) => {
+            debug!("Response received (id={request_id})");
             let correlation_id = correlator.expire(request_id)?;
-            debug!("Correlated sync response: {correlation_id}");
-            event_tx.send(NetEvent::OutgoingSyncRequestSucceeded(
-                OutgoingSyncRequestSucceeded {
-                    value: response,
+            debug!("Correlated response: {correlation_id}");
+            event_tx.send(NetEvent::OutgoingRequestSucceeded(
+                OutgoingRequestSucceeded {
+                    payload: response,
                     correlation_id,
                 },
             ))?;
         }
 
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(
+        SwarmEvent::Behaviour(NodeBehaviourEvent::RequestResponse(
             RequestResponseEvent::OutboundFailure {
                 peer,
                 request_id,
@@ -465,34 +498,33 @@ async fn process_swarm_event(
             },
         )) => {
             warn!(
-                "Outbound sync request failed: peer={}, id={}, error={:?}",
+                "Outbound request failed: peer={}, id={}, error={:?}",
                 peer, request_id, error
             );
             let correlation_id = correlator.expire(request_id)?;
-            event_tx.send(NetEvent::OutgoingSyncRequestFailed(
-                OutgoingSyncRequestFailed {
-                    correlation_id,
-                    error: format!("Outbound sync request failed: {:?}", error),
-                },
-            ))?;
+            event_tx.send(NetEvent::OutgoingRequestFailed(OutgoingRequestFailed {
+                correlation_id,
+                error: format!("Outbound request failed: {:?}", error),
+            }))?;
         }
 
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::InboundFailure {
-            peer,
-            request_id,
-            error,
-        })) => {
+        SwarmEvent::Behaviour(NodeBehaviourEvent::RequestResponse(
+            RequestResponseEvent::InboundFailure {
+                peer,
+                request_id,
+                error,
+            },
+        )) => {
             warn!(
-                "Inbound sync request failed: peer={}, id={}, error={:?}",
+                "Inbound request failed: peer={}, id={}, error={:?}",
                 peer, request_id, error
             );
         }
 
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::ResponseSent {
-            peer,
-            request_id,
-        })) => {
-            debug!("Sync response sent to peer={}, id={}", peer, request_id);
+        SwarmEvent::Behaviour(NodeBehaviourEvent::RequestResponse(
+            RequestResponseEvent::ResponseSent { peer, request_id },
+        )) => {
+            debug!("Response sent to peer={}, id={}", peer, request_id);
         }
 
         unknown => {
@@ -518,7 +550,8 @@ async fn process_swarm_command(
             handle_gossip_publish(swarm, event_tx, data, topic, correlation_id)?;
             Ok(())
         }
-        NetCommand::Dial(multi) => {
+        NetCommand::Dial(env) => {
+            let multi = env.take().context("Dial received without payload")?;
             handle_dial(swarm, event_tx, multi)?;
             Ok(())
         }
@@ -550,19 +583,20 @@ async fn process_swarm_command(
             handle_remove_records(swarm, keys);
             Ok(())
         }
-        NetCommand::OutgoingSyncRequest {
+        NetCommand::OutgoingRequest(OutgoingRequest {
             correlation_id,
-            value,
-        } => {
-            handle_outgoing_sync_request(swarm, correlator, correlation_id, value)?;
+            payload,
+            target,
+        }) => {
+            handle_outgoing_request(swarm, correlator, correlation_id, payload, target)?;
             Ok(())
         }
-        NetCommand::SyncResponse { value, channel } => {
-            handle_sync_response(swarm, channel, value)?;
+        NetCommand::IncomingResponse(IncomingResponse { responder }) => {
+            handle_response(swarm, responder)?;
             Ok(())
         }
         NetCommand::Shutdown => {
-            unreachable!("shutdown command must be handled in NetInterface::start")
+            unreachable!("shutdown command must be handled in Libp2pNetInterface::start")
         }
     }
 }
@@ -753,55 +787,48 @@ fn handle_shutdown(swarm: &mut Swarm<NodeBehaviour>) -> Result<()> {
     Ok(())
 }
 
-fn handle_outgoing_sync_request(
+fn handle_outgoing_request(
     swarm: &mut Swarm<NodeBehaviour>,
     correlator: &mut Correlator,
     correlation_id: CorrelationId,
-    value: SyncRequestValue,
+    payload: Vec<u8>,
+    target: PeerTarget,
 ) -> Result<()> {
-    debug!("Outgoing sync request (cid={})", correlation_id);
-    // TODO:
-    // This is a first pass.
-    // Lots of stuff to work through here:
-    // How can I know events are correct?
-    // How can I trust this peer?
-    // Can I validate events with another peer?
-    // Should I use an OrderedSet with a hash and request the hash from a second peer?
-
-    // Pick a random peer
-    let Some(peer) = swarm
-        .connected_peers()
-        .choose(&mut rand::thread_rng())
-        .copied()
-    else {
-        bail!("No peer found on swarm!")
+    let peer = match target {
+        PeerTarget::Random => swarm
+            .connected_peers()
+            .choose(&mut rand::thread_rng())
+            .copied()
+            .context("No connected peers available")?,
+        PeerTarget::Specific(peer_id) => peer_id,
     };
 
-    debug!(
-        "Sync request payload size: {:?}",
-        estimate_hashmap_size(&value.since)
-    );
+    debug!("Outgoing request payload size: {:?}", payload.len());
 
     // Request events
-    let query_id = swarm.behaviour_mut().sync.send_request(&peer, value);
+    let query_id = swarm
+        .behaviour_mut()
+        .request_response
+        .send_request(&peer, payload);
     debug!(
-        "Sync request sent: query_id={}, correlation_id={}",
+        "Outgoing request sent: query_id={}, correlation_id={}",
         query_id, correlation_id
     );
     correlator.track(query_id, correlation_id);
     Ok(())
 }
 
-fn handle_sync_response(
-    swarm: &mut Swarm<NodeBehaviour>,
-    channel: OnceTake<ResponseChannel<SyncResponseValue>>,
-    value: SyncResponseValue,
-) -> Result<()> {
-    debug!("Sending sync response");
-    let channel = channel.try_take()?;
-    if let Err(value) = swarm.behaviour_mut().sync.send_response(channel, value) {
-        error!("Failed to send sync response: {:?}", value);
-    }
+fn handle_response(swarm: &mut Swarm<NodeBehaviour>, responder: DirectResponder) -> Result<()> {
+    debug!("Sending response to {}", responder.id());
+    let (channel, response) = responder.to_response()?;
+    let ChannelType::Channel(channel) = channel else {
+        bail!("responder did not return the correct type of channel");
+    };
+    swarm
+        .behaviour_mut()
+        .request_response
+        .send_response(channel, response)
+        .map_err(|payload| anyhow::anyhow!("Failed to send response: {:?}", payload))?;
     Ok(())
 }
 

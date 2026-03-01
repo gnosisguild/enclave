@@ -19,7 +19,7 @@ pub fn to_retry(e: impl Into<anyhow::Error>) -> RetryError {
     RetryError::Retry(e.into())
 }
 
-pub const BACKOFF_DELAY: u64 = 500;
+pub const BACKOFF_DELAY: u64 = 3000;
 pub const BACKOFF_MAX_RETRIES: u32 = 10;
 
 /// Retries an async operation with exponential backoff

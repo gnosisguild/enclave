@@ -29,7 +29,7 @@ mod encryption_key_created;
 mod encryption_key_pending;
 mod encryption_key_received;
 mod keyshare_created;
-mod net_sync_events_received;
+mod net_ready;
 mod operator_activation_changed;
 mod outgoing_sync_requested;
 mod pk_generation_proof_signed;
@@ -80,7 +80,7 @@ pub use encryption_key_created::*;
 pub use encryption_key_pending::*;
 pub use encryption_key_received::*;
 pub use keyshare_created::*;
-pub use net_sync_events_received::*;
+pub use net_ready::*;
 pub use operator_activation_changed::*;
 pub use outgoing_sync_requested::*;
 pub use pk_generation_proof_signed::*;
@@ -246,12 +246,13 @@ pub enum EnclaveEventData {
     ShareVerificationDispatched(ShareVerificationDispatched),
     ShareVerificationComplete(ShareVerificationComplete),
     OutgoingSyncRequested(OutgoingSyncRequested),
-    NetSyncEventsReceived(NetSyncEventsReceived),
     HistoricalEvmSyncStart(HistoricalEvmSyncStart),
     HistoricalNetSyncStart(HistoricalNetSyncStart),
+    HistoricalNetSyncEventsReceived(HistoricalNetSyncEventsReceived),
     SyncEffect(SyncEffect),
     SyncEnded(SyncEnded),
     EffectsEnabled(EffectsEnabled),
+    NetReady(NetReady),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -380,6 +381,14 @@ impl EnclaveEvent<Unsequenced> {
             payload: self.payload,
             ctx: self.ctx.sequence(seq),
         }
+    }
+}
+
+impl TryFrom<Vec<u8>> for EnclaveEvent<Unsequenced> {
+    type Error = bincode::Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        EnclaveEvent::from_bytes(&value)
     }
 }
 
@@ -574,12 +583,13 @@ impl_event_types!(
     ShareVerificationDispatched,
     ShareVerificationComplete,
     OutgoingSyncRequested,
-    NetSyncEventsReceived,
     HistoricalEvmSyncStart,
     HistoricalNetSyncStart,
+    HistoricalNetSyncEventsReceived,
     SyncEffect,
     SyncEnded,
-    EffectsEnabled
+    EffectsEnabled,
+    NetReady
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {
@@ -648,5 +658,130 @@ impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
                 .map(|cause| EventContext::from_cause(id, cause, ts, aggregate_id, block, source))
                 .unwrap_or_else(|| EventContext::new_origin(id, ts, aggregate_id, block, source)),
         }
+    }
+}
+
+#[cfg(feature = "test-helpers")]
+impl<S: SeqState> EnclaveEvent<S> {
+    /// Create a test event using the TestEventBuilder struct
+    pub fn test_event(label: &str) -> TestEventBuilder<Unsequenced> {
+        TestEventBuilder::<Unsequenced>::new(label)
+    }
+}
+
+/// Build out a test event
+pub struct TestEventBuilder<S: SeqState> {
+    label: String,
+    seq: S::Seq,
+    id: Option<u64>,
+    data: Option<EnclaveEventData>,
+    aggregate_id: Option<u64>,
+    e3_id: Option<E3id>,
+    ts: Option<u128>,
+}
+
+impl TestEventBuilder<Unsequenced> {
+    /// Create a new test event
+    pub fn new(label: &str) -> Self {
+        Self {
+            label: label.to_owned(),
+            seq: (),
+            id: None,
+            aggregate_id: None,
+            data: None,
+            e3_id: None,
+            ts: None,
+        }
+    }
+
+    /// make it a sequenced event
+    pub fn seq(self, seq: u64) -> TestEventBuilder<Sequenced> {
+        TestEventBuilder::<Sequenced> {
+            seq,
+            label: self.label,
+            id: self.id,
+            data: self.data,
+            aggregate_id: self.aggregate_id,
+            e3_id: self.e3_id,
+            ts: self.ts,
+        }
+    }
+}
+
+impl<S: SeqState> TestEventBuilder<S> {
+    /// Add an e3_id based on a u64 this takes preference over e3_id()
+    pub fn id(mut self, id: u64) -> Self {
+        self.id = Some(id);
+        self
+    }
+
+    /// Ensure the event holds the given aggregate_id this takes preference over e3_id()
+    pub fn aggregate_id(mut self, id: u64) -> Self {
+        self.aggregate_id = Some(id);
+        self
+    }
+
+    /// Ensure the event holds the given e3_id.
+    pub fn e3_id(mut self, e3_id: E3id) -> Self {
+        self.e3_id = Some(e3_id);
+        self
+    }
+
+    /// Ensure the event holds a ts
+    pub fn ts(mut self, ts: u128) -> Self {
+        self.ts = Some(ts);
+        self
+    }
+
+    /// Ensure the event holds the given EnclaveEventData object. This overrides all other params
+    /// aiside from seq(n)
+    pub fn data(mut self, data: impl Into<EnclaveEventData>) -> Self {
+        self.data = Some(data.into());
+        self
+    }
+
+    fn get_built_event(self) -> EnclaveEvent<Unsequenced> {
+        let event = self.data.unwrap_or(
+            TestEvent {
+                msg: self.label,
+                entropy: self.id.unwrap_or(0),
+                e3_id: resolve_e3_id(self.e3_id, self.id, self.aggregate_id),
+            }
+            .into(),
+        );
+
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(
+            event,
+            None,
+            self.ts.unwrap_or(0),
+            None,
+            EventSource::Evm,
+        )
+    }
+}
+
+impl TestEventBuilder<Unsequenced> {
+    /// Build the event
+    pub fn build(self) -> EnclaveEvent<Unsequenced> {
+        self.get_built_event()
+    }
+}
+
+impl TestEventBuilder<Sequenced> {
+    /// Build the event
+    pub fn build(self) -> EnclaveEvent<Sequenced> {
+        let seq = self.seq;
+        let unseq = self.get_built_event();
+        unseq.into_sequenced(seq)
+    }
+}
+
+fn resolve_e3_id(e3_id: Option<E3id>, id: Option<u64>, aggregate_id: Option<u64>) -> Option<E3id> {
+    match (e3_id, id, aggregate_id) {
+        (Some(_), Some(id), Some(agg)) if agg != 0 => Some(E3id::new(id.to_string(), agg)),
+        (Some(e3), Some(id), _) => Some(E3id::new(id.to_string(), e3.chain_id())),
+        (Some(e3), _, Some(agg)) if agg != 0 => Some(E3id::new(e3.e3_id(), agg)),
+        (None, Some(id), Some(agg)) if agg != 0 => Some(E3id::new(id.to_string(), agg)),
+        (e3, _, _) => e3,
     }
 }

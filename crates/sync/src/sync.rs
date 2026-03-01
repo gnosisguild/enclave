@@ -6,13 +6,14 @@
 
 use crate::SyncRepositoryFactory;
 use actix::{Message, Recipient};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use e3_data::Repositories;
 use e3_events::{
-    AggregateConfig, AggregateId, BusHandle, CorrelationId, EffectsEnabled, EnclaveEvent,
+    AggregateConfig, AggregateId, BusHandle, CorrelationId, E3id, EffectsEnabled, EnclaveEvent,
     EnclaveEventData, Event, EventContextAccessors, EventPublisher, EventStoreQueryBy,
-    EventStoreQueryResponse, EvmEventConfig, EvmEventConfigChain, HistoricalEvmEventsReceived,
-    HistoricalEvmSyncStart, SeqAgg, SyncEnded, Unsequenced,
+    EventStoreQueryResponse, EventSubscriber, EventType, EvmEventConfig, EvmEventConfigChain,
+    HistoricalEvmEventsReceived, HistoricalEvmSyncStart, HistoricalNetSyncStart, SeqAgg, SyncEnded,
+    Unsequenced,
 };
 use e3_utils::actix::channel as actix_toolbox;
 use std::{
@@ -38,6 +39,9 @@ pub async fn sync(
     aggregate_config: &AggregateConfig,
     eventstore: &Recipient<EventStoreQueryBy<SeqAgg>>,
 ) -> Result<()> {
+    // 0. start listening early for net ready
+    let net_ready = bus.wait_for(EventType::NetReady);
+
     // 1. Load snapsshot metadata
     info!("Loading snapshot metadata...");
     let snapshot =
@@ -91,22 +95,30 @@ pub async fn sync(
         "{} historical blockchain events loaded.",
         historical_evm_events.len()
     );
-
-    // XXX: Skipping as we have bugs in libp2p netevent requests
+    let net_config = find_net_hlc(&historical_evm_events);
     // 6. Load the historical libp2p events to memory
-    // info!("Loading historical libp2p events...");
-    // let (addr, rx) = actix_toolbox::oneshot::<HistoricalNetEventsReceived>();
-    // bus.publish_without_context(HistoricalNetSyncStart::new(addr, net_config.clone()))?;
-    // let historical_net_events = rx.await?.events;
-    // info!(
-    //     "{} historical libp2p events loaded.",
-    //     historical_net_events.len()
-    // );
+    info!("Waiting until NetReady...");
+    net_ready.await?;
+    info!("NetReady!");
+    info!("Loading historical libp2p events...");
+    // let (addr, rx) = actix_toolbox::oneshot::<HistoricalNetSyncEventsReceived>();
+    let events_received = bus.wait_for(EventType::HistoricalNetSyncEventsReceived);
+    bus.publish_without_context(HistoricalNetSyncStart::new(net_config.clone()))?;
+    let EnclaveEventData::HistoricalNetSyncEventsReceived(event) =
+        events_received.await?.into_data()
+    else {
+        bail!("failed to get HistoricalNetSyncEventsReceived");
+    };
+    let historical_net_events = event.events;
+    info!(
+        "{} historical libp2p events loaded.",
+        historical_net_events.len()
+    );
 
     // 7. Sort both the evm and libp2p events together by HLC timestamp
     let mut historical = historical_evm_events
         .into_iter()
-        // .chain(historical_net_events) // Commenting out to skip
+        .chain(historical_net_events)
         .collect::<Vec<_>>();
 
     historical.sort_by_key(|event| event.ts());
@@ -175,6 +187,28 @@ pub async fn collect_historical_evm_events(
     }
 
     results
+}
+
+fn find_net_hlc(events: &[EnclaveEvent<Unsequenced>]) -> BTreeMap<AggregateId, u128> {
+    // find all E3s that are closed
+    let e3s: Vec<E3id> = events
+        .iter()
+        .filter_map(|e| match e.get_data() {
+            EnclaveEventData::E3Failed(d) => Some(d.e3_id.clone()),
+            EnclaveEventData::E3RequestComplete(d) => Some(d.e3_id.clone()),
+            _ => None,
+        })
+        .collect();
+    events
+        .to_vec()
+        .into_iter()
+        .filter(|e| e.get_e3_id().map_or(true, |id| !e3s.contains(&id)))
+        .fold(BTreeMap::new(), |mut acc, e| {
+            acc.entry(e.aggregate_id())
+                .and_modify(|ts| *ts = (*ts).max(e.ts()))
+                .or_insert(e.ts());
+            acc
+        })
 }
 
 /// Latest event information in store
@@ -278,29 +312,16 @@ impl SnapshotLoaded {
         Self { snapshot }
     }
 }
-
 #[cfg(test)]
 mod tests {
-    use super::is_infrastructure_event;
+    use super::*;
     use e3_ciphernode_builder::EventSystem;
     use e3_events::{
-        EffectsEnabled, EnclaveEvent, EnclaveEventData, Event, EventConstructorWithTimestamp,
-        EventSource, EvmEventConfig, HistoricalEvmSyncStart, SyncEnded, TakeEvents, TestEvent,
+        E3Failed, E3RequestComplete, E3Stage, E3id, EffectsEnabled, EnclaveEvent, EnclaveEventData,
+        Event, EvmEventConfig, FailureReason, HistoricalEvmSyncStart, SyncEnded, TakeEvents,
         Unsequenced,
     };
 
-    fn make_sequenced(data: impl Into<EnclaveEventData>, seq: u64) -> EnclaveEvent {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(
-            data.into(),
-            None,
-            1000,
-            None,
-            EventSource::Local,
-        )
-        .into_sequenced(seq)
-    }
-
-    /// `sender` is `Option<Recipient<…>>` — `None` is safe here since we're not dispatching.
     fn make_historical_evm_sync_start() -> HistoricalEvmSyncStart {
         HistoricalEvmSyncStart {
             evm_config: EvmEventConfig::new(),
@@ -310,10 +331,22 @@ mod tests {
 
     #[test]
     fn infrastructure_events_are_detected() {
-        let sync_ended = make_sequenced(SyncEnded::new(), 1);
-        let effects_enabled = make_sequenced(EffectsEnabled::new(), 2);
-        let evm_sync_start = make_sequenced(make_historical_evm_sync_start(), 3);
-        let test_event = make_sequenced(TestEvent::new("hello", 42), 4);
+        let sync_ended = EnclaveEvent::<Unsequenced>::test_event("sync")
+            .data(SyncEnded::new())
+            .seq(1)
+            .build();
+        let effects_enabled = EnclaveEvent::<Unsequenced>::test_event("fx")
+            .data(EffectsEnabled::new())
+            .seq(2)
+            .build();
+        let evm_sync_start = EnclaveEvent::<Unsequenced>::test_event("evm")
+            .data(make_historical_evm_sync_start())
+            .seq(3)
+            .build();
+        let test_event = EnclaveEvent::<Unsequenced>::test_event("hello")
+            .id(42)
+            .seq(4)
+            .build();
 
         assert!(is_infrastructure_event(&sync_ended));
         assert!(is_infrastructure_event(&effects_enabled));
@@ -321,9 +354,6 @@ mod tests {
         assert!(!is_infrastructure_event(&test_event));
     }
 
-    /// Regression: infrastructure events replayed from the EventStore must be filtered before
-    /// they reach the bus. If they aren't, the bloom-filter deduplicates the copy that `sync()`
-    /// re-publishes later, causing it to be silently dropped.
     #[actix::test]
     async fn infrastructure_events_are_filtered_during_replay() -> anyhow::Result<()> {
         let system = EventSystem::new().with_fresh_bus();
@@ -331,11 +361,26 @@ mod tests {
         let history = bus.history();
 
         let events: Vec<EnclaveEvent> = vec![
-            make_sequenced(TestEvent::new("before", 1), 1),
-            make_sequenced(SyncEnded::new(), 2),
-            make_sequenced(EffectsEnabled::new(), 3),
-            make_sequenced(make_historical_evm_sync_start(), 4),
-            make_sequenced(TestEvent::new("after", 2), 5),
+            EnclaveEvent::<Unsequenced>::test_event("before")
+                .id(1)
+                .seq(1)
+                .build(),
+            EnclaveEvent::<Unsequenced>::test_event("sync")
+                .data(SyncEnded::new())
+                .seq(2)
+                .build(),
+            EnclaveEvent::<Unsequenced>::test_event("fx")
+                .data(EffectsEnabled::new())
+                .seq(3)
+                .build(),
+            EnclaveEvent::<Unsequenced>::test_event("evm")
+                .data(make_historical_evm_sync_start())
+                .seq(4)
+                .build(),
+            EnclaveEvent::<Unsequenced>::test_event("after")
+                .id(2)
+                .seq(5)
+                .build(),
         ];
 
         for event in events {
@@ -370,8 +415,81 @@ mod tests {
                 }
             })
             .collect();
-        assert_eq!(msgs, vec!["before", "after"]);
 
+        assert_eq!(msgs, vec!["before", "after"]);
         Ok(())
+    }
+
+    #[test]
+    fn test_find_net_hlc() {
+        let closed_1 = E3id::new("1", 1);
+        let closed_2 = E3id::new("2", 2);
+        let open_1 = E3id::new("3", 3);
+        let open_2 = E3id::new("4", 4);
+
+        let events = vec![
+            // closed e3s -> should be filtered out
+            EnclaveEvent::<Unsequenced>::test_event("a")
+                .e3_id(closed_1.clone())
+                .ts(1000)
+                .build(),
+            EnclaveEvent::<Unsequenced>::test_event("a")
+                .e3_id(closed_1.clone())
+                .ts(2000)
+                .build(),
+            EnclaveEvent::<Unsequenced>::test_event("complete")
+                .data(E3RequestComplete {
+                    e3_id: closed_1.clone(),
+                })
+                .ts(3000)
+                .build(),
+            EnclaveEvent::<Unsequenced>::test_event("b")
+                .e3_id(closed_2.clone())
+                .ts(1500)
+                .build(),
+            EnclaveEvent::<Unsequenced>::test_event("failed")
+                .data(E3Failed {
+                    e3_id: closed_2.clone(),
+                    failed_at_stage: E3Stage::CommitteeFinalized,
+                    reason: FailureReason::InsufficientCommitteeMembers,
+                })
+                .ts(2500)
+                .build(),
+            // open e3s -> should be kept
+            EnclaveEvent::<Unsequenced>::test_event("c")
+                .e3_id(open_1.clone())
+                .ts(4000)
+                .build(),
+            EnclaveEvent::<Unsequenced>::test_event("c")
+                .e3_id(open_1.clone())
+                .ts(5000)
+                .build(),
+            EnclaveEvent::<Unsequenced>::test_event("d")
+                .e3_id(open_2.clone())
+                .ts(6000)
+                .build(),
+            // no e3_id -> aggregate 0, always kept
+            EnclaveEvent::<Unsequenced>::test_event("e")
+                .ts(7000)
+                .build(),
+            EnclaveEvent::<Unsequenced>::test_event("e")
+                .ts(8000)
+                .build(),
+        ];
+
+        let result = find_net_hlc(&events);
+
+        // closed e3s excluded
+        assert!(!result.contains_key(&AggregateId::new(1)));
+        assert!(!result.contains_key(&AggregateId::new(2)));
+
+        // open e3s kept with max ts
+        assert_eq!(result[&AggregateId::new(3)], 5000);
+        assert_eq!(result[&AggregateId::new(4)], 6000);
+
+        // no-e3 events kept with max ts
+        assert_eq!(result[&AggregateId::new(0)], 8000);
+
+        assert_eq!(result.len(), 3);
     }
 }

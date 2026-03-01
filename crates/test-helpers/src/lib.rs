@@ -6,18 +6,18 @@
 
 pub mod application;
 pub mod ciphernode_system;
+pub mod libp2p_mock;
 mod plaintext_writer;
 mod public_key_writer;
 pub mod usecase_helpers;
 mod utils;
 use actix::prelude::*;
 use alloy::primitives::Address;
-use anyhow::*;
+use anyhow::Result;
 use e3_ciphernode_builder::{CiphernodeHandle, EventSystem};
 use e3_events::{
     BusHandle, CiphernodeAdded, Enabled, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
-    EventContextAccessors, EventPublisher, EventSubscriber, EventType, HistoryCollector, Seed,
-    Sequenced, Subscribe,
+    EventContextAccessors, EventPublisher, EventType, HistoryCollector, Seed, Sequenced, Subscribe,
 };
 use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::DEFAULT_BFV_PRESET;
@@ -28,13 +28,13 @@ use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::mbfv::CommonRandomPoly;
 use fhe_traits::Serialize;
 use fhe_traits::{FheEncoder, FheEncrypter};
+use libp2p_mock::Libp2pMock;
 pub use plaintext_writer::*;
 pub use public_key_writer::*;
 use rand::Rng;
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::sync::Arc;
-use tracing::trace;
 pub use utils::*;
 
 pub fn create_shared_rng_from_u64(value: u64) -> Arc<std::sync::Mutex<ChaCha20Rng>> {
@@ -153,20 +153,99 @@ impl Handler<EnclaveEvent<Sequenced>> for SimulatedNetPipe {
 ///                    │ FIL │───────────────┘
 ///                    └─────┘
 /// ```
-pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
+pub async fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
+    println!("MOCK: simulate_libp2p_net");
+    let mock = Libp2pMock::new();
     for node in nodes.iter() {
-        let source = node.bus();
-        for (_, node) in nodes.iter().enumerate() {
-            let dest = node.bus();
-            if source != dest {
-                let pipe = SimulatedNetPipe { dest: dest.clone() }.start();
-                source.subscribe(EventType::All, pipe.into());
-            } else {
-                trace!("Source = Dest! Not piping bus to itself");
-            }
-        }
+        let interface = node.channel_bridge().unwrap();
+        mock.add_node(node.peer_id, interface).await;
     }
 }
+
+// fn pipe(src: NetChannelBridge, dest: NetChannelBridge) {
+//     let src_event_tx = src.event_tx();
+//     let dest_event_tx = dest.event_tx();
+//     let mut src_cmd_rx = src.cmd_rx();
+//
+//     tokio::spawn(async move {
+//         let mut store: HashMap<ContentHash, ArcBytes> = HashMap::new();
+//
+//         loop {
+//             match src_cmd_rx.recv().await {
+//                 Ok(NetCommand::GossipPublish {
+//                     data,
+//                     correlation_id,
+//                     ..
+//                 }) => {
+//                     if let Err(e) = dest_event_tx.send(NetEvent::GossipData(data)) {
+//                         error!("pipe: failed to forward GossipData to dest: {e}");
+//                     }
+//
+//                     let message_id = MessageId::new(&format!("{correlation_id:?}").into_bytes());
+//                     if let Err(e) = src_event_tx.send(NetEvent::GossipPublished {
+//                         correlation_id,
+//                         message_id,
+//                     }) {
+//                         error!("pipe: failed to send GossipPublished to src: {e}");
+//                     }
+//                 }
+//                 Ok(NetCommand::DhtPutRecord {
+//                     correlation_id,
+//                     key,
+//                     value,
+//                     ..
+//                 }) => {
+//                     store.insert(key.clone(), value.clone());
+//
+//                     if let Err(e) = dest_event_tx.send(NetEvent::DhtGetRecordSucceeded {
+//                         key: key.clone(),
+//                         correlation_id,
+//                         value,
+//                     }) {
+//                         error!("pipe: failed to forward DhtGetRecordSucceeded to dest: {e}");
+//                     }
+//
+//                     if let Err(e) = src_event_tx.send(NetEvent::DhtPutRecordSucceeded {
+//                         key,
+//                         correlation_id,
+//                     }) {
+//                         error!("pipe: failed to send DhtPutRecordSucceeded to src: {e}");
+//                     }
+//                 }
+//                 Ok(NetCommand::DhtGetRecord {
+//                     correlation_id,
+//                     key,
+//                 }) => {
+//                     if let Some(value) = store.get(&key).cloned() {
+//                         if let Err(e) = src_event_tx.send(NetEvent::DhtGetRecordSucceeded {
+//                             key,
+//                             correlation_id,
+//                             value,
+//                         }) {
+//                             error!("pipe: failed to send DhtGetRecordSucceeded to src: {e}");
+//                         }
+//                     } else {
+//                         if let Err(e) = src_event_tx.send(NetEvent::DhtGetRecordError {
+//                             correlation_id,
+//                             error: GetRecordError::NotFound {
+//                                 key: RecordKey::new(&key.into_inner()),
+//                                 closest_peers: vec![],
+//                             },
+//                         }) {
+//                             error!("pipe: failed to send DhtGetRecordError to src: {e}");
+//                         }
+//                     }
+//                 }
+//                 Err(broadcast::error::RecvError::Lagged(n)) => {
+//                     warn!("pipe: src cmd receiver lagged by {n} messages");
+//                     continue;
+//                 }
+//                 Err(_) => break,
+//                 _ => continue,
+//             }
+//         }
+//     });
+// }
 
 /// Creates test eth addresses
 /// NOTE: THESE ARE NOT ACTUAL ADDRESSES JUST RANDOM DATA
@@ -224,7 +303,7 @@ pub fn encrypt_ciphertext(
         .map(|pt| {
             pubkey
                 .try_encrypt(&pt, &mut rng)
-                .map_err(|e| anyhow!("{e}"))
+                .map_err(|e| anyhow::anyhow!("{e}"))
         })
         .collect::<Result<Vec<Ciphertext>>>()?;
     Ok((ciphertext, plaintext))

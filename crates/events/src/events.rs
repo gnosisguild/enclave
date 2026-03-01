@@ -8,7 +8,13 @@ use std::collections::HashMap;
 
 use actix::{Message, Recipient};
 
-use crate::{AggregateId, CorrelationId, EnclaveEvent, Sequenced, Unsequenced};
+use crate::traits::EventContextAccessors;
+use crate::{AggregateId, CorrelationId, EnclaveEvent, EventSource, Sequenced, Unsequenced};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EventStoreFilter {
+    Source(EventSource),
+}
 
 /// Direct event received by the EventStore to store an event
 #[derive(Message, Debug)]
@@ -98,6 +104,8 @@ pub struct EventStoreQueryBy<Q: QueryKind> {
     correlation_id: CorrelationId,
     query: Q::Shape,
     sender: Recipient<EventStoreQueryResponse>,
+    limit: Option<u64>,
+    filter: Option<EventStoreFilter>,
 }
 
 impl EventStoreQueryBy<SeqAgg> {
@@ -110,11 +118,31 @@ impl EventStoreQueryBy<SeqAgg> {
             correlation_id,
             query,
             sender: sender.into(),
+            limit: None,
+            filter: None,
         }
     }
 
     pub fn query(&self) -> &HashMap<AggregateId, u64> {
         &self.query
+    }
+
+    pub fn limit(&self) -> Option<u64> {
+        self.limit
+    }
+
+    pub fn filter(&self) -> Option<&EventStoreFilter> {
+        self.filter.as_ref()
+    }
+
+    pub fn with_limit(mut self, limit: u64) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn with_filter(mut self, filter: EventStoreFilter) -> Self {
+        self.filter = Some(filter);
+        self
     }
 }
 
@@ -128,11 +156,31 @@ impl EventStoreQueryBy<TsAgg> {
             correlation_id,
             query,
             sender: sender.into(),
+            limit: None,
+            filter: None,
         }
     }
 
     pub fn query(&self) -> &HashMap<AggregateId, u128> {
         &self.query
+    }
+
+    pub fn limit(&self) -> Option<u64> {
+        self.limit
+    }
+
+    pub fn filter(&self) -> Option<&EventStoreFilter> {
+        self.filter.as_ref()
+    }
+
+    pub fn with_limit(mut self, limit: u64) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn with_filter(mut self, filter: EventStoreFilter) -> Self {
+        self.filter = Some(filter);
+        self
     }
 }
 
@@ -146,11 +194,31 @@ impl EventStoreQueryBy<Ts> {
             correlation_id,
             query,
             sender: sender.into(),
+            limit: None,
+            filter: None,
         }
     }
 
     pub fn query(&self) -> u128 {
         self.query
+    }
+
+    pub fn limit(&self) -> Option<u64> {
+        self.limit
+    }
+
+    pub fn filter(&self) -> Option<&EventStoreFilter> {
+        self.filter.as_ref()
+    }
+
+    pub fn with_limit(mut self, limit: u64) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn with_filter(mut self, filter: EventStoreFilter) -> Self {
+        self.filter = Some(filter);
+        self
     }
 }
 
@@ -164,11 +232,31 @@ impl EventStoreQueryBy<Seq> {
             correlation_id,
             query,
             sender: sender.into(),
+            limit: None,
+            filter: None,
         }
     }
 
     pub fn query(&self) -> u64 {
         self.query
+    }
+
+    pub fn limit(&self) -> Option<u64> {
+        self.limit
+    }
+
+    pub fn filter(&self) -> Option<&EventStoreFilter> {
+        self.filter.as_ref()
+    }
+
+    pub fn with_limit(mut self, limit: u64) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn with_filter(mut self, filter: EventStoreFilter) -> Self {
+        self.filter = Some(filter);
+        self
     }
 }
 
@@ -179,5 +267,15 @@ impl<Q: QueryKind> EventStoreQueryBy<Q> {
 
     pub fn sender(self) -> Recipient<EventStoreQueryResponse> {
         self.sender
+    }
+
+    pub fn with_options(mut self, limit: Option<u64>, filter: Option<EventStoreFilter>) -> Self {
+        if let Some(l) = limit {
+            self.limit = Some(l);
+        }
+        if let Some(f) = filter {
+            self.filter = Some(f);
+        }
+        self
     }
 }

@@ -4,25 +4,27 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::CorrelationId;
 use actix::Message;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
-use super::{EnclaveEvent, Unsequenced};
-
+/// Dispatched once effects (side-effects) should be activated after a sync pass
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct NetSyncEventsReceived {
-    pub events: Vec<EnclaveEvent<Unsequenced>>,
+pub struct NetReady {
+    correlation_id: CorrelationId,
 }
 
-impl NetSyncEventsReceived {
-    pub fn new(events: Vec<EnclaveEvent<Unsequenced>>) -> Self {
-        Self { events }
+impl NetReady {
+    pub fn new() -> Self {
+        Self {
+            correlation_id: CorrelationId::new(),
+        }
     }
 }
 
-impl Display for NetSyncEventsReceived {
+impl Display for NetReady {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }

@@ -712,7 +712,7 @@ importers:
         version: 5.3.0
       '@risc0/ethereum':
         specifier: file:lib/risc0-ethereum
-        version: file:templates/default/lib/risc0-ethereum
+        version: risc0-ethereum@file:templates/default/lib/risc0-ethereum
       '@types/chai':
         specifier: ^4.2.0
         version: 4.3.20
@@ -3067,9 +3067,6 @@ packages:
 
   '@reown/appkit@1.7.8':
     resolution: {integrity: sha512-51kTleozhA618T1UvMghkhKfaPcc9JlKwLJ5uV+riHyvSoWPKPRIa5A6M1Wano5puNyW0s3fwywhyqTHSilkaA==}
-
-  '@risc0/ethereum@file:templates/default/lib/risc0-ethereum':
-    resolution: {directory: templates/default/lib/risc0-ethereum, type: directory}
 
   '@rolldown/pluginutils@1.0.0-beta.27':
     resolution: {integrity: sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA==}
@@ -8703,6 +8700,9 @@ packages:
     resolution: {integrity: sha512-5Di9UC0+8h1L6ZD2d7awM7E/T4uA1fJRlx6zk/NvdCCVEoAnFqvHmCuNeIKoCeIixBX/q8uM+6ycDvF8woqosA==}
     engines: {node: '>= 0.8'}
 
+  risc0-ethereum@file:templates/default/lib/risc0-ethereum:
+    resolution: {directory: templates/default/lib/risc0-ethereum, type: directory}
+
   robust-predicates@3.0.2:
     resolution: {integrity: sha512-IXgzBWvWQwE6PrDI05OvmXUIruQTcoMDzRsOd5CDvHCVLcLHMTSYvOK5Cm46kWqlV3yAbuSpBZdJ5oP5OUoStg==}
 
@@ -13126,8 +13126,6 @@ snapshots:
       - uploadthing
       - utf-8-validate
       - zod
-
-  '@risc0/ethereum@file:templates/default/lib/risc0-ethereum': {}
 
   '@rolldown/pluginutils@1.0.0-beta.27': {}
 
@@ -19920,7 +19918,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.1.1(typescript@5.8.3)(zod@3.25.76)
+      abitype: 1.1.1(typescript@5.8.3)(zod@3.22.4)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.8.3
@@ -20767,6 +20765,8 @@ snapshots:
     dependencies:
       hash-base: 3.1.2
       inherits: 2.0.4
+
+  risc0-ethereum@file:templates/default/lib/risc0-ethereum: {}
 
   robust-predicates@3.0.2: {}
 
@@ -21968,7 +21968,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.1.0(typescript@5.8.3)(zod@3.25.76)
+      abitype: 1.1.0(typescript@5.8.3)(zod@3.22.4)
       isows: 1.0.7(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10))
       ox: 0.9.6(typescript@5.8.3)
       ws: 8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10)
