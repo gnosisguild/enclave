@@ -8,7 +8,7 @@ use actix::Addr;
 use anyhow::Result;
 use e3_data::{DataStore, InMemStore, StoreAddr};
 use e3_events::{BusHandle, EnclaveEvent, HistoryCollector};
-use e3_net::NetInterfaceInvertedHandle;
+use e3_net::NetChannelBridge;
 use libp2p::PeerId;
 
 /// A Sharable handle to a Ciphernode. NOTE: clones are available for use in the CiphernodeSystem
@@ -21,7 +21,7 @@ pub struct CiphernodeHandle {
     pub history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
     pub errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
     pub peer_id: PeerId,
-    pub net_simulate_adaptor: Option<NetInterfaceInvertedHandle>,
+    pub channel_bridge: Option<NetChannelBridge>,
 }
 
 impl PartialEq for CiphernodeHandle {
@@ -40,7 +40,7 @@ impl CiphernodeHandle {
         history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
         errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
         peer_id: PeerId,
-        net_simulate_adaptor: Option<NetInterfaceInvertedHandle>,
+        channel_bridge: Option<NetChannelBridge>,
     ) -> Self {
         Self {
             address,
@@ -49,7 +49,7 @@ impl CiphernodeHandle {
             history,
             errors,
             peer_id,
-            net_simulate_adaptor,
+            channel_bridge,
         }
     }
 
@@ -73,11 +73,10 @@ impl CiphernodeHandle {
         &self.store
     }
 
-    pub fn get_test_interface(&self) -> Result<NetInterfaceInvertedHandle> {
-        Ok(self
-            .net_simulate_adaptor
-            .clone()
-            .ok_or(anyhow::anyhow!("No interface exists"))?)
+    pub fn channel_bridge(&self) -> Result<NetChannelBridge> {
+        Ok(self.channel_bridge.clone().ok_or(anyhow::anyhow!(
+            "No channel bridge exists. We are likely not in test mode"
+        ))?)
     }
 
     pub fn in_mem_store(&self) -> Option<&Addr<InMemStore>> {

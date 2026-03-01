@@ -10,7 +10,6 @@ use tokio::{
     sync::{broadcast, mpsc},
     time::sleep,
 };
-use tracing::error;
 
 use crate::events::{NetCommand, NetEvent};
 
@@ -34,7 +33,9 @@ pub trait NetInterface: Sized {
 }
 
 #[derive(Debug, Clone)]
-pub struct NetInterfaceInvertedHandle {
+/// Allow Net events and commands to be bridged between nodes. This is used for testing purposes to
+/// simulate libp2p without running libp2p.
+pub struct NetChannelBridge {
     cmd_tx: broadcast::Sender<NetCommand>,
     tx: mpsc::Sender<NetCommand>,
     event_tx: broadcast::Sender<NetEvent>,
@@ -57,7 +58,9 @@ impl NetInterface for NetInterfaceHandle {
         self.tx.clone()
     }
 }
-pub fn create_test_net_interface() -> (NetInterfaceHandle, NetInterfaceInvertedHandle) {
+
+/// This creates a channel bridge which allows for network events to be connected between test nodes
+pub fn create_channel_bridge() -> (NetInterfaceHandle, NetChannelBridge) {
     let (m_cmd_tx, mut m_cmd_rx) = mpsc::channel::<NetCommand>(1000);
     let (b_evt_tx, _) = broadcast::channel(1000);
     let (b_cmd_tx, _) = broadcast::channel(1000);
@@ -66,6 +69,7 @@ pub fn create_test_net_interface() -> (NetInterfaceHandle, NetInterfaceInvertedH
     let startup_event_tx = b_evt_tx.clone();
     let keep_alive = b_cmd_tx.subscribe();
 
+    // Bridge from mpsc channel to broadcast channel simulating AllPeersDialed for each node
     tokio::spawn(async move {
         let _rx_guard = keep_alive;
         sleep(Duration::from_millis(100)).await;
@@ -80,7 +84,7 @@ pub fn create_test_net_interface() -> (NetInterfaceHandle, NetInterfaceInvertedH
         rx: b_evt_tx.subscribe(),
     };
 
-    let inverted = NetInterfaceInvertedHandle {
+    let inverted = NetChannelBridge {
         tx: m_cmd_tx,
         cmd_tx: b_cmd_tx,
         event_tx: b_evt_tx,
@@ -89,83 +93,15 @@ pub fn create_test_net_interface() -> (NetInterfaceHandle, NetInterfaceInvertedH
     (handle, inverted)
 }
 
-#[derive(Clone)]
-pub struct TestNetInterface {
-    m_cmd_tx: mpsc::Sender<NetCommand>,
-    b_cmd_tx: broadcast::Sender<NetCommand>,
-    b_evt_tx: broadcast::Sender<NetEvent>,
-}
-
-impl TestNetInterface {
-    pub fn new() -> Self {
-        let (m_cmd_tx, mut m_cmd_rx) = mpsc::channel::<NetCommand>(1000);
-        let (b_evt_tx, _) = broadcast::channel(1000);
-        let (b_cmd_tx, _) = broadcast::channel(1000);
-
-        // Bridge mpsc commands to broadcast so the mock can subscribe
-        let tx = b_cmd_tx.clone();
-        let startup_event_tx = b_evt_tx.clone();
-        tokio::spawn(async move {
-            // Simulate dial-in delay like TestNetInterface
-            sleep(Duration::from_millis(100)).await;
-            let _ = startup_event_tx.send(NetEvent::AllPeersDialed);
-
-            while let Some(cmd) = m_cmd_rx.recv().await {
-                if let Err(e) = tx.send(cmd.clone()) {
-                    error!("Error sending on channel. cmd={cmd:?} with error={e}");
-                }
-            }
-            println!("***** ERROR CLOSING CHANNEL!!!! ****");
-        });
-
-        Self {
-            m_cmd_tx,
-            b_evt_tx,
-            b_cmd_tx,
-        }
-    }
-}
-
-impl NetInterface for TestNetInterface {
-    fn tx(&self) -> mpsc::Sender<NetCommand> {
-        self.m_cmd_tx.clone()
-    }
-
-    fn rx(&self) -> broadcast::Receiver<NetEvent> {
-        self.b_evt_tx.subscribe()
-    }
-}
-
-impl NetInterfaceInverted for TestNetInterface {
-    fn tx(&self) -> mpsc::Sender<NetCommand> {
-        self.m_cmd_tx.clone()
-    }
-    fn cmd_tx(&self) -> broadcast::Sender<NetCommand> {
-        self.b_cmd_tx.clone()
-    }
-
-    fn cmd_rx(&self) -> broadcast::Receiver<NetCommand> {
-        self.b_cmd_tx.subscribe()
-    }
-
-    fn event_tx(&self) -> broadcast::Sender<NetEvent> {
-        self.b_evt_tx.clone()
-    }
-
-    fn event_rx(&self) -> broadcast::Receiver<NetEvent> {
-        self.b_evt_tx.subscribe()
-    }
-}
-
 pub trait NetInterfaceInverted: Sized {
     fn tx(&self) -> mpsc::Sender<NetCommand>;
-    fn event_tx(&self) -> broadcast::Sender<NetEvent>;
+    fn event_tx(&self) -> broadcast::Sender<NetEvent>; //U
     fn event_rx(&self) -> broadcast::Receiver<NetEvent>;
     fn cmd_tx(&self) -> broadcast::Sender<NetCommand>;
-    fn cmd_rx(&self) -> broadcast::Receiver<NetCommand>;
+    fn cmd_rx(&self) -> broadcast::Receiver<NetCommand>; //U
 
-    fn into_handle_inverted(self) -> NetInterfaceInvertedHandle {
-        NetInterfaceInvertedHandle {
+    fn into_handle_inverted(self) -> NetChannelBridge {
+        NetChannelBridge {
             tx: self.tx(),
             event_tx: self.event_tx(),
             cmd_tx: self.cmd_tx(),
@@ -173,7 +109,7 @@ pub trait NetInterfaceInverted: Sized {
     }
 }
 
-impl NetInterfaceInverted for NetInterfaceInvertedHandle {
+impl NetInterfaceInverted for NetChannelBridge {
     fn tx(&self) -> mpsc::Sender<NetCommand> {
         self.tx.clone()
     }

@@ -24,7 +24,7 @@ use e3_fhe_params::BfvPreset;
 use e3_keyshare::ext::ThresholdKeyshareExtension;
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
 use e3_net::{
-    create_test_net_interface, setup_libp2p_keypair, setup_net, setup_net_interface, NetInterface,
+    create_channel_bridge, setup_libp2p_keypair, setup_net, setup_net_interface, NetInterface,
     NetInterfaceInverted, NetRepositoryFactory, TestNetInterface,
 };
 use e3_request::E3Router;
@@ -482,22 +482,23 @@ impl CiphernodeBuilder {
         e3_builder.build().await?;
 
         let topic = "enclave-gossip";
-        let out = if let Some(net_config) = self.net_config {
+        let (peer_id, interface, channel_bridge) = if let Some(net_config) = self.net_config {
+            // Setup real net interface
             let repositories = store.repositories();
             let keypair = setup_libp2p_keypair(repositories.libp2p_keypair(), &self.cipher).await?;
             let peer_id = keypair.peer_id();
-            let handle =
+            let interface =
                 setup_net_interface(topic, keypair, net_config.peers, net_config.quic_port)?;
-            (peer_id, handle, None)
+            (peer_id, interface, None)
         } else {
-            let (handle, inverted) = create_test_net_interface();
+            // Setup test net interface with random PeerId
+            let (interface, channel_bridge) = create_channel_bridge();
             let peer_id = PeerId::random();
-            let test_handle = Some(inverted);
-            (peer_id, handle, test_handle)
+            let channel_bridge = Some(channel_bridge);
+            (peer_id, interface, channel_bridge)
         };
-        let (peer_id, handle, test_handle) = out;
 
-        setup_net(topic, bus.clone(), eventstore_ts, handle)?;
+        setup_net(topic, bus.clone(), eventstore_ts, interface)?;
 
         // Run the sync routine
         sync(
@@ -516,7 +517,7 @@ impl CiphernodeBuilder {
             history,
             errors,
             peer_id,
-            test_handle,
+            channel_bridge,
         ))
     }
 

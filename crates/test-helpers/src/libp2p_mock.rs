@@ -8,7 +8,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use e3_net::{
     events::{NetCommand, NetEvent},
-    ContentHash, NetInterfaceInverted, NetInterfaceInvertedHandle,
+    ContentHash, NetChannelBridge, NetInterfaceInverted,
 };
 use e3_utils::ArcBytes;
 use libp2p::{gossipsub::MessageId, kad::GetRecordError, PeerId};
@@ -18,7 +18,7 @@ use tracing::{error, warn};
 #[derive(Debug, Clone)]
 pub struct Libp2pMock {
     store: Arc<RwLock<HashMap<ContentHash, ArcBytes>>>,
-    nodes: Arc<RwLock<HashMap<PeerId, NetInterfaceInvertedHandle>>>,
+    nodes: Arc<RwLock<HashMap<PeerId, NetChannelBridge>>>,
 }
 
 impl Libp2pMock {
@@ -29,7 +29,7 @@ impl Libp2pMock {
         }
     }
 
-    pub async fn add_node(&self, peer_id: PeerId, handle: NetInterfaceInvertedHandle) {
+    pub async fn add_node(&self, peer_id: PeerId, handle: NetChannelBridge) {
         self.nodes.write().await.insert(peer_id, handle.clone());
 
         let src_event_tx = handle.event_tx();

@@ -157,15 +157,12 @@ pub async fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
     println!("MOCK: simulate_libp2p_net");
     let mock = Libp2pMock::new();
     for node in nodes.iter() {
-        let interface = node
-            .net_simulate_adaptor
-            .clone()
-            .expect("net_simulate_adaptor must be set for simulated nodes");
+        let interface = node.channel_bridge().unwrap();
         mock.add_node(node.peer_id, interface).await;
     }
 }
 
-// fn pipe(src: NetInterfaceInvertedHandle, dest: NetInterfaceInvertedHandle) {
+// fn pipe(src: NetChannelBridge, dest: NetChannelBridge) {
 //     let src_event_tx = src.event_tx();
 //     let dest_event_tx = dest.event_tx();
 //     let mut src_cmd_rx = src.cmd_rx();
