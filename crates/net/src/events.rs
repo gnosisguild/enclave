@@ -11,7 +11,7 @@ use e3_events::{
     CorrelationId, DocumentMeta, EnclaveEvent, EventContextAccessors, EventSource, Sequenced,
     Unsequenced,
 };
-use e3_utils::ArcBytes;
+use e3_utils::{ArcBytes, OnceTake};
 use libp2p::{
     gossipsub::{MessageId, PublishError, TopicHash},
     kad::{store, GetRecordError, PutRecordError},
@@ -93,12 +93,12 @@ pub struct IncomingRequest {
 
 #[derive(Clone, Debug)]
 /// We are responding to a remote request
-pub struct IncomingResponse<C = ResponseChannel<Vec<u8>>> {
-    pub responder: DirectResponder<C>,
+pub struct IncomingResponse {
+    pub responder: DirectResponder,
 }
 
-impl<C> IncomingResponse<C> {
-    pub fn new(responder: DirectResponder<C>) -> Self {
+impl IncomingResponse {
+    pub fn new(responder: DirectResponder) -> Self {
         Self { responder }
     }
 }
@@ -153,12 +153,8 @@ pub struct OutgoingRequestFailed {
 pub struct AllPeersDialed;
 
 /// NetInterface Commands are sent to the network peer over a mspc channel
-#[derive(Debug)]
-// The generics here aid testing allowing us to avoid constructing complex types
-// This is probably not an issue aside from complex types that are actively hidden from
-// clone such as passing around a response channel which we don't control.
-// Basically this helps us test and I don't expect this list to grow much.
-pub enum NetCommand<C = ProtocolResponseChannel> {
+#[derive(Debug, Clone)]
+pub enum NetCommand {
     /// Publish message to gossipsub
     GossipPublish {
         topic: String,
@@ -166,7 +162,7 @@ pub enum NetCommand<C = ProtocolResponseChannel> {
         correlation_id: CorrelationId,
     },
     /// Dial peer
-    Dial(DialOpts),
+    Dial(OnceTake<DialOpts>),
     /// Command to PublishDocument to Kademlia
     DhtPutRecord {
         correlation_id: CorrelationId,
@@ -187,7 +183,7 @@ pub enum NetCommand<C = ProtocolResponseChannel> {
     Shutdown,
     /// Send a request to a peer and await response
     OutgoingRequest(OutgoingRequest),
-    IncomingResponse(IncomingResponse<C>),
+    IncomingResponse(IncomingResponse),
 }
 
 impl NetCommand {

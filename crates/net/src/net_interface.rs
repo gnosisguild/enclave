@@ -6,10 +6,10 @@
 
 use crate::{
     correlator::Correlator,
-    direct_responder::DirectResponder,
+    direct_responder::{ChannelType, DirectResponder},
     events::{IncomingResponse, OutgoingRequest, ProtocolResponse},
 };
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use e3_events::CorrelationId;
 use e3_utils::ArcBytes;
 use libp2p::{
@@ -434,7 +434,8 @@ async fn process_swarm_event(
         )) => {
             debug!("Incoming request received (id={})", request_id);
             let responder =
-                DirectResponder::new(request_id, channel, &cmd_tx).with_request(request);
+                DirectResponder::new(request_id, ChannelType::Channel(channel), &cmd_tx)
+                    .with_request(request);
 
             // received a request for events
             event_tx.send(NetEvent::IncomingRequest(IncomingRequest { responder }))?;
@@ -522,7 +523,8 @@ async fn process_swarm_command(
             handle_gossip_publish(swarm, event_tx, data, topic, correlation_id)?;
             Ok(())
         }
-        NetCommand::Dial(multi) => {
+        NetCommand::Dial(env) => {
+            let multi = env.take().context("Dial received without payload")?;
             handle_dial(swarm, event_tx, multi)?;
             Ok(())
         }
@@ -792,6 +794,9 @@ fn handle_outgoing_request(
 fn handle_response(swarm: &mut Swarm<NodeBehaviour>, responder: DirectResponder) -> Result<()> {
     debug!("Sending response to {}", responder.id());
     let (channel, response) = responder.to_response()?;
+    let ChannelType::Channel(channel) = channel else {
+        bail!("responder did not return the correct type of channel");
+    };
     swarm
         .behaviour_mut()
         .request_response

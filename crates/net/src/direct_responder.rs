@@ -7,7 +7,7 @@
 use crate::events::{IncomingResponse, NetCommand, ProtocolResponse, ProtocolResponseChannel};
 use anyhow::{anyhow, Context, Result};
 use e3_utils::OnceTake;
-use libp2p::request_response::InboundRequestId;
+use libp2p::request_response::{InboundRequestId, ResponseChannel};
 use tokio::sync::mpsc;
 
 /// Helper trait to extract id from libp2p things like InboundRequestId
@@ -31,6 +31,13 @@ impl IntoId for InboundRequestId {
             .expect("Failed to extract u64 from InboundRequestId")
     }
 }
+
+#[derive(Debug)]
+pub enum ChannelType {
+    Test(String),                               // For testing
+    Channel(ResponseChannel<ProtocolResponse>), // actual libp2p response channel
+}
+
 #[derive(Debug)]
 /// DirectResponder is used to respond to incoming libp2p requests.
 ///
@@ -63,14 +70,14 @@ impl IntoId for InboundRequestId {
 /// # Ok(())
 /// # }
 /// ```
-pub struct DirectResponder<C = ProtocolResponseChannel> {
+pub struct DirectResponder {
     id: u64,
     request: Vec<u8>,
     response: Option<ProtocolResponse>,
-    channel: OnceTake<C>,
-    net_cmds: mpsc::Sender<NetCommand<C>>,
+    channel: OnceTake<ChannelType>,
+    net_cmds: mpsc::Sender<NetCommand>,
 }
-impl<C> Clone for DirectResponder<C> {
+impl Clone for DirectResponder {
     fn clone(&self) -> Self {
         Self {
             id: self.id.clone(),
@@ -82,13 +89,13 @@ impl<C> Clone for DirectResponder<C> {
     }
 }
 
-impl<C> DirectResponder<C> {
+impl DirectResponder {
     /// Creates a new responder for an incoming request.
     ///
     /// * `id` - is the request identifier used for debugging (e.g., `InboundRequestId` or `u64`).
     /// * `channel` - is usually the response channel provided by libp2p but can be anything that is passed along with the response
     /// * `net_cmds` - sender is used to send the response back to the net interface.
-    pub fn new(id: impl IntoId, channel: C, net_cmds: &mpsc::Sender<NetCommand<C>>) -> Self {
+    pub fn new(id: impl IntoId, channel: ChannelType, net_cmds: &mpsc::Sender<NetCommand>) -> Self {
         Self {
             id: id.into_id(),
             request: Vec::new(),
@@ -124,7 +131,7 @@ impl<C> DirectResponder<C> {
     }
 
     /// Extract the payload information to send to swarm
-    pub fn to_response(mut self) -> Result<(C, ProtocolResponse)> {
+    pub fn to_response(mut self) -> Result<(ChannelType, ProtocolResponse)> {
         let channel = self.channel.try_take()?;
         let response = self
             .response
@@ -138,10 +145,10 @@ impl<C> DirectResponder<C> {
         let response = value;
         self.response = Some(response);
         let cmds = self.net_cmds.clone();
-        let incoming = IncomingResponse::<C>::new(self);
+        let incoming = IncomingResponse::new(self);
         Ok(cmds
             .clone()
-            .try_send(NetCommand::<C>::IncomingResponse(incoming))
+            .try_send(NetCommand::IncomingResponse(incoming))
             .map_err(|e| anyhow!("Failed to send response command {:?}", e))?)
     }
 
@@ -167,20 +174,27 @@ impl<C> DirectResponder<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::bail;
     use tokio::sync::mpsc;
 
-    fn make_responder() -> (DirectResponder<String>, mpsc::Receiver<NetCommand<String>>) {
-        let (tx, rx) = mpsc::channel::<NetCommand<String>>(16);
-        let responder = DirectResponder::new(42u64, "test_channel".to_string(), &tx);
+    fn make_responder() -> (DirectResponder, mpsc::Receiver<NetCommand>) {
+        let (tx, rx) = mpsc::channel::<NetCommand>(16);
+        let responder =
+            DirectResponder::new(42u64, ChannelType::Test("test_channel".to_string()), &tx);
         (responder, rx)
     }
 
-    fn extract_response(
-        rx: &mut mpsc::Receiver<NetCommand<String>>,
-    ) -> Result<(String, ProtocolResponse)> {
+    fn extract_response(rx: &mut mpsc::Receiver<NetCommand>) -> Result<(String, ProtocolResponse)> {
         let cmd = rx.try_recv().unwrap();
         match cmd {
-            NetCommand::IncomingResponse(incoming) => incoming.responder.to_response(),
+            NetCommand::IncomingResponse(incoming) => {
+                let (channel, response) = incoming.responder.to_response().unwrap();
+                let ChannelType::Test(channel) = channel else {
+                    bail!("bad channel");
+                };
+                Ok((channel, response))
+            }
+
             other => panic!("Expected IncomingResponse, got {:?}", other),
         }
     }
