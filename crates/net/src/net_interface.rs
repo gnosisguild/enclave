@@ -8,6 +8,7 @@ use crate::{
     correlator::Correlator,
     direct_responder::{ChannelType, DirectResponder},
     events::{IncomingResponse, OutgoingRequest, ProtocolResponse},
+    net_interface_handle::NetInterfaceHandle,
 };
 use anyhow::{bail, Context, Result};
 use e3_events::CorrelationId;
@@ -17,7 +18,7 @@ use libp2p::{
     futures::StreamExt,
     gossipsub,
     identify::{Behaviour as IdentifyBehaviour, Config as IdentifyConfig},
-    identity::Keypair,
+    identity::{ed25519, Keypair},
     kad::{
         self,
         store::{MemoryStore, MemoryStoreConfig, RecordStore},
@@ -38,7 +39,10 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{select, sync::broadcast, sync::mpsc};
+use tokio::{
+    select,
+    sync::{broadcast, mpsc},
+};
 use tracing::{debug, error, info, trace, warn};
 
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/enclave/kad/1.0.0");
@@ -68,7 +72,7 @@ pub struct NodeBehaviour {
 
 /// Manage the peer to peer connection. This struct wraps a libp2p Swarm and enables communication
 /// with it using channels.
-pub struct NetInterface {
+pub struct Libp2pNetInterface {
     /// The Libp2p Swarm instance
     swarm: Swarm<NodeBehaviour>,
     /// A list of peers to automatically dial
@@ -79,15 +83,15 @@ pub struct NetInterface {
     topic: gossipsub::IdentTopic,
     /// Broadcast channel to report NetEvents to listeners
     event_tx: broadcast::Sender<NetEvent>,
-    /// Transmission channel to send NetCommands to the NetInterface
+    /// Transmission channel to send NetCommands to the Libp2pNetInterface
     cmd_tx: mpsc::Sender<NetCommand>,
     /// Local receiver to process NetCommands from
     cmd_rx: mpsc::Receiver<NetCommand>,
 }
 
-impl NetInterface {
+impl Libp2pNetInterface {
     pub fn new(
-        id: &Keypair,
+        id: Libp2pKeypair,
         peers: Vec<String>,
         udp_port: Option<u16>,
         topic: &str,
@@ -95,7 +99,7 @@ impl NetInterface {
         let (event_tx, _) = broadcast::channel(1000); // TODO : tune this param
         let (cmd_tx, cmd_rx) = mpsc::channel(1000); // TODO : tune this param
 
-        let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
+        let swarm = libp2p::SwarmBuilder::with_existing_identity(id.into_keypair())
             .with_tokio()
             .with_quic()
             .with_dns()
@@ -117,12 +121,8 @@ impl NetInterface {
         })
     }
 
-    pub fn rx(&mut self) -> broadcast::Receiver<NetEvent> {
-        self.event_tx.subscribe()
-    }
-
-    pub fn tx(&self) -> mpsc::Sender<NetCommand> {
-        self.cmd_tx.clone()
+    pub fn handle(&self) -> NetInterfaceHandle {
+        NetInterfaceHandle::new(self.cmd_tx.clone(), self.event_tx.subscribe())
     }
 
     pub async fn start(&mut self) -> Result<()> {
@@ -190,6 +190,33 @@ impl NetInterface {
     }
 }
 
+pub struct Libp2pKeypair {
+    keypair: libp2p::identity::Keypair,
+}
+
+impl Libp2pKeypair {
+    pub fn new(keypair: libp2p::identity::Keypair) -> Self {
+        Self { keypair }
+    }
+
+    pub fn generate() -> Self {
+        let id = libp2p::identity::Keypair::generate_ed25519();
+        Self::new(id)
+    }
+
+    pub fn try_from_bytes(bytes: &mut [u8]) -> Result<Self> {
+        let keypair: libp2p::identity::Keypair =
+            ed25519::Keypair::try_from_bytes(bytes)?.try_into()?;
+        Ok(Self { keypair })
+    }
+
+    pub fn into_keypair(self) -> libp2p::identity::Keypair {
+        self.keypair
+    }
+    pub fn peer_id(&self) -> PeerId {
+        self.keypair.public().to_peer_id()
+    }
+}
 /// Create the libp2p behaviour
 fn create_behaviour(
     key: &Keypair,
@@ -569,7 +596,7 @@ async fn process_swarm_command(
             Ok(())
         }
         NetCommand::Shutdown => {
-            unreachable!("shutdown command must be handled in NetInterface::start")
+            unreachable!("shutdown command must be handled in Libp2pNetInterface::start")
         }
     }
 }

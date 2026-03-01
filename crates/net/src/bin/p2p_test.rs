@@ -7,7 +7,7 @@
 use anyhow::{Context, Result};
 use e3_events::CorrelationId;
 use e3_net::events::{GossipData, NetCommand, NetEvent};
-use e3_net::{ContentHash, NetInterface};
+use e3_net::{ContentHash, Libp2pKeypair, Libp2pNetInterface, NetInterface};
 use e3_utils::ArcBytes;
 use libp2p::gossipsub::IdentTopic;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -221,11 +221,11 @@ impl TestPeer {
 
         let topic = IdentTopic::new("test");
         let peers: Vec<String> = dial_to.iter().cloned().collect();
-        let id = libp2p::identity::Keypair::generate_ed25519();
-
-        let mut peer = NetInterface::new(&id, peers, udp_port, &topic.to_string())?;
-        let tx = peer.tx();
-        let mut rx = peer.rx();
+        let keypair = Libp2pKeypair::generate();
+        let mut peer = Libp2pNetInterface::new(keypair, peers, udp_port, &topic.to_string())?;
+        let handle = peer.handle();
+        let tx = handle.tx();
+        let mut rx = handle.rx();
 
         tokio::spawn({
             let name = name.clone();

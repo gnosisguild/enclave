@@ -23,7 +23,10 @@ use e3_fhe::ext::FheExtension;
 use e3_fhe_params::BfvPreset;
 use e3_keyshare::ext::ThresholdKeyshareExtension;
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
-use e3_net::{setup_net, NetRepositoryFactory};
+use e3_net::{
+    create_test_net_interface, setup_libp2p_keypair, setup_net, setup_net_interface, NetInterface,
+    NetInterfaceInverted, NetRepositoryFactory, TestNetInterface,
+};
 use e3_request::E3Router;
 use e3_sortition::{
     CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
@@ -32,6 +35,7 @@ use e3_sortition::{
 use e3_sync::sync;
 use e3_utils::SharedRng;
 use e3_zk_prover::{setup_zk_actors, ZkBackend};
+use libp2p::PeerId;
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
@@ -470,27 +474,26 @@ impl CiphernodeBuilder {
             ))
         }
 
-        info!("building...");
-
+        info!("E3Router building...");
         e3_builder.build().await?;
 
-        let (join_handle, peer_id) = if let Some(net_config) = self.net_config {
+        let topic = "enclave-gossip";
+        let out = if let Some(net_config) = self.net_config {
             let repositories = store.repositories();
-            setup_net(
-                bus.clone(),
-                net_config.peers,
-                &self.cipher,
-                net_config.quic_port,
-                repositories.libp2p_keypair(),
-                eventstore_ts,
-            )
-            .await?
+            let keypair = setup_libp2p_keypair(repositories.libp2p_keypair(), &self.cipher).await?;
+            let peer_id = keypair.peer_id();
+            let handle =
+                setup_net_interface(topic, keypair, net_config.peers, net_config.quic_port)?;
+            (peer_id, handle, None)
         } else {
-            (
-                tokio::spawn(std::future::ready(Ok(()))),
-                "-not set-".to_string(),
-            )
+            let (handle, inverted) = create_test_net_interface();
+            let peer_id = PeerId::random();
+            let test_handle = Some(inverted);
+            (peer_id, handle, test_handle)
         };
+        let (peer_id, handle, test_handle) = out;
+
+        setup_net(topic, bus.clone(), eventstore_ts, handle)?;
 
         // Run the sync routine
         sync(
@@ -509,7 +512,7 @@ impl CiphernodeBuilder {
             history,
             errors,
             peer_id,
-            join_handle,
+            test_handle,
         ))
     }
 

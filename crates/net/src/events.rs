@@ -152,7 +152,7 @@ pub struct OutgoingRequestFailed {
 #[rtype("()")]
 pub struct AllPeersDialed;
 
-/// NetInterface Commands are sent to the network peer over a mspc channel
+/// Libp2pNetInterface Commands are sent to the network peer over a mspc channel
 #[derive(Debug, Clone)]
 pub enum NetCommand {
     /// Publish message to gossipsub
@@ -334,7 +334,7 @@ where
     // We don't have access to this later and we cannot clone command
     let debug_cmd = format!("{:?}", command);
 
-    // Send the command to NetInterface
+    // Send the command to Libp2pNetInterface
     trace!(
         "call_and_await_response: sending command {:?} with timeout {:?}",
         command,

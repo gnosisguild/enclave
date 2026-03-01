@@ -23,7 +23,7 @@ use tracing::{info, trace, warn};
 // should do this as this functionality is not global and ramifications should stay local to here
 
 /// NetEventTranslator Actor converts between EventBus events and Libp2p events forwarding them to a
-/// NetInterface for propagation over the p2p network
+/// Libp2pNetInterface for propagation over the p2p network
 pub struct NetEventTranslator {
     bus: BusHandle,
     tx: mpsc::Sender<NetCommand>,
@@ -38,7 +38,7 @@ impl Actor for NetEventTranslator {
     }
 }
 
-/// Libp2pEvent is used to send data to the NetInterface from the NetEventTranslator
+/// Libp2pEvent is used to send data to the Libp2pNetInterface from the NetEventTranslator
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "()")]
 struct LibP2pEvent(pub GossipData);

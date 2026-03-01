@@ -8,7 +8,8 @@ use actix::Addr;
 use anyhow::Result;
 use e3_data::{DataStore, InMemStore, StoreAddr};
 use e3_events::{BusHandle, EnclaveEvent, HistoryCollector};
-use tokio::task::JoinHandle;
+use e3_net::NetInterfaceInvertedHandle;
+use libp2p::PeerId;
 
 /// A Sharable handle to a Ciphernode. NOTE: clones are available for use in the CiphernodeSystem
 /// but they cannot await the task.
@@ -19,9 +20,17 @@ pub struct CiphernodeHandle {
     pub bus: BusHandle,
     pub history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
     pub errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
-    pub peer_id: String,
-    pub join_handle: JoinHandle<Result<()>>,
+    pub peer_id: PeerId,
+    pub net_simulate_adaptor: Option<NetInterfaceInvertedHandle>,
 }
+
+impl PartialEq for CiphernodeHandle {
+    fn eq(&self, other: &Self) -> bool {
+        self.address == other.address && self.peer_id == other.peer_id
+    }
+}
+
+impl Eq for CiphernodeHandle {}
 
 impl CiphernodeHandle {
     pub fn new(
@@ -30,8 +39,8 @@ impl CiphernodeHandle {
         bus: BusHandle,
         history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
         errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
-        peer_id: String,
-        join_handle: JoinHandle<Result<()>>,
+        peer_id: PeerId,
+        net_simulate_adaptor: Option<NetInterfaceInvertedHandle>,
     ) -> Self {
         Self {
             address,
@@ -40,7 +49,7 @@ impl CiphernodeHandle {
             history,
             errors,
             peer_id,
-            join_handle,
+            net_simulate_adaptor,
         }
     }
 
@@ -64,8 +73,11 @@ impl CiphernodeHandle {
         &self.store
     }
 
-    pub fn split(self) -> (BusHandle, JoinHandle<Result<()>>) {
-        (self.bus, self.join_handle)
+    pub fn get_test_interface(&self) -> Result<NetInterfaceInvertedHandle> {
+        Ok(self
+            .net_simulate_adaptor
+            .clone()
+            .ok_or(anyhow::anyhow!("No interface exists"))?)
     }
 
     pub fn in_mem_store(&self) -> Option<&Addr<InMemStore>> {

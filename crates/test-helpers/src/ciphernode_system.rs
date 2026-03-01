@@ -199,7 +199,7 @@ mod tests {
     use e3_ciphernode_builder::EventSystem;
     use e3_data::InMemStore;
     use e3_events::{EventBus, EventBusConfig};
-    use tokio::task::JoinHandle;
+    use libp2p::PeerId;
 
     async fn mock_setup_node(address: String) -> Result<CiphernodeHandle> {
         // Create mock actors for the test
@@ -212,7 +212,6 @@ mod tests {
             .with_event_bus(bus)
             .handle()?
             .enable("test");
-        let handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async { Ok(()) });
 
         Ok(CiphernodeHandle {
             address,
@@ -220,8 +219,8 @@ mod tests {
             bus,
             history: Some(history),
             errors: Some(errors),
-            join_handle: handle,
-            peer_id: "-unknown peer id-".to_string(),
+            peer_id: PeerId::random(),
+            net_simulate_adaptor: None,
         })
     }
 

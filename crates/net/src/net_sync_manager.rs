@@ -55,7 +55,7 @@ pub struct SyncRequestSucceeded {
 pub struct NetSyncManager {
     /// Enclave EventBus
     bus: BusHandle,
-    /// NetCommand sender to forward commands to the NetInterface
+    /// NetCommand sender to forward commands to the Libp2pNetInterface
     tx: mpsc::Sender<NetCommand>,
     /// NetEvents receiver to receive events
     rx: Arc<broadcast::Receiver<NetEvent>>,
