@@ -22,33 +22,19 @@ use e3_events::{
 use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_fhe_params::{build_bfv_params_arc, create_deterministic_crp_from_default_seed};
-use e3_net::events::NetCommand;
-use e3_net::events::NetEvent;
-use e3_net::ContentHash;
-use e3_net::NetInterfaceInvertedHandle;
-use e3_net::{DocumentPublisher, NetEventTranslator, NetInterfaceInverted};
-use e3_utils::ArcBytes;
+use e3_net::{DocumentPublisher, NetEventTranslator};
 use e3_utils::SharedRng;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::mbfv::CommonRandomPoly;
 use fhe_traits::Serialize;
 use fhe_traits::{FheEncoder, FheEncrypter};
-use libp2p::gossipsub::MessageId;
-use libp2p::kad::GetRecordError;
-use libp2p::kad::RecordKey;
 use libp2p_mock::Libp2pMock;
 pub use plaintext_writer::*;
 pub use public_key_writer::*;
 use rand::Rng;
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::broadcast;
-use tracing::error;
-use tracing::info;
-use tracing::trace;
-use tracing::warn;
 pub use utils::*;
 
 pub fn create_shared_rng_from_u64(value: u64) -> Arc<std::sync::Mutex<ChaCha20Rng>> {
