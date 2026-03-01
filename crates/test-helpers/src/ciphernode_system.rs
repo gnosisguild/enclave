@@ -81,7 +81,7 @@ impl<'a> CiphernodeSystemBuilder<'a> {
         }
 
         if self.simulate {
-            simulate_libp2p_net(&nodes);
+            simulate_libp2p_net(&nodes).await;
         }
 
         for then_fn in self.thens {

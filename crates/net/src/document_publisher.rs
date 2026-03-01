@@ -363,7 +363,7 @@ async fn put_record(
     .await
 }
 
-/// Call DhtPutRecord Command on the Libp2pNetInterface and handle the results
+/// Call DhtGetRecord Command on the Libp2pNetInterface and handle the results
 async fn get_record(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,

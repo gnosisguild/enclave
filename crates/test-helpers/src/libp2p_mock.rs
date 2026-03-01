@@ -33,6 +33,7 @@ impl Libp2pMock {
         let self_peer_id = peer_id;
 
         tokio::spawn(async move {
+            println!("MOCK: SPAWNING TASK!");
             loop {
                 match src_cmd_rx.recv().await {
                     Ok(NetCommand::GossipPublish {
@@ -40,12 +41,15 @@ impl Libp2pMock {
                         correlation_id,
                         ..
                     }) => {
+                        println!("MOCK: RECEIVED GOSSIP PUBLISH...");
+
                         // Broadcast to all other nodes
                         let peers = nodes.read().await;
                         for (id, peer) in peers.iter() {
                             if *id == self_peer_id {
                                 continue;
                             }
+                            println!("MOCK: FORWARDING GOSSIP PUBLISH...");
                             if let Err(e) = peer.event_tx().send(NetEvent::GossipData(data.clone()))
                             {
                                 error!("Libp2pMock: failed to forward GossipData to {id}: {e}");

@@ -168,6 +168,7 @@ impl Handler<EnclaveEvent<Sequenced>> for SimulatedNetPipe {
 ///                    └─────┘
 /// ```
 pub async fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
+    println!("MOCK: simulate_libp2p_net");
     let mock = Libp2pMock::new();
     for node in nodes.iter() {
         let interface = node
