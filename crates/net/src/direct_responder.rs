@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::events::{IncomingResponse, NetCommand, ProtocolResponse, ProtocolResponseChannel};
+use crate::events::{IncomingResponse, NetCommand, ProtocolResponse};
 use anyhow::{anyhow, Context, Result};
 use e3_utils::OnceTake;
 use libp2p::request_response::{InboundRequestId, ResponseChannel};
@@ -46,10 +46,11 @@ pub enum ChannelType {
 /// ```
 /// # use tokio::sync::mpsc;
 /// use e3_net::direct_responder::DirectResponder;
+/// # use e3_net::direct_responder::ChannelType;
 /// # fn main() -> anyhow::Result<()> {
 /// # let request_id = 6;
-/// # let channel_orig = String::from("channel");
-/// # let channel = channel_orig.clone();
+/// # let channel_orig = ChannelType::Test("channel".to_string());
+/// # let channel = ChannelType::Test("channel".to_string());
 /// # let (cmd_tx, _rx) = mpsc::channel(400);
 ///
 /// // We create a responder and send it over our event channel
