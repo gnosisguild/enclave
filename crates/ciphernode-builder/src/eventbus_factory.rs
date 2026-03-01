@@ -6,11 +6,8 @@
 
 use actix::Actor;
 use actix::Addr;
-use e3_config::AppConfig;
-use e3_data::Repositories;
 use e3_events::Disabled;
 use e3_events::EventType;
-use e3_evm::EthPrivateKeyRepositoryFactory;
 use once_cell::sync::Lazy;
 use std::any::Any;
 use std::any::TypeId;

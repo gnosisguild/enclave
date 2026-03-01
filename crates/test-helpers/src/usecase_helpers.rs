@@ -168,8 +168,8 @@ pub fn get_decryption_keys(
             })
             .collect::<Result<_>>()?;
 
-        // Similarly decrypt esi_sss
-        let esi_sss_collected: Vec<Vec<ShamirShare>> = shares
+        // Similarly decrypt esi_sss — shape [sender][esi_idx]
+        let per_sender_esi: Vec<Vec<ShamirShare>> = shares
             .iter()
             .map(|ts| {
                 ts.esi_sss
@@ -183,6 +183,17 @@ pub fn get_decryption_keys(
                     .collect::<Result<Vec<_>>>()
             })
             .collect::<Result<_>>()?;
+
+        // Transpose to [esi_idx][sender] — CalculateDecryptionKey aggregates per smudging noise
+        let num_esi = per_sender_esi.first().map_or(0, |v| v.len());
+        let esi_sss_collected: Vec<Vec<ShamirShare>> = (0..num_esi)
+            .map(|esi_idx| {
+                per_sender_esi
+                    .iter()
+                    .map(|sender_esi| sender_esi[esi_idx].clone())
+                    .collect()
+            })
+            .collect();
 
         let CalculateDecryptionKeyResponse {
             es_poly_sum,

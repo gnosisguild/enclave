@@ -141,6 +141,7 @@ impl Handler<TypedEvent<DecryptionKeyShared>> for DecryptionKeySharedCollector {
                 ec,
             );
             self.parent.do_send(event);
+            ctx.stop();
         }
 
         info!(

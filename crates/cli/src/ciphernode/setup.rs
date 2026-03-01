@@ -9,12 +9,11 @@ use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input};
 use e3_config::AppConfig;
 use e3_entrypoint::config::setup;
-use e3_utils::{colorize, eth_address_from_private_key, Color};
+use e3_utils::{colorize, Color};
 use std::path::PathBuf;
 use tracing::instrument;
 use zeroize::Zeroizing;
 
-use crate::password_set;
 use crate::password_set::ask_for_password;
 use crate::wallet_set::ask_for_private_key;
 

@@ -7,7 +7,7 @@
 use actix::{Actor, Handler};
 use e3_events::{hlc::HlcTimestamp, EnclaveEventData};
 use e3_utils::MAILBOX_LIMIT;
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::{
     events::{EnclaveEvmEvent, EvmEventProcessor, EvmLog},

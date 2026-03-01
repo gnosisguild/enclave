@@ -439,6 +439,15 @@ impl CiphernodeBuilder {
             // Currently hardcoded to InsecureDkg512 for DKG operations.
             // Production deployments should use BfvPreset::SecureDkg8192.
             let share_enc_preset = BfvPreset::InsecureDkg512;
+
+            let backend = self
+                .zk_backend
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("ZK backend is required for threshold keyshare"))?;
+
+            // Ensure signer is available before setting up extensions that need it
+            let signer = provider_cache.ensure_signer().await?;
+
             info!("Setting up ThresholdKeyshareExtension");
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
                 &bus,
@@ -447,12 +456,7 @@ impl CiphernodeBuilder {
                 share_enc_preset,
             ));
 
-            let backend = self
-                .zk_backend
-                .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("ZK backend is required for threshold keyshare"))?;
             info!("Setting up ZK actors");
-            let signer = provider_cache.ensure_signer().await?;
             setup_zk_actors(&bus, backend, signer);
         }
 

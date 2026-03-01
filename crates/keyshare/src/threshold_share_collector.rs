@@ -22,7 +22,7 @@ use tracing::{info, warn};
 use crate::{AllThresholdSharesCollected, ThresholdKeyshare};
 
 /// Proofs received alongside a threshold share from a sender.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ReceivedShareProofs {
     /// Signed C2a proof (sk share computation) from the sender.
     pub signed_c2a_proof: Option<SignedProofPayload>,

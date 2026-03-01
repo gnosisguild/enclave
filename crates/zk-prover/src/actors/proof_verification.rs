@@ -134,6 +134,16 @@ impl ProofVerificationActor {
             }
         };
 
+        // Validate circuit name matches expected ProofType circuits
+        let expected_circuits = signed.payload.proof_type.circuit_names();
+        if !expected_circuits.contains(&signed.payload.proof.circuit) {
+            error!(
+                "Circuit name mismatch for key from party {}: expected {:?}, got {:?}",
+                msg.key.party_id, expected_circuits, signed.payload.proof.circuit
+            );
+            return;
+        }
+
         // Store the signed payload so we can reference it in the verification response
         self.pending.insert(
             (msg.e3_id.clone(), msg.key.party_id),
