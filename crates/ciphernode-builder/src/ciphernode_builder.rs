@@ -24,8 +24,8 @@ use e3_fhe_params::BfvPreset;
 use e3_keyshare::ext::ThresholdKeyshareExtension;
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
 use e3_net::{
-    create_channel_bridge, setup_libp2p_keypair, setup_net, setup_net_interface, NetInterface,
-    NetInterfaceInverted, NetRepositoryFactory, TestNetInterface,
+    create_channel_bridge, setup_libp2p_keypair, setup_net, setup_net_interface,
+    NetRepositoryFactory,
 };
 use e3_request::E3Router;
 use e3_sortition::{
