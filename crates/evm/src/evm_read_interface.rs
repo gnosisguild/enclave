@@ -278,7 +278,7 @@ async fn get_new_provider_or_exit<P: Provider + Clone + 'static>(
         return None;
     };
     let result = recreate_provider(factory, shutdown, chain_id, backoff).await;
-    if result.is_none() {
+    if result.is_none() && shutdown.try_recv().is_err() {
         bus.err(
             EType::Evm,
             anyhow!("Provider recreation failed for chain {}", chain_id),
@@ -419,8 +419,8 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
                                 }
                                 None => {
                                     // Stream ended (server-side close, idle timeout, etc.)
-                                    // Loop back to backfill + resubscribe with no penalty.
-                                    warn!(chain_id, "Live event stream ended, will reconnect");
+                                    consecutive_failures += 1;
+                                    warn!(chain_id, consecutive_failures, "Live event stream ended, will reconnect");
                                     break;
                                 }
                             }
@@ -430,6 +430,26 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
                             let _ = current_provider.provider().unsubscribe(sub_id).await;
                             return;
                         }
+                    }
+                }
+
+                if consecutive_failures >= MAX_RETRIES_BEFORE_RECREATE {
+                    let Some(p) = get_new_provider_or_exit(
+                        &provider_factory,
+                        &mut shutdown,
+                        chain_id,
+                        &mut backoff,
+                        bus,
+                    )
+                    .await
+                    else {
+                        return;
+                    };
+                    current_provider = p;
+                    consecutive_failures = 0;
+                } else if consecutive_failures > 0 {
+                    if sleep_or_shutdown(backoff.next_delay(), &mut shutdown).await {
+                        return;
                     }
                 }
             }
