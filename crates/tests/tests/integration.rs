@@ -888,6 +888,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
 
 /// Test that stopped keyshares retain their state after restart.
 /// This test needs to be ported to the new trBFV system once Sync is completed.
+// XXX: ENABLE THIS!!
 #[actix::test]
 #[ignore = "Needs to be ported to trBFV system after Sync is completed"]
 async fn test_stopped_keyshares_retain_state() -> Result<()> {
