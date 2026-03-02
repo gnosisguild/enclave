@@ -177,7 +177,7 @@ impl ZkProver {
         if let Some(t) = verifier_target {
             args.extend(["-t", t]);
         } else {
-            args.extend(["--oracle_hash", "keccak"]);
+            args.extend(["-t", "evm"]);
         }
 
         let output = StdCommand::new(&self.bb_binary).args(&args).output()?;
@@ -329,7 +329,7 @@ impl ZkProver {
         if let Some(t) = verifier_target {
             args.extend(["-t", t]);
         } else {
-            args.extend(["--oracle_hash", "keccak"]);
+            args.extend(["-t", "evm"]);
         }
 
         let output = StdCommand::new(&self.bb_binary).args(&args).output()?;
