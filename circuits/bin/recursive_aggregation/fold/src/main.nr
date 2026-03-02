@@ -43,8 +43,8 @@ fn main(
     let mut vk_hashes = Vec::new();
     vk_hashes.push(proof1_public_inputs[0]); // key_hash attested by proof1 (from its inner folds)
     vk_hashes.push(proof2_public_inputs[0]); // key_hash attested by proof2 (from its inner folds)
-    vk_hashes.push(proof1_key_hash);         // VK hash of circuit that produced proof1
-    vk_hashes.push(proof2_key_hash);        // VK hash of circuit that produced proof2
+    vk_hashes.push(proof1_key_hash); // VK hash of circuit that produced proof1
+    vk_hashes.push(proof2_key_hash); // VK hash of circuit that produced proof2
     let key_hash = compute_vk_hash(vk_hashes);
 
     (key_hash, commitment)
