@@ -11,7 +11,7 @@ use alloy::{primitives::Address, providers::Provider};
 use e3_events::{run_once, BusHandle, EventSubscriber, EventType, HistoricalEvmSyncStart};
 use e3_evm::{
     EthProvider, EvmChainGateway, EvmEventProcessor, EvmReadInterface, EvmRouter, Filters,
-    FixHistoricalOrder,
+    FixHistoricalOrder, ProviderFactory,
 };
 
 pub trait RouteFn: FnOnce(EvmEventProcessor) -> EvmEventProcessor + Send {}
@@ -22,6 +22,7 @@ type RouteFactory = Box<dyn RouteFn>;
 // Build the event system for a single chain
 pub struct EvmSystemChainBuilder<P> {
     provider: EthProvider<P>,
+    provider_factory: Option<ProviderFactory<P>>,
     bus: BusHandle,
     chain_id: u64,
     route_factories: Vec<(Address, RouteFactory)>,
@@ -33,9 +34,15 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
         Self {
             bus: bus.clone(),
             provider: provider.clone(),
+            provider_factory: None,
             chain_id,
             route_factories: Vec::new(),
         }
+    }
+
+    pub fn with_provider_factory(&mut self, factory: ProviderFactory<P>) -> &mut Self {
+        self.provider_factory = Some(factory);
+        self
     }
 
     pub fn with_contract<F: RouteFn + 'static>(
@@ -61,6 +68,7 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
             // Clone self refs for closure
             let bus = self.bus.clone();
             let provider = self.provider.clone();
+            let provider_factory = self.provider_factory.clone();
             let chain_id = self.chain_id;
 
             // Only gets consumed once so fine to use replace to clean out route_factories
@@ -78,7 +86,13 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
                 let filters = filters_from_router(&router, deploy_block);
 
                 // Setup and start the read interface and the router
-                EvmReadInterface::setup(&provider, router.start(), &bus, filters);
+                EvmReadInterface::setup_with_factory(
+                    &provider,
+                    provider_factory,
+                    router.start(),
+                    &bus,
+                    filters,
+                );
                 Ok(())
             }
         });
