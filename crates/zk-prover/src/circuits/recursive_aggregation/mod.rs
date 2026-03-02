@@ -126,11 +126,11 @@ pub fn generate_wrapper_proof(
 struct FoldInput {
     proof1_verification_key: Vec<String>,
     proof1_proof: Vec<String>,
-    proof1_commitment: String,
+    proof1_public_inputs: Vec<String>,
     proof1_key_hash: String,
     proof2_verification_key: Vec<String>,
     proof2_proof: Vec<String>,
-    proof2_commitment: String,
+    proof2_public_inputs: Vec<String>,
     proof2_key_hash: String,
 }
 
@@ -149,11 +149,11 @@ impl serde::Serialize for FoldInput {
         let mut map = serializer.serialize_map(Some(8))?;
         map.serialize_entry("proof1_verification_key", &self.proof1_verification_key)?;
         map.serialize_entry("proof1_proof", &self.proof1_proof)?;
-        map.serialize_entry("proof1_commitment", &self.proof1_commitment)?;
+        map.serialize_entry("proof1_public_inputs", &self.proof1_public_inputs)?;
         map.serialize_entry("proof1_key_hash", &self.proof1_key_hash)?;
         map.serialize_entry("proof2_verification_key", &self.proof2_verification_key)?;
         map.serialize_entry("proof2_proof", &self.proof2_proof)?;
-        map.serialize_entry("proof2_commitment", &self.proof2_commitment)?;
+        map.serialize_entry("proof2_public_inputs", &self.proof2_public_inputs)?;
         map.serialize_entry("proof2_key_hash", &self.proof2_key_hash)?;
         map.end()
     }
@@ -170,23 +170,37 @@ pub fn generate_fold_proof(
     let vk1 = vk::load_vk_for_fold_input(prover.circuits_dir(), proof1.circuit)?;
     let vk2 = vk::load_vk_for_fold_input(prover.circuits_dir(), proof2.circuit)?;
 
-    let commitment1 = bytes_to_field_strings(&proof1.public_signals)?
-        .into_iter()
-        .last()
-        .ok_or_else(|| ZkError::InvalidInput("proof1 public_signals is empty".into()))?;
-    let commitment2 = bytes_to_field_strings(&proof2.public_signals)?
-        .into_iter()
-        .last()
-        .ok_or_else(|| ZkError::InvalidInput("proof2 public_signals is empty".into()))?;
+    // Both wrapper and fold output [key_hash, commitment].
+    let mut proof1_public_inputs = bytes_to_field_strings(&proof1.public_signals)?;
+    let mut proof2_public_inputs = bytes_to_field_strings(&proof2.public_signals)?;
+
+    proof1_public_inputs = proof1_public_inputs
+        .get(0..2)
+        .ok_or_else(|| {
+            ZkError::InvalidInput(format!(
+                "proof1 must have 2 public inputs, got {}",
+                proof1_public_inputs.len()
+            ))
+        })?
+        .to_vec();
+    proof2_public_inputs = proof2_public_inputs
+        .get(0..2)
+        .ok_or_else(|| {
+            ZkError::InvalidInput(format!(
+                "proof2 must have 2 public inputs, got {}",
+                proof2_public_inputs.len()
+            ))
+        })?
+        .to_vec();
 
     let full_input = FoldInput {
         proof1_verification_key: vk1.verification_key,
         proof1_proof: bytes_to_field_strings(&proof1.data)?,
-        proof1_commitment: commitment1,
+        proof1_public_inputs,
         proof1_key_hash: vk1.key_hash,
         proof2_verification_key: vk2.verification_key,
         proof2_proof: bytes_to_field_strings(&proof2.data)?,
-        proof2_commitment: commitment2,
+        proof2_public_inputs,
         proof2_key_hash: vk2.key_hash,
     };
 
@@ -271,7 +285,7 @@ mod tests {
             .join("wrapper")
             .join("dkg")
             .join("pk");
-        if wrapper_src.join("pk.json").exists() && wrapper_src.join("pk.vk").exists() {
+        if wrapper_src.join("pk.json").exists() && wrapper_src.join("pk.vk_recursive").exists() {
             // Use dist entirely so inner + wrapper circuits match (same build).
             backend.circuits_dir = dist.clone();
         }
@@ -284,7 +298,7 @@ mod tests {
             .join("wrapper")
             .join("dkg")
             .join("pk");
-        if !wrapper_dir.join("pk.json").exists() || !wrapper_dir.join("pk.vk").exists() {
+        if !wrapper_dir.join("pk.json").exists() || !wrapper_dir.join("pk.vk_recursive").exists() {
             panic!(
                 "wrapper circuit not found at {} — run pnpm build:circuits and set circuits_dir to dist/circuits, or ensure the release includes recursive_aggregation",
                 wrapper_dir.display()

@@ -20,7 +20,7 @@ fn main(
     verification_key: UltraHonkVerificationKey,
     proofs: [UltraHonkProof; N_PROOFS],
     public_inputs: [[Field; N_PUBLIC_INPUTS]; N_PROOFS],
-    key_hash: Field,
+    key_hash: pub Field,
 ) -> pub Field {
     for i in 0..N_PROOFS {
         verify_honk_proof_non_zk(verification_key, proofs[i], public_inputs[i], key_hash);
