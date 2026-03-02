@@ -507,6 +507,7 @@ impl EventConverter {
 
         Ok(())
     }
+
     fn handle_encryption_key_created(&self, msg: TypedEvent<EncryptionKeyCreated>) -> Result<()> {
         let (msg, ctx) = msg.into_components();
         if msg.external {
@@ -535,6 +536,7 @@ impl EventConverter {
         Ok(())
     }
 
+    // TODO: Split this off to a separate module/actor to make each component unidirectional
     /// Convert received document to internal events.
     /// Note: Filtering already happened in DocumentPublisher before DHT fetch.
     fn handle_document_received(&self, msg: TypedEvent<DocumentReceived>) -> Result<()> {
@@ -850,7 +852,7 @@ mod tests {
 
         // wait for events to settle
         let errors = errors.send(TakeEvents::new(1)).await?;
-        let error: EnclaveError = errors.first().unwrap().try_into()?;
+        let error: EnclaveError = errors.events.first().unwrap().try_into()?;
         assert_eq!(
             error.message,
             "Operation failed after 4 attempts. Last error: DHT get record failed: Timeout { key: Key(b\"\\xda-\\xe1\\xc0T\\x11$X\\x05\\xd1\\xd4\\xa6C\\x86\\x96\\xb7e\\xd9j\\x96\\x1bD\\xc8P#\\x0f\\\"\\xea A@b\") }"
@@ -907,7 +909,7 @@ mod tests {
 
         // Expect error to exist
         let errors = errors.send(TakeEvents::new(1)).await?;
-        let error: EnclaveError = errors.first().unwrap().try_into()?;
+        let error: EnclaveError = errors.events.first().unwrap().try_into()?;
         assert_eq!(
             error.message,
             "Operation failed after 4 attempts. Last error: DHT put record failed: PutRecordError(QuorumFailed { key: Key(b\"I got the secret\"), success: [], quorum: 1 })"

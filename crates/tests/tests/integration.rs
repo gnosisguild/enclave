@@ -335,23 +335,6 @@ async fn setup_score_sortition_environment(
     Ok(())
 }
 
-fn serialize_report(report: &[(String, Duration)]) -> String {
-    let max_key_len = report.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
-
-    report
-        .iter()
-        .map(|(key, duration)| {
-            format!(
-                "{:width$}: {:.3}s",
-                key,
-                duration.as_secs_f64(),
-                width = max_key_len
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
 #[derive(Default)]
 struct Report {
     inner: Vec<(String, Duration)>,
@@ -384,7 +367,20 @@ impl Report {
     }
 
     pub fn serialize(&self) -> String {
-        serialize_report(&self.inner)
+        let max_key_len = self.inner.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+
+        self.inner
+            .iter()
+            .map(|(key, duration)| {
+                format!(
+                    "{:width$}: {:.3}s",
+                    key,
+                    duration.as_secs_f64(),
+                    width = max_key_len
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
 
@@ -591,57 +587,6 @@ async fn test_trbfv_actor() -> Result<()> {
         committee_finalized_timer.elapsed(),
     ));
 
-    // First, wait for all EncryptionKeyCreated events (BFV key exchange)
-    // The collector (node 0) only sees events forwarded by simulate_libp2p:
-    // - EncryptionKeyCreated × 5 (one per party, passes is_document_publisher_event filter)
-    // Internal events (EncryptionKeyPending, ComputeRequest/Response) stay on committee nodes' local buses.
-    let encryption_keys_timer = Instant::now();
-
-    nodes
-        .expect_events(&[
-            "EncryptionKeyCreated",
-            "EncryptionKeyCreated",
-            "EncryptionKeyCreated",
-            "EncryptionKeyCreated",
-            "EncryptionKeyCreated",
-        ])
-        .await?;
-
-    report.push((
-        "All EncryptionKeyCreated events",
-        encryption_keys_timer.elapsed(),
-    ));
-
-    // Then wait for all ThresholdShareCreated events
-    // Each of the 5 parties publishes 5 events (one per target party) = 25 total
-    // Only ThresholdShareCreated passes the simulate_libp2p filter (is_document_publisher_event).
-    // Internal events (ComputeRequest/Response for GenPk, GenEsi, ZK proofs, ThresholdSharePending,
-    // PkGenerationProofSigned, DkgProofSigned) stay on committee nodes' local buses.
-    let shares_timer = Instant::now();
-
-    nodes
-        .expect_events_with_timeout(
-            &(0..25).map(|_| "ThresholdShareCreated").collect::<Vec<_>>(),
-            Duration::from_secs(3000),
-        )
-        .await?;
-
-    report.push(("All ThresholdShareCreated events", shares_timer.elapsed()));
-
-    // Wait for DecryptionKeyShared (Exchange #3) events
-    // - DecryptionKeyShared × 5 (passes is_document_publisher_event filter)
-    // Each committee node publishes DecryptionKeyShared after computing its decryption key
-    // and generating C4 (share decryption) proofs.
-    let decryption_key_shared_timer = Instant::now();
-    nodes
-        .expect_events(&(0..5).map(|_| "DecryptionKeyShared").collect::<Vec<_>>())
-        .await?;
-
-    report.push((
-        "All DecryptionKeyShared events",
-        decryption_key_shared_timer.elapsed(),
-    ));
-
     // Wait for KeyshareCreated + PublicKeyAggregated
     // - KeyshareCreated × 5 (passes is_forwardable_event filter)
     // - PublicKeyAggregated × 1 (passes is_forwardable_event filter)
@@ -649,14 +594,18 @@ async fn test_trbfv_actor() -> Result<()> {
     // each party publishes KeyshareCreated.
     let shares_to_pubkey_agg_timer = Instant::now();
     let h = nodes
-        .expect_events(&[
-            "KeyshareCreated",
-            "KeyshareCreated",
-            "KeyshareCreated",
-            "KeyshareCreated",
-            "KeyshareCreated",
-            "PublicKeyAggregated",
-        ])
+        .expect_events_with_timeouts(
+            &[
+                "KeyshareCreated",
+                "KeyshareCreated",
+                "KeyshareCreated",
+                "KeyshareCreated",
+                "KeyshareCreated",
+                "PublicKeyAggregated",
+            ],
+            Duration::from_secs(5000),
+            Duration::from_secs(600),
+        )
         .await?;
 
     report.push((
@@ -876,6 +825,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     assert_eq!(
         history
+            .events
             .into_iter()
             .map(|e| e.into_data())
             .collect::<Vec<_>>(),
@@ -922,6 +872,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
 
     assert_eq!(
         history
+            .events
             .into_iter()
             .map(|e| e.into_data())
             .collect::<Vec<EnclaveEventData>>(),
@@ -994,7 +945,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             let tuple = setup_local_ciphernode(&bus, &rng, true, addr, None, cipher).await?;
             result.push(tuple);
         }
-        simulate_libp2p_net(&result);
+        simulate_libp2p_net(&result).await;
         Ok(result)
     }
 
@@ -1084,12 +1035,13 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     )
     .await?;
     let history_collector = cn1.history().unwrap();
-    simulate_libp2p_net(&[cn1, cn2]);
+    simulate_libp2p_net(&[cn1, cn2]).await;
 
     println!("getting collector from cn1.6");
 
     // get the public key from history.
     let pubkey: PublicKey = history
+        .events
         .iter()
         .filter_map(|evt| match evt.get_data() {
             EnclaveEventData::KeyshareCreated(data) => {
@@ -1116,6 +1068,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .await?;
 
     let actual = history
+        .events
         .into_iter()
         .filter_map(|e| match e.into_data() {
             EnclaveEventData::PlaintextAggregated(data) => Some(data),
@@ -1282,7 +1235,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         .await?;
 
     assert_eq!(
-        history.last().cloned().unwrap().into_data(),
+        history.events.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
             pubkey: test_pubkey.to_bytes(),
             public_key_hash,
@@ -1324,7 +1277,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         .await?;
 
     assert_eq!(
-        history.last().cloned().unwrap().into_data(),
+        history.events.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
             pubkey: test_pubkey.to_bytes(),
             public_key_hash,

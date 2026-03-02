@@ -253,11 +253,17 @@ impl<E: Event> GetEvents<E> {
 }
 
 #[derive(Message)]
-#[rtype(result = "Vec<E>")]
+#[rtype(result = "TakeEventsResult<E>")]
 pub struct TakeEvents<E: Event> {
     amount: usize,
     timeout: Duration,
     _d: PhantomData<E>,
+}
+
+#[derive(Debug)]
+pub struct TakeEventsResult<E: Event> {
+    pub events: Vec<E>,
+    pub timed_out: bool,
 }
 
 impl<E: Event> TakeEvents<E> {
@@ -445,7 +451,7 @@ impl<E: Event> Actor for HistoryCollectorWaiter<E> {
 }
 
 impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollectorWaiter<E> {
-    type Result = ResponseActFuture<Self, Vec<E>>;
+    type Result = ResponseActFuture<Self, TakeEventsResult<E>>;
     fn handle(&mut self, msg: TakeEvents<E>, _: &mut Context<Self>) -> Self::Result {
         let count = msg.amount;
         let timeout = msg.timeout;
@@ -453,18 +459,23 @@ impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollectorWaiter<E>
         Box::pin(
             async move {
                 let mut events = Vec::with_capacity(count);
+                let mut timed_out = false;
                 for _ in 0..count {
                     match tokio::time::timeout(timeout, rx.recv()).await {
                         Ok(Some(e)) => events.push(e),
-                        _ => break,
+                        Ok(None) => break,
+                        Err(_) => {
+                            timed_out = true;
+                            break;
+                        }
                     }
                 }
-                (events, rx)
+                (TakeEventsResult { events, timed_out }, rx)
             }
             .into_actor(self)
-            .map(|(events, rx), actor, _| {
+            .map(|(result, rx), actor, _| {
                 actor.rx = Some(rx);
-                events
+                result
             }),
         )
     }
@@ -473,6 +484,7 @@ impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollectorWaiter<E>
 impl<E: Event> Handler<ResetHistory> for HistoryCollectorWaiter<E> {
     type Result = ();
     fn handle(&mut self, _: ResetHistory, _: &mut Context<Self>) {
+        println!("HHH: WAITER RESETING HISTORY");
         if let Some(ref mut rx) = self.rx {
             while rx.try_recv().is_ok() {}
         }
@@ -507,6 +519,7 @@ impl<E: Event> Actor for HistoryCollector<E> {
 impl<E: Event> Handler<E> for HistoryCollector<E> {
     type Result = E::Result;
     fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {
+        println!("HHH: EVENT: {}", msg.event_type());
         self.history.push(msg.clone());
         let _ = self.tx.send(msg);
     }
@@ -515,14 +528,16 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
 impl<E: Event> Handler<ResetHistory> for HistoryCollector<E> {
     type Result = ();
     fn handle(&mut self, _: ResetHistory, _: &mut Context<Self>) {
+        println!("HHH: RESET");
         self.history.clear();
         self.waiter.do_send(ResetHistory);
     }
 }
 
 impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollector<E> {
-    type Result = ResponseActFuture<Self, Vec<E>>;
+    type Result = ResponseActFuture<Self, TakeEventsResult<E>>;
     fn handle(&mut self, msg: TakeEvents<E>, _: &mut Context<Self>) -> Self::Result {
+        println!("HHH: TAKE EVENTS");
         let fut = self.waiter.send(msg);
         Box::pin(async move { fut.await.unwrap() }.into_actor(self))
     }
@@ -531,6 +546,7 @@ impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollector<E> {
 impl<E: Event> Handler<GetEvents<E>> for HistoryCollector<E> {
     type Result = Vec<E>;
     fn handle(&mut self, _: GetEvents<E>, _: &mut Context<Self>) -> Vec<E> {
+        println!("HHH: GET EVENTS");
         self.history.clone()
     }
 }

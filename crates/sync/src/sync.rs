@@ -393,6 +393,7 @@ mod tests {
         let received = history.send(TakeEvents::new(2)).await?;
 
         let event_types: Vec<&'static str> = received
+            .events
             .iter()
             .map(|e| match e.get_data() {
                 EnclaveEventData::TestEvent(_) => "TestEvent",
@@ -406,6 +407,7 @@ mod tests {
         assert_eq!(event_types, vec!["TestEvent", "TestEvent"]);
 
         let msgs: Vec<String> = received
+            .events
             .iter()
             .filter_map(|e| {
                 if let EnclaveEventData::TestEvent(t) = e.get_data() {

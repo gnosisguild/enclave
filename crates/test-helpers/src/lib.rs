@@ -127,125 +127,15 @@ impl Handler<EnclaveEvent<Sequenced>> for SimulatedNetPipe {
     }
 }
 
-/// Simulate libp2p by taking output events on each local bus and filter for !is_local_only() and forward remaining events back to the event bus
-/// deduplication will remove previously seen events.
-/// This sets up a set of cyphernodes without libp2p.
-/// The way it works is that it feeds back all events from
-/// all nodes filteres by whether they are broadcastible or not
-/// ```txt
-///
-///                    ┌─────┐
-///                    │ BUS │
-///                    └─────┘
-///                       │
-///          ┌────────────┼────────────┐
-///          │            │            │
-///          ▼            ▼            ▼
-///       ┌────┐       ┌────┐       ┌────┐
-///       │ B1 │       │ B2 │       │ B3 │◀──┐
-///       └────┘       └────┘       └────┘   │
-///          │            │            │     │
-///          │            │            │     │
-///          └────────────┼────────────┘     │
-///                       │                  │
-///                       ▼                  │
-///                    ┌─────┐               │
-///                    │ FIL │───────────────┘
-///                    └─────┘
-/// ```
+/// Simulate libp2p by taking output net commands and converting them to net events sending them to
+/// the other nodes
 pub async fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
-    println!("MOCK: simulate_libp2p_net");
     let mock = Libp2pMock::new();
     for node in nodes.iter() {
         let interface = node.channel_bridge().unwrap();
         mock.add_node(node.peer_id, interface).await;
     }
 }
-
-// fn pipe(src: NetChannelBridge, dest: NetChannelBridge) {
-//     let src_event_tx = src.event_tx();
-//     let dest_event_tx = dest.event_tx();
-//     let mut src_cmd_rx = src.cmd_rx();
-//
-//     tokio::spawn(async move {
-//         let mut store: HashMap<ContentHash, ArcBytes> = HashMap::new();
-//
-//         loop {
-//             match src_cmd_rx.recv().await {
-//                 Ok(NetCommand::GossipPublish {
-//                     data,
-//                     correlation_id,
-//                     ..
-//                 }) => {
-//                     if let Err(e) = dest_event_tx.send(NetEvent::GossipData(data)) {
-//                         error!("pipe: failed to forward GossipData to dest: {e}");
-//                     }
-//
-//                     let message_id = MessageId::new(&format!("{correlation_id:?}").into_bytes());
-//                     if let Err(e) = src_event_tx.send(NetEvent::GossipPublished {
-//                         correlation_id,
-//                         message_id,
-//                     }) {
-//                         error!("pipe: failed to send GossipPublished to src: {e}");
-//                     }
-//                 }
-//                 Ok(NetCommand::DhtPutRecord {
-//                     correlation_id,
-//                     key,
-//                     value,
-//                     ..
-//                 }) => {
-//                     store.insert(key.clone(), value.clone());
-//
-//                     if let Err(e) = dest_event_tx.send(NetEvent::DhtGetRecordSucceeded {
-//                         key: key.clone(),
-//                         correlation_id,
-//                         value,
-//                     }) {
-//                         error!("pipe: failed to forward DhtGetRecordSucceeded to dest: {e}");
-//                     }
-//
-//                     if let Err(e) = src_event_tx.send(NetEvent::DhtPutRecordSucceeded {
-//                         key,
-//                         correlation_id,
-//                     }) {
-//                         error!("pipe: failed to send DhtPutRecordSucceeded to src: {e}");
-//                     }
-//                 }
-//                 Ok(NetCommand::DhtGetRecord {
-//                     correlation_id,
-//                     key,
-//                 }) => {
-//                     if let Some(value) = store.get(&key).cloned() {
-//                         if let Err(e) = src_event_tx.send(NetEvent::DhtGetRecordSucceeded {
-//                             key,
-//                             correlation_id,
-//                             value,
-//                         }) {
-//                             error!("pipe: failed to send DhtGetRecordSucceeded to src: {e}");
-//                         }
-//                     } else {
-//                         if let Err(e) = src_event_tx.send(NetEvent::DhtGetRecordError {
-//                             correlation_id,
-//                             error: GetRecordError::NotFound {
-//                                 key: RecordKey::new(&key.into_inner()),
-//                                 closest_peers: vec![],
-//                             },
-//                         }) {
-//                             error!("pipe: failed to send DhtGetRecordError to src: {e}");
-//                         }
-//                     }
-//                 }
-//                 Err(broadcast::error::RecvError::Lagged(n)) => {
-//                     warn!("pipe: src cmd receiver lagged by {n} messages");
-//                     continue;
-//                 }
-//                 Err(_) => break,
-//                 _ => continue,
-//             }
-//         }
-//     });
-// }
 
 /// Creates test eth addresses
 /// NOTE: THESE ARE NOT ACTUAL ADDRESSES JUST RANDOM DATA
