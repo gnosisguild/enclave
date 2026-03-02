@@ -33,6 +33,8 @@ const MAX_RECONNECT_DELAY_SECS: u64 = 60;
 const PROVIDER_RECREATE_MAX_ATTEMPTS: u32 = 3;
 /// Initial delay (ms) between provider-recreation attempts.
 const PROVIDER_RECREATE_INITIAL_DELAY_MS: u64 = 2000;
+/// Consecutive failures before we assume the provider is dead and recreate it.
+const MAX_RETRIES_BEFORE_RECREATE: u32 = 3;
 
 #[derive(Default, serde::Serialize, serde::Deserialize, Clone)]
 pub struct EvmReadInterfaceState {
@@ -176,16 +178,6 @@ impl Backoff {
     }
 }
 
-fn is_transport_dead(e: &anyhow::Error) -> bool {
-    let msg = e.to_string();
-    msg.contains("backend connection task has stopped")
-        || msg.contains("connection closed")
-        || msg.contains("broken pipe")
-        || msg.contains("connection reset")
-        || msg.contains("WebSocket connection closed")
-        || msg.contains("transport error")
-}
-
 async fn sleep_or_shutdown(duration: Duration, shutdown: &mut oneshot::Receiver<()>) -> bool {
     select! {
         _ = tokio::time::sleep(duration) => false,
@@ -233,20 +225,6 @@ async fn recreate_provider<P: Provider + Clone + 'static>(
                         RetryError::Retry(anyhow!("Health check failed: {}", e))
                     })?;
 
-                    let new_chain_id = provider.chain_id();
-                    if new_chain_id != chain_id {
-                        let err = anyhow!(
-                            "Chain ID mismatch: expected {}, got {}",
-                            chain_id,
-                            new_chain_id
-                        );
-                        error!(
-                            chain_id,
-                            new_chain_id, "Recreated provider is on wrong chain"
-                        );
-                        return Err(RetryError::Failure(err));
-                    }
-
                     Ok(provider)
                 }
             },
@@ -257,6 +235,14 @@ async fn recreate_provider<P: Provider + Clone + 'static>(
 
         match result {
             Ok(new_provider) => {
+                let new_chain_id = new_provider.chain_id();
+                if new_chain_id != chain_id {
+                    error!(
+                        chain_id,
+                        new_chain_id, "Recreated provider is on wrong chain — fatal"
+                    );
+                    return None;
+                }
                 info!(chain_id, "Provider recreated and verified");
                 backoff.reset();
                 return Some(new_provider);
@@ -291,7 +277,14 @@ async fn get_new_provider_or_exit<P: Provider + Clone + 'static>(
         );
         return None;
     };
-    recreate_provider(factory, shutdown, chain_id, backoff).await
+    let result = recreate_provider(factory, shutdown, chain_id, backoff).await;
+    if result.is_none() {
+        bus.err(
+            EType::Evm,
+            anyhow!("Provider recreation failed for chain {}", chain_id),
+        );
+    }
+    result
 }
 
 #[instrument(name = "evm_interface", skip_all)]
@@ -352,6 +345,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
 
     let mut last_block = latest_block;
     let mut current_provider = provider;
+    let mut consecutive_failures: u32 = 0;
 
     loop {
         // Step 1: Backfill any blocks missed since last_block
@@ -365,25 +359,29 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
         )
         .await
         {
-            Ok(_) => backoff.reset(),
-            Err(e) if is_transport_dead(&e) => {
-                warn!(chain_id, error = %e, "Transport dead during backfill");
-                let Some(p) = get_new_provider_or_exit(
-                    &provider_factory,
-                    &mut shutdown,
-                    chain_id,
-                    &mut backoff,
-                    bus,
-                )
-                .await
-                else {
-                    return;
-                };
-                current_provider = p;
-                continue;
+            Ok(_) => {
+                backoff.reset();
+                consecutive_failures = 0;
             }
             Err(e) => {
-                warn!(chain_id, error = %e, "Transient backfill failure");
+                consecutive_failures += 1;
+                warn!(chain_id, error = %e, consecutive_failures, "Backfill failed");
+                if consecutive_failures >= MAX_RETRIES_BEFORE_RECREATE {
+                    let Some(p) = get_new_provider_or_exit(
+                        &provider_factory,
+                        &mut shutdown,
+                        chain_id,
+                        &mut backoff,
+                        bus,
+                    )
+                    .await
+                    else {
+                        return;
+                    };
+                    current_provider = p;
+                    consecutive_failures = 0;
+                    continue;
+                }
                 if sleep_or_shutdown(backoff.next_delay(), &mut shutdown).await {
                     return;
                 }
@@ -401,6 +399,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
         match sub_result {
             Ok(subscription) => {
                 backoff.reset();
+                consecutive_failures = 0;
                 let sub_id: B256 = subscription.local_id().clone();
                 let mut stream = subscription.into_stream();
                 info!(chain_id, "Live event subscription active");
@@ -434,26 +433,28 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
                     }
                 }
             }
-            Err(e) if is_transport_dead(&e) => {
-                warn!(chain_id, error = %e, "Transport dead during subscribe");
-                let Some(p) = get_new_provider_or_exit(
-                    &provider_factory,
-                    &mut shutdown,
-                    chain_id,
-                    &mut backoff,
-                    bus,
-                )
-                .await
-                else {
-                    return;
-                };
-                current_provider = p;
-            }
             Err(e) => {
-                error!(chain_id, error = %e, "Failed to subscribe to live events");
-                bus.err(EType::Evm, anyhow!("{}", e));
-                if sleep_or_shutdown(backoff.next_delay(), &mut shutdown).await {
-                    return;
+                consecutive_failures += 1;
+                error!(chain_id, error = %e, consecutive_failures, "Failed to subscribe to live events");
+                if consecutive_failures >= MAX_RETRIES_BEFORE_RECREATE {
+                    let Some(p) = get_new_provider_or_exit(
+                        &provider_factory,
+                        &mut shutdown,
+                        chain_id,
+                        &mut backoff,
+                        bus,
+                    )
+                    .await
+                    else {
+                        return;
+                    };
+                    current_provider = p;
+                    consecutive_failures = 0;
+                } else {
+                    bus.err(EType::Evm, anyhow!("{}", e));
+                    if sleep_or_shutdown(backoff.next_delay(), &mut shutdown).await {
+                        return;
+                    }
                 }
             }
         }
