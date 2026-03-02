@@ -28,8 +28,8 @@ use e3_test_helpers::{
     create_seed_from_u64, create_shared_rng_from_u64, with_tracing, AddToCommittee,
 };
 use e3_trbfv::helpers::calculate_error_size;
-use e3_utils::rand_eth_addr;
 use e3_utils::utility_types::ArcBytes;
+use e3_utils::{colorize, rand_eth_addr, Color};
 use e3_zk_prover::test_utils::get_tempdir;
 use e3_zk_prover::ZkBackend;
 use fhe::bfv::PublicKey;
@@ -335,7 +335,7 @@ async fn setup_score_sortition_environment(
     Ok(())
 }
 
-fn serialize_report(report: &[(&str, Duration)]) -> String {
+fn serialize_report(report: &[(String, Duration)]) -> String {
     let max_key_len = report.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
 
     report
@@ -352,14 +352,49 @@ fn serialize_report(report: &[(&str, Duration)]) -> String {
         .join("\n")
 }
 
+#[derive(Default)]
+struct Report {
+    inner: Vec<(String, Duration)>,
+}
+
+fn repeat(ch: char, num: usize) -> String {
+    let mut s = String::new();
+    while s.len() < num {
+        s.push(ch);
+    }
+    s
+}
+
+impl Report {
+    pub fn push(&mut self, repo: (&str, Duration)) {
+        let (label, dur) = repo;
+        self.show(label);
+        self.inner.push((label.to_owned(), dur));
+    }
+
+    pub fn show(&self, label: &str) {
+        println!(
+            "\n\n {}\n {}{}{}\n {}\n",
+            colorize(repeat('#', label.len() + 6), Color::Yellow),
+            colorize("## ", Color::Yellow),
+            colorize(label.to_uppercase(), Color::White),
+            colorize(" ##", Color::Yellow),
+            colorize(repeat('#', label.len() + 6), Color::Yellow),
+        );
+    }
+
+    pub fn serialize(&self) -> String {
+        serialize_report(&self.inner)
+    }
+}
+
 /// Test trbfv
 #[actix::test]
 #[serial_test::serial]
 async fn test_trbfv_actor() -> Result<()> {
-    println!("Running test_trbfv_actor...");
-    let mut report: Vec<(&str, Duration)> = vec![];
+    let mut report = Report::default();
+    report.push(("Starting trbfv actor test", Duration::from_secs(0)));
     let whole_test = Instant::now();
-
     let _guard = with_tracing("info");
 
     // NOTE: Here we are trying to make it as clear as possible as to what is going on so attempting to
@@ -466,7 +501,7 @@ async fn test_trbfv_actor() -> Result<()> {
         .build()
         .await?;
 
-    report.push(("Setup", setup.elapsed()));
+    report.push(("Setup completed", setup.elapsed()));
 
     let committee_setup = Instant::now();
     let chain_id = 1u64;
@@ -491,8 +526,9 @@ async fn test_trbfv_actor() -> Result<()> {
     setup_score_sortition_environment(&bus, &eth_addrs, chain_id).await?;
 
     // Flush all events
-    nodes.flush_all_history(100).await?;
-    report.push(("Committee Setup", committee_setup.elapsed()));
+    nodes.flush_all_history(10000).await?;
+
+    report.push(("Committee Setup Completed", committee_setup.elapsed()));
 
     ///////////////////////////////////////////////////////////////////////////////////
     // 2. Trigger E3Requested
@@ -532,16 +568,13 @@ async fn test_trbfv_actor() -> Result<()> {
         &collector_addr,
     )?;
 
-    println!(
+    report.show(&format!(
         "Committee selected: {} nodes, {} buffer nodes",
         committee.len(),
         buffer_nodes.len()
-    );
+    ));
 
-    let expected = vec!["E3Requested"];
-    let _ = nodes
-        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
-        .await?;
+    nodes.expect_events(&["E3Requested"]).await?;
 
     bus.publish_without_context(CommitteeFinalized {
         e3_id: e3_id.clone(),
@@ -551,13 +584,10 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let committee_finalized_timer = Instant::now();
 
-    let expected = vec!["CommitteeFinalized"];
-    let _ = nodes
-        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
-        .await?;
+    nodes.expect_events(&["CommitteeFinalized"]).await?;
 
     report.push((
-        "Committee Finalization",
+        "Committee Finalization Complete",
         committee_finalized_timer.elapsed(),
     ));
 
@@ -566,16 +596,17 @@ async fn test_trbfv_actor() -> Result<()> {
     // - EncryptionKeyCreated × 5 (one per party, passes is_document_publisher_event filter)
     // Internal events (EncryptionKeyPending, ComputeRequest/Response) stay on committee nodes' local buses.
     let encryption_keys_timer = Instant::now();
-    let expected = vec![
-        "EncryptionKeyCreated",
-        "EncryptionKeyCreated",
-        "EncryptionKeyCreated",
-        "EncryptionKeyCreated",
-        "EncryptionKeyCreated",
-    ];
-    let _ = nodes
-        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
+
+    nodes
+        .expect_events(&[
+            "EncryptionKeyCreated",
+            "EncryptionKeyCreated",
+            "EncryptionKeyCreated",
+            "EncryptionKeyCreated",
+            "EncryptionKeyCreated",
+        ])
         .await?;
+
     report.push((
         "All EncryptionKeyCreated events",
         encryption_keys_timer.elapsed(),
@@ -587,10 +618,14 @@ async fn test_trbfv_actor() -> Result<()> {
     // Internal events (ComputeRequest/Response for GenPk, GenEsi, ZK proofs, ThresholdSharePending,
     // PkGenerationProofSigned, DkgProofSigned) stay on committee nodes' local buses.
     let shares_timer = Instant::now();
-    let expected: Vec<&str> = (0..25).map(|_| "ThresholdShareCreated").collect();
-    let _ = nodes
-        .take_history_with_timeout(0, expected.len(), Duration::from_secs(3000))
+
+    nodes
+        .expect_events_with_timeout(
+            &(0..25).map(|_| "ThresholdShareCreated").collect::<Vec<_>>(),
+            Duration::from_secs(3000),
+        )
         .await?;
+
     report.push(("All ThresholdShareCreated events", shares_timer.elapsed()));
 
     // Wait for DecryptionKeyShared (Exchange #3) events
@@ -598,10 +633,10 @@ async fn test_trbfv_actor() -> Result<()> {
     // Each committee node publishes DecryptionKeyShared after computing its decryption key
     // and generating C4 (share decryption) proofs.
     let decryption_key_shared_timer = Instant::now();
-    let expected: Vec<&str> = (0..5).map(|_| "DecryptionKeyShared").collect();
-    let _ = nodes
-        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
+    nodes
+        .expect_events(&(0..5).map(|_| "DecryptionKeyShared").collect::<Vec<_>>())
         .await?;
+
     report.push((
         "All DecryptionKeyShared events",
         decryption_key_shared_timer.elapsed(),
@@ -613,16 +648,15 @@ async fn test_trbfv_actor() -> Result<()> {
     // After DecryptionKeySharedCollector collects all shares and C4 proofs are verified,
     // each party publishes KeyshareCreated.
     let shares_to_pubkey_agg_timer = Instant::now();
-    let expected = vec![
-        "KeyshareCreated",
-        "KeyshareCreated",
-        "KeyshareCreated",
-        "KeyshareCreated",
-        "KeyshareCreated",
-        "PublicKeyAggregated",
-    ];
     let h = nodes
-        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
+        .expect_events(&[
+            "KeyshareCreated",
+            "KeyshareCreated",
+            "KeyshareCreated",
+            "KeyshareCreated",
+            "KeyshareCreated",
+            "PublicKeyAggregated",
+        ])
         .await?;
 
     report.push((
@@ -751,7 +785,7 @@ async fn test_trbfv_actor() -> Result<()> {
     println!("{}", mt_report);
 
     report.push(("Entire Test", whole_test.elapsed()));
-    println!("{}", serialize_report(&report));
+    println!("{}", report.serialize());
 
     Ok(())
 }

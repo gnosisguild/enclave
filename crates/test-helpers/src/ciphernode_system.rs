@@ -116,11 +116,50 @@ impl CiphernodeSystem {
             .await
     }
 
+    pub async fn expect_events(&self, expected: &[&str]) -> Result<CiphernodeHistory> {
+        let h = self
+            .take_history_with_timeout_impl(
+                0,
+                expected.len(),
+                Duration::from_secs(1000),
+                Duration::from_secs(30),
+            )
+            .await?;
+        println!(">> {:?} == {:?}", h.event_types(), expected.to_vec());
+        h.expect(expected.to_vec());
+        Ok(h)
+    }
+
+    pub async fn expect_events_with_timeout(
+        &self,
+        expected: &[&str],
+        total_to: Duration,
+    ) -> Result<CiphernodeHistory> {
+        let h = self
+            .take_history_with_timeout(0, expected.len(), total_to)
+            .await?;
+        println!(">> {:?} == {:?}", h.event_types(), expected.to_vec());
+
+        h.expect(expected.to_vec());
+        Ok(h)
+    }
+
     pub async fn take_history_with_timeout(
         &self,
         index: usize,
         count: usize,
-        tout: Duration,
+        total_to: Duration,
+    ) -> Result<CiphernodeHistory> {
+        self.take_history_with_timeout_impl(index, count, total_to, Duration::from_millis(1000))
+            .await
+    }
+
+    pub async fn take_history_with_timeout_impl(
+        &self,
+        index: usize,
+        count: usize,
+        total_to: Duration,
+        event_to: Duration,
     ) -> Result<CiphernodeHistory> {
         let Some(node) = self.0.get(index) else {
             bail!("No node found");
@@ -130,12 +169,15 @@ impl CiphernodeSystem {
             return Ok(CiphernodeHistory(vec![]));
         };
 
-        let history = timeout(tout, history.send(TakeEvents::new(count)))
-            .await
-            .context(format!(
-                "Could not take {} events from node {}",
-                count, index
-            ))??;
+        let history = timeout(
+            total_to,
+            history.send(TakeEvents::with_per_evt_timeout(count, event_to)),
+        )
+        .await
+        .context(format!(
+            "Could not take {} events from node {}",
+            count, index
+        ))??;
 
         Ok(CiphernodeHistory(history))
     }
@@ -146,7 +188,7 @@ impl CiphernodeSystem {
                 break;
             };
             loop {
-                let nhs = history.send(TakeEvents::new(1));
+                let nhs = history.send(TakeEvents::with_per_evt_timeout(1, Duration::from_secs(1)));
                 let tr = timeout(Duration::from_millis(millis), nhs).await;
                 if !tr.is_ok() {
                     break;
@@ -181,6 +223,10 @@ impl CiphernodeHistory {
 
     pub fn event_types(&self) -> Vec<String> {
         self.0.iter().map(|e| e.event_type()).collect()
+    }
+
+    pub fn expect(&self, event_types: Vec<&str>) {
+        assert_eq!(self.event_types(), event_types);
     }
 }
 

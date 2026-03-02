@@ -246,6 +246,8 @@ impl Handler<EnclaveEvmEvent> for EvmChainGateway {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use crate::EvmEvent;
 
     use super::*;
