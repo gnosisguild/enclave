@@ -330,19 +330,23 @@ class NoirCircuitBuilder {
     const vkRecursiveHashFile = join(targetDir, `${packageName}.vk_recursive_hash`)
 
     if (!isWrapper) {
-      if (runWriteVk('evm', vkFile, vkHashFile)) {
-        result.vk = existsSync(vkFile) ? vkFile : null
-        result.vkHash = existsSync(vkHashFile) ? vkHashFile : null
+      if (!runWriteVk('evm', vkFile, vkHashFile)) {
+        throw new Error(`VK generation failed for ${packageName} (evm)`)
       }
-      if (runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
-        result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
-        result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
+      result.vk = existsSync(vkFile) ? vkFile : null
+      result.vkHash = existsSync(vkHashFile) ? vkHashFile : null
+
+      if (!runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
+        throw new Error(`VK generation failed for ${packageName} (noir-recursive-no-zk)`)
       }
+      result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
+      result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
     } else {
-      if (runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
-        result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
-        result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
+      if (!runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
+        throw new Error(`VK generation failed for ${packageName} (noir-recursive-no-zk)`)
       }
+      result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
+      result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
     }
 
     return result
