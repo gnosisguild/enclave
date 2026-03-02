@@ -19,6 +19,37 @@ import userDataEncryptionCircuit from '../../../../../circuits/bin/recursive_agg
 import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress } from 'viem/utils'
 import { Hex } from 'viem'
 
+// Cached Barretenberg API instance — avoids re-initialising WASM + SRS on every proof.
+let _bbApi: Barretenberg | null = null
+let _bbApiInitPromise: Promise<Barretenberg> | null = null
+
+const getBBApi = async (): Promise<Barretenberg> => {
+  if (_bbApi) return _bbApi
+  if (_bbApiInitPromise) return _bbApiInitPromise
+
+  _bbApiInitPromise = (async () => {
+    try {
+      const api = await Barretenberg.new()
+      await api.initSRSChonk(2 ** 21)
+      _bbApi = api
+      return api
+    } finally {
+      _bbApiInitPromise = null
+    }
+  })()
+
+  return _bbApiInitPromise
+}
+
+// Destroy the cached Barretenberg API and free its resources.
+export const destroyBBApi = (): void => {
+  _bbApiInitPromise = null
+  if (_bbApi) {
+    _bbApi.destroy()
+    _bbApi = null
+  }
+}
+
 /**
  * Generate the circuit inputs for a vote proof.
  * Runs in a worker when available to avoid blocking the main thread.
@@ -72,141 +103,135 @@ export const executeCircuit = async (circuit: CompiledCircuit, inputs: any): Pro
  * @returns The proof.
  */
 export const generateProof = async (circuitInputs: any) => {
-  const api = await Barretenberg.new()
+  const api = await getBBApi()
 
-  try {
-    await api.initSRSChonk(2 ** 21) // fold circuit needs 2^21 points; default is 2^20
+  const { witness: userDataEncryptionCt0Witness } = await executeCircuit(userDataEncryptionCt0Circuit as CompiledCircuit, {
+    pk0is: circuitInputs.pk0is,
+    ct0is: circuitInputs.ct0is,
+    u: circuitInputs.u,
+    e0: circuitInputs.e0,
+    e0is: circuitInputs.e0is,
+    e0_quotients: circuitInputs.e0_quotients,
+    k1: circuitInputs.k1,
+    r1is: circuitInputs.r1is,
+    r2is: circuitInputs.r2is,
+  })
+  const { witness: userDataEncryptionCt1Witness } = await executeCircuit(userDataEncryptionCt1Circuit as CompiledCircuit, {
+    pk1is: circuitInputs.pk1is,
+    ct1is: circuitInputs.ct1is,
+    u: circuitInputs.u,
+    e1: circuitInputs.e1,
+    p1is: circuitInputs.p1is,
+    p2is: circuitInputs.p2is,
+  })
+  const { witness: crispWitness, returnValue: crispReturnValue } = await executeCircuit(crispCircuit as CompiledCircuit, {
+    prev_ct0is: circuitInputs.prev_ct0is,
+    prev_ct1is: circuitInputs.prev_ct1is,
+    prev_ct_commitment: circuitInputs.prev_ct_commitment,
+    sum_ct0is: circuitInputs.sum_ct0is,
+    sum_ct1is: circuitInputs.sum_ct1is,
+    sum_r0is: circuitInputs.sum_r0is,
+    sum_r1is: circuitInputs.sum_r1is,
+    ct0is: circuitInputs.ct0is,
+    ct1is: circuitInputs.ct1is,
+    k1: circuitInputs.k1,
+    public_key_x: circuitInputs.public_key_x,
+    public_key_y: circuitInputs.public_key_y,
+    signature: circuitInputs.signature,
+    hashed_message: circuitInputs.hashed_message,
+    merkle_root: circuitInputs.merkle_root,
+    merkle_proof_length: circuitInputs.merkle_proof_length,
+    merkle_proof_indices: circuitInputs.merkle_proof_indices,
+    merkle_proof_siblings: circuitInputs.merkle_proof_siblings,
+    slot_address: circuitInputs.slot_address,
+    balance: circuitInputs.balance,
+    is_first_vote: circuitInputs.is_first_vote,
+    is_mask_vote: circuitInputs.is_mask_vote,
+    num_options: circuitInputs.num_options,
+  })
 
-    const { witness: userDataEncryptionCt0Witness } = await executeCircuit(userDataEncryptionCt0Circuit as CompiledCircuit, {
-      pk0is: circuitInputs.pk0is,
-      ct0is: circuitInputs.ct0is,
-      u: circuitInputs.u,
-      e0: circuitInputs.e0,
-      e0is: circuitInputs.e0is,
-      e0_quotients: circuitInputs.e0_quotients,
-      k1: circuitInputs.k1,
-      r1is: circuitInputs.r1is,
-      r2is: circuitInputs.r2is,
-    })
-    const { witness: userDataEncryptionCt1Witness } = await executeCircuit(userDataEncryptionCt1Circuit as CompiledCircuit, {
-      pk1is: circuitInputs.pk1is,
-      ct1is: circuitInputs.ct1is,
-      u: circuitInputs.u,
-      e1: circuitInputs.e1,
-      p1is: circuitInputs.p1is,
-      p2is: circuitInputs.p2is,
-    })
-    const { witness: crispWitness, returnValue: crispReturnValue } = await executeCircuit(crispCircuit as CompiledCircuit, {
-      prev_ct0is: circuitInputs.prev_ct0is,
-      prev_ct1is: circuitInputs.prev_ct1is,
-      prev_ct_commitment: circuitInputs.prev_ct_commitment,
-      sum_ct0is: circuitInputs.sum_ct0is,
-      sum_ct1is: circuitInputs.sum_ct1is,
-      sum_r0is: circuitInputs.sum_r0is,
-      sum_r1is: circuitInputs.sum_r1is,
-      ct0is: circuitInputs.ct0is,
-      ct1is: circuitInputs.ct1is,
-      k1: circuitInputs.k1,
-      public_key_x: circuitInputs.public_key_x,
-      public_key_y: circuitInputs.public_key_y,
-      signature: circuitInputs.signature,
-      hashed_message: circuitInputs.hashed_message,
-      merkle_root: circuitInputs.merkle_root,
-      merkle_proof_length: circuitInputs.merkle_proof_length,
-      merkle_proof_indices: circuitInputs.merkle_proof_indices,
-      merkle_proof_siblings: circuitInputs.merkle_proof_siblings,
-      slot_address: circuitInputs.slot_address,
-      balance: circuitInputs.balance,
-      is_first_vote: circuitInputs.is_first_vote,
-      is_mask_vote: circuitInputs.is_mask_vote,
-      num_options: circuitInputs.num_options,
-    })
+  const userDataEncryptionCt0Backend = new UltraHonkBackend((userDataEncryptionCt0Circuit as CompiledCircuit).bytecode, api)
+  const userDataEncryptionCt1Backend = new UltraHonkBackend((userDataEncryptionCt1Circuit as CompiledCircuit).bytecode, api)
+  const userDataEncryptionBackend = new UltraHonkBackend((userDataEncryptionCircuit as CompiledCircuit).bytecode, api)
+  const crispBackend = new UltraHonkBackend((crispCircuit as CompiledCircuit).bytecode, api)
+  const foldBackend = new UltraHonkBackend((foldCircuit as CompiledCircuit).bytecode, api)
 
-    const userDataEncryptionCt0Backend = new UltraHonkBackend((userDataEncryptionCt0Circuit as CompiledCircuit).bytecode, api)
-    const userDataEncryptionCt1Backend = new UltraHonkBackend((userDataEncryptionCt1Circuit as CompiledCircuit).bytecode, api)
-    const userDataEncryptionBackend = new UltraHonkBackend((userDataEncryptionCircuit as CompiledCircuit).bytecode, api)
-    const crispBackend = new UltraHonkBackend((crispCircuit as CompiledCircuit).bytecode, api)
-    const foldBackend = new UltraHonkBackend((foldCircuit as CompiledCircuit).bytecode, api)
-
-    const { proof: userDataEncryptionCt0Proof, publicInputs: userDataEncryptionCt0PublicInputs } =
-      await userDataEncryptionCt0Backend.generateProof(userDataEncryptionCt0Witness, {
-        verifierTarget: 'noir-recursive-no-zk',
-      })
-    const { proof: userDataEncryptionCt1Proof, publicInputs: userDataEncryptionCt1PublicInputs } =
-      await userDataEncryptionCt1Backend.generateProof(userDataEncryptionCt1Witness, {
-        verifierTarget: 'noir-recursive-no-zk',
-      })
-    const { proof: crispProof, publicInputs: crispPublicInputs } = await crispBackend.generateProof(crispWitness, {
+  const { proof: userDataEncryptionCt0Proof, publicInputs: userDataEncryptionCt0PublicInputs } =
+    await userDataEncryptionCt0Backend.generateProof(userDataEncryptionCt0Witness, {
       verifierTarget: 'noir-recursive-no-zk',
     })
-
-    const userDataEncryptionCt0Artifacts = await userDataEncryptionCt0Backend.generateRecursiveProofArtifacts(
-      userDataEncryptionCt0Proof,
-      userDataEncryptionCt0PublicInputs.length,
-      {
-        verifierTarget: 'noir-recursive-no-zk',
-      },
-    )
-    const userDataEncryptionCt1Artifacts = await userDataEncryptionCt1Backend.generateRecursiveProofArtifacts(
-      userDataEncryptionCt1Proof,
-      userDataEncryptionCt1PublicInputs.length,
-      {
-        verifierTarget: 'noir-recursive-no-zk',
-      },
-    )
-    const crispArtifacts = await crispBackend.generateRecursiveProofArtifacts(crispProof, crispPublicInputs.length, {
+  const { proof: userDataEncryptionCt1Proof, publicInputs: userDataEncryptionCt1PublicInputs } =
+    await userDataEncryptionCt1Backend.generateProof(userDataEncryptionCt1Witness, {
       verifierTarget: 'noir-recursive-no-zk',
     })
+  const { proof: crispProof, publicInputs: crispPublicInputs } = await crispBackend.generateProof(crispWitness, {
+    verifierTarget: 'noir-recursive-no-zk',
+  })
 
-    const { witness: userDataEncryptionWitness } = await executeCircuit(userDataEncryptionCircuit as CompiledCircuit, {
-      ct0_verification_key: userDataEncryptionCt0Artifacts.vkAsFields,
-      ct0_proof: proofToFields(userDataEncryptionCt0Proof),
-      ct0_public_inputs: userDataEncryptionCt0PublicInputs,
-      ct0_key_hash: userDataEncryptionCt0Artifacts.vkHash,
-      ct1_verification_key: userDataEncryptionCt1Artifacts.vkAsFields,
-      ct1_proof: proofToFields(userDataEncryptionCt1Proof),
-      ct1_public_inputs: userDataEncryptionCt1PublicInputs,
-      ct1_key_hash: userDataEncryptionCt1Artifacts.vkHash,
-    })
+  const userDataEncryptionCt0Artifacts = await userDataEncryptionCt0Backend.generateRecursiveProofArtifacts(
+    userDataEncryptionCt0Proof,
+    userDataEncryptionCt0PublicInputs.length,
+    {
+      verifierTarget: 'noir-recursive-no-zk',
+    },
+  )
+  const userDataEncryptionCt1Artifacts = await userDataEncryptionCt1Backend.generateRecursiveProofArtifacts(
+    userDataEncryptionCt1Proof,
+    userDataEncryptionCt1PublicInputs.length,
+    {
+      verifierTarget: 'noir-recursive-no-zk',
+    },
+  )
+  const crispArtifacts = await crispBackend.generateRecursiveProofArtifacts(crispProof, crispPublicInputs.length, {
+    verifierTarget: 'noir-recursive-no-zk',
+  })
 
-    const { proof: userDataEncryptionProof, publicInputs: userDataEncryptionPublicInputs } = await userDataEncryptionBackend.generateProof(
-      userDataEncryptionWitness,
-      {
-        verifierTarget: 'noir-recursive-no-zk',
-      },
-    )
-    const userDataEncryptionArtifacts = await userDataEncryptionBackend.generateRecursiveProofArtifacts(
-      userDataEncryptionProof,
-      userDataEncryptionPublicInputs.length,
-      {
-        verifierTarget: 'noir-recursive-no-zk',
-      },
-    )
+  const { witness: userDataEncryptionWitness } = await executeCircuit(userDataEncryptionCircuit as CompiledCircuit, {
+    ct0_verification_key: userDataEncryptionCt0Artifacts.vkAsFields,
+    ct0_proof: proofToFields(userDataEncryptionCt0Proof),
+    ct0_public_inputs: userDataEncryptionCt0PublicInputs,
+    ct0_key_hash: userDataEncryptionCt0Artifacts.vkHash,
+    ct1_verification_key: userDataEncryptionCt1Artifacts.vkAsFields,
+    ct1_proof: proofToFields(userDataEncryptionCt1Proof),
+    ct1_public_inputs: userDataEncryptionCt1PublicInputs,
+    ct1_key_hash: userDataEncryptionCt1Artifacts.vkHash,
+  })
 
-    const { witness: foldWitness } = await executeCircuit(foldCircuit as CompiledCircuit, {
-      user_data_encryption_verification_key: userDataEncryptionArtifacts.vkAsFields,
-      user_data_encryption_proof: proofToFields(userDataEncryptionProof),
-      user_data_encryption_public_inputs: userDataEncryptionPublicInputs,
-      user_data_encryption_key_hash: userDataEncryptionArtifacts.vkHash,
-      crisp_verification_key: crispArtifacts.vkAsFields,
-      crisp_proof: proofToFields(crispProof),
-      crisp_key_hash: crispArtifacts.vkHash,
-      prev_ct_commitment: circuitInputs.prev_ct_commitment,
-      merkle_root: circuitInputs.merkle_root,
-      slot_address: circuitInputs.slot_address,
-      is_first_vote: circuitInputs.is_first_vote,
-      num_options: circuitInputs.num_options,
-      final_ct_commitment: crispReturnValue[0].toString(),
-      ct_commitment: crispReturnValue[1].toString(),
-      k1_commitment: crispReturnValue[2].toString(),
-    })
+  const { proof: userDataEncryptionProof, publicInputs: userDataEncryptionPublicInputs } = await userDataEncryptionBackend.generateProof(
+    userDataEncryptionWitness,
+    {
+      verifierTarget: 'noir-recursive-no-zk',
+    },
+  )
+  const userDataEncryptionArtifacts = await userDataEncryptionBackend.generateRecursiveProofArtifacts(
+    userDataEncryptionProof,
+    userDataEncryptionPublicInputs.length,
+    {
+      verifierTarget: 'noir-recursive-no-zk',
+    },
+  )
 
-    const proof = await foldBackend.generateProof(foldWitness, { verifierTarget: 'evm' })
+  const { witness: foldWitness } = await executeCircuit(foldCircuit as CompiledCircuit, {
+    user_data_encryption_verification_key: userDataEncryptionArtifacts.vkAsFields,
+    user_data_encryption_proof: proofToFields(userDataEncryptionProof),
+    user_data_encryption_public_inputs: userDataEncryptionPublicInputs,
+    user_data_encryption_key_hash: userDataEncryptionArtifacts.vkHash,
+    crisp_verification_key: crispArtifacts.vkAsFields,
+    crisp_proof: proofToFields(crispProof),
+    crisp_key_hash: crispArtifacts.vkHash,
+    prev_ct_commitment: circuitInputs.prev_ct_commitment,
+    merkle_root: circuitInputs.merkle_root,
+    slot_address: circuitInputs.slot_address,
+    is_first_vote: circuitInputs.is_first_vote,
+    num_options: circuitInputs.num_options,
+    final_ct_commitment: crispReturnValue[0].toString(),
+    ct_commitment: crispReturnValue[1].toString(),
+    k1_commitment: crispReturnValue[2].toString(),
+  })
 
-    return proof
-  } finally {
-    api.destroy()
-  }
+  const proof = await foldBackend.generateProof(foldWitness, { verifierTarget: 'evm' })
+
+  return proof
 }
 
 /**
@@ -298,17 +323,10 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
  * @returns True if the proof is valid, false otherwise.
  */
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {
-  const api = await Barretenberg.new()
+  const api = await getBBApi()
+  const foldBackend = new UltraHonkBackend(foldCircuit.bytecode, api)
 
-  try {
-    const foldBackend = new UltraHonkBackend(foldCircuit.bytecode, api)
-
-    const isValid = await foldBackend.verifyProof(proof, { verifierTarget: 'evm' })
-
-    return isValid
-  } finally {
-    api.destroy()
-  }
+  return foldBackend.verifyProof(proof, { verifierTarget: 'evm' })
 }
 
 /**
