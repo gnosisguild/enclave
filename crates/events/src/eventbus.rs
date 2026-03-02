@@ -301,146 +301,6 @@ impl<E: ErrorEvent> GetErrors<E> {
 //////////////////////////////////////////////////////////////////////////////
 // History Collector
 //////////////////////////////////////////////////////////////////////////////
-//
-// /// Actor to subscribe to EventBus to capture all history
-// pub struct HistoryCollector<E: Event> {
-//     history: VecDeque<E>,
-//     pending_takes: Vec<PendingTake<E>>,
-// }
-//
-// impl<E: Event> HistoryCollector<E> {
-//     pub fn new() -> Self {
-//         Self {
-//             history: VecDeque::new(),
-//             pending_takes: Vec::new(),
-//         }
-//     }
-//
-//     fn try_fulfill_pending_takes(&mut self) {
-//         let mut completed = Vec::new();
-//
-//         // For each pending take, try to fulfill it
-//         for (idx, pending) in self.pending_takes.iter_mut().enumerate() {
-//             // Fill from history first
-//             while pending.collected.len() < pending.count && !self.history.is_empty() {
-//                 pending.collected.push(self.history.pop_front().unwrap());
-//             }
-//
-//             // If we have enough, mark as complete
-//             if pending.collected.len() >= pending.count {
-//                 info!(
-//                     "HHH: > [{}] We have received all {} events",
-//                     idx,
-//                     pending.collected.len()
-//                 );
-//                 completed.push(idx);
-//             } else {
-//                 info!(
-//                     "HHH: > [{}] We are still waiting on events {}/{}...",
-//                     idx,
-//                     pending.collected.len(),
-//                     pending.count
-//                 )
-//             }
-//         }
-//
-//         // Send responses for completed takes (in reverse order to maintain indices)
-//         for idx in completed.into_iter().rev() {
-//             let pending = self.pending_takes.swap_remove(idx);
-//             let events = pending.collected.into_iter().take(pending.count).collect();
-//             let _ = pending.responder.send(events);
-//         }
-//     }
-//
-//     fn add_event(&mut self, event: E) {
-//         info!("HHH: Received event {}", event.event_type());
-//         // First try to give to pending takes
-//         for (idx, pending) in &mut self.pending_takes.iter_mut().enumerate() {
-//             if pending.collected.len() < pending.count {
-//                 info!(
-//                     "HHH: > [{}] Pushing {} to pending take {}/{}...",
-//                     idx,
-//                     event.event_type(),
-//                     pending.collected.len() + 1,
-//                     pending.count
-//                 );
-//                 pending.collected.push(event);
-//                 self.try_fulfill_pending_takes();
-//                 return;
-//             }
-//         }
-//
-//         // No pending take needed it, add to history
-//         self.history.push_back(event);
-//     }
-// }
-//
-// impl<E: Event> Handler<GetEvents<E>> for HistoryCollector<E> {
-//     type Result = Vec<E>;
-//
-//     fn handle(&mut self, _: GetEvents<E>, _: &mut Context<Self>) -> Vec<E> {
-//         self.history.iter().cloned().collect()
-//     }
-// }
-//
-// impl<E: Event> Handler<TakeEvents<E>> for HistoryCollector<E> {
-//     type Result = ResponseActFuture<Self, Vec<E>>;
-//
-//     fn handle(&mut self, msg: TakeEvents<E>, _: &mut Context<Self>) -> Self::Result {
-//         let count = msg.amount;
-//         info!("HHH: take() requested for {} events.", msg.amount);
-//         // If we have enough events in history, return immediately
-//         if self.history.len() >= count {
-//             let events: Vec<E> = self.history.drain(..count).collect();
-//             info!(
-//                 "HHH: Returning {} events. Completed take() immediately.",
-//                 events.len()
-//             );
-//             return Box::pin(async move { events }.into_actor(self));
-//         }
-//
-//         info!(
-//             "HHH: Requesting {} events but only {} in the buffer. waiting for more...",
-//             msg.amount,
-//             self.history.len()
-//         );
-//
-//         // Create a tokio oneshot channel for the response
-//         let (tx, rx) = tokio::sync::oneshot::channel();
-//
-//         // Collect what we can from history
-//         let mut collected = Vec::new();
-//         while !self.history.is_empty() && collected.len() < count {
-//             collected.push(self.history.pop_front().unwrap());
-//         }
-//
-//         // Store the pending request
-//         let idx = self.pending_takes.len();
-//         self.pending_takes.push(PendingTake {
-//             count,
-//             collected,
-//             responder: tx,
-//         });
-//         info!("HHH: [{}] waiting for take to complete...", idx);
-//         // Return future that waits for the response
-//         Box::pin(async move { rx.await.unwrap_or_else(|_| Vec::new()) }.into_actor(self))
-//     }
-// }
-//
-// impl<E: Event> Actor for HistoryCollector<E> {
-//     type Context = Context<Self>;
-//     fn started(&mut self, ctx: &mut Self::Context) {
-//         ctx.set_mailbox_capacity(MAILBOX_LIMIT)
-//     }
-// }
-//
-// impl<E: Event> Handler<E> for HistoryCollector<E> {
-//     type Result = E::Result;
-//     fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {
-//         self.add_event(msg);
-//     }
-// }
-//
 
 struct HistoryCollectorWaiter<E: Event> {
     rx: Option<mpsc::UnboundedReceiver<E>>,
@@ -484,7 +344,6 @@ impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollectorWaiter<E>
 impl<E: Event> Handler<ResetHistory> for HistoryCollectorWaiter<E> {
     type Result = ();
     fn handle(&mut self, _: ResetHistory, _: &mut Context<Self>) {
-        println!("HHH: WAITER RESETING HISTORY");
         if let Some(ref mut rx) = self.rx {
             while rx.try_recv().is_ok() {}
         }
@@ -519,7 +378,6 @@ impl<E: Event> Actor for HistoryCollector<E> {
 impl<E: Event> Handler<E> for HistoryCollector<E> {
     type Result = E::Result;
     fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {
-        println!("HHH: EVENT: {}", msg.event_type());
         self.history.push(msg.clone());
         let _ = self.tx.send(msg);
     }
@@ -528,7 +386,6 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
 impl<E: Event> Handler<ResetHistory> for HistoryCollector<E> {
     type Result = ();
     fn handle(&mut self, _: ResetHistory, _: &mut Context<Self>) {
-        println!("HHH: RESET");
         self.history.clear();
         self.waiter.do_send(ResetHistory);
     }
@@ -537,7 +394,6 @@ impl<E: Event> Handler<ResetHistory> for HistoryCollector<E> {
 impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollector<E> {
     type Result = ResponseActFuture<Self, TakeEventsResult<E>>;
     fn handle(&mut self, msg: TakeEvents<E>, _: &mut Context<Self>) -> Self::Result {
-        println!("HHH: TAKE EVENTS");
         let fut = self.waiter.send(msg);
         Box::pin(async move { fut.await.unwrap() }.into_actor(self))
     }
@@ -546,7 +402,6 @@ impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollector<E> {
 impl<E: Event> Handler<GetEvents<E>> for HistoryCollector<E> {
     type Result = Vec<E>;
     fn handle(&mut self, _: GetEvents<E>, _: &mut Context<Self>) -> Vec<E> {
-        println!("HHH: GET EVENTS");
         self.history.clone()
     }
 }
