@@ -39,7 +39,6 @@ interface BuildOptions {
   circuits?: string[]
   skipChecksums?: boolean
   skipVk?: boolean
-  oracleHash?: string
   outputDir?: string
   clean?: boolean
   dryRun?: boolean
@@ -66,7 +65,6 @@ class NoirCircuitBuilder {
       outputDir: join(this.rootDir, 'dist', 'circuits'),
       clean: true,
       skipVk: false,
-      oracleHash: 'keccak',
       ...options,
     }
   }
@@ -488,7 +486,6 @@ async function main() {
     else if (arg === '--skip-checksums') options.skipChecksums = true
     else if (arg === '--skip-vk') options.skipVk = true
     else if (arg === '--no-clean') options.clean = false
-    else if (arg === '--oracle-hash') options.oracleHash = args[++i]
     else if (arg === '--group') options.groups = args[++i]?.split(',') as CircuitGroup[]
     else if (arg === '--circuit') (options.circuits ??= []).push(args[++i])
     else if (arg === '-o' || arg === '--output') options.outputDir = resolve(args[++i])
@@ -519,7 +516,6 @@ Options:
   --circuit <name>    Build specific circuit(s)
   --skip-vk           Skip verification key generation
   --skip-checksums    Skip checksum generation
-  --oracle-hash <h>   Oracle hash for VK generation (default: keccak)
   -o, --output <dir>  Output directory (default: dist/circuits)
   --dry-run           Show what would be built
   --no-clean          Don't clean output directory
