@@ -29,7 +29,7 @@ use tracing::{error, info, instrument, warn};
 
 const MAX_RECONNECT_DELAY_SECS: u64 = 60;
 /// Maximum attempts to recreate a provider via the factory before adding an
-/// extra outer delay. Uses exponential backoff between each attempt.
+/// extra outer delay.
 const PROVIDER_RECREATE_MAX_ATTEMPTS: u32 = 3;
 /// Initial delay (ms) between provider-recreation attempts.
 const PROVIDER_RECREATE_INITIAL_DELAY_MS: u64 = 2000;
@@ -203,7 +203,6 @@ async fn recreate_provider<P: Provider + Clone + 'static>(
     backoff: &mut Backoff,
 ) -> Option<EthProvider<P>> {
     loop {
-        // Check for shutdown before each attempt cycle
         if shutdown.try_recv().is_ok() {
             return None;
         }
@@ -218,7 +217,6 @@ async fn recreate_provider<P: Provider + Clone + 'static>(
             return None;
         }
 
-        // Use retry_with_backoff for bounded attempts to create + health-check
         let factory_clone = factory.clone();
         let result = retry_with_backoff(
             || {
@@ -234,6 +232,20 @@ async fn recreate_provider<P: Provider + Clone + 'static>(
                         warn!(chain_id, error = %e, "New provider failed health check");
                         RetryError::Retry(anyhow!("Health check failed: {}", e))
                     })?;
+
+                    let new_chain_id = provider.chain_id();
+                    if new_chain_id != chain_id {
+                        let err = anyhow!(
+                            "Chain ID mismatch: expected {}, got {}",
+                            chain_id,
+                            new_chain_id
+                        );
+                        error!(
+                            chain_id,
+                            new_chain_id, "Recreated provider is on wrong chain"
+                        );
+                        return Err(RetryError::Failure(err));
+                    }
 
                     Ok(provider)
                 }

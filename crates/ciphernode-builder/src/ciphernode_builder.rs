@@ -614,7 +614,6 @@ async fn setup_evm_system(
         let chain_id = provider.chain_id();
         evm_config.insert(chain_id, chain.try_into()?);
 
-        // Create a provider factory so the EVM reader can reconnect on transport failures
         let rpc_url = chain.rpc_url()?;
         let provider_factory =
             ProviderConfig::new(rpc_url, chain.rpc_auth.clone()).into_read_provider_factory();
