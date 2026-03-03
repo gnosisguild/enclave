@@ -687,7 +687,12 @@ async fn test_trbfv_actor() -> Result<()> {
     let expected_count = 1 + 5 + 1 + 1 + 1;
 
     let h = nodes
-        .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))
+        .take_history_with_timeouts(
+            0,
+            expected_count,
+            Some(Duration::from_secs(1000)),
+            Some(Duration::from_secs(1000)),
+        )
         .await?;
 
     report.push((

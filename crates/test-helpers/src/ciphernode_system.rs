@@ -122,7 +122,7 @@ impl CiphernodeSystem {
     /// expect events to fire with the default timeout 1000sec per event
     pub async fn expect_events(&self, expected: &[&str]) -> Result<CiphernodeHistory> {
         let h = self
-            .take_history_with_timeout_impl(
+            .take_history_with_timeouts(
                 0,
                 expected.len(),
                 Some(Duration::from_secs(1000)),
@@ -141,7 +141,7 @@ impl CiphernodeSystem {
         expected: &[&str],
     ) -> Result<CiphernodeHistory> {
         let h = self
-            .take_history_with_timeout_impl(0, expected.len(), None, None)
+            .take_history_with_timeouts(0, expected.len(), None, None)
             .await
             .map_err(|e| anyhow::anyhow!("FAILURE: {expected:?} : {e}"))?;
 
@@ -157,7 +157,7 @@ impl CiphernodeSystem {
         per_evt_to: Duration, // per event
     ) -> Result<CiphernodeHistory> {
         let h = self
-            .take_history_with_timeout_impl(0, expected.len(), Some(total_to), Some(per_evt_to))
+            .take_history_with_timeouts(0, expected.len(), Some(total_to), Some(per_evt_to))
             .await
             .map_err(|e| anyhow::anyhow!("FAILURE: {expected:?} : {e}"))?;
         println!(">> {:?} == {:?}", h.event_types(), expected.to_vec());
@@ -172,7 +172,7 @@ impl CiphernodeSystem {
         count: usize,
         total_to: Duration,
     ) -> Result<CiphernodeHistory> {
-        self.take_history_with_timeout_impl(
+        self.take_history_with_timeouts(
             index,
             count,
             Some(total_to),
@@ -181,7 +181,7 @@ impl CiphernodeSystem {
         .await
     }
 
-    pub async fn take_history_with_timeout_impl(
+    pub async fn take_history_with_timeouts(
         &self,
         index: usize,
         count: usize,
