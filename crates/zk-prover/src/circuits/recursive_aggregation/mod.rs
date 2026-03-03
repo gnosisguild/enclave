@@ -171,27 +171,21 @@ pub fn generate_fold_proof(
     let vk2 = vk::load_vk_for_fold_input(prover.circuits_dir(), proof2.circuit)?;
 
     // Both wrapper and fold output [key_hash, commitment].
-    let mut proof1_public_inputs = bytes_to_field_strings(&proof1.public_signals)?;
-    let mut proof2_public_inputs = bytes_to_field_strings(&proof2.public_signals)?;
+    let proof1_public_inputs = bytes_to_field_strings(&proof1.public_signals)?;
+    let proof2_public_inputs = bytes_to_field_strings(&proof2.public_signals)?;
 
-    proof1_public_inputs = proof1_public_inputs
-        .get(0..2)
-        .ok_or_else(|| {
-            ZkError::InvalidInput(format!(
-                "proof1 must have 2 public inputs, got {}",
-                proof1_public_inputs.len()
-            ))
-        })?
-        .to_vec();
-    proof2_public_inputs = proof2_public_inputs
-        .get(0..2)
-        .ok_or_else(|| {
-            ZkError::InvalidInput(format!(
-                "proof2 must have 2 public inputs, got {}",
-                proof2_public_inputs.len()
-            ))
-        })?
-        .to_vec();
+    if proof1_public_inputs.len() != 2 {
+        return Err(ZkError::InvalidInput(format!(
+            "proof1 must have exactly 2 public inputs, got {}",
+            proof1_public_inputs.len()
+        )));
+    }
+    if proof2_public_inputs.len() != 2 {
+        return Err(ZkError::InvalidInput(format!(
+            "proof2 must have exactly 2 public inputs, got {}",
+            proof2_public_inputs.len()
+        )));
+    }
 
     let full_input = FoldInput {
         proof1_verification_key: vk1.verification_key,
