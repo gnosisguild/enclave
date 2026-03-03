@@ -588,7 +588,14 @@ async fn process_swarm_command(
             payload,
             target,
         }) => {
-            handle_outgoing_request(swarm, correlator, correlation_id, payload, target)?;
+            if let Err(e) =
+                handle_outgoing_request(swarm, correlator, correlation_id, payload, target)
+            {
+                event_tx.send(NetEvent::OutgoingRequestFailed(OutgoingRequestFailed {
+                    correlation_id,
+                    error: e.to_string(),
+                }))?;
+            };
             Ok(())
         }
         NetCommand::IncomingResponse(IncomingResponse { responder }) => {

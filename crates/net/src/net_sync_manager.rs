@@ -216,6 +216,10 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
 
             let fetch_request: FetchEventsSince = responder.try_request_into()?;
             let limit = fetch_request.limit();
+            if limit == 0 {
+                responder.bad_request("limit must be greater than 0")?;
+                return Ok(());
+            }
             let aggregate_id = fetch_request.aggregate_id();
             let events: Vec<EnclaveEvent<Unsequenced>> = msg
                 .into_events()
@@ -226,7 +230,7 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
                 .collect();
 
             let next = if events.len() == limit {
-                let last_event_ts = events.get(limit - 1).map(|e| e.ts()).unwrap_or(0);
+                let last_event_ts = events.last().map(|e| e.ts()).unwrap_or(0);
                 BatchCursor::Next(last_event_ts)
             } else {
                 BatchCursor::Done
