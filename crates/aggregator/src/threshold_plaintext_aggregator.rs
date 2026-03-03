@@ -42,6 +42,7 @@ pub struct VerifyingC6 {
     threshold_m: u64,
     threshold_n: u64,
     shares: HashMap<u64, Vec<ArcBytes>>,
+    c6_proofs: HashMap<u64, Vec<Proof>>,
     ciphertext_output: Vec<ArcBytes>,
     params: ArcBytes,
 }
@@ -234,6 +235,7 @@ impl ThresholdPlaintextAggregator {
             Ok(ThresholdPlaintextAggregatorState::VerifyingC6(
                 VerifyingC6 {
                     shares,
+                    c6_proofs,
                     ciphertext_output,
                     threshold_m,
                     threshold_n,
@@ -302,18 +304,18 @@ impl ThresholdPlaintextAggregator {
             );
         }
 
-        ensure!(
-            honest_party_ids.len() > state.threshold_m as usize,
-            "Not enough honest parties after C6 verification: {} honest, {} required",
-            honest_party_ids.len(),
-            state.threshold_m + 1
-        );
-
         // Filter shares to only honest parties
         let honest_shares: Vec<(u64, Vec<ArcBytes>)> = honest_party_ids
             .iter()
             .filter_map(|id| state.shares.get(id).map(|s| (*id, s.clone())))
             .collect();
+
+        ensure!(
+            honest_shares.len() > state.threshold_m as usize,
+            "Not enough honest shares after C6 verification: {} honest shares, {} required",
+            honest_shares.len(),
+            state.threshold_m + 1
+        );
 
         info!(
             "C6 verification passed: {} honest parties, transitioning to Computing",
@@ -402,6 +404,13 @@ impl ThresholdPlaintextAggregator {
 
         let plaintext = state.plaintext.clone();
         let shares = state.shares.clone();
+
+        ensure!(
+            data.proofs.len() == plaintext.len(),
+            "C7 proof count mismatch: got {} proofs for {} ciphertext indices",
+            data.proofs.len(),
+            plaintext.len()
+        );
 
         self.state.try_mutate(ec, |_| {
             Ok(ThresholdPlaintextAggregatorState::Complete(Complete {
@@ -590,25 +599,14 @@ impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
                     ec,
                 ) = msg.into_inner().into_components();
 
-                // Collect c6_proofs before add_share mutates state
-                let c6_proofs_snapshot =
-                    if let Some(ThresholdPlaintextAggregatorState::Collecting(ref collecting)) =
-                        self.state.get()
-                    {
-                        let mut proofs = collecting.c6_proofs.clone();
-                        proofs.insert(party_id, decryption_proofs.clone());
-                        Some(proofs)
-                    } else {
-                        None
-                    };
-
                 self.add_share(party_id, decryption_share, decryption_proofs, &ec)?;
 
                 // If we transitioned to VerifyingC6, dispatch C6 verification
-                if let Some(ThresholdPlaintextAggregatorState::VerifyingC6(_)) = self.state.get() {
-                    if let Some(proofs) = c6_proofs_snapshot {
-                        self.dispatch_c6_verification(proofs, ec)?;
-                    }
+                // using the proofs persisted in state
+                if let Some(ThresholdPlaintextAggregatorState::VerifyingC6(ref state)) =
+                    self.state.get()
+                {
+                    self.dispatch_c6_verification(state.c6_proofs.clone(), ec)?;
                 }
 
                 Ok(())

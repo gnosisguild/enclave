@@ -251,6 +251,10 @@ pub struct ThresholdKeyshareState {
     pub threshold_m: u64,
     pub threshold_n: u64,
     pub params: ArcBytes,
+    /// Aggregated public key bytes, captured from PublicKeyAggregated event for C6 proof.
+    /// Defaults to None for backward compatibility with existing persisted state.
+    #[serde(default)]
+    pub aggregated_pk: Option<ArcBytes>,
 }
 
 impl ThresholdKeyshareState {
@@ -271,6 +275,7 @@ impl ThresholdKeyshareState {
             threshold_m,
             threshold_n,
             params,
+            aggregated_pk: None,
         }
     }
 
@@ -1979,6 +1984,7 @@ impl ThresholdKeyshare {
         let aggregated_pk_bytes = self
             .aggregated_pk
             .clone()
+            .or_else(|| state.aggregated_pk.clone())
             .ok_or_else(|| anyhow!("Aggregated public key not available for C6 proof"))?;
 
         let threshold_preset = self
@@ -1994,12 +2000,29 @@ impl ThresholdKeyshare {
 
         info!("Dispatching C6 proof generation (threshold share decryption)...");
 
+        // Publish C6 proof request before transitioning state so a publish
+        // failure leaves us in Decrypting (retryable) rather than
+        // GeneratingDecryptionProof (no retry path).
+        let request = ComputeRequest::zk(
+            ZkRequest::ThresholdShareDecryption(ThresholdShareDecryptionProofRequest {
+                ciphertext_bytes: decrypting.ciphertext_output,
+                aggregated_pk_bytes,
+                sk_poly_sum: decrypting.sk_poly_sum,
+                es_poly_sum: decrypting.es_poly_sum,
+                d_share_bytes: d_share_poly.clone(),
+                params_preset: threshold_preset,
+            }),
+            CorrelationId::new(),
+            e3_id,
+        );
+        self.bus.publish(request, ec.clone())?;
+
         // Transition to GeneratingDecryptionProof state
         self.state.try_mutate(&ec, |s| {
             use KeyshareState as K;
             s.new_state(K::GeneratingDecryptionProof(GeneratingDecryptionProof {
                 pk_share: decrypting.pk_share.clone(),
-                decryption_share: d_share_poly.clone(),
+                decryption_share: d_share_poly,
                 signed_pk_generation_proof: decrypting.signed_pk_generation_proof.clone(),
                 signed_sk_share_computation_proof: decrypting
                     .signed_sk_share_computation_proof
@@ -2015,21 +2038,6 @@ impl ThresholdKeyshare {
                     .clone(),
             }))
         })?;
-
-        // Dispatch C6 proof request
-        let request = ComputeRequest::zk(
-            ZkRequest::ThresholdShareDecryption(ThresholdShareDecryptionProofRequest {
-                ciphertext_bytes: decrypting.ciphertext_output,
-                aggregated_pk_bytes,
-                sk_poly_sum: decrypting.sk_poly_sum,
-                es_poly_sum: decrypting.es_poly_sum,
-                d_share_bytes: d_share_poly,
-                params_preset: threshold_preset,
-            }),
-            CorrelationId::new(),
-            e3_id,
-        );
-        self.bus.publish(request, ec)?;
         Ok(())
     }
 
@@ -2087,7 +2095,12 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::PublicKeyAggregated(data) => {
-                self.aggregated_pk = Some(ArcBytes::from_bytes(&data.pubkey));
+                let pk = ArcBytes::from_bytes(&data.pubkey);
+                self.aggregated_pk = Some(pk.clone());
+                let _ = self.state.try_mutate(&ec, |mut s| {
+                    s.aggregated_pk = Some(pk);
+                    Ok(s)
+                });
             }
             EnclaveEventData::ThresholdShareCreated(data) => {
                 let _ =

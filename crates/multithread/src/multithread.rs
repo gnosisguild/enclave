@@ -356,6 +356,19 @@ fn handle_threshold_share_decryption_proof(
 
     // 4. For each index, build circuit data and generate proof
     let num_indices = req.ciphertext_bytes.len();
+    if req.es_poly_sum.is_empty() {
+        return Err(make_zk_error(&request, "empty es_poly_sum".to_string()));
+    }
+    if req.d_share_bytes.len() < num_indices {
+        return Err(make_zk_error(
+            &request,
+            format!(
+                "d_share_bytes too short: {} < {}",
+                req.d_share_bytes.len(),
+                num_indices
+            ),
+        ));
+    }
     let mut proofs = Vec::with_capacity(num_indices);
 
     for i in 0..num_indices {
@@ -1151,6 +1164,13 @@ fn handle_verify_c6_proofs(
         .map(|party| {
             let sender = party.sender_party_id;
 
+            if party.c6_proofs.is_empty() {
+                return PartyC6VerificationResult {
+                    sender_party_id: sender,
+                    all_verified: false,
+                };
+            }
+
             for c6_proof in &party.c6_proofs {
                 let result = prover.verify_proof(c6_proof, &e3_id_str, sender);
                 match result {
@@ -1194,6 +1214,21 @@ fn handle_decrypted_shares_aggregation_proof(
     // 3. Determine dimensions
     let num_indices = req.plaintext.len();
     let num_parties = req.d_share_polys.len();
+
+    for (party_id, shares) in &req.d_share_polys {
+        if shares.len() < num_indices {
+            return Err(make_zk_error(
+                &request,
+                format!(
+                    "party {} has {} shares but {} expected",
+                    party_id,
+                    shares.len(),
+                    num_indices
+                ),
+            ));
+        }
+    }
+
     let mut proofs = Vec::with_capacity(num_indices);
 
     // 4. For each ciphertext index, build circuit data and generate proof
