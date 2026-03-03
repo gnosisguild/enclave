@@ -1,9 +1,10 @@
 # Wrapper Circuits
 
-Each wrapper circuit takes one or more ZK UltraHonk proofs from a base circuit, re-verifies them
-in-circuit, and computes a single recursive aggregation commitment over all public inputs. This
-converts a ZK proof with many public inputs into a single `Field` that downstream aggregation steps
-(fold, or an on-chain verifier) can process cheaply.
+Each wrapper circuit takes one or more UltraHonk proofs from a base circuit, re-verifies them
+in-circuit with `verify_honk_proof_non_zk`, and computes a single recursive aggregation commitment
+over all public inputs (or a tuple for the user_data_encryption wrapper). This converts a proof with
+many public inputs into one or a few `Field` values that downstream aggregation steps (fold, or an
+on-chain verifier) can process cheaply.
 
 ## Common Pattern
 
@@ -25,24 +26,22 @@ Every wrapper follows the same structure. What varies between circuits:
 | `threshold/pk_aggregation`               | 1          | `H + 1`                                                                     |
 | `threshold/share_decryption`             | 1          | `2 + (3 × L × N)`                                                           |
 | `threshold/decrypted_shares_aggregation` | 1          | `((T+1) × L × MAX_MSG_NON_ZERO_COEFFS) + (T + 1 + MAX_MSG_NON_ZERO_COEFFS)` |
-| `threshold/user_data_encryption`         | 2          | 4 (ct0) · 3 (ct1) — asymmetric, see below                                  |
+| `threshold/user_data_encryption`         | 2          | 4 (ct0) · 3 (ct1) — asymmetric, see below                                   |
 
 ## Special Case: `threshold/user_data_encryption`
 
-This wrapper departs from the standard pattern in three ways:
+This wrapper departs from the standard pattern in two ways:
 
-1. **Non-ZK verification** — uses `verify_honk_proof_non_zk`; the ct0 and ct1 base circuits are
-   verified without the ZK layer, unlike all other wrappers.
-2. **Cross-proof constraint** — asserts that the `u_commitment` is identical across the ct0 and ct1
+1. **Cross-proof constraint** — asserts that the `u_commitment` is identical across the ct0 and ct1
    proofs, binding the two ciphertexts to the same encryption randomness.
-3. **Tuple output** — returns `(Field, Field, Field)` instead of a single commitment, carrying the
-   ciphertext commitment, the public-key commitment, and the aggregation commitment separately.
+2. **Tuple output** — returns `(Field, Field, Field)` instead of a single commitment: the public-key
+   commitment, the ciphertext commitment, and the k1_commitment (in that order).
 
 ## Data Flow
 
 ```mermaid
 flowchart LR
-    Base["base circuit proof (ZK UltraHonk)"] --> W["wrapper"]
+    Base["base circuit proof (UltraHonk)"] --> W["wrapper"]
     W -->|"pub: commitment (Field)"| F["fold"]
     F -->|"aggregated commitment"| Out["verifier"]
 ```
