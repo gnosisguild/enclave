@@ -28,7 +28,8 @@ flowchart TD
 
 **Phase:** P4 (Decryption)
 
-**Runs:** 1 × Ciphernode (once per ciphernode per decryption request; T+1 valid proofs required)
+**Runs:** H (once per honest ciphernode per decryption request; T+1 valid proofs required before C7
+can proceed)
 
 **Requires:**
 
