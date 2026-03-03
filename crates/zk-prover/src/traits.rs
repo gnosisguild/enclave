@@ -82,8 +82,8 @@ pub trait Provable: Send + Sync {
 
     /// Proves for recursive aggregation (poseidon2). Accepts 1 or 2 inputs of the same circuit,
     /// generates recursive proof(s), wraps them with the wrapper circuit.
-    /// When `fold_proof` is provided: if it is a wrapper proof, does initial fold (two wrappers → fold);
-    /// if it is a fold proof, folds wrapper with it. When `None`, returns the wrapper proof.
+    /// When `aggregated_proof` is provided: if it is a wrapper proof, does initial fold (two wrappers → fold);
+    /// if it is a fold proof, folds the wrapper with it. When `None`, returns the wrapper proof.
     fn aggregate_proof(
         &self,
         prover: &ZkProver,

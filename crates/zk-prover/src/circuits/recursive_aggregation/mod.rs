@@ -503,6 +503,7 @@ mod tests {
         assert!(verified, "fold proof should verify successfully");
 
         prover.cleanup(&format!("{}_inner_0", e3_id)).unwrap();
+        prover.cleanup(&format!("{}_inner_1", e3_id)).unwrap();
         prover.cleanup(e3_id).unwrap();
     }
 }

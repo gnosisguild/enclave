@@ -305,16 +305,18 @@ class NoirCircuitBuilder {
         execSync(`bb write_vk -b "${jsonFile}" -o "${targetDir}" -t ${verifierTarget}`, { stdio: 'pipe' })
         const defaultVk = join(targetDir, 'vk')
         const defaultVkHash = join(targetDir, 'vk_hash')
-        if (existsSync(defaultVk)) {
-          if (existsSync(vkOut)) rmSync(vkOut)
-          copyFileSync(defaultVk, vkOut)
-          rmSync(defaultVk)
+        if (!existsSync(defaultVk) || !existsSync(defaultVkHash)) {
+          console.error(
+            `VK artifacts missing after bb write_vk (${verifierTarget}) for ${jsonFile}: expected ${defaultVk} and ${defaultVkHash}`,
+          )
+          return false
         }
-        if (existsSync(defaultVkHash)) {
-          if (existsSync(vkHashOut)) rmSync(vkHashOut)
-          copyFileSync(defaultVkHash, vkHashOut)
-          rmSync(defaultVkHash)
-        }
+        if (existsSync(vkOut)) rmSync(vkOut)
+        copyFileSync(defaultVk, vkOut)
+        rmSync(defaultVk)
+        if (existsSync(vkHashOut)) rmSync(vkHashOut)
+        copyFileSync(defaultVkHash, vkHashOut)
+        rmSync(defaultVkHash)
         return true
       } catch (err) {
         console.error(`Error generating VK (${verifierTarget}) for ${jsonFile}:`, err)
