@@ -77,7 +77,7 @@ impl ProofVerificationActor {
         let (msg, ec) = msg.into_components();
         let Some(ref proof) = msg.key.proof else {
             error!(
-                "External key from party {} is missing T0 proof - rejecting",
+                "External key from party {} is missing C0 proof - rejecting",
                 msg.key.party_id
             );
             return;
@@ -206,14 +206,14 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
 
         if msg.verified {
             info!(
-                "T0 proof verified for party {} - accepting key",
+                "C0 proof verified for party {} - accepting key",
                 msg.key.party_id
             );
             self.publish_key_created(msg.e3_id, msg.key, ec.clone());
         } else {
             let error_msg = msg.error.unwrap_or_else(|| "unknown error".to_string());
             error!(
-                "T0 proof verification FAILED for party {} - rejecting key and stopping E3: {}",
+                "C0 proof verification FAILED for party {} - rejecting key and stopping E3: {}",
                 msg.key.party_id, error_msg
             );
 

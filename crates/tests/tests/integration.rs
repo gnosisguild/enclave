@@ -102,7 +102,7 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             .join("circuits")
             .join("bin");
 
-        // Copy T0 (pk) circuit
+        // Copy C0 (pk) circuit
         let pk_circuit_dir = circuits_dir.join("dkg").join("pk");
         tokio::fs::create_dir_all(&pk_circuit_dir).await.unwrap();
         let dkg_target = circuits_build_root.join("dkg").join("target");

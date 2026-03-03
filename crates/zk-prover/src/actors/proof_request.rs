@@ -219,7 +219,7 @@ impl ProofRequestActor {
             msg.e3_id,
         );
 
-        info!("Requesting T0 proof generation");
+        info!("Requesting C0 proof generation");
         if let Err(err) = self.bus.publish(request, ec) {
             error!("Failed to publish ZK proof request: {err}");
             self.pending.remove(&correlation_id);
@@ -843,14 +843,14 @@ impl ProofRequestActor {
         match SignedProofPayload::sign(payload, &self.signer) {
             Ok(signed) => {
                 info!(
-                    "Signed T0 proof for party {} (signer: {})",
+                    "Signed C0 proof for party {} (signer: {})",
                     key.party_id,
                     self.signer.address()
                 );
                 key.signed_payload = Some(signed);
             }
             Err(err) => {
-                error!("Failed to sign T0 proof payload: {err} — proof will not be published");
+                error!("Failed to sign C0 proof payload: {err} — proof will not be published");
                 return;
             }
         }
@@ -874,7 +874,7 @@ impl ProofRequestActor {
 
         if let Some(pending) = self.pending.remove(msg.correlation_id()) {
             error!(
-                "T0 proof request failed for E3 {}: {err} — key will not be published without proof",
+                "C0 proof request failed for E3 {}: {err} — key will not be published without proof",
                 pending.e3_id
             );
         }

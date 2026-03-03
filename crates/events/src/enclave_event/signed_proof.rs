@@ -29,7 +29,7 @@ use std::fmt::{self, Display};
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ProofType {
-    /// T0 — BFV public key proof (Proof 0).
+    /// C0 — BFV public key proof (Proof 0).
     C0PkBfv = 0,
     /// C1 — TrBFV public key generation proof (Proof 1).
     C1PkGeneration = 1,

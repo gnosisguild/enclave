@@ -6,7 +6,7 @@
 
 //! Actor for C2/C3/C4 share proof verification.
 //!
-//! Follows the same pattern as [`ProofVerificationActor`] (for C0/T0) — sits
+//! Follows the same pattern as [`ProofVerificationActor`] (for C0) — sits
 //! between the raw proof data and the verified result, handling ECDSA validation
 //! and ZK verification orchestration.
 //!
