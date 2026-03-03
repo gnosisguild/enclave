@@ -845,7 +845,7 @@ fn handle_verify_share_proofs(
 
                 // 2. ZK proof verification
                 let proof = &signed_proof.payload.proof;
-                let result = prover.verify(proof, &e3_id_str, sender);
+                let result = prover.verify_proof(proof, &e3_id_str, sender);
                 match result {
                     Ok(true) => continue,
                     Ok(false) | Err(_) => {
@@ -929,7 +929,7 @@ fn handle_verify_share_decryption_proofs(
 
                 // 2. ZK proof verification
                 let proof = &signed_proof.payload.proof;
-                let result = prover.verify(proof, &e3_id_str, sender);
+                let result = prover.verify_proof(proof, &e3_id_str, sender);
                 match result {
                     Ok(true) => continue,
                     Ok(false) | Err(_) => {
