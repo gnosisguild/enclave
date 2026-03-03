@@ -267,9 +267,6 @@ pnpm generate:verifiers --dry-run
 
 # Skip auto-compilation (requires pre-built circuits)
 pnpm generate:verifiers --no-compile
-
-# Specify oracle hash scheme for VK generation
-pnpm generate:verifiers --oracle-hash keccak
 ```
 
 ### What it does
@@ -278,7 +275,7 @@ Automates the full pipeline from Noir circuits to on-chain Solidity verifiers:
 
 1. **Discovers circuits** in `circuits/bin/{dkg,threshold,recursive_aggregation}/`
 2. **Compiles circuits** with `nargo compile` (if not already compiled)
-3. **Generates verification keys** using `bb write_vk --oracle_hash keccak`
+3. **Generates verification keys** using `bb write_vk -t evm`
 4. **Generates Solidity verifiers** using `bb write_solidity_verifier`
 5. **Post-processes** the generated Solidity:
    - Renames contract from `HonkVerifier` to descriptive name (e.g., `DkgPkVerifier`,
@@ -292,7 +289,6 @@ Automates the full pipeline from Noir circuits to on-chain Solidity verifiers:
 - `--circuit <name>` - Generate verifier for specific circuit(s) (repeatable)
 - `--clean` - Remove existing verifier directory before generating
 - `--no-compile` - Don't compile circuits automatically (fail if not already compiled)
-- `--oracle-hash <hash>` - Oracle hash scheme for VK generation (default: keccak)
 - `--dry-run` - Show what would be generated without doing anything
 - `-h, --help` - Show help message
 

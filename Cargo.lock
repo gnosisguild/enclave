@@ -3055,6 +3055,7 @@ dependencies = [
  "e3-events",
  "e3-evm",
  "e3-fhe",
+ "e3-fhe-params",
  "e3-multithread",
  "e3-request",
  "e3-sortition",

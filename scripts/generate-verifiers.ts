@@ -51,7 +51,6 @@ interface GenerateOptions {
   clean?: boolean
   dryRun?: boolean
   compile?: boolean // compile circuits before generating verifiers
-  oracleHash?: string // oracle hash scheme for bb write_vk (default: keccak)
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +71,6 @@ class VerifierGenerator {
       groups: ALL_GROUPS,
       clean: false,
       compile: true,
-      oracleHash: 'keccak',
       ...options,
     }
   }
@@ -259,9 +257,8 @@ class VerifierGenerator {
       return vkFile
     }
 
-    // Generate VK
-    const oracleHashFlag = this.options.oracleHash ? ` --oracle_hash ${this.options.oracleHash}` : ''
-    execSync(`bb write_vk -b "${jsonFile}" -o "${targetDir}"${oracleHashFlag}`, { stdio: 'pipe' })
+    // Generate VK (EVM target for Solidity verifiers)
+    execSync(`bb write_vk -b "${jsonFile}" -o "${targetDir}" -t evm`, { stdio: 'pipe' })
 
     // bb writes to 'vk' by default, rename to <packageName>.vk
     if (existsSync(defaultVk) && !existsSync(vkFile)) {
@@ -378,13 +375,6 @@ async function main() {
         process.exit(1)
       }
       ;(options.circuits ??= []).push(value)
-    } else if (arg === '--oracle-hash') {
-      const value = args[++i]
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --oracle-hash requires a value')
-        process.exit(1)
-      }
-      options.oracleHash = value
     }
   }
 
@@ -404,7 +394,6 @@ Options:
   --circuit <name>       Generate verifier for specific circuit(s) (repeatable)
   --clean                Remove existing verifier directory before generating
   --no-compile           Don't compile circuits automatically (fail if not already compiled)
-  --oracle-hash <hash>   Oracle hash scheme for VK generation (default: keccak)
   --dry-run              Show what would be generated without doing anything
   -h, --help             Show this help message
 
