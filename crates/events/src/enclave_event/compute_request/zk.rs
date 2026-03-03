@@ -30,6 +30,26 @@ pub enum ZkRequest {
     VerifyShareProofs(VerifyShareProofsRequest),
     /// Batch-verify C4 proofs from DecryptionKeyShared events.
     VerifyShareDecryptionProofs(VerifyShareDecryptionProofsRequest),
+    /// Generate proof for public key aggregation (C5).
+    PkAggregation(PkAggregationProofRequest),
+}
+
+/// Request to generate a proof for public key aggregation (C5).
+#[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derivative(Debug)]
+pub struct PkAggregationProofRequest {
+    /// Serialized PublicKeyShare bytes per party.
+    pub keyshare_bytes: Vec<ArcBytes>,
+    /// Serialized aggregated PublicKey bytes.
+    pub aggregated_pk_bytes: ArcBytes,
+    /// BFV preset for parameter resolution.
+    pub params_preset: BfvPreset,
+    /// Total committee size (N).
+    pub committee_n: usize,
+    /// Honest committee size (H) — number of shares being aggregated.
+    pub committee_h: usize,
+    /// Threshold (T).
+    pub committee_threshold: usize,
 }
 
 /// Request to generate a proof for share computation (C2a or C2b).
@@ -177,6 +197,14 @@ pub enum ZkResponse {
     VerifyShareProofs(VerifyShareProofsResponse),
     /// Batch verification results for C4 proofs.
     VerifyShareDecryptionProofs(VerifyShareDecryptionProofsResponse),
+    /// Proof for public key aggregation (C5).
+    PkAggregation(PkAggregationProofResponse),
+}
+
+/// Response containing a generated proof for public key aggregation (C5).
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PkAggregationProofResponse {
+    pub proof: Proof,
 }
 
 /// Response containing a generated share computation proof.
