@@ -148,7 +148,6 @@ impl DirectResponder {
         let cmds = self.net_cmds.clone();
         let incoming = IncomingResponse::new(self);
         Ok(cmds
-            .clone()
             .try_send(NetCommand::IncomingResponse(incoming))
             .map_err(|e| anyhow!("Failed to send response command {:?}", e))?)
     }

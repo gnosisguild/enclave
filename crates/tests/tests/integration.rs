@@ -605,6 +605,8 @@ async fn test_trbfv_actor() -> Result<()> {
         committee_finalized_timer.elapsed(),
     ));
 
+    let shares_to_pubkey_agg_timer = Instant::now();
+
     // Wait for KeyshareCreated + C1 verification + C5 proof + PublicKeyAggregated
     // - KeyshareCreated × 5 (forwarded from committee nodes)
     // - ComputeRequest (C1 proof verification dispatched by PublicKeyAggregator)
