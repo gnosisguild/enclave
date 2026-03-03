@@ -5,14 +5,17 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Handler};
+use alloy::primitives::{LogData, B256};
 use e3_events::{hlc::HlcTimestamp, EnclaveEventData};
 use e3_utils::MAILBOX_LIMIT;
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::{
     events::{EnclaveEvmEvent, EvmEventProcessor, EvmLog},
-    EvmEvent, ExtractorFn,
+    EvmEvent,
 };
+
+pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
 
 pub struct EvmParser {
     next: EvmEventProcessor,

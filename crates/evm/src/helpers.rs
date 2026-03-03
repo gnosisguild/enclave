@@ -33,7 +33,7 @@ use e3_config::{RpcAuth, RPC};
 use e3_crypto::Cipher;
 use e3_data::Repository;
 use e3_utils::{retry_with_backoff, RetryError};
-use std::{env, future::Future, sync::Arc};
+use std::{env, future::Future, pin::Pin, sync::Arc};
 use tracing::info;
 use zeroize::{Zeroize, Zeroizing};
 
@@ -87,6 +87,10 @@ impl<P: Provider + Clone> EthProvider<P> {
     }
 }
 
+pub type ProviderFactory<P> =
+    Arc<dyn Fn() -> Pin<Box<dyn Future<Output = Result<EthProvider<P>>> + Send>> + Send + Sync>;
+
+#[derive(Clone)]
 pub struct ProviderConfig {
     rpc: RPC,
     auth: RpcAuth,
@@ -167,6 +171,13 @@ impl ProviderConfig {
         }
 
         Ok(ws_connect)
+    }
+
+    pub fn into_read_provider_factory(self) -> ProviderFactory<ConcreteReadProvider> {
+        Arc::new(move || {
+            let config = self.clone();
+            Box::pin(async move { config.create_readonly_provider().await })
+        })
     }
 
     fn create_http_client(&self) -> Result<alloy::rpc::client::RpcClient> {

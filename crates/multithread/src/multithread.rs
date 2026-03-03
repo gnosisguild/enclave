@@ -19,6 +19,7 @@ use anyhow::Result;
 use e3_crypto::Cipher;
 use e3_events::run_once;
 use e3_events::trap_fut;
+
 use e3_events::EType;
 use e3_events::EffectsEnabled;
 use e3_events::{
@@ -27,7 +28,8 @@ use e3_events::{
     EnclaveEventData, EventPublisher, EventSubscriber, EventType, PartyVerificationResult,
     PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest, PkGenerationProofResponse,
     ShareComputationProofRequest, ShareComputationProofResponse, ShareEncryptionProofRequest,
-    ShareEncryptionProofResponse, TypedEvent, VerifyShareProofsRequest, VerifyShareProofsResponse,
+    ShareEncryptionProofResponse, TypedEvent, VerifyShareDecryptionProofsRequest,
+    VerifyShareDecryptionProofsResponse, VerifyShareProofsRequest, VerifyShareProofsResponse,
     ZkError as ZkEventError, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::build_pair_for_preset;
@@ -424,6 +426,11 @@ fn handle_zk_request(
         ZkRequest::VerifyShareProofs(req) => timefunc("zk_verify_share_proofs", id, || {
             handle_verify_share_proofs(&prover, req, request.clone())
         }),
+        ZkRequest::VerifyShareDecryptionProofs(req) => {
+            timefunc("zk_verify_share_decryption_proofs", id, || {
+                handle_verify_share_decryption_proofs(&prover, req, request.clone())
+            })
+        }
     }
 }
 
@@ -808,38 +815,49 @@ fn handle_verify_share_proofs(
 ) -> Result<ComputeResponse, ComputeRequestError> {
     let e3_id_str = request.e3_id.to_string();
 
+    // ECDSA validation (signature recovery, signer consistency, e3_id match)
+    // is handled by ShareVerificationActor before dispatching to multithread.
+    // This function performs ZK-only proof verification.
     let party_results: Vec<PartyVerificationResult> = req
         .party_proofs
         .into_iter()
         .map(|party| {
             let sender = party.sender_party_id;
+
             for signed_proof in &party.signed_proofs {
+                // 1. Validate CircuitName matches expected circuits for this ProofType
+                let expected_circuits = signed_proof.payload.proof_type.circuit_names();
+                if !expected_circuits.contains(&signed_proof.payload.proof.circuit) {
+                    info!(
+                        "Circuit name mismatch for party {} ({:?}): expected {:?}, got {:?}",
+                        sender,
+                        signed_proof.payload.proof_type,
+                        expected_circuits,
+                        signed_proof.payload.proof.circuit
+                    );
+                    return PartyVerificationResult {
+                        sender_party_id: sender,
+                        all_verified: false,
+                        failed_signed_payload: Some(signed_proof.clone()),
+                        recovered_address: None,
+                    };
+                }
+
+                // 2. ZK proof verification
                 let proof = &signed_proof.payload.proof;
                 let result = prover.verify(proof, &e3_id_str, sender);
                 match result {
                     Ok(true) => continue,
-                    Ok(false) => {
+                    Ok(false) | Err(_) => {
                         info!(
-                            "Proof verification failed for party {} ({:?})",
+                            "ZK proof verification failed for party {} ({:?})",
                             sender, signed_proof.payload.proof_type
                         );
                         return PartyVerificationResult {
                             sender_party_id: sender,
                             all_verified: false,
-                            failed_proof_type: Some(signed_proof.payload.proof_type),
                             failed_signed_payload: Some(signed_proof.clone()),
-                        };
-                    }
-                    Err(e) => {
-                        info!(
-                            "Proof verification error for party {} ({:?}): {}",
-                            sender, signed_proof.payload.proof_type, e
-                        );
-                        return PartyVerificationResult {
-                            sender_party_id: sender,
-                            all_verified: false,
-                            failed_proof_type: Some(signed_proof.payload.proof_type),
-                            failed_signed_payload: Some(signed_proof.clone()),
+                            recovered_address: None,
                         };
                     }
                 }
@@ -847,14 +865,101 @@ fn handle_verify_share_proofs(
             PartyVerificationResult {
                 sender_party_id: sender,
                 all_verified: true,
-                failed_proof_type: None,
                 failed_signed_payload: None,
+                recovered_address: None,
             }
         })
         .collect();
 
     Ok(ComputeResponse::zk(
         ZkResponse::VerifyShareProofs(VerifyShareProofsResponse { party_results }),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
+fn handle_verify_share_decryption_proofs(
+    prover: &ZkProver,
+    req: VerifyShareDecryptionProofsRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    let e3_id_str = request.e3_id.to_string();
+
+    // ECDSA validation (signature recovery, signer consistency, e3_id match)
+    // is handled by ShareVerificationActor before dispatching to multithread.
+    // This function performs ZK-only proof verification.
+    let party_results: Vec<PartyVerificationResult> = req
+        .party_proofs
+        .into_iter()
+        .map(|party| {
+            let sender = party.sender_party_id;
+
+            // Guard: an empty esm_decryption_proofs vec would make this loop
+            // vacuously true.  Defence-in-depth: reject any party with zero ESM proofs.
+            if party.signed_esm_decryption_proofs.is_empty() {
+                return PartyVerificationResult {
+                    sender_party_id: sender,
+                    all_verified: false,
+                    failed_signed_payload: None,
+                    recovered_address: None,
+                };
+            }
+
+            // Flatten all signed proofs (SK + ESMs) and verify uniformly.
+            let all_signed: Vec<&e3_events::SignedProofPayload> =
+                std::iter::once(&party.signed_sk_decryption_proof)
+                    .chain(party.signed_esm_decryption_proofs.iter())
+                    .collect();
+
+            for signed_proof in &all_signed {
+                // 1. Validate CircuitName matches expected circuits for this ProofType
+                let expected_circuits = signed_proof.payload.proof_type.circuit_names();
+                if !expected_circuits.contains(&signed_proof.payload.proof.circuit) {
+                    info!(
+                        "C4 circuit mismatch for party {}: expected {:?}, got {:?}",
+                        sender, expected_circuits, signed_proof.payload.proof.circuit
+                    );
+                    return PartyVerificationResult {
+                        sender_party_id: sender,
+                        all_verified: false,
+                        failed_signed_payload: Some((*signed_proof).clone()),
+                        recovered_address: None,
+                    };
+                }
+
+                // 2. ZK proof verification
+                let proof = &signed_proof.payload.proof;
+                let result = prover.verify(proof, &e3_id_str, sender);
+                match result {
+                    Ok(true) => continue,
+                    Ok(false) | Err(_) => {
+                        info!(
+                            "C4 ZK proof verification failed for party {} ({:?})",
+                            sender, signed_proof.payload.proof_type
+                        );
+                        return PartyVerificationResult {
+                            sender_party_id: sender,
+                            all_verified: false,
+                            failed_signed_payload: Some((*signed_proof).clone()),
+                            recovered_address: None,
+                        };
+                    }
+                }
+            }
+
+            PartyVerificationResult {
+                sender_party_id: sender,
+                all_verified: true,
+                failed_signed_payload: None,
+                recovered_address: None,
+            }
+        })
+        .collect();
+
+    Ok(ComputeResponse::zk(
+        ZkResponse::VerifyShareDecryptionProofs(VerifyShareDecryptionProofsResponse {
+            party_results,
+        }),
         request.correlation_id,
         request.e3_id,
     ))

@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::owo;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use e3_config::{AppConfig, NodeRole};
 use e3_entrypoint::helpers::listen_for_shutdown;
 use tracing::{info, instrument};

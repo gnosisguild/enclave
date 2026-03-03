@@ -14,19 +14,70 @@ import {
   generateMerkleTree,
   SIGNATURE_MESSAGE_HASH,
   generateMaskVoteProof,
+  destroyBBApi,
 } from '@crisp-e3/sdk'
+import type { ProofData } from '@crisp-e3/sdk'
 import { expect } from 'chai'
 import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, ethers } from './utils'
+import type { CRISPProgram, HonkVerifier, MockEnclave } from '../types'
 
 let keys = generateBFVKeys()
 let publicKey = keys.publicKey
 
 describe('CRISP Contracts', function () {
+  // Allow time for contract deployments + proof generation in before()
+  this.timeout(600000)
+
+  let honkVerifier: HonkVerifier
+  let mockEnclave: MockEnclave
+  let crispProgram: CRISPProgram
+  let signature: `0x${string}`
+  let address: string
+  let leaves: bigint[]
+  let voteProof: ProofData
+  let maskProof: ProofData
+  const balance = 100n
+  const vote = [10, 0]
+
+  before(async function () {
+    // Deploy contracts once
+    mockEnclave = await deployMockEnclave()
+    honkVerifier = await deployHonkVerifier()
+    crispProgram = await deployCRISPProgram({ mockEnclave, honkVerifier })
+
+    // Compute signature, address, and leaves once
+    const [signer] = await ethers.getSigners()
+    signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
+    address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
+    leaves = [...[10n, 20n, 30n], hashLeaf(address, balance)]
+
+    // Generate proofs once
+    voteProof = await generateVoteProof({
+      vote,
+      publicKey,
+      signature,
+      merkleLeaves: leaves,
+      balance,
+      messageHash: SIGNATURE_MESSAGE_HASH,
+      slotAddress: address,
+    })
+
+    maskProof = await generateMaskVoteProof({
+      publicKey,
+      merkleLeaves: leaves,
+      balance,
+      slotAddress: address,
+      numOptions: 2,
+    })
+  })
+
+  after(() => {
+    destroyBBApi()
+  })
+
   describe('decode tally', () => {
     it('should decode a tally correctly', async () => {
-      const mockEnclave = await deployMockEnclave()
-      const crispProgram = await deployCRISPProgram({ mockEnclave })
-
+      const e3Id = await mockEnclave.nextE3Id()
       await mockEnclave.request(await crispProgram.getAddress())
 
       const tally =
@@ -34,7 +85,7 @@ describe('CRISP Contracts', function () {
 
       await mockEnclave.setPlaintextOutput(tally)
 
-      const decodedTally1 = await crispProgram.decodeTally(0)
+      const decodedTally1 = await crispProgram.decodeTally(e3Id)
 
       expect(decodedTally1[0]).to.equal(10000000000n)
       expect(decodedTally1[1]).to.equal(30000000000n)
@@ -43,96 +94,29 @@ describe('CRISP Contracts', function () {
 
   describe('validate input', () => {
     it('should verify the proof correctly with the crisp verifier', async function () {
-      // It needs some time to generate the proof.
-      this.timeout(300000)
-
-      const honkVerifier = await deployHonkVerifier()
-      const [signer] = await ethers.getSigners()
-
-      const vote = [10, 0]
-      const balance = 100n
-      const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
-      const address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
-      const leaves = [...[10n, 20n, 30n], hashLeaf(address, balance)]
-
-      const proof = await generateVoteProof({
-        vote,
-        publicKey,
-        signature,
-        merkleLeaves: leaves,
-        balance,
-        messageHash: SIGNATURE_MESSAGE_HASH,
-        slotAddress: address,
-      })
-
-      const isValid = await honkVerifier.verify(proof.proof, proof.publicInputs)
+      const isValid = await honkVerifier.verify(voteProof.proof, voteProof.publicInputs)
 
       expect(isValid).to.be.true
     })
 
     it('should verify the proof for a vote mask', async function () {
-      // It needs some time to generate the proof.
-      this.timeout(300000)
-
-      const honkVerifier = await deployHonkVerifier()
-      const [signer] = await ethers.getSigners()
-
-      const balance = 100n
-      const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
-      const address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
-      const leaves = [...[10n, 20n, 30n], hashLeaf(address, balance)]
-
-      const proof = await generateMaskVoteProof({
-        publicKey,
-        merkleLeaves: leaves,
-        balance,
-        slotAddress: address,
-        numOptions: 2,
-      })
-
-      const isValid = await honkVerifier.verify(proof.proof, proof.publicInputs)
+      const isValid = await honkVerifier.verify(maskProof.proof, maskProof.publicInputs)
 
       expect(isValid).to.be.true
     })
 
     it('should validate input correctly', async function () {
-      // It needs some time to generate the proof.
-      this.timeout(300000)
-
-      const mockEnclave = await deployMockEnclave()
-      const crispProgram = await deployCRISPProgram({ mockEnclave })
-      await mockEnclave.request(await crispProgram.getAddress())
-      const [signer] = await ethers.getSigners()
-
-      const e3Id = 0n
-
+      const e3Id = await mockEnclave.nextE3Id()
       await mockEnclave.request(await crispProgram.getAddress())
 
-      const vote = [10, 0]
-      const balance = 100n
-      const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
-      const address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
-      const leaves = [...[10n, 20n, 30n], hashLeaf(address, balance)]
       const merkleTree = generateMerkleTree(leaves)
 
-      const proof = await generateVoteProof({
-        vote,
-        publicKey,
-        signature,
-        merkleLeaves: leaves,
-        balance,
-        messageHash: SIGNATURE_MESSAGE_HASH,
-        slotAddress: address,
-      })
+      await mockEnclave.setCommitteePublicKey(voteProof.publicInputs[6])
 
-      await mockEnclave.setCommitteePublicKey(proof.publicInputs[6])
+      const encodedProof = encodeSolidityProof(voteProof)
 
-      const encodedProof = encodeSolidityProof(proof)
-
-      // Call next functions with fake data for testing.
       await crispProgram.setMerkleRoot(e3Id, merkleTree.root)
 
-      // If it doesn't throw, the test is successful.
       await crispProgram.publishInput(e3Id, encodedProof)
     })
   })

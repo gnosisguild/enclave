@@ -19,7 +19,8 @@ use e3_events::{
 };
 use e3_evm::{BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter};
 use e3_evm::{
-    CiphernodeRegistrySol, EnclaveSolReader, SlashingManagerSolReader, SlashingManagerSolWriter,
+    CiphernodeRegistrySol, EnclaveSolReader, ProviderConfig, SlashingManagerSolReader,
+    SlashingManagerSolWriter,
 };
 use e3_fhe::ext::FheExtension;
 use e3_fhe_params::BfvPreset;
@@ -445,6 +446,15 @@ impl CiphernodeBuilder {
             // Currently hardcoded to InsecureDkg512 for DKG operations.
             // Production deployments should use BfvPreset::SecureDkg8192.
             let share_enc_preset = BfvPreset::InsecureDkg512;
+
+            let backend = self
+                .zk_backend
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("ZK backend is required for threshold keyshare"))?;
+
+            // Ensure signer is available before setting up extensions that need it
+            let signer = provider_cache.ensure_signer().await?;
+
             info!("Setting up ThresholdKeyshareExtension");
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
                 &bus,
@@ -453,12 +463,7 @@ impl CiphernodeBuilder {
                 share_enc_preset,
             ));
 
-            let backend = self
-                .zk_backend
-                .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("ZK backend is required for threshold keyshare"))?;
             info!("Setting up ZK actors");
-            let signer = provider_cache.ensure_signer().await?;
             setup_zk_actors(&bus, backend, signer);
         }
 
@@ -619,7 +624,13 @@ async fn setup_evm_system(
         let provider = provider_cache.ensure_read_provider(chain).await?;
         let chain_id = provider.chain_id();
         evm_config.insert(chain_id, chain.try_into()?);
+
+        let rpc_url = chain.rpc_url()?;
+        let provider_factory =
+            ProviderConfig::new(rpc_url, chain.rpc_auth.clone()).into_read_provider_factory();
+
         let mut system = EvmSystemChainBuilder::new(&bus, &provider);
+        system.with_provider_factory(provider_factory);
 
         if contract_components.enclave {
             let write_provider = provider_cache.ensure_write_provider(chain).await?;

@@ -140,7 +140,7 @@ impl Handler<Insert> for SnapshotBuffer {
 
 impl Handler<EnclaveEvent> for SnapshotBuffer {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
         trap(EType::IO, &PanicDispatcher::new(), || {
             if let Some(ref router) = self.router {
                 router.try_send(msg)?;

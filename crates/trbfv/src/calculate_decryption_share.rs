@@ -120,11 +120,15 @@ pub fn calculate_decryption_share(
         .map(|(index, ciphertext)| {
             let share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
             info!("Create decryption share for ct index {}...", index);
+            // Currently there is a single smudging noise polynomial shared across all
+            // ciphertexts. When multiple per-ciphertext noises are supported, the
+            // index mapping here will need to change.
+            let es_idx = index % es_poly_sum.len();
             share_manager
                 .decryption_share(
                     Arc::new(ciphertext),
                     sk_poly_sum.clone(),
-                    es_poly_sum[index].clone(),
+                    es_poly_sum[es_idx].clone(),
                 )
                 .context(format!("Could not decrypt ciphertext {}", index))
         })

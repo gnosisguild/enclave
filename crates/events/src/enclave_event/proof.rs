@@ -96,6 +96,6 @@ impl CircuitName {
 
 impl fmt::Display for CircuitName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_str())
+        write!(f, "{}", self.dir_path())
     }
 }

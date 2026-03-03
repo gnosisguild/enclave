@@ -7,7 +7,6 @@ use std::mem::replace;
 
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, Recipient};
 use e3_utils::MAILBOX_LIMIT;
-use tracing::debug;
 
 use crate::{trap, Die, EType, Insert, InsertBatch, PanicDispatcher};
 

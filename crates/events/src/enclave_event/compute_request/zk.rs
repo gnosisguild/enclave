@@ -4,7 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{Proof, ProofType, SignedProofPayload};
+use crate::{Proof, SignedProofPayload};
+use alloy::primitives::Address;
 use derivative::Derivative;
 use e3_crypto::SensitiveBytes;
 use e3_fhe_params::BfvPreset;
@@ -27,6 +28,8 @@ pub enum ZkRequest {
     DkgShareDecryption(DkgShareDecryptionProofRequest),
     /// Batch-verify C2/C3 proofs from other parties.
     VerifyShareProofs(VerifyShareProofsRequest),
+    /// Batch-verify C4 proofs from DecryptionKeyShared events.
+    VerifyShareDecryptionProofs(VerifyShareDecryptionProofsRequest),
 }
 
 /// Request to generate a proof for share computation (C2a or C2b).
@@ -172,6 +175,8 @@ pub enum ZkResponse {
     DkgShareDecryption(DkgShareDecryptionProofResponse),
     /// Batch verification results for C2/C3 proofs.
     VerifyShareProofs(VerifyShareProofsResponse),
+    /// Batch verification results for C4 proofs.
+    VerifyShareDecryptionProofs(VerifyShareDecryptionProofsResponse),
 }
 
 /// Response containing a generated share computation proof.
@@ -267,16 +272,45 @@ pub struct VerifyShareProofsResponse {
 }
 
 /// Verification result for all proofs from a single sender.
+///
+/// Used for both C2/C3 and C4 verification results.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PartyVerificationResult {
     /// The party whose proofs were verified.
     pub sender_party_id: u64,
     /// Whether ALL proofs from this party verified successfully.
     pub all_verified: bool,
-    /// If any proof failed: the proof type that failed.
-    pub failed_proof_type: Option<ProofType>,
     /// If any proof failed: the signed payload for fault attribution.
     pub failed_signed_payload: Option<SignedProofPayload>,
+    /// ECDSA-recovered address of the signer (set during verification).
+    pub recovered_address: Option<Address>,
+}
+
+/// Request to batch-verify C4 proofs from DecryptionKeyShared events.
+///
+/// Grouped by sender so the verifier can report honest/dishonest per party.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct VerifyShareDecryptionProofsRequest {
+    /// C4 proofs grouped by sender party_id.
+    pub party_proofs: Vec<PartyShareDecryptionProofsToVerify>,
+}
+
+/// C4 proofs from a single sender to verify.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PartyShareDecryptionProofsToVerify {
+    /// The party that generated these proofs.
+    pub sender_party_id: u64,
+    /// Signed C4a proof (SecretKey decryption).
+    pub signed_sk_decryption_proof: SignedProofPayload,
+    /// Signed C4b proofs (SmudgingNoise decryption), one per smudging noise index.
+    pub signed_esm_decryption_proofs: Vec<SignedProofPayload>,
+}
+
+/// Batch verification results for C4 proofs.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct VerifyShareDecryptionProofsResponse {
+    /// Per-party verification results.
+    pub party_results: Vec<PartyVerificationResult>,
 }
 
 /// ZK-specific error variants.

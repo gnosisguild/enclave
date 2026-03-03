@@ -9,7 +9,7 @@ use actix::{Actor, Addr, Handler};
 use bloom::{BloomFilter, ASMS};
 use e3_events::CorrelationId;
 use e3_utils::MAILBOX_LIMIT;
-use tracing::{debug, info};
+use tracing::debug;
 
 pub struct FixHistoricalOrder {
     dest: EvmEventProcessor,

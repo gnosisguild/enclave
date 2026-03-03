@@ -6,7 +6,7 @@
 
 mod helpers;
 use alloy::{
-    primitives::{Bytes, FixedBytes, Uint},
+    primitives::{Bytes, Uint},
     sol,
 };
 use e3_bfv_client::compute_pk_commitment;

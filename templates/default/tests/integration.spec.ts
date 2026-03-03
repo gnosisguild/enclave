@@ -162,7 +162,7 @@ describe('Integration', () => {
     const { waitForEvent } = await setupEventListeners(sdk, store)
 
     const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
-    const duration = 200
+    const duration = 225
     const inputWindow = await calculateInputWindow(publicClient, duration)
     const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
     const e3ProgramParams = encodeBfvParams(thresholdBfvParams)

@@ -15,6 +15,7 @@ mod committee_requested;
 mod compute_request;
 mod configuration_updated;
 mod decryption_key_shared;
+mod decryption_share_proofs;
 mod decryptionshare_created;
 mod die;
 mod e3_failed;
@@ -38,6 +39,7 @@ mod proof;
 mod publickey_aggregated;
 mod publish_document;
 mod share_computation_proof_signed;
+mod share_verification;
 mod shutdown;
 mod signed_proof;
 mod slash_executed;
@@ -64,6 +66,7 @@ pub use committee_requested::*;
 pub use compute_request::*;
 pub use configuration_updated::*;
 pub use decryption_key_shared::*;
+pub use decryption_share_proofs::*;
 pub use decryptionshare_created::*;
 pub use die::*;
 pub use e3_failed::*;
@@ -88,6 +91,7 @@ pub use proof::*;
 pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use share_computation_proof_signed::*;
+pub use share_verification::*;
 pub use shutdown::*;
 pub use signed_proof::*;
 pub use slash_executed::*;
@@ -240,6 +244,9 @@ pub enum EnclaveEventData {
     ComputeResponse(ComputeResponse),         // ComputeResponseReceived
     ComputeRequestError(ComputeRequestError), // ComputeRequestFailed
     SignedProofFailed(SignedProofFailed),
+    DecryptionShareProofsPending(DecryptionShareProofsPending),
+    ShareVerificationDispatched(ShareVerificationDispatched),
+    ShareVerificationComplete(ShareVerificationComplete),
     SlashExecuted(SlashExecuted),
     CommitteeMemberExpelled(CommitteeMemberExpelled),
     OutgoingSyncRequested(OutgoingSyncRequested),
@@ -496,6 +503,9 @@ impl EnclaveEventData {
             EnclaveEventData::ComputeResponse(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::TestEvent(ref data) => data.e3_id.clone(),
             EnclaveEventData::SignedProofFailed(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::DecryptionShareProofsPending(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ShareVerificationDispatched(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ShareVerificationComplete(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::SlashExecuted(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::CommitteeMemberExpelled(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3Failed(ref data) => Some(data.e3_id.clone()),
@@ -566,6 +576,9 @@ impl_event_types!(
     ComputeResponse,
     ComputeRequestError,
     SignedProofFailed,
+    DecryptionShareProofsPending,
+    ShareVerificationDispatched,
+    ShareVerificationComplete,
     SlashExecuted,
     CommitteeMemberExpelled,
     OutgoingSyncRequested,

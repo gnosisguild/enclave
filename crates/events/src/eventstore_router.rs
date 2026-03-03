@@ -78,7 +78,7 @@ impl Handler<EventStoreQueryResponse> for QueryAggregator {
 impl Handler<Die> for QueryAggregator {
     type Result = ();
 
-    fn handle(&mut self, msg: Die, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _msg: Die, ctx: &mut Self::Context) -> Self::Result {
         ctx.stop()
     }
 }

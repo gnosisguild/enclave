@@ -11,14 +11,16 @@ use actix::{Actor, Addr, Context, Handler};
 use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeResponse,
-    ComputeResponseKind, CorrelationId, DkgProofSigned, E3id, EnclaveEvent, EnclaveEventData,
-    EncryptionKey, EncryptionKeyCreated, EncryptionKeyPending, EventContext, EventPublisher,
-    EventSubscriber, EventType, PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload,
-    ProofType, Sequenced, SignedProofPayload, ThresholdShare, ThresholdShareCreated,
-    ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
+    ComputeResponseKind, CorrelationId, DecryptionKeyShared, DecryptionShareProofsPending,
+    DkgProofSigned, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated,
+    EncryptionKeyPending, EventContext, EventPublisher, EventSubscriber, EventType,
+    PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload, ProofType, Sequenced,
+    SignedProofPayload, ThresholdShare, ThresholdShareCreated, ThresholdSharePending, TypedEvent,
+    ZkRequest, ZkResponse,
 };
+use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[derive(Clone, Debug)]
 enum ThresholdProofKind {
@@ -130,6 +132,33 @@ impl PendingThresholdProofs {
     }
 }
 
+#[derive(Clone, Debug)]
+enum DecryptionProofKind {
+    SecretKey,
+    SmudgingNoise { esi_idx: usize },
+}
+
+/// Pending C4 (DkgShareDecryption) proof generation state.
+#[derive(Clone, Debug)]
+struct PendingDecryptionProofs {
+    party_id: u64,
+    node: String,
+    sk_poly_sum: ArcBytes,
+    es_poly_sum: Vec<ArcBytes>,
+    ec: EventContext<Sequenced>,
+    sk_proof: Option<Proof>,
+    esm_proofs: HashMap<usize, Proof>,
+    expected_esm_count: usize,
+}
+
+impl PendingDecryptionProofs {
+    fn is_complete(&self) -> bool {
+        self.sk_proof.is_some()
+            && self.esm_proofs.len() == self.expected_esm_count
+            && (0..self.expected_esm_count).all(|i| self.esm_proofs.contains_key(&i))
+    }
+}
+
 /// Core actor that handles encryption key proof requests.
 ///
 /// Proofs are always wrapped in a [`SignedProofPayload`] before being published,
@@ -141,6 +170,10 @@ pub struct ProofRequestActor {
     pending: HashMap<CorrelationId, PendingProofRequest>,
     threshold_correlation: HashMap<CorrelationId, (E3id, ThresholdProofKind)>,
     pending_threshold: HashMap<E3id, PendingThresholdProofs>,
+    /// C4 proof staging: correlation → (e3_id, kind)
+    decryption_correlation: HashMap<CorrelationId, (E3id, DecryptionProofKind)>,
+    /// C4 pending proofs per E3
+    pending_decryption: HashMap<E3id, PendingDecryptionProofs>,
 }
 
 impl ProofRequestActor {
@@ -151,6 +184,8 @@ impl ProofRequestActor {
             pending: HashMap::new(),
             pending_threshold: HashMap::new(),
             threshold_correlation: HashMap::new(),
+            decryption_correlation: HashMap::new(),
+            pending_decryption: HashMap::new(),
         }
     }
 
@@ -160,6 +195,7 @@ impl ProofRequestActor {
         bus.subscribe(EventType::ComputeResponse, addr.clone().into());
         bus.subscribe(EventType::ComputeRequestError, addr.clone().into());
         bus.subscribe(EventType::ThresholdSharePending, addr.clone().into());
+        bus.subscribe(EventType::DecryptionShareProofsPending, addr.clone().into());
         addr
     }
 
@@ -347,9 +383,199 @@ impl ProofRequestActor {
                 self.handle_threshold_proof_response(&msg.correlation_id, resp.proof.clone());
             }
             ComputeResponseKind::Zk(ZkResponse::DkgShareDecryption(resp)) => {
-                self.handle_threshold_proof_response(&msg.correlation_id, resp.proof.clone());
+                // Try C4 decryption proof first, then fall back to C1/C2/C3 threshold
+                if self
+                    .decryption_correlation
+                    .contains_key(&msg.correlation_id)
+                {
+                    self.handle_decryption_proof_response(&msg.correlation_id, resp.proof.clone());
+                } else {
+                    self.handle_threshold_proof_response(&msg.correlation_id, resp.proof.clone());
+                }
             }
             _ => {}
+        }
+    }
+
+    /// Handle DecryptionShareProofsPending: dispatch C4 proof generation.
+    fn handle_decryption_share_proofs_pending(
+        &mut self,
+        msg: TypedEvent<DecryptionShareProofsPending>,
+    ) {
+        let (msg, ec) = msg.into_components();
+        let e3_id = msg.e3_id.clone();
+        let esm_count = msg.esm_requests.len();
+
+        if self.pending_decryption.contains_key(&e3_id) {
+            warn!(
+                "Duplicate DecryptionShareProofsPending for E3 {} — ignoring",
+                e3_id
+            );
+            return;
+        }
+
+        self.pending_decryption.insert(
+            e3_id.clone(),
+            PendingDecryptionProofs {
+                party_id: msg.party_id,
+                node: msg.node,
+                sk_poly_sum: msg.sk_poly_sum,
+                es_poly_sum: msg.es_poly_sum,
+                ec: ec.clone(),
+                sk_proof: None,
+                esm_proofs: HashMap::new(),
+                expected_esm_count: esm_count,
+            },
+        );
+
+        // C4a: SecretKey decryption proof
+        let sk_corr = CorrelationId::new();
+        self.decryption_correlation
+            .insert(sk_corr, (e3_id.clone(), DecryptionProofKind::SecretKey));
+        info!(
+            "Requesting C4a DkgShareDecryption proof (SecretKey) for E3 {}",
+            e3_id
+        );
+        if let Err(err) = self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::DkgShareDecryption(msg.sk_request),
+                sk_corr,
+                e3_id.clone(),
+            ),
+            ec.clone(),
+        ) {
+            error!("Failed to publish C4a proof request: {err}");
+            self.decryption_correlation
+                .retain(|_, (eid, _)| *eid != e3_id);
+            self.pending_decryption.remove(&e3_id);
+            return;
+        }
+
+        // C4b: SmudgingNoise decryption proofs
+        for (esi_idx, esm_req) in msg.esm_requests.into_iter().enumerate() {
+            let esm_corr = CorrelationId::new();
+            self.decryption_correlation.insert(
+                esm_corr,
+                (
+                    e3_id.clone(),
+                    DecryptionProofKind::SmudgingNoise { esi_idx },
+                ),
+            );
+            info!(
+                "Requesting C4b DkgShareDecryption proof (SmudgingNoise[{}]) for E3 {}",
+                esi_idx, e3_id
+            );
+            if let Err(err) = self.bus.publish(
+                ComputeRequest::zk(
+                    ZkRequest::DkgShareDecryption(esm_req),
+                    esm_corr,
+                    e3_id.clone(),
+                ),
+                ec.clone(),
+            ) {
+                error!("Failed to publish C4b proof request: {err}");
+                self.decryption_correlation
+                    .retain(|_, (eid, _)| *eid != e3_id);
+                self.pending_decryption.remove(&e3_id);
+                return;
+            }
+        }
+    }
+
+    /// Handle a C4 proof response — store and check completeness.
+    fn handle_decryption_proof_response(&mut self, correlation_id: &CorrelationId, proof: Proof) {
+        let Some((e3_id, kind)) = self.decryption_correlation.remove(correlation_id) else {
+            return;
+        };
+
+        let Some(pending) = self.pending_decryption.get_mut(&e3_id) else {
+            error!(
+                "No pending decryption proofs for E3 {} — orphan correlation",
+                e3_id
+            );
+            return;
+        };
+
+        match kind {
+            DecryptionProofKind::SecretKey => {
+                info!("Received C4a SK decryption proof for E3 {}", e3_id);
+                pending.sk_proof = Some(proof);
+            }
+            DecryptionProofKind::SmudgingNoise { esi_idx } => {
+                info!(
+                    "Received C4b ESM decryption proof [{}] for E3 {}",
+                    esi_idx, e3_id
+                );
+                pending.esm_proofs.insert(esi_idx, proof);
+            }
+        }
+
+        if pending.is_complete() {
+            info!(
+                "All C4 proofs complete for E3 {} — signing and publishing DecryptionKeyShared",
+                e3_id
+            );
+            let pending = self.pending_decryption.remove(&e3_id).unwrap();
+            self.sign_and_publish_decryption_key_shared(&e3_id, pending);
+        }
+    }
+
+    /// Sign all C4 proofs and publish DecryptionKeyShared (Exchange #3).
+    fn sign_and_publish_decryption_key_shared(
+        &mut self,
+        e3_id: &E3id,
+        pending: PendingDecryptionProofs,
+    ) {
+        // Sign C4a (SK decryption proof)
+        let Some(signed_sk) = self.sign_proof(
+            e3_id,
+            ProofType::T2DkgShareDecryption,
+            pending.sk_proof.expect("checked in is_complete"),
+        ) else {
+            error!("Failed to sign C4a SK proof — DecryptionKeyShared will not be published");
+            return;
+        };
+
+        // Sign C4b (ESM decryption proofs) in esi_idx order
+        let mut signed_esms = Vec::with_capacity(pending.expected_esm_count);
+        for idx in 0..pending.expected_esm_count {
+            let proof = pending
+                .esm_proofs
+                .get(&idx)
+                .expect("checked in is_complete")
+                .clone();
+            let Some(signed) = self.sign_proof(e3_id, ProofType::T2DkgShareDecryption, proof)
+            else {
+                error!(
+                    "Failed to sign C4b ESM proof [{}] — DecryptionKeyShared will not be published",
+                    idx
+                );
+                return;
+            };
+            signed_esms.push(signed);
+        }
+
+        info!(
+            "All C4 proofs signed for E3 {} party {} (signer: {})",
+            e3_id,
+            pending.party_id,
+            self.signer.address()
+        );
+
+        if let Err(err) = self.bus.publish(
+            DecryptionKeyShared {
+                e3_id: e3_id.clone(),
+                party_id: pending.party_id,
+                node: pending.node,
+                sk_poly_sum: pending.sk_poly_sum,
+                es_poly_sum: pending.es_poly_sum,
+                signed_sk_decryption_proof: signed_sk,
+                signed_esm_decryption_proofs: signed_esms,
+                external: false,
+            },
+            pending.ec,
+        ) {
+            error!("Failed to publish DecryptionKeyShared: {err}");
         }
     }
 
@@ -662,6 +888,16 @@ impl ProofRequestActor {
                 .retain(|_, (eid, _)| *eid != e3_id);
             self.pending_threshold.remove(&e3_id);
         }
+
+        if let Some((e3_id, kind)) = self.decryption_correlation.remove(msg.correlation_id()) {
+            error!(
+                "C4 {:?} proof request failed for E3 {}: {err} — DecryptionKeyShared will not be published",
+                kind, e3_id
+            );
+            self.decryption_correlation
+                .retain(|_, (eid, _)| *eid != e3_id);
+            self.pending_decryption.remove(&e3_id);
+        }
     }
 }
 
@@ -686,6 +922,9 @@ impl Handler<EnclaveEvent> for ProofRequestActor {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::ComputeRequestError(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::DecryptionShareProofsPending(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),
@@ -738,5 +977,17 @@ impl Handler<TypedEvent<ComputeRequestError>> for ProofRequestActor {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         self.handle_compute_request_error(msg)
+    }
+}
+
+impl Handler<TypedEvent<DecryptionShareProofsPending>> for ProofRequestActor {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<DecryptionShareProofsPending>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.handle_decryption_share_proofs_pending(msg)
     }
 }
