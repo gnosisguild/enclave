@@ -18,7 +18,7 @@ use e3_events::{
     AggregateConfig, AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig,
 };
 use e3_evm::{BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter};
-use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader};
+use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader, ProviderConfig};
 use e3_fhe::ext::FheExtension;
 use e3_fhe_params::BfvPreset;
 use e3_keyshare::ext::ThresholdKeyshareExtension;
@@ -617,7 +617,13 @@ async fn setup_evm_system(
         let provider = provider_cache.ensure_read_provider(chain).await?;
         let chain_id = provider.chain_id();
         evm_config.insert(chain_id, chain.try_into()?);
+
+        let rpc_url = chain.rpc_url()?;
+        let provider_factory =
+            ProviderConfig::new(rpc_url, chain.rpc_auth.clone()).into_read_provider_factory();
+
         let mut system = EvmSystemChainBuilder::new(&bus, &provider);
+        system.with_provider_factory(provider_factory);
 
         if contract_components.enclave {
             let write_provider = provider_cache.ensure_write_provider(chain).await?;
