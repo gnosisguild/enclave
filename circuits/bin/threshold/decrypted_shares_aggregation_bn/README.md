@@ -51,4 +51,5 @@ downstream circuit
 **Related Circuits:**
 
 - C6 [`threshold/share_decryption`](../share_decryption)
-- Modular variant [`threshold/decrypted_shares_aggregation_mod`](../decrypted_shares_aggregation_mod)
+- Modular variant
+  [`threshold/decrypted_shares_aggregation_mod`](../decrypted_shares_aggregation_mod)
