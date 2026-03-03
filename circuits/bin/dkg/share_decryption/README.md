@@ -36,12 +36,11 @@ flowchart TD
 ## Metadata
 
 - **Phase**: P1 (DKG).
-- **Runs**: (N_PARTIES - 1) × Ciphernode per variant (once per recipient per share type).
+- **Runs**: N_PARTIES × Ciphernode x variant (`e_sm` && `sk`) (once per ciphernode; each instance
+  aggregates all received shares).
 - **Requires**:
-  - C4a: `commit(sk_share)` from C2a
-    ([`dkg/sk_share_computation`](../sk_share_computation))
-  - C4b: `commit(e_sm_share)` from C2b
-    ([`dkg/e_sm_share_computation`](../e_sm_share_computation))
+  - C4a: `commit(sk_share)` from C2a ([`dkg/sk_share_computation`](../sk_share_computation))
+  - C4b: `commit(e_sm_share)` from C2b ([`dkg/e_sm_share_computation`](../e_sm_share_computation))
 - **Output(s)**:
   - C4a: `commit(agg_sk)` → C6 ([`threshold/share_decryption`](../../threshold/share_decryption))
   - C4b: `commit(agg_e_sm)` → C6 ([`threshold/share_decryption`](../../threshold/share_decryption))

@@ -40,7 +40,8 @@ flowchart TD
 ## Metadata
 
 - **Phase**: P1 (DKG).
-- **Runs**: (N_PARTIES - 1) × Ciphernode per variant (once per recipient per share type).
+- **Runs**: N_PARTIES × (N_PARTIES - 1) x variant (`e_sm` && `sk`) (each ciphernode encrypts one
+  share for each of the other N_PARTIES - 1 recipients).
 - **Requires**:
   - `commit(pk_dkg)` from C0 ([`dkg/pk`](../pk))
   - C3a: `commit(sk_share[party_idx][mod_idx])` from C2a
@@ -57,6 +58,10 @@ flowchart TD
   `compute_share_encryption_challenge()`
 - **Commitment Functions**: [`math/commitments.nr`](../../../lib/src/math/commitments.nr) -
   `compute_dkg_pk_commitment()`, `compute_share_encryption_commitment_from_message()`
+- **Note**: C3 is structurally similar to the
+  [GRECO](https://blog.enclave.gg/enclave-cryptography-greco-fhe-zk/) circuit (P3). The same
+  decomposition approach used for GRECO could be applied here if further circuit splitting is
+  desired.
 - **Related Circuits**:
   - C0 [`dkg/pk`](../pk)
   - C2a [`dkg/sk_share_computation`](../sk_share_computation)

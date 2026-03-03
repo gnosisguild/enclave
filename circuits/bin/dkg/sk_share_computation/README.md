@@ -35,7 +35,8 @@ flowchart TD
 ## Metadata
 
 - **Phase**: P1 (DKG).
-- **Runs**: (N_PARTIES - 1) × Ciphernode (after threshold key generation in C1).
+- **Runs**: N_PARTIES (once per ciphernode; each instance proves all N_PARTIES shares
+  simultaneously).
 - **Requires**: `commit(sk)` from C1 ([`threshold/pk_generation`](../../threshold/pk_generation))
 - **Output(s)**:
   - `commit(sk_share[party_idx][mod_idx])` for each party and modulus → C3a

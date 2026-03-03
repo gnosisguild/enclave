@@ -34,7 +34,8 @@ flowchart TD
 ## Metadata
 
 - **Phase**: P1 (DKG).
-- **Runs**: (N_PARTIES -1) × Ciphernode (after threshold key generation in C1).
+- **Runs**: N_PARTIES (once per ciphernode; each instance proves all N_PARTIES shares
+  simultaneously).
 - **Requires**: `commit(e_sm)` from C1 ([`threshold/pk_generation`](../../threshold/pk_generation))
 - **Output(s)**:
   - `commit(e_sm_share[party_idx][mod_idx])` for each party and modulus → C3b
@@ -45,6 +46,9 @@ flowchart TD
   moduli)
 - **Commitment Functions**: [`math/commitments.nr`](../../../lib/src/math/commitments.nr) -
   `compute_share_computation_e_sm_commitment()`, `compute_share_encryption_commitment_from_shares()`
+- **Note**: The single-instance approach (one proof per ciphernode covering all shares) is the most
+  optimized variant. Breaking it into per-share sub-circuits is an alternative but requires
+  empirical testing to confirm performance gains.
 - **Related Circuits**:
   - C1 [`threshold/pk_generation`](../../threshold/pk_generation)
   - C2a [`dkg/sk_share_computation`](../sk_share_computation) (parallel circuit for secret key)
