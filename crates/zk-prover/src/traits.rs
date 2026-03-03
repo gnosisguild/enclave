@@ -102,14 +102,22 @@ pub trait Provable: Send + Sync {
             ));
         }
 
+        let resolved_names: Vec<_> = inputs
+            .iter()
+            .map(|input| self.resolve_circuit_name(params, input))
+            .collect();
+
+        if resolved_names.len() == 2 && resolved_names[0] != resolved_names[1] {
+            return Err(ZkError::InvalidInput(
+                "aggregate_proof requires both inputs to use the same circuit".into(),
+            ));
+        }
+
         let mut recursive_proofs = Vec::with_capacity(inputs.len());
-        let mut resolved_names = Vec::with_capacity(inputs.len());
         let witness_gen = WitnessGenerator::new();
 
         for (i, input) in inputs.iter().enumerate() {
             let input_map = self.build_inputs(params, input)?;
-            let resolved_name = self.resolve_circuit_name(params, input);
-            resolved_names.push(resolved_name);
             let circuit_path = prover
                 .circuits_dir()
                 .join(resolved_names[i].dir_path())
@@ -120,12 +128,6 @@ pub trait Provable: Send + Sync {
             let proof =
                 prover.generate_recursive_proof(resolved_names[i], &witness, &inner_e3_id)?;
             recursive_proofs.push(proof);
-        }
-
-        if recursive_proofs.len() == 2 && resolved_names[0] != resolved_names[1] {
-            return Err(ZkError::InvalidInput(
-                "aggregate_proof requires both inputs to use the same circuit".into(),
-            ));
         }
 
         let wrapper_proof = generate_wrapper_proof(prover, &recursive_proofs, e3_id)?;
