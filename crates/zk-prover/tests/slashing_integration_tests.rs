@@ -152,7 +152,7 @@ async fn deploy_contract(
 fn test_proof_payload(e3_id: u64, chain_id: u64) -> ProofPayload {
     ProofPayload {
         e3_id: E3id::new(&e3_id.to_string(), chain_id),
-        proof_type: ProofType::T0PkBfv,
+        proof_type: ProofType::C0PkBfv,
         proof: Proof::new(
             CircuitName::PkBfv,
             ArcBytes::from_bytes(&[0xde, 0xad, 0xbe, 0xef]),
@@ -194,7 +194,7 @@ fn test_proof_payload_digest_matches_manual_computation() {
         typehash,
         U256::from(42u64),                    // chainId
         U256::from(1u64),                     // e3Id
-        U256::from(0u8),                      // proofType (T0PkBfv = 0)
+        U256::from(0u8),                      // proofType (C0PkBfv = 0)
         keccak256(&[0xde, 0xad, 0xbe, 0xef]), // keccak256(zkProof)
         keccak256(&[0u8; 32]),                // keccak256(publicSignals)
     )
@@ -232,7 +232,7 @@ fn test_different_payloads_different_digests() {
     let p1 = test_proof_payload(1, 42);
     let p2 = test_proof_payload(2, 42); // different e3Id
     let mut p3 = test_proof_payload(1, 42);
-    p3.proof_type = ProofType::T1PkGeneration; // different proofType
+    p3.proof_type = ProofType::C1PkGeneration; // different proofType
 
     let d1 = p1.digest().unwrap();
     let d2 = p2.digest().unwrap();
@@ -262,7 +262,7 @@ fn test_encode_fault_evidence_structure() {
     let failed = SignedProofFailed {
         e3_id: E3id::new("42", 31337),
         faulting_node: signer.address(),
-        proof_type: ProofType::T0PkBfv,
+        proof_type: ProofType::C0PkBfv,
         signed_payload: signed.clone(),
     };
 
@@ -444,7 +444,7 @@ async fn test_onchain_valid_proof_reverts_proof_is_valid() {
 
     let payload = ProofPayload {
         e3_id: E3id::new(&e3_id.to_string(), chain_id),
-        proof_type: ProofType::T0PkBfv,
+        proof_type: ProofType::C0PkBfv,
         proof: Proof::new(
             CircuitName::PkBfv,
             ArcBytes::from_bytes(&[0xde, 0xad, 0xbe, 0xef]),
@@ -460,7 +460,7 @@ async fn test_onchain_valid_proof_reverts_proof_is_valid() {
     let failed = SignedProofFailed {
         e3_id: E3id::new(&e3_id.to_string(), chain_id),
         faulting_node: operator_addr,
-        proof_type: ProofType::T0PkBfv,
+        proof_type: ProofType::C0PkBfv,
         signed_payload: signed,
     };
 
@@ -571,7 +571,7 @@ async fn test_onchain_wrong_signer_reverts_signer_is_not_operator() {
     // Attacker signs the proof with their own key
     let payload = ProofPayload {
         e3_id: E3id::new(&e3_id.to_string(), chain_id),
-        proof_type: ProofType::T0PkBfv,
+        proof_type: ProofType::C0PkBfv,
         proof: Proof::new(
             CircuitName::PkBfv,
             ArcBytes::from_bytes(&[0xde, 0xad]),
@@ -584,7 +584,7 @@ async fn test_onchain_wrong_signer_reverts_signer_is_not_operator() {
     let failed = SignedProofFailed {
         e3_id: E3id::new(&e3_id.to_string(), chain_id),
         faulting_node: attacker_signer.address(),
-        proof_type: ProofType::T0PkBfv,
+        proof_type: ProofType::C0PkBfv,
         signed_payload: signed,
     };
 
@@ -675,7 +675,7 @@ async fn test_onchain_non_committee_member_reverts() {
     // Operator signs a proof
     let payload = ProofPayload {
         e3_id: E3id::new(&e3_id.to_string(), chain_id),
-        proof_type: ProofType::T0PkBfv,
+        proof_type: ProofType::C0PkBfv,
         proof: Proof::new(
             CircuitName::PkBfv,
             ArcBytes::from_bytes(&[0xab, 0xcd]),
@@ -688,7 +688,7 @@ async fn test_onchain_non_committee_member_reverts() {
     let failed = SignedProofFailed {
         e3_id: E3id::new(&e3_id.to_string(), chain_id),
         faulting_node: operator_addr,
-        proof_type: ProofType::T0PkBfv,
+        proof_type: ProofType::C0PkBfv,
         signed_payload: signed,
     };
 
@@ -804,7 +804,7 @@ async fn test_onchain_invalid_proof_executes_slash() {
     // Operator signs a (bad) proof
     let payload = ProofPayload {
         e3_id: E3id::new(&e3_id.to_string(), chain_id),
-        proof_type: ProofType::T0PkBfv,
+        proof_type: ProofType::C0PkBfv,
         proof: Proof::new(
             CircuitName::PkBfv,
             ArcBytes::from_bytes(&[0xba, 0xd0, 0xba, 0xd0]),
@@ -817,7 +817,7 @@ async fn test_onchain_invalid_proof_executes_slash() {
     let failed = SignedProofFailed {
         e3_id: E3id::new(&e3_id.to_string(), chain_id),
         faulting_node: operator_addr,
-        proof_type: ProofType::T0PkBfv,
+        proof_type: ProofType::C0PkBfv,
         signed_payload: signed,
     };
 
@@ -933,7 +933,7 @@ async fn test_onchain_verifier_mismatch_reverts() {
 
     let payload = ProofPayload {
         e3_id: E3id::new(&e3_id.to_string(), chain_id),
-        proof_type: ProofType::T0PkBfv,
+        proof_type: ProofType::C0PkBfv,
         proof: Proof::new(
             CircuitName::PkBfv,
             ArcBytes::from_bytes(&[0xab]),
@@ -946,7 +946,7 @@ async fn test_onchain_verifier_mismatch_reverts() {
     let failed = SignedProofFailed {
         e3_id: E3id::new(&e3_id.to_string(), chain_id),
         faulting_node: operator_addr,
-        proof_type: ProofType::T0PkBfv,
+        proof_type: ProofType::C0PkBfv,
         signed_payload: signed,
     };
 
