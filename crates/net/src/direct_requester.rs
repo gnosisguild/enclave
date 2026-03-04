@@ -346,12 +346,14 @@ impl DirectRequesterTester {
         });
         // Reverse expectations so we can pop from the back in order.
         self.expectations.reverse();
+        self.responses.reverse();
 
         tokio::spawn(async move {
             let mut remaining = num_requests;
             while remaining > 0 {
                 if let Some(cmd) = self.net_cmds_rx.recv().await {
                     if let NetCommand::OutgoingRequest(req) = cmd {
+                        remaining -= 1;
                         let response = if let Some(expectation) = self.expectations.pop() {
                             assert_eq!(
                                 req.payload, expectation.expected_request,
@@ -392,7 +394,6 @@ impl DirectRequesterTester {
                         };
                         let _ = self.net_events_tx.send(response);
                     }
-                    remaining -= 1;
                 } else {
                     break;
                 }
@@ -534,5 +535,35 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("connection refused"));
+    }
+
+    #[tokio::test]
+    async fn test_respond_with_each() {
+        let (net_cmds_tx, net_cmds_rx) = mpsc::channel::<NetCommand>(16);
+        let (net_events_tx, net_events_rx) = broadcast::channel::<NetEvent>(16);
+        let net_events = Arc::new(net_events_rx);
+
+        let requester = DirectRequester::builder(net_cmds_tx, net_events).build();
+
+        let handle = DirectRequesterTester::new(net_cmds_rx, net_events_tx)
+            .respond_with_each(vec![
+                b"first_response".to_vec(),
+                b"second_response".to_vec(),
+                b"third_response".to_vec(),
+            ])
+            .num_requests(3)
+            .spawn();
+
+        let peer = requester.to(PeerTarget::Random);
+
+        let r1: Vec<u8> = peer.request(b"req1".to_vec()).await.unwrap();
+        let r2: Vec<u8> = peer.request(b"req2".to_vec()).await.unwrap();
+        let r3: Vec<u8> = peer.request(b"req3".to_vec()).await.unwrap();
+
+        handle.await.unwrap();
+
+        assert_eq!(r1, b"first_response");
+        assert_eq!(r2, b"second_response");
+        assert_eq!(r3, b"third_response");
     }
 }
