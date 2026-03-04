@@ -339,8 +339,8 @@ export const encodeSolidityProof = ({ publicInputs, proof, encryptedVote }: Proo
   const slotAddress = getAddress(numberToHex(BigInt(publicInputs[2]), { size: 20 }))
   const encryptedVoteCommitment = publicInputs[5] as `0x${string}`
 
-  // Verification key hash from proof public inputs (indices 7–38). Must match the value stored on-chain.
-  const keyHash = bytesToHex(Uint8Array.from(publicInputs.slice(7, 39), (p) => Number(BigInt(p) & 0xffn))) as `0x${string}`
+  // Verification key hash (Poseidon) at index 7. Must match the value stored on-chain.
+  const keyHash = numberToHex(BigInt(publicInputs[7]), { size: 32 }) as `0x${string}`
 
   return encodeAbiParameters(parseAbiParameters('bytes, address, bytes32, bytes32, bytes'), [
     bytesToHex(proof),

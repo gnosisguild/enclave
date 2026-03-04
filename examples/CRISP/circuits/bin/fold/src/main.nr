@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
-use keccak256::keccak256;
+use enclave_lib::math::commitments::compute_vk_hash;
 
 fn main(
     // User Data Encryption Section.
@@ -25,7 +25,7 @@ fn main(
     final_ct_commitment: pub Field,
     ct_commitment: Field,
     k1_commitment: Field,
-) -> pub (Field, [u8; 32]) {
+) -> pub (Field, Field) {
     verify_honk_proof_non_zk(
         user_data_encryption_verification_key,
         user_data_encryption_proof,
@@ -54,21 +54,15 @@ fn main(
     // Verify that the k1_commitment from the crisp proof matches the one computed from user data encryption.
     assert(k1_commitment == user_data_encryption_public_inputs[4]);
 
-    // Hash all verification key-related values: ud_key_hash, crisp_key_hash, ct0_key_hash, ct1_key_hash
-    let ud_bytes: [u8; 32] = user_data_encryption_key_hash.to_be_bytes();
-    let crisp_bytes: [u8; 32] = crisp_key_hash.to_be_bytes();
-    let ct0_bytes: [u8; 32] = user_data_encryption_public_inputs[0].to_be_bytes();
-    let ct1_bytes: [u8; 32] = user_data_encryption_public_inputs[1].to_be_bytes();
-    let mut combined: [u8; 128] = [0; 128];
-    for i in 0..32 {
-        combined[i] = ud_bytes[i];
-        combined[i + 32] = crisp_bytes[i];
-        combined[i + 64] = ct0_bytes[i];
-        combined[i + 96] = ct1_bytes[i];
-    }
-    let key_hash: [u8; 32] = keccak256(combined, 128);
+    // Hash the full VK chain: key hashes from both proofs (user_data_encryption, crisp, ct0, ct1) so the verifier can
+    // check the entire proof genealogy.
+    let mut vk_hashes = Vec::new();
+    vk_hashes.push(user_data_encryption_key_hash);
+    vk_hashes.push(crisp_key_hash);
+    vk_hashes.push(user_data_encryption_public_inputs[0]); // ct0_key_hash
+    vk_hashes.push(user_data_encryption_public_inputs[1]); // ct1_key_hash
+    let key_hash = compute_vk_hash(vk_hashes);
 
-    // Return the verification key hash and pk_commitment from the user data encryption proof (this will
-    // be verified in the crisp contract).
+    // Return pk_commitment from user data encryption proof and the combined VK hash (verified in crisp contract).
     (user_data_encryption_public_inputs[2], key_hash)
 }
