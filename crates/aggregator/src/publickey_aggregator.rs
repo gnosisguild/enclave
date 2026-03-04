@@ -304,8 +304,10 @@ impl PublicKeyAggregator {
                     keyshare_bytes: honest_keyshares,
                     aggregated_pk_bytes: ArcBytes::from_bytes(&pubkey),
                     params_preset: self.params_preset.clone(),
+                    // this field is not really used in the circuit, we only use H
                     committee_n: committee_h,
                     committee_h,
+                    // this field is not really used in the circuit, we only use H
                     committee_threshold: 0,
                 },
                 public_key: pubkey,

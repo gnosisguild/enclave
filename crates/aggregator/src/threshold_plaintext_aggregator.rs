@@ -230,7 +230,7 @@ impl ThresholdPlaintextAggregator {
                 }));
             }
 
-            info!("Changing state to VerifyingC6 because received enough shares...");
+            info!("Changing state to VerifyingC6 because we received enough shares...");
 
             Ok(ThresholdPlaintextAggregatorState::VerifyingC6(
                 VerifyingC6 {
