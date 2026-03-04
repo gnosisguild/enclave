@@ -113,8 +113,6 @@ describe('CRISP Contracts', function () {
 
       await mockEnclave.setCommitteePublicKey(voteProof.publicInputs[6])
 
-      console.log('voteProof.publicInputs', voteProof.publicInputs)
-
       const encodedProof = encodeSolidityProof(voteProof)
 
       await crispProgram.setMerkleRoot(e3Id, merkleTree.root)
