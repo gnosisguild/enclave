@@ -612,6 +612,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // - ComputeRequest (C5 PkAggregation proof dispatched by PublicKeyAggregator)
     // - ComputeResponse (C5 PkAggregation proof result)
     // - PublicKeyAggregated × 1
+    let shares_to_pubkey_agg_timer = Instant::now();
     let h = nodes
         .expect_events_with_timeouts(
             &[
