@@ -10,13 +10,15 @@ use std::sync::Arc;
 use actix::{Actor, Addr, Context, Handler};
 use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
-    BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeResponse,
-    ComputeResponseKind, CorrelationId, DecryptionKeyShared, DecryptionShareProofsPending,
-    DkgProofSigned, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated,
-    EncryptionKeyPending, EventContext, EventPublisher, EventSubscriber, EventType,
-    PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload, ProofType, Sequenced,
-    SignedProofPayload, ThresholdShare, ThresholdShareCreated, ThresholdSharePending, TypedEvent,
-    ZkRequest, ZkResponse,
+    AggregationProofPending, AggregationProofSigned, BusHandle, ComputeRequest,
+    ComputeRequestError, ComputeRequestErrorKind, ComputeResponse, ComputeResponseKind,
+    CorrelationId, DecryptionKeyShared, DecryptionShareProofSigned, DecryptionShareProofsPending,
+    DecryptionshareCreated, DkgProofSigned, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
+    EncryptionKeyCreated, EncryptionKeyPending, EventContext, EventPublisher, EventSubscriber,
+    EventType, PkAggregationProofPending, PkAggregationProofSigned, PkBfvProofRequest,
+    PkGenerationProofSigned, Proof, ProofPayload, ProofType, Sequenced,
+    ShareDecryptionProofPending, SignedProofPayload, ThresholdShare, ThresholdShareCreated,
+    ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
@@ -159,6 +161,27 @@ impl PendingDecryptionProofs {
     }
 }
 
+/// Pending C5 (PkAggregation) proof generation state.
+#[derive(Clone, Debug)]
+struct PendingPkAggregationProof {
+    ec: EventContext<Sequenced>,
+}
+
+/// Pending C6 (ShareDecryptionProof) proof generation state.
+#[derive(Clone, Debug)]
+struct PendingShareDecryptionProof {
+    party_id: u64,
+    node: String,
+    decryption_share: Vec<ArcBytes>,
+    ec: EventContext<Sequenced>,
+}
+
+/// Pending C7 (DecryptedSharesAggregation) proof generation state.
+#[derive(Clone, Debug)]
+struct PendingAggregationProof {
+    ec: EventContext<Sequenced>,
+}
+
 /// Core actor that handles encryption key proof requests.
 ///
 /// Proofs are always wrapped in a [`SignedProofPayload`] before being published,
@@ -170,10 +193,22 @@ pub struct ProofRequestActor {
     pending: HashMap<CorrelationId, PendingProofRequest>,
     threshold_correlation: HashMap<CorrelationId, (E3id, ThresholdProofKind)>,
     pending_threshold: HashMap<E3id, PendingThresholdProofs>,
-    /// C4 proof staging: correlation → (e3_id, kind)
+    /// C4 proof staging: correlation -> (e3_id, kind)
     decryption_correlation: HashMap<CorrelationId, (E3id, DecryptionProofKind)>,
     /// C4 pending proofs per E3
     pending_decryption: HashMap<E3id, PendingDecryptionProofs>,
+    /// C6 proof staging: correlation -> e3_id
+    share_decryption_correlation: HashMap<CorrelationId, E3id>,
+    /// C6 pending proofs per E3
+    pending_share_decryption: HashMap<E3id, PendingShareDecryptionProof>,
+    /// C5 proof staging: correlation -> e3_id
+    pk_aggregation_correlation: HashMap<CorrelationId, E3id>,
+    /// C5 pending proofs per E3
+    pending_pk_aggregation: HashMap<E3id, PendingPkAggregationProof>,
+    /// C7 proof staging: correlation -> e3_id
+    aggregation_correlation: HashMap<CorrelationId, E3id>,
+    /// C7 pending proofs per E3
+    pending_aggregation: HashMap<E3id, PendingAggregationProof>,
 }
 
 impl ProofRequestActor {
@@ -186,6 +221,12 @@ impl ProofRequestActor {
             threshold_correlation: HashMap::new(),
             decryption_correlation: HashMap::new(),
             pending_decryption: HashMap::new(),
+            share_decryption_correlation: HashMap::new(),
+            pending_share_decryption: HashMap::new(),
+            pk_aggregation_correlation: HashMap::new(),
+            pending_pk_aggregation: HashMap::new(),
+            aggregation_correlation: HashMap::new(),
+            pending_aggregation: HashMap::new(),
         }
     }
 
@@ -196,6 +237,9 @@ impl ProofRequestActor {
         bus.subscribe(EventType::ComputeRequestError, addr.clone().into());
         bus.subscribe(EventType::ThresholdSharePending, addr.clone().into());
         bus.subscribe(EventType::DecryptionShareProofsPending, addr.clone().into());
+        bus.subscribe(EventType::ShareDecryptionProofPending, addr.clone().into());
+        bus.subscribe(EventType::PkAggregationProofPending, addr.clone().into());
+        bus.subscribe(EventType::AggregationProofPending, addr.clone().into());
         addr
     }
 
@@ -393,6 +437,18 @@ impl ProofRequestActor {
                     self.handle_threshold_proof_response(&msg.correlation_id, resp.proof.clone());
                 }
             }
+            ComputeResponseKind::Zk(ZkResponse::ThresholdShareDecryption(resp)) => {
+                self.handle_share_decryption_proof_response(
+                    &msg.correlation_id,
+                    resp.proofs.clone(),
+                );
+            }
+            ComputeResponseKind::Zk(ZkResponse::PkAggregation(resp)) => {
+                self.handle_pk_aggregation_proof_response(&msg.correlation_id, resp.proof.clone());
+            }
+            ComputeResponseKind::Zk(ZkResponse::DecryptedSharesAggregation(resp)) => {
+                self.handle_aggregation_proof_response(&msg.correlation_id, resp.proofs.clone());
+            }
             _ => {}
         }
     }
@@ -579,6 +635,273 @@ impl ProofRequestActor {
         }
     }
 
+    /// Handle ShareDecryptionProofPending: dispatch C6 proof generation.
+    fn handle_share_decryption_proof_pending(
+        &mut self,
+        msg: TypedEvent<ShareDecryptionProofPending>,
+    ) {
+        let (msg, ec) = msg.into_components();
+        let e3_id = msg.e3_id.clone();
+
+        if self.pending_share_decryption.contains_key(&e3_id) {
+            warn!(
+                "Duplicate ShareDecryptionProofPending for E3 {} — ignoring",
+                e3_id
+            );
+            return;
+        }
+
+        self.pending_share_decryption.insert(
+            e3_id.clone(),
+            PendingShareDecryptionProof {
+                party_id: msg.party_id,
+                node: msg.node,
+                decryption_share: msg.decryption_share,
+                ec: ec.clone(),
+            },
+        );
+
+        let correlation_id = CorrelationId::new();
+        self.share_decryption_correlation
+            .insert(correlation_id, e3_id.clone());
+
+        info!(
+            "Requesting C6 ThresholdShareDecryption proof for E3 {}",
+            e3_id
+        );
+        if let Err(err) = self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::ThresholdShareDecryption(msg.proof_request),
+                correlation_id,
+                e3_id.clone(),
+            ),
+            ec,
+        ) {
+            error!("Failed to publish C6 proof request: {err}");
+            self.share_decryption_correlation.remove(&correlation_id);
+            self.pending_share_decryption.remove(&e3_id);
+        }
+    }
+
+    /// Handle C6 proof response — sign proofs and publish DecryptionshareCreated.
+    fn handle_share_decryption_proof_response(
+        &mut self,
+        correlation_id: &CorrelationId,
+        proofs: Vec<Proof>,
+    ) {
+        let Some(e3_id) = self.share_decryption_correlation.remove(correlation_id) else {
+            return;
+        };
+
+        let Some(pending) = self.pending_share_decryption.remove(&e3_id) else {
+            error!(
+                "No pending share decryption proof for E3 {} — orphan correlation",
+                e3_id
+            );
+            return;
+        };
+
+        // Sign each C6 proof
+        let mut signed_proofs = Vec::with_capacity(proofs.len());
+        for proof in proofs {
+            let Some(signed) = self.sign_proof(&e3_id, ProofType::T5ShareDecryption, proof) else {
+                error!("Failed to sign C6 proof — DecryptionshareCreated will not be published");
+                return;
+            };
+            signed_proofs.push(signed);
+        }
+
+        info!(
+            "All C6 proofs signed for E3 {} party {} (signer: {})",
+            e3_id,
+            pending.party_id,
+            self.signer.address()
+        );
+
+        let ec = pending.ec;
+        if let Err(err) = self.bus.publish(
+            DecryptionshareCreated {
+                party_id: pending.party_id,
+                node: pending.node,
+                e3_id: e3_id.clone(),
+                decryption_share: pending.decryption_share,
+                signed_decryption_proofs: signed_proofs,
+            },
+            ec.clone(),
+        ) {
+            error!("Failed to publish DecryptionshareCreated: {err}");
+        }
+
+        if let Err(err) = self.bus.publish(
+            DecryptionShareProofSigned {
+                e3_id: e3_id.clone(),
+            },
+            ec,
+        ) {
+            error!("Failed to publish DecryptionShareProofSigned: {err}");
+        }
+    }
+
+    /// Handle PkAggregationProofPending: dispatch C5 proof generation.
+    fn handle_pk_aggregation_proof_pending(&mut self, msg: TypedEvent<PkAggregationProofPending>) {
+        let (msg, ec) = msg.into_components();
+        let e3_id = msg.e3_id.clone();
+
+        if self.pending_pk_aggregation.contains_key(&e3_id) {
+            warn!(
+                "Duplicate PkAggregationProofPending for E3 {} — ignoring",
+                e3_id
+            );
+            return;
+        }
+
+        self.pending_pk_aggregation
+            .insert(e3_id.clone(), PendingPkAggregationProof { ec: ec.clone() });
+
+        let correlation_id = CorrelationId::new();
+        self.pk_aggregation_correlation
+            .insert(correlation_id, e3_id.clone());
+
+        info!("Requesting C5 PkAggregation proof for E3 {}", e3_id);
+        if let Err(err) = self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::PkAggregation(msg.proof_request),
+                correlation_id,
+                e3_id.clone(),
+            ),
+            ec,
+        ) {
+            error!("Failed to publish C5 proof request: {err}");
+            self.pk_aggregation_correlation.remove(&correlation_id);
+            self.pending_pk_aggregation.remove(&e3_id);
+        }
+    }
+
+    /// Handle C5 proof response — sign proof and publish PkAggregationProofSigned.
+    fn handle_pk_aggregation_proof_response(
+        &mut self,
+        correlation_id: &CorrelationId,
+        proof: Proof,
+    ) {
+        let Some(e3_id) = self.pk_aggregation_correlation.remove(correlation_id) else {
+            return;
+        };
+
+        let Some(pending) = self.pending_pk_aggregation.remove(&e3_id) else {
+            error!(
+                "No pending pk aggregation proof for E3 {} — orphan correlation",
+                e3_id
+            );
+            return;
+        };
+
+        let Some(signed) = self.sign_proof(&e3_id, ProofType::C5PkAggregation, proof) else {
+            error!("Failed to sign C5 proof — PkAggregationProofSigned will not be published");
+            return;
+        };
+
+        info!(
+            "C5 proof signed for E3 {} (signer: {})",
+            e3_id,
+            self.signer.address()
+        );
+
+        if let Err(err) = self.bus.publish(
+            PkAggregationProofSigned {
+                e3_id: e3_id.clone(),
+                signed_proof: signed,
+            },
+            pending.ec,
+        ) {
+            error!("Failed to publish PkAggregationProofSigned: {err}");
+        }
+    }
+
+    /// Handle AggregationProofPending: dispatch C7 proof generation.
+    fn handle_aggregation_proof_pending(&mut self, msg: TypedEvent<AggregationProofPending>) {
+        let (msg, ec) = msg.into_components();
+        let e3_id = msg.e3_id.clone();
+
+        if self.pending_aggregation.contains_key(&e3_id) {
+            warn!(
+                "Duplicate AggregationProofPending for E3 {} — ignoring",
+                e3_id
+            );
+            return;
+        }
+
+        self.pending_aggregation
+            .insert(e3_id.clone(), PendingAggregationProof { ec: ec.clone() });
+
+        let correlation_id = CorrelationId::new();
+        self.aggregation_correlation
+            .insert(correlation_id, e3_id.clone());
+
+        info!(
+            "Requesting C7 DecryptedSharesAggregation proof for E3 {}",
+            e3_id
+        );
+        if let Err(err) = self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::DecryptedSharesAggregation(msg.proof_request),
+                correlation_id,
+                e3_id.clone(),
+            ),
+            ec,
+        ) {
+            error!("Failed to publish C7 proof request: {err}");
+            self.aggregation_correlation.remove(&correlation_id);
+            self.pending_aggregation.remove(&e3_id);
+        }
+    }
+
+    /// Handle C7 proof response — sign proofs and publish AggregationProofSigned.
+    fn handle_aggregation_proof_response(
+        &mut self,
+        correlation_id: &CorrelationId,
+        proofs: Vec<Proof>,
+    ) {
+        let Some(e3_id) = self.aggregation_correlation.remove(correlation_id) else {
+            return;
+        };
+
+        let Some(pending) = self.pending_aggregation.remove(&e3_id) else {
+            error!(
+                "No pending aggregation proof for E3 {} — orphan correlation",
+                e3_id
+            );
+            return;
+        };
+
+        // Sign each C7 proof
+        let mut signed_proofs = Vec::with_capacity(proofs.len());
+        for proof in proofs {
+            let Some(signed) =
+                self.sign_proof(&e3_id, ProofType::T6DecryptedSharesAggregation, proof)
+            else {
+                error!("Failed to sign C7 proof — AggregationProofSigned will not be published");
+                return;
+            };
+            signed_proofs.push(signed);
+        }
+
+        info!(
+            "All C7 proofs signed for E3 {} (signer: {})",
+            e3_id,
+            self.signer.address()
+        );
+
+        if let Err(err) = self.bus.publish(
+            AggregationProofSigned {
+                e3_id: e3_id.clone(),
+                signed_proofs,
+            },
+            pending.ec,
+        ) {
+            error!("Failed to publish AggregationProofSigned: {err}");
+        }
+    }
+
     fn handle_threshold_proof_response(&mut self, correlation_id: &CorrelationId, proof: Proof) {
         let Some((e3_id, kind)) = self.threshold_correlation.remove(correlation_id) else {
             return;
@@ -632,6 +955,20 @@ impl ProofRequestActor {
         }
     }
 
+    fn sign_and_group_proofs(
+        &self,
+        e3_id: &E3id,
+        proof_type: ProofType,
+        proofs: impl Iterator<Item = (usize, Proof)>,
+    ) -> Option<BTreeMap<usize, Vec<SignedProofPayload>>> {
+        let mut map: BTreeMap<usize, Vec<SignedProofPayload>> = BTreeMap::new();
+        for (recipient, proof) in proofs {
+            let signed = self.sign_proof(e3_id, proof_type, proof)?;
+            map.entry(recipient).or_default().push(signed);
+        }
+        Some(map)
+    }
+
     fn publish_threshold_share_with_proofs(&mut self, pending: PendingThresholdProofs) {
         let e3_id = &pending.e3_id;
         let party_id = pending.full_share.party_id;
@@ -667,37 +1004,29 @@ impl ProofRequestActor {
             return;
         };
 
-        // Sign C3a proofs (SkShareEncryption) — keyed by (recipient, row)
-        let mut signed_c3a_map: BTreeMap<usize, Vec<SignedProofPayload>> = BTreeMap::new();
-        for ((_recipient, _row), proof) in &pending.sk_share_encryption_proofs {
-            if let Some(signed) =
-                self.sign_proof(e3_id, ProofType::C3aSkShareEncryption, proof.clone())
-            {
-                signed_c3a_map.entry(*_recipient).or_default().push(signed);
-            } else {
-                error!(
-                    "Failed to sign C3a proof for recipient {} — shares will not be published",
-                    _recipient
-                );
-                return;
-            }
-        }
+        let Some(signed_c3a_map) = self.sign_and_group_proofs(
+            e3_id,
+            ProofType::C3aSkShareEncryption,
+            pending
+                .sk_share_encryption_proofs
+                .iter()
+                .map(|((recipient, _row), proof)| (*recipient, proof.clone())),
+        ) else {
+            error!("Failed to sign C3a proofs — shares will not be published");
+            return;
+        };
 
-        // Sign C3b proofs (ESmShareEncryption) — keyed by (esi_index, recipient, row)
-        let mut signed_c3b_map: BTreeMap<usize, Vec<SignedProofPayload>> = BTreeMap::new();
-        for ((_esi, _recipient, _row), proof) in &pending.e_sm_share_encryption_proofs {
-            if let Some(signed) =
-                self.sign_proof(e3_id, ProofType::C3bESmShareEncryption, proof.clone())
-            {
-                signed_c3b_map.entry(*_recipient).or_default().push(signed);
-            } else {
-                error!(
-                    "Failed to sign C3b proof for recipient {} — shares will not be published",
-                    _recipient
-                );
-                return;
-            }
-        }
+        let Some(signed_c3b_map) = self.sign_and_group_proofs(
+            e3_id,
+            ProofType::C3bESmShareEncryption,
+            pending
+                .e_sm_share_encryption_proofs
+                .iter()
+                .map(|((_esi, recipient, _row), proof)| (*recipient, proof.clone())),
+        ) else {
+            error!("Failed to sign C3b proofs — shares will not be published");
+            return;
+        };
 
         info!(
             "All proofs signed for E3 {} party {} (signer: {})",
@@ -898,6 +1227,33 @@ impl ProofRequestActor {
                 .retain(|_, (eid, _)| *eid != e3_id);
             self.pending_decryption.remove(&e3_id);
         }
+
+        if let Some(e3_id) = self
+            .share_decryption_correlation
+            .remove(msg.correlation_id())
+        {
+            error!(
+                "C6 proof request failed for E3 {}: {err} — DecryptionshareCreated will not be published",
+                e3_id
+            );
+            self.pending_share_decryption.remove(&e3_id);
+        }
+
+        if let Some(e3_id) = self.pk_aggregation_correlation.remove(msg.correlation_id()) {
+            error!(
+                "C5 proof request failed for E3 {}: {err} — PkAggregationProofSigned will not be published",
+                e3_id
+            );
+            self.pending_pk_aggregation.remove(&e3_id);
+        }
+
+        if let Some(e3_id) = self.aggregation_correlation.remove(msg.correlation_id()) {
+            error!(
+                "C7 proof request failed for E3 {}: {err} — AggregationProofSigned will not be published",
+                e3_id
+            );
+            self.pending_aggregation.remove(&e3_id);
+        }
     }
 }
 
@@ -925,6 +1281,15 @@ impl Handler<EnclaveEvent> for ProofRequestActor {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::DecryptionShareProofsPending(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::ShareDecryptionProofPending(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::PkAggregationProofPending(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::AggregationProofPending(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),
@@ -989,5 +1354,41 @@ impl Handler<TypedEvent<DecryptionShareProofsPending>> for ProofRequestActor {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         self.handle_decryption_share_proofs_pending(msg)
+    }
+}
+
+impl Handler<TypedEvent<ShareDecryptionProofPending>> for ProofRequestActor {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ShareDecryptionProofPending>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.handle_share_decryption_proof_pending(msg)
+    }
+}
+
+impl Handler<TypedEvent<PkAggregationProofPending>> for ProofRequestActor {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<PkAggregationProofPending>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.handle_pk_aggregation_proof_pending(msg)
+    }
+}
+
+impl Handler<TypedEvent<AggregationProofPending>> for ProofRequestActor {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<AggregationProofPending>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.handle_aggregation_proof_pending(msg)
     }
 }

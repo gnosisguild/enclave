@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{E3id, Proof};
+use crate::{E3id, SignedProofPayload};
 use actix::Message;
 use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
@@ -18,8 +18,8 @@ pub struct DecryptionshareCreated {
     // ciphertext
     pub e3_id: E3id,
     pub node: String,
-    /// C6 proofs: one proof of correct decryption per ciphertext index.
-    pub decryption_proofs: Vec<Proof>,
+    /// C6 proofs: one signed proof of correct decryption per ciphertext index.
+    pub signed_decryption_proofs: Vec<SignedProofPayload>,
 }
 
 impl Display for DecryptionshareCreated {

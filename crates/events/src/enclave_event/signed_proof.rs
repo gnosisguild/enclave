@@ -47,6 +47,8 @@ pub enum ProofType {
     T5ShareDecryption = 7,
     /// T6 — Decrypted shares aggregation proof (Proof 7).
     T6DecryptedSharesAggregation = 8,
+    /// C5 — Public key aggregation proof (Proof 5).
+    C5PkAggregation = 9,
 }
 
 impl ProofType {
@@ -65,6 +67,7 @@ impl ProofType {
                 CircuitName::DecryptedSharesAggregationBn,
                 CircuitName::DecryptedSharesAggregationMod,
             ],
+            ProofType::C5PkAggregation => vec![CircuitName::PkAggregation],
         }
     }
 
@@ -80,6 +83,7 @@ impl ProofType {
             | ProofType::T2DkgShareDecryption => "E3_BAD_DKG_PROOF",
             ProofType::T5ShareDecryption => "E3_BAD_DECRYPTION_PROOF",
             ProofType::T6DecryptedSharesAggregation => "E3_BAD_AGGREGATION_PROOF",
+            ProofType::C5PkAggregation => "E3_BAD_PK_AGGREGATION_PROOF",
         }
     }
 }

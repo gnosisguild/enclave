@@ -27,14 +27,14 @@ use e3_events::{
     ComputeResponse, DecryptedSharesAggregationProofRequest,
     DecryptedSharesAggregationProofResponse, DkgShareDecryptionProofRequest,
     DkgShareDecryptionProofResponse, EnclaveEvent, EnclaveEventData, EventPublisher,
-    EventSubscriber, EventType, PartyC6VerificationResult, PartyVerificationResult,
-    PkAggregationProofRequest, PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse,
-    PkGenerationProofRequest, PkGenerationProofResponse, ShareComputationProofRequest,
-    ShareComputationProofResponse, ShareEncryptionProofRequest, ShareEncryptionProofResponse,
+    EventSubscriber, EventType, PartyVerificationResult, PkAggregationProofRequest,
+    PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest,
+    PkGenerationProofResponse, ShareComputationProofRequest, ShareComputationProofResponse,
+    ShareEncryptionProofRequest, ShareEncryptionProofResponse,
     ThresholdShareDecryptionProofRequest, ThresholdShareDecryptionProofResponse, TypedEvent,
-    VerifyC6ProofsRequest, VerifyC6ProofsResponse, VerifyShareDecryptionProofsRequest,
-    VerifyShareDecryptionProofsResponse, VerifyShareProofsRequest, VerifyShareProofsResponse,
-    ZkError as ZkEventError, ZkRequest, ZkResponse,
+    VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
+    VerifyShareProofsRequest, VerifyShareProofsResponse, ZkError as ZkEventError, ZkRequest,
+    ZkResponse,
 };
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
@@ -609,9 +609,6 @@ fn handle_zk_request(
                 handle_threshold_share_decryption_proof(&prover, &cipher, req, request.clone())
             })
         }
-        ZkRequest::VerifyC6Proofs(req) => timefunc("zk_verify_c6_proofs", id, || {
-            handle_verify_c6_proofs(&prover, req, request.clone())
-        }),
         ZkRequest::DecryptedSharesAggregation(req) => {
             timefunc("zk_decrypted_shares_aggregation", id, || {
                 handle_decrypted_shares_aggregation_proof(&prover, req, request.clone())
@@ -1146,53 +1143,6 @@ fn handle_verify_share_decryption_proofs(
         ZkResponse::VerifyShareDecryptionProofs(VerifyShareDecryptionProofsResponse {
             party_results,
         }),
-        request.correlation_id,
-        request.e3_id,
-    ))
-}
-
-fn handle_verify_c6_proofs(
-    prover: &ZkProver,
-    req: VerifyC6ProofsRequest,
-    request: ComputeRequest,
-) -> Result<ComputeResponse, ComputeRequestError> {
-    let e3_id_str = request.e3_id.to_string();
-
-    let party_results: Vec<PartyC6VerificationResult> = req
-        .party_proofs
-        .into_iter()
-        .map(|party| {
-            let sender = party.sender_party_id;
-
-            if party.c6_proofs.is_empty() {
-                return PartyC6VerificationResult {
-                    sender_party_id: sender,
-                    all_verified: false,
-                };
-            }
-
-            for c6_proof in &party.c6_proofs {
-                let result = prover.verify_proof(c6_proof, &e3_id_str, sender);
-                match result {
-                    Ok(true) => continue,
-                    Ok(false) | Err(_) => {
-                        return PartyC6VerificationResult {
-                            sender_party_id: sender,
-                            all_verified: false,
-                        };
-                    }
-                }
-            }
-
-            PartyC6VerificationResult {
-                sender_party_id: sender,
-                all_verified: true,
-            }
-        })
-        .collect();
-
-    Ok(ComputeResponse::zk(
-        ZkResponse::VerifyC6Proofs(VerifyC6ProofsResponse { party_results }),
         request.correlation_id,
         request.e3_id,
     ))

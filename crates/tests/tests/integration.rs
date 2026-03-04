@@ -663,10 +663,14 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // Wait for KeyshareCreated + C1 verification + C5 proof + PublicKeyAggregated
     // - KeyshareCreated × 5 (forwarded from committee nodes)
-    // - ComputeRequest (C1 proof verification dispatched by PublicKeyAggregator)
-    // - ComputeResponse (C1 proof verification result)
-    // - ComputeRequest (C5 PkAggregation proof dispatched by PublicKeyAggregator)
-    // - ComputeResponse (C5 PkAggregation proof result)
+    // - ShareVerificationDispatched (C1 proof verification dispatched by PublicKeyAggregator)
+    // - ComputeRequest (C1 ZK verification)
+    // - ComputeResponse (C1 ZK verification result)
+    // - ShareVerificationComplete (C1 verification done)
+    // - PkAggregationProofPending (C5 proof requested by PublicKeyAggregator)
+    // - ComputeRequest (C5 proof generation)
+    // - ComputeResponse (C5 proof result)
+    // - PkAggregationProofSigned (C5 proof signed by ProofRequestActor)
     // - PublicKeyAggregated × 1
     let shares_to_pubkey_agg_timer = Instant::now();
     let expected = vec![
@@ -675,10 +679,14 @@ async fn test_trbfv_actor() -> Result<()> {
         "KeyshareCreated",
         "KeyshareCreated",
         "KeyshareCreated",
+        "ShareVerificationDispatched",
         "ComputeRequest",
         "ComputeResponse",
+        "ShareVerificationComplete",
+        "PkAggregationProofPending",
         "ComputeRequest",
         "ComputeResponse",
+        "PkAggregationProofSigned",
         "PublicKeyAggregated",
     ];
     let h = nodes
@@ -755,17 +763,21 @@ async fn test_trbfv_actor() -> Result<()> {
     // The collector sees:
     // - 1 CiphertextOutputPublished (from shared bus)
     // - 5 DecryptionshareCreated (from simulate_libp2p, passes is_forwardable_event)
-    // - 1 ComputeRequest (VerifyC6Proofs)
-    // - 1 ComputeResponse (VerifyC6Proofs)
+    // - 1 ShareVerificationDispatched (C6 verification dispatched by ThresholdPlaintextAggregator)
+    // - 1 ComputeRequest (C6 ZK verification)
+    // - 1 ComputeResponse (C6 ZK verification result)
+    // - 1 ShareVerificationComplete (C6 verification done)
     // - 1 ComputeRequest (TrBFV CalculateThresholdDecryption)
     // - 1 ComputeResponse (TrBFV CalculateThresholdDecryption)
-    // - 1 ComputeRequest (DecryptedSharesAggregation C7)
-    // - 1 ComputeResponse (DecryptedSharesAggregation C7)
+    // - 1 AggregationProofPending (C7 proof requested by ThresholdPlaintextAggregator)
+    // - 1 ComputeRequest (C7 proof generation)
+    // - 1 ComputeResponse (C7 proof result)
+    // - 1 AggregationProofSigned (C7 proof signed by ProofRequestActor)
     // - 1 PlaintextAggregated (with C7 proofs)
     // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
     // stay on their local buses.
-    // Total: 1 + 5 + 2 + 2 + 2 + 1 = 13 events
-    let expected_count = 1 + 5 + 2 + 2 + 2 + 1;
+    // Total: 1 + 5 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 1 = 17 events
+    let expected_count = 1 + 5 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 1;
 
     let h = nodes
         .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))

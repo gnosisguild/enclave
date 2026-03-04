@@ -34,8 +34,6 @@ pub enum ZkRequest {
     PkAggregation(PkAggregationProofRequest),
     /// Generate proof(s) for threshold share decryption (C6).
     ThresholdShareDecryption(ThresholdShareDecryptionProofRequest),
-    /// Batch-verify C6 proofs from DecryptionshareCreated events.
-    VerifyC6Proofs(VerifyC6ProofsRequest),
     /// Generate proof for decrypted shares aggregation (C7).
     DecryptedSharesAggregation(DecryptedSharesAggregationProofRequest),
 }
@@ -207,8 +205,6 @@ pub enum ZkResponse {
     PkAggregation(PkAggregationProofResponse),
     /// Proof(s) for threshold share decryption (C6).
     ThresholdShareDecryption(ThresholdShareDecryptionProofResponse),
-    /// Batch verification results for C6 proofs.
-    VerifyC6Proofs(VerifyC6ProofsResponse),
     /// Proof for decrypted shares aggregation (C7).
     DecryptedSharesAggregation(DecryptedSharesAggregationProofResponse),
 }
@@ -377,40 +373,6 @@ pub struct PartyShareDecryptionProofsToVerify {
 pub struct VerifyShareDecryptionProofsResponse {
     /// Per-party verification results.
     pub party_results: Vec<PartyVerificationResult>,
-}
-
-// --- C6 verification (follows VerifyC4Proofs pattern) ---
-
-/// Request to batch-verify C6 proofs from DecryptionshareCreated events.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct VerifyC6ProofsRequest {
-    /// C6 proofs grouped by sender party_id.
-    pub party_proofs: Vec<PartyC6ProofsToVerify>,
-}
-
-/// C6 proofs from a single sender to verify.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct PartyC6ProofsToVerify {
-    /// The party that generated these proofs.
-    pub sender_party_id: u64,
-    /// One C6 proof per ciphertext index.
-    pub c6_proofs: Vec<Proof>,
-}
-
-/// Batch verification results for C6 proofs.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct VerifyC6ProofsResponse {
-    /// Per-party verification results.
-    pub party_results: Vec<PartyC6VerificationResult>,
-}
-
-/// Verification result for C6 proofs from a single sender.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct PartyC6VerificationResult {
-    /// The party whose C6 proofs were verified.
-    pub sender_party_id: u64,
-    /// Whether ALL C6 proofs from this party verified successfully.
-    pub all_verified: bool,
 }
 
 // --- C7 proof generation ---

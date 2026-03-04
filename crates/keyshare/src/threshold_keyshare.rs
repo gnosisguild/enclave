@@ -11,16 +11,16 @@ use e3_data::Persistable;
 use e3_events::{
     prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
     ComputeResponse, ComputeResponseKind, CorrelationId, DecryptionKeyShared,
-    DecryptionShareProofsPending, DecryptionshareCreated, Die, DkgProofSigned,
+    DecryptionShareProofSigned, DecryptionShareProofsPending, Die, DkgProofSigned,
     DkgShareDecryptionProofRequest, E3Failed, E3RequestComplete, E3Stage, E3id, EType,
     EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed,
     EncryptionKeyCreated, EncryptionKeyPending, EventContext, FailureReason, KeyshareCreated,
     PartyId, PartyProofsToVerify, PartyShareDecryptionProofsToVerify, PkGenerationProofRequest,
     PkGenerationProofSigned, ProofType, Sequenced, ShareComputationProofRequest,
-    ShareEncryptionProofRequest, ShareVerificationComplete, ShareVerificationDispatched,
-    SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated,
-    ThresholdShareDecryptionProofRequest, ThresholdSharePending, TypedEvent, VerificationKind,
-    ZkRequest, ZkResponse,
+    ShareDecryptionProofPending, ShareEncryptionProofRequest, ShareVerificationComplete,
+    ShareVerificationDispatched, SignedProofPayload, ThresholdShare,
+    ThresholdShareCollectionFailed, ThresholdShareCreated, ThresholdShareDecryptionProofRequest,
+    ThresholdSharePending, TypedEvent, VerificationKind,
 };
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::{build_pair_for_preset, BfvParamSet, BfvPreset};
@@ -644,13 +644,9 @@ impl ThresholdKeyshare {
                 }
                 _ => Ok(()),
             },
-            // ZK responses: C4 proofs and share verification are handled by
+            // ZK responses: proofs and verification are handled by
             // ProofRequestActor and ShareVerificationActor respectively.
-            // Only C6 (ThresholdShareDecryption) is handled here.
-            ComputeResponseKind::Zk(zk) => match zk {
-                ZkResponse::ThresholdShareDecryption(_) => self.handle_c6_proof_response(msg),
-                _ => Ok(()),
-            },
+            ComputeResponseKind::Zk(_) => Ok(()),
         }
     }
 
@@ -1382,6 +1378,7 @@ impl ThresholdKeyshare {
 
                 self.publish_keyshare_created(ec)
             }
+            _ => Ok(()),
         }
     }
 
@@ -1969,7 +1966,8 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// CalculateDecryptionShareResponse — dispatch C6 proof generation
+    /// CalculateDecryptionShareResponse — publish ShareDecryptionProofPending
+    /// so ProofRequestActor generates and signs C6 proofs.
     pub fn handle_calculate_decryption_share_response(
         &mut self,
         res: TypedEvent<ComputeResponse>,
@@ -1998,24 +1996,28 @@ impl ThresholdKeyshare {
                 )
             })?;
 
-        info!("Dispatching C6 proof generation (threshold share decryption)...");
+        info!("Publishing ShareDecryptionProofPending for C6 proof generation...");
 
-        // Publish C6 proof request before transitioning state so a publish
+        // Publish pending event before transitioning state so a publish
         // failure leaves us in Decrypting (retryable) rather than
         // GeneratingDecryptionProof (no retry path).
-        let request = ComputeRequest::zk(
-            ZkRequest::ThresholdShareDecryption(ThresholdShareDecryptionProofRequest {
-                ciphertext_bytes: decrypting.ciphertext_output,
-                aggregated_pk_bytes,
-                sk_poly_sum: decrypting.sk_poly_sum,
-                es_poly_sum: decrypting.es_poly_sum,
-                d_share_bytes: d_share_poly.clone(),
-                params_preset: threshold_preset,
-            }),
-            CorrelationId::new(),
-            e3_id,
-        );
-        self.bus.publish(request, ec.clone())?;
+        self.bus.publish(
+            ShareDecryptionProofPending {
+                e3_id: e3_id.clone(),
+                party_id: state.party_id,
+                node: state.address.clone(),
+                decryption_share: d_share_poly.clone(),
+                proof_request: ThresholdShareDecryptionProofRequest {
+                    ciphertext_bytes: decrypting.ciphertext_output,
+                    aggregated_pk_bytes,
+                    sk_poly_sum: decrypting.sk_poly_sum,
+                    es_poly_sum: decrypting.es_poly_sum,
+                    d_share_bytes: d_share_poly.clone(),
+                    params_preset: threshold_preset,
+                },
+            },
+            ec.clone(),
+        )?;
 
         // Transition to GeneratingDecryptionProof state
         self.state.try_mutate(&ec, |s| {
@@ -2041,37 +2043,12 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// Handle C6 proof response — publish DecryptionshareCreated with proofs
-    pub fn handle_c6_proof_response(&mut self, res: TypedEvent<ComputeResponse>) -> Result<()> {
-        let (res, ec) = res.into_components();
-        let zk_response = res.try_into_zk()?;
-        let proofs = match zk_response {
-            ZkResponse::ThresholdShareDecryption(data) => data.proofs,
-            _ => bail!("Expected ThresholdShareDecryptionProofResponse"),
-        };
+    pub fn handle_decryption_share_proof_signed(
+        &mut self,
+        msg: TypedEvent<DecryptionShareProofSigned>,
+    ) -> Result<()> {
+        let (_msg, ec) = msg.into_components();
 
-        let state = self.state.try_get()?;
-        let party_id = state.party_id;
-        let node = state.address.clone();
-        let e3_id = state.e3_id.clone();
-        let gen_proof: GeneratingDecryptionProof = state.clone().try_into()?;
-
-        info!(
-            "C6 proof generated ({} proofs), publishing DecryptionshareCreated",
-            proofs.len()
-        );
-
-        let event = DecryptionshareCreated {
-            party_id,
-            node,
-            e3_id,
-            decryption_share: gen_proof.decryption_share,
-            decryption_proofs: proofs,
-        };
-
-        self.bus.publish(event, ec.clone())?;
-
-        // mark as complete
         self.state.try_mutate(&ec, |s| {
             use KeyshareState as K;
             info!("Decryption share sending process is complete");
@@ -2199,6 +2176,9 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
                     }
                 }
             }
+            EnclaveEventData::DecryptionShareProofSigned(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             EnclaveEventData::ShareVerificationComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
@@ -2207,6 +2187,21 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
             }
             _ => (),
         }
+    }
+}
+
+impl Handler<TypedEvent<DecryptionShareProofSigned>> for ThresholdKeyshare {
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: TypedEvent<DecryptionShareProofSigned>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(
+            EType::KeyGeneration,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_decryption_share_proof_signed(msg),
+        )
     }
 }
 
