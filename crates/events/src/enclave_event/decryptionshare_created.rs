@@ -19,6 +19,7 @@ pub struct DecryptionshareCreated {
     pub e3_id: E3id,
     pub node: String,
     /// C6 proofs: one signed proof of correct decryption per ciphertext index.
+    #[serde(default)]
     pub signed_decryption_proofs: Vec<SignedProofPayload>,
 }
 

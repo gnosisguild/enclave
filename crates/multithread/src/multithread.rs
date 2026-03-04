@@ -37,6 +37,7 @@ use e3_events::{
     ZkResponse,
 };
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
 use e3_polynomial::CrtPolynomial;
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
@@ -46,6 +47,7 @@ use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::helpers::deserialize_secret_key;
 use e3_trbfv::helpers::try_poly_from_bytes;
+use e3_trbfv::helpers::try_poly_from_sensitive_bytes;
 use e3_trbfv::shares::SharedSecret;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::SharedRng;
@@ -64,8 +66,10 @@ use e3_zk_helpers::dkg::share_decryption::{ShareDecryptionCircuit, ShareDecrypti
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
+use e3_zk_helpers::CiphernodesCommittee;
 use e3_zk_prover::{Provable, ZkBackend, ZkProver};
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
+use fhe::mbfv::PublicKeyShare;
 use fhe_traits::{DeserializeParametrized, FheEncoder};
 use ndarray::Array2;
 use num_bigint::BigInt;
@@ -277,16 +281,15 @@ fn handle_pk_aggregation_proof(
         .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
 
     // 2. Create deterministic CRP
-    let crp = e3_fhe_params::create_deterministic_crp_from_default_seed(&threshold_params);
+    let crp = create_deterministic_crp_from_default_seed(&threshold_params);
 
     // 3. Deserialize each keyshare as PublicKeyShare and extract pk0
     let mut pk0_shares = Vec::with_capacity(req.keyshare_bytes.len());
     for (i, ks_bytes) in req.keyshare_bytes.iter().enumerate() {
-        let pk_share =
-            fhe::mbfv::PublicKeyShare::deserialize(ks_bytes, &threshold_params, crp.clone())
-                .map_err(|e| {
-                    make_zk_error(&request, format!("keyshare[{}] deserialize: {:?}", i, e))
-                })?;
+        let pk_share = PublicKeyShare::deserialize(ks_bytes, &threshold_params, crp.clone())
+            .map_err(|e| {
+                make_zk_error(&request, format!("keyshare[{}] deserialize: {:?}", i, e))
+            })?;
         pk0_shares.push(CrtPolynomial::from_fhe_polynomial(&pk_share.p0_share()));
     }
 
@@ -298,7 +301,7 @@ fn handle_pk_aggregation_proof(
     let a = CrtPolynomial::from_fhe_polynomial(&crp.poly());
 
     // 6. Build committee and circuit data
-    let committee = e3_zk_helpers::CiphernodesCommittee {
+    let committee = CiphernodesCommittee {
         n: req.committee_n,
         h: req.committee_h,
         threshold: req.committee_threshold,
@@ -346,12 +349,8 @@ fn handle_threshold_share_decryption_proof(
         .map_err(|e| make_zk_error(&request, format!("aggregated_pk deserialize: {:?}", e)))?;
 
     // 3. Decrypt sk_poly_sum → Poly → CrtPolynomial (s)
-    let sk_poly = e3_trbfv::helpers::try_poly_from_sensitive_bytes(
-        req.sk_poly_sum,
-        threshold_params.clone(),
-        cipher,
-    )
-    .map_err(|e| make_zk_error(&request, format!("sk_poly_sum decrypt: {}", e)))?;
+    let sk_poly = try_poly_from_sensitive_bytes(req.sk_poly_sum, threshold_params.clone(), cipher)
+        .map_err(|e| make_zk_error(&request, format!("sk_poly_sum decrypt: {}", e)))?;
     let s = CrtPolynomial::from_fhe_polynomial(&sk_poly);
 
     // 4. For each index, build circuit data and generate proof
@@ -382,7 +381,7 @@ fn handle_threshold_share_decryption_proof(
         // Currently there is a single smudging noise polynomial shared across all
         // ciphertexts (see calculate_decryption_share.rs).
         let es_idx = i % req.es_poly_sum.len();
-        let e_poly = e3_trbfv::helpers::try_poly_from_sensitive_bytes(
+        let e_poly = try_poly_from_sensitive_bytes(
             req.es_poly_sum[es_idx].clone(),
             threshold_params.clone(),
             cipher,

@@ -18,6 +18,7 @@ pub struct PlaintextAggregated {
     pub e3_id: E3id,
     pub decrypted_output: Vec<ArcBytes>,
     /// C7 proofs: one proof of correct aggregation per ciphertext index.
+    #[serde(default)]
     pub aggregation_proofs: Vec<Proof>,
 }
 

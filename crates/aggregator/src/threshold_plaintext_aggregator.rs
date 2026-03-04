@@ -283,6 +283,10 @@ impl ThresholdPlaintextAggregator {
             return Ok(());
         }
 
+        if msg.e3_id != self.e3_id {
+            return Ok(());
+        }
+
         let state: VerifyingC6 = self
             .state
             .get()
@@ -421,6 +425,11 @@ impl ThresholdPlaintextAggregator {
         msg: TypedEvent<AggregationProofSigned>,
     ) -> Result<()> {
         let (msg, ec) = msg.into_components();
+
+        if msg.e3_id != self.e3_id {
+            return Ok(());
+        }
+
         let state: GeneratingC7Proof = self
             .state
             .get()

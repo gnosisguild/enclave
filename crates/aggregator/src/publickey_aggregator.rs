@@ -218,6 +218,10 @@ impl PublicKeyAggregator {
             return Ok(());
         }
 
+        if msg.e3_id != self.e3_id {
+            return Ok(());
+        }
+
         let PublicKeyAggregatorState::VerifyingC1 {
             keyshares,
             nodes,

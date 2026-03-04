@@ -22,10 +22,8 @@ use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
-/// Proof type identifier covering all node-generated proofs.
-///
-/// Aggregation proofs (Proofs 5 and 7) are excluded — they are published on-chain
-/// directly and verified by the contract at submission time.
+/// Proof type identifier covering all node-generated proofs, including
+/// aggregation proofs (C5 pk aggregation and C7 decrypted shares aggregation).
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ProofType {
