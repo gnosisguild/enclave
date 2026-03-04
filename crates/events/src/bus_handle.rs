@@ -292,13 +292,13 @@ impl<S> EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle<S> {
         &self,
         event_type: EventType,
     ) -> Pin<Box<dyn Future<Output = Result<EnclaveEvent<Sequenced>>> + Send>> {
-        let (addr, rx) = oneshot::<EnclaveEvent<Sequenced>>();
-        self.subscribe(event_type, addr.clone());
         let bus = self.event_bus.clone();
         Box::pin(async move {
-            let r = rx.await?;
+            let (addr, rx) = oneshot::<EnclaveEvent<Sequenced>>();
+            bus.do_send(Subscribe::new(event_type, addr.clone()));
+            let received = rx.await;
             bus.do_send(Unsubscribe::new(event_type, addr));
-            Ok(r)
+            Ok(received?)
         })
     }
 }
