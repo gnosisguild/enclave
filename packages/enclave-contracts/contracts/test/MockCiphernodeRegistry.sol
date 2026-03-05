@@ -56,7 +56,7 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function addCiphernode(address) external pure {}
 
     // solhint-disable-next-line no-empty-blocks
-    function removeCiphernode(address, uint256[] calldata) external pure {}
+    function removeCiphernode(address) external pure {}
 
     function publishCommittee(
         uint256,
@@ -183,7 +183,7 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
     function addCiphernode(address) external pure {}
 
     // solhint-disable-next-line no-empty-blocks
-    function removeCiphernode(address, uint256[] calldata) external pure {}
+    function removeCiphernode(address) external pure {}
 
     function publishCommittee(
         uint256,
