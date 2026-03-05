@@ -55,7 +55,7 @@ If you use [Nix](https://nixos.org/) with flakes enabled, you can get a complete
 Run the CLI directly without installing it:
 
 ```bash
-nix run github:gnosisguild/enclave -- --help
+nix run github:gnosisguild/enclave/v0.1.15 -- --help
 ```
 
 This will build from source using the nix framework.
@@ -66,18 +66,14 @@ To add Enclave to a project, create a `flake.nix` in your project root:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    enclave.url = "github:gnosisguild/enclave";
+    enclave.url = "github:gnosisguild/enclave/v0.1.15";
   };
-  outputs = {
-    nixpkgs,
-    enclave,
-    ...
-  }: let
+  outputs = { nixpkgs, enclave, ... }: let
     system = "x86_64-linux";
     e = enclave.packages.${system};
   in {
     devShells.${system}.default = nixpkgs.legacyPackages.${system}.mkShell {
-      packages = [e.default e.bb];
+      packages = [ e.default e.bb ];
       shellHook = ''
         export E3_CUSTOM_BB="${e.bb}/bin/bb"
       '';
@@ -93,6 +89,8 @@ nix develop
 ```
 
 Replace `x86_64-linux` with `aarch64-linux`, `x86_64-darwin`, or `aarch64-darwin` as appropriate for your platform.
+
+Replace `v0.1.15` with the desired [release tag](https://github.com/gnosisguild/enclave/releases). To update later, run `nix flake update enclave`.
 
 To check your installation:
 
