@@ -56,8 +56,9 @@ pub fn load_wrapper_vk_artifacts(
 }
 
 /// Loads VK artifacts from `.vk` and `.vk_hash` in the flavor-specific circuits directory.
-/// The caller is responsible for passing the correct circuits_dir
-/// (typically `circuits_dir(CircuitFlavor::Default)` for recursive proofs).
+/// The caller is responsible for passing the correct circuits_dir:
+/// - `circuits_dir(CircuitFlavor::Recursive)` for inner/base proofs embedded in a wrapper
+/// - `circuits_dir(CircuitFlavor::Default)` for wrapper/fold proofs
 pub fn load_vk_artifacts(
     circuits_dir: &Path,
     circuit: CircuitName,

@@ -21,14 +21,16 @@ export const ALL_GROUPS: CircuitGroup[] = [CIRCUIT_GROUPS.DKG, CIRCUIT_GROUPS.TH
 /**
  * Circuit flavors determine the hash oracle used for VK generation and proving.
  *
- * - `default`: Uses poseidon hash — for off-chain ciphernode-to-ciphernode verification.
- * - `evm`: Uses keccak hash — for on-chain EVM-verifiable proofs.
+ * - `default`: Uses poseidon/noir-recursive-no-zk — wrapper & fold proofs (efficient, no ZK blinding).
+ * - `recursive`: Uses poseidon/noir-recursive — inner/base proofs (ZK blinding preserved).
+ * - `evm`: Uses keccak — for on-chain EVM-verifiable proofs.
  */
 export const CIRCUIT_FLAVORS = {
   DEFAULT: 'default',
+  RECURSIVE: 'recursive',
   EVM: 'evm',
 } as const
 
 export type CircuitFlavor = (typeof CIRCUIT_FLAVORS)[keyof typeof CIRCUIT_FLAVORS]
 
-export const ALL_FLAVORS: CircuitFlavor[] = [CIRCUIT_FLAVORS.DEFAULT, CIRCUIT_FLAVORS.EVM]
+export const ALL_FLAVORS: CircuitFlavor[] = [CIRCUIT_FLAVORS.DEFAULT, CIRCUIT_FLAVORS.RECURSIVE, CIRCUIT_FLAVORS.EVM]

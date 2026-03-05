@@ -68,8 +68,8 @@ impl ZkProver {
         self.generate_proof_impl(circuit, witness_data, e3_id, &circuit.dir_path(), flavor)
     }
 
-    /// Generates a proof for recursive aggregation (poseidon2, noir-recursive-no-zk).
-    /// Uses the default (poseidon) flavor since recursive proofs require poseidon.
+    /// Generates a proof for recursive aggregation (poseidon, noir-recursive with ZK blinding).
+    /// Inner/base proofs fed into a wrapper use the Recursive flavor so the witness stays hidden.
     pub fn generate_recursive_proof(
         &self,
         circuit: CircuitName,
@@ -81,7 +81,7 @@ impl ZkProver {
             witness_data,
             e3_id,
             &circuit.dir_path(),
-            CircuitFlavor::Default,
+            CircuitFlavor::Recursive,
         )
     }
 

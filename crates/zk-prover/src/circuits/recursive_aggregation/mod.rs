@@ -97,7 +97,7 @@ pub fn generate_wrapper_proof(
     let circuit = proofs[0].circuit;
 
     let vk_artifacts =
-        vk::load_vk_artifacts(&prover.circuits_dir(CircuitFlavor::Default), circuit)?;
+        vk::load_vk_artifacts(&prover.circuits_dir(CircuitFlavor::Recursive), circuit)?;
 
     let full_input = WrapperInput {
         verification_key: vk_artifacts.verification_key,

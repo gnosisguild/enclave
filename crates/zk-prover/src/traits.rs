@@ -119,7 +119,7 @@ pub trait Provable: Send + Sync {
         for (i, input) in inputs.iter().enumerate() {
             let input_map = self.build_inputs(params, input)?;
             let circuit_path = prover
-                .circuits_dir(CircuitFlavor::Default)
+                .circuits_dir(CircuitFlavor::Recursive)
                 .join(resolved_names[i].dir_path())
                 .join(format!("{}.json", resolved_names[i].as_str()));
             let circuit = CompiledCircuit::from_file(&circuit_path)?;

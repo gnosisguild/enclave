@@ -48,6 +48,7 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
     let json_path = target_dir.join(format!("{circuit_name}.json"));
     let vk_evm_path = target_dir.join(format!("{circuit_name}.vk"));
     let vk_recursive_path = target_dir.join(format!("{circuit_name}.vk_recursive"));
+    let vk_noir_path = target_dir.join(format!("{circuit_name}.vk_noir"));
 
     assert!(
         json_path.exists(),
@@ -74,7 +75,7 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
         .await
         .unwrap();
 
-    // Set up the default flavor directory (poseidon VK, renamed from .vk_recursive)
+    // Set up the default flavor directory (noir-recursive-no-zk VK for wrapper/fold proofs)
     let default_dir = backend
         .circuits_dir
         .join("default")
@@ -84,7 +85,7 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
     fs::copy(&json_path, default_dir.join(format!("{circuit_name}.json")))
         .await
         .unwrap();
-    // Use the poseidon VK (.vk_recursive) if available, otherwise fall back to .vk
+    // Use .vk_recursive (noir-recursive-no-zk) if available, otherwise fall back to .vk
     let default_vk_src = if vk_recursive_path.exists() {
         &vk_recursive_path
     } else {
@@ -93,6 +94,34 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
     fs::copy(
         default_vk_src,
         default_dir.join(format!("{circuit_name}.vk")),
+    )
+    .await
+    .unwrap();
+
+    // Set up the recursive flavor directory (noir-recursive VK for inner/base proofs)
+    let recursive_dir = backend
+        .circuits_dir
+        .join("recursive")
+        .join(group)
+        .join(circuit_name);
+    fs::create_dir_all(&recursive_dir).await.unwrap();
+    fs::copy(
+        &json_path,
+        recursive_dir.join(format!("{circuit_name}.json")),
+    )
+    .await
+    .unwrap();
+    // Use .vk_noir (noir-recursive) if available, otherwise fall back to .vk_recursive, then .vk
+    let recursive_vk_src = if vk_noir_path.exists() {
+        &vk_noir_path
+    } else if vk_recursive_path.exists() {
+        &vk_recursive_path
+    } else {
+        &vk_evm_path
+    };
+    fs::copy(
+        recursive_vk_src,
+        recursive_dir.join(format!("{circuit_name}.vk")),
     )
     .await
     .unwrap();
