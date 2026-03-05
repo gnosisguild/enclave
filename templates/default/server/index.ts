@@ -135,7 +135,6 @@ async function handleCommitteePublishedEvent(event: any) {
   console.log(`🎯 Committee Published for: ${e3Id}, expiration: ${expiration}`)
 
   console.log(`📥 Setting up session for E3 ${e3Id}...`)
-  console.log(e3Sessions)
 
   if (!e3Sessions.has(e3Id.toString())) {
     e3Sessions.set(e3Id.toString(), {

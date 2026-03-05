@@ -204,8 +204,62 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
 
-        let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
+        // Copy C5 (pk_aggregation) circuit
+        let pk_agg_circuit_dir = circuits_dir.join("threshold").join("pk_aggregation");
+        tokio::fs::create_dir_all(&pk_agg_circuit_dir)
+            .await
+            .unwrap();
+        tokio::fs::copy(
+            threshold_target.join("pk_aggregation.json"),
+            pk_agg_circuit_dir.join("pk_aggregation.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            threshold_target.join("pk_aggregation.vk"),
+            pk_agg_circuit_dir.join("pk_aggregation.vk"),
+        )
+        .await
+        .unwrap();
 
+        // Copy C6 (threshold/share_decryption) circuit for C6 verification
+        let threshold_share_dec_circuit_dir =
+            circuits_dir.join("threshold").join("share_decryption");
+        tokio::fs::create_dir_all(&threshold_share_dec_circuit_dir)
+            .await
+            .unwrap();
+        tokio::fs::copy(
+            threshold_target.join("share_decryption.json"),
+            threshold_share_dec_circuit_dir.join("share_decryption.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            threshold_target.join("share_decryption.vk"),
+            threshold_share_dec_circuit_dir.join("share_decryption.vk"),
+        )
+        .await
+        .unwrap();
+
+        // Copy C7 (decrypted_shares_aggregation_mod) circuit
+        let dsa_circuit_dir = circuits_dir
+            .join("threshold")
+            .join("decrypted_shares_aggregation_mod");
+        tokio::fs::create_dir_all(&dsa_circuit_dir).await.unwrap();
+        tokio::fs::copy(
+            threshold_target.join("decrypted_shares_aggregation_mod.json"),
+            dsa_circuit_dir.join("decrypted_shares_aggregation_mod.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            threshold_target.join("decrypted_shares_aggregation_mod.vk"),
+            dsa_circuit_dir.join("decrypted_shares_aggregation_mod.vk"),
+        )
+        .await
+        .unwrap();
+
+        let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
         (backend, temp)
     } else {
         println!("bb binary not found locally, downloading via ensure_installed()...");
@@ -607,11 +661,17 @@ async fn test_trbfv_actor() -> Result<()> {
         decryption_key_shared_timer.elapsed(),
     ));
 
-    // Wait for KeyshareCreated + PublicKeyAggregated
-    // - KeyshareCreated × 5 (passes is_forwardable_event filter)
-    // - PublicKeyAggregated × 1 (passes is_forwardable_event filter)
-    // After DecryptionKeySharedCollector collects all shares and C4 proofs are verified,
-    // each party publishes KeyshareCreated.
+    // Wait for KeyshareCreated + C1 verification + C5 proof + PublicKeyAggregated
+    // - KeyshareCreated × 5 (forwarded from committee nodes)
+    // - ShareVerificationDispatched (C1 proof verification dispatched by PublicKeyAggregator)
+    // - ComputeRequest (C1 ZK verification)
+    // - ComputeResponse (C1 ZK verification result)
+    // - ShareVerificationComplete (C1 verification done)
+    // - PkAggregationProofPending (C5 proof requested by PublicKeyAggregator)
+    // - ComputeRequest (C5 proof generation)
+    // - ComputeResponse (C5 proof result)
+    // - PkAggregationProofSigned (C5 proof signed by ProofRequestActor)
+    // - PublicKeyAggregated × 1
     let shares_to_pubkey_agg_timer = Instant::now();
     let expected = vec![
         "KeyshareCreated",
@@ -619,6 +679,14 @@ async fn test_trbfv_actor() -> Result<()> {
         "KeyshareCreated",
         "KeyshareCreated",
         "KeyshareCreated",
+        "ShareVerificationDispatched",
+        "ComputeRequest",
+        "ComputeResponse",
+        "ShareVerificationComplete",
+        "PkAggregationProofPending",
+        "ComputeRequest",
+        "ComputeResponse",
+        "PkAggregationProofSigned",
         "PublicKeyAggregated",
     ];
     let h = nodes
@@ -695,13 +763,21 @@ async fn test_trbfv_actor() -> Result<()> {
     // The collector sees:
     // - 1 CiphertextOutputPublished (from shared bus)
     // - 5 DecryptionshareCreated (from simulate_libp2p, passes is_forwardable_event)
-    // - 1 ComputeRequest (PlaintextAggregation on node 0's own bus)
-    // - 1 ComputeResponse (PlaintextAggregation on node 0's own bus)
-    // - 1 PlaintextAggregated (from node 0's own aggregation actor)
+    // - 1 ShareVerificationDispatched (C6 verification dispatched by ThresholdPlaintextAggregator)
+    // - 1 ComputeRequest (C6 ZK verification)
+    // - 1 ComputeResponse (C6 ZK verification result)
+    // - 1 ShareVerificationComplete (C6 verification done)
+    // - 1 ComputeRequest (TrBFV CalculateThresholdDecryption)
+    // - 1 ComputeResponse (TrBFV CalculateThresholdDecryption)
+    // - 1 AggregationProofPending (C7 proof requested by ThresholdPlaintextAggregator)
+    // - 1 ComputeRequest (C7 proof generation)
+    // - 1 ComputeResponse (C7 proof result)
+    // - 1 AggregationProofSigned (C7 proof signed by ProofRequestActor)
+    // - 1 PlaintextAggregated (with C7 proofs)
     // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
     // stay on their local buses.
-    // Total: 1 + 5 + 1 + 1 + 1 = 9 events
-    let expected_count = 1 + 5 + 1 + 1 + 1;
+    // Total: 1 + 5 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 1 = 17 events
+    let expected_count = 1 + 5 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 1;
 
     let h = nodes
         .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))
@@ -714,6 +790,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let Some(EnclaveEventData::PlaintextAggregated(PlaintextAggregated {
         decrypted_output: plaintext,
+        aggregation_proofs,
         ..
     })) = h.last().map(|e| e.get_data())
     else {
@@ -722,6 +799,11 @@ async fn test_trbfv_actor() -> Result<()> {
             h.event_types()
         )
     };
+
+    assert!(
+        !aggregation_proofs.is_empty(),
+        "C7 proofs should be present in PlaintextAggregated"
+    );
 
     let results = plaintext
         .into_iter()
@@ -811,11 +893,13 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     let evt_1 = PlaintextAggregated {
         e3_id: E3id::new("1235", 1),
         decrypted_output: vec![ArcBytes::from_bytes(&[1, 2, 3, 4])],
+        aggregation_proofs: vec![],
     };
 
     let evt_2 = PlaintextAggregated {
         e3_id: E3id::new("1236", 1),
         decrypted_output: vec![ArcBytes::from_bytes(&[1, 2, 3, 4])],
+        aggregation_proofs: vec![],
     };
 
     let local_evt_3 = CiphernodeSelected {
@@ -925,9 +1009,12 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         addr: &str,
         store: Option<actix::Addr<InMemStore>>,
         cipher: &Arc<Cipher>,
+        zk_backend: ZkBackend,
     ) -> Result<e3_ciphernode_builder::CiphernodeHandle> {
         let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
             .with_trbfv()
+            .with_zkproof(zk_backend)
+            .testmode_with_signer(PrivateKeySigner::random())
             .testmode_with_forked_bus(bus.event_bus())
             .testmode_with_history()
             .testmode_with_errors()
@@ -952,23 +1039,29 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         rng: &e3_utils::SharedRng,
         count: u32,
         cipher: &Arc<Cipher>,
+        zk_backend: ZkBackend,
     ) -> Result<Vec<e3_ciphernode_builder::CiphernodeHandle>> {
         let eth_addrs = create_random_eth_addrs(count);
         let mut result = vec![];
         for addr in &eth_addrs {
             println!("Setting up eth addr: {}", addr);
-            let tuple = setup_local_ciphernode(&bus, &rng, true, addr, None, cipher).await?;
+            let tuple =
+                setup_local_ciphernode(&bus, &rng, true, addr, None, cipher, zk_backend.clone())
+                    .await?;
             result.push(tuple);
         }
         simulate_libp2p_net(&result);
         Ok(result)
     }
 
+    let (zk_backend, _zk_temp) = setup_test_zk_backend().await;
+
     let e3_id = E3id::new("1234", 1);
     let (rng, cn1_address, cn1_data, cn2_address, cn2_data, cipher, history, params, crpoly) = {
         let (bus, rng, seed, params, crpoly, _, _) = get_common_setup(None)?;
         let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
-        let ciphernodes = create_local_ciphernodes(&bus, &rng, 2, &cipher).await?;
+        let ciphernodes =
+            create_local_ciphernodes(&bus, &rng, 2, &cipher, zk_backend.clone()).await?;
         let eth_addrs = ciphernodes.iter().map(|n| n.address()).collect::<Vec<_>>();
 
         setup_score_sortition_environment(&bus, &eth_addrs, 1).await?;
@@ -1038,6 +1131,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         &cn1_address,
         Some(InMemStore::from_dump(cn1_data, true)?.start()),
         &cipher,
+        zk_backend.clone(),
     )
     .await?;
     let cn2 = setup_local_ciphernode(
@@ -1047,6 +1141,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         &cn2_address,
         Some(InMemStore::from_dump(cn2_data, true)?.start()),
         &cipher,
+        zk_backend.clone(),
     )
     .await?;
     let history_collector = cn1.history().unwrap();
@@ -1132,9 +1227,12 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         addr: &str,
         store: Option<actix::Addr<e3_data::InMemStore>>,
         cipher: &Arc<Cipher>,
+        zk_backend: ZkBackend,
     ) -> Result<e3_ciphernode_builder::CiphernodeHandle> {
         let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
             .with_trbfv()
+            .with_zkproof(zk_backend)
+            .testmode_with_signer(PrivateKeySigner::random())
             .testmode_with_forked_bus(bus.event_bus())
             .testmode_with_history()
             .testmode_with_errors()
@@ -1159,12 +1257,15 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         rng: &e3_utils::SharedRng,
         count: u32,
         cipher: &Arc<Cipher>,
+        zk_backend: ZkBackend,
     ) -> Result<Vec<e3_ciphernode_builder::CiphernodeHandle>> {
         let eth_addrs = create_random_eth_addrs(count);
         let mut result = vec![];
         for addr in &eth_addrs {
             println!("Setting up eth addr: {}", addr);
-            let tuple = setup_local_ciphernode(&bus, &rng, true, addr, None, cipher).await?;
+            let tuple =
+                setup_local_ciphernode(&bus, &rng, true, addr, None, cipher, zk_backend.clone())
+                    .await?;
             result.push(tuple);
         }
         simulate_libp2p_net(&result);
@@ -1206,9 +1307,10 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     // Setup
     let (bus, rng, seed, params, crpoly, _, _) = get_common_setup(None)?;
     let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
+    let (zk_backend, _zk_temp) = setup_test_zk_backend().await;
 
     // Setup actual ciphernodes and dispatch add events
-    let ciphernodes = create_local_ciphernodes(&bus, &rng, 3, &cipher).await?;
+    let ciphernodes = create_local_ciphernodes(&bus, &rng, 3, &cipher, zk_backend.clone()).await?;
     let eth_addrs = ciphernodes.iter().map(|tup| tup.address()).collect();
 
     setup_score_sortition_environment(&bus, &eth_addrs, 1).await?;
@@ -1254,6 +1356,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
             public_key_hash,
             e3_id: E3id::new("1234", 1),
             nodes: OrderedSet::from(eth_addrs.clone()),
+            pk_aggregation_proof: None,
         }
         .into()
     );
@@ -1296,6 +1399,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
             public_key_hash,
             e3_id: E3id::new("1234", 2),
             nodes: OrderedSet::from(eth_addrs.clone()),
+            pk_aggregation_proof: None,
         }
         .into()
     );

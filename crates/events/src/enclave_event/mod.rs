@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+mod aggregation_proof_pending;
+mod aggregation_proof_signed;
 mod ciphernode_added;
 mod ciphernode_removed;
 mod ciphernode_selected;
@@ -15,6 +17,7 @@ mod committee_requested;
 mod compute_request;
 mod configuration_updated;
 mod decryption_key_shared;
+mod decryption_share_proof_signed;
 mod decryption_share_proofs;
 mod decryptionshare_created;
 mod die;
@@ -32,6 +35,8 @@ mod keyshare_created;
 mod net_sync_events_received;
 mod operator_activation_changed;
 mod outgoing_sync_requested;
+mod pk_aggregation_proof_pending;
+mod pk_aggregation_proof_signed;
 mod pk_generation_proof_signed;
 mod plaintext_aggregated;
 mod plaintext_output_published;
@@ -39,6 +44,7 @@ mod proof;
 mod publickey_aggregated;
 mod publish_document;
 mod share_computation_proof_signed;
+mod share_decryption_proof_pending;
 mod share_verification;
 mod shutdown;
 mod signed_proof;
@@ -55,6 +61,8 @@ mod ticket_generated;
 mod ticket_submitted;
 mod typed_event;
 
+pub use aggregation_proof_pending::*;
+pub use aggregation_proof_signed::*;
 pub use ciphernode_added::*;
 pub use ciphernode_removed::*;
 pub use ciphernode_selected::*;
@@ -66,6 +74,7 @@ pub use committee_requested::*;
 pub use compute_request::*;
 pub use configuration_updated::*;
 pub use decryption_key_shared::*;
+pub use decryption_share_proof_signed::*;
 pub use decryption_share_proofs::*;
 pub use decryptionshare_created::*;
 pub use die::*;
@@ -84,6 +93,8 @@ pub use keyshare_created::*;
 pub use net_sync_events_received::*;
 pub use operator_activation_changed::*;
 pub use outgoing_sync_requested::*;
+pub use pk_aggregation_proof_pending::*;
+pub use pk_aggregation_proof_signed::*;
 pub use pk_generation_proof_signed::*;
 pub use plaintext_aggregated::*;
 pub use plaintext_output_published::*;
@@ -91,6 +102,7 @@ pub use proof::*;
 pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use share_computation_proof_signed::*;
+pub use share_decryption_proof_pending::*;
 pub use share_verification::*;
 pub use shutdown::*;
 pub use signed_proof::*;
@@ -256,6 +268,12 @@ pub enum EnclaveEventData {
     SyncEffect(SyncEffect),
     SyncEnded(SyncEnded),
     EffectsEnabled(EffectsEnabled),
+    DecryptionShareProofSigned(DecryptionShareProofSigned),
+    ShareDecryptionProofPending(ShareDecryptionProofPending),
+    PkAggregationProofPending(PkAggregationProofPending),
+    PkAggregationProofSigned(PkAggregationProofSigned),
+    AggregationProofPending(AggregationProofPending),
+    AggregationProofSigned(AggregationProofSigned),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -510,6 +528,12 @@ impl EnclaveEventData {
             EnclaveEventData::CommitteeMemberExpelled(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3Failed(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3StageChanged(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::DecryptionShareProofSigned(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ShareDecryptionProofPending(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::PkAggregationProofPending(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::PkAggregationProofSigned(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::AggregationProofPending(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::AggregationProofSigned(ref data) => Some(data.e3_id.clone()),
             _ => None,
         }
     }
@@ -587,7 +611,13 @@ impl_event_types!(
     HistoricalNetSyncStart,
     SyncEffect,
     SyncEnded,
-    EffectsEnabled
+    EffectsEnabled,
+    DecryptionShareProofSigned,
+    ShareDecryptionProofPending,
+    PkAggregationProofPending,
+    PkAggregationProofSigned,
+    AggregationProofPending,
+    AggregationProofSigned
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {

@@ -23,7 +23,7 @@ use e3_evm::{
     SlashingManagerSolWriter,
 };
 use e3_fhe::ext::FheExtension;
-use e3_fhe_params::BfvPreset;
+use e3_fhe_params::{BfvPreset, DEFAULT_BFV_PRESET};
 use e3_keyshare::ext::ThresholdKeyshareExtension;
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
 use e3_net::{setup_net, NetRepositoryFactory};
@@ -474,14 +474,36 @@ impl CiphernodeBuilder {
 
         if self.pubkey_agg {
             info!("Setting up PublicKeyAggregationExtension");
-            e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(&bus))
+            // Ensure multithread worker is available for C1 verification and C5 proof generation
+            let _ = self.ensure_multithread(&bus);
+            // TODO: Make BfvPreset configurable via builder method.
+            // Currently hardcoded to InsecureThreshold512 for C5 proof generation.
+            // Production deployments should use the appropriate threshold preset.
+            let aggregator_preset = DEFAULT_BFV_PRESET;
+            e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(
+                &bus,
+                aggregator_preset,
+            ));
+
+            if self.keyshare.is_none() {
+                let backend = self
+                    .zk_backend
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("ZK backend is required for aggregator"))?;
+                let signer = provider_cache.ensure_signer().await?;
+                info!("Setting up ZK actors for aggregator");
+                setup_zk_actors(&bus, backend, signer);
+            }
         }
 
         if self.threshold_plaintext_agg {
             info!("Setting up ThresholdPlaintextAggregatorExtension");
             let _ = self.ensure_multithread(&bus);
+            let aggregator_preset = DEFAULT_BFV_PRESET;
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
-                &bus, &sortition,
+                &bus,
+                &sortition,
+                aggregator_preset,
             ))
         }
 

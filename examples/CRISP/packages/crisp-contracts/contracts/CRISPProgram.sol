@@ -42,7 +42,7 @@ contract CRISPProgram is IE3Program, Ownable {
   /// @notice Maximum number of bits allocated for vote counts in the plaintext output per option.
   uint256 constant MAX_VOTE_BITS = 50;
   /// @notice The zero-knowledge verification key hash for the CRISP program.
-  bytes32 public constant ZK_VK_HASH = 0xfbb1352f018828a2e0989e3010af055b6217b60462066ae0ce06209e22ffa8c2;
+  bytes32 public constant ZK_VK_HASH = 0x2e53e3285d47eebd65eb932cf6a57ecaa5e43f90b1673165715c92b78e493a9c;
 
   // State variables
   IEnclave public enclave;
@@ -181,7 +181,7 @@ contract CRISPProgram is IE3Program, Ownable {
     (uint40 voteIndex, bytes32 previousEncryptedVoteCommitment) = _processVote(e3Id, slotAddress, encryptedVoteCommitment);
 
     // Set the public inputs for the proof. Order must match Noir circuit.
-    bytes32[] memory noirPublicInputs = new bytes32[](39);
+    bytes32[] memory noirPublicInputs = new bytes32[](8);
     noirPublicInputs[0] = previousEncryptedVoteCommitment;
     noirPublicInputs[1] = bytes32(e3Data[e3Id].merkleRoot);
     noirPublicInputs[2] = bytes32(uint256(uint160(slotAddress)));
@@ -189,10 +189,7 @@ contract CRISPProgram is IE3Program, Ownable {
     noirPublicInputs[4] = bytes32(e3Data[e3Id].numOptions);
     noirPublicInputs[5] = encryptedVoteCommitment;
     noirPublicInputs[6] = e3.committeePublicKey;
-    // Insert ZK_VK_HASH as 32 separate bytes (each as bytes32), matching proof format
-    for (uint256 i = 0; i < 32; i++) {
-      noirPublicInputs[7 + i] = bytes32(uint256(uint8(zkKeyHash[i])));
-    }
+    noirPublicInputs[7] = zkKeyHash;
 
     // Check if the ciphertext was encrypted correctly
     if (!honkVerifier.verify(noirProof, noirPublicInputs)) {
@@ -243,21 +240,10 @@ contract CRISPProgram is IE3Program, Ownable {
   /// @notice Get the slot index for a given E3 ID and slot address
   /// @param e3Id The E3 program ID
   /// @param slotAddress The slot address
-  /// @return The slot index
-  function getSlotIndex(uint256 e3Id, address slotAddress) external view returns (uint40) {
+  /// @return The slot index, or -1 if the slot is empty
+  function getSlotIndex(uint256 e3Id, address slotAddress) external view returns (int40) {
     uint40 storedIndexPlusOne = e3Data[e3Id].voteSlots[slotAddress];
-    if (storedIndexPlusOne == 0) {
-      revert SlotIsEmpty();
-    }
-    return storedIndexPlusOne - 1;
-  }
-
-  /// @notice Check if a slot is empty for a given E3 ID and slot address
-  /// @param e3Id The E3 program ID
-  /// @param slotAddress The slot address
-  /// @return Whether the slot is empty or not
-  function isSlotEmptyByAddress(uint256 e3Id, address slotAddress) external view returns (bool) {
-    return e3Data[e3Id].voteSlots[slotAddress] == 0;
+    return int40(storedIndexPlusOne) - 1;
   }
 
   /// @inheritdoc IE3Program

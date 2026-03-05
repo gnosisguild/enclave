@@ -31,14 +31,12 @@ describe('Vote', () => {
   const mockGetPreviousCiphertextResponse = () =>
     ({
       ok: true,
+      status: 200,
       json: async () => ({ ciphertext: previousCiphertext }),
     }) as Response
 
-  const mockIsSlotEmptyResponse = (isEmpty: boolean) =>
-    ({
-      ok: true,
-      json: async () => ({ is_empty: isEmpty }),
-    }) as Response
+  const mockPreviousCiphertextNotFoundResponse = () =>
+    ({ ok: false, status: 404 }) as Response
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -151,7 +149,7 @@ describe('Vote', () => {
 
   describe('generateVoteProof', () => {
     it('Should generate a valid vote proof', { timeout: 300000 }, async () => {
-      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse(true))
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockPreviousCiphertextNotFoundResponse())
 
       const proof = await sdk.generateVoteProof({
         vote,
@@ -181,7 +179,7 @@ describe('Vote', () => {
 
   describe('generateMaskVoteProof', () => {
     it('Should generate a valid mask vote proof when there are no votes in the slot', { timeout: 300000 }, async () => {
-      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse(true))
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockPreviousCiphertextNotFoundResponse())
 
       const proof = await sdk.generateMaskVoteProof({
         balance,
@@ -207,9 +205,7 @@ describe('Vote', () => {
     })
 
     it('Should generate a valid mask vote proof when there is a previous vote in the slot', { timeout: 300000 }, async () => {
-      vi.spyOn(global, 'fetch')
-        .mockResolvedValueOnce(mockIsSlotEmptyResponse(false))
-        .mockResolvedValueOnce(mockGetPreviousCiphertextResponse())
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockGetPreviousCiphertextResponse())
 
       const proof = await sdk.generateMaskVoteProof({
         balance,

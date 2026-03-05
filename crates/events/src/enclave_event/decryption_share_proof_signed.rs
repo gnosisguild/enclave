@@ -4,7 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-mod dkg;
-pub mod recursive_aggregation;
-mod threshold;
-pub(crate) mod utils;
+use crate::E3id;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DecryptionShareProofSigned {
+    pub e3_id: E3id,
+}

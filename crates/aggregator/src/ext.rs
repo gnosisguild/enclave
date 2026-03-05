@@ -20,16 +20,21 @@ use e3_events::{prelude::*, E3id};
 use e3_events::{BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use e3_fhe::ext::FHE_KEY;
 use e3_fhe::Fhe;
+use e3_fhe_params::BfvPreset;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use e3_sortition::Sortition;
 
 pub struct PublicKeyAggregatorExtension {
     bus: BusHandle,
+    params_preset: BfvPreset,
 }
 
 impl PublicKeyAggregatorExtension {
-    pub fn create(bus: &BusHandle) -> Box<Self> {
-        Box::new(Self { bus: bus.clone() })
+    pub fn create(bus: &BusHandle, params_preset: BfvPreset) -> Box<Self> {
+        Box::new(Self {
+            bus: bus.clone(),
+            params_preset,
+        })
     }
 }
 
@@ -62,10 +67,17 @@ impl E3Extension for PublicKeyAggregatorExtension {
         let repo = ctx.repositories().publickey(&e3_id);
         let sync_state = repo.send(Some(PublicKeyAggregatorState::init(
             meta.threshold_n,
+            meta.threshold_m,
             meta.seed,
         )));
 
-        let value = create_publickey_aggregator(fhe.clone(), self.bus.clone(), e3_id, sync_state);
+        let value = create_publickey_aggregator(
+            fhe.clone(),
+            self.bus.clone(),
+            e3_id,
+            sync_state,
+            self.params_preset.clone(),
+        );
 
         ctx.set_event_recipient("publickey", Some(value));
     }
@@ -98,6 +110,7 @@ impl E3Extension for PublicKeyAggregatorExtension {
             self.bus.clone(),
             ctx.e3_id.clone(),
             sync_state,
+            self.params_preset.clone(),
         );
 
         // send to context
@@ -112,11 +125,20 @@ fn create_publickey_aggregator(
     bus: BusHandle,
     e3_id: E3id,
     sync_state: Persistable<PublicKeyAggregatorState>,
+    params_preset: BfvPreset,
 ) -> Recipient<EnclaveEvent> {
     KeyshareCreatedFilterBuffer::new(
-        PublicKeyAggregator::new(PublicKeyAggregatorParams { fhe, bus, e3_id }, sync_state)
-            .start()
-            .into(),
+        PublicKeyAggregator::new(
+            PublicKeyAggregatorParams {
+                fhe,
+                bus,
+                e3_id,
+                params_preset,
+            },
+            sync_state,
+        )
+        .start()
+        .into(),
     )
     .start()
     .into()
@@ -125,13 +147,19 @@ fn create_publickey_aggregator(
 pub struct ThresholdPlaintextAggregatorExtension {
     bus: BusHandle,
     sortition: Addr<Sortition>,
+    params_preset: BfvPreset,
 }
 
 impl ThresholdPlaintextAggregatorExtension {
-    pub fn create(bus: &BusHandle, sortition: &Addr<Sortition>) -> Box<Self> {
+    pub fn create(
+        bus: &BusHandle,
+        sortition: &Addr<Sortition>,
+        params_preset: BfvPreset,
+    ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
+            params_preset,
         })
     }
 }
@@ -172,6 +200,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                         bus: self.bus.clone(),
                         sortition: self.sortition.clone(),
                         e3_id: e3_id.clone(),
+                        params_preset: self.params_preset.clone(),
                     },
                     sync_state,
                 )
@@ -200,6 +229,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                 bus: self.bus.clone(),
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
+                params_preset: self.params_preset.clone(),
             },
             sync_state,
         )

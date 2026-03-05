@@ -22,10 +22,8 @@ use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
-/// Proof type identifier covering all node-generated proofs.
-///
-/// Aggregation proofs (Proofs 5 and 7) are excluded — they are published on-chain
-/// directly and verified by the contract at submission time.
+/// Proof type identifier covering all node-generated proofs, including
+/// aggregation proofs (C5 pk aggregation and C7 decrypted shares aggregation).
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ProofType {
@@ -47,6 +45,8 @@ pub enum ProofType {
     T5ShareDecryption = 7,
     /// T6 — Decrypted shares aggregation proof (Proof 7).
     T6DecryptedSharesAggregation = 8,
+    /// C5 — Public key aggregation proof (Proof 5).
+    C5PkAggregation = 9,
 }
 
 impl ProofType {
@@ -65,6 +65,7 @@ impl ProofType {
                 CircuitName::DecryptedSharesAggregationBn,
                 CircuitName::DecryptedSharesAggregationMod,
             ],
+            ProofType::C5PkAggregation => vec![CircuitName::PkAggregation],
         }
     }
 
@@ -80,6 +81,7 @@ impl ProofType {
             | ProofType::T2DkgShareDecryption => "E3_BAD_DKG_PROOF",
             ProofType::T5ShareDecryption => "E3_BAD_DECRYPTION_PROOF",
             ProofType::T6DecryptedSharesAggregation => "E3_BAD_AGGREGATION_PROOF",
+            ProofType::C5PkAggregation => "E3_BAD_PK_AGGREGATION_PROOF",
         }
     }
 }
