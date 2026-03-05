@@ -3,11 +3,9 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { LeanIMT } from "@zk-kit/lean-imt";
 import { ZeroAddress } from "ethers";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
-import { poseidon2 } from "poseidon-lite";
 
 export const ciphernodeAdd = task(
   "ciphernode:add",
@@ -153,13 +151,8 @@ export const ciphernodeRemove = task(
   "ciphernode:remove",
   "Deregister a ciphernode from the bonding registry",
 )
-  .addOption({
-    name: "siblings",
-    description: "comma separated siblings from tree proof",
-    defaultValue: "",
-  })
   .setAction(async () => ({
-    default: async ({ siblings }, hre) => {
+    default: async (_, hre) => {
       const connection = await hre.network.connect();
       const { ethers } = connection;
 
@@ -173,14 +166,11 @@ export const ciphernodeRemove = task(
 
       const bondingRegistryConnected = bondingRegistry.connect(signer);
 
-      const siblingsArray = siblings.split(",").map((s: string) => BigInt(s));
-
       try {
         console.log(
           "Deregistering operator (will also remove from CiphernodeRegistry)...",
         );
-        const tx =
-          await bondingRegistryConnected.deregisterOperator(siblingsArray);
+        const tx = await bondingRegistryConnected.deregisterOperator();
         await tx.wait();
 
         console.log(`Ciphernode ${signer.address} deregistered`);
@@ -496,40 +486,6 @@ export const ciphernodeAdminAdd = task(
         console.error("Admin registration failed:", error);
         throw error;
       }
-    },
-  }))
-  .build();
-
-export const ciphernodeSiblings = task(
-  "ciphernode:siblings",
-  "Get the sibling of a ciphernode in the registry",
-)
-  .addOption({
-    name: "ciphernodeAddress",
-    description: "address of ciphernode to get siblings for",
-    defaultValue: ZeroAddress,
-  })
-  .addOption({
-    name: "ciphernodeAddresses",
-    description:
-      "comma separated addresses of ciphernodes in the order they were added to the registry",
-    defaultValue: ZeroAddress,
-  })
-  .setAction(async () => ({
-    default: async ({ ciphernodeAddress, ciphernodeAddresses }, _) => {
-      const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
-      const tree = new LeanIMT(hash);
-
-      const addresses = ciphernodeAddresses.split(",");
-
-      for (const address of addresses) {
-        tree.insert(BigInt(address));
-      }
-
-      const index = tree.indexOf(BigInt(ciphernodeAddress));
-      const { siblings } = tree.generateProof(index);
-
-      console.log(`Siblings for ${ciphernodeAddress}: ${siblings}`);
     },
   }))
   .build();
