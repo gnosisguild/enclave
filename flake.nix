@@ -18,7 +18,7 @@
 
         e3-cli = pkgs.rustPlatform.buildRustPackage {
           pname = "e3-cli";
-          version = (builtins.fromTOML (builtins.readFile ./crates/cli/Cargo.toml)).package.version;
+          version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
 
           src = ./.;
 
