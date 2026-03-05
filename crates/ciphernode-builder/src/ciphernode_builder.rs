@@ -472,14 +472,27 @@ impl CiphernodeBuilder {
             e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(
                 &bus,
                 aggregator_preset,
-            ))
+            ));
+
+            if self.keyshare.is_none() {
+                let backend = self
+                    .zk_backend
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("ZK backend is required for aggregator"))?;
+                let signer = provider_cache.ensure_signer().await?;
+                info!("Setting up ZK actors for aggregator");
+                setup_zk_actors(&bus, backend, signer);
+            }
         }
 
         if self.threshold_plaintext_agg {
             info!("Setting up ThresholdPlaintextAggregatorExtension");
             let _ = self.ensure_multithread(&bus);
+            let aggregator_preset = DEFAULT_BFV_PRESET;
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
-                &bus, &sortition,
+                &bus,
+                &sortition,
+                aggregator_preset,
             ))
         }
 

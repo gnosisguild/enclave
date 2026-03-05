@@ -38,7 +38,6 @@ use tracing::{error, info, warn};
 
 /// ECDSA validation result for a single party.
 struct EcdsaPartyResult {
-    sender_party_id: u64,
     passed: bool,
     /// The pair (signed_payload, recovered_address) of the first failing proof, if any.
     failed_payload: Option<(SignedProofPayload, Option<Address>)>,
@@ -55,9 +54,6 @@ struct PendingVerification {
     pre_dishonest: BTreeSet<u64>,
     /// Party IDs dispatched for ZK verification (for cross-checking results).
     dispatched_party_ids: HashSet<u64>,
-    /// Signed payloads for each party, indexed by party_id.
-    /// Used for SignedProofFailed emission when ZK also fails.
-    party_signed_payloads: HashMap<u64, Vec<SignedProofPayload>>,
     /// Recovered address for each party (from ECDSA step).
     party_addresses: HashMap<u64, Address>,
 }
@@ -97,9 +93,16 @@ impl ShareVerificationActor {
         let (msg, ec) = msg.into_components();
         let e3_id = msg.e3_id.clone();
 
+        info!(
+            "handling ShareVerificationDispatched {:?}, {:?}",
+            e3_id, msg.kind
+        );
+
         match msg.kind {
-            VerificationKind::ShareProofs => {
-                self.verify_share_proofs(e3_id, msg.share_proofs, msg.pre_dishonest, ec);
+            VerificationKind::ShareProofs
+            | VerificationKind::ThresholdDecryptionProofs
+            | VerificationKind::PkGenerationProofs => {
+                self.verify_share_proofs(e3_id, msg.kind, msg.share_proofs, msg.pre_dishonest, ec);
             }
             VerificationKind::DecryptionProofs => {
                 self.verify_decryption_proofs(e3_id, msg.decryption_proofs, msg.pre_dishonest, ec);
@@ -107,18 +110,24 @@ impl ShareVerificationActor {
         }
     }
 
-    /// C2/C3 verification: ECDSA check on each party, then dispatch ZK.
+    /// C2/C3/C6/C1 verification: ECDSA check on each party, then dispatch ZK.
     fn verify_share_proofs(
         &mut self,
         e3_id: E3id,
+        kind: VerificationKind,
         party_proofs: Vec<PartyProofsToVerify>,
         pre_dishonest: BTreeSet<u64>,
         ec: EventContext<Sequenced>,
     ) {
         let e3_id_str = e3_id.to_string();
+        let label = match &kind {
+            VerificationKind::ShareProofs => "C2/C3",
+            VerificationKind::ThresholdDecryptionProofs => "C6",
+            VerificationKind::PkGenerationProofs => "C1",
+            VerificationKind::DecryptionProofs => "C4",
+        };
         let mut ecdsa_dishonest = HashSet::new();
         let mut ecdsa_passed_parties = Vec::new();
-        let mut party_signed_payloads: HashMap<u64, Vec<SignedProofPayload>> = HashMap::new();
         let mut party_addresses: HashMap<u64, Address> = HashMap::new();
 
         for party in &party_proofs {
@@ -126,9 +135,8 @@ impl ShareVerificationActor {
                 party.sender_party_id,
                 &party.signed_proofs,
                 &e3_id_str,
-                "C2/C3",
+                label,
             );
-            party_signed_payloads.insert(party.sender_party_id, party.signed_proofs.clone());
             if result.passed {
                 ecdsa_passed_parties.push(party.clone());
             } else {
@@ -154,7 +162,7 @@ impl ShareVerificationActor {
             // All parties failed ECDSA — publish result immediately
             let mut all_dishonest: BTreeSet<u64> = pre_dishonest;
             all_dishonest.extend(ecdsa_dishonest);
-            self.publish_complete(e3_id, VerificationKind::ShareProofs, all_dishonest, ec);
+            self.publish_complete(e3_id, kind, all_dishonest, ec);
             return;
         }
 
@@ -168,12 +176,11 @@ impl ShareVerificationActor {
             correlation_id,
             PendingVerification {
                 e3_id: e3_id.clone(),
-                kind: VerificationKind::ShareProofs,
+                kind: kind.clone(),
                 ec: ec.clone(),
                 ecdsa_dishonest,
                 pre_dishonest,
                 dispatched_party_ids,
-                party_signed_payloads,
                 party_addresses,
             },
         );
@@ -187,13 +194,13 @@ impl ShareVerificationActor {
         );
 
         if let Err(err) = self.bus.publish(request, ec.clone()) {
-            error!("Failed to dispatch ZK verification: {err}");
+            error!("Failed to dispatch {} ZK verification: {err}", label);
             if let Some(pending) = self.pending.remove(&correlation_id) {
                 let mut all_dishonest: BTreeSet<u64> = pending.pre_dishonest;
                 all_dishonest.extend(pending.ecdsa_dishonest);
                 // Dispatched parties were never ZK-verified — treat as dishonest
                 all_dishonest.extend(pending.dispatched_party_ids);
-                self.publish_complete(e3_id, VerificationKind::ShareProofs, all_dishonest, ec);
+                self.publish_complete(e3_id, kind, all_dishonest, ec);
             }
         }
     }
@@ -209,7 +216,6 @@ impl ShareVerificationActor {
         let e3_id_str = e3_id.to_string();
         let mut ecdsa_dishonest = HashSet::new();
         let mut ecdsa_passed_parties = Vec::new();
-        let mut party_signed_payloads: HashMap<u64, Vec<SignedProofPayload>> = HashMap::new();
         let mut party_addresses: HashMap<u64, Address> = HashMap::new();
 
         for party in &party_proofs {
@@ -227,7 +233,6 @@ impl ShareVerificationActor {
                 &e3_id_str,
                 "C4",
             );
-            party_signed_payloads.insert(party.sender_party_id, all_signed_cloned);
 
             if result.passed {
                 ecdsa_passed_parties.push(party.clone());
@@ -269,7 +274,6 @@ impl ShareVerificationActor {
                 ecdsa_dishonest,
                 pre_dishonest,
                 dispatched_party_ids,
-                party_signed_payloads,
                 party_addresses,
             },
         );
@@ -316,7 +320,6 @@ impl ShareVerificationActor {
                     label, sender_party_id, signed.payload.e3_id, e3_id_str
                 );
                 return EcdsaPartyResult {
-                    sender_party_id,
                     passed: false,
                     failed_payload: Some((signed.clone(), expected_addr)),
                 };
@@ -333,7 +336,6 @@ impl ShareVerificationActor {
                                 label, sender_party_id
                             );
                             return EcdsaPartyResult {
-                                sender_party_id,
                                 passed: false,
                                 failed_payload: Some((signed.clone(), Some(addr))),
                             };
@@ -348,7 +350,6 @@ impl ShareVerificationActor {
                         label, sender_party_id, signed.payload.proof_type, e
                     );
                     return EcdsaPartyResult {
-                        sender_party_id,
                         passed: false,
                         failed_payload: Some((signed.clone(), expected_addr)),
                     };
@@ -363,7 +364,6 @@ impl ShareVerificationActor {
                     label, sender_party_id, expected_circuits, signed.payload.proof.circuit
                 );
                 return EcdsaPartyResult {
-                    sender_party_id,
                     passed: false,
                     failed_payload: Some((signed.clone(), expected_addr)),
                 };
@@ -371,7 +371,6 @@ impl ShareVerificationActor {
         }
 
         EcdsaPartyResult {
-            sender_party_id,
             passed: true,
             failed_payload: None,
         }
@@ -388,7 +387,9 @@ impl ShareVerificationActor {
 
         let zk_results: Vec<PartyVerificationResult> = match (&pending.kind, msg.response) {
             (
-                VerificationKind::ShareProofs,
+                VerificationKind::ShareProofs
+                | VerificationKind::ThresholdDecryptionProofs
+                | VerificationKind::PkGenerationProofs,
                 ComputeResponseKind::Zk(ZkResponse::VerifyShareProofs(r)),
             ) => r.party_results,
             (

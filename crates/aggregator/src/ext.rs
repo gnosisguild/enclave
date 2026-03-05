@@ -147,13 +147,19 @@ fn create_publickey_aggregator(
 pub struct ThresholdPlaintextAggregatorExtension {
     bus: BusHandle,
     sortition: Addr<Sortition>,
+    params_preset: BfvPreset,
 }
 
 impl ThresholdPlaintextAggregatorExtension {
-    pub fn create(bus: &BusHandle, sortition: &Addr<Sortition>) -> Box<Self> {
+    pub fn create(
+        bus: &BusHandle,
+        sortition: &Addr<Sortition>,
+        params_preset: BfvPreset,
+    ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
+            params_preset,
         })
     }
 }
@@ -194,6 +200,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                         bus: self.bus.clone(),
                         sortition: self.sortition.clone(),
                         e3_id: e3_id.clone(),
+                        params_preset: self.params_preset.clone(),
                     },
                     sync_state,
                 )
@@ -222,6 +229,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                 bus: self.bus.clone(),
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
+                params_preset: self.params_preset.clone(),
             },
             sync_state,
         )

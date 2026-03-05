@@ -16,7 +16,7 @@ use tracing::{info, warn};
 
 use crate::ThresholdKeyshare;
 
-const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(600);
+const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(1200);
 
 enum CollectorState {
     Collecting,
