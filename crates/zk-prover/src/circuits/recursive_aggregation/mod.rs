@@ -411,29 +411,34 @@ mod tests {
         backend.ensure_installed().await.expect("ensure_installed");
 
         let dist = dist_circuits_path();
-        let default_dist = dist.join("default");
-        let pk_wrapper = default_dist
+        {
+            let default_dist = dist.join("default");
+            if default_dist
+                .join("recursive_aggregation")
+                .join("wrapper")
+                .join("dkg")
+                .join("pk")
+                .join("pk.json")
+                .exists()
+            {
+                backend.circuits_dir = dist.clone();
+            }
+        }
+
+        let prover = ZkProver::new(&backend);
+
+        let default_dir = backend.circuits_dir.join("default");
+        let pk_wrapper = default_dir
             .join("recursive_aggregation")
             .join("wrapper")
             .join("dkg")
             .join("pk");
-        let share_enc_wrapper = default_dist
+        let share_enc_wrapper = default_dir
             .join("recursive_aggregation")
             .join("wrapper")
             .join("dkg")
             .join("share_encryption");
-        let fold_dir = default_dist.join("recursive_aggregation").join("fold");
-        if pk_wrapper.join("pk.json").exists()
-            && pk_wrapper.join("pk.vk").exists()
-            && share_enc_wrapper.join("share_encryption.json").exists()
-            && share_enc_wrapper.join("share_encryption.vk").exists()
-            && fold_dir.join("fold.json").exists()
-            && fold_dir.join("fold.vk").exists()
-        {
-            backend.circuits_dir = dist.clone();
-        }
-
-        let prover = ZkProver::new(&backend);
+        let fold_dir = default_dir.join("recursive_aggregation").join("fold");
 
         if !pk_wrapper.join("pk.json").exists()
             || !pk_wrapper.join("pk.vk").exists()
