@@ -149,10 +149,10 @@ const address = await getAddressFromSignature(signature, messageHash)
 #### State Utilities
 
 ```typescript
-import { getPreviousCiphertext, getIsSlotEmpty } from '@crisp-e3/sdk'
+import { getPreviousCiphertext } from '@crisp-e3/sdk'
 
 const previousCiphertext = await getPreviousCiphertext(serverUrl, e3Id, slotAddress)
-const isEmpty = await getIsSlotEmpty(serverUrl, e3Id, slotAddress)
+// Returns undefined when the slot is empty (404)
 ```
 
 ## API
@@ -170,10 +170,8 @@ const isEmpty = await getIsSlotEmpty(serverUrl, e3Id, slotAddress)
 - `getRoundDetails(serverUrl: string, e3Id: number): Promise<RoundDetails>` - Get round details
 - `getRoundTokenDetails(serverUrl: string, e3Id: number): Promise<TokenDetails>` - Get token details
   for a round
-- `getPreviousCiphertext(serverUrl: string, e3Id: number, address: string): Promise<Uint8Array>` -
-  Get previous ciphertext for a slot
-- `getIsSlotEmpty(serverUrl: string, e3Id: number, address: string): Promise<boolean>` - Check if a
-  slot is empty
+- `getPreviousCiphertext(serverUrl: string, e3Id: number, address: string): Promise<Uint8Array | undefined>` -
+  Get previous ciphertext for a slot (undefined when slot is empty)
 
 ### Token Functions
 
