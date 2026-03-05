@@ -68,10 +68,8 @@ pub enum CiphernodeCommands {
         #[command(flatten)]
         chain: ChainArgs,
     },
-    /// Request deregistration by providing the IMT proof siblings
+    /// Request deregistration from the bonding registry
     Deregister {
-        #[arg(long = "proof", value_delimiter = ',', value_name = "NODE")]
-        sibling_nodes: Vec<String>,
         #[command(flatten)]
         chain: ChainArgs,
     },
@@ -145,12 +143,9 @@ pub async fn execute(command: CiphernodeCommands, config: &AppConfig) -> Result<
             let ctx = ChainContext::new(config, chain.selection()).await?;
             lifecycle::register(&ctx).await?
         }
-        CiphernodeCommands::Deregister {
-            chain,
-            sibling_nodes,
-        } => {
+        CiphernodeCommands::Deregister { chain } => {
             let ctx = ChainContext::new(config, chain.selection()).await?;
-            lifecycle::deregister(&ctx, sibling_nodes).await?
+            lifecycle::deregister(&ctx).await?
         }
         CiphernodeCommands::Activate { chain } => {
             let ctx = ChainContext::new(config, chain.selection()).await?;

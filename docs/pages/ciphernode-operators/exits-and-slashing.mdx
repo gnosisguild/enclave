@@ -94,14 +94,11 @@ To safely exit the ciphernode registry:
 
 ### Step 1: Deregister
 
-Request deregistration with your IMT proof siblings:
+Request deregistration:
 
 ```bash
-enclave ciphernode deregister --proof 0x123...,0x456...,0x789...
+enclave ciphernode deregister
 ```
-
-> Save your sibling proof from the `CiphernodeAdded` event when you first register. You'll need it
-> to deregister.
 
 ### Step 2: Wait for Exit Delay
 

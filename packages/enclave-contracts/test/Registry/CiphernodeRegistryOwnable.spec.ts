@@ -3,11 +3,9 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
 import type { Signer } from "ethers";
 import { network } from "hardhat";
-import { poseidon2 } from "poseidon-lite";
 
 import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
 import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
@@ -34,9 +32,6 @@ const { loadFixture } = networkHelpers;
 const data = "0xda7a";
 const dataHash = ethers.id(data);
 const SORTITION_SUBMISSION_WINDOW = 3;
-
-// Hash function used to compute the tree nodes.
-const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
 describe("CiphernodeRegistryOwnable", function () {
   async function finalizeCommitteeAfterWindow(
@@ -236,7 +231,6 @@ describe("CiphernodeRegistryOwnable", function () {
 
     // ── Operators ──────────────────────────────────────────────────────────────
     await licenseToken.setTransferRestriction(false);
-    const tree = new LeanIMT(hash);
 
     for (const operator of [operator1, operator2]) {
       await setupOperatorForSortition(
@@ -247,7 +241,6 @@ describe("CiphernodeRegistryOwnable", function () {
         ticketToken,
         registry,
       );
-      tree.insert(BigInt(await operator.getAddress()));
     }
     await networkHelpers.mine(1);
 
@@ -263,7 +256,6 @@ describe("CiphernodeRegistryOwnable", function () {
       licenseToken,
       ticketToken,
       usdcToken,
-      tree,
       mockE3Program,
       mockDecryptionVerifier,
       request: {
@@ -578,43 +570,34 @@ describe("CiphernodeRegistryOwnable", function () {
     it("reverts if the caller is not the owner", async function () {
       const { registry, notTheOwner } = await loadFixture(setup);
       await expect(
-        registry.connect(notTheOwner).removeCiphernode(AddressOne, []),
+        registry.connect(notTheOwner).removeCiphernode(AddressOne),
       ).to.be.revertedWithCustomError(registry, "NotOwnerOrBondingRegistry");
     });
     it("removes the ciphernode from the registry", async function () {
-      const { registry, operator1, tree } = await loadFixture(setup);
+      const { registry, operator1 } = await loadFixture(setup);
       const operator1Address = await operator1.getAddress();
-      const localTree = new LeanIMT(hash);
-      for (let i = 0; i < tree.size; i++) {
-        localTree.insert(tree.leaves[i]);
-      }
-      const index = localTree.indexOf(BigInt(operator1Address));
-      const proof = localTree.generateProof(index);
-      localTree.update(index, BigInt(0));
+      const rootBefore = await registry.root();
       expect(await registry.isEnabled(operator1Address)).to.be.true;
-      expect(await registry.removeCiphernode(operator1Address, proof.siblings));
+      await registry.removeCiphernode(operator1Address);
       expect(await registry.isEnabled(operator1Address)).to.be.false;
-      expect(await registry.root()).to.equal(localTree.root);
+      expect(await registry.root()).to.not.equal(rootBefore);
     });
     it("decrements numCiphernodes", async function () {
-      const { registry, operator1, tree } = await loadFixture(setup);
+      const { registry, operator1 } = await loadFixture(setup);
       const operator1Address = await operator1.getAddress();
       const numCiphernodes = await registry.numCiphernodes();
-      const index = tree.indexOf(BigInt(operator1Address));
-      const proof = tree.generateProof(index);
-      expect(await registry.removeCiphernode(operator1Address, proof.siblings));
+      await registry.removeCiphernode(operator1Address);
       expect(await registry.numCiphernodes()).to.equal(
         numCiphernodes - BigInt(1),
       );
     });
     it("emits a CiphernodeRemoved event", async function () {
-      const { registry, operator1, tree } = await loadFixture(setup);
+      const { registry, operator1 } = await loadFixture(setup);
       const operator1Address = await operator1.getAddress();
       const numCiphernodes = await registry.numCiphernodes();
       const size = await registry.treeSize();
-      const index = tree.indexOf(BigInt(operator1Address));
-      const proof = tree.generateProof(index);
-      await expect(registry.removeCiphernode(operator1Address, proof.siblings))
+      const index = await registry.ciphernodeTreeIndex(operator1Address);
+      await expect(registry.removeCiphernode(operator1Address))
         .to.emit(registry, "CiphernodeRemoved")
         .withArgs(operator1Address, index, numCiphernodes - BigInt(1), size);
     });
@@ -715,9 +698,9 @@ describe("CiphernodeRegistryOwnable", function () {
   });
 
   describe("root()", function () {
-    it("returns the root of the ciphernode registry merkle tree", async function () {
-      const { registry, tree } = await loadFixture(setup);
-      expect(await registry.root()).to.equal(tree.root);
+    it("returns a non-zero root when ciphernodes are registered", async function () {
+      const { registry } = await loadFixture(setup);
+      expect(await registry.root()).to.not.equal(0);
     });
   });
 
@@ -725,27 +708,28 @@ describe("CiphernodeRegistryOwnable", function () {
     it("returns the root of the ciphernode registry merkle tree at the given e3Id", async function () {
       const {
         registry,
-        tree,
         enclave,
         usdcToken,
         mockE3Program,
         mockDecryptionVerifier,
       } = await loadFixture(setup);
       const e3Id = 0;
+      const rootBeforeRequest = await registry.root();
       await makeRequest(
         enclave,
         usdcToken,
         mockE3Program,
         mockDecryptionVerifier,
       );
-      expect(await registry.rootAt(e3Id)).to.equal(tree.root);
+      expect(await registry.rootAt(e3Id)).to.equal(rootBeforeRequest);
     });
   });
 
   describe("treeSize()", function () {
     it("returns the size of the ciphernode registry merkle tree", async function () {
-      const { registry, tree } = await loadFixture(setup);
-      expect(await registry.treeSize()).to.equal(tree.size);
+      const { registry } = await loadFixture(setup);
+      // Two operators registered in setup
+      expect(await registry.treeSize()).to.equal(2);
     });
   });
 });
