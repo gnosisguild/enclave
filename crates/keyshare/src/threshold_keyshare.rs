@@ -1239,10 +1239,10 @@ impl ThresholdKeyshare {
             let dishonest_count = (pre_dishonest.len() as u64).min(total);
             let honest_count = total - dishonest_count;
 
-            if honest_count < threshold {
+            if honest_count <= threshold {
                 warn!(
-                    "Too few honest parties for E3 {} ({} honest < {} threshold) after C2/C3 pre-dishonest filtering — cannot proceed",
-                    e3_id, honest_count, threshold
+                    "Too few honest parties for E3 {} ({} honest, need at least {}) after C2/C3 pre-dishonest filtering — cannot proceed",
+                    e3_id, honest_count, threshold + 1
                 );
                 self.pending_shares.clear();
                 self.bus.publish(
@@ -1305,10 +1305,10 @@ impl ThresholdKeyshare {
                     let dishonest_count = (msg.dishonest_parties.len() as u64).min(total);
                     let honest_count = total - dishonest_count;
 
-                    if honest_count < threshold {
+                    if honest_count <= threshold {
                         warn!(
-                            "Too few honest parties for E3 {} ({} honest < {} threshold) — cannot proceed",
-                            e3_id, honest_count, threshold
+                            "Too few honest parties for E3 {} ({} honest, need at least {}) — cannot proceed",
+                            e3_id, honest_count, threshold + 1
                         );
                         // Clear pending shares
                         self.pending_shares.clear();
@@ -1347,10 +1347,10 @@ impl ThresholdKeyshare {
                         .map(|h| h.len() as u64)
                         .unwrap_or(0);
 
-                    if honest_count < threshold {
+                    if honest_count <= threshold {
                         warn!(
-                            "Too few honest parties after C4 for E3 {} ({} honest < {} threshold)",
-                            e3_id, honest_count, threshold
+                            "Too few honest parties after C4 for E3 {} ({} honest, need at least {})",
+                            e3_id, honest_count, threshold + 1
                         );
                         self.bus.publish(
                             E3Failed {
@@ -1522,7 +1522,7 @@ impl ThresholdKeyshare {
             );
             // Re-check threshold after exclusion
             let threshold = state.threshold_m;
-            if (honest_shares.len() as u64) < threshold {
+            if (honest_shares.len() as u64) <= threshold {
                 self.pending_shares.clear();
                 self.bus.publish(
                     E3Failed {
@@ -1851,10 +1851,10 @@ impl ThresholdKeyshare {
                 .map(|h| h.len() as u64)
                 .unwrap_or(0);
 
-            if honest_count < threshold {
+            if honest_count <= threshold {
                 warn!(
-                    "Too few honest parties after C4 pre-filtering for E3 {} ({} honest < {} threshold)",
-                    e3_id, honest_count, threshold
+                    "Too few honest parties after C4 pre-filtering for E3 {} ({} honest, need at least {})",
+                    e3_id, honest_count, threshold + 1
                 );
                 self.bus.publish(
                     E3Failed {

@@ -488,7 +488,7 @@ impl CiphernodeBuilder {
         if self.threshold_plaintext_agg {
             info!("Setting up ThresholdPlaintextAggregatorExtension");
             let _ = self.ensure_multithread(&bus);
-            let aggregator_preset = BfvPreset::InsecureThreshold512;
+            let aggregator_preset = DEFAULT_BFV_PRESET;
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
                 &bus,
                 &sortition,

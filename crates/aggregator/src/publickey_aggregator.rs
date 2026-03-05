@@ -259,12 +259,12 @@ impl PublicKeyAggregator {
             );
         }
 
-        // Check remaining count >= threshold
-        if honest_keyshares.len() < threshold_m {
+        // Need at least threshold + 1 honest parties for aggregation
+        if honest_keyshares.len() <= threshold_m {
             return Err(anyhow::anyhow!(
-                "Not enough honest parties after C1 verification: {} < {}",
+                "Not enough honest parties after C1 verification: {} (need at least {})",
                 honest_keyshares.len(),
-                threshold_m
+                threshold_m + 1
             ));
         }
 
@@ -287,17 +287,9 @@ impl PublicKeyAggregator {
 
         let honest_nodes_set = OrderedSet::from(honest_nodes);
 
-        // Transition to GeneratingC5Proof
-        self.state.try_mutate(&ec, |_| {
-            Ok(PublicKeyAggregatorState::GeneratingC5Proof {
-                public_key: pubkey.clone(),
-                public_key_hash,
-                keyshare_bytes: honest_keyshares.clone(),
-                nodes: honest_nodes_set.clone(),
-            })
-        })?;
-
-        // Dispatch C5 proof generation through ProofRequestActor
+        // Publish pending event before transitioning state so a publish
+        // failure leaves us in VerifyingC1 (retryable) rather than
+        // GeneratingC5Proof (no retry path).
         let committee_h = honest_keyshares.len();
 
         info!("Publishing PkAggregationProofPending for C5 proof generation...");
@@ -305,7 +297,7 @@ impl PublicKeyAggregator {
             PkAggregationProofPending {
                 e3_id: self.e3_id.clone(),
                 proof_request: PkAggregationProofRequest {
-                    keyshare_bytes: honest_keyshares,
+                    keyshare_bytes: honest_keyshares.clone(),
                     aggregated_pk_bytes: ArcBytes::from_bytes(&pubkey),
                     params_preset: self.params_preset.clone(),
                     // this field is not really used in the circuit, we only use H
@@ -314,12 +306,22 @@ impl PublicKeyAggregator {
                     // this field is not really used in the circuit, we only use H
                     committee_threshold: 0,
                 },
+                public_key: pubkey.clone(),
+                public_key_hash,
+                nodes: honest_nodes_set.clone(),
+            },
+            ec.clone(),
+        )?;
+
+        // Transition to GeneratingC5Proof
+        self.state.try_mutate(&ec, |_| {
+            Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key: pubkey,
                 public_key_hash,
+                keyshare_bytes: honest_keyshares,
                 nodes: honest_nodes_set,
-            },
-            ec,
-        )?;
+            })
+        })?;
         Ok(())
     }
 
@@ -352,24 +354,26 @@ impl PublicKeyAggregator {
 
         let proof = msg.signed_proof.payload.proof;
 
+        // Publish PublicKeyAggregated before transitioning state so a publish
+        // failure leaves us in GeneratingC5Proof (retryable) rather than
+        // Complete (no retry path).
+        let event = PublicKeyAggregated {
+            pubkey: public_key.clone(),
+            public_key_hash,
+            e3_id: self.e3_id.clone(),
+            nodes: nodes.clone(),
+            pk_aggregation_proof: Some(proof),
+        };
+        self.bus.publish(event, ec.clone())?;
+
         // Transition to Complete
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::Complete {
-                public_key: public_key.clone(),
+                public_key,
                 keyshares: OrderedSet::new(),
-                nodes: nodes.clone(),
+                nodes,
             })
         })?;
-
-        // Publish PublicKeyAggregated with C5 proof
-        let event = PublicKeyAggregated {
-            pubkey: public_key,
-            public_key_hash,
-            e3_id: self.e3_id.clone(),
-            nodes,
-            pk_aggregation_proof: Some(proof),
-        };
-        self.bus.publish(event, ec)?;
         Ok(())
     }
 }

@@ -1211,6 +1211,7 @@ impl ProofRequestActor {
                 "T0 proof request failed for E3 {}: {err} — key will not be published without proof",
                 pending.e3_id
             );
+            return;
         }
 
         if let Some((e3_id, kind)) = self.threshold_correlation.remove(msg.correlation_id()) {
@@ -1221,6 +1222,7 @@ impl ProofRequestActor {
             self.threshold_correlation
                 .retain(|_, (eid, _)| *eid != e3_id);
             self.pending_threshold.remove(&e3_id);
+            return;
         }
 
         if let Some((e3_id, kind)) = self.decryption_correlation.remove(msg.correlation_id()) {
@@ -1231,6 +1233,7 @@ impl ProofRequestActor {
             self.decryption_correlation
                 .retain(|_, (eid, _)| *eid != e3_id);
             self.pending_decryption.remove(&e3_id);
+            return;
         }
 
         if let Some(e3_id) = self
@@ -1242,6 +1245,17 @@ impl ProofRequestActor {
                 e3_id
             );
             self.pending_share_decryption.remove(&e3_id);
+            if let Err(e) = self.bus.publish(
+                E3Failed {
+                    e3_id,
+                    failed_at_stage: E3Stage::CiphertextReady,
+                    reason: FailureReason::DecryptionInvalidShares,
+                },
+                ec.clone(),
+            ) {
+                error!("Failed to publish E3Failed for C6 error: {e}");
+            }
+            return;
         }
 
         if let Some(e3_id) = self.pk_aggregation_correlation.remove(msg.correlation_id()) {
@@ -1256,7 +1270,7 @@ impl ProofRequestActor {
                     failed_at_stage: E3Stage::CommitteeFinalized,
                     reason: FailureReason::DKGInvalidShares,
                 },
-                ec,
+                ec.clone(),
             ) {
                 error!("Failed to publish E3Failed for C5 error: {e}");
             }

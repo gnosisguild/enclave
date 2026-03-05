@@ -316,42 +316,35 @@ impl ThresholdPlaintextAggregator {
             honest_shares.len()
         );
 
-        self.state.try_mutate(&ec, |_| {
-            Ok(ThresholdPlaintextAggregatorState::Computing(Computing {
-                shares: honest_shares.clone(),
-                ciphertext_output: state.ciphertext_output.clone(),
-                threshold_m: state.threshold_m,
-                threshold_n: state.threshold_n,
-                params: state.params.clone(),
-            }))
-        })?;
-
-        // Dispatch TrBFV computation
-        let computing: Computing = self
-            .state
-            .get()
-            .ok_or(anyhow!("Could not get state after C6 verification"))?
-            .try_into()?;
-
-        let trbfv_config = TrBFVConfig::new(
-            computing.params.clone(),
-            computing.threshold_n,
-            computing.threshold_m,
-        );
+        // Publish ComputeRequest before transitioning state so a publish
+        // failure leaves us in VerifyingC6 (retryable) rather than
+        // Computing (no retry path).
+        let trbfv_config =
+            TrBFVConfig::new(state.params.clone(), state.threshold_n, state.threshold_m);
 
         let event = ComputeRequest::trbfv(
             TrBFVRequest::CalculateThresholdDecryption(
                 CalculateThresholdDecryptionRequest {
-                    ciphertexts: computing.ciphertext_output.clone(),
+                    ciphertexts: state.ciphertext_output.clone(),
                     trbfv_config,
-                    d_share_polys: computing.shares.clone(),
+                    d_share_polys: honest_shares.clone(),
                 }
                 .into(),
             ),
             CorrelationId::new(),
             self.e3_id.clone(),
         );
-        self.bus.publish(event, ec)?;
+        self.bus.publish(event, ec.clone())?;
+
+        self.state.try_mutate(&ec, |_| {
+            Ok(ThresholdPlaintextAggregatorState::Computing(Computing {
+                shares: honest_shares,
+                ciphertext_output: state.ciphertext_output,
+                threshold_m: state.threshold_m,
+                threshold_n: state.threshold_n,
+                params: state.params,
+            }))
+        })?;
 
         Ok(())
     }
@@ -417,22 +410,24 @@ impl ThresholdPlaintextAggregator {
             plaintext.len()
         );
 
-        self.state.try_mutate(&ec, |_| {
-            Ok(ThresholdPlaintextAggregatorState::Complete(Complete {
-                decrypted: plaintext.clone(),
-                shares: shares.clone(),
-            }))
-        })?;
-
-        // Dispatch the PlaintextAggregated event with C7 proofs
+        // Publish PlaintextAggregated before transitioning state so a publish
+        // failure leaves us in GeneratingC7Proof (retryable) rather than
+        // Complete (no retry path).
         let event = PlaintextAggregated {
-            decrypted_output: plaintext,
+            decrypted_output: plaintext.clone(),
             e3_id: self.e3_id.clone(),
             aggregation_proofs: proofs,
         };
 
         info!("Dispatching plaintext event with C7 proofs {:?}", event);
-        self.bus.publish(event, ec)?;
+        self.bus.publish(event, ec.clone())?;
+
+        self.state.try_mutate(&ec, |_| {
+            Ok(ThresholdPlaintextAggregatorState::Complete(Complete {
+                decrypted: plaintext,
+                shares,
+            }))
+        })?;
         Ok(())
     }
 
@@ -459,20 +454,28 @@ impl ThresholdPlaintextAggregator {
                 let threshold_m = state.threshold_m;
                 let threshold_n = state.threshold_n;
 
+                // Publish pending event before transitioning state so a publish
+                // failure leaves us in Computing (retryable) rather than
+                // GeneratingC7Proof (no retry path).
+                self.dispatch_c7_proof_request(
+                    shares.clone(),
+                    plaintext.clone(),
+                    threshold_m,
+                    threshold_n,
+                    ec.clone(),
+                )?;
+
                 // Transition to GeneratingC7Proof
                 self.state.try_mutate(&ec, |_| {
                     Ok(ThresholdPlaintextAggregatorState::GeneratingC7Proof(
                         GeneratingC7Proof {
                             threshold_m,
                             threshold_n,
-                            shares: shares.clone(),
-                            plaintext: plaintext.clone(),
+                            shares,
+                            plaintext,
                         },
                     ))
                 })?;
-
-                // Dispatch C7 proof request through ProofRequestActor
-                self.dispatch_c7_proof_request(shares, plaintext, threshold_m, threshold_n, ec)?;
             }
 
             _ => {
