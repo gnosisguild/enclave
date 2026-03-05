@@ -1160,7 +1160,14 @@ fn handle_decrypted_shares_aggregation_proof(
     //    party_ids in strictly increasing order for Lagrange sign computation.
     req.d_share_polys.sort_by_key(|(id, _)| *id);
 
-    // 3. Determine dimensions
+    // 3. The circuit expects exactly threshold + 1 shares for Lagrange interpolation.
+    //    We may have more honest parties than needed, so take the first threshold + 1.
+    let required = req.threshold_m as usize + 1;
+    if req.d_share_polys.len() > required {
+        req.d_share_polys.truncate(required);
+    }
+
+    // 4. Determine dimensions
     let num_indices = req.plaintext.len();
     let num_parties = req.d_share_polys.len();
 

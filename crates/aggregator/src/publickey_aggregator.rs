@@ -329,6 +329,10 @@ impl PublicKeyAggregator {
     ) -> Result<()> {
         let (msg, ec) = msg.into_components();
 
+        if msg.e3_id != self.e3_id {
+            return Ok(());
+        }
+
         let PublicKeyAggregatorState::GeneratingC5Proof {
             public_key,
             public_key_hash,

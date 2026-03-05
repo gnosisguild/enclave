@@ -13,12 +13,12 @@ use e3_events::{
     AggregationProofPending, AggregationProofSigned, BusHandle, ComputeRequest,
     ComputeRequestError, ComputeRequestErrorKind, ComputeResponse, ComputeResponseKind,
     CorrelationId, DecryptionKeyShared, DecryptionShareProofSigned, DecryptionShareProofsPending,
-    DecryptionshareCreated, DkgProofSigned, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCreated, EncryptionKeyPending, EventContext, EventPublisher, EventSubscriber,
-    EventType, PkAggregationProofPending, PkAggregationProofSigned, PkBfvProofRequest,
-    PkGenerationProofSigned, Proof, ProofPayload, ProofType, Sequenced,
-    ShareDecryptionProofPending, SignedProofPayload, ThresholdShare, ThresholdShareCreated,
-    ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
+    DecryptionshareCreated, DkgProofSigned, E3Failed, E3Stage, E3id, EnclaveEvent,
+    EnclaveEventData, EncryptionKey, EncryptionKeyCreated, EncryptionKeyPending, EventContext,
+    EventPublisher, EventSubscriber, EventType, FailureReason, PkAggregationProofPending,
+    PkAggregationProofSigned, PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload,
+    ProofType, Sequenced, ShareDecryptionProofPending, SignedProofPayload, ThresholdShare,
+    ThresholdShareCreated, ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
@@ -719,7 +719,8 @@ impl ProofRequestActor {
         );
 
         let ec = pending.ec;
-        if let Err(err) = self.bus.publish(
+
+        match self.bus.publish(
             DecryptionshareCreated {
                 party_id: pending.party_id,
                 node: pending.node,
@@ -729,16 +730,19 @@ impl ProofRequestActor {
             },
             ec.clone(),
         ) {
-            error!("Failed to publish DecryptionshareCreated: {err}");
-        }
-
-        if let Err(err) = self.bus.publish(
-            DecryptionShareProofSigned {
-                e3_id: e3_id.clone(),
-            },
-            ec,
-        ) {
-            error!("Failed to publish DecryptionShareProofSigned: {err}");
+            Ok(_) => {
+                if let Err(err) = self.bus.publish(
+                    DecryptionShareProofSigned {
+                        e3_id: e3_id.clone(),
+                    },
+                    ec,
+                ) {
+                    error!("Failed to publish DecryptionShareProofSigned: {err}");
+                }
+            }
+            Err(err) => {
+                error!("Failed to publish DecryptionshareCreated: {err}");
+            }
         }
     }
 
@@ -1197,6 +1201,7 @@ impl ProofRequestActor {
     }
 
     fn handle_compute_request_error(&mut self, msg: TypedEvent<ComputeRequestError>) {
+        let (msg, ec) = msg.into_components();
         let ComputeRequestErrorKind::Zk(err) = msg.get_err() else {
             return;
         };
@@ -1245,6 +1250,17 @@ impl ProofRequestActor {
                 e3_id
             );
             self.pending_pk_aggregation.remove(&e3_id);
+            if let Err(e) = self.bus.publish(
+                E3Failed {
+                    e3_id,
+                    failed_at_stage: E3Stage::CommitteeFinalized,
+                    reason: FailureReason::DKGInvalidShares,
+                },
+                ec,
+            ) {
+                error!("Failed to publish E3Failed for C5 error: {e}");
+            }
+            return;
         }
 
         if let Some(e3_id) = self.aggregation_correlation.remove(msg.correlation_id()) {
@@ -1253,6 +1269,16 @@ impl ProofRequestActor {
                 e3_id
             );
             self.pending_aggregation.remove(&e3_id);
+            if let Err(e) = self.bus.publish(
+                E3Failed {
+                    e3_id,
+                    failed_at_stage: E3Stage::CiphertextReady,
+                    reason: FailureReason::DecryptionInvalidShares,
+                },
+                ec,
+            ) {
+                error!("Failed to publish E3Failed for C7 error: {e}");
+            }
         }
     }
 }

@@ -159,15 +159,6 @@ impl ThresholdPlaintextAggregatorState {
     }
 }
 
-#[derive(Message)]
-#[rtype("()")]
-pub struct ComputeAggregate {
-    pub shares: Vec<(u64, Vec<ArcBytes>)>,
-    pub ciphertext_output: Vec<ArcBytes>,
-    pub threshold_m: u64,
-    pub threshold_n: u64,
-}
-
 pub struct ThresholdPlaintextAggregator {
     bus: BusHandle,
     sortition: Addr<Sortition>,
@@ -218,7 +209,7 @@ impl ThresholdPlaintextAggregator {
             shares.insert(party_id, share);
             c6_proofs.insert(party_id, decryption_proofs);
 
-            if shares.len() <= threshold_m as usize {
+            if (shares.len() as u64) < threshold_n {
                 return Ok(ThresholdPlaintextAggregatorState::Collecting(Collecting {
                     params,
                     threshold_n,
@@ -230,7 +221,10 @@ impl ThresholdPlaintextAggregator {
                 }));
             }
 
-            info!("Changing state to VerifyingC6 because we received enough shares...");
+            info!(
+                "Changing state to VerifyingC6 because received all {} shares...",
+                threshold_n
+            );
 
             Ok(ThresholdPlaintextAggregatorState::VerifyingC6(
                 VerifyingC6 {
@@ -359,36 +353,6 @@ impl ThresholdPlaintextAggregator {
         );
         self.bus.publish(event, ec)?;
 
-        Ok(())
-    }
-
-    pub fn handle_compute_aggregate(&mut self, msg: TypedEvent<ComputeAggregate>) -> Result<()> {
-        let (msg, ec) = msg.into_components();
-        info!("create_calculate_threshold_decryption_event...");
-
-        let e3_id = self.e3_id.clone();
-        let state: Computing = self
-            .state
-            .get()
-            .ok_or(anyhow!("Could not get state"))?
-            .try_into()?;
-
-        let trbfv_config =
-            TrBFVConfig::new(state.params.clone(), state.threshold_n, state.threshold_m);
-
-        let event = ComputeRequest::trbfv(
-            TrBFVRequest::CalculateThresholdDecryption(
-                CalculateThresholdDecryptionRequest {
-                    ciphertexts: msg.ciphertext_output,
-                    trbfv_config,
-                    d_share_polys: msg.shares,
-                }
-                .into(),
-            ),
-            CorrelationId::new(),
-            e3_id,
-        );
-        self.bus.publish(event, ec)?;
         Ok(())
     }
 
@@ -622,17 +586,6 @@ impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
 
                 Ok(())
             },
-        )
-    }
-}
-
-impl Handler<TypedEvent<ComputeAggregate>> for ThresholdPlaintextAggregator {
-    type Result = ();
-    fn handle(&mut self, msg: TypedEvent<ComputeAggregate>, _: &mut Self::Context) -> Self::Result {
-        trap(
-            EType::PlaintextAggregation,
-            &self.bus.with_ec(msg.get_ctx()),
-            || self.handle_compute_aggregate(msg),
         )
     }
 }
