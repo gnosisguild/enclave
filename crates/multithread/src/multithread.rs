@@ -24,16 +24,20 @@ use e3_events::EType;
 use e3_events::EffectsEnabled;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
-    ComputeResponse, DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, EnclaveEvent,
-    EnclaveEventData, EventPublisher, EventSubscriber, EventType, PartyVerificationResult,
-    PkAggregationProofRequest, PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse,
-    PkGenerationProofRequest, PkGenerationProofResponse, ShareComputationProofRequest,
-    ShareComputationProofResponse, ShareEncryptionProofRequest, ShareEncryptionProofResponse,
-    TypedEvent, VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
+    ComputeResponse, DecryptedSharesAggregationProofRequest,
+    DecryptedSharesAggregationProofResponse, DkgShareDecryptionProofRequest,
+    DkgShareDecryptionProofResponse, EnclaveEvent, EnclaveEventData, EventPublisher,
+    EventSubscriber, EventType, PartyVerificationResult, PkAggregationProofRequest,
+    PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest,
+    PkGenerationProofResponse, ShareComputationProofRequest, ShareComputationProofResponse,
+    ShareEncryptionProofRequest, ShareEncryptionProofResponse,
+    ThresholdShareDecryptionProofRequest, ThresholdShareDecryptionProofResponse, TypedEvent,
+    VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
     VerifyShareProofsRequest, VerifyShareProofsResponse, ZkError as ZkEventError, ZkRequest,
     ZkResponse,
 };
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
 use e3_polynomial::CrtPolynomial;
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
@@ -43,12 +47,16 @@ use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::helpers::deserialize_secret_key;
 use e3_trbfv::helpers::try_poly_from_bytes;
+use e3_trbfv::helpers::try_poly_from_sensitive_bytes;
 use e3_trbfv::shares::SharedSecret;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::SharedRng;
 use e3_utils::MAILBOX_LIMIT;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
 use e3_zk_helpers::circuits::dkg::share_computation::utils::compute_parity_matrix;
+use e3_zk_helpers::circuits::threshold::decrypted_shares_aggregation::circuit::{
+    DecryptedSharesAggregationCircuit, DecryptedSharesAggregationCircuitData,
+};
 use e3_zk_helpers::circuits::threshold::pk_generation::circuit::{
     PkGenerationCircuit, PkGenerationCircuitData,
 };
@@ -58,8 +66,10 @@ use e3_zk_helpers::dkg::share_decryption::{ShareDecryptionCircuit, ShareDecrypti
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
+use e3_zk_helpers::CiphernodesCommittee;
 use e3_zk_prover::{Provable, ZkBackend, ZkProver};
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
+use fhe::mbfv::PublicKeyShare;
 use fhe_traits::{DeserializeParametrized, FheEncoder};
 use ndarray::Array2;
 use num_bigint::BigInt;
@@ -271,16 +281,15 @@ fn handle_pk_aggregation_proof(
         .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
 
     // 2. Create deterministic CRP
-    let crp = e3_fhe_params::create_deterministic_crp_from_default_seed(&threshold_params);
+    let crp = create_deterministic_crp_from_default_seed(&threshold_params);
 
     // 3. Deserialize each keyshare as PublicKeyShare and extract pk0
     let mut pk0_shares = Vec::with_capacity(req.keyshare_bytes.len());
     for (i, ks_bytes) in req.keyshare_bytes.iter().enumerate() {
-        let pk_share =
-            fhe::mbfv::PublicKeyShare::deserialize(ks_bytes, &threshold_params, crp.clone())
-                .map_err(|e| {
-                    make_zk_error(&request, format!("keyshare[{}] deserialize: {:?}", i, e))
-                })?;
+        let pk_share = PublicKeyShare::deserialize(ks_bytes, &threshold_params, crp.clone())
+            .map_err(|e| {
+                make_zk_error(&request, format!("keyshare[{}] deserialize: {:?}", i, e))
+            })?;
         pk0_shares.push(CrtPolynomial::from_fhe_polynomial(&pk_share.p0_share()));
     }
 
@@ -292,7 +301,7 @@ fn handle_pk_aggregation_proof(
     let a = CrtPolynomial::from_fhe_polynomial(&crp.poly());
 
     // 6. Build committee and circuit data
-    let committee = e3_zk_helpers::CiphernodesCommittee {
+    let committee = CiphernodesCommittee {
         n: req.committee_n,
         h: req.committee_h,
         threshold: req.committee_threshold,
@@ -320,6 +329,99 @@ fn handle_pk_aggregation_proof(
     // 8. Return response
     Ok(ComputeResponse::zk(
         ZkResponse::PkAggregation(PkAggregationProofResponse { proof }),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
+fn handle_threshold_share_decryption_proof(
+    prover: &ZkProver,
+    cipher: &Cipher,
+    req: ThresholdShareDecryptionProofRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    // 1. Build threshold BFV parameters from preset
+    let (threshold_params, _dkg_params) = build_pair_for_preset(req.params_preset.clone())
+        .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
+
+    // 2. Deserialize aggregated PublicKey
+    let public_key = PublicKey::from_bytes(&req.aggregated_pk_bytes, &threshold_params)
+        .map_err(|e| make_zk_error(&request, format!("aggregated_pk deserialize: {:?}", e)))?;
+
+    // 3. Decrypt sk_poly_sum → Poly → CrtPolynomial (s)
+    let sk_poly = try_poly_from_sensitive_bytes(req.sk_poly_sum, threshold_params.clone(), cipher)
+        .map_err(|e| make_zk_error(&request, format!("sk_poly_sum decrypt: {}", e)))?;
+    let s = CrtPolynomial::from_fhe_polynomial(&sk_poly);
+
+    // 4. For each index, build circuit data and generate proof
+    let num_indices = req.ciphertext_bytes.len();
+    if req.es_poly_sum.is_empty() {
+        return Err(make_zk_error(&request, "empty es_poly_sum".to_string()));
+    }
+    if req.d_share_bytes.len() < num_indices {
+        return Err(make_zk_error(
+            &request,
+            format!(
+                "d_share_bytes too short: {} < {}",
+                req.d_share_bytes.len(),
+                num_indices
+            ),
+        ));
+    }
+    let mut proofs = Vec::with_capacity(num_indices);
+
+    for i in 0..num_indices {
+        // Deserialize ciphertext
+        let ciphertext = Ciphertext::from_bytes(&req.ciphertext_bytes[i], &threshold_params)
+            .map_err(|e| {
+                make_zk_error(&request, format!("ciphertext[{}] deserialize: {:?}", i, e))
+            })?;
+
+        // Decrypt es_poly_sum → Poly → CrtPolynomial (e)
+        // Currently there is a single smudging noise polynomial shared across all
+        // ciphertexts (see calculate_decryption_share.rs).
+        let es_idx = i % req.es_poly_sum.len();
+        let e_poly = try_poly_from_sensitive_bytes(
+            req.es_poly_sum[es_idx].clone(),
+            threshold_params.clone(),
+            cipher,
+        )
+        .map_err(|e| make_zk_error(&request, format!("es_poly_sum[{}] decrypt: {}", i, e)))?;
+        let e = CrtPolynomial::from_fhe_polynomial(&e_poly);
+
+        // Deserialize d_share → Poly → CrtPolynomial
+        let d_share_poly = try_poly_from_bytes(&req.d_share_bytes[i], &threshold_params)
+            .map_err(|e| make_zk_error(&request, format!("d_share[{}] deserialize: {}", i, e)))?;
+        let d_share = CrtPolynomial::from_fhe_polynomial(&d_share_poly);
+
+        // Build circuit data
+        let circuit_data = e3_zk_helpers::threshold::share_decryption::ShareDecryptionCircuitData {
+            ciphertext,
+            public_key: public_key.clone(),
+            s: s.clone(),
+            e,
+            d_share,
+        };
+
+        // Generate proof
+        let circuit = e3_zk_helpers::threshold::share_decryption::ShareDecryptionCircuit;
+        let e3_id_str = request.e3_id.to_string();
+        let proof = circuit
+            .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+            .map_err(|e| {
+                ComputeRequestError::new(
+                    ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                        "C6 proof[{}]: {}",
+                        i, e
+                    ))),
+                    request.clone(),
+                )
+            })?;
+        proofs.push(proof);
+    }
+
+    Ok(ComputeResponse::zk(
+        ZkResponse::ThresholdShareDecryption(ThresholdShareDecryptionProofResponse { proofs }),
         request.correlation_id,
         request.e3_id,
     ))
@@ -501,6 +603,16 @@ fn handle_zk_request(
         ZkRequest::PkAggregation(req) => timefunc("zk_pk_aggregation", id, || {
             handle_pk_aggregation_proof(&prover, req, request.clone())
         }),
+        ZkRequest::ThresholdShareDecryption(req) => {
+            timefunc("zk_threshold_share_decryption", id, || {
+                handle_threshold_share_decryption_proof(&prover, &cipher, req, request.clone())
+            })
+        }
+        ZkRequest::DecryptedSharesAggregation(req) => {
+            timefunc("zk_decrypted_shares_aggregation", id, || {
+                handle_decrypted_shares_aggregation_proof(&prover, req, request.clone())
+            })
+        }
     }
 }
 
@@ -1030,6 +1142,108 @@ fn handle_verify_share_decryption_proofs(
         ZkResponse::VerifyShareDecryptionProofs(VerifyShareDecryptionProofsResponse {
             party_results,
         }),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
+fn handle_decrypted_shares_aggregation_proof(
+    prover: &ZkProver,
+    mut req: DecryptedSharesAggregationProofRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    // 1. Build threshold BFV parameters from preset
+    let (threshold_params, _dkg_params) = build_pair_for_preset(req.params_preset.clone())
+        .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
+
+    // 2. Sort d_share_polys by party ID — the Noir circuit requires
+    //    party_ids in strictly increasing order for Lagrange sign computation.
+    req.d_share_polys.sort_by_key(|(id, _)| *id);
+
+    // 3. The circuit expects exactly threshold + 1 shares for Lagrange interpolation.
+    //    We may have more honest parties than needed, so take the first threshold + 1.
+    let required = req.threshold_m as usize + 1;
+    if req.d_share_polys.len() > required {
+        req.d_share_polys.truncate(required);
+    }
+
+    // 4. Determine dimensions
+    let num_indices = req.plaintext.len();
+    let num_parties = req.d_share_polys.len();
+
+    for (party_id, shares) in &req.d_share_polys {
+        if shares.len() < num_indices {
+            return Err(make_zk_error(
+                &request,
+                format!(
+                    "party {} has {} shares but {} expected",
+                    party_id,
+                    shares.len(),
+                    num_indices
+                ),
+            ));
+        }
+    }
+
+    let mut proofs = Vec::with_capacity(num_indices);
+
+    // 4. For each ciphertext index, build circuit data and generate proof
+    for i in 0..num_indices {
+        // a. Extract per-party shares for index i, deserialize to Poly
+        let d_share_polys: Vec<fhe_math::rq::Poly> = req
+            .d_share_polys
+            .iter()
+            .map(|(_, shares)| try_poly_from_bytes(&shares[i], &threshold_params))
+            .collect::<std::result::Result<_, _>>()
+            .map_err(|e| {
+                make_zk_error(&request, format!("d_share_polys[{}] deserialize: {}", i, e))
+            })?;
+
+        // b. Get party IDs (convert 0-based to 1-based for circuit)
+        let reconstructing_parties: Vec<usize> = req
+            .d_share_polys
+            .iter()
+            .map(|(id, _)| (*id as usize) + 1)
+            .collect();
+
+        // c. Decode plaintext at index i to Vec<u64>
+        let message_vec = e3_bfv_client::decode_bytes_to_vec_u64(&req.plaintext[i].extract_bytes())
+            .map_err(|e| make_zk_error(&request, format!("plaintext[{}] decode: {:?}", i, e)))?;
+
+        // d. Build committee
+        let committee = e3_zk_helpers::CiphernodesCommittee {
+            n: req.threshold_n as usize,
+            h: num_parties,
+            threshold: req.threshold_m as usize,
+        };
+
+        // e. Build circuit data and generate proof
+        let circuit_data = DecryptedSharesAggregationCircuitData {
+            committee,
+            d_share_polys,
+            reconstructing_parties,
+            message_vec,
+        };
+
+        let circuit = DecryptedSharesAggregationCircuit;
+        let e3_id_str = request.e3_id.to_string();
+        let proof = circuit
+            .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+            .map_err(|e| {
+                ComputeRequestError::new(
+                    ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                        "C7 proof[{}]: {}",
+                        i, e
+                    ))),
+                    request.clone(),
+                )
+            })?;
+        proofs.push(proof);
+    }
+
+    // 4. Return response
+    Ok(ComputeResponse::zk(
+        ZkResponse::DecryptedSharesAggregation(DecryptedSharesAggregationProofResponse { proofs }),
         request.correlation_id,
         request.e3_id,
     ))

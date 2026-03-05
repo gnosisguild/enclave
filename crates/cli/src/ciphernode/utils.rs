@@ -68,26 +68,6 @@ pub(crate) fn parse_amount(value: &str, decimals: u8) -> Result<U256> {
     Ok(result)
 }
 
-pub(crate) fn parse_u256_list(values: &[String]) -> Result<Vec<U256>> {
-    values
-        .iter()
-        .filter(|s| !s.trim().is_empty())
-        .map(|value| parse_u256(value))
-        .collect()
-}
-
-fn parse_u256(value: &str) -> Result<U256> {
-    let trimmed = value.trim();
-    if let Some(hex) = trimmed
-        .strip_prefix("0x")
-        .or_else(|| trimmed.strip_prefix("0X"))
-    {
-        U256::from_str_radix(hex, 16).context("Invalid hex value")
-    } else {
-        U256::from_str(trimmed).context("Invalid decimal value")
-    }
-}
-
 pub(crate) async fn ensure_allowance(
     ctx: &ChainContext,
     token: Address,

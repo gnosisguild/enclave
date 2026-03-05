@@ -9,8 +9,8 @@ use std::str::FromStr;
 use crate::server::{
     app_data::AppData,
     models::{
-        GetRoundRequest, IsSlotEmptyRequest, IsSlotEmptyResponse, PreviousCiphertextRequest,
-        PreviousCiphertextResponse, RoundRequestWithRequester, WebhookPayload,
+        GetRoundRequest, PreviousCiphertextRequest, PreviousCiphertextResponse,
+        RoundRequestWithRequester, WebhookPayload,
     },
     CONFIG,
 };
@@ -40,8 +40,7 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
             .route(
                 "/previous-ciphertext",
                 web::post().to(handle_get_previous_ciphertext),
-            )
-            .route("/is-slot-empty", web::post().to(handle_is_slot_empty)),
+            ),
     );
 }
 
@@ -81,7 +80,8 @@ async fn handle_get_previous_ciphertext(
         .get_slot_index_from_address(U256::from(incoming.round_id), address)
         .await
     {
-        Ok(index) => index.to::<u64>(),
+        Ok(Some(index)) => index,
+        Ok(None) => return HttpResponse::NotFound().body("Ciphertext not found"),
         Err(e) => {
             error!("Error getting slot index from address: {:?}", e);
             return HttpResponse::InternalServerError()
@@ -300,45 +300,6 @@ async fn get_token_holders_hashes(
             HttpResponse::InternalServerError().body("Failed to get token holders hashes")
         }
     }
-}
-
-/// Check if a slot is empty given an address
-/// # Arguments
-/// * `IsSlotEmptyRequest` - The request containing round_id and address
-async fn handle_is_slot_empty(data: web::Json<IsSlotEmptyRequest>) -> impl Responder {
-    let incoming = data.into_inner();
-
-    let contract =
-        match CRISPContractFactory::create_read(&CONFIG.http_rpc_url, &CONFIG.e3_program_address)
-            .await
-        {
-            Ok(contract) => contract,
-            Err(e) => {
-                error!("Failed to create CRISP contract: {:?}", e);
-                return HttpResponse::InternalServerError().body("Failed to create CRISP contract");
-            }
-        };
-
-    let address = match Address::from_str(incoming.address.as_str()) {
-        Ok(addr) => addr,
-        Err(e) => {
-            error!("Invalid address format: {:?}", e);
-            return HttpResponse::BadRequest().body("Invalid address format");
-        }
-    };
-
-    let is_empty = match contract
-        .get_is_slot_empty_by_address(U256::from(incoming.round_id), address)
-        .await
-    {
-        Ok(empty) => empty,
-        Err(e) => {
-            error!("Error checking if slot is empty: {:?}", e);
-            return HttpResponse::InternalServerError().body("Failed to check if slot is empty");
-        }
-    };
-
-    HttpResponse::Ok().json(IsSlotEmptyResponse { is_empty })
 }
 
 /// Get the eligible addresses for a given round

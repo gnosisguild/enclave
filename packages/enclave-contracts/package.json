@@ -169,7 +169,6 @@
     "ciphernode:admin-add": "hardhat ciphernode:admin-add",
     "ciphernode:mint-tokens": "hardhat ciphernode:mint-tokens",
     "ciphernode:remove": "hardhat ciphernode:remove",
-    "ciphernode:siblings": "hardhat ciphernode:siblings",
     "committee:new": "hardhat committee:new",
     "lint": "solhint --disc --max-warnings 10 \"contracts/**/*.sol\"",
     "prettier:check": "prettier --check \"**/*.{js,json,md,sol,ts,yml}\"",
@@ -188,8 +187,7 @@
   },
   "dependencies": {
     "@openzeppelin/contracts-upgradeable": "^5.0.2",
-    "@zk-kit/lean-imt.sol": "2.0.1",
-    "@zk-kit/lean-imt": "2.2.4",
+    "@zk-kit/lazy-imt.sol": "2.0.0-beta.12",
     "js-yaml": "^4.1.1",
     "poseidon-solidity": "0.0.5"
   },

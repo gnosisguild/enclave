@@ -275,10 +275,8 @@ interface IBondingRegistry {
 
     /**
      * @notice Deregister as an operator and remove from IMT
-     * @param siblingNodes Sibling node proofs for IMT removal
-     * @dev Requires operator to provide sibling nodes for immediate IMT removal
      */
-    function deregisterOperator(uint256[] calldata siblingNodes) external;
+    function deregisterOperator() external;
 
     /**
      * @notice Increase operator's ticket balance by depositing tokens
