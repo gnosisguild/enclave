@@ -88,12 +88,21 @@ async fn test_full_flow_download_circuits_prove_and_verify() {
 
     assert!(backend
         .circuits_dir
+        .join("default")
         .join("dkg")
         .join("pk")
         .join("pk.json")
         .exists());
     assert!(backend
         .circuits_dir
+        .join("default")
+        .join("dkg")
+        .join("pk")
+        .join("pk.vk")
+        .exists());
+    assert!(backend
+        .circuits_dir
+        .join("evm")
         .join("dkg")
         .join("pk")
         .join("pk.vk")

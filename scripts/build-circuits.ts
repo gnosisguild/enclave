@@ -9,7 +9,7 @@ import { execSync } from 'child_process'
 import { createHash } from 'crypto'
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { basename, join, resolve } from 'path'
-import { ALL_GROUPS, CIRCUIT_GROUPS, type CircuitGroup } from './circuit-constants'
+import { ALL_GROUPS, CIRCUIT_GROUPS, CIRCUIT_VARIANTS, type CircuitGroup, type CircuitVariant } from './circuit-constants'
 
 interface CircuitInfo {
   name: string
@@ -25,6 +25,8 @@ interface CompiledCircuit {
     vkHash?: string
     vkRecursive?: string
     vkRecursiveHash?: string
+    vkNoir?: string
+    vkNoirHash?: string
   }
   checksums: {
     json?: string
@@ -32,6 +34,8 @@ interface CompiledCircuit {
     vkHash?: string
     vkRecursive?: string
     vkRecursiveHash?: string
+    vkNoir?: string
+    vkNoirHash?: string
   }
 }
 interface BuildOptions {
@@ -271,6 +275,14 @@ class NoirCircuitBuilder {
         result.artifacts.vkRecursiveHash = vkArtifacts.vkRecursiveHash
         result.checksums.vkRecursiveHash = this.checksum(vkArtifacts.vkRecursiveHash)
       }
+      if (vkArtifacts.vkNoir) {
+        result.artifacts.vkNoir = vkArtifacts.vkNoir
+        result.checksums.vkNoir = this.checksum(vkArtifacts.vkNoir)
+      }
+      if (vkArtifacts.vkNoirHash && existsSync(vkArtifacts.vkNoirHash)) {
+        result.artifacts.vkNoirHash = vkArtifacts.vkNoirHash
+        result.checksums.vkNoirHash = this.checksum(vkArtifacts.vkNoirHash)
+      }
     }
     console.log(`   ✓ ${circuit.group}/${circuit.name}`)
 
@@ -291,12 +303,16 @@ class NoirCircuitBuilder {
     vkHash: string | null
     vkRecursive: string | null
     vkRecursiveHash: string | null
+    vkNoir: string | null
+    vkNoirHash: string | null
   } {
     const result = {
       vk: null as string | null,
       vkHash: null as string | null,
       vkRecursive: null as string | null,
       vkRecursiveHash: null as string | null,
+      vkNoir: null as string | null,
+      vkNoirHash: null as string | null,
     }
     const isWrapper = this.isWrapper(circuit)
 
@@ -328,25 +344,44 @@ class NoirCircuitBuilder {
     const vkHashFile = join(targetDir, `${packageName}.vk_hash`)
     const vkRecursiveFile = join(targetDir, `${packageName}.vk_recursive`)
     const vkRecursiveHashFile = join(targetDir, `${packageName}.vk_recursive_hash`)
+    const vkNoirFile = join(targetDir, `${packageName}.vk_noir`)
+    const vkNoirHashFile = join(targetDir, `${packageName}.vk_noir_hash`)
 
     if (!isWrapper) {
+      // evm VK: for on-chain Solidity verification
       if (!runWriteVk('evm', vkFile, vkHashFile)) {
         throw new Error(`VK generation failed for ${packageName} (evm)`)
       }
       result.vk = existsSync(vkFile) ? vkFile : null
       result.vkHash = existsSync(vkHashFile) ? vkHashFile : null
 
+      // noir-recursive-no-zk VK: for wrapper/fold output verification (Default variant)
       if (!runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
         throw new Error(`VK generation failed for ${packageName} (noir-recursive-no-zk)`)
       }
       result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
       result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
+
+      // noir-recursive VK: for inner/base proofs embedded in wrapper inputs (Recursive variant)
+      if (!runWriteVk('noir-recursive', vkNoirFile, vkNoirHashFile)) {
+        throw new Error(`VK generation failed for ${packageName} (noir-recursive)`)
+      }
+      result.vkNoir = existsSync(vkNoirFile) ? vkNoirFile : null
+      result.vkNoirHash = existsSync(vkNoirHashFile) ? vkNoirHashFile : null
     } else {
+      // Wrapper circuits: noir-recursive-no-zk (Default variant)
       if (!runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
         throw new Error(`VK generation failed for ${packageName} (noir-recursive-no-zk)`)
       }
       result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
       result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
+
+      // noir-recursive VK: needed if wrapper/fold proofs are embedded in further recursive aggregation
+      if (!runWriteVk('noir-recursive', vkNoirFile, vkNoirHashFile)) {
+        throw new Error(`VK generation failed for ${packageName} (noir-recursive)`)
+      }
+      result.vkNoir = existsSync(vkNoirFile) ? vkNoirFile : null
+      result.vkNoirHash = existsSync(vkNoirHashFile) ? vkNoirHashFile : null
     }
 
     return result
@@ -384,31 +419,61 @@ class NoirCircuitBuilder {
     const checksums: Record<string, string> = {}
 
     for (const c of compiled) {
-      const prefix = `${c.group}/${c.name}`
+      const packageName = basename(c.artifacts.json ?? '', '.json')
+
+      // evm/ variant checksums (only for circuits that have an evm VK)
+      if (c.checksums.vk && c.artifacts.vk) {
+        const evmPrefix = `${CIRCUIT_VARIANTS.EVM}/${c.group}/${c.name}`
+        if (c.checksums.json && c.artifacts.json) {
+          const f = `${evmPrefix}/${basename(c.artifacts.json)}`
+          checksums[f] = c.checksums.json
+          lines.push(`${c.checksums.json}  ${f}`)
+        }
+        const f = `${evmPrefix}/${basename(c.artifacts.vk)}`
+        checksums[f] = c.checksums.vk
+        lines.push(`${c.checksums.vk}  ${f}`)
+        if (c.checksums.vkHash && c.artifacts.vkHash) {
+          const fHash = `${evmPrefix}/${basename(c.artifacts.vkHash)}`
+          checksums[fHash] = c.checksums.vkHash
+          lines.push(`${c.checksums.vkHash}  ${fHash}`)
+        }
+      }
+
+      // default/ variant checksums
+      const defaultPrefix = `${CIRCUIT_VARIANTS.DEFAULT}/${c.group}/${c.name}`
       if (c.checksums.json && c.artifacts.json) {
-        const f = `${prefix}/${basename(c.artifacts.json)}`
+        const f = `${defaultPrefix}/${basename(c.artifacts.json)}`
         checksums[f] = c.checksums.json
         lines.push(`${c.checksums.json}  ${f}`)
       }
-      if (c.checksums.vk && c.artifacts.vk) {
-        const f = `${prefix}/${basename(c.artifacts.vk)}`
-        checksums[f] = c.checksums.vk
-        lines.push(`${c.checksums.vk}  ${f}`)
-      }
-      if (c.checksums.vkHash && c.artifacts.vkHash) {
-        const f = `${prefix}/${basename(c.artifacts.vkHash)}`
-        checksums[f] = c.checksums.vkHash
-        lines.push(`${c.checksums.vkHash}  ${f}`)
-      }
       if (c.checksums.vkRecursive && c.artifacts.vkRecursive) {
-        const f = `${prefix}/${basename(c.artifacts.vkRecursive)}`
+        // In default/ variant, .vk_recursive is stored as .vk
+        const f = `${defaultPrefix}/${packageName}.vk`
         checksums[f] = c.checksums.vkRecursive
         lines.push(`${c.checksums.vkRecursive}  ${f}`)
       }
       if (c.checksums.vkRecursiveHash && c.artifacts.vkRecursiveHash) {
-        const f = `${prefix}/${basename(c.artifacts.vkRecursiveHash)}`
+        // In default/ variant, .vk_recursive_hash is stored as .vk_hash
+        const f = `${defaultPrefix}/${packageName}.vk_hash`
         checksums[f] = c.checksums.vkRecursiveHash
         lines.push(`${c.checksums.vkRecursiveHash}  ${f}`)
+      }
+      // recursive/ variant checksums (noir-recursive VKs for inner proofs)
+      if (c.checksums.vkNoir && c.artifacts.vkNoir) {
+        const recursivePrefix = `${CIRCUIT_VARIANTS.RECURSIVE}/${c.group}/${c.name}`
+        if (c.checksums.json && c.artifacts.json) {
+          const f = `${recursivePrefix}/${basename(c.artifacts.json)}`
+          checksums[f] = c.checksums.json
+          lines.push(`${c.checksums.json}  ${f}`)
+        }
+        const fVk = `${recursivePrefix}/${packageName}.vk`
+        checksums[fVk] = c.checksums.vkNoir
+        lines.push(`${c.checksums.vkNoir}  ${fVk}`)
+        if (c.checksums.vkNoirHash && c.artifacts.vkNoirHash) {
+          const fHash = `${recursivePrefix}/${packageName}.vk_hash`
+          checksums[fHash] = c.checksums.vkNoirHash
+          lines.push(`${c.checksums.vkNoirHash}  ${fHash}`)
+        }
       }
     }
 
@@ -425,13 +490,38 @@ class NoirCircuitBuilder {
     const outputDir = this.options.outputDir!
     for (const c of compiled) {
       if (!c.artifacts.json && !c.artifacts.vk) continue
-      const dir = join(outputDir, c.group, c.name)
-      mkdirSync(dir, { recursive: true })
-      if (c.artifacts.json) copyFileSync(c.artifacts.json, join(dir, basename(c.artifacts.json)))
-      if (c.artifacts.vk) copyFileSync(c.artifacts.vk, join(dir, basename(c.artifacts.vk)))
-      if (c.artifacts.vkHash) copyFileSync(c.artifacts.vkHash, join(dir, basename(c.artifacts.vkHash)))
-      if (c.artifacts.vkRecursive) copyFileSync(c.artifacts.vkRecursive, join(dir, basename(c.artifacts.vkRecursive)))
-      if (c.artifacts.vkRecursiveHash) copyFileSync(c.artifacts.vkRecursiveHash, join(dir, basename(c.artifacts.vkRecursiveHash)))
+      const packageName = basename(c.artifacts.json ?? '', '.json')
+
+      // Copy to evm/ variant: .json + evm .vk + .vk_hash (only for circuits that have an evm VK)
+      if (c.artifacts.vk) {
+        const evmDir = join(outputDir, CIRCUIT_VARIANTS.EVM, c.group, c.name)
+        mkdirSync(evmDir, { recursive: true })
+        if (c.artifacts.json) copyFileSync(c.artifacts.json, join(evmDir, basename(c.artifacts.json)))
+        copyFileSync(c.artifacts.vk, join(evmDir, basename(c.artifacts.vk)))
+        if (c.artifacts.vkHash) copyFileSync(c.artifacts.vkHash, join(evmDir, basename(c.artifacts.vkHash)))
+      }
+
+      // Copy to default/ variant: .json + noir-recursive-no-zk .vk (wrapper/fold proofs)
+      const defaultDir = join(outputDir, CIRCUIT_VARIANTS.DEFAULT, c.group, c.name)
+      mkdirSync(defaultDir, { recursive: true })
+      if (c.artifacts.json) copyFileSync(c.artifacts.json, join(defaultDir, basename(c.artifacts.json)))
+      if (c.artifacts.vkRecursive) {
+        copyFileSync(c.artifacts.vkRecursive, join(defaultDir, `${packageName}.vk`))
+      }
+      if (c.artifacts.vkRecursiveHash) {
+        copyFileSync(c.artifacts.vkRecursiveHash, join(defaultDir, `${packageName}.vk_hash`))
+      }
+
+      // Copy to recursive/ variant: .json + noir-recursive .vk (inner/base proofs fed into wrapper)
+      if (c.artifacts.vkNoir) {
+        const recursiveDir = join(outputDir, CIRCUIT_VARIANTS.RECURSIVE, c.group, c.name)
+        mkdirSync(recursiveDir, { recursive: true })
+        if (c.artifacts.json) copyFileSync(c.artifacts.json, join(recursiveDir, basename(c.artifacts.json)))
+        copyFileSync(c.artifacts.vkNoir, join(recursiveDir, `${packageName}.vk`))
+        if (c.artifacts.vkNoirHash) {
+          copyFileSync(c.artifacts.vkNoirHash, join(recursiveDir, `${packageName}.vk_hash`))
+        }
+      }
     }
     return outputDir
   }

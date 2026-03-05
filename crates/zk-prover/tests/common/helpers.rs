@@ -46,7 +46,12 @@ fn circuits_build_root() -> PathBuf {
 pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_name: &str) {
     let target_dir = circuits_build_root().join(group).join("target");
     let json_path = target_dir.join(format!("{circuit_name}.json"));
-    let vk_path = target_dir.join(format!("{circuit_name}.vk"));
+    let vk_evm_path = target_dir.join(format!("{circuit_name}.vk"));
+    let vk_evm_hash_path = target_dir.join(format!("{circuit_name}.vk_hash"));
+    let vk_recursive_path = target_dir.join(format!("{circuit_name}.vk_recursive"));
+    let vk_recursive_hash_path = target_dir.join(format!("{circuit_name}.vk_recursive_hash"));
+    let vk_noir_path = target_dir.join(format!("{circuit_name}.vk_noir"));
+    let vk_noir_hash_path = target_dir.join(format!("{circuit_name}.vk_noir_hash"));
 
     assert!(
         json_path.exists(),
@@ -54,19 +59,99 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
         json_path.display()
     );
     assert!(
-        vk_path.exists(),
-        "verification key not found: {} (run `pnpm build:circuits` to compile)",
-        vk_path.display()
+        vk_evm_path.exists(),
+        "evm verification key not found: {} (run `pnpm build:circuits` to compile)",
+        vk_evm_path.display()
     );
 
-    let circuit_dir = backend.circuits_dir.join(group).join(circuit_name);
-    fs::create_dir_all(&circuit_dir).await.unwrap();
-    fs::copy(&json_path, circuit_dir.join(format!("{circuit_name}.json")))
+    // Set up the evm variant directory (keccak VK + hash)
+    let evm_dir = backend
+        .circuits_dir
+        .join("evm")
+        .join(group)
+        .join(circuit_name);
+    fs::create_dir_all(&evm_dir).await.unwrap();
+    fs::copy(&json_path, evm_dir.join(format!("{circuit_name}.json")))
         .await
         .unwrap();
-    fs::copy(&vk_path, circuit_dir.join(format!("{circuit_name}.vk")))
+    fs::copy(&vk_evm_path, evm_dir.join(format!("{circuit_name}.vk")))
         .await
         .unwrap();
+    if vk_evm_hash_path.exists() {
+        fs::copy(
+            &vk_evm_hash_path,
+            evm_dir.join(format!("{circuit_name}.vk_hash")),
+        )
+        .await
+        .unwrap();
+    }
+
+    // Set up the default variant directory (noir-recursive-no-zk VK for wrapper/fold proofs)
+    let default_dir = backend
+        .circuits_dir
+        .join("default")
+        .join(group)
+        .join(circuit_name);
+    fs::create_dir_all(&default_dir).await.unwrap();
+    fs::copy(&json_path, default_dir.join(format!("{circuit_name}.json")))
+        .await
+        .unwrap();
+    // Use .vk_recursive (noir-recursive-no-zk) if available, otherwise fall back to .vk
+    let (default_vk_src, default_hash_src) = if vk_recursive_path.exists() {
+        (&vk_recursive_path, &vk_recursive_hash_path)
+    } else {
+        (&vk_evm_path, &vk_evm_hash_path)
+    };
+    fs::copy(
+        default_vk_src,
+        default_dir.join(format!("{circuit_name}.vk")),
+    )
+    .await
+    .unwrap();
+    if default_hash_src.exists() {
+        fs::copy(
+            default_hash_src,
+            default_dir.join(format!("{circuit_name}.vk_hash")),
+        )
+        .await
+        .unwrap();
+    }
+
+    // Set up the recursive variant directory (noir-recursive VK for inner/base proofs)
+    let recursive_dir = backend
+        .circuits_dir
+        .join("recursive")
+        .join(group)
+        .join(circuit_name);
+    fs::create_dir_all(&recursive_dir).await.unwrap();
+    fs::copy(
+        &json_path,
+        recursive_dir.join(format!("{circuit_name}.json")),
+    )
+    .await
+    .unwrap();
+    // Use .vk_noir (noir-recursive) if available, otherwise fall back to .vk_recursive, then .vk
+    let (recursive_vk_src, recursive_hash_src) = if vk_noir_path.exists() {
+        (&vk_noir_path, &vk_noir_hash_path)
+    } else if vk_recursive_path.exists() {
+        (&vk_recursive_path, &vk_recursive_hash_path)
+    } else {
+        (&vk_evm_path, &vk_evm_hash_path)
+    };
+    fs::copy(
+        recursive_vk_src,
+        recursive_dir.join(format!("{circuit_name}.vk")),
+    )
+    .await
+    .unwrap();
+    if recursive_hash_src.exists() {
+        fs::copy(
+            recursive_hash_src,
+            recursive_dir.join(format!("{circuit_name}.vk_hash")),
+        )
+        .await
+        .unwrap();
+    }
 }
 
 pub async fn find_anvil() -> bool {
@@ -98,9 +183,6 @@ pub async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, TempDir) {
     let backend = ZkBackend::new(bb_binary.clone(), circuits_dir.clone(), work_dir.clone());
 
     fs::create_dir_all(&backend.circuits_dir).await.unwrap();
-    fs::create_dir_all(backend.circuits_dir.join("vk"))
-        .await
-        .unwrap();
     fs::create_dir_all(&backend.work_dir).await.unwrap();
     fs::create_dir_all(backend.base_dir.join("bin"))
         .await

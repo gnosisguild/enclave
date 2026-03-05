@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 //! Loads verification key and hash for inner circuits (wrapper proof aggregation).
-//! Reads `.vk_recursive` and `.vk_recursive_hash` (poseidon2/noir-recursive-no-zk format).
+//! In the default variant directory, these are stored as `.vk` and `.vk_hash`.
 
 use super::utils::bytes_to_field_strings;
 use crate::error::ZkError;
@@ -20,8 +20,8 @@ pub struct VkArtifacts {
 }
 
 fn load_vk_from_dir(circuit_dir: &Path, circuit_name: &str) -> Result<VkArtifacts, ZkError> {
-    let vk_path = circuit_dir.join(format!("{}.vk_recursive", circuit_name));
-    let vk_hash_path = circuit_dir.join(format!("{}.vk_recursive_hash", circuit_name));
+    let vk_path = circuit_dir.join(format!("{}.vk", circuit_name));
+    let vk_hash_path = circuit_dir.join(format!("{}.vk_hash", circuit_name));
 
     let vk_bytes = fs::read(&vk_path)
         .map_err(|e| ZkError::CircuitNotFound(format!("{}: {}", vk_path.display(), e)))?;
@@ -45,7 +45,7 @@ fn load_vk_from_dir(circuit_dir: &Path, circuit_name: &str) -> Result<VkArtifact
     })
 }
 
-/// Loads recursive VK artifacts from the wrapper circuit dir.
+/// Loads VK artifacts from the wrapper circuit dir.
 /// Use when folding wrapper proofs (verifier needs the wrapper's VK).
 pub fn load_wrapper_vk_artifacts(
     circuits_dir: &Path,
@@ -55,8 +55,10 @@ pub fn load_wrapper_vk_artifacts(
     load_vk_from_dir(&circuit_dir, circuit.as_str())
 }
 
-/// Loads recursive VK artifacts from `.vk_recursive` and `.vk_recursive_hash`.
-/// Uses poseidon2 format (noir-recursive-no-zk) to match bb_proof_verification.
+/// Loads VK artifacts from `.vk` and `.vk_hash` in the variant-specific circuits directory.
+/// The caller is responsible for passing the correct circuits_dir:
+/// - `circuits_dir(CircuitVariant::Recursive)` for inner/base proofs embedded in a wrapper
+/// - `circuits_dir(CircuitVariant::Default)` for wrapper/fold proofs
 pub fn load_vk_artifacts(
     circuits_dir: &Path,
     circuit: CircuitName,
