@@ -8,21 +8,35 @@
 export { EnclaveSDK } from './enclave-sdk'
 
 // Core classes
-export { EventListener } from './event-listener'
-export { ContractClient } from './contract-client'
+export { EventListener } from './events/event-listener'
+export { ContractClient } from './contracts/contract-client'
+export type { ContractClientConfig } from './contracts/contract-client'
+export type { EventListenerOptions } from './events/event-listener'
 
-// Types and interfaces
+// Standalone encryption functions
+export {
+  getThresholdBfvParamsSet,
+  generatePublicKey,
+  computePublicKeyCommitment,
+  encryptNumber,
+  encryptVector,
+  encryptNumberAndGenInputs,
+  encryptNumberAndGenProof,
+  encryptVectorAndGenInputs,
+  encryptVectorAndGenProof,
+} from './encryption/encrypt'
+
+// Types and interfaces (re-exported from sub-modules via types.ts)
 export type {
-  E3,
   SDKConfig,
+  ContractAddresses,
+  E3,
   EventListenerConfig,
-  ContractInstances,
   EventFilter,
   EventCallback,
   SDKEventEmitter,
   AllEventTypes,
   EnclaveEvent,
-  // Event data types
   E3RequestedData,
   E3ActivatedData,
   CiphertextOutputPublishedData,
@@ -37,10 +51,11 @@ export type {
   BfvParams,
   VerifiableEncryptionResult,
   EncryptedValueAndPublicInputs,
+  ThresholdBfvParamsPresetName,
 } from './types'
 
-// enums and constants
-export { EnclaveEventType, RegistryEventType, ThresholdBfvParamsPresetName, ThresholdBfvParamsPresetNames } from './types'
+// Enums and constants
+export { EnclaveEventType, RegistryEventType, ThresholdBfvParamsPresetNames } from './types'
 
 // Export utilities
 export {
@@ -54,7 +69,6 @@ export {
   generateEventId,
   sleep,
   getCurrentTimestamp,
-  // BFV and E3 utilities
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
   DEFAULT_E3_CONFIG,
   encodeBfvParams,

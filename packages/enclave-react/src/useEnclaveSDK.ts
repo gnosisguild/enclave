@@ -23,7 +23,6 @@ export interface UseEnclaveSDKConfig {
     ciphernodeRegistry: `0x${string}`
     feeToken: `0x${string}`
   }
-  chainId?: number
   autoConnect?: boolean
   thresholdBfvParamsPresetName: ThresholdBfvParamsPresetName
 }
@@ -32,13 +31,10 @@ export interface UseEnclaveSDKReturn {
   sdk: EnclaveSDK | null
   isInitialized: boolean
   error: string | null
-  // Contract interaction methods (only the ones commonly used)
   requestE3: typeof EnclaveSDK.prototype.requestE3
   getThresholdBfvParamsSet: typeof EnclaveSDK.prototype.getThresholdBfvParamsSet
-  // Event handling
   onEnclaveEvent: <T extends AllEventTypes>(eventType: T, callback: EventCallback<T>) => void
   off: <T extends AllEventTypes>(eventType: T, callback: EventCallback<T>) => void
-  // Event types for convenience
   EnclaveEventType: typeof EnclaveEventType
   RegistryEventType: typeof RegistryEventType
 }
@@ -64,7 +60,8 @@ export interface UseEnclaveSDKReturn {
  *     autoConnect: true,
  *     contracts: {
  *       enclave: '0x...',
- *       ciphernodeRegistry: '0x...'
+ *       ciphernodeRegistry: '0x...',
+ *       feeToken: '0x...',
  *     },
  *     thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
  *   });
@@ -102,12 +99,10 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
           ciphernodeRegistry: '0x0000000000000000000000000000000000000000',
           feeToken: '0x0000000000000000000000000000000000000000',
         },
-        chainId: config.chainId,
         thresholdBfvParamsPresetName: config.thresholdBfvParamsPresetName,
       }
 
       const newSdk = new EnclaveSDK(sdkConfig)
-      await newSdk.initialize()
       setSdk(newSdk)
       sdkRef.current = newSdk
       setIsInitialized(true)
@@ -116,7 +111,7 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
       setError(errorMessage)
       console.error('SDK initialization failed:', err)
     }
-  }, [publicClient, walletClient, config.contracts, config.chainId, config.thresholdBfvParamsPresetName])
+  }, [publicClient, walletClient, config.contracts, config.thresholdBfvParamsPresetName])
 
   // Initialize SDK when wagmi clients are available
   useEffect(() => {
@@ -146,7 +141,6 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
     return sdk.getThresholdBfvParamsSet()
   }, [sdk])
 
-  // Contract interaction methods
   const requestE3 = useCallback(
     (...args: Parameters<typeof EnclaveSDK.prototype.requestE3>) => {
       if (!sdk) throw new Error('SDK not initialized')
@@ -155,7 +149,6 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
     [sdk],
   )
 
-  // Event handling methods
   const onEnclaveEvent = useCallback(
     <T extends AllEventTypes>(eventType: T, callback: EventCallback<T>) => {
       if (!sdk) throw new Error('SDK not initialized')

@@ -7,9 +7,12 @@
 import { defineConfig } from 'tsup'
 import { baseConfig } from '@enclave-e3/config/tsup'
 
+const entry = ['src/index.ts', 'src/encryption/index.ts', 'src/contracts/index.ts', 'src/events/index.ts']
+
 export default defineConfig([
   {
     ...baseConfig,
+    entry,
     include: ['./src/**/*.ts'],
     format: ['esm'],
     outExtension: () => ({
@@ -23,6 +26,7 @@ export default defineConfig([
   },
   {
     ...baseConfig,
+    entry,
     include: ['./src/**/*.ts'],
     format: ['cjs'],
     outExtension: () => ({

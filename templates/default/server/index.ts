@@ -7,6 +7,7 @@
 import express, { Request, Response } from 'express'
 import { EnclaveSDK, RegistryEventType, CommitteePublishedData } from '@enclave-e3/sdk'
 import { Log, PublicClient } from 'viem'
+import { hardhat } from 'viem/chains'
 import { handleTestInteraction } from './testHandler'
 import { getCheckedEnvVars } from './utils'
 import { callFheRunner } from './runner'
@@ -25,11 +26,7 @@ interface E3Session {
 const e3Sessions = new Map<string, E3Session>()
 
 async function createPrivateSDK() {
-  const { CHAIN_ID, PRIVATE_KEY, CIPHERNODE_REGISTRY_CONTRACT, ENCLAVE_CONTRACT, FEE_TOKEN_CONTRACT, RPC_URL } = getCheckedEnvVars()
-
-  if (!isSupportedChain(CHAIN_ID)) {
-    throw new Error(`Unsupported CHAIN_ID: ${CHAIN_ID}`)
-  }
+  const { PRIVATE_KEY, CIPHERNODE_REGISTRY_CONTRACT, ENCLAVE_CONTRACT, FEE_TOKEN_CONTRACT, RPC_URL } = getCheckedEnvVars()
 
   const sdk = EnclaveSDK.create({
     rpcUrl: RPC_URL,
@@ -39,11 +36,10 @@ async function createPrivateSDK() {
       ciphernodeRegistry: CIPHERNODE_REGISTRY_CONTRACT as `0x${string}`,
       feeToken: FEE_TOKEN_CONTRACT as `0x${string}`,
     },
-    chainId: CHAIN_ID,
+    chain: hardhat,
     thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
   })
 
-  await sdk.initialize()
   return sdk
 }
 
@@ -223,10 +219,6 @@ async function setupEventListeners() {
 
 function isValidHexString(value: string): value is `0x${string}` {
   return value.startsWith('0x') && /^0x[a-fA-F0-9]*$/.test(value)
-}
-
-function isSupportedChain(value: any): value is keyof typeof EnclaveSDK.chains {
-  return value in EnclaveSDK.chains
 }
 
 async function handleWebhookRequest(req: Request, res: Response) {

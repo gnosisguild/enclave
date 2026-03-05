@@ -137,7 +137,7 @@ describe('Integration', () => {
 
   const store = new Map<bigint, E3State>()
   const sdk = EnclaveSDK.create({
-    chainId: 31337,
+    chain: hardhat,
     contracts: {
       enclave: contracts.enclave,
       ciphernodeRegistry: contracts.ciphernodeRegistry,
