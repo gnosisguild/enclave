@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::E3id;
+use crate::{E3id, Proof};
 use actix::Message;
 use derivative::Derivative;
 use e3_utils::ArcBytes;
@@ -17,6 +17,9 @@ use std::fmt::{self, Display};
 pub struct PlaintextAggregated {
     pub e3_id: E3id,
     pub decrypted_output: Vec<ArcBytes>,
+    /// C7 proofs: one proof of correct aggregation per ciphertext index.
+    #[serde(default)]
+    pub aggregation_proofs: Vec<Proof>,
 }
 
 impl Display for PlaintextAggregated {
