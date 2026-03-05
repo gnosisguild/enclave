@@ -23,3 +23,42 @@ export interface E3 {
   ciphertextOutput: string
   plaintextOutput: string
 }
+
+export interface RequestParams {
+  gasLimit?: bigint
+}
+
+export interface E3RequestParams extends RequestParams {
+  threshold: readonly [number, number]
+  inputWindow: readonly [bigint, bigint]
+  e3Program: `0x${string}`
+  e3ProgramParams: `0x${string}`
+  computeProviderParams: `0x${string}`
+  customParams?: `0x${string}`
+}
+
+export enum E3Stage {
+  None,
+  Requested,
+  CommitteeFinalized,
+  KeyPublished,
+  CiphertextReady,
+  Complete,
+  Failed,
+}
+
+export enum FailureReason {
+  None,
+  CommitteeFormationTimeout,
+  InsufficientCommitteeMembers,
+  DKGTimeout,
+  DKGInvalidShares,
+  NoInputsReceived,
+  ComputeTimeout,
+  ComputeProviderExpired,
+  ComputeProviderFailed,
+  RequesterCancelled,
+  DecryptionTimeout,
+  DecryptionInvalidShares,
+  VerificationFailed,
+}

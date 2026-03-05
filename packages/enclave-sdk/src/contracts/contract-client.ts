@@ -19,7 +19,7 @@ import {
 import { privateKeyToAccount } from 'viem/accounts'
 
 import { CiphernodeRegistryOwnable__factory, Enclave__factory, EnclaveToken__factory } from '@enclave-e3/contracts/types'
-import type { ContractAddresses, E3 } from './types'
+import type { ContractAddresses, E3, E3RequestParams, E3Stage, FailureReason } from './types'
 import { SDKError, isValidAddress } from '../utils'
 
 export interface ContractClientConfig {
@@ -132,15 +132,7 @@ export class ContractClient {
     }
   }
 
-  public async requestE3(params: {
-    threshold: [number, number]
-    inputWindow: [bigint, bigint]
-    e3Program: `0x${string}`
-    e3ProgramParams: `0x${string}`
-    computeProviderParams: `0x${string}`
-    customParams?: `0x${string}`
-    gasLimit?: bigint
-  }): Promise<Hash> {
+  public async requestE3(params: E3RequestParams): Promise<Hash> {
     if (!this.walletClient) {
       throw new SDKError('Wallet client required for write operations', 'NO_WALLET')
     }
@@ -221,6 +213,41 @@ export class ContractClient {
     }
   }
 
+  public async getE3Quote(requestParams: E3RequestParams): Promise<bigint> {
+    try {
+      return this.publicClient.readContract({
+        address: this.contracts.enclave,
+        abi: Enclave__factory.abi,
+        functionName: 'getE3Quote',
+        args: [
+          {
+            threshold: requestParams.threshold,
+            inputWindow: requestParams.inputWindow,
+            e3Program: requestParams.e3Program,
+            e3ProgramParams: requestParams.e3ProgramParams,
+            computeProviderParams: requestParams.computeProviderParams,
+            customParams: requestParams.customParams || '0x',
+          },
+        ],
+      })
+    } catch (error) {
+      throw new SDKError(`Failed to get E3 quote: ${error}`, 'GET_E3_QUOTE_FAILED')
+    }
+  }
+
+  public async getFailureReason(e3Id: bigint): Promise<FailureReason> {
+    try {
+      return this.publicClient.readContract({
+        address: this.contracts.enclave,
+        abi: Enclave__factory.abi,
+        functionName: 'getFailureReason',
+        args: [e3Id],
+      })
+    } catch (error) {
+      throw new SDKError(`Failed to get failure reason: ${error}`, 'GET_FAILURE_REASON_FAILED')
+    }
+  }
+
   public async getE3PublicKey(e3Id: bigint): Promise<`0x${string}`> {
     try {
       const result: `0x${string}` = await this.publicClient.readContract({
@@ -233,6 +260,19 @@ export class ContractClient {
       return result
     } catch (error) {
       throw new SDKError(`Failed to get E3 public key: ${error}`, 'GET_E3_PUBLIC_KEY_FAILED')
+    }
+  }
+
+  public async getE3Stage(e3Id: bigint): Promise<E3Stage> {
+    try {
+      return this.publicClient.readContract({
+        address: this.contracts.enclave,
+        abi: Enclave__factory.abi,
+        functionName: 'getE3Stage',
+        args: [e3Id],
+      })
+    } catch (error) {
+      throw new SDKError(`Failed to get E3 stage: ${error}`, 'GET_E3_STAGE_FAILED')
     }
   }
 

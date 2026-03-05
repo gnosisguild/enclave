@@ -5,18 +5,18 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import {
-  AllEventTypes,
+  EnclaveSDK,
   calculateInputWindow,
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
   DEFAULT_E3_CONFIG,
-  E3,
-  EnclaveEvent,
-  EnclaveEventType,
-  EnclaveSDK,
   encodeBfvParams,
   encodeComputeProviderParams,
-  RegistryEventType,
+  decodePlaintextOutput,
 } from '@enclave-e3/sdk'
+import { EnclaveEventType, RegistryEventType } from '@enclave-e3/sdk/events'
+import type { AllEventTypes, EnclaveEvent } from '@enclave-e3/sdk/events'
+import { E3Stage } from '@enclave-e3/sdk/contracts'
+import type { E3 } from '@enclave-e3/sdk/contracts'
 import { createWalletClient, hexToBytes, http } from 'viem'
 import assert from 'assert'
 
@@ -33,12 +33,6 @@ export function getContractAddresses() {
     e3Program: process.env.E3_PROGRAM_ADDRESS as `0x${string}`,
     feeToken: process.env.FEE_TOKEN_ADDRESS as `0x${string}`,
   }
-}
-
-function hexToUint8Array(hexString: string) {
-  const hex = hexString.startsWith('0x') ? hexString.slice(2) : hexString
-  const m = hex.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) ?? []
-  return new Uint8Array(m)
 }
 
 type E3Shared = {
@@ -137,13 +131,13 @@ describe('Integration', () => {
 
   const store = new Map<bigint, E3State>()
   const sdk = EnclaveSDK.create({
-    chain: hardhat,
     contracts: {
       enclave: contracts.enclave,
       ciphernodeRegistry: contracts.ciphernodeRegistry,
       feeToken: contracts.feeToken,
     },
     rpcUrl: 'ws://localhost:8545',
+    chain: anvil,
     thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
     privateKey: testPrivateKey,
   })
@@ -162,7 +156,7 @@ describe('Integration', () => {
     const { waitForEvent } = await setupEventListeners(sdk, store)
 
     const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
-    const duration = 225
+    const duration = 250
     const inputWindow = await calculateInputWindow(publicClient, duration)
     const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
     const e3ProgramParams = encodeBfvParams(thresholdBfvParams)
@@ -182,16 +176,22 @@ describe('Integration', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
+    // Verify fee quoting works
+    const requestParams = {
+      threshold,
+      inputWindow,
+      e3Program: contracts.e3Program,
+      e3ProgramParams,
+      computeProviderParams,
+    }
+    const quote = await sdk.getE3Quote(requestParams)
+    console.log('E3 quote:', quote)
+    assert(quote >= 0n, 'E3 quote should be a non-negative bigint')
+
     // REQUEST phase
     await waitForEvent(EnclaveEventType.E3_REQUESTED, async () => {
       console.log('Requested E3...')
-      await sdk.requestE3({
-        threshold,
-        inputWindow,
-        e3Program: contracts.e3Program,
-        e3ProgramParams,
-        computeProviderParams,
-      })
+      await sdk.requestE3(requestParams)
     })
 
     state = store.get(0n)
@@ -199,6 +199,10 @@ describe('Integration', () => {
     assert.strictEqual(state.e3Id, 0n)
     assert.strictEqual(state.type, 'requested')
     console.log('E3 Sucessfully Requested!')
+
+    // Verify E3 stage after request
+    const stageAfterRequest = await sdk.getE3Stage(0n)
+    assert.strictEqual(stageAfterRequest, E3Stage.Requested, 'E3 stage should be Requested after requestE3')
 
     // Ciphernodes will publish a public key within the COMMITTEE_PUBLISHED event
     event = await waitForEvent(RegistryEventType.COMMITTEE_PUBLISHED)
@@ -209,6 +213,10 @@ describe('Integration', () => {
     assert(state, 'store should have E3State but it was falsey')
     assert.strictEqual(state.type, 'committee_published')
     assert.strictEqual(state.publicKey, event.data.publicKey)
+
+    // Verify E3 stage after committee published
+    const stageAfterCommittee = await sdk.getE3Stage(0n)
+    assert.strictEqual(stageAfterCommittee, E3Stage.KeyPublished, 'E3 stage should be KeyPublished after committee published')
 
     let { e3Id } = state
 
@@ -228,7 +236,7 @@ describe('Integration', () => {
       account.address,
       contracts.e3Program,
     )
-    await publicClient.waitForTransactionReceipt({ hash: txHash })
+    await sdk.waitForTransaction(txHash)
     txHash = await publishInput(
       walletClient,
       e3Id,
@@ -236,13 +244,14 @@ describe('Integration', () => {
       account.address,
       contracts.e3Program,
     )
-    await publicClient.waitForTransactionReceipt({ hash: txHash })
+    await sdk.waitForTransaction(txHash)
 
     const plaintextEvent = await waitForEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED)
 
-    const parsed = hexToUint8Array(plaintextEvent.data.plaintextOutput)
+    const result = decodePlaintextOutput(plaintextEvent.data.plaintextOutput)
+    assert(result !== null, 'Failed to decode plaintext output')
 
-    expect(BigInt(parsed[0])).toBe(num1 + num2)
+    expect(BigInt(result)).toBe(num1 + num2)
     console.log('Answer was correct')
   }, 9999999)
 })

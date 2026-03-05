@@ -210,8 +210,8 @@ that wraps or complements the core Enclave SDK.
 
 - **Historical events**: `sdk.getHistoricalEvents(type, fromBlock, toBlock)` fetches logs without a
   WebSocket provider; useful for CRON jobs or health checks.
-- **Gas controls**: pass `gasLimit` to `requestE3`, `publishCiphertextOutput`, or other write methods
-  if you want fixed limits when interacting with Enclave on L2s.
+- **Gas controls**: pass `gasLimit` to `requestE3`, `publishCiphertextOutput`, or other write
+  methods if you want fixed limits when interacting with Enclave on L2s.
 - **Event polling**: `sdk.startEventPolling()` is handy in serverless environments where websockets
   are unavailable.
 - **Custom transports**: on the server, call `createWalletClient({ account, transport: http(rpc) })`
@@ -221,11 +221,11 @@ that wraps or complements the core Enclave SDK.
 
 ## Troubleshooting
 
-| Symptom                        | Triage                                                                                                                   |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `MISSING_PUBLIC_CLIENT` errors | Ensure `createPublicClient` uses an HTTP or WebSocket RPC reachable from the app.                                        |
-| `INVALID_ADDRESS`              | Double-check contract addresses passed into the SDK match the current chain.                                             |
+| Symptom                        | Triage                                                                                                                         |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `MISSING_PUBLIC_CLIENT` errors | Ensure `createPublicClient` uses an HTTP or WebSocket RPC reachable from the app.                                              |
+| `INVALID_ADDRESS`              | Double-check contract addresses passed into the SDK match the current chain.                                                   |
 | Hooks never initialize         | Confirm `autoConnect` is true, wallet is connected, and React component is inside a wagmi provider that renders on the client. |
-| No events arrive               | Switch to a WebSocket RPC or call `sdk.startEventPolling()` so logs are polled over HTTP.                                |
+| No events arrive               | Switch to a WebSocket RPC or call `sdk.startEventPolling()` so logs are polled over HTTP.                                      |
 
 For additional API surface details see `packages/enclave-sdk/README.md` inside this repo.

@@ -5,7 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import express, { Request, Response } from 'express'
-import { EnclaveSDK, RegistryEventType, CommitteePublishedData } from '@enclave-e3/sdk'
+import { EnclaveSDK } from '@enclave-e3/sdk'
+import { RegistryEventType, type CommitteePublishedData } from '@enclave-e3/sdk/events'
 import { Log, PublicClient } from 'viem'
 import { hardhat } from 'viem/chains'
 import { handleTestInteraction } from './testHandler'
@@ -25,10 +26,14 @@ interface E3Session {
 
 const e3Sessions = new Map<string, E3Session>()
 
+let sdkInstance: EnclaveSDK | null = null
+
 async function createPrivateSDK() {
+  if (sdkInstance) return sdkInstance
+
   const { PRIVATE_KEY, CIPHERNODE_REGISTRY_CONTRACT, ENCLAVE_CONTRACT, FEE_TOKEN_CONTRACT, RPC_URL } = getCheckedEnvVars()
 
-  const sdk = EnclaveSDK.create({
+  sdkInstance = EnclaveSDK.create({
     rpcUrl: RPC_URL,
     privateKey: PRIVATE_KEY as `0x${string}`,
     contracts: {
@@ -40,7 +45,7 @@ async function createPrivateSDK() {
     thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
   })
 
-  return sdk
+  return sdkInstance
 }
 
 async function runProgram(e3Id: bigint): Promise<void> {
@@ -65,7 +70,7 @@ async function runProgram(e3Id: bigint): Promise<void> {
     let e3ProgramParams = session.e3ProgramParams
     if (!e3ProgramParams) {
       const sdk = await createPrivateSDK()
-      const e3Details = (await sdk.getE3(e3Id)) as any
+      const e3Details = await sdk.getE3(e3Id)
       e3ProgramParams = e3Details.e3ProgramParams
       session.e3ProgramParams = e3ProgramParams
     }
@@ -282,8 +287,6 @@ app.get('/sessions', handleGetSessions)
 if (process.env.TEST_MODE) {
   app.get('/test', handleTestInteraction)
 }
-
-app.get('/sessions', handleGetSessions)
 
 async function startServer() {
   try {

@@ -31,6 +31,7 @@ export type {
   SDKConfig,
   ContractAddresses,
   E3,
+  E3RequestParams,
   EventListenerConfig,
   EventFilter,
   EventCallback,
@@ -55,7 +56,7 @@ export type {
 } from './types'
 
 // Enums and constants
-export { EnclaveEventType, RegistryEventType, ThresholdBfvParamsPresetNames } from './types'
+export { EnclaveEventType, RegistryEventType, ThresholdBfvParamsPresetNames, E3Stage, FailureReason } from './types'
 
 // Export utilities
 export {

@@ -36,7 +36,8 @@ import { SDKError, isValidAddress } from './utils'
 
 import type { SDKConfig } from './types'
 import type { AllEventTypes, EventCallback } from './events/types'
-import type { E3 } from './contracts/types'
+import type { E3, E3RequestParams } from './contracts/types'
+import { E3Stage, FailureReason } from './contracts/types'
 import type { BfvParams, EncryptedValueAndPublicInputs, ThresholdBfvParamsPresetName, VerifiableEncryptionResult } from './encryption/types'
 
 export class EnclaveSDK {
@@ -163,6 +164,18 @@ export class EnclaveSDK {
 
   public async getE3(e3Id: bigint): Promise<E3> {
     return this.contractClient.getE3(e3Id)
+  }
+
+  public async getE3Quote(params: E3RequestParams): Promise<bigint> {
+    return this.contractClient.getE3Quote(params)
+  }
+
+  public async getFailureReason(e3Id: bigint): Promise<FailureReason> {
+    return this.contractClient.getFailureReason(e3Id)
+  }
+
+  public async getE3Stage(e3Id: bigint): Promise<E3Stage> {
+    return this.contractClient.getE3Stage(e3Id)
   }
 
   public async estimateGas(

@@ -13,7 +13,8 @@ export type { BfvParams, ThresholdBfvParamsPresetName, VerifiableEncryptionResul
 
 export { ThresholdBfvParamsPresetNames } from './encryption/types'
 
-export type { ContractAddresses, E3 } from './contracts/types'
+export type { ContractAddresses, E3, E3RequestParams } from './contracts/types'
+export { E3Stage, FailureReason } from './contracts/types'
 
 export { EnclaveEventType, RegistryEventType } from './events/types'
 

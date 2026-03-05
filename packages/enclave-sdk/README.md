@@ -8,7 +8,8 @@ real-time event listening, contract interaction methods, and comprehensive error
 - **Event-driven architecture**: Listen to smart contract events in real-time
 - **Type-safe**: Built with TypeScript and uses generated types from contracts
 - **Easy contract interactions**: Simple methods for reading from and writing to contracts
-- **React integration**: Includes React hooks for easy frontend integration (via `@enclave-e3/react`)
+- **React integration**: Includes React hooks for easy frontend integration (via
+  `@enclave-e3/react`)
 - **Modular architecture**: Tree-shakeable sub-modules for contracts, events, and encryption
 - **Encryption helpers**: Standalone FHE encryption functions with optional ZK proof generation
 - **Error handling**: Comprehensive error handling with custom error types
@@ -292,7 +293,8 @@ import type { ContractAddresses, E3 } from '@enclave-e3/sdk/contracts'
 import { EventListener, EnclaveEventType, RegistryEventType } from '@enclave-e3/sdk/events'
 ```
 
-All sub-module exports are also re-exported from the main `@enclave-e3/sdk` entry point for convenience.
+All sub-module exports are also re-exported from the main `@enclave-e3/sdk` entry point for
+convenience.
 
 ## API Reference
 
@@ -395,7 +397,8 @@ interface SDKConfig {
 }
 ```
 
-`thresholdBfvParamsPresetName` must be one of: `'INSECURE_THRESHOLD_512'` or `'SECURE_THRESHOLD_8192'`.
+`thresholdBfvParamsPresetName` must be one of: `'INSECURE_THRESHOLD_512'` or
+`'SECURE_THRESHOLD_8192'`.
 
 ## Error Handling
 
@@ -446,9 +449,12 @@ pnpm test
 The SDK is organized into a modular architecture with three domain-specific sub-modules:
 
 - **EnclaveSDK** (`enclave-sdk.ts`): Main orchestrator class that delegates to sub-modules
-- **Contracts** (`contracts/`): `ContractClient` for contract read/write operations, type definitions for contract addresses and E3 data
-- **Events** (`events/`): `EventListener` for real-time and historical event subscriptions, typed event enums and data interfaces
-- **Encryption** (`encryption/`): Standalone FHE encryption functions, BFV parameter management, ZK proof generation
+- **Contracts** (`contracts/`): `ContractClient` for contract read/write operations, type
+  definitions for contract addresses and E3 data
+- **Events** (`events/`): `EventListener` for real-time and historical event subscriptions, typed
+  event enums and data interfaces
+- **Encryption** (`encryption/`): Standalone FHE encryption functions, BFV parameter management, ZK
+  proof generation
 - **Utils** (`utils.ts`): Helper functions, error classes, encoding utilities
 
 Each sub-module has its own `index.ts` entry point and can be imported independently.

@@ -6,4 +6,5 @@
 
 export { ContractClient } from './contract-client'
 export type { ContractClientConfig } from './contract-client'
-export type { ContractAddresses, E3 } from './types'
+export type { ContractAddresses, E3, E3RequestParams } from './types'
+export { E3Stage, FailureReason } from './types'
