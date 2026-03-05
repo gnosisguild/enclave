@@ -47,6 +47,60 @@ enclaveup install --system
 Running `enclaveup install` will install the latest version of the Enclave CLI. See
 `enclaveup --help` for more options.
 
+
+## Install with Nix
+
+If you use [Nix](https://nixos.org/) with flakes enabled, you can get a complete runtime environment with no additional dependencies — Nix handles everything including installing the `bb` backend.
+
+Run the CLI directly without installing it:
+
+```bash
+nix run github:gnosisguild/enclave -- --help
+```
+
+This will build from source using the nix framework.
+
+To add Enclave to a project, create a `flake.nix` in your project root:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    enclave.url = "github:gnosisguild/enclave";
+  };
+  outputs = {
+    nixpkgs,
+    enclave,
+    ...
+  }: let
+    system = "x86_64-linux";
+    e = enclave.packages.${system};
+  in {
+    devShells.${system}.default = nixpkgs.legacyPackages.${system}.mkShell {
+      packages = [e.default e.bb];
+      shellHook = ''
+        export E3_CUSTOM_BB="${e.bb}/bin/bb"
+      '';
+    };
+  };
+}
+```
+
+Then enter the development shell:
+
+```bash
+nix develop
+```
+
+Replace `x86_64-linux` with `aarch64-linux`, `x86_64-darwin`, or `aarch64-darwin` as appropriate for your platform.
+
+To check your installation:
+
+```bash
+enclave --version
+bb --version
+```
+
 ## Manual Installation
 
 If you prefer to install manually:

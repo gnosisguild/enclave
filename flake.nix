@@ -174,7 +174,7 @@
       };
     in {
       packages.default = e3-cli;
-      packages.e3-cli = e3-cli;
+      packages.cli = e3-cli;
       packages.bb = wrapped-bb;
 
       devShells.default = pkgs.mkShell {
