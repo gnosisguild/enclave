@@ -385,6 +385,7 @@ impl PublicKeyAggregator {
         self.state.try_mutate(ec, |mut state| {
             let PublicKeyAggregatorState::Collecting {
                 threshold_n,
+                threshold_m,
                 keyshares,
                 nodes,
                 ..
@@ -410,10 +411,13 @@ impl PublicKeyAggregator {
             }
 
             if keyshares.len() == *threshold_n && *threshold_n > 0 {
-                info!("PublicKeyAggregator: enough keyshares after expulsion, computing aggregate");
-                return Ok(PublicKeyAggregatorState::Computing {
+                let m = *threshold_m;
+                info!("PublicKeyAggregator: enough keyshares after expulsion, transitioning to VerifyingC1");
+                return Ok(PublicKeyAggregatorState::VerifyingC1 {
                     keyshares: std::mem::take(keyshares),
                     nodes: std::mem::take(nodes),
+                    threshold_m: m,
+                    no_proof_parties: Vec::new(),
                 });
             }
 
@@ -470,22 +474,24 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
                         Some(PublicKeyAggregatorState::Collecting { .. })
                     );
 
+                    // Snapshot c1_proofs before expulsion mutates state
+                    let c1_proofs_snapshot = match self.state.get() {
+                        Some(PublicKeyAggregatorState::Collecting { c1_proofs, .. }) => {
+                            Some(c1_proofs.clone())
+                        }
+                        _ => None,
+                    };
+
                     self.handle_member_expelled(&node_addr, &ec)?;
 
                     if was_collecting {
-                        if let Some(PublicKeyAggregatorState::Computing { keyshares, .. }) =
-                            &self.state.get()
-                        {
-                            self.notify_sync(
-                                ctx,
-                                TypedEvent::new(
-                                    ComputeAggregate {
-                                        keyshares: keyshares.clone(),
-                                        e3_id: data.e3_id,
-                                    },
-                                    ec.clone(),
-                                ),
-                            );
+                        if matches!(
+                            self.state.get(),
+                            Some(PublicKeyAggregatorState::VerifyingC1 { .. })
+                        ) {
+                            if let Some(c1_proofs) = c1_proofs_snapshot {
+                                self.dispatch_c1_verification(&c1_proofs, ec.clone())?;
+                            }
                         }
                     }
                     Ok(())
