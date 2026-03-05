@@ -6,7 +6,7 @@
 
 use crate::backend::ZkBackend;
 use crate::error::ZkError;
-use e3_events::{CircuitName, Proof};
+use e3_events::{CircuitFlavor, CircuitName, Proof};
 use e3_utils::utility_types::ArcBytes;
 use std::fs;
 use std::path::PathBuf;
@@ -28,8 +28,8 @@ impl ZkProver {
         }
     }
 
-    pub fn circuits_dir(&self) -> &PathBuf {
-        &self.circuits_dir
+    pub fn circuits_dir(&self, flavor: CircuitFlavor) -> PathBuf {
+        self.circuits_dir.join(flavor.as_str())
     }
 
     pub fn work_dir(&self) -> &PathBuf {
@@ -46,11 +46,30 @@ impl ZkProver {
         witness_data: &[u8],
         e3_id: &str,
     ) -> Result<Proof, ZkError> {
-        self.generate_proof_impl(circuit, witness_data, e3_id, &circuit.dir_path(), None)
+        self.generate_proof_with_flavor(circuit, witness_data, e3_id, CircuitFlavor::Default)
+    }
+
+    pub fn generate_evm_proof(
+        &self,
+        circuit: CircuitName,
+        witness_data: &[u8],
+        e3_id: &str,
+    ) -> Result<Proof, ZkError> {
+        self.generate_proof_with_flavor(circuit, witness_data, e3_id, CircuitFlavor::Evm)
+    }
+
+    pub fn generate_proof_with_flavor(
+        &self,
+        circuit: CircuitName,
+        witness_data: &[u8],
+        e3_id: &str,
+        flavor: CircuitFlavor,
+    ) -> Result<Proof, ZkError> {
+        self.generate_proof_impl(circuit, witness_data, e3_id, &circuit.dir_path(), flavor)
     }
 
     /// Generates a proof for recursive aggregation (poseidon2, noir-recursive-no-zk).
-    /// Uses inner circuit dir and `.vk_recursive`.
+    /// Uses the default (poseidon) flavor since recursive proofs require poseidon.
     pub fn generate_recursive_proof(
         &self,
         circuit: CircuitName,
@@ -62,12 +81,12 @@ impl ZkProver {
             witness_data,
             e3_id,
             &circuit.dir_path(),
-            Some("noir-recursive-no-zk"),
+            CircuitFlavor::Default,
         )
     }
 
     /// Generates a proof of the wrapper circuit (for aggregation output).
-    /// Uses wrapper dir; verifier_target determines proof format and VK suffix.
+    /// Uses wrapper dir; always uses default (poseidon) flavor for recursive compatibility.
     pub fn generate_wrapper_proof(
         &self,
         circuit: CircuitName,
@@ -79,13 +98,13 @@ impl ZkProver {
             witness_data,
             e3_id,
             &circuit.wrapper_dir_path(),
-            Some("noir-recursive-no-zk"),
+            CircuitFlavor::Default,
         )
     }
 
     /// Generates a proof of the fold circuit (for aggregation output).
     /// The fold circuit is independent; uses fixed path `recursive_aggregation/fold`.
-    /// Verifier target: `noir-recursive-no-zk`.
+    /// Uses default (poseidon) flavor for recursive compatibility.
     pub fn generate_fold_proof(&self, witness_data: &[u8], e3_id: &str) -> Result<Proof, ZkError> {
         let dir = CircuitName::Fold.dir_path();
         self.generate_proof_impl(
@@ -93,18 +112,24 @@ impl ZkProver {
             witness_data,
             e3_id,
             &dir,
-            Some("noir-recursive-no-zk"),
+            CircuitFlavor::Default,
         )
     }
 
-    /// Generates the final fold proof for on-chain verification (evm target).
+    /// Generates the final fold proof for on-chain verification (evm/keccak target).
     pub fn generate_final_fold_proof(
         &self,
         witness_data: &[u8],
         e3_id: &str,
     ) -> Result<Proof, ZkError> {
         let dir = CircuitName::Fold.dir_path();
-        self.generate_proof_impl(CircuitName::Fold, witness_data, e3_id, &dir, Some("evm"))
+        self.generate_proof_impl(
+            CircuitName::Fold,
+            witness_data,
+            e3_id,
+            &dir,
+            CircuitFlavor::Evm,
+        )
     }
 
     fn generate_proof_impl(
@@ -113,20 +138,17 @@ impl ZkProver {
         witness_data: &[u8],
         e3_id: &str,
         dir_path: &str,
-        verifier_target: Option<&str>,
+        flavor: CircuitFlavor,
     ) -> Result<Proof, ZkError> {
         if !self.bb_binary.exists() {
             return Err(ZkError::BbNotInstalled);
         }
 
-        let vk_suffix = match verifier_target {
-            Some("noir-recursive") | Some("noir-recursive-no-zk") => "_recursive",
-            _ => "",
-        };
+        let verifier_target = flavor.verifier_target();
 
-        let circuit_dir = self.circuits_dir.join(dir_path);
+        let circuit_dir = self.circuits_dir(flavor).join(dir_path);
         let circuit_path = circuit_dir.join(format!("{}.json", circuit.as_str()));
-        let vk_path = circuit_dir.join(format!("{}.vk{vk_suffix}", circuit.as_str()));
+        let vk_path = circuit_dir.join(format!("{}.vk", circuit.as_str()));
 
         if !circuit_path.exists() {
             return Err(ZkError::CircuitNotFound(format!(
@@ -162,7 +184,7 @@ impl ZkProver {
         let vk_path_s = vk_path.to_string_lossy();
         let output_dir_s = output_dir.to_string_lossy();
 
-        let mut args = vec![
+        let args = vec![
             "prove",
             "-b",
             circuit_path_s.as_ref(),
@@ -173,12 +195,9 @@ impl ZkProver {
             "-o",
             output_dir_s.as_ref(),
             "-v",
+            "-t",
+            verifier_target,
         ];
-        if let Some(t) = verifier_target {
-            args.extend(["-t", t]);
-        } else {
-            args.extend(["-t", "evm"]);
-        }
 
         let output = StdCommand::new(&self.bb_binary).args(&args).output()?;
 
@@ -216,7 +235,24 @@ impl ZkProver {
             proof.circuit.dir_path(),
             e3_id,
             party_id,
-            None,
+            CircuitFlavor::Default,
+        )
+    }
+
+    pub fn verify_evm_proof(
+        &self,
+        proof: &Proof,
+        e3_id: &str,
+        party_id: u64,
+    ) -> Result<bool, ZkError> {
+        self.verify_proof_impl(
+            proof.circuit,
+            &proof.data,
+            &proof.public_signals,
+            proof.circuit.dir_path(),
+            e3_id,
+            party_id,
+            CircuitFlavor::Evm,
         )
     }
 
@@ -234,7 +270,7 @@ impl ZkProver {
             proof.circuit.wrapper_dir_path(),
             e3_id,
             party_id,
-            Some("noir-recursive-no-zk"),
+            CircuitFlavor::Default,
         )
     }
 
@@ -259,7 +295,7 @@ impl ZkProver {
             proof.circuit.dir_path(),
             e3_id,
             party_id,
-            Some("noir-recursive-no-zk"),
+            CircuitFlavor::Default,
         )
     }
 
@@ -271,20 +307,17 @@ impl ZkProver {
         dir_path: String,
         e3_id: &str,
         party_id: u64,
-        verifier_target: Option<&str>,
+        flavor: CircuitFlavor,
     ) -> Result<bool, ZkError> {
         if !self.bb_binary.exists() {
             return Err(ZkError::BbNotInstalled);
         }
 
-        let vk_suffix = match verifier_target {
-            Some("noir-recursive") | Some("noir-recursive-no-zk") => "_recursive",
-            _ => "",
-        };
+        let verifier_target = flavor.verifier_target();
         let vk_path = self
-            .circuits_dir
+            .circuits_dir(flavor)
             .join(&dir_path)
-            .join(format!("{}.vk{vk_suffix}", circuit.as_str()));
+            .join(format!("{}.vk", circuit.as_str()));
         if !vk_path.exists() {
             return Err(ZkError::CircuitNotFound(format!(
                 "VK not found: {}",
@@ -315,7 +348,7 @@ impl ZkProver {
         let proof_s = proof_path.to_string_lossy();
         let vk_s = vk_path.to_string_lossy();
 
-        let mut args = vec![
+        let args = vec![
             "verify",
             "--scheme",
             "ultra_honk",
@@ -325,12 +358,9 @@ impl ZkProver {
             proof_s.as_ref(),
             "-k",
             vk_s.as_ref(),
+            "-t",
+            verifier_target,
         ];
-        if let Some(t) = verifier_target {
-            args.extend(["-t", t]);
-        } else {
-            args.extend(["-t", "evm"]);
-        }
 
         let output = StdCommand::new(&self.bb_binary).args(&args).output()?;
 

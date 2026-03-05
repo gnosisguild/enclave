@@ -17,3 +17,18 @@ export const CIRCUIT_GROUPS = {
 export type CircuitGroup = (typeof CIRCUIT_GROUPS)[keyof typeof CIRCUIT_GROUPS]
 
 export const ALL_GROUPS: CircuitGroup[] = [CIRCUIT_GROUPS.DKG, CIRCUIT_GROUPS.THRESHOLD, CIRCUIT_GROUPS.AGGREGATION]
+
+/**
+ * Circuit flavors determine the hash oracle used for VK generation and proving.
+ *
+ * - `default`: Uses poseidon hash — for off-chain ciphernode-to-ciphernode verification.
+ * - `evm`: Uses keccak hash — for on-chain EVM-verifiable proofs.
+ */
+export const CIRCUIT_FLAVORS = {
+  DEFAULT: 'default',
+  EVM: 'evm',
+} as const
+
+export type CircuitFlavor = (typeof CIRCUIT_FLAVORS)[keyof typeof CIRCUIT_FLAVORS]
+
+export const ALL_FLAVORS: CircuitFlavor[] = [CIRCUIT_FLAVORS.DEFAULT, CIRCUIT_FLAVORS.EVM]

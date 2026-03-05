@@ -33,6 +33,42 @@ impl Proof {
     }
 }
 
+/// Circuit flavors determine the hash oracle used for VK generation and proving.
+///
+/// - `Default`: Uses poseidon hash — for off-chain ciphernode-to-ciphernode verification.
+/// - `Evm`: Uses keccak hash — for on-chain EVM-verifiable proofs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum CircuitFlavor {
+    /// Poseidon-based circuits for off-chain ciphernode verification (default).
+    #[default]
+    Default,
+    /// Keccak-based circuits for on-chain EVM verification.
+    Evm,
+}
+
+impl CircuitFlavor {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CircuitFlavor::Default => "default",
+            CircuitFlavor::Evm => "evm",
+        }
+    }
+
+    /// Returns the bb verifier target flag value for this flavor.
+    pub fn verifier_target(&self) -> &'static str {
+        match self {
+            CircuitFlavor::Default => "noir-recursive-no-zk",
+            CircuitFlavor::Evm => "evm",
+        }
+    }
+}
+
+impl fmt::Display for CircuitFlavor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Circuit identifiers for ZK proofs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CircuitName {

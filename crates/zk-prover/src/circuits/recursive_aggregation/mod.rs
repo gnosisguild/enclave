@@ -16,7 +16,7 @@ use crate::circuits::utils::inputs_json_to_input_map;
 use crate::error::ZkError;
 use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
-use e3_events::{CircuitName, Proof};
+use e3_events::{CircuitFlavor, CircuitName, Proof};
 
 use self::utils::bytes_to_field_strings;
 
@@ -96,7 +96,8 @@ pub fn generate_wrapper_proof(
     };
     let circuit = proofs[0].circuit;
 
-    let vk_artifacts = vk::load_vk_artifacts(prover.circuits_dir(), circuit)?;
+    let vk_artifacts =
+        vk::load_vk_artifacts(&prover.circuits_dir(CircuitFlavor::Default), circuit)?;
 
     let full_input = WrapperInput {
         verification_key: vk_artifacts.verification_key,
@@ -107,7 +108,7 @@ pub fn generate_wrapper_proof(
 
     let dir_path = circuit.wrapper_dir_path();
     let circuit_path = prover
-        .circuits_dir()
+        .circuits_dir(CircuitFlavor::Default)
         .join(&dir_path)
         .join(format!("{}.json", circuit.as_str()));
     let compiled = CompiledCircuit::from_file(&circuit_path)?;
@@ -167,8 +168,10 @@ pub fn generate_fold_proof(
     proof2: &Proof,
     e3_id: &str,
 ) -> Result<Proof, ZkError> {
-    let vk1 = vk::load_vk_for_fold_input(prover.circuits_dir(), proof1.circuit)?;
-    let vk2 = vk::load_vk_for_fold_input(prover.circuits_dir(), proof2.circuit)?;
+    let vk1 =
+        vk::load_vk_for_fold_input(&prover.circuits_dir(CircuitFlavor::Default), proof1.circuit)?;
+    let vk2 =
+        vk::load_vk_for_fold_input(&prover.circuits_dir(CircuitFlavor::Default), proof2.circuit)?;
 
     // Both wrapper and fold output [key_hash, commitment].
     let proof1_public_inputs = bytes_to_field_strings(&proof1.public_signals)?;
@@ -200,7 +203,7 @@ pub fn generate_fold_proof(
 
     let dir_path = CircuitName::Fold.dir_path();
     let circuit_path = prover
-        .circuits_dir()
+        .circuits_dir(CircuitFlavor::Default)
         .join(&dir_path)
         .join(format!("{}.json", CircuitName::Fold.as_str()));
     let compiled = CompiledCircuit::from_file(&circuit_path)?;
@@ -275,11 +278,12 @@ mod tests {
 
         let dist = dist_circuits_path();
         let wrapper_src = dist
+            .join("default")
             .join("recursive_aggregation")
             .join("wrapper")
             .join("dkg")
             .join("pk");
-        if wrapper_src.join("pk.json").exists() && wrapper_src.join("pk.vk_recursive").exists() {
+        if wrapper_src.join("pk.json").exists() && wrapper_src.join("pk.vk").exists() {
             // Use dist entirely so inner + wrapper circuits match (same build).
             backend.circuits_dir = dist.clone();
         }
@@ -288,11 +292,12 @@ mod tests {
 
         let wrapper_dir = backend
             .circuits_dir
+            .join("default")
             .join("recursive_aggregation")
             .join("wrapper")
             .join("dkg")
             .join("pk");
-        if !wrapper_dir.join("pk.json").exists() || !wrapper_dir.join("pk.vk_recursive").exists() {
+        if !wrapper_dir.join("pk.json").exists() || !wrapper_dir.join("pk.vk").exists() {
             panic!(
                 "wrapper circuit not found at {} — run pnpm build:circuits and set circuits_dir to dist/circuits, or ensure the release includes recursive_aggregation",
                 wrapper_dir.display()
@@ -332,12 +337,13 @@ mod tests {
 
         let dist = dist_circuits_path();
         let wrapper_src = dist
+            .join("default")
             .join("recursive_aggregation")
             .join("wrapper")
             .join("dkg")
             .join("share_decryption");
         if wrapper_src.join("share_decryption.json").exists()
-            && wrapper_src.join("share_decryption.vk_recursive").exists()
+            && wrapper_src.join("share_decryption.vk").exists()
         {
             backend.circuits_dir = dist.clone();
         }
@@ -346,12 +352,13 @@ mod tests {
 
         let wrapper_dir = backend
             .circuits_dir
+            .join("default")
             .join("recursive_aggregation")
             .join("wrapper")
             .join("dkg")
             .join("share_decryption");
         if !wrapper_dir.join("share_decryption.json").exists()
-            || !wrapper_dir.join("share_decryption.vk_recursive").exists()
+            || !wrapper_dir.join("share_decryption.vk").exists()
         {
             panic!(
                 "2-proof wrapper circuit not found at {} — run pnpm build:circuits and set circuits_dir to dist/circuits",
@@ -404,25 +411,24 @@ mod tests {
         backend.ensure_installed().await.expect("ensure_installed");
 
         let dist = dist_circuits_path();
-        let pk_wrapper = dist
+        let default_dist = dist.join("default");
+        let pk_wrapper = default_dist
             .join("recursive_aggregation")
             .join("wrapper")
             .join("dkg")
             .join("pk");
-        let share_enc_wrapper = dist
+        let share_enc_wrapper = default_dist
             .join("recursive_aggregation")
             .join("wrapper")
             .join("dkg")
             .join("share_encryption");
-        let fold_dir = dist.join("recursive_aggregation").join("fold");
+        let fold_dir = default_dist.join("recursive_aggregation").join("fold");
         if pk_wrapper.join("pk.json").exists()
-            && pk_wrapper.join("pk.vk_recursive").exists()
+            && pk_wrapper.join("pk.vk").exists()
             && share_enc_wrapper.join("share_encryption.json").exists()
-            && share_enc_wrapper
-                .join("share_encryption.vk_recursive")
-                .exists()
+            && share_enc_wrapper.join("share_encryption.vk").exists()
             && fold_dir.join("fold.json").exists()
-            && fold_dir.join("fold.vk_recursive").exists()
+            && fold_dir.join("fold.vk").exists()
         {
             backend.circuits_dir = dist.clone();
         }
@@ -430,17 +436,15 @@ mod tests {
         let prover = ZkProver::new(&backend);
 
         if !pk_wrapper.join("pk.json").exists()
-            || !pk_wrapper.join("pk.vk_recursive").exists()
+            || !pk_wrapper.join("pk.vk").exists()
             || !share_enc_wrapper.join("share_encryption.json").exists()
-            || !share_enc_wrapper
-                .join("share_encryption.vk_recursive")
-                .exists()
+            || !share_enc_wrapper.join("share_encryption.vk").exists()
         {
             panic!(
                 "wrapper circuits not found — run pnpm build:circuits and ensure dist/circuits includes recursive_aggregation wrappers for pk and share_encryption",
             );
         }
-        if !fold_dir.join("fold.json").exists() || !fold_dir.join("fold.vk_recursive").exists() {
+        if !fold_dir.join("fold.json").exists() || !fold_dir.join("fold.vk").exists() {
             panic!(
                 "fold circuit not found at {} — run pnpm build:circuits",
                 fold_dir.display()

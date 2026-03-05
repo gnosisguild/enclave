@@ -11,7 +11,7 @@ use crate::circuits::utils::inputs_json_to_input_map;
 use crate::error::ZkError;
 use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
-use e3_events::{CircuitName, Proof};
+use e3_events::{CircuitFlavor, CircuitName, Proof};
 use e3_zk_helpers::Computation;
 use noirc_abi::InputMap;
 
@@ -68,7 +68,7 @@ pub trait Provable: Send + Sync {
 
         let resolved_name = self.resolve_circuit_name(params, input);
         let circuit_path = prover
-            .circuits_dir()
+            .circuits_dir(CircuitFlavor::Default)
             .join(resolved_name.dir_path())
             .join(format!("{}.json", resolved_name.as_str()));
 
@@ -119,7 +119,7 @@ pub trait Provable: Send + Sync {
         for (i, input) in inputs.iter().enumerate() {
             let input_map = self.build_inputs(params, input)?;
             let circuit_path = prover
-                .circuits_dir()
+                .circuits_dir(CircuitFlavor::Default)
                 .join(resolved_names[i].dir_path())
                 .join(format!("{}.json", resolved_names[i].as_str()));
             let circuit = CompiledCircuit::from_file(&circuit_path)?;

@@ -9,7 +9,7 @@ import { execSync } from 'child_process'
 import { createHash } from 'crypto'
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { basename, join, resolve } from 'path'
-import { ALL_GROUPS, CIRCUIT_GROUPS, type CircuitGroup } from './circuit-constants'
+import { ALL_GROUPS, CIRCUIT_GROUPS, CIRCUIT_FLAVORS, type CircuitGroup, type CircuitFlavor } from './circuit-constants'
 
 interface CircuitInfo {
   name: string
@@ -384,29 +384,42 @@ class NoirCircuitBuilder {
     const checksums: Record<string, string> = {}
 
     for (const c of compiled) {
-      const prefix = `${c.group}/${c.name}`
+      const packageName = basename(c.artifacts.json ?? '', '.json')
+
+      // evm/ flavor checksums
+      const evmPrefix = `${CIRCUIT_FLAVORS.EVM}/${c.group}/${c.name}`
       if (c.checksums.json && c.artifacts.json) {
-        const f = `${prefix}/${basename(c.artifacts.json)}`
+        const f = `${evmPrefix}/${basename(c.artifacts.json)}`
         checksums[f] = c.checksums.json
         lines.push(`${c.checksums.json}  ${f}`)
       }
       if (c.checksums.vk && c.artifacts.vk) {
-        const f = `${prefix}/${basename(c.artifacts.vk)}`
+        const f = `${evmPrefix}/${basename(c.artifacts.vk)}`
         checksums[f] = c.checksums.vk
         lines.push(`${c.checksums.vk}  ${f}`)
       }
       if (c.checksums.vkHash && c.artifacts.vkHash) {
-        const f = `${prefix}/${basename(c.artifacts.vkHash)}`
+        const f = `${evmPrefix}/${basename(c.artifacts.vkHash)}`
         checksums[f] = c.checksums.vkHash
         lines.push(`${c.checksums.vkHash}  ${f}`)
       }
+
+      // default/ flavor checksums
+      const defaultPrefix = `${CIRCUIT_FLAVORS.DEFAULT}/${c.group}/${c.name}`
+      if (c.checksums.json && c.artifacts.json) {
+        const f = `${defaultPrefix}/${basename(c.artifacts.json)}`
+        checksums[f] = c.checksums.json
+        lines.push(`${c.checksums.json}  ${f}`)
+      }
       if (c.checksums.vkRecursive && c.artifacts.vkRecursive) {
-        const f = `${prefix}/${basename(c.artifacts.vkRecursive)}`
+        // In default/ flavor, .vk_recursive is stored as .vk
+        const f = `${defaultPrefix}/${packageName}.vk`
         checksums[f] = c.checksums.vkRecursive
         lines.push(`${c.checksums.vkRecursive}  ${f}`)
       }
       if (c.checksums.vkRecursiveHash && c.artifacts.vkRecursiveHash) {
-        const f = `${prefix}/${basename(c.artifacts.vkRecursiveHash)}`
+        // In default/ flavor, .vk_recursive_hash is stored as .vk_hash
+        const f = `${defaultPrefix}/${packageName}.vk_hash`
         checksums[f] = c.checksums.vkRecursiveHash
         lines.push(`${c.checksums.vkRecursiveHash}  ${f}`)
       }
@@ -425,13 +438,27 @@ class NoirCircuitBuilder {
     const outputDir = this.options.outputDir!
     for (const c of compiled) {
       if (!c.artifacts.json && !c.artifacts.vk) continue
-      const dir = join(outputDir, c.group, c.name)
-      mkdirSync(dir, { recursive: true })
-      if (c.artifacts.json) copyFileSync(c.artifacts.json, join(dir, basename(c.artifacts.json)))
-      if (c.artifacts.vk) copyFileSync(c.artifacts.vk, join(dir, basename(c.artifacts.vk)))
-      if (c.artifacts.vkHash) copyFileSync(c.artifacts.vkHash, join(dir, basename(c.artifacts.vkHash)))
-      if (c.artifacts.vkRecursive) copyFileSync(c.artifacts.vkRecursive, join(dir, basename(c.artifacts.vkRecursive)))
-      if (c.artifacts.vkRecursiveHash) copyFileSync(c.artifacts.vkRecursiveHash, join(dir, basename(c.artifacts.vkRecursiveHash)))
+      const packageName = basename(c.artifacts.json ?? '', '.json')
+
+      // Copy to evm/ flavor: .json + evm .vk + .vk_hash
+      const evmDir = join(outputDir, CIRCUIT_FLAVORS.EVM, c.group, c.name)
+      mkdirSync(evmDir, { recursive: true })
+      if (c.artifacts.json) copyFileSync(c.artifacts.json, join(evmDir, basename(c.artifacts.json)))
+      if (c.artifacts.vk) copyFileSync(c.artifacts.vk, join(evmDir, basename(c.artifacts.vk)))
+      if (c.artifacts.vkHash) copyFileSync(c.artifacts.vkHash, join(evmDir, basename(c.artifacts.vkHash)))
+
+      // Copy to default/ flavor: .json + poseidon .vk (from .vk_recursive) + .vk_hash (from .vk_recursive_hash)
+      const defaultDir = join(outputDir, CIRCUIT_FLAVORS.DEFAULT, c.group, c.name)
+      mkdirSync(defaultDir, { recursive: true })
+      if (c.artifacts.json) copyFileSync(c.artifacts.json, join(defaultDir, basename(c.artifacts.json)))
+      if (c.artifacts.vkRecursive) {
+        // Rename .vk_recursive → .vk in the default flavor directory
+        copyFileSync(c.artifacts.vkRecursive, join(defaultDir, `${packageName}.vk`))
+      }
+      if (c.artifacts.vkRecursiveHash) {
+        // Rename .vk_recursive_hash → .vk_hash in the default flavor directory
+        copyFileSync(c.artifacts.vkRecursiveHash, join(defaultDir, `${packageName}.vk_hash`))
+      }
     }
     return outputDir
   }
