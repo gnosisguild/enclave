@@ -9,12 +9,19 @@
     nixpkgs,
     flake-utils,
   }: let
-    depLock = builtins.fromJSON (builtins.readFile ./versions/dep.lock.json);
-    bbVersions = builtins.fromJSON (builtins.readFile ./versions/bb.versions.json);
-
+    # define the version hashes. everytime we change dependencies these need to change
     noirHash = "sha256-RoeWaqgFwr8A4HAlu5DzuxrNrexMolIZG14fHQA0KmM=";
     fheHash = "sha256-dS8LcKDI/D9ycsRXbQnMVkUc2ymFBFL8kDrEtRGuHNI=";
     vfsHash = "sha256-+d8RFk7UgOXDCE/LizCTV+UX/Xm/1mYWrR7W0l6mAl8=";
+
+    # bb version hashes
+    bbVersion = "3.0.0-nightly.20251104";
+    bbHashes = {
+      "amd64-linux" = "sha256-l0ABPRqg6xsLstcUhMiz3rxQUKQJvV8S+EVPv8fLVBk=";
+      "arm64-linux" = "sha256-rmv4UYmYUjtOE1zWOPMFqAL1Lo36XqmxwhDefQTFU0M=";
+      "amd64-darwin" = "sha256-eHRJTdEjhlWZOkS4XZTp3MNYnSmYDv+LA6fxZ6RcMuQ=";
+      "arm64-darwin" = "sha256-bTU8BdvsxXPRsMqZLIsiLbjoc4U7eRC3kpFWKTR/Z4k=";
+    };
   in
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
@@ -26,53 +33,54 @@
         hash = noirHash;
       };
 
-      mkBB = {version}: let
-        hashes = bbVersions.${version} or (throw "Unknown bb version ${version}. Available: ${builtins.concatStringsSep ", " (builtins.attrNames bbVersions)}");
-        bbPlatform =
-          if pkgs.stdenv.isLinux
-          then
-            if pkgs.stdenv.isAarch64
-            then "arm64-linux"
-            else "amd64-linux"
-          else if pkgs.stdenv.isDarwin
-          then
-            if pkgs.stdenv.isAarch64
-            then "arm64-darwin"
-            else "amd64-darwin"
-          else throw "Unsupported platform";
-        bb = pkgs.stdenv.mkDerivation {
-          pname = "barretenberg";
-          inherit version;
-          src = pkgs.fetchurl {
-            url = "https://github.com/AztecProtocol/aztec-packages/releases/download/v${version}/barretenberg-${bbPlatform}.tar.gz";
-            sha256 = hashes.${bbPlatform} or (throw "No hash for ${bbPlatform} in version ${version}");
-          };
-          nativeBuildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [pkgs.autoPatchelfHook];
-          buildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [pkgs.stdenv.cc.cc.lib];
-          sourceRoot = ".";
-          installPhase = ''
-            mkdir -p $out/bin
-            install -D -m755 bb $out/bin/bb
-          '';
-          meta = {
-            description = "Barretenberg proving system";
-            homepage = "https://github.com/AztecProtocol/aztec-packages";
-          };
+      bbPlatform =
+        if pkgs.stdenv.isLinux
+        then
+          if pkgs.stdenv.isAarch64
+          then "arm64-linux"
+          else "amd64-linux"
+        else if pkgs.stdenv.isDarwin
+        then
+          if pkgs.stdenv.isAarch64
+          then "arm64-darwin"
+          else "amd64-darwin"
+        else throw "Unsupported platform";
+
+      bbBin = pkgs.stdenv.mkDerivation {
+        pname = "barretenberg";
+        version = bbVersion;
+        src = pkgs.fetchurl {
+          url = "https://github.com/AztecProtocol/aztec-packages/releases/download/v${bbVersion}/barretenberg-${bbPlatform}.tar.gz";
+          sha256 = bbHashes.${bbPlatform};
         };
-      in
+        nativeBuildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [pkgs.autoPatchelfHook];
+        buildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [pkgs.stdenv.cc.cc.lib];
+        sourceRoot = ".";
+        installPhase = ''
+          mkdir -p $out/bin
+          install -D -m755 bb $out/bin/bb
+        '';
+        meta = {
+          description = "Barretenberg proving system";
+          homepage = "https://github.com/AztecProtocol/aztec-packages";
+        };
+      };
+
+      bb =
         if pkgs.stdenv.isLinux
         then
           pkgs.buildFHSEnv {
             name = "bb";
-            targetPkgs = p: [bb p.stdenv.cc.cc.lib];
-            runScript = "${bb}/bin/bb";
+            targetPkgs = p: [bbBin p.stdenv.cc.cc.lib];
+            runScript = "${bbBin}/bin/bb";
           }
-        else bb;
+        else bbBin;
 
       e3-cli = pkgs.rustPlatform.buildRustPackage {
         pname = "e3-cli";
         version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
         src = ./.;
+        GIT_SHA = self.rev or self.dirtyRev or "unknown";
         GIT_COMMIT = "unknown";
         GIT_DIRTY = "false";
         preBuild = ''
@@ -157,27 +165,20 @@
           license = pkgs.lib.licenses.mit;
         };
       };
-
-      mkE3Shell = {version}: let
-        deps = depLock.${version} or (throw "Unknown e3 version ${version}. Available: ${builtins.concatStringsSep ", " (builtins.attrNames depLock)}");
-        bb = mkBB {version = deps.bb;};
-      in
-        pkgs.mkShell {
-          packages = [
-            e3-cli
-            bb
-          ];
-          shellHook = ''
-            export E3_CUSTOM_BB="${bb}/bin/bb"
-          '';
-        };
     in {
       packages.default = e3-cli;
       packages.e3-cli = e3-cli;
+      packages.bb = bb;
 
-      lib = {inherit mkBB mkE3Shell;};
-
-      devShells.default = mkE3Shell {version = "0.1.14";};
+      devShells.default = pkgs.mkShell {
+        packages = [
+          e3-cli
+          bb
+        ];
+        shellHook = ''
+          export E3_CUSTOM_BB="${bb}/bin/bb"
+        '';
+      };
     })
     // {
       templates.default = {
