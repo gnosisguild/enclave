@@ -177,10 +177,10 @@
       devShells.default = pkgs.mkShell {
         packages = [
           e3-cli
-          bb
+          wrapped-bb
         ];
         shellHook = ''
-          export E3_CUSTOM_BB="${bb}/bin/bb"
+          export E3_CUSTOM_BB="${wrapped-bb}/bin/bb"
         '';
       };
     })
