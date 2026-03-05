@@ -90,7 +90,13 @@ nix develop
 
 Replace `x86_64-linux` with `aarch64-linux`, `x86_64-darwin`, or `aarch64-darwin` as appropriate for your platform.
 
-Replace `v0.1.15` with the desired [release tag](https://github.com/gnosisguild/enclave/releases). To update later, run `nix flake update enclave`.
+Replace `v0.1.15` with the desired [release tag](https://github.com/gnosisguild/enclave/releases). You can also pin to a specific commit:
+
+```nix
+enclave.url = "github:gnosisguild/enclave/a1b2c3d";
+```
+
+To update later, run `nix flake update enclave`.
 
 To check your installation:
 
