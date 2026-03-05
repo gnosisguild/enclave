@@ -68,7 +68,7 @@ pub trait Provable: Send + Sync {
 
         let resolved_name = self.resolve_circuit_name(params, input);
         let circuit_path = prover
-            .circuits_dir(CircuitFlavor::Default)
+            .circuits_dir(CircuitFlavor::Recursive)
             .join(resolved_name.dir_path())
             .join(format!("{}.json", resolved_name.as_str()));
 
@@ -80,57 +80,27 @@ pub trait Provable: Send + Sync {
         prover.generate_proof(resolved_name, &witness, e3_id)
     }
 
-    /// Proves for recursive aggregation (poseidon2). Accepts 1 or 2 inputs of the same circuit,
-    /// generates recursive proof(s), wraps them with the wrapper circuit.
-    /// When `aggregated_proof` is provided: if it is a wrapper proof, does initial fold (two wrappers → fold);
-    /// if it is a fold proof, folds the wrapper with it. When `None`, returns the wrapper proof.
+    /// Wraps 1–2 proofs (from `prove()`) and optionally folds with `aggregated_proof`.
     fn aggregate_proof(
         &self,
         prover: &ZkProver,
-        params: &Self::Params,
-        inputs: &[Self::Input],
+        proofs: &[Proof],
         aggregated_proof: Option<&Proof>,
         e3_id: &str,
-    ) -> Result<Proof, ZkError>
-    where
-        Self::Inputs: Computation<Preset = Self::Params, Data = Self::Input> + serde::Serialize,
-        <Self::Inputs as Computation>::Error: Display,
-    {
-        if !matches!(inputs.len(), 1 | 2) {
+    ) -> Result<Proof, ZkError> {
+        if !matches!(proofs.len(), 1 | 2) {
             return Err(ZkError::InvalidInput(
-                "aggregate_proof requires 1 or 2 inputs".into(),
+                "aggregate_proof requires 1 or 2 proofs".into(),
             ));
         }
 
-        let resolved_names: Vec<_> = inputs
-            .iter()
-            .map(|input| self.resolve_circuit_name(params, input))
-            .collect();
-
-        if resolved_names.len() == 2 && resolved_names[0] != resolved_names[1] {
+        if proofs.len() == 2 && proofs[0].circuit != proofs[1].circuit {
             return Err(ZkError::InvalidInput(
-                "aggregate_proof requires both inputs to use the same circuit".into(),
+                "aggregate_proof requires all proofs to use the same circuit".into(),
             ));
         }
 
-        let mut recursive_proofs = Vec::with_capacity(inputs.len());
-        let witness_gen = WitnessGenerator::new();
-
-        for (i, input) in inputs.iter().enumerate() {
-            let input_map = self.build_inputs(params, input)?;
-            let circuit_path = prover
-                .circuits_dir(CircuitFlavor::Recursive)
-                .join(resolved_names[i].dir_path())
-                .join(format!("{}.json", resolved_names[i].as_str()));
-            let circuit = CompiledCircuit::from_file(&circuit_path)?;
-            let witness = witness_gen.generate_witness(&circuit, input_map)?;
-            let inner_e3_id = format!("{}_inner_{}", e3_id, i);
-            let proof =
-                prover.generate_recursive_proof(resolved_names[i], &witness, &inner_e3_id)?;
-            recursive_proofs.push(proof);
-        }
-
-        let wrapper_proof = generate_wrapper_proof(prover, &recursive_proofs, e3_id)?;
+        let wrapper_proof = generate_wrapper_proof(prover, proofs, e3_id)?;
 
         match aggregated_proof {
             Some(ap) => generate_fold_proof(prover, &wrapper_proof, ap, e3_id),

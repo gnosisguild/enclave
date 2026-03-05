@@ -309,10 +309,16 @@ mod tests {
             PkCircuitData::generate_sample(preset).expect("sample data generation should succeed");
 
         let e3_id = "aggregation-test-wrapper";
+
+        // First generate the inner proof with prove() (Recursive flavor)
+        let inner_proof = PkCircuit
+            .prove(&prover, &preset, &sample, &format!("{e3_id}_inner_0"))
+            .expect("inner prove() should succeed");
+
         let start = std::time::Instant::now();
         let wrapper_proof = PkCircuit
-            .aggregate_proof(&prover, &preset, &[sample], None, e3_id)
-            .expect("aggregate_proof (1 input) should succeed");
+            .aggregate_proof(&prover, &[inner_proof], None, e3_id)
+            .expect("aggregate_proof (1 proof) should succeed");
         let elapsed = start.elapsed();
         eprintln!("1-proof wrapper generation: {:?}", elapsed);
 
@@ -379,10 +385,19 @@ mod tests {
                 .expect("sample B generation should succeed");
 
         let e3_id = "aggregation-2proof-wrapper";
+
+        // First generate the inner proofs with prove() (Recursive flavor)
+        let inner_proof_a = ShareDecryptionCircuit
+            .prove(&prover, &preset, &sample_a, &format!("{e3_id}_inner_0"))
+            .expect("inner prove() A should succeed");
+        let inner_proof_b = ShareDecryptionCircuit
+            .prove(&prover, &preset, &sample_b, &format!("{e3_id}_inner_1"))
+            .expect("inner prove() B should succeed");
+
         let start = std::time::Instant::now();
         let wrapper_proof = ShareDecryptionCircuit
-            .aggregate_proof(&prover, &preset, &[sample_a, sample_b], None, e3_id)
-            .expect("aggregate_proof (2 inputs) should succeed");
+            .aggregate_proof(&prover, &[inner_proof_a, inner_proof_b], None, e3_id)
+            .expect("aggregate_proof (2 proofs) should succeed");
         let elapsed = start.elapsed();
         eprintln!("2-proof wrapper generation: {:?}", elapsed);
 
@@ -482,15 +497,36 @@ mod tests {
 
         let e3_id = "aggregation-test-fold";
 
+        // Generate inner proofs first with prove() (Recursive flavor)
+        let pk_inner_proof = PkCircuit
+            .prove(&prover, &preset, &pk_sample, &format!("{e3_id}_pk_inner_0"))
+            .expect("pk inner prove() should succeed");
+
         let pk_wrapper_proof = PkCircuit
-            .aggregate_proof(&prover, &preset, &[pk_sample], None, e3_id)
-            .expect("pk aggregate_proof (1 input) should succeed");
+            .aggregate_proof(&prover, &[pk_inner_proof], None, e3_id)
+            .expect("pk aggregate_proof (1 proof) should succeed");
+
+        let enc_inner_secret = ShareEncryptionCircuit
+            .prove(
+                &prover,
+                &preset,
+                &share_enc_sample_secret,
+                &format!("{e3_id}_enc_inner_0"),
+            )
+            .expect("share_encryption inner prove() (secret) should succeed");
+        let enc_inner_noise = ShareEncryptionCircuit
+            .prove(
+                &prover,
+                &preset,
+                &share_enc_sample_noise,
+                &format!("{e3_id}_enc_inner_1"),
+            )
+            .expect("share_encryption inner prove() (noise) should succeed");
 
         let fold_proof = ShareEncryptionCircuit
             .aggregate_proof(
                 &prover,
-                &preset,
-                &[share_enc_sample_secret, share_enc_sample_noise],
+                &[enc_inner_secret, enc_inner_noise],
                 Some(&pk_wrapper_proof),
                 e3_id,
             )
@@ -505,8 +541,9 @@ mod tests {
             .expect("verification should not error");
         assert!(verified, "fold proof should verify successfully");
 
-        prover.cleanup(&format!("{}_inner_0", e3_id)).unwrap();
-        prover.cleanup(&format!("{}_inner_1", e3_id)).unwrap();
+        prover.cleanup(&format!("{}_pk_inner_0", e3_id)).unwrap();
+        prover.cleanup(&format!("{}_enc_inner_0", e3_id)).unwrap();
+        prover.cleanup(&format!("{}_enc_inner_1", e3_id)).unwrap();
         prover.cleanup(e3_id).unwrap();
     }
 }

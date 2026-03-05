@@ -46,7 +46,7 @@ impl ZkProver {
         witness_data: &[u8],
         e3_id: &str,
     ) -> Result<Proof, ZkError> {
-        self.generate_proof_with_flavor(circuit, witness_data, e3_id, CircuitFlavor::Default)
+        self.generate_proof_with_flavor(circuit, witness_data, e3_id, CircuitFlavor::Recursive)
     }
 
     pub fn generate_evm_proof(
@@ -68,25 +68,7 @@ impl ZkProver {
         self.generate_proof_impl(circuit, witness_data, e3_id, &circuit.dir_path(), flavor)
     }
 
-    /// Generates a proof for recursive aggregation (poseidon, noir-recursive with ZK blinding).
-    /// Inner/base proofs fed into a wrapper use the Recursive flavor so the witness stays hidden.
-    pub fn generate_recursive_proof(
-        &self,
-        circuit: CircuitName,
-        witness_data: &[u8],
-        e3_id: &str,
-    ) -> Result<Proof, ZkError> {
-        self.generate_proof_impl(
-            circuit,
-            witness_data,
-            e3_id,
-            &circuit.dir_path(),
-            CircuitFlavor::Recursive,
-        )
-    }
-
-    /// Generates a proof of the wrapper circuit (for aggregation output).
-    /// Uses wrapper dir; always uses default (poseidon) flavor for recursive compatibility.
+    /// Wrapper proof (Default flavor, wrapper dir).
     pub fn generate_wrapper_proof(
         &self,
         circuit: CircuitName,
@@ -102,9 +84,7 @@ impl ZkProver {
         )
     }
 
-    /// Generates a proof of the fold circuit (for aggregation output).
-    /// The fold circuit is independent; uses fixed path `recursive_aggregation/fold`.
-    /// Uses default (poseidon) flavor for recursive compatibility.
+    /// Fold proof (Default flavor).
     pub fn generate_fold_proof(&self, witness_data: &[u8], e3_id: &str) -> Result<Proof, ZkError> {
         let dir = CircuitName::Fold.dir_path();
         self.generate_proof_impl(
@@ -116,7 +96,7 @@ impl ZkProver {
         )
     }
 
-    /// Generates the final fold proof for on-chain verification (evm/keccak target).
+    /// Final fold proof for on-chain verification (Evm flavor).
     pub fn generate_final_fold_proof(
         &self,
         witness_data: &[u8],
@@ -227,6 +207,7 @@ impl ZkProver {
         ))
     }
 
+    /// Verifies a proof (Recursive flavor, matching `prove()`).
     pub fn verify_proof(&self, proof: &Proof, e3_id: &str, party_id: u64) -> Result<bool, ZkError> {
         self.verify_proof_impl(
             proof.circuit,
@@ -235,7 +216,7 @@ impl ZkProver {
             proof.circuit.dir_path(),
             e3_id,
             party_id,
-            CircuitFlavor::Default,
+            CircuitFlavor::Recursive,
         )
     }
 
@@ -256,7 +237,7 @@ impl ZkProver {
         )
     }
 
-    /// Verifies a wrapper/aggregation proof using the wrapper circuit's recursive VK.
+    /// Verifies a wrapper proof (Default flavor, wrapper dir).
     pub fn verify_wrapper_proof(
         &self,
         proof: &Proof,
@@ -274,7 +255,7 @@ impl ZkProver {
         )
     }
 
-    /// Verifies a fold proof using the fold circuit's recursive VK.
+    /// Verifies a fold proof (Default flavor).
     pub fn verify_fold_proof(
         &self,
         proof: &Proof,
