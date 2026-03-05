@@ -1,3 +1,4 @@
+# /flake.nix
 {
   description = "e3-cli";
 
@@ -17,11 +18,11 @@
 
         e3-cli = pkgs.rustPlatform.buildRustPackage {
           pname = "e3-cli";
-          version = (builtins.fromTOML (builtins.readFile (self + "/crates/cli/Cargo.toml"))).package.version;
+          version = (builtins.fromTOML (builtins.readFile ./crates/cli/Cargo.toml)).package.version;
 
-          src = self;
+          src = ./.;
 
-          cargoLock.lockFile = self + "/Cargo.lock";
+          cargoLock.lockFile = ./Cargo.lock;
 
           buildAndTestSubdir = "crates/cli";
 
