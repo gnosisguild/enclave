@@ -4,11 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import {
-  CRISP_SERVER_STATE_LITE_ENDPOINT,
-  CRISP_SERVER_PREVIOUS_CIPHERTEXT_ENDPOINT,
-  CRISP_SERVER_IS_SLOT_EMPTY_ENDPOINT,
-} from './constants'
+import { CRISP_SERVER_STATE_LITE_ENDPOINT, CRISP_SERVER_PREVIOUS_CIPHERTEXT_ENDPOINT } from './constants'
 
 import type { RoundDetailsResponse, RoundDetails, TokenDetails } from './types'
 
@@ -59,13 +55,15 @@ export const getRoundTokenDetails = async (serverUrl: string, e3Id: number): Pro
 }
 
 /**
- * Get the previous ciphertext for a slot from the CRISP server
+ * Get the previous ciphertext for a slot from the CRISP server.
+ * Returns undefined when the slot is empty (404).
+ *
  * @param serverUrl - The base URL of the CRISP server
  * @param e3Id - The e3Id of the round
  * @param address - The address of the slot
- * @returns The previous ciphertext for the slot
+ * @returns The previous ciphertext for the slot, or undefined if the slot is empty
  */
-export const getPreviousCiphertext = async (serverUrl: string, e3Id: number, address: string): Promise<Uint8Array> => {
+export const getPreviousCiphertext = async (serverUrl: string, e3Id: number, address: string): Promise<Uint8Array | undefined> => {
   const response = await fetch(`${serverUrl}/${CRISP_SERVER_PREVIOUS_CIPHERTEXT_ENDPOINT}`, {
     method: 'POST',
     headers: {
@@ -74,6 +72,10 @@ export const getPreviousCiphertext = async (serverUrl: string, e3Id: number, add
     body: JSON.stringify({ round_id: e3Id, address }),
   })
 
+  if (response.status === 404) {
+    return undefined
+  }
+
   if (!response.ok) {
     throw new Error(`Failed to fetch previous ciphertext: ${response.statusText}`)
   }
@@ -81,29 +83,4 @@ export const getPreviousCiphertext = async (serverUrl: string, e3Id: number, add
   const data = await response.json()
 
   return new Uint8Array(data.ciphertext)
-}
-
-/**
- * Check if a slot is empty for a given E3 ID and slot address
- * @param serverUrl - The base URL of the CRISP server
- * @param e3Id - The e3Id of the round
- * @param address - The address of the slot
- * @returns Whether the slot is empty or not
- */
-export const getIsSlotEmpty = async (serverUrl: string, e3Id: number, address: string): Promise<boolean> => {
-  const response = await fetch(`${serverUrl}/${CRISP_SERVER_IS_SLOT_EMPTY_ENDPOINT}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ round_id: e3Id, address }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to check if slot is empty: ${response.statusText}`)
-  }
-
-  const data = await response.json()
-
-  return data.is_empty as boolean
 }
