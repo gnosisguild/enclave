@@ -76,6 +76,10 @@
           }
         else bbBin;
 
+      wrapped-bb = pkgs.writeShellScriptBin "bb" ''
+        exec ${pkgs.steam-run}/bin/steam-run ${bb}/bin/bb "$@"
+      '';
+
       e3-cli = pkgs.rustPlatform.buildRustPackage {
         pname = "e3-cli";
         version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
@@ -168,7 +172,7 @@
     in {
       packages.default = e3-cli;
       packages.e3-cli = e3-cli;
-      packages.bb = bb;
+      packages.bb = wrapped-bb;
 
       devShells.default = pkgs.mkShell {
         packages = [
