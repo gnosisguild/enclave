@@ -24,7 +24,8 @@ export {
   encryptNumberAndGenProof,
   encryptVectorAndGenInputs,
   encryptVectorAndGenProof,
-} from './encryption/encrypt'
+  generateProof,
+} from './crypto'
 
 // Types and interfaces (re-exported from sub-modules via types.ts)
 export type {
@@ -57,6 +58,7 @@ export type {
 
 // Enums and constants
 export { EnclaveEventType, RegistryEventType, ThresholdBfvParamsPresetNames, E3Stage, FailureReason } from './types'
+export { DEFAULT_THRESHOLD_BFV_PARAMS_PRESET_NAME } from './constants'
 
 // Export utilities
 export {
@@ -79,5 +81,3 @@ export {
   decodePlaintextOutput,
   type ComputeProviderParams,
 } from './utils'
-
-export { generateProof } from './greco'

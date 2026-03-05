@@ -30,15 +30,16 @@ import {
   encryptNumberAndGenProof,
   encryptVectorAndGenInputs,
   encryptVectorAndGenProof,
-} from './encryption/encrypt'
-import { ThresholdBfvParamsPresetNames } from './encryption/types'
+} from './crypto/encrypt'
+import { ThresholdBfvParamsPresetNames } from './crypto/types'
 import { SDKError, isValidAddress } from './utils'
+import { DEFAULT_THRESHOLD_BFV_PARAMS_PRESET_NAME } from './constants'
 
 import type { SDKConfig } from './types'
 import type { AllEventTypes, EventCallback } from './events/types'
 import type { E3, E3RequestParams } from './contracts/types'
 import { E3Stage, FailureReason } from './contracts/types'
-import type { BfvParams, EncryptedValueAndPublicInputs, ThresholdBfvParamsPresetName, VerifiableEncryptionResult } from './encryption/types'
+import type { BfvParams, EncryptedValueAndPublicInputs, ThresholdBfvParamsPresetName, VerifiableEncryptionResult } from './crypto/types'
 
 export class EnclaveSDK {
   private eventListener: EventListener
@@ -63,18 +64,13 @@ export class EnclaveSDK {
       throw new SDKError('Invalid FeeToken contract address', 'INVALID_ADDRESS')
     }
 
-    if (!config.thresholdBfvParamsPresetName) {
-      throw new SDKError('Threshold BFV parameters preset name is required', 'MISSING_THRESHOLD_BFV_PARAMS_PRESET_NAME')
+    const presetName = config.thresholdBfvParamsPresetName ?? DEFAULT_THRESHOLD_BFV_PARAMS_PRESET_NAME
+
+    if (!Object.values(ThresholdBfvParamsPresetNames).includes(presetName)) {
+      throw new SDKError(`Invalid threshold BFV parameters preset name: ${presetName}`, 'INVALID_THRESHOLD_BFV_PARAMS_PRESET_NAME')
     }
 
-    if (!Object.values(ThresholdBfvParamsPresetNames).includes(config.thresholdBfvParamsPresetName)) {
-      throw new SDKError(
-        `Invalid threshold BFV parameters preset name: ${config.thresholdBfvParamsPresetName}`,
-        'INVALID_THRESHOLD_BFV_PARAMS_PRESET_NAME',
-      )
-    }
-
-    this.thresholdBfvParamsPresetName = config.thresholdBfvParamsPresetName
+    this.thresholdBfvParamsPresetName = presetName
     this.publicClient = config.publicClient
 
     this.contractClient = new ContractClient({
@@ -194,24 +190,24 @@ export class EnclaveSDK {
 
   // --- Events (delegates to EventListener) ---
 
-  public onEnclaveEvent<T extends AllEventTypes>(eventType: T, callback: EventCallback<T>): void {
-    this.eventListener.onEnclaveEvent(eventType, callback)
+  public async onEnclaveEvent<T extends AllEventTypes>(eventType: T, callback: EventCallback<T>): Promise<void> {
+    return this.eventListener.onEnclaveEvent(eventType, callback)
   }
 
   public off<T extends AllEventTypes>(eventType: T, callback: EventCallback<T>): void {
     this.eventListener.off(eventType, callback)
   }
 
-  public once<T extends AllEventTypes>(type: T, callback: EventCallback<T>): void {
-    this.eventListener.once(type, callback)
+  public async once<T extends AllEventTypes>(type: T, callback: EventCallback<T>): Promise<void> {
+    return this.eventListener.once(type, callback)
   }
 
   public async getHistoricalEvents(eventType: AllEventTypes, fromBlock?: bigint, toBlock?: bigint): Promise<Log[]> {
     return this.eventListener.getHistoricalEvents(eventType, fromBlock, toBlock)
   }
 
-  public async startEventPolling(): Promise<void> {
-    void this.eventListener.startPolling()
+  public startEventPolling(): Promise<void> {
+    return this.eventListener.startPolling()
   }
 
   public stopEventPolling(): void {
@@ -233,7 +229,7 @@ export class EnclaveSDK {
     }
     privateKey?: `0x${string}`
     chain: Chain
-    thresholdBfvParamsPresetName: ThresholdBfvParamsPresetName
+    thresholdBfvParamsPresetName?: ThresholdBfvParamsPresetName
   }): EnclaveSDK {
     const isWebSocket = options.rpcUrl.startsWith('ws://') || options.rpcUrl.startsWith('wss://')
     const transport = isWebSocket

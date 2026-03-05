@@ -8,7 +8,7 @@ import { type Abi, type Log, type PublicClient } from 'viem'
 import { CiphernodeRegistryOwnable__factory, Enclave__factory } from '@enclave-e3/contracts/types'
 
 import {
-  EnclaveEventType,
+  RegistryEventType,
   type AllEventTypes,
   type EnclaveEvent,
   type EnclaveEventData,
@@ -16,7 +16,7 @@ import {
   type EventCallback,
   type EventListenerConfig,
   type RegistryEventData,
-  type RegistryEventType,
+  type RegistryEventType as RegistryEventTypeT,
   type SDKEventEmitter,
 } from './types'
 import type { ContractAddresses } from '../contracts/types'
@@ -43,20 +43,31 @@ export class EventListener implements SDKEventEmitter {
     this.config = options.config || {}
   }
 
+  // Registry-exclusive event names that don't collide with EnclaveEventType.
+  // Shared names like 'OwnershipTransferred' and 'Initialized' exist in both
+  // enums with the same string value, so they cannot be disambiguated at
+  // runtime; those default to the Enclave contract.
+  private static readonly REGISTRY_ONLY_EVENTS: ReadonlySet<string> = new Set([
+    RegistryEventType.COMMITTEE_REQUESTED,
+    RegistryEventType.COMMITTEE_PUBLISHED,
+    RegistryEventType.COMMITTEE_FINALIZED,
+    RegistryEventType.ENCLAVE_SET,
+  ])
+
   private resolveContract(eventType: AllEventTypes): { address: `0x${string}`; abi: Abi } {
-    const isEnclaveEvent = Object.values(EnclaveEventType).includes(eventType as EnclaveEventType)
+    const isRegistryEvent = EventListener.REGISTRY_ONLY_EVENTS.has(eventType as string)
     return {
-      address: isEnclaveEvent ? this.contracts.enclave : this.contracts.ciphernodeRegistry,
-      abi: isEnclaveEvent ? Enclave__factory.abi : CiphernodeRegistryOwnable__factory.abi,
+      address: isRegistryEvent ? this.contracts.ciphernodeRegistry : this.contracts.enclave,
+      abi: isRegistryEvent ? CiphernodeRegistryOwnable__factory.abi : Enclave__factory.abi,
     }
   }
 
-  public onEnclaveEvent<T extends AllEventTypes>(eventType: T, callback: EventCallback<T>): void {
+  public async onEnclaveEvent<T extends AllEventTypes>(eventType: T, callback: EventCallback<T>): Promise<void> {
     const { address, abi } = this.resolveContract(eventType)
-    void this.watchContractEvent(address, eventType, abi, callback)
+    return this.watchContractEvent(address, eventType, abi, callback)
   }
 
-  public once<T extends AllEventTypes>(type: T, callback: EventCallback<T>): void {
+  public async once<T extends AllEventTypes>(type: T, callback: EventCallback<T>): Promise<void> {
     const handler: EventCallback<T> = (event) => {
       this.off(type, handler)
       const prom = callback(event)
@@ -64,7 +75,7 @@ export class EventListener implements SDKEventEmitter {
         prom.catch((e) => console.error(e))
       }
     }
-    this.onEnclaveEvent(type, handler)
+    return this.onEnclaveEvent(type, handler)
   }
 
   public async watchContractEvent<T extends AllEventTypes>(
@@ -98,7 +109,7 @@ export class EventListener implements SDKEventEmitter {
                 type: eventType,
                 data: (log as unknown as { args: unknown }).args as T extends EnclaveEventTypeT
                   ? EnclaveEventData[T]
-                  : T extends RegistryEventType
+                  : T extends RegistryEventTypeT
                     ? RegistryEventData[T]
                     : unknown,
                 log,
@@ -165,8 +176,8 @@ export class EventListener implements SDKEventEmitter {
         address,
         abi,
         eventName: eventType as string,
-        fromBlock: fromBlock || this.config.fromBlock,
-        toBlock: toBlock || this.config.toBlock,
+        fromBlock: fromBlock ?? this.config.fromBlock,
+        toBlock: toBlock ?? this.config.toBlock,
       })
     } catch (error) {
       throw new SDKError(`Failed to get historical events: ${error}`, 'HISTORICAL_EVENTS_FAILED')

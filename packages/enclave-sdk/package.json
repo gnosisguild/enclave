@@ -9,10 +9,10 @@
       "require": "./dist/index.cjs",
       "default": "./dist/index.js"
     },
-    "./encryption": {
-      "types": "./dist/encryption/index.d.ts",
-      "import": "./dist/encryption/index.js",
-      "require": "./dist/encryption/index.cjs"
+    "./crypto": {
+      "types": "./dist/crypto/index.d.ts",
+      "import": "./dist/crypto/index.js",
+      "require": "./dist/crypto/index.cjs"
     },
     "./contracts": {
       "types": "./dist/contracts/index.d.ts",

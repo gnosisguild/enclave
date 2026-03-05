@@ -24,7 +24,7 @@ export interface UseEnclaveSDKConfig {
     feeToken: `0x${string}`
   }
   autoConnect?: boolean
-  thresholdBfvParamsPresetName: ThresholdBfvParamsPresetName
+  thresholdBfvParamsPresetName?: ThresholdBfvParamsPresetName
 }
 
 export interface UseEnclaveSDKReturn {

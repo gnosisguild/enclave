@@ -14,7 +14,7 @@ import {
   compute_pk_commitment,
   get_bfv_params,
 } from '@enclave-e3/wasm'
-import { generateProof } from '../greco'
+import { generateProof } from './user-data-encryption'
 import type { BfvParams, EncryptedValueAndPublicInputs, ThresholdBfvParamsPresetName, VerifiableEncryptionResult } from './types'
 
 async function resolveParams(presetName: ThresholdBfvParamsPresetName): Promise<BfvParams> {

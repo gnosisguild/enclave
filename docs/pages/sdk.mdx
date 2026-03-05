@@ -85,7 +85,10 @@ const sdk = EnclaveSDK.create({
 ```ts
 const hash = await sdk.requestE3({
   threshold: [2, 3],
-  inputWindow: [BigInt(Date.now()), BigInt(Date.now() + 5 * 60 * 1000)],
+  inputWindow: [
+    BigInt(Math.floor(Date.now() / 1000)),
+    BigInt(Math.floor(Date.now() / 1000) + 5 * 60),
+  ],
   e3Program: '0x...',
   e3ProgramParams: '0x',
   computeProviderParams: '0x',
@@ -164,7 +167,7 @@ The SDK is organized into three sub-modules (`contracts`, `events`, `encryption`
 imported independently for tree-shaking:
 
 ```ts
-import { generatePublicKey, encryptNumber } from '@enclave-e3/sdk/encryption'
+import { generatePublicKey, encryptNumber } from '@enclave-e3/sdk/crypto'
 import { ContractClient } from '@enclave-e3/sdk/contracts'
 import { EventListener, EnclaveEventType } from '@enclave-e3/sdk/events'
 ```
@@ -216,6 +219,8 @@ that wraps or complements the core Enclave SDK.
   are unavailable.
 - **Custom transports**: on the server, call `createWalletClient({ account, transport: http(rpc) })`
   and load the private key from Vaults/KMS.
+- **Get E3 quote**: call `sdk.getE3Quote(requestParams)` to get the fee amount required for an E3
+  request.
 - **Fee token approval**: call `sdk.approveFeeToken(amount)` before `requestE3` to approve the fee
   token spend.
 

@@ -60,14 +60,14 @@ type E3State = E3StateRequested | E3StatePublished | E3StateOutputPublished
 async function setupEventListeners(sdk: EnclaveSDK, store: Map<bigint, E3State>) {
   async function waitForEvent<T extends AllEventTypes>(type: T, trigger?: () => Promise<void>): Promise<EnclaveEvent<T>> {
     return new Promise((resolve, reject) => {
-      sdk.once(type, resolve)
+      sdk.once(type, resolve).catch(reject)
       if (trigger) {
         trigger().catch(reject)
       }
     })
   }
 
-  sdk.onEnclaveEvent(EnclaveEventType.E3_REQUESTED, (event) => {
+  await sdk.onEnclaveEvent(EnclaveEventType.E3_REQUESTED, (event) => {
     const id = event.data.e3Id
 
     if (store.has(id)) {
@@ -80,7 +80,7 @@ async function setupEventListeners(sdk: EnclaveSDK, store: Map<bigint, E3State>)
     })
   })
 
-  sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, (event) => {
+  await sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, (event) => {
     const id = event.data.e3Id
 
     const state = store.get(id)
@@ -100,7 +100,7 @@ async function setupEventListeners(sdk: EnclaveSDK, store: Map<bigint, E3State>)
     })
   })
 
-  sdk.onEnclaveEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED, (event) => {
+  await sdk.onEnclaveEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED, (event) => {
     const id = event.data.e3Id
     const state = store.get(id)
 
@@ -169,13 +169,6 @@ describe('Integration', () => {
     let state
     let event
 
-    // Approve fee token
-    console.log('Approving fee token...')
-    const hash = await sdk.approveFeeToken(100000000000n)
-    console.log('Fee token approved:', hash)
-
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
     // Verify fee quoting works
     const requestParams = {
       threshold,
@@ -187,6 +180,13 @@ describe('Integration', () => {
     const quote = await sdk.getE3Quote(requestParams)
     console.log('E3 quote:', quote)
     assert(quote >= 0n, 'E3 quote should be a non-negative bigint')
+
+    // Approve fee token
+    console.log('Approving fee token...')
+    const hash = await sdk.approveFeeToken(quote)
+    console.log('Fee token approved:', hash)
+
+    await new Promise((resolve) => setTimeout(resolve, 1000))
 
     // REQUEST phase
     await waitForEvent(EnclaveEventType.E3_REQUESTED, async () => {
@@ -201,7 +201,7 @@ describe('Integration', () => {
     console.log('E3 Sucessfully Requested!')
 
     // Verify E3 stage after request
-    const stageAfterRequest = await sdk.getE3Stage(0n)
+    const stageAfterRequest = await sdk.getE3Stage(state.e3Id)
     assert.strictEqual(stageAfterRequest, E3Stage.Requested, 'E3 stage should be Requested after requestE3')
 
     // Ciphernodes will publish a public key within the COMMITTEE_PUBLISHED event
@@ -209,16 +209,14 @@ describe('Integration', () => {
 
     const publicKeyBytes = hexToBytes(event.data.publicKey as `0x${string}`)
 
-    state = store.get(0n)
+    state = store.get(state.e3Id)
     assert(state, 'store should have E3State but it was falsey')
     assert.strictEqual(state.type, 'committee_published')
     assert.strictEqual(state.publicKey, event.data.publicKey)
 
     // Verify E3 stage after committee published
-    const stageAfterCommittee = await sdk.getE3Stage(0n)
+    const stageAfterCommittee = await sdk.getE3Stage(state.e3Id)
     assert.strictEqual(stageAfterCommittee, E3Stage.KeyPublished, 'E3 stage should be KeyPublished after committee published')
-
-    let { e3Id } = state
 
     // INPUT PUBLISHING phase
     console.log('PUBLISHING PRIVATE INPUT')
@@ -231,7 +229,7 @@ describe('Integration', () => {
 
     let txHash = await publishInput(
       walletClient,
-      e3Id,
+      state.e3Id,
       `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`,
       account.address,
       contracts.e3Program,
@@ -239,7 +237,7 @@ describe('Integration', () => {
     await sdk.waitForTransaction(txHash)
     txHash = await publishInput(
       walletClient,
-      e3Id,
+      state.e3Id,
       `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`,
       account.address,
       contracts.e3Program,

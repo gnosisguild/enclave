@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { EnclaveSDK } from '../src/enclave-sdk'
 import { zeroAddress } from 'viem'
 import { hardhat } from 'viem/chains'
-import { generatePublicKey, encryptNumber as standaloneEncryptNumber, encryptVector as standaloneEncryptVector } from '../src/encryption'
+import { generatePublicKey, encryptNumber as standaloneEncryptNumber, encryptVector as standaloneEncryptVector } from '../src/crypto'
 
 describe('encryptNumber', () => {
   describe('trbfv', () => {

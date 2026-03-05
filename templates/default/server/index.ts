@@ -215,7 +215,7 @@ async function setupEventListeners() {
   console.log('📡 Setting up event listeners...')
 
   // we need to listen to CommitteePublished to know when an E3 is ready
-  sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, handleCommitteePublishedEvent)
+  await sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, handleCommitteePublishedEvent)
 
   await listenToInputPublishedEvents(sdk.getPublicClient(), PROGRAM_ADDRESS as `0x${string}`, 0n)
 

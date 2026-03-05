@@ -283,7 +283,7 @@ The SDK is organized into three sub-modules that can be imported independently f
 
 ```typescript
 // Encryption functions and types
-import { generatePublicKey, encryptNumber } from '@enclave-e3/sdk/encryption'
+import { generatePublicKey, encryptNumber } from '@enclave-e3/sdk/crypto'
 
 // Contract client and types
 import { ContractClient } from '@enclave-e3/sdk/contracts'

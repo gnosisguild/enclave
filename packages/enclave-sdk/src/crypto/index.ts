@@ -16,6 +16,8 @@ export {
   encryptVectorAndGenProof,
 } from './encrypt'
 
+export { generateProof } from './user-data-encryption'
+
 export type { BfvParams, ThresholdBfvParamsPresetName, VerifiableEncryptionResult, EncryptedValueAndPublicInputs } from './types'
 
 export { ThresholdBfvParamsPresetNames } from './types'

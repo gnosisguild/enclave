@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import type { ProofData } from '@aztec/bb.js'
-import type { CircuitInputs } from '../greco'
+import type { CircuitInputs } from './user-data-encryption'
 
 export interface BfvParams {
   degree: number
