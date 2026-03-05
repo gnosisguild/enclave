@@ -673,6 +673,18 @@ jobs:
                circuits/bin/threshold/target/*.vk_noir \
                circuits/bin/threshold/target/*.vk_noir_hash
 
+      - name: Verify variant output directories
+        run: |
+          echo "Checking default/ variant (noir-recursive-no-zk VKs):"
+          find circuits/bin/default -name '*.json' | head -20
+          find circuits/bin/default -name '*.vk' | head -20
+          echo "Checking recursive/ variant (noir-recursive VKs):"
+          find circuits/bin/recursive -name '*.json' | head -20
+          find circuits/bin/recursive -name '*.vk' | head -20
+          echo "Checking evm/ variant (keccak VKs):"
+          find circuits/bin/evm -name '*.json' | head -20
+          find circuits/bin/evm -name '*.vk' | head -20
+
       - name: Run ZK prover e2e tests
         run: cargo test -p e3-zk-prover --test local_e2e_tests -- --nocapture
 

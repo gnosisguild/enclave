@@ -6,7 +6,7 @@
 
 use crate::backend::ZkBackend;
 use crate::error::ZkError;
-use e3_events::{CircuitFlavor, CircuitName, Proof};
+use e3_events::{CircuitName, CircuitVariant, Proof};
 use e3_utils::utility_types::ArcBytes;
 use std::fs;
 use std::path::PathBuf;
@@ -28,8 +28,8 @@ impl ZkProver {
         }
     }
 
-    pub fn circuits_dir(&self, flavor: CircuitFlavor) -> PathBuf {
-        self.circuits_dir.join(flavor.as_str())
+    pub fn circuits_dir(&self, variant: CircuitVariant) -> PathBuf {
+        self.circuits_dir.join(variant.as_str())
     }
 
     pub fn work_dir(&self) -> &PathBuf {
@@ -46,7 +46,7 @@ impl ZkProver {
         witness_data: &[u8],
         e3_id: &str,
     ) -> Result<Proof, ZkError> {
-        self.generate_proof_with_flavor(circuit, witness_data, e3_id, CircuitFlavor::Recursive)
+        self.generate_proof_with_variant(circuit, witness_data, e3_id, CircuitVariant::Recursive)
     }
 
     pub fn generate_evm_proof(
@@ -55,20 +55,20 @@ impl ZkProver {
         witness_data: &[u8],
         e3_id: &str,
     ) -> Result<Proof, ZkError> {
-        self.generate_proof_with_flavor(circuit, witness_data, e3_id, CircuitFlavor::Evm)
+        self.generate_proof_with_variant(circuit, witness_data, e3_id, CircuitVariant::Evm)
     }
 
-    pub fn generate_proof_with_flavor(
+    pub fn generate_proof_with_variant(
         &self,
         circuit: CircuitName,
         witness_data: &[u8],
         e3_id: &str,
-        flavor: CircuitFlavor,
+        variant: CircuitVariant,
     ) -> Result<Proof, ZkError> {
-        self.generate_proof_impl(circuit, witness_data, e3_id, &circuit.dir_path(), flavor)
+        self.generate_proof_impl(circuit, witness_data, e3_id, &circuit.dir_path(), variant)
     }
 
-    /// Wrapper proof (Default flavor, wrapper dir).
+    /// Wrapper proof (Default variant, wrapper dir).
     pub fn generate_wrapper_proof(
         &self,
         circuit: CircuitName,
@@ -80,11 +80,11 @@ impl ZkProver {
             witness_data,
             e3_id,
             &circuit.wrapper_dir_path(),
-            CircuitFlavor::Default,
+            CircuitVariant::Default,
         )
     }
 
-    /// Fold proof (Default flavor).
+    /// Fold proof (Default variant).
     pub fn generate_fold_proof(&self, witness_data: &[u8], e3_id: &str) -> Result<Proof, ZkError> {
         let dir = CircuitName::Fold.dir_path();
         self.generate_proof_impl(
@@ -92,11 +92,11 @@ impl ZkProver {
             witness_data,
             e3_id,
             &dir,
-            CircuitFlavor::Default,
+            CircuitVariant::Default,
         )
     }
 
-    /// Final fold proof for on-chain verification (Evm flavor).
+    /// Final fold proof for on-chain verification (Evm variant).
     pub fn generate_final_fold_proof(
         &self,
         witness_data: &[u8],
@@ -108,7 +108,7 @@ impl ZkProver {
             witness_data,
             e3_id,
             &dir,
-            CircuitFlavor::Evm,
+            CircuitVariant::Evm,
         )
     }
 
@@ -118,15 +118,15 @@ impl ZkProver {
         witness_data: &[u8],
         e3_id: &str,
         dir_path: &str,
-        flavor: CircuitFlavor,
+        variant: CircuitVariant,
     ) -> Result<Proof, ZkError> {
         if !self.bb_binary.exists() {
             return Err(ZkError::BbNotInstalled);
         }
 
-        let verifier_target = flavor.verifier_target();
+        let verifier_target = variant.verifier_target();
 
-        let circuit_dir = self.circuits_dir(flavor).join(dir_path);
+        let circuit_dir = self.circuits_dir(variant).join(dir_path);
         let circuit_path = circuit_dir.join(format!("{}.json", circuit.as_str()));
         let vk_path = circuit_dir.join(format!("{}.vk", circuit.as_str()));
 
@@ -207,8 +207,18 @@ impl ZkProver {
         ))
     }
 
-    /// Verifies a proof (Recursive flavor, matching `prove()`).
+    /// Verifies a proof (Recursive variant, matching `prove()`).
     pub fn verify_proof(&self, proof: &Proof, e3_id: &str, party_id: u64) -> Result<bool, ZkError> {
+        self.verify_proof_with_variant(proof, e3_id, party_id, CircuitVariant::Recursive)
+    }
+
+    pub fn verify_proof_with_variant(
+        &self,
+        proof: &Proof,
+        e3_id: &str,
+        party_id: u64,
+        variant: CircuitVariant,
+    ) -> Result<bool, ZkError> {
         self.verify_proof_impl(
             proof.circuit,
             &proof.data,
@@ -216,7 +226,7 @@ impl ZkProver {
             proof.circuit.dir_path(),
             e3_id,
             party_id,
-            CircuitFlavor::Recursive,
+            variant,
         )
     }
 
@@ -226,18 +236,10 @@ impl ZkProver {
         e3_id: &str,
         party_id: u64,
     ) -> Result<bool, ZkError> {
-        self.verify_proof_impl(
-            proof.circuit,
-            &proof.data,
-            &proof.public_signals,
-            proof.circuit.dir_path(),
-            e3_id,
-            party_id,
-            CircuitFlavor::Evm,
-        )
+        self.verify_proof_with_variant(proof, e3_id, party_id, CircuitVariant::Evm)
     }
 
-    /// Verifies a wrapper proof (Default flavor, wrapper dir).
+    /// Verifies a wrapper proof (Default Variant, wrapper dir).
     pub fn verify_wrapper_proof(
         &self,
         proof: &Proof,
@@ -251,11 +253,11 @@ impl ZkProver {
             proof.circuit.wrapper_dir_path(),
             e3_id,
             party_id,
-            CircuitFlavor::Default,
+            CircuitVariant::Default,
         )
     }
 
-    /// Verifies a fold proof (Default flavor).
+    /// Verifies a fold proof (Default variant).
     pub fn verify_fold_proof(
         &self,
         proof: &Proof,
@@ -276,7 +278,7 @@ impl ZkProver {
             proof.circuit.dir_path(),
             e3_id,
             party_id,
-            CircuitFlavor::Default,
+            CircuitVariant::Default,
         )
     }
 
@@ -288,15 +290,15 @@ impl ZkProver {
         dir_path: String,
         e3_id: &str,
         party_id: u64,
-        flavor: CircuitFlavor,
+        variant: CircuitVariant,
     ) -> Result<bool, ZkError> {
         if !self.bb_binary.exists() {
             return Err(ZkError::BbNotInstalled);
         }
 
-        let verifier_target = flavor.verifier_target();
+        let verifier_target = variant.verifier_target();
         let vk_path = self
-            .circuits_dir(flavor)
+            .circuits_dir(variant)
             .join(&dir_path)
             .join(format!("{}.vk", circuit.as_str()));
         if !vk_path.exists() {

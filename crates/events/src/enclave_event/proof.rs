@@ -33,13 +33,13 @@ impl Proof {
     }
 }
 
-/// Circuit flavors determine the hash oracle used for VK generation and proving.
+/// Circuit variants determine the hash oracle used for VK generation and proving.
 ///
 /// - `Default`: poseidon/`noir-recursive-no-zk` — wrapper & fold proofs (no ZK blinding, efficient).
 /// - `Recursive`: poseidon/`noir-recursive` — inner/base proofs fed into a wrapper (ZK blinding preserved).
 /// - `Evm`: keccak/`evm` — on-chain EVM-verifiable proofs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-pub enum CircuitFlavor {
+pub enum CircuitVariant {
     /// noir-recursive-no-zk: for wrapper & fold proofs — poseidon, no ZK blinding.
     #[default]
     Default,
@@ -49,26 +49,26 @@ pub enum CircuitFlavor {
     Evm,
 }
 
-impl CircuitFlavor {
+impl CircuitVariant {
     pub fn as_str(&self) -> &'static str {
         match self {
-            CircuitFlavor::Default => "default",
-            CircuitFlavor::Recursive => "recursive",
-            CircuitFlavor::Evm => "evm",
+            CircuitVariant::Default => "default",
+            CircuitVariant::Recursive => "recursive",
+            CircuitVariant::Evm => "evm",
         }
     }
 
-    /// Returns the bb verifier target flag value for this flavor.
+    /// Returns the bb verifier target flag value for this variant.
     pub fn verifier_target(&self) -> &'static str {
         match self {
-            CircuitFlavor::Default => "noir-recursive-no-zk",
-            CircuitFlavor::Recursive => "noir-recursive",
-            CircuitFlavor::Evm => "evm",
+            CircuitVariant::Default => "noir-recursive-no-zk",
+            CircuitVariant::Recursive => "noir-recursive",
+            CircuitVariant::Evm => "evm",
         }
     }
 }
 
-impl fmt::Display for CircuitFlavor {
+impl fmt::Display for CircuitVariant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
     }

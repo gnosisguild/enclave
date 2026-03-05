@@ -16,7 +16,7 @@ use crate::circuits::utils::inputs_json_to_input_map;
 use crate::error::ZkError;
 use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
-use e3_events::{CircuitFlavor, CircuitName, Proof};
+use e3_events::{CircuitName, CircuitVariant, Proof};
 
 use self::utils::bytes_to_field_strings;
 
@@ -97,7 +97,7 @@ pub fn generate_wrapper_proof(
     let circuit = proofs[0].circuit;
 
     let vk_artifacts =
-        vk::load_vk_artifacts(&prover.circuits_dir(CircuitFlavor::Recursive), circuit)?;
+        vk::load_vk_artifacts(&prover.circuits_dir(CircuitVariant::Recursive), circuit)?;
 
     let full_input = WrapperInput {
         verification_key: vk_artifacts.verification_key,
@@ -108,7 +108,7 @@ pub fn generate_wrapper_proof(
 
     let dir_path = circuit.wrapper_dir_path();
     let circuit_path = prover
-        .circuits_dir(CircuitFlavor::Default)
+        .circuits_dir(CircuitVariant::Default)
         .join(&dir_path)
         .join(format!("{}.json", circuit.as_str()));
     let compiled = CompiledCircuit::from_file(&circuit_path)?;
@@ -168,10 +168,14 @@ pub fn generate_fold_proof(
     proof2: &Proof,
     e3_id: &str,
 ) -> Result<Proof, ZkError> {
-    let vk1 =
-        vk::load_vk_for_fold_input(&prover.circuits_dir(CircuitFlavor::Default), proof1.circuit)?;
-    let vk2 =
-        vk::load_vk_for_fold_input(&prover.circuits_dir(CircuitFlavor::Default), proof2.circuit)?;
+    let vk1 = vk::load_vk_for_fold_input(
+        &prover.circuits_dir(CircuitVariant::Default),
+        proof1.circuit,
+    )?;
+    let vk2 = vk::load_vk_for_fold_input(
+        &prover.circuits_dir(CircuitVariant::Default),
+        proof2.circuit,
+    )?;
 
     // Both wrapper and fold output [key_hash, commitment].
     let proof1_public_inputs = bytes_to_field_strings(&proof1.public_signals)?;
@@ -203,7 +207,7 @@ pub fn generate_fold_proof(
 
     let dir_path = CircuitName::Fold.dir_path();
     let circuit_path = prover
-        .circuits_dir(CircuitFlavor::Default)
+        .circuits_dir(CircuitVariant::Default)
         .join(&dir_path)
         .join(format!("{}.json", CircuitName::Fold.as_str()));
     let compiled = CompiledCircuit::from_file(&circuit_path)?;
@@ -310,7 +314,7 @@ mod tests {
 
         let e3_id = "aggregation-test-wrapper";
 
-        // First generate the inner proof with prove() (Recursive flavor)
+        // First generate the inner proof with prove() (Recursive Variant)
         let inner_proof = PkCircuit
             .prove(&prover, &preset, &sample, &format!("{e3_id}_inner_0"))
             .expect("inner prove() should succeed");
@@ -386,7 +390,7 @@ mod tests {
 
         let e3_id = "aggregation-2proof-wrapper";
 
-        // First generate the inner proofs with prove() (Recursive flavor)
+        // First generate the inner proofs with prove() (Recursive Variant)
         let inner_proof_a = ShareDecryptionCircuit
             .prove(&prover, &preset, &sample_a, &format!("{e3_id}_inner_0"))
             .expect("inner prove() A should succeed");
@@ -497,7 +501,7 @@ mod tests {
 
         let e3_id = "aggregation-test-fold";
 
-        // Generate inner proofs first with prove() (Recursive flavor)
+        // Generate inner proofs first with prove() (Recursive Variant)
         let pk_inner_proof = PkCircuit
             .prove(&prover, &preset, &pk_sample, &format!("{e3_id}_pk_inner_0"))
             .expect("pk inner prove() should succeed");

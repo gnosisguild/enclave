@@ -64,7 +64,7 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
         vk_evm_path.display()
     );
 
-    // Set up the evm flavor directory (keccak VK + hash)
+    // Set up the evm variant directory (keccak VK + hash)
     let evm_dir = backend
         .circuits_dir
         .join("evm")
@@ -86,7 +86,7 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
         .unwrap();
     }
 
-    // Set up the default flavor directory (noir-recursive-no-zk VK for wrapper/fold proofs)
+    // Set up the default variant directory (noir-recursive-no-zk VK for wrapper/fold proofs)
     let default_dir = backend
         .circuits_dir
         .join("default")
@@ -117,7 +117,7 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
         .unwrap();
     }
 
-    // Set up the recursive flavor directory (noir-recursive VK for inner/base proofs)
+    // Set up the recursive variant directory (noir-recursive VK for inner/base proofs)
     let recursive_dir = backend
         .circuits_dir
         .join("recursive")

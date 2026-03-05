@@ -11,7 +11,7 @@ use crate::circuits::utils::inputs_json_to_input_map;
 use crate::error::ZkError;
 use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
-use e3_events::{CircuitFlavor, CircuitName, Proof};
+use e3_events::{CircuitName, CircuitVariant, Proof};
 use e3_zk_helpers::Computation;
 use noirc_abi::InputMap;
 
@@ -64,11 +64,26 @@ pub trait Provable: Send + Sync {
         Self::Inputs: Computation<Preset = Self::Params, Data = Self::Input> + serde::Serialize,
         <Self::Inputs as Computation>::Error: Display,
     {
+        self.prove_with_variant(prover, params, input, e3_id, CircuitVariant::Recursive)
+    }
+
+    fn prove_with_variant(
+        &self,
+        prover: &ZkProver,
+        params: &Self::Params,
+        input: &Self::Input,
+        e3_id: &str,
+        variant: CircuitVariant,
+    ) -> Result<Proof, ZkError>
+    where
+        Self::Inputs: Computation<Preset = Self::Params, Data = Self::Input> + serde::Serialize,
+        <Self::Inputs as Computation>::Error: Display,
+    {
         let inputs = self.build_inputs(params, input)?;
 
         let resolved_name = self.resolve_circuit_name(params, input);
         let circuit_path = prover
-            .circuits_dir(CircuitFlavor::Recursive)
+            .circuits_dir(variant)
             .join(resolved_name.dir_path())
             .join(format!("{}.json", resolved_name.as_str()));
 
@@ -77,7 +92,7 @@ pub trait Provable: Send + Sync {
         let witness_gen = WitnessGenerator::new();
         let witness = witness_gen.generate_witness(&circuit, inputs)?;
 
-        prover.generate_proof(resolved_name, &witness, e3_id)
+        prover.generate_proof_with_variant(resolved_name, &witness, e3_id, variant)
     }
 
     /// Wraps 1–2 proofs (from `prove()`) and optionally folds with `aggregated_proof`.
@@ -115,6 +130,17 @@ pub trait Provable: Send + Sync {
         e3_id: &str,
         party_id: u64,
     ) -> Result<bool, ZkError> {
+        self.verify_with_variant(prover, proof, e3_id, party_id, CircuitVariant::Recursive)
+    }
+
+    fn verify_with_variant(
+        &self,
+        prover: &ZkProver,
+        proof: &Proof,
+        e3_id: &str,
+        party_id: u64,
+        variant: CircuitVariant,
+    ) -> Result<bool, ZkError> {
         if !self.valid_circuits().contains(&proof.circuit) {
             return Err(ZkError::VerifyFailed(format!(
                 "circuit mismatch: expected one of {:?}, got {}",
@@ -127,6 +153,6 @@ pub trait Provable: Send + Sync {
             "Verifying proof for circuit {} with e3_id {} and party_id {}",
             proof.circuit, e3_id, party_id
         );
-        prover.verify_proof(proof, e3_id, party_id)
+        prover.verify_proof_with_variant(proof, e3_id, party_id, variant)
     }
 }

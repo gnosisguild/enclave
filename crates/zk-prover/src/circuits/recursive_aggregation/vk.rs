@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 //! Loads verification key and hash for inner circuits (wrapper proof aggregation).
-//! In the default flavor directory, these are stored as `.vk` and `.vk_hash`.
+//! In the default variant directory, these are stored as `.vk` and `.vk_hash`.
 
 use super::utils::bytes_to_field_strings;
 use crate::error::ZkError;
@@ -55,10 +55,10 @@ pub fn load_wrapper_vk_artifacts(
     load_vk_from_dir(&circuit_dir, circuit.as_str())
 }
 
-/// Loads VK artifacts from `.vk` and `.vk_hash` in the flavor-specific circuits directory.
+/// Loads VK artifacts from `.vk` and `.vk_hash` in the variant-specific circuits directory.
 /// The caller is responsible for passing the correct circuits_dir:
-/// - `circuits_dir(CircuitFlavor::Recursive)` for inner/base proofs embedded in a wrapper
-/// - `circuits_dir(CircuitFlavor::Default)` for wrapper/fold proofs
+/// - `circuits_dir(CircuitVariant::Recursive)` for inner/base proofs embedded in a wrapper
+/// - `circuits_dir(CircuitVariant::Default)` for wrapper/fold proofs
 pub fn load_vk_artifacts(
     circuits_dir: &Path,
     circuit: CircuitName,
