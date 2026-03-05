@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { getIsSlotEmpty, getPreviousCiphertext } from './state'
+import { getPreviousCiphertext } from './state'
 import { generateMaskVoteProof, generateVoteProof } from './vote'
 
 import type { MaskVoteProofRequest, ProofData, VoteProofRequest } from './types'
@@ -33,13 +33,7 @@ export class CrispSDK {
    * @returns A promise that resolves to the generated proof data.
    */
   async generateMaskVoteProof(maskProofInputs: MaskVoteProofRequest): Promise<ProofData> {
-    const isSlotEmpty = await getIsSlotEmpty(this.serverUrl, maskProofInputs.e3Id, maskProofInputs.slotAddress)
-
-    let previousCiphertext
-
-    if (!isSlotEmpty) {
-      previousCiphertext = await getPreviousCiphertext(this.serverUrl, maskProofInputs.e3Id, maskProofInputs.slotAddress)
-    }
+    const previousCiphertext = await getPreviousCiphertext(this.serverUrl, maskProofInputs.e3Id, maskProofInputs.slotAddress)
 
     return generateMaskVoteProof({
       ...maskProofInputs,
@@ -49,17 +43,16 @@ export class CrispSDK {
 
   /**
    * Generate a proof for a vote.
+   *
+   * Note: The previous ciphertext is not used in the proof computation. This method still calls
+   * the same server API (previous-ciphertext) as {@link generateMaskVoteProof} to prevent the
+   * server from inferring the vote type (mask vs normal) from the client's API usage pattern.
+   *
    * @param voteProofInputs - The inputs required to generate the vote proof.
    * @returns A promise that resolves to the generated proof data.
    */
   async generateVoteProof(voteProofInputs: VoteProofRequest): Promise<ProofData> {
-    const isSlotEmpty = await getIsSlotEmpty(this.serverUrl, voteProofInputs.e3Id, voteProofInputs.slotAddress)
-
-    let previousCiphertext
-
-    if (!isSlotEmpty) {
-      previousCiphertext = await getPreviousCiphertext(this.serverUrl, voteProofInputs.e3Id, voteProofInputs.slotAddress)
-    }
+    const previousCiphertext = await getPreviousCiphertext(this.serverUrl, voteProofInputs.e3Id, voteProofInputs.slotAddress)
 
     return generateVoteProof({
       ...voteProofInputs,
