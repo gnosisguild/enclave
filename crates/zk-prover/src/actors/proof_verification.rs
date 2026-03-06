@@ -12,11 +12,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, Recipient};
-use alloy::primitives::Address;
+use alloy::primitives::{keccak256, Address, Bytes};
+use alloy::sol_types::SolValue;
 use e3_events::{
     BusHandle, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated,
     EncryptionKeyReceived, EventContext, EventPublisher, EventSubscriber, EventType, Proof,
-    Sequenced, SignedProofFailed, SignedProofPayload, TypedEvent,
+    ProofType, ProofVerificationFailed, ProofVerificationPassed, Sequenced, SignedProofFailed,
+    SignedProofPayload, TypedEvent,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
@@ -209,7 +211,37 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
                 "C0 proof verified for party {} - accepting key",
                 msg.key.party_id
             );
+            let party_id = msg.key.party_id;
+            let e3_id = msg.e3_id.clone();
             self.publish_key_created(msg.e3_id, msg.key, ec.clone());
+
+            // Emit ProofVerificationPassed so AccusationManager can cache success
+            if let Some(PendingVerification {
+                signed_payload,
+                recovered_signer,
+            }) = pending
+            {
+                let data_hash: [u8; 32] = {
+                    let msg = (
+                        Bytes::copy_from_slice(&signed_payload.payload.proof.data),
+                        Bytes::copy_from_slice(&signed_payload.payload.proof.public_signals),
+                    )
+                        .abi_encode_packed();
+                    keccak256(&msg).into()
+                };
+                if let Err(err) = self.bus.publish(
+                    ProofVerificationPassed {
+                        e3_id,
+                        party_id,
+                        address: recovered_signer,
+                        proof_type: ProofType::C0PkBfv,
+                        data_hash,
+                    },
+                    ec,
+                ) {
+                    error!("Failed to publish ProofVerificationPassed: {err}");
+                }
+            }
         } else {
             let error_msg = msg.error.unwrap_or_else(|| "unknown error".to_string());
             error!(
@@ -231,11 +263,34 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
                         e3_id: msg.e3_id.clone(),
                         faulting_node: recovered_signer,
                         proof_type: signed_payload.payload.proof_type,
-                        signed_payload,
+                        signed_payload: signed_payload.clone(),
                     },
                     ec.clone(),
                 ) {
                     error!("Failed to publish SignedProofFailed: {err}");
+                }
+
+                // Emit ProofVerificationFailed for AccusationManager
+                let data_hash: [u8; 32] = {
+                    let msg = (
+                        Bytes::copy_from_slice(&signed_payload.payload.proof.data),
+                        Bytes::copy_from_slice(&signed_payload.payload.proof.public_signals),
+                    )
+                        .abi_encode_packed();
+                    keccak256(&msg).into()
+                };
+                if let Err(err) = self.bus.publish(
+                    ProofVerificationFailed {
+                        e3_id: msg.e3_id.clone(),
+                        accused_party_id: msg.key.party_id,
+                        accused_address: recovered_signer,
+                        proof_type: ProofType::C0PkBfv,
+                        data_hash,
+                        signed_payload,
+                    },
+                    ec.clone(),
+                ) {
+                    error!("Failed to publish ProofVerificationFailed: {err}");
                 }
             }
 

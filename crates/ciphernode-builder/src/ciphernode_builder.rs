@@ -34,7 +34,7 @@ use e3_sortition::{
 };
 use e3_sync::sync;
 use e3_utils::SharedRng;
-use e3_zk_prover::{setup_zk_actors, ZkBackend};
+use e3_zk_prover::{setup_zk_actors, AccusationManagerExtension, ZkBackend};
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
@@ -505,6 +505,13 @@ impl CiphernodeBuilder {
                 &sortition,
                 aggregator_preset,
             ))
+        }
+
+        // AccusationManager extension — per-E3 fault attribution quorum
+        {
+            let signer = provider_cache.ensure_signer().await?;
+            info!("Setting up AccusationManagerExtension");
+            e3_builder = e3_builder.with(AccusationManagerExtension::create(&bus, signer));
         }
 
         info!("building...");

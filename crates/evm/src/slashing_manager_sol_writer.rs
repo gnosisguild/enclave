@@ -4,8 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Subscribes to `SignedProofFailed` events and submits `proposeSlash`
-//! transactions on the SlashingManager contract.
+//! Subscribes to `AccusationQuorumReached` events and submits `proposeSlash`
+//! transactions on the SlashingManager contract with committee attestation evidence.
 
 use crate::helpers::EthProvider;
 use crate::send_tx_with_retry;
@@ -16,6 +16,7 @@ use alloy::{
     providers::{Provider, WalletProvider},
     rpc::types::TransactionReceipt,
     sol,
+    sol_types::SolValue,
 };
 use anyhow::Result;
 use e3_events::prelude::*;
@@ -24,7 +25,7 @@ use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
 use e3_events::EventType;
 use e3_events::Shutdown;
-use e3_events::{encode_fault_evidence, EType, SignedProofFailed};
+use e3_events::{AccusationOutcome, AccusationQuorumReached, EType};
 use e3_utils::NotifySync;
 use tracing::info;
 
@@ -34,7 +35,7 @@ sol!(
     "../../packages/enclave-contracts/artifacts/contracts/interfaces/ISlashingManager.sol/ISlashingManager.json"
 );
 
-/// Submits `SignedProofFailed` events as slash proposals on-chain.
+/// Submits `AccusationQuorumReached` events as slash proposals on-chain.
 pub struct SlashingManagerSolWriter<P> {
     provider: EthProvider<P>,
     contract_address: Address,
@@ -61,7 +62,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> SlashingManagerSolWriter<P>
     ) -> Result<Addr<SlashingManagerSolWriter<P>>> {
         let addr = SlashingManagerSolWriter::new(bus, provider, contract_address)?.start();
         bus.subscribe_all(
-            &[EventType::SignedProofFailed, EventType::Shutdown],
+            &[EventType::AccusationQuorumReached, EventType::Shutdown],
             addr.clone().into(),
         );
         Ok(addr)
@@ -79,8 +80,15 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
-            EnclaveEventData::SignedProofFailed(data) => {
-                if self.provider.chain_id() == data.e3_id.chain_id() {
+            EnclaveEventData::AccusationQuorumReached(data) => {
+                // Only submit if:
+                // 1. This is the right chain
+                // 2. The quorum decided the accused is at fault
+                // 3. This node is the accuser (only one node should submit)
+                if self.provider.chain_id() == data.e3_id.chain_id()
+                    && data.outcome == AccusationOutcome::AccusedFaulted
+                    && data.accuser == self.provider.provider().default_signer_address()
+                {
                     ctx.notify(data);
                 }
             }
@@ -90,12 +98,12 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
     }
 }
 
-impl<P: Provider + WalletProvider + Clone + 'static> Handler<SignedProofFailed>
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<AccusationQuorumReached>
     for SlashingManagerSolWriter<P>
 {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, msg: SignedProofFailed, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: AccusationQuorumReached, _: &mut Self::Context) -> Self::Result {
         Box::pin({
             let contract_address = self.contract_address;
             let provider = self.provider.clone();
@@ -104,7 +112,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<SignedProofFailed>
                 let result = submit_slash_proposal(provider, contract_address, msg).await;
                 match result {
                     Ok(receipt) => {
-                        info!(tx=%receipt.transaction_hash, "Submitted slash proposal on-chain");
+                        info!(tx=%receipt.transaction_hash, "Submitted attestation-based slash proposal on-chain");
                     }
                     Err(err) => {
                         bus.err(
@@ -128,23 +136,38 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
     }
 }
 
+/// Encode `AccusationQuorumReached` into the attestation evidence format expected
+/// by `SlashingManager.proposeSlash()`:
+/// `abi.encode(uint256 proofType, address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures)`
+///
+/// Voters are sorted ascending by address to satisfy the contract's duplicate-prevention check.
+fn encode_attestation_evidence(data: &AccusationQuorumReached) -> Vec<u8> {
+    // Collect and sort votes by voter address (ascending)
+    let mut votes = data.votes_for.clone();
+    votes.sort_by_key(|v| v.voter);
+
+    let proof_type = U256::from(data.proof_type as u8);
+    let voters: Vec<Address> = votes.iter().map(|v| v.voter).collect();
+    let agrees: Vec<bool> = votes.iter().map(|v| v.agrees).collect();
+    let data_hashes: Vec<[u8; 32]> = votes.iter().map(|v| v.data_hash).collect();
+    let signatures: Vec<Bytes> = votes
+        .iter()
+        .map(|v| Bytes::from(v.signature.clone()))
+        .collect();
+
+    (proof_type, voters, agrees, data_hashes, signatures).abi_encode()
+}
+
 async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
     provider: EthProvider<P>,
     contract_address: Address,
-    data: SignedProofFailed,
+    data: AccusationQuorumReached,
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = data.e3_id.clone().try_into()?;
-    let operator = data.faulting_node;
+    let operator = data.accused;
     let reason = keccak256(data.proof_type.slash_reason().as_bytes());
 
-    // Look up the verifier address from the on-chain slash policy.
-    // This is required to encode the full 6-tuple evidence that the contract expects:
-    // (bytes zkProof, bytes32[] publicInputs, bytes signature, uint256 chainId, uint256 proofType, address verifier)
-    let contract = ISlashingManager::new(contract_address, provider.provider());
-    let policy = contract.getSlashPolicy(reason.into()).call().await?;
-    let verifier = policy.proofVerifier;
-
-    let proof_data = encode_fault_evidence(&data, verifier);
+    let proof_data = encode_attestation_evidence(&data);
 
     let from_address = provider.provider().default_signer_address();
     let current_nonce = provider

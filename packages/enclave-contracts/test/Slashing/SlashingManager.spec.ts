@@ -46,77 +46,118 @@ describe("SlashingManager", function () {
 
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
-  // Must match the PROOF_PAYLOAD_TYPEHASH in SlashingManager.sol
-  const PROOF_PAYLOAD_TYPEHASH = ethers.keccak256(
+  // Must match the VOTE_TYPEHASH in SlashingManager.sol
+  const VOTE_TYPEHASH = ethers.keccak256(
     ethers.toUtf8Bytes(
-      "ProofPayload(uint256 chainId,uint256 e3Id,uint256 proofType,bytes zkProof,bytes publicSignals)",
+      "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)",
     ),
   );
 
   /**
-   * Helper to create a signed proof evidence bundle.
-   * The operator signs the proof payload (matching Rust ProofPayload.digest()),
-   * then the evidence is encoded in the format expected by proposeSlash().
-   * Returns abi.encode(zkProof, publicInputs, signature, chainId, proofType, verifier)
+   * Helper to create signed committee attestation evidence for Lane A.
+   * Each voter signs a VOTE_TYPEHASH-structured digest via personal_sign (EIP-191).
+   * Returns abi.encode(proofType, voters, agrees, dataHashes, signatures)
+   * with voters sorted ascending by address.
    */
-  async function signAndEncodeProof(
-    signer: any,
+  async function signAndEncodeAttestation(
+    voterSigners: any[],
     e3Id: number,
-    reason: string,
-    verifierAddress: string,
-    zkProof: string = "0x1234",
-    publicInputs: string[] = [ethers.ZeroHash],
-    chainId: number = 31337, // Hardhat default chain ID
-    proofType: number = 0, // T0PkBfv
+    operator: string,
+    proofType: number = 0,
+    chainId: number = 31337,
+    dataHash: string = ethers.ZeroHash,
+    agreesOverride?: boolean[],
   ): Promise<string> {
-    // Operator signs: keccak256(abi.encode(PROOF_PAYLOAD_TYPEHASH, chainId, e3Id, proofType, keccak256(zkProof), keccak256(publicSignals)))
-    const messageHash = ethers.keccak256(
-      abiCoder.encode(
-        ["bytes32", "uint256", "uint256", "uint256", "bytes32", "bytes32"],
-        [
-          PROOF_PAYLOAD_TYPEHASH,
-          chainId,
-          e3Id,
-          proofType,
-          ethers.keccak256(zkProof),
-          ethers.keccak256(
-            ethers.solidityPacked(["bytes32[]"], [publicInputs]),
-          ),
-        ],
+    // Compute accusationId matching AccusationManager::accusation_id() on Rust side
+    const accusationId = ethers.keccak256(
+      ethers.solidityPacked(
+        ["uint256", "uint256", "address", "uint256"],
+        [chainId, e3Id, operator, proofType],
       ),
     );
-    const signature = await signer.signMessage(ethers.getBytes(messageHash));
-    // Evidence format: abi.encode(zkProof, publicInputs, signature, chainId, proofType, verifier)
+
+    // Sort voters by address ascending (required by contract to prevent duplicates)
+    const signersWithAddrs = await Promise.all(
+      voterSigners.map(async (s) => ({
+        signer: s,
+        address: await s.getAddress(),
+      })),
+    );
+    signersWithAddrs.sort((a, b) =>
+      a.address.toLowerCase() < b.address.toLowerCase()
+        ? -1
+        : a.address.toLowerCase() > b.address.toLowerCase()
+          ? 1
+          : 0,
+    );
+
+    const voters: string[] = [];
+    const agrees: boolean[] = [];
+    const dataHashes: string[] = [];
+    const signatures: string[] = [];
+
+    for (let i = 0; i < signersWithAddrs.length; i++) {
+      const { signer, address: voterAddress } = signersWithAddrs[i];
+      const voteAgrees =
+        agreesOverride !== undefined ? agreesOverride[i] : true;
+
+      voters.push(voterAddress);
+      agrees.push(voteAgrees);
+      dataHashes.push(dataHash);
+
+      // Reconstruct vote digest matching _verifyAttestationEvidence
+      const messageHash = ethers.keccak256(
+        abiCoder.encode(
+          [
+            "bytes32",
+            "uint256",
+            "uint256",
+            "bytes32",
+            "address",
+            "bool",
+            "bytes32",
+          ],
+          [
+            VOTE_TYPEHASH,
+            chainId,
+            e3Id,
+            accusationId,
+            voterAddress,
+            voteAgrees,
+            dataHash,
+          ],
+        ),
+      );
+      const signature = await signer.signMessage(ethers.getBytes(messageHash));
+      signatures.push(signature);
+    }
+
     return abiCoder.encode(
-      ["bytes", "bytes32[]", "bytes", "uint256", "uint256", "address"],
-      [zkProof, publicInputs, signature, chainId, proofType, verifierAddress],
+      ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]"],
+      [proofType, voters, agrees, dataHashes, signatures],
     );
   }
 
   /**
-   * Legacy helper for tests that check early failures (before abi.decode).
-   * This encodes a minimal 6-tuple with dummy values for basic validation tests.
+   * Encodes a minimal attestation evidence for tests that check early
+   * failures (before abi.decode is reached).
    */
-  function encodeDummyProof(
-    zkProof: string = "0x1234",
-    publicInputs: string[] = [ethers.ZeroHash],
-    verifierAddress: string = ethers.ZeroAddress,
-  ): string {
+  function encodeDummyAttestation(proofType: number = 0): string {
     return abiCoder.encode(
-      ["bytes", "bytes32[]", "bytes", "uint256", "uint256", "address"],
-      [zkProof, publicInputs, "0x00", 31337, 0, verifierAddress],
+      ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]"],
+      [proofType, [], [], [], []],
     );
   }
 
   async function setupPolicies(
     slashingManager: SlashingManager,
-    mockVerifier: MockCircuitVerifier,
+    _mockVerifier?: MockCircuitVerifier,
   ) {
     const proofPolicy = {
       ticketPenalty: ethers.parseUnits("50", 6),
       licensePenalty: ethers.parseEther("100"),
       requiresProof: true,
-      proofVerifier: await mockVerifier.getAddress(),
+      proofVerifier: ethers.ZeroAddress,
       banNode: false,
       appealWindow: 0,
       enabled: true,
@@ -140,7 +181,7 @@ describe("SlashingManager", function () {
       ticketPenalty: ethers.parseUnits("100", 6),
       licensePenalty: ethers.parseEther("500"),
       requiresProof: true,
-      proofVerifier: await mockVerifier.getAddress(),
+      proofVerifier: ethers.ZeroAddress,
       banNode: true,
       appealWindow: 0,
       enabled: true,
@@ -155,8 +196,16 @@ describe("SlashingManager", function () {
 
   async function setup() {
     // ── Signers ────────────────────────────────────────────────────────────────
-    const [owner, slasher, proposer, operator, notTheOwner] =
-      await ethers.getSigners();
+    const [
+      owner,
+      slasher,
+      proposer,
+      operator,
+      notTheOwner,
+      voter1,
+      voter2,
+      voter3,
+    ] = await ethers.getSigners();
     const ownerAddress = await owner.getAddress();
     const operatorAddress = await operator.getAddress();
 
@@ -281,6 +330,9 @@ describe("SlashingManager", function () {
       operator,
       operatorAddress,
       notTheOwner,
+      voter1,
+      voter2,
+      voter3,
       slashingManager,
       bondingRegistry,
       enclaveToken,
@@ -466,7 +518,7 @@ describe("SlashingManager", function () {
       ).to.be.revertedWithCustomError(slashingManager, "InvalidPolicy");
     });
 
-    it("should revert if proof required but no verifier set", async function () {
+    it("should allow proof-based policy without verifier (attestation model)", async function () {
       const { slashingManager } = await loadFixture(setup);
 
       const policy = {
@@ -481,9 +533,9 @@ describe("SlashingManager", function () {
         failureReason: 0,
       };
 
-      await expect(
-        slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, policy),
-      ).to.be.revertedWithCustomError(slashingManager, "VerifierNotSet");
+      await expect(slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, policy))
+        .to.emit(slashingManager, "SlashPolicyUpdated")
+        .withArgs(REASON_MISBEHAVIOR, Object.values(policy));
     });
 
     it("should revert if proof required but appeal window set", async function () {
@@ -571,23 +623,21 @@ describe("SlashingManager", function () {
   });
 
   describe("proposeSlash() — Lane A (proof-based, permissionless)", function () {
-    it("should propose and auto-execute slash with signed proof from operator", async function () {
+    it("should propose and auto-execute slash with committee attestation", async function () {
       const {
         slashingManager,
         proposer,
-        operator,
         operatorAddress,
-        mockVerifier,
+        voter1,
+        voter2,
         mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
-      // MockCircuitVerifier default returnValue=false → proof invalid → fault confirmed
-      const verifierAddress = await mockVerifier.getAddress();
       const proofPolicy = {
         ticketPenalty: ethers.parseUnits("50", 6),
         licensePenalty: ethers.parseEther("100"),
         requiresProof: true,
-        proofVerifier: verifierAddress,
+        proofVerifier: ethers.ZeroAddress,
         banNode: false,
         appealWindow: 0,
         enabled: true,
@@ -596,19 +646,24 @@ describe("SlashingManager", function () {
       };
       await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
 
-      // Set up committee membership for operator
+      // Set up committee membership for voters (not the operator — voters attest the operator is faulty)
       const e3Id = 0;
-      await mockCiphernodeRegistry.setCommitteeNodes(e3Id, [operatorAddress]);
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(e3Id, [
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(e3Id, 2);
 
-      // Operator signs the bad proof
-      const proof = await signAndEncodeProof(
-        operator,
+      // Committee members sign attestation votes
+      const proof = await signAndEncodeAttestation(
+        [voter1, voter2],
         e3Id,
-        REASON_MISBEHAVIOR,
-        verifierAddress,
+        operatorAddress,
       );
 
-      // Anyone can submit the signed evidence (permissionless for Lane A)
+      // Anyone can submit the signed attestation evidence (permissionless for Lane A)
       await expect(
         slashingManager
           .connect(proposer)
@@ -624,22 +679,21 @@ describe("SlashingManager", function () {
       expect(proposal.proposer).to.equal(await proposer.getAddress());
     });
 
-    it("should revert if circuit verifier says proof is valid (no fault)", async function () {
+    it("should revert if committee attestation has insufficient votes", async function () {
       const {
         slashingManager,
         proposer,
-        operator,
         operatorAddress,
-        mockVerifier,
+        voter1,
+        voter2,
         mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
-      const verifierAddress = await mockVerifier.getAddress();
       const proofPolicy = {
         ticketPenalty: ethers.parseUnits("50", 6),
         licensePenalty: ethers.parseEther("100"),
         requiresProof: true,
-        proofVerifier: verifierAddress,
+        proofVerifier: ethers.ZeroAddress,
         banNode: false,
         appealWindow: 0,
         enabled: true,
@@ -648,93 +702,19 @@ describe("SlashingManager", function () {
       };
       await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
 
-      // Set mock verifier to return true → proof is valid → NOT a fault
-      await mockVerifier.setReturnValue(true);
+      // Threshold is 2 but only 1 vote provided
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(0, 2);
 
-      await mockCiphernodeRegistry.setCommitteeNodes(0, [operatorAddress]);
-
-      const proof = await signAndEncodeProof(
-        operator,
+      const proof = await signAndEncodeAttestation(
+        [voter1], // only 1 voter, need 2
         0,
-        REASON_MISBEHAVIOR,
-        verifierAddress,
-      );
-      await expect(
-        slashingManager
-          .connect(proposer)
-          .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof),
-      ).to.be.revertedWithCustomError(slashingManager, "ProofIsValid");
-    });
-
-    it("should revert if signer is not the operator (V-001 fix)", async function () {
-      const {
-        slashingManager,
-        proposer,
         operatorAddress,
-        mockVerifier,
-        mockCiphernodeRegistry,
-      } = await loadFixture(setup);
-
-      const verifierAddress = await mockVerifier.getAddress();
-      const proofPolicy = {
-        ticketPenalty: ethers.parseUnits("50", 6),
-        licensePenalty: ethers.parseEther("100"),
-        requiresProof: true,
-        proofVerifier: verifierAddress,
-        banNode: false,
-        appealWindow: 0,
-        enabled: true,
-        affectsCommittee: false,
-        failureReason: 0,
-      };
-      await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
-
-      await mockCiphernodeRegistry.setCommitteeNodes(0, [operatorAddress]);
-
-      // Proposer signs the proof (NOT the operator) — should be rejected
-      const proof = await signAndEncodeProof(
-        proposer,
-        0,
-        REASON_MISBEHAVIOR,
-        verifierAddress,
-      );
-      await expect(
-        slashingManager
-          .connect(proposer)
-          .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof),
-      ).to.be.revertedWithCustomError(slashingManager, "SignerIsNotOperator");
-    });
-
-    it("should revert if operator is not in committee (V-001 fix)", async function () {
-      const {
-        slashingManager,
-        proposer,
-        operator,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
-
-      const verifierAddress = await mockVerifier.getAddress();
-      const proofPolicy = {
-        ticketPenalty: ethers.parseUnits("50", 6),
-        licensePenalty: ethers.parseEther("100"),
-        requiresProof: true,
-        proofVerifier: verifierAddress,
-        banNode: false,
-        appealWindow: 0,
-        enabled: true,
-        affectsCommittee: false,
-        failureReason: 0,
-      };
-      await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
-
-      // Do NOT add operator to committee — empty committee for this E3
-
-      const proof = await signAndEncodeProof(
-        operator,
-        0,
-        REASON_MISBEHAVIOR,
-        verifierAddress,
       );
       await expect(
         slashingManager
@@ -742,18 +722,159 @@ describe("SlashingManager", function () {
           .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof),
       ).to.be.revertedWithCustomError(
         slashingManager,
-        "OperatorNotInCommittee",
+        "InsufficientAttestations",
       );
     });
 
+    it("should revert if vote signature is invalid", async function () {
+      const {
+        slashingManager,
+        proposer,
+        operatorAddress,
+        voter1,
+        voter2,
+        notTheOwner,
+        mockCiphernodeRegistry,
+      } = await loadFixture(setup);
+
+      const proofPolicy = {
+        ticketPenalty: ethers.parseUnits("50", 6),
+        licensePenalty: ethers.parseEther("100"),
+        requiresProof: true,
+        proofVerifier: ethers.ZeroAddress,
+        banNode: false,
+        appealWindow: 0,
+        enabled: true,
+        affectsCommittee: false,
+        failureReason: 0,
+      };
+      await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
+
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(0, 2);
+
+      // Build attestation manually with voter2's address but notTheOwner's signature
+      const chainId = 31337;
+      const accusationId = ethers.keccak256(
+        ethers.solidityPacked(
+          ["uint256", "uint256", "address", "uint256"],
+          [chainId, 0, operatorAddress, 0],
+        ),
+      );
+
+      // Sort voters ascending
+      const sortedVoters = [voter1Addr, voter2Addr].sort((a, b) =>
+        a.toLowerCase() < b.toLowerCase() ? -1 : 1,
+      );
+      const sortedSigners = sortedVoters.map((addr) =>
+        addr.toLowerCase() === voter1Addr.toLowerCase() ? voter1 : voter2,
+      );
+
+      const voters: string[] = [];
+      const agrees: boolean[] = [];
+      const dataHashes: string[] = [];
+      const signatures: string[] = [];
+
+      for (let i = 0; i < sortedVoters.length; i++) {
+        const voterAddr = sortedVoters[i];
+        voters.push(voterAddr);
+        agrees.push(true);
+        dataHashes.push(ethers.ZeroHash);
+
+        // For the second voter, use notTheOwner to sign (wrong signer)
+        const signerToUse =
+          i === sortedVoters.length - 1 ? notTheOwner : sortedSigners[i];
+        const messageHash = ethers.keccak256(
+          abiCoder.encode(
+            [
+              "bytes32",
+              "uint256",
+              "uint256",
+              "bytes32",
+              "address",
+              "bool",
+              "bytes32",
+            ],
+            [
+              VOTE_TYPEHASH,
+              chainId,
+              0,
+              accusationId,
+              voterAddr,
+              true,
+              ethers.ZeroHash,
+            ],
+          ),
+        );
+        const signature = await signerToUse.signMessage(
+          ethers.getBytes(messageHash),
+        );
+        signatures.push(signature);
+      }
+
+      const proof = abiCoder.encode(
+        ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]"],
+        [0, voters, agrees, dataHashes, signatures],
+      );
+
+      await expect(
+        slashingManager
+          .connect(proposer)
+          .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof),
+      ).to.be.revertedWithCustomError(slashingManager, "InvalidVoteSignature");
+    });
+
+    it("should revert if voter is not in committee", async function () {
+      const {
+        slashingManager,
+        proposer,
+        operatorAddress,
+        voter1,
+        voter2,
+        mockCiphernodeRegistry,
+      } = await loadFixture(setup);
+
+      const proofPolicy = {
+        ticketPenalty: ethers.parseUnits("50", 6),
+        licensePenalty: ethers.parseEther("100"),
+        requiresProof: true,
+        proofVerifier: ethers.ZeroAddress,
+        banNode: false,
+        appealWindow: 0,
+        enabled: true,
+        affectsCommittee: false,
+        failureReason: 0,
+      };
+      await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
+
+      // Only voter1 is a committee member, but voter2 also signs
+      const voter1Addr = await voter1.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(0, [voter1Addr]);
+      await mockCiphernodeRegistry.setThreshold(0, 1);
+
+      const proof = await signAndEncodeAttestation(
+        [voter1, voter2], // voter2 is NOT in committee
+        0,
+        operatorAddress,
+      );
+      await expect(
+        slashingManager
+          .connect(proposer)
+          .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof),
+      ).to.be.revertedWithCustomError(slashingManager, "VoterNotInCommittee");
+    });
+
     it("should revert if operator is zero address", async function () {
-      const { slashingManager, proposer, mockVerifier } =
-        await loadFixture(setup);
+      const { slashingManager, proposer } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
-      // Any non-empty proof triggers ZeroAddress check before decode
-      const proof = encodeDummyProof();
+      const proof = encodeDummyAttestation();
 
       await expect(
         slashingManager
@@ -766,7 +887,7 @@ describe("SlashingManager", function () {
       const { slashingManager, proposer, operatorAddress } =
         await loadFixture(setup);
 
-      const proof = encodeDummyProof();
+      const proof = encodeDummyAttestation();
 
       await expect(
         slashingManager
@@ -776,14 +897,14 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if proof is empty", async function () {
-      const { slashingManager, proposer, operatorAddress, mockVerifier } =
+      const { slashingManager, proposer, operatorAddress } =
         await loadFixture(setup);
 
       const proofPolicy = {
         ticketPenalty: ethers.parseUnits("50", 6),
         licensePenalty: ethers.parseEther("100"),
         requiresProof: true,
-        proofVerifier: await mockVerifier.getAddress(),
+        proofVerifier: ethers.ZeroAddress,
         banNode: false,
         appealWindow: 0,
         enabled: true,
@@ -803,18 +924,17 @@ describe("SlashingManager", function () {
       const {
         slashingManager,
         proposer,
-        operator,
         operatorAddress,
-        mockVerifier,
+        voter1,
+        voter2,
         mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
-      const verifierAddress = await mockVerifier.getAddress();
       const proofPolicy = {
         ticketPenalty: ethers.parseUnits("50", 6),
         licensePenalty: ethers.parseEther("100"),
         requiresProof: true,
-        proofVerifier: verifierAddress,
+        proofVerifier: ethers.ZeroAddress,
         banNode: false,
         appealWindow: 0,
         enabled: true,
@@ -822,13 +942,18 @@ describe("SlashingManager", function () {
         failureReason: 0,
       };
       await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
-      await mockCiphernodeRegistry.setCommitteeNodes(0, [operatorAddress]);
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(0, 2);
 
-      const proof = await signAndEncodeProof(
-        operator,
+      const proof = await signAndEncodeAttestation(
+        [voter1, voter2],
         0,
-        REASON_MISBEHAVIOR,
-        verifierAddress,
+        operatorAddress,
       );
       await slashingManager
         .connect(proposer)
@@ -846,26 +971,33 @@ describe("SlashingManager", function () {
       const {
         slashingManager,
         proposer,
-        operator,
         operatorAddress,
-        mockVerifier,
+        voter1,
+        voter2,
         mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
-      const verifierAddress = await mockVerifier.getAddress();
-      await mockCiphernodeRegistry.setCommitteeNodes(0, [operatorAddress]);
-      await mockCiphernodeRegistry.setCommitteeNodes(1, [operatorAddress]);
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(0, 2);
+      await mockCiphernodeRegistry.setCommitteeNodes(1, [
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(1, 2);
 
       expect(await slashingManager.totalProposals()).to.equal(0);
 
-      const proof1 = await signAndEncodeProof(
-        operator,
+      const proof1 = await signAndEncodeAttestation(
+        [voter1, voter2],
         0,
-        REASON_MISBEHAVIOR,
-        verifierAddress,
-        "0x1111",
+        operatorAddress,
       );
       await slashingManager
         .connect(proposer)
@@ -873,12 +1005,10 @@ describe("SlashingManager", function () {
 
       expect(await slashingManager.totalProposals()).to.equal(1);
 
-      const proof2 = await signAndEncodeProof(
-        operator,
+      const proof2 = await signAndEncodeAttestation(
+        [voter1, voter2],
         1,
-        REASON_MISBEHAVIOR,
-        verifierAddress,
-        "0x2222",
+        operatorAddress,
       );
       await slashingManager
         .connect(proposer)
@@ -891,25 +1021,28 @@ describe("SlashingManager", function () {
       const {
         slashingManager,
         proposer,
-        operator,
         operatorAddress,
-        mockVerifier,
+        voter1,
+        voter2,
         mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
-      const verifierAddress = await mockVerifier.getAddress();
-      await mockCiphernodeRegistry.setCommitteeNodes(0, [operatorAddress]);
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(0, 2);
 
       expect(await slashingManager.isBanned(operatorAddress)).to.be.false;
 
-      const proof = await signAndEncodeProof(
-        operator,
+      const proof = await signAndEncodeAttestation(
+        [voter1, voter2],
         0,
-        REASON_DOUBLE_SIGN,
-        verifierAddress,
-        "0x3333",
+        operatorAddress,
       );
       await slashingManager
         .connect(proposer)
@@ -925,7 +1058,7 @@ describe("SlashingManager", function () {
       const { slashingManager, slasher, operatorAddress, mockVerifier } =
         await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       const evidence = ethers.toUtf8Bytes("operator was inactive during E3");
       const e3Id = 0;
@@ -954,7 +1087,7 @@ describe("SlashingManager", function () {
       const { slashingManager, notTheOwner, operatorAddress, mockVerifier } =
         await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       const evidence = ethers.toUtf8Bytes("evidence");
 
@@ -974,7 +1107,7 @@ describe("SlashingManager", function () {
       const { slashingManager, slasher, mockVerifier } =
         await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       await expect(
         slashingManager
@@ -994,7 +1127,7 @@ describe("SlashingManager", function () {
       const { slashingManager, slasher, operatorAddress, mockVerifier } =
         await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       await slashingManager
         .connect(slasher)
@@ -1026,22 +1159,26 @@ describe("SlashingManager", function () {
       const {
         slashingManager,
         proposer,
-        operator,
         operatorAddress,
-        mockVerifier,
+        voter1,
+        voter2,
         mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
-      const verifierAddress = await mockVerifier.getAddress();
-      await mockCiphernodeRegistry.setCommitteeNodes(0, [operatorAddress]);
+      await setupPolicies(slashingManager);
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(0, 2);
 
       // Proof-based slash auto-executes in proposeSlash
-      const proof = await signAndEncodeProof(
-        operator,
+      const proof = await signAndEncodeAttestation(
+        [voter1, voter2],
         0,
-        REASON_MISBEHAVIOR,
-        verifierAddress,
+        operatorAddress,
       );
       await slashingManager
         .connect(proposer)
@@ -1065,7 +1202,7 @@ describe("SlashingManager", function () {
       const { slashingManager, slasher, operatorAddress, mockVerifier } =
         await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       await slashingManager
         .connect(slasher)
@@ -1095,7 +1232,7 @@ describe("SlashingManager", function () {
         mockVerifier,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       await slashingManager
         .connect(slasher)
@@ -1125,7 +1262,7 @@ describe("SlashingManager", function () {
         mockVerifier,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       await slashingManager
         .connect(slasher)
@@ -1150,7 +1287,7 @@ describe("SlashingManager", function () {
         mockVerifier,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       await slashingManager
         .connect(slasher)
@@ -1177,7 +1314,7 @@ describe("SlashingManager", function () {
         mockVerifier,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       await slashingManager
         .connect(slasher)
@@ -1201,20 +1338,25 @@ describe("SlashingManager", function () {
         proposer,
         operator,
         operatorAddress,
-        mockVerifier,
+        voter1,
+        voter2,
         mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
-      const verifierAddress = await mockVerifier.getAddress();
-      await mockCiphernodeRegistry.setCommitteeNodes(0, [operatorAddress]);
+      await setupPolicies(slashingManager);
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(0, 2);
 
       // Proof-based slash auto-executes with proofVerified=true
-      const proof = await signAndEncodeProof(
-        operator,
+      const proof = await signAndEncodeAttestation(
+        [voter1, voter2],
         0,
-        REASON_MISBEHAVIOR,
-        verifierAddress,
+        operatorAddress,
       );
       await slashingManager
         .connect(proposer)
@@ -1236,7 +1378,7 @@ describe("SlashingManager", function () {
         mockVerifier,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       await slashingManager
         .connect(slasher)
@@ -1277,7 +1419,7 @@ describe("SlashingManager", function () {
         mockVerifier,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       await slashingManager
         .connect(slasher)
@@ -1307,7 +1449,7 @@ describe("SlashingManager", function () {
         mockVerifier,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       await slashingManager
         .connect(slasher)
@@ -1336,7 +1478,7 @@ describe("SlashingManager", function () {
         mockVerifier,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       await slashingManager
         .connect(slasher)
@@ -1366,7 +1508,7 @@ describe("SlashingManager", function () {
         mockVerifier,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
+      await setupPolicies(slashingManager);
 
       await slashingManager
         .connect(slasher)
@@ -1490,22 +1632,25 @@ describe("SlashingManager", function () {
       const {
         slashingManager,
         proposer,
-        operator,
         operatorAddress,
-        mockVerifier,
+        voter1,
+        voter2,
         mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
-      await setupPolicies(slashingManager, mockVerifier);
-      const verifierAddress = await mockVerifier.getAddress();
-      await mockCiphernodeRegistry.setCommitteeNodes(0, [operatorAddress]);
+      await setupPolicies(slashingManager);
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(0, 2);
 
-      const proof = await signAndEncodeProof(
-        operator,
+      const proof = await signAndEncodeAttestation(
+        [voter1, voter2],
         0,
-        REASON_MISBEHAVIOR,
-        verifierAddress,
-        "0x4444",
+        operatorAddress,
       );
       await slashingManager
         .connect(proposer)

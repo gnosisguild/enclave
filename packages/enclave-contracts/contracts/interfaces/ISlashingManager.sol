@@ -163,6 +163,18 @@ interface ISlashingManager {
     /// @notice Thrown when the chainId in the signed proof payload does not match the current chain
     error ChainIdMismatch();
 
+    /// @notice Thrown when the number of attestation votes is below the committee threshold M
+    error InsufficientAttestations();
+
+    /// @notice Thrown when the attestation voters array contains duplicate addresses (must be sorted ascending)
+    error DuplicateVoter();
+
+    /// @notice Thrown when an attestation voter is not a member of the committee for this E3
+    error VoterNotInCommittee();
+
+    /// @notice Thrown when an attestation vote signature does not recover to the declared voter
+    error InvalidVoteSignature();
+
     // ======================
     // Events
     // ======================
@@ -373,23 +385,25 @@ interface ISlashingManager {
     // ======================
 
     /**
-     * @notice Creates a new slash proposal with cryptographic proof (Lane A - permissionless)
-     * @dev Anyone can call this for proof-based slashes. Requires the operator's ECDSA signature
-     *      over the proof payload to prevent arbitrary slashing.
+     * @notice Creates a new slash proposal with committee attestation (Lane A - permissionless)
+     * @dev Anyone can call this for attestation-based slashes. Requires a quorum of committee
+     *      members to have signed votes attesting that the operator submitted a bad proof.
      *      Evidence format:
-     *        abi.encode(bytes zkProof, bytes32[] publicInputs,
-     *        bytes signature, uint256 chainId, uint256 proofType, address verifier)
-     *      The operator must have signed: keccak256(abi.encode(PROOF_PAYLOAD_TYPEHASH, chainId, e3Id,
-     *        proofType, keccak256(zkProof), keccak256(abi.encodePacked(publicInputs))))
+     *        abi.encode(uint256 proofType,
+     *          address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures)
+     *      Each voter must have signed: personal_sign(keccak256(abi.encode(VOTE_TYPEHASH,
+     *        block.chainid, e3Id, accusationId, voter, agrees, dataHash)))
+     *      where accusationId = keccak256(abi.encodePacked(block.chainid, e3Id, operator, proofType))
      *      Verifications performed:
-     *        1. Verifier address in evidence matches the policy's current proofVerifier
-     *        2. Signature recovery confirms the operator authored the bad proof
-     *        3. Committee membership check confirms the operator was in the E3's committee
-     *        4. ZK proof re-verification confirms the proof is indeed invalid (fault)
+     *        1. Number of votes >= committee threshold M
+     *        2. Voters are sorted ascending (prevents duplicates)
+     *        3. Each voter is a committee member for this E3
+     *        4. Each vote signature recovers to the declared voter
+     *        5. All votes agree the proof is invalid (agrees == true)
      * @param e3Id ID of the E3 computation this slash relates to
      * @param operator Address of the ciphernode operator to slash (must be non-zero)
      * @param reason Hash of the slash reason (must have an enabled proof-required policy)
-     * @param proof Evidence data: abi.encode(zkProof, publicInputs, signature, chainId, proofType, verifier)
+     * @param proof Attestation evidence: abi.encode(proofType, voters, agrees, dataHashes, signatures)
      * @return proposalId Sequential ID of the created proposal
      */
     function proposeSlash(

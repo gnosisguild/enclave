@@ -24,14 +24,16 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use actix::{Actor, Addr, Context, Handler};
-use alloy::primitives::Address;
+use alloy::primitives::{keccak256, Address, Bytes};
+use alloy::sol_types::SolValue;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind,
     CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EventContext, EventPublisher,
     EventSubscriber, EventType, PartyProofsToVerify, PartyShareDecryptionProofsToVerify,
-    PartyVerificationResult, Sequenced, ShareVerificationComplete, ShareVerificationDispatched,
-    SignedProofFailed, SignedProofPayload, TypedEvent, VerificationKind,
-    VerifyShareDecryptionProofsRequest, VerifyShareProofsRequest, ZkRequest, ZkResponse,
+    PartyVerificationResult, ProofType, ProofVerificationFailed, ProofVerificationPassed,
+    Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed,
+    SignedProofPayload, TypedEvent, VerificationKind, VerifyShareDecryptionProofsRequest,
+    VerifyShareProofsRequest, ZkRequest, ZkResponse,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
@@ -56,6 +58,8 @@ struct PendingVerification {
     dispatched_party_ids: HashSet<u64>,
     /// Recovered address for each party (from ECDSA step).
     party_addresses: HashMap<u64, Address>,
+    /// Cached (proof_type, data_hash) per party — for emitting ProofVerificationPassed.
+    party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>>,
 }
 
 /// Actor that handles C2/C3/C4 share proof verification.
@@ -142,7 +146,7 @@ impl ShareVerificationActor {
             } else {
                 ecdsa_dishonest.insert(party.sender_party_id);
                 if let Some((ref signed, addr)) = result.failed_payload {
-                    self.emit_signed_proof_failed(&e3_id, signed, addr, &ec);
+                    self.emit_signed_proof_failed(&e3_id, signed, addr, party.sender_party_id, &ec);
                 }
             }
         }
@@ -172,6 +176,25 @@ impl ShareVerificationActor {
             .iter()
             .map(|p| p.sender_party_id)
             .collect();
+
+        // Compute proof hashes for ECDSA-passed parties (for ProofVerificationPassed on success)
+        let mut party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>> = HashMap::new();
+        for party in &ecdsa_passed_parties {
+            let hashes: Vec<(ProofType, [u8; 32])> = party
+                .signed_proofs
+                .iter()
+                .map(|signed| {
+                    let msg = (
+                        Bytes::copy_from_slice(&signed.payload.proof.data),
+                        Bytes::copy_from_slice(&signed.payload.proof.public_signals),
+                    )
+                        .abi_encode_packed();
+                    (signed.payload.proof_type, keccak256(&msg).into())
+                })
+                .collect();
+            party_proof_hashes.insert(party.sender_party_id, hashes);
+        }
+
         self.pending.insert(
             correlation_id,
             PendingVerification {
@@ -182,6 +205,7 @@ impl ShareVerificationActor {
                 pre_dishonest,
                 dispatched_party_ids,
                 party_addresses,
+                party_proof_hashes,
             },
         );
 
@@ -239,7 +263,7 @@ impl ShareVerificationActor {
             } else {
                 ecdsa_dishonest.insert(party.sender_party_id);
                 if let Some((ref signed, addr)) = result.failed_payload {
-                    self.emit_signed_proof_failed(&e3_id, signed, addr, &ec);
+                    self.emit_signed_proof_failed(&e3_id, signed, addr, party.sender_party_id, &ec);
                 }
             }
         }
@@ -265,6 +289,28 @@ impl ShareVerificationActor {
             .iter()
             .map(|p| p.sender_party_id)
             .collect();
+
+        // Compute proof hashes for ECDSA-passed parties (for ProofVerificationPassed on success)
+        let mut party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>> = HashMap::new();
+        for party in &ecdsa_passed_parties {
+            let all_signed: Vec<&SignedProofPayload> =
+                std::iter::once(&party.signed_sk_decryption_proof)
+                    .chain(party.signed_esm_decryption_proofs.iter())
+                    .collect();
+            let hashes: Vec<(ProofType, [u8; 32])> = all_signed
+                .iter()
+                .map(|signed| {
+                    let msg = (
+                        Bytes::copy_from_slice(&signed.payload.proof.data),
+                        Bytes::copy_from_slice(&signed.payload.proof.public_signals),
+                    )
+                        .abi_encode_packed();
+                    (signed.payload.proof_type, keccak256(&msg).into())
+                })
+                .collect();
+            party_proof_hashes.insert(party.sender_party_id, hashes);
+        }
+
         self.pending.insert(
             correlation_id,
             PendingVerification {
@@ -275,6 +321,7 @@ impl ShareVerificationActor {
                 pre_dishonest,
                 dispatched_party_ids,
                 party_addresses,
+                party_proof_hashes,
             },
         );
 
@@ -444,7 +491,36 @@ impl ShareVerificationActor {
                         .party_addresses
                         .get(&result.sender_party_id)
                         .copied();
-                    self.emit_signed_proof_failed(&pending.e3_id, signed, addr, &pending.ec);
+                    self.emit_signed_proof_failed(
+                        &pending.e3_id,
+                        signed,
+                        addr,
+                        result.sender_party_id,
+                        &pending.ec,
+                    );
+                }
+            } else {
+                // Emit ProofVerificationPassed for each proof type from this party
+                if let Some(hashes) = pending.party_proof_hashes.get(&result.sender_party_id) {
+                    let addr = pending
+                        .party_addresses
+                        .get(&result.sender_party_id)
+                        .copied()
+                        .unwrap_or_default();
+                    for &(proof_type, data_hash) in hashes {
+                        if let Err(err) = self.bus.publish(
+                            ProofVerificationPassed {
+                                e3_id: pending.e3_id.clone(),
+                                party_id: result.sender_party_id,
+                                address: addr,
+                                proof_type,
+                                data_hash,
+                            },
+                            pending.ec.clone(),
+                        ) {
+                            error!("Failed to publish ProofVerificationPassed: {err}");
+                        }
+                    }
                 }
             }
         }
@@ -457,6 +533,7 @@ impl ShareVerificationActor {
         e3_id: &E3id,
         signed_payload: &SignedProofPayload,
         recovered_addr: Option<Address>,
+        party_id: u64,
         ec: &EventContext<Sequenced>,
     ) {
         let faulting_node = match recovered_addr {
@@ -480,6 +557,29 @@ impl ShareVerificationActor {
             ec.clone(),
         ) {
             error!("Failed to publish SignedProofFailed: {err}");
+        }
+
+        // Also emit ProofVerificationFailed for AccusationManager
+        let data_hash: [u8; 32] = {
+            let msg = (
+                Bytes::copy_from_slice(&signed_payload.payload.proof.data),
+                Bytes::copy_from_slice(&signed_payload.payload.proof.public_signals),
+            )
+                .abi_encode_packed();
+            keccak256(&msg).into()
+        };
+        if let Err(err) = self.bus.publish(
+            ProofVerificationFailed {
+                e3_id: e3_id.clone(),
+                accused_party_id: party_id,
+                accused_address: faulting_node,
+                proof_type: signed_payload.payload.proof_type,
+                data_hash,
+                signed_payload: signed_payload.clone(),
+            },
+            ec.clone(),
+        ) {
+            error!("Failed to publish ProofVerificationFailed: {err}");
         }
     }
 

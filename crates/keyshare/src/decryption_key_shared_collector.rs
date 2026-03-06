@@ -10,7 +10,7 @@ use std::{
 };
 
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, SpawnHandle};
-use e3_events::{DecryptionKeyShared, E3id, TypedEvent};
+use e3_events::{DecryptionKeyShared, E3id, EventContext, Sequenced, TypedEvent};
 use e3_utils::MAILBOX_LIMIT;
 use tracing::{info, warn};
 
@@ -43,6 +43,15 @@ pub struct DecryptionKeySharedCollectionFailed {
     pub e3_id: E3id,
     pub reason: String,
     pub missing_parties: Vec<u64>,
+}
+
+/// Removes this party from the `expected` set so decryption can proceed with
+/// N-1 shares instead of waiting for a share that will never arrive.
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "()")]
+pub struct ExpelPartyFromDecryptionKeySharedCollection {
+    pub party_id: u64,
+    pub ec: EventContext<Sequenced>,
 }
 
 /// Collects `DecryptionKeyShared` events from expected parties in H (Exchange #3).
@@ -182,5 +191,60 @@ impl Handler<DecryptionKeySharedCollectionTimeout> for DecryptionKeySharedCollec
         });
 
         ctx.stop();
+    }
+}
+
+impl Handler<ExpelPartyFromDecryptionKeySharedCollection> for DecryptionKeySharedCollector {
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: ExpelPartyFromDecryptionKeySharedCollection,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        if !matches!(self.state, CollectorState::Collecting) {
+            return;
+        }
+
+        let party_id = msg.party_id;
+
+        if !self.expected.remove(&party_id) {
+            info!(
+                e3_id = %self.e3_id,
+                party_id = party_id,
+                "Expelled party {} was not in expected set (already received or unknown)",
+                party_id
+            );
+            return;
+        }
+
+        info!(
+            e3_id = %self.e3_id,
+            party_id = party_id,
+            remaining = self.expected.len(),
+            "Removed expelled party {} from decryption key shared collection, {} remaining",
+            party_id,
+            self.expected.len()
+        );
+
+        if self.expected.is_empty() {
+            info!(
+                e3_id = %self.e3_id,
+                "All remaining decryption key shares collected after party expulsion!"
+            );
+            self.state = CollectorState::Finished;
+
+            if let Some(handle) = self.timeout_handle.take() {
+                ctx.cancel_future(handle);
+            }
+
+            let event: TypedEvent<AllDecryptionKeySharesCollected> = TypedEvent::new(
+                AllDecryptionKeySharesCollected {
+                    shares: std::mem::take(&mut self.shares),
+                },
+                msg.ec.clone(),
+            );
+            self.parent.do_send(event);
+            ctx.stop();
+        }
     }
 }

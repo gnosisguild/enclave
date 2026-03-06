@@ -51,7 +51,7 @@ use tracing::{error, info, trace, warn};
 
 use crate::decryption_key_shared_collector::{
     AllDecryptionKeySharesCollected, DecryptionKeySharedCollectionFailed,
-    DecryptionKeySharedCollector,
+    DecryptionKeySharedCollector, ExpelPartyFromDecryptionKeySharedCollection,
 };
 use crate::encryption_key_collector::{
     AllEncryptionKeysCollected, EncryptionKeyCollector, ExpelPartyFromKeyCollection,
@@ -535,7 +535,14 @@ impl ThresholdKeyshare {
         }
 
         if let Some(ref collector) = self.decryption_key_collector {
-            collector.do_send(ExpelPartyFromShareCollection { party_id, ec });
+            collector.do_send(ExpelPartyFromShareCollection {
+                party_id,
+                ec: ec.clone(),
+            });
+        }
+
+        if let Some(ref collector) = self.decryption_key_shared_collector {
+            collector.do_send(ExpelPartyFromDecryptionKeySharedCollection { party_id, ec });
         }
     }
 
