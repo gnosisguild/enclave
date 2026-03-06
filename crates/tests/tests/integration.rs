@@ -772,7 +772,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 ShareVerificationDispatched (C6 verification dispatched by ThresholdPlaintextAggregator)
     // - 1 ComputeRequest (C6 ZK verification)
     // - 1 ComputeResponse (C6 ZK verification result)
-    // - 5 ProofVerificationPassed (one per party's C6 proof)
+    // - 15 ProofVerificationPassed (5 parties × 3 C6 proofs per ciphertext)
     // - 1 ShareVerificationComplete (C6 verification done)
     // - 1 ComputeRequest (TrBFV CalculateThresholdDecryption)
     // - 1 ComputeResponse (TrBFV CalculateThresholdDecryption)
@@ -783,8 +783,8 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 PlaintextAggregated (with C7 proofs)
     // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
     // stay on their local buses.
-    // Total: 1 + 5 + 1 + 2 + 5 + 1 + 2 + 1 + 2 + 1 + 1 = 22 events
-    let expected_count = 1 + 5 + 1 + 2 + 5 + 1 + 2 + 1 + 2 + 1 + 1;
+    // Total: 1 + 5 + 1 + 2 + 15 + 1 + 2 + 1 + 2 + 1 + 1 = 32 events
+    let expected_count = 1 + 5 + 1 + 2 + 15 + 1 + 2 + 1 + 2 + 1 + 1;
 
     let h = nodes
         .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))
