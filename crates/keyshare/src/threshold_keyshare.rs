@@ -256,9 +256,9 @@ pub struct ThresholdKeyshareState {
     pub threshold_n: u64,
     pub params: ArcBytes,
     /// Aggregated public key bytes, captured from PublicKeyAggregated event for C6 proof.
-    /// Defaults to None for backward compatibility with existing persisted state.
-    #[serde(default)]
     pub aggregated_pk: Option<ArcBytes>,
+    pub expelled_parties: HashSet<u64>,
+    pub honest_parties: Option<HashSet<u64>>,
 }
 
 impl ThresholdKeyshareState {
@@ -280,6 +280,8 @@ impl ThresholdKeyshareState {
             threshold_n,
             params,
             aggregated_pk: None,
+            expelled_parties: HashSet::new(),
+            honest_parties: None,
         }
     }
 
@@ -407,12 +409,8 @@ pub struct ThresholdKeyshare {
         DkgShareDecryptionProofRequest,
         Vec<DkgShareDecryptionProofRequest>,
     )>,
-    /// Honest party IDs determined by C2/C3 verification, narrowed by C4.
-    honest_parties: Option<HashSet<u64>>,
     /// Temporarily stores DecryptionKeyShared while C4 verification is in flight.
     pending_c4_verification_shares: Option<HashMap<u64, DecryptionKeyShared>>,
-    /// Aggregated public key bytes, captured from PublicKeyAggregated event for C6 proof.
-    aggregated_pk: Option<ArcBytes>,
 }
 
 impl ThresholdKeyshare {
@@ -427,9 +425,7 @@ impl ThresholdKeyshare {
             share_enc_preset: params.share_enc_preset,
             pending_shares: Vec::new(),
             pending_share_decryption_data: None,
-            honest_parties: None,
             pending_c4_verification_shares: None,
-            aggregated_pk: None,
         }
     }
 }
@@ -483,7 +479,7 @@ impl ThresholdKeyshare {
     }
 
     /// Create or return the DecryptionKeySharedCollector.
-    /// Uses honest_parties from the struct.
+    /// Uses honest_parties from persisted state.
     pub fn ensure_decryption_key_shared_collector(
         &mut self,
         self_addr: Addr<Self>,
@@ -491,7 +487,7 @@ impl ThresholdKeyshare {
         let state = self.state.try_get()?;
         let my_party_id = state.party_id;
 
-        let honest = self
+        let honest = state
             .honest_parties
             .as_ref()
             .ok_or_else(|| anyhow!("honest_parties not set when creating collector"))?;
@@ -527,12 +523,19 @@ impl ThresholdKeyshare {
             node_addr, party_id, data.e3_id, data.active_count_after
         );
 
+        // Record permanently so late-arriving data is rejected even if
+        // collectors haven't been created or have already completed.
+        // Also clean honest_parties set for the expelled party.
+        let _ = self.state.try_mutate(&ec, |mut s| {
+            s.expelled_parties.insert(party_id);
+            if let Some(ref mut honest) = s.honest_parties {
+                honest.remove(&party_id);
+            }
+            Ok(s)
+        });
+
         // Clean transient coordination state for the expelled party
         self.pending_shares.retain(|s| s.party_id != party_id);
-
-        if let Some(ref mut honest) = self.honest_parties {
-            honest.remove(&party_id);
-        }
 
         if let Some(ref mut pending_c4) = self.pending_c4_verification_shares {
             pending_c4.remove(&party_id);
@@ -570,6 +573,15 @@ impl ThresholdKeyshare {
             return Ok(());
         }
 
+        // Reject shares from expelled parties
+        if state.expelled_parties.contains(&msg.share.party_id) {
+            info!(
+                "Dropping ThresholdShareCreated from expelled party {} for us (party {})",
+                msg.share.party_id, my_party_id
+            );
+            return Ok(());
+        }
+
         info!(
             "Received ThresholdShareCreated from party {} for us (party {}), forwarding to collector!",
             msg.share.party_id, my_party_id
@@ -585,6 +597,15 @@ impl ThresholdKeyshare {
         msg: TypedEvent<EncryptionKeyCreated>,
         self_addr: Addr<Self>,
     ) -> Result<()> {
+        let state = self.state.try_get()?;
+        // Reject keys from expelled parties
+        if state.expelled_parties.contains(&msg.key.party_id) {
+            info!(
+                "Dropping EncryptionKeyCreated from expelled party {}",
+                msg.key.party_id
+            );
+            return Ok(());
+        }
         info!("Received EncryptionKeyCreated forwarding to encryption key collector!");
         let collector = self.ensure_encryption_key_collector(self_addr)?;
         collector.do_send(msg);
@@ -759,7 +780,18 @@ impl ThresholdKeyshare {
             msg.keys.len()
         );
 
-        let current: CollectingEncryptionKeysData = self.state.try_get()?.try_into()?;
+        let state = self.state.try_get()?;
+        let current: CollectingEncryptionKeysData = state.clone().try_into()?;
+
+        // Filter out any keys from parties expelled after collection started
+        let filtered_keys: Vec<_> = if state.expelled_parties.is_empty() {
+            msg.keys
+        } else {
+            msg.keys
+                .into_iter()
+                .filter(|k| !state.expelled_parties.contains(&k.party_id))
+                .collect()
+        };
 
         self.state.try_mutate(&ec, |s| {
             s.new_state(KeyshareState::GeneratingThresholdShare(
@@ -770,7 +802,7 @@ impl ThresholdKeyshare {
                     e_sm_raw: None,
                     sk_bfv: current.sk_bfv,
                     pk_bfv: current.pk_bfv,
-                    collected_encryption_keys: msg.keys,
+                    collected_encryption_keys: filtered_keys,
                     ciphernode_selected: Some(current.ciphernode_selected.clone()),
                     proof_request_data: None,
                 },
@@ -1254,24 +1286,7 @@ impl ThresholdKeyshare {
         // Store shares on the actor for use after verification completes (keep Arc to avoid deep clone)
         self.pending_shares = msg.shares.iter().cloned().collect();
 
-        // Backward compat: only when ALL non-self parties have zero proofs
-        // AND none have incomplete proofs (incomplete proofs are always dishonest)
-        if party_proofs_to_verify.is_empty() && incomplete_proof_parties.is_empty() {
-            if no_proof_parties.is_empty() {
-                info!(
-                    "No C2/C3 proofs to verify for E3 {} — proceeding with all parties",
-                    e3_id
-                );
-                return self.proceed_with_decryption_key_calculation(None, ec);
-            }
-            info!(
-                "No C2/C3 proofs from any party for E3 {} — proceeding with all parties (backward compat)",
-                e3_id
-            );
-            return self.proceed_with_decryption_key_calculation(None, ec);
-        }
-
-        // Merge no-proof and incomplete-proof parties — both are pre-dishonest
+        // Merge no-proof and incomplete-proof parties — both are dishonest
         let mut pre_dishonest: BTreeSet<u64> = BTreeSet::new();
         pre_dishonest.extend(incomplete_proof_parties);
         pre_dishonest.extend(no_proof_parties);
@@ -1388,12 +1403,16 @@ impl ThresholdKeyshare {
             VerificationKind::DecryptionProofs => {
                 // C4 verification complete — update honest set and publish KeyshareCreated
                 if !msg.dishonest_parties.is_empty() {
-                    if let Some(ref mut honest) = self.honest_parties {
-                        honest.retain(|pid| !msg.dishonest_parties.contains(pid));
-                    }
+                    self.state.try_mutate(&ec, |mut s| {
+                        if let Some(ref mut honest) = s.honest_parties {
+                            honest.retain(|pid| !msg.dishonest_parties.contains(pid));
+                        }
+                        Ok(s)
+                    })?;
 
+                    let state = self.state.try_get()?;
                     let threshold = state.threshold_m;
-                    let honest_count = self
+                    let honest_count = state
                         .honest_parties
                         .as_ref()
                         .map(|h| h.len() as u64)
@@ -1714,7 +1733,10 @@ impl ThresholdKeyshare {
             .collect();
 
         // Store honest parties and C4 data on the actor (transient coordination)
-        self.honest_parties = Some(honest_party_ids);
+        self.state.try_mutate(&ec, |mut s| {
+            s.honest_parties = Some(honest_party_ids);
+            Ok(s)
+        })?;
         self.pending_share_decryption_data = Some((sk_request, esm_requests));
 
         Ok(())
@@ -1808,7 +1830,7 @@ impl ThresholdKeyshare {
         // Create collector and replay any early-arriving DecryptionKeyShared events
         let state = self.state.try_get()?;
         let my_party_id = state.party_id;
-        let honest = self.honest_parties.as_ref().cloned().unwrap_or_default();
+        let honest = state.honest_parties.as_ref().cloned().unwrap_or_default();
         let expected: HashSet<u64> = honest
             .iter()
             .filter(|&&pid| pid != my_party_id)
@@ -1833,6 +1855,14 @@ impl ThresholdKeyshare {
         _ec: EventContext<Sequenced>,
     ) -> Result<()> {
         let party_id = data.party_id;
+        let state = self.state.try_get()?;
+        if state.expelled_parties.contains(&party_id) {
+            info!(
+                "Dropping early DecryptionKeyShared from expelled party {}",
+                party_id
+            );
+            return Ok(());
+        }
         info!(
             "Storing early DecryptionKeyShared from party {} (state: AggregatingDecryptionKey)",
             party_id
@@ -1889,15 +1919,19 @@ impl ThresholdKeyshare {
 
         // Evict pre-dishonest parties (wrong ESM count) from honest set
         if !c4_count_dishonest.is_empty() {
-            if let Some(ref mut honest) = self.honest_parties {
-                honest.retain(|pid| !c4_count_dishonest.contains(pid));
-            }
+            self.state.try_mutate(&ec, |mut s| {
+                if let Some(ref mut honest) = s.honest_parties {
+                    honest.retain(|pid| !c4_count_dishonest.contains(pid));
+                }
+                Ok(s)
+            })?;
         }
 
         if party_proofs.is_empty() {
             // Check threshold viability after removing pre-dishonest parties
+            let state = self.state.try_get()?;
             let threshold = state.threshold_m;
-            let honest_count = self
+            let honest_count = state
                 .honest_parties
                 .as_ref()
                 .map(|h| h.len() as u64)
@@ -2031,10 +2065,9 @@ impl ThresholdKeyshare {
         let decrypting: Decrypting = state.clone().try_into()?;
         let d_share_poly = msg.d_share_poly;
 
-        let aggregated_pk_bytes = self
+        let aggregated_pk_bytes = state
             .aggregated_pk
             .clone()
-            .or_else(|| state.aggregated_pk.clone())
             .ok_or_else(|| anyhow!("Aggregated public key not available for C6 proof"))?;
 
         let threshold_preset = self
@@ -2125,7 +2158,6 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
             }
             EnclaveEventData::PublicKeyAggregated(data) => {
                 let pk = ArcBytes::from_bytes(&data.pubkey);
-                self.aggregated_pk = Some(pk.clone());
                 let _ = self.state.try_mutate(&ec, |mut s| {
                     s.aggregated_pk = Some(pk);
                     Ok(s)
@@ -2173,6 +2205,13 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
                 if data.external {
                     // Route based on current state
                     if let Some(state) = self.state.get() {
+                        if state.expelled_parties.contains(&data.party_id) {
+                            info!(
+                                "Dropping DecryptionKeyShared from expelled party {}",
+                                data.party_id
+                            );
+                            return;
+                        }
                         let result = match &state.state {
                             KeyshareState::AggregatingDecryptionKey(_) => {
                                 self.handle_early_decryption_key_share(data, ec)
@@ -2209,7 +2248,7 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
                     if let Some(state) = self.state.get() {
                         if data.party_id == state.party_id {
                             if let KeyshareState::ReadyForDecryption(_) = state.state {
-                                let others = self
+                                let others = state
                                     .honest_parties
                                     .as_ref()
                                     .map(|h| h.iter().filter(|&&pid| pid != state.party_id).count())
@@ -2461,7 +2500,6 @@ impl Handler<E3RequestComplete> for ThresholdKeyshare {
         self.decryption_key_shared_collector = None;
         self.pending_shares.clear();
         self.pending_share_decryption_data = None;
-        self.honest_parties = None;
         self.pending_c4_verification_shares = None;
         self.notify_sync(ctx, Die);
     }
