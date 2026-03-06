@@ -3,10 +3,8 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
 import { network } from "hardhat";
-import { poseidon2 } from "poseidon-lite";
 
 import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
 import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
@@ -27,8 +25,6 @@ const AddressOne = "0x0000000000000000000000000000000000000001";
 
 const { ethers, networkHelpers, ignition } = await network.connect();
 const { loadFixture, time } = networkHelpers;
-
-const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
 const REASON_DEPOSIT = ethers.encodeBytes32String("DEPOSIT");
 const REASON_WITHDRAW = ethers.encodeBytes32String("WITHDRAW");
@@ -176,7 +172,6 @@ describe("BondingRegistry", function () {
       operator1Address,
       operator2Address,
       treasuryAddress,
-      tree: new LeanIMT(hash),
     };
   }
 
@@ -250,7 +245,7 @@ describe("BondingRegistry", function () {
 
       await bondingRegistry.connect(operator1).registerOperator();
 
-      await bondingRegistry.connect(operator1).deregisterOperator([]);
+      await bondingRegistry.connect(operator1).deregisterOperator();
 
       await licenseToken
         .connect(operator1)
@@ -405,7 +400,7 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
       await bondingRegistry.connect(operator1).registerOperator();
 
-      await bondingRegistry.connect(operator1).deregisterOperator([]);
+      await bondingRegistry.connect(operator1).deregisterOperator();
 
       await time.increase(SEVEN_DAYS_IN_SECONDS + 1);
 
@@ -434,7 +429,7 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).registerOperator();
 
       const latestTime = await time.latest();
-      await expect(bondingRegistry.connect(operator1).deregisterOperator([]))
+      await expect(bondingRegistry.connect(operator1).deregisterOperator())
         .to.emit(bondingRegistry, "CiphernodeDeregistrationRequested")
         .withArgs(
           await operator1.getAddress(),
@@ -452,7 +447,7 @@ describe("BondingRegistry", function () {
       const { bondingRegistry, operator1 } = await loadFixture(setup);
 
       await expect(
-        bondingRegistry.connect(operator1).deregisterOperator([]),
+        bondingRegistry.connect(operator1).deregisterOperator(),
       ).to.be.revertedWithCustomError(bondingRegistry, "NotRegistered");
     });
 
@@ -478,7 +473,7 @@ describe("BondingRegistry", function () {
         .approve(await ticketToken.getAddress(), ticketAmount);
       await bondingRegistry.connect(operator1).addTicketBalance(ticketAmount);
 
-      await bondingRegistry.connect(operator1).deregisterOperator([]);
+      await bondingRegistry.connect(operator1).deregisterOperator();
 
       const [ticketPending, licensePending] =
         await bondingRegistry.pendingExits(await operator1.getAddress());
@@ -731,7 +726,7 @@ describe("BondingRegistry", function () {
         .approve(await ticketToken.getAddress(), ticketAmount);
       await bondingRegistry.connect(operator1).addTicketBalance(ticketAmount);
 
-      await bondingRegistry.connect(operator1).deregisterOperator([]);
+      await bondingRegistry.connect(operator1).deregisterOperator();
 
       await time.increase(SEVEN_DAYS_IN_SECONDS + 1);
 
@@ -765,7 +760,7 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
       await bondingRegistry.connect(operator1).registerOperator();
 
-      await bondingRegistry.connect(operator1).deregisterOperator([]);
+      await bondingRegistry.connect(operator1).deregisterOperator();
 
       await expect(
         bondingRegistry.connect(operator1).claimExits(0, bondAmount),
@@ -794,7 +789,7 @@ describe("BondingRegistry", function () {
         .approve(await ticketToken.getAddress(), ticketAmount);
       await bondingRegistry.connect(operator1).addTicketBalance(ticketAmount);
 
-      await bondingRegistry.connect(operator1).deregisterOperator([]);
+      await bondingRegistry.connect(operator1).deregisterOperator();
 
       await time.increase(SEVEN_DAYS_IN_SECONDS + 1);
 
@@ -1101,7 +1096,7 @@ describe("BondingRegistry", function () {
       expect(await bondingRegistry.isActive(await operator1.getAddress())).to.be
         .true;
 
-      await bondingRegistry.connect(operator1).deregisterOperator([]);
+      await bondingRegistry.connect(operator1).deregisterOperator();
       expect(await bondingRegistry.isRegistered(await operator1.getAddress()))
         .to.be.false;
       expect(

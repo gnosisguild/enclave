@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tar::Archive;
 use tokio::fs;
-use tracing::{info, warn};
+use tracing::info;
 use walkdir::WalkDir;
 
 use super::ZkBackend;
@@ -107,17 +107,10 @@ impl ZkBackend {
                 info!("installed circuits v{}", version);
             }
             Err(e) => {
-                warn!(
-                    "could not download circuits ({}), creating placeholder for testing",
-                    e
-                );
-                create_placeholder_circuits(&self.circuits_dir).await?;
-
-                version_info.circuits_version = Some("0.0.0-placeholder".to_string());
-                version_info.last_updated = Some(chrono::Utc::now().to_rfc3339());
-                version_info.save(&self.version_file()).await?;
-
-                info!("created placeholder circuits (will retry download on next setup)");
+                return Err(ZkError::DownloadFailed(
+                    url,
+                    format!("could not download circuits: {}", e),
+                ));
             }
         }
 
@@ -209,40 +202,4 @@ async fn download_with_progress(url: &str, message: &str) -> Result<Vec<u8>, ZkE
 
     pb.finish_with_message("download complete");
     Ok(bytes)
-}
-
-async fn create_placeholder_circuits(circuits_dir: &Path) -> Result<(), ZkError> {
-    fs::create_dir_all(circuits_dir).await?;
-
-    let placeholder = serde_json::json!({
-        "noir_version":"1.0.0-beta.15+83245db91dcf63420ef4bcbbd85b98f397fee663",
-        "hash":"15412581843239610929",
-        "abi":{
-            "parameters":[
-                {"name":"x","type":{"kind":"field"},"visibility":"private"},
-                {"name":"y","type":{"kind":"field"},"visibility":"private"},
-                {"name":"_sum","type":{"kind":"field"},"visibility":"public"}
-            ],
-            "return_type":null,
-            "error_types":{}
-        },
-        "bytecode":"H4sIAAAAAAAA/5WOMQ5AMBRA/y8HMbIRRxCJSYwWg8RiIGIz9gjiAk4hHKeb0WLX0KHRDu1bXvL/y89H+HCFu7rtCTeCiiPsgRFo06LUhk0+smgN9iLdKC0rPz6z6RjmhN3LxffE/O7byg+hZv7nAb2HRPkUAQAA",
-        "debug_symbols":"jZDRCoMwDEX/Jc996MbG1F8ZQ2qNUghtie1giP++KLrpw2BPaXJ7bsgdocUm97XzXRiguo/QsCNyfU3BmuSCl+k4KdjaOjGijGCnCxUNo09Q+Uyk4GkoL5+GaPxSk2FRtQL0rVQx7Bzh/JrUl9a/0Vu5ssXlA1//psvbSp90ccAf0hnr+HAuaKjO0+zGzjSEawRd9naXSHrFTdkyixwstplxtls0WfAG",
-        "file_map":{
-            "50":{"source":"pub fn main(\n    x: Field,\n    y: Field,\n    _sum: pub Field\n) {\n    let sum = x + y;\n    assert(sum == _sum);\n}\n",
-            "path":"./enclave/circuits/bin/dummy/src/main.nr"}
-        },"expression_width":{"Bounded":{"width":4}}
-    });
-
-    let circuit_path = circuits_dir.join("pk.json");
-    fs::write(&circuit_path, serde_json::to_string_pretty(&placeholder)?).await?;
-
-    fs::create_dir_all(circuits_dir.join("vk")).await?;
-
-    // Create a minimal placeholder VK file so proof generation doesn't fail
-    // This is just for testing when actual circuits can't be downloaded
-    let vk_path = circuits_dir.join("vk").join("pk.vk");
-    fs::write(&vk_path, b"placeholder_vk").await?;
-
-    Ok(())
 }

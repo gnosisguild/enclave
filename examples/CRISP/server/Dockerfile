@@ -1,5 +1,5 @@
 ############### stage 0: base-dev ###############
-ARG RUST_VERSION=1.86.0
+ARG RUST_VERSION=1.88.0
 ARG SKIP_SOLIDITY=0
 
 FROM rust:${RUST_VERSION}-slim-bullseye AS base-dev

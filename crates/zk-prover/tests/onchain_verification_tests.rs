@@ -20,7 +20,7 @@ use alloy::{
 use common::{find_anvil, find_bb, setup_compiled_circuit, setup_test_prover};
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
-use e3_zk_prover::{Provable, ZkProver};
+use e3_zk_prover::{CircuitVariant, Provable, ZkProver};
 use std::path::PathBuf;
 
 sol! {
@@ -83,8 +83,9 @@ async fn test_pk_bfv_onchain_verification() {
     let prover = ZkProver::new(&backend);
     let e3_id = "0";
 
+    // Generate proof with EVM variant (keccak) for on-chain Solidity verification
     let proof = PkCircuit
-        .prove(&prover, &preset, &sample, e3_id)
+        .prove_with_variant(&prover, &preset, &sample, e3_id, CircuitVariant::Evm)
         .expect("proof generation should succeed");
 
     assert!(!proof.data.is_empty(), "proof data should not be empty");
@@ -93,7 +94,7 @@ async fn test_pk_bfv_onchain_verification() {
         "public signals should not be empty"
     );
 
-    let local_ok = PkCircuit.verify(&prover, &proof, e3_id, 1);
+    let local_ok = PkCircuit.verify_with_variant(&prover, &proof, e3_id, 1, CircuitVariant::Evm);
     assert!(
         local_ok.as_ref().is_ok_and(|&v| v),
         "local proof verification failed: {local_ok:?}"

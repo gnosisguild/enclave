@@ -24,6 +24,10 @@ pub enum VerificationKind {
     ShareProofs,
     /// C4 share decryption proof verification (after AllDecryptionKeySharesCollected).
     DecryptionProofs,
+    /// C6 threshold decryption proof verification (after all DecryptionshareCreated collected).
+    ThresholdDecryptionProofs,
+    /// C1 PK generation proof verification (after all KeyshareCreated collected).
+    PkGenerationProofs,
 }
 
 /// ThresholdKeyshare → ShareVerificationActor: verify party proofs.

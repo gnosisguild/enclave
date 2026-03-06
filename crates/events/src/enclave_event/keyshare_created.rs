@@ -19,6 +19,7 @@ pub struct KeyshareCreated {
     pub pubkey: ArcBytes,
     pub e3_id: E3id,
     pub node: String,
+    #[serde(default)]
     pub signed_pk_generation_proof: Option<SignedProofPayload>,
 }
 

@@ -17,7 +17,6 @@ import {
   ciphernodeAdminAdd,
   ciphernodeMintTokens,
   ciphernodeRemove,
-  ciphernodeSiblings,
   updateSubmissionWindow,
 } from "./tasks/ciphernode";
 import {
@@ -92,7 +91,6 @@ const config: HardhatUserConfig = {
     ciphernodeAdminAdd,
     ciphernodeMintTokens,
     ciphernodeRemove,
-    ciphernodeSiblings,
     requestCommittee,
     publishPlaintext,
     publishCiphertext,

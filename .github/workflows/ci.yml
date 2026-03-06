@@ -657,9 +657,33 @@ jobs:
       - name: Verify circuit artifacts
         run: |
           echo "DKG circuits:"
-          ls -la circuits/bin/dkg/target/*.json circuits/bin/dkg/target/*.vk
+          ls -la circuits/bin/dkg/target/*.json \
+               circuits/bin/dkg/target/*.vk \
+               circuits/bin/dkg/target/*.vk_hash \
+               circuits/bin/dkg/target/*.vk_recursive \
+               circuits/bin/dkg/target/*.vk_recursive_hash \
+               circuits/bin/dkg/target/*.vk_noir \
+               circuits/bin/dkg/target/*.vk_noir_hash
           echo "Threshold circuits:"
-          ls -la circuits/bin/threshold/target/*.json circuits/bin/threshold/target/*.vk
+          ls -la circuits/bin/threshold/target/*.json \
+               circuits/bin/threshold/target/*.vk \
+               circuits/bin/threshold/target/*.vk_hash \
+               circuits/bin/threshold/target/*.vk_recursive \
+               circuits/bin/threshold/target/*.vk_recursive_hash \
+               circuits/bin/threshold/target/*.vk_noir \
+               circuits/bin/threshold/target/*.vk_noir_hash
+
+      - name: Verify variant output directories
+        run: |
+          echo "Checking default/ variant (noir-recursive-no-zk VKs):"
+          find circuits/bin/default -name '*.json' | head -20
+          find circuits/bin/default -name '*.vk' | head -20
+          echo "Checking recursive/ variant (noir-recursive VKs):"
+          find circuits/bin/recursive -name '*.json' | head -20
+          find circuits/bin/recursive -name '*.vk' | head -20
+          echo "Checking evm/ variant (keccak VKs):"
+          find circuits/bin/evm -name '*.json' | head -20
+          find circuits/bin/evm -name '*.vk' | head -20
 
       - name: Run ZK prover e2e tests
         run: cargo test -p e3-zk-prover --test local_e2e_tests -- --nocapture

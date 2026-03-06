@@ -312,9 +312,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     }
 
     /// @inheritdoc IBondingRegistry
-    function deregisterOperator(
-        uint256[] calldata siblingNodes
-    ) external noExitInProgress(msg.sender) {
+    function deregisterOperator() external noExitInProgress(msg.sender) {
         Operator storage op = operators[msg.sender];
         require(op.registered, NotRegistered());
 
@@ -353,7 +351,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         }
 
         // CiphernodeRegistry already emits an event when a ciphernode is removed
-        registry.removeCiphernode(msg.sender, siblingNodes);
+        registry.removeCiphernode(msg.sender);
 
         emit CiphernodeDeregistrationRequested(msg.sender, op.exitUnlocksAt);
         _updateOperatorStatus(msg.sender);

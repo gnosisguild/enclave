@@ -20,6 +20,7 @@ pub struct PublicKeyAggregated {
     pub e3_id: E3id,
     pub nodes: OrderedSet<String>,
     /// C5 proof: proof of correct pk aggregation.
+    #[serde(default)]
     pub pk_aggregation_proof: Option<Proof>,
 }
 
