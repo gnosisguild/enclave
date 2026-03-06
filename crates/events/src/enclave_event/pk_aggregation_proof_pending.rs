@@ -12,6 +12,7 @@
 //! `PkAggregationProofSigned`.
 
 use crate::{E3id, OrderedSet, PkAggregationProofRequest};
+use e3_utils::ArcBytes;
 use serde::{Deserialize, Serialize};
 
 /// PublicKeyAggregator -> ProofRequestActor: generate and sign C5 proof.
@@ -19,7 +20,7 @@ use serde::{Deserialize, Serialize};
 pub struct PkAggregationProofPending {
     pub e3_id: E3id,
     pub proof_request: PkAggregationProofRequest,
-    pub public_key: Vec<u8>,
+    pub public_key: ArcBytes,
     pub public_key_hash: [u8; 32],
     pub nodes: OrderedSet<String>,
 }

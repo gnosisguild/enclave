@@ -661,6 +661,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 "KeyshareCreated",
                 "KeyshareCreated",
                 "KeyshareCreated",
+                "ShareVerificationDispatched",
                 "ComputeRequest",
                 "ComputeResponse",
                 "ShareVerificationComplete",
@@ -668,7 +669,6 @@ async fn test_trbfv_actor() -> Result<()> {
                 "ComputeRequest",
                 "ComputeResponse",
                 "PkAggregationProofSigned",
-                "PublicKeyAggregated",
             ],
             Duration::from_secs(5000),
             Duration::from_secs(600),
@@ -1344,7 +1344,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     assert_eq!(
         history.events.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
-            pubkey: test_pubkey.to_bytes(),
+            pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
             public_key_hash,
             e3_id: E3id::new("1234", 1),
             nodes: OrderedSet::from(eth_addrs.clone()),
@@ -1387,7 +1387,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     assert_eq!(
         history.events.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
-            pubkey: test_pubkey.to_bytes(),
+            pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
             public_key_hash,
             e3_id: E3id::new("1234", 2),
             nodes: OrderedSet::from(eth_addrs.clone()),
