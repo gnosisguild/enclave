@@ -669,6 +669,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 "ComputeRequest",
                 "ComputeResponse",
                 "PkAggregationProofSigned",
+                "PublicKeyAggregated",
             ],
             Duration::from_secs(5000),
             Duration::from_secs(600),
@@ -1260,7 +1261,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
                     .await?;
             result.push(tuple);
         }
-        simulate_libp2p_net(&result);
+        simulate_libp2p_net(&result).await;
         Ok(result)
     }
 
