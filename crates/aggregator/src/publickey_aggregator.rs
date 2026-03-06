@@ -9,11 +9,11 @@ use anyhow::Result;
 use e3_bfv_client::client::compute_pk_commitment;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, BusHandle, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
-    Die, E3id, EnclaveEvent, EnclaveEventData, EventContext, KeyshareCreated, OrderedSet,
-    PartyProofsToVerify, PkAggregationProofRequest, PkAggregationProofResponse,
-    PublicKeyAggregated, Seed, Sequenced, SignedProofPayload, TypedEvent, VerifyShareProofsRequest,
-    VerifyShareProofsResponse, ZkRequest, ZkResponse,
+    prelude::*, BusHandle, Die, E3id, EnclaveEvent, EnclaveEventData, EventContext,
+    KeyshareCreated, OrderedSet, PartyProofsToVerify, PkAggregationProofPending,
+    PkAggregationProofRequest, PkAggregationProofSigned, PublicKeyAggregated, Seed, Sequenced,
+    ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload, TypedEvent,
+    VerificationKind,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -195,47 +195,49 @@ impl PublicKeyAggregator {
             no_proof_parties.len()
         );
 
-        let request = ComputeRequest::zk(
-            ZkRequest::VerifyShareProofs(VerifyShareProofsRequest { party_proofs }),
-            CorrelationId::new(),
-            self.e3_id.clone(),
-        );
-        self.bus.publish(request, ec)?;
+        self.bus.publish(
+            ShareVerificationDispatched {
+                e3_id: self.e3_id.clone(),
+                kind: VerificationKind::PkGenerationProofs,
+                share_proofs: party_proofs,
+                decryption_proofs: vec![],
+                pre_dishonest: no_proof_parties.into_iter().collect(),
+            },
+            ec,
+        )?;
         Ok(())
     }
 
-    fn handle_c1_verification_response(
+    fn handle_c1_verification_complete(
         &mut self,
-        response: VerifyShareProofsResponse,
-        ec: EventContext<Sequenced>,
+        msg: TypedEvent<ShareVerificationComplete>,
     ) -> Result<()> {
+        let (msg, ec) = msg.into_components();
+
+        if msg.kind != VerificationKind::PkGenerationProofs {
+            return Ok(());
+        }
+
+        if msg.e3_id != self.e3_id {
+            return Ok(());
+        }
+
         let PublicKeyAggregatorState::VerifyingC1 {
             keyshares,
             nodes,
             threshold_m,
-            no_proof_parties,
+            ..
         } = self
             .state
             .get()
             .ok_or_else(|| anyhow::anyhow!("Expected VerifyingC1 state"))?
         else {
             return Err(anyhow::anyhow!(
-                "handle_c1_verification_response called outside VerifyingC1 state"
+                "handle_c1_verification_complete called outside VerifyingC1 state"
             ));
         };
 
-        // Partition honest/dishonest parties — include those that failed verification
-        // AND those that submitted no C1 proof at all
-        let mut dishonest_parties: Vec<u64> = no_proof_parties;
-        for result in &response.party_results {
-            if !result.all_verified {
-                warn!(
-                    "Party {} failed C1 proof verification (failed payload: {:?})",
-                    result.sender_party_id, result.failed_signed_payload
-                );
-                dishonest_parties.push(result.sender_party_id);
-            }
-        }
+        let dishonest_parties = &msg.dishonest_parties;
 
         // Filter out dishonest parties from keyshares and nodes
         let keyshares_vec: Vec<ArcBytes> = keyshares.into_iter().collect();
@@ -257,12 +259,12 @@ impl PublicKeyAggregator {
             );
         }
 
-        // Check remaining count >= threshold
-        if honest_keyshares.len() < threshold_m {
+        // Need at least threshold + 1 honest parties for aggregation
+        if honest_keyshares.len() <= threshold_m {
             return Err(anyhow::anyhow!(
-                "Not enough honest parties after C1 verification: {} < {}",
+                "Not enough honest parties after C1 verification: {} (need at least {})",
                 honest_keyshares.len(),
-                threshold_m
+                threshold_m + 1
             ));
         }
 
@@ -285,41 +287,54 @@ impl PublicKeyAggregator {
 
         let honest_nodes_set = OrderedSet::from(honest_nodes);
 
+        // Publish pending event before transitioning state so a publish
+        // failure leaves us in VerifyingC1 (retryable) rather than
+        // GeneratingC5Proof (no retry path).
+        let committee_h = honest_keyshares.len();
+
+        info!("Publishing PkAggregationProofPending for C5 proof generation...");
+        self.bus.publish(
+            PkAggregationProofPending {
+                e3_id: self.e3_id.clone(),
+                proof_request: PkAggregationProofRequest {
+                    keyshare_bytes: honest_keyshares.clone(),
+                    aggregated_pk_bytes: ArcBytes::from_bytes(&pubkey),
+                    params_preset: self.params_preset.clone(),
+                    // this field is not really used in the circuit, we only use H
+                    committee_n: committee_h,
+                    committee_h,
+                    // this field is not really used in the circuit, we only use H
+                    committee_threshold: 0,
+                },
+                public_key: pubkey.clone(),
+                public_key_hash,
+                nodes: honest_nodes_set.clone(),
+            },
+            ec.clone(),
+        )?;
+
         // Transition to GeneratingC5Proof
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
-                public_key: pubkey.clone(),
+                public_key: pubkey,
                 public_key_hash,
-                keyshare_bytes: honest_keyshares.clone(),
-                nodes: honest_nodes_set.clone(),
+                keyshare_bytes: honest_keyshares,
+                nodes: honest_nodes_set,
             })
         })?;
-
-        // Dispatch C5 proof request
-        let committee_h = honest_keyshares.len();
-
-        info!("Dispatching C5 proof generation (pk aggregation)...");
-        let request = ComputeRequest::zk(
-            ZkRequest::PkAggregation(PkAggregationProofRequest {
-                keyshare_bytes: honest_keyshares,
-                aggregated_pk_bytes: ArcBytes::from_bytes(&pubkey),
-                params_preset: self.params_preset.clone(),
-                committee_n: committee_h, // N = all parties in this aggregation
-                committee_h,
-                committee_threshold: 0, // Will be resolved from preset in handler
-            }),
-            CorrelationId::new(),
-            self.e3_id.clone(),
-        );
-        self.bus.publish(request, ec)?;
         Ok(())
     }
 
-    fn handle_c5_proof_response(
+    fn handle_pk_aggregation_proof_signed(
         &mut self,
-        response: PkAggregationProofResponse,
-        ec: EventContext<Sequenced>,
+        msg: TypedEvent<PkAggregationProofSigned>,
     ) -> Result<()> {
+        let (msg, ec) = msg.into_components();
+
+        if msg.e3_id != self.e3_id {
+            return Ok(());
+        }
+
         let PublicKeyAggregatorState::GeneratingC5Proof {
             public_key,
             public_key_hash,
@@ -331,49 +346,35 @@ impl PublicKeyAggregator {
             .ok_or_else(|| anyhow::anyhow!("Expected GeneratingC5Proof state"))?
         else {
             return Err(anyhow::anyhow!(
-                "handle_c5_proof_response called outside GeneratingC5Proof state"
+                "handle_pk_aggregation_proof_signed called outside GeneratingC5Proof state"
             ));
         };
 
-        info!("C5 proof generated, publishing PublicKeyAggregated...");
+        info!("C5 proof signed, publishing PublicKeyAggregated...");
 
-        let proof = response.proof;
+        let proof = msg.signed_proof.payload.proof;
+
+        // Publish PublicKeyAggregated before transitioning state so a publish
+        // failure leaves us in GeneratingC5Proof (retryable) rather than
+        // Complete (no retry path).
+        let event = PublicKeyAggregated {
+            pubkey: public_key.clone(),
+            public_key_hash,
+            e3_id: self.e3_id.clone(),
+            nodes: nodes.clone(),
+            pk_aggregation_proof: Some(proof),
+        };
+        self.bus.publish(event, ec.clone())?;
 
         // Transition to Complete
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::Complete {
-                public_key: public_key.clone(),
+                public_key,
                 keyshares: OrderedSet::new(),
-                nodes: nodes.clone(),
+                nodes,
             })
         })?;
-
-        // Publish PublicKeyAggregated with C5 proof
-        let event = PublicKeyAggregated {
-            pubkey: public_key,
-            public_key_hash,
-            e3_id: self.e3_id.clone(),
-            nodes,
-            pk_aggregation_proof: Some(proof),
-        };
-        self.bus.publish(event, ec)?;
         Ok(())
-    }
-
-    fn handle_compute_response(
-        &mut self,
-        response: ComputeResponse,
-        ec: EventContext<Sequenced>,
-    ) -> Result<()> {
-        match response.response {
-            ComputeResponseKind::Zk(ZkResponse::VerifyShareProofs(data)) => {
-                self.handle_c1_verification_response(data, ec)
-            }
-            ComputeResponseKind::Zk(ZkResponse::PkAggregation(data)) => {
-                self.handle_c5_proof_response(data, ec)
-            }
-            _ => Ok(()), // Ignore other compute responses
-        }
     }
 }
 
@@ -392,7 +393,10 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
             EnclaveEventData::KeyshareCreated(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeResponse(data) => {
+            EnclaveEventData::ShareVerificationComplete(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::PkAggregationProofSigned(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::ComputeRequestError(data) => {
@@ -451,18 +455,35 @@ impl Handler<TypedEvent<KeyshareCreated>> for PublicKeyAggregator {
     }
 }
 
-impl Handler<TypedEvent<ComputeResponse>> for PublicKeyAggregator {
+impl Handler<TypedEvent<ShareVerificationComplete>> for PublicKeyAggregator {
     type Result = ();
 
     fn handle(
         &mut self,
-        msg: TypedEvent<ComputeResponse>,
+        msg: TypedEvent<ShareVerificationComplete>,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let (msg, ec) = msg.into_components();
-        trap(EType::PublickeyAggregation, &self.bus.with_ec(&ec), || {
-            self.handle_compute_response(msg, ec)
-        })
+        trap(
+            EType::PublickeyAggregation,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_c1_verification_complete(msg),
+        )
+    }
+}
+
+impl Handler<TypedEvent<PkAggregationProofSigned>> for PublicKeyAggregator {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<PkAggregationProofSigned>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(
+            EType::PublickeyAggregation,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_pk_aggregation_proof_signed(msg),
+        )
     }
 }
 

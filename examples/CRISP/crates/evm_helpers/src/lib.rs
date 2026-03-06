@@ -5,7 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use alloy::{
-    network::{Ethereum, EthereumWallet}, primitives::{Address, Bytes, U256}, providers::{
+    network::{Ethereum, EthereumWallet},
+    primitives::{Address, Bytes, I256, U256},
+    providers::{
         Identity, ProviderBuilder, RootProvider, fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
@@ -20,8 +22,7 @@ sol! {
     #[sol(rpc)]
     contract CRISPProgram {
         function setMerkleRoot(uint256 e3_id, uint256 _root) external;
-        function getSlotIndex(uint256 e3_id, address slot_address) external view returns (uint256);
-        function isSlotEmptyByAddress(uint256 e3_id, address slot_address) external view returns (bool);
+        function getSlotIndex(uint256 e3_id, address slot_address) external view returns (int256);
         function publishInput(uint256 e3_id, bytes data) external;
     }
 }
@@ -128,35 +129,24 @@ impl CRISPContract<CRISPReadProvider> {
         })
     }
 
-    /// Get the slot index from a given slot address
+    /// Get the slot index from a given slot address.
+    /// Returns `None` when the slot is empty (contract returns -1).
     pub async fn get_slot_index_from_address(
         &self,
         e3_id: U256,
         slot_address: Address,
-    ) -> Result<U256> {
+    ) -> Result<Option<u64>> {
         let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
 
         match contract.getSlotIndex(e3_id, slot_address).call().await {
-            Ok(slot_index) => Ok(slot_index),
+            Ok(slot_index) => {
+                if slot_index < I256::ZERO {
+                    Ok(None)
+                } else {
+                    Ok(Some(slot_index.as_u64()))
+                }
+            }
             Err(e) => Err(eyre::eyre!("Failed to get slot index: {}", e)),
-        }
-    }
-
-    /// Check if a slot is empty by its address
-    pub async fn get_is_slot_empty_by_address(
-        &self,
-        e3_id: U256,
-        slot_address: Address,
-    ) -> Result<bool> {
-        let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
-
-        match contract
-            .isSlotEmptyByAddress(e3_id, slot_address)
-            .call()
-            .await
-        {
-            Ok(is_empty) => Ok(is_empty),
-            Err(e) => Err(eyre::eyre!("Failed to check if slot is empty: {}", e)),
         }
     }
 }

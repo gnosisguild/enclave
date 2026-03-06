@@ -13,9 +13,9 @@ import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {
-    InternalLeanIMT,
-    LeanIMTData
-} from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
+    InternalLazyIMT,
+    LazyIMTData
+} from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
 
 /**
  * @title CiphernodeRegistryOwnable
@@ -23,7 +23,7 @@ import {
  * @dev Manages ciphernode registration, committee selection, and integrates with bonding registry
  */
 contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
-    using InternalLeanIMT for LeanIMTData;
+    using InternalLazyIMT for LazyIMTData;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -55,8 +55,17 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// their tickets to be a part of the committee.
     uint256 public sortitionSubmissionWindow;
 
+    /// @notice Depth of the LazyIMT tree
+    uint8 public constant TREE_DEPTH = 20;
+
     /// @notice Incremental Merkle Tree (IMT) containing all registered ciphernodes
-    LeanIMTData public ciphernodes;
+    LazyIMTData public ciphernodes;
+
+    /// @notice Tracks whether a ciphernode is enabled in the registry
+    mapping(address => bool) public ciphernodeEnabled;
+
+    /// @notice Tracks the tree leaf index for each ciphernode
+    mapping(address => uint40) public ciphernodeTreeIndex;
 
     /// @notice Maps E3 ID to the IMT root at the time of committee request
     mapping(uint256 e3Id => uint256 root) public roots;
@@ -212,6 +221,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         require(_owner != address(0), ZeroAddress());
 
         __Ownable_init(msg.sender);
+        ciphernodes._init(TREE_DEPTH);
         setSortitionSubmissionWindow(_submissionWindow);
         if (_owner != owner()) transferOwnership(_owner);
     }
@@ -302,29 +312,33 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             return;
         }
 
-        uint160 ciphernode = uint160(node);
-        ciphernodes._insert(ciphernode);
+        uint40 index = ciphernodes.numberOfLeaves;
+        ciphernodes._insert(uint160(node));
+        ciphernodeEnabled[node] = true;
+        ciphernodeTreeIndex[node] = index;
         numCiphernodes++;
         emit CiphernodeAdded(
             node,
-            ciphernodes._indexOf(ciphernode),
+            index,
             numCiphernodes,
-            ciphernodes.size
+            ciphernodes.numberOfLeaves
         );
     }
 
     /// @inheritdoc ICiphernodeRegistry
-    function removeCiphernode(
-        address node,
-        uint256[] calldata siblingNodes
-    ) external onlyOwnerOrBondingVault {
+    function removeCiphernode(address node) external onlyOwnerOrBondingVault {
         require(isEnabled(node), CiphernodeNotEnabled(node));
 
-        uint160 ciphernode = uint160(node);
-        uint256 index = ciphernodes._indexOf(ciphernode);
-        ciphernodes._remove(ciphernode, siblingNodes);
+        uint40 index = ciphernodeTreeIndex[node];
+        ciphernodes._update(0, index);
+        ciphernodeEnabled[node] = false;
         numCiphernodes--;
-        emit CiphernodeRemoved(node, index, numCiphernodes, ciphernodes.size);
+        emit CiphernodeRemoved(
+            node,
+            index,
+            numCiphernodes,
+            ciphernodes.numberOfLeaves
+        );
     }
 
     ////////////////////////////////////////////////////////////
@@ -497,13 +511,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     /// @inheritdoc ICiphernodeRegistry
     function isEnabled(address node) public view returns (bool) {
-        return ciphernodes._has(uint160(node));
+        return ciphernodeEnabled[node];
     }
 
     /// @notice Returns the current root of the ciphernode IMT
     /// @return Current IMT root
     function root() public view returns (uint256) {
-        return (ciphernodes._root());
+        return ciphernodes._root(TREE_DEPTH);
     }
 
     /// @notice Returns the IMT root at the time a committee was requested
@@ -525,7 +539,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Returns the current size of the ciphernode IMT
     /// @return Size of the IMT
     function treeSize() public view returns (uint256) {
-        return ciphernodes.size;
+        return ciphernodes.numberOfLeaves;
     }
 
     /// @notice Returns the address of the bonding registry

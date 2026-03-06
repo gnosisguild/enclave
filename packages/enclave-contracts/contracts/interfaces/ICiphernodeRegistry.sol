@@ -183,11 +183,7 @@ interface ICiphernodeRegistry {
 
     /// @notice Remove a ciphernode from the registry
     /// @param node Address of the ciphernode to remove
-    /// @param siblingNodes Array of sibling node indices for tree operations
-    function removeCiphernode(
-        address node,
-        uint256[] calldata siblingNodes
-    ) external;
+    function removeCiphernode(address node) external;
 
     /// @notice Initiates the committee selection process for a specified E3.
     /// @dev This function MUST revert when not called by the Enclave contract.

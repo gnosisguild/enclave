@@ -3,11 +3,9 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
 import type { Signer } from "ethers";
 import { network } from "hardhat";
-import { poseidon2 } from "poseidon-lite";
 
 import BondingRegistryModule from "../ignition/modules/bondingRegistry";
 import CiphernodeRegistryModule from "../ignition/modules/ciphernodeRegistry";
@@ -68,9 +66,6 @@ describe("Enclave", function () {
 
   const data = "0xda7a";
   const proof = "0x1337";
-
-  // Hash function used to compute the tree nodes.
-  const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
   const setupAndPublishCommittee = async (
     registry: any,
@@ -287,7 +282,6 @@ describe("Enclave", function () {
 
     // ── Operators ─────────────────────────────────────────────────────────────
     await licenseToken.setTransferRestriction(false);
-    const tree = new LeanIMT(hash);
 
     for (const operator of [operator1, operator2]) {
       await setupOperatorForSortition(
@@ -298,7 +292,6 @@ describe("Enclave", function () {
         ticketToken,
         ciphernodeRegistryContract,
       );
-      tree.insert(BigInt(await operator.getAddress()));
     }
     await mine(1);
 
@@ -337,7 +330,6 @@ describe("Enclave", function () {
       ticketToken,
       usdcToken,
       slashingManager,
-      tree,
       request,
       mocks: { decryptionVerifier, e3Program, mockComputeProvider },
     };

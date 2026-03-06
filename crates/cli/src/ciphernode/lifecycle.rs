@@ -8,7 +8,7 @@ use alloy::primitives::U256;
 use anyhow::{bail, Result};
 
 use super::context::ChainContext;
-use super::utils::{format_amount, parse_amount, parse_u256_list};
+use super::utils::{format_amount, parse_amount};
 
 pub(crate) async fn register(ctx: &ChainContext) -> Result<()> {
     let receipt = ctx
@@ -26,11 +26,10 @@ pub(crate) async fn register(ctx: &ChainContext) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn deregister(ctx: &ChainContext, siblings: Vec<String>) -> Result<()> {
-    let proof = parse_u256_list(&siblings)?;
+pub(crate) async fn deregister(ctx: &ChainContext) -> Result<()> {
     let receipt = ctx
         .bonding()
-        .deregisterOperator(proof)
+        .deregisterOperator()
         .send()
         .await?
         .get_receipt()

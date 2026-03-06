@@ -32,6 +32,10 @@ pub enum ZkRequest {
     VerifyShareDecryptionProofs(VerifyShareDecryptionProofsRequest),
     /// Generate proof for public key aggregation (C5).
     PkAggregation(PkAggregationProofRequest),
+    /// Generate proof(s) for threshold share decryption (C6).
+    ThresholdShareDecryption(ThresholdShareDecryptionProofRequest),
+    /// Generate proof for decrypted shares aggregation (C7).
+    DecryptedSharesAggregation(DecryptedSharesAggregationProofRequest),
 }
 
 /// Request to generate a proof for public key aggregation (C5).
@@ -199,12 +203,42 @@ pub enum ZkResponse {
     VerifyShareDecryptionProofs(VerifyShareDecryptionProofsResponse),
     /// Proof for public key aggregation (C5).
     PkAggregation(PkAggregationProofResponse),
+    /// Proof(s) for threshold share decryption (C6).
+    ThresholdShareDecryption(ThresholdShareDecryptionProofResponse),
+    /// Proof for decrypted shares aggregation (C7).
+    DecryptedSharesAggregation(DecryptedSharesAggregationProofResponse),
 }
 
 /// Response containing a generated proof for public key aggregation (C5).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PkAggregationProofResponse {
     pub proof: Proof,
+}
+
+/// Request to generate proof(s) of correct threshold share decryption (C6).
+/// One proof is generated per ciphertext index.
+#[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derivative(Debug)]
+pub struct ThresholdShareDecryptionProofRequest {
+    /// Serialized ciphertext bytes, one per output index.
+    pub ciphertext_bytes: Vec<ArcBytes>,
+    /// Serialized aggregated PublicKey bytes.
+    pub aggregated_pk_bytes: ArcBytes,
+    /// Aggregated secret key polynomial (encrypted at rest).
+    pub sk_poly_sum: SensitiveBytes,
+    /// Aggregated smudging error polynomials (encrypted at rest), one per output index.
+    pub es_poly_sum: Vec<SensitiveBytes>,
+    /// Computed decryption share polynomials, one per output index.
+    pub d_share_bytes: Vec<ArcBytes>,
+    /// BFV preset for parameter resolution.
+    pub params_preset: BfvPreset,
+}
+
+/// Response containing generated proofs for threshold share decryption (C6).
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ThresholdShareDecryptionProofResponse {
+    /// One C6 proof per ciphertext index.
+    pub proofs: Vec<Proof>,
 }
 
 /// Response containing a generated share computation proof.
@@ -339,6 +373,31 @@ pub struct PartyShareDecryptionProofsToVerify {
 pub struct VerifyShareDecryptionProofsResponse {
     /// Per-party verification results.
     pub party_results: Vec<PartyVerificationResult>,
+}
+
+// --- C7 proof generation ---
+
+/// Request to generate proof(s) for decrypted shares aggregation (C7).
+#[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derivative(Debug)]
+pub struct DecryptedSharesAggregationProofRequest {
+    /// Decryption shares per party: (party_id, shares_per_ct_index).
+    pub d_share_polys: Vec<(u64, Vec<ArcBytes>)>,
+    /// Decoded plaintext per ciphertext index.
+    pub plaintext: Vec<ArcBytes>,
+    /// BFV preset (selects BN vs Mod circuit variant).
+    pub params_preset: BfvPreset,
+    /// Threshold required for decryption.
+    pub threshold_m: u64,
+    /// Committee size.
+    pub threshold_n: u64,
+}
+
+/// Response containing generated proofs for decrypted shares aggregation (C7).
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DecryptedSharesAggregationProofResponse {
+    /// One C7 proof per ciphertext index.
+    pub proofs: Vec<Proof>,
 }
 
 /// ZK-specific error variants.
