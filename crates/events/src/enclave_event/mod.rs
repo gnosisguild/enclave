@@ -613,7 +613,7 @@ impl_event_types!(
     SyncEffect,
     SyncEnded,
     EffectsEnabled,
-    NetReady
+    NetReady,
     DecryptionShareProofSigned,
     ShareDecryptionProofPending,
     PkAggregationProofPending,
