@@ -9,7 +9,7 @@ import { execSync } from 'child_process'
 import { createHash } from 'crypto'
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { basename, join, resolve } from 'path'
-import { ALL_GROUPS, CIRCUIT_GROUPS, CIRCUIT_VARIANTS, type CircuitGroup, type CircuitVariant } from './circuit-constants'
+import { ALL_GROUPS, CIRCUIT_GROUPS, CIRCUIT_VARIANTS, type CircuitGroup } from './circuit-constants'
 
 interface CircuitInfo {
   name: string
