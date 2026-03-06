@@ -2,6 +2,10 @@
 
 MCP server for [Enclave](https://enclave.gg) documentation. Allows AI assistants to answer questions about Enclave by fetching content directly from [docs.enclave.gg](https://docs.enclave.gg).
 
+## Requirements
+
+- Node.js **>=18.20.0** — required for ESM JSON import attributes, global `fetch`, and top-level await used by the `enclave-mcp` CLI.
+
 ## Tools
 
 | Tool | Description |

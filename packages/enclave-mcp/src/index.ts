@@ -12,6 +12,7 @@ import pkg from '../package.json' with { type: 'json' }
 const { version } = pkg
 
 const BASE_URL = 'https://docs.enclave.gg'
+const FETCH_TIMEOUT_MS = 10_000
 
 interface DocPage {
   slug: string
@@ -19,7 +20,8 @@ interface DocPage {
   url: string
 }
 
-const DOC_PAGES: DocPage[] = [
+// Fallback corpus used when the sitemap cannot be fetched.
+const STATIC_DOC_PAGES: DocPage[] = [
   { slug: 'introduction', title: 'Introduction', url: '/introduction' },
   { slug: 'what-is-e3', title: 'What is an E3?', url: '/what-is-e3' },
   { slug: 'architecture-overview', title: 'Architecture Overview', url: '/architecture-overview' },
@@ -50,9 +52,44 @@ const DOC_PAGES: DocPage[] = [
   { slug: 'CRISP/running-e3', title: 'CRISP Running an E3 Program', url: '/CRISP/running-e3' },
 ]
 
+function fetchWithTimeout(url: string): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer))
+}
+
+// Attempt to build the page corpus from the sitemap so it stays current
+// without manual updates. Falls back to STATIC_DOC_PAGES on any failure.
+async function loadDocPages(): Promise<DocPage[]> {
+  try {
+    const response = await fetchWithTimeout(`${BASE_URL}/sitemap.xml`)
+    if (!response.ok) return STATIC_DOC_PAGES
+    const xml = await response.text()
+    const root = parse(xml)
+    const locs = root.querySelectorAll('loc').map((el) => el.text.trim())
+    if (locs.length === 0) return STATIC_DOC_PAGES
+    return locs
+      .filter((loc) => loc.startsWith(BASE_URL))
+      .map((loc) => {
+        const path = loc.slice(BASE_URL.length) || '/'
+        const slug = path.replace(/^\//, '')
+        const known = STATIC_DOC_PAGES.find((p) => p.slug === slug)
+        const title =
+          known?.title ??
+          slug
+            .split('/')
+            .map((s) => s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()))
+            .join(' / ')
+        return { slug, title, url: path }
+      })
+  } catch {
+    return STATIC_DOC_PAGES
+  }
+}
+
 async function fetchDocPage(url: string): Promise<string> {
   const fullUrl = `${BASE_URL}${url}`
-  const response = await fetch(fullUrl)
+  const response = await fetchWithTimeout(fullUrl)
   if (!response.ok) {
     throw new Error(`Failed to fetch ${fullUrl}: ${response.status} ${response.statusText}`)
   }
@@ -68,6 +105,8 @@ async function fetchDocPage(url: string): Promise<string> {
 
   return content.text.replace(/\n{3,}/g, '\n\n').trim()
 }
+
+const DOC_PAGES = await loadDocPages()
 
 const server = new McpServer({
   name: 'enclave-docs',
@@ -121,8 +160,13 @@ server.registerTool(
     inputSchema: z.object({ query: z.string().describe('Search query') }),
   },
   async ({ query }) => {
+    if (!query.trim()) {
+      return { content: [{ type: 'text', text: 'Query must not be empty.' }], isError: true }
+    }
+
     const lower = query.toLowerCase()
     const results: string[] = []
+    const failures: string[] = []
 
     await Promise.all(
       DOC_PAGES.map(async (page) => {
@@ -136,20 +180,26 @@ server.registerTool(
             results.push(`## ${page.title}\nURL: ${BASE_URL}${page.url}\n\n...${snippet}...`)
           }
         } catch {
-          // skip pages that fail to load
+          failures.push(`${page.title} (${page.url})`)
         }
       }),
     )
 
+    const failureSummary = failures.length > 0 ? `\n\n---\n⚠️ Failed to load ${failures.length} page(s): ${failures.join(', ')}` : ''
+
+    if (results.length === 0 && failures.length === DOC_PAGES.length) {
+      return { content: [{ type: 'text', text: `All page fetches failed. Check network connectivity.${failureSummary}` }], isError: true }
+    }
+
     if (results.length === 0) {
-      return { content: [{ type: 'text', text: `No results found for "${query}".` }] }
+      return { content: [{ type: 'text', text: `No results found for "${query}".${failureSummary}` }] }
     }
 
     return {
       content: [
         {
           type: 'text',
-          text: `Found ${results.length} page(s) matching "${query}":\n\n${results.join('\n\n---\n\n')}`,
+          text: `Found ${results.length} page(s) matching "${query}":\n\n${results.join('\n\n---\n\n')}${failureSummary}`,
         },
       ],
     }
