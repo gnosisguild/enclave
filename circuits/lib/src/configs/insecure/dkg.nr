@@ -6,7 +6,8 @@
 
 use crate::configs::default::{N_PARTIES, T};
 pub use crate::configs::insecure::threshold::{L as L_THRESHOLD, QIS as QIS_THRESHOLD};
-use crate::core::dkg::share_computation::Configs as ShareComputationConfigs;
+use crate::core::dkg::share_computation::base::Configs as ShareComputationBaseConfigs;
+use crate::core::dkg::share_computation::chunk::Configs as ShareComputationChunkConfigs;
 use crate::core::dkg::share_encryption::Configs as ShareEncryptionConfigs;
 
 // Global configs for DKG insecure preset
@@ -49,9 +50,15 @@ share_computation_sk (CIRCUIT 2a)
 pub global SHARE_COMPUTATION_BIT_SHARE: u32 = 36;
 pub global SHARE_COMPUTATION_SK_BIT_SECRET: u32 = 1;
 
-// share_computation_sk - configs
-pub global SHARE_COMPUTATION_SK_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
-    ShareComputationConfigs::new(QIS_THRESHOLD);
+// With N=512 and 5 parties, a single chunk covers all coefficients
+pub global SHARE_COMPUTATION_CHUNK_SIZE: u32 = 512;
+pub global SHARE_COMPUTATION_N_CHUNKS: u32 = 1; // N / CHUNK_SIZE = 512 / 512
+
+pub global SHARE_COMPUTATION_SK_BASE_CONFIGS: ShareComputationBaseConfigs<L_THRESHOLD> =
+    ShareComputationBaseConfigs::new(QIS_THRESHOLD);
+
+pub global SHARE_COMPUTATION_SK_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
+    ShareComputationChunkConfigs::new(QIS_THRESHOLD);
 
 /************************************
 -------------------------------------
@@ -62,9 +69,11 @@ share_computation_e_sm (CIRCUIT 2b)
 // share_computation_e_sm - bit parameters
 pub global SHARE_COMPUTATION_E_SM_BIT_SECRET: u32 = 24;
 
-// verify_shares - configs
-pub global SHARE_COMPUTATION_E_SM_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
-    ShareComputationConfigs::new(QIS_THRESHOLD);
+pub global SHARE_COMPUTATION_E_SM_BASE_CONFIGS: ShareComputationBaseConfigs<L_THRESHOLD> =
+    ShareComputationBaseConfigs::new(QIS_THRESHOLD);
+
+pub global SHARE_COMPUTATION_E_SM_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
+    ShareComputationChunkConfigs::new(QIS_THRESHOLD);
 
 /************************************
 -------------------------------------
