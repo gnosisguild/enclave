@@ -1,7 +1,7 @@
 # [C3a & C3b] Share Encryption (`share_encryption`)
 
 The Share Encryption circuit verifies that each ciphernode correctly encrypted a secret share under
-the recipient's BFV public key. After shares are verified and committed in _C2a/C2b_, they must be
+the recipient's DKG public key. After shares are verified and committed in _C2a/C2b_, they must be
 encrypted for secure peer-to-peer transmission — this circuit proves the encryption was formed
 correctly without revealing the plaintext share or the encryption randomness.
 
@@ -17,7 +17,7 @@ flowchart TD
     Input2b["C2b<br>share-computation-e-sm"] -.->|"commit(e_sm_share[i][j])"| C3
 
     subgraph Focus["C3a & C3b"]
-        C3["<i>Encrypt share under BFV pk</i>"]
+        C3["<i>Encrypt share under DKG pk</i>"]
     end
 
     C3 -->|"ct(sk_share)"| Output1["→ C4a<br>share-decryption-sk"]

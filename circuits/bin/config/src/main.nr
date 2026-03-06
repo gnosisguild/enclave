@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-/// Configuration Verification Circuit (Phase 0).
+/// Configuration Verification Circuit (pre-deployment).
 ///
 /// This circuit verifies all cryptographic parameters used across both BFV (for DKG share encryption)
 /// and Threshold BFV (for user data encryption) schemes. It runs once per deployment to establish

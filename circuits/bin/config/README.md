@@ -1,4 +1,4 @@
-# Configuration Verification Circuit (Phase 0)
+# Configuration Verification Circuit
 
 The Configuration Verification circuit runs once per deployment to verify all cryptographic
 parameters used across both BFV (for DKG share encryption) and Threshold BFV (for user data
@@ -11,7 +11,7 @@ cross-scheme consistency.
 
 ```mermaid
 flowchart TD
-    subgraph P0["P0<br>Configuration Verification"]
+    subgraph P0["Configuration Verification"]
         ConfigCircuit["Configuration Circuit<br/><i>Verify crypto configs</i>"]
     end
 
@@ -25,11 +25,11 @@ flowchart TD
 
 ## Metadata
 
-- **Phase**: P0 (Configuration Verification).
-- **Runs**: 1 x Ciphernode (one-time program verification).
+- **Phase**: Pre-deployment (one-time configuration verification).
+- **Runs**: 1 (once per deployment, before any P1–P4 circuits run).
 - **Requires**: Configured parameter sets from [`configs/secure`](../../../lib/src/configs/secure).
 - **Output(s)**: Single proof that all parameters are valid, consumed by all P1-P4 circuits.
-- **Data Flow**: `Parameter Sets → P0 → Verified Configs → All Circuits (P1-P4)`
+- **Data Flow**: `Parameter Sets → Config Circuit → Verified Configs → All Circuits (P1-P4)`
 - **Verification Categories**:
   - DKG (BFV) Parameters: [`configs/secure/dkg.nr`](../../../lib/src/configs/secure/dkg.nr)
   - Threshold BFV Parameters:

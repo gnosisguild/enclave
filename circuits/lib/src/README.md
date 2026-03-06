@@ -16,7 +16,7 @@ graph LR
     math["math primitives"] --> core["core circuits logic"]
     configs["configs & parameters"] --> core
     core --> dkg["dkg (C0 · C2a/b · C3a/b · C4a/b)"]
-    core --> threshold["threshold (C1 · C5 · P3 · C6 · C7)"]
+    core --> threshold["threshold (C1 · C5 · UDE · C6 · C7)"]
 ```
 
 ## math
@@ -93,9 +93,9 @@ Circuits for the Distributed Key Generation phase (P1).
 
 | File                   | Circuit   | Role                                                                |
 | ---------------------- | --------- | ------------------------------------------------------------------- |
-| `pk.nr`                | C0        | Commit to a ciphernode's BFV public key                             |
+| `pk.nr`                | C0        | Commit to a ciphernode's DKG public key                             |
 | `share_computation.nr` | C2a / C2b | Verify Shamir shares of `sk` / `e_sm` via Reed-Solomon parity check |
-| `share_encryption.nr`  | C3a / C3b | Verify BFV encryption of each share for its recipient               |
+| `share_encryption.nr`  | C3a / C3b | Verify DKG BFV encryption of each share for its recipient           |
 | `share_decryption.nr`  | C4a / C4b | Verify share decryption and aggregate across honest parties         |
 
 **C2 share matrix layout** — `y[coeff_idx][mod_idx][party_idx]`:
