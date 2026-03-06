@@ -720,36 +720,41 @@ async fn setup_evm_system(
         }
 
         if contract_components.slashing_manager {
-            if let Some(contract) = &chain.contracts.slashing_manager {
-                // Reader: read SlashExecuted events from chain
-                let contract_addr = contract.address()?;
-                system.with_contract(contract_addr, move |next| {
-                    SlashingManagerSolReader::setup(&next).recipient()
-                });
+            let contract = chain.contracts.slashing_manager.as_ref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Slashing manager is enabled but no contract address configured for chain {}",
+                    chain.name
+                )
+            })?;
 
-                // Writer: submit proposeSlash transactions
-                match provider_cache.ensure_write_provider(&chain).await {
-                    Ok(write_provider) => {
-                        match SlashingManagerSolWriter::attach(
-                            &bus,
-                            write_provider.clone(),
-                            contract_addr,
-                        )
-                        .await
-                        {
-                            Ok(_) => {
-                                info!("SlashingManagerSolWriter attached for fault submission");
-                            }
-                            Err(e) => {
-                                error!("Failed to attach SlashingManagerSolWriter, skipping: {}", e)
-                            }
+            // Reader: read SlashExecuted events from chain
+            let contract_addr = contract.address()?;
+            system.with_contract(contract_addr, move |next| {
+                SlashingManagerSolReader::setup(&next).recipient()
+            });
+
+            // Writer: submit proposeSlash transactions
+            match provider_cache.ensure_write_provider(&chain).await {
+                Ok(write_provider) => {
+                    match SlashingManagerSolWriter::attach(
+                        &bus,
+                        write_provider.clone(),
+                        contract_addr,
+                    )
+                    .await
+                    {
+                        Ok(_) => {
+                            info!("SlashingManagerSolWriter attached for fault submission");
+                        }
+                        Err(e) => {
+                            error!("Failed to attach SlashingManagerSolWriter, skipping: {}", e)
                         }
                     }
-                    Err(e) => error!(
-                        "Failed to create write provider for SlashingManager, skipping: {}",
-                        e
-                    ),
                 }
+                Err(e) => error!(
+                    "Failed to create write provider for SlashingManager, skipping: {}",
+                    e
+                ),
             }
         }
 

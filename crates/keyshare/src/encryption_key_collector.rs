@@ -226,12 +226,22 @@ impl Handler<ExpelPartyFromKeyCollection> for EncryptionKeyCollector {
 
         // Remove expelled party from the todo set
         if !self.todo.remove(&party_id) {
-            info!(
-                e3_id = %self.e3_id,
-                party_id = party_id,
-                "Expelled party {} was not in todo set (already received or unknown)",
-                party_id
-            );
+            // Party already delivered their key — remove it from collected keys
+            if self.keys.remove(&party_id).is_some() {
+                info!(
+                    e3_id = %self.e3_id,
+                    party_id = party_id,
+                    "Expelled party {} already delivered key — removed from collected keys",
+                    party_id
+                );
+            } else {
+                info!(
+                    e3_id = %self.e3_id,
+                    party_id = party_id,
+                    "Expelled party {} was not in todo set and had no collected key",
+                    party_id
+                );
+            }
             return;
         }
 

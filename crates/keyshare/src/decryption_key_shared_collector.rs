@@ -208,12 +208,22 @@ impl Handler<ExpelPartyFromDecryptionKeySharedCollection> for DecryptionKeyShare
         let party_id = msg.party_id;
 
         if !self.expected.remove(&party_id) {
-            info!(
-                e3_id = %self.e3_id,
-                party_id = party_id,
-                "Expelled party {} was not in expected set (already received or unknown)",
-                party_id
-            );
+            // Party already delivered their share — remove from collected data
+            if self.shares.remove(&party_id).is_some() {
+                info!(
+                    e3_id = %self.e3_id,
+                    party_id = party_id,
+                    "Expelled party {} already delivered decryption key share — removed from collected data",
+                    party_id
+                );
+            } else {
+                info!(
+                    e3_id = %self.e3_id,
+                    party_id = party_id,
+                    "Expelled party {} was not in expected set and had no collected data",
+                    party_id
+                );
+            }
             return;
         }
 

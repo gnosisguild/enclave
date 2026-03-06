@@ -224,12 +224,24 @@ impl Handler<ExpelPartyFromShareCollection> for ThresholdShareCollector {
 
         // Remove expelled party from the todo set
         if !self.todo.remove(&party_id) {
-            info!(
-                e3_id = %self.e3_id,
-                party_id = party_id,
-                "Expelled party {} was not in share collection todo set (already received or unknown)",
-                party_id
-            );
+            // Party already delivered their share — remove from collected data
+            let had_share = self.shares.remove(&party_id).is_some();
+            let had_proofs = self.share_proofs.remove(&party_id).is_some();
+            if had_share || had_proofs {
+                info!(
+                    e3_id = %self.e3_id,
+                    party_id = party_id,
+                    "Expelled party {} already delivered share — removed from collected data",
+                    party_id
+                );
+            } else {
+                info!(
+                    e3_id = %self.e3_id,
+                    party_id = party_id,
+                    "Expelled party {} was not in share collection todo set and had no collected data",
+                    party_id
+                );
+            }
             return;
         }
 

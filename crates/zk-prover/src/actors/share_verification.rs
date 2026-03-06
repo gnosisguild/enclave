@@ -188,7 +188,7 @@ impl ShareVerificationActor {
                         Bytes::copy_from_slice(&signed.payload.proof.data),
                         Bytes::copy_from_slice(&signed.payload.proof.public_signals),
                     )
-                        .abi_encode_packed();
+                        .abi_encode();
                     (signed.payload.proof_type, keccak256(&msg).into())
                 })
                 .collect();
@@ -304,7 +304,7 @@ impl ShareVerificationActor {
                         Bytes::copy_from_slice(&signed.payload.proof.data),
                         Bytes::copy_from_slice(&signed.payload.proof.public_signals),
                     )
-                        .abi_encode_packed();
+                        .abi_encode();
                     (signed.payload.proof_type, keccak256(&msg).into())
                 })
                 .collect();
@@ -541,8 +541,11 @@ impl ShareVerificationActor {
             None => match signed_payload.recover_address() {
                 Ok(addr) => addr,
                 Err(err) => {
-                    warn!("Cannot attribute fault — signature recovery failed: {err}");
-                    return;
+                    warn!(
+                        "Signature recovery failed for party {} — using zero address for fault attribution: {err}",
+                        party_id
+                    );
+                    Address::ZERO
                 }
             },
         };
@@ -565,7 +568,7 @@ impl ShareVerificationActor {
                 Bytes::copy_from_slice(&signed_payload.payload.proof.data),
                 Bytes::copy_from_slice(&signed_payload.payload.proof.public_signals),
             )
-                .abi_encode_packed();
+                .abi_encode();
             keccak256(&msg).into()
         };
         if let Err(err) = self.bus.publish(

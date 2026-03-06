@@ -26,7 +26,7 @@ use e3_events::{run_once, EnclaveEvent};
 use e3_events::{E3id, EType, PlaintextAggregated};
 use e3_utils::NotifySync;
 use e3_utils::MAILBOX_LIMIT;
-use tracing::{info, warn};
+use tracing::info;
 
 sol!(
     #[sol(rpc)]
@@ -114,14 +114,18 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                     bus.err(EType::Evm, anyhow::anyhow!("Decrypted output was empty!"));
                     return;
                 };
-                // Warn if multiple outputs are silently discarded
+                // Reject multi-output results — partial on-chain write is worse than failing
                 if decrypted_output.len() > 1 {
-                    warn!(
-                        "E3 {} has {} decrypted outputs but only the first is published on-chain. \
-                        Multi-output support is not yet implemented.",
-                        e3_id,
-                        decrypted_output.len()
+                    bus.err(
+                        EType::Evm,
+                        anyhow::anyhow!(
+                            "E3 {} has {} decrypted outputs but only single-output is supported. \
+                            Refusing partial on-chain write.",
+                            e3_id,
+                            decrypted_output.len()
+                        ),
                     );
+                    return;
                 }
                 let result = publish_plaintext_output(
                     provider,

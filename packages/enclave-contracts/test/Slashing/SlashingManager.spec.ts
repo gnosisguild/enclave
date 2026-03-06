@@ -78,9 +78,10 @@ describe("SlashingManager", function () {
 
     // Sort voters by address ascending (required by contract to prevent duplicates)
     const signersWithAddrs = await Promise.all(
-      voterSigners.map(async (s) => ({
+      voterSigners.map(async (s, idx) => ({
         signer: s,
         address: await s.getAddress(),
+        originalIndex: idx,
       })),
     );
     signersWithAddrs.sort((a, b) =>
@@ -97,9 +98,13 @@ describe("SlashingManager", function () {
     const signatures: string[] = [];
 
     for (let i = 0; i < signersWithAddrs.length; i++) {
-      const { signer, address: voterAddress } = signersWithAddrs[i];
+      const {
+        signer,
+        address: voterAddress,
+        originalIndex,
+      } = signersWithAddrs[i];
       const voteAgrees =
-        agreesOverride !== undefined ? agreesOverride[i] : true;
+        agreesOverride !== undefined ? agreesOverride[originalIndex] : true;
 
       voters.push(voterAddress);
       agrees.push(voteAgrees);

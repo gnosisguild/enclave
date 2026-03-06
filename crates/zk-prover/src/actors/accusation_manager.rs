@@ -677,12 +677,27 @@ impl AccusationManager {
         let total_votes = agree_count + disagree_count;
 
         // CASE A: Majority says proof is bad → accused is at fault
+        // But first check for equivocation: if agreeing voters saw different data,
+        // the accused sent different payloads to different nodes.
         if agree_count >= self.threshold_m {
-            info!(
-                "Quorum reached: {} votes confirm {} sent bad {:?} proof — AccusedFaulted",
-                agree_count, pending.accusation.accused, pending.accusation.proof_type
-            );
-            self.emit_quorum_reached(accusation_id, AccusationOutcome::AccusedFaulted, ec);
+            let agree_hashes: HashSet<[u8; 32]> =
+                pending.votes_for.iter().map(|v| v.data_hash).collect();
+            if agree_hashes.len() > 1 {
+                info!(
+                    "Equivocation detected at quorum: {} unique data hashes among {} agreeing voters for {} {:?}",
+                    agree_hashes.len(),
+                    agree_count,
+                    pending.accusation.accused,
+                    pending.accusation.proof_type
+                );
+                self.emit_quorum_reached(accusation_id, AccusationOutcome::Equivocation, ec);
+            } else {
+                info!(
+                    "Quorum reached: {} votes confirm {} sent bad {:?} proof — AccusedFaulted",
+                    agree_count, pending.accusation.accused, pending.accusation.proof_type
+                );
+                self.emit_quorum_reached(accusation_id, AccusationOutcome::AccusedFaulted, ec);
+            }
             return;
         }
 
@@ -820,13 +835,13 @@ impl AccusationManager {
 
     /// Compute a keccak256 hash of a SignedProofPayload for data_hash comparison.
     ///
-    /// `keccak256(abi.encodePacked(zkProof, publicSignals))`
+    /// `keccak256(abi.encode(zkProof, publicSignals))`
     fn compute_payload_hash(payload: &SignedProofPayload) -> [u8; 32] {
         let msg = (
             Bytes::copy_from_slice(&payload.payload.proof.data),
             Bytes::copy_from_slice(&payload.payload.proof.public_signals),
         )
-            .abi_encode_packed();
+            .abi_encode();
         keccak256(&msg).into()
     }
 
@@ -844,6 +859,10 @@ impl AccusationManager {
 
         let zk_passed = match msg.response {
             ComputeResponseKind::Zk(ZkResponse::VerifyShareProofs(r)) => {
+                if r.party_results.is_empty() {
+                    warn!("Empty ZK re-verification results — abstaining");
+                    return;
+                }
                 r.party_results.first().is_some_and(|r| r.all_verified)
             }
             _ => {

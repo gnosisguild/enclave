@@ -203,13 +203,16 @@ impl Handler<EnclaveEvent> for E3Router {
                     self.bus.publish(event, ctx)?;
                 }
                 EnclaveEventData::E3StageChanged(ref data)
-                    if matches!(data.new_stage, E3Stage::Complete | E3Stage::Failed) =>
+                    if matches!(data.new_stage, E3Stage::Complete) =>
                 {
                     let event = E3RequestComplete {
                         e3_id: e3_id.clone(),
                     };
                     self.bus.publish(event, ctx)?;
                 }
+                // NOTE: E3Stage::Failed does NOT trigger E3RequestComplete.
+                // Failed rounds need the accusation/slashing lifecycle to
+                // complete before the context is torn down.
                 EnclaveEventData::E3RequestComplete(_) => {
                     // Note this will be sent above to the children who can kill themselves based on
                     // the event

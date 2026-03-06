@@ -169,22 +169,22 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
 
     let proof_data = encode_attestation_evidence(&data);
 
-    let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider
-        .provider()
-        .get_transaction_count(from_address)
-        .pending()
-        .await?;
-
     send_tx_with_retry("proposeSlash", &[], || {
         info!(
             "proposeSlash() e3_id={:?} operator={:?} reason={:?}",
             e3_id, operator, reason
         );
         let proof = Bytes::from(proof_data.clone());
-        let contract = ISlashingManager::new(contract_address, provider.provider());
+        let provider = provider.clone();
 
         async move {
+            let from_address = provider.provider().default_signer_address();
+            let current_nonce = provider
+                .provider()
+                .get_transaction_count(from_address)
+                .pending()
+                .await?;
+            let contract = ISlashingManager::new(contract_address, provider.provider());
             let builder = contract
                 .proposeSlash(e3_id, operator, reason.into(), proof)
                 .nonce(current_nonce);

@@ -242,7 +242,13 @@ impl Display for SignedProofFailed {
 }
 
 /// Encode a [`SignedProofFailed`] event into the ABI-encoded evidence bytes
-/// expected by `SlashingManager.proposeSlash()`.
+/// expected by `SlashingManager.proposeSlash()` for **Lane B** (evidence-based,
+/// SLASHER_ROLE) slashing.
+///
+/// **Not used in production.** The current production flow uses Lane A
+/// (attestation-based) via `encode_attestation_evidence()` in
+/// `slashing_manager_sol_writer.rs`. This function is retained for Lane B
+/// integration tests and may be activated when Lane B slashing is implemented.
 ///
 /// Returns: `abi.encode(bytes zkProof, bytes32[] publicInputs, bytes signature, uint256 chainId, uint256 proofType, address verifier)`
 ///

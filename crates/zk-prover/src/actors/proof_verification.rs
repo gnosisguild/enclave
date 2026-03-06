@@ -207,6 +207,18 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
         let pending = self.pending.remove(&pending_key);
 
         if msg.verified {
+            let Some(PendingVerification {
+                signed_payload,
+                recovered_signer,
+            }) = pending
+            else {
+                warn!(
+                    "No pending verification for verified party {} — ignoring duplicate response",
+                    msg.key.party_id
+                );
+                return;
+            };
+
             info!(
                 "C0 proof verified for party {} - accepting key",
                 msg.key.party_id
@@ -216,17 +228,13 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
             self.publish_key_created(msg.e3_id, msg.key, ec.clone());
 
             // Emit ProofVerificationPassed so AccusationManager can cache success
-            if let Some(PendingVerification {
-                signed_payload,
-                recovered_signer,
-            }) = pending
             {
                 let data_hash: [u8; 32] = {
                     let msg = (
                         Bytes::copy_from_slice(&signed_payload.payload.proof.data),
                         Bytes::copy_from_slice(&signed_payload.payload.proof.public_signals),
                     )
-                        .abi_encode_packed();
+                        .abi_encode();
                     keccak256(&msg).into()
                 };
                 if let Err(err) = self.bus.publish(
@@ -276,7 +284,7 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
                         Bytes::copy_from_slice(&signed_payload.payload.proof.data),
                         Bytes::copy_from_slice(&signed_payload.payload.proof.public_signals),
                     )
-                        .abi_encode_packed();
+                        .abi_encode();
                     keccak256(&msg).into()
                 };
                 if let Err(err) = self.bus.publish(

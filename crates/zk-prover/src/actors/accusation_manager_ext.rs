@@ -17,7 +17,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use e3_events::{BusHandle, CommitteeFinalized, EnclaveEvent, EnclaveEventData, Event};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 pub struct AccusationManagerExtension {
     bus: BusHandle,
@@ -49,20 +49,23 @@ impl E3Extension for AccusationManagerExtension {
             e3_id, committee, ..
         } = data.clone();
 
-        // Parse committee addresses
-        let committee_addresses: Vec<Address> = committee
-            .iter()
-            .filter_map(|s| match s.parse::<Address>() {
-                Ok(addr) => Some(addr),
+        // Parse committee addresses — all must be valid or we cannot start
+        let mut committee_addresses: Vec<Address> = Vec::with_capacity(committee.len());
+        for s in committee.iter() {
+            match s.parse::<Address>() {
+                Ok(addr) => committee_addresses.push(addr),
                 Err(e) => {
-                    warn!("Failed to parse committee address {}: {}", s, e);
-                    None
+                    error!(
+                        "Failed to parse committee address {} — cannot start AccusationManager: {}",
+                        s, e
+                    );
+                    return;
                 }
-            })
-            .collect();
+            }
+        }
 
         if committee_addresses.is_empty() {
-            error!("No valid committee addresses — cannot start AccusationManager");
+            error!("No committee addresses — cannot start AccusationManager");
             return;
         }
 
