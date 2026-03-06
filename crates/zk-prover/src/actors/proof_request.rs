@@ -16,9 +16,10 @@ use e3_events::{
     DecryptionshareCreated, DkgProofSigned, E3Failed, E3Stage, E3id, EnclaveEvent,
     EnclaveEventData, EncryptionKey, EncryptionKeyCreated, EncryptionKeyPending, EventContext,
     EventPublisher, EventSubscriber, EventType, FailureReason, PkAggregationProofPending,
-    PkAggregationProofSigned, PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload,
-    ProofType, Sequenced, ShareDecryptionProofPending, SignedProofPayload, ThresholdShare,
-    ThresholdShareCreated, ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
+    AggregateNodeProofsRequest, NodeProofsAggregated, PkAggregationProofSigned, PkBfvProofRequest,
+    PkGenerationProofSigned, Proof, ProofPayload, ProofType, Sequenced,
+    ShareDecryptionProofPending, SignedProofPayload, ThresholdShare, ThresholdShareCreated,
+    ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
@@ -209,6 +210,12 @@ pub struct ProofRequestActor {
     aggregation_correlation: HashMap<CorrelationId, E3id>,
     /// C7 pending proofs per E3
     pending_aggregation: HashMap<E3id, PendingAggregationProof>,
+    /// Stored C0 proof per E3 for node aggregation
+    stored_c0_proof: HashMap<E3id, Proof>,
+    /// Stored C1-C3 proofs per E3 for node aggregation
+    stored_threshold_proofs: HashMap<E3id, Vec<Proof>>,
+    /// Node aggregation correlation: correlation -> (e3_id, party_id, node)
+    node_aggregation_correlation: HashMap<CorrelationId, (E3id, u64, String)>,
 }
 
 impl ProofRequestActor {
@@ -227,6 +234,9 @@ impl ProofRequestActor {
             pending_pk_aggregation: HashMap::new(),
             aggregation_correlation: HashMap::new(),
             pending_aggregation: HashMap::new(),
+            stored_c0_proof: HashMap::new(),
+            stored_threshold_proofs: HashMap::new(),
+            node_aggregation_correlation: HashMap::new(),
         }
     }
 
@@ -449,6 +459,13 @@ impl ProofRequestActor {
             ComputeResponseKind::Zk(ZkResponse::DecryptedSharesAggregation(resp)) => {
                 self.handle_aggregation_proof_response(&msg.correlation_id, resp.proofs.clone());
             }
+            ComputeResponseKind::Zk(ZkResponse::AggregateNodeProofs(resp)) => {
+                self.handle_node_aggregation_response(
+                    &msg.correlation_id,
+                    resp.aggregated_proof.clone(),
+                    &ec,
+                );
+            }
             _ => {}
         }
     }
@@ -618,10 +635,14 @@ impl ProofRequestActor {
             self.signer.address()
         );
 
+        let party_id = pending.party_id;
+        let node = pending.node.clone();
+        let ec = pending.ec.clone();
+
         if let Err(err) = self.bus.publish(
             DecryptionKeyShared {
                 e3_id: e3_id.clone(),
-                party_id: pending.party_id,
+                party_id,
                 node: pending.node,
                 sk_poly_sum: pending.sk_poly_sum,
                 es_poly_sum: pending.es_poly_sum,
@@ -629,9 +650,129 @@ impl ProofRequestActor {
                 signed_esm_decryption_proofs: signed_esms,
                 external: false,
             },
-            pending.ec,
+            ec.clone(),
         ) {
             error!("Failed to publish DecryptionKeyShared: {err}");
+        }
+
+        // Dispatch node proof aggregation (C0-C4 → wrapper+fold)
+        self.dispatch_node_aggregation(e3_id, party_id, node, ec);
+    }
+
+    /// Collect C0-C4 proofs and dispatch AggregateNodeProofs compute request.
+    fn dispatch_node_aggregation(
+        &mut self,
+        e3_id: &E3id,
+        party_id: u64,
+        node: String,
+        ec: EventContext<Sequenced>,
+    ) {
+        let c0 = self.stored_c0_proof.remove(e3_id);
+        let threshold = self.stored_threshold_proofs.remove(e3_id);
+
+        let Some(c4_pending) = self.pending_decryption.get(e3_id) else {
+            warn!("No C4 proofs found for E3 {} — skipping node aggregation", e3_id);
+            return;
+        };
+
+        // Collect C4 proofs
+        let mut c4_proofs = Vec::new();
+        if let Some(ref p) = c4_pending.sk_proof {
+            c4_proofs.push(p.clone());
+        }
+        for idx in 0..c4_pending.expected_esm_count {
+            if let Some(p) = c4_pending.esm_proofs.get(&idx) {
+                c4_proofs.push(p.clone());
+            }
+        }
+
+        // Build proof groups: group proofs by circuit for efficient wrapping
+        // Each group contains 1-2 proofs of the same circuit
+        let mut all_proofs = Vec::new();
+        if let Some(p) = c0 {
+            all_proofs.push(p);
+        }
+        if let Some(proofs) = threshold {
+            all_proofs.extend(proofs);
+        }
+        all_proofs.extend(c4_proofs);
+
+        if all_proofs.is_empty() {
+            warn!("No proofs to aggregate for E3 {} — skipping", e3_id);
+            return;
+        }
+
+        // Group by circuit name, max 2 per group
+        let mut circuit_groups: HashMap<e3_events::CircuitName, Vec<Proof>> = HashMap::new();
+        for proof in all_proofs {
+            circuit_groups
+                .entry(proof.circuit.clone())
+                .or_default()
+                .push(proof);
+        }
+
+        let mut proof_groups = Vec::new();
+        for (_circuit, proofs) in circuit_groups {
+            for chunk in proofs.chunks(2) {
+                proof_groups.push(chunk.to_vec());
+            }
+        }
+
+        let correlation_id = CorrelationId::new();
+        self.node_aggregation_correlation
+            .insert(correlation_id, (e3_id.clone(), party_id, node.clone()));
+
+        info!(
+            "Dispatching node proof aggregation for E3 {} party {} ({} groups)",
+            e3_id,
+            party_id,
+            proof_groups.len()
+        );
+
+        if let Err(err) = self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::AggregateNodeProofs(AggregateNodeProofsRequest { proof_groups }),
+                correlation_id,
+                e3_id.clone(),
+            ),
+            ec,
+        ) {
+            error!("Failed to publish AggregateNodeProofs request: {err}");
+        }
+    }
+
+    /// Handle AggregateNodeProofs response: publish NodeProofsAggregated.
+    fn handle_node_aggregation_response(
+        &mut self,
+        correlation_id: &CorrelationId,
+        aggregated_proof: Proof,
+        ec: &EventContext<Sequenced>,
+    ) {
+        let Some((e3_id, party_id, node)) =
+            self.node_aggregation_correlation.remove(correlation_id)
+        else {
+            error!(
+                "Received AggregateNodeProofs response with unknown correlation_id {:?}",
+                correlation_id
+            );
+            return;
+        };
+
+        info!(
+            "Node proof aggregation complete for E3 {} party {}",
+            e3_id, party_id
+        );
+
+        if let Err(err) = self.bus.publish(
+            NodeProofsAggregated {
+                e3_id,
+                party_id,
+                node,
+                aggregated_proof,
+            },
+            ec.clone(),
+        ) {
+            error!("Failed to publish NodeProofsAggregated: {err}");
         }
     }
 
@@ -978,6 +1119,28 @@ impl ProofRequestActor {
         let party_id = pending.full_share.party_id;
         let ec = &pending.ec;
 
+        // Store C1-C3 proofs for node aggregation
+        {
+            let mut threshold_proofs = Vec::new();
+            if let Some(ref p) = pending.pk_generation_proof {
+                threshold_proofs.push(p.clone());
+            }
+            if let Some(ref p) = pending.sk_share_computation_proof {
+                threshold_proofs.push(p.clone());
+            }
+            if let Some(ref p) = pending.e_sm_share_computation_proof {
+                threshold_proofs.push(p.clone());
+            }
+            for proof in pending.sk_share_encryption_proofs.values() {
+                threshold_proofs.push(proof.clone());
+            }
+            for proof in pending.e_sm_share_encryption_proofs.values() {
+                threshold_proofs.push(proof.clone());
+            }
+            self.stored_threshold_proofs
+                .insert(e3_id.clone(), threshold_proofs);
+        }
+
         // Sign C1 (PkGeneration)
         let Some(signed_pk_gen) = self.sign_proof(
             e3_id,
@@ -1165,6 +1328,10 @@ impl ProofRequestActor {
 
         let mut key = (*pending.key).clone();
         key.proof = Some(proof.clone());
+
+        // Store C0 proof for node aggregation
+        self.stored_c0_proof
+            .insert(pending.e3_id.clone(), proof.clone());
 
         // Always sign the proof payload — unsigned proofs are not published
         let payload = ProofPayload {
