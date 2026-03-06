@@ -88,7 +88,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
     ///      Includes chainId to prevent cross-chain replay and dataHash for equivocation detection.
     bytes32 public constant VOTE_TYPEHASH =
         keccak256(
-            "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)"
+            "AccusationVote(uint256 chainId,uint256 e3Id,"
+            "bytes32 accusationId,address voter,"
+            "bool agrees,bytes32 dataHash)"
         );
 
     // ======================
@@ -486,6 +488,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
             // If active count drops below M, fail the E3
             if (activeCount < thresholdM && p.failureReason > 0) {
                 // NOTE: catch block must not be empty (solc optimizer bug, see below)
+                // solhint-disable-next-line no-empty-blocks
                 try enclave.onE3Failed(p.e3Id, p.failureReason) {
                     // Side effects occur in the external call
                 } catch {
@@ -499,6 +502,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         // Self-call for try/catch atomicity — on failure, funds stay in BondingRegistry.
         if (actualTicketSlashed > 0) {
             // NOTE: catch must not be empty — solc >=0.8.28 optimizer bug.
+            // solhint-disable-next-line no-empty-blocks
             try
                 this.escrowSlashedFundsToRefund(p.e3Id, actualTicketSlashed)
             {} catch {

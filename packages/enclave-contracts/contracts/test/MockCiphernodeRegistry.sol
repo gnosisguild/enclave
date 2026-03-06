@@ -14,7 +14,7 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     mapping(uint256 e3Id => address[] nodes) private _committeeNodes;
 
     /// @notice Configurable threshold M per E3 for testing
-    mapping(uint256 e3Id => uint32) private _thresholdM;
+    mapping(uint256 e3Id => uint32 threshold) private _thresholdM;
 
     /// @notice Set committee members for an E3 (test helper)
     function setCommitteeNodes(
