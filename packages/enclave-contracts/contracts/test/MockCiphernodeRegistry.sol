@@ -116,13 +116,21 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         return false;
     }
 
-    // solhint-disable-next-line no-empty-blocks
     function expelCommitteeMember(
-        uint256,
-        address,
+        uint256 e3Id,
+        address member,
         bytes32
-    ) external pure returns (uint256, uint32) {
-        return (0, 0);
+    ) external returns (uint256, uint32) {
+        address[] storage nodes = _committeeNodes[e3Id];
+        for (uint256 i = 0; i < nodes.length; i++) {
+            if (nodes[i] == member) {
+                nodes[i] = nodes[nodes.length - 1];
+                nodes.pop();
+                break;
+            }
+        }
+        uint32 m = _thresholdM[e3Id];
+        return (nodes.length, m);
     }
 
     function isCommitteeMemberActive(

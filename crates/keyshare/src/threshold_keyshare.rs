@@ -527,6 +527,17 @@ impl ThresholdKeyshare {
             node_addr, party_id, data.e3_id, data.active_count_after
         );
 
+        // Clean transient coordination state for the expelled party
+        self.pending_shares.retain(|s| s.party_id != party_id);
+
+        if let Some(ref mut honest) = self.honest_parties {
+            honest.remove(&party_id);
+        }
+
+        if let Some(ref mut pending_c4) = self.pending_c4_verification_shares {
+            pending_c4.remove(&party_id);
+        }
+
         if let Some(ref collector) = self.encryption_key_collector {
             collector.do_send(ExpelPartyFromKeyCollection {
                 party_id,

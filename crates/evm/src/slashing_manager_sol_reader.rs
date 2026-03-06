@@ -9,11 +9,20 @@ use crate::{
 };
 use actix::{Actor, Addr};
 use alloy::{
-    primitives::{LogData, B256},
+    primitives::{LogData, B256, U256},
     sol_types::SolEvent,
 };
 use e3_events::{E3id, EnclaveEventData};
 use tracing::{error, info, trace};
+
+/// Convert a U256 to u128, returning None if the value overflows.
+fn safe_u256_to_u128(val: U256) -> Option<u128> {
+    if val > U256::from(u128::MAX) {
+        None
+    } else {
+        Some(val.to::<u128>())
+    }
+}
 
 pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEventData> {
     match topic {
@@ -28,11 +37,38 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
             );
             Some(EnclaveEventData::from(e3_events::SlashExecuted {
                 e3_id: E3id::new(event.e3Id.to_string(), chain_id),
-                proposal_id: event.proposalId.to::<u128>(),
+                proposal_id: match safe_u256_to_u128(event.proposalId) {
+                    Some(v) => v,
+                    None => {
+                        error!(
+                            "SlashExecuted proposalId overflows u128: {}",
+                            event.proposalId
+                        );
+                        return None;
+                    }
+                },
                 operator: event.operator,
                 reason: event.reason.into(),
-                ticket_amount: event.ticketAmount.to::<u128>(),
-                license_amount: event.licenseAmount.to::<u128>(),
+                ticket_amount: match safe_u256_to_u128(event.ticketAmount) {
+                    Some(v) => v,
+                    None => {
+                        error!(
+                            "SlashExecuted ticketAmount overflows u128: {}",
+                            event.ticketAmount
+                        );
+                        return None;
+                    }
+                },
+                license_amount: match safe_u256_to_u128(event.licenseAmount) {
+                    Some(v) => v,
+                    None => {
+                        error!(
+                            "SlashExecuted licenseAmount overflows u128: {}",
+                            event.licenseAmount
+                        );
+                        return None;
+                    }
+                },
             }))
         }
         _topic => {
