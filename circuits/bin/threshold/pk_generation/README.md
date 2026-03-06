@@ -12,8 +12,8 @@ probability.
 
 ```mermaid
 flowchart TD
-    %% Input from Phase 0
-    Input0["P0<br>Configs Verification"] -.->|"verified configs"| C1
+    %% Input from config circuit
+    Input0["Config<br>Verification"] -.->|"verified configs"| C1
 
     subgraph Focus["C1"]
         C1["<i>Generate TRBFV key pair</i>"]
@@ -39,13 +39,13 @@ flowchart TD
 ### Metadata
 
 - **Phase**: P1 (DKG).
-- **Runs**: N_PARTIES (once per ciphernode after BFV key commitment).
-- **Requires**: [`config`](../../config) circuit from P0 (Configs Verification).
+- **Runs**: N_PARTIES (once per ciphernode after DKG key commitment).
+- **Requires**: [`config`](../../config) circuit (pre-deployment parameter verification).
 - **Output(s)**:
   - `commit(sk)` → C2a ([`dkg/share_computation`](../../dkg/sk_share_computation))
   - `commit(e_sm)` → C2b ([`dkg/share_computation`](../../dkg/e_sm_share_computation))
   - `commit(pk_trbfv)` → C5 ([`threshold/pk_aggregation`](../../threshold/pk_aggregation/))
-- **Data Flow**: `P0 → C1 → {commit(sk) → C2a, commit(pk_trbfv) → C5, commit(e_sm) → C2b}`
+- **Data Flow**: `Config → C1 → {commit(sk) → C2a, commit(pk_trbfv) → C5, commit(e_sm) → C2b}`
 - **Challenge Generation**: [`math/commitments.nr`](../../../lib/src/math/commitments.nr) -
   `compute_threshold_pk_challenge()`
 - **Commitment Functions**: [`math/commitments.nr`](../../../lib/src/math/commitments.nr) -

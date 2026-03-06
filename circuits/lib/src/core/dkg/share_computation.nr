@@ -49,7 +49,7 @@ pub struct SecretKeyShareComputation<let N: u32, let L: u32, let N_PARTIES: u32,
     y: [[[Field; N_PARTIES + 1]; L]; N],
     /// Parity check matrices for Reed-Solomon verification.
     /// H[mod_idx] has dimensions (N_PARTIES - T) x (N_PARTIES + 1).
-    /// (public constants, verified in P0)
+    /// (public constants, verified at deployment)
     h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
 }
 
@@ -78,7 +78,7 @@ pub struct SmudgingNoiseShareComputation<let N: u32, let L: u32, let N_PARTIES: 
     y: [[[Field; N_PARTIES + 1]; L]; N],
     /// Parity check matrices for Reed-Solomon verification.
     /// H[mod_idx] has dimensions (N_PARTIES - T) x (N_PARTIES + 1).
-    /// (public constants, verified in P0)
+    /// (public constants, verified at deployment)
     h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
 }
 
@@ -245,7 +245,7 @@ pub fn check_range_bounds<let N: u32, let L: u32, let N_PARTIES: u32, let BIT_SH
 /// Verifies Reed-Solomon parity check: `H[j] * y[i][j]^T == 0 mod q_j` for all i, j.
 ///
 /// This is the cryptographic core of share verification. The parity check matrix H[j]
-/// is constructed (and verified in P0) such that valid Shamir shares must satisfy this
+/// is constructed (and verified at deployment) such that valid Shamir shares must satisfy this
 /// linear equation. This guarantees two essential properties:
 ///
 /// 1. **Reconstruction**: Any T+1 shares can correctly recover the secret via Lagrange interpolation

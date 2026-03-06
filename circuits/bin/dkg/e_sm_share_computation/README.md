@@ -5,8 +5,8 @@ correctly computed using Shamir Secret Sharing. After generating smudging noise 
 ciphernode must split it into shares and prove the sharing was done correctly.
 
 This circuit uses identical verification logic to C2a but operates on smudging noise instead of the
-secret key. The smudging noise is critical for Phase 4 (threshold decryption)—it masks decryption
-shares to prevent secret key leakage while allowing correct reconstruction of the plaintext.
+secret key. The smudging noise is critical for P4 (Threshold Decryption)—it masks decryption shares
+to prevent secret key leakage while allowing correct reconstruction of the plaintext.
 
 ```mermaid
 flowchart TD

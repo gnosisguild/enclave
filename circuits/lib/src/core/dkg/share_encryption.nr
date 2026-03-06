@@ -82,7 +82,7 @@ impl<let L: u32> Configs<L> {
 
 /// DKG Share Encryption Circuit (C3a / C3b).
 ///
-/// Verifies that a secret share was correctly encrypted under a recipient's BFV public key.
+/// Verifies that a secret share was correctly encrypted under a recipient's DKG public key.
 /// This circuit runs twice in parallel per ciphernode per recipient:
 /// - C3a: encrypts a secret key (sk) share, consuming commit(sk_share) from C2a
 /// - C3b: encrypts a smudging noise (e_sm) share, consuming commit(e_sm_share) from C2b
@@ -98,7 +98,7 @@ impl<let L: u32> Configs<L> {
 pub struct ShareEncryption<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     /// Circuit parameters
     configs: Configs<L>,
-    /// Expected commitment to the BFV public key (from C0: pk).
+    /// Expected commitment to the DKG public key (from C0: pk).
     /// (public witness)
     expected_pk_commitment: Field,
     /// Expected commitment to the share (message) being encrypted.
@@ -177,7 +177,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         }
     }
 
-    /// Verifies that the BFV public key hashes to the expected commitment from C0.
+    /// Verifies that the DKG public key hashes to the expected commitment from C0.
     ///
     /// Ensures the ciphernode encrypted under the same key they committed to in C0,
     /// preventing key substitution attacks.
