@@ -36,6 +36,10 @@ pub enum ZkRequest {
     ThresholdShareDecryption(ThresholdShareDecryptionProofRequest),
     /// Generate proof for decrypted shares aggregation (C7).
     DecryptedSharesAggregation(DecryptedSharesAggregationProofRequest),
+    /// Aggregate node inner proofs (C0-C4) into a single wrapper+fold proof.
+    AggregateNodeProofs(AggregateNodeProofsRequest),
+    /// Aggregator-side Phase 1: fold H node aggregated proofs + generate and fold C5.
+    Phase1Aggregation(Phase1AggregationRequest),
 }
 
 /// Request to generate a proof for public key aggregation (C5).
@@ -207,6 +211,10 @@ pub enum ZkResponse {
     ThresholdShareDecryption(ThresholdShareDecryptionProofResponse),
     /// Proof for decrypted shares aggregation (C7).
     DecryptedSharesAggregation(DecryptedSharesAggregationProofResponse),
+    /// Aggregated node proof (wrapper+fold chain of C0-C4).
+    AggregateNodeProofs(AggregateNodeProofsResponse),
+    /// Final Phase 1 aggregated proof (node proofs folded + C5).
+    Phase1Aggregation(Phase1AggregationResponse),
 }
 
 /// Response containing a generated proof for public key aggregation (C5).
@@ -398,6 +406,43 @@ pub struct DecryptedSharesAggregationProofRequest {
 pub struct DecryptedSharesAggregationProofResponse {
     /// One C7 proof per ciphertext index.
     pub proofs: Vec<Proof>,
+}
+
+// --- Node-side proof aggregation (Phase 1) ---
+
+/// Request to aggregate inner proofs (C0-C4) into a single wrapper+fold proof.
+///
+/// Each group contains 1-2 proofs of the same circuit. Groups are processed
+/// sequentially: the first group produces a wrapper, subsequent groups produce
+/// a wrapper that is folded with the running aggregate.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AggregateNodeProofsRequest {
+    /// Ordered proof groups. Each inner Vec has 1-2 proofs sharing the same circuit.
+    pub proof_groups: Vec<Vec<Proof>>,
+}
+
+/// Response from node-side proof aggregation.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AggregateNodeProofsResponse {
+    /// The single aggregated proof (wrapper or fold).
+    pub aggregated_proof: Proof,
+}
+
+/// Aggregator-side Phase 1: fold H node aggregated proofs together, then
+/// generate C5 (pk_aggregation) and fold it with the node aggregate.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Phase1AggregationRequest {
+    /// Aggregated proofs from H honest nodes (wrapper/fold proofs).
+    pub node_aggregated_proofs: Vec<Proof>,
+    /// C5 proof generation parameters.
+    pub pk_aggregation_request: PkAggregationProofRequest,
+}
+
+/// Response from aggregator-side Phase 1 aggregation.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Phase1AggregationResponse {
+    /// The final Phase 1 proof: all node proofs + C5, folded together.
+    pub final_proof: Proof,
 }
 
 /// ZK-specific error variants.

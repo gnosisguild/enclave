@@ -23,13 +23,14 @@ use e3_events::trap_fut;
 use e3_events::EType;
 use e3_events::EffectsEnabled;
 use e3_events::{
-    BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
-    ComputeResponse, DecryptedSharesAggregationProofRequest,
-    DecryptedSharesAggregationProofResponse, DkgShareDecryptionProofRequest,
-    DkgShareDecryptionProofResponse, EnclaveEvent, EnclaveEventData, EventPublisher,
-    EventSubscriber, EventType, PartyVerificationResult, PkAggregationProofRequest,
+    AggregateNodeProofsRequest, AggregateNodeProofsResponse, BusHandle, ComputeRequest,
+    ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind, ComputeResponse,
+    DecryptedSharesAggregationProofRequest, DecryptedSharesAggregationProofResponse,
+    DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, EnclaveEvent,
+    EnclaveEventData, EventPublisher, EventSubscriber, EventType, PartyVerificationResult,
+    Phase1AggregationRequest, Phase1AggregationResponse, PkAggregationProofRequest,
     PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest,
-    PkGenerationProofResponse, ShareComputationProofRequest, ShareComputationProofResponse,
+    PkGenerationProofResponse, Proof, ShareComputationProofRequest, ShareComputationProofResponse,
     ShareEncryptionProofRequest, ShareEncryptionProofResponse,
     ThresholdShareDecryptionProofRequest, ThresholdShareDecryptionProofResponse, TypedEvent,
     VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
@@ -67,7 +68,7 @@ use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncrypti
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
-use e3_zk_prover::{Provable, ZkBackend, ZkProver};
+use e3_zk_prover::{generate_fold_proof, generate_wrapper_proof, Provable, ZkBackend, ZkProver};
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
 use fhe_traits::{DeserializeParametrized, FheEncoder};
@@ -613,6 +614,12 @@ fn handle_zk_request(
                 handle_decrypted_shares_aggregation_proof(&prover, req, request.clone())
             })
         }
+        ZkRequest::AggregateNodeProofs(req) => timefunc("zk_aggregate_node_proofs", id, || {
+            handle_aggregate_node_proofs(&prover, req, request.clone())
+        }),
+        ZkRequest::Phase1Aggregation(req) => timefunc("zk_phase1_aggregation", id, || {
+            handle_phase1_aggregation(&prover, req, request.clone())
+        }),
     }
 }
 
@@ -622,6 +629,170 @@ fn make_zk_error(request: &ComputeRequest, msg: String) -> ComputeRequestError {
         ComputeRequestErrorKind::Zk(ZkEventError::InvalidParams(msg)),
         request.clone(),
     )
+}
+
+fn handle_aggregate_node_proofs(
+    prover: &ZkProver,
+    req: AggregateNodeProofsRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    let e3_id_str = request.e3_id.to_string();
+    let mut running_aggregate: Option<Proof> = None;
+
+    for (i, group) in req.proof_groups.iter().enumerate() {
+        if group.is_empty() || group.len() > 2 {
+            return Err(make_zk_error(
+                &request,
+                format!(
+                    "proof_groups[{}]: expected 1-2 proofs, got {}",
+                    i,
+                    group.len()
+                ),
+            ));
+        }
+
+        let wrapper = generate_wrapper_proof(prover, group, &e3_id_str).map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                    "wrapper proof group[{}]: {}",
+                    i, e
+                ))),
+                request.clone(),
+            )
+        })?;
+
+        running_aggregate = Some(match running_aggregate {
+            Some(agg) => generate_fold_proof(prover, &wrapper, &agg, &e3_id_str).map_err(|e| {
+                ComputeRequestError::new(
+                    ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                        "fold proof group[{}]: {}",
+                        i, e
+                    ))),
+                    request.clone(),
+                )
+            })?,
+            None => wrapper,
+        });
+    }
+
+    let aggregated_proof = running_aggregate
+        .ok_or_else(|| make_zk_error(&request, "proof_groups was empty".to_string()))?;
+
+    Ok(ComputeResponse::zk(
+        ZkResponse::AggregateNodeProofs(AggregateNodeProofsResponse { aggregated_proof }),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
+fn handle_phase1_aggregation(
+    prover: &ZkProver,
+    req: Phase1AggregationRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    let e3_id_str = request.e3_id.to_string();
+
+    // Step 1: Fold all H node aggregated proofs together
+    let mut running_aggregate: Option<Proof> = None;
+    for (i, node_proof) in req.node_aggregated_proofs.iter().enumerate() {
+        running_aggregate = Some(match running_aggregate {
+            Some(agg) => {
+                // Wrap the single node proof, then fold with running aggregate
+                let wrapper = generate_wrapper_proof(prover, &[node_proof.clone()], &e3_id_str)
+                    .map_err(|e| {
+                        ComputeRequestError::new(
+                            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(
+                                format!("node proof wrapper[{}]: {}", i, e),
+                            )),
+                            request.clone(),
+                        )
+                    })?;
+                generate_fold_proof(prover, &wrapper, &agg, &e3_id_str).map_err(|e| {
+                    ComputeRequestError::new(
+                        ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                            "node proof fold[{}]: {}",
+                            i, e
+                        ))),
+                        request.clone(),
+                    )
+                })?
+            }
+            None => node_proof.clone(),
+        });
+    }
+
+    let nodes_aggregate = running_aggregate
+        .ok_or_else(|| make_zk_error(&request, "node_aggregated_proofs was empty".to_string()))?;
+
+    // Step 2: Generate C5 (PkAggregation) proof
+    let pk_req = req.pk_aggregation_request;
+    let (threshold_params, _dkg_params) = build_pair_for_preset(pk_req.params_preset.clone())
+        .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
+    let crp = create_deterministic_crp_from_default_seed(&threshold_params);
+
+    let mut pk0_shares = Vec::with_capacity(pk_req.keyshare_bytes.len());
+    for (i, ks_bytes) in pk_req.keyshare_bytes.iter().enumerate() {
+        let pk_share = PublicKeyShare::deserialize(ks_bytes, &threshold_params, crp.clone())
+            .map_err(|e| {
+                make_zk_error(&request, format!("keyshare[{}] deserialize: {:?}", i, e))
+            })?;
+        pk0_shares.push(CrtPolynomial::from_fhe_polynomial(&pk_share.p0_share()));
+    }
+
+    let public_key = PublicKey::from_bytes(&pk_req.aggregated_pk_bytes, &threshold_params)
+        .map_err(|e| make_zk_error(&request, format!("aggregated_pk deserialize: {:?}", e)))?;
+    let a = CrtPolynomial::from_fhe_polynomial(&crp.poly());
+
+    let committee = CiphernodesCommittee {
+        n: pk_req.committee_n,
+        h: pk_req.committee_h,
+        threshold: pk_req.committee_threshold,
+    };
+
+    let circuit_data = PkAggregationCircuitData {
+        committee,
+        public_key,
+        pk0_shares,
+        a,
+    };
+
+    let circuit = PkAggregationCircuit;
+    let c5_proof = circuit
+        .prove(prover, &pk_req.params_preset, &circuit_data, &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
+    // Step 3: Wrap C5 and fold with nodes aggregate
+    let c5_wrapper = generate_wrapper_proof(prover, &[c5_proof], &e3_id_str).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                "c5 wrapper: {}",
+                e
+            ))),
+            request.clone(),
+        )
+    })?;
+
+    let final_proof = generate_fold_proof(prover, &c5_wrapper, &nodes_aggregate, &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                    "c5 fold: {}",
+                    e
+                ))),
+                request.clone(),
+            )
+        })?;
+
+    Ok(ComputeResponse::zk(
+        ZkResponse::Phase1Aggregation(Phase1AggregationResponse { final_proof }),
+        request.correlation_id,
+        request.e3_id,
+    ))
 }
 
 fn handle_share_computation_proof(

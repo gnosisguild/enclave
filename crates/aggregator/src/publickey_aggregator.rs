@@ -9,11 +9,12 @@ use anyhow::Result;
 use e3_bfv_client::client::compute_pk_commitment;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, BusHandle, Die, E3id, EnclaveEvent, EnclaveEventData, EventContext,
-    KeyshareCreated, OrderedSet, PartyProofsToVerify, PkAggregationProofPending,
-    PkAggregationProofRequest, PkAggregationProofSigned, PublicKeyAggregated, Seed, Sequenced,
-    ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload, TypedEvent,
-    VerificationKind,
+    prelude::*, BusHandle, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
+    Die, E3id, EnclaveEvent, EnclaveEventData, EventContext, KeyshareCreated, NodeProofsAggregated,
+    OrderedSet, PartyProofsToVerify, Phase1AggregationRequest, PkAggregationProofPending,
+    PkAggregationProofRequest, PkAggregationProofSigned, Proof, PublicKeyAggregated, Seed,
+    Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload,
+    TypedEvent, VerificationKind, ZkRequest, ZkResponse,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -73,6 +74,12 @@ pub struct PublicKeyAggregator {
     e3_id: E3id,
     state: Persistable<PublicKeyAggregatorState>,
     params_preset: BfvPreset,
+    /// Node aggregated proofs collected for Phase 1 aggregation.
+    node_aggregated_proofs: Vec<Proof>,
+    /// Expected number of node aggregated proofs (set when entering GeneratingC5Proof).
+    expected_node_proofs: usize,
+    /// Stored PkAggregationProofRequest for Phase 1 aggregation dispatch.
+    stored_pk_agg_request: Option<PkAggregationProofRequest>,
 }
 
 pub struct PublicKeyAggregatorParams {
@@ -96,6 +103,9 @@ impl PublicKeyAggregator {
             e3_id: params.e3_id,
             state,
             params_preset: params.params_preset,
+            node_aggregated_proofs: Vec::new(),
+            expected_node_proofs: 0,
+            stored_pk_agg_request: None,
         }
     }
 
@@ -292,20 +302,26 @@ impl PublicKeyAggregator {
         // GeneratingC5Proof (no retry path).
         let committee_h = honest_keyshares.len();
 
+        let pk_agg_request = PkAggregationProofRequest {
+            keyshare_bytes: honest_keyshares.clone(),
+            aggregated_pk_bytes: ArcBytes::from_bytes(&pubkey),
+            params_preset: self.params_preset.clone(),
+            // this field is not really used in the circuit, we only use H
+            committee_n: committee_h,
+            committee_h,
+            // this field is not really used in the circuit, we only use H
+            committee_threshold: 0,
+        };
+
+        // Store for Phase 1 aggregation
+        self.expected_node_proofs = committee_h;
+        self.stored_pk_agg_request = Some(pk_agg_request.clone());
+
         info!("Publishing PkAggregationProofPending for C5 proof generation...");
         self.bus.publish(
             PkAggregationProofPending {
                 e3_id: self.e3_id.clone(),
-                proof_request: PkAggregationProofRequest {
-                    keyshare_bytes: honest_keyshares.clone(),
-                    aggregated_pk_bytes: ArcBytes::from_bytes(&pubkey),
-                    params_preset: self.params_preset.clone(),
-                    // this field is not really used in the circuit, we only use H
-                    committee_n: committee_h,
-                    committee_h,
-                    // this field is not really used in the circuit, we only use H
-                    committee_threshold: 0,
-                },
+                proof_request: pk_agg_request,
                 public_key: pubkey.clone(),
                 public_key_hash,
                 nodes: honest_nodes_set.clone(),
@@ -376,6 +392,81 @@ impl PublicKeyAggregator {
         })?;
         Ok(())
     }
+
+    fn handle_node_proofs_aggregated(
+        &mut self,
+        msg: TypedEvent<NodeProofsAggregated>,
+    ) -> Result<()> {
+        let (msg, ec) = msg.into_components();
+
+        if msg.e3_id != self.e3_id {
+            return Ok(());
+        }
+
+        self.node_aggregated_proofs.push(msg.aggregated_proof);
+
+        info!(
+            "PublicKeyAggregator collected node aggregated proof {}/{} for E3 {}",
+            self.node_aggregated_proofs.len(),
+            self.expected_node_proofs,
+            self.e3_id
+        );
+
+        if self.node_aggregated_proofs.len() >= self.expected_node_proofs
+            && self.expected_node_proofs > 0
+        {
+            self.dispatch_phase1_aggregation(ec)?;
+        }
+
+        Ok(())
+    }
+
+    fn dispatch_phase1_aggregation(&mut self, ec: EventContext<Sequenced>) -> Result<()> {
+        let Some(pk_agg_request) = self.stored_pk_agg_request.take() else {
+            return Err(anyhow::anyhow!(
+                "No stored PkAggregationProofRequest for Phase 1 aggregation"
+            ));
+        };
+
+        let node_proofs = std::mem::take(&mut self.node_aggregated_proofs);
+        let correlation_id = CorrelationId::new();
+
+        info!(
+            "Dispatching Phase 1 aggregation for E3 {} ({} node proofs + C5)",
+            self.e3_id,
+            node_proofs.len()
+        );
+
+        self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::Phase1Aggregation(Phase1AggregationRequest {
+                    node_aggregated_proofs: node_proofs,
+                    pk_aggregation_request: pk_agg_request,
+                }),
+                correlation_id,
+                self.e3_id.clone(),
+            ),
+            ec,
+        )?;
+
+        Ok(())
+    }
+
+    fn handle_phase1_aggregation_response(
+        &mut self,
+        msg: TypedEvent<ComputeResponse>,
+    ) -> Result<()> {
+        let (msg, _ec) = msg.into_components();
+
+        if let ComputeResponseKind::Zk(ZkResponse::Phase1Aggregation(resp)) = &msg.response {
+            info!(
+                "Phase 1 aggregation complete for E3 {} — final proof circuit: {:?}",
+                self.e3_id, resp.final_proof.circuit
+            );
+        }
+
+        Ok(())
+    }
 }
 
 impl Actor for PublicKeyAggregator {
@@ -397,6 +488,12 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::PkAggregationProofSigned(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::NodeProofsAggregated(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::ComputeRequestError(data) => {
@@ -483,6 +580,38 @@ impl Handler<TypedEvent<PkAggregationProofSigned>> for PublicKeyAggregator {
             EType::PublickeyAggregation,
             &self.bus.with_ec(msg.get_ctx()),
             || self.handle_pk_aggregation_proof_signed(msg),
+        )
+    }
+}
+
+impl Handler<TypedEvent<NodeProofsAggregated>> for PublicKeyAggregator {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<NodeProofsAggregated>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(
+            EType::PublickeyAggregation,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_node_proofs_aggregated(msg),
+        )
+    }
+}
+
+impl Handler<TypedEvent<ComputeResponse>> for PublicKeyAggregator {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ComputeResponse>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(
+            EType::PublickeyAggregation,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_phase1_aggregation_response(msg),
         )
     }
 }

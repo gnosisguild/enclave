@@ -33,6 +33,7 @@ mod encryption_key_pending;
 mod encryption_key_received;
 mod keyshare_created;
 mod net_sync_events_received;
+mod node_proofs_aggregated;
 mod operator_activation_changed;
 mod outgoing_sync_requested;
 mod pk_aggregation_proof_pending;
@@ -90,6 +91,7 @@ pub use encryption_key_pending::*;
 pub use encryption_key_received::*;
 pub use keyshare_created::*;
 pub use net_sync_events_received::*;
+pub use node_proofs_aggregated::*;
 pub use operator_activation_changed::*;
 pub use outgoing_sync_requested::*;
 pub use pk_aggregation_proof_pending::*;
@@ -270,6 +272,7 @@ pub enum EnclaveEventData {
     PkAggregationProofSigned(PkAggregationProofSigned),
     AggregationProofPending(AggregationProofPending),
     AggregationProofSigned(AggregationProofSigned),
+    NodeProofsAggregated(NodeProofsAggregated),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -528,6 +531,7 @@ impl EnclaveEventData {
             EnclaveEventData::PkAggregationProofSigned(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::AggregationProofPending(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::AggregationProofSigned(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::NodeProofsAggregated(ref data) => Some(data.e3_id.clone()),
             _ => None,
         }
     }
@@ -609,7 +613,8 @@ impl_event_types!(
     PkAggregationProofPending,
     PkAggregationProofSigned,
     AggregationProofPending,
-    AggregationProofSigned
+    AggregationProofSigned,
+    NodeProofsAggregated
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {
