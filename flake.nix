@@ -79,9 +79,13 @@
           }
         else bbBin;
 
-      wrapped-bb = pkgs.writeShellScriptBin "bb" ''
-        exec ${pkgs.steam-run}/bin/steam-run ${bb}/bin/bb "$@"
-      '';
+      wrapped-bb =
+        if pkgs.stdenv.isLinux
+        then
+          pkgs.writeShellScriptBin "bb" ''
+            exec ${pkgs.steam-run}/bin/steam-run ${bb}/bin/bb "$@"
+          ''
+        else bb;
 
       e3-cli = pkgs.rustPlatform.buildRustPackage {
         pname = "e3-cli";

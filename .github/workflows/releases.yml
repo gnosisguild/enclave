@@ -153,7 +153,7 @@ jobs:
         # into the flake.nix where those hashes are expected. if you want to do this locally 
         # install the nix package manager and try running the scripts below.
       - run: bash ./scripts/nix-versions.sh # display bad versions when deps change
-      - run: nix build .#e3-cli # build the nix flake
+      - run: nix build .#cli # build the nix flake
 
   build-binaries:
     name: Build Binaries (${{ matrix.os_name }}-${{ matrix.arch }})

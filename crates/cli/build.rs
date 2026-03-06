@@ -25,6 +25,8 @@ fn main() {
 
     // Set environment variable for compilation
     println!("cargo:rustc-env=GIT_SHA={}", git_sha);
+    println!("cargo:rerun-if-env-changed=GIT_SHA");
+
     // Rebuild if git HEAD changes
     println!("cargo:rerun-if-changed=.git/HEAD");
 }
