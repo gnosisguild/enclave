@@ -10,13 +10,13 @@ use std::sync::Arc;
 use actix::{Actor, Addr, Context, Handler};
 use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
-    AggregationProofPending, AggregationProofSigned, BusHandle, ComputeRequest,
-    ComputeRequestError, ComputeRequestErrorKind, ComputeResponse, ComputeResponseKind,
-    CorrelationId, DecryptionKeyShared, DecryptionShareProofSigned, DecryptionShareProofsPending,
-    DecryptionshareCreated, DkgProofSigned, E3Failed, E3Stage, E3id, EnclaveEvent,
-    EnclaveEventData, EncryptionKey, EncryptionKeyCreated, EncryptionKeyPending, EventContext,
-    EventPublisher, EventSubscriber, EventType, FailureReason, PkAggregationProofPending,
-    AggregateNodeProofsRequest, NodeProofsAggregated, PkAggregationProofSigned, PkBfvProofRequest,
+    AggregateNodeProofsRequest, AggregationProofPending, AggregationProofSigned, BusHandle,
+    ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeResponse,
+    ComputeResponseKind, CorrelationId, DecryptionKeyShared, DecryptionShareProofSigned,
+    DecryptionShareProofsPending, DecryptionshareCreated, DkgProofSigned, E3Failed, E3Stage, E3id,
+    EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated, EncryptionKeyPending,
+    EventContext, EventPublisher, EventSubscriber, EventType, FailureReason, NodeProofsAggregated,
+    PkAggregationProofPending, PkAggregationProofSigned, PkBfvProofRequest,
     PkGenerationProofSigned, Proof, ProofPayload, ProofType, Sequenced,
     ShareDecryptionProofPending, SignedProofPayload, ThresholdShare, ThresholdShareCreated,
     ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
@@ -671,7 +671,10 @@ impl ProofRequestActor {
         let threshold = self.stored_threshold_proofs.remove(e3_id);
 
         let Some(c4_pending) = self.pending_decryption.get(e3_id) else {
-            warn!("No C4 proofs found for E3 {} — skipping node aggregation", e3_id);
+            warn!(
+                "No C4 proofs found for E3 {} — skipping node aggregation",
+                e3_id
+            );
             return;
         };
 

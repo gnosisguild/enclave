@@ -23,16 +23,15 @@ use e3_events::trap_fut;
 use e3_events::EType;
 use e3_events::EffectsEnabled;
 use e3_events::{
-    BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
-    ComputeResponse, DecryptedSharesAggregationProofRequest,
-    DecryptedSharesAggregationProofResponse, DkgShareDecryptionProofRequest,
-    DkgShareDecryptionProofResponse, EnclaveEvent, EnclaveEventData, EventPublisher,
-    EventSubscriber, EventType, PartyVerificationResult, PkAggregationProofRequest,
+    AggregateNodeProofsRequest, AggregateNodeProofsResponse, BusHandle, ComputeRequest,
+    ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind, ComputeResponse,
+    DecryptedSharesAggregationProofRequest, DecryptedSharesAggregationProofResponse,
+    DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, EnclaveEvent,
+    EnclaveEventData, EventPublisher, EventSubscriber, EventType, PartyVerificationResult,
+    Phase1AggregationRequest, Phase1AggregationResponse, PkAggregationProofRequest,
     PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest,
-    PkGenerationProofResponse, ShareComputationProofRequest, ShareComputationProofResponse,
+    PkGenerationProofResponse, Proof, ShareComputationProofRequest, ShareComputationProofResponse,
     ShareEncryptionProofRequest, ShareEncryptionProofResponse,
-    AggregateNodeProofsRequest, AggregateNodeProofsResponse, Phase1AggregationRequest,
-    Phase1AggregationResponse, Proof,
     ThresholdShareDecryptionProofRequest, ThresholdShareDecryptionProofResponse, TypedEvent,
     VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
     VerifyShareProofsRequest, VerifyShareProofsResponse, ZkError as ZkEventError, ZkRequest,
@@ -615,16 +614,12 @@ fn handle_zk_request(
                 handle_decrypted_shares_aggregation_proof(&prover, req, request.clone())
             })
         }
-        ZkRequest::AggregateNodeProofs(req) => {
-            timefunc("zk_aggregate_node_proofs", id, || {
-                handle_aggregate_node_proofs(&prover, req, request.clone())
-            })
-        }
-        ZkRequest::Phase1Aggregation(req) => {
-            timefunc("zk_phase1_aggregation", id, || {
-                handle_phase1_aggregation(&prover, req, request.clone())
-            })
-        }
+        ZkRequest::AggregateNodeProofs(req) => timefunc("zk_aggregate_node_proofs", id, || {
+            handle_aggregate_node_proofs(&prover, req, request.clone())
+        }),
+        ZkRequest::Phase1Aggregation(req) => timefunc("zk_phase1_aggregation", id, || {
+            handle_phase1_aggregation(&prover, req, request.clone())
+        }),
     }
 }
 
@@ -648,15 +643,20 @@ fn handle_aggregate_node_proofs(
         if group.is_empty() || group.len() > 2 {
             return Err(make_zk_error(
                 &request,
-                format!("proof_groups[{}]: expected 1-2 proofs, got {}", i, group.len()),
+                format!(
+                    "proof_groups[{}]: expected 1-2 proofs, got {}",
+                    i,
+                    group.len()
+                ),
             ));
         }
 
         let wrapper = generate_wrapper_proof(prover, group, &e3_id_str).map_err(|e| {
             ComputeRequestError::new(
-                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(
-                    format!("wrapper proof group[{}]: {}", i, e),
-                )),
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                    "wrapper proof group[{}]: {}",
+                    i, e
+                ))),
                 request.clone(),
             )
         })?;
@@ -664,9 +664,10 @@ fn handle_aggregate_node_proofs(
         running_aggregate = Some(match running_aggregate {
             Some(agg) => generate_fold_proof(prover, &wrapper, &agg, &e3_id_str).map_err(|e| {
                 ComputeRequestError::new(
-                    ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(
-                        format!("fold proof group[{}]: {}", i, e),
-                    )),
+                    ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                        "fold proof group[{}]: {}",
+                        i, e
+                    ))),
                     request.clone(),
                 )
             })?,
@@ -674,9 +675,8 @@ fn handle_aggregate_node_proofs(
         });
     }
 
-    let aggregated_proof = running_aggregate.ok_or_else(|| {
-        make_zk_error(&request, "proof_groups was empty".to_string())
-    })?;
+    let aggregated_proof = running_aggregate
+        .ok_or_else(|| make_zk_error(&request, "proof_groups was empty".to_string()))?;
 
     Ok(ComputeResponse::zk(
         ZkResponse::AggregateNodeProofs(AggregateNodeProofsResponse { aggregated_proof }),
@@ -709,9 +709,10 @@ fn handle_phase1_aggregation(
                     })?;
                 generate_fold_proof(prover, &wrapper, &agg, &e3_id_str).map_err(|e| {
                     ComputeRequestError::new(
-                        ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(
-                            format!("node proof fold[{}]: {}", i, e),
-                        )),
+                        ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                            "node proof fold[{}]: {}",
+                            i, e
+                        ))),
                         request.clone(),
                     )
                 })?
@@ -720,9 +721,8 @@ fn handle_phase1_aggregation(
         });
     }
 
-    let nodes_aggregate = running_aggregate.ok_or_else(|| {
-        make_zk_error(&request, "node_aggregated_proofs was empty".to_string())
-    })?;
+    let nodes_aggregate = running_aggregate
+        .ok_or_else(|| make_zk_error(&request, "node_aggregated_proofs was empty".to_string()))?;
 
     // Step 2: Generate C5 (PkAggregation) proof
     let pk_req = req.pk_aggregation_request;
@@ -769,19 +769,21 @@ fn handle_phase1_aggregation(
     // Step 3: Wrap C5 and fold with nodes aggregate
     let c5_wrapper = generate_wrapper_proof(prover, &[c5_proof], &e3_id_str).map_err(|e| {
         ComputeRequestError::new(
-            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(
-                format!("c5 wrapper: {}", e),
-            )),
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                "c5 wrapper: {}",
+                e
+            ))),
             request.clone(),
         )
     })?;
 
-    let final_proof =
-        generate_fold_proof(prover, &c5_wrapper, &nodes_aggregate, &e3_id_str).map_err(|e| {
+    let final_proof = generate_fold_proof(prover, &c5_wrapper, &nodes_aggregate, &e3_id_str)
+        .map_err(|e| {
             ComputeRequestError::new(
-                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(
-                    format!("c5 fold: {}", e),
-                )),
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                    "c5 fold: {}",
+                    e
+                ))),
                 request.clone(),
             )
         })?;
