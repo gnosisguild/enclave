@@ -35,8 +35,7 @@ describe('Vote', () => {
       json: async () => ({ ciphertext: previousCiphertext }),
     }) as Response
 
-  const mockPreviousCiphertextNotFoundResponse = () =>
-    ({ ok: false, status: 404 }) as Response
+  const mockPreviousCiphertextNotFoundResponse = () => ({ ok: false, status: 404 }) as Response
 
   beforeEach(() => {
     vi.clearAllMocks()

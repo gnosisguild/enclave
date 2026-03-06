@@ -8,12 +8,14 @@ import { describe, expect, it } from 'vitest'
 
 import { EnclaveSDK } from '../src/enclave-sdk'
 import { zeroAddress } from 'viem'
+import { hardhat } from 'viem/chains'
+import { generatePublicKey, encryptNumber as standaloneEncryptNumber, encryptVector as standaloneEncryptVector } from '../src/crypto'
 
 describe('encryptNumber', () => {
   describe('trbfv', () => {
     // create SDK with default config
     const sdk = EnclaveSDK.create({
-      chainId: 31337,
+      chain: hardhat,
       contracts: {
         enclave: zeroAddress,
         ciphernodeRegistry: zeroAddress,
@@ -57,5 +59,21 @@ describe('encryptNumber', () => {
       expect(value.encryptedData).to.be.an.instanceof(Uint8Array)
       expect(value.proof).to.be.an.instanceOf(Object)
     }, 9999999)
+  })
+
+  describe('standalone encryption (no blockchain setup)', () => {
+    it('should encrypt a number using standalone functions', async () => {
+      const pk = await generatePublicKey('INSECURE_THRESHOLD_512')
+      const ct = await standaloneEncryptNumber(10n, pk, 'INSECURE_THRESHOLD_512')
+      expect(ct).to.be.an.instanceof(Uint8Array)
+      expect(ct.length).to.equal(9_242)
+    })
+
+    it('should encrypt a vector using standalone functions', async () => {
+      const pk = await generatePublicKey('INSECURE_THRESHOLD_512')
+      const ct = await standaloneEncryptVector(new BigUint64Array([1n, 2n]), pk, 'INSECURE_THRESHOLD_512')
+      expect(ct).to.be.an.instanceof(Uint8Array)
+      expect(ct.length).to.equal(9_242)
+    })
   })
 })
