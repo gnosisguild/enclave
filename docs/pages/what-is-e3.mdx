@@ -1,44 +1,38 @@
 ## Encrypted Execution Environment (E3)
 
-An **Encrypted Execution Environment (E3)** is a decentralized framework designed to allow secure
-computation over encrypted data from multiple sources. E3s ensure data privacy and computational
-integrity by combining three essential components:
+An **Encrypted Execution Environment (E3)** enables secure computation over encrypted inputs from multiple independent parties. E3s combine three essential components to preserve input confidentiality and support correct execution:
 
-1. **Fully Homomorphic Encryption (FHE):** Enables computations directly on encrypted data without
-   needing to decrypt it, maintaining security from start to finish.
-2. **Zero-Knowledge Proofs (ZKPs):** Allow verification of data and computations without revealing
-   sensitive information, offering a way to validate accuracy while preserviing privacy.
-3. **Distributed Threshold Cryptography (DTC):** Distributes cryptographic keys across multiple
-   nodes, eliminating single points of failure and enhancing the framework’s resilience against
-   breaches.
+1. **Fully Homomorphic Encryption (FHE):** Enables computation directly on encrypted data without decrypting it.
+2. **Zero-Knowledge Proofs (ZKPs):** Enable verification of inputs and computation without revealing sensitive information, making it possible to validate correctness while preserving privacy.
+3. **Distributed Threshold Cryptography (DTC):**Distributes cryptographic key control across multiple ciphernodes, reducing reliance on any single operator and eliminating single points of failure.
 
-Together, these components create a secure, verifiable framework for privacy-preserving computation.
+Together, these components make it possible to compute across private inputs without exposing the underlying data.
 
-### When to Use E3
+### When to Use E3s
 
 E3s are ideal for scenarios where you want to:
 
-- Compute over sensitive data from multiple parties without taking custody of the plaintext data.
-- Ensure compliance with data protection laws like GDPR or HIPAA.
-- Reduce liability when interacting with sensitive data.
-- Derive insights from otherwise inaccessible or sensitive datasets.
-- Eliminate trust in any single party or hardware component.
+E3s are useful when you need to:
+
+- Compute across sensitive inputs from multiple parties without taking custody of the underlying plaintext data.
+- Build workflows compatible with data protection requirements such as GDPR or HIPAA.
+- Reduce operational and legal liability when handling sensitive data.
+- Produce shared results from otherwise inaccessible or sensitive datasets.
+- Reduce reliance on any single operator or trusted hardware component.
 
 ### Practical Use Cases
 
-- **Secret Ballots**: Implement verifiable and private voting systems.
-- **Secure Data Analysis**: Perform computations on private datasets without taking custody of raw
-  data.
-- **Collaborative Research**: Enable multiple organizations to securely aggregate and analyze data
-  without mutual data sharing.
+- **Secret Ballots**: Implement voting systems that preserve ballot secrecy while producing verifiable outcomes.
+- **Secure Data Analysis**: Compute across private datasets without taking custody of raw data.
+- **Collaborative Research**: Enable multiple organizations to jointly analyze sensitive data without sharing the underlying records.
 
-### How E3 Works for Developers
+### How E3s Works for Developers
 
-As a developer, interacting with an E3 involves:
+As a developer, building with an E3 typically involves:
 
-- Defining the computation logic (E3 Program).
-- Configuring parameters for the execution environment.
-- Submitting encrypted data inputs.
-- Retrieving and verifying the computation results.
+- Defining the computation logic for the E3 Program.
+- Configuring the parameters for the execution environment.
+- Submitting encrypted inputs.
+- Retrieving and verifying the result.
 
-Each of these steps will be covered in detail in the following sections.
+Each of these steps is covered in detail in the following sections.
