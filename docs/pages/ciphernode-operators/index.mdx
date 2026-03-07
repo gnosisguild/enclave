@@ -5,9 +5,9 @@ description: 'Overview of ciphernode operations, contracts, and lifecycle'
 
 # Ciphernode Operators
 
-Ciphernodes are the distributed workers that power the Enclave network. They participate in
-threshold cryptography to enable encrypted computations (E3s) while ensuring no single party can
-access the underlying data.
+Ciphernodes are the distributed workers that power the Interfold network. They participate in
+threshold cryptography to enable encrypted exeuction environments (E3s) while ensuring no single party can
+access the underlying plaintext data.
 
 ## What is a Ciphernode?
 
@@ -25,11 +25,11 @@ malicious behavior.
 
 ## Contract Architecture
 
-The Enclave protocol uses several contracts that work together:
+The Interfold protocol uses several contracts that work together:
 
 | Contract               | Purpose                                                                        |
 | ---------------------- | ------------------------------------------------------------------------------ |
-| **Enclave**            | Core coordinator that manages E3 requests and computation lifecycle            |
+| **Interfold**            | Core coordinator that manages E3 requests and computation lifecycle            |
 | **CiphernodeRegistry** | Tracks registered operators and manages committee formation                    |
 | **BondingRegistry**    | Handles license bonds (ENCL) and ticket balances (ETK)                         |
 | **SlashingManager**    | Processes slashing proposals, appeals, and ban enforcement                     |
@@ -91,14 +91,14 @@ Before operating a ciphernode, ensure you have:
 | **Stablecoin**  | USDC (or configured fee token) for tickets; minimum 1 ticket worth       |
 | **ETH**         | Gas for transactions on your target network                              |
 | **Hardware**    | Linux/macOS, 4+ cores, 8GB+ RAM, stable internet with open UDP port      |
-| **Software**    | Enclave CLI installed, WebSocket RPC endpoint                            |
+| **Software**    | Interfold CLI installed, WebSocket RPC endpoint                            |
 
 ## Getting Started
 
 Follow these guides in order to become an active ciphernode operator:
 
 1. **[Running a Ciphernode](./ciphernode-operators/running)** - Set up your node using DappNode,
-   Enclave CLI, or Docker
+   Interfold CLI, or Docker
 2. **[Registration & Licensing](./ciphernode-operators/registration)** - Bond your license,
    register, and add tickets
 3. **[Tickets & Sortition](./ciphernode-operators/tickets-and-sortition)** - Understand how
