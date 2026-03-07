@@ -1119,7 +1119,7 @@ impl ProofRequestActor {
             e3_id, num_parties
         );
 
-        for positional_idx in 0..num_parties {
+        for (positional_idx, &real_party_id) in pending.recipient_party_ids.iter().enumerate() {
             if let Some(party_share) = share.extract_for_party(positional_idx) {
                 let c3a_proofs = signed_c3a_map
                     .get(&positional_idx)
@@ -1129,19 +1129,6 @@ impl ProofRequestActor {
                     .get(&positional_idx)
                     .cloned()
                     .unwrap_or_default();
-
-                // Use real party_id from the mapping (positional index may differ
-                // from party_id when expelled members cause gaps)
-                let real_party_id = match pending.recipient_party_ids.get(positional_idx) {
-                    Some(&id) => id,
-                    None => {
-                        warn!(
-                            "recipient_party_ids has no entry for positional index {} (len={}), falling back to index as party_id",
-                            positional_idx, pending.recipient_party_ids.len()
-                        );
-                        positional_idx as u64
-                    }
-                };
 
                 if let Err(err) = self.bus.publish(
                     ThresholdShareCreated {
