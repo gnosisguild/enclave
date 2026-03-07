@@ -656,11 +656,17 @@ impl AccusationManager {
 
         // Find the pending accusation
         let Some(pending) = self.pending.get_mut(&vote_accusation_id) else {
-            // Unknown accusation — buffer the vote for replay when the accusation arrives
-            self.buffered_votes
-                .entry(vote_accusation_id)
-                .or_default()
-                .push(vote);
+            // Unknown accusation — buffer the vote for replay when the accusation arrives.
+            // Cap buffer size to prevent unbounded growth if the accusation never arrives.
+            let buf = self.buffered_votes.entry(vote_accusation_id).or_default();
+            if buf.len() < self.committee.len() {
+                buf.push(vote);
+            } else {
+                warn!(
+                    "Buffered votes for unknown accusation {:?} reached committee-size cap — dropping vote",
+                    vote_accusation_id
+                );
+            }
             return;
         };
 

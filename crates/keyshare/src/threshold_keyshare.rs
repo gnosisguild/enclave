@@ -1211,11 +1211,29 @@ impl ThresholdKeyshare {
         let e3_id = state.get_e3_id();
         let own_party_id = state.party_id;
 
+        // Filter out expelled parties before any processing. The collector may
+        // have accepted shares before the expulsion arrived, so we scrub here.
+        let expelled = &state.expelled_parties;
+        let (shares, share_proofs): (Vec<_>, Vec<_>) = if expelled.is_empty() {
+            (msg.shares, msg.share_proofs)
+        } else {
+            warn!(
+                "Filtering {} expelled parties from AllThresholdSharesCollected for E3 {}: {:?}",
+                expelled.len(),
+                e3_id,
+                expelled
+            );
+            msg.shares
+                .into_iter()
+                .zip(msg.share_proofs.into_iter())
+                .filter(|(s, _)| !expelled.contains(&s.party_id))
+                .unzip()
+        };
+
         // Derive expected proof counts from our own share (trusted source).
         // All parties use the same BFV params, so moduli counts are identical.
         // Using the sender's share would let a malicious party manipulate expected counts.
-        let own_share = msg
-            .shares
+        let own_share = shares
             .iter()
             .find(|s| s.party_id == own_party_id)
             .ok_or_else(|| anyhow!("Own share not found in AllThresholdSharesCollected"))?;
@@ -1235,7 +1253,7 @@ impl ThresholdKeyshare {
         let mut party_proofs_to_verify: Vec<PartyProofsToVerify> = Vec::new();
         let mut no_proof_parties: HashSet<u64> = HashSet::new();
         let mut incomplete_proof_parties: HashSet<u64> = HashSet::new();
-        for (share, proofs) in msg.shares.iter().zip(msg.share_proofs.iter()) {
+        for (share, proofs) in shares.iter().zip(share_proofs.iter()) {
             if share.party_id == own_party_id {
                 continue;
             }
@@ -1288,7 +1306,7 @@ impl ThresholdKeyshare {
         }
 
         // Store shares on the actor for use after verification completes (keep Arc to avoid deep clone)
-        self.pending_shares = msg.shares.iter().cloned().collect();
+        self.pending_shares = shares.iter().cloned().collect();
 
         // Merge no-proof and incomplete-proof parties — both are dishonest
         let mut pre_dishonest: BTreeSet<u64> = BTreeSet::new();

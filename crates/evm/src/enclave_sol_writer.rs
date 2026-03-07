@@ -95,6 +95,8 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for E
                 }
             }
             EnclaveEventData::E3StageChanged(data) => {
+                // When an E3 transitions to Failed on-chain, call processE3Failure
+                // to finalize refund distribution automatically.
                 if data.new_stage == E3Stage::Failed
                     && self.provider.chain_id() == data.e3_id.chain_id()
                 {
@@ -240,18 +242,18 @@ async fn process_e3_failure<P: Provider + WalletProvider + Clone>(
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = e3_id.try_into()?;
 
-    let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider
-        .provider()
-        .get_transaction_count(from_address)
-        .pending()
-        .await?;
-
     send_tx_with_retry("processE3Failure", &[], || {
         info!("processE3Failure() e3_id={:?}", e3_id);
-        let contract = IEnclave::new(contract_address, provider.provider());
+        let provider = provider.clone();
 
         async move {
+            let from_address = provider.provider().default_signer_address();
+            let current_nonce = provider
+                .provider()
+                .get_transaction_count(from_address)
+                .pending()
+                .await?;
+            let contract = IEnclave::new(contract_address, provider.provider());
             let builder = contract.processE3Failure(e3_id).nonce(current_nonce);
             let receipt = builder.send().await?.get_receipt().await?;
             Ok(receipt)
