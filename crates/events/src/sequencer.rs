@@ -81,6 +81,7 @@ mod tests {
 
         assert_eq!(
             events
+                .events
                 .iter()
                 .map(EnclaveEvent::strip_ts)
                 .collect::<Vec<_>>(),

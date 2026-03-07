@@ -4,18 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::ContentHash;
+use crate::{direct_responder::DirectResponder, ContentHash};
 use actix::Message;
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use e3_events::{
-    AggregateId, CorrelationId, DocumentMeta, EnclaveEvent, EventContextAccessors, EventSource,
-    Sequenced, Unsequenced,
+    CorrelationId, DocumentMeta, EnclaveEvent, EventContextAccessors, EventSource, Sequenced,
+    Unsequenced,
 };
 use e3_utils::{ArcBytes, OnceTake};
 use libp2p::{
     gossipsub::{MessageId, PublishError, TopicHash},
     kad::{store, GetRecordError, PutRecordError},
-    request_response::{InboundRequestId, ResponseChannel},
+    request_response::ResponseChannel,
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 use serde::{Deserialize, Serialize};
@@ -27,6 +27,14 @@ use std::{
 };
 use tokio::sync::{broadcast, mpsc};
 use tracing::{error, trace, warn};
+
+use libp2p::PeerId;
+
+#[derive(Clone, Copy, Debug)]
+pub enum PeerTarget {
+    Random,
+    Specific(PeerId),
+}
 
 /// Incoming/Outgoing GossipData. We disambiguate on concerns relative to the net package.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -68,39 +76,84 @@ impl TryFrom<GossipData> for EnclaveEvent<Unsequenced> {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SyncRequestValue {
-    pub since: HashMap<AggregateId, u128>,
+pub enum ProtocolResponse {
+    Ok(Vec<u8>),
+    BadRequest(String),
+    Error(String),
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SyncResponseValue {
-    pub events: Vec<GossipData>,
-    pub ts: u128,
+pub type ProtocolResponseChannel = ResponseChannel<ProtocolResponse>;
+
+#[derive(Message, Clone, Debug)]
+#[rtype("()")]
+/// Remote has sent us a request
+pub struct IncomingRequest {
+    pub responder: DirectResponder,
+}
+
+#[derive(Clone, Debug)]
+/// We are responding to a remote request
+pub struct IncomingResponse {
+    pub responder: DirectResponder,
+}
+
+impl IncomingResponse {
+    pub fn new(responder: DirectResponder) -> Self {
+        Self { responder }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct OutgoingRequest {
+    pub correlation_id: CorrelationId,
+    pub payload: Vec<u8>,
+    pub target: PeerTarget,
+}
+
+impl OutgoingRequest {
+    pub fn new_with_correlation(
+        id: CorrelationId,
+        target: PeerTarget,
+        payload: impl TryInto<Vec<u8>>,
+    ) -> Result<Self> {
+        Ok(Self {
+            correlation_id: id,
+            payload: payload.try_into().map_err(|_| {
+                anyhow!(
+                    "could not serialize payload for outgoing request with correlation_id={id} and target={target:?}."
+                )
+            })?,
+            target,
+        })
+    }
+    pub fn to_random_peer(payload: impl TryInto<Vec<u8>>) -> Result<Self> {
+        Self::new_with_correlation(CorrelationId::new(), PeerTarget::Random, payload)
+    }
+
+    pub fn new(target: PeerId, payload: impl TryInto<Vec<u8>>) -> Result<Self> {
+        Self::new_with_correlation(CorrelationId::new(), PeerTarget::Specific(target), payload)
+    }
 }
 
 #[derive(Message, Clone, Debug)]
 #[rtype("()")]
-pub struct SyncRequestReceived {
-    pub request_id: InboundRequestId,
-    pub value: SyncRequestValue,
-    pub channel: OnceTake<ResponseChannel<SyncResponseValue>>,
-}
-
-#[derive(Message, Clone, Debug)]
-#[rtype("()")]
-pub struct OutgoingSyncRequestSucceeded {
-    pub value: SyncResponseValue,
+pub struct OutgoingRequestSucceeded {
+    pub payload: ProtocolResponse,
     pub correlation_id: CorrelationId,
 }
 
 #[derive(Debug, Clone)]
-pub struct OutgoingSyncRequestFailed {
+pub struct OutgoingRequestFailed {
     pub correlation_id: CorrelationId,
     pub error: String,
 }
 
-/// NetInterface Commands are sent to the network peer over a mspc channel
-#[derive(Debug)]
+#[derive(Message, Debug, Clone)]
+#[rtype("()")]
+pub struct AllPeersDialed;
+
+/// Libp2pNetInterface Commands are sent to the network peer over a mspc channel
+#[derive(Debug, Clone)]
 pub enum NetCommand {
     /// Publish message to gossipsub
     GossipPublish {
@@ -109,7 +162,7 @@ pub enum NetCommand {
         correlation_id: CorrelationId,
     },
     /// Dial peer
-    Dial(DialOpts),
+    Dial(OnceTake<DialOpts>),
     /// Command to PublishDocument to Kademlia
     DhtPutRecord {
         correlation_id: CorrelationId,
@@ -123,20 +176,14 @@ pub enum NetCommand {
         key: ContentHash,
     },
     /// Remove DHT records associated with a completed E3
-    DhtRemoveRecords { keys: Vec<ContentHash> },
+    DhtRemoveRecords {
+        keys: Vec<ContentHash>,
+    },
     /// Shutdown signal
     Shutdown,
-    /// Called from the syning node to request libp2p events from a random peer node starting
-    /// from the given timestamp.
-    OutgoingSyncRequest {
-        correlation_id: CorrelationId,
-        value: SyncRequestValue,
-    },
-    /// Send libp2p events back to a peer that requested a sync.
-    SyncResponse {
-        value: SyncResponseValue,
-        channel: OnceTake<ResponseChannel<SyncResponseValue>>,
-    },
+    /// Send a request to a peer and await response
+    OutgoingRequest(OutgoingRequest),
+    IncomingResponse(IncomingResponse),
 }
 
 impl NetCommand {
@@ -146,7 +193,7 @@ impl NetCommand {
             N::DhtPutRecord { correlation_id, .. } => Some(*correlation_id),
             N::DhtGetRecord { correlation_id, .. } => Some(*correlation_id),
             N::GossipPublish { correlation_id, .. } => Some(*correlation_id),
-            N::OutgoingSyncRequest { correlation_id, .. } => Some(*correlation_id),
+            N::OutgoingRequest(OutgoingRequest { correlation_id, .. }) => Some(*correlation_id),
             _ => None,
         }
     }
@@ -207,12 +254,11 @@ pub enum NetEvent {
         count: usize,
         topic: TopicHash,
     },
-    /// A peer node is requesting gossipsub events since the given timestamp.
-    /// Use the provided channel to send a `SyncResponse
-    SyncRequestReceived(SyncRequestReceived),
-    /// Received gossipsub events from a peer in response to a `SyncRequest`.
-    OutgoingSyncRequestSucceeded(OutgoingSyncRequestSucceeded),
-    OutgoingSyncRequestFailed(OutgoingSyncRequestFailed),
+    /// A peer made a request to this node
+    IncomingRequest(IncomingRequest),
+    /// Received response from a peer in response to an outgoing request
+    OutgoingRequestSucceeded(OutgoingRequestSucceeded),
+    OutgoingRequestFailed(OutgoingRequestFailed),
     AllPeersDialed,
 }
 
@@ -232,8 +278,8 @@ impl NetEvent {
             N::DhtGetRecordSucceeded { correlation_id, .. } => Some(*correlation_id),
             N::DhtPutRecordError { correlation_id, .. } => Some(*correlation_id),
             N::DhtPutRecordSucceeded { correlation_id, .. } => Some(*correlation_id),
-            N::OutgoingSyncRequestSucceeded(msg) => Some(msg.correlation_id),
-            N::OutgoingSyncRequestFailed(msg) => Some(msg.correlation_id),
+            N::OutgoingRequestSucceeded(msg) => Some(msg.correlation_id),
+            N::OutgoingRequestFailed(msg) => Some(msg.correlation_id),
             _ => None,
         }
     }
@@ -288,7 +334,7 @@ where
     // We don't have access to this later and we cannot clone command
     let debug_cmd = format!("{:?}", command);
 
-    // Send the command to NetInterface
+    // Send the command to Libp2pNetInterface
     trace!(
         "call_and_await_response: sending command {:?} with timeout {:?}",
         command,

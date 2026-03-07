@@ -7,6 +7,7 @@
 use crate::{E3id, OrderedSet, Proof};
 use actix::Message;
 use derivative::Derivative;
+use e3_utils::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
@@ -15,8 +16,9 @@ use std::fmt::{self, Display};
 #[rtype(result = "()")]
 pub struct PublicKeyAggregated {
     #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub pubkey: Vec<u8>,
-    pub public_key_hash: [u8; 32],
+    pub pubkey: ArcBytes, // TODO: ArcBytes ?
+    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
+    pub public_key_hash: [u8; 32], // TODO: ArcBytes32 ?
     pub e3_id: E3id,
     pub nodes: OrderedSet<String>,
     /// C5 proof: proof of correct pk aggregation.

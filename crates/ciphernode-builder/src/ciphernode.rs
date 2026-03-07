@@ -8,7 +8,8 @@ use actix::Addr;
 use anyhow::Result;
 use e3_data::{DataStore, InMemStore, StoreAddr};
 use e3_events::{BusHandle, EnclaveEvent, HistoryCollector};
-use tokio::task::JoinHandle;
+use e3_net::NetChannelBridge;
+use libp2p::PeerId;
 
 /// A Sharable handle to a Ciphernode. NOTE: clones are available for use in the CiphernodeSystem
 /// but they cannot await the task.
@@ -19,9 +20,17 @@ pub struct CiphernodeHandle {
     pub bus: BusHandle,
     pub history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
     pub errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
-    pub peer_id: String,
-    pub join_handle: JoinHandle<Result<()>>,
+    pub peer_id: PeerId,
+    pub channel_bridge: Option<NetChannelBridge>,
 }
+
+impl PartialEq for CiphernodeHandle {
+    fn eq(&self, other: &Self) -> bool {
+        self.address == other.address && self.peer_id == other.peer_id
+    }
+}
+
+impl Eq for CiphernodeHandle {}
 
 impl CiphernodeHandle {
     pub fn new(
@@ -30,8 +39,8 @@ impl CiphernodeHandle {
         bus: BusHandle,
         history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
         errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
-        peer_id: String,
-        join_handle: JoinHandle<Result<()>>,
+        peer_id: PeerId,
+        channel_bridge: Option<NetChannelBridge>,
     ) -> Self {
         Self {
             address,
@@ -40,7 +49,7 @@ impl CiphernodeHandle {
             history,
             errors,
             peer_id,
-            join_handle,
+            channel_bridge,
         }
     }
 
@@ -64,8 +73,10 @@ impl CiphernodeHandle {
         &self.store
     }
 
-    pub fn split(self) -> (BusHandle, JoinHandle<Result<()>>) {
-        (self.bus, self.join_handle)
+    pub fn channel_bridge(&self) -> Result<NetChannelBridge> {
+        Ok(self.channel_bridge.clone().ok_or(anyhow::anyhow!(
+            "No channel bridge exists. We are likely not in test mode"
+        ))?)
     }
 
     pub fn in_mem_store(&self) -> Option<&Addr<InMemStore>> {
