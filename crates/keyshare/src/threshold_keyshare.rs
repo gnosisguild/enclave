@@ -1179,6 +1179,9 @@ impl ThresholdKeyshare {
             e_sm_share_encryption_requests.len()
         );
 
+        // Collect real party IDs in positional order (indices match encrypt_all_extended output)
+        let recipient_party_ids: Vec<u64> = encryption_keys.iter().map(|k| k.party_id).collect();
+
         // Publish ThresholdSharePending - ProofRequestActor will generate proof, sign, and publish ThresholdShareCreated
         self.bus.publish(
             ThresholdSharePending {
@@ -1189,6 +1192,7 @@ impl ThresholdKeyshare {
                 e_sm_share_computation_request,
                 sk_share_encryption_requests,
                 e_sm_share_encryption_requests,
+                recipient_party_ids,
             },
             ec.clone(),
         )?;

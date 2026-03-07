@@ -83,11 +83,25 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
             EnclaveEventData::AccusationQuorumReached(data) => {
                 // Only submit if:
                 // 1. This is the right chain
-                // 2. The quorum decided the accused is at fault
-                // 3. This node is the accuser (only one node should submit)
+                // 2. The quorum decided the accused is at fault OR equivocated
+                // 3. This node is the designated submitter (lowest-address agreeing
+                //    voter). This is deterministic so exactly one node submits,
+                //    and decouples submission from the accuser to avoid single-point
+                //    failures if the accuser's node goes down after quorum.
+                let my_addr = self.provider.provider().default_signer_address();
+                let is_designated_submitter = data
+                    .votes_for
+                    .iter()
+                    .map(|v| v.voter)
+                    .min()
+                    .map_or(false, |min_voter| min_voter == my_addr);
+
                 if self.provider.chain_id() == data.e3_id.chain_id()
-                    && data.outcome == AccusationOutcome::AccusedFaulted
-                    && data.accuser == self.provider.provider().default_signer_address()
+                    && matches!(
+                        data.outcome,
+                        AccusationOutcome::AccusedFaulted | AccusationOutcome::Equivocation
+                    )
+                    && is_designated_submitter
                 {
                     ctx.notify(data);
                 }

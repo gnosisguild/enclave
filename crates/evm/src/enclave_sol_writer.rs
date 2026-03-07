@@ -23,6 +23,7 @@ use e3_events::EventType;
 use e3_events::Shutdown;
 use e3_events::{prelude::*, EffectsEnabled};
 use e3_events::{run_once, EnclaveEvent};
+use e3_events::{E3Stage, E3StageChanged};
 use e3_events::{E3id, EType, PlaintextAggregated};
 use e3_utils::NotifySync;
 use e3_utils::MAILBOX_LIMIT;
@@ -60,7 +61,11 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
             move |_| {
                 let addr = EnclaveSolWriter::new(&bus, provider, contract_address)?.start();
                 bus.subscribe_all(
-                    &[EventType::PlaintextAggregated, EventType::Shutdown],
+                    &[
+                        EventType::PlaintextAggregated,
+                        EventType::E3StageChanged,
+                        EventType::Shutdown,
+                    ],
                     addr.clone().into(),
                 );
                 Ok(())
@@ -86,6 +91,13 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for E
             EnclaveEventData::PlaintextAggregated(data) => {
                 // Only publish if the src and destination chains match
                 if self.provider.chain_id() == data.e3_id.chain_id() {
+                    ctx.notify(data);
+                }
+            }
+            EnclaveEventData::E3StageChanged(data) => {
+                if data.new_stage == E3Stage::Failed
+                    && self.provider.chain_id() == data.e3_id.chain_id()
+                {
                     ctx.notify(data);
                 }
             }
@@ -158,6 +170,36 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown> for Encla
     }
 }
 
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<E3StageChanged>
+    for EnclaveSolWriter<P>
+{
+    type Result = ResponseFuture<()>;
+
+    fn handle(&mut self, msg: E3StageChanged, _: &mut Self::Context) -> Self::Result {
+        Box::pin({
+            let contract_address = self.contract_address;
+            let provider = self.provider.clone();
+            let bus = self.bus.clone();
+            async move {
+                let result =
+                    process_e3_failure(provider, contract_address, msg.e3_id.clone()).await;
+                match result {
+                    Ok(receipt) => {
+                        info!(tx=%receipt.transaction_hash, "Called processE3Failure for E3 {}", msg.e3_id);
+                    }
+                    Err(err) => {
+                        // Non-fatal: may revert if already processed or no payment
+                        info!(
+                            "processE3Failure for E3 {} did not succeed (may already be processed): {:?}",
+                            msg.e3_id, err
+                        );
+                    }
+                }
+            }
+        })
+    }
+}
+
 async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     provider: EthProvider<P>,
     contract_address: Address,
@@ -184,6 +226,33 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
             let builder = contract
                 .publishPlaintextOutput(e3_id, decrypted_output, proof)
                 .nonce(current_nonce);
+            let receipt = builder.send().await?.get_receipt().await?;
+            Ok(receipt)
+        }
+    })
+    .await
+}
+
+async fn process_e3_failure<P: Provider + WalletProvider + Clone>(
+    provider: EthProvider<P>,
+    contract_address: Address,
+    e3_id: E3id,
+) -> Result<TransactionReceipt> {
+    let e3_id: U256 = e3_id.try_into()?;
+
+    let from_address = provider.provider().default_signer_address();
+    let current_nonce = provider
+        .provider()
+        .get_transaction_count(from_address)
+        .pending()
+        .await?;
+
+    send_tx_with_retry("processE3Failure", &[], || {
+        info!("processE3Failure() e3_id={:?}", e3_id);
+        let contract = IEnclave::new(contract_address, provider.provider());
+
+        async move {
+            let builder = contract.processE3Failure(e3_id).nonce(current_nonce);
             let receipt = builder.send().await?.get_receipt().await?;
             Ok(receipt)
         }

@@ -301,7 +301,25 @@ impl AccusationManager {
         ec: &EventContext<Sequenced>,
         ctx: &mut Context<Self>,
     ) {
-        let key = (event.accused_address, event.proof_type);
+        let accused_address = if event.accused_address == Address::ZERO {
+            if let Some(&addr) = self.committee.get(event.accused_party_id as usize) {
+                warn!(
+                    "Resolved Address::ZERO for party {} to committee address {}",
+                    event.accused_party_id, addr
+                );
+                addr
+            } else {
+                error!(
+                    "Cannot resolve address for party {} (out of committee bounds) — dropping accusation",
+                    event.accused_party_id
+                );
+                return;
+            }
+        } else {
+            event.accused_address
+        };
+
+        let key = (accused_address, event.proof_type);
 
         // Cache the failed verification result
         self.received_data.insert(
@@ -316,7 +334,7 @@ impl AccusationManager {
         if !self.accused_proofs.insert(key) {
             info!(
                 "Already accused {:?} for {:?} — skipping duplicate",
-                event.accused_address, event.proof_type
+                accused_address, event.proof_type
             );
             return;
         }
@@ -333,7 +351,7 @@ impl AccusationManager {
         let mut accusation = ProofFailureAccusation {
             e3_id: self.e3_id.clone(),
             accuser: self.my_address,
-            accused: event.accused_address,
+            accused: accused_address,
             accused_party_id: event.accused_party_id,
             proof_type: event.proof_type,
             data_hash: event.data_hash,
@@ -346,7 +364,7 @@ impl AccusationManager {
 
         info!(
             "Broadcasting accusation against {} for {:?} proof failure",
-            event.accused_address, event.proof_type
+            accused_address, event.proof_type
         );
 
         // Broadcast accusation via gossip
@@ -390,12 +408,12 @@ impl AccusationManager {
         // Replay any votes that arrived before this accusation
         if let Some(buffered) = self.buffered_votes.remove(&accusation_id) {
             for vote in buffered {
-                self.on_vote_received(vote, ec);
+                self.on_vote_received(vote, ec, ctx);
             }
         }
 
         // Check quorum immediately (in case threshold_m == 1)
-        self.check_quorum(accusation_id, ec);
+        self.check_quorum(accusation_id, ec, ctx);
     }
 
     /// Called when we receive an accusation from another node via gossip.
@@ -508,7 +526,7 @@ impl AccusationManager {
             // Replay any buffered votes
             if let Some(buffered) = self.buffered_votes.remove(&accusation_id) {
                 for vote in buffered {
-                    self.on_vote_received(vote, ec);
+                    self.on_vote_received(vote, ec, ctx);
                 }
             }
 
@@ -597,16 +615,21 @@ impl AccusationManager {
         // Replay any votes that arrived before this accusation
         if let Some(buffered) = self.buffered_votes.remove(&accusation_id) {
             for vote in buffered {
-                self.on_vote_received(vote, ec);
+                self.on_vote_received(vote, ec, ctx);
             }
         }
 
         // Check quorum
-        self.check_quorum(accusation_id, ec);
+        self.check_quorum(accusation_id, ec, ctx);
     }
 
     /// Called when we receive a vote from another node via gossip.
-    fn on_vote_received(&mut self, vote: AccusationVote, ec: &EventContext<Sequenced>) {
+    fn on_vote_received(
+        &mut self,
+        vote: AccusationVote,
+        ec: &EventContext<Sequenced>,
+        ctx: &mut Context<Self>,
+    ) {
         // Ignore votes for other E3s
         if vote.e3_id != self.e3_id {
             return;
@@ -641,6 +664,15 @@ impl AccusationManager {
             return;
         };
 
+        // Reject votes from the accused party — they have a conflict of interest
+        if vote.voter == pending.accusation.accused {
+            warn!(
+                "Ignoring vote from accused party {} on their own accusation",
+                vote.voter
+            );
+            return;
+        }
+
         // Dedup: don't count same voter twice
         let already_voted = pending
             .votes_for
@@ -658,7 +690,7 @@ impl AccusationManager {
         }
 
         // Check if quorum reached
-        self.check_quorum(vote_accusation_id, ec);
+        self.check_quorum(vote_accusation_id, ec, ctx);
     }
 
     /// Evaluate whether we have enough votes to decide.
@@ -667,7 +699,12 @@ impl AccusationManager {
     /// - Need >= M agreeing votes → AccusedFaulted
     /// - If impossible to reach M even with remaining voters → early exit
     /// - data_hash comparison detects equivocation vs false accusation
-    fn check_quorum(&mut self, accusation_id: [u8; 32], ec: &EventContext<Sequenced>) {
+    fn check_quorum(
+        &mut self,
+        accusation_id: [u8; 32],
+        ec: &EventContext<Sequenced>,
+        ctx: &mut Context<Self>,
+    ) {
         let Some(pending) = self.pending.get(&accusation_id) else {
             return;
         };
@@ -690,13 +727,13 @@ impl AccusationManager {
                     pending.accusation.accused,
                     pending.accusation.proof_type
                 );
-                self.emit_quorum_reached(accusation_id, AccusationOutcome::Equivocation, ec);
+                self.emit_quorum_reached(accusation_id, AccusationOutcome::Equivocation, ec, ctx);
             } else {
                 info!(
                     "Quorum reached: {} votes confirm {} sent bad {:?} proof — AccusedFaulted",
                     agree_count, pending.accusation.accused, pending.accusation.proof_type
                 );
-                self.emit_quorum_reached(accusation_id, AccusationOutcome::AccusedFaulted, ec);
+                self.emit_quorum_reached(accusation_id, AccusationOutcome::AccusedFaulted, ec, ctx);
             }
             return;
         }
@@ -722,7 +759,7 @@ impl AccusationManager {
                     pending.accusation.accused,
                     pending.accusation.proof_type
                 );
-                self.emit_quorum_reached(accusation_id, AccusationOutcome::Equivocation, ec);
+                self.emit_quorum_reached(accusation_id, AccusationOutcome::Equivocation, ec, ctx);
             } else if agree_count <= 1 && disagree_count > 0 {
                 // Same data, only accuser says bad, others say good → AccuserLied
                 info!(
@@ -731,9 +768,9 @@ impl AccusationManager {
                     pending.accusation.accused,
                     pending.accusation.proof_type
                 );
-                self.emit_quorum_reached(accusation_id, AccusationOutcome::AccuserLied, ec);
+                self.emit_quorum_reached(accusation_id, AccusationOutcome::AccuserLied, ec, ctx);
             } else {
-                self.emit_quorum_reached(accusation_id, AccusationOutcome::Inconclusive, ec);
+                self.emit_quorum_reached(accusation_id, AccusationOutcome::Inconclusive, ec, ctx);
             }
         }
         // Otherwise: still waiting for more votes — timeout will handle it
@@ -745,8 +782,28 @@ impl AccusationManager {
             return; // Already resolved
         };
 
+        // Check for equivocation: if voters saw different data hashes,
+        // the accused sent different payloads to different nodes.
+        let all_hashes: HashSet<[u8; 32]> = pending
+            .votes_for
+            .iter()
+            .chain(pending.votes_against.iter())
+            .map(|v| v.data_hash)
+            .chain(std::iter::once(pending.accusation.data_hash))
+            .collect();
+
         let outcome = if pending.votes_for.len() >= self.threshold_m {
-            AccusationOutcome::AccusedFaulted
+            // Check among agreeing voters first
+            let agree_hashes: HashSet<[u8; 32]> =
+                pending.votes_for.iter().map(|v| v.data_hash).collect();
+            if agree_hashes.len() > 1 {
+                AccusationOutcome::Equivocation
+            } else {
+                AccusationOutcome::AccusedFaulted
+            }
+        } else if all_hashes.len() > 1 {
+            // Not enough votes to convict, but divergent data → equivocation
+            AccusationOutcome::Equivocation
         } else {
             AccusationOutcome::Inconclusive
         };
@@ -781,14 +838,16 @@ impl AccusationManager {
         accusation_id: [u8; 32],
         outcome: AccusationOutcome,
         ec: &EventContext<Sequenced>,
+        ctx: &mut Context<Self>,
     ) {
         let Some(pending) = self.pending.remove(&accusation_id) else {
             return;
         };
 
-        // Cancel the timeout if it exists
-        // (SpawnHandle can't be cancelled directly in actix without ctx,
-        //  but removing from pending prevents the timeout handler from acting)
+        // Cancel the timeout to avoid unnecessary timer fires
+        if let Some(handle) = pending.timeout_handle {
+            ctx.cancel_future(handle);
+        }
 
         info!(
             "Accusation quorum reached for {} {:?}: {} for, {} against — outcome: {}",
@@ -849,7 +908,11 @@ impl AccusationManager {
     ///
     /// Dispatched by `on_accusation_received` when the accused's forwarded proof
     /// needs async ZK verification. Casts our vote based on the ZK result.
-    fn handle_reverification_response(&mut self, msg: TypedEvent<ComputeResponse>) {
+    fn handle_reverification_response(
+        &mut self,
+        msg: TypedEvent<ComputeResponse>,
+        ctx: &mut Context<Self>,
+    ) {
         let (msg, _ec) = msg.into_components();
 
         let correlation_id = msg.correlation_id;
@@ -922,7 +985,7 @@ impl AccusationManager {
         }
 
         // Check quorum
-        self.check_quorum(reverif.accusation_id, &ec);
+        self.check_quorum(reverif.accusation_id, &ec, ctx);
     }
 
     /// Handle ZK re-verification error for a forwarded C3a/C3b proof.
@@ -1024,13 +1087,9 @@ impl Handler<TypedEvent<ProofFailureAccusation>> for AccusationManager {
 impl Handler<TypedEvent<AccusationVote>> for AccusationManager {
     type Result = ();
 
-    fn handle(
-        &mut self,
-        msg: TypedEvent<AccusationVote>,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
+    fn handle(&mut self, msg: TypedEvent<AccusationVote>, ctx: &mut Self::Context) -> Self::Result {
         let (data, ec) = msg.into_components();
-        self.on_vote_received(data, &ec);
+        self.on_vote_received(data, &ec, ctx);
     }
 }
 
@@ -1040,9 +1099,9 @@ impl Handler<TypedEvent<ComputeResponse>> for AccusationManager {
     fn handle(
         &mut self,
         msg: TypedEvent<ComputeResponse>,
-        _ctx: &mut Self::Context,
+        ctx: &mut Self::Context,
     ) -> Self::Result {
-        self.handle_reverification_response(msg);
+        self.handle_reverification_response(msg, ctx);
     }
 }
 

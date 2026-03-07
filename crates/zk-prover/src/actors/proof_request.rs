@@ -60,6 +60,8 @@ struct PendingThresholdProofs {
     /// C3b proofs: keyed by (esi_index, recipient_party_id, row_index)
     e_sm_share_encryption_proofs: HashMap<(usize, usize, usize), Proof>,
     expected_e_sm_enc_count: usize,
+    /// Maps positional index to real party_id (from ThresholdSharePending).
+    recipient_party_ids: Vec<u64>,
 }
 
 impl PendingThresholdProofs {
@@ -69,6 +71,7 @@ impl PendingThresholdProofs {
         ec: EventContext<Sequenced>,
         expected_sk_enc_count: usize,
         expected_e_sm_enc_count: usize,
+        recipient_party_ids: Vec<u64>,
     ) -> Self {
         Self {
             e3_id,
@@ -81,6 +84,7 @@ impl PendingThresholdProofs {
             expected_sk_enc_count,
             e_sm_share_encryption_proofs: HashMap::new(),
             expected_e_sm_enc_count,
+            recipient_party_ids,
         }
     }
 
@@ -285,6 +289,7 @@ impl ProofRequestActor {
                 ec.clone(),
                 sk_enc_count,
                 e_sm_enc_count,
+                msg.recipient_party_ids,
             ),
         );
 
@@ -1114,22 +1119,30 @@ impl ProofRequestActor {
             e3_id, num_parties
         );
 
-        for recipient_party_id in 0..num_parties {
-            if let Some(party_share) = share.extract_for_party(recipient_party_id) {
+        for positional_idx in 0..num_parties {
+            if let Some(party_share) = share.extract_for_party(positional_idx) {
                 let c3a_proofs = signed_c3a_map
-                    .get(&recipient_party_id)
+                    .get(&positional_idx)
                     .cloned()
                     .unwrap_or_default();
                 let c3b_proofs = signed_c3b_map
-                    .get(&recipient_party_id)
+                    .get(&positional_idx)
                     .cloned()
                     .unwrap_or_default();
+
+                // Use real party_id from the mapping (positional index may differ
+                // from party_id when expelled members cause gaps)
+                let real_party_id = pending
+                    .recipient_party_ids
+                    .get(positional_idx)
+                    .copied()
+                    .unwrap_or(positional_idx as u64);
 
                 if let Err(err) = self.bus.publish(
                     ThresholdShareCreated {
                         e3_id: e3_id.clone(),
                         share: Arc::new(party_share),
-                        target_party_id: recipient_party_id as u64,
+                        target_party_id: real_party_id,
                         external: false,
                         signed_c2a_proof: Some(signed_c2a.clone()),
                         signed_c2b_proof: Some(signed_c2b.clone()),
@@ -1139,12 +1152,12 @@ impl ProofRequestActor {
                     ec.clone(),
                 ) {
                     error!(
-                        "Failed to publish ThresholdShareCreated for party {}: {err}",
-                        recipient_party_id
+                        "Failed to publish ThresholdShareCreated for party {} (idx {}): {err}",
+                        real_party_id, positional_idx
                     );
                 }
             } else {
-                error!("Failed to extract share for party {}", recipient_party_id);
+                error!("Failed to extract share for index {}", positional_idx);
             }
         }
     }
