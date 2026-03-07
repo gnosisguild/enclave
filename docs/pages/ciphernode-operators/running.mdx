@@ -1,6 +1,6 @@
 ---
 title: 'Running a Ciphernode'
-description: 'Three ways to run a ciphernode: DappNode, Enclave CLI, or Docker'
+description: 'Three ways to run a ciphernode: DappNode, Interfold CLI, or Docker'
 ---
 
 # Running a Ciphernode
@@ -15,7 +15,7 @@ DappNode provides a user-friendly interface for running a ciphernode with minima
 ### Installation
 
 1. Open your DappNode UI (`http://my.dappnode`)
-2. Search for **"Enclave Ciphernode"** and install the package
+2. Search for **"Enclave Ciphernode"** (the current package name for the Interfold ciphernode) and install the package
 3. The setup wizard will prompt you for:
    - `RPC_URL` - WebSocket RPC endpoint (e.g., `wss://ethereum-sepolia-rpc.publicnode.com`)
    - `NETWORK` - Network name (e.g., `sepolia`, `mainnet`)
@@ -42,9 +42,9 @@ DappNode provides a user-friendly interface for running a ciphernode with minima
 
 ---
 
-## Method 2: Enclave CLI (Recommended)
+## Method 2: Interfold CLI (Recommended)
 
-The Enclave CLI provides the most control and is recommended for production deployments.
+The Interfold CLI provides the most control and is recommended for production deployments.
 
 ### Install the CLI
 
@@ -246,7 +246,7 @@ Each chain requires these contract addresses:
 
 | Contract              | Description                              |
 | --------------------- | ---------------------------------------- |
-| `enclave`             | Main Enclave coordinator                 |
+| `enclave`             | Main Interfold coordinator contract                 |
 | `ciphernode_registry` | Tracks registered operators              |
 | `bonding_registry`    | Manages bonds and tickets                |
 | `fee_token`           | Optional: stablecoin address for tickets |
@@ -265,7 +265,7 @@ Open the following ports:
 
 ### Bootstrap Peers
 
-Connect to the Enclave bootstrap network:
+Connect to the Interfold bootstrap network:
 
 ```yaml
 peers:
