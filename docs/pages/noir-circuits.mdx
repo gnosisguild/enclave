@@ -1,11 +1,11 @@
 ---
 title: 'Noir Circuits'
-description: 'Build and reuse Noir circuits for Enclave programs'
+description: 'Build and reuse Noir circuits for Interfold programs'
 ---
 
 # Noir Circuits & Libraries
 
-Enclave ships a dedicated Noir workspace under `circuits/` plus reusable libraries (SAFE sponge API,
+The Interfold ships a dedicated Noir workspace under `circuits/` plus reusable libraries (SAFE sponge API,
 polynomial utilities, Greco BFV proofs, etc.). Use these circuits as-is or vendor them into your own
 E3 programs.
 
@@ -22,7 +22,7 @@ circuits/
 └── target/                 # build artifacts (created by nargo)
 ```
 
-Each library has its own `README.md` describing APIs and dependency stanza. Example (`safe`):
+Each library has its own `README.md` describing APIs and dependency stanzas. Example (`safe`):
 
 ```toml
 [dependencies]
