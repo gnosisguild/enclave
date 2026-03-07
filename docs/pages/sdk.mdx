@@ -37,9 +37,16 @@ export default defineConfig({
 ```ts
 import { EnclaveSDK, EnclaveEventType, RegistryEventType } from '@enclave-e3/sdk'
 import { createPublicClient, createWalletClient, http, custom } from 'viem'
+import { sepolia } from 'viem/chains'
 
-const publicClient = createPublicClient({ transport: http(import.meta.env.VITE_RPC_URL) })
-const walletClient = createWalletClient({ transport: custom(window.ethereum) })
+const publicClient = createPublicClient({
+  chain: sepolia,
+  transport: http(import.meta.env.VITE_RPC_URL),
+})
+const walletClient = createWalletClient({
+  chain: sepolia,
+  transport: custom(window.ethereum),
+})
 
 const sdk = new EnclaveSDK({
   publicClient,
@@ -47,11 +54,30 @@ const sdk = new EnclaveSDK({
   contracts: {
     enclave: import.meta.env.VITE_ENCLAVE_ADDRESS,
     ciphernodeRegistry: import.meta.env.VITE_REGISTRY_ADDRESS,
+    feeToken: import.meta.env.VITE_FEE_TOKEN_ADDRESS,
   },
-  chainId: 11155111,
+  chain: sepolia,
+  thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
 })
+```
 
-await sdk.initialize()
+For server-side or simpler setups, use the factory method:
+
+```ts
+import { EnclaveSDK } from '@enclave-e3/sdk'
+import { sepolia } from 'viem/chains'
+
+const sdk = EnclaveSDK.create({
+  rpcUrl: import.meta.env.VITE_RPC_URL,
+  contracts: {
+    enclave: import.meta.env.VITE_ENCLAVE_ADDRESS,
+    ciphernodeRegistry: import.meta.env.VITE_REGISTRY_ADDRESS,
+    feeToken: import.meta.env.VITE_FEE_TOKEN_ADDRESS,
+  },
+  chain: sepolia,
+  privateKey: '0x...', // optional — omit for read-only
+  thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
+})
 ```
 
 ### Requesting computations
@@ -59,8 +85,10 @@ await sdk.initialize()
 ```ts
 const hash = await sdk.requestE3({
   threshold: [2, 3],
-  startWindow: [BigInt(Date.now()), BigInt(Date.now() + 5 * 60 * 1000)],
-  duration: BigInt(1800),
+  inputWindow: [
+    BigInt(Math.floor(Date.now() / 1000)),
+    BigInt(Math.floor(Date.now() / 1000) + 5 * 60),
+  ],
   e3Program: '0x...',
   e3ProgramParams: '0x',
   computeProviderParams: '0x',
@@ -91,31 +119,65 @@ sdk.off(EnclaveEventType.E3_REQUESTED, e3Handler)
 import { useEnclaveSDK } from '@enclave-e3/react'
 
 export function Dashboard() {
-  const { isInitialized, requestE3, onEnclaveEvent, EnclaveEventType } = useEnclaveSDK({
+  const { isInitialized, requestE3, onEnclaveEvent, off, EnclaveEventType } = useEnclaveSDK({
     autoConnect: true,
     contracts: {
       enclave: import.meta.env.VITE_ENCLAVE_ADDRESS,
       ciphernodeRegistry: import.meta.env.VITE_REGISTRY_ADDRESS,
+      feeToken: import.meta.env.VITE_FEE_TOKEN_ADDRESS,
     },
-    chainId: 31337,
+    thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
   })
 
   useEffect(() => {
     if (!isInitialized) return
-    const handle = (event) => console.log('Activated', event.data)
-    onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handle)
-    return () => off(EnclaveEventType.E3_ACTIVATED, handle)
+    const handle = (event) => console.log('E3 Requested', event.data)
+    onEnclaveEvent(EnclaveEventType.E3_REQUESTED, handle)
+    return () => off(EnclaveEventType.E3_REQUESTED, handle)
   }, [isInitialized])
 
   return <button onClick={() => requestE3(/* params */)}>Request E3</button>
 }
 ```
 
+The hook uses wagmi's `usePublicClient` and `useWalletClient` internally, so your app must be inside
+a wagmi provider.
+
+## Encryption functions
+
+The SDK includes standalone FHE encryption functions that can be called via the SDK instance or
+imported directly:
+
+```ts
+// Via SDK instance (uses the configured preset name automatically)
+const publicKey = await sdk.generatePublicKey()
+const encrypted = await sdk.encryptNumber(42n, publicKey)
+const { encryptedData, proof } = await sdk.encryptNumberAndGenProof(42n, publicKey)
+
+// Standalone import (pass preset name explicitly)
+import { generatePublicKey, encryptNumber } from '@enclave-e3/sdk'
+
+const pk = await generatePublicKey('INSECURE_THRESHOLD_512')
+const ct = await encryptNumber(42n, pk, 'INSECURE_THRESHOLD_512')
+```
+
+## Modular sub-module imports
+
+The SDK is organized into three sub-modules (`contracts`, `events`, `encryption`) that can be
+imported independently for tree-shaking:
+
+```ts
+import { generatePublicKey, encryptNumber } from '@enclave-e3/sdk/crypto'
+import { ContractClient } from '@enclave-e3/sdk/contracts'
+import { EventListener, EnclaveEventType } from '@enclave-e3/sdk/events'
+```
+
+All exports are also available from the main `@enclave-e3/sdk` entry point.
+
 ## Configuration contract map
 
-Provide both the Enclave and CiphernodeRegistry addresses. The template exposes these via `.env` /
-`enclave.config.yaml`. For multi-chain apps, instantiate multiple SDKs or call
-`sdk.updateConfig({ contracts: { ... }, chainId })` whenever wallets switch networks.
+Provide the Enclave, CiphernodeRegistry, and FeeToken addresses. The template exposes these via
+`.env` / `enclave.config.yaml`. For multi-chain apps, instantiate separate SDK instances per chain.
 
 ## Working with the template
 
@@ -151,20 +213,24 @@ that wraps or complements the core Enclave SDK.
 
 - **Historical events**: `sdk.getHistoricalEvents(type, fromBlock, toBlock)` fetches logs without a
   WebSocket provider; useful for CRON jobs or health checks.
-- **Gas controls**: pass `gasLimit` to `requestE3`, `activateE3`, or `publishInput` if you want
-  fixed limits when interacting with Enclave on L2s.
+- **Gas controls**: pass `gasLimit` to `requestE3`, `publishCiphertextOutput`, or other write
+  methods if you want fixed limits when interacting with Enclave on L2s.
 - **Event polling**: `sdk.startEventPolling()` is handy in serverless environments where websockets
   are unavailable.
 - **Custom transports**: on the server, call `createWalletClient({ account, transport: http(rpc) })`
   and load the private key from Vaults/KMS.
+- **Get E3 quote**: call `sdk.getE3Quote(requestParams)` to get the fee amount required for an E3
+  request.
+- **Fee token approval**: call `sdk.approveFeeToken(amount)` before `requestE3` to approve the fee
+  token spend.
 
 ## Troubleshooting
 
-| Symptom                        | Triage                                                                                                                   |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `MISSING_PUBLIC_CLIENT` errors | Ensure `createPublicClient` uses an HTTP or WebSocket RPC reachable from the app.                                        |
-| `INVALID_ADDRESS`              | Double-check contract addresses passed into the SDK match the current chain.                                             |
-| Hooks never initialize         | Confirm `autoConnect` is true, wallet is connected, and React component is inside a provider that renders on the client. |
-| No events arrive               | Switch to a WebSocket RPC or call `sdk.startEventPolling()` so logs are polled over HTTP.                                |
+| Symptom                        | Triage                                                                                                                         |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `MISSING_PUBLIC_CLIENT` errors | Ensure `createPublicClient` uses an HTTP or WebSocket RPC reachable from the app.                                              |
+| `INVALID_ADDRESS`              | Double-check contract addresses passed into the SDK match the current chain.                                                   |
+| Hooks never initialize         | Confirm `autoConnect` is true, wallet is connected, and React component is inside a wagmi provider that renders on the client. |
+| No events arrive               | Switch to a WebSocket RPC or call `sdk.startEventPolling()` so logs are polled over HTTP.                                      |
 
 For additional API surface details see `packages/enclave-sdk/README.md` inside this repo.
