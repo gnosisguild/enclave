@@ -18,7 +18,6 @@ import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IEnclave } from "../interfaces/IEnclave.sol";
 import { IE3RefundManager } from "../interfaces/IE3RefundManager.sol";
-import { ICircuitVerifier } from "../interfaces/ICircuitVerifier.sol";
 
 /**
  * @title SlashingManager
@@ -82,6 +81,16 @@ contract SlashingManager is ISlashingManager, AccessControl {
     bytes32 public constant PROOF_PAYLOAD_TYPEHASH =
         keccak256(
             "ProofPayload(uint256 chainId,uint256 e3Id,uint256 proofType,bytes zkProof,bytes publicSignals)"
+        );
+
+    /// @notice EIP-712 style typehash for committee attestation votes.
+    /// @dev Must match `AccusationManager::vote_digest()` in `crates/zk-prover/src/actors/accusation_manager.rs`.
+    ///      Includes chainId to prevent cross-chain replay and dataHash for equivocation detection.
+    bytes32 public constant VOTE_TYPEHASH =
+        keccak256(
+            "AccusationVote(uint256 chainId,uint256 e3Id,"
+            "bytes32 accusationId,address voter,"
+            "bool agrees,bytes32 dataHash)"
         );
 
     // ======================
@@ -155,7 +164,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         );
 
         if (policy.requiresProof) {
-            require(policy.proofVerifier != address(0), VerifierNotSet());
+            // Attestation-based slashes: no proofVerifier needed, no appeal window
             require(policy.appealWindow == 0, InvalidPolicy());
         } else {
             require(policy.appealWindow > 0, InvalidPolicy());
@@ -217,17 +226,15 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // ======================
 
     /// @inheritdoc ISlashingManager
-    /// @dev Lane A: Permissionless proof-based slash. Anyone can call.
-    ///      Atomically proposes, verifies operator signature + ZK proof, and executes slash.
+    /// @dev Lane A: Permissionless committee attestation-based slash. Anyone can call.
+    ///      Atomically proposes, verifies committee vote signatures, and executes slash.
     ///      Evidence format:
-    ///      `abi.encode(bytes zkProof, bytes32[] publicInputs,
-    ///         bytes signature,
-    ///         uint256 chainId,
-    ///         uint256 proofType,
-    ///         address verifier)`
-    ///      Operator must sign the EIP-191 prefixed payload hash via `personal_sign`/`signMessage()`
-    ///      (NOT raw `eth_signHash`): `personal_sign(keccak256(abi.encode(PROOF_PAYLOAD_TYPEHASH,
-    ///         chainId, e3Id, proofType, keccak256(zkProof), keccak256(abi.encodePacked(publicInputs)))))`
+    ///      `abi.encode(uint256 proofType,
+    ///         address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures)`
+    ///      Each voter must sign via `personal_sign`/`signMessage()` (EIP-191 prefixed):
+    ///      `personal_sign(keccak256(abi.encode(VOTE_TYPEHASH,
+    ///         block.chainid, e3Id, accusationId, voter, agrees, dataHash)))`
+    ///      where `accusationId = keccak256(abi.encodePacked(block.chainid, e3Id, operator, proofType))`
     function proposeSlash(
         uint256 e3Id,
         address operator,
@@ -248,8 +255,8 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(!evidenceConsumed[evidenceKey], DuplicateEvidence());
         evidenceConsumed[evidenceKey] = true;
 
-        // Verify evidence: signature, committee membership, and ZK proof
-        _verifyProofEvidence(proof, e3Id, operator, policy.proofVerifier);
+        // Verify committee attestation: vote signatures and quorum
+        _verifyAttestationEvidence(proof, e3Id, operator);
 
         // Create proposal
         proposalId = totalProposals;
@@ -361,66 +368,83 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // Internal Execution
     // ======================
 
-    /// @dev Decodes and verifies: verifier match, chainId, operator EIP-191 signature, committee
-    ///      membership, and that the ZK proof is invalid (fault confirmed). Evidence encoding
-    ///      matches proposeSlash — see that function's dev note for the abi.encode layout.
-    function _verifyProofEvidence(
+    /// @dev Verifies committee attestation evidence for Lane A slashes.
+    ///      Decodes the attestation, checks quorum (>= threshold M), verifies each voter's
+    ///      ECDSA signature against the VOTE_TYPEHASH-structured digest, and confirms each
+    ///      voter is a committee member. Voters must be sorted ascending to prevent duplicates.
+    function _verifyAttestationEvidence(
         bytes calldata proof,
         uint256 e3Id,
-        address operator,
-        address policyVerifier
+        address operator
     ) internal view {
         (
-            bytes memory zkProof,
-            bytes32[] memory publicInputs,
-            bytes memory signature,
-            uint256 chainId,
             uint256 proofType,
-            address signedVerifier
-        ) = abi.decode(
-                proof,
-                (bytes, bytes32[], bytes, uint256, uint256, address)
+            address[] memory voters,
+            bool[] memory agrees,
+            bytes32[] memory dataHashes,
+            bytes[] memory signatures
+        ) = abi.decode(proof, (uint256, address[], bool[], bytes32[], bytes[]));
+
+        uint256 numVotes = voters.length;
+        require(
+            numVotes == agrees.length &&
+                numVotes == dataHashes.length &&
+                numVotes == signatures.length,
+            InvalidProof()
+        );
+
+        // Compute accusation ID matching AccusationManager::accusation_id() on the Rust side
+        bytes32 accusationId = keccak256(
+            abi.encodePacked(block.chainid, e3Id, operator, proofType)
+        );
+
+        // Get committee threshold — need at least M agreeing votes
+        {
+            (, uint32 thresholdM, , ) = ciphernodeRegistry
+                .getCommitteeViability(e3Id);
+            require(numVotes >= thresholdM, InsufficientAttestations());
+        }
+
+        // Verify each vote signature and membership
+        address prevVoter = address(0);
+        for (uint256 i = 0; i < numVotes; i++) {
+            address voter = voters[i];
+
+            // Sorted ascending order prevents duplicate voters
+            require(voter > prevVoter, DuplicateVoter());
+            prevVoter = voter;
+
+            // All votes must agree the proof is bad (fault confirmed)
+            require(agrees[i], InvalidProof());
+
+            // Verify voter was a committee member for this E3
+            require(
+                ciphernodeRegistry.isCommitteeMember(e3Id, voter),
+                VoterNotInCommittee()
             );
 
-        // 1. Verify verifier in evidence matches policy's current verifier.
-        require(signedVerifier == policyVerifier, VerifierMismatch());
-
-        // 1b. Verify chainId matches current chain to prevent cross-chain replay.
-        require(chainId == block.chainid, ChainIdMismatch());
-
-        // 2. Verify the operator signed this exact proof payload.
-        bytes32 messageHash = keccak256(
-            abi.encode(
-                PROOF_PAYLOAD_TYPEHASH,
-                chainId,
-                e3Id,
-                proofType,
-                keccak256(zkProof),
-                keccak256(abi.encodePacked(publicInputs))
-            )
-        );
-        bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(
-            messageHash
-        );
-        address recoveredSigner = ECDSA.recover(ethSignedHash, signature);
-        require(recoveredSigner == operator, SignerIsNotOperator());
-
-        // 3. Verify the operator was ever a committee member for this E3.
-        require(
-            ciphernodeRegistry.isCommitteeMember(e3Id, operator),
-            OperatorNotInCommittee()
-        );
-
-        // 4. Re-verify the ZK proof on-chain (INVERTED: must FAIL to confirm fault).
-        //    The staticcall MUST succeed — if the verifier reverts or doesn't exist,
-        //    we cannot determine fault and must not slash.
-        (bool callSuccess, bytes memory returnData) = policyVerifier.staticcall(
-            abi.encodeCall(ICircuitVerifier.verify, (zkProof, publicInputs))
-        );
-        require(callSuccess, VerifierCallFailed());
-        require(returnData.length >= 32, VerifierCallFailed());
-        bool proofValid = abi.decode(returnData, (bool));
-        require(!proofValid, ProofIsValid());
+            // Reconstruct vote digest and verify signature in a scoped block
+            // to avoid stack-too-deep
+            {
+                bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(
+                    keccak256(
+                        abi.encode(
+                            VOTE_TYPEHASH,
+                            block.chainid,
+                            e3Id,
+                            accusationId,
+                            voter,
+                            agrees[i],
+                            dataHashes[i]
+                        )
+                    )
+                );
+                require(
+                    ECDSA.recover(ethSignedHash, signatures[i]) == voter,
+                    InvalidVoteSignature()
+                );
+            }
+        }
     }
 
     /// @dev Executes a slash: applies financial penalties, optional ban, and committee expulsion.
@@ -464,6 +488,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
             // If active count drops below M, fail the E3
             if (activeCount < thresholdM && p.failureReason > 0) {
                 // NOTE: catch block must not be empty (solc optimizer bug, see below)
+                // solhint-disable-next-line no-empty-blocks
                 try enclave.onE3Failed(p.e3Id, p.failureReason) {
                     // Side effects occur in the external call
                 } catch {
@@ -477,6 +502,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         // Self-call for try/catch atomicity — on failure, funds stay in BondingRegistry.
         if (actualTicketSlashed > 0) {
             // NOTE: catch must not be empty — solc >=0.8.28 optimizer bug.
+            // solhint-disable-next-line no-empty-blocks
             try
                 this.escrowSlashedFundsToRefund(p.e3Id, actualTicketSlashed)
             {} catch {

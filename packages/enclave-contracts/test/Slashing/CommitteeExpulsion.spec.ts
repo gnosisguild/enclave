@@ -79,46 +79,86 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     decryptionWindow: ONE_DAY,
   };
 
-  // Must match the PROOF_PAYLOAD_TYPEHASH in SlashingManager.sol
-  const PROOF_PAYLOAD_TYPEHASH = ethers.keccak256(
+  // Must match the VOTE_TYPEHASH in SlashingManager.sol
+  const VOTE_TYPEHASH = ethers.keccak256(
     ethers.toUtf8Bytes(
-      "ProofPayload(uint256 chainId,uint256 e3Id,uint256 proofType,bytes zkProof,bytes publicSignals)",
+      "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)",
     ),
   );
 
   /**
-   * Helper to create a signed proof evidence bundle.
-   * The operator signs the proof payload (matching SlashingManager._verifyProofEvidence),
-   * then the evidence is encoded in the 6-field format expected by proposeSlash().
+   * Helper to create signed committee attestation evidence for Lane A.
+   * Voters (other committee members) sign votes confirming the accused is faulty.
+   * Returns abi.encode(proofType, voters, agrees, dataHashes, signatures)
    */
-  async function signAndEncodeProof(
-    signer: Signer,
+  async function signAndEncodeAttestation(
+    voterSigners: Signer[],
     e3Id: number,
-    verifierAddress: string,
-    zkProof: string = "0x1234",
-    publicInputs: string[] = [ethers.ZeroHash],
-    chainId: number = 31337,
+    operator: string,
     proofType: number = 0,
+    chainId: number = 31337,
+    dataHash: string = ethers.ZeroHash,
   ): Promise<string> {
-    const messageHash = ethers.keccak256(
-      abiCoder.encode(
-        ["bytes32", "uint256", "uint256", "uint256", "bytes32", "bytes32"],
-        [
-          PROOF_PAYLOAD_TYPEHASH,
-          chainId,
-          e3Id,
-          proofType,
-          ethers.keccak256(zkProof),
-          ethers.keccak256(
-            ethers.solidityPacked(["bytes32[]"], [publicInputs]),
-          ),
-        ],
+    const accusationId = ethers.keccak256(
+      ethers.solidityPacked(
+        ["uint256", "uint256", "address", "uint256"],
+        [chainId, e3Id, operator, proofType],
       ),
     );
-    const signature = await signer.signMessage(ethers.getBytes(messageHash));
+
+    const signersWithAddrs = await Promise.all(
+      voterSigners.map(async (s) => ({
+        signer: s,
+        address: await s.getAddress(),
+      })),
+    );
+    signersWithAddrs.sort((a, b) =>
+      a.address.toLowerCase() < b.address.toLowerCase()
+        ? -1
+        : a.address.toLowerCase() > b.address.toLowerCase()
+          ? 1
+          : 0,
+    );
+
+    const voters: string[] = [];
+    const agrees: boolean[] = [];
+    const dataHashes: string[] = [];
+    const signatures: string[] = [];
+
+    for (const { signer, address: voterAddress } of signersWithAddrs) {
+      voters.push(voterAddress);
+      agrees.push(true);
+      dataHashes.push(dataHash);
+
+      const messageHash = ethers.keccak256(
+        abiCoder.encode(
+          [
+            "bytes32",
+            "uint256",
+            "uint256",
+            "bytes32",
+            "address",
+            "bool",
+            "bytes32",
+          ],
+          [
+            VOTE_TYPEHASH,
+            chainId,
+            e3Id,
+            accusationId,
+            voterAddress,
+            true,
+            dataHash,
+          ],
+        ),
+      );
+      const signature = await signer.signMessage(ethers.getBytes(messageHash));
+      signatures.push(signature);
+    }
+
     return abiCoder.encode(
-      ["bytes", "bytes32[]", "bytes", "uint256", "uint256", "address"],
-      [zkProof, publicInputs, signature, chainId, proofType, verifierAddress],
+      ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]"],
+      [proofType, voters, agrees, dataHashes, signatures],
     );
   }
   const setup = async () => {
@@ -300,7 +340,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       ticketPenalty: ethers.parseUnits("10", 6),
       licensePenalty: ethers.parseEther("50"),
       requiresProof: true,
-      proofVerifier: await mockVerifier.getAddress(),
+      proofVerifier: ethers.ZeroAddress,
       banNode: false,
       appealWindow: 0,
       enabled: true,
@@ -408,7 +448,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const {
         registry,
         slashingManager,
-        mockVerifier,
         operator1,
         operator2,
         operator3,
@@ -435,12 +474,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       expect(await registry.isCommitteeMemberActive(0, op1Address)).to.be.true;
       expect((await registry.getCommitteeViability(0)).activeCount).to.equal(3);
 
-      // Submit slash proposal — MockCircuitVerifier returns false by default
-      // so fault is confirmed and slash is auto-executed
-      const proof = await signAndEncodeProof(
-        operator1,
+      // Committee members attest that operator1 is faulty
+      const proof = await signAndEncodeAttestation(
+        [operator2, operator3],
         0,
-        await mockVerifier.getAddress(),
+        op1Address,
       );
       const tx = await slashingManager.proposeSlash(
         0,
@@ -469,7 +507,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         enclave,
         registry,
         slashingManager,
-        mockVerifier,
         operator1,
         operator2,
         operator3,
@@ -490,10 +527,10 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       ]);
 
       // Slash one member — 3 active → 2 active, threshold is 2, still viable
-      const proof = await signAndEncodeProof(
-        operator1,
+      const proof = await signAndEncodeAttestation(
+        [operator2, operator3],
         0,
-        await mockVerifier.getAddress(),
+        await operator1.getAddress(),
       );
       await slashingManager.proposeSlash(
         0,
@@ -518,7 +555,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const {
         enclave,
         slashingManager,
-        mockVerifier,
         operator1,
         operator2,
         operator3,
@@ -539,11 +575,13 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       ]);
 
       // Slash first member — 3 → 2 active, still >= 2
-      const proof1 = await signAndEncodeProof(
-        operator1,
+      const proof1 = await signAndEncodeAttestation(
+        [operator2, operator3],
         0,
-        await mockVerifier.getAddress(),
-        "0x1111",
+        await operator1.getAddress(),
+        0,
+        31337,
+        ethers.keccak256(ethers.toUtf8Bytes("data1")),
       );
       await slashingManager.proposeSlash(
         0,
@@ -556,11 +594,14 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       expect(stage).to.not.equal(6); // Not failed yet
 
       // Slash second member — 2 → 1 active, below threshold M=2
-      const proof2 = await signAndEncodeProof(
-        operator2,
+      // Use operator1 and operator3 as voters (operator1's vote still valid per isCommitteeMember)
+      const proof2 = await signAndEncodeAttestation(
+        [operator1, operator3],
         0,
-        await mockVerifier.getAddress(),
-        "0x2222",
+        await operator2.getAddress(),
+        0,
+        31337,
+        ethers.keccak256(ethers.toUtf8Bytes("data2")),
       );
       const tx = await slashingManager.proposeSlash(
         0,
@@ -585,7 +626,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const {
         registry,
         slashingManager,
-        mockVerifier,
         operator1,
         operator2,
         operator3,
@@ -606,11 +646,13 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       ]);
 
       // Slash operator1 once
-      const proof1 = await signAndEncodeProof(
-        operator1,
+      const proof1 = await signAndEncodeAttestation(
+        [operator2, operator3],
         0,
-        await mockVerifier.getAddress(),
-        "0xaaaa",
+        await operator1.getAddress(),
+        0,
+        31337,
+        ethers.keccak256(ethers.toUtf8Bytes("first")),
       );
       await slashingManager.proposeSlash(
         0,
@@ -620,12 +662,14 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       );
       expect((await registry.getCommitteeViability(0)).activeCount).to.equal(2);
 
-      // Slash operator1 again with different proof (different evidence key)
-      const proof2 = await signAndEncodeProof(
-        operator1,
+      // Slash operator1 again with different evidence (different dataHash)
+      const proof2 = await signAndEncodeAttestation(
+        [operator2, operator3],
         0,
-        await mockVerifier.getAddress(),
-        "0xbbbb",
+        await operator1.getAddress(),
+        0,
+        31337,
+        ethers.keccak256(ethers.toUtf8Bytes("second")),
       );
       await slashingManager.proposeSlash(
         0,
@@ -642,7 +686,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const {
         registry,
         slashingManager,
-        mockVerifier,
         operator1,
         operator2,
         operator3,
@@ -668,10 +711,10 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       expect(nodesBefore).to.include(await operator1.getAddress());
 
       // Expel operator1
-      const proof = await signAndEncodeProof(
-        operator1,
+      const proof = await signAndEncodeAttestation(
+        [operator2, operator3],
         0,
-        await mockVerifier.getAddress(),
+        await operator1.getAddress(),
       );
       await slashingManager.proposeSlash(
         0,
@@ -695,7 +738,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         enclave,
         registry,
         slashingManager,
-        mockVerifier,
         operator1,
         operator2,
         operator3,
@@ -721,11 +763,13 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       expect((await registry.getCommitteeViability(0)).activeCount).to.equal(4);
 
       // Expel 2 out of 4 — still have 2 >= M=2
-      const proof1 = await signAndEncodeProof(
-        operator1,
+      const proof1 = await signAndEncodeAttestation(
+        [operator2, operator3],
         0,
-        await mockVerifier.getAddress(),
-        "0x1111",
+        await operator1.getAddress(),
+        0,
+        31337,
+        ethers.keccak256(ethers.toUtf8Bytes("expel1")),
       );
       await slashingManager.proposeSlash(
         0,
@@ -735,11 +779,13 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       );
       expect((await registry.getCommitteeViability(0)).activeCount).to.equal(3);
 
-      const proof2 = await signAndEncodeProof(
-        operator2,
+      const proof2 = await signAndEncodeAttestation(
+        [operator3, operator4],
         0,
-        await mockVerifier.getAddress(),
-        "0x2222",
+        await operator2.getAddress(),
+        0,
+        31337,
+        ethers.keccak256(ethers.toUtf8Bytes("expel2")),
       );
       await slashingManager.proposeSlash(
         0,
@@ -761,7 +807,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         enclave,
         registry,
         slashingManager,
-        mockVerifier,
         operator1,
         operator2,
         setupOperator,
@@ -776,10 +821,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await finalizeCommitteeWithOperators(0, [operator1, operator2]);
 
       // Expel one member: 2 → 1 < M=2 → E3 fails immediately
-      const proof = await signAndEncodeProof(
-        operator1,
+      // Both committee members vote (including the accused — contract allows it)
+      const proof = await signAndEncodeAttestation(
+        [operator1, operator2],
         0,
-        await mockVerifier.getAddress(),
+        await operator1.getAddress(),
       );
       const tx = await slashingManager.proposeSlash(
         0,
@@ -803,7 +849,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const {
         enclave,
         slashingManager,
-        mockVerifier,
         operator1,
         operator2,
         operator3,
@@ -824,11 +869,13 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       ]);
 
       // Expel operator1 — still viable (2 >= 2)
-      const proof1 = await signAndEncodeProof(
-        operator1,
+      const proof1 = await signAndEncodeAttestation(
+        [operator2, operator3],
         0,
-        await mockVerifier.getAddress(),
-        "0x1111",
+        await operator1.getAddress(),
+        0,
+        31337,
+        ethers.keccak256(ethers.toUtf8Bytes("expel-op1")),
       );
       await slashingManager.proposeSlash(
         0,
@@ -838,11 +885,14 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       );
 
       // Expel operator2 — now below threshold (1 < 2), E3 fails
-      const proof2 = await signAndEncodeProof(
-        operator2,
+      // operator1 is expelled but still isCommitteeMember, so can vote
+      const proof2 = await signAndEncodeAttestation(
+        [operator1, operator3],
         0,
-        await mockVerifier.getAddress(),
-        "0x2222",
+        await operator2.getAddress(),
+        0,
+        31337,
+        ethers.keccak256(ethers.toUtf8Bytes("expel-op2")),
       );
       await slashingManager.proposeSlash(
         0,
@@ -857,11 +907,13 @@ describe("Committee Expulsion & Fault Tolerance", function () {
 
       // Try to expel operator3 — E3 already failed, but onE3Failed is wrapped
       // in try-catch so financial penalties are still applied
-      const proof3 = await signAndEncodeProof(
-        operator3,
+      const proof3 = await signAndEncodeAttestation(
+        [operator1, operator2],
         0,
-        await mockVerifier.getAddress(),
-        "0x3333",
+        await operator3.getAddress(),
+        0,
+        31337,
+        ethers.keccak256(ethers.toUtf8Bytes("expel-op3")),
       );
 
       // The third slash should succeed — penalties are applied even though E3 is already Failed.
@@ -885,7 +937,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     it("should emit SlashExecuted on proof-based committee slash", async function () {
       const {
         slashingManager,
-        mockVerifier,
         operator1,
         operator2,
         operator3,
@@ -905,10 +956,10 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         operator3,
       ]);
 
-      const proof = await signAndEncodeProof(
-        operator1,
+      const proof = await signAndEncodeAttestation(
+        [operator2, operator3],
         0,
-        await mockVerifier.getAddress(),
+        await operator1.getAddress(),
       );
       const op1Addr = await operator1.getAddress();
       const tx = await slashingManager.proposeSlash(

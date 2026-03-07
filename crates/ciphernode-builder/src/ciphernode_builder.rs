@@ -18,7 +18,10 @@ use e3_events::{
     AggregateConfig, AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig,
 };
 use e3_evm::{BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter};
-use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader, ProviderConfig};
+use e3_evm::{
+    CiphernodeRegistrySol, EnclaveSolReader, ProviderConfig, SlashingManagerSolReader,
+    SlashingManagerSolWriter,
+};
 use e3_fhe::ext::FheExtension;
 use e3_fhe_params::{BfvPreset, DEFAULT_BFV_PRESET};
 use e3_keyshare::ext::ThresholdKeyshareExtension;
@@ -31,7 +34,7 @@ use e3_sortition::{
 };
 use e3_sync::sync;
 use e3_utils::SharedRng;
-use e3_zk_prover::{setup_zk_actors, ZkBackend};
+use e3_zk_prover::{setup_zk_actors, AccusationManagerExtension, ZkBackend};
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
@@ -95,6 +98,7 @@ pub struct ContractComponents {
     enclave: bool,
     ciphernode_registry: bool,
     bonding_registry: bool,
+    slashing_manager: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -296,6 +300,13 @@ impl CiphernodeBuilder {
         self
     }
 
+    /// Setup a SlashingManager writer for submitting slash proposals on-chain.
+    /// Requires the `slashing_manager` contract address to be configured.
+    pub fn with_contract_slashing_manager(mut self) -> Self {
+        self.contract_components.slashing_manager = true;
+        self
+    }
+
     /// Setup net package components.
     pub fn with_net(mut self, peers: Vec<String>, quic_port: u16) -> Self {
         self.net_config = Some(NetConfig::new(peers, quic_port));
@@ -494,6 +505,13 @@ impl CiphernodeBuilder {
                 &sortition,
                 aggregator_preset,
             ))
+        }
+
+        // AccusationManager extension — per-E3 fault attribution quorum
+        {
+            let signer = provider_cache.ensure_signer().await?;
+            info!("Setting up AccusationManagerExtension");
+            e3_builder = e3_builder.with(AccusationManagerExtension::create(&bus, signer));
         }
 
         info!("building...");
@@ -700,6 +718,46 @@ async fn setup_evm_system(
                     )
                 }
         }
+
+        if contract_components.slashing_manager {
+            let contract = chain.contracts.slashing_manager.as_ref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Slashing manager is enabled but no contract address configured for chain {}",
+                    chain.name
+                )
+            })?;
+
+            // Reader: read SlashExecuted events from chain
+            let contract_addr = contract.address()?;
+            system.with_contract(contract_addr, move |next| {
+                SlashingManagerSolReader::setup(&next).recipient()
+            });
+
+            // Writer: submit proposeSlash transactions
+            match provider_cache.ensure_write_provider(&chain).await {
+                Ok(write_provider) => {
+                    match SlashingManagerSolWriter::attach(
+                        &bus,
+                        write_provider.clone(),
+                        contract_addr,
+                    )
+                    .await
+                    {
+                        Ok(_) => {
+                            info!("SlashingManagerSolWriter attached for fault submission");
+                        }
+                        Err(e) => {
+                            error!("Failed to attach SlashingManagerSolWriter, skipping: {}", e)
+                        }
+                    }
+                }
+                Err(e) => error!(
+                    "Failed to create write provider for SlashingManager, skipping: {}",
+                    e
+                ),
+            }
+        }
+
         system.build();
     }
 

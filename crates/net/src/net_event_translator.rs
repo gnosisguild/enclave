@@ -95,6 +95,8 @@ impl NetEventTranslator {
             EnclaveEventData::KeyshareCreated(_) => true,
             EnclaveEventData::PlaintextAggregated(_) => true,
             EnclaveEventData::PublicKeyAggregated(_) => true,
+            EnclaveEventData::ProofFailureAccusation(_) => true,
+            EnclaveEventData::AccusationVote(_) => true,
             _ => false,
         }
     }

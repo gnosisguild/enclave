@@ -13,6 +13,9 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     /// @notice Configurable committee members per E3 for testing
     mapping(uint256 e3Id => address[] nodes) private _committeeNodes;
 
+    /// @notice Configurable threshold M per E3 for testing
+    mapping(uint256 e3Id => uint32 threshold) private _thresholdM;
+
     /// @notice Set committee members for an E3 (test helper)
     function setCommitteeNodes(
         uint256 e3Id,
@@ -22,6 +25,11 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         for (uint256 i = 0; i < nodes.length; i++) {
             _committeeNodes[e3Id].push(nodes[i]);
         }
+    }
+
+    /// @notice Set the threshold M for an E3 (test helper)
+    function setThreshold(uint256 e3Id, uint32 m) external {
+        _thresholdM[e3Id] = m;
     }
 
     function requestCommittee(
@@ -108,13 +116,21 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         return false;
     }
 
-    // solhint-disable-next-line no-empty-blocks
     function expelCommitteeMember(
-        uint256,
-        address,
+        uint256 e3Id,
+        address member,
         bytes32
-    ) external pure returns (uint256, uint32) {
-        return (0, 0);
+    ) external returns (uint256, uint32) {
+        address[] storage nodes = _committeeNodes[e3Id];
+        for (uint256 i = 0; i < nodes.length; i++) {
+            if (nodes[i] == member) {
+                nodes[i] = nodes[nodes.length - 1];
+                nodes.pop();
+                break;
+            }
+        }
+        uint32 m = _thresholdM[e3Id];
+        return (nodes.length, m);
     }
 
     function isCommitteeMemberActive(
@@ -146,9 +162,11 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     }
 
     function getCommitteeViability(
-        uint256
-    ) external pure returns (uint256, uint32, uint32, bool) {
-        return (0, 0, 0, false);
+        uint256 e3Id
+    ) external view returns (uint256, uint32, uint32, bool) {
+        uint32 m = _thresholdM[e3Id];
+        uint32 n = uint32(_committeeNodes[e3Id].length);
+        return (n, m, n, n >= m && m > 0);
     }
 }
 

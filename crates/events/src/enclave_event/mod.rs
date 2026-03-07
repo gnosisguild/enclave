@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+mod accusation_quorum_reached;
+mod accusation_vote;
 mod aggregation_proof_pending;
 mod aggregation_proof_signed;
 mod ciphernode_added;
@@ -41,6 +43,9 @@ mod pk_generation_proof_signed;
 mod plaintext_aggregated;
 mod plaintext_output_published;
 mod proof;
+mod proof_failure_accusation;
+mod proof_verification_failed;
+mod proof_verification_passed;
 mod publickey_aggregated;
 mod publish_document;
 mod share_computation_proof_signed;
@@ -48,6 +53,7 @@ mod share_decryption_proof_pending;
 mod share_verification;
 mod shutdown;
 mod signed_proof;
+mod slash_executed;
 mod sync_effect;
 mod sync_end;
 mod sync_start;
@@ -60,6 +66,8 @@ mod ticket_generated;
 mod ticket_submitted;
 mod typed_event;
 
+pub use accusation_quorum_reached::*;
+pub use accusation_vote::*;
 pub use aggregation_proof_pending::*;
 pub use aggregation_proof_signed::*;
 pub use ciphernode_added::*;
@@ -98,6 +106,9 @@ pub use pk_generation_proof_signed::*;
 pub use plaintext_aggregated::*;
 pub use plaintext_output_published::*;
 pub use proof::*;
+pub use proof_failure_accusation::*;
+pub use proof_verification_failed::*;
+pub use proof_verification_passed::*;
 pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use share_computation_proof_signed::*;
@@ -105,6 +116,7 @@ pub use share_decryption_proof_pending::*;
 pub use share_verification::*;
 pub use shutdown::*;
 pub use signed_proof::*;
+pub use slash_executed::*;
 use strum::IntoStaticStr;
 pub use sync_effect::*;
 pub use sync_end::*;
@@ -214,6 +226,11 @@ macro_rules! impl_event_types {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, IntoStaticStr, Serialize, Deserialize)]
 pub enum EnclaveEventData {
+    AccusationQuorumReached(AccusationQuorumReached),
+    AccusationVote(AccusationVote),
+    ProofFailureAccusation(ProofFailureAccusation),
+    ProofVerificationFailed(ProofVerificationFailed),
+    ProofVerificationPassed(ProofVerificationPassed),
     KeyshareCreated(KeyshareCreated),
     E3Requested(E3Requested),
     PublicKeyAggregated(PublicKeyAggregated),
@@ -257,6 +274,8 @@ pub enum EnclaveEventData {
     DecryptionShareProofsPending(DecryptionShareProofsPending),
     ShareVerificationDispatched(ShareVerificationDispatched),
     ShareVerificationComplete(ShareVerificationComplete),
+    SlashExecuted(SlashExecuted),
+    CommitteeMemberExpelled(CommitteeMemberExpelled),
     OutgoingSyncRequested(OutgoingSyncRequested),
     NetSyncEventsReceived(NetSyncEventsReceived),
     HistoricalEvmSyncStart(HistoricalEvmSyncStart),
@@ -492,6 +511,11 @@ impl<S: SeqState> From<&EnclaveEvent<S>> for EventId {
 impl EnclaveEventData {
     pub fn get_e3_id(&self) -> Option<E3id> {
         match self {
+            EnclaveEventData::AccusationQuorumReached(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::AccusationVote(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ProofFailureAccusation(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ProofVerificationFailed(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ProofVerificationPassed(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::KeyshareCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3Requested(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::PublicKeyAggregated(ref data) => Some(data.e3_id.clone()),
@@ -520,6 +544,8 @@ impl EnclaveEventData {
             EnclaveEventData::DecryptionShareProofsPending(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ShareVerificationDispatched(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ShareVerificationComplete(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::SlashExecuted(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::CommitteeMemberExpelled(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3Failed(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3StageChanged(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::DecryptionShareProofSigned(ref data) => Some(data.e3_id.clone()),
@@ -553,6 +579,11 @@ impl<S: SeqState> WithAggregateId for EnclaveEvent<S> {
 }
 
 impl_event_types!(
+    AccusationQuorumReached,
+    AccusationVote,
+    ProofFailureAccusation,
+    ProofVerificationFailed,
+    ProofVerificationPassed,
     KeyshareCreated,
     E3Requested,
     PublicKeyAggregated,
@@ -597,6 +628,8 @@ impl_event_types!(
     DecryptionShareProofsPending,
     ShareVerificationDispatched,
     ShareVerificationComplete,
+    SlashExecuted,
+    CommitteeMemberExpelled,
     OutgoingSyncRequested,
     NetSyncEventsReceived,
     HistoricalEvmSyncStart,

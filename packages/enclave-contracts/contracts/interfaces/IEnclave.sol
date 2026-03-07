@@ -394,6 +394,11 @@ interface IEnclave {
     /// @return reason The failure reason
     function markE3Failed(uint256 e3Id) external returns (FailureReason reason);
 
+    /// @notice Process a failed E3: transfer payment to E3RefundManager and calculate refunds.
+    /// @dev Permissionless. Requires E3 to be in Failed stage.
+    /// @param e3Id The E3 ID
+    function processE3Failure(uint256 e3Id) external;
+
     /// @notice Check if E3 can be marked as failed
     /// @param e3Id The E3 ID
     /// @return canFail Whether failure condition is met
