@@ -1,13 +1,13 @@
 ---
 title: 'Setting Up the Client and Server'
-description: 'Build client applications and coordination servers using the Enclave SDK'
+description: 'Build client applications and coordination servers using the Interfold SDK'
 ---
 
 # Setting Up the Client and Server
 
 Building E3 applications involves creating client-side interfaces for users and coordination logic
-for managing the E3 lifecycle. The Enclave SDK provides powerful TypeScript and React tools to
-streamline this development process.
+for managing the E3 lifecycle. The Interfold SDK provides powerful TypeScript and React tools to
+streamline development.
 
 ## Overview
 
@@ -18,7 +18,7 @@ Modern E3 applications typically consist of:
 3. **Event Management**: Real-time monitoring of E3 lifecycle events
 4. **Contract Interactions**: Type-safe smart contract communication
 
-The Enclave SDK handles much of this complexity for you, providing:
+The Interfold SDK handles much of this complexity for you, providing:
 
 - Type-safe contract interactions
 - Real-time event listening
@@ -29,7 +29,7 @@ The Enclave SDK handles much of this complexity for you, providing:
 
 ### Install the SDK
 
-For TypeScript/JavaScript applications install the TypeScript SDK:
+For TypeScript/JavaScript applications, install the TypeScript SDK:
 
 ```bash
 pnpm add @enclave-e3/sdk
@@ -43,7 +43,7 @@ pnpm add @enclave-e3/sdk @enclave-e3/react
 
 ### Basic TypeScript Client
 
-Create a type-safe client that can interact with Enclave contracts:
+Create a type-safe client that can interact with Interfold contracts:
 
 ```typescript
 import { EnclaveSDK, EnclaveEventType } from '@enclave-e3/sdk'
@@ -182,7 +182,7 @@ export default E3Dashboard;
 
 The SDK provides comprehensive event handling for the entire E3 lifecycle:
 
-### Enclave Events
+### Interfold Events
 
 ```typescript
 // Listen to key E3 lifecycle events
@@ -354,5 +354,5 @@ const prodConfig = {
 }
 ```
 
-The Enclave SDK abstracts away much of the complexity, allowing you to focus on your application's
-unique business logic while ensuring robust, type-safe interaction with the Enclave protocol.
+The Interfold SDK abstracts away much of the complexity, allowing you to focus on your application's
+unique business logic while ensuring robust, type-safe interaction with the Interfold protocol.
