@@ -190,11 +190,5 @@
           export E3_CUSTOM_BB="${wrapped-bb}/bin/bb"
         '';
       };
-    })
-    // {
-      templates.default = {
-        path = ./template;
-        description = "New project using e3 tools";
-      };
-    };
+    });
 }
