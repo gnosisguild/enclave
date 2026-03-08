@@ -5,11 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { Barretenberg, UltraHonkBackend, type ProofData } from '@aztec/bb.js'
-import userDataEncryptionCt0Circuit from '../../../circuits/bin/threshold/target/user_data_encryption_ct0.json'
-import userDataEncryptionCt1Circuit from '../../../circuits/bin/threshold/target/user_data_encryption_ct1.json'
-import userDataEncryptionCircuit from '../../../circuits/bin/recursive_aggregation/wrapper/threshold/target/user_data_encryption.json'
+import userDataEncryptionCt0Circuit from '../../../../circuits/bin/threshold/target/user_data_encryption_ct0.json'
+import userDataEncryptionCt1Circuit from '../../../../circuits/bin/threshold/target/user_data_encryption_ct1.json'
+import userDataEncryptionCircuit from '../../../../circuits/bin/recursive_aggregation/wrapper/threshold/target/user_data_encryption.json'
 import { CompiledCircuit, Noir } from '@noir-lang/noir_js'
-import { proofToFields } from './utils'
+import { proofToFields } from '../utils'
 
 // Conversion to Noir types
 export type Field = string

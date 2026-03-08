@@ -5,8 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import express, { Request, Response } from 'express'
-import { EnclaveSDK, RegistryEventType, CommitteePublishedData } from '@enclave-e3/sdk'
+import { EnclaveSDK } from '@enclave-e3/sdk'
+import { RegistryEventType, type CommitteePublishedData } from '@enclave-e3/sdk/events'
 import { Log, PublicClient } from 'viem'
+import { hardhat } from 'viem/chains'
 import { handleTestInteraction } from './testHandler'
 import { getCheckedEnvVars } from './utils'
 import { callFheRunner } from './runner'
@@ -24,14 +26,14 @@ interface E3Session {
 
 const e3Sessions = new Map<string, E3Session>()
 
+let sdkInstance: EnclaveSDK | null = null
+
 async function createPrivateSDK() {
-  const { CHAIN_ID, PRIVATE_KEY, CIPHERNODE_REGISTRY_CONTRACT, ENCLAVE_CONTRACT, FEE_TOKEN_CONTRACT, RPC_URL } = getCheckedEnvVars()
+  if (sdkInstance) return sdkInstance
 
-  if (!isSupportedChain(CHAIN_ID)) {
-    throw new Error(`Unsupported CHAIN_ID: ${CHAIN_ID}`)
-  }
+  const { PRIVATE_KEY, CIPHERNODE_REGISTRY_CONTRACT, ENCLAVE_CONTRACT, FEE_TOKEN_CONTRACT, RPC_URL } = getCheckedEnvVars()
 
-  const sdk = EnclaveSDK.create({
+  sdkInstance = EnclaveSDK.create({
     rpcUrl: RPC_URL,
     privateKey: PRIVATE_KEY as `0x${string}`,
     contracts: {
@@ -39,12 +41,11 @@ async function createPrivateSDK() {
       ciphernodeRegistry: CIPHERNODE_REGISTRY_CONTRACT as `0x${string}`,
       feeToken: FEE_TOKEN_CONTRACT as `0x${string}`,
     },
-    chainId: CHAIN_ID,
+    chain: hardhat,
     thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
   })
 
-  await sdk.initialize()
-  return sdk
+  return sdkInstance
 }
 
 async function runProgram(e3Id: bigint): Promise<void> {
@@ -69,7 +70,7 @@ async function runProgram(e3Id: bigint): Promise<void> {
     let e3ProgramParams = session.e3ProgramParams
     if (!e3ProgramParams) {
       const sdk = await createPrivateSDK()
-      const e3Details = (await sdk.getE3(e3Id)) as any
+      const e3Details = await sdk.getE3(e3Id)
       e3ProgramParams = e3Details.e3ProgramParams
       session.e3ProgramParams = e3ProgramParams
     }
@@ -214,7 +215,7 @@ async function setupEventListeners() {
   console.log('📡 Setting up event listeners...')
 
   // we need to listen to CommitteePublished to know when an E3 is ready
-  sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, handleCommitteePublishedEvent)
+  await sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, handleCommitteePublishedEvent)
 
   await listenToInputPublishedEvents(sdk.getPublicClient(), PROGRAM_ADDRESS as `0x${string}`, 0n)
 
@@ -223,10 +224,6 @@ async function setupEventListeners() {
 
 function isValidHexString(value: string): value is `0x${string}` {
   return value.startsWith('0x') && /^0x[a-fA-F0-9]*$/.test(value)
-}
-
-function isSupportedChain(value: any): value is keyof typeof EnclaveSDK.chains {
-  return value in EnclaveSDK.chains
 }
 
 async function handleWebhookRequest(req: Request, res: Response) {
@@ -290,8 +287,6 @@ app.get('/sessions', handleGetSessions)
 if (process.env.TEST_MODE) {
   app.get('/test', handleTestInteraction)
 }
-
-app.get('/sessions', handleGetSessions)
 
 async function startServer() {
   try {
