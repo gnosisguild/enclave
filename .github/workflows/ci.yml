@@ -291,7 +291,6 @@ jobs:
           if-no-files-found: error
 
   check-nix-flake:
-    name: Build Nix Flake
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
