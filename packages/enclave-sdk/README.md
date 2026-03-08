@@ -323,6 +323,9 @@ await sdk.publishCiphertextOutput(e3Id: bigint, ciphertextOutput: `0x${string}`,
 // Read operations
 const e3Data = await sdk.getE3(e3Id: bigint);
 const publicKey = await sdk.getE3PublicKey(e3Id: bigint);
+const quote = await sdk.getE3Quote(params: E3RequestParams);
+const stage = await sdk.getE3Stage(e3Id: bigint);
+const reason = await sdk.getFailureReason(e3Id: bigint);
 ```
 
 #### Event Handling
