@@ -87,6 +87,13 @@ impl ZkConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChecksumManifest {
+    pub algorithm: String,
+    pub generated: String,
+    pub files: HashMap<String, String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct VersionInfo {
     #[serde(default)]
