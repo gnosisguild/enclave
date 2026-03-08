@@ -173,7 +173,7 @@
           ];
         meta = {
           description = "e3 CLI";
-          license = pkgs.lib.licenses.mit;
+          license = pkgs.lib.licenses.lgpl3Only;
         };
       };
     in {
