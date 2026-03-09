@@ -37,11 +37,11 @@ const getBBApi = async (): Promise<Barretenberg> => {
       switch (Number(params.polynomial_degree)) {
         case 8192:
           await api.initSRSChonk(2 ** 21)
-          break;
+          break
         default:
           await api.initSRSChonk()
       }
-      
+
       _bbApi = api
       return api
     } finally {
