@@ -387,6 +387,7 @@ class VersionBumper {
       'packages/enclave-contracts',
       'packages/enclave-config',
       'packages/enclave-react',
+      'packages/enclave-mcp',
       'crates/wasm',
     ]
 
