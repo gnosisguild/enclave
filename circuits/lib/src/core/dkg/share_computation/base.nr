@@ -5,12 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 // Base circuit for C2 (SecretKeyShareComputation and SmudgingNoiseShareComputation).
-// Verifies secret commitment and consistency, and outputs chunk and party commitments
-// to bind the chunk circuits and provide share commitments for downstream C3/C4.
+// Verifies secret commitment and consistency, and outputs party commitments for
+// downstream use in C3/C4. y is public to allow the wrapper to enforce consistency
+// with chunk circuits without hashing overhead.
 
 use crate::math::commitments::{
-    compute_share_computation_chunk_commitment, compute_share_computation_e_sm_commitment,
-    compute_share_computation_sk_commitment, compute_share_encryption_commitment_from_shares,
+    compute_share_computation_e_sm_commitment, compute_share_computation_sk_commitment,
+    compute_share_encryption_commitment_from_shares,
 };
 use crate::math::polynomial::Polynomial;
 
@@ -26,17 +27,18 @@ impl<let L: u32> Configs<L> {
 
 // ===== BASE CIRCUIT FOR SK =====
 
-pub struct SecretKeyShareComputationBase<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let CHUNK_SIZE: u32, let N_CHUNKS: u32> {
+pub struct SecretKeyShareComputationBase<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32> {
     configs: Configs<L>,
     /// Expected commitment to sk secret (from C1, public input)
     expected_secret_commitment: Field,
     /// Secret key polynomial
     sk_secret: Polynomial<N>,
     /// Full shares array y[coeff_idx][mod_idx][party_idx]
+    /// Public so wrapper can enforce consistency with chunk circuits
     y: [[[Field; N_PARTIES + 1]; L]; N],
 }
 
-impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let CHUNK_SIZE: u32, let N_CHUNKS: u32> SecretKeyShareComputationBase<N, L, N_PARTIES, T, BIT_SECRET, CHUNK_SIZE, N_CHUNKS> {
+impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32> SecretKeyShareComputationBase<N, L, N_PARTIES, T, BIT_SECRET> {
 
     pub fn new(
         configs: Configs<L>,
@@ -68,23 +70,6 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
         }
     }
 
-    fn compute_chunk_commitments(self) -> [Field; N_CHUNKS] {
-        let mut chunk_commitments: [Field; N_CHUNKS] = [0; N_CHUNKS];
-        for chunk_idx in 0..N_CHUNKS {
-            let start = chunk_idx * CHUNK_SIZE;
-            let mut y_chunk: [[[Field; N_PARTIES + 1]; L]; CHUNK_SIZE] =
-                [[[0; N_PARTIES + 1]; L]; CHUNK_SIZE];
-            for i in 0..CHUNK_SIZE {
-                y_chunk[i] = self.y[start + i];
-            }
-            chunk_commitments[chunk_idx] = compute_share_computation_chunk_commitment::<N_PARTIES, L, CHUNK_SIZE>(
-                y_chunk,
-                chunk_idx,
-            );
-        }
-        chunk_commitments
-    }
-
     fn compute_party_commitments(self) -> [[Field; L]; N_PARTIES] {
         let mut party_commitments: [[Field; L]; N_PARTIES] = [[0; L]; N_PARTIES];
         for party_idx in 0..N_PARTIES {
@@ -99,31 +84,28 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
         party_commitments
     }
 
-    /// Returns (chunk_commitments, party_commitments)
-    /// chunk_commitments bind the chunk circuits
-    /// party_commitments[party_idx][mod_idx] are used downstream in C3/C4
-    pub fn execute(self) -> ([Field; N_CHUNKS], [[Field; L]; N_PARTIES]) {
+    /// Returns party_commitments[party_idx][mod_idx] for downstream use in C3/C4
+    pub fn execute(self) -> [[Field; L]; N_PARTIES] {
         self.verify_secret_commitment();
         self.verify_secret_consistency();
-        let chunk_commitments = self.compute_chunk_commitments();
-        let party_commitments = self.compute_party_commitments();
-        (chunk_commitments, party_commitments)
+        self.compute_party_commitments()
     }
 }
 
 // ===== BASE CIRCUIT FOR ESM =====
 
-pub struct SmudgingNoiseShareComputationBase<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let CHUNK_SIZE: u32, let N_CHUNKS: u32> {
+pub struct SmudgingNoiseShareComputationBase<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32> {
     configs: Configs<L>,
     /// Expected commitment to e_sm secret (from C1, public input)
     expected_secret_commitment: Field,
     /// Smudging noise polynomial per modulus
     e_sm_secret: [Polynomial<N>; L],
     /// Full shares array y[coeff_idx][mod_idx][party_idx]
+    /// Public so wrapper can enforce consistency with chunk circuits
     y: [[[Field; N_PARTIES + 1]; L]; N],
 }
 
-impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let CHUNK_SIZE: u32, let N_CHUNKS: u32> SmudgingNoiseShareComputationBase<N, L, N_PARTIES, T, BIT_SECRET, CHUNK_SIZE, N_CHUNKS> {
+impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32> SmudgingNoiseShareComputationBase<N, L, N_PARTIES, T, BIT_SECRET> {
 
     pub fn new(
         configs: Configs<L>,
@@ -155,23 +137,6 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
         }
     }
 
-    fn compute_chunk_commitments(self) -> [Field; N_CHUNKS] {
-        let mut chunk_commitments: [Field; N_CHUNKS] = [0; N_CHUNKS];
-        for chunk_idx in 0..N_CHUNKS {
-            let start = chunk_idx * CHUNK_SIZE;
-            let mut y_chunk: [[[Field; N_PARTIES + 1]; L]; CHUNK_SIZE] =
-                [[[0; N_PARTIES + 1]; L]; CHUNK_SIZE];
-            for i in 0..CHUNK_SIZE {
-                y_chunk[i] = self.y[start + i];
-            }
-            chunk_commitments[chunk_idx] = compute_share_computation_chunk_commitment::<N_PARTIES, L, CHUNK_SIZE>(
-                y_chunk,
-                chunk_idx,
-            );
-        }
-        chunk_commitments
-    }
-
     fn compute_party_commitments(self) -> [[Field; L]; N_PARTIES] {
         let mut party_commitments: [[Field; L]; N_PARTIES] = [[0; L]; N_PARTIES];
         for party_idx in 0..N_PARTIES {
@@ -186,14 +151,10 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
         party_commitments
     }
 
-    /// Returns (chunk_commitments, party_commitments)
-    /// chunk_commitments bind the chunk circuits
-    /// party_commitments[party_idx][mod_idx] are used downstream in C3/C4
-    pub fn execute(self) -> ([Field; N_CHUNKS], [[Field; L]; N_PARTIES]) {
+    /// Returns party_commitments[party_idx][mod_idx] for downstream use in C3/C4
+    pub fn execute(self) -> [[Field; L]; N_PARTIES] {
         self.verify_secret_commitment();
         self.verify_secret_consistency();
-        let chunk_commitments = self.compute_chunk_commitments();
-        let party_commitments = self.compute_party_commitments();
-        (chunk_commitments, party_commitments)
+        self.compute_party_commitments()
     }
 }
