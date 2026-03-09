@@ -51,12 +51,35 @@ and workflows to help you implement it effectively.
 - Ensures correct result decryption
 - Verifies threshold signature schemes
 
+#### Bonding Registry Contract
+
+- Manages operator license bonds (ENCL tokens) and ticket balances (ETK)
+- Handles operator registration and deregistration
+- Enforces minimum bond and ticket requirements for active status
+- Processes exit queues with configurable delay periods
+- Distributes rewards to committee members on successful E3 completion
+
+#### Slashing Manager Contract
+
+- Processes slashing proposals against misbehaving operators
+- Supports two lanes: attestation-based (immediate) and evidence-based (with appeal window)
+- Manages appeals and governance resolution
+- Can expel committee members and trigger E3 failure if viability drops below threshold
+- Enforces ban policies for repeat offenders
+
+#### E3 Refund Manager Contract
+
+- Calculates refund distributions when an E3 fails at any stage
+- Distributes refunds proportionally based on work completed (committee formation, DKG, decryption)
+- Manages escrow of slashed funds for redistribution
+- Ensures honest node operators receive compensation for completed work
+
 ### 3. Compute Infrastructure
 
 #### Compute Provider (CP)
 
 - Runs the E3 Program over the published inputs
-- Reports computation reults of the E3P to the Enclave contract
+- Reports computation results of the E3P to the Enclave contract
 
 Enclave supports multiple CPs with a variety of different trust, scalability, and cost properties.
 
@@ -64,7 +87,7 @@ Enclave supports multiple CPs with a variety of different trust, scalability, an
 
 1. **Verifiable Systems**
    - [RISC Zero zkVM](https://www.risczero.com/)
-   - [Succint SP1](https://docs.succinct.xyz/) (coming soon)
+   - [Succinct SP1](https://docs.succinct.xyz/) (coming soon)
    - [Jolt](https://jolt.a16zcrypto.com/) (coming soon)
 
 2. **Oracle-Based Systems**
@@ -87,10 +110,40 @@ The following steps outline how these components interact in a typical computati
 6. **Decryption**: The CiCo collectively decrypts the final result.
 7. **Result Retrieval**: The Requester retrieves and consumes the decrypted output of the E3P.
 
+## E3 Lifecycle Stages
+
+Every E3 transitions through a well-defined state machine managed by the Enclave contract:
+
+| Stage                  | Description                                                     |
+| ---------------------- | --------------------------------------------------------------- |
+| **None**               | Default state; E3 does not yet exist                            |
+| **Requested**          | E3 submitted and committee selection initiated                  |
+| **CommitteeFinalized** | Sortition complete; selected nodes begin DKG                    |
+| **KeyPublished**       | Committee public key published; inputs and computation accepted |
+| **CiphertextReady**    | Encrypted output published; awaiting decryption                 |
+| **Complete**           | Plaintext output published and rewards distributed              |
+| **Failed**             | Timeout or fault detected; refund process initiated             |
+
+Timeout deadlines are configured per-deployment via `E3TimeoutConfig` (DKG window, compute window,
+decryption window). If any deadline passes without the expected action, the E3 can be marked as
+failed and the refund manager distributes funds to honest participants.
+
+### Failure Reasons
+
+When an E3 fails, a specific reason is recorded:
+
+- `CommitteeFormationTimeout` / `InsufficientCommitteeMembers`
+- `DKGTimeout` / `DKGInvalidShares`
+- `NoInputsReceived`
+- `ComputeTimeout` / `ComputeProviderExpired` / `ComputeProviderFailed`
+- `RequesterCancelled`
+- `DecryptionTimeout` / `DecryptionInvalidShares`
+- `VerificationFailed`
+
 ## Developer's Perspective
 
 As a developer, you'll interact with:
 
 - **Enclave's Smart Contracts**: To submit requests and retrieve results.
-- **Compute Providers**: To run your E3P using verfiable or oracle-based systems.
+- **Compute Providers**: To run your E3P using verifiable or oracle-based systems.
 - **E3 Smart Contracts**: To verify the inputs and computation result.
