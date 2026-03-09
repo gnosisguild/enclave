@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { AllEventTypes } from '@enclave-e3/sdk'
+import type { AllEventTypes } from '@enclave-e3/sdk/events'
 
 export enum ProgramEventType {
   INPUT_PUBLISHED = 'InputPublished',
