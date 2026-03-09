@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 // Chunk circuit for C2. Verifies range checks and parity check for a chunk of
 // CHUNK_SIZE coefficients. CHUNK_IDX identifies which chunk this is, used to
 // verify consistency against the chunk commitment from the base circuit.
