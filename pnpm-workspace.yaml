@@ -10,6 +10,7 @@ packages:
   - packages/enclave-react
   - packages/enclave-sdk
   - packages/enclave-contracts
+  - packages/enclave-mcp
   - templates/default
   - templates/default/client
 linkWorkspacePackages: true
