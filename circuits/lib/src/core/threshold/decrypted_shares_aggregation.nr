@@ -343,22 +343,20 @@ pub fn compute_all_lagrange_coeffs<let T: u32, let L: u32>(
         }
     }
 
-    // Numerator sign: PROD_{j=0..T} (-x_j) contributes (-1)^{T+1} overall;
-    // negative when T is odd
+    // PROD_{j!=i}(-x_j) has T factors -> sign (-1)^T; numerator_sign_negative = (T % 2) == 1.
     let numerator_sign_negative = (T % 2) == 1;
 
     for basis_idx in 0..L {
         let q_l = qis[basis_idx];
         let m = ModU128::new(q_l);
 
-        // Compute PROD(j=0..T) x_j mod q_l once; divide by x_i per party
+        // product_x = PROD_{j=0..T} x_j; numerator_abs = product_x / x_i = PROD_{j!=i} x_j
         let mut product_x = 1 as Field;
         for j in 0..(T + 1) {
             product_x = m.mul_mod(product_x, party_ids[j]);
         }
 
         for party_idx in 0..(T + 1) {
-            // |numerator| = PROD_{j!=i} x_j = product_x / x_i
             let numerator_abs = m.div_mod(product_x, party_ids[party_idx]);
 
             // |denominator| = PROD_{j!=i} |x_i - x_j|
