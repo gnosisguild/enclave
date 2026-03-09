@@ -18,6 +18,7 @@ import userDataEncryptionCt1Circuit from '../../../../../circuits/bin/threshold/
 import userDataEncryptionCircuit from '../../../../../circuits/bin/recursive_aggregation/wrapper/threshold/target/user_data_encryption.json'
 import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress } from 'viem/utils'
 import { Hex } from 'viem'
+import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 
 // Cached Barretenberg API instance — avoids re-initialising WASM + SRS on every proof.
 let _bbApi: Barretenberg | null = null
@@ -30,7 +31,17 @@ const getBBApi = async (): Promise<Barretenberg> => {
   _bbApiInitPromise = (async () => {
     try {
       const api = await Barretenberg.new()
-      await api.initSRSChonk(2 ** 21)
+      const generator = ZKInputsGenerator.withDefaults()
+      const params = generator.getBFVParams()
+
+      switch (Number(params.polynomial_degree)) {
+        case 8192:
+          await api.initSRSChonk(2 ** 21)
+          break;
+        default:
+          await api.initSRSChonk()
+      }
+      
       _bbApi = api
       return api
     } finally {
