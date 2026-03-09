@@ -13,29 +13,22 @@
     noirHash = "sha256-RoeWaqgFwr8A4HAlu5DzuxrNrexMolIZG14fHQA0KmM=";
     fheHash = "sha256-dS8LcKDI/D9ycsRXbQnMVkUc2ymFBFL8kDrEtRGuHNI=";
     vfsHash = "sha256-+d8RFk7UgOXDCE/LizCTV+UX/Xm/1mYWrR7W0l6mAl8=";
-
-    # bb version hashes
-    bbVersion = "3.0.0-nightly.20251104";
-    bbHashes = {
-      "amd64-linux" = "sha256-l0ABPRqg6xsLstcUhMiz3rxQUKQJvV8S+EVPv8fLVBk=";
-      "arm64-linux" = "sha256-rmv4UYmYUjtOE1zWOPMFqAL1Lo36XqmxwhDefQTFU0M=";
-      "amd64-darwin" = "sha256-eHRJTdEjhlWZOkS4XZTp3MNYnSmYDv+LA6fxZ6RcMuQ=";
-      "arm64-darwin" = "sha256-bTU8BdvsxXPRsMqZLIsiLbjoc4U7eRC3kpFWKTR/Z4k=";
-    };
+    # bb version + checksums driven from versions.json
+    versionsJson = builtins.fromJSON (builtins.readFile ./crates/zk-prover/versions.json);
+    bbVersion = versionsJson.required_bb_version;
+    bbHashes = versionsJson.bb_checksums;
   in
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {
         inherit system;
         config.allowUnfree = true;
       };
-
       noirSrc = pkgs.fetchFromGitHub {
         owner = "noir-lang";
         repo = "noir";
         rev = "v1.0.0-beta.16";
         hash = noirHash;
       };
-
       bbPlatform =
         if pkgs.stdenv.isLinux
         then
@@ -48,7 +41,6 @@
           then "arm64-darwin"
           else "amd64-darwin"
         else throw "Unsupported platform";
-
       bbBin = pkgs.stdenv.mkDerivation {
         pname = "barretenberg";
         version = bbVersion;
@@ -68,7 +60,6 @@
           homepage = "https://github.com/AztecProtocol/aztec-packages";
         };
       };
-
       bb =
         if pkgs.stdenv.isLinux
         then
@@ -78,7 +69,6 @@
             runScript = "${bbBin}/bin/bb";
           }
         else bbBin;
-
       wrapped-bb =
         if pkgs.stdenv.isLinux
         then
@@ -86,7 +76,6 @@
             exec ${pkgs.steam-run}/bin/steam-run ${bb}/bin/bb "$@"
           ''
         else bb;
-
       e3-cli = pkgs.rustPlatform.buildRustPackage {
         pname = "e3-cli";
         version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
@@ -100,7 +89,6 @@
               cp -r ${noirSrc}/noir_stdlib "$d/../../noir_stdlib"
             fi
           done
-
           export HOME=$(mktemp -d)
           git config --global user.email "nix@nix"
           git config --global user.name "nix"
@@ -180,7 +168,6 @@
       packages.default = e3-cli;
       packages.cli = e3-cli;
       packages.bb = wrapped-bb;
-
       devShells.default = pkgs.mkShell {
         packages = [
           e3-cli
