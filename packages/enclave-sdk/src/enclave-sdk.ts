@@ -66,7 +66,7 @@ export class EnclaveSDK {
 
     const presetName = config.thresholdBfvParamsPresetName ?? DEFAULT_THRESHOLD_BFV_PARAMS_PRESET_NAME
 
-    if (!Object.values(ThresholdBfvParamsPresetNames).includes(presetName)) {
+    if (!ThresholdBfvParamsPresetNames.includes(presetName)) {
       throw new SDKError(`Invalid threshold BFV parameters preset name: ${presetName}`, 'INVALID_THRESHOLD_BFV_PARAMS_PRESET_NAME')
     }
 
