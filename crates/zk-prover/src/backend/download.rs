@@ -4,16 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::config::{verify_checksum, BbTarget};
+use crate::config::{verify_checksum, BbTarget, ChecksumManifest, CircuitInfo};
 use crate::error::ZkError;
 use flate2::read::GzDecoder;
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tar::Archive;
 use tokio::fs;
-use tracing::info;
+use tracing::{info, warn};
 use walkdir::WalkDir;
 
 use super::ZkBackend;
@@ -100,6 +101,9 @@ impl ZkBackend {
                 let mut archive = Archive::new(decoder);
                 archive.unpack(&self.base_dir)?;
 
+                let circuit_infos = self.verify_circuits().await?;
+
+                version_info.circuits = circuit_infos;
                 version_info.circuits_version = Some(version.clone());
                 version_info.last_updated = Some(chrono::Utc::now().to_rfc3339());
                 version_info.save(&self.version_file()).await?;
@@ -135,6 +139,43 @@ impl ZkBackend {
 
         let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
         Ok(version)
+    }
+
+    async fn verify_circuits(&self) -> Result<HashMap<String, CircuitInfo>, ZkError> {
+        let manifest_path = self.circuits_dir.join("checksums.json");
+        if !manifest_path.exists() {
+            warn!("checksums.json not found, skipping circuit verification");
+            return Ok(HashMap::new());
+        }
+
+        let manifest_data = fs::read_to_string(&manifest_path).await?;
+        let manifest: ChecksumManifest = serde_json::from_str(&manifest_data)?;
+
+        let mut circuit_infos = HashMap::new();
+
+        for (rel_path, expected_hash) in &manifest.files {
+            let file_path = self.circuits_dir.join(rel_path);
+            if !file_path.exists() {
+                return Err(ZkError::CircuitNotFound(rel_path.clone()));
+            }
+
+            let data = fs::read(&file_path).await?;
+            verify_checksum(rel_path, &data, Some(expected_hash))?;
+
+            circuit_infos.insert(
+                rel_path.clone(),
+                CircuitInfo {
+                    file: rel_path.clone(),
+                    checksum: expected_hash.clone(),
+                },
+            );
+        }
+
+        info!(
+            "verified {} circuit files from checksums.json",
+            circuit_infos.len()
+        );
+        Ok(circuit_infos)
     }
 }
 
