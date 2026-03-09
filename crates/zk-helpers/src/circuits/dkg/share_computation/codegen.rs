@@ -4,21 +4,20 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Code generation for the share-computation BFV circuit: Prover.toml and configs.nr.
+//! Code generation for the share-computation helper scripts: Prover.toml and configs.nr.
 
-use crate::circuits::computation::CircuitComputation;
-use crate::circuits::computation::Computation;
+use crate::circuits::computation::{CircuitComputation, Computation};
 use crate::circuits::dkg::share_computation::{
-    utils::parity_matrix_constant_string, Bits, Inputs, ShareComputationCircuit,
-    ShareComputationCircuitData, ShareComputationOutput,
+    utils::parity_matrix_constant_string, Bits, Bounds, ChunkInputs, Configs, Inputs,
+    ShareComputationBaseCircuit, ShareComputationChunkCircuit, ShareComputationChunkCircuitData,
+    ShareComputationCircuit, ShareComputationCircuitData, ShareComputationOutput,
 };
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
 use crate::registry::Circuit;
-use e3_fhe_params::build_pair_for_preset;
-use e3_fhe_params::BfvPreset;
+use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 
-/// Implementation of [`CircuitCodegen`] for [`ShareComputationCircuit`].
+/// Implementation of [`CircuitCodegen`] for the shared share-computation input builder.
 impl CircuitCodegen for ShareComputationCircuit {
     type Preset = BfvPreset;
     type Data = ShareComputationCircuitData;
@@ -27,44 +26,100 @@ impl CircuitCodegen for ShareComputationCircuit {
     fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
         let ShareComputationOutput { inputs, bits, .. } =
             ShareComputationCircuit::compute(preset, data)?;
+        let configs = Configs::compute(preset, data)?;
 
-        let toml = generate_toml(&inputs)?;
-        let configs = generate_configs(
+        build_base_artifacts(preset, data, inputs, bits, &configs)
+    }
+}
+
+impl CircuitCodegen for ShareComputationBaseCircuit {
+    type Preset = BfvPreset;
+    type Data = ShareComputationCircuitData;
+    type Error = CircuitsErrors;
+
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
+        let ShareComputationOutput { inputs, bits, .. } =
+            ShareComputationCircuit::compute(preset, data)?;
+        let configs = Configs::compute(preset, data)?;
+
+        build_base_artifacts(preset, data, inputs, bits, &configs)
+    }
+}
+
+impl CircuitCodegen for ShareComputationChunkCircuit {
+    type Preset = BfvPreset;
+    type Data = ShareComputationChunkCircuitData;
+    type Error = CircuitsErrors;
+
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
+        let inputs = ChunkInputs::compute(preset, data)?;
+        let bounds = Bounds::compute(preset, &data.share_data)?;
+        let bits = Bits::compute(preset, &bounds)?;
+        let configs = Configs::compute(preset, &data.share_data)?;
+
+        Ok(Artifacts {
+            toml: generate_chunk_toml(&inputs)?,
+            configs: generate_configs(
+                preset,
+                &bits,
+                data.share_data.n_parties as usize,
+                data.share_data.threshold as usize,
+                configs.chunk_size,
+                configs.n_chunks,
+            )?,
+        })
+    }
+}
+
+fn build_base_artifacts(
+    preset: BfvPreset,
+    data: &ShareComputationCircuitData,
+    inputs: Inputs,
+    bits: Bits,
+    configs: &Configs,
+) -> Result<Artifacts, CircuitsErrors> {
+    Ok(Artifacts {
+        toml: generate_toml(&inputs)?,
+        configs: generate_configs(
             preset,
             &bits,
             data.n_parties as usize,
             data.threshold as usize,
-        )?;
-
-        Ok(Artifacts { toml, configs })
-    }
+            configs.chunk_size,
+            configs.n_chunks,
+        )?,
+    })
 }
 
 pub fn generate_toml(witness: &Inputs) -> Result<CodegenToml, CircuitsErrors> {
-    let json = witness
-        .to_json()
-        .map_err(|e| CircuitsErrors::SerdeJson(e))?;
-
+    let json = witness.to_json().map_err(CircuitsErrors::SerdeJson)?;
     Ok(toml::to_string(&json)?)
 }
 
-/// Builds the configs.nr string (N, L, parity matrix, bit parameters, configs) for the Noir prover.
-///
-/// `n_parties` and `threshold` are used to build the parity matrix (Reed–Solomon generator null space)
-/// and must match the committee size used for the input/sample.
+pub fn generate_chunk_toml(witness: &ChunkInputs) -> Result<CodegenToml, CircuitsErrors> {
+    let json = witness.to_json().map_err(CircuitsErrors::SerdeJson)?;
+    Ok(toml::to_string(&json)?)
+}
+
+/// Builds the configs.nr string used by the split base/chunk share-computation circuits.
 pub fn generate_configs(
     preset: BfvPreset,
     bits: &Bits,
     n_parties: usize,
     threshold: usize,
+    chunk_size: usize,
+    n_chunks: usize,
 ) -> Result<CodegenConfigs, CircuitsErrors> {
     let (threshold_params, _) =
         build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
     let config_name = preset.metadata().security.as_config_str();
     let parity_matrix_str = parity_matrix_constant_string(&threshold_params, n_parties, threshold)?;
     let prefix = <ShareComputationCircuit as Circuit>::PREFIX;
-    let configs = format!(
-        r#"
+
+    Ok(format!(
+        r#"use crate::core::dkg::share_computation::base::Configs as ShareComputationBaseConfigs;
+use crate::core::dkg::share_computation::chunk::Configs as ShareComputationChunkConfigs;
+
 pub use crate::configs::{}::threshold::{{L as L_THRESHOLD, QIS as QIS_THRESHOLD}};
 
 pub global N: u32 = {};
@@ -76,13 +131,15 @@ share_computation_sk (CIRCUIT 2a)
 -------------------------------------
 ************************************/
 
-// share_computation_sk - bit parameters
 pub global {}_BIT_SHARE: u32 = {};
 pub global {}_SK_BIT_SECRET: u32 = {};
+pub global {}_CHUNK_SIZE: u32 = {};
+pub global {}_N_CHUNKS: u32 = {};
 
-// share_computation_sk - configs
-pub global {}_SK_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
-    ShareComputationConfigs::new(QIS_THRESHOLD);
+pub global {}_SK_BASE_CONFIGS: ShareComputationBaseConfigs<L_THRESHOLD> =
+    ShareComputationBaseConfigs::new(QIS_THRESHOLD);
+pub global {}_SK_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
+    ShareComputationChunkConfigs::new(QIS_THRESHOLD);
 
 /************************************
 -------------------------------------
@@ -90,12 +147,12 @@ share_computation_e_sm (CIRCUIT 2b)
 -------------------------------------
 ************************************/
 
-// share_computation_e_sm - bit parameters
 pub global {}_E_SM_BIT_SECRET: u32 = {};
 
-// verify_shares - configs
-pub global {}_E_SM_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
-    ShareComputationConfigs::new(QIS_THRESHOLD);
+pub global {}_E_SM_BASE_CONFIGS: ShareComputationBaseConfigs<L_THRESHOLD> =
+    ShareComputationBaseConfigs::new(QIS_THRESHOLD);
+pub global {}_E_SM_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
+    ShareComputationChunkConfigs::new(QIS_THRESHOLD);
 "#,
         config_name,
         preset.metadata().degree,
@@ -105,12 +162,16 @@ pub global {}_E_SM_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
         prefix,
         bits.bit_sk_secret,
         prefix,
+        chunk_size,
+        prefix,
+        n_chunks,
+        prefix,
+        prefix,
         prefix,
         bits.bit_e_sm_secret,
         prefix,
-    );
-
-    Ok(configs)
+        prefix,
+    ))
 }
 
 #[cfg(test)]
@@ -118,7 +179,7 @@ mod tests {
     use super::*;
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::circuits::computation::Computation;
-    use crate::circuits::dkg::share_computation::{Bits, Bounds};
+    use crate::circuits::dkg::share_computation::{Bits, Bounds, ShareComputationChunkCircuitData};
     use crate::codegen::write_artifacts;
     use crate::computation::DkgInputType;
     use crate::Circuit;
@@ -184,8 +245,29 @@ mod tests {
             .contains(format!("{}_BIT_SHARE: u32 = {}", prefix, bits.bit_share).as_str()));
         assert!(configs_content
             .contains(format!("{}_SK_BIT_SECRET: u32 = {}", prefix, bits.bit_sk_secret).as_str()));
+        assert!(configs_content.contains(format!("{}_CHUNK_SIZE: u32 = {}", prefix, 512).as_str()));
         assert!(configs_content.contains(
             format!("{}_E_SM_BIT_SECRET: u32 = {}", prefix, bits.bit_e_sm_secret).as_str()
         ));
+    }
+
+    #[test]
+    fn test_chunk_toml_generation_and_structure() {
+        let committee = CiphernodesCommitteeSize::Small.values();
+        let sample = ShareComputationChunkCircuitData::generate_sample(
+            BfvPreset::SecureThreshold8192,
+            committee,
+            DkgInputType::SecretKey,
+            1,
+        )
+        .unwrap();
+
+        let artifacts = ShareComputationChunkCircuit
+            .codegen(BfvPreset::SecureThreshold8192, &sample)
+            .unwrap();
+
+        let parsed: toml::Value = artifacts.toml.parse().unwrap();
+        let y_chunk = parsed.get("y_chunk").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(y_chunk.len(), 512);
     }
 }
