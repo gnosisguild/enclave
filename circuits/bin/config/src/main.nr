@@ -7,7 +7,7 @@
 /// Configuration Verification Circuit (pre-deployment).
 ///
 /// This circuit verifies all cryptographic parameters used across both BFV (for DKG share encryption)
-/// and Threshold BFV (for user data encryption) schemes. It runs once per deployment to establish
+/// and Threshold BFV (for user data encryption and decryption) schemes. It runs once per deployment to establish
 /// the mathematical foundation that all subsequent circuits depend on.
 ///
 /// Rather than trusting parameter configuration, this circuit provides public proof that:
