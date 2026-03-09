@@ -200,8 +200,7 @@ fn find_net_hlc(events: &[EnclaveEvent<Unsequenced>]) -> BTreeMap<AggregateId, u
         })
         .collect();
     events
-        .to_vec()
-        .into_iter()
+        .iter()
         .filter(|e| e.get_e3_id().map_or(true, |id| !e3s.contains(&id)))
         .fold(BTreeMap::new(), |mut acc, e| {
             acc.entry(e.aggregate_id())
