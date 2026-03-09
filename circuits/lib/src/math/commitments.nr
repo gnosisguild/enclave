@@ -117,7 +117,6 @@ pub global DS_SHARE_COMPUTATION_CHUNK: [u8; 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-
 /// WRAPPERS
 
 pub fn compute_commitment(inputs: Vec<Field>, domain_separator: [u8; 64]) -> Field {
@@ -299,4 +298,3 @@ pub fn compute_share_computation_chunk_commitment<let N_PARTIES: u32, let L: u32
     payload.push(chunk_idx as Field);
     compute_commitment(payload, DS_SHARE_COMPUTATION_CHUNK)
 }
-
