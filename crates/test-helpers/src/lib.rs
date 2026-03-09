@@ -6,18 +6,18 @@
 
 pub mod application;
 pub mod ciphernode_system;
+pub mod libp2p_mock;
 mod plaintext_writer;
 mod public_key_writer;
 pub mod usecase_helpers;
 mod utils;
 use actix::prelude::*;
 use alloy::primitives::Address;
-use anyhow::*;
+use anyhow::Result;
 use e3_ciphernode_builder::{CiphernodeHandle, EventSystem};
 use e3_events::{
     BusHandle, CiphernodeAdded, Enabled, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
-    EventContextAccessors, EventPublisher, EventSubscriber, EventType, HistoryCollector, Seed,
-    Sequenced, Subscribe,
+    EventContextAccessors, EventPublisher, EventType, HistoryCollector, Seed, Sequenced, Subscribe,
 };
 use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::DEFAULT_BFV_PRESET;
@@ -28,13 +28,13 @@ use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::mbfv::CommonRandomPoly;
 use fhe_traits::Serialize;
 use fhe_traits::{FheEncoder, FheEncrypter};
+use libp2p_mock::Libp2pMock;
 pub use plaintext_writer::*;
 pub use public_key_writer::*;
 use rand::Rng;
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::sync::Arc;
-use tracing::trace;
 pub use utils::*;
 
 pub fn create_shared_rng_from_u64(value: u64) -> Arc<std::sync::Mutex<ChaCha20Rng>> {
@@ -127,44 +127,13 @@ impl Handler<EnclaveEvent<Sequenced>> for SimulatedNetPipe {
     }
 }
 
-/// Simulate libp2p by taking output events on each local bus and filter for !is_local_only() and forward remaining events back to the event bus
-/// deduplication will remove previously seen events.
-/// This sets up a set of cyphernodes without libp2p.
-/// The way it works is that it feeds back all events from
-/// all nodes filteres by whether they are broadcastible or not
-/// ```txt
-///
-///                    ┌─────┐
-///                    │ BUS │
-///                    └─────┘
-///                       │
-///          ┌────────────┼────────────┐
-///          │            │            │
-///          ▼            ▼            ▼
-///       ┌────┐       ┌────┐       ┌────┐
-///       │ B1 │       │ B2 │       │ B3 │◀──┐
-///       └────┘       └────┘       └────┘   │
-///          │            │            │     │
-///          │            │            │     │
-///          └────────────┼────────────┘     │
-///                       │                  │
-///                       ▼                  │
-///                    ┌─────┐               │
-///                    │ FIL │───────────────┘
-///                    └─────┘
-/// ```
-pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
+/// Simulate libp2p by taking output net commands and converting them to net events sending them to
+/// the other nodes
+pub async fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
+    let mock = Libp2pMock::new();
     for node in nodes.iter() {
-        let source = node.bus();
-        for (_, node) in nodes.iter().enumerate() {
-            let dest = node.bus();
-            if source != dest {
-                let pipe = SimulatedNetPipe { dest: dest.clone() }.start();
-                source.subscribe(EventType::All, pipe.into());
-            } else {
-                trace!("Source = Dest! Not piping bus to itself");
-            }
-        }
+        let interface = node.channel_bridge().unwrap();
+        mock.add_node(node.peer_id, interface).await;
     }
 }
 
@@ -224,7 +193,7 @@ pub fn encrypt_ciphertext(
         .map(|pt| {
             pubkey
                 .try_encrypt(&pt, &mut rng)
-                .map_err(|e| anyhow!("{e}"))
+                .map_err(|e| anyhow::anyhow!("{e}"))
         })
         .collect::<Result<Vec<Ciphertext>>>()?;
     Ok((ciphertext, plaintext))

@@ -19,7 +19,10 @@ use tracing::trace;
 use tracing::warn;
 
 use crate::events::{NetCommand, NetEvent};
-use e3_utils::{retry_with_backoff, to_retry, RetryError, BACKOFF_DELAY, BACKOFF_MAX_RETRIES};
+use e3_utils::{retry_with_backoff, to_retry, OnceTake, RetryError};
+
+const DIAL_DELAY: u64 = 3000;
+const DIAL_RETRIES: u32 = 10;
 
 /// Dial a single Multiaddr with retries and return an error should those retries not work
 async fn dial_multiaddr(
@@ -31,8 +34,8 @@ async fn dial_multiaddr(
     info!("Now dialing in to {}", multiaddr);
     retry_with_backoff(
         || attempt_connection(cmd_tx, event_tx, multiaddr),
-        BACKOFF_MAX_RETRIES,
-        BACKOFF_DELAY,
+        DIAL_RETRIES,
+        DIAL_DELAY,
     )
     .await?;
     Ok(())
@@ -79,7 +82,7 @@ async fn attempt_connection(
         dial_connection
     );
     cmd_tx
-        .send(NetCommand::Dial(opts))
+        .send(NetCommand::Dial(OnceTake::new(opts)))
         .await
         .map_err(to_retry)?;
     wait_for_connection(&mut event_rx, dial_connection).await

@@ -119,6 +119,8 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         debug!("Received request for timestamp query.");
         let parent_id = msg.id();
         let query = msg.query().clone();
+        let limit = msg.limit();
+        let filter = msg.filter().cloned();
         let sender = msg.sender();
 
         let sub_queries: Vec<_> = query
@@ -145,7 +147,8 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
 
         for (aggregate_id, ts, sub_query_id, store_addr) in sub_queries {
             let get_events_msg =
-                EventStoreQueryBy::<Ts>::new(sub_query_id, ts, aggregator_addr.clone().recipient());
+                EventStoreQueryBy::<Ts>::new(sub_query_id, ts, aggregator_addr.clone().recipient())
+                    .with_options(limit, filter.clone());
             debug!("Sending query for aggregate {:?}", aggregate_id);
             store_addr.do_send(get_events_msg);
         }
@@ -161,6 +164,8 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         debug!("Received request for sequence query.");
         let parent_id = msg.id();
         let query = msg.query().clone();
+        let limit = msg.limit();
+        let filter = msg.filter().cloned();
         let sender = msg.sender();
 
         let sub_queries: Vec<_> = query
@@ -190,7 +195,8 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
                 sub_query_id,
                 seq,
                 aggregator_addr.clone().recipient(),
-            );
+            )
+            .with_options(limit, filter.clone());
             debug!("Sending query for aggregate {:?}", aggregate_id);
             store_addr.do_send(get_events_msg);
         }

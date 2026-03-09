@@ -31,6 +31,7 @@ e3-sortition = { workspace = true }
 fhe = { workspace = true }
 fhe-traits = { workspace = true }
 hex = { workspace = true }
+libp2p = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
 tokio = { workspace = true }

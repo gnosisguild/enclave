@@ -13,7 +13,7 @@ use std::fmt::{self, Display};
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct EffectsEnabled {
-    pub correlation_id: CorrelationId,
+    correlation_id: CorrelationId,
 }
 
 impl EffectsEnabled {
