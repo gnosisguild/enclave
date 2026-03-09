@@ -246,6 +246,8 @@ impl Handler<EnclaveEvmEvent> for EvmChainGateway {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use crate::EvmEvent;
 
     use super::*;
@@ -349,6 +351,7 @@ mod tests {
         let full = history_collector.send(TakeEvents::new(5)).await?;
 
         let test_events: Vec<String> = full
+            .events
             .iter()
             .filter_map(|e| {
                 if let EnclaveEventData::TestEvent(TestEvent { msg, .. }) = e.get_data() {
@@ -364,7 +367,7 @@ mod tests {
             vec!["Before Complete", "Before SyncEnded", "After SyncEnded"]
         );
 
-        let event_types: Vec<String> = full.iter().map(|e| e.event_type()).collect();
+        let event_types: Vec<String> = full.events.iter().map(|e| e.event_type()).collect();
 
         assert_eq!(
             event_types,

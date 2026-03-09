@@ -40,7 +40,7 @@ use tracing::{debug, info};
 const KADEMLIA_PUT_TIMEOUT: Duration = Duration::from_secs(30);
 const KADEMLIA_GET_TIMEOUT: Duration = Duration::from_secs(30);
 const KADEMLIA_BROADCAST_TIMEOUT: Duration = Duration::from_secs(30);
-/// DocumentPublisher is an actor that monitors events from both the NetInterface and the Enclave
+/// DocumentPublisher is an actor that monitors events from both the Libp2pNetInterface and the Enclave
 /// EventBus in order to manage document publishing interactions. In particular this involves the
 /// interactions of publishing a document and listening for notifications, determining if the node
 /// is interested in a specific document and fetching the document to broadcast on the local event
@@ -48,9 +48,9 @@ const KADEMLIA_BROADCAST_TIMEOUT: Duration = Duration::from_secs(30);
 pub struct DocumentPublisher {
     /// Enclave EventBus
     bus: BusHandle,
-    /// NetCommand sender to forward commands to the NetInterface
+    /// NetCommand sender to forward commands to the Libp2pNetInterface
     tx: mpsc::Sender<NetCommand>,
-    /// NetEvent receiver to resubscribe for events from the NetInterface. This is in an Arc so
+    /// NetEvent receiver to resubscribe for events from the Libp2pNetInterface. This is in an Arc so
     /// that we do not do excessive resubscribes without actually listening for events.
     rx: Arc<broadcast::Receiver<NetEvent>>,
     /// The gossipsub broadcast topic
@@ -333,7 +333,7 @@ pub async fn handle_document_published_notification(
     Ok(())
 }
 
-/// Call DhtPutRecord Command on the NetInterface and handle the results
+/// Call DhtPutRecord Command on the Libp2pNetInterface and handle the results
 async fn put_record(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
@@ -363,7 +363,7 @@ async fn put_record(
     .await
 }
 
-/// Call DhtPutRecord Command on the NetInterface and handle the results
+/// Call DhtGetRecord Command on the Libp2pNetInterface and handle the results
 async fn get_record(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
@@ -389,7 +389,7 @@ async fn get_record(
     .await
 }
 
-/// Broadcasts document published notification on NetInterface
+/// Broadcasts document published notification on Libp2pNetInterface
 async fn broadcast_document_published_notification(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
@@ -507,6 +507,7 @@ impl EventConverter {
 
         Ok(())
     }
+
     fn handle_encryption_key_created(&self, msg: TypedEvent<EncryptionKeyCreated>) -> Result<()> {
         let (msg, ctx) = msg.into_components();
         if msg.external {
@@ -535,6 +536,7 @@ impl EventConverter {
         Ok(())
     }
 
+    // TODO: Split this off to a separate module/actor to make each component unidirectional
     /// Convert received document to internal events.
     /// Note: Filtering already happened in DocumentPublisher before DHT fetch.
     fn handle_document_received(&self, msg: TypedEvent<DocumentReceived>) -> Result<()> {
@@ -745,7 +747,7 @@ mod tests {
             value: value.clone(),
         })?;
 
-        // 2. Document publisher should have asked the NetInterface to put the doc on Kademlia
+        // 2. Document publisher should have asked the Libp2pNetInterface to put the doc on Kademlia
         let Some(NetCommand::DhtPutRecord {
             correlation_id,
             expires,
@@ -850,7 +852,7 @@ mod tests {
 
         // wait for events to settle
         let errors = errors.send(TakeEvents::new(1)).await?;
-        let error: EnclaveError = errors.first().unwrap().try_into()?;
+        let error: EnclaveError = errors.events.first().unwrap().try_into()?;
         assert_eq!(
             error.message,
             "Operation failed after 4 attempts. Last error: DHT get record failed: Timeout { key: Key(b\"\\xda-\\xe1\\xc0T\\x11$X\\x05\\xd1\\xd4\\xa6C\\x86\\x96\\xb7e\\xd9j\\x96\\x1bD\\xc8P#\\x0f\\\"\\xea A@b\") }"
@@ -907,7 +909,7 @@ mod tests {
 
         // Expect error to exist
         let errors = errors.send(TakeEvents::new(1)).await?;
-        let error: EnclaveError = errors.first().unwrap().try_into()?;
+        let error: EnclaveError = errors.events.first().unwrap().try_into()?;
         assert_eq!(
             error.message,
             "Operation failed after 4 attempts. Last error: DHT put record failed: PutRecordError(QuorumFailed { key: Key(b\"I got the secret\"), success: [], quorum: 1 })"
@@ -934,7 +936,7 @@ mod tests {
             ..CiphernodeSelected::default()
         })?;
 
-        // 2. Dispatch a NetEvent from the NetInterface signaling that a document was published
+        // 2. Dispatch a NetEvent from the Libp2pNetInterface signaling that a document was published
         net_evt_tx.send(NetEvent::GossipData(
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
                 key: ContentHash::from_content(&b"wrong document".to_vec()),
@@ -952,7 +954,7 @@ mod tests {
         let result = timeout(Duration::from_secs(1), net_cmd_rx.recv()).await;
         assert!(result.is_err(), "Expected timeout but received a message");
 
-        // 4. Dispatch a NetEvent from the NetInterface signaling that a document we ARE interested
+        // 4. Dispatch a NetEvent from the Libp2pNetInterface signaling that a document we ARE interested
         //    in was published
         net_evt_tx.send(NetEvent::GossipData(
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {

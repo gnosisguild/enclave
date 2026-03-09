@@ -7,53 +7,20 @@
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::{prelude::*, Shutdown};
 use std::time::Duration;
-use tokio::{
-    select,
-    signal::unix::{signal, SignalKind},
-};
+use tokio::signal::unix::{signal, SignalKind};
 use tracing::{error, info};
 
 pub async fn listen_for_shutdown(node: CiphernodeHandle) {
-    let (bus, mut handle) = node.split();
+    let bus = node.bus;
     let mut sigterm =
         signal(SignalKind::terminate()).expect("Failed to create SIGTERM signal stream");
-    select! {
-        _ = sigterm.recv() => {
-            info!("SIGTERM received, initiating graceful shutdown...");
+    sigterm.recv().await;
+    info!("SIGTERM received, initiating graceful shutdown...");
 
-            // Stop the actor system
-            match bus.publish_without_context(Shutdown){
-                Ok(_) => (),
-                Err(e) => error!("Shutdown failed to publish! {e}")
-            }
-
-            // Wait for all events to propagate
-            tokio::time::sleep(Duration::from_secs(2)).await;
-
-            // Abort the spawned task
-            handle.abort();
-
-            // Wait for all actor processes to disconnect
-            tokio::time::sleep(Duration::from_secs(2)).await;
-
-            // Wait for the task to finish
-            let _ = handle.await;
-
-            info!("Graceful shutdown complete");
-
-        }
-        result = &mut handle => {
-            match result {
-                Ok(Ok(_)) => {
-                    info!("Completed");
-                }
-                Ok(Err(e)) => {
-                    error!("Failed: {}", e);
-                }
-                Err(e) => {
-                    error!("Panicked: {}", e);
-                }
-            }
-        }
+    if let Err(e) = bus.publish_without_context(Shutdown) {
+        error!("Shutdown failed to publish! {e}");
     }
+
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    info!("Graceful shutdown complete");
 }

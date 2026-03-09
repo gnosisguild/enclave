@@ -5,10 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::simulate_libp2p_net;
-use anyhow::*;
+use anyhow::bail;
+use anyhow::Context;
+use anyhow::Result;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::Event;
 use e3_events::{EnclaveEvent, GetEvents, ResetHistory, TakeEvents};
+use std::u64;
 use std::{future::Future, ops::Deref, pin::Pin, time::Duration};
 use tokio::time::timeout;
 
@@ -81,7 +84,7 @@ impl<'a> CiphernodeSystemBuilder<'a> {
         }
 
         if self.simulate {
-            simulate_libp2p_net(&nodes);
+            simulate_libp2p_net(&nodes).await;
         }
 
         for then_fn in self.thens {
@@ -116,11 +119,74 @@ impl CiphernodeSystem {
             .await
     }
 
+    /// expect events to fire with the default timeout 1000sec per event
+    pub async fn expect_events(&self, expected: &[&str]) -> Result<CiphernodeHistory> {
+        let h = self
+            .take_history_with_timeouts(
+                0,
+                expected.len(),
+                Some(Duration::from_secs(1000)),
+                Some(Duration::from_secs(1000)),
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("FAILURE: {expected:?} : {e}"))?;
+
+        println!(">> {:?} == {:?}", h.event_types(), expected.to_vec());
+        h.expect(expected.to_vec());
+        Ok(h)
+    }
+
+    pub async fn expect_events_without_timeout(
+        &self,
+        expected: &[&str],
+    ) -> Result<CiphernodeHistory> {
+        let h = self
+            .take_history_with_timeouts(0, expected.len(), None, None)
+            .await
+            .map_err(|e| anyhow::anyhow!("FAILURE: {expected:?} : {e}"))?;
+
+        println!(">> {:?} == {:?}", h.event_types(), expected.to_vec());
+        h.expect(expected.to_vec());
+        Ok(h)
+    }
+
+    pub async fn expect_events_with_timeouts(
+        &self,
+        expected: &[&str],
+        total_to: Duration,   // total
+        per_evt_to: Duration, // per event
+    ) -> Result<CiphernodeHistory> {
+        let h = self
+            .take_history_with_timeouts(0, expected.len(), Some(total_to), Some(per_evt_to))
+            .await
+            .map_err(|e| anyhow::anyhow!("FAILURE: {expected:?} : {e}"))?;
+        println!(">> {:?} == {:?}", h.event_types(), expected.to_vec());
+
+        h.expect(expected.to_vec());
+        Ok(h)
+    }
+
     pub async fn take_history_with_timeout(
         &self,
         index: usize,
         count: usize,
-        tout: Duration,
+        total_to: Duration,
+    ) -> Result<CiphernodeHistory> {
+        self.take_history_with_timeouts(
+            index,
+            count,
+            Some(total_to),
+            Some(Duration::from_millis(1000)),
+        )
+        .await
+    }
+
+    pub async fn take_history_with_timeouts(
+        &self,
+        index: usize,
+        count: usize,
+        total_to: Option<Duration>,
+        event_to: Option<Duration>,
     ) -> Result<CiphernodeHistory> {
         let Some(node) = self.0.get(index) else {
             bail!("No node found");
@@ -130,14 +196,28 @@ impl CiphernodeSystem {
             return Ok(CiphernodeHistory(vec![]));
         };
 
-        let history = timeout(tout, history.send(TakeEvents::new(count)))
-            .await
-            .context(format!(
-                "Could not take {} events from node {}",
-                count, index
-            ))??;
+        let history = timeout(
+            total_to.unwrap_or(Duration::from_secs(u64::MAX)), // No timeout
+            history.send(TakeEvents::with_per_evt_timeout(
+                count,
+                event_to.unwrap_or(Duration::from_secs(u64::MAX)),
+            )),
+        )
+        .await
+        .context(format!(
+            "Could not take {} events from node {}",
+            count, index
+        ))??;
 
-        Ok(CiphernodeHistory(history))
+        if history.timed_out {
+            bail!(
+                "Take History timed out was trying to take {} events. Returned {:?}",
+                count,
+                history
+            );
+        };
+
+        Ok(CiphernodeHistory(history.events))
     }
     pub async fn flush_all_history(&self, millis: u64) -> Result<()> {
         let nodes = &self.0;
@@ -146,15 +226,25 @@ impl CiphernodeSystem {
                 break;
             };
             loop {
+                println!("IN FLUSH LOOP...");
                 let nhs = history.send(TakeEvents::new(1));
                 let tr = timeout(Duration::from_millis(millis), nhs).await;
-                if !tr.is_ok() {
-                    break;
+                match tr {
+                    Ok(Ok(result)) if result.timed_out => {
+                        println!("PER-EVENT TIMEOUT, BREAKING LOOP...");
+                        break;
+                    }
+                    Err(_) => {
+                        println!("OUTER TIMEOUT, BREAKING LOOP...");
+                        break;
+                    }
+                    _ => {
+                        // Got events, keep draining
+                    }
                 }
             }
             history.send(ResetHistory).await?;
         }
-
         Ok(())
     }
 }
@@ -182,6 +272,10 @@ impl CiphernodeHistory {
     pub fn event_types(&self) -> Vec<String> {
         self.0.iter().map(|e| e.event_type()).collect()
     }
+
+    pub fn expect(&self, event_types: Vec<&str>) {
+        assert_eq!(self.event_types(), event_types);
+    }
 }
 
 impl Deref for CiphernodeHistory {
@@ -199,7 +293,7 @@ mod tests {
     use e3_ciphernode_builder::EventSystem;
     use e3_data::InMemStore;
     use e3_events::{EventBus, EventBusConfig};
-    use tokio::task::JoinHandle;
+    use libp2p::PeerId;
 
     async fn mock_setup_node(address: String) -> Result<CiphernodeHandle> {
         // Create mock actors for the test
@@ -212,7 +306,6 @@ mod tests {
             .with_event_bus(bus)
             .handle()?
             .enable("test");
-        let handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async { Ok(()) });
 
         Ok(CiphernodeHandle {
             address,
@@ -220,8 +313,8 @@ mod tests {
             bus,
             history: Some(history),
             errors: Some(errors),
-            join_handle: handle,
-            peer_id: "-unknown peer id-".to_string(),
+            peer_id: PeerId::random(),
+            channel_bridge: None,
         })
     }
 
