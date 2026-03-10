@@ -13,24 +13,35 @@ E3 programs.
 
 ```
 circuits/
-├── Nargo.toml              # workspace manifest
-├── crates/
-│   └── libs/
-│       ├── safe/           # SAFE sponge implementation
-│       ├── greco/          # ZK circuit for BFV ciphertext correctness proofs
-│       └── polynomial/     # polynomial commitments utils
-└── target/                 # build artifacts (created by nargo)
+├── lib/
+│   ├── Nargo.toml              # library manifest
+│   └── src/
+│       ├── lib.nr              # top-level library entry
+│       ├── configs/            # BFV parameter configurations (insecure, secure, committee)
+│       ├── core/               # DKG and threshold cryptography circuits
+│       └── math/               # polynomial, SAFE sponge, modular arithmetic, commitments
+├── bin/
+│   ├── config/                 # configuration circuit binary
+│   ├── dkg/                    # DKG sub-circuits (pk, share_encryption, share_decryption, etc.)
+│   ├── threshold/              # threshold sub-circuits (pk_aggregation, share_decryption, etc.)
+│   ├── insecure/               # insecure-parameter circuits for development
+│   ├── production/             # production-parameter circuits
+│   └── recursive_aggregation/  # recursive proof aggregation (fold, wrapper)
+├── benchmarks/                 # benchmark scripts and results
+└── .gitignore
 ```
 
-Each library has its own `README.md` describing APIs and dependency stanza. Example (`safe`):
+The core library at `circuits/lib/` contains reusable modules for polynomial arithmetic, the SAFE
+sponge API, modular reduction helpers, and BFV DKG/threshold primitives. Binary circuits under
+`circuits/bin/` implement specific proof programs (DKG key generation, share encryption/decryption,
+threshold aggregation, etc.).
+
+To reference the library from an external project:
 
 ```toml
 [dependencies]
-safe = { git = "https://github.com/gnosisguild/enclave", tag = "v0.1.5", directory = "circuits/crates/libs/safe" }
+enclave_lib = { git = "https://github.com/gnosisguild/enclave", tag = "v0.1.6", directory = "circuits/lib" }
 ```
-
-From `v0.1.6` onward the directory becomes `circuits/crates/libs/safe` (the `packages/` prefix was
-removed).
 
 ## Tooling requirements
 
@@ -41,6 +52,25 @@ curl -L https://noir-lang.org/install | bash   # installs nargo + bb
 nargo --version                                # 1.0.0-beta.11+
 bb --version                                   # v0.87.0+
 ```
+
+### CLI ZK Prover Setup
+
+The Enclave CLI can manage the ZK prover toolchain (Barretenberg and circuits) for you:
+
+```bash
+# Check current ZK prover status (installed versions, paths)
+enclave noir status
+
+# Install or update the ZK prover components (bb binary, circuit artifacts)
+enclave noir setup
+
+# Force reinstall all components
+enclave noir setup --force
+```
+
+`enclave noir status` shows installation paths, versions, and whether all components are present.
+`enclave noir setup` downloads and installs the correct versions of `bb` and pre-compiled circuit
+artifacts needed for proof generation.
 
 ## Formatting & compilation
 

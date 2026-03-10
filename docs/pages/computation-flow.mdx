@@ -44,6 +44,12 @@ Providers, or other network participant.
    `E3` record with a random seed derived from `block.prevrandao`, and delegates committee selection
    to the `CiphernodeRegistry`.
 
+   You can estimate the fee before submitting by calling `getE3Quote`:
+
+   ```solidity
+   function getE3Quote(E3RequestParams calldata requestParams) external view returns (uint256 fee);
+   ```
+
 ### Phase 2: Node Selection
 
 Each new request to the Enclave contracts initiates a verifiable sortition process to select a

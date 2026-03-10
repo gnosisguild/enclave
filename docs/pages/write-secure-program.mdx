@@ -63,14 +63,15 @@ environment. Below are the key steps to implement it effectively:
 **Example (Rust with RISC Zero + Boundless):**
 
 ```rust
-use fhe::bfv::{BfvParameters, Ciphertext};
-use fhe_traits::{Deserialize, Serialize};
-use std::sync::Arc;
+use e3_fhe_params::decode_bfv_params_arc;
+use e3_compute_provider::FHEInputs;
+use fhe::bfv::Ciphertext;
+use fhe_traits::{DeserializeParametrized, Serialize};
 
 /// Your secure computation function
 pub fn fhe_processor(fhe_inputs: &FHEInputs) -> Vec<u8> {
-    // Deserialize parameters
-    let params = Arc::new(BfvParameters::try_deserialize(&fhe_inputs.params).unwrap());
+    // Decode the FHE parameters
+    let params = decode_bfv_params_arc(&fhe_inputs.params).unwrap();
 
     // Initialize sum
     let mut sum = Ciphertext::zero(&params);
@@ -92,10 +93,20 @@ To run the Secure Process, use the Compute Provider `ComputeManager` to execute 
 expects:
 
 - The `ComputeProvider` implementation
-- The `FHEInputs` struct that consists of the FHE parameters and the ciphertexts to use.
+- The `FHEInputs` struct that consists of the FHE parameters and the ciphertexts to use. Each
+  ciphertext is a tuple of `(bytes, index)` where `index` is the position in the input set.
 - The Secure Process function `fhe_processor`
 - A boolean flag `use_parallel` to indicate whether to use parallel processing.
 - An optional `batch_size` that will be used for parallel processing. Must be a power of 2.
+
+The `FHEInputs` struct is defined as:
+
+```rust
+pub struct FHEInputs {
+    pub ciphertexts: Vec<(Vec<u8>, u64)>,  // (ciphertext_bytes, index)
+    pub params: Vec<u8>,                    // serialized BFV parameters
+}
+```
 
 ```rs
 // Run the secure process inside the Compute Provider

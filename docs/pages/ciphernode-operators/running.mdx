@@ -123,16 +123,30 @@ enclave nodes down        # Stop all nodes
 
 ### CLI Commands Reference
 
-| Command                        | Description                            |
-| ------------------------------ | -------------------------------------- |
-| `enclave start`                | Start the node in foreground           |
-| `enclave nodes up`             | Start all configured nodes             |
-| `enclave nodes down`           | Stop all nodes                         |
-| `enclave nodes ps`             | List running nodes                     |
-| `enclave nodes status <name>`  | Check specific node status             |
-| `enclave nodes restart <name>` | Restart a specific node                |
-| `enclave ciphernode status`    | Show on-chain registration status      |
-| `enclave purge-all`            | Wipe all local data (use with caution) |
+| Command                        | Description                                         |
+| ------------------------------ | --------------------------------------------------- |
+| `enclave start`                | Start the node in foreground                        |
+| `enclave start -v`             | Start with INFO logging (`-vv`=DEBUG, `-vvv`=TRACE) |
+| `enclave nodes up`             | Start all configured nodes                          |
+| `enclave nodes up --detach`    | Start all nodes in background                       |
+| `enclave nodes up --exclude x` | Start all nodes except `x`                          |
+| `enclave nodes down`           | Stop all nodes                                      |
+| `enclave nodes ps`             | List running nodes and their status                 |
+| `enclave nodes start <name>`   | Start an individual node                            |
+| `enclave nodes stop <name>`    | Stop an individual node                             |
+| `enclave nodes status <name>`  | Check specific node status                          |
+| `enclave nodes restart <name>` | Restart a specific node                             |
+| `enclave nodes purge`          | Purge all local ciphernode data                     |
+| `enclave ciphernode status`    | Show on-chain registration status                   |
+| `enclave net get-peer-id`      | Show your libp2p peer ID                            |
+| `enclave wallet get`           | Show your wallet address                            |
+| `enclave rev`                  | Show the git SHA the CLI was built from             |
+| `enclave purge-all`            | Wipe all local data (use with caution)              |
+| `enclave print-env`            | Print contract addresses as env vars                |
+| `enclave print-env --vite`     | Print env vars with `VITE_` prefix                  |
+| `enclave print-env --chain x`  | Print env vars for chain `x`                        |
+| `enclave noir status`          | Check ZK prover status                              |
+| `enclave noir setup`           | Install/update ZK prover components                 |
 
 ---
 
@@ -221,16 +235,15 @@ docker logs -f ciphernode
 
 ### Node Configuration
 
-| Field          | Description                          | Default                  |
-| -------------- | ------------------------------------ | ------------------------ |
-| `address`      | Your Ethereum address                | Required                 |
-| `quic_port`    | UDP port for QUIC/libp2p networking  | `9091`                   |
-| `peers`        | Bootstrap peer multiaddresses        | `[]`                     |
-| `autonetkey`   | Auto-generate network key if missing | `false`                  |
-| `autopassword` | Auto-generate password if missing    | `false`                  |
-| `autowallet`   | Auto-load wallet from environment    | `false`                  |
-| `data_dir`     | Override data directory              | `~/.local/share/enclave` |
-| `config_dir`   | Override config directory            | `~/.config/enclave`      |
+| Field          | Description                         | Default                  |
+| -------------- | ----------------------------------- | ------------------------ |
+| `address`      | Your Ethereum address               | Required                 |
+| `quic_port`    | UDP port for QUIC/libp2p networking | `9091`                   |
+| `peers`        | Bootstrap peer multiaddresses       | `[]`                     |
+| `autopassword` | Auto-generate password if missing   | `false`                  |
+| `autowallet`   | Auto-load wallet from environment   | `false`                  |
+| `data_dir`     | Override data directory             | `~/.local/share/enclave` |
+| `config_dir`   | Override config directory           | `~/.config/enclave`      |
 
 ### Chain Configuration
 
@@ -244,12 +257,24 @@ docker logs -f ciphernode
 
 Each chain requires these contract addresses:
 
-| Contract              | Description                              |
-| --------------------- | ---------------------------------------- |
-| `enclave`             | Main Enclave coordinator                 |
-| `ciphernode_registry` | Tracks registered operators              |
-| `bonding_registry`    | Manages bonds and tickets                |
-| `fee_token`           | Optional: stablecoin address for tickets |
+| Contract              | Description                             | Required for ciphernode |
+| --------------------- | --------------------------------------- | ----------------------- |
+| `enclave`             | Main Enclave coordinator                | Yes                     |
+| `ciphernode_registry` | Tracks registered operators             | Yes                     |
+| `bonding_registry`    | Manages bonds and tickets               | Yes                     |
+| `slashing_manager`    | Manages slashing penalties              | Yes                     |
+| `e3_program`          | E3 Program contract address             | No                      |
+| `fee_token`           | Stablecoin address for fees and tickets | No                      |
+
+Each contract can be specified as a simple address string or with a deploy block for faster syncing:
+
+```yaml
+contracts:
+  enclave:
+    address: '0x450015E41E1F6b6AfaEbf598E32a8d02a368c0A0'
+    deploy_block: 10395619
+  ciphernode_registry: '0xc8D2880c59D5e807eFFDee3451fb0Aa97f6aefDA'
+```
 
 ---
 

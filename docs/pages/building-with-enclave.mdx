@@ -40,25 +40,87 @@ contract Enclave {
   // Mapping of E3s.
   mapping(uint256 e3Id => E3 e3) public e3s;
 
-  // Mapping of E3 lifecycle stages.
-  mapping(uint256 e3Id => E3Stage stage) public e3Stages;
-
-  // Mapping of E3 deadline configuration.
-  mapping(uint256 e3Id => E3Deadlines deadlines) public e3Deadlines;
-
   // Mapping of enabled encryption schemes.
   mapping(bytes32 encryptionSchemeId => IDecryptionVerifier decryptionVerifier)
     public decryptionVerifiers;
 
-  // Timeout configuration for DKG, compute, and decryption windows.
-  E3TimeoutConfig public timeoutConfig;
+  // Mapping of E3 payment amounts.
+  mapping(uint256 e3Id => uint256 amount) public e3Payments;
 
   // Maximum allowed duration for an E3's input window.
   uint256 public maxDuration;
 
-  // Total number of E3s created.
-  uint256 public e3Count;
+  // Auto-incrementing E3 identifier.
+  uint256 public nexte3Id;
 }
+```
+
+### E3 Struct
+
+Each computation is tracked by an `E3` struct:
+
+```solidity
+struct E3 {
+  uint256 seed; // Random seed for committee selection
+  uint32[2] threshold; // [M, N] - M required out of N members
+  uint256 requestBlock; // Block when E3 was requested
+  uint256[2] inputWindow; // [start, end] timestamps for input acceptance
+  bytes32 encryptionSchemeId; // Encryption scheme identifier
+  IE3Program e3Program; // E3 Program contract address
+  bytes e3ProgramParams; // ABI-encoded program params
+  bytes customParams; // Arbitrary application-defined params
+  IDecryptionVerifier decryptionVerifier; // Verifier for decryption proofs
+  bytes32 committeePublicKey; // Hash of committee's shared public key
+  bytes32 ciphertextOutput; // Hash of encrypted output
+  bytes plaintextOutput; // Decrypted final result
+  address requester; // Entity that requested computation
+}
+```
+
+### Lifecycle Stages
+
+Each E3 progresses through these stages:
+
+| Stage                | Value | Description                                     |
+| -------------------- | ----- | ----------------------------------------------- |
+| `None`               | 0     | E3 does not exist                               |
+| `Requested`          | 1     | E3 submitted, committee selection initiated     |
+| `CommitteeFinalized` | 2     | Sortition complete, DKG started                 |
+| `KeyPublished`       | 3     | Committee public key published, inputs accepted |
+| `CiphertextReady`    | 4     | Encrypted output published, awaiting decryption |
+| `Complete`           | 5     | Plaintext output published, rewards distributed |
+| `Failed`             | 6     | Timeout or fault detected, refund initiated     |
+
+### View Functions
+
+The Enclave contract exposes these read-only functions for querying E3 state:
+
+```solidity
+// Fetch the complete E3 struct (reverts if e3Id doesn't exist)
+function getE3(uint256 e3Id) external view returns (E3 memory e3);
+
+// Get current lifecycle stage
+function getE3Stage(uint256 e3Id) external view returns (E3Stage stage);
+
+// Estimate the fee for an E3 request
+function getE3Quote(E3RequestParams calldata params) external view returns (uint256 fee);
+
+// Get the decryption verifier for an encryption scheme
+function getDecryptionVerifier(
+  bytes32 encryptionSchemeId
+) external view returns (IDecryptionVerifier);
+
+// Get failure reason (if E3 has failed)
+function getFailureReason(uint256 e3Id) external view returns (FailureReason reason);
+
+// Get the address that requested the E3
+function getRequester(uint256 e3Id) external view returns (address requester);
+
+// Get timeline deadlines (dkgDeadline, computeDeadline, decryptionDeadline)
+function getDeadlines(uint256 e3Id) external view returns (E3Deadlines memory deadlines);
+
+// Get global timeout configuration
+function getTimeoutConfig() external view returns (E3TimeoutConfig memory config);
 ```
 
 ## Requesting Computation
@@ -155,17 +217,17 @@ the E3's public key. It is also recommended to bundle in proofs to validate:
 **Enclave Contract Events:**
 
 ```solidity
-event E3Requested(uint256 indexed e3Id, address indexed requester, address e3ProgramAddress);
+event E3Requested(uint256 e3Id, E3 e3, IE3Program indexed e3Program);
 
-event E3StageChanged(uint256 indexed e3Id, E3Stage stage);
+event E3StageChanged(uint256 indexed e3Id, E3Stage previousStage, E3Stage newStage);
 
 event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
 
 event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
 
-event E3Failed(uint256 indexed e3Id, FailureReason reason);
+event E3Failed(uint256 indexed e3Id, E3Stage failedAtStage, FailureReason reason);
 
-event RewardsDistributed(uint256 indexed e3Id, uint256 totalReward, uint256 nodeCount);
+event RewardsDistributed(uint256 indexed e3Id, address[] nodes, uint256[] amounts);
 ```
 
 **Program Contract Events:**

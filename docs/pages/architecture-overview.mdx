@@ -125,8 +125,18 @@ Every E3 transitions through a well-defined state machine managed by the Enclave
 | **Failed**             | Timeout or fault detected; refund process initiated             |
 
 Timeout deadlines are configured per-deployment via `E3TimeoutConfig` (DKG window, compute window,
-decryption window). If any deadline passes without the expected action, the E3 can be marked as
+decryption window) on the Enclave contract. The committee formation window is managed separately by
+the CiphernodeRegistry. If any deadline passes without the expected action, the E3 can be marked as
 failed and the refund manager distributes funds to honest participants.
+
+Current Sepolia timeout configuration:
+
+| Window                     | Duration |
+| -------------------------- | -------- |
+| Committee Formation Window | 3,600s   |
+| DKG Window                 | 7,200s   |
+| Compute Window             | 86,400s  |
+| Decryption Window          | 3,600s   |
 
 ### Failure Reasons
 
