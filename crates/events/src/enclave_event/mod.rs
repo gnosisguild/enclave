@@ -569,6 +569,9 @@ impl EnclaveEventData {
             EnclaveEventData::PkAggregationProofSigned(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::AggregationProofPending(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::AggregationProofSigned(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::DKGRecursiveAggregationComplete(ref data) => {
+                Some(data.e3_id.clone())
+            }
             _ => None,
         }
     }

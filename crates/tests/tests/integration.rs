@@ -1365,6 +1365,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
             e3_id: E3id::new("1234", 1),
             nodes: OrderedSet::from(eth_addrs.clone()),
             pk_aggregation_proof: None,
+            dkg_aggregated_proof: None,
         }
         .into()
     );
@@ -1408,6 +1409,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
             e3_id: E3id::new("1234", 2),
             nodes: OrderedSet::from(eth_addrs.clone()),
             pk_aggregation_proof: None,
+            dkg_aggregated_proof: None,
         }
         .into()
     );

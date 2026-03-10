@@ -9,17 +9,19 @@ use anyhow::Result;
 use e3_bfv_client::client::compute_pk_commitment;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, BusHandle, Die, E3id, EnclaveEvent, EnclaveEventData, EventContext,
+    prelude::*, BusHandle, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
+    DKGRecursiveAggregationComplete, Die, E3id, EnclaveEvent, EnclaveEventData, EventContext,
     KeyshareCreated, OrderedSet, PartyProofsToVerify, PkAggregationProofPending,
-    PkAggregationProofRequest, PkAggregationProofSigned, PublicKeyAggregated, Seed, Sequenced,
-    ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload, TypedEvent,
-    VerificationKind,
+    PkAggregationProofRequest, PkAggregationProofSigned, Proof, PublicKeyAggregated, Seed,
+    Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload,
+    TypedEvent, VerificationKind, ZkRequest, ZkResponse,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_fhe_params::BfvPreset;
 use e3_utils::NotifySync;
 use e3_utils::{ArcBytes, MAILBOX_LIMIT};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
@@ -81,6 +83,22 @@ pub struct PublicKeyAggregator {
     e3_id: E3id,
     state: Persistable<PublicKeyAggregatorState>,
     params_preset: BfvPreset,
+    /// Buffer for per-node DKG recursive proofs keyed by party_id.
+    dkg_node_proofs: HashMap<u64, Proof>,
+    /// Number of honest parties (set after C1 verification).
+    expected_honest_count: Option<usize>,
+    /// Correlation ID for the in-flight cross-node fold.
+    cross_node_fold_correlation: Option<CorrelationId>,
+    /// Running accumulated proof during cross-node folding.
+    cross_node_accumulated: Option<Proof>,
+    /// Proofs remaining to fold.
+    cross_node_remaining: Vec<Proof>,
+    /// Final cross-node folded proof.
+    cross_node_proof: Option<Proof>,
+    /// C5 proof stored while waiting for cross-node fold completion.
+    c5_proof_pending: Option<Proof>,
+    /// Last event context for publishing.
+    last_ec: Option<EventContext<Sequenced>>,
 }
 
 pub struct PublicKeyAggregatorParams {
@@ -104,6 +122,14 @@ impl PublicKeyAggregator {
             e3_id: params.e3_id,
             state,
             params_preset: params.params_preset,
+            dkg_node_proofs: HashMap::new(),
+            expected_honest_count: None,
+            cross_node_fold_correlation: None,
+            cross_node_accumulated: None,
+            cross_node_remaining: Vec::new(),
+            cross_node_proof: None,
+            c5_proof_pending: None,
+            last_ec: None,
         }
     }
 
@@ -329,6 +355,11 @@ impl PublicKeyAggregator {
                 nodes: honest_nodes_set,
             })
         })?;
+
+        self.expected_honest_count = Some(committee_h);
+        self.last_ec = Some(ec.clone());
+        self.try_start_cross_node_fold(&ec)?;
+
         Ok(())
     }
 
@@ -342,6 +373,177 @@ impl PublicKeyAggregator {
             return Ok(());
         }
 
+        if !matches!(
+            self.state.get(),
+            Some(PublicKeyAggregatorState::GeneratingC5Proof { .. })
+        ) {
+            return Err(anyhow::anyhow!(
+                "handle_pk_aggregation_proof_signed called outside GeneratingC5Proof state"
+            ));
+        }
+
+        info!("C5 proof signed — waiting for cross-node DKG fold to complete...");
+
+        self.c5_proof_pending = Some(msg.signed_proof.payload.proof);
+        self.last_ec = Some(ec);
+        self.try_publish_complete()
+    }
+
+    // -- Cross-node DKG proof aggregation --------------------------------------------------
+
+    fn handle_dkg_recursive_aggregation_complete(
+        &mut self,
+        msg: TypedEvent<DKGRecursiveAggregationComplete>,
+    ) -> Result<()> {
+        let (msg, ec) = msg.into_components();
+
+        if msg.e3_id != self.e3_id {
+            return Ok(());
+        }
+
+        if self.dkg_node_proofs.contains_key(&msg.party_id) {
+            warn!(
+                "Duplicate DKGRecursiveAggregationComplete for party {} — ignoring",
+                msg.party_id
+            );
+            return Ok(());
+        }
+
+        info!(
+            "PublicKeyAggregator: buffered DKG proof from party {} (buffered={})",
+            msg.party_id,
+            self.dkg_node_proofs.len() + 1
+        );
+        self.dkg_node_proofs.insert(msg.party_id, msg.aggregated_proof);
+        self.last_ec = Some(ec.clone());
+
+        self.try_start_cross_node_fold(&ec)
+    }
+
+    /// Start cross-node fold if we know the honest count and have all proofs.
+    fn try_start_cross_node_fold(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
+        let Some(expected) = self.expected_honest_count else {
+            return Ok(());
+        };
+
+        if self.dkg_node_proofs.len() < expected {
+            return Ok(());
+        }
+
+        // Already started or completed
+        if self.cross_node_accumulated.is_some() || self.cross_node_proof.is_some() {
+            return Ok(());
+        }
+
+        let mut pairs: Vec<_> = self
+            .dkg_node_proofs
+            .iter()
+            .map(|(pid, p)| (*pid, p.clone()))
+            .collect();
+        pairs.sort_by_key(|(pid, _)| *pid);
+        let mut proofs: Vec<Proof> = pairs.into_iter().map(|(_, p)| p).collect();
+
+        if proofs.is_empty() {
+            return Ok(());
+        }
+
+        if proofs.len() == 1 {
+            info!("PublicKeyAggregator: single honest DKG proof — no fold needed");
+            self.cross_node_proof = Some(proofs.remove(0));
+            return self.try_publish_complete();
+        }
+
+        let first = proofs.remove(0);
+        self.cross_node_accumulated = Some(first);
+        self.cross_node_remaining = proofs;
+
+        info!(
+            "PublicKeyAggregator: starting cross-node fold ({} proofs to fold)",
+            self.cross_node_remaining.len()
+        );
+
+        self.advance_cross_node_fold(ec)
+    }
+
+    /// Dispatch the next fold step (accumulated + next_remaining).
+    fn advance_cross_node_fold(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
+        if self.cross_node_fold_correlation.is_some() {
+            return Ok(());
+        }
+
+        let Some(acc) = self.cross_node_accumulated.take() else {
+            return Ok(());
+        };
+
+        let Some(next) = self.cross_node_remaining.first().cloned() else {
+            self.cross_node_proof = Some(acc);
+            return self.try_publish_complete();
+        };
+        self.cross_node_remaining.remove(0);
+
+        let corr = CorrelationId::new();
+        self.cross_node_fold_correlation = Some(corr);
+
+        info!(
+            "PublicKeyAggregator: dispatching cross-node fold (remaining={})",
+            self.cross_node_remaining.len()
+        );
+
+        if let Err(err) = self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::FoldProofs {
+                    proof1: acc,
+                    proof2: next,
+                },
+                corr,
+                self.e3_id.clone(),
+            ),
+            ec.clone(),
+        ) {
+            error!("Failed to publish cross-node fold request: {err}");
+            self.cross_node_fold_correlation = None;
+        }
+
+        Ok(())
+    }
+
+    fn handle_fold_response(&mut self, correlation_id: &CorrelationId, proof: Proof) -> Result<()> {
+        let Some(expected_corr) = self.cross_node_fold_correlation else {
+            return Ok(());
+        };
+        if expected_corr != *correlation_id {
+            return Ok(());
+        }
+
+        self.cross_node_fold_correlation = None;
+        self.cross_node_accumulated = Some(proof);
+
+        info!(
+            "PublicKeyAggregator: fold response received (remaining={})",
+            self.cross_node_remaining.len()
+        );
+
+        let ec = self
+            .last_ec
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("No EventContext for fold advance"))?;
+
+        if self.cross_node_remaining.is_empty() {
+            self.cross_node_proof = self.cross_node_accumulated.take();
+            self.try_publish_complete()
+        } else {
+            self.advance_cross_node_fold(&ec)
+        }
+    }
+
+    /// Publish `PublicKeyAggregated` when both C5 and cross-node fold are complete.
+    fn try_publish_complete(&mut self) -> Result<()> {
+        let (Some(c5_proof), Some(cross_node_proof)) =
+            (self.c5_proof_pending.as_ref(), self.cross_node_proof.as_ref())
+        else {
+            return Ok(());
+        };
+
         let PublicKeyAggregatorState::GeneratingC5Proof {
             public_key,
             public_key_hash,
@@ -353,23 +555,24 @@ impl PublicKeyAggregator {
             .ok_or_else(|| anyhow::anyhow!("Expected GeneratingC5Proof state"))?
         else {
             return Err(anyhow::anyhow!(
-                "handle_pk_aggregation_proof_signed called outside GeneratingC5Proof state"
+                "try_publish_complete called outside GeneratingC5Proof state"
             ));
         };
 
-        info!("C5 proof signed, publishing PublicKeyAggregated...");
+        let ec = self
+            .last_ec
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("No EventContext for publish"))?;
 
-        let proof = msg.signed_proof.payload.proof;
+        info!("Both C5 and cross-node DKG proof ready — publishing PublicKeyAggregated");
 
-        // Publish PublicKeyAggregated before transitioning state so a publish
-        // failure leaves us in GeneratingC5Proof (retryable) rather than
-        // Complete (no retry path).
         let event = PublicKeyAggregated {
             pubkey: public_key.clone(),
             public_key_hash,
             e3_id: self.e3_id.clone(),
             nodes: nodes.clone(),
-            pk_aggregation_proof: Some(proof),
+            pk_aggregation_proof: Some(c5_proof.clone()),
+            dkg_aggregated_proof: Some(cross_node_proof.clone()),
         };
         self.bus.publish(event, ec.clone())?;
 
@@ -381,6 +584,15 @@ impl PublicKeyAggregator {
                 nodes,
             })
         })?;
+
+        Ok(())
+    }
+
+    fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
+        let (msg, _ec) = msg.into_components();
+        if let ComputeResponseKind::Zk(ZkResponse::FoldProofs(resp)) = msg.response {
+            self.handle_fold_response(&msg.correlation_id, resp.proof)?;
+        }
         Ok(())
     }
 
@@ -466,6 +678,12 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::PkAggregationProofSigned(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::DKGRecursiveAggregationComplete(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::ComputeRequestError(data) => {
@@ -577,6 +795,38 @@ impl Handler<TypedEvent<PkAggregationProofSigned>> for PublicKeyAggregator {
             EType::PublickeyAggregation,
             &self.bus.with_ec(msg.get_ctx()),
             || self.handle_pk_aggregation_proof_signed(msg),
+        )
+    }
+}
+
+impl Handler<TypedEvent<DKGRecursiveAggregationComplete>> for PublicKeyAggregator {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<DKGRecursiveAggregationComplete>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(
+            EType::PublickeyAggregation,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_dkg_recursive_aggregation_complete(msg),
+        )
+    }
+}
+
+impl Handler<TypedEvent<ComputeResponse>> for PublicKeyAggregator {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ComputeResponse>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(
+            EType::PublickeyAggregation,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_compute_response(msg),
         )
     }
 }
