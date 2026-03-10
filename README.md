@@ -20,6 +20,10 @@ The Interfold leverages a combination of Fully Homomorphic Encryption (FHE), Zer
 integrity and privacy guarantees rooted in cryptography and economics, rather than hardware and
 attestations.
 
+## Documentation
+
+Full documentation is available at: https://docs.theinterfold.com
+
 ## Quick Start
 
 Follow instructions in the [quick start][quick-start] section of the documentation.
