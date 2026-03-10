@@ -155,14 +155,9 @@
           pkgs.jq
           pkgs.solc
         ];
-        buildInputs =
-          [
-            pkgs.openssl
-          ]
-          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            pkgs.darwin.apple_sdk.frameworks.Security
-            pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-          ];
+        buildInputs = [
+          pkgs.openssl
+        ];
         meta = {
           description = "e3 CLI";
           license = pkgs.lib.licenses.lgpl3Only;
