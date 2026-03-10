@@ -414,7 +414,8 @@ impl PublicKeyAggregator {
             msg.party_id,
             self.dkg_node_proofs.len() + 1
         );
-        self.dkg_node_proofs.insert(msg.party_id, msg.aggregated_proof);
+        self.dkg_node_proofs
+            .insert(msg.party_id, msg.aggregated_proof);
         self.last_ec = Some(ec.clone());
 
         self.try_start_cross_node_fold(&ec)
@@ -538,9 +539,10 @@ impl PublicKeyAggregator {
 
     /// Publish `PublicKeyAggregated` when both C5 and cross-node fold are complete.
     fn try_publish_complete(&mut self) -> Result<()> {
-        let (Some(c5_proof), Some(cross_node_proof)) =
-            (self.c5_proof_pending.as_ref(), self.cross_node_proof.as_ref())
-        else {
+        let (Some(c5_proof), Some(cross_node_proof)) = (
+            self.c5_proof_pending.as_ref(),
+            self.cross_node_proof.as_ref(),
+        ) else {
             return Ok(());
         };
 
