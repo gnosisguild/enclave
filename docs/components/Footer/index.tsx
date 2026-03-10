@@ -12,7 +12,7 @@ import classes from './Footer.module.css'
 const Footer = () => {
   return (
     <footer style={{ padding: '3rem', textAlign: 'center', color: '#B8B8B8' }}>
-      <img
+      {/* <img
         src='/enclave-mark-glow.svg'
         style={{
           opacity: 0.3,
@@ -20,7 +20,7 @@ const Footer = () => {
           maxWidth: '200px',
           marginBottom: '1rem',
         }}
-      />
+      /> */}
       <p>{new Date().getFullYear()} © Enclave</p>
       <ul className={classes.socialLinks}>
         {socialLinks.map(({ name, icon, url }, i) => {
