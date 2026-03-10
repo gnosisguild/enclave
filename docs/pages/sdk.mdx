@@ -80,6 +80,15 @@ const sdk = EnclaveSDK.create({
 })
 ```
 
+### BFV Parameter Presets
+
+The SDK supports two BFV parameter presets:
+
+| Preset Name              | Degree | Security | Use Case                     |
+| ------------------------ | ------ | -------- | ---------------------------- |
+| `INSECURE_THRESHOLD_512` | 512    | Insecure | Development and testing only |
+| `SECURE_THRESHOLD_8192`  | 8192   | Secure   | Production deployments       |
+
 ### Requesting computations
 
 ```ts
@@ -152,7 +161,15 @@ imported directly:
 // Via SDK instance (uses the configured preset name automatically)
 const publicKey = await sdk.generatePublicKey()
 const encrypted = await sdk.encryptNumber(42n, publicKey)
+const encryptedVec = await sdk.encryptVector(new BigUint64Array([1n, 2n, 3n]), publicKey)
 const { encryptedData, proof } = await sdk.encryptNumberAndGenProof(42n, publicKey)
+const { encryptedData: vecData, proof: vecProof } = await sdk.encryptVectorAndGenProof(
+  new BigUint64Array([1n, 2n]),
+  publicKey,
+)
+
+// Generate public inputs without proof (useful for debugging)
+const { encryptedData, publicInputs } = await sdk.encryptNumberAndGenInputs(42n, publicKey)
 
 // Standalone import (pass preset name explicitly)
 import { generatePublicKey, encryptNumber } from '@enclave-e3/sdk'
@@ -160,6 +177,20 @@ import { generatePublicKey, encryptNumber } from '@enclave-e3/sdk'
 const pk = await generatePublicKey('INSECURE_THRESHOLD_512')
 const ct = await encryptNumber(42n, pk, 'INSECURE_THRESHOLD_512')
 ```
+
+### Full encryption method reference
+
+| Method                             | Description                                          |
+| ---------------------------------- | ---------------------------------------------------- |
+| `generatePublicKey()`              | Generate a BFV public key                            |
+| `computePublicKeyCommitment(pk)`   | Compute a commitment for a public key                |
+| `encryptNumber(n, pk)`             | Encrypt a single bigint                              |
+| `encryptVector(vec, pk)`           | Encrypt a `BigUint64Array`                           |
+| `encryptNumberAndGenInputs(n, pk)` | Encrypt and return public inputs for ZK verification |
+| `encryptNumberAndGenProof(n, pk)`  | Encrypt and generate a ZK proof of valid encryption  |
+| `encryptVectorAndGenInputs(v, pk)` | Vector version of `encryptNumberAndGenInputs`        |
+| `encryptVectorAndGenProof(v, pk)`  | Vector version of `encryptNumberAndGenProof`         |
+| `getThresholdBfvParamsSet()`       | Get the parameter set for the configured preset      |
 
 ## Modular submodule imports
 
@@ -215,14 +246,23 @@ that wraps or complements the core Interfold SDK.
   WebSocket provider; useful for CRON jobs or health checks.
 - **Gas controls**: pass `gasLimit` to `requestE3`, `publishCiphertextOutput`, or other write
   methods if you want fixed limits when interacting with Interfold on L2s.
-- **Event polling**: `sdk.startEventPolling()` is handy in serverless environments where websockets
-  are unavailable.
+- **Gas estimation**: `sdk.estimateGas(functionName, args, contractAddress, abi)` returns the
+  estimated gas for a contract call before sending.
+- **Transaction confirmation**: `sdk.waitForTransaction(hash)` blocks until a transaction is mined.
+- **Event polling**: `sdk.startEventPolling()` / `sdk.stopEventPolling()` are handy in serverless
+  environments where websockets are unavailable.
 - **Custom transports**: on the server, call `createWalletClient({ account, transport: http(rpc) })`
   and load the private key from Vaults/KMS.
 - **Get E3 quote**: call `sdk.getE3Quote(requestParams)` to get the fee amount required for an E3
   request.
 - **Fee token approval**: call `sdk.approveFeeToken(amount)` before `requestE3` to approve the fee
   token spend.
+- **Query E3 data**: use `sdk.getE3(e3Id)` to read the full E3 struct, `sdk.getE3Stage(e3Id)` for
+  the current lifecycle stage, and `sdk.getFailureReason(e3Id)` if the E3 has failed.
+- **Public key retrieval**: `sdk.getE3PublicKey(e3Id)` returns the committee's aggregated public key
+  for a given E3.
+- **Cleanup**: call `sdk.cleanup()` when shutting down to unsubscribe all event listeners and stop
+  polling.
 
 ## Troubleshooting
 

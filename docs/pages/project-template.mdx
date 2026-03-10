@@ -20,6 +20,7 @@ my-first-e3/
 ├── deploy/             # Deployment scripts
 ├── scripts/            # Helper scripts (start dev stack, ciphernodes, etc.)
 ├── tests/              # Integration + contract tests
+├── lib/                # Git submodules (risc0-ethereum)
 ├── enclave.config.yaml # Node + chain config consumed by the CLI
 ├── package.json        # Dev orchestrator scripts
 └── .enclave/           # cached CLI state (ignored by Git)
@@ -66,12 +67,12 @@ Update the `.env` files after every redeploy so the SDK listens to the correct c
 ## Noir circuits & Nargo
 
 Although the template ships with a simple addition circuit, you can plug in Noir circuits by
-pointing to this repo's shared libraries (`circuits/crates/libs/*`). Add dependencies in your
-`program/Cargo.toml` or your Noir workspace's `Nargo.toml`:
+pointing to this repo's shared library (`circuits/lib/`). Add dependencies in your Noir workspace's
+`Nargo.toml`:
 
 ```toml
 [dependencies]
-safe = { git = "https://github.com/gnosisguild/enclave", tag = "v0.1.5", directory = "circuits/crates/libs/safe" }
+enclave_lib = { git = "https://github.com/gnosisguild/enclave", tag = "v0.1.6", directory = "circuits/lib" }
 ```
 
 Use the helper scripts in the root repo (`scripts/compile-circuits.sh`, `scripts/lint-circuits.sh`)

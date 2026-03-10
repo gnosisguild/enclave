@@ -11,7 +11,7 @@ Program using RISC Zero.
 
 - **Install Required Tools**:
   - Rust and Cargo
-  - Node.js and pnpm or Yarn
+  - Node.js and pnpm
   - Foundry and Anvil for Ethereum development
   - RISC Zero toolchain
 
@@ -28,7 +28,7 @@ Program using RISC Zero.
 #![no_main]
 #![no_std]
 
-use compute_provider::FHEInputs;
+use e3_compute_provider::FHEInputs;
 use fhe::bfv::{BfvParameters, Ciphertext};
 use fhe_traits::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -103,27 +103,21 @@ impl ComputeProvider for Risc0Provider {
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
-import {CRISPBase, IEnclave, IE3Program} from "evm_base/contracts/CRISPBase.sol";
+import {IEnclave, IE3Program} from "@enclave-e3/contracts/interfaces/IEnclave.sol";
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 
-contract MyE3Program is CRISPBase {
+contract MyE3Program is IE3Program {
     bytes32 public constant IMAGE_ID = /* Your Image ID */;
     bytes32 public constant ENCRYPTION_SCHEME_ID = /* Your Encryption Scheme ID */;
 
     IRiscZeroVerifier public verifier;
+    IEnclave public enclave;
 
     constructor(
         IEnclave _enclave,
         IRiscZeroVerifier _verifier
     ) {
-        initialize(_enclave, _verifier);
-    }
-
-    function initialize(
-        IEnclave _enclave,
-        IRiscZeroVerifier _verifier
-    ) public {
-        CRISPBase.initialize(_enclave);
+        enclave = _enclave;
         verifier = _verifier;
     }
 
@@ -147,16 +141,18 @@ contract MyE3Program is CRISPBase {
 **Example (JavaScript):**
 
 ```javascript
-await EnclaveContract.request(
-  filterAddress,
-  [thresholdMin, thresholdMax],
-  [startWindowStart, startWindowEnd],
-  duration,
-  e3ProgramAddress,
-  e3ProgramParams,
-  computeProviderParams,
-  { value: computationFee },
-)
+// First approve the fee token
+await FeeTokenContract.approve(EnclaveContract.address, computationFee)
+
+// Then request the E3
+await EnclaveContract.request({
+  threshold: [thresholdMin, thresholdMax],
+  inputWindow: [inputWindowStart, inputWindowEnd],
+  e3Program: e3ProgramAddress,
+  e3ProgramParams: e3ProgramParams,
+  computeProviderParams: computeProviderParams,
+  customParams: '0x',
+})
 ```
 
 ### Step 8: Submit Encrypted Inputs
