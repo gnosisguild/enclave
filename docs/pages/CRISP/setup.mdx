@@ -7,9 +7,9 @@ import { Steps } from 'nextra/components'
 
 # Getting Started with CRISP
 
-This guide will walk you through the steps to set up and run CRISP locally. CRISP is a complete
-example of an E3 Program, built with a modern architecture that includes smart contracts,
-zero-knowledge circuits, frontend applications, and secure computation components.
+This guide will walk you through the steps to set up and run CRISP locally. CRISP is a full
+reference implementation of an E3 Program, built with a modern architecture that includes smart
+contracts, zero-knowledge circuits, frontend applications, and secure computation components.
 
 ## Prerequisites
 
@@ -17,8 +17,8 @@ Before getting started, ensure you have installed:
 
 - [Rust](https://rust-lang.org/tools/install/)
 - [Foundry](https://getfoundry.sh)
-- [RiscZero](https://dev.risczero.com/api/zkvm/install)
-- [NodeJS](https://nodejs.org/en/download)
+- [RISC Zero](https://dev.risczero.com/api/zkvm/install)
+- [Node.js](https://nodejs.org/en/download)
 - [pnpm](https://pnpm.io)
 - [MetaMask](https://metamask.io)
 - Noir toolchain ([`nargo`](https://noir-lang.org/docs/getting_started/quick_start),
@@ -41,7 +41,7 @@ pnpm dev:up
 1. Starts the Hardhat node in `packages/crisp-contracts`
 2. Deploys all contracts (Enclave, CRISPProgram, verifiers, registries) via
    `scripts/crisp_deploy.sh`
-3. Starts ciphernodes using `enclave.config.yaml` via `scripts/dev_cipher.sh`
+3. Starts Ciphernodes using `enclave.config.yaml` via `scripts/dev_cipher.sh`
 4. Launches the program server via `scripts/dev_program.sh`
 5. Starts the coordination server (Rust) via `scripts/dev_server.sh` on port `4000`
 6. Starts the React client via `scripts/dev_client.sh` on port `3000`

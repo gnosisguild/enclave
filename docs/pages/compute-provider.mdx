@@ -5,8 +5,8 @@ description: ''
 
 # Compute Provider (CP)
 
-Compute Providers form the modular compute layer of the Enclave protocol, allowing you to choose the
-optimal balance of trust, cost, and scalability for your application. CPs are responsible for
+Compute Providers form the modular compute layer of the Interfold protocol, allowing you to choose
+the optimal balance of trust, cost, and scalability for your application. CPs are responsible for
 running your E3 Program's Secure Process and reporting results back to your E3 Program's smart
 contract.
 
@@ -22,10 +22,10 @@ Select a CP that suits your needs. Options include:
 **Verifiable**
 
 - [RISC Zero zkVM](https://www.risczero.com/)
-- [Succint SP1](https://docs.succinct.xyz/) (coming soon)
+- [Succinct SP1](https://docs.succinct.xyz/) (coming soon)
 - [Jolt](https://jolt.a16zcrypto.com/) (coming soon)
 
-**Oracle-Based Systems**
+**Oracle-based systems**
 
 - zkTLS VMs (coming soon)
 - Committee-based oracles (coming soon)
@@ -33,10 +33,10 @@ Select a CP that suits your needs. Options include:
 
 **Custom**
 
-- You can also implement your own custom CP. From Enclave's perspective, it simply requires a
+- You can also implement your own custom CP. From Interfold's perspective, it simply requires a
   contract that conforms to `IComputeProvider`.
 
-**Factors to Consider:**
+**Factors to consider:**
 
 - **Verifiability**: Consider whether or not your use case requires cryptographic guarantees of
   correct execution.
@@ -45,7 +45,7 @@ Select a CP that suits your needs. Options include:
 - **Performance**: Verifiable systems will often be less performant compared to oracle-based CPs.
 - **Language Support**: Choose a CP that supports the programming languages you're comfortable with.
 
-Enclave provides a
+The Interfold provides a
 [Compute Provider package](https://github.com/gnosisguild/CRISP/tree/main/crates/compute-provider)
 to simplify the integration, letting you focus on computation logic. More details can be found in
 the [Writing the Secure Process](./write-secure-program.mdx) guide.
@@ -61,7 +61,7 @@ template includes a basic program that can be used to get started with the smart
 verify the proof.
 
 Follow the instructions in the
-[Boundless Foundry template](https://github.com/boundless-xyz/boundless-foundry-template) to setup
+[Boundless Foundry template](https://github.com/boundless-xyz/boundless-foundry-template) to set up
 RISC Zero with Boundless.
 
 Ensure the following tools are installed:
@@ -84,7 +84,7 @@ To install `rzup`, run the following command and follow the instructions:
 curl -L https://risczero.com/install | bash
 ```
 
-Next we can install the RISC Zero toolchain by running `rzup`:
+Next, install the RISC Zero toolchain by running `rzup`:
 
 ```sh
 rzup
