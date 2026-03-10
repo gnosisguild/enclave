@@ -135,6 +135,11 @@
     },
     {
       "inputs": [],
+      "name": "VoterIsAccused",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "VoterNotInCommittee",
       "type": "error"
     },
@@ -954,5 +959,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ISlashingManager.sol",
-  "buildInfoId": "solc-0_8_28-b29e2e20df477e5829743192d3e53aa86d40cfe2"
+  "buildInfoId": "solc-0_8_28-6bc8af1be4d8089e346f35a0a250902383427ca2"
 }

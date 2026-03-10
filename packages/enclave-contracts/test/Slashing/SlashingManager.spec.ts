@@ -651,11 +651,12 @@ describe("SlashingManager", function () {
       };
       await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
 
-      // Set up committee membership for voters (not the operator — voters attest the operator is faulty)
+      // Set up committee membership: operator must be a member, voters attest the operator is faulty
       const e3Id = 0;
       const voter1Addr = await voter1.getAddress();
       const voter2Addr = await voter2.getAddress();
       await mockCiphernodeRegistry.setCommitteeNodes(e3Id, [
+        operatorAddress,
         voter1Addr,
         voter2Addr,
       ]);
@@ -711,6 +712,7 @@ describe("SlashingManager", function () {
       const voter1Addr = await voter1.getAddress();
       const voter2Addr = await voter2.getAddress();
       await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        operatorAddress,
         voter1Addr,
         voter2Addr,
       ]);
@@ -758,6 +760,7 @@ describe("SlashingManager", function () {
       const voter1Addr = await voter1.getAddress();
       const voter2Addr = await voter2.getAddress();
       await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        operatorAddress,
         voter1Addr,
         voter2Addr,
       ]);
@@ -859,7 +862,10 @@ describe("SlashingManager", function () {
 
       // Only voter1 is a committee member, but voter2 also signs
       const voter1Addr = await voter1.getAddress();
-      await mockCiphernodeRegistry.setCommitteeNodes(0, [voter1Addr]);
+      await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        operatorAddress,
+        voter1Addr,
+      ]);
       await mockCiphernodeRegistry.setThreshold(0, 1);
 
       const proof = await signAndEncodeAttestation(
@@ -950,6 +956,7 @@ describe("SlashingManager", function () {
       const voter1Addr = await voter1.getAddress();
       const voter2Addr = await voter2.getAddress();
       await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        operatorAddress,
         voter1Addr,
         voter2Addr,
       ]);
@@ -987,11 +994,13 @@ describe("SlashingManager", function () {
       const voter1Addr = await voter1.getAddress();
       const voter2Addr = await voter2.getAddress();
       await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        operatorAddress,
         voter1Addr,
         voter2Addr,
       ]);
       await mockCiphernodeRegistry.setThreshold(0, 2);
       await mockCiphernodeRegistry.setCommitteeNodes(1, [
+        operatorAddress,
         voter1Addr,
         voter2Addr,
       ]);
@@ -1037,6 +1046,7 @@ describe("SlashingManager", function () {
       const voter1Addr = await voter1.getAddress();
       const voter2Addr = await voter2.getAddress();
       await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        operatorAddress,
         voter1Addr,
         voter2Addr,
       ]);
@@ -1174,6 +1184,7 @@ describe("SlashingManager", function () {
       const voter1Addr = await voter1.getAddress();
       const voter2Addr = await voter2.getAddress();
       await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        operatorAddress,
         voter1Addr,
         voter2Addr,
       ]);
@@ -1352,6 +1363,7 @@ describe("SlashingManager", function () {
       const voter1Addr = await voter1.getAddress();
       const voter2Addr = await voter2.getAddress();
       await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        operatorAddress,
         voter1Addr,
         voter2Addr,
       ]);
@@ -1647,6 +1659,7 @@ describe("SlashingManager", function () {
       const voter1Addr = await voter1.getAddress();
       const voter2Addr = await voter2.getAddress();
       await mockCiphernodeRegistry.setCommitteeNodes(0, [
+        operatorAddress,
         voter1Addr,
         voter2Addr,
       ]);

@@ -175,6 +175,9 @@ interface ISlashingManager {
     /// @notice Thrown when an attestation vote signature does not recover to the declared voter
     error InvalidVoteSignature();
 
+    /// @notice Thrown when the accused operator is included as a voter in the attestation
+    error VoterIsAccused();
+
     // ======================
     // Events
     // ======================

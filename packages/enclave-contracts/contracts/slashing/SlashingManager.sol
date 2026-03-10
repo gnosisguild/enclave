@@ -419,6 +419,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
             require(voter > prevVoter, DuplicateVoter());
             prevVoter = voter;
 
+            // The accused cannot vote on their own accusation (conflict of interest)
+            require(voter != operator, VoterIsAccused());
+
             // All votes must agree the proof is bad (fault confirmed)
             require(agrees[i], InvalidProof());
 

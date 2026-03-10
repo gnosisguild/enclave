@@ -144,8 +144,15 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
   const setup = async () => {
     // ── Signers ────────────────────────────────────────────────────────────────
-    const [owner, requester, treasury, operator1, operator2, computeProvider] =
-      await ethers.getSigners();
+    const [
+      owner,
+      requester,
+      treasury,
+      operator1,
+      operator2,
+      computeProvider,
+      operator3,
+    ] = await ethers.getSigners();
 
     const ownerAddress = await owner.getAddress();
     const treasuryAddress = await treasury.getAddress();
@@ -345,11 +352,12 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     // ── Helpers ────────────────────────────────────────────────────────────────
     const makeRequest = async (
       signer: Signer = requester,
+      threshold: [number, number] = [2, 2],
     ): Promise<{ e3Id: number }> => {
       const startTime = (await time.latest()) + 100;
 
       const requestParams = {
-        threshold: [2, 2] as [number, number],
+        threshold,
         inputWindow: [startTime + 100, startTime + ONE_DAY] as [number, number],
         e3Program: await e3Program.getAddress(),
         e3ProgramParams: encodedE3ProgramParams,
@@ -414,6 +422,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       treasury,
       operator1,
       operator2,
+      operator3,
       computeProvider,
       makeRequest,
       setupOperator,
@@ -744,22 +753,26 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         requester,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // 1. Request E3, form committee, publish key
-      await makeRequest();
+      await makeRequest(requester, [2, 3]);
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
       const nodes = [
         await operator1.getAddress(),
         await operator2.getAddress(),
+        await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const publicKeyHash = ethers.keccak256(publicKey);
@@ -789,7 +802,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       //    This triggers: _executeSlash → slashTicketBalance → redirectSlashedTicketFunds
       //    → ticketToken.payout(refundManager, amount) → enclave.escrowSlashedFunds → e3RefundManager.escrowSlashedFunds
       const proof = await signAndEncodeAttestation(
-        [operator1, operator2],
+        [operator2, operator3],
         0,
         await operator1.getAddress(),
       );
@@ -846,22 +859,26 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         makeRequest,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // 1. Request E3, form committee, publish key
-      await makeRequest();
+      await makeRequest(undefined, [2, 3]);
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
       const nodes = [
         await operator1.getAddress(),
         await operator2.getAddress(),
+        await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const publicKeyHash = ethers.keccak256(publicKey);
@@ -881,7 +898,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       // 4. Slash operator1 — this routes funds into the refund pool
       const proof = await signAndEncodeAttestation(
-        [operator1, operator2],
+        [operator2, operator3],
         0,
         await operator1.getAddress(),
       );
@@ -1396,23 +1413,27 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         makeRequest,
         operator1,
         operator2,
+        operator3,
         treasury,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // 1. Request E3, form committee, publish key
-      await makeRequest();
+      await makeRequest(undefined, [2, 3]);
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
       const nodes = [
         await operator1.getAddress(),
         await operator2.getAddress(),
+        await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const publicKeyHash = ethers.keccak256(publicKey);
@@ -1427,7 +1448,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         await usdcToken.balanceOf(refundManagerAddress);
 
       const proof = await signAndEncodeAttestation(
-        [operator1, operator2],
+        [operator2, operator3],
         0,
         await operator1.getAddress(),
       );
@@ -1465,6 +1486,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const op2BalanceBefore = await usdcToken.balanceOf(
         await operator2.getAddress(),
       );
+      const op3BalanceBefore = await usdcToken.balanceOf(
+        await operator3.getAddress(),
+      );
 
       const plaintextOutput = "0x" + "cd".repeat(100);
       await enclave.publishPlaintextOutput(0, plaintextOutput, proofBytes);
@@ -1494,10 +1518,14 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const op2BalanceAfter = await usdcToken.balanceOf(
         await operator2.getAddress(),
       );
+      const op3BalanceAfter = await usdcToken.balanceOf(
+        await operator3.getAddress(),
+      );
       const nodesReceivedTotal =
         op1BalanceAfter -
         op1BalanceBefore +
-        (op2BalanceAfter - op2BalanceBefore);
+        (op2BalanceAfter - op2BalanceBefore) +
+        (op3BalanceAfter - op3BalanceBefore);
       expect(nodesReceivedTotal).to.equal(e3Payment + expectedSlashedToNodes);
 
       // Verify refund manager escrowed balance was drained
