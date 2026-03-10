@@ -109,14 +109,6 @@ pub global DS_USER_DATA_ENCRYPTION_COMMITMENT: [u8; 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-// Domain separator - "SHARE_COMPUTATION_CHUNK"
-pub global DS_SHARE_COMPUTATION_CHUNK: [u8; 64] = [
-    0x53, 0x48, 0x41, 0x52, 0x45, 0x5f, 0x43, 0x4f, 0x4d, 0x50, 0x55, 0x54, 0x41, 0x54, 0x49, 0x4f,
-    0x4e, 0x5f, 0x43, 0x48, 0x55, 0x4e, 0x4b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-];
-
 /// WRAPPERS
 
 pub fn compute_commitment(inputs: Vec<Field>, domain_separator: [u8; 64]) -> Field {
@@ -281,20 +273,4 @@ pub fn compute_user_data_encryption_ct0_challenge<let L: u32>(payload: Vec<Field
 
 pub fn compute_user_data_encryption_ct1_challenge<let L: u32>(payload: Vec<Field>) -> Vec<Field> {
     compute_challenge::<L>(payload, DS_CLG_USER_DATA_ENCRYPTION)
-}
-
-pub fn compute_share_computation_chunk_commitment<let N_PARTIES: u32, let L: u32, let CHUNK_SIZE: u32>(
-    y_chunk: [[[Field; N_PARTIES + 1]; L]; CHUNK_SIZE],
-    chunk_idx: u32,
-) -> Field {
-    let mut payload = Vec::new();
-    for coeff_idx in 0..CHUNK_SIZE {
-        for mod_idx in 0..L {
-            for party_idx in 0..(N_PARTIES + 1) {
-                payload.push(y_chunk[coeff_idx][mod_idx][party_idx]);
-            }
-        }
-    }
-    payload.push(chunk_idx as Field);
-    compute_commitment(payload, DS_SHARE_COMPUTATION_CHUNK)
 }

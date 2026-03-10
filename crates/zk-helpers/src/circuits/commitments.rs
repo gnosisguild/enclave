@@ -47,14 +47,6 @@ const DS_SHARE_COMPUTATION: [u8; 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-/// String: "SHARE_COMPUTATION_CHUNK"
-const DS_SHARE_COMPUTATION_CHUNK: [u8; 64] = [
-    0x53, 0x48, 0x41, 0x52, 0x45, 0x5f, 0x43, 0x4f, 0x4d, 0x50, 0x55, 0x54, 0x41, 0x54, 0x49, 0x4f,
-    0x4e, 0x5f, 0x43, 0x48, 0x55, 0x4e, 0x4b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-];
-
 /// String: "SHARE_ENCRYPTION"
 const DS_SHARE_ENCRYPTION: [u8; 64] = [
     0x53, 0x48, 0x41, 0x52, 0x45, 0x5f, 0x45, 0x4e, 0x43, 0x52, 0x59, 0x50, 0x54, 0x49, 0x4f, 0x4e,
@@ -313,37 +305,6 @@ pub fn compute_share_encryption_commitment_from_shares(
     let io_pattern = [0x80000000 | input_size, 1];
 
     let commitment_field = compute_commitments(payload, DS_SHARE_ENCRYPTION, io_pattern)[0];
-    let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
-    BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
-}
-
-/// Compute share-computation chunk commitment.
-///
-/// This matches the Noir `compute_share_computation_chunk_commitment` function exactly.
-///
-/// # Arguments
-/// * `y_chunk` - 3D chunk slice `y_chunk[coeff_idx][mod_idx][party_idx]`
-/// * `chunk_idx` - Index of the chunk
-pub fn compute_share_computation_chunk_commitment(
-    y_chunk: &[Vec<Vec<BigInt>>],
-    chunk_idx: usize,
-) -> BigInt {
-    let mut payload = Vec::new();
-
-    for coeff_y in y_chunk {
-        for mod_y in coeff_y {
-            for share_value in mod_y {
-                payload.push(crate::utils::bigint_to_field(share_value));
-            }
-        }
-    }
-
-    payload.push(Field::from(chunk_idx as u64));
-
-    let input_size = payload.len() as u32;
-    let io_pattern = [0x80000000 | input_size, 1];
-
-    let commitment_field = compute_commitments(payload, DS_SHARE_COMPUTATION_CHUNK, io_pattern)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }

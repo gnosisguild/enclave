@@ -27,17 +27,18 @@ fn main(
     base_verification_key: UltraHonkVerificationKey,
     base_proof: UltraHonkProof,
     base_public_inputs: [Field; BASE_PUBLIC_INPUTS],
+    base_key_hash: pub Field,
     chunk_verification_key: UltraHonkVerificationKey,
     chunk_proofs: [UltraHonkProof; SHARE_COMPUTATION_N_CHUNKS],
     chunk_public_inputs: [[Field; CHUNK_PUBLIC_INPUTS]; SHARE_COMPUTATION_N_CHUNKS],
-    key_hash: pub Field,
+    chunk_key_hash: pub Field,
 ) -> pub Field {
     // Step 1: Verify base proof
     verify_honk_proof_non_zk(
         base_verification_key,
         base_proof,
         base_public_inputs,
-        key_hash,
+        base_key_hash,
     );
 
     // Step 2: Verify each chunk proof and enforce y consistency with base
@@ -48,7 +49,7 @@ fn main(
             chunk_verification_key,
             chunk_proofs[chunk_idx],
             chunk_public_inputs[chunk_idx],
-            key_hash,
+            chunk_key_hash,
         );
 
         // Enforce y consistency: base_public_inputs y slice == chunk y_chunk
