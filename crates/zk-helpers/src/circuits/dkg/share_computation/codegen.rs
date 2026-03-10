@@ -117,29 +117,21 @@ pub fn generate_configs(
     let prefix = <ShareComputationCircuit as Circuit>::PREFIX;
 
     Ok(format!(
-        r#"use crate::core::dkg::share_computation::base::Configs as ShareComputationBaseConfigs;
-use crate::core::dkg::share_computation::chunk::Configs as ShareComputationChunkConfigs;
+        r#"use crate::core::dkg::share_computation::chunk::Configs as ShareComputationChunkConfigs;
+pub use crate::configs::{config_name}::threshold::{{L as L_THRESHOLD, QIS as QIS_THRESHOLD}};
 
-pub use crate::configs::{}::threshold::{{L as L_THRESHOLD, QIS as QIS_THRESHOLD}};
+pub global N: u32 = {degree};
 
-pub global N: u32 = {};
+{parity_matrix}
 
-{}
 /************************************
 -------------------------------------
 share_computation_sk (CIRCUIT 2a)
 -------------------------------------
 ************************************/
 
-pub global {}_BIT_SHARE: u32 = {};
-pub global {}_SK_BIT_SECRET: u32 = {};
-pub global {}_CHUNK_SIZE: u32 = {};
-pub global {}_N_CHUNKS: u32 = {};
-
-pub global {}_SK_BASE_CONFIGS: ShareComputationBaseConfigs<L_THRESHOLD> =
-    ShareComputationBaseConfigs::new(QIS_THRESHOLD);
-pub global {}_SK_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
-    ShareComputationChunkConfigs::new(QIS_THRESHOLD);
+pub global {prefix}_BIT_SHARE: u32 = {bit_share};
+pub global {prefix}_SK_BIT_SECRET: u32 = {bit_sk_secret};
 
 /************************************
 -------------------------------------
@@ -147,30 +139,29 @@ share_computation_e_sm (CIRCUIT 2b)
 -------------------------------------
 ************************************/
 
-pub global {}_E_SM_BIT_SECRET: u32 = {};
+pub global {prefix}_E_SM_BIT_SECRET: u32 = {bit_e_sm_secret};
 
-pub global {}_E_SM_BASE_CONFIGS: ShareComputationBaseConfigs<L_THRESHOLD> =
-    ShareComputationBaseConfigs::new(QIS_THRESHOLD);
-pub global {}_E_SM_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
+/************************************
+-------------------------------------
+share_computation_chunk (CIRCUIT 2c)
+-------------------------------------
+************************************/
+
+pub global {prefix}_CHUNK_SIZE: u32 = {chunk_size};
+pub global {prefix}_N_CHUNKS: u32 = {n_chunks};
+
+pub global {prefix}_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
     ShareComputationChunkConfigs::new(QIS_THRESHOLD);
 "#,
-        config_name,
-        preset.metadata().degree,
-        parity_matrix_str,
-        prefix,
-        bits.bit_share,
-        prefix,
-        bits.bit_sk_secret,
-        prefix,
-        chunk_size,
-        prefix,
-        n_chunks,
-        prefix,
-        prefix,
-        prefix,
-        bits.bit_e_sm_secret,
-        prefix,
-        prefix,
+        config_name = config_name,
+        degree = preset.metadata().degree,
+        parity_matrix = parity_matrix_str,
+        prefix = prefix,
+        bit_share = bits.bit_share,
+        bit_sk_secret = bits.bit_sk_secret,
+        bit_e_sm_secret = bits.bit_e_sm_secret,
+        chunk_size = chunk_size,
+        n_chunks = n_chunks,
     ))
 }
 

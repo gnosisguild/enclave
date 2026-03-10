@@ -15,20 +15,9 @@ use crate::math::commitments::{
 };
 use crate::math::polynomial::Polynomial;
 
-pub struct Configs<let L: u32> {
-    pub qis: [Field; L],
-}
-
-impl<let L: u32> Configs<L> {
-    pub fn new(qis: [Field; L]) -> Self {
-        Configs { qis }
-    }
-}
-
 // ===== BASE CIRCUIT FOR SK =====
 
 pub struct SecretKeyShareComputationBase<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32> {
-    configs: Configs<L>,
     /// Expected commitment to sk secret (from C1, public input)
     expected_secret_commitment: Field,
     /// Secret key polynomial
@@ -41,12 +30,11 @@ pub struct SecretKeyShareComputationBase<let N: u32, let L: u32, let N_PARTIES: 
 impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32> SecretKeyShareComputationBase<N, L, N_PARTIES, T, BIT_SECRET> {
 
     pub fn new(
-        configs: Configs<L>,
         expected_secret_commitment: Field,
         sk_secret: Polynomial<N>,
         y: [[[Field; N_PARTIES + 1]; L]; N],
     ) -> Self {
-        SecretKeyShareComputationBase { configs, expected_secret_commitment, sk_secret, y }
+        SecretKeyShareComputationBase { expected_secret_commitment, sk_secret, y }
     }
 
     fn verify_secret_commitment(self) {
@@ -95,7 +83,6 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
 // ===== BASE CIRCUIT FOR ESM =====
 
 pub struct SmudgingNoiseShareComputationBase<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32> {
-    configs: Configs<L>,
     /// Expected commitment to e_sm secret (from C1, public input)
     expected_secret_commitment: Field,
     /// Smudging noise polynomial per modulus
@@ -108,12 +95,11 @@ pub struct SmudgingNoiseShareComputationBase<let N: u32, let L: u32, let N_PARTI
 impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32> SmudgingNoiseShareComputationBase<N, L, N_PARTIES, T, BIT_SECRET> {
 
     pub fn new(
-        configs: Configs<L>,
         expected_secret_commitment: Field,
         e_sm_secret: [Polynomial<N>; L],
         y: [[[Field; N_PARTIES + 1]; L]; N],
     ) -> Self {
-        SmudgingNoiseShareComputationBase { configs, expected_secret_commitment, e_sm_secret, y }
+        SmudgingNoiseShareComputationBase { expected_secret_commitment, e_sm_secret, y }
     }
 
     fn verify_secret_commitment(self) {
