@@ -11,7 +11,7 @@ import Footer from './components/Footer'
 export default {
   logo: (
     <Link href='https://theinterfold.com' target='_self'>
-      <img src='/interfold-logo.png' style={{ maxWidth: '150px' }} />
+      <img src='/interfold-logo.png' style={{ maxWidth: '150px', borderRadius: '0px' }} />
     </Link>
   ),
   logoLink: false,
