@@ -1,6 +1,6 @@
 <div align="center">
   <picture>
-    <img src="./enclave.png" alt="Enclave" width="100%">
+    <img src="./interfold-meta.jpg" alt="The Interfold" width="100%">
   </picture>
 
 [![Docs][docs-badge]][docs] [![Github Actions][gha-badge]][gha] [![Hardhat][hardhat-badge]][hardhat]
@@ -8,23 +8,27 @@
 
 </div>
 
-# Enclave
+# The Interfold
 
-This is the monorepo for Enclave, an open-source protocol for Collaborative Confidential Compute.
-Enclave leverages the combination of Fully Homomorphic Encryption (FHE), Zero Knowledge Proofs
-(ZKPs), and Multi-Party Computation (MPC) to enable Encrypted Execution Environments (E3) with
+> **Note:** The Interfold was previously known as **Enclave**.  
+> Many repositories, packages, and CLI tools still use the `enclave` name while the project transitions.
+
+This is the monorepo for **The Interfold**, an open-source protocol for confidential coordination.
+
+The Interfold leverages a combination of Fully Homomorphic Encryption (FHE), Zero-Knowledge Proofs
+(ZKPs), and Multi-Party Computation (MPC) to enable Encrypted Execution Environments (E3), with
 integrity and privacy guarantees rooted in cryptography and economics, rather than hardware and
 attestations.
 
 ## Quick Start
 
-Follow instructions in the [quick start][quick-start] section of the [Enclave docs][docs].
+Follow instructions in the [quick start][quick-start] section of the documentation.
 
 See the [CRISP example][crisp] for a fully functioning example application.
 
 ## Getting Help
 
-Join the Enclave [Telegram group][telegram].
+Join the community [Telegram group][telegram].
 
 ## Contributing
 
@@ -193,7 +197,7 @@ This workspace's minimum supported rustc version is 1.86.0.
 
 ## Architecture
 
-Enclave employs a modular architecture involving numerous actors and participants. The sequence
+The Interfold employs a modular architecture involving numerous actors and participants. The sequence
 diagram below offers a high-level overview of the protocol, but necessarily omits most detail.
 
 ```mermaid
@@ -242,7 +246,7 @@ sequenceDiagram
 
 ### Overview
 
-Enclave uses a unified versioning strategy where all packages (Rust crates and npm packages) share
+The Interfold uses a unified versioning strategy where all packages (Rust crates and npm packages) share
 the same version number. Releases are triggered by git tags and follow semantic versioning.
 
 ### Quick Release
@@ -343,7 +347,7 @@ Once the tag is pushed, GitHub Actions automatically:
 
 ### Version Format
 
-Enclave follows [Semantic Versioning](https://semver.org/):
+The Interfold follows [Semantic Versioning](https://semver.org/):
 
 - **Stable**: `v1.0.0` - Production ready
 - **Pre-release**: `v1.0.0-beta.1` - Testing/preview versions
@@ -476,9 +480,9 @@ This repo created under the [LGPL-3.0+ license](LICENSE).
 [hardhat-badge]: https://img.shields.io/badge/Built%20with-Hardhat-FFDB1C.svg
 [license]: https://opensource.org/license/lgpl-3-0
 [license-badge]: https://img.shields.io/badge/License-LGPLv3.0-blue.svg
-[docs]: https://docs.enclave.gg
+[docs]: https://docs.theinterfold.com
 [docs-badge]: https://img.shields.io/badge/Documentation-blue.svg
-[quick-start]: https://docs.enclave.gg/quick-start
-[crisp]: https://docs.enclave.gg/CRISP/introduction
+[quick-start]: https://docs.theinterfold.com/quick-start
+[crisp]: https://docs.theinterfold.com/CRISP/introduction
 [telegram]: https://t.me/+raYAZgrwgOw2ODJh
 [contributing]: CONTRIBUTING.md
