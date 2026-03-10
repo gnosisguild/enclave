@@ -6,7 +6,6 @@
 
 use crate::configs::default::{N_PARTIES, T};
 pub use crate::configs::secure::threshold::{L as L_THRESHOLD, QIS as QIS_THRESHOLD};
-use crate::core::dkg::share_computation::base::Configs as ShareComputationBaseConfigs;
 use crate::core::dkg::share_computation::chunk::Configs as ShareComputationChunkConfigs;
 use crate::core::dkg::share_encryption::Configs as ShareEncryptionConfigs;
 
@@ -17,16 +16,6 @@ pub global QIS: [Field; L] = [72057594082099201, 72057594062438401];
 pub global PLAINTEXT_MODULUS: Field = 18014398509481984;
 pub global Q_MOD_T: Field = 1082658244788225;
 pub global Q_MOD_T_CENTERED: Field = 1082658244788225;
-
-/************************************
--------------------------------------
-pk (CIRCUIT 0)
--------------------------------------
-************************************/
-
-// pk - bit parameters
-
-pub global PK_BIT_PK: u32 = 56;
 
 pub global PARITY_MATRIX: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L_THRESHOLD] = [
     [
@@ -50,6 +39,17 @@ pub global PARITY_MATRIX: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L_THRESHOLD]
         [4503599634579451, 15, 4503599634579447, 0, 0, 1],
     ],
 ];
+
+/************************************
+-------------------------------------
+pk (CIRCUIT 0)
+-------------------------------------
+************************************/
+
+// pk - bit parameters
+
+pub global PK_BIT_PK: u32 = 56;
+
 /************************************
 -------------------------------------
 share_computation_sk (CIRCUIT 2a)
@@ -59,19 +59,6 @@ share_computation_sk (CIRCUIT 2a)
 pub global SHARE_COMPUTATION_BIT_SHARE: u32 = 53;
 pub global SHARE_COMPUTATION_SK_BIT_SECRET: u32 = 1;
 
-// Chunk size controls circuit size vs number of chunks tradeoff.
-// N_CHUNKS =  N / CHUNK_SIZE
-// At 5 parties: CHUNK_SIZE=512, N_CHUNKS=16
-// At 50 parties: reduce CHUNK_SIZE to keep chunk circuit constant size
-pub global SHARE_COMPUTATION_CHUNK_SIZE: u32 = 512;
-// N / CHUNK_SIZE = 8192 / 512 =1 6
-pub global SHARE_COMPUTATION_N_CHUNKS: u32 = 16;
-pub global SHARE_COMPUTATION_SK_BASE_CONFIGS: ShareComputationBaseConfigs<L_THRESHOLD> =
-    ShareComputationBaseConfigs::new(QIS_THRESHOLD);
-
-pub global SHARE_COMPUTATION_SK_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
-    ShareComputationChunkConfigs::new(QIS_THRESHOLD);
-
 /************************************
 -------------------------------------
 share_computation_e_sm (CIRCUIT 2b)
@@ -80,11 +67,18 @@ share_computation_e_sm (CIRCUIT 2b)
 
 pub global SHARE_COMPUTATION_E_SM_BIT_SECRET: u32 = 192;
 
-pub global SHARE_COMPUTATION_E_SM_BASE_CONFIGS: ShareComputationBaseConfigs<L_THRESHOLD> =
-    ShareComputationBaseConfigs::new(QIS_THRESHOLD);
+/************************************
+-------------------------------------
+share_computation_chunk (CIRCUIT 2c)
+-------------------------------------
+************************************/
 
-pub global SHARE_COMPUTATION_E_SM_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
+pub global SHARE_COMPUTATION_CHUNK_SIZE: u32 = 512;
+pub global SHARE_COMPUTATION_N_CHUNKS: u32 = 16;
+
+pub global SHARE_COMPUTATION_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
     ShareComputationChunkConfigs::new(QIS_THRESHOLD);
+
 /************************************
 -------------------------------------
 share_encryption_sk (CIRCUIT 3a)
