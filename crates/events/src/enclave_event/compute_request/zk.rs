@@ -309,13 +309,19 @@ impl ShareComputationProofResponse {
 
 impl PkBfvProofResponse {
     pub fn new(proof: Proof, wrapped_proof: Proof) -> Self {
-        Self { proof, wrapped_proof }
+        Self {
+            proof,
+            wrapped_proof,
+        }
     }
 }
 
 impl PkGenerationProofResponse {
     pub fn new(proof: Proof, wrapped_proof: Proof) -> Self {
-        Self { proof, wrapped_proof }
+        Self {
+            proof,
+            wrapped_proof,
+        }
     }
 }
 
