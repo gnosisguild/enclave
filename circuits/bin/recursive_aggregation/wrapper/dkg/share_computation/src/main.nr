@@ -11,7 +11,7 @@ use lib::{configs::default::N_PARTIES, math::commitments::compute_recursive_aggr
 // Number of proofs.
 pub global N_PROOFS: u32 = 2;
 /// Number of public inputs/outputs per proof.
-pub global N_PUBLIC_INPUTS: u32 = (L_THRESHOLD * N_PARTIES) + 1;
+pub global N_PUBLIC_INPUTS: u32 = (L_THRESHOLD * N_PARTIES) + 3;
 
 fn main(
     verification_key: UltraHonkVerificationKey,

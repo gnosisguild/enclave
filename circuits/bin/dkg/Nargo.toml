@@ -6,5 +6,6 @@ members = [
     "sk_share_computation_base",
     "e_sm_share_computation_base",
     "share_computation_chunk",
+    "share_computation_wrapper"
 ]
 
