@@ -1,5 +1,9 @@
 {
   description = "Enclave";
+  nixConfig = {
+    extra-substituters = ["https://enclave.cachix.org"];
+    extra-trusted-public-keys = ["enclave.cachix.org-1:B5SynR85iX/TRueDpZu4dh1xVR8lNfKoAaVWZkux1ss="];
+  };
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";

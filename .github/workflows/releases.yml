@@ -148,12 +148,17 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
+            - uses: cachix/install-nix-action@v4
+      - uses: cachix/cachix-action@v15
+        with:
+          name: enclave
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         # if the following fails it means some of our git dependencies or bb has updated
-        # to fix this basically what you need to do here is copy the actual hashes 
-        # into the flake.nix where those hashes are expected. if you want to do this locally 
+        # to fix this basically what you need to do here is copy the actual hashes
+        # into the flake.nix where those hashes are expected. if you want to do this locally
         # install the nix package manager and try running the scripts below.
       - run: bash ./scripts/nix-versions.sh # display bad versions when deps change
-      - run: nix build .#cli # build the nix flake
+      - run: nix build .#default # build the nix flake
 
   build-binaries:
     name: Build Binaries (${{ matrix.os_name }}-${{ matrix.arch }})
@@ -390,7 +395,9 @@ jobs:
         download-circuits,
         build-nix-flake,
       ]
-    if: always() && needs.validate-and-prepare.result == 'success' && needs.build-binaries.result == 'success' && needs.build-nix-flake.result == 'success'
+    if:
+      always() && needs.validate-and-prepare.result == 'success' && needs.build-binaries.result == 'success' && needs.build-nix-flake.result
+      == 'success'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
