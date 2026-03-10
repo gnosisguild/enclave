@@ -23,6 +23,8 @@ mod decryption_share_proof_signed;
 mod decryption_share_proofs;
 mod decryptionshare_created;
 mod die;
+mod dkg_inner_proof_ready;
+mod dkg_recursive_aggregation_complete;
 mod e3_failed;
 mod e3_request_complete;
 mod e3_requested;
@@ -85,6 +87,8 @@ pub use decryption_share_proof_signed::*;
 pub use decryption_share_proofs::*;
 pub use decryptionshare_created::*;
 pub use die::*;
+pub use dkg_inner_proof_ready::*;
+pub use dkg_recursive_aggregation_complete::*;
 pub use e3_failed::*;
 pub use e3_request_complete::*;
 pub use e3_requested::*;
@@ -290,6 +294,8 @@ pub enum EnclaveEventData {
     PkAggregationProofSigned(PkAggregationProofSigned),
     AggregationProofPending(AggregationProofPending),
     AggregationProofSigned(AggregationProofSigned),
+    DKGInnerProofReady(DKGInnerProofReady),
+    DKGRecursiveAggregationComplete(DKGRecursiveAggregationComplete),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -652,7 +658,9 @@ impl_event_types!(
     PkAggregationProofPending,
     PkAggregationProofSigned,
     AggregationProofPending,
-    AggregationProofSigned
+    AggregationProofSigned,
+    DKGInnerProofReady,
+    DKGRecursiveAggregationComplete
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {
