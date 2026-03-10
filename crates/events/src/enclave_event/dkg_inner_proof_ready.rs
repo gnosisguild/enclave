@@ -15,8 +15,11 @@ use serde::{Deserialize, Serialize};
 /// A single wrapped inner proof ready for incremental aggregation.
 ///
 /// Emitted for every inner circuit (C0-C4) as soon as its wrapped proof
-/// is available. `seq` gives the deterministic ordering; `total_expected`
-/// lets the aggregator know when the stream is complete.
+/// is available. `seq` gives the deterministic ordering.
+///
+/// The total count of expected proofs is communicated separately via
+/// [`ThresholdSharePending`], which is always published before the first
+/// `DKGInnerProofReady` for a given E3.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DKGInnerProofReady {
     pub e3_id: E3id,
@@ -25,6 +28,4 @@ pub struct DKGInnerProofReady {
     pub wrapped_proof: Proof,
     /// Deterministic sequence index for ordered folding.
     pub seq: usize,
-    /// Total number of inner proofs expected for this E3 node.
-    pub total_expected: usize,
 }

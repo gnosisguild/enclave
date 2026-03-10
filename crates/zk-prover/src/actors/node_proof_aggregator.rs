@@ -6,12 +6,18 @@
 
 //! Incremental node-level proof aggregation for DKG.
 //!
-//! `NodeProofAggregator` subscribes to `DKGInnerProofReady` events and folds
-//! each wrapped proof into a running aggregate in strict `seq` order, using
-//! a reorder buffer for out-of-order arrivals.
+//! `NodeProofAggregator` subscribes to `ThresholdSharePending` to learn how
+//! many proofs to expect per E3, then folds each `DKGInnerProofReady` wrapped
+//! proof into a running aggregate in strict `seq` order, using a reorder
+//! buffer for out-of-order arrivals.
 //!
 //! When all expected proofs have been folded, it publishes
 //! `DKGRecursiveAggregationComplete`.
+//!
+//! Ordering guarantee: `ThresholdSharePending` is always published to the bus
+//! before any `DKGInnerProofReady` for the same E3 (ProofRequestActor holds
+//! back C0's event until after `ThresholdSharePending` is processed).
+//! Arriving out of that order is treated as a programming error and logged.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -20,7 +26,7 @@ use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind,
     CorrelationId, DKGInnerProofReady, DKGRecursiveAggregationComplete, E3id, EnclaveEvent,
     EnclaveEventData, EventContext, EventPublisher, EventSubscriber, EventType, Proof, Sequenced,
-    TypedEvent, ZkRequest, ZkResponse,
+    ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
 };
 use tracing::{error, info, warn};
 
@@ -35,8 +41,6 @@ struct RollingAggregationState {
     next_to_aggregate: usize,
     /// Number of proofs remaining to process (decrements on first store + each fold completion).
     remaining: usize,
-    /// Whether a fold is currently in flight.
-    in_flight: bool,
     /// Correlation ID for the in-flight fold, if any.
     fold_correlation: Option<CorrelationId>,
     /// EventContext for publishing.
@@ -62,32 +66,51 @@ impl NodeProofAggregator {
 
     pub fn setup(bus: &BusHandle) -> Addr<Self> {
         let addr = Self::new(bus).start();
+        bus.subscribe(EventType::ThresholdSharePending, addr.clone().into());
         bus.subscribe(EventType::DKGInnerProofReady, addr.clone().into());
         bus.subscribe(EventType::ComputeResponse, addr.clone().into());
         bus.subscribe(EventType::ComputeRequestError, addr.clone().into());
         addr
     }
 
+    fn handle_threshold_share_pending(&mut self, msg: TypedEvent<ThresholdSharePending>) {
+        let (msg, ec) = msg.into_components();
+        let e3_id = msg.e3_id.clone();
+
+        let sk_enc_count = msg.sk_share_encryption_requests.len();
+        let e_sm_enc_count = msg.e_sm_share_encryption_requests.len();
+        // Must mirror the formula in ProofRequestActor::handle_threshold_share_pending:
+        //   C0 + C1 + C2a + C2b + C3a×sk_enc + C3b×e_sm_enc + C4a + C4b
+        let total_expected = 4 + sk_enc_count + e_sm_enc_count + 2;
+
+        self.states.entry(e3_id.clone()).or_insert_with(|| {
+            info!(
+                "NodeProofAggregator: initializing state for E3 {} party {} (total_expected={})",
+                e3_id, msg.full_share.party_id, total_expected,
+            );
+            RollingAggregationState {
+                party_id: msg.full_share.party_id,
+                buffer: BTreeMap::new(),
+                accumulated: None,
+                next_to_aggregate: 0,
+                remaining: total_expected,
+                fold_correlation: None,
+                last_ec: ec,
+            }
+        });
+    }
+
     fn handle_inner_proof_ready(&mut self, msg: TypedEvent<DKGInnerProofReady>) {
         let (msg, ec) = msg.into_components();
         let e3_id = msg.e3_id.clone();
 
-        let state = self.states.entry(e3_id.clone()).or_insert_with(|| {
-            info!(
-                "NodeProofAggregator: initializing state for E3 {} party {}",
-                e3_id, msg.party_id,
+        let Some(state) = self.states.get_mut(&e3_id) else {
+            error!(
+                "NodeProofAggregator: received DKGInnerProofReady for E3 {} before ThresholdSharePending — proof dropped",
+                e3_id
             );
-            RollingAggregationState {
-                party_id: msg.party_id,
-                buffer: BTreeMap::new(),
-                accumulated: None,
-                next_to_aggregate: 0,
-                remaining: msg.total_expected,
-                in_flight: false,
-                fold_correlation: None,
-                last_ec: ec.clone(),
-            }
-        });
+            return;
+        };
 
         state.buffer.insert(msg.seq, msg.wrapped_proof);
         state.last_ec = ec;
@@ -107,7 +130,7 @@ impl NodeProofAggregator {
                 None => return,
             };
 
-            if state.in_flight || state.remaining == 0 {
+            if state.fold_correlation.is_some() || state.remaining == 0 {
                 return;
             }
 
@@ -133,10 +156,9 @@ impl NodeProofAggregator {
                 }
             } else {
                 // Fold accumulated + next_proof
-                let acc = state.accumulated.clone().expect("checked above");
+                let acc = state.accumulated.take().expect("checked above");
                 let corr = CorrelationId::new();
                 let ec = state.last_ec.clone();
-                state.in_flight = true;
                 state.fold_correlation = Some(corr);
                 state.next_to_aggregate += 1;
 
@@ -165,7 +187,6 @@ impl NodeProofAggregator {
                         e3_id
                     );
                     if let Some(state) = self.states.get_mut(e3_id) {
-                        state.in_flight = false;
                         state.fold_correlation = None;
                     }
                     self.fold_correlation.remove(&corr);
@@ -189,16 +210,14 @@ impl NodeProofAggregator {
             return;
         };
 
+        state.remaining -= 1;
         info!(
             "NodeProofAggregator: fold response received for E3 {} (remaining={})",
-            e3_id,
-            state.remaining - 1
+            e3_id, state.remaining
         );
 
         state.accumulated = Some(proof);
-        state.in_flight = false;
         state.fold_correlation = None;
-        state.remaining -= 1;
 
         if state.remaining == 0 {
             self.publish_complete(&e3_id);
@@ -251,6 +270,9 @@ impl Handler<EnclaveEvent> for NodeProofAggregator {
     fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
         let (data, ec) = msg.into_components();
         match data {
+            EnclaveEventData::ThresholdSharePending(data) => {
+                self.handle_threshold_share_pending(TypedEvent::new(data, ec));
+            }
             EnclaveEventData::DKGInnerProofReady(data) => {
                 self.handle_inner_proof_ready(TypedEvent::new(data, ec));
             }
@@ -262,6 +284,18 @@ impl Handler<EnclaveEvent> for NodeProofAggregator {
             }
             _ => {}
         }
+    }
+}
+
+impl Handler<TypedEvent<ThresholdSharePending>> for NodeProofAggregator {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ThresholdSharePending>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.handle_threshold_share_pending(msg);
     }
 }
 
@@ -317,11 +351,6 @@ impl NodeProofAggregator {
                 e3_id,
                 msg.get_err()
             );
-            if let Some(state) = self.states.get_mut(&e3_id) {
-                state.in_flight = false;
-                state.fold_correlation = None;
-            }
-            // Remove state — aggregation is broken
             self.states.remove(&e3_id);
             warn!(
                 "NodeProofAggregator: E3 {} aggregation state discarded due to fold error",

@@ -315,7 +315,6 @@ impl ProofRequestActor {
                     party_id: msg.full_share.party_id,
                     wrapped_proof: c0_proof,
                     seq: 0,
-                    total_expected,
                 },
                 ec.clone(),
             ) {
@@ -668,7 +667,6 @@ impl ProofRequestActor {
                     party_id: meta.party_id,
                     wrapped_proof,
                     seq,
-                    total_expected: meta.total_expected,
                 },
                 ec.clone(),
             ) {
@@ -1054,7 +1052,6 @@ impl ProofRequestActor {
                     party_id: meta.party_id,
                     wrapped_proof,
                     seq,
-                    total_expected: meta.total_expected,
                 },
                 ec.clone(),
             ) {
@@ -1347,7 +1344,6 @@ impl ProofRequestActor {
                     party_id: meta.party_id,
                     wrapped_proof,
                     seq: 0,
-                    total_expected: meta.total_expected,
                 },
                 ec.clone(),
             ) {
