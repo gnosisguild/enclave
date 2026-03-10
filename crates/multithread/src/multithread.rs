@@ -27,10 +27,10 @@ use e3_events::{
     ComputeResponse, DecryptedSharesAggregationProofRequest,
     DecryptedSharesAggregationProofResponse, DkgShareDecryptionProofRequest,
     DkgShareDecryptionProofResponse, EnclaveEvent, EnclaveEventData, EventPublisher,
-    EventSubscriber, EventType, PartyVerificationResult, PkAggregationProofRequest,
-    PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest,
-    PkGenerationProofResponse, ShareComputationProofRequest, ShareComputationProofResponse,
-    ShareEncryptionProofRequest, ShareEncryptionProofResponse,
+    EventSubscriber, EventType, FoldProofsResponse, PartyVerificationResult,
+    PkAggregationProofRequest, PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse,
+    PkGenerationProofRequest, PkGenerationProofResponse, ShareComputationProofRequest,
+    ShareComputationProofResponse, ShareEncryptionProofRequest, ShareEncryptionProofResponse,
     ThresholdShareDecryptionProofRequest, ThresholdShareDecryptionProofResponse, TypedEvent,
     VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
     VerifyShareProofsRequest, VerifyShareProofsResponse, ZkError as ZkEventError, ZkRequest,
@@ -67,7 +67,7 @@ use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncrypti
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
-use e3_zk_prover::{Provable, ZkBackend, ZkProver};
+use e3_zk_prover::{generate_fold_proof, generate_wrapper_proof, Provable, ZkBackend, ZkProver};
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
 use fhe_traits::{DeserializeParametrized, FheEncoder};
@@ -613,6 +613,22 @@ fn handle_zk_request(
                 handle_decrypted_shares_aggregation_proof(&prover, req, request.clone())
             })
         }
+        ZkRequest::FoldProofs { proof1, proof2 } => timefunc("zk_fold_proofs", id, || {
+            let e3_id_str = request.e3_id.to_string();
+            match generate_fold_proof(&prover, &proof1, &proof2, &e3_id_str) {
+                Ok(proof) => Ok(ComputeResponse::zk(
+                    ZkResponse::FoldProofs(FoldProofsResponse { proof }),
+                    request.correlation_id,
+                    request.e3_id.clone(),
+                )),
+                Err(e) => Err(ComputeRequestError::new(
+                    ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(
+                        e.to_string(),
+                    )),
+                    request.clone(),
+                )),
+            }
+        }),
     }
 }
 
@@ -694,10 +710,19 @@ fn handle_share_computation_proof(
             )
         })?;
 
+    let wrapped_proof = generate_wrapper_proof(prover, &[proof.clone()], &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
     // 7. Return response
     Ok(ComputeResponse::zk(
         ZkResponse::ShareComputation(ShareComputationProofResponse {
             proof,
+            wrapped_proof,
             dkg_input_type: req.dkg_input_type,
         }),
         request.correlation_id,
@@ -770,9 +795,17 @@ fn handle_pk_generation_proof(
             )
         })?;
 
+    let wrapped_proof = generate_wrapper_proof(prover, &[proof.clone()], &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
     // 6. Return response
     Ok(ComputeResponse::zk(
-        ZkResponse::PkGeneration(PkGenerationProofResponse::new(proof)),
+        ZkResponse::PkGeneration(PkGenerationProofResponse::new(proof, wrapped_proof)),
         request.correlation_id,
         request.e3_id,
     ))
@@ -814,8 +847,16 @@ fn handle_pk_bfv_proof(
             )
         })?;
 
+    let wrapped_proof = generate_wrapper_proof(prover, &[proof.clone()], &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
     Ok(ComputeResponse::zk(
-        ZkResponse::PkBfv(PkBfvProofResponse::new(proof)),
+        ZkResponse::PkBfv(PkBfvProofResponse::new(proof, wrapped_proof)),
         request.correlation_id,
         request.e3_id,
     ))
@@ -894,9 +935,18 @@ fn handle_share_encryption_proof(
             )
         })?;
 
+    let wrapped_proof = generate_wrapper_proof(prover, &[proof.clone()], &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
     Ok(ComputeResponse::zk(
         ZkResponse::ShareEncryption(ShareEncryptionProofResponse {
             proof,
+            wrapped_proof,
             dkg_input_type: req.dkg_input_type,
             recipient_party_id: req.recipient_party_id,
             row_index: req.row_index,
@@ -979,10 +1029,19 @@ fn handle_dkg_share_decryption_proof(
             )
         })?;
 
+    let wrapped_proof = generate_wrapper_proof(prover, &[proof.clone()], &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
     // 6. Return response
     Ok(ComputeResponse::zk(
         ZkResponse::DkgShareDecryption(DkgShareDecryptionProofResponse {
             proof,
+            wrapped_proof,
             dkg_input_type: req.dkg_input_type,
         }),
         request.correlation_id,

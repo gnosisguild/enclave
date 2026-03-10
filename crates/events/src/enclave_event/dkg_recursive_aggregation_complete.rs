@@ -18,6 +18,5 @@ use serde::{Deserialize, Serialize};
 pub struct DKGRecursiveAggregationComplete {
     pub e3_id: E3id,
     pub party_id: u64,
-    pub node: String,
     pub aggregated_proof: Proof,
 }

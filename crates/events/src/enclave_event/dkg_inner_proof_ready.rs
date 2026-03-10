@@ -21,7 +21,6 @@ use serde::{Deserialize, Serialize};
 pub struct DKGInnerProofReady {
     pub e3_id: E3id,
     pub party_id: u64,
-    pub node: String,
     /// Already-wrapped proof (single-element RecursiveAggregation output).
     pub wrapped_proof: Proof,
     /// Deterministic sequence index for ordered folding.

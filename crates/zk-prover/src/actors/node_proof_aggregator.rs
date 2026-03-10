@@ -1,0 +1,332 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
+//! Incremental node-level proof aggregation for DKG.
+//!
+//! `NodeProofAggregator` subscribes to `DKGInnerProofReady` events and folds
+//! each wrapped proof into a running aggregate in strict `seq` order, using
+//! a reorder buffer for out-of-order arrivals.
+//!
+//! When all expected proofs have been folded, it publishes
+//! `DKGRecursiveAggregationComplete`.
+
+use std::collections::{BTreeMap, HashMap};
+
+use actix::{Actor, Addr, Context, Handler};
+use e3_events::{
+    BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind,
+    CorrelationId, DKGInnerProofReady, DKGRecursiveAggregationComplete, E3id, EnclaveEvent,
+    EnclaveEventData, EventContext, EventPublisher, EventSubscriber, EventType, Proof, Sequenced,
+    TypedEvent, ZkRequest, ZkResponse,
+};
+use tracing::{error, info, warn};
+
+/// Per-E3 rolling aggregation state for one node's proofs.
+struct RollingAggregationState {
+    party_id: u64,
+    /// Proofs buffered out-of-order, keyed by seq index.
+    buffer: BTreeMap<usize, Proof>,
+    /// The running accumulated (folded) proof.
+    accumulated: Option<Proof>,
+    /// Next seq index expected for folding.
+    next_to_aggregate: usize,
+    /// Number of proofs remaining to process (decrements on first store + each fold completion).
+    remaining: usize,
+    /// Whether a fold is currently in flight.
+    in_flight: bool,
+    /// Correlation ID for the in-flight fold, if any.
+    fold_correlation: Option<CorrelationId>,
+    /// EventContext for publishing.
+    last_ec: EventContext<Sequenced>,
+}
+
+/// Actor that incrementally folds DKG inner proofs into a single node-level proof.
+pub struct NodeProofAggregator {
+    bus: BusHandle,
+    states: HashMap<E3id, RollingAggregationState>,
+    /// Reverse map: fold correlation_id -> e3_id.
+    fold_correlation: HashMap<CorrelationId, E3id>,
+}
+
+impl NodeProofAggregator {
+    pub fn new(bus: &BusHandle) -> Self {
+        Self {
+            bus: bus.clone(),
+            states: HashMap::new(),
+            fold_correlation: HashMap::new(),
+        }
+    }
+
+    pub fn setup(bus: &BusHandle) -> Addr<Self> {
+        let addr = Self::new(bus).start();
+        bus.subscribe(EventType::DKGInnerProofReady, addr.clone().into());
+        bus.subscribe(EventType::ComputeResponse, addr.clone().into());
+        bus.subscribe(EventType::ComputeRequestError, addr.clone().into());
+        addr
+    }
+
+    fn handle_inner_proof_ready(&mut self, msg: TypedEvent<DKGInnerProofReady>) {
+        let (msg, ec) = msg.into_components();
+        let e3_id = msg.e3_id.clone();
+
+        let state = self.states.entry(e3_id.clone()).or_insert_with(|| {
+            info!(
+                "NodeProofAggregator: initializing state for E3 {} party {}",
+                e3_id, msg.party_id,
+            );
+            RollingAggregationState {
+                party_id: msg.party_id,
+                buffer: BTreeMap::new(),
+                accumulated: None,
+                next_to_aggregate: 0,
+                remaining: msg.total_expected,
+                in_flight: false,
+                fold_correlation: None,
+                last_ec: ec.clone(),
+            }
+        });
+
+        state.buffer.insert(msg.seq, msg.wrapped_proof);
+        state.last_ec = ec;
+
+        info!(
+            "NodeProofAggregator: buffered seq={} for E3 {} (remaining={})",
+            msg.seq, e3_id, state.remaining
+        );
+
+        self.try_advance(&e3_id);
+    }
+
+    fn try_advance(&mut self, e3_id: &E3id) {
+        loop {
+            let state = match self.states.get_mut(e3_id) {
+                Some(s) => s,
+                None => return,
+            };
+
+            if state.in_flight || state.remaining == 0 {
+                return;
+            }
+
+            let next_proof = match state.buffer.remove(&state.next_to_aggregate) {
+                Some(p) => p,
+                None => return, // not yet available
+            };
+
+            if state.accumulated.is_none() {
+                // First proof: store as accumulated
+                info!(
+                    "NodeProofAggregator: storing first proof (seq={}) for E3 {}",
+                    state.next_to_aggregate, e3_id
+                );
+                state.accumulated = Some(next_proof);
+                state.remaining -= 1;
+                state.next_to_aggregate += 1;
+
+                if state.remaining == 0 {
+                    // Only one proof total — done immediately
+                    self.publish_complete(e3_id);
+                    return;
+                }
+            } else {
+                // Fold accumulated + next_proof
+                let acc = state.accumulated.clone().expect("checked above");
+                let corr = CorrelationId::new();
+                let ec = state.last_ec.clone();
+                state.in_flight = true;
+                state.fold_correlation = Some(corr);
+                state.next_to_aggregate += 1;
+
+                info!(
+                    "NodeProofAggregator: dispatching fold (seq={}) for E3 {} corr={:?}",
+                    state.next_to_aggregate - 1,
+                    e3_id,
+                    corr
+                );
+
+                self.fold_correlation.insert(corr, e3_id.clone());
+
+                if let Err(err) = self.bus.publish(
+                    ComputeRequest::zk(
+                        ZkRequest::FoldProofs {
+                            proof1: acc,
+                            proof2: next_proof,
+                        },
+                        corr,
+                        e3_id.clone(),
+                    ),
+                    ec,
+                ) {
+                    error!(
+                        "NodeProofAggregator: failed to publish fold request for E3 {}: {err}",
+                        e3_id
+                    );
+                    if let Some(state) = self.states.get_mut(e3_id) {
+                        state.in_flight = false;
+                        state.fold_correlation = None;
+                    }
+                    self.fold_correlation.remove(&corr);
+                }
+
+                return; // wait for fold response
+            }
+        }
+    }
+
+    fn handle_fold_response(&mut self, correlation_id: &CorrelationId, proof: Proof) {
+        let Some(e3_id) = self.fold_correlation.remove(correlation_id) else {
+            return;
+        };
+
+        let Some(state) = self.states.get_mut(&e3_id) else {
+            error!(
+                "NodeProofAggregator: received fold response for unknown E3 {}",
+                e3_id
+            );
+            return;
+        };
+
+        info!(
+            "NodeProofAggregator: fold response received for E3 {} (remaining={})",
+            e3_id,
+            state.remaining - 1
+        );
+
+        state.accumulated = Some(proof);
+        state.in_flight = false;
+        state.fold_correlation = None;
+        state.remaining -= 1;
+
+        if state.remaining == 0 {
+            self.publish_complete(&e3_id);
+        } else {
+            self.try_advance(&e3_id);
+        }
+    }
+
+    fn publish_complete(&mut self, e3_id: &E3id) {
+        let Some(state) = self.states.remove(e3_id) else {
+            return;
+        };
+
+        let Some(aggregated_proof) = state.accumulated else {
+            error!(
+                "NodeProofAggregator: no accumulated proof for E3 {} at completion",
+                e3_id
+            );
+            return;
+        };
+
+        info!(
+            "NodeProofAggregator: all proofs folded for E3 {} party {} — publishing DKGRecursiveAggregationComplete",
+            e3_id, state.party_id
+        );
+
+        if let Err(err) = self.bus.publish(
+            DKGRecursiveAggregationComplete {
+                e3_id: e3_id.clone(),
+                party_id: state.party_id,
+                aggregated_proof,
+            },
+            state.last_ec,
+        ) {
+            error!(
+                "NodeProofAggregator: failed to publish DKGRecursiveAggregationComplete for E3 {}: {err}",
+                e3_id
+            );
+        }
+    }
+}
+
+impl Actor for NodeProofAggregator {
+    type Context = Context<Self>;
+}
+
+impl Handler<EnclaveEvent> for NodeProofAggregator {
+    type Result = ();
+
+    fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
+        let (data, ec) = msg.into_components();
+        match data {
+            EnclaveEventData::DKGInnerProofReady(data) => {
+                self.handle_inner_proof_ready(TypedEvent::new(data, ec));
+            }
+            EnclaveEventData::ComputeResponse(data) => {
+                self.handle_compute_response(TypedEvent::new(data, ec));
+            }
+            EnclaveEventData::ComputeRequestError(data) => {
+                self.handle_compute_request_error(TypedEvent::new(data, ec));
+            }
+            _ => {}
+        }
+    }
+}
+
+impl Handler<TypedEvent<DKGInnerProofReady>> for NodeProofAggregator {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<DKGInnerProofReady>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.handle_inner_proof_ready(msg);
+    }
+}
+
+impl Handler<TypedEvent<ComputeResponse>> for NodeProofAggregator {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ComputeResponse>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.handle_compute_response(msg);
+    }
+}
+
+impl Handler<TypedEvent<ComputeRequestError>> for NodeProofAggregator {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ComputeRequestError>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.handle_compute_request_error(msg);
+    }
+}
+
+impl NodeProofAggregator {
+    fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) {
+        let (msg, _ec) = msg.into_components();
+        if let ComputeResponseKind::Zk(ZkResponse::FoldProofs(resp)) = msg.response {
+            self.handle_fold_response(&msg.correlation_id, resp.proof);
+        }
+    }
+
+    fn handle_compute_request_error(&mut self, msg: TypedEvent<ComputeRequestError>) {
+        let (msg, _ec) = msg.into_components();
+        if let Some(e3_id) = self.fold_correlation.remove(msg.correlation_id()) {
+            error!(
+                "NodeProofAggregator: fold request failed for E3 {}: {:?} — aggregation aborted",
+                e3_id,
+                msg.get_err()
+            );
+            if let Some(state) = self.states.get_mut(&e3_id) {
+                state.in_flight = false;
+                state.fold_correlation = None;
+            }
+            // Remove state — aggregation is broken
+            self.states.remove(&e3_id);
+            warn!(
+                "NodeProofAggregator: E3 {} aggregation state discarded due to fold error",
+                e3_id
+            );
+        }
+    }
+}
