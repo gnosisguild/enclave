@@ -15,6 +15,7 @@ use common::test_backend;
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
 use e3_zk_prover::{test_utils::get_tempdir, BbTarget, Provable, SetupStatus, ZkConfig, ZkProver};
+use sha2::{Digest, Sha256};
 use std::env;
 
 #[tokio::test]
@@ -25,18 +26,12 @@ async fn test_full_flow_download_circuits_prove_and_verify() {
     let backend = test_backend(temp.path(), config);
 
     if !backend.using_custom_bb {
-        // --- Step 1: Fresh state should need full setup ---
-        eprintln!(">>> Step 1: Checking fresh state...");
         assert!(matches!(
             backend.check_status().await,
             SetupStatus::FullSetupNeeded
         ));
-        eprintln!(">>> Step 1: Done");
 
-        // --- Step 2: Download bb and verify structure ---
-        eprintln!(">>> Step 2: Downloading bb...");
         let result = backend.download_bb().await;
-        eprintln!(">>> Step 2: bb downloaded");
         assert!(result.is_ok(), "download failed: {:?}", result);
         assert!(backend.bb_binary.exists(), "bb binary not found");
 
@@ -77,13 +72,11 @@ async fn test_full_flow_download_circuits_prove_and_verify() {
     println!("bb version: {}", version.unwrap());
 
     // --- Step 3: Download circuits ---
-    eprintln!(">>> Step 3: Downloading circuits...");
     tokio::fs::create_dir_all(&backend.circuits_dir)
         .await
         .unwrap();
 
     let result = backend.download_circuits().await;
-    eprintln!(">>> Step 3: Circuits downloaded");
     assert!(result.is_ok(), "download_circuits failed: {:?}", result);
 
     assert!(backend
@@ -108,10 +101,7 @@ async fn test_full_flow_download_circuits_prove_and_verify() {
         .join("pk.vk")
         .exists());
 
-    // --- Step 4: ensure_installed is idempotent on top of existing setup ---
-    eprintln!(">>> Step 4: Running ensure_installed...");
     let result = backend.ensure_installed().await;
-    eprintln!(">>> Step 4: ensure_installed done");
     assert!(result.is_ok(), "ensure_installed failed: {:?}", result);
     assert!(matches!(backend.check_status().await, SetupStatus::Ready));
 
@@ -120,8 +110,6 @@ async fn test_full_flow_download_circuits_prove_and_verify() {
     assert!(backend.work_dir.exists());
     assert!(backend.base_dir.join("version.json").exists());
 
-    // --- Step 5: Generate and verify a proof ---
-    eprintln!(">>> Step 5: Generating proof...");
     let preset = BfvPreset::InsecureThreshold512;
     let prover = ZkProver::new(&backend);
 
@@ -133,25 +121,21 @@ async fn test_full_flow_download_circuits_prove_and_verify() {
         .prove(&prover, &preset, &sample, e3_id)
         .expect("proof generation should succeed");
 
-    eprintln!(">>> Step 5: Proof generated");
     assert!(!proof.data.is_empty(), "proof data should not be empty");
     assert!(
         !proof.public_signals.is_empty(),
         "public signals should not be empty"
     );
 
-    eprintln!(">>> Step 5: Verifying proof...");
     let party_id = 0;
     let verified = PkCircuit
         .verify(&prover, &proof, e3_id, party_id)
         .expect("verification call should not error");
 
     assert!(verified, "proof should verify successfully");
-    eprintln!(">>> Step 5: Proof verified!");
 
     prover.cleanup(e3_id).unwrap();
 
-    // --- Cleanup ---
     let temp_path = temp.path().to_path_buf();
     drop(temp);
     assert!(!temp_path.exists());
@@ -180,6 +164,54 @@ async fn test_download_bb_rejects_wrong_checksum() {
     );
 
     assert!(!backend.bb_binary.exists());
+
+    let temp_path = temp.path().to_path_buf();
+    drop(temp);
+    assert!(!temp_path.exists());
+}
+
+#[tokio::test]
+async fn test_download_circuits_verifies_checksums() {
+    let config = ZkConfig::default();
+    let temp = get_tempdir().unwrap();
+    let backend = test_backend(temp.path(), config);
+
+    let result = backend.download_circuits().await;
+    assert!(result.is_ok(), "download_circuits failed: {:?}", result);
+
+    let version_info = backend.load_version_info().await;
+
+    // If the archive included a checksums.json, verify_circuits should have
+    // populated version_info.circuits with entries and valid SHA256 hashes.
+    if !version_info.circuits.is_empty() {
+        for (rel_path, circuit_info) in &version_info.circuits {
+            assert_eq!(rel_path, &circuit_info.file);
+            assert!(
+                !circuit_info.checksum.is_empty(),
+                "checksum should not be empty for {}",
+                rel_path
+            );
+
+            // Re-read the file from disk and verify the stored checksum matches.
+            let file_path = backend.circuits_dir.join(rel_path);
+            assert!(
+                file_path.exists(),
+                "circuit file should exist on disk: {}",
+                file_path.display()
+            );
+
+            let data = tokio::fs::read(&file_path).await.unwrap();
+            let mut hasher = Sha256::new();
+            hasher.update(&data);
+            let actual_hash = hex::encode(hasher.finalize());
+
+            assert_eq!(
+                actual_hash, circuit_info.checksum,
+                "stored checksum for {} doesn't match file on disk",
+                rel_path
+            );
+        }
+    }
 
     let temp_path = temp.path().to_path_buf();
     drop(temp);

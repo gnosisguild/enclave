@@ -163,8 +163,8 @@ const ct = await encryptNumber(42n, pk, 'INSECURE_THRESHOLD_512')
 
 ## Modular submodule imports
 
-The SDK is organized into three submodules (`contracts`, `events`, `encryption`) that can be
-imported independently for tree-shaking:
+The SDK is organized into three sub-modules (`contracts`, `events`, `crypto`) that can be imported
+independently for tree-shaking:
 
 ```ts
 import { generatePublicKey, encryptNumber } from '@enclave-e3/sdk/crypto'

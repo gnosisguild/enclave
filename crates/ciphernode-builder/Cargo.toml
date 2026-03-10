@@ -29,6 +29,7 @@ e3-sortition.workspace = true
 e3-sync.workspace = true
 e3-trbfv.workspace = true
 e3-utils.workspace = true
+libp2p.workspace = true
 rayon.workspace = true
 tempfile.workspace = true
 tokio.workspace = true

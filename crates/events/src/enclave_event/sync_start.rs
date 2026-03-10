@@ -63,23 +63,11 @@ impl Display for HistoricalEvmSyncStart {
 #[rtype(result = "()")]
 pub struct HistoricalNetSyncStart {
     pub since: BTreeMap<AggregateId, u128>,
-    #[serde(skip)]
-    /// We include the sender here so that the evm can communicate directly with the sync actor
-    pub sender: Option<Recipient<HistoricalNetEventsReceived>>, // Must be Option to allow serde deserialize on
-                                                                // EnclaveEvent as Default is required to be
-                                                                // implemented this is fine as this event is never
-                                                                // shared
 }
 
 impl HistoricalNetSyncStart {
-    pub fn new(
-        sender: impl Into<Recipient<HistoricalNetEventsReceived>>,
-        since: BTreeMap<AggregateId, u128>,
-    ) -> Self {
-        Self {
-            since,
-            sender: Some(sender.into()),
-        }
+    pub fn new(since: BTreeMap<AggregateId, u128>) -> Self {
+        Self { since }
     }
 }
 
@@ -110,17 +98,17 @@ impl Display for HistoricalEvmEventsReceived {
 
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct HistoricalNetEventsReceived {
+pub struct HistoricalNetSyncEventsReceived {
     pub events: Vec<EnclaveEvent<Unsequenced>>,
 }
 
-impl HistoricalNetEventsReceived {
+impl HistoricalNetSyncEventsReceived {
     pub fn new(events: Vec<EnclaveEvent<Unsequenced>>) -> Self {
         Self { events }
     }
 }
 
-impl Display for HistoricalNetEventsReceived {
+impl Display for HistoricalNetSyncEventsReceived {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }
