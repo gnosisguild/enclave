@@ -6,8 +6,9 @@
 
 use actix::{Message, Recipient};
 use anyhow::Result;
-use std::fmt::Display;
 use std::hash::Hash;
+use std::pin::Pin;
+use std::{fmt::Display, future::Future};
 
 use crate::{
     event_context::{AggregateId, EventContext},
@@ -140,6 +141,8 @@ pub trait EventSubscriber<E: Event> {
     fn subscribe_all(&self, event_types: &[EventType], recipient: Recipient<E>);
     /// Subscribe the recipient to events matching the given event type
     fn unsubscribe(&self, event_type: &str, recipient: Recipient<E>);
+    /// Return a future that waits for a specific event
+    fn wait_for(&self, event_type: EventType) -> Pin<Box<dyn Future<Output = Result<E>> + Send>>;
 }
 
 /// Trait to create an event with a timestamp from its associated type data

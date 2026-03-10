@@ -49,13 +49,13 @@ pub enum PublicKeyAggregatorState {
         no_proof_parties: Vec<u64>,
     },
     GeneratingC5Proof {
-        public_key: Vec<u8>,
+        public_key: ArcBytes,
         public_key_hash: [u8; 32],
         keyshare_bytes: Vec<ArcBytes>,
         nodes: OrderedSet<String>,
     },
     Complete {
-        public_key: Vec<u8>,
+        public_key: ArcBytes,
         keyshares: OrderedSet<ArcBytes>,
         nodes: OrderedSet<String>,
     },
@@ -299,12 +299,13 @@ impl PublicKeyAggregator {
         let committee_h = honest_keyshares.len();
 
         info!("Publishing PkAggregationProofPending for C5 proof generation...");
+        let pubkey = ArcBytes::from_bytes(&pubkey);
         self.bus.publish(
             PkAggregationProofPending {
                 e3_id: self.e3_id.clone(),
                 proof_request: PkAggregationProofRequest {
                     keyshare_bytes: honest_keyshares.clone(),
-                    aggregated_pk_bytes: ArcBytes::from_bytes(&pubkey),
+                    aggregated_pk_bytes: pubkey.clone(),
                     params_preset: self.params_preset.clone(),
                     // this field is not really used in the circuit, we only use H
                     committee_n: committee_h,
@@ -322,7 +323,7 @@ impl PublicKeyAggregator {
         // Transition to GeneratingC5Proof
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
-                public_key: pubkey,
+                public_key: pubkey.clone(),
                 public_key_hash,
                 keyshare_bytes: honest_keyshares,
                 nodes: honest_nodes_set,
