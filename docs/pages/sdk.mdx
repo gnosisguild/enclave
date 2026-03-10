@@ -1,11 +1,11 @@
 ---
-title: 'Enclave SDK'
+title: 'Interfold SDK'
 description: 'Use the TypeScript + React SDKs to drive E3 programs from clients and services'
 ---
 
-# Enclave SDK Overview
+# Interfold SDK Overview
 
-The Enclave SDK (`@enclave-e3/sdk`) and React helpers (`@enclave-e3/react`) provide a
+The Interfold SDK (`@enclave-e3/sdk`) and React helpers (`@enclave-e3/react`) provide a
 batteries-included client stack for requesting E3 computations, subscribing to protocol events, and
 coordinating custom frontends or backend services. Both packages ship in this repository (see
 `packages/enclave-sdk` and `packages/enclave-react`).
@@ -192,9 +192,9 @@ const ct = await encryptNumber(42n, pk, 'INSECURE_THRESHOLD_512')
 | `encryptVectorAndGenProof(v, pk)`  | Vector version of `encryptNumberAndGenProof`         |
 | `getThresholdBfvParamsSet()`       | Get the parameter set for the configured preset      |
 
-## Modular sub-module imports
+## Modular submodule imports
 
-The SDK is organized into three sub-modules (`contracts`, `events`, `crypto`) that can be imported
+The SDK is organized into three submodules (`contracts`, `events`, `crypto`) that can be imported
 independently for tree-shaking:
 
 ```ts
@@ -207,7 +207,7 @@ All exports are also available from the main `@enclave-e3/sdk` entry point.
 
 ## Configuration contract map
 
-Provide the Enclave, CiphernodeRegistry, and FeeToken addresses. The template exposes these via
+Provide the Interfold, CiphernodeRegistry, and FeeToken addresses. The template exposes these via
 `.env` / `enclave.config.yaml`. For multi-chain apps, instantiate separate SDK instances per chain.
 
 ## Working with the template
@@ -226,7 +226,7 @@ addresses, then restart the dev server so the SDK reconnects.
 ## Application-specific SDKs
 
 For complex E3 programs with specialized requirements, you may want to build an application-specific
-SDK on top of or alongside the Enclave SDK. For example,
+SDK on top of or alongside the Interfold SDK. For example,
 [CRISP](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP) uses `@crisp-e3/sdk`, which
 provides:
 
@@ -238,14 +238,14 @@ provides:
 
 If your E3 program requires specialized cryptographic operations, domain-specific logic, or
 application-level abstractions beyond basic protocol interactions, consider building a dedicated SDK
-that wraps or complements the core Enclave SDK.
+that wraps or complements the core Interfold SDK.
 
 ## Advanced usage
 
 - **Historical events**: `sdk.getHistoricalEvents(type, fromBlock, toBlock)` fetches logs without a
   WebSocket provider; useful for CRON jobs or health checks.
 - **Gas controls**: pass `gasLimit` to `requestE3`, `publishCiphertextOutput`, or other write
-  methods if you want fixed limits when interacting with Enclave on L2s.
+  methods if you want fixed limits when interacting with Interfold on L2s.
 - **Gas estimation**: `sdk.estimateGas(functionName, args, contractAddress, abi)` returns the
   estimated gas for a contract call before sending.
 - **Transaction confirmation**: `sdk.waitForTransaction(hash)` blocks until a transaction is mined.

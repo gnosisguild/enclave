@@ -4,16 +4,17 @@ title: 'Computation Flow'
 
 ## Computation Flow
 
-The computation process within Enclave is decentralized and open, allowing any participant to
-contribute to each phase of execution. This design ensures transparency and flexibility, enabling
-different roles to be fulfilled by various actors, including the application server, Compute
-Providers, or other network participant.
+The computation process within the Interfold protocol is decentralized and open, allowing any
+participant to contribute to each phase of execution. This design ensures transparency and
+flexibility, enabling different roles to be fulfilled by various actors, including the application
+server, Compute Providers, or other network participants.
 
 ### Phase 1: Request
 
 1. **Define the E3 Program**: Author your Secure Process using the tooling described in
-   [Writing the Secure Process](/write-secure-program). Enclave currently ships first-party support
-   for the BFV scheme via [fhe.rs](https://github.com/gnosisguild/fhe.rs) and the SAFE library.
+   [Writing the Secure Process](/write-secure-program). The Interfold currently ships first-party
+   support for the BFV scheme via [fhe.rs](https://github.com/gnosisguild/fhe.rs) and the SAFE
+   library.
 2. **Choose a Compute Provider**: Your program must align with the execution backend (e.g.,
    [RISC Zero](https://www.risczero.com/) for [CRISP](/CRISP/introduction) or a custom FHE
    coprocessor).
@@ -52,7 +53,7 @@ Providers, or other network participant.
 
 ### Phase 2: Node Selection
 
-Each new request to the Enclave contracts initiates a verifiable sortition process to select a
+Each new request to the Interfold contracts initiates a verifiable sortition process to select a
 Ciphernode Committee (CiCo). The selected Ciphernodes use the E3 Program parameters to determine the
 appropriate Fully Homomorphic Encryption (FHE) scheme, then generate and publish a shared public
 encryption key.
@@ -80,13 +81,13 @@ During this phase, Data Providers — who may include individual users, applicat
 ### Phase 4: Execution
 
 In this phase, the Compute Provider (CP) executes the Secure Process defined in your E3 Program and
-publishes the encrypted output back to Enclave contract. This must happen before the compute
+publishes the encrypted output back to Interfold contract. This must happen before the compute
 deadline expires.
 
 1. **Execution**: The CP retrieves encrypted inputs and executes the Secure Process defined in your
    E3 program.
-2. **Publish Output**: The ciphertext output and accompanying proof are submitted to the Enclave
-   contract via `publishCiphertextOutput`. The Enclave contract calls your E3 Program's `verify`
+2. **Publish Output**: The ciphertext output and accompanying proof are submitted to the Interfold
+   contract via `publishCiphertextOutput`. The Interfold contract calls your E3 Program's `verify`
    function to validate the proof before accepting the output.
 
    ```solidity
@@ -102,7 +103,7 @@ deadline expires.
 After the ciphertext output is published, the CiCo for the given E3 coordinates to decrypt the
 ciphertext output and publish the resulting plaintext. The decryption must complete before the
 decryption deadline. The Decryption Verifier contract validates the submitted plaintext proof before
-accepting the output. The plaintext output can be queried from the Enclave contract's `getE3()`
+accepting the output. The plaintext output can be queried from the Interfold contract's `getE3()`
 function.
 
 ```solidity

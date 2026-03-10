@@ -127,16 +127,16 @@ contract MyE3Program is IE3Program {
 
 ### Step 5: Deploy Contracts
 
-- Deploy the Enclave contract to your desired network.
-- Deploy your E3 Program contract and register it with the Enclave contract.
+- Deploy the Interfold contracts to your desired network.
+- Deploy your E3 Program contract and register it with the Interfold contract.
 
 ### Step 6: Run Ciphernodes
 
-- Start Ciphernodes and ensure they are registered with the Enclave contract.
+- Start Ciphernodes and ensure they are registered with the Interfold contract.
 
 ### Step 7: Submit a Computation Request
 
-- Use your application or a script to submit a computation request to the Enclave contract.
+- Use your application or a script to submit a computation request to the Interfold contract.
 
 **Example (JavaScript):**
 
@@ -172,19 +172,19 @@ await EnclaveContract.request({
 ### Step 11: Retrieve Final Result
 
 - Listen for the `PlaintextOutputPublished` event.
-- Retrieve the plaintext result from the Enclave contract.
+- Retrieve the plaintext result from the Interfold contract.
 
 ---
 
 ## Conclusion
 
-By following this guide, you should now have a solid understanding of Enclave and how to build your
-own E3 Programs. Enclave provides a powerful framework for secure, privacy-preserving computations
-over encrypted data, enabling a new class of decentralized applications.
+By following this guide, you should now have a solid understanding of the Interfold and how to build
+your own E3 Programs. The Interfold provides a framework for privacy-preserving computations over
+encrypted data, enabling a new class of decentralized applications.
 
 **Key Takeaways:**
 
-- Enclave distributes trust and ensures data remains encrypted throughout computation.
+- The Interfold distributes trust and ensures data remains encrypted throughout computation.
 - The modular architecture allows for flexibility in choosing Compute Providers and designing
   computations.
 - The provided Compute Provider package simplifies integration and handles complex tasks like Merkle
@@ -194,13 +194,13 @@ over encrypted data, enabling a new class of decentralized applications.
 
 ## Additional Resources
 
-- **Enclave GitHub Repository**:
+- **Interfold GitHub Repository**:
   [https://github.com/gnosisguild/enclave](https://github.com/gnosisguild/enclave)
 - **CRISP GitHub Repository**:
   [https://github.com/gnosisguild/enclave](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP)
-- **Enclave Quick Start**: [Quick Start](/quick-start)
+- **Interfold Quick Start**: [Quick Start](/quick-start)
 - **RISC Zero Documentation**: [https://www.risczero.com](https://www.risczero.com)
-- **Compute Provider Package**: Check the Enclave repository for the Compute Provider package and
+- **Compute Provider Package**: Check the Interfold repository for the Compute Provider package and
   examples.
 - **FHE Libraries**: Explore libraries like `fhe.rs` for Rust to handle homomorphic encryption.
 - **Zero-Knowledge Proof Libraries**: Use libraries like `risc0-zkvm` for proof generation and
@@ -211,4 +211,4 @@ over encrypted data, enabling a new class of decentralized applications.
 **Happy Building!**
 
 If you have any questions or need further assistance, feel free to reach out to
-[Gnosis Guild](https://gnosisguild.org), the initial development team building Enclave.
+[Gnosis Guild](https://gnosisguild.org), the initial development team building the Interfold.

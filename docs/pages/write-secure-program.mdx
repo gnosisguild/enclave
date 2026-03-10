@@ -5,22 +5,22 @@ description: ''
 
 # Secure Process
 
-The Secure Process is the core FHE logic for your E3 Program. It runs within your selected Compute
-Provider's environment, ultimately producing and publishing a ciphertext output that is decrypted by
-your Ciphernode Committee. To facilitate this, Enclave provides a
+The Secure Process defines the core computation for your E3 Program. It runs within your selected
+Compute Provider's environment, ultimately producing a ciphertext output that is decrypted by your
+Ciphernode Committee. To facilitate this, Interfold provides a
 [Compute Provider package](https://github.com/gnosisguild/enclave/tree/main/crates/compute-provider)
 to simplify writing the Secure Process with any Compute Provider.
 
 ### Using the Compute Provider Package
 
-To simplify integration with Enclave, use the provided Compute Provider package.
+To simplify integration with the Interfold, use the provided Compute Provider package.
 
 **Benefits:**
 
-- **Handles Merkle Tree Construction**: Recreates the input Merkle tree inside the compute
+- **Handles Merkle tree construction**: Recreates the input Merkle tree inside the compute
   environment.
-- **Simplifies Proof Generation**: Manages proof creation for computation verification.
-- **Abstracts Complexity**: Allows you to focus on your computation logic.
+- **Simplifies proof generation**: Manages proof creation for computation verification.
+- **Abstracts complexity**: Allows you to focus on your computation logic.
 
 **Implementation:**
 
@@ -56,9 +56,9 @@ environment. Below are the key steps to implement it effectively:
 1. **Define the Computation**: Specify the exact computation your E3 program needs to perform.
 2. **Implement the Logic**: Write the Secure Process using the Compute Provider's supported language
    (e.g., Rust for RISC Zero).
-3. **Handle Encrypted Inputs**: Ensure the program can process encrypted data correctly.
+3. **Handle Program Inputs**: Ensure the program can process encrypted data correctly.
 4. **Focus on Computation**: Use the Compute Provider package to handle additional tasks like Merkle
-   tree verification and proof verification, so you can focus on your computation logic.
+   tree verification and proof generation, so you can focus on your computation logic.
 
 **Example (Rust with RISC Zero + Boundless):**
 

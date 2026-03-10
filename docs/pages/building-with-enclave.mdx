@@ -1,10 +1,10 @@
-# Building with Enclave
+# Building with the Interfold
 
-The Enclave smart contract acts as the central coordinator for all E3 operations. It manages
+The Interfold smart contract acts as the central coordinator for all E3 operations. It manages
 computation requests, input validation, Ciphernode Committees (CiCos), and result publication while
 maintaining the security and privacy guarantees of the protocol.
 
-## The Enclave Smart Contract
+## The Interfold Smart Contract
 
 ### Core Responsibilities
 
@@ -158,7 +158,7 @@ function getTimeoutConfig() external view returns (E3TimeoutConfig memory config
 
 After the committee is selected and finalized via sortition, the selected Ciphernodes perform a
 Distributed Key Generation (DKG) to produce a shared public key. When the aggregated public key is
-published, the CiphernodeRegistry calls `onCommitteePublished()` on the Enclave contract, which
+published, the CiphernodeRegistry calls `onCommitteePublished()` on the Interfold contract, which
 transitions the E3 to the `KeyPublished` stage.
 
 Once the E3 reaches the `KeyPublished` stage and the input window opens
@@ -185,7 +185,7 @@ program implementation). This allows you to:
 
 ### Merkle Tree Construction
 
-Enclave uses a Lean Merkle Tree implementation. Each input is hashed using the PoseidonT3 Hash
+The Interfold uses a Lean Merkle Tree implementation. Each input is hashed using the PoseidonT3 Hash
 function, and the root is updated with each new input.
 
 Your E3 program should:
@@ -214,7 +214,7 @@ the E3's public key. It is also recommended to bundle in proofs to validate:
 
 ### Key Events
 
-**Enclave Contract Events:**
+**Interfold Contract Events:**
 
 ```solidity
 event E3Requested(uint256 e3Id, E3 e3, IE3Program indexed e3Program);
@@ -239,9 +239,11 @@ event InputPublished(uint256 indexed e3Id, bytes data, uint256 inputHash, uint25
 ### Result Publication Flow
 
 1. The Compute Provider submits a proof and ciphertext output.
-2. Enclave uses the E3 Program contract to verify the proof and emits `CiphertextOutputPublished`.
+2. The Interfold uses the E3 Program contract to verify the proof and emits
+   `CiphertextOutputPublished`.
 3. Ciphernodes decrypt the ciphertext output.
-4. The plaintext result is published and the Decryption Verifier validates the decryption proof.
+4. The plaintext result is then published and the Decryption Verifier validates the decryption
+   proof.
 5. Rewards are distributed to active committee members.
 6. Events are emitted for off-chain services.
 
@@ -301,15 +303,15 @@ Program contract to push computation to the edges, reducing the complexity of yo
 
 3. **Result Verification**
 
-The Enclave protocol will accept and decrypt whatever output is reported by your Compute Provider.
+The Interfold protocol will accept and decrypt whatever output is reported by your Compute Provider.
 In other words, your E3s inherit the trust assumptions of your Compute Provider. An incorrectly
 implemented Secure Process in your E3 Program or a dishonest or compromised Compute Provider could
 leak information.
 
 4. **Event Handling**
 
-If you are consuming Enclave outputs offchain, allow for sufficient confirmations to be confident in
-the finality of the outcome and to appropriately handle re-orgs.
+If you are consuming Interfold outputs offchain, allow for sufficient block confirmations to be
+confident in the finality of the outcome and to appropriately handle re-orgs.
 
 ## Best Practices
 
