@@ -5,9 +5,9 @@ description: 'Overview of ciphernode operations, contracts, and lifecycle'
 
 # Ciphernode Operators
 
-Ciphernodes are the distributed workers that power the Enclave network. They participate in
-threshold cryptography to enable encrypted computations (E3s) while ensuring no single party can
-access the underlying data.
+Ciphernodes are the distributed workers that power the Interfold network. They participate in
+threshold cryptography to enable encrypted execution environments (E3s) while ensuring no single
+party can access the underlying plaintext data.
 
 ## What is a Ciphernode?
 
@@ -25,14 +25,15 @@ malicious behavior.
 
 ## Contract Architecture
 
-The Enclave protocol uses several contracts that work together:
+The Interfold protocol uses several contracts that work together:
 
 | Contract               | Purpose                                                                        |
 | ---------------------- | ------------------------------------------------------------------------------ |
-| **Enclave**            | Core coordinator that manages E3 requests and computation lifecycle            |
+| **Interfold**          | Core coordinator that manages E3 requests and computation lifecycle            |
 | **CiphernodeRegistry** | Tracks registered operators and manages committee formation                    |
 | **BondingRegistry**    | Handles license bonds (ENCL) and ticket balances (ETK)                         |
 | **SlashingManager**    | Processes slashing proposals, appeals, and ban enforcement                     |
+| **E3RefundManager**    | Calculates and distributes refunds when an E3 fails                            |
 | **EnclaveToken**       | ENCL token used for license bonding                                            |
 | **EnclaveTicketToken** | Non-transferable ETK token representing ticket balances (backed by stablecoin) |
 
@@ -44,9 +45,11 @@ The Enclave protocol uses several contracts that work together:
 | CiphernodeRegistry   | `0xc8D2880c59D5e807eFFDee3451fb0Aa97f6aefDA` | 10395615     |
 | BondingRegistry      | `0x1323d235Cd040d64D01d3C2adf084F9A16a675aE` | 10395616     |
 | SlashingManager      | `0x9263b4B2D98FB26172faF018EB81B9227E56dB35` | 10395614     |
+| E3RefundManager      | `0xaa4d3F3d3482cbC51f013c7Eb1591BeD9e0187dc` | 10395621     |
 | EnclaveTicketToken   | `0x7D3D17F0A60cF227aaC78cB0cE6B25E00768dbe8` | 10395613     |
 | EnclaveToken (ENCL)  | `0x24b28471AE7BdF1fdBcfDd183c73D13ff0689B99` | 10395612     |
 | MockUSDC (fee token) | `0x01AbD7D8e6547c943c2fE082C3Ce194fDCe57396` | 10395611     |
+| DkgPkVerifier        | `0x6997eCF2926a94c439599f7275219Cb2BfBA300C` | 10395629     |
 
 > Always verify addresses from `packages/enclave-contracts/deployed_contracts.json` or your
 > deployment output. Addresses differ per network.
@@ -67,19 +70,19 @@ stateDiagram-v2
     Inactive --> ExitPending: deregisterOperator()
     Registered --> ExitPending: deregisterOperator()
     ExitPending --> [*]: claimExits() after exitDelay
-    ExitPending --> Registered: registerOperator() (cancels exit)
+    ExitPending --> Registered: registerOperator() (after exitDelay)
 ```
 
 ### State Descriptions
 
-| State           | Description                                                            |
-| --------------- | ---------------------------------------------------------------------- |
-| **Unbonded**    | No license bond deposited; cannot register                             |
-| **Licensed**    | ENCL bonded but not yet registered in the registry                     |
-| **Registered**  | In the registry but lacking minimum ticket balance                     |
-| **Active**      | Fully operational; eligible for committee selection via sortition      |
-| **Inactive**    | Registered but below minimum requirements (tickets or license bond)    |
-| **ExitPending** | Deregistration requested; waiting for exit delay before claiming funds |
+| State           | Description                                                                        |
+| --------------- | ---------------------------------------------------------------------------------- |
+| **Unbonded**    | No license bond deposited; cannot register                                         |
+| **Licensed**    | ENCL bonded but not yet registered in the registry                                 |
+| **Registered**  | In the registry but lacking minimum ticket balance                                 |
+| **Active**      | Fully operational; eligible for committee selection via sortition                  |
+| **Inactive**    | Registered but below minimum requirements (tickets or license bond)                |
+| **ExitPending** | Deregistration requested; waiting for exit delay before claiming or re-registering |
 
 ## Requirements
 
@@ -91,14 +94,14 @@ Before operating a ciphernode, ensure you have:
 | **Stablecoin**  | USDC (or configured fee token) for tickets; minimum 1 ticket worth       |
 | **ETH**         | Gas for transactions on your target network                              |
 | **Hardware**    | Linux/macOS, 4+ cores, 8GB+ RAM, stable internet with open UDP port      |
-| **Software**    | Enclave CLI installed, WebSocket RPC endpoint                            |
+| **Software**    | Interfold CLI installed, WebSocket RPC endpoint                          |
 
 ## Getting Started
 
 Follow these guides in order to become an active ciphernode operator:
 
 1. **[Running a Ciphernode](./ciphernode-operators/running)** - Set up your node using DappNode,
-   Enclave CLI, or Docker
+   Interfold CLI, or Docker
 2. **[Registration & Licensing](./ciphernode-operators/registration)** - Bond your license,
    register, and add tickets
 3. **[Tickets & Sortition](./ciphernode-operators/tickets-and-sortition)** - Understand how

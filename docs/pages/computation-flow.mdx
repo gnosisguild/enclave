@@ -4,22 +4,23 @@ title: 'Computation Flow'
 
 ## Computation Flow
 
-The computation process within Enclave is decentralized and open, allowing any participant to
-contribute to each phase of execution. This design ensures transparency and flexibility, enabling
-different roles to be fulfilled by various actors, including the application server, Compute
-Providers, or other network participant.
+The computation process within the Interfold protocol is decentralized and open, allowing any
+participant to contribute to each phase of execution. This design ensures transparency and
+flexibility, enabling different roles to be fulfilled by various actors, including the application
+server, Compute Providers, or other network participants.
 
 ### Phase 1: Request
 
 1. **Define the E3 Program**: Author your Secure Process using the tooling described in
-   [Writing the Secure Process](/write-secure-program). Enclave currently ships first-party support
-   for the BFV scheme via [fhe.rs](https://github.com/gnosisguild/fhe.rs) and the SAFE library.
+   [Writing the Secure Process](/write-secure-program). The Interfold currently ships first-party
+   support for the BFV scheme via [fhe.rs](https://github.com/gnosisguild/fhe.rs) and the SAFE
+   library.
 2. **Choose a Compute Provider**: Your program must align with the execution backend (e.g.,
    [RISC Zero](https://www.risczero.com/) for [CRISP](/CRISP/introduction) or a custom FHE
    coprocessor).
 3. **Assemble `E3RequestParams`**:
-   - `threshold`: the CiCo size/threshold tuple (t/n) used for decryption security
-   - `startWindow` and `duration`: governs when inputs open/close and how long execution may run
+   - `threshold`: the CiCo size/threshold tuple (m/n) used for decryption security
+   - `inputWindow`: a two-element array `[start, end]` defining when inputs open and close
    - `e3Program`, `e3ProgramParams`, `computeProviderParams`, and optional `customParams`
 4. **Submit the Request**: Call `request` with the struct to publish the new computation.
 
@@ -32,8 +33,7 @@ Providers, or other network participant.
    ```solidity
    struct E3RequestParams {
      uint32[2] threshold;
-     uint256[2] startWindow;
-     uint256 duration;
+     uint256[2] inputWindow;
      IE3Program e3Program;
      bytes e3ProgramParams;
      bytes computeProviderParams;
@@ -41,9 +41,19 @@ Providers, or other network participant.
    }
    ```
 
+   The contract validates the parameters, transfers the required fee from the requester, creates an
+   `E3` record with a random seed derived from `block.prevrandao`, and delegates committee selection
+   to the `CiphernodeRegistry`.
+
+   You can estimate the fee before submitting by calling `getE3Quote`:
+
+   ```solidity
+   function getE3Quote(E3RequestParams calldata requestParams) external view returns (uint256 fee);
+   ```
+
 ### Phase 2: Node Selection
 
-Each new request to the Enclave contracts initiates a verifiable sortition process to select a
+Each new request to the Interfold contracts initiates a verifiable sortition process to select a
 Ciphernode Committee (CiCo). The selected Ciphernodes use the E3 Program parameters to determine the
 appropriate Fully Homomorphic Encryption (FHE) scheme, then generate and publish a shared public
 encryption key.
@@ -59,24 +69,26 @@ During this phase, Data Providers — who may include individual users, applicat
 2. **Input Validation**: Data Providers generate several Zero-Knowledge Proofs about their inputs to
    ensure they are valid for the requested E3. Some of these proofs are generic (e.g., proof of
    valid encryption) while others will be specific to your application.
-3. **Submit Inputs**: Both encrypted data and ZKPs are submitted to the Enclave contract, which will
-   call the `validateInput` function on your E3P smart contract. The input hash is then added to a
-   Merkle tree, the root of which can later be used to anchor proofs of correct execution of your E3
+3. **Submit Inputs**: Both encrypted data and ZKPs are submitted to your E3 Program contract's
+   `publishInput` function. The E3 Program validates the input and may add its hash to a Merkle
+   tree, the root of which can later be used to anchor proofs of correct execution of your E3
    Program.
 
    ```solidity
-   function validateInput(address sender, bytes memory data) external returns (bytes memory input);
+   function publishInput(uint256 e3Id, bytes memory data) external;
    ```
 
 ### Phase 4: Execution
 
 In this phase, the Compute Provider (CP) executes the Secure Process defined in your E3 Program and
-publishes the encrypted output back to Enclave contract.
+publishes the encrypted output back to Interfold contract. This must happen before the compute
+deadline expires.
 
 1. **Execution**: The CP retrieves encrypted inputs and executes the Secure Process defined in your
    E3 program.
-2. **Publish Output**: Your E3 Program contract must implement a `verify` function that will be
-   invoked by the Enclave contract to publish the ciphertext output of your computation.
+2. **Publish Output**: The ciphertext output and accompanying proof are submitted to the Interfold
+   contract via `publishCiphertextOutput`. The Interfold contract calls your E3 Program's `verify`
+   function to validate the proof before accepting the output.
 
    ```solidity
    function publishCiphertextOutput(
@@ -89,8 +101,10 @@ publishes the encrypted output back to Enclave contract.
 ### Phase 5: Decryption
 
 After the ciphertext output is published, the CiCo for the given E3 coordinates to decrypt the
-ciphertext output and publish the resulting plaintext. The plaintext output can be queried from the
-Enclave contract's `getE3()` function.
+ciphertext output and publish the resulting plaintext. The decryption must complete before the
+decryption deadline. The Decryption Verifier contract validates the submitted plaintext proof before
+accepting the output. The plaintext output can be queried from the Interfold contract's `getE3()`
+function.
 
 ```solidity
 function getE3(uint256 e3Id) external view returns (E3 memory e3);
@@ -101,3 +115,19 @@ or by listening to the `PlaintextOutputPublished` event.
 ```solidity
 event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
 ```
+
+Upon successful decryption, rewards are distributed to the active committee members.
+
+### Failure Handling
+
+If any phase exceeds its deadline or a fault is detected, the E3 transitions to the `Failed` stage.
+Anyone can call `markE3Failed(e3Id)` to check timeout conditions, or the `SlashingManager` /
+`CiphernodeRegistry` can trigger failure directly.
+
+Once failed, the `E3RefundManager` calculates a proportional refund based on how much work was
+completed:
+
+- The requester can claim a partial refund via `claimRequesterRefund(e3Id)`
+- Honest committee members (non-expelled nodes) can claim compensation via
+  `claimHonestNodeReward(e3Id)`
+- A protocol fee is retained for operational costs

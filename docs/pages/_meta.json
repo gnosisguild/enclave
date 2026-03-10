@@ -23,7 +23,7 @@
     "title": "Use Cases"
   },
   "building-with-enclave": {
-    "title": "Building with Enclave"
+    "title": "Building with Interfold"
   },
   "best-practices": {
     "title": "Best Practices"
@@ -49,7 +49,7 @@
     "title": "Project Template"
   },
   "sdk": {
-    "title": "Enclave SDK"
+    "title": "Interfold SDK"
   },
   "setting-up-server": {
     "title": "Setting Up the Server"
@@ -98,6 +98,6 @@
     "title": "Reference"
   },
   "whitepaper": {
-    "title": "White Paper"
+    "title": "Whitepaper"
   }
 }

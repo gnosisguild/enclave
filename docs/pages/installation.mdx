@@ -1,21 +1,21 @@
 ---
 title: 'Installation'
-description: 'Install and set up the Enclave CLI'
+description: 'Install and set up the Interfold CLI'
 ---
 
 # Installation
 
-This guide covers how to install the Enclave CLI and get your development environment set up.
+This guide covers how to install the Interfold CLI and get your development environment set up.
 
 ## Prerequisites
 
-Before installing Enclave, make sure you have the following dependencies:
+Before installing Interfold, make sure you have the following dependency installed:
 
 - [Rust](https://www.rust-lang.org/tools/install)
 
 ## Quick Install (Recommended)
 
-The easiest way to install the Enclave CLI is using our installer script:
+The easiest way to install the Interfold CLI is using our installer script:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/gnosisguild/enclave/main/install | bash
@@ -27,14 +27,14 @@ Or if you prefer `wget`:
 wget -qO- https://raw.githubusercontent.com/gnosisguild/enclave/main/install | bash
 ```
 
-This script will download and install `enclaveup`, which is the standalone installer for the Enclave
-CLI.
+This script will download and install `enclaveup`, which is the standalone installer for the
+Interfold CLI.
 
 ## Using enclaveup
 
-Once you have `enclaveup` installed, you can manage your Enclave CLI installation:
+Once you have `enclaveup` installed, you can manage your Interfold CLI installation:
 
-### Install the Enclave CLI
+### Install the Interfold CLI
 
 ```bash
 # Install to ~/.local/bin (default)
@@ -44,15 +44,35 @@ enclaveup install
 enclaveup install --system
 ```
 
-Running `enclaveup install` will install the latest version of the Enclave CLI. See
+Running `enclaveup install` will install the latest version of the Interfold CLI. See
 `enclaveup --help` for more options.
+
+### Update the Enclave CLI
+
+```bash
+# Update to the latest version
+enclaveup update
+
+# Update system-wide installation
+enclaveup update --system
+```
+
+### Uninstall
+
+```bash
+# Remove the Enclave CLI
+enclaveup uninstall
+
+# Remove system-wide installation
+enclaveup uninstall --system
+```
 
 ## Manual Installation
 
 If you prefer to install manually:
 
 1. Visit the [releases page](https://github.com/gnosisguild/enclave/releases)
-2. Download the appropriate binary for your platform:
+2. Download the appropriate release archive for your platform:
    - Linux: `enclave-linux-x86_64.tar.gz`
    - macOS: `enclave-macos-aarch64.tar.gz`
 3. Extract the binary and place it in your PATH (e.g., `~/.local/bin` or `/usr/local/bin`)
@@ -88,17 +108,17 @@ cargo install --locked --path ./crates/cli --bin enclave -f
 
 ## Verify Installation
 
-After installation, verify that the Enclave CLI is working correctly:
+After installation, verify that the Interfold CLI is working correctly:
 
 ```bash
 enclave --help
 ```
 
-You should see the help information for the Enclave CLI.
+You should see the help information for the Interfold CLI.
 
 ## Next Steps
 
-Once you have the Enclave CLI installed, you're ready to:
+Once you have the Interfold CLI installed, you're ready to:
 
 1. [Run your first E3 program](/quick-start)
 2. [Learn about E3 concepts](/what-is-e3)

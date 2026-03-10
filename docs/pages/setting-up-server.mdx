@@ -1,13 +1,13 @@
 ---
 title: 'Setting Up the Client and Server'
-description: 'Build client applications and coordination servers using the Enclave SDK'
+description: 'Build client applications and coordination servers using the Interfold SDK'
 ---
 
 # Setting Up the Client and Server
 
 Building E3 applications involves creating client-side interfaces for users and coordination logic
-for managing the E3 lifecycle. The Enclave SDK provides powerful TypeScript and React tools to
-streamline this development process.
+for managing the E3 lifecycle. The Interfold SDK provides powerful TypeScript and React tools to
+streamline development.
 
 ## Overview
 
@@ -18,7 +18,7 @@ Modern E3 applications typically consist of:
 3. **Event Management**: Real-time monitoring of E3 lifecycle events
 4. **Contract Interactions**: Type-safe smart contract communication
 
-The Enclave SDK handles much of this complexity for you, providing:
+The Interfold SDK handles much of this complexity for you, providing:
 
 - Type-safe contract interactions
 - Real-time event listening
@@ -29,7 +29,7 @@ The Enclave SDK handles much of this complexity for you, providing:
 
 ### Install the SDK
 
-For TypeScript/JavaScript applications install the TypeScript SDK:
+For TypeScript/JavaScript applications, install the TypeScript SDK:
 
 ```bash
 pnpm add @enclave-e3/sdk
@@ -43,40 +43,41 @@ pnpm add @enclave-e3/sdk @enclave-e3/react
 
 ### Basic TypeScript Client
 
-Create a type-safe client that can interact with Enclave contracts:
+Create a type-safe client that can interact with Interfold contracts:
 
 ```typescript
 import { EnclaveSDK, EnclaveEventType } from '@enclave-e3/sdk'
 import { createPublicClient, createWalletClient, http, custom } from 'viem'
+import { hardhat } from 'viem/chains'
 
 // Initialize clients
 const publicClient = createPublicClient({
-  transport: http('http://localhost:8545'), // Your RPC URL
+  chain: hardhat,
+  transport: http('http://localhost:8545'),
 })
 
 const walletClient = createWalletClient({
   transport: custom(window.ethereum),
 })
 
-// Create SDK instance
+// Create SDK instance (no separate initialize() call needed)
 const sdk = new EnclaveSDK({
   publicClient,
   walletClient,
   contracts: {
     enclave: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
     ciphernodeRegistry: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
+    feeToken: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
   },
-  chainId: 31337, // Hardhat local network
 })
 
-// Initialize the SDK
-await sdk.initialize()
+// Approve the fee token before requesting
+await sdk.approveFeeToken(BigInt(1000000))
 
 // Request a new E3 computation
 const hash = await sdk.requestE3({
   threshold: [2, 3],
-  startWindow: [BigInt(0), BigInt(100)],
-  duration: BigInt(3600),
+  inputWindow: [BigInt(0), BigInt(100)],
   e3Program: '0x9A676e781A523b5d0C0e43731313A708CB607508',
   e3ProgramParams: '0x',
   computeProviderParams: '0x',
@@ -103,14 +104,15 @@ function E3Dashboard() {
     requestE3,
     onEnclaveEvent,
     off,
-    EnclaveEventType
+    EnclaveEventType,
+    RegistryEventType
   } = useEnclaveSDK({
     autoConnect: true,
     contracts: {
       enclave: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
-      ciphernodeRegistry: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9'
+      ciphernodeRegistry: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
+      feeToken: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
     },
-    chainId: 31337
   });
 
   // Listen to E3 events
@@ -122,25 +124,24 @@ function E3Dashboard() {
       setE3Data(event.data);
     };
 
-    const handleE3Activated = (event) => {
-      console.log('E3 activated:', event.data);
+    const handleCommitteePublished = (event) => {
+      console.log('Committee published:', event.data);
     };
 
     onEnclaveEvent(EnclaveEventType.E3_REQUESTED, handleE3Requested);
-    onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handleE3Activated);
+    onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, handleCommitteePublished);
 
     return () => {
       off(EnclaveEventType.E3_REQUESTED, handleE3Requested);
-      off(EnclaveEventType.E3_ACTIVATED, handleE3Activated);
+      off(RegistryEventType.COMMITTEE_PUBLISHED, handleCommitteePublished);
     };
-  }, [isInitialized, onEnclaveEvent, off, EnclaveEventType]);
+  }, [isInitialized, onEnclaveEvent, off, EnclaveEventType, RegistryEventType]);
 
   const handleRequestE3 = async () => {
     try {
       const hash = await requestE3({
         threshold: [2, 3],
-        startWindow: [BigInt(Date.now()), BigInt(Date.now() + 300000)],
-        duration: BigInt(1800),
+        inputWindow: [BigInt(Date.now()), BigInt(Date.now() + 300000)],
         e3Program: '0x9A676e781A523b5d0C0e43731313A708CB607508',
         e3ProgramParams: '0x',
         computeProviderParams: '0x',
@@ -182,7 +183,7 @@ export default E3Dashboard;
 
 The SDK provides comprehensive event handling for the entire E3 lifecycle:
 
-### Enclave Events
+### Interfold Events
 
 ```typescript
 // Listen to key E3 lifecycle events
@@ -190,16 +191,12 @@ sdk.onEnclaveEvent(EnclaveEventType.E3_REQUESTED, (event) => {
   console.log('New E3 computation requested:', event.data)
 })
 
-sdk.onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, (event) => {
-  console.log('E3 environment activated:', event.data)
-})
-
-sdk.onEnclaveEvent(EnclaveEventType.INPUT_PUBLISHED, (event) => {
-  console.log('Input data published:', event.data)
-})
-
 sdk.onEnclaveEvent(EnclaveEventType.CIPHERTEXT_OUTPUT_PUBLISHED, (event) => {
-  console.log('Computation result available:', event.data)
+  console.log('Encrypted computation result available:', event.data)
+})
+
+sdk.onEnclaveEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED, (event) => {
+  console.log('Decrypted plaintext output available:', event.data)
 })
 ```
 
@@ -208,13 +205,17 @@ sdk.onEnclaveEvent(EnclaveEventType.CIPHERTEXT_OUTPUT_PUBLISHED, (event) => {
 ```typescript
 import { RegistryEventType } from '@enclave-e3/sdk'
 
-// Monitor ciphernode network changes
-sdk.onEnclaveEvent(RegistryEventType.CIPHERNODE_ADDED, (event) => {
-  console.log('New ciphernode joined:', event.data)
+// Monitor committee lifecycle events
+sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_REQUESTED, (event) => {
+  console.log('Committee requested for E3:', event.data)
 })
 
 sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, (event) => {
   console.log('Committee selection complete:', event.data)
+})
+
+sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_FINALIZED, (event) => {
+  console.log('Committee finalized:', event.data)
 })
 ```
 
@@ -223,58 +224,46 @@ sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, (event) => {
 For server-side applications, you can create automated coordination services:
 
 ```typescript
-import { EnclaveSDK } from '@enclave-e3/sdk'
-import { createPublicClient, createWalletClient, http } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
+import { EnclaveSDK, EnclaveEventType } from '@enclave-e3/sdk'
+import { hardhat } from 'viem/chains'
 
 class E3CoordinationServer {
   private sdk: EnclaveSDK
 
   constructor(privateKey: string, rpcUrl: string) {
-    const account = privateKeyToAccount(privateKey as `0x${string}`)
-
-    const publicClient = createPublicClient({
-      transport: http(rpcUrl),
-    })
-
-    const walletClient = createWalletClient({
-      account,
-      transport: http(rpcUrl),
-    })
-
-    this.sdk = new EnclaveSDK({
-      publicClient,
-      walletClient,
+    // Use the static factory for convenience
+    this.sdk = EnclaveSDK.create({
+      rpcUrl,
+      privateKey: privateKey as `0x${string}`,
+      chain: hardhat,
       contracts: {
         enclave: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
         ciphernodeRegistry: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
+        feeToken: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
       },
     })
   }
 
   async start() {
-    await this.sdk.initialize()
     this.setupEventListeners()
     console.log('E3 Coordination Server started')
   }
 
   private setupEventListeners() {
-    // Auto-activate E3s when they become available
+    // Monitor new E3 requests
     this.sdk.onEnclaveEvent(EnclaveEventType.E3_REQUESTED, async (event) => {
       const { e3Id } = event.data
-      console.log(`Auto-activating E3 ${e3Id}`)
-
-      try {
-        await this.sdk.activateE3(e3Id)
-      } catch (error) {
-        console.error(`Failed to activate E3 ${e3Id}:`, error)
-      }
+      console.log(`New E3 requested: ${e3Id}`)
     })
 
-    // Handle input aggregation
-    this.sdk.onEnclaveEvent(EnclaveEventType.INPUT_PUBLISHED, async (event) => {
-      console.log('Input published:', event.data)
-      // Implement your input aggregation logic here
+    // Monitor ciphertext output publication
+    this.sdk.onEnclaveEvent(EnclaveEventType.CIPHERTEXT_OUTPUT_PUBLISHED, async (event) => {
+      console.log('Ciphertext output published:', event.data)
+    })
+
+    // Monitor plaintext output publication
+    this.sdk.onEnclaveEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED, async (event) => {
+      console.log('Plaintext output published:', event.data)
     })
   }
 
@@ -329,14 +318,17 @@ try {
 For local development with the default template:
 
 ```typescript
-const devConfig = {
+import { hardhat } from 'viem/chains'
+
+const devSdk = EnclaveSDK.create({
+  rpcUrl: 'http://localhost:8545',
+  chain: hardhat,
   contracts: {
     enclave: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
     ciphernodeRegistry: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
+    feeToken: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
   },
-  chainId: 31337,
-  rpcUrl: 'http://localhost:8545',
-}
+})
 ```
 
 ### Production Configuration
@@ -344,15 +336,19 @@ const devConfig = {
 For production deployments:
 
 ```typescript
-const prodConfig = {
-  contracts: {
-    enclave: process.env.ENCLAVE_CONTRACT_ADDRESS!,
-    ciphernodeRegistry: process.env.REGISTRY_CONTRACT_ADDRESS!,
-  },
-  chainId: 1, // Mainnet
+import { mainnet } from 'viem/chains'
+
+const prodSdk = EnclaveSDK.create({
   rpcUrl: process.env.RPC_URL!,
-}
+  privateKey: process.env.PRIVATE_KEY! as `0x${string}`,
+  chain: mainnet,
+  contracts: {
+    enclave: process.env.ENCLAVE_CONTRACT_ADDRESS! as `0x${string}`,
+    ciphernodeRegistry: process.env.REGISTRY_CONTRACT_ADDRESS! as `0x${string}`,
+    feeToken: process.env.FEE_TOKEN_ADDRESS! as `0x${string}`,
+  },
+})
 ```
 
-The Enclave SDK abstracts away much of the complexity, allowing you to focus on your application's
-unique business logic while ensuring robust, type-safe interaction with the Enclave protocol.
+The Interfold SDK abstracts away much of the complexity, allowing you to focus on your application's
+unique business logic while ensuring robust, type-safe interaction with the Interfold protocol.
