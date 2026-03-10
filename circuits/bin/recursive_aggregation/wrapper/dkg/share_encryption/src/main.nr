@@ -11,7 +11,7 @@ use lib::{
 };
 
 // Number of proofs.
-pub global N_PROOFS: u32 = 2;
+pub global N_PROOFS: u32 = 1;
 /// Number of public inputs/outputs per proof.
 pub global N_PUBLIC_INPUTS: u32 = (2 * L * N) + 2;
 
