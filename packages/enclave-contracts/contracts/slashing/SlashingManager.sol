@@ -247,6 +247,10 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(policy.enabled, SlashReasonDisabled());
         require(policy.requiresProof, InvalidPolicy());
         require(proof.length != 0, ProofRequired());
+        require(
+            ciphernodeRegistry.isCommitteeMember(e3Id, operator),
+            OperatorNotInCommittee()
+        );
 
         // Evidence replay protection — reason-independent to prevent cross-reason replay
         bytes32 evidenceKey = keccak256(
@@ -402,6 +406,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         {
             (, uint32 thresholdM, , ) = ciphernodeRegistry
                 .getCommitteeViability(e3Id);
+            require(thresholdM > 0, InvalidProposal());
             require(numVotes >= thresholdM, InsufficientAttestations());
         }
 
@@ -417,9 +422,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
             // All votes must agree the proof is bad (fault confirmed)
             require(agrees[i], InvalidProof());
 
-            // Verify voter was a committee member for this E3
+            // Verify voter is an active committee member for this E3
             require(
-                ciphernodeRegistry.isCommitteeMember(e3Id, voter),
+                ciphernodeRegistry.isCommitteeMemberActive(e3Id, voter),
                 VoterNotInCommittee()
             );
 
