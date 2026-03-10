@@ -101,30 +101,31 @@ When `CommitteeRequested` fires, nodes check if they're eligible:
 For each ticket you hold, a score is calculated:
 
 ```
-score = keccak256(seed, operator, ticketNumber)
+score = keccak256(node, ticketNumber, e3Id, seed)
 ```
 
 The same inputs always produce the same scores, so all honest nodes converge on the same committee.
 
 ### 3. Ticket Submission
 
-Operators submit their winning tickets during the submission window (300 seconds on Sepolia):
+Operators submit their winning tickets during the submission window (10 seconds on Sepolia):
 
 ```bash
 # The CLI handles this automatically when running
 submitTicket(e3Id, ticketNumber)
 ```
 
-Each submission emits `TicketSubmitted(e3Id, operator, ticketNumber, score)`.
+Each submission emits `TicketSubmitted(e3Id, node, ticketId, score)`.
 
 ### 4. Committee Finalization
 
-After the window closes and ≥ `threshold_m` tickets are present:
+After the window closes and ≥ `threshold_n` tickets are present:
 
 1. Anyone can call `finalizeCommittee(e3Id)`
-2. Registry emits `CommitteeFinalized`
-3. Selected nodes generate and publish key shares
-4. Aggregated public key is published via `publishCommittee`
+2. If enough operators submitted, the registry emits `CommitteeFinalized(e3Id, committee)`
+3. If the threshold isn't met, `CommitteeFormationFailed` is emitted and the E3 fails
+4. Selected nodes generate and publish key shares
+5. Aggregated public key is published via `publishCommittee`
 
 ## Parameters
 
@@ -140,12 +141,13 @@ After the window closes and ≥ `threshold_m` tickets are present:
 
 ### Events to Watch
 
-| Event                | Meaning                              |
-| -------------------- | ------------------------------------ |
-| `CommitteeRequested` | New committee formation started      |
-| `TicketSubmitted`    | A ticket was submitted for selection |
-| `CommitteeFinalized` | Committee members confirmed          |
-| `CommitteePublished` | Aggregated public key ready          |
+| Event                      | Meaning                                |
+| -------------------------- | -------------------------------------- |
+| `CommitteeRequested`       | New committee formation started        |
+| `TicketSubmitted`          | A ticket was submitted for selection   |
+| `CommitteeFinalized`       | Committee members confirmed            |
+| `CommitteeFormationFailed` | Not enough operators submitted tickets |
+| `CommitteePublished`       | Aggregated public key ready            |
 
 ### Log Messages
 

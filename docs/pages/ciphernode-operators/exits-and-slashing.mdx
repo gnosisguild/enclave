@@ -59,9 +59,13 @@ Each slash reason has an associated policy:
 struct SlashPolicy {
   uint256 ticketPenalty; // Tickets to burn
   uint256 licensePenalty; // ENCL to confiscate
-  bool requiresProof; // Whether evidence is needed
-  uint64 appealWindow; // Time to file appeal
-  bool appealable; // Whether appeals are allowed
+  bool requiresProof; // Whether on-chain proof verification is needed
+  address proofVerifier; // ISlashVerifier contract for proof validation
+  bool banNode; // Whether to permanently ban the node
+  uint256 appealWindow; // Seconds to file appeal (0 = no appeals, immediate execution)
+  bool enabled; // Whether this slash type is active
+  bool affectsCommittee; // Whether to expel node from active committee
+  uint8 failureReason; // FailureReason enum value for E3 failure (0 = none)
 }
 ```
 
@@ -72,10 +76,11 @@ struct SlashPolicy {
 3. **File appeal if applicable**:
    ```bash
    # Using cast (or implement in automation)
-   cast send $SLASHING "fileAppeal(uint256,string,string)" $E3_ID "reason" "evidence_uri" \
+   cast send $SLASHING "fileAppeal(uint256,string)" $PROPOSAL_ID "evidence_uri" \
      --rpc-url $RPC --private-key $OPERATOR_KEY
    ```
-4. **Track resolution**: Watch for finalization events
+   Only the accused operator can appeal, and only within the appeal window. Proof-verified slashes
+   cannot be appealed.
 
 ### Slashing Penalties
 
@@ -85,8 +90,8 @@ struct SlashPolicy {
 | License penalty | Confiscates ENCL from your bond                  |
 | Ban             | Prevents re-registration until governance clears |
 
-> Some policies skip the appeal process entirely. Always check the policy before assuming you can
-> appeal.
+> Some policies have an `appealWindow` of 0, meaning execution is immediate with no appeal. Always
+> check the policy before assuming you can appeal.
 
 ## Exit Process
 
@@ -141,23 +146,24 @@ This clears the exit queue and re-registers you in the registry.
 
 ## CLI Commands Summary
 
-| Command                                   | Description                        |
-| ----------------------------------------- | ---------------------------------- |
-| `enclave ciphernode status`               | Check registration and exit status |
-| `enclave ciphernode deregister --proof X` | Start exit process                 |
-| `enclave ciphernode license claim`        | Claim unlocked exits               |
-| `enclave ciphernode register`             | Cancel exit and re-register        |
-| `enclave ciphernode deactivate`           | Withdraw stakes to become inactive |
+| Command                            | Description                        |
+| ---------------------------------- | ---------------------------------- |
+| `enclave ciphernode status`        | Check registration and exit status |
+| `enclave ciphernode deregister`    | Start exit process                 |
+| `enclave ciphernode license claim` | Claim unlocked exits               |
+| `enclave ciphernode register`      | Cancel exit and re-register        |
+| `enclave ciphernode deactivate`    | Withdraw stakes to become inactive |
 
 ## Monitoring Checklist
 
-| Check                 | Command / Event                             |
-| --------------------- | ------------------------------------------- |
-| Exit queue status     | `enclave ciphernode status`                 |
-| Pending exits amounts | `pendingExits(address)` on BondingRegistry  |
-| Exit unlock time      | `exitUnlocksAt(address)` on BondingRegistry |
-| Slash proposals       | Watch `SlashProposed` events                |
-| Rewards distribution  | Watch `RewardsDistributed` events           |
+| Check                 | Command / Event                                 |
+| --------------------- | ----------------------------------------------- |
+| Exit queue status     | `enclave ciphernode status`                     |
+| Pending exits amounts | `pendingExits(address)` on BondingRegistry      |
+| Exit in progress      | `hasExitInProgress(address)` on BondingRegistry |
+| Claimable amounts     | `previewClaimable(address)` on BondingRegistry  |
+| Slash proposals       | Watch `SlashProposed` events                    |
+| Rewards distribution  | Watch `RewardsDistributed` events               |
 
 ## Troubleshooting
 
