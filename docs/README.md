@@ -11,7 +11,7 @@
 [license-badge]: https://img.shields.io/badge/License-LGPLv3.0-blue.svg
 
 This is the documentation site for the Interfold, built with Next.js and Nextra. The documentation
-provides comprehensive guides, API references, and explanations of the Enclave protocol.
+provides comprehensive guides, API references, and explanations of The Interfold protocol.
 
 ## Development
 

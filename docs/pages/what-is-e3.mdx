@@ -1,18 +1,26 @@
 ## Encrypted Execution Environment (E3)
 
-An **Encrypted Execution Environment (E3)** enables secure computation over encrypted inputs from multiple independent parties. E3s combine three essential components to preserve input confidentiality and support correct execution:
+An **Encrypted Execution Environment (E3)** enables secure computation over encrypted inputs from
+multiple independent parties. E3s combine three essential components to preserve input
+confidentiality and support correct execution:
 
-1. **Fully Homomorphic Encryption (FHE):** Enables computation directly on encrypted data without decrypting it.
-2. **Zero-Knowledge Proofs (ZKPs):** Enable verification of inputs and computation without revealing sensitive information, making it possible to validate correctness while preserving privacy.
-3. **Distributed Threshold Cryptography (DTC):**Distributes cryptographic key control across multiple ciphernodes, reducing reliance on any single operator and eliminating single points of failure.
+1. **Fully Homomorphic Encryption (FHE):** Enables computation directly on encrypted data without
+   decrypting it.
+2. **Zero-Knowledge Proofs (ZKPs):** Enable verification of inputs and computation without revealing
+   sensitive information, making it possible to validate correctness while preserving privacy.
+3. **Distributed Threshold Cryptography (DTC):** Distributes cryptographic key control across
+   multiple ciphernodes, reducing reliance on any single operator and eliminating single points of
+   failure.
 
-Together, these components make it possible to compute across private inputs without exposing the underlying data.
+Together, these components make it possible to compute across private inputs without exposing the
+underlying data.
 
 ### When to Use E3s
 
 E3s are useful when you need to:
 
-- Compute across sensitive inputs from multiple parties without taking custody of the underlying plaintext data.
+- Compute across sensitive inputs from multiple parties without taking custody of the underlying
+  plaintext data.
 - Build workflows compatible with data protection requirements such as GDPR or HIPAA.
 - Reduce operational and legal liability when handling sensitive data.
 - Produce shared results from otherwise inaccessible or sensitive datasets.
@@ -20,11 +28,13 @@ E3s are useful when you need to:
 
 ### Practical Use Cases
 
-- **Secret Ballots**: Implement voting systems that preserve ballot secrecy while producing verifiable outcomes.
+- **Secret Ballots**: Implement voting systems that preserve ballot secrecy while producing
+  verifiable outcomes.
 - **Secure Data Analysis**: Compute across private datasets without taking custody of raw data.
-- **Collaborative Research**: Enable multiple organizations to jointly analyze sensitive data without sharing the underlying records.
+- **Collaborative Research**: Enable multiple organizations to jointly analyze sensitive data
+  without sharing the underlying records.
 
-### How E3s Works for Developers
+### How E3s Work for Developers
 
 As a developer, building with an E3 typically involves:
 

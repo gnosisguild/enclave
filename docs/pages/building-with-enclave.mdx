@@ -103,7 +103,7 @@ program implementation). This allows you to:
 
 ### Merkle Tree Construction
 
-The Interfold uses a Lean Merkle Tree implementation. Each input is hashed using the PoseidenT3 Hash
+The Interfold uses a Lean Merkle Tree implementation. Each input is hashed using the PoseidonT3 Hash
 function, and the root is updated with each new input.
 
 Your E3 program should:
@@ -151,7 +151,8 @@ event InputPublished(uint256 indexed e3Id, bytes data, uint256 inputHash, uint25
 ### Result Publication Flow
 
 1. The Compute Provider submits a proof and ciphertext output.
-2. The Interfold uses the E3 Program contract to verify the proof and emits `CiphertextOutputPublished`.
+2. The Interfold uses the E3 Program contract to verify the proof and emits
+   `CiphertextOutputPublished`.
 3. Ciphernodes decrypt the ciphertext output.
 4. The plaintext result is then published.
 5. Events are emitted for off-chain services.
@@ -220,8 +221,8 @@ leak information.
 
 4. **Event Handling**
 
-If you are consuming Interfold outputs offchain, allow for sufficient block confirmations to be confident in
-the finality of the outcome and to appropriately handle re-orgs.
+If you are consuming Interfold outputs offchain, allow for sufficient block confirmations to be
+confident in the finality of the outcome and to appropriately handle re-orgs.
 
 ## Best Practices
 

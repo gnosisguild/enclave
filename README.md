@@ -11,7 +11,8 @@
 # The Interfold
 
 > **Note:** The Interfold was previously known as **Enclave**.  
-> Many repositories, packages, and CLI tools still use the `enclave` name while the project transitions.
+> Many repositories, packages, and CLI tools still use the `enclave` name while the project
+> transitions.
 
 This is the monorepo for **The Interfold**, an open-source protocol for confidential coordination.
 
@@ -201,8 +202,9 @@ This workspace's minimum supported rustc version is 1.86.0.
 
 ## Architecture
 
-The Interfold employs a modular architecture involving numerous actors and participants. The sequence
-diagram below offers a high-level overview of the protocol, but necessarily omits most detail.
+The Interfold employs a modular architecture involving numerous actors and participants. The
+sequence diagram below offers a high-level overview of the protocol, but necessarily omits most
+detail.
 
 ```mermaid
 sequenceDiagram
@@ -250,8 +252,8 @@ sequenceDiagram
 
 ### Overview
 
-The Interfold uses a unified versioning strategy where all packages (Rust crates and npm packages) share
-the same version number. Releases are triggered by git tags and follow semantic versioning.
+The Interfold uses a unified versioning strategy where all packages (Rust crates and npm packages)
+share the same version number. Releases are triggered by git tags and follow semantic versioning.
 
 ### Quick Release
 

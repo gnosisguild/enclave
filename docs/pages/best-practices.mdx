@@ -5,12 +5,14 @@ title: 'Best Practices'
 # Design & Operations Best Practices
 
 Competitor docs such as Fhenix's "Key Considerations" and Ritual's architecture primers emphasize
-clear guardrails for confidential compute. This guide distills the equivalent playbook for the Interfold.
+clear guardrails for confidential compute. This guide distills the equivalent playbook for the
+Interfold.
 
 ## Parameter Strategy
 
 - **Thresholds**: Choose `threshold = [t, n]` so that `t` withstands your adversary model while `n`
-  matches the available Ciphernodes. Higher thresholds improve collusion resistance but increase fees.
+  matches the available Ciphernodes. Higher thresholds improve collusion resistance but increase
+  fees.
 - **Timing Windows**: Ensure `startWindow` leaves enough time for committee selection (a few blocks)
   and `duration` matches the longest credible compute time plus buffer.
 - **Custom Params**: Use `customParams` in `E3RequestParams` to tag jurisdiction, use case, or

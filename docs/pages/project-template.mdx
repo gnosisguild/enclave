@@ -29,17 +29,17 @@ Each workspace shares the same `pnpm` root so dependencies stay in sync.
 
 ## Commands
 
-| Script                  | Purpose                                                                                                                 |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Script                  | Purpose                                                                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm dev:all`          | Spins up Hardhat, deploys contracts, launches the RISC Zero program server, coordination server, frontend, and ciphernodes. |
-| `pnpm dev:evm`          | Runs `hardhat node` on `http://localhost:8545`.                                                                         |
+| `pnpm dev:evm`          | Runs `hardhat node` on `http://localhost:8545`.                                                                             |
 | `pnpm dev:program`      | Starts the RISC Zero guest runner. Pass `--dev` to skip real proving.                                                       |
-| `pnpm dev:server`       | Boots the TypeScript coordination server with hot reload.                                                               |
-| `pnpm dev:frontend`     | Launches the Vite client on `http://localhost:3000`.                                                                    |
-| `pnpm dev:ciphernodes`  | Calls the Interfold CLI to launch the nodes defined in `enclave.config.yaml`.                                             |
-| `pnpm compile`          | Compiles Solidity contracts.                                                                                            |
-| `pnpm test`             | Runs Hardhat tests.                                                                                                     |
-| `pnpm test:integration` | Executes the end-to-end flow in `tests/`.                                                                               |
+| `pnpm dev:server`       | Boots the TypeScript coordination server with hot reload.                                                                   |
+| `pnpm dev:frontend`     | Launches the Vite client on `http://localhost:3000`.                                                                        |
+| `pnpm dev:ciphernodes`  | Calls the Interfold CLI to launch the nodes defined in `enclave.config.yaml`.                                               |
+| `pnpm compile`          | Compiles Solidity contracts.                                                                                                |
+| `pnpm test`             | Runs Hardhat tests.                                                                                                         |
+| `pnpm test:integration` | Executes the end-to-end flow in `tests/`.                                                                                   |
 
 Before `dev:all` runs, the `predev:all` hook calls `enclave program compile` so the latest zkVM
 image is ready; skip this by exporting `SKIP_PROGRAM_COMPILE=1`.
@@ -48,7 +48,8 @@ image is ready; skip this by exporting `SKIP_PROGRAM_COMPILE=1`.
 
 - `client/.env`: contains `VITE_` variables for contract addresses, RPC URLs, and optional feature
   flags.
-- `server/.env`: holds the operator wallet key (never commit this file), RPC endpoints, and cron API tokens.
+- `server/.env`: holds the operator wallet key (never commit this file), RPC endpoints, and cron API
+  tokens.
 - `enclave.config.yaml`: describes your Ciphernodes and aggregator profile. The default file mirrors
   the template you saw earlier in this repo.
 
