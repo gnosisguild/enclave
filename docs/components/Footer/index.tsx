@@ -21,7 +21,7 @@ const Footer = () => {
           marginBottom: '1rem',
         }}
       /> */}
-      <p>{new Date().getFullYear()} © Enclave</p>
+      <p>{new Date().getFullYear()} © The Interfold</p>
       <ul className={classes.socialLinks}>
         {socialLinks.map(({ name, icon, url }, i) => {
           return (
