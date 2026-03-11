@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use e3_evm_helpers::contracts::CommitteeSize;
 use serde::{Deserialize, Serialize};
 
 // This correlates with the information from the contract
@@ -23,6 +24,6 @@ pub struct E3 {
     pub request_block: u64,
     pub seed: [u8; 32],
     pub input_window: [u64; 2],
-    pub threshold: [u32; 2],
+    pub commitee_size: CommitteeSize,
     pub requester: String,
 }

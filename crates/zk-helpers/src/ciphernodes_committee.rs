@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 /// the default values that must be used and shared among the whole enclave repository.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CiphernodesCommitteeSize {
+    /// Tiny committee size (for quick local testing with production parameters).
+    Micro,
     /// Small committee size (fast local/testing).
     Small,
     /// Medium committee size (default).
@@ -33,6 +35,11 @@ impl CiphernodesCommitteeSize {
     /// Returns `(num_parties, num_honest_parties, threshold)` for this size.
     pub fn values(self) -> CiphernodesCommittee {
         match self {
+            CiphernodesCommitteeSize::Micro => CiphernodesCommittee {
+                n: 2,
+                h: 2,
+                threshold: 1,
+            },
             CiphernodesCommitteeSize::Small => CiphernodesCommittee {
                 n: 5,
                 h: 5,

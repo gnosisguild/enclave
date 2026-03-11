@@ -98,6 +98,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice Maps E3 ID to the fee token used at request time
     mapping(uint256 e3Id => IERC20 token) internal _e3FeeTokens;
 
+    /// @notice 
+    mapping(CommitteSize => uint8[2] threshold) public committeeThresholds;
+
     /// @notice Global timeout configuration
     E3TimeoutConfig internal _timeoutConfig;
 
