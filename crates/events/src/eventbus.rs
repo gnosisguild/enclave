@@ -72,7 +72,10 @@ impl<E: Event> EventBus<E> {
     }
 
     pub fn history(source: &Addr<EventBus<E>>) -> Addr<HistoryCollector<E>> {
-        let addr = HistoryCollector::<E>::new().start();
+        let arbiter = Arbiter::new();
+        let addr = HistoryCollector::<E>::start_in_arbiter(&arbiter.handle(), |_| {
+            HistoryCollector::<E>::new()
+        });
         source.do_send(Subscribe::new(EventType::All, addr.clone().recipient()));
         addr
     }
@@ -401,6 +404,7 @@ impl<E: Event> Actor for HistoryCollector<E> {
 impl<E: Event> Handler<E> for HistoryCollector<E> {
     type Result = E::Result;
     fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {
+        info!("HistoryCollector received event {}", msg.event_type());
         self.history.push(msg.clone());
         if let Err(e) = self.tx.send(msg) {
             error!("history: Error sending event in History collector. {e}");
