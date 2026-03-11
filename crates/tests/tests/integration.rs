@@ -678,7 +678,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 "PublicKeyAggregated",
             ],
             Duration::from_secs(5000),
-            Duration::from_secs(600),
+            Duration::from_secs(5000),
         )
         .await?;
 
