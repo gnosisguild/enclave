@@ -420,16 +420,15 @@ fn handle_threshold_share_decryption_proof(
             })?;
 
         // Wrap for recursive folding
-        let wrapped =
-            generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
-                ComputeRequestError::new(
-                    ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
-                        "C6 wrapper proof[{}]: {}",
-                        i, e
-                    ))),
-                    request.clone(),
-                )
-            })?;
+        let wrapped = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                    "C6 wrapper proof[{}]: {}",
+                    i, e
+                ))),
+                request.clone(),
+            )
+        })?;
 
         proofs.push(proof);
         wrapped_proofs.push(wrapped);
@@ -730,13 +729,12 @@ fn handle_share_computation_proof(
             )
         })?;
 
-    let wrapped_proof =
-        generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
-            ComputeRequestError::new(
-                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
-                request.clone(),
-            )
-        })?;
+    let wrapped_proof = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
 
     // 7. Return response
     Ok(ComputeResponse::zk(
@@ -815,13 +813,12 @@ fn handle_pk_generation_proof(
             )
         })?;
 
-    let wrapped_proof =
-        generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
-            ComputeRequestError::new(
-                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
-                request.clone(),
-            )
-        })?;
+    let wrapped_proof = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
 
     // 6. Return response
     Ok(ComputeResponse::zk(
@@ -867,13 +864,12 @@ fn handle_pk_bfv_proof(
             )
         })?;
 
-    let wrapped_proof =
-        generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
-            ComputeRequestError::new(
-                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
-                request.clone(),
-            )
-        })?;
+    let wrapped_proof = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
 
     Ok(ComputeResponse::zk(
         ZkResponse::PkBfv(PkBfvProofResponse::new(proof, wrapped_proof)),
@@ -955,13 +951,12 @@ fn handle_share_encryption_proof(
             )
         })?;
 
-    let wrapped_proof =
-        generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
-            ComputeRequestError::new(
-                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
-                request.clone(),
-            )
-        })?;
+    let wrapped_proof = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
 
     Ok(ComputeResponse::zk(
         ZkResponse::ShareEncryption(ShareEncryptionProofResponse {
@@ -1049,13 +1044,12 @@ fn handle_dkg_share_decryption_proof(
             )
         })?;
 
-    let wrapped_proof =
-        generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
-            ComputeRequestError::new(
-                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
-                request.clone(),
-            )
-        })?;
+    let wrapped_proof = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
 
     // 6. Return response
     Ok(ComputeResponse::zk(
