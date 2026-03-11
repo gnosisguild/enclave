@@ -501,6 +501,9 @@ impl PublicKeyAggregator {
     fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
         let (msg, _ec) = msg.into_components();
         if let ComputeResponseKind::Zk(ZkResponse::FoldProofs(resp)) = msg.response {
+            if msg.e3_id != self.e3_id {
+                return Ok(());
+            }
             let ec = self
                 .last_ec
                 .clone()

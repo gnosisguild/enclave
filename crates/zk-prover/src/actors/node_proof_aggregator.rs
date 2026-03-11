@@ -157,21 +157,19 @@ impl NodeProofAggregator {
             } else {
                 // Fold accumulated + next_proof
                 let acc = state.accumulated.take().expect("checked above");
+                let acc_restore = acc.clone();
+                let next_proof_restore = next_proof.clone();
+                let seq = state.next_to_aggregate;
                 let corr = CorrelationId::new();
                 let ec = state.last_ec.clone();
-                state.fold_correlation = Some(corr);
-                state.next_to_aggregate += 1;
+                let e3_id_clone = e3_id.clone();
 
                 info!(
                     "NodeProofAggregator: dispatching fold (seq={}) for E3 {} corr={:?}",
-                    state.next_to_aggregate - 1,
-                    e3_id,
-                    corr
+                    seq, e3_id, corr
                 );
 
-                self.fold_correlation.insert(corr, e3_id.clone());
-
-                if let Err(err) = self.bus.publish(
+                match self.bus.publish(
                     ComputeRequest::zk(
                         ZkRequest::FoldProofs {
                             proof1: acc,
@@ -179,18 +177,23 @@ impl NodeProofAggregator {
                             target_evm: false,
                         },
                         corr,
-                        e3_id.clone(),
+                        e3_id_clone,
                     ),
                     ec,
                 ) {
-                    error!(
-                        "NodeProofAggregator: failed to publish fold request for E3 {}: {err}",
-                        e3_id
-                    );
-                    if let Some(state) = self.states.get_mut(e3_id) {
-                        state.fold_correlation = None;
+                    Ok(()) => {
+                        state.fold_correlation = Some(corr);
+                        state.next_to_aggregate += 1;
+                        self.fold_correlation.insert(corr, e3_id.clone());
                     }
-                    self.fold_correlation.remove(&corr);
+                    Err(err) => {
+                        error!(
+                            "NodeProofAggregator: failed to publish fold request for E3 {}: {err}",
+                            e3_id
+                        );
+                        state.accumulated = Some(acc_restore);
+                        state.buffer.insert(seq, next_proof_restore);
+                    }
                 }
 
                 return; // wait for fold response
