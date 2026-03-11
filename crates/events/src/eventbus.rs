@@ -72,10 +72,7 @@ impl<E: Event> EventBus<E> {
     }
 
     pub fn history(source: &Addr<EventBus<E>>) -> Addr<HistoryCollector<E>> {
-        let arbiter = Arbiter::new();
-        let addr = HistoryCollector::<E>::start_in_arbiter(&arbiter.handle(), |_| {
-            HistoryCollector::<E>::new()
-        });
+        let addr = HistoryCollector::<E>::new().start();
         source.do_send(Subscribe::new(EventType::All, addr.clone().recipient()));
         addr
     }
@@ -385,7 +382,11 @@ pub struct HistoryCollector<E: Event> {
 impl<E: Event> HistoryCollector<E> {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
-        let waiter = HistoryCollectorWaiter { rx: Some(rx) }.start();
+        let arbiter = Arbiter::new();
+        let waiter = HistoryCollectorWaiter::start_in_arbiter(&arbiter.handle(), |_| {
+            HistoryCollectorWaiter { rx: Some(rx) }
+        });
+
         Self {
             history: Vec::new(),
             tx,
