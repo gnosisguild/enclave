@@ -316,12 +316,12 @@ impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollectorWaiter<E>
     fn handle(&mut self, msg: TakeEvents<E>, ctx: &mut Context<Self>) -> Self::Result {
         let count = msg.amount;
         let timeout = msg.timeout;
-        ctx.run_interval(Duration::from_secs(1), |_act, _ctx| {
-            // just wakes the actor context periodically
-        });
         let mut rx = self.rx.take().unwrap();
         const MAX_TIMEOUT: Duration = Duration::from_secs(60 * 60); // 1h (cannot use Duration::MAX or
                                                                     // timeout fails)
+        ctx.run_interval(Duration::from_secs(1), |_act, _ctx| {
+            // just wakes the actor context periodically
+        });
         Box::pin(
             async move {
                 let mut events = Vec::with_capacity(count);
@@ -402,7 +402,9 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
     type Result = E::Result;
     fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {
         self.history.push(msg.clone());
-        let _ = self.tx.send(msg);
+        if let Err(e) = self.tx.send(msg) {
+            error!("history: Error sending event in History collector. {e}");
+        }
     }
 }
 
