@@ -10,12 +10,12 @@ use anyhow::Result;
 use e3_bfv_client::client::compute_pk_commitment;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, BusHandle, ComputeResponse, ComputeResponseKind,
-    DKGRecursiveAggregationComplete, Die, E3id, EnclaveEvent, EnclaveEventData, EventContext,
-    KeyshareCreated, OrderedSet, PartyProofsToVerify, PkAggregationProofPending,
-    PkAggregationProofRequest, PkAggregationProofSigned, Proof, PublicKeyAggregated, Seed,
-    Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload,
-    TypedEvent, VerificationKind, ZkResponse,
+    prelude::*, BusHandle, ComputeResponse, ComputeResponseKind, DKGRecursiveAggregationComplete,
+    Die, E3id, EnclaveEvent, EnclaveEventData, EventContext, KeyshareCreated, OrderedSet,
+    PartyProofsToVerify, PkAggregationProofPending, PkAggregationProofRequest,
+    PkAggregationProofSigned, Proof, PublicKeyAggregated, Seed, Sequenced,
+    ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload, TypedEvent,
+    VerificationKind, ZkResponse,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -430,8 +430,13 @@ impl PublicKeyAggregator {
         pairs.sort_by_key(|(pid, _)| *pid);
         let proofs: Vec<Proof> = pairs.into_iter().map(|(_, p)| p).collect();
 
-        self.cross_node_fold
-            .start(proofs, "PublicKeyAggregator cross-node DKG fold", &self.bus, &self.e3_id, ec)?;
+        self.cross_node_fold.start(
+            proofs,
+            "PublicKeyAggregator cross-node DKG fold",
+            &self.bus,
+            &self.e3_id,
+            ec,
+        )?;
         self.try_publish_complete()
     }
 

@@ -383,8 +383,13 @@ impl ThresholdPlaintextAggregator {
             .into_iter()
             .flat_map(|(_, proofs)| proofs)
             .collect();
-        self.c6_fold
-            .start(proofs, "ThresholdPlaintextAggregator C6 fold", &self.bus, &self.e3_id, &ec)?;
+        self.c6_fold.start(
+            proofs,
+            "ThresholdPlaintextAggregator C6 fold",
+            &self.bus,
+            &self.e3_id,
+            &ec,
+        )?;
         self.try_publish_complete()?;
 
         Ok(())
@@ -557,7 +562,10 @@ impl ThresholdPlaintextAggregator {
             c6_aggregated_proof: Some(c6_proof.clone()),
         };
 
-        info!("Dispatching plaintext event with C7 and C6 proofs {:?}", event);
+        info!(
+            "Dispatching plaintext event with C7 and C6 proofs {:?}",
+            event
+        );
         self.bus.publish(event, ec.clone())?;
 
         self.state.try_mutate(&ec, |_| {
