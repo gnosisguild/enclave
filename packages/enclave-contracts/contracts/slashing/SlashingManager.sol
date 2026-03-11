@@ -67,8 +67,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
     mapping(address node => bool banned) public banned;
 
     /// @notice Evidence replay protection: tracks consumed evidence keys
-    /// @dev Key is keccak256(abi.encode(e3Id, operator, keccak256(proof))) — reason-independent
-    ///      to prevent the same proof/evidence from being used to slash under multiple reasons.
+    /// @dev Lane A key is keccak256(abi.encodePacked(chainId, e3Id, operator, proofType)) — the accusation identity.
+    ///      This prevents the same fault from being slashed multiple times via different voter subsets.
+    ///      Lane B key is keccak256(abi.encode(e3Id, operator, keccak256(evidence))) — exact evidence bytes.
     mapping(bytes32 evidenceKey => bool consumed) public evidenceConsumed;
 
     // ======================
@@ -253,8 +254,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
         );
 
         // Evidence replay protection — reason-independent to prevent cross-reason replay
+        uint256 proofType = abi.decode(proof, (uint256));
         bytes32 evidenceKey = keccak256(
-            abi.encode(e3Id, operator, keccak256(proof))
+            abi.encodePacked(block.chainid, e3Id, operator, proofType)
         );
         require(!evidenceConsumed[evidenceKey], DuplicateEvidence());
         evidenceConsumed[evidenceKey] = true;

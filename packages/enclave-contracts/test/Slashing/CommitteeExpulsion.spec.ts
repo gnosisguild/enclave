@@ -682,19 +682,21 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       );
       expect((await registry.getCommitteeViability(0)).activeCount).to.equal(2);
 
-      // Slash operator1 again with different evidence (different dataHash)
+      // Slash operator1 again for a different proof type to verify expulsion is idempotent.
+      // Same (e3Id, operator, proofType) would revert DuplicateEvidence — that's correct.
+      // Using proofType=7 (T5ShareDecryption) with REASON_BAD_DECRYPTION instead.
       const proof2 = await signAndEncodeAttestation(
         [operator2, operator3],
         0,
         await operator1.getAddress(),
-        0,
+        7, // T5ShareDecryption — different proofType
         31337,
         ethers.keccak256(ethers.toUtf8Bytes("second")),
       );
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_DKG,
+        REASON_BAD_DECRYPTION,
         proof2,
       );
 
