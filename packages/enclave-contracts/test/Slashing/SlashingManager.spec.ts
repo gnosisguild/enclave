@@ -29,9 +29,10 @@ const { ethers, networkHelpers, ignition } = await network.connect();
 const { loadFixture, time } = networkHelpers;
 
 describe("SlashingManager", function () {
-  const REASON_MISBEHAVIOR = ethers.encodeBytes32String("misbehavior");
+  // Lane A reasons are derived on-chain as keccak256(abi.encodePacked(proofType))
+  const REASON_PT_0 = ethers.keccak256(ethers.solidityPacked(["uint256"], [0]));
+  const REASON_PT_1 = ethers.keccak256(ethers.solidityPacked(["uint256"], [1]));
   const REASON_INACTIVITY = ethers.encodeBytes32String("inactivity");
-  const REASON_DOUBLE_SIGN = ethers.encodeBytes32String("doubleSign");
 
   const SLASHER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("SLASHER_ROLE"));
   const GOVERNANCE_ROLE = ethers.keccak256(
@@ -194,9 +195,9 @@ describe("SlashingManager", function () {
       failureReason: 0,
     };
 
-    await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
+    await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
     await slashingManager.setSlashPolicy(REASON_INACTIVITY, evidencePolicy);
-    await slashingManager.setSlashPolicy(REASON_DOUBLE_SIGN, banPolicy);
+    await slashingManager.setSlashPolicy(REASON_PT_1, banPolicy);
   }
 
   async function setup() {
@@ -406,12 +407,11 @@ describe("SlashingManager", function () {
         failureReason: 0,
       };
 
-      await expect(slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, policy))
+      await expect(slashingManager.setSlashPolicy(REASON_PT_0, policy))
         .to.emit(slashingManager, "SlashPolicyUpdated")
-        .withArgs(REASON_MISBEHAVIOR, Object.values(policy));
+        .withArgs(REASON_PT_0, Object.values(policy));
 
-      const storedPolicy =
-        await slashingManager.getSlashPolicy(REASON_MISBEHAVIOR);
+      const storedPolicy = await slashingManager.getSlashPolicy(REASON_PT_0);
       expect(storedPolicy.ticketPenalty).to.equal(policy.ticketPenalty);
       expect(storedPolicy.licensePenalty).to.equal(policy.licensePenalty);
       expect(storedPolicy.requiresProof).to.equal(policy.requiresProof);
@@ -456,7 +456,7 @@ describe("SlashingManager", function () {
       await expect(
         slashingManager
           .connect(notTheOwner)
-          .setSlashPolicy(REASON_MISBEHAVIOR, policy),
+          .setSlashPolicy(REASON_PT_0, policy),
       ).to.be.revertedWithCustomError(
         slashingManager,
         "AccessControlUnauthorizedAccount",
@@ -499,7 +499,7 @@ describe("SlashingManager", function () {
       };
 
       await expect(
-        slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, policy),
+        slashingManager.setSlashPolicy(REASON_PT_0, policy),
       ).to.be.revertedWithCustomError(slashingManager, "InvalidPolicy");
     });
 
@@ -519,7 +519,7 @@ describe("SlashingManager", function () {
       };
 
       await expect(
-        slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, policy),
+        slashingManager.setSlashPolicy(REASON_PT_0, policy),
       ).to.be.revertedWithCustomError(slashingManager, "InvalidPolicy");
     });
 
@@ -538,9 +538,9 @@ describe("SlashingManager", function () {
         failureReason: 0,
       };
 
-      await expect(slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, policy))
+      await expect(slashingManager.setSlashPolicy(REASON_PT_0, policy))
         .to.emit(slashingManager, "SlashPolicyUpdated")
-        .withArgs(REASON_MISBEHAVIOR, Object.values(policy));
+        .withArgs(REASON_PT_0, Object.values(policy));
     });
 
     it("should revert if proof required but appeal window set", async function () {
@@ -559,7 +559,7 @@ describe("SlashingManager", function () {
       };
 
       await expect(
-        slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, policy),
+        slashingManager.setSlashPolicy(REASON_PT_0, policy),
       ).to.be.revertedWithCustomError(slashingManager, "InvalidPolicy");
     });
 
@@ -579,7 +579,7 @@ describe("SlashingManager", function () {
       };
 
       await expect(
-        slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, policy),
+        slashingManager.setSlashPolicy(REASON_PT_0, policy),
       ).to.be.revertedWithCustomError(slashingManager, "InvalidPolicy");
     });
   });
@@ -649,7 +649,7 @@ describe("SlashingManager", function () {
         affectsCommittee: false,
         failureReason: 0,
       };
-      await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
+      await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
 
       // Set up committee membership: operator must be a member, voters attest the operator is faulty
       const e3Id = 0;
@@ -673,13 +673,13 @@ describe("SlashingManager", function () {
       await expect(
         slashingManager
           .connect(proposer)
-          .proposeSlash(e3Id, operatorAddress, REASON_MISBEHAVIOR, proof),
+          .proposeSlash(e3Id, operatorAddress, proof),
       ).to.emit(slashingManager, "SlashProposed");
 
       // Proof-based slashes auto-execute
       const proposal = await slashingManager.getSlashProposal(0);
       expect(proposal.operator).to.equal(operatorAddress);
-      expect(proposal.reason).to.equal(REASON_MISBEHAVIOR);
+      expect(proposal.reason).to.equal(REASON_PT_0);
       expect(proposal.proofVerified).to.be.true;
       expect(proposal.executed).to.be.true;
       expect(proposal.proposer).to.equal(await proposer.getAddress());
@@ -706,7 +706,7 @@ describe("SlashingManager", function () {
         affectsCommittee: false,
         failureReason: 0,
       };
-      await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
+      await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
 
       // Threshold is 2 but only 1 vote provided
       const voter1Addr = await voter1.getAddress();
@@ -726,7 +726,7 @@ describe("SlashingManager", function () {
       await expect(
         slashingManager
           .connect(proposer)
-          .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof),
+          .proposeSlash(0, operatorAddress, proof),
       ).to.be.revertedWithCustomError(
         slashingManager,
         "InsufficientAttestations",
@@ -755,7 +755,7 @@ describe("SlashingManager", function () {
         affectsCommittee: false,
         failureReason: 0,
       };
-      await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
+      await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
 
       const voter1Addr = await voter1.getAddress();
       const voter2Addr = await voter2.getAddress();
@@ -833,7 +833,7 @@ describe("SlashingManager", function () {
       await expect(
         slashingManager
           .connect(proposer)
-          .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof),
+          .proposeSlash(0, operatorAddress, proof),
       ).to.be.revertedWithCustomError(slashingManager, "InvalidVoteSignature");
     });
 
@@ -858,7 +858,7 @@ describe("SlashingManager", function () {
         affectsCommittee: false,
         failureReason: 0,
       };
-      await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
+      await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
 
       // Only voter1 is a committee member, but voter2 also signs
       const voter1Addr = await voter1.getAddress();
@@ -876,7 +876,7 @@ describe("SlashingManager", function () {
       await expect(
         slashingManager
           .connect(proposer)
-          .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof),
+          .proposeSlash(0, operatorAddress, proof),
       ).to.be.revertedWithCustomError(slashingManager, "VoterNotInCommittee");
     });
 
@@ -890,7 +890,7 @@ describe("SlashingManager", function () {
       await expect(
         slashingManager
           .connect(proposer)
-          .proposeSlash(0, ethers.ZeroAddress, REASON_MISBEHAVIOR, proof),
+          .proposeSlash(0, ethers.ZeroAddress, proof),
       ).to.be.revertedWithCustomError(slashingManager, "ZeroAddress");
     });
 
@@ -903,7 +903,7 @@ describe("SlashingManager", function () {
       await expect(
         slashingManager
           .connect(proposer)
-          .proposeSlash(0, operatorAddress, REASON_DOUBLE_SIGN, proof),
+          .proposeSlash(0, operatorAddress, proof),
       ).to.be.revertedWithCustomError(slashingManager, "SlashReasonDisabled");
     });
 
@@ -922,12 +922,12 @@ describe("SlashingManager", function () {
         affectsCommittee: false,
         failureReason: 0,
       };
-      await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
+      await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
 
       await expect(
         slashingManager
           .connect(proposer)
-          .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, "0x"),
+          .proposeSlash(0, operatorAddress, "0x"),
       ).to.be.revertedWithCustomError(slashingManager, "ProofRequired");
     });
 
@@ -952,7 +952,7 @@ describe("SlashingManager", function () {
         affectsCommittee: false,
         failureReason: 0,
       };
-      await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
+      await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
       const voter1Addr = await voter1.getAddress();
       const voter2Addr = await voter2.getAddress();
       await mockCiphernodeRegistry.setCommitteeNodes(0, [
@@ -969,13 +969,13 @@ describe("SlashingManager", function () {
       );
       await slashingManager
         .connect(proposer)
-        .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof);
+        .proposeSlash(0, operatorAddress, proof);
 
       // Same proof for same e3Id/operator/reason should be rejected
       await expect(
         slashingManager
           .connect(proposer)
-          .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof),
+          .proposeSlash(0, operatorAddress, proof),
       ).to.be.revertedWithCustomError(slashingManager, "DuplicateEvidence");
     });
 
@@ -1015,7 +1015,7 @@ describe("SlashingManager", function () {
       );
       await slashingManager
         .connect(proposer)
-        .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof1);
+        .proposeSlash(0, operatorAddress, proof1);
 
       expect(await slashingManager.totalProposals()).to.equal(1);
 
@@ -1026,7 +1026,7 @@ describe("SlashingManager", function () {
       );
       await slashingManager
         .connect(proposer)
-        .proposeSlash(1, operatorAddress, REASON_MISBEHAVIOR, proof2);
+        .proposeSlash(1, operatorAddress, proof2);
 
       expect(await slashingManager.totalProposals()).to.equal(2);
     });
@@ -1058,10 +1058,11 @@ describe("SlashingManager", function () {
         [voter1, voter2],
         0,
         operatorAddress,
+        1, // proofType=1 maps to REASON_PT_1 (ban policy)
       );
       await slashingManager
         .connect(proposer)
-        .proposeSlash(0, operatorAddress, REASON_DOUBLE_SIGN, proof);
+        .proposeSlash(0, operatorAddress, proof);
 
       // banNode=true → auto-executed → node is now banned
       expect(await slashingManager.isBanned(operatorAddress)).to.be.true;
@@ -1198,7 +1199,7 @@ describe("SlashingManager", function () {
       );
       await slashingManager
         .connect(proposer)
-        .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof);
+        .proposeSlash(0, operatorAddress, proof);
 
       // Should revert because already executed
       await expect(
@@ -1377,7 +1378,7 @@ describe("SlashingManager", function () {
       );
       await slashingManager
         .connect(proposer)
-        .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof);
+        .proposeSlash(0, operatorAddress, proof);
 
       // Cannot appeal proof-verified slashes — appeal window is 0 so it's already expired
       await expect(
@@ -1630,10 +1631,9 @@ describe("SlashingManager", function () {
         failureReason: 0,
       };
 
-      await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, policy);
+      await slashingManager.setSlashPolicy(REASON_PT_0, policy);
 
-      const retrieved =
-        await slashingManager.getSlashPolicy(REASON_MISBEHAVIOR);
+      const retrieved = await slashingManager.getSlashPolicy(REASON_PT_0);
       expect(retrieved.ticketPenalty).to.equal(policy.ticketPenalty);
       expect(retrieved.licensePenalty).to.equal(policy.licensePenalty);
       expect(retrieved.requiresProof).to.equal(policy.requiresProof);
@@ -1672,11 +1672,11 @@ describe("SlashingManager", function () {
       );
       await slashingManager
         .connect(proposer)
-        .proposeSlash(0, operatorAddress, REASON_MISBEHAVIOR, proof);
+        .proposeSlash(0, operatorAddress, proof);
 
       const proposal = await slashingManager.getSlashProposal(0);
       expect(proposal.operator).to.equal(operatorAddress);
-      expect(proposal.reason).to.equal(REASON_MISBEHAVIOR);
+      expect(proposal.reason).to.equal(REASON_PT_0);
       expect(proposal.ticketAmount).to.equal(ethers.parseUnits("50", 6));
       expect(proposal.licenseAmount).to.equal(ethers.parseEther("100"));
       expect(proposal.proposer).to.equal(await proposer.getAddress());

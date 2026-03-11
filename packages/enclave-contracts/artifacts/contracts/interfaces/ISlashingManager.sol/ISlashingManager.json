@@ -734,11 +734,6 @@
           "type": "address"
         },
         {
-          "internalType": "bytes32",
-          "name": "reason",
-          "type": "bytes32"
-        },
-        {
           "internalType": "bytes",
           "name": "proof",
           "type": "bytes"
@@ -959,5 +954,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ISlashingManager.sol",
-  "buildInfoId": "solc-0_8_28-6bc8af1be4d8089e346f35a0a250902383427ca2"
+  "buildInfoId": "solc-0_8_28-13a9a691eee81d28d467846ed639e157d0edfd2b"
 }

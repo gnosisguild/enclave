@@ -229,6 +229,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
     /// @inheritdoc ISlashingManager
     /// @dev Lane A: Permissionless committee attestation-based slash. Anyone can call.
     ///      Atomically proposes, verifies committee vote signatures, and executes slash.
+    ///      The slash reason is derived deterministically from proofType as
+    ///      `keccak256(abi.encodePacked(proofType))`, eliminating the need for the caller
+    ///      to pass a reason and preventing cross-reason replay attacks.
     ///      Evidence format:
     ///      `abi.encode(uint256 proofType,
     ///         address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures)`
@@ -239,22 +242,25 @@ contract SlashingManager is ISlashingManager, AccessControl {
     function proposeSlash(
         uint256 e3Id,
         address operator,
-        bytes32 reason,
         bytes calldata proof
     ) external returns (uint256 proposalId) {
         require(operator != address(0), ZeroAddress());
+        require(proof.length != 0, ProofRequired());
+
+        // Extract proofType and derive the slash reason deterministically.
+        uint256 proofType = abi.decode(proof, (uint256));
+        bytes32 reason = keccak256(abi.encodePacked(proofType));
 
         SlashPolicy memory policy = slashPolicies[reason];
         require(policy.enabled, SlashReasonDisabled());
         require(policy.requiresProof, InvalidPolicy());
-        require(proof.length != 0, ProofRequired());
+
         require(
             ciphernodeRegistry.isCommitteeMember(e3Id, operator),
             OperatorNotInCommittee()
         );
 
         // Evidence replay protection — reason-independent to prevent cross-reason replay
-        uint256 proofType = abi.decode(proof, (uint256));
         bytes32 evidenceKey = keccak256(
             abi.encodePacked(block.chainid, e3Id, operator, proofType)
         );

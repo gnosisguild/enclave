@@ -77,10 +77,25 @@ struct PendingReVerification {
 
 /// Manages the off-chain accusation quorum protocol.
 ///
+/// **Lifecycle**: One instance per E3 computation. Created by
+/// [`AccusationManagerExtension`] when [`CommitteeFinalized`] fires and
+/// destroyed when the E3 completes or the node shuts down. All internal
+/// state (pending accusations, votes, caches) is therefore naturally
+/// scoped to a single E3 — no cross-E3 data contamination is possible.
+///
+/// **Ephemeral**: This actor does *not* persist state across restarts.
+/// In-flight accusations are lost on node restart (accepted trade-off:
+/// they would have timed out within [`DEFAULT_VOTE_TIMEOUT`] anyway).
+/// A strategic node restart can delay slash submission but cannot
+/// prevent it, because other committee members independently maintain
+/// their own `AccusationManager` instances and will continue voting.
+///
 /// Subscribes to:
 /// - [`ProofVerificationFailed`] — local proof failure detection
+/// - [`ProofVerificationPassed`] — cache successful verification for voting
 /// - [`ProofFailureAccusation`] — incoming accusations from other nodes via gossip
 /// - [`AccusationVote`] — incoming votes from other nodes via gossip
+/// - [`SlashExecuted`] — on-chain slash confirmation for committee updates
 ///
 /// Publishes:
 /// - [`ProofFailureAccusation`] — broadcast own accusations via gossip
@@ -509,7 +524,15 @@ impl AccusationManager {
             let accused_party_id = accusation.accused_party_id;
             let forwarded_clone = forwarded.clone();
 
-            // Create PendingAccusation without our vote — it arrives after ZK completes
+            // Create PendingAccusation without our vote — it arrives after ZK completes.
+            //
+            // NOTE (timeout race): If the async ZK re-verification takes longer than
+            // `vote_timeout` (default 5 min), the accusation will time out before this
+            // node casts its vote. This is an accepted trade-off: the node's contribution
+            // is lost, but the quorum can still be reached by other voters. In small
+            // committees near the threshold M, this could cause a valid accusation to
+            // become Inconclusive instead of AccusedFaulted. Operators should ensure ZK
+            // verification completes well within the vote timeout.
             let timeout_handle = ctx.run_later(self.vote_timeout, move |act, _ctx| {
                 act.on_vote_timeout(accusation_id);
             });
@@ -690,6 +713,20 @@ impl AccusationManager {
             return;
         }
 
+        // If the voter is the original accuser, their vote's data_hash must
+        // match the accusation's data_hash. A malicious accuser could otherwise
+        // send an accusation with one data_hash and a vote with a different one
+        // to create artificial data_hash diversity and trigger false equivocation.
+        if vote.voter == pending.accusation.accuser
+            && vote.data_hash != pending.accusation.data_hash
+        {
+            warn!(
+                "Accuser {} sent vote with data_hash inconsistent with their accusation — rejecting vote",
+                vote.voter
+            );
+            return;
+        }
+
         if vote.agrees {
             pending.votes_for.push(vote);
         } else {
@@ -755,13 +792,14 @@ impl AccusationManager {
         let remaining = effective_committee.saturating_sub(total_votes);
         if agree_count + remaining < self.threshold_m {
             // Even if all remaining voters agree, can't reach quorum.
-            // Collect all unique data hashes (from all votes + the accusation itself)
+            // Collect unique data hashes from actual votes only — do NOT include
+            // the accusation's data_hash because it is unverified (the accuser's
+            // own vote already carries their independently-observed hash).
             let all_hashes: HashSet<[u8; 32]> = pending
                 .votes_for
                 .iter()
                 .chain(pending.votes_against.iter())
                 .map(|v| v.data_hash)
-                .chain(std::iter::once(pending.accusation.data_hash))
                 .collect();
 
             if all_hashes.len() > 1 {
@@ -797,12 +835,13 @@ impl AccusationManager {
 
         // Check for equivocation: if voters saw different data hashes,
         // the accused sent different payloads to different nodes.
+        // Only use actual vote data_hashes — the accusation's data_hash is
+        // unverified and already represented by the accuser's own vote.
         let all_hashes: HashSet<[u8; 32]> = pending
             .votes_for
             .iter()
             .chain(pending.votes_against.iter())
             .map(|v| v.data_hash)
-            .chain(std::iter::once(pending.accusation.data_hash))
             .collect();
 
         let outcome = if pending.votes_for.len() >= self.threshold_m {

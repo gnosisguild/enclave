@@ -74,8 +74,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
   const encryptionSchemeId =
     "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
 
-  // Slash-related constants for E2E tests
-  const REASON_BAD_PROOF = ethers.keccak256(ethers.toUtf8Bytes("E3_BAD_PROOF"));
+  // Lane A reason derived on-chain as keccak256(abi.encodePacked(proofType))
+  const REASON_PT_0 = ethers.keccak256(ethers.solidityPacked(["uint256"], [0]));
   const VOTE_TYPEHASH = ethers.keccak256(
     ethers.toUtf8Bytes(
       "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)",
@@ -333,7 +333,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     await enclaveTicketToken.setRegistry(await bondingRegistry.getAddress());
 
     // ── Slash Policy (for E2E routing tests) ───────────────────────────────────
-    await slashingManagerTyped.setSlashPolicy(REASON_BAD_PROOF, {
+    await slashingManagerTyped.setSlashPolicy(REASON_PT_0, {
       ticketPenalty: ethers.parseUnits("50", 6),
       licensePenalty: ethers.parseEther("100"),
       requiresProof: true,
@@ -810,7 +810,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_PROOF,
         proof,
       );
 
@@ -905,7 +904,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_PROOF,
         proof,
       );
 
@@ -1455,7 +1453,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_PROOF,
         proof,
       );
 

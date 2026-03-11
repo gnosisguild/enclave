@@ -94,11 +94,23 @@ impl E3Extension for AccusationManagerExtension {
         ctx.set_event_recipient("accusation_manager", Some(addr.into()));
     }
 
+    /// Re-hydrates the `AccusationManager` after a node restart.
+    ///
+    /// Intentionally a no-op — `AccusationManager` is **ephemeral by design**:
+    ///
+    /// - Each instance is scoped to one E3 (created by [`AccusationManagerExtension::handle`]
+    ///   when `CommitteeFinalized` is received) and holds only transient in-memory state
+    ///   (pending accusations, buffered votes, verification caches).
+    /// - On restart, all in-flight accusations are lost. This is an accepted trade-off:
+    ///   every pending accusation has a finite vote timeout (default 5 min). If the node
+    ///   restarts, the accusation would have timed out anyway. Other committee members
+    ///   running their own independent `AccusationManager` instances will continue the
+    ///   protocol unaffected.
+    /// - A malicious node cannot exploit restart-induced state loss to prevent slashing:
+    ///   restarting only loses *this node's* pending state — all other honest nodes still
+    ///   independently verify, vote, and reach quorum without this node's participation
+    ///   (as long as enough honest nodes remain to meet threshold M).
     async fn hydrate(&self, _ctx: &mut E3Context, _snapshot: &E3ContextSnapshot) -> Result<()> {
-        // AccusationManager is ephemeral — no state to hydrate.
-        // On restart, in-flight accusations are lost (acceptable: they would
-        // have timed out anyway). The actor will be re-created on the next
-        // CommitteeFinalized.
         Ok(())
     }
 }

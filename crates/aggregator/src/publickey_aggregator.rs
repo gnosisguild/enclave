@@ -423,6 +423,14 @@ impl PublicKeyAggregator {
                 );
             }
 
+            if *threshold_n < *threshold_m {
+                warn!(
+                    "PublicKeyAggregator: threshold_n ({}) < threshold_m ({}) after expulsion — committee unviable",
+                    threshold_n, threshold_m
+                );
+                return Ok(state);
+            }
+
             if keyshares.len() == *threshold_n && *threshold_n > 0 {
                 let m = *threshold_m;
                 info!("PublicKeyAggregator: enough keyshares after expulsion, transitioning to VerifyingC1");

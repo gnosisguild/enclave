@@ -52,12 +52,9 @@ describe("Committee Expulsion & Fault Tolerance", function () {
   const SORTITION_SUBMISSION_WINDOW = 10;
   const addressOne = "0x0000000000000000000000000000000000000001";
 
-  const REASON_BAD_DKG = ethers.keccak256(
-    ethers.toUtf8Bytes("E3_BAD_DKG_PROOF"),
-  );
-  const REASON_BAD_DECRYPTION = ethers.keccak256(
-    ethers.toUtf8Bytes("E3_BAD_DECRYPTION_PROOF"),
-  );
+  // Lane A reasons are derived on-chain as keccak256(abi.encodePacked(proofType))
+  const REASON_PT_0 = ethers.keccak256(ethers.solidityPacked(["uint256"], [0]));
+  const REASON_PT_7 = ethers.keccak256(ethers.solidityPacked(["uint256"], [7]));
 
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
   const polynomial_degree = ethers.toBigInt(2048);
@@ -347,11 +344,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       affectsCommittee: true,
     };
 
-    await slashingManager.setSlashPolicy(REASON_BAD_DKG, {
+    await slashingManager.setSlashPolicy(REASON_PT_0, {
       ...baseSlashPolicy,
       failureReason: 4, // FailureReason.DKGInvalidShares
     });
-    await slashingManager.setSlashPolicy(REASON_BAD_DECRYPTION, {
+    await slashingManager.setSlashPolicy(REASON_PT_7, {
       ...baseSlashPolicy,
       failureReason: 11, // FailureReason.DecryptionInvalidShares
     });
@@ -480,17 +477,12 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         0,
         op1Address,
       );
-      const tx = await slashingManager.proposeSlash(
-        0,
-        op1Address,
-        REASON_BAD_DKG,
-        proof,
-      );
+      const tx = await slashingManager.proposeSlash(0, op1Address, proof);
 
       // Should emit CommitteeMemberExpelled
       await expect(tx)
         .to.emit(registry, "CommitteeMemberExpelled")
-        .withArgs(0, op1Address, REASON_BAD_DKG, 2);
+        .withArgs(0, op1Address, REASON_PT_0, 2);
 
       // Should emit CommitteeViabilityUpdated
       await expect(tx)
@@ -535,7 +527,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_DKG,
         proof,
       );
 
@@ -607,7 +598,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_DKG,
         proof,
       );
 
@@ -677,14 +667,13 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_DKG,
         proof1,
       );
       expect((await registry.getCommitteeViability(0)).activeCount).to.equal(2);
 
       // Slash operator1 again for a different proof type to verify expulsion is idempotent.
       // Same (e3Id, operator, proofType) would revert DuplicateEvidence — that's correct.
-      // Using proofType=7 (T5ShareDecryption) with REASON_BAD_DECRYPTION instead.
+      // Using proofType=7 (T5ShareDecryption) with REASON_PT_7 instead.
       const proof2 = await signAndEncodeAttestation(
         [operator2, operator3],
         0,
@@ -696,7 +685,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_DECRYPTION,
         proof2,
       );
 
@@ -741,7 +729,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_DKG,
         proof,
       );
 
@@ -796,7 +783,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_DKG,
         proof1,
       );
       expect((await registry.getCommitteeViability(0)).activeCount).to.equal(3);
@@ -812,7 +798,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await slashingManager.proposeSlash(
         0,
         await operator2.getAddress(),
-        REASON_BAD_DKG,
         proof2,
       );
       expect((await registry.getCommitteeViability(0)).activeCount).to.equal(2);
@@ -926,7 +911,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_DKG,
         proof1,
       );
 
@@ -942,7 +926,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await slashingManager.proposeSlash(
         0,
         await operator2.getAddress(),
-        REASON_BAD_DKG,
         proof2,
       );
 
@@ -959,7 +942,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         slashingManager.proposeSlash(
           0,
           await operator3.getAddress(),
-          REASON_BAD_DKG,
           await signAndEncodeAttestation(
             [operator4],
             0,
@@ -1009,18 +991,13 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await operator1.getAddress(),
       );
       const op1Addr = await operator1.getAddress();
-      const tx = await slashingManager.proposeSlash(
-        0,
-        op1Addr,
-        REASON_BAD_DKG,
-        proof,
-      );
+      const tx = await slashingManager.proposeSlash(0, op1Addr, proof);
 
       await expect(tx).to.emit(slashingManager, "SlashExecuted").withArgs(
         0, // proposalId
         0, // e3Id
         op1Addr,
-        REASON_BAD_DKG,
+        REASON_PT_0,
         ethers.parseUnits("10", 6), // ticketPenalty
         ethers.parseEther("50"), // licensePenalty
         true, // executed

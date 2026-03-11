@@ -12,7 +12,7 @@ use crate::send_tx_with_retry;
 use actix::prelude::*;
 use actix::Addr;
 use alloy::{
-    primitives::{keccak256, Address, Bytes, U256},
+    primitives::{Address, Bytes, U256},
     providers::{Provider, WalletProvider},
     rpc::types::TransactionReceipt,
     sol,
@@ -27,13 +27,22 @@ use e3_events::EventType;
 use e3_events::Shutdown;
 use e3_events::{AccusationOutcome, AccusationQuorumReached, EType};
 use e3_utils::NotifySync;
-use tracing::info;
+use std::time::Duration;
+use tracing::{info, warn};
 
 sol!(
     #[sol(rpc)]
     ISlashingManager,
     "../../packages/enclave-contracts/artifacts/contracts/interfaces/ISlashingManager.sol/ISlashingManager.json"
 );
+
+/// Maximum number of voters eligible to attempt on-chain submission.
+/// Rank 0 submits immediately, rank 1 after one delay interval, etc.
+const MAX_SLASH_SUBMITTERS: usize = 3;
+
+/// Delay between fallback submission attempts (seconds).
+/// Rank N waits N * SUBMITTER_DELAY_SECS before submitting.
+const SUBMITTER_DELAY_SECS: u64 = 30;
 
 /// Submits `AccusationQuorumReached` events as slash proposals on-chain.
 pub struct SlashingManagerSolWriter<P> {
@@ -84,24 +93,24 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
                 // Only submit if:
                 // 1. This is the right chain
                 // 2. The quorum decided the accused is at fault OR equivocated
-                // 3. This node is the designated submitter (lowest-address agreeing
-                //    voter). This is deterministic so exactly one node submits,
-                //    and decouples submission from the accuser to avoid single-point
-                //    failures if the accuser's node goes down after quorum.
+                // 3. This node is among the top MAX_SLASH_SUBMITTERS voters
+                //    (sorted ascending by address). The lowest-address voter
+                //    submits immediately; higher-ranked fallback voters wait
+                //    progressively longer (rank * SUBMITTER_DELAY_SECS) before
+                //    attempting submission. On-chain DuplicateEvidence protection
+                //    ensures at most one slash executes.
                 let my_addr = self.provider.provider().default_signer_address();
-                let is_designated_submitter = data
-                    .votes_for
-                    .iter()
-                    .map(|v| v.voter)
-                    .min()
-                    .map_or(false, |min_voter| min_voter == my_addr);
+                let mut sorted_voters: Vec<Address> =
+                    data.votes_for.iter().map(|v| v.voter).collect();
+                sorted_voters.sort();
+                let my_rank = sorted_voters.iter().position(|&v| v == my_addr);
 
                 if self.provider.chain_id() == data.e3_id.chain_id()
                     && matches!(
                         data.outcome,
                         AccusationOutcome::AccusedFaulted | AccusationOutcome::Equivocation
                     )
-                    && is_designated_submitter
+                    && my_rank.map_or(false, |r| r < MAX_SLASH_SUBMITTERS)
                 {
                     ctx.notify(data);
                 }
@@ -122,17 +131,46 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<AccusationQuorumRea
             let contract_address = self.contract_address;
             let provider = self.provider.clone();
             let bus = self.bus.clone();
+            let my_addr = self.provider.provider().default_signer_address();
             async move {
+                // Compute this node's submission rank for staggered fallback
+                let mut sorted_voters: Vec<Address> =
+                    msg.votes_for.iter().map(|v| v.voter).collect();
+                sorted_voters.sort();
+                let rank = sorted_voters
+                    .iter()
+                    .position(|&v| v == my_addr)
+                    .unwrap_or(0);
+
+                // Fallback submitters wait before attempting, giving the primary
+                // submitter time to land the transaction on-chain.
+                if rank > 0 {
+                    let delay = Duration::from_secs(rank as u64 * SUBMITTER_DELAY_SECS);
+                    info!(
+                        "Fallback submitter (rank {rank}): waiting {delay:?} before submission attempt"
+                    );
+                    tokio::time::sleep(delay).await;
+                }
+
                 let result = submit_slash_proposal(provider, contract_address, msg).await;
                 match result {
                     Ok(receipt) => {
                         info!(tx=%receipt.transaction_hash, "Submitted attestation-based slash proposal on-chain");
                     }
                     Err(err) => {
-                        bus.err(
-                            EType::Evm,
-                            anyhow::anyhow!("Error submitting slash proposal: {:?}", err),
-                        );
+                        if rank > 0 {
+                            // Fallback submitters expect DuplicateEvidence reverts
+                            // when the primary submitter has already landed the tx.
+                            warn!(
+                                "Fallback submitter (rank {rank}): slash submission failed \
+                                 (likely already submitted by primary): {err:?}"
+                            );
+                        } else {
+                            bus.err(
+                                EType::Evm,
+                                anyhow::anyhow!("Error submitting slash proposal: {:?}", err),
+                            );
+                        }
                     }
                 }
             }
@@ -179,15 +217,11 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = data.e3_id.clone().try_into()?;
     let operator = data.accused;
-    let reason = keccak256(data.proof_type.slash_reason().as_bytes());
 
     let proof_data = encode_attestation_evidence(&data);
 
     send_tx_with_retry("proposeSlash", &[], || {
-        info!(
-            "proposeSlash() e3_id={:?} operator={:?} reason={:?}",
-            e3_id, operator, reason
-        );
+        info!("proposeSlash() e3_id={:?} operator={:?}", e3_id, operator);
         let proof = Bytes::from(proof_data.clone());
         let provider = provider.clone();
 
@@ -200,7 +234,7 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
                 .await?;
             let contract = ISlashingManager::new(contract_address, provider.provider());
             let builder = contract
-                .proposeSlash(e3_id, operator, reason.into(), proof)
+                .proposeSlash(e3_id, operator, proof)
                 .nonce(current_nonce);
             let receipt = builder.send().await?.get_receipt().await?;
             Ok(receipt)

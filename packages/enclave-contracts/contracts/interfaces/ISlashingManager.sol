@@ -391,6 +391,10 @@ interface ISlashingManager {
      * @notice Creates a new slash proposal with committee attestation (Lane A - permissionless)
      * @dev Anyone can call this for attestation-based slashes. Requires a quorum of committee
      *      members to have signed votes attesting that the operator submitted a bad proof.
+     *      The slash reason is derived deterministically on-chain as
+     *      `keccak256(abi.encodePacked(proofType))` — the caller does not pass a reason.
+     *      This creates a 1:1 binding between proof types and slash policies, preventing
+     *      cross-reason replay attacks.
      *      Evidence format:
      *        abi.encode(uint256 proofType,
      *          address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures)
@@ -405,14 +409,12 @@ interface ISlashingManager {
      *        5. All votes agree the proof is invalid (agrees == true)
      * @param e3Id ID of the E3 computation this slash relates to
      * @param operator Address of the ciphernode operator to slash (must be non-zero)
-     * @param reason Hash of the slash reason (must have an enabled proof-required policy)
      * @param proof Attestation evidence: abi.encode(proofType, voters, agrees, dataHashes, signatures)
      * @return proposalId Sequential ID of the created proposal
      */
     function proposeSlash(
         uint256 e3Id,
         address operator,
-        bytes32 reason,
         bytes calldata proof
     ) external returns (uint256 proposalId);
 
