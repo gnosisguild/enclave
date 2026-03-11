@@ -12,8 +12,9 @@ use e3_utils::{colorize, Color, MAILBOX_LIMIT, MAILBOX_LIMIT_LARGE};
 use std::collections::HashMap;
 use std::fmt;
 use std::marker::PhantomData;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
+use tracing::{error, info};
 
 //////////////////////////////////////////////////////////////////////////////
 // Configuration
@@ -316,19 +317,38 @@ impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollectorWaiter<E>
         let count = msg.amount;
         let timeout = msg.timeout;
         let mut rx = self.rx.take().unwrap();
+        const MAX_TIMEOUT: Duration = Duration::from_secs(60 * 60 * 24); // 1 day (cannot use Duration::MAX or
+                                                                         // timeout fails)
         Box::pin(
             async move {
                 let mut events = Vec::with_capacity(count);
                 let mut timed_out = false;
-                for _ in 0..count {
-                    match tokio::time::timeout(timeout, rx.recv()).await {
-                        Ok(Some(e)) => events.push(e),
-                        Ok(None) => break,
+                let mut max_time = Duration::ZERO;
+                info!("take: max={:?}", MAX_TIMEOUT);
+                info!("take: given={:?}", timeout);
+                for i in 0..count {
+                    let round = Instant::now();
+                    let tout = if i == 0 { timeout } else { timeout };
+                    match tokio::time::timeout(tout, rx.recv()).await {
+                        Ok(Some(e)) => {
+                            if i > 0 {
+                                max_time = Duration::max(round.elapsed(), max_time);
+                            }
+                            events.push(e)
+                        }
+                        Ok(None) => {
+                            max_time = Duration::max(round.elapsed(), max_time);
+                            break;
+                        }
                         Err(_) => {
                             timed_out = true;
+                            error!("take: timed out after {:?}", round.elapsed());
                             break;
                         }
                     }
+                }
+                if max_time > Duration::ZERO {
+                    info!("take: max_event = {:?}", max_time);
                 }
                 (TakeEventsResult { events, timed_out }, rx)
             }
