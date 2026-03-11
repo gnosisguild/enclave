@@ -549,18 +549,19 @@ class NoirCircuitBuilder {
       }
     }
 
-    // Share_computation wrapper aliases
+    // Share_computation wrapper aliases (source includes circuit group per SHARE_COMP_WRAPPER.path)
     for (const variant of SHARE_COMP_WRAPPER.variants) {
       const shareCompSrc = join(outputDir, variant, ...SHARE_COMP_WRAPPER.path, 'share_computation')
-      if (existsSync(join(shareCompSrc, 'share_computation.json'))) {
+      const hasJson = existsSync(join(shareCompSrc, 'share_computation.json'))
+      const hasVk = existsSync(join(shareCompSrc, 'share_computation.vk'))
+      const hasVkHash = existsSync(join(shareCompSrc, 'share_computation.vk_hash'))
+      if (hasJson || hasVk || hasVkHash) {
         for (const alias of SHARE_COMP_WRAPPER.aliases) {
           const destDir = join(outputDir, variant, ...SHARE_COMP_WRAPPER.path, alias)
           mkdirSync(destDir, { recursive: true })
-          copyFileSync(join(shareCompSrc, 'share_computation.json'), join(destDir, `${alias}.json`))
-          copyFileSync(join(shareCompSrc, 'share_computation.vk'), join(destDir, `${alias}.vk`))
-          if (existsSync(join(shareCompSrc, 'share_computation.vk_hash'))) {
-            copyFileSync(join(shareCompSrc, 'share_computation.vk_hash'), join(destDir, `${alias}.vk_hash`))
-          }
+          if (hasJson) copyFileSync(join(shareCompSrc, 'share_computation.json'), join(destDir, `${alias}.json`))
+          if (hasVk) copyFileSync(join(shareCompSrc, 'share_computation.vk'), join(destDir, `${alias}.vk`))
+          if (hasVkHash) copyFileSync(join(shareCompSrc, 'share_computation.vk_hash'), join(destDir, `${alias}.vk_hash`))
         }
       }
     }
