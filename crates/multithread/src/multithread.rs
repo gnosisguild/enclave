@@ -421,7 +421,7 @@ fn handle_threshold_share_decryption_proof(
 
         // Wrap for recursive folding
         let wrapped =
-            generate_wrapper_proof(prover, &[proof.clone()], &e3_id_str).map_err(|e| {
+            generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
                 ComputeRequestError::new(
                     ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
                         "C6 wrapper proof[{}]: {}",
@@ -731,7 +731,7 @@ fn handle_share_computation_proof(
         })?;
 
     let wrapped_proof =
-        generate_wrapper_proof(prover, &[proof.clone()], &e3_id_str).map_err(|e| {
+        generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
             ComputeRequestError::new(
                 ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
                 request.clone(),
@@ -816,7 +816,7 @@ fn handle_pk_generation_proof(
         })?;
 
     let wrapped_proof =
-        generate_wrapper_proof(prover, &[proof.clone()], &e3_id_str).map_err(|e| {
+        generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
             ComputeRequestError::new(
                 ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
                 request.clone(),
@@ -868,7 +868,7 @@ fn handle_pk_bfv_proof(
         })?;
 
     let wrapped_proof =
-        generate_wrapper_proof(prover, &[proof.clone()], &e3_id_str).map_err(|e| {
+        generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
             ComputeRequestError::new(
                 ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
                 request.clone(),
@@ -956,7 +956,7 @@ fn handle_share_encryption_proof(
         })?;
 
     let wrapped_proof =
-        generate_wrapper_proof(prover, &[proof.clone()], &e3_id_str).map_err(|e| {
+        generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
             ComputeRequestError::new(
                 ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
                 request.clone(),
@@ -1050,7 +1050,7 @@ fn handle_dkg_share_decryption_proof(
         })?;
 
     let wrapped_proof =
-        generate_wrapper_proof(prover, &[proof.clone()], &e3_id_str).map_err(|e| {
+        generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
             ComputeRequestError::new(
                 ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
                 request.clone(),
