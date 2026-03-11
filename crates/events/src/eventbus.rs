@@ -317,8 +317,8 @@ impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollectorWaiter<E>
         let count = msg.amount;
         let timeout = msg.timeout;
         let mut rx = self.rx.take().unwrap();
-        const MAX_TIMEOUT: Duration = Duration::from_secs(60 * 60 * 24); // 1 day (cannot use Duration::MAX or
-                                                                         // timeout fails)
+        const MAX_TIMEOUT: Duration = Duration::from_secs(60 * 60); // 1h (cannot use Duration::MAX or
+                                                                    // timeout fails)
         Box::pin(
             async move {
                 let mut events = Vec::with_capacity(count);
@@ -328,7 +328,7 @@ impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollectorWaiter<E>
                 info!("take: given={:?}", timeout);
                 for i in 0..count {
                     let round = Instant::now();
-                    let tout = if i == 0 { timeout } else { timeout };
+                    let tout = if i == 0 { MAX_TIMEOUT } else { timeout };
                     match tokio::time::timeout(tout, rx.recv()).await {
                         Ok(Some(e)) => {
                             if i > 0 {
