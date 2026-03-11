@@ -722,6 +722,9 @@ jobs:
           path: |
             circuits/bin/dkg/target/
             circuits/bin/threshold/target/
+            circuits/bin/recursive_aggregation/wrapper/dkg/target/
+            circuits/bin/recursive_aggregation/wrapper/threshold/target/
+            circuits/bin/recursive_aggregation/fold/target/
           retention-days: 1
           if-no-files-found: error
 
