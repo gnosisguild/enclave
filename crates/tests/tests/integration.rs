@@ -132,38 +132,72 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
 
-        // Copy C2a (sk_share_computation) circuit
-        let sk_share_comp_circuit_dir = circuits_dir.join("dkg").join("sk_share_computation");
-        tokio::fs::create_dir_all(&sk_share_comp_circuit_dir)
+        // Copy C2a base (sk_share_computation_base) circuit
+        let sk_share_comp_base_dir = circuits_dir.join("dkg").join("sk_share_computation_base");
+        tokio::fs::create_dir_all(&sk_share_comp_base_dir)
             .await
             .unwrap();
         tokio::fs::copy(
-            dkg_target.join("sk_share_computation.json"),
-            sk_share_comp_circuit_dir.join("sk_share_computation.json"),
+            dkg_target.join("sk_share_computation_base.json"),
+            sk_share_comp_base_dir.join("sk_share_computation_base.json"),
         )
         .await
         .unwrap();
         tokio::fs::copy(
-            dkg_target.join("sk_share_computation.vk"),
-            sk_share_comp_circuit_dir.join("sk_share_computation.vk"),
+            dkg_target.join("sk_share_computation_base.vk"),
+            sk_share_comp_base_dir.join("sk_share_computation_base.vk"),
         )
         .await
         .unwrap();
 
-        // Copy C2b (e_sm_share_computation) circuit
-        let e_sm_share_comp_circuit_dir = circuits_dir.join("dkg").join("e_sm_share_computation");
-        tokio::fs::create_dir_all(&e_sm_share_comp_circuit_dir)
+        // Copy C2b base (e_sm_share_computation_base) circuit
+        let e_sm_share_comp_base_dir = circuits_dir.join("dkg").join("e_sm_share_computation_base");
+        tokio::fs::create_dir_all(&e_sm_share_comp_base_dir)
             .await
             .unwrap();
         tokio::fs::copy(
-            dkg_target.join("e_sm_share_computation.json"),
-            e_sm_share_comp_circuit_dir.join("e_sm_share_computation.json"),
+            dkg_target.join("e_sm_share_computation_base.json"),
+            e_sm_share_comp_base_dir.join("e_sm_share_computation_base.json"),
         )
         .await
         .unwrap();
         tokio::fs::copy(
-            dkg_target.join("e_sm_share_computation.vk"),
-            e_sm_share_comp_circuit_dir.join("e_sm_share_computation.vk"),
+            dkg_target.join("e_sm_share_computation_base.vk"),
+            e_sm_share_comp_base_dir.join("e_sm_share_computation_base.vk"),
+        )
+        .await
+        .unwrap();
+
+        // Copy C2c chunk (share_computation_chunk) circuit — shared for SK and E_SM
+        let share_comp_chunk_dir = circuits_dir.join("dkg").join("share_computation_chunk");
+        tokio::fs::create_dir_all(&share_comp_chunk_dir)
+            .await
+            .unwrap();
+        tokio::fs::copy(
+            dkg_target.join("share_computation_chunk.json"),
+            share_comp_chunk_dir.join("share_computation_chunk.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            dkg_target.join("share_computation_chunk.vk"),
+            share_comp_chunk_dir.join("share_computation_chunk.vk"),
+        )
+        .await
+        .unwrap();
+
+        // Copy share_computation inner circuit (binds base + N chunks — IS the C2 proof)
+        let share_comp_dir = circuits_dir.join("dkg").join("share_computation");
+        tokio::fs::create_dir_all(&share_comp_dir).await.unwrap();
+        tokio::fs::copy(
+            dkg_target.join("share_computation.json"),
+            share_comp_dir.join("share_computation.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            dkg_target.join("share_computation.vk"),
+            share_comp_dir.join("share_computation.vk"),
         )
         .await
         .unwrap();

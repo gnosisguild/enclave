@@ -55,8 +55,8 @@ impl ProofType {
         match self {
             ProofType::C0PkBfv => vec![CircuitName::PkBfv],
             ProofType::C1PkGeneration => vec![CircuitName::PkGeneration],
-            ProofType::C2aSkShareComputation => vec![CircuitName::SkShareComputation],
-            ProofType::C2bESmShareComputation => vec![CircuitName::ESmShareComputation],
+            ProofType::C2aSkShareComputation => vec![CircuitName::ShareComputation],
+            ProofType::C2bESmShareComputation => vec![CircuitName::ShareComputation],
             ProofType::C3aSkShareEncryption => vec![CircuitName::ShareEncryption],
             ProofType::C3bESmShareEncryption => vec![CircuitName::ShareEncryption],
             ProofType::T2DkgShareDecryption => vec![CircuitName::DkgShareDecryption],
