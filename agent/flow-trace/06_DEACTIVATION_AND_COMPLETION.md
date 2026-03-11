@@ -3,8 +3,8 @@
 ## Overview
 
 An operator can voluntarily leave the network by deactivating (withdrawing collateral) and
-deregistering (removing from the Merkle tree). The exit is time-locked to prevent flash-unstake
-attacks.
+deregistering (removing from the Merkle tree). The exit is time-locked, and pending exits remain
+slashable until claimed.
 
 ---
 
@@ -22,18 +22,21 @@ User runs: enclave ciphernode deactivate --tickets 50
     │  ┌─── ON-CHAIN (BondingRegistry.sol) ─────────────────────┐
     │  │                                                         │
     │  │  removeTicketBalance(50):                               │
-    │  │    1. burnAmount = 50 * ticketPrice                     │
-    │  │    2. ticketToken.burnTickets(operator, burnAmount)     │
-    │  │       → ETK destroyed, USDC held in payableBalance      │
+    │  │    1. require(amount != 0, registered, sufficient ETK)  │
+    │  │    2. ticketToken.burnTickets(operator, amount)         │
+    │  │       → ETK destroyed, underlying becomes claimable      │
     │  │    3. _exits.queueTicketsForExit(                       │
-    │  │         operator, exitDelay, burnAmount                  │
+    │  │         operator, exitDelay, amount                      │
     │  │       )                                                  │
     │  │       → Locked in ExitQueue until now + exitDelay        │
     │  │    4. _updateOperatorStatus(operator)                   │
-    │  │       → If tickets drop below minTicketBalance:          │
+    │  │       → Active iff registered &&                         │
+    │  │         licenseBond >= _minLicenseBond() &&              │
+    │  │         (ticketBalance / ticketPrice) >= minTicketBalance│
     │  │         active = false, numActiveOperators--             │
     │  │         Emit OperatorActivationChanged(op, false)        │
-    │  │    5. Emit TicketBalanceUpdated(operator, newBalance)    │
+    │  │    5. Emit TicketBalanceUpdated(op, -amount, newBal,     │
+    │  │       "WITHDRAW")                                         │
     │  │  }                                                      │
     │  └─────────────────────────────────────────────────────────┘
 ```
@@ -48,12 +51,16 @@ User runs: enclave ciphernode deactivate --license 20000
     │  ┌─── ON-CHAIN ───────────────────────────────────────────┐
     │  │                                                         │
     │  │  unbondLicense(20000):                                  │
-    │  │    1. operators[op].licenseBond -= 20000                │
-    │  │    2. _exits.queueLicensesForExit(op, exitDelay, 20000)│
-    │  │    3. _updateOperatorStatus(operator)                   │
-    │  │       → If licenseBond < requiredBond * 80%:            │
+    │  │    1. require(amount != 0, sufficient bonded ENCL)      │
+    │  │    2. operators[op].licenseBond -= 20000                │
+    │  │    3. _exits.queueLicensesForExit(op, exitDelay, 20000)│
+    │  │    4. _updateOperatorStatus(operator)                   │
+    │  │       → If licenseBond <                                │
+    │  │         (licenseRequiredBond * licenseActiveBps / 10000)│
+    │  │         (default: 80% of required bond):                │
     │  │         active = false, numActiveOperators--             │
-    │  │    4. Emit LicenseBondUpdated(operator, newBond)        │
+    │  │    5. Emit LicenseBondUpdated(op, -amount, newBond,      │
+    │  │       "UNBOND")                                          │
     │  │  }                                                      │
     │  └─────────────────────────────────────────────────────────┘
 ```
@@ -74,17 +81,15 @@ User runs: enclave ciphernode deactivate --tickets 50 --license 20000
 ## Full Deregistration
 
 ```
-User runs: enclave ciphernode deregister --proof 123,456,789
+User runs: enclave ciphernode deregister
 │
 ├─ ChainContext::new()
 │
-├─ Parse proof: comma-separated IMT sibling node values → Vec<U256>
-│
-└─ BondingRegistryContract.deregisterOperator(siblingNodes).send().await
+└─ BondingRegistryContract.deregisterOperator().send().await
     │
     │  ┌─── ON-CHAIN (BondingRegistry.sol) ─────────────────────┐
     │  │                                                         │
-    │  │  deregisterOperator(uint256[] siblingNodes) {           │
+    │  │  deregisterOperator() {                                  │
     │  │    1. require(operators[msg.sender].registered)         │
     │  │    2. require(!exitInProgress(msg.sender))              │
     │  │       → Cannot deregister if an exit is already pending │
@@ -108,12 +113,13 @@ User runs: enclave ciphernode deregister --proof 123,456,789
     │  │       )                                                  │
     │  │                                                         │
     │  │    8. Remove from Merkle tree:                          │
-    │  │       registry.removeCiphernode(msg.sender, siblingNodes)│
+    │  │       registry.removeCiphernode(msg.sender)             │
     │  │       │                                                  │
     │  │       │  ┌─ CiphernodeRegistryOwnable ──────────────┐  │
-    │  │       │  │  removeCiphernode(node, siblings):        │  │
-    │  │       │  │    _remove(uint160(node), siblings)       │  │
-    │  │       │  │    → Node removed from Lean IMT           │  │
+    │  │       │  │  removeCiphernode(node):                  │  │
+    │  │       │  │    index = ciphernodeTreeIndex[node]      │  │
+    │  │       │  │    ciphernodes._update(0, index)          │  │
+    │  │       │  │    → Leaf zeroed in Lazy IMT              │  │
     │  │       │  │    numCiphernodes--                       │  │
     │  │       │  │    Emit CiphernodeRemoved(node)           │  │
     │  │       │  └──────────────────────────────────────────┘  │
@@ -127,17 +133,11 @@ User runs: enclave ciphernode deregister --proof 123,456,789
     │  │  }                                                      │
     │  └─────────────────────────────────────────────────────────┘
 │
-└─ After exitDelay seconds, operator can claim everything back:
-     enclave ciphernode license claim --max-ticket X --max-license Y
+└─ After exitDelay seconds, operator can claim unlocked exits:
+    enclave ciphernode license claim
+    # optional caps:
+    enclave ciphernode license claim --max-ticket X --max-license Y
 ```
-
-### Getting the IMT Proof
-
-The `--proof` parameter requires Indexed Merkle Tree sibling nodes. These must be computed off-chain
-by traversing the current IMT state. The proof allows the contract to verify and remove the node
-from the tree.
-
----
 
 ## E3 Completion (Happy Path)
 
@@ -152,6 +152,8 @@ publishPlaintextOutput() succeeds
 │   │   ├─ activeNodes = ciphernodeRegistry.getActiveCommitteeNodes(e3Id)
 │   │   ├─ perNode = payment / activeNodes.length
 │   │   ├─ dust → last member
+│   │   ├─ if activeNodes.length == 0: refund payment to requester
+│   │   ├─ if payment == 0: only slashed-funds distribution runs
 │   │   ├─ bondingRegistry.distributeRewards(token, nodes, amounts)
 │   │   │   → Transfers fee tokens to each registered operator
 │   │   ├─ e3RefundManager.distributeSlashedFundsOnSuccess(
@@ -173,15 +175,15 @@ publishPlaintextOutput() succeeds
     │
     ├─ Sortition: decrements activeJobs for each committee member
     │   → Node becomes available for future E3s
-    │   → Removes e3_id from finalized_committees map
+    │   → Removes e3_id from node_state.e3_committees map
     │
     ├─ CiphernodeSelector: removes e3_id from e3_cache
     │
-    ├─ Per-E3 actors receive Die via E3RequestComplete:
+    ├─ Per-E3 actors receive Die / shutdown on completion:
     │   ├─ ThresholdKeyshare: state = Completed, actor stops
     │   ├─ PublicKeyAggregator: actor stops
     │   ├─ ThresholdPlaintextAggregator: actor stops
-    │   └─ KeyshareCreatedFilterBuffer: actor stops
+    │   └─ KeyshareCreatedFilterBuffer: no new E3 events after context teardown
     │
     └─ E3Router: removes E3Context for this e3_id
         → All per-E3 state fully cleaned up
@@ -240,11 +242,11 @@ no safe harbor for misbehaving operators.
 ```
 SLASHING → operator banned:
   banned[operator] = true
-  → Cannot call registerOperator() (reverts with "banned")
+    → Cannot call registerOperator() (reverts with CiphernodeBanned)
   → Permanent until governance intervenes
 
 GOVERNANCE lifts ban:
-  SlashingManager.updateBanStatus(operator, false, "reason")
+    SlashingManager.updateBanStatus(operator, false, keccak256("reason"))
   → banned[operator] = false
   → Operator can re-register
 ```
