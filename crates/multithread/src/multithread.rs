@@ -782,7 +782,8 @@ fn handle_share_computation_proof(
         chunk_proofs.push(chunk_proof);
     }
 
-    // 9. Prove the share_computation circuit (binds base + N chunks) — this IS the C2 proof
+    // 9. Prove the share_computation circuit (binds base + N chunks) — this IS the C2 proof.
+    //    Wrapping happens later during aggregation (both SK + ESM wrapped together).
     let c2_proof = generate_share_computation_proof(
         prover,
         &base_proof,
