@@ -9,29 +9,40 @@ use e3_events::CircuitName;
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_computation::{
-    Inputs, ShareComputationCircuit, ShareComputationCircuitData,
+    ChunkInputs, Inputs, ShareComputationBaseCircuit, ShareComputationChunkCircuit,
+    ShareComputationChunkCircuitData, ShareComputationCircuitData,
 };
 
-impl Provable for ShareComputationCircuit {
+impl Provable for ShareComputationBaseCircuit {
     type Params = BfvPreset;
     type Input = ShareComputationCircuitData;
     type Inputs = Inputs;
 
-    fn resolve_circuit_name(&self, _params: &Self::Params, _input: &Self::Input) -> CircuitName {
-        match _input.dkg_input_type {
-            DkgInputType::SecretKey => CircuitName::SkShareComputation,
-            DkgInputType::SmudgingNoise => CircuitName::ESmShareComputation,
+    fn resolve_circuit_name(&self, _params: &Self::Params, input: &Self::Input) -> CircuitName {
+        match input.dkg_input_type {
+            DkgInputType::SecretKey => CircuitName::SkShareComputationBase,
+            DkgInputType::SmudgingNoise => CircuitName::ESmShareComputationBase,
         }
     }
 
     fn valid_circuits(&self) -> Vec<CircuitName> {
         vec![
-            CircuitName::SkShareComputation,
-            CircuitName::ESmShareComputation,
+            CircuitName::SkShareComputationBase,
+            CircuitName::ESmShareComputationBase,
         ]
     }
 
     fn circuit(&self) -> CircuitName {
-        CircuitName::SkShareComputation
+        CircuitName::SkShareComputationBase
+    }
+}
+
+impl Provable for ShareComputationChunkCircuit {
+    type Params = BfvPreset;
+    type Input = ShareComputationChunkCircuitData;
+    type Inputs = ChunkInputs;
+
+    fn circuit(&self) -> CircuitName {
+        CircuitName::ShareComputationChunk
     }
 }

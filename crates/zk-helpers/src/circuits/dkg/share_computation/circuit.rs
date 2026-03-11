@@ -47,6 +47,7 @@ impl Circuit for ShareComputationChunkCircuit {
 }
 
 // todo: currently reusing this but should be renamed when we change zk-prover
+#[derive(Clone)]
 pub struct ShareComputationCircuitData {
     /// Which secret type this data is for (determines which branch to use in data).
     pub dkg_input_type: DkgInputType,
