@@ -11,9 +11,11 @@ use anyhow::Result;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::Event;
 use e3_events::{EnclaveEvent, GetEvents, ResetHistory, TakeEvents};
+use std::time::Instant;
 use std::u64;
 use std::{future::Future, ops::Deref, pin::Pin, time::Duration};
 use tokio::time::timeout;
+use tracing::info;
 
 // This type allows us to store various dynamic async callbacks
 type SetupFn<'a> =
@@ -156,12 +158,20 @@ impl CiphernodeSystem {
         total_to: Duration,   // total
         per_evt_to: Duration, // per event
     ) -> Result<CiphernodeHistory> {
+        let start = Instant::now();
         let h = self
             .take_history_with_timeouts(0, expected.len(), Some(total_to), Some(per_evt_to))
             .await
             .map_err(|e| anyhow::anyhow!("FAILURE: {expected:?} : {e}"))?;
         println!(">> {:?} == {:?}", h.event_types(), expected.to_vec());
 
+        info!(
+            "expectation take took {:?} for {:?} total_timeout={:?} per_evt_timeout={:?}",
+            start.elapsed(),
+            expected,
+            total_to,
+            per_evt_to
+        );
         h.expect(expected.to_vec());
         Ok(h)
     }
@@ -188,6 +198,7 @@ impl CiphernodeSystem {
         total_to: Option<Duration>,
         event_to: Option<Duration>,
     ) -> Result<CiphernodeHistory> {
+        let start = Instant::now();
         let Some(node) = self.0.get(index) else {
             bail!("No node found");
         };
@@ -211,12 +222,19 @@ impl CiphernodeSystem {
 
         if history.timed_out {
             bail!(
-                "Take History timed out was trying to take {} events. Returned {:?}",
+                "Take History timed out after {:?} was trying to take {} events. Returned {:?}",
+                start.elapsed(),
                 count,
                 history
             );
         };
-
+        info!(
+            "take took {:?} for count={}, total_timeout={:?}, per_evt_timeout={:?}",
+            start.elapsed(),
+            count,
+            total_to,
+            event_to
+        );
         Ok(CiphernodeHistory(history.events))
     }
     pub async fn flush_all_history(&self, millis: u64) -> Result<()> {
