@@ -4,7 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
+// Base and chunk proofs are produced with noir-recursive (ZK) target, so they use
+// UltraHonkZKProof (508 elements). Non-ZK type would expect 457 and cause LengthMismatch.
+use bb_proof_verification::{UltraHonkVerificationKey, UltraHonkZKProof, verify_honk_proof};
 use lib::configs::default::dkg::{
     L_THRESHOLD, N, SHARE_COMPUTATION_CHUNK_SIZE, SHARE_COMPUTATION_N_CHUNKS,
 };
@@ -25,16 +27,16 @@ pub global CHUNK_PUBLIC_INPUTS: u32 = SHARE_COMPUTATION_CHUNK_SIZE * L_THRESHOLD
 
 fn main(
     base_verification_key: UltraHonkVerificationKey,
-    base_proof: UltraHonkProof,
+    base_proof: UltraHonkZKProof,
     base_public_inputs: [Field; BASE_PUBLIC_INPUTS],
     base_key_hash: pub Field,
     chunk_verification_key: UltraHonkVerificationKey,
-    chunk_proofs: [UltraHonkProof; SHARE_COMPUTATION_N_CHUNKS],
+    chunk_proofs: [UltraHonkZKProof; SHARE_COMPUTATION_N_CHUNKS],
     chunk_public_inputs: [[Field; CHUNK_PUBLIC_INPUTS]; SHARE_COMPUTATION_N_CHUNKS],
     chunk_key_hash: pub Field,
 ) -> pub Field {
-    // Step 1: Verify base proof
-    verify_honk_proof_non_zk(
+    // Step 1: Verify base proof (ZK verifier; proof is 508 elements)
+    verify_honk_proof(
         base_verification_key,
         base_proof,
         base_public_inputs,
@@ -45,7 +47,7 @@ fn main(
     // y starts at index 1 in base_public_inputs (after expected_secret_commitment)
     // y_chunk for chunk i starts at offset i * CHUNK_PUBLIC_INPUTS within base y
     for chunk_idx in 0..SHARE_COMPUTATION_N_CHUNKS {
-        verify_honk_proof_non_zk(
+        verify_honk_proof(
             chunk_verification_key,
             chunk_proofs[chunk_idx],
             chunk_public_inputs[chunk_idx],
