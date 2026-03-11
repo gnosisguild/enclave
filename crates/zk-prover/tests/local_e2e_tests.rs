@@ -15,6 +15,8 @@
 
 mod common;
 
+use ark_bn254::Fr;
+use ark_ff::PrimeField;
 use common::{
     extract_field, extract_field_from_end, find_bb, setup_compiled_circuit, setup_test_prover,
 };
@@ -45,8 +47,6 @@ use e3_zk_helpers::threshold::{
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_helpers::Computation;
 use e3_zk_helpers::{compute_share_computation_sk_commitment, compute_threshold_pk_commitment};
-use ark_bn254::Fr;
-use ark_ff::PrimeField;
 use e3_zk_prover::{generate_share_computation_proof, Provable, ZkBackend, ZkProver};
 
 /// Convert raw public signals bytes (32-byte big-endian chunks) to ark_bn254::Fr field elements.
@@ -497,9 +497,7 @@ async fn test_share_computation_sk_commitment_consistency() {
         .prove(&prover, &preset, &sample, &format!("{e3_id}_base"))
         .expect("base proof should succeed");
 
-    let n_chunks = Configs::compute(preset, &sample)
-        .expect("configs")
-        .n_chunks;
+    let n_chunks = Configs::compute(preset, &sample).expect("configs").n_chunks;
 
     let mut chunk_proofs = Vec::with_capacity(n_chunks);
     for chunk_idx in 0..n_chunks {
@@ -561,9 +559,7 @@ async fn test_share_computation_e_sm_commitment_consistency() {
         .prove(&prover, &preset, &sample, &format!("{e3_id}_base"))
         .expect("base proof should succeed");
 
-    let n_chunks = Configs::compute(preset, &sample)
-        .expect("configs")
-        .n_chunks;
+    let n_chunks = Configs::compute(preset, &sample).expect("configs").n_chunks;
 
     let mut chunk_proofs = Vec::with_capacity(n_chunks);
     for chunk_idx in 0..n_chunks {
