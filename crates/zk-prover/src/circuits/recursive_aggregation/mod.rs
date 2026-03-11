@@ -234,7 +234,7 @@ pub fn generate_fold_proof(
 
 #[cfg(all(test, feature = "integration-tests"))]
 mod tests {
-    use super::*;
+    use super::{generate_fold_proof, generate_wrapper_proof};
     use crate::prover::ZkProver;
     use crate::test_utils::get_tempdir;
     use crate::traits::Provable;
@@ -331,9 +331,8 @@ mod tests {
             .expect("inner prove() should succeed");
 
         let start = std::time::Instant::now();
-        let wrapper_proof = PkCircuit
-            .aggregate_proof(&prover, &[inner_proof], None, e3_id)
-            .expect("aggregate_proof (1 proof) should succeed");
+        let wrapper_proof =
+            generate_wrapper_proof(&prover, &[inner_proof], e3_id).expect("wrapper (1 proof)");
         let elapsed = start.elapsed();
         eprintln!("1-proof wrapper generation: {:?}", elapsed);
 
@@ -410,9 +409,12 @@ mod tests {
             .expect("inner prove() B should succeed");
 
         let start = std::time::Instant::now();
-        let wrapper_proof = ShareDecryptionCircuit
-            .aggregate_proof(&prover, &[inner_proof_a, inner_proof_b], None, e3_id)
-            .expect("aggregate_proof (2 proofs) should succeed");
+        let wrapper_proof = generate_wrapper_proof(
+            &prover,
+            &[inner_proof_a, inner_proof_b],
+            e3_id,
+        )
+        .expect("wrapper (2 proofs)");
         let elapsed = start.elapsed();
         eprintln!("2-proof wrapper generation: {:?}", elapsed);
 
@@ -517,9 +519,8 @@ mod tests {
             .prove(&prover, &preset, &pk_sample, &format!("{e3_id}_pk_inner_0"))
             .expect("pk inner prove() should succeed");
 
-        let pk_wrapper_proof = PkCircuit
-            .aggregate_proof(&prover, &[pk_inner_proof], None, e3_id)
-            .expect("pk aggregate_proof (1 proof) should succeed");
+        let pk_wrapper_proof =
+            generate_wrapper_proof(&prover, &[pk_inner_proof], e3_id).expect("pk wrapper");
 
         let enc_inner_secret = ShareEncryptionCircuit
             .prove(
@@ -538,14 +539,15 @@ mod tests {
             )
             .expect("share_encryption inner prove() (noise) should succeed");
 
-        let fold_proof = ShareEncryptionCircuit
-            .aggregate_proof(
-                &prover,
-                &[enc_inner_secret, enc_inner_noise],
-                Some(&pk_wrapper_proof),
-                e3_id,
-            )
-            .expect("share_encryption aggregate_proof with fold should succeed");
+        let share_enc_wrapper_proof = generate_wrapper_proof(
+            &prover,
+            &[enc_inner_secret, enc_inner_noise],
+            e3_id,
+        )
+        .expect("share_encryption wrapper");
+        let fold_proof =
+            generate_fold_proof(&prover, &share_enc_wrapper_proof, &pk_wrapper_proof, e3_id, false)
+                .expect("fold");
 
         assert!(!fold_proof.data.is_empty());
         assert!(!fold_proof.public_signals.is_empty());

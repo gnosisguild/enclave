@@ -6,7 +6,6 @@
 
 use std::fmt::Display;
 
-use crate::circuits::recursive_aggregation::{generate_fold_proof, generate_wrapper_proof};
 use crate::circuits::utils::inputs_json_to_input_map;
 use crate::error::ZkError;
 use crate::prover::ZkProver;
@@ -93,34 +92,6 @@ pub trait Provable: Send + Sync {
         let witness = witness_gen.generate_witness(&circuit, inputs)?;
 
         prover.generate_proof_with_variant(resolved_name, &witness, e3_id, variant)
-    }
-
-    /// Wraps 1–2 proofs (from `prove()`) and optionally folds with `aggregated_proof`.
-    fn aggregate_proof(
-        &self,
-        prover: &ZkProver,
-        proofs: &[Proof],
-        aggregated_proof: Option<&Proof>,
-        e3_id: &str,
-    ) -> Result<Proof, ZkError> {
-        if !matches!(proofs.len(), 1 | 2) {
-            return Err(ZkError::InvalidInput(
-                "aggregate_proof requires 1 or 2 proofs".into(),
-            ));
-        }
-
-        if proofs.len() == 2 && proofs[0].circuit != proofs[1].circuit {
-            return Err(ZkError::InvalidInput(
-                "aggregate_proof requires all proofs to use the same circuit".into(),
-            ));
-        }
-
-        let wrapper_proof = generate_wrapper_proof(prover, proofs, e3_id)?;
-
-        match aggregated_proof {
-            Some(ap) => generate_fold_proof(prover, &wrapper_proof, ap, e3_id, false),
-            None => Ok(wrapper_proof),
-        }
     }
 
     fn verify(
