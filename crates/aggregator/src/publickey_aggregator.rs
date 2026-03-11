@@ -86,8 +86,8 @@ pub struct PublicKeyAggregator {
     params_preset: BfvPreset,
     /// Buffer for per-node DKG recursive proofs keyed by party_id.
     dkg_node_proofs: HashMap<u64, Proof>,
-    /// Number of honest parties (set after C1 verification).
-    expected_honest_count: Option<usize>,
+    /// Party IDs that passed C1 verification (set at C1 completion).
+    honest_party_ids: Option<BTreeSet<u64>>,
     /// Party IDs excluded as dishonest after C1 verification.
     dishonest_parties: BTreeSet<u64>,
     /// Cross-node DKG proof fold state.
@@ -120,7 +120,7 @@ impl PublicKeyAggregator {
             state,
             params_preset: params.params_preset,
             dkg_node_proofs: HashMap::new(),
-            expected_honest_count: None,
+            honest_party_ids: None,
             dishonest_parties: BTreeSet::new(),
             cross_node_fold: ProofFoldState::new(),
             c5_proof_pending: None,
@@ -268,6 +268,7 @@ impl PublicKeyAggregator {
         };
 
         let dishonest_parties = &msg.dishonest_parties;
+        let total_parties = submission_order.len();
 
         // Filter out dishonest parties using submission_order (insertion-order indexed,
         // matching the party IDs sent to dispatch_c1_verification).
@@ -286,6 +287,11 @@ impl PublicKeyAggregator {
             );
         }
         self.dishonest_parties = dishonest_parties.clone();
+
+        let honest_party_ids: BTreeSet<u64> = (0..total_parties as u64)
+            .filter(|id| !dishonest_parties.contains(id))
+            .collect();
+        self.honest_party_ids = Some(honest_party_ids);
 
         // Need at least threshold + 1 honest parties for aggregation
         if honest_keyshares.len() <= threshold_m {
@@ -352,7 +358,6 @@ impl PublicKeyAggregator {
             })
         })?;
 
-        self.expected_honest_count = Some(committee_h);
         self.last_ec = Some(ec.clone());
         self.try_start_cross_node_fold(&ec)?;
 
@@ -417,19 +422,22 @@ impl PublicKeyAggregator {
         self.try_start_cross_node_fold(&ec)
     }
 
-    /// Start cross-node fold once we know the honest count and have collected all proofs.
+    /// Start cross-node fold once we have DKG proofs from all verified honest parties.
     fn try_start_cross_node_fold(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
-        let Some(expected) = self.expected_honest_count else {
+        let Some(honest_ids) = &self.honest_party_ids else {
             return Ok(());
         };
-        if self.dkg_node_proofs.len() < expected || !self.cross_node_fold.is_idle() {
+        let all_honest_proofs_present = honest_ids
+            .iter()
+            .all(|id| self.dkg_node_proofs.contains_key(id));
+        if !all_honest_proofs_present || !self.cross_node_fold.is_idle() {
             return Ok(());
         }
 
         let mut pairs: Vec<_> = self
             .dkg_node_proofs
             .iter()
-            .filter(|(pid, _)| !self.dishonest_parties.contains(pid))
+            .filter(|(pid, _)| honest_ids.contains(pid))
             .map(|(pid, p)| (*pid, p.clone()))
             .collect();
         pairs.sort_by_key(|(pid, _)| *pid);
