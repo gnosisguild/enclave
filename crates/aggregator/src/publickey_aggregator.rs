@@ -22,7 +22,7 @@ use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_fhe_params::BfvPreset;
 use e3_utils::NotifySync;
 use e3_utils::{ArcBytes, MAILBOX_LIMIT};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
@@ -88,6 +88,8 @@ pub struct PublicKeyAggregator {
     dkg_node_proofs: HashMap<u64, Proof>,
     /// Number of honest parties (set after C1 verification).
     expected_honest_count: Option<usize>,
+    /// Party IDs excluded as dishonest after C1 verification.
+    dishonest_parties: BTreeSet<u64>,
     /// Cross-node DKG proof fold state.
     cross_node_fold: ProofFoldState,
     /// C5 proof stored while waiting for cross-node fold completion.
@@ -119,6 +121,7 @@ impl PublicKeyAggregator {
             params_preset: params.params_preset,
             dkg_node_proofs: HashMap::new(),
             expected_honest_count: None,
+            dishonest_parties: BTreeSet::new(),
             cross_node_fold: ProofFoldState::new(),
             c5_proof_pending: None,
             last_ec: None,
@@ -282,6 +285,7 @@ impl PublicKeyAggregator {
                 dishonest_parties
             );
         }
+        self.dishonest_parties = dishonest_parties.clone();
 
         // Need at least threshold + 1 honest parties for aggregation
         if honest_keyshares.len() <= threshold_m {
@@ -425,6 +429,7 @@ impl PublicKeyAggregator {
         let mut pairs: Vec<_> = self
             .dkg_node_proofs
             .iter()
+            .filter(|(pid, _)| !self.dishonest_parties.contains(pid))
             .map(|(pid, p)| (*pid, p.clone()))
             .collect();
         pairs.sort_by_key(|(pid, _)| *pid);
