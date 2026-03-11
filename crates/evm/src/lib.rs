@@ -18,6 +18,8 @@ mod fix_historical_order;
 pub mod helpers;
 mod log_fetcher;
 mod repo;
+mod slashing_manager_sol_reader;
+mod slashing_manager_sol_writer;
 mod sync_start_extractor;
 
 pub use bonding_registry_sol::BondingRegistrySolReader;
@@ -35,4 +37,6 @@ pub use evm_router::*;
 pub use fix_historical_order::*;
 pub use helpers::*;
 pub use repo::*;
+pub use slashing_manager_sol_reader::SlashingManagerSolReader;
+pub use slashing_manager_sol_writer::SlashingManagerSolWriter;
 pub use sync_start_extractor::*;
