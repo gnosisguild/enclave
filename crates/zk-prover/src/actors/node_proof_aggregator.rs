@@ -33,6 +33,8 @@ use tracing::{error, info, warn};
 /// Per-E3 rolling aggregation state for one node's proofs.
 struct RollingAggregationState {
     party_id: u64,
+    /// Total proofs expected (for progress logging).
+    total_expected: usize,
     /// Proofs buffered out-of-order, keyed by seq index.
     buffer: BTreeMap<usize, Proof>,
     /// The running accumulated (folded) proof.
@@ -85,11 +87,13 @@ impl NodeProofAggregator {
 
         self.states.entry(e3_id.clone()).or_insert_with(|| {
             info!(
-                "NodeProofAggregator: initializing state for E3 {} party {} (total_expected={})",
+                "NodeProofAggregator: initializing state for E3 {} party {} (total_expected={}, ~{} fold steps)",
                 e3_id, msg.full_share.party_id, total_expected,
+                total_expected.saturating_sub(1),
             );
             RollingAggregationState {
                 party_id: msg.full_share.party_id,
+                total_expected,
                 buffer: BTreeMap::new(),
                 accumulated: None,
                 next_to_aggregate: 0,
@@ -164,9 +168,11 @@ impl NodeProofAggregator {
                 let ec = state.last_ec.clone();
                 let e3_id_clone = e3_id.clone();
 
+                let folds_completed = state.total_expected - state.remaining - 1;
+                let total_folds = state.total_expected.saturating_sub(1);
                 info!(
-                    "NodeProofAggregator: dispatching fold (seq={}) for E3 {} corr={:?}",
-                    seq, e3_id, corr
+                    "NodeProofAggregator: dispatching fold step {}/{} (seq={}) for E3 {}",
+                    folds_completed + 1, total_folds, seq, e3_id
                 );
 
                 match self.bus.publish(
@@ -215,9 +221,11 @@ impl NodeProofAggregator {
         };
 
         state.remaining -= 1;
+        let folds_completed = state.total_expected - state.remaining - 1;
+        let total_folds = state.total_expected.saturating_sub(1);
         info!(
-            "NodeProofAggregator: fold response received for E3 {} (remaining={})",
-            e3_id, state.remaining
+            "NodeProofAggregator: fold step {}/{} complete for E3 {} ({} proofs remaining)",
+            folds_completed, total_folds, e3_id, state.remaining
         );
 
         state.accumulated = Some(proof);

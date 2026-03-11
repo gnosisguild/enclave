@@ -23,6 +23,9 @@ pub struct ProofFoldState {
     correlation: Option<CorrelationId>,
     accumulated: Option<Proof>,
     remaining: Vec<Proof>,
+    /// Total fold steps (for progress logging). Set when fold starts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    total_steps: Option<usize>,
     /// Set when all fold steps have completed.
     pub result: Option<Proof>,
 }
@@ -33,6 +36,7 @@ impl ProofFoldState {
             correlation: None,
             accumulated: None,
             remaining: Vec::new(),
+            total_steps: None,
             result: None,
         }
     }
@@ -42,6 +46,7 @@ impl ProofFoldState {
         self.correlation.is_none()
             && self.accumulated.is_none()
             && self.remaining.is_empty()
+            && self.total_steps.is_none()
             && self.result.is_none()
     }
 
@@ -72,9 +77,11 @@ impl ProofFoldState {
                 let first = proofs.remove(0);
                 self.accumulated = Some(first);
                 self.remaining = proofs;
+                let total = self.remaining.len();
+                self.total_steps = Some(total);
                 info!(
-                    "{label}: starting fold ({} steps remaining)",
-                    self.remaining.len()
+                    "{label}: starting fold ({} steps total, {} proofs remaining)",
+                    total, self.remaining.len()
                 );
                 self.advance(label, bus, e3_id, ec)
             }
@@ -103,8 +110,14 @@ impl ProofFoldState {
         self.correlation = None;
         self.accumulated = Some(proof);
 
+        let step_done = self
+            .total_steps
+            .map(|t| t - self.remaining.len())
+            .unwrap_or(0);
         info!(
-            "{label}: fold step done ({} remaining)",
+            "{label}: fold step {}/{} done ({} remaining)",
+            step_done,
+            self.total_steps.unwrap_or(0),
             self.remaining.len()
         );
 
@@ -142,8 +155,11 @@ impl ProofFoldState {
         let corr = CorrelationId::new();
         self.correlation = Some(corr);
 
+        let step = self.total_steps.map(|t| t - self.remaining.len()).unwrap_or(0);
         info!(
-            "{label}: dispatching fold step ({} remaining, target_evm={})",
+            "{label}: dispatching fold step {}/{} ({} proofs remaining, target_evm={})",
+            step + 1,
+            self.total_steps.unwrap_or(0),
             self.remaining.len(),
             target_evm
         );
