@@ -172,7 +172,10 @@ impl NodeProofAggregator {
                 let total_folds = state.total_expected.saturating_sub(1);
                 info!(
                     "NodeProofAggregator: dispatching fold step {}/{} (seq={}) for E3 {}",
-                    folds_completed + 1, total_folds, seq, e3_id
+                    folds_completed + 1,
+                    total_folds,
+                    seq,
+                    e3_id
                 );
 
                 match self.bus.publish(

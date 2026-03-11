@@ -88,7 +88,8 @@ impl ProofFoldState {
                 self.total_steps = Some(total);
                 info!(
                     "{label}: starting fold ({} steps total, {} proofs remaining)",
-                    total, self.remaining.len()
+                    total,
+                    self.remaining.len()
                 );
                 self.advance(label, bus, e3_id, ec)
             }
@@ -162,7 +163,10 @@ impl ProofFoldState {
         let corr = CorrelationId::new();
         self.correlation = Some(corr);
 
-        let step = self.total_steps.map(|t| t - self.remaining.len()).unwrap_or(0);
+        let step = self
+            .total_steps
+            .map(|t| t - self.remaining.len())
+            .unwrap_or(0);
         info!(
             "{label}: dispatching fold step {}/{} ({} proofs remaining, target_evm={})",
             step,

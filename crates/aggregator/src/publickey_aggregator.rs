@@ -422,8 +422,9 @@ impl PublicKeyAggregator {
         }
 
         let state = self.state.get();
-        let Some(PublicKeyAggregatorState::GeneratingC5Proof { dkg_node_proofs, .. }) =
-            state.as_ref()
+        let Some(PublicKeyAggregatorState::GeneratingC5Proof {
+            dkg_node_proofs, ..
+        }) = state.as_ref()
         else {
             return Ok(());
         };
@@ -565,10 +566,9 @@ impl PublicKeyAggregator {
             return Ok(());
         };
 
-        let (Some(c5_proof), Some(cross_node_proof)) = (
-            c5_proof_pending.as_ref(),
-            cross_node_fold.result.as_ref(),
-        ) else {
+        let (Some(c5_proof), Some(cross_node_proof)) =
+            (c5_proof_pending.as_ref(), cross_node_fold.result.as_ref())
+        else {
             return Ok(());
         };
 
