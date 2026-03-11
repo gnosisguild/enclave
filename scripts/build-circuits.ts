@@ -11,6 +11,13 @@ import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readF
 import { basename, join, resolve } from 'path'
 import { ALL_GROUPS, CIRCUIT_GROUPS, CIRCUIT_VARIANTS, type CircuitGroup } from './circuit-constants'
 
+/** share_computation wrapper is shared by sk_share_computation and e_sm_share_computation. */
+const SHARE_COMP_WRAPPER = {
+  path: ['recursive_aggregation', 'wrapper', 'dkg'] as const,
+  aliases: ['sk_share_computation', 'e_sm_share_computation'] as const,
+  variants: [CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_VARIANTS.RECURSIVE] as const,
+}
+
 interface CircuitInfo {
   name: string
   group: CircuitGroup
@@ -477,6 +484,24 @@ class NoirCircuitBuilder {
       }
     }
 
+    // share_computation wrapper aliases
+    const wrapperPath = SHARE_COMP_WRAPPER.path.join('/')
+    for (const variant of SHARE_COMP_WRAPPER.variants) {
+      const shareCompPrefix = `${variant}/${wrapperPath}/share_computation`
+      const basePrefix = `${variant}/${wrapperPath}`
+      for (const alias of SHARE_COMP_WRAPPER.aliases) {
+        for (const suffix of ['.json', '.vk', '.vk_hash']) {
+          const srcKey = `${shareCompPrefix}/share_computation${suffix}`
+          const srcHash = checksums[srcKey]
+          if (srcHash) {
+            const aliasKey = `${basePrefix}/${alias}/${alias}${suffix}`
+            checksums[aliasKey] = srcHash
+            lines.push(`${srcHash}  ${aliasKey}`)
+          }
+        }
+      }
+    }
+
     const outputDir = this.options.outputDir!
     writeFileSync(join(outputDir, 'SHA256SUMS'), lines.join('\n') + '\n')
     writeFileSync(
@@ -523,6 +548,23 @@ class NoirCircuitBuilder {
         }
       }
     }
+
+    // Share_computation wrapper aliases
+    for (const variant of SHARE_COMP_WRAPPER.variants) {
+      const shareCompSrc = join(outputDir, variant, ...SHARE_COMP_WRAPPER.path, 'share_computation')
+      if (existsSync(join(shareCompSrc, 'share_computation.json'))) {
+        for (const alias of SHARE_COMP_WRAPPER.aliases) {
+          const destDir = join(outputDir, variant, ...SHARE_COMP_WRAPPER.path, alias)
+          mkdirSync(destDir, { recursive: true })
+          copyFileSync(join(shareCompSrc, 'share_computation.json'), join(destDir, `${alias}.json`))
+          copyFileSync(join(shareCompSrc, 'share_computation.vk'), join(destDir, `${alias}.vk`))
+          if (existsSync(join(shareCompSrc, 'share_computation.vk_hash'))) {
+            copyFileSync(join(shareCompSrc, 'share_computation.vk_hash'), join(destDir, `${alias}.vk_hash`))
+          }
+        }
+      }
+    }
+
     return outputDir
   }
 
