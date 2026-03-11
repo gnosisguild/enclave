@@ -313,9 +313,12 @@ impl<E: Event> Actor for HistoryCollectorWaiter<E> {
 
 impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollectorWaiter<E> {
     type Result = ResponseActFuture<Self, TakeEventsResult<E>>;
-    fn handle(&mut self, msg: TakeEvents<E>, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: TakeEvents<E>, ctx: &mut Context<Self>) -> Self::Result {
         let count = msg.amount;
         let timeout = msg.timeout;
+        ctx.run_interval(Duration::from_secs(1), |_act, _ctx| {
+            // just wakes the actor context periodically
+        });
         let mut rx = self.rx.take().unwrap();
         const MAX_TIMEOUT: Duration = Duration::from_secs(60 * 60); // 1h (cannot use Duration::MAX or
                                                                     // timeout fails)

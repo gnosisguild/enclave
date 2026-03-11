@@ -123,6 +123,7 @@ impl CiphernodeSystem {
 
     /// expect events to fire with the default timeout 1000sec per event
     pub async fn expect_events(&self, expected: &[&str]) -> Result<CiphernodeHistory> {
+        info!("expect_events: {:?}", expected);
         let h = self
             .take_history_with_timeouts(
                 0,
@@ -158,6 +159,7 @@ impl CiphernodeSystem {
         total_to: Duration,   // total
         per_evt_to: Duration, // per event
     ) -> Result<CiphernodeHistory> {
+        info!("expect_events_with_timeouts {:?}", expected);
         let start = Instant::now();
         let h = self
             .take_history_with_timeouts(0, expected.len(), Some(total_to), Some(per_evt_to))
