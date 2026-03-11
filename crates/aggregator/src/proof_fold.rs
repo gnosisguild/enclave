@@ -134,13 +134,15 @@ impl ProofFoldState {
             return Ok(());
         };
         self.remaining.remove(0);
+        let target_evm = self.remaining.is_empty();
 
         let corr = CorrelationId::new();
         self.correlation = Some(corr);
 
         info!(
-            "{label}: dispatching fold step ({} remaining)",
-            self.remaining.len()
+            "{label}: dispatching fold step ({} remaining, target_evm={})",
+            self.remaining.len(),
+            target_evm
         );
 
         if let Err(err) = bus.publish(
@@ -148,6 +150,7 @@ impl ProofFoldState {
                 ZkRequest::FoldProofs {
                     proof1: acc,
                     proof2: next,
+                    target_evm,
                 },
                 corr,
                 e3_id.clone(),

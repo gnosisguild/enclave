@@ -162,11 +162,13 @@ impl serde::Serialize for FoldInput {
 
 /// Generates the fold proof by folding two proofs.
 /// VK path is chosen by circuit type: Fold uses dir_path, wrappers use wrapper_dir_path.
+/// When `target_evm` is true, the proof is generated for on-chain EVM verification.
 pub fn generate_fold_proof(
     prover: &ZkProver,
     proof1: &Proof,
     proof2: &Proof,
     e3_id: &str,
+    target_evm: bool,
 ) -> Result<Proof, ZkError> {
     let vk1 = vk::load_vk_for_fold_input(
         &prover.circuits_dir(CircuitVariant::Default),
@@ -205,9 +207,14 @@ pub fn generate_fold_proof(
         proof2_key_hash: vk2.key_hash,
     };
 
+    let variant = if target_evm {
+        CircuitVariant::Evm
+    } else {
+        CircuitVariant::Default
+    };
     let dir_path = CircuitName::Fold.dir_path();
     let circuit_path = prover
-        .circuits_dir(CircuitVariant::Default)
+        .circuits_dir(variant)
         .join(&dir_path)
         .join(format!("{}.json", CircuitName::Fold.as_str()));
     let compiled = CompiledCircuit::from_file(&circuit_path)?;
@@ -218,7 +225,11 @@ pub fn generate_fold_proof(
     let witness_gen = WitnessGenerator::new();
     let witness = witness_gen.generate_witness(&compiled, input_map)?;
 
-    prover.generate_fold_proof(&witness, e3_id)
+    if target_evm {
+        prover.generate_final_fold_proof(&witness, e3_id)
+    } else {
+        prover.generate_fold_proof(&witness, e3_id)
+    }
 }
 
 #[cfg(all(test, feature = "integration-tests"))]

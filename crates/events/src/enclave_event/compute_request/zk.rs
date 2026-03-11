@@ -37,7 +37,12 @@ pub enum ZkRequest {
     /// Generate proof for decrypted shares aggregation (C7).
     DecryptedSharesAggregation(DecryptedSharesAggregationProofRequest),
     /// Fold two proofs into one (incremental recursive aggregation).
-    FoldProofs { proof1: Proof, proof2: Proof },
+    /// When `target_evm` is true, the output proof is generated for on-chain EVM verification.
+    FoldProofs {
+        proof1: Proof,
+        proof2: Proof,
+        target_evm: bool,
+    },
 }
 
 /// Request to generate a proof for public key aggregation (C5).

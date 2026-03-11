@@ -631,9 +631,13 @@ fn handle_zk_request(
                 handle_decrypted_shares_aggregation_proof(&prover, req, request.clone())
             })
         }
-        ZkRequest::FoldProofs { proof1, proof2 } => timefunc("zk_fold_proofs", id, || {
+        ZkRequest::FoldProofs {
+            proof1,
+            proof2,
+            target_evm,
+        } => timefunc("zk_fold_proofs", id, || {
             let e3_id_str = request.e3_id.to_string();
-            match generate_fold_proof(&prover, &proof1, &proof2, &e3_id_str) {
+            match generate_fold_proof(&prover, &proof1, &proof2, &e3_id_str, target_evm) {
                 Ok(proof) => Ok(ComputeResponse::zk(
                     ZkResponse::FoldProofs(FoldProofsResponse { proof }),
                     request.correlation_id,

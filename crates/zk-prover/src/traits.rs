@@ -118,7 +118,7 @@ pub trait Provable: Send + Sync {
         let wrapper_proof = generate_wrapper_proof(prover, proofs, e3_id)?;
 
         match aggregated_proof {
-            Some(ap) => generate_fold_proof(prover, &wrapper_proof, ap, e3_id),
+            Some(ap) => generate_fold_proof(prover, &wrapper_proof, ap, e3_id, false),
             None => Ok(wrapper_proof),
         }
     }

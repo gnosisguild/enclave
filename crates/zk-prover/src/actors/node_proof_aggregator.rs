@@ -176,6 +176,7 @@ impl NodeProofAggregator {
                         ZkRequest::FoldProofs {
                             proof1: acc,
                             proof2: next_proof,
+                            target_evm: false,
                         },
                         corr,
                         e3_id.clone(),
