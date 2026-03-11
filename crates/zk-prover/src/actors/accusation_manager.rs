@@ -39,8 +39,8 @@ use e3_events::{
     ComputeRequestError, ComputeResponse, ComputeResponseKind, CorrelationId, E3id, EnclaveEvent,
     EnclaveEventData, EventContext, EventPublisher, EventSubscriber, EventType,
     PartyProofsToVerify, ProofFailureAccusation, ProofType, ProofVerificationFailed,
-    ProofVerificationPassed, Sequenced, SignedProofPayload, TypedEvent, VerifyShareProofsRequest,
-    ZkRequest, ZkResponse,
+    ProofVerificationPassed, Sequenced, SignedProofPayload, SlashExecuted, TypedEvent,
+    VerifyShareProofsRequest, ZkRequest, ZkResponse,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
@@ -158,6 +158,7 @@ impl AccusationManager {
         bus.subscribe(EventType::AccusationVote, addr.clone().into());
         bus.subscribe(EventType::ComputeResponse, addr.clone().into());
         bus.subscribe(EventType::ComputeRequestError, addr.clone().into());
+        bus.subscribe(EventType::SlashExecuted, addr.clone().into());
         addr
     }
 
@@ -744,8 +745,14 @@ impl AccusationManager {
             return;
         }
 
-        // Check if quorum is still possible
-        let remaining = self.committee.len().saturating_sub(total_votes);
+        // Check if quorum is still possible.
+        // Exclude the accused — they cannot vote on their own accusation.
+        let effective_committee = if self.committee.contains(&pending.accusation.accused) {
+            self.committee.len().saturating_sub(1)
+        } else {
+            self.committee.len()
+        };
+        let remaining = effective_committee.saturating_sub(total_votes);
         if agree_count + remaining < self.threshold_m {
             // Even if all remaining voters agree, can't reach quorum.
             // Collect all unique data hashes (from all votes + the accusation itself)
@@ -877,6 +884,33 @@ impl AccusationManager {
             ec.clone(),
         ) {
             error!("Failed to publish AccusationQuorumReached: {err}");
+        }
+    }
+
+    /// Handle an on-chain SlashExecuted event for this E3.
+    fn on_slash_executed(&mut self, data: SlashExecuted) {
+        if data.e3_id != self.e3_id {
+            return;
+        }
+        let prev_len = self.committee.len();
+        self.committee.retain(|addr| *addr != data.operator);
+        if self.committee.len() < prev_len {
+            info!(
+                "Removed slashed operator {} from committee (now {} members)",
+                data.operator,
+                self.committee.len()
+            );
+
+            // Purge any votes from the expelled node in pending accusations
+            for pending in self.pending.values_mut() {
+                pending.votes_for.retain(|v| v.voter != data.operator);
+                pending.votes_against.retain(|v| v.voter != data.operator);
+            }
+
+            // Purge from buffered votes
+            for buf in self.buffered_votes.values_mut() {
+                buf.retain(|v| v.voter != data.operator);
+            }
         }
     }
 
@@ -1038,6 +1072,9 @@ impl Handler<EnclaveEvent> for AccusationManager {
             }
             EnclaveEventData::ComputeRequestError(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::SlashExecuted(data) => {
+                self.on_slash_executed(data);
             }
             _ => (),
         }
