@@ -72,6 +72,8 @@ pub struct NodeDefinition {
     pub autopassword: bool,
     /// If a wallet has not been set autogenerate one on start
     pub autowallet: bool,
+    /// Port for embedded dashboard web UI (0 = auto-assign, None = disabled)
+    pub dashboard_port: Option<u16>,
 }
 
 impl Default for NodeDefinition {
@@ -89,6 +91,7 @@ impl Default for NodeDefinition {
             autonetkey: false,
             autopassword: false,
             autowallet: false,
+            dashboard_port: None,
         }
     }
 }
@@ -406,6 +409,11 @@ impl AppConfig {
 
     pub fn program(&self) -> &ProgramConfig {
         &self.program
+    }
+
+    /// Get the dashboard port if configured
+    pub fn dashboard_port(&self) -> Option<u16> {
+        self.node_def().dashboard_port
     }
 }
 

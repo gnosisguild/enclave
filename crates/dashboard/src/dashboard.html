@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enclave Ciphernode Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e1e4ed;
+    --text-dim: #8b8fa3;
+    --accent: #6c72cb;
+    --accent-light: #8b90e0;
+    --green: #4ade80;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --blue: #60a5fa;
+    --orange: #fb923c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 { font-size: 16px; font-weight: 600; }
+  header .status { font-size: 12px; color: var(--text-dim); }
+  .tabs {
+    display: flex;
+    gap: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    padding: 10px 24px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-dim);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    font-family: inherit;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent-light); border-bottom-color: var(--accent); }
+  .panel { display: none; padding: 20px 24px; }
+  .panel.active { display: block; }
+
+  /* Overview */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .card .label { font-size: 11px; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.5px; margin-bottom: 6px; }
+  .card .value { font-size: 24px; font-weight: 700; }
+  .card .value.green { color: var(--green); }
+  .card .value.red { color: var(--red); }
+  .card .value.blue { color: var(--blue); }
+  .card .value.yellow { color: var(--yellow); }
+  .section-title { font-size: 13px; color: var(--text-dim); margin: 20px 0 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .e3-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .e3-tag {
+    background: var(--accent);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: monospace;
+  }
+  .info-row { font-size: 13px; color: var(--text-dim); margin: 4px 0; }
+  .info-row span { color: var(--text); font-family: monospace; }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .controls select, .controls input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .controls input { min-width: 200px; }
+  .controls label { font-size: 12px; color: var(--text-dim); display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .controls input[type="checkbox"] { width: auto; min-width: auto; }
+
+  /* Table */
+  .log-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    table-layout: fixed;
+  }
+  .log-table th {
+    text-align: left;
+    padding: 8px 10px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .log-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .log-table tr:hover { background: rgba(108, 114, 203, 0.05); }
+  .log-table .col-time { width: 180px; }
+  .log-table .col-level { width: 70px; }
+  .log-table .col-target { width: 220px; }
+  .log-table .col-etype { width: 200px; }
+  .log-table .col-e3id { width: 160px; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .badge.ERROR { background: rgba(248,113,113,0.15); color: var(--red); }
+  .badge.WARN { background: rgba(251,191,36,0.15); color: var(--yellow); }
+  .badge.INFO { background: rgba(96,165,250,0.15); color: var(--blue); }
+  .badge.DEBUG { background: rgba(139,144,224,0.15); color: var(--accent-light); }
+  .badge.TRACE { background: rgba(139,143,163,0.15); color: var(--text-dim); }
+  .time-cell { color: var(--text-dim); font-family: monospace; font-size: 11px; }
+  .target-cell { color: var(--accent-light); font-family: monospace; font-size: 11px; }
+  .empty { text-align: center; padding: 40px; color: var(--text-dim); }
+  .table-wrap { max-height: calc(100vh - 220px); overflow-y: auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Enclave Ciphernode Dashboard</h1>
+  <span class="status" id="status">Connecting...</span>
+</header>
+<div class="tabs">
+  <button class="tab active" data-tab="overview">Overview</button>
+  <button class="tab" data-tab="logs">Logs</button>
+  <button class="tab" data-tab="events">Events</button>
+</div>
+
+<!-- Overview Panel -->
+<div id="overview" class="panel active">
+  <div class="cards">
+    <div class="card"><div class="label">E3s Participated</div><div class="value blue" id="m-participated">0</div></div>
+    <div class="card"><div class="label">E3s Completed</div><div class="value green" id="m-completed">0</div></div>
+    <div class="card"><div class="label">E3s Failed</div><div class="value red" id="m-failed">0</div></div>
+    <div class="card"><div class="label">Ticket Balance</div><div class="value yellow" id="m-balance">-</div></div>
+    <div class="card"><div class="label">Uptime</div><div class="value" id="m-uptime">-</div></div>
+  </div>
+  <div class="info-row">Node Address: <span id="m-address">-</span></div>
+  <div class="section-title">Active E3s</div>
+  <div class="e3-list" id="m-active-e3s"><span class="info-row">None</span></div>
+</div>
+
+<!-- Logs Panel -->
+<div id="logs" class="panel">
+  <div class="controls">
+    <select id="log-level">
+      <option value="">All Levels</option>
+      <option value="ERROR">ERROR</option>
+      <option value="WARN">WARN</option>
+      <option value="INFO">INFO</option>
+      <option value="DEBUG">DEBUG</option>
+      <option value="TRACE">TRACE</option>
+    </select>
+    <input type="text" id="log-search" placeholder="Search logs...">
+    <label><input type="checkbox" id="log-auto" checked> Auto-refresh</label>
+  </div>
+  <div class="table-wrap">
+    <table class="log-table">
+      <thead><tr>
+        <th class="col-time">Time</th>
+        <th class="col-level">Level</th>
+        <th class="col-target">Target</th>
+        <th>Message</th>
+      </tr></thead>
+      <tbody id="log-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Events Panel -->
+<div id="events" class="panel">
+  <div class="controls">
+    <input type="text" id="event-type-filter" placeholder="Filter event type...">
+    <input type="text" id="event-e3-filter" placeholder="Filter E3 ID...">
+    <label><input type="checkbox" id="event-auto" checked> Auto-refresh</label>
+  </div>
+  <div class="table-wrap">
+    <table class="log-table">
+      <thead><tr>
+        <th class="col-time">Time</th>
+        <th class="col-etype">Event Type</th>
+        <th class="col-e3id">E3 ID</th>
+        <th>Details</th>
+      </tr></thead>
+      <tbody id="event-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function fmtTime(iso) {
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:3});
+    } catch { return iso; }
+  }
+
+  function fmtUptime(secs) {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (h > 0) return h + 'h ' + m + 'm ' + s + 's';
+    if (m > 0) return m + 'm ' + s + 's';
+    return s + 's';
+  }
+
+  async function fetchJSON(url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(r.statusText);
+    return r.json();
+  }
+
+  async function refreshMetrics() {
+    try {
+      const m = await fetchJSON('/api/metrics');
+      document.getElementById('m-participated').textContent = m.e3s_participated;
+      document.getElementById('m-completed').textContent = m.e3s_completed;
+      document.getElementById('m-failed').textContent = m.e3s_failed;
+      document.getElementById('m-balance').textContent = m.ticket_balance || '-';
+      document.getElementById('m-uptime').textContent = fmtUptime(m.uptime_seconds);
+      document.getElementById('m-address').textContent = m.node_address || '-';
+
+      const el = document.getElementById('m-active-e3s');
+      if (m.current_e3s && m.current_e3s.length > 0) {
+        el.innerHTML = m.current_e3s.map(id => '<span class="e3-tag">' + esc(id) + '</span>').join('');
+      } else {
+        el.innerHTML = '<span class="info-row">None</span>';
+      }
+      document.getElementById('status').textContent = 'Connected';
+    } catch (e) {
+      document.getElementById('status').textContent = 'Error: ' + e.message;
+    }
+  }
+
+  function debounce(func, delay) {
+    let timer;
+    return function(...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => func.apply(this, args), delay);
+    };
+  }
+
+  async function refreshLogs(fromTimer) {
+    if (fromTimer && !document.getElementById('log-auto').checked) return;
+    try {
+      const level = document.getElementById('log-level').value;
+      const search = document.getElementById('log-search').value;
+      const params = new URLSearchParams();
+      if (level) params.set('level', level);
+      if (search) params.set('search', search);
+      params.set('limit', '500');
+
+      const logs = await fetchJSON('/api/logs?' + params.toString());
+      const tbody = document.getElementById('log-body');
+      if (logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">No logs yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = logs.map(l =>
+        '<tr>' +
+        '<td class="time-cell">' + esc(fmtTime(l.timestamp)) + '</td>' +
+        '<td><span class="badge ' + esc(l.level) + '">' + esc(l.level) + '</span></td>' +
+        '<td class="target-cell">' + esc(l.target) + '</td>' +
+        '<td>' + esc(l.message) + '</td>' +
+        '</tr>'
+      ).join('');
+    } catch (e) {
+      document.getElementById('status').textContent = 'Logs error: ' + e.message;
+    }
+  }
+
+  async function refreshEvents(fromTimer) {
+    if (fromTimer && !document.getElementById('event-auto').checked) return;
+    try {
+      const eventType = document.getElementById('event-type-filter').value;
+      const e3id = document.getElementById('event-e3-filter').value;
+      const params = new URLSearchParams();
+      if (eventType) params.set('type', eventType);
+      if (e3id) params.set('e3_id', e3id);
+      params.set('limit', '500');
+
+      const events = await fetchJSON('/api/events?' + params.toString());
+      const tbody = document.getElementById('event-body');
+      if (events.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">No events yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = events.map(e =>
+        '<tr' + (e.is_error ? ' style="background:rgba(248,113,113,0.05)"' : '') + '>' +
+        '<td class="time-cell">' + esc(fmtTime(e.timestamp)) + '</td>' +
+        '<td>' + esc(e.event_type) + '</td>' +
+        '<td style="font-family:monospace;font-size:11px">' + esc(e.e3_id || '-') + '</td>' +
+        '<td style="font-size:11px">' + esc(e.details) + '</td>' +
+        '</tr>'
+      ).join('');
+    } catch (e) {
+      document.getElementById('status').textContent = 'Events error: ' + e.message;
+    }
+  }
+
+  // Initial load
+  refreshMetrics();
+  refreshLogs();
+  refreshEvents();
+
+  // Poll intervals (events less frequently since it queries the eventstore)
+  setInterval(refreshMetrics, 2000);
+  setInterval(() => refreshLogs(true), 2000);
+  setInterval(() => refreshEvents(true), 10000);
+
+  // Immediate refresh on filter change (debounced for text inputs)
+  document.getElementById('log-level').addEventListener('change', refreshLogs);
+  document.getElementById('log-search').addEventListener('input', debounce(refreshLogs, 300));
+  document.getElementById('event-type-filter').addEventListener('input', debounce(refreshEvents, 300));
+  document.getElementById('event-e3-filter').addEventListener('input', debounce(refreshEvents, 300));
+})();
+</script>
+</body>
+</html>

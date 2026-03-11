@@ -61,7 +61,7 @@ dependencies = [
  "futures-util",
  "log",
  "once_cell",
- "parking_lot 0.12.5",
+ "parking_lot 0.12.3",
  "pin-project-lite",
  "smallvec",
  "tokio",
@@ -751,7 +751,7 @@ dependencies = [
  "futures",
  "futures-utils-wasm",
  "lru 0.13.0",
- "parking_lot 0.12.5",
+ "parking_lot 0.12.3",
  "pin-project",
  "reqwest",
  "serde",
@@ -775,7 +775,7 @@ dependencies = [
  "auto_impl",
  "bimap",
  "futures",
- "parking_lot 0.12.5",
+ "parking_lot 0.12.3",
  "serde",
  "serde_json",
  "tokio",
@@ -1077,7 +1077,7 @@ dependencies = [
  "derive_more",
  "futures",
  "futures-utils-wasm",
- "parking_lot 0.12.5",
+ "parking_lot 0.12.3",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -3091,6 +3091,7 @@ dependencies = [
  "e3-aggregator",
  "e3-config",
  "e3-crypto",
+ "e3-dashboard",
  "e3-data",
  "e3-events",
  "e3-evm",
@@ -3127,6 +3128,7 @@ dependencies = [
  "dirs 5.0.1",
  "e3-config",
  "e3-crypto",
+ "e3-dashboard",
  "e3-entrypoint",
  "e3-events",
  "e3-evm",
@@ -3210,6 +3212,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-dashboard"
+version = "0.1.15"
+dependencies = [
+ "actix",
+ "actix-web",
+ "anyhow",
+ "chrono",
+ "e3-events",
+ "parking_lot 0.12.3",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "e3-data"
 version = "0.1.15"
 dependencies = [
@@ -3244,6 +3263,7 @@ dependencies = [
  "e3-ciphernode-builder",
  "e3-config",
  "e3-crypto",
+ "e3-dashboard",
  "e3-data",
  "e3-events",
  "e3-evm",
@@ -4219,7 +4239,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8cb01cd46b0cf372153850f4c6c272d9cbea2da513e07538405148f95bd789f3"
 dependencies = [
  "atomic",
- "parking_lot 0.12.5",
+ "parking_lot 0.12.3",
  "pear",
  "serde",
  "serde_yaml",
@@ -4759,7 +4779,7 @@ dependencies = [
  "ipconfig",
  "lru-cache",
  "once_cell",
- "parking_lot 0.12.5",
+ "parking_lot 0.12.3",
  "rand 0.8.5",
  "resolv-conf",
  "smallvec",
@@ -5633,7 +5653,7 @@ dependencies = [
  "multihash",
  "multistream-select",
  "once_cell",
- "parking_lot 0.12.5",
+ "parking_lot 0.12.3",
  "pin-project",
  "quick-protobuf",
  "rand 0.8.5",
@@ -5657,7 +5677,7 @@ dependencies = [
  "hickory-resolver",
  "libp2p-core",
  "libp2p-identity",
- "parking_lot 0.12.5",
+ "parking_lot 0.12.3",
  "smallvec",
  "tracing",
 ]
@@ -5834,7 +5854,7 @@ dependencies = [
  "libp2p-core",
  "libp2p-identity",
  "libp2p-tls",
- "parking_lot 0.12.5",
+ "parking_lot 0.12.3",
  "quinn",
  "rand 0.8.5",
  "ring 0.17.14",
@@ -6999,9 +7019,9 @@ dependencies = [
 
 [[package]]
 name = "parking_lot"
-version = "0.12.5"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93857453250e3077bd71ff98b6a65ea6621a19bb0f559a85248955ac12c45a1a"
+checksum = "f1bf18183cf54e8d6059647fc3063646a1801cf30896933ec2311622cc4b9a27"
 dependencies = [
  "lock_api",
  "parking_lot_core 0.9.12",
@@ -7448,7 +7468,7 @@ checksum = "504ee9ff529add891127c4827eb481bd69dc0ebc72e9a682e187db4caa60c3ca"
 dependencies = [
  "dtoa",
  "itoa",
- "parking_lot 0.12.5",
+ "parking_lot 0.12.3",
  "prometheus-client-derive-encode",
 ]
 
@@ -7529,8 +7549,8 @@ version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
- "heck 0.4.1",
- "itertools 0.10.5",
+ "heck 0.5.0",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "once_cell",
@@ -8722,7 +8742,7 @@ dependencies = [
  "futures",
  "log",
  "once_cell",
- "parking_lot 0.12.5",
+ "parking_lot 0.12.3",
  "scc",
  "serial_test_derive",
 ]
@@ -9335,7 +9355,7 @@ dependencies = [
  "io-uring",
  "libc",
  "mio",
- "parking_lot 0.12.5",
+ "parking_lot 0.12.3",
  "pin-project-lite",
  "signal-hook-registry",
  "slab",
@@ -10077,7 +10097,7 @@ checksum = "1c598d6b99ea013e35844697fc4670d08339d5cda15588f193c6beedd12f644b"
 dependencies = [
  "futures",
  "js-sys",
- "parking_lot 0.12.5",
+ "parking_lot 0.12.3",
  "pin-utils",
  "slab",
  "wasm-bindgen",

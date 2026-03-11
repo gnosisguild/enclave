@@ -3,23 +3,23 @@ chains:
     rpc_url: "ws://localhost:8545"
     contracts:
       e3_program:
-        address: '0x851356ae760d987E095750cCeb3bC6014560891C'
-        deploy_block: 31
+        address: "0x851356ae760d987E095750cCeb3bC6014560891C"
+        deploy_block: 42
       enclave:
         address: "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
-        deploy_block: 21
+        deploy_block: 25
       ciphernode_registry:
-        address: '0xa513E6E4b8f2a923D98304ec87F64353C4D5C853'
-        deploy_block: 14
+        address: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
+        deploy_block: 16
       bonding_registry:
-        address: '0x8A791620dd6260079BF849Dc5567aDC3F2FdC318'
-        deploy_block: 10
+        address: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+        deploy_block: 19
       slashing_manager:
-        address: '0x5FC8d32690cc91D4c39d9d3abcBD16989F875707'
-        deploy_block: 10
+        address: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+        deploy_block: 15
       fee_token:
         address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-        deploy_block: 6
+        deploy_block: 8
 program:
   dev: true
 nodes:
@@ -28,6 +28,7 @@ nodes:
     quic_port: 9201
     autonetkey: true
     autopassword: true
+    dashboard_port: 3001
   cn2:
     address: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
     quic_port: 9202

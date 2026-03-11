@@ -13,6 +13,7 @@ use e3_aggregator::ext::{PublicKeyAggregatorExtension, ThresholdPlaintextAggrega
 use e3_aggregator::CommitteeFinalizer;
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
+use e3_dashboard::{DashboardActor, SharedLogBuffer};
 use e3_data::{InMemStore, RepositoriesFactory};
 use e3_events::{
     AggregateConfig, AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig,
@@ -78,6 +79,8 @@ pub struct CiphernodeBuilder {
     zk_backend: Option<ZkBackend>,
     net_config: Option<NetConfig>,
     ignore_address_check: bool,
+    dashboard_port: Option<u16>,
+    dashboard_log_buffer: Option<SharedLogBuffer>,
 }
 
 // Simple Net Configuration
@@ -144,6 +147,8 @@ impl CiphernodeBuilder {
             net_config: None,
             zk_backend: None,
             ignore_address_check: false,
+            dashboard_port: None,
+            dashboard_log_buffer: None,
         }
     }
 
@@ -308,6 +313,13 @@ impl CiphernodeBuilder {
 
     pub fn testmode_ignore_address_check(mut self) -> Self {
         self.ignore_address_check = true;
+        self
+    }
+
+    /// Enable the embedded web dashboard on the given port with the given log buffer.
+    pub fn with_dashboard(mut self, port: u16, log_buffer: SharedLogBuffer) -> Self {
+        self.dashboard_port = Some(port);
+        self.dashboard_log_buffer = Some(log_buffer);
         self
     }
 
@@ -521,6 +533,31 @@ impl CiphernodeBuilder {
         };
 
         setup_net(topic, bus.clone(), eventstore_ts, interface)?;
+
+        // Start dashboard if configured
+        if let Some(port) = self.dashboard_port {
+            match self.dashboard_log_buffer.take() {
+                Some(log_buffer) => {
+                    let dashboard = DashboardActor::attach_with_eventstore(
+                        &bus,
+                        &addr,
+                        eventstore_seq.clone(),
+                        aggregate_config.aggregates(),
+                    );
+                    match e3_dashboard::start_dashboard_server(port, log_buffer, dashboard).await {
+                        Ok(actual_port) => {
+                            info!("Dashboard running at http://127.0.0.1:{}", actual_port);
+                        }
+                        Err(e) => {
+                            error!("Failed to start dashboard server on port {}: {}. Continuing without dashboard.", port, e);
+                        }
+                    }
+                }
+                None => {
+                    error!("Dashboard port configured but no log buffer provided. Continuing without dashboard.");
+                }
+            }
+        }
 
         // Run the sync routine
         sync(

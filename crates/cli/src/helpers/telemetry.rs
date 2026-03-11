@@ -6,6 +6,7 @@
 
 use anyhow::Result;
 use e3_config::AppConfig;
+use e3_dashboard::{DashboardTracingLayer, SharedLogBuffer};
 use opentelemetry::trace::TracerProvider;
 use opentelemetry_otlp::{Protocol, WithExportConfig};
 use opentelemetry_sdk::trace::SdkTracerProvider;
@@ -23,9 +24,16 @@ pub fn setup_simple_tracing(log_level: Level) {
         .init();
 }
 
-pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
+pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<Option<SharedLogBuffer>> {
     let name = config.name();
     let maybe_otel_endpoint = config.otel();
+
+    let (dashboard_layer, log_buffer) = if config.dashboard_port().is_some() {
+        let (layer, buffer) = DashboardTracingLayer::new(5000);
+        (Some(layer), Some(buffer))
+    } else {
+        (None, None)
+    };
 
     match maybe_otel_endpoint {
         Some(endpoint) => {
@@ -48,16 +56,16 @@ pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
             tracing_subscriber::registry()
                 .with(tracing_subscriber::fmt::layer())
                 .with(telemetry)
+                .with(dashboard_layer)
                 .with(tracing_subscriber::filter::LevelFilter::from_level(
                     log_level,
                 ))
                 .init();
         }
         None => {
-            // TODO: we might be able to dedupe this with above but there were
-            //       issues with telemetry so have left this like so for now
             tracing_subscriber::registry()
                 .with(tracing_subscriber::fmt::layer())
+                .with(dashboard_layer)
                 .with(tracing_subscriber::filter::LevelFilter::from_level(
                     log_level,
                 ))
@@ -65,5 +73,5 @@ pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
         }
     }
 
-    Ok(())
+    Ok(log_buffer)
 }

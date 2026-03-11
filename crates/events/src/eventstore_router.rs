@@ -53,7 +53,7 @@ impl Handler<EventStoreQueryResponse> for QueryAggregator {
         let sub_query_id = msg.id();
 
         if let Some(aggregate_id) = self.pending.remove(&sub_query_id) {
-            info!(
+            debug!(
                 "Received response for aggregate {:?}, {} pending",
                 aggregate_id,
                 self.pending.len()
@@ -61,7 +61,7 @@ impl Handler<EventStoreQueryResponse> for QueryAggregator {
             self.collected_events.extend(msg.into_events());
 
             if self.pending.is_empty() {
-                info!("All aggregates fulfilled, sending response");
+                debug!("All aggregates fulfilled, sending response");
                 let response = EventStoreQueryResponse::new(
                     self.parent_id,
                     std::mem::take(&mut self.collected_events),

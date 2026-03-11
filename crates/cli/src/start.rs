@@ -7,11 +7,16 @@
 use crate::owo;
 use anyhow::Result;
 use e3_config::{AppConfig, NodeRole};
+use e3_dashboard::SharedLogBuffer;
 use e3_entrypoint::helpers::listen_for_shutdown;
 use tracing::{info, instrument};
 
 #[instrument(skip_all)]
-pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
+pub async fn execute(
+    mut config: AppConfig,
+    peers: Vec<String>,
+    log_buffer: Option<SharedLogBuffer>,
+) -> Result<()> {
     owo();
 
     // add cli peers to the config
@@ -27,12 +32,13 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
                 &config,
                 pubkey_write_path,
                 plaintext_write_path,
+                log_buffer,
             )
             .await?
         }
 
         // Launch in ciphernode configuration
-        NodeRole::Ciphernode => e3_entrypoint::start::start::execute(&config).await?,
+        NodeRole::Ciphernode => e3_entrypoint::start::start::execute(&config, log_buffer).await?,
     };
 
     info!(
