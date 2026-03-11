@@ -69,6 +69,10 @@ pub struct DashboardActor {
 
 const FALLBACK_MAX_EVENTS: usize = 2000;
 const PENDING_QUERY_TIMEOUT: Duration = Duration::from_secs(30);
+/// Default cap on events fetched from the store when no explicit limit is provided.
+const DEFAULT_QUERY_CAP: usize = 500;
+/// Upper bound on events fetched even when filters require over-fetching.
+const MAX_OVERFETCH: usize = 5000;
 
 impl DashboardActor {
     pub fn new(node_address: &str) -> Self {
@@ -270,16 +274,22 @@ impl Handler<QueryPersistedEvents> for DashboardActor {
         let e3_id_filter = msg.e3_id;
 
         // Send query to eventstore router, with our own address as receiver.
-        // Only pass limit to the eventstore when no filters are active, otherwise
-        // the eventstore would truncate results before we can filter them client-side.
+        // When filters are active we over-fetch (since the eventstore can't filter by
+        // event type / e3_id) but still cap to MAX_OVERFETCH to prevent full replays.
         let has_filters = event_type_filter.as_ref().is_some_and(|s| !s.is_empty())
             || e3_id_filter.as_ref().is_some_and(|s| !s.is_empty());
+        let default_cap = DEFAULT_QUERY_CAP as u64;
+        let max_overfetch = MAX_OVERFETCH as u64;
+        let effective_limit = if has_filters {
+            limit
+                .unwrap_or(default_cap)
+                .max(default_cap)
+                .min(max_overfetch)
+        } else {
+            limit.unwrap_or(default_cap)
+        };
         let mut query_msg = EventStoreQueryBy::<SeqAgg>::new(id, query, ctx.address().recipient());
-        if !has_filters {
-            if let Some(l) = limit {
-                query_msg = query_msg.with_limit(l);
-            }
-        }
+        query_msg = query_msg.with_limit(effective_limit);
 
         if let Err(e) = eventstore.try_send(query_msg) {
             tracing::error!("Failed to send query to eventstore: {}", e);
@@ -304,7 +314,17 @@ impl Handler<QueryPersistedEvents> for DashboardActor {
                         limit,
                     )
                 }
-                _ => vec![],
+                Ok(Err(_)) => {
+                    tracing::warn!("Eventstore query channel closed unexpectedly");
+                    vec![]
+                }
+                Err(_) => {
+                    tracing::warn!(
+                        "Eventstore query timed out after {}s",
+                        PENDING_QUERY_TIMEOUT.as_secs()
+                    );
+                    vec![]
+                }
             }
         })
     }

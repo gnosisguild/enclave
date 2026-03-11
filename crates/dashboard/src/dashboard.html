@@ -306,8 +306,8 @@
     };
   }
 
-  async function refreshLogs() {
-    if (!document.getElementById('log-auto').checked) return;
+  async function refreshLogs(fromTimer) {
+    if (fromTimer && !document.getElementById('log-auto').checked) return;
     try {
       const level = document.getElementById('log-level').value;
       const search = document.getElementById('log-search').value;
@@ -335,8 +335,8 @@
     }
   }
 
-  async function refreshEvents() {
-    if (!document.getElementById('event-auto').checked) return;
+  async function refreshEvents(fromTimer) {
+    if (fromTimer && !document.getElementById('event-auto').checked) return;
     try {
       const eventType = document.getElementById('event-type-filter').value;
       const e3id = document.getElementById('event-e3-filter').value;
@@ -371,8 +371,8 @@
 
   // Poll intervals (events less frequently since it queries the eventstore)
   setInterval(refreshMetrics, 2000);
-  setInterval(refreshLogs, 2000);
-  setInterval(refreshEvents, 10000);
+  setInterval(() => refreshLogs(true), 2000);
+  setInterval(() => refreshEvents(true), 10000);
 
   // Immediate refresh on filter change (debounced for text inputs)
   document.getElementById('log-level').addEventListener('change', refreshLogs);
