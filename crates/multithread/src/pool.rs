@@ -84,6 +84,13 @@ impl TaskPool {
                     _ => (),
                 }
             }
+
+            let heartbeat = Duration::from_secs(60);
+            loop {
+                sleep(heartbeat).await;
+                elapsed += heartbeat;
+                warn!("Job '{}' still running after {:?}", task_name, elapsed);
+            }
         });
 
         // This uses channels to track pending and complete tasks when
@@ -148,7 +155,7 @@ impl TaskTimeouts {
 
 impl Default for TaskTimeouts {
     fn default() -> Self {
-        [(10, Level::WARN), (30, Level::ERROR)].into()
+        [(30, Level::INFO), (120, Level::WARN)].into()
     }
 }
 
