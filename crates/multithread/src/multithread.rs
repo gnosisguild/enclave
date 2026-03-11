@@ -369,6 +369,8 @@ fn handle_threshold_share_decryption_proof(
         ));
     }
     let mut proofs = Vec::with_capacity(num_indices);
+    let mut wrapped_proofs = Vec::with_capacity(num_indices);
+    let e3_id_str = request.e3_id.to_string();
 
     for i in 0..num_indices {
         // Deserialize ciphertext
@@ -405,7 +407,6 @@ fn handle_threshold_share_decryption_proof(
 
         // Generate proof
         let circuit = e3_zk_helpers::threshold::share_decryption::ShareDecryptionCircuit;
-        let e3_id_str = request.e3_id.to_string();
         let proof = circuit
             .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
             .map_err(|e| {
@@ -417,11 +418,27 @@ fn handle_threshold_share_decryption_proof(
                     request.clone(),
                 )
             })?;
+
+        // Wrap for recursive folding
+        let wrapped = generate_wrapper_proof(prover, &[proof.clone()], &e3_id_str).map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                    "C6 wrapper proof[{}]: {}",
+                    i, e
+                ))),
+                request.clone(),
+            )
+        })?;
+
         proofs.push(proof);
+        wrapped_proofs.push(wrapped);
     }
 
     Ok(ComputeResponse::zk(
-        ZkResponse::ThresholdShareDecryption(ThresholdShareDecryptionProofResponse { proofs }),
+        ZkResponse::ThresholdShareDecryption(ThresholdShareDecryptionProofResponse {
+            proofs,
+            wrapped_proofs,
+        }),
         request.correlation_id,
         request.e3_id,
     ))

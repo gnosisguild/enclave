@@ -4,17 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::proof_fold::ProofFoldState;
 use actix::prelude::*;
 use anyhow::Result;
 use e3_bfv_client::client::compute_pk_commitment;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, BusHandle, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
+    prelude::*, BusHandle, ComputeResponse, ComputeResponseKind,
     DKGRecursiveAggregationComplete, Die, E3id, EnclaveEvent, EnclaveEventData, EventContext,
     KeyshareCreated, OrderedSet, PartyProofsToVerify, PkAggregationProofPending,
     PkAggregationProofRequest, PkAggregationProofSigned, Proof, PublicKeyAggregated, Seed,
     Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload,
-    TypedEvent, VerificationKind, ZkRequest, ZkResponse,
+    TypedEvent, VerificationKind, ZkResponse,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -87,14 +88,8 @@ pub struct PublicKeyAggregator {
     dkg_node_proofs: HashMap<u64, Proof>,
     /// Number of honest parties (set after C1 verification).
     expected_honest_count: Option<usize>,
-    /// Correlation ID for the in-flight cross-node fold.
-    cross_node_fold_correlation: Option<CorrelationId>,
-    /// Running accumulated proof during cross-node folding.
-    cross_node_accumulated: Option<Proof>,
-    /// Proofs remaining to fold.
-    cross_node_remaining: Vec<Proof>,
-    /// Final cross-node folded proof.
-    cross_node_proof: Option<Proof>,
+    /// Cross-node DKG proof fold state.
+    cross_node_fold: ProofFoldState,
     /// C5 proof stored while waiting for cross-node fold completion.
     c5_proof_pending: Option<Proof>,
     /// Last event context for publishing.
@@ -124,10 +119,7 @@ impl PublicKeyAggregator {
             params_preset: params.params_preset,
             dkg_node_proofs: HashMap::new(),
             expected_honest_count: None,
-            cross_node_fold_correlation: None,
-            cross_node_accumulated: None,
-            cross_node_remaining: Vec::new(),
-            cross_node_proof: None,
+            cross_node_fold: ProofFoldState::new(),
             c5_proof_pending: None,
             last_ec: None,
         }
@@ -421,18 +413,12 @@ impl PublicKeyAggregator {
         self.try_start_cross_node_fold(&ec)
     }
 
-    /// Start cross-node fold if we know the honest count and have all proofs.
+    /// Start cross-node fold once we know the honest count and have collected all proofs.
     fn try_start_cross_node_fold(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
         let Some(expected) = self.expected_honest_count else {
             return Ok(());
         };
-
-        if self.dkg_node_proofs.len() < expected {
-            return Ok(());
-        }
-
-        // Already started or completed
-        if self.cross_node_accumulated.is_some() || self.cross_node_proof.is_some() {
+        if self.dkg_node_proofs.len() < expected || !self.cross_node_fold.is_idle() {
             return Ok(());
         }
 
@@ -442,106 +428,18 @@ impl PublicKeyAggregator {
             .map(|(pid, p)| (*pid, p.clone()))
             .collect();
         pairs.sort_by_key(|(pid, _)| *pid);
-        let mut proofs: Vec<Proof> = pairs.into_iter().map(|(_, p)| p).collect();
+        let proofs: Vec<Proof> = pairs.into_iter().map(|(_, p)| p).collect();
 
-        if proofs.is_empty() {
-            return Ok(());
-        }
-
-        if proofs.len() == 1 {
-            info!("PublicKeyAggregator: single honest DKG proof — no fold needed");
-            self.cross_node_proof = Some(proofs.remove(0));
-            return self.try_publish_complete();
-        }
-
-        let first = proofs.remove(0);
-        self.cross_node_accumulated = Some(first);
-        self.cross_node_remaining = proofs;
-
-        info!(
-            "PublicKeyAggregator: starting cross-node fold ({} proofs to fold)",
-            self.cross_node_remaining.len()
-        );
-
-        self.advance_cross_node_fold(ec)
-    }
-
-    /// Dispatch the next fold step (accumulated + next_remaining).
-    fn advance_cross_node_fold(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
-        if self.cross_node_fold_correlation.is_some() {
-            return Ok(());
-        }
-
-        let Some(acc) = self.cross_node_accumulated.take() else {
-            return Ok(());
-        };
-
-        let Some(next) = self.cross_node_remaining.first().cloned() else {
-            self.cross_node_proof = Some(acc);
-            return self.try_publish_complete();
-        };
-        self.cross_node_remaining.remove(0);
-
-        let corr = CorrelationId::new();
-        self.cross_node_fold_correlation = Some(corr);
-
-        info!(
-            "PublicKeyAggregator: dispatching cross-node fold (remaining={})",
-            self.cross_node_remaining.len()
-        );
-
-        if let Err(err) = self.bus.publish(
-            ComputeRequest::zk(
-                ZkRequest::FoldProofs {
-                    proof1: acc,
-                    proof2: next,
-                },
-                corr,
-                self.e3_id.clone(),
-            ),
-            ec.clone(),
-        ) {
-            error!("Failed to publish cross-node fold request: {err}");
-            self.cross_node_fold_correlation = None;
-        }
-
-        Ok(())
-    }
-
-    fn handle_fold_response(&mut self, correlation_id: &CorrelationId, proof: Proof) -> Result<()> {
-        let Some(expected_corr) = self.cross_node_fold_correlation else {
-            return Ok(());
-        };
-        if expected_corr != *correlation_id {
-            return Ok(());
-        }
-
-        self.cross_node_fold_correlation = None;
-        self.cross_node_accumulated = Some(proof);
-
-        info!(
-            "PublicKeyAggregator: fold response received (remaining={})",
-            self.cross_node_remaining.len()
-        );
-
-        let ec = self
-            .last_ec
-            .clone()
-            .ok_or_else(|| anyhow::anyhow!("No EventContext for fold advance"))?;
-
-        if self.cross_node_remaining.is_empty() {
-            self.cross_node_proof = self.cross_node_accumulated.take();
-            self.try_publish_complete()
-        } else {
-            self.advance_cross_node_fold(&ec)
-        }
+        self.cross_node_fold
+            .start(proofs, "PublicKeyAggregator cross-node DKG fold", &self.bus, &self.e3_id, ec)?;
+        self.try_publish_complete()
     }
 
     /// Publish `PublicKeyAggregated` when both C5 and cross-node fold are complete.
     fn try_publish_complete(&mut self) -> Result<()> {
         let (Some(c5_proof), Some(cross_node_proof)) = (
             self.c5_proof_pending.as_ref(),
-            self.cross_node_proof.as_ref(),
+            self.cross_node_fold.result.as_ref(),
         ) else {
             return Ok(());
         };
@@ -593,7 +491,20 @@ impl PublicKeyAggregator {
     fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
         let (msg, _ec) = msg.into_components();
         if let ComputeResponseKind::Zk(ZkResponse::FoldProofs(resp)) = msg.response {
-            self.handle_fold_response(&msg.correlation_id, resp.proof)?;
+            let ec = self
+                .last_ec
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("No EventContext for fold response"))?;
+            if self.cross_node_fold.handle_response(
+                &msg.correlation_id,
+                resp.proof,
+                "PublicKeyAggregator cross-node DKG fold",
+                &self.bus,
+                &self.e3_id,
+                &ec,
+            )? {
+                self.try_publish_complete()?;
+            }
         }
         Ok(())
     }

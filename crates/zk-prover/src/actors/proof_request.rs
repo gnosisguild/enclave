@@ -521,6 +521,7 @@ impl ProofRequestActor {
                 self.handle_share_decryption_proof_response(
                     &msg.correlation_id,
                     resp.proofs.clone(),
+                    resp.wrapped_proofs.clone(),
                 );
             }
             ComputeResponseKind::Zk(ZkResponse::PkAggregation(resp)) => {
@@ -794,11 +795,12 @@ impl ProofRequestActor {
         }
     }
 
-    /// Handle C6 proof response — sign proofs and publish DecryptionshareCreated.
+    /// Handle C6 proof response — sign raw proofs, keep wrapped for fold, publish DecryptionshareCreated.
     fn handle_share_decryption_proof_response(
         &mut self,
         correlation_id: &CorrelationId,
         proofs: Vec<Proof>,
+        wrapped_proofs: Vec<Proof>,
     ) {
         let Some(e3_id) = self.share_decryption_correlation.remove(correlation_id) else {
             return;
@@ -812,7 +814,16 @@ impl ProofRequestActor {
             return;
         };
 
-        // Sign each C6 proof
+        if proofs.len() != wrapped_proofs.len() {
+            error!(
+                "C6 proofs and wrapped_proofs length mismatch: {} vs {} — DecryptionshareCreated will not be published",
+                proofs.len(),
+                wrapped_proofs.len()
+            );
+            return;
+        }
+
+        // Sign raw C6 proofs (for ShareVerification)
         let mut signed_proofs = Vec::with_capacity(proofs.len());
         for proof in proofs {
             let Some(signed) = self.sign_proof(&e3_id, ProofType::T5ShareDecryption, proof) else {
@@ -838,6 +849,7 @@ impl ProofRequestActor {
                 e3_id: e3_id.clone(),
                 decryption_share: pending.decryption_share,
                 signed_decryption_proofs: signed_proofs,
+                wrapped_proofs,
             },
             ec.clone(),
         ) {

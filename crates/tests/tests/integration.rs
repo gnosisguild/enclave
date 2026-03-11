@@ -897,12 +897,14 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
         e3_id: E3id::new("1235", 1),
         decrypted_output: vec![ArcBytes::from_bytes(&[1, 2, 3, 4])],
         aggregation_proofs: vec![],
+        c6_aggregated_proof: None,
     };
 
     let evt_2 = PlaintextAggregated {
         e3_id: E3id::new("1236", 1),
         decrypted_output: vec![ArcBytes::from_bytes(&[1, 2, 3, 4])],
         aggregation_proofs: vec![],
+        c6_aggregated_proof: None,
     };
 
     let local_evt_3 = CiphernodeSelected {

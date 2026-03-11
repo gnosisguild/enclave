@@ -241,8 +241,10 @@ pub struct ThresholdShareDecryptionProofRequest {
 /// Response containing generated proofs for threshold share decryption (C6).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ThresholdShareDecryptionProofResponse {
-    /// One C6 proof per ciphertext index.
+    /// One raw C6 proof per ciphertext index.
     pub proofs: Vec<Proof>,
+    /// Wrapper proof for each C6 proof (same order as `proofs`), ready for recursive folding.
+    pub wrapped_proofs: Vec<Proof>,
 }
 
 /// Response containing a generated share computation proof.
