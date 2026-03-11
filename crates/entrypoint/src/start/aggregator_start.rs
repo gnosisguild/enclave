@@ -8,6 +8,7 @@ use anyhow::Result;
 use e3_ciphernode_builder::{CiphernodeBuilder, CiphernodeHandle};
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
+use e3_dashboard::SharedLogBuffer;
 use e3_test_helpers::{PlaintextWriter, PublicKeyWriter};
 use e3_zk_prover::ZkBackend;
 use rand::SeedableRng;
@@ -21,13 +22,14 @@ pub async fn execute(
     config: &AppConfig,
     pubkey_write_path: Option<PathBuf>,
     plaintext_write_path: Option<PathBuf>,
+    log_buffer: Option<SharedLogBuffer>,
 ) -> Result<CiphernodeHandle> {
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(config.key_file()).await?);
     let backend = ZkBackend::new(config.bb_binary(), config.circuits_dir(), config.work_dir());
     backend.ensure_installed().await?;
 
-    let node = CiphernodeBuilder::new(rng.clone(), cipher.clone())
+    let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_persistence(&config.log_file(), &config.db_file())
         .with_chains(&config.chains())
         .with_sortition_score()
@@ -38,9 +40,13 @@ pub async fn execute(
         .with_zkproof(backend)
         .with_pubkey_aggregation()
         .with_threshold_plaintext_aggregation()
-        .with_net(config.peers(), config.quic_port())
-        .build()
-        .await?;
+        .with_net(config.peers(), config.quic_port());
+
+    if let (Some(port), Some(buffer)) = (config.dashboard_port(), log_buffer) {
+        builder = builder.with_dashboard(port, buffer);
+    }
+
+    let node = builder.build().await?;
 
     // These are here purely for our integration test so leaving out of the builder
     if let Some(path) = pubkey_write_path {

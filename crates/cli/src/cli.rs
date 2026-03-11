@@ -136,7 +136,7 @@ impl Cli {
             Err(e) => return Err(e),
         };
 
-        setup_tracing(&config, log_level)?;
+        let log_buffer = setup_tracing(&config, log_level)?;
         info!("Config loaded from: {:?}", config.config_file());
 
         if config.autopassword() {
@@ -148,7 +148,7 @@ impl Cli {
         }
 
         match self.command {
-            Commands::Start { peers } => start::execute(config, peers).await?,
+            Commands::Start { peers } => start::execute(config, peers, log_buffer).await?,
             Commands::Init { .. } => {
                 bail!("Cannot run `enclave init` when a configuration exists.");
             }

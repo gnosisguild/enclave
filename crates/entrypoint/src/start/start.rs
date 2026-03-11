@@ -8,6 +8,7 @@ use anyhow::Result;
 use e3_ciphernode_builder::{CiphernodeBuilder, CiphernodeHandle};
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
+use e3_dashboard::SharedLogBuffer;
 use e3_zk_prover::ZkBackend;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
@@ -15,13 +16,16 @@ use std::sync::{Arc, Mutex};
 use tracing::instrument;
 
 #[instrument(name = "app", skip_all)]
-pub async fn execute(config: &AppConfig) -> Result<CiphernodeHandle> {
+pub async fn execute(
+    config: &AppConfig,
+    log_buffer: Option<SharedLogBuffer>,
+) -> Result<CiphernodeHandle> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
     let backend = ZkBackend::new(config.bb_binary(), config.circuits_dir(), config.work_dir());
     backend.ensure_installed().await?;
 
-    let node = CiphernodeBuilder::new(rng.clone(), cipher.clone())
+    let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_persistence(&config.log_file(), &config.db_file())
         .with_sortition_score()
         .with_chains(&config.chains())
@@ -31,9 +35,13 @@ pub async fn execute(config: &AppConfig) -> Result<CiphernodeHandle> {
         .with_contract_ciphernode_registry()
         .with_trbfv()
         .with_zkproof(backend)
-        .with_net(config.peers(), config.quic_port())
-        .build()
-        .await?;
+        .with_net(config.peers(), config.quic_port());
+
+    if let (Some(port), Some(buffer)) = (config.dashboard_port(), log_buffer) {
+        builder = builder.with_dashboard(port, buffer);
+    }
+
+    let node = builder.build().await?;
 
     Ok(node)
 }
