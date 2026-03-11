@@ -39,7 +39,7 @@ Ciphernode status on sepolia:
   Ticket balance: 0 (0 available)
   License bond: 0
   Pending exits: tickets=0, license=0
-  Requirements: minTickets=1, ticketPrice=10 EKT, licenseBond=100 ENCL
+  Requirements: minTickets=1, ticketPrice=10 ETK, licenseBond=100 ENCL
 ```
 
 ### Step 2: Bond Your License
@@ -107,7 +107,7 @@ Ciphernode status on sepolia:
   Ticket balance: 100 (10 available)
   License bond: 100
   Pending exits: tickets=0, license=0
-  Requirements: minTickets=1, ticketPrice=10 EKT, licenseBond=100 ENCL
+  Requirements: minTickets=1, ticketPrice=10 ETK, licenseBond=100 ENCL
 ```
 
 ## CLI Command Reference
@@ -142,13 +142,13 @@ enclave ciphernode tickets burn --amount <AMOUNT>
 # Register as an operator
 enclave ciphernode register
 
-# Deregister (requires IMT proof)
-enclave ciphernode deregister --proof <SIBLING_NODES>
+# Deregister (burns tickets and queues all assets for exit)
+enclave ciphernode deregister
 
-# Force activation check
+# Re-register (also cancels a pending exit)
 enclave ciphernode activate
 
-# Deactivate by withdrawing stake
+# Deactivate by withdrawing stake (without full deregistration)
 enclave ciphernode deactivate --tickets <AMOUNT> --license <AMOUNT>
 
 # Check status
@@ -203,24 +203,19 @@ Set up alerts for:
 - `SlashProposed` events targeting your address
 - Low ticket balance approaching minimum
 
-### Backup Your IMT Proof
+### Monitor Activation Events
 
-When you register, save the sibling nodes from the `CiphernodeAdded` event. You'll need these to
-deregister:
-
-```bash
-# Store the proof when you register
-enclave ciphernode deregister --proof 0x123...,0x456...,0x789...
-```
+Watch for `OperatorActivationChanged` events targeting your address. These fire whenever your active
+status changes due to balance or bond updates.
 
 ## Troubleshooting
 
-| Issue                     | Cause                                  | Solution                              |
-| ------------------------- | -------------------------------------- | ------------------------------------- |
-| `isActive` is false       | Below minimum license (80%) or tickets | Add more ENCL or tickets              |
-| Registration fails        | Already registered or banned           | Check `isRegistered()` and ban status |
-| Ticket purchase fails     | Insufficient stablecoin or allowance   | Ensure balance and approve spending   |
-| "NodeNotEligible" in logs | Not registered before E3 request       | Register before requests are made     |
+| Issue                     | Cause                                   | Solution                                             |
+| ------------------------- | --------------------------------------- | ---------------------------------------------------- |
+| `isActive` is false       | Below minimum license (80%) or tickets  | Add more ENCL or tickets                             |
+| Registration fails        | Already registered, banned, or unbonded | Check `isRegistered()`, ban status, and license bond |
+| Ticket purchase fails     | Insufficient stablecoin or allowance    | Ensure balance and approve spending                  |
+| "NodeNotEligible" in logs | Not registered before E3 request        | Register before requests are made                    |
 
 ## Next Steps
 

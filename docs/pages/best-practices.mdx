@@ -5,12 +5,14 @@ title: 'Best Practices'
 # Design & Operations Best Practices
 
 Competitor docs such as Fhenix's "Key Considerations" and Ritual's architecture primers emphasize
-clear guardrails for confidential compute. This guide distills the equivalent playbook for Enclave.
+clear guardrails for confidential compute. This guide distills the equivalent playbook for the
+Interfold.
 
 ## Parameter Strategy
 
 - **Thresholds**: Choose `threshold = [t, n]` so that `t` withstands your adversary model while `n`
-  matches available Ciphernodes. Higher thresholds improve collusion resistance but increase fees.
+  matches the available Ciphernodes. Higher thresholds improve collusion resistance but increase
+  fees.
 - **Timing Windows**: Ensure `startWindow` leaves enough time for committee selection (a few blocks)
   and `duration` matches the longest credible compute time plus buffer.
 - **Custom Params**: Use `customParams` in `E3RequestParams` to tag jurisdiction, use case, or
@@ -29,11 +31,11 @@ clear guardrails for confidential compute. This guide distills the equivalent pl
 ## Secure Process & Compute Providers
 
 - **Determinism**: Reconstruct the on-chain Merkle root inside the Secure Process, then assert
-  equality prior to any heavy math.
+  equality prior to any heavy computation.
 - **Proof hooks**: When using RISC Zero or other verifiable CPs, keep witness blobs small and
   reserve `computeProviderParams` for runtime toggles (precision, chunk size, etc.).
 - **Failover**: Decide how your app reacts if `CiphertextOutputPublished` never arrives—e.g., allow
-  a guardian to cancel the round and refund deposits.
+  a guardian actor to cancel the round and refund deposits.
 
 ## Key Material & Ciphernodes
 
