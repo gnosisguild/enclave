@@ -71,9 +71,7 @@ use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
 use e3_zk_helpers::Computation;
-use e3_zk_prover::{
-    generate_share_computation_proof, generate_wrapper_proof, Provable, ZkBackend, ZkProver,
-};
+use e3_zk_prover::{generate_share_computation_proof, Provable, ZkBackend, ZkProver};
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
 use fhe_traits::{DeserializeParametrized, FheEncoder};
@@ -733,8 +731,9 @@ fn handle_share_computation_proof(
         chunk_proofs.push(chunk_proof);
     }
 
-    // 9. Prove the share_computation circuit (binds base + N chunks) — this IS the C2 proof
-    let c2_proof = generate_share_computation_proof(
+    // 9. Prove the share_computation circuit (binds base + N chunks) — this IS the C2 proof.
+    //    Wrapping happens later during aggregation (both SK + ESM wrapped together).
+    let proof = generate_share_computation_proof(
         prover,
         &base_proof,
         &chunk_proofs,
@@ -747,15 +746,7 @@ fn handle_share_computation_proof(
         )
     })?;
 
-    // 10. Wrap with the standard outer wrapper
-    let proof = generate_wrapper_proof(prover, &[c2_proof], &e3_id_str).map_err(|e| {
-        ComputeRequestError::new(
-            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
-            request.clone(),
-        )
-    })?;
-
-    // 11. Return response
+    // 10. Return inner proof
     Ok(ComputeResponse::zk(
         ZkResponse::ShareComputation(ShareComputationProofResponse {
             proof,
