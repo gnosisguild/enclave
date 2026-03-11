@@ -490,7 +490,9 @@ impl PublicKeyAggregator {
         let all_honest_proofs_present = honest_party_ids
             .iter()
             .all(|id| dkg_node_proofs.contains_key(id));
-        if !all_honest_proofs_present || !cross_node_fold.is_idle() {
+        if !all_honest_proofs_present
+            || (!cross_node_fold.is_idle() && !cross_node_fold.needs_restart())
+        {
             return Ok(());
         }
 
@@ -518,6 +520,10 @@ impl PublicKeyAggregator {
             else {
                 return Ok(state);
             };
+            if cross_node_fold.needs_restart() {
+                warn!("cross-node fold stuck mid-step on restart — resetting and re-folding from persisted proofs");
+                cross_node_fold = ProofFoldState::new();
+            }
             cross_node_fold.start(
                 proofs,
                 "PublicKeyAggregator cross-node DKG fold",
@@ -600,16 +606,13 @@ impl PublicKeyAggregator {
             if msg.e3_id != self.e3_id {
                 return Ok(());
             }
-            let Some(ec) = self
-                .state
-                .get()
-                .and_then(|s| {
-                    let PublicKeyAggregatorState::GeneratingC5Proof { last_ec, .. } = &s else {
-                        return None;
-                    };
-                    last_ec.clone()
-                })
+            let state = self.state.get();
+            let Some(PublicKeyAggregatorState::GeneratingC5Proof { last_ec, .. }) = state.as_ref()
             else {
+                // Late response after transitioning out of GeneratingC5Proof — ignore.
+                return Ok(());
+            };
+            let Some(ec) = last_ec.clone() else {
                 return Err(anyhow::anyhow!("No EventContext for fold response"));
             };
             self.state.try_mutate_without_context(|state| {

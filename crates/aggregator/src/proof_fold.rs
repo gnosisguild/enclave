@@ -9,7 +9,7 @@ use e3_events::{
     prelude::*, BusHandle, ComputeRequest, CorrelationId, E3id, EventContext, Proof, Sequenced,
     ZkRequest,
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// Manages the state of a sequential `FoldProofs` operation.
 ///
@@ -39,6 +39,13 @@ impl ProofFoldState {
             total_steps: None,
             result: None,
         }
+    }
+
+    /// Returns `true` if a fold step was dispatched but the in-flight proof was consumed
+    /// and the response will never arrive (e.g. after a restart). The caller should reset
+    /// and re-initiate the fold from the original proofs.
+    pub fn needs_restart(&self) -> bool {
+        self.correlation.is_some() && self.accumulated.is_none() && self.result.is_none()
     }
 
     /// Returns `true` if no fold has been initiated yet (idle / not started).
