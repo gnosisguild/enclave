@@ -165,7 +165,7 @@ impl ProofFoldState {
         let step = self.total_steps.map(|t| t - self.remaining.len()).unwrap_or(0);
         info!(
             "{label}: dispatching fold step {}/{} ({} proofs remaining, target_evm={})",
-            step + 1,
+            step,
             self.total_steps.unwrap_or(0),
             self.remaining.len(),
             target_evm
