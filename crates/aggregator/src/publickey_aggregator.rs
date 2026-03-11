@@ -56,6 +56,13 @@ pub enum PublicKeyAggregatorState {
         public_key_hash: [u8; 32],
         keyshare_bytes: Vec<ArcBytes>,
         nodes: OrderedSet<String>,
+        /// DKG recursive proofs per party (restart-critical).
+        dkg_node_proofs: HashMap<u64, Proof>,
+        honest_party_ids: BTreeSet<u64>,
+        dishonest_parties: BTreeSet<u64>,
+        cross_node_fold: ProofFoldState,
+        c5_proof_pending: Option<Proof>,
+        last_ec: Option<EventContext<Sequenced>>,
     },
     Complete {
         public_key: ArcBytes,
@@ -84,18 +91,6 @@ pub struct PublicKeyAggregator {
     e3_id: E3id,
     state: Persistable<PublicKeyAggregatorState>,
     params_preset: BfvPreset,
-    /// Buffer for per-node DKG recursive proofs keyed by party_id.
-    dkg_node_proofs: HashMap<u64, Proof>,
-    /// Party IDs that passed C1 verification (set at C1 completion).
-    honest_party_ids: Option<BTreeSet<u64>>,
-    /// Party IDs excluded as dishonest after C1 verification.
-    dishonest_parties: BTreeSet<u64>,
-    /// Cross-node DKG proof fold state.
-    cross_node_fold: ProofFoldState,
-    /// C5 proof stored while waiting for cross-node fold completion.
-    c5_proof_pending: Option<Proof>,
-    /// Last event context for publishing.
-    last_ec: Option<EventContext<Sequenced>>,
 }
 
 pub struct PublicKeyAggregatorParams {
@@ -119,12 +114,6 @@ impl PublicKeyAggregator {
             e3_id: params.e3_id,
             state,
             params_preset: params.params_preset,
-            dkg_node_proofs: HashMap::new(),
-            honest_party_ids: None,
-            dishonest_parties: BTreeSet::new(),
-            cross_node_fold: ProofFoldState::new(),
-            c5_proof_pending: None,
-            last_ec: None,
         }
     }
 
@@ -286,12 +275,10 @@ impl PublicKeyAggregator {
                 dishonest_parties
             );
         }
-        self.dishonest_parties = dishonest_parties.clone();
 
         let honest_party_ids: BTreeSet<u64> = (0..total_parties as u64)
             .filter(|id| !dishonest_parties.contains(id))
             .collect();
-        self.honest_party_ids = Some(honest_party_ids);
 
         // Need at least threshold + 1 honest parties for aggregation
         if honest_keyshares.len() <= threshold_m {
@@ -348,17 +335,22 @@ impl PublicKeyAggregator {
             ec.clone(),
         )?;
 
-        // Transition to GeneratingC5Proof
+        // Transition to GeneratingC5Proof with restart-critical fold fields
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key: pubkey.clone(),
                 public_key_hash,
                 keyshare_bytes: honest_keyshares,
                 nodes: honest_nodes_set,
+                dkg_node_proofs: HashMap::new(),
+                honest_party_ids: honest_party_ids.clone(),
+                dishonest_parties: dishonest_parties.clone(),
+                cross_node_fold: ProofFoldState::new(),
+                c5_proof_pending: None,
+                last_ec: Some(ec.clone()),
             })
         })?;
 
-        self.last_ec = Some(ec.clone());
         self.try_start_cross_node_fold(&ec)?;
 
         Ok(())
@@ -385,8 +377,35 @@ impl PublicKeyAggregator {
 
         info!("C5 proof signed — waiting for cross-node DKG fold to complete...");
 
-        self.c5_proof_pending = Some(msg.signed_proof.payload.proof);
-        self.last_ec = Some(ec);
+        let c5_proof = msg.signed_proof.payload.proof.clone();
+        self.state.try_mutate(&ec, |state| {
+            let PublicKeyAggregatorState::GeneratingC5Proof {
+                public_key,
+                public_key_hash,
+                keyshare_bytes,
+                nodes,
+                dkg_node_proofs,
+                honest_party_ids,
+                dishonest_parties,
+                cross_node_fold,
+                ..
+            } = state
+            else {
+                return Ok(state);
+            };
+            Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                public_key,
+                public_key_hash,
+                keyshare_bytes,
+                nodes,
+                dkg_node_proofs,
+                honest_party_ids,
+                dishonest_parties,
+                cross_node_fold,
+                c5_proof_pending: Some(c5_proof),
+                last_ec: Some(ec.clone()),
+            })
+        })?;
         self.try_publish_complete()
     }
 
@@ -402,7 +421,13 @@ impl PublicKeyAggregator {
             return Ok(());
         }
 
-        if self.dkg_node_proofs.contains_key(&msg.party_id) {
+        let state = self.state.get();
+        let Some(PublicKeyAggregatorState::GeneratingC5Proof { dkg_node_proofs, .. }) =
+            state.as_ref()
+        else {
+            return Ok(());
+        };
+        if dkg_node_proofs.contains_key(&msg.party_id) {
             warn!(
                 "Duplicate DKGRecursiveAggregationComplete for party {} — ignoring",
                 msg.party_id
@@ -413,72 +438,135 @@ impl PublicKeyAggregator {
         info!(
             "PublicKeyAggregator: buffered DKG proof from party {} (buffered={})",
             msg.party_id,
-            self.dkg_node_proofs.len() + 1
+            dkg_node_proofs.len() + 1
         );
-        self.dkg_node_proofs
-            .insert(msg.party_id, msg.aggregated_proof);
-        self.last_ec = Some(ec.clone());
+
+        self.state.try_mutate(&ec, |state| {
+            let PublicKeyAggregatorState::GeneratingC5Proof {
+                public_key,
+                public_key_hash,
+                keyshare_bytes,
+                nodes,
+                mut dkg_node_proofs,
+                honest_party_ids,
+                dishonest_parties,
+                cross_node_fold,
+                c5_proof_pending,
+                last_ec: _,
+            } = state
+            else {
+                return Ok(state);
+            };
+            dkg_node_proofs.insert(msg.party_id, msg.aggregated_proof);
+            Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                public_key,
+                public_key_hash,
+                keyshare_bytes,
+                nodes,
+                dkg_node_proofs,
+                honest_party_ids,
+                dishonest_parties,
+                cross_node_fold,
+                c5_proof_pending,
+                last_ec: Some(ec.clone()),
+            })
+        })?;
 
         self.try_start_cross_node_fold(&ec)
     }
 
     /// Start cross-node fold once we have DKG proofs from all verified honest parties.
     fn try_start_cross_node_fold(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
-        let Some(honest_ids) = &self.honest_party_ids else {
+        let state = self.state.get();
+        let Some(PublicKeyAggregatorState::GeneratingC5Proof {
+            dkg_node_proofs,
+            honest_party_ids,
+            cross_node_fold,
+            ..
+        }) = state.as_ref()
+        else {
             return Ok(());
         };
-        let all_honest_proofs_present = honest_ids
+        let all_honest_proofs_present = honest_party_ids
             .iter()
-            .all(|id| self.dkg_node_proofs.contains_key(id));
-        if !all_honest_proofs_present || !self.cross_node_fold.is_idle() {
+            .all(|id| dkg_node_proofs.contains_key(id));
+        if !all_honest_proofs_present || !cross_node_fold.is_idle() {
             return Ok(());
         }
 
-        let mut pairs: Vec<_> = self
-            .dkg_node_proofs
+        let mut pairs: Vec<_> = dkg_node_proofs
             .iter()
-            .filter(|(pid, _)| honest_ids.contains(pid))
+            .filter(|(pid, _)| honest_party_ids.contains(pid))
             .map(|(pid, p)| (*pid, p.clone()))
             .collect();
         pairs.sort_by_key(|(pid, _)| *pid);
         let proofs: Vec<Proof> = pairs.into_iter().map(|(_, p)| p).collect();
 
-        self.cross_node_fold.start(
-            proofs,
-            "PublicKeyAggregator cross-node DKG fold",
-            &self.bus,
-            &self.e3_id,
-            ec,
-        )?;
+        self.state.try_mutate(ec, |state| {
+            let PublicKeyAggregatorState::GeneratingC5Proof {
+                public_key,
+                public_key_hash,
+                keyshare_bytes,
+                nodes,
+                dkg_node_proofs,
+                honest_party_ids,
+                dishonest_parties,
+                mut cross_node_fold,
+                c5_proof_pending,
+                last_ec,
+            } = state
+            else {
+                return Ok(state);
+            };
+            cross_node_fold.start(
+                proofs,
+                "PublicKeyAggregator cross-node DKG fold",
+                &self.bus,
+                &self.e3_id,
+                ec,
+            )?;
+            Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                public_key,
+                public_key_hash,
+                keyshare_bytes,
+                nodes,
+                dkg_node_proofs,
+                honest_party_ids,
+                dishonest_parties,
+                cross_node_fold,
+                c5_proof_pending,
+                last_ec,
+            })
+        })?;
         self.try_publish_complete()
     }
 
     /// Publish `PublicKeyAggregated` when both C5 and cross-node fold are complete.
     fn try_publish_complete(&mut self) -> Result<()> {
-        let (Some(c5_proof), Some(cross_node_proof)) = (
-            self.c5_proof_pending.as_ref(),
-            self.cross_node_fold.result.as_ref(),
-        ) else {
-            return Ok(());
-        };
-
         let PublicKeyAggregatorState::GeneratingC5Proof {
             public_key,
             public_key_hash,
             nodes,
+            c5_proof_pending,
+            cross_node_fold,
+            last_ec,
             ..
         } = self
             .state
             .get()
             .ok_or_else(|| anyhow::anyhow!("Expected GeneratingC5Proof state"))?
         else {
-            return Err(anyhow::anyhow!(
-                "try_publish_complete called outside GeneratingC5Proof state"
-            ));
+            return Ok(());
         };
 
-        let ec = self
-            .last_ec
+        let (Some(c5_proof), Some(cross_node_proof)) = (
+            c5_proof_pending.as_ref(),
+            cross_node_fold.result.as_ref(),
+        ) else {
+            return Ok(());
+        };
+
+        let ec = last_ec
             .clone()
             .ok_or_else(|| anyhow::anyhow!("No EventContext for publish"))?;
 
@@ -512,20 +600,56 @@ impl PublicKeyAggregator {
             if msg.e3_id != self.e3_id {
                 return Ok(());
             }
-            let ec = self
-                .last_ec
-                .clone()
-                .ok_or_else(|| anyhow::anyhow!("No EventContext for fold response"))?;
-            if self.cross_node_fold.handle_response(
-                &msg.correlation_id,
-                resp.proof,
-                "PublicKeyAggregator cross-node DKG fold",
-                &self.bus,
-                &self.e3_id,
-                &ec,
-            )? {
-                self.try_publish_complete()?;
-            }
+            let Some(ec) = self
+                .state
+                .get()
+                .and_then(|s| {
+                    let PublicKeyAggregatorState::GeneratingC5Proof { last_ec, .. } = &s else {
+                        return None;
+                    };
+                    last_ec.clone()
+                })
+            else {
+                return Err(anyhow::anyhow!("No EventContext for fold response"));
+            };
+            self.state.try_mutate_without_context(|state| {
+                let PublicKeyAggregatorState::GeneratingC5Proof {
+                    public_key,
+                    public_key_hash,
+                    keyshare_bytes,
+                    nodes,
+                    dkg_node_proofs,
+                    honest_party_ids,
+                    dishonest_parties,
+                    mut cross_node_fold,
+                    c5_proof_pending,
+                    last_ec,
+                } = state
+                else {
+                    return Ok(state);
+                };
+                cross_node_fold.handle_response(
+                    &msg.correlation_id,
+                    resp.proof.clone(),
+                    "PublicKeyAggregator cross-node DKG fold",
+                    &self.bus,
+                    &self.e3_id,
+                    &ec,
+                )?;
+                Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                    public_key,
+                    public_key_hash,
+                    keyshare_bytes,
+                    nodes,
+                    dkg_node_proofs,
+                    honest_party_ids,
+                    dishonest_parties,
+                    cross_node_fold,
+                    c5_proof_pending,
+                    last_ec,
+                })
+            })?;
+            self.try_publish_complete()?;
         }
         Ok(())
     }

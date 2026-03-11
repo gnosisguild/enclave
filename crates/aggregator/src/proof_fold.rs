@@ -16,6 +16,9 @@ use tracing::{error, info};
 /// Takes an ordered list of proofs and folds them pairwise via `ZkRequest::FoldProofs`
 /// until a single aggregated proof remains. The caller owns the struct and checks
 /// `result` (or calls `is_complete`) to know when folding is done.
+///
+/// Serialization support enables persistence during VerifyingC1/GeneratingC5Proof for restart recovery.
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct ProofFoldState {
     correlation: Option<CorrelationId>,
     accumulated: Option<Proof>,
