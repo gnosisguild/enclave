@@ -22,13 +22,13 @@ use crate::CircuitsErrors;
 use crate::{calculate_bit_width, crt_polynomial_to_toml_json, poly_coefficients_to_toml_json};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::{reduce, CrtPolynomial};
 use fhe::bfv::SecretKey;
 use fhe::trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig};
 use num_bigint::{BigInt, BigUint};
 use serde::{Deserialize, Serialize};
-
 // todo: understand where to put this!
 const SHARE_COMPUTATION_CHUNK_SIZE: usize = 512;
 
@@ -67,6 +67,8 @@ pub struct Configs {
     pub moduli: Vec<u64>,
     pub chunk_size: usize,
     pub n_chunks: usize,
+    pub chunks_per_batch: usize,
+    pub n_batches: usize,
     pub bits: Bits,
     pub bounds: Bounds,
 }
@@ -128,12 +130,20 @@ impl Computation for Configs {
         let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
 
+        let degree = threshold_params.degree();
+        let chunk_size = compute_chunk_size();
+        let n_chunks = compute_n_chunks(degree, chunk_size);
+        let chunks_per_batch = compute_chunks_per_batch(degree);
+        let n_batches = compute_n_batches(n_chunks, chunks_per_batch);
+
         Ok(Configs {
-            n: threshold_params.degree(),
+            n: degree,
             l,
             moduli,
-            chunk_size: compute_chunk_size(),
-            n_chunks: compute_n_chunks(threshold_params.degree(), compute_chunk_size()),
+            chunk_size,
+            n_chunks,
+            chunks_per_batch,
+            n_batches,
             bits,
             bounds,
         })
@@ -146,6 +156,19 @@ fn compute_chunk_size() -> usize {
 
 fn compute_n_chunks(degree: usize, chunk_size: usize) -> usize {
     degree.div_ceil(chunk_size)
+}
+
+fn compute_chunks_per_batch(degree: usize) -> usize {
+    // Matches Noir configs: insecure (N<=512) uses 1, secure (N=8192) uses 4
+    if degree == BfvParamSet::from(BfvPreset::InsecureThreshold512).degree {
+        1
+    } else {
+        4
+    }
+}
+
+fn compute_n_batches(n_chunks: usize, chunks_per_batch: usize) -> usize {
+    n_chunks.div_ceil(chunks_per_batch)
 }
 
 impl Computation for Bits {
