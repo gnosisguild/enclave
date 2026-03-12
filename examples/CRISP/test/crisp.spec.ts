@@ -14,6 +14,9 @@ import path from 'path'
 
 config({ path: path.join(process.cwd(), 'server', '.env') })
 
+const E3_DURATION = parseInt(process.env.E3_DURATION as string, 10) * 1000
+const OUTPUT_DECRYPTION_WAIT = 25_000 // A small buffer for decryption
+
 async function runCliInit(): Promise<number> {
   try {
     // Execute the command and wait for it to complete
@@ -48,18 +51,14 @@ async function checkE3Ready(e3id: number): Promise<boolean> {
   }
 }
 
-async function waitForE3Ready(e3id: number, maxWaitMs: number = 500000): Promise<void> {
+async function waitForE3Ready(e3id: number, maxWaitMs: number = E3_DURATION): Promise<void> {
   const startTime = Date.now()
-  let attempt = 0
   while (Date.now() - startTime < maxWaitMs) {
-    attempt++
     const isActivated = await checkE3Ready(e3id)
     if (isActivated) {
       log(`E3 ${e3id} is ready`)
       return
     }
-    const elapsed = Math.round((Date.now() - startTime) / 1000)
-    log(`E3 ${e3id} not ready yet (attempt ${attempt}, ${elapsed}s elapsed)`)
     await new Promise((resolve) => setTimeout(resolve, 5000))
   }
   throw new Error(`E3 ${e3id} was not ready within ${maxWaitMs}ms`)
@@ -114,6 +113,7 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
   log('============================================')
   log('      STARTING YOUR PLAYWRIGHT TEST!        ')
   log('============================================')
+  const testStart = Date.now()
 
   log('Creating new Metamask...')
   const metamask = new MetaMask(context, metamaskPage, basicSetup.walletPassword, extensionId)
@@ -137,6 +137,8 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
 
   log(`waiting for E3 Committee being published...`)
   await waitForE3Ready(e3id)
+  const DKG_DURATION = Date.now() - testStart
+  log(`DKG duration: ${DKG_DURATION}ms`)
   log(`forcing page reload...`)
   await page.reload()
 
@@ -146,7 +148,7 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
   await page.locator('button:has-text("Cast Vote")').click()
   log(`confirming MetaMask signature request...`)
   await metamask.confirmSignature()
-  const WAIT = parseInt(process.env.E3_DURATION as string, 10) * 1000 + 25_000 // A small buffer for decryption
+  const WAIT = E3_DURATION - DKG_DURATION + OUTPUT_DECRYPTION_WAIT
   log(`waiting ${WAIT}ms...`)
   await page.waitForTimeout(WAIT)
   log(`clicking historic polls button...`)
