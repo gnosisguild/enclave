@@ -62,10 +62,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     LazyIMTData public ciphernodes;
 
     /// @notice Tracks whether a ciphernode is enabled in the registry
-    mapping(address => bool) public ciphernodeEnabled;
+    mapping(address node => bool enabled) public ciphernodeEnabled;
 
     /// @notice Tracks the tree leaf index for each ciphernode
-    mapping(address => uint40) public ciphernodeTreeIndex;
+    mapping(address node => uint40 index) public ciphernodeTreeIndex;
 
     /// @notice Maps E3 ID to the IMT root at the time of committee request
     mapping(uint256 e3Id => uint256 root) public roots;

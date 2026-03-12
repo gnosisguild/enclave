@@ -60,6 +60,8 @@ struct PendingThresholdProofs {
     /// C3b proofs: keyed by (esi_index, recipient_party_id, row_index)
     e_sm_share_encryption_proofs: HashMap<(usize, usize, usize), Proof>,
     expected_e_sm_enc_count: usize,
+    /// Maps positional index to real party_id (from ThresholdSharePending).
+    recipient_party_ids: Vec<u64>,
 }
 
 impl PendingThresholdProofs {
@@ -69,6 +71,7 @@ impl PendingThresholdProofs {
         ec: EventContext<Sequenced>,
         expected_sk_enc_count: usize,
         expected_e_sm_enc_count: usize,
+        recipient_party_ids: Vec<u64>,
     ) -> Self {
         Self {
             e3_id,
@@ -81,6 +84,7 @@ impl PendingThresholdProofs {
             expected_sk_enc_count,
             e_sm_share_encryption_proofs: HashMap::new(),
             expected_e_sm_enc_count,
+            recipient_party_ids,
         }
     }
 
@@ -263,7 +267,7 @@ impl ProofRequestActor {
             msg.e3_id,
         );
 
-        info!("Requesting T0 proof generation");
+        info!("Requesting C0 proof generation");
         if let Err(err) = self.bus.publish(request, ec) {
             error!("Failed to publish ZK proof request: {err}");
             self.pending.remove(&correlation_id);
@@ -285,6 +289,7 @@ impl ProofRequestActor {
                 ec.clone(),
                 sk_enc_count,
                 e_sm_enc_count,
+                msg.recipient_party_ids,
             ),
         );
 
@@ -1114,14 +1119,14 @@ impl ProofRequestActor {
             e3_id, num_parties
         );
 
-        for recipient_party_id in 0..num_parties {
-            if let Some(party_share) = share.extract_for_party(recipient_party_id) {
+        for (positional_idx, &real_party_id) in pending.recipient_party_ids.iter().enumerate() {
+            if let Some(party_share) = share.extract_for_party(positional_idx) {
                 let c3a_proofs = signed_c3a_map
-                    .get(&recipient_party_id)
+                    .get(&positional_idx)
                     .cloned()
                     .unwrap_or_default();
                 let c3b_proofs = signed_c3b_map
-                    .get(&recipient_party_id)
+                    .get(&positional_idx)
                     .cloned()
                     .unwrap_or_default();
 
@@ -1129,7 +1134,7 @@ impl ProofRequestActor {
                     ThresholdShareCreated {
                         e3_id: e3_id.clone(),
                         share: Arc::new(party_share),
-                        target_party_id: recipient_party_id as u64,
+                        target_party_id: real_party_id,
                         external: false,
                         signed_c2a_proof: Some(signed_c2a.clone()),
                         signed_c2b_proof: Some(signed_c2b.clone()),
@@ -1139,12 +1144,12 @@ impl ProofRequestActor {
                     ec.clone(),
                 ) {
                     error!(
-                        "Failed to publish ThresholdShareCreated for party {}: {err}",
-                        recipient_party_id
+                        "Failed to publish ThresholdShareCreated for party {} (idx {}): {err}",
+                        real_party_id, positional_idx
                     );
                 }
             } else {
-                error!("Failed to extract share for party {}", recipient_party_id);
+                error!("Failed to extract share for index {}", positional_idx);
             }
         }
     }
@@ -1176,14 +1181,14 @@ impl ProofRequestActor {
         match SignedProofPayload::sign(payload, &self.signer) {
             Ok(signed) => {
                 info!(
-                    "Signed T0 proof for party {} (signer: {})",
+                    "Signed C0 proof for party {} (signer: {})",
                     key.party_id,
                     self.signer.address()
                 );
                 key.signed_payload = Some(signed);
             }
             Err(err) => {
-                error!("Failed to sign T0 proof payload: {err} — proof will not be published");
+                error!("Failed to sign C0 proof payload: {err} — proof will not be published");
                 return;
             }
         }
@@ -1208,7 +1213,7 @@ impl ProofRequestActor {
 
         if let Some(pending) = self.pending.remove(msg.correlation_id()) {
             error!(
-                "T0 proof request failed for E3 {}: {err} — key will not be published without proof",
+                "C0 proof request failed for E3 {}: {err} — key will not be published without proof",
                 pending.e3_id
             );
             return;

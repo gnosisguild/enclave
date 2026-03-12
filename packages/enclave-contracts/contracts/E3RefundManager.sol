@@ -334,8 +334,11 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
 
         RefundDistribution storage dist = _distributions[e3Id];
         if (dist.calculated) {
-            require(_claimCount[e3Id] == 0, "Claims already started");
-            _applySlashedFunds(e3Id, amount);
+            if (_claimCount[e3Id] == 0) {
+                _applySlashedFunds(e3Id, amount);
+            } else {
+                _pendingSlashedFunds[e3Id] += amount;
+            }
         } else {
             _pendingSlashedFunds[e3Id] += amount;
         }
@@ -470,5 +473,43 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     function setTreasury(address _treasury) external onlyOwner {
         require(_treasury != address(0), "Invalid treasury");
         treasury = _treasury;
+    }
+
+    /// @notice Recover orphaned slashed funds for an E3 that has already completed
+    ///         or whose failure was already fully processed.
+    /// @dev When a slash executes after an E3 has completed (or after failure claims
+    ///      have started), funds accumulate in `_pendingSlashedFunds` with no drain
+    ///      path. This function allows the owner to redirect them to the treasury.
+    ///      Only callable when the E3 is in a terminal state (Complete or Failed)
+    ///      and the funds cannot be distributed through normal channels.
+    /// @param e3Id The E3 ID
+    /// @param paymentToken The token the slashed funds are denominated in
+    function withdrawOrphanedSlashedFunds(
+        uint256 e3Id,
+        IERC20 paymentToken
+    ) external onlyOwner {
+        uint256 amount = _pendingSlashedFunds[e3Id];
+        require(amount > 0, "No orphaned funds");
+
+        // Only allow withdrawal when E3 is in a terminal state
+        IEnclave.E3Stage stage = enclave.getE3Stage(e3Id);
+        require(
+            stage == IEnclave.E3Stage.Complete ||
+                stage == IEnclave.E3Stage.Failed,
+            "E3 not in terminal state"
+        );
+
+        // If E3 is Failed and distribution hasn't been calculated yet,
+        // funds should flow through the normal processE3Failure path
+        if (stage == IEnclave.E3Stage.Failed) {
+            RefundDistribution storage dist = _distributions[e3Id];
+            require(dist.calculated, "Use processE3Failure first");
+        }
+
+        _pendingSlashedFunds[e3Id] = 0;
+        require(address(paymentToken) != address(0), "Invalid fee token");
+        paymentToken.safeTransfer(treasury, amount);
+
+        emit OrphanedSlashedFundsWithdrawn(e3Id, amount);
     }
 }
