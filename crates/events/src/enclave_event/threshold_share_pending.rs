@@ -29,6 +29,10 @@ pub struct ThresholdSharePending {
     pub sk_share_encryption_requests: Vec<ShareEncryptionProofRequest>,
     /// C3b: E_SM share encryption proof requests (per ESI, per recipient, per modulus row)
     pub e_sm_share_encryption_requests: Vec<ShareEncryptionProofRequest>,
+    /// Maps positional index (used by extract_for_party) to real party_id.
+    /// Required because collected_encryption_keys may be filtered for expulsions,
+    /// making positional indices diverge from actual party IDs.
+    pub recipient_party_ids: Vec<u64>,
 }
 
 impl Display for ThresholdSharePending {

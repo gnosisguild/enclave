@@ -48,6 +48,7 @@ pub struct ContractAddresses {
     pub bonding_registry: Contract,
     pub e3_program: Option<Contract>,
     pub fee_token: Option<Contract>,
+    pub slashing_manager: Option<Contract>,
 }
 
 impl ContractAddresses {
@@ -58,6 +59,7 @@ impl ContractAddresses {
             Some(&self.bonding_registry),
             self.e3_program.as_ref(),
             self.fee_token.as_ref(),
+            self.slashing_manager.as_ref(),
         ]
         .into_iter()
         .flatten()

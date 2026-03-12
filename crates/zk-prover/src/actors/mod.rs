@@ -33,11 +33,15 @@
 //! setup_zk_actors(&bus, &backend, signer);
 //! ```
 
+pub mod accusation_manager;
+pub mod accusation_manager_ext;
 pub mod proof_request;
 pub mod proof_verification;
 pub mod share_verification;
 pub mod zk_actor;
 
+pub use accusation_manager::AccusationManager;
+pub use accusation_manager_ext::AccusationManagerExtension;
 pub use proof_request::ProofRequestActor;
 pub use proof_verification::{
     ProofVerificationActor, ZkVerificationRequest, ZkVerificationResponse,

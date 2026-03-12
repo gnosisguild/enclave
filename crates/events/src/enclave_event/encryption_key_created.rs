@@ -21,7 +21,7 @@ pub struct EncryptionKey {
     pub party_id: u64,
     #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub pk_bfv: ArcBytes,
-    /// Proof of correct BFV public key generation (T0 proof).
+    /// Proof of correct BFV public key generation (C0 proof).
     pub proof: Option<Proof>,
     /// ECDSA-signed payload for fault attribution.
     /// Present when the node signs its proof before broadcasting.

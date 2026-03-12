@@ -15,8 +15,9 @@ mod traits;
 mod witness;
 
 pub use actors::{
-    setup_zk_actors, ProofRequestActor, ProofVerificationActor, ShareVerificationActor, ZkActors,
-    ZkVerificationRequest, ZkVerificationResponse,
+    setup_zk_actors, AccusationManager, AccusationManagerExtension, ProofRequestActor,
+    ProofVerificationActor, ShareVerificationActor, ZkActors, ZkVerificationRequest,
+    ZkVerificationResponse,
 };
 
 pub use backend::{SetupStatus, ZkBackend};

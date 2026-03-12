@@ -55,6 +55,16 @@
     },
     {
       "inputs": [],
+      "name": "DuplicateVoter",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InsufficientAttestations",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "InvalidPolicy",
       "type": "error"
     },
@@ -66,6 +76,11 @@
     {
       "inputs": [],
       "name": "InvalidProposal",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidVoteSignature",
       "type": "error"
     },
     {
@@ -116,6 +131,16 @@
     {
       "inputs": [],
       "name": "VerifierNotSet",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "VoterIsAccused",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "VoterNotInCommittee",
       "type": "error"
     },
     {
@@ -709,11 +734,6 @@
           "type": "address"
         },
         {
-          "internalType": "bytes32",
-          "name": "reason",
-          "type": "bytes32"
-        },
-        {
           "internalType": "bytes",
           "name": "proof",
           "type": "bytes"
@@ -934,5 +954,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ISlashingManager.sol",
-  "buildInfoId": "solc-0_8_28-16cefaab22a5b0c22d849bfd93e340ea85b6ef79"
+  "buildInfoId": "solc-0_8_28-13a9a691eee81d28d467846ed639e157d0edfd2b"
 }

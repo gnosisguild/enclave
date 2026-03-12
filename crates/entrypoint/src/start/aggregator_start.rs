@@ -34,6 +34,7 @@ pub async fn execute(
         .with_contract_enclave_full()
         .with_contract_bonding_registry()
         .with_contract_ciphernode_registry()
+        .with_contract_slashing_manager()
         .with_max_threads()
         .with_zkproof(backend)
         .with_pubkey_aggregation()
