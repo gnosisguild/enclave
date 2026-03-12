@@ -222,6 +222,126 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
 
+        // todo: temporary fix to make it work locally.
+        // Copy DKG circuits into recursive/dkg/ so the prover finds them
+        // (prover uses circuits_dir(CircuitVariant::Recursive) = circuits_dir/recursive/)
+        let recursive_dkg = circuits_dir.join("recursive").join("dkg");
+        // C0 (pk), C2 share-computation pipeline, C3 (share_encryption), C4 (share_decryption)
+        let recursive_dkg_circuits = [
+            "pk",
+            "sk_share_computation_base",
+            "e_sm_share_computation_base",
+            "share_computation_chunk",
+            "share_computation_chunk_batch",
+            "share_computation",
+            "share_encryption",
+            "share_decryption",
+        ];
+        for name in &recursive_dkg_circuits {
+            let subdir = recursive_dkg.join(name);
+            tokio::fs::create_dir_all(&subdir).await.unwrap();
+            tokio::fs::copy(
+                dkg_target.join(format!("{name}.json")),
+                subdir.join(format!("{name}.json")),
+            )
+            .await
+            .unwrap();
+            // Recursive variant requires noir-recursive VK (bb --verifier_target noir-recursive).
+            // build:circuits writes .vk_noir and .vk_noir_hash; use them when present (group or per-circuit target).
+            let circuit_target = circuits_build_root.join("dkg").join(name).join("target");
+            let vk_noir_in_group = dkg_target.join(format!("{name}.vk_noir"));
+            let vk_noir_in_circuit = circuit_target.join(format!("{name}.vk_noir"));
+            let vk_src = if vk_noir_in_group.exists() {
+                vk_noir_in_group
+            } else if vk_noir_in_circuit.exists() {
+                vk_noir_in_circuit
+            } else if dkg_target.join(format!("{name}.vk")).exists() {
+                dkg_target.join(format!("{name}.vk"))
+            } else {
+                circuit_target.join(format!("{name}.vk"))
+            };
+            tokio::fs::copy(&vk_src, subdir.join(format!("{name}.vk")))
+                .await
+                .unwrap();
+            let vk_hash_in_group = dkg_target.join(format!("{name}.vk_noir_hash"));
+            let vk_hash_in_circuit = circuit_target.join(format!("{name}.vk_noir_hash"));
+            let vk_hash_fallback_g = dkg_target.join(format!("{name}.vk_hash"));
+            let vk_hash_fallback_c = circuit_target.join(format!("{name}.vk_hash"));
+            let vk_hash_src = [
+                &vk_hash_in_group,
+                &vk_hash_in_circuit,
+                &vk_hash_fallback_g,
+                &vk_hash_fallback_c,
+            ]
+            .into_iter()
+            .find(|p| p.exists());
+            if let Some(src) = vk_hash_src {
+                tokio::fs::copy(src.clone(), subdir.join(format!("{name}.vk_hash")))
+                    .await
+                    .unwrap();
+            }
+        }
+
+        // Copy threshold circuits into recursive/threshold/ (C1 PkGeneration, C5, C6, C7 use Recursive variant)
+        let recursive_threshold = circuits_dir.join("recursive").join("threshold");
+        let recursive_threshold_circuits = [
+            "pk_generation",
+            "pk_aggregation",
+            "share_decryption",
+            "decrypted_shares_aggregation_mod",
+        ];
+        for name in &recursive_threshold_circuits {
+            let subdir = recursive_threshold.join(name);
+            tokio::fs::create_dir_all(&subdir).await.unwrap();
+            let circuit_target = circuits_build_root
+                .join("threshold")
+                .join(name)
+                .join("target");
+            let json_in_group = threshold_target.join(format!("{name}.json"));
+            let json_in_circuit = circuit_target.join(format!("{name}.json"));
+            let json_src = if json_in_group.exists() {
+                &json_in_group
+            } else if json_in_circuit.exists() {
+                &json_in_circuit
+            } else {
+                continue;
+            };
+            tokio::fs::copy(json_src, subdir.join(format!("{name}.json")))
+                .await
+                .unwrap();
+            let vk_noir_in_group = threshold_target.join(format!("{name}.vk_noir"));
+            let vk_noir_in_circuit = circuit_target.join(format!("{name}.vk_noir"));
+            let vk_src = if vk_noir_in_group.exists() {
+                vk_noir_in_group
+            } else if vk_noir_in_circuit.exists() {
+                vk_noir_in_circuit
+            } else if threshold_target.join(format!("{name}.vk")).exists() {
+                threshold_target.join(format!("{name}.vk"))
+            } else {
+                circuit_target.join(format!("{name}.vk"))
+            };
+            tokio::fs::copy(&vk_src, subdir.join(format!("{name}.vk")))
+                .await
+                .unwrap();
+            let vk_hash_in_group = threshold_target.join(format!("{name}.vk_noir_hash"));
+            let vk_hash_in_circuit = circuit_target.join(format!("{name}.vk_noir_hash"));
+            let vk_hash_fallback_g = threshold_target.join(format!("{name}.vk_hash"));
+            let vk_hash_fallback_c = circuit_target.join(format!("{name}.vk_hash"));
+            let vk_hash_src = [
+                &vk_hash_in_group,
+                &vk_hash_in_circuit,
+                &vk_hash_fallback_g,
+                &vk_hash_fallback_c,
+            ]
+            .into_iter()
+            .find(|p| p.exists());
+            if let Some(src) = vk_hash_src {
+                tokio::fs::copy(src.clone(), subdir.join(format!("{name}.vk_hash")))
+                    .await
+                    .unwrap();
+            }
+        }
+
         // Copy C3 (share_encryption) circuit — single circuit used for both SK and E_SM
         let share_enc_circuit_dir = circuits_dir.join("dkg").join("share_encryption");
         tokio::fs::create_dir_all(&share_enc_circuit_dir)
