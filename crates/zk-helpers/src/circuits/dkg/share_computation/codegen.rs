@@ -59,15 +59,15 @@ impl CircuitCodegen for ShareComputationChunkCircuit {
 
         Ok(Artifacts {
             toml: generate_chunk_toml(&inputs)?,
-        configs: generate_configs(
-            preset,
-            &bits,
-            data.share_data.n_parties as usize,
-            data.share_data.threshold as usize,
-            configs.chunk_size,
-            configs.chunks_per_batch,
-            configs.n_batches,
-        )?,
+            configs: generate_configs(
+                preset,
+                &bits,
+                data.share_data.n_parties as usize,
+                data.share_data.threshold as usize,
+                configs.chunk_size,
+                configs.chunks_per_batch,
+                configs.n_batches,
+            )?,
         })
     }
 }
@@ -244,15 +244,10 @@ mod tests {
         assert!(configs_content
             .contains(format!("{}_SK_BIT_SECRET: u32 = {}", prefix, bits.bit_sk_secret).as_str()));
         assert!(configs_content.contains(format!("{}_CHUNK_SIZE: u32 = {}", prefix, 512).as_str()));
-        assert!(configs_content.contains(
-            format!("{}_N_CHUNKS: u32 = N / {}_CHUNK_SIZE", prefix, prefix).as_str()
-        ));
-        assert!(configs_content.contains(
-            format!("{}_CHUNKS_PER_BATCH: u32 = 1", prefix).as_str()
-        ));
-        assert!(configs_content.contains(
-            format!("{}_N_BATCHES: u32 =", prefix).as_str()
-        ));
+        assert!(configs_content
+            .contains(format!("{}_N_CHUNKS: u32 = N / {}_CHUNK_SIZE", prefix, prefix).as_str()));
+        assert!(configs_content.contains(format!("{}_CHUNKS_PER_BATCH: u32 = 1", prefix).as_str()));
+        assert!(configs_content.contains(format!("{}_N_BATCHES: u32 =", prefix).as_str()));
         assert!(configs_content.contains(
             format!("{}_E_SM_BIT_SECRET: u32 = {}", prefix, bits.bit_e_sm_secret).as_str()
         ));
