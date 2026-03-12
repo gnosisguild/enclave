@@ -236,7 +236,11 @@ export const updateE3Config = (
     }
 
     // If we hit a top-level key while in the target chain, we've left it
-    if (inTargetChain && indent <= chainBaseIndent && !trimmed.startsWith("-")) {
+    if (
+      inTargetChain &&
+      indent <= chainBaseIndent &&
+      !trimmed.startsWith("-")
+    ) {
       break;
     }
 
@@ -261,7 +265,10 @@ export const updateE3Config = (
 
     // Detect contract key line (e.g., `      enclave:`)
     const keyMatch = trimmed.match(/^(\w+):$/);
-    if (keyMatch && (contractEntryIndent === -1 || indent === contractEntryIndent)) {
+    if (
+      keyMatch &&
+      (contractEntryIndent === -1 || indent === contractEntryIndent)
+    ) {
       currentContractKey = keyMatch[1];
       if (contractEntryIndent === -1) contractEntryIndent = indent;
       continue;
@@ -276,8 +283,11 @@ export const updateE3Config = (
     if (trimmed.startsWith("address:")) {
       foundKeys.add(currentContractKey);
       const ws = line.match(/^(\s*)/)?.[1] ?? "";
-      const comment = trimmed.match(/^address:\s*["']?[^#"']*["']?\s*(#.*)$/)?.[1];
-      lines[i] = `${ws}address: "${update.address}"${comment ? " " + comment : ""}`;
+      const comment = trimmed.match(
+        /^address:\s*["']?[^#"']*["']?\s*(#.*)$/,
+      )?.[1];
+      lines[i] =
+        `${ws}address: "${update.address}"${comment ? " " + comment : ""}`;
       console.log(
         `✓ Updated ${currentContractKey}: ${update.address} (block ${update.deployBlock})`,
       );
@@ -286,7 +296,8 @@ export const updateE3Config = (
     if (trimmed.startsWith("deploy_block:")) {
       const ws = line.match(/^(\s*)/)?.[1] ?? "";
       const comment = trimmed.match(/^deploy_block:\s*\S+\s*(#.*)$/)?.[1];
-      lines[i] = `${ws}deploy_block: ${update.deployBlock}${comment ? " " + comment : ""}`;
+      lines[i] =
+        `${ws}deploy_block: ${update.deployBlock}${comment ? " " + comment : ""}`;
     }
   }
 
@@ -333,7 +344,9 @@ export const updateE3Config = (
     const missingKeys = [...updates.keys()].filter((k) => !foundKeys.has(k));
     if (missingKeys.length > 0 && lastContractsLine !== -1) {
       const keyIndent =
-        contractEntryIndent !== -1 ? contractEntryIndent : contractsKeyIndent + 2;
+        contractEntryIndent !== -1
+          ? contractEntryIndent
+          : contractsKeyIndent + 2;
       const valIndent = keyIndent + 2;
 
       const newLines: string[] = [];
@@ -341,7 +354,9 @@ export const updateE3Config = (
         const update = updates.get(configKey)!;
         newLines.push(`${" ".repeat(keyIndent)}${configKey}:`);
         newLines.push(`${" ".repeat(valIndent)}address: "${update.address}"`);
-        newLines.push(`${" ".repeat(valIndent)}deploy_block: ${update.deployBlock}`);
+        newLines.push(
+          `${" ".repeat(valIndent)}deploy_block: ${update.deployBlock}`,
+        );
         console.log(
           `✓ Added ${configKey}: ${update.address} (block ${update.deployBlock})`,
         );
