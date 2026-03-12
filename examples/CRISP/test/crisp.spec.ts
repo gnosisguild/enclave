@@ -15,7 +15,7 @@ import path from 'path'
 config({ path: path.join(process.cwd(), 'server', '.env') })
 
 const E3_DURATION = parseInt(process.env.E3_DURATION as string, 10) * 1000
-const OUTPUT_DECRYPTION_WAIT = 25_000 // A small buffer for decryption
+const OUTPUT_DECRYPTION_WAIT = 80_000 // A small buffer for decryption
 
 async function runCliInit(): Promise<number> {
   try {
