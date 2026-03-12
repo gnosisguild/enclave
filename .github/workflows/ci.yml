@@ -43,7 +43,6 @@ jobs:
       net: ${{ steps.jobs.outputs.net }}
       init: ${{ steps.jobs.outputs.init }}
       build_sdk: ${{ steps.jobs.outputs.build_sdk }}
-      build_crisp_sdk: ${{ steps.jobs.outputs.build_crisp_sdk }}
       build_e3_support_dev: ${{ steps.jobs.outputs.build_e3_support_dev }}
       build_circuits: ${{ steps.jobs.outputs.build_circuits }}
       integration_prebuild: ${{ steps.jobs.outputs.integration_prebuild }}
@@ -98,7 +97,8 @@ jobs:
           any() { for v in "$@"; do [ "$v" = "true" ] && echo "true" && return; done; echo "false"; }
 
           echo "rust_tests=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $CI)" >> $GITHUB_OUTPUT
-          echo "build_sdk=$(any "$FORCE" "$RUST" "$CONTRACTS" "$SDK" "$INTEGRATION" "$CIRCUITS" "$CI" "$TEMPLATES")" >> $GITHUB_OUTPUT
+          echo "ciphernode_e2e=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $INTEGRATION $CI)" >> $GITHUB_OUTPUT
+          echo "build_sdk=$(any $FORCE $RUST $CONTRACTS $SDK $INTEGRATION $CIRCUITS $CI $TEMPLATES)" >> $GITHUB_OUTPUT
           echo "crisp=$(any $FORCE $CRISP $CONTRACTS $CIRCUITS $RUST $CI)" >> $GITHUB_OUTPUT
           echo "templates=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $SDK $CI)" >> $GITHUB_OUTPUT
           echo "zk=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
@@ -107,10 +107,9 @@ jobs:
           echo "docker_ciphernode=$(any $FORCE $RUST $CONTRACTS $DOCKER $CI)" >> $GITHUB_OUTPUT
           echo "net=$(any $FORCE $INTEGRATION $CI)" >> $GITHUB_OUTPUT
           echo "init=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $CI)" >> $GITHUB_OUTPUT
-          echo "build_sdk=$(any $FORCE $RUST $CONTRACTS $SDK $CI $TEMPLATES)" >> $GITHUB_OUTPUT
           echo "build_e3_support_dev=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $SDK $CI)" >> $GITHUB_OUTPUT
           echo "build_circuits=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
-          echo "integration_prebuild=$(any "$FORCE" "$RUST" "$CONTRACTS" "$CIRCUITS" "$INTEGRATION" "$CI")" >> $GITHUB_OUTPUT
+          echo "integration_prebuild=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $INTEGRATION $CI)" >> $GITHUB_OUTPUT
           echo "zk_prover_integration=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
 
   rust_tests:
@@ -328,8 +327,7 @@ jobs:
 
   integration_prebuild:
     needs: [detect_changes]
-    # TODO: re-enable with ciphernode_integration_test
-    if: false && needs.detect_changes.outputs.integration_prebuild == 'true'
+    if: needs.detect_changes.outputs.integration_prebuild == 'true'
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
@@ -387,14 +385,14 @@ jobs:
 
   ciphernode_integration_test:
     needs: [detect_changes, integration_prebuild, build_enclave_cli, build_sdk]
-    # TODO: discuss if we need to re-enable — template_integration covers the same flow
-    if: false && needs.detect_changes.outputs.ciphernode_e2e == 'true'
+    if: needs.detect_changes.outputs.ciphernode_e2e == 'true'
     runs-on:
       group: enclave-ci
       labels: [enclave-ci-runner]
     strategy:
       matrix:
-        test-suite: [base, persist]
+        # TODO removed base test for now
+        test-suite: [persist]
       fail-fast: false
     steps:
       - name: 'Check out the repo'
