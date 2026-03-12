@@ -59,14 +59,15 @@ impl CircuitCodegen for ShareComputationChunkCircuit {
 
         Ok(Artifacts {
             toml: generate_chunk_toml(&inputs)?,
-            configs: generate_configs(
-                preset,
-                &bits,
-                data.share_data.n_parties as usize,
-                data.share_data.threshold as usize,
-                configs.chunk_size,
-                configs.n_chunks,
-            )?,
+        configs: generate_configs(
+            preset,
+            &bits,
+            data.share_data.n_parties as usize,
+            data.share_data.threshold as usize,
+            configs.chunk_size,
+            configs.chunks_per_batch,
+            configs.n_batches,
+        )?,
         })
     }
 }
@@ -86,7 +87,8 @@ fn build_base_artifacts(
             data.n_parties as usize,
             data.threshold as usize,
             configs.chunk_size,
-            configs.n_chunks,
+            configs.chunks_per_batch,
+            configs.n_batches,
         )?,
     })
 }
@@ -108,7 +110,8 @@ pub fn generate_configs(
     n_parties: usize,
     threshold: usize,
     chunk_size: usize,
-    n_chunks: usize,
+    chunks_per_batch: usize,
+    _n_batches: usize,
 ) -> Result<CodegenConfigs, CircuitsErrors> {
     let (threshold_params, _) =
         build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
@@ -148,7 +151,11 @@ share_computation_chunk (CIRCUIT 2c)
 ************************************/
 
 pub global {prefix}_CHUNK_SIZE: u32 = {chunk_size};
-pub global {prefix}_N_CHUNKS: u32 = {n_chunks};
+pub global {prefix}_N_CHUNKS: u32 = N / {prefix}_CHUNK_SIZE;
+
+pub global {prefix}_CHUNKS_PER_BATCH: u32 = {chunks_per_batch};
+pub global {prefix}_N_BATCHES: u32 =
+    {prefix}_N_CHUNKS / {prefix}_CHUNKS_PER_BATCH;
 
 pub global {prefix}_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
     ShareComputationChunkConfigs::new(QIS_THRESHOLD);
@@ -161,7 +168,7 @@ pub global {prefix}_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
         bit_sk_secret = bits.bit_sk_secret,
         bit_e_sm_secret = bits.bit_e_sm_secret,
         chunk_size = chunk_size,
-        n_chunks = n_chunks,
+        chunks_per_batch = chunks_per_batch,
     ))
 }
 
@@ -237,6 +244,15 @@ mod tests {
         assert!(configs_content
             .contains(format!("{}_SK_BIT_SECRET: u32 = {}", prefix, bits.bit_sk_secret).as_str()));
         assert!(configs_content.contains(format!("{}_CHUNK_SIZE: u32 = {}", prefix, 512).as_str()));
+        assert!(configs_content.contains(
+            format!("{}_N_CHUNKS: u32 = N / {}_CHUNK_SIZE", prefix, prefix).as_str()
+        ));
+        assert!(configs_content.contains(
+            format!("{}_CHUNKS_PER_BATCH: u32 = 1", prefix).as_str()
+        ));
+        assert!(configs_content.contains(
+            format!("{}_N_BATCHES: u32 =", prefix).as_str()
+        ));
         assert!(configs_content.contains(
             format!("{}_E_SM_BIT_SECRET: u32 = {}", prefix, bits.bit_e_sm_secret).as_str()
         ));
