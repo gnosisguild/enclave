@@ -10,10 +10,6 @@ on:
     branches:
       - main
       - dev
-  push:
-    branches:
-      - main
-      - dev
 env:
   SUPPORT_DOCKERFILE_PATH: crates/support/Dockerfile
   CIPHERNODE_DOCKERFILE_PATH: crates/Dockerfile
@@ -33,7 +29,93 @@ permissions:
   packages: write
 
 jobs:
+  detect_changes:
+    runs-on: 'ubuntu-latest'
+    outputs:
+      rust_tests: ${{ steps.jobs.outputs.rust_tests }}
+      ciphernode_e2e: ${{ steps.jobs.outputs.ciphernode_e2e }}
+      crisp: ${{ steps.jobs.outputs.crisp }}
+      templates: ${{ steps.jobs.outputs.templates }}
+      zk: ${{ steps.jobs.outputs.zk }}
+      contracts: ${{ steps.jobs.outputs.contracts }}
+      docker_support: ${{ steps.jobs.outputs.docker_support }}
+      docker_ciphernode: ${{ steps.jobs.outputs.docker_ciphernode }}
+      net: ${{ steps.jobs.outputs.net }}
+      init: ${{ steps.jobs.outputs.init }}
+      build_sdk: ${{ steps.jobs.outputs.build_sdk }}
+      build_crisp_sdk: ${{ steps.jobs.outputs.build_crisp_sdk }}
+      build_e3_support_dev: ${{ steps.jobs.outputs.build_e3_support_dev }}
+      build_circuits: ${{ steps.jobs.outputs.build_circuits }}
+      integration_prebuild: ${{ steps.jobs.outputs.integration_prebuild }}
+      zk_prover_integration: ${{ steps.jobs.outputs.zk_prover_integration }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            rust:
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+            contracts:
+              - 'packages/enclave-contracts/**'
+            circuits:
+              - 'circuits/**'
+              - 'scripts/*-circuits.sh'
+            crisp:
+              - 'examples/CRISP/**'
+            templates:
+              - 'templates/**'
+            sdk:
+              - 'packages/enclave-sdk/**'
+              - 'packages/enclave-react/**'
+              - 'packages/enclave-config/**'
+              - 'crates/wasm/**'
+            integration_tests:
+              - 'tests/integration/**'
+            docker:
+              - 'crates/Dockerfile'
+              - 'crates/support/Dockerfile'
+              - 'crates/support/**'
+            ci:
+              - '.github/**'
+      - name: Compute job filters
+        id: jobs
+        run: |
+          RUST="${{ steps.filter.outputs.rust }}"
+          CONTRACTS="${{ steps.filter.outputs.contracts }}"
+          CIRCUITS="${{ steps.filter.outputs.circuits }}"
+          CRISP="${{ steps.filter.outputs.crisp }}"
+          TEMPLATES="${{ steps.filter.outputs.templates }}"
+          SDK="${{ steps.filter.outputs.sdk }}"
+          INTEGRATION="${{ steps.filter.outputs.integration_tests }}"
+          DOCKER="${{ steps.filter.outputs.docker }}"
+          CI="${{ steps.filter.outputs.ci }}"
+          FORCE="${{ github.event_name == 'workflow_dispatch' }}"
+
+          any() { for v in "$@"; do [ "$v" = "true" ] && echo "true" && return; done; echo "false"; }
+
+          echo "rust_tests=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $CI)" >> $GITHUB_OUTPUT
+          echo "build_sdk=$(any "$FORCE" "$RUST" "$CONTRACTS" "$SDK" "$INTEGRATION" "$CIRCUITS" "$CI" "$TEMPLATES")" >> $GITHUB_OUTPUT
+          echo "crisp=$(any $FORCE $CRISP $CONTRACTS $CIRCUITS $RUST $CI)" >> $GITHUB_OUTPUT
+          echo "templates=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $SDK $CI)" >> $GITHUB_OUTPUT
+          echo "zk=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
+          echo "contracts=$(any $FORCE $CONTRACTS $CI)" >> $GITHUB_OUTPUT
+          echo "docker_support=$(any $FORCE $DOCKER $CI)" >> $GITHUB_OUTPUT
+          echo "docker_ciphernode=$(any $FORCE $RUST $CONTRACTS $DOCKER $CI)" >> $GITHUB_OUTPUT
+          echo "net=$(any $FORCE $INTEGRATION $CI)" >> $GITHUB_OUTPUT
+          echo "init=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $CI)" >> $GITHUB_OUTPUT
+          echo "build_sdk=$(any $FORCE $RUST $CONTRACTS $SDK $CI $TEMPLATES)" >> $GITHUB_OUTPUT
+          echo "build_e3_support_dev=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $SDK $CI)" >> $GITHUB_OUTPUT
+          echo "build_circuits=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
+          echo "integration_prebuild=$(any "$FORCE" "$RUST" "$CONTRACTS" "$CIRCUITS" "$INTEGRATION" "$CI")" >> $GITHUB_OUTPUT
+          echo "zk_prover_integration=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
+
   rust_tests:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.rust_tests == 'true'
     runs-on:
       group: enclave-ci
       labels: [enclave-ci-runner]
@@ -81,6 +163,8 @@ jobs:
         run: 'cargo test --test integration -- --nocapture'
 
   zk_prover_integration:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.zk_prover_integration == 'true'
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -110,6 +194,8 @@ jobs:
         run: 'cargo test -p e3-zk-prover --features integration-tests --test integration_tests -- --nocapture'
 
   build_e3_support_risc0:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.docker_support == 'true'
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -147,6 +233,8 @@ jobs:
             type=gha,mode=max,scope=e3-support
 
   build_ciphernode_image:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.docker_ciphernode == 'true'
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -187,6 +275,8 @@ jobs:
             type=gha,mode=max,scope=ciphernode
 
   test_contracts:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.contracts == 'true'
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
@@ -222,6 +312,8 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   test_net:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.net == 'true'
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
@@ -235,6 +327,9 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   integration_prebuild:
+    needs: [detect_changes]
+    # TODO: re-enable with ciphernode_integration_test
+    if: false && needs.detect_changes.outputs.integration_prebuild == 'true'
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
@@ -291,7 +386,9 @@ jobs:
           if-no-files-found: error
 
   ciphernode_integration_test:
-    needs: [integration_prebuild, build_enclave_cli, build_sdk]
+    needs: [detect_changes, integration_prebuild, build_enclave_cli, build_sdk]
+    # TODO: discuss if we need to re-enable — template_integration covers the same flow
+    if: false && needs.detect_changes.outputs.ciphernode_e2e == 'true'
     runs-on:
       group: enclave-ci
       labels: [enclave-ci-runner]
@@ -355,6 +452,7 @@ jobs:
           echo "## Test results for ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
+  # Always runs — shared artifact dependency for many downstream jobs
   build_enclave_cli:
     runs-on: 'ubuntu-latest'
     steps:
@@ -387,8 +485,9 @@ jobs:
           retention-days: 1
 
   crisp_unit:
+    needs: [detect_changes, build_crisp_sdk]
+    if: needs.detect_changes.outputs.crisp == 'true'
     runs-on: 'ubuntu-latest'
-    needs: [build_crisp_sdk]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -460,10 +559,11 @@ jobs:
         run: 'pnpm test:contracts'
 
   crisp_e2e:
+    needs: [detect_changes, build_enclave_cli, build_crisp_sdk]
+    if: needs.detect_changes.outputs.crisp == 'true'
     runs-on:
       group: enclave-ci
       labels: [enclave-ci-runner]
-    needs: [build_enclave_cli, build_crisp_sdk]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -573,6 +673,8 @@ jobs:
           retention-days: 30
 
   build_circuits:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.build_circuits == 'true'
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -626,8 +728,9 @@ jobs:
           if-no-files-found: error
 
   zk_prover_e2e:
+    needs: [detect_changes, build_circuits]
+    if: needs.detect_changes.outputs.zk == 'true'
     runs-on: 'ubuntu-latest'
-    needs: [build_circuits]
     steps:
       - uses: actions/checkout@v6
 
@@ -689,6 +792,8 @@ jobs:
         run: cargo test -p e3-zk-prover --test local_e2e_tests -- --nocapture
 
   build_e3_support_dev:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.build_e3_support_dev == 'true'
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -718,6 +823,8 @@ jobs:
           if-no-files-found: error
 
   build_sdk:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.build_sdk == 'true'
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -774,6 +881,8 @@ jobs:
           if-no-files-found: warn
 
   build_crisp_sdk:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.crisp == 'true'
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -821,10 +930,11 @@ jobs:
           if-no-files-found: warn
 
   template_integration:
+    needs: [detect_changes, build_enclave_cli, build_e3_support_dev, build_sdk]
+    if: needs.detect_changes.outputs.templates == 'true'
     runs-on:
       group: enclave-ci
       labels: [enclave-ci-runner]
-    needs: [build_enclave_cli, build_e3_support_dev, build_sdk]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -895,8 +1005,9 @@ jobs:
           pnpm test:integration
 
   test_enclave_init:
+    needs: [detect_changes, build_enclave_cli, build_e3_support_dev]
+    if: needs.detect_changes.outputs.init == 'true'
     runs-on: 'ubuntu-latest'
-    needs: [build_enclave_cli, build_e3_support_dev]
     steps:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
