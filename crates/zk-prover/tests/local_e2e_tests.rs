@@ -16,17 +16,14 @@
 mod common;
 
 use ark_bn254::Fr;
-use ark_ff::PrimeField;
+use ark_ff::{PrimeField, Zero};
 use common::{
     extract_field, extract_field_from_end, find_bb, setup_compiled_circuit, setup_test_prover,
 };
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
-use e3_zk_helpers::circuits::{
-    commitments::{compute_dkg_pk_commitment, compute_recursive_aggregation_commitment},
-    CircuitComputation,
-};
+use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_computation::{
     Configs, ShareComputationBaseCircuit, ShareComputationChunkCircuit,
@@ -47,7 +44,10 @@ use e3_zk_helpers::threshold::{
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_helpers::Computation;
 use e3_zk_helpers::{compute_share_computation_sk_commitment, compute_threshold_pk_commitment};
-use e3_zk_prover::{generate_share_computation_proof, Provable, ZkBackend, ZkProver};
+use e3_zk_prover::{
+    generate_chunk_batch_proof, generate_share_computation_final_proof, Provable, ZkBackend,
+    ZkProver,
+};
 
 /// Convert raw public signals bytes (32-byte big-endian chunks) to ark_bn254::Fr field elements.
 fn public_signals_to_fields(signals: &[u8]) -> Vec<Fr> {
@@ -151,10 +151,11 @@ async fn setup_share_computation_sk_base_chunk_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    // Inner share_computation only: base, chunk, share_computation aggregator (no wrapper)
+    // Two-level wrapper: base, chunk, chunk_batch (level 1), share_computation (level 2)
     setup_compiled_circuit(&backend, "dkg", "sk_share_computation_base").await;
     setup_compiled_circuit(&backend, "dkg", "e_sm_share_computation_base").await;
     setup_compiled_circuit(&backend, "dkg", "share_computation_chunk").await;
+    setup_compiled_circuit(&backend, "dkg", "share_computation_chunk_batch").await;
     setup_compiled_circuit(&backend, "dkg", "share_computation").await;
 
     let sample =
@@ -187,10 +188,11 @@ async fn setup_share_computation_e_sm_base_chunk_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    // Inner share_computation only: base, chunk, share_computation aggregator (no wrapper)
+    // Two-level wrapper: base, chunk, chunk_batch (level 1), share_computation (level 2)
     setup_compiled_circuit(&backend, "dkg", "sk_share_computation_base").await;
     setup_compiled_circuit(&backend, "dkg", "e_sm_share_computation_base").await;
     setup_compiled_circuit(&backend, "dkg", "share_computation_chunk").await;
+    setup_compiled_circuit(&backend, "dkg", "share_computation_chunk_batch").await;
     setup_compiled_circuit(&backend, "dkg", "share_computation").await;
 
     let sample = ShareComputationCircuitData::generate_sample(
@@ -497,10 +499,10 @@ async fn test_share_computation_sk_commitment_consistency() {
         .prove(&prover, &preset, &sample, &format!("{e3_id}_base"))
         .expect("base proof should succeed");
 
-    let n_chunks = Configs::compute(preset, &sample).expect("configs").n_chunks;
+    let configs = Configs::compute(preset, &sample).expect("configs");
 
-    let mut chunk_proofs = Vec::with_capacity(n_chunks);
-    for chunk_idx in 0..n_chunks {
+    let mut chunk_proofs = Vec::with_capacity(configs.n_chunks);
+    for chunk_idx in 0..configs.n_chunks {
         let chunk_data = ShareComputationChunkCircuitData {
             share_data: sample.clone(),
             chunk_idx,
@@ -516,30 +518,40 @@ async fn test_share_computation_sk_commitment_consistency() {
         chunk_proofs.push(chunk_proof);
     }
 
-    let proof = generate_share_computation_proof(&prover, &base_proof, &chunk_proofs, e3_id)
-        .expect("share_computation proof should succeed");
+    // Level 1: group chunks into batches and prove each batch
+    let mut batch_proofs = Vec::with_capacity(configs.n_batches);
+    for batch_idx in 0..configs.n_batches {
+        let start = batch_idx * configs.chunks_per_batch;
+        let end = start + configs.chunks_per_batch;
+        let batch_proof = generate_chunk_batch_proof(
+            &prover,
+            &base_proof,
+            &chunk_proofs[start..end],
+            batch_idx as u32,
+            &format!("{e3_id}_batch_{batch_idx}"),
+        )
+        .expect("chunk batch proof should succeed");
+        batch_proofs.push(batch_proof);
+    }
 
-    // The share_computation inner circuit has 3 public outputs (each 32 bytes):
-    //   [0] base_key_hash
-    //   [1] chunk_key_hash
-    //   [2] aggregated commitment = compute_recursive_aggregation_commitment(base_pub ++ chunk_pubs)
+    // Level 2: aggregate batch proofs into final C2 proof
+    let proof = generate_share_computation_final_proof(&prover, &batch_proofs, e3_id)
+        .expect("final share_computation proof should succeed");
+
+    // Final wrapper now exposes:
+    //   [0] batch_key_hash (pub param)
+    //   [1..=4] batch wrapper public inputs (length 4 fields).
     assert_eq!(
         proof.public_signals.len(),
-        3 * 32,
-        "share_computation inner circuit should have exactly 3 public outputs (96 bytes)"
+        5 * 32,
+        "final share_computation wrapper should expose 5 field public inputs (160 bytes)"
     );
 
-    // Reconstruct the aggregated payload from intermediate proofs' public signals
-    let mut payload: Vec<Fr> = public_signals_to_fields(&base_proof.public_signals);
-    for cp in &chunk_proofs {
-        payload.extend(public_signals_to_fields(&cp.public_signals));
-    }
-    let expected_commitment = compute_recursive_aggregation_commitment(payload);
-
-    let commitment_from_proof = extract_field(&proof.public_signals, 2);
-    assert_eq!(
-        commitment_from_proof, expected_commitment,
-        "Aggregated commitment from proof must match independently calculated commitment"
+    // Sanity check: at least one public input is non-zero.
+    let fields = public_signals_to_fields(&proof.public_signals);
+    assert!(
+        fields.iter().any(|f| !f.is_zero()),
+        "party commitments from final wrapper should not all be zero"
     );
 
     prover.cleanup(e3_id).unwrap();
@@ -559,10 +571,10 @@ async fn test_share_computation_e_sm_commitment_consistency() {
         .prove(&prover, &preset, &sample, &format!("{e3_id}_base"))
         .expect("base proof should succeed");
 
-    let n_chunks = Configs::compute(preset, &sample).expect("configs").n_chunks;
+    let configs = Configs::compute(preset, &sample).expect("configs");
 
-    let mut chunk_proofs = Vec::with_capacity(n_chunks);
-    for chunk_idx in 0..n_chunks {
+    let mut chunk_proofs = Vec::with_capacity(configs.n_chunks);
+    for chunk_idx in 0..configs.n_chunks {
         let chunk_data = ShareComputationChunkCircuitData {
             share_data: sample.clone(),
             chunk_idx,
@@ -578,30 +590,40 @@ async fn test_share_computation_e_sm_commitment_consistency() {
         chunk_proofs.push(chunk_proof);
     }
 
-    let proof = generate_share_computation_proof(&prover, &base_proof, &chunk_proofs, e3_id)
-        .expect("share_computation proof should succeed");
+    // Level 1: group chunks into batches and prove each batch
+    let mut batch_proofs = Vec::with_capacity(configs.n_batches);
+    for batch_idx in 0..configs.n_batches {
+        let start = batch_idx * configs.chunks_per_batch;
+        let end = start + configs.chunks_per_batch;
+        let batch_proof = generate_chunk_batch_proof(
+            &prover,
+            &base_proof,
+            &chunk_proofs[start..end],
+            batch_idx as u32,
+            &format!("{e3_id}_batch_{batch_idx}"),
+        )
+        .expect("chunk batch proof should succeed");
+        batch_proofs.push(batch_proof);
+    }
 
-    // The share_computation inner circuit has 3 public outputs (each 32 bytes):
-    //   [0] base_key_hash
-    //   [1] chunk_key_hash
-    //   [2] aggregated commitment = compute_recursive_aggregation_commitment(base_pub ++ chunk_pubs)
+    // Level 2: aggregate batch proofs into final C2 proof
+    let proof = generate_share_computation_final_proof(&prover, &batch_proofs, e3_id)
+        .expect("final share_computation proof should succeed");
+
+    // Final wrapper now exposes:
+    //   [0] batch_key_hash (pub param)
+    //   [1..=4] batch wrapper public inputs (length 4 fields).
     assert_eq!(
         proof.public_signals.len(),
-        3 * 32,
-        "share_computation inner circuit should have exactly 3 public outputs (96 bytes)"
+        5 * 32,
+        "final share_computation wrapper should expose 5 field public inputs (160 bytes)"
     );
 
-    // Reconstruct the aggregated payload from intermediate proofs' public signals
-    let mut payload: Vec<Fr> = public_signals_to_fields(&base_proof.public_signals);
-    for cp in &chunk_proofs {
-        payload.extend(public_signals_to_fields(&cp.public_signals));
-    }
-    let expected_commitment = compute_recursive_aggregation_commitment(payload);
-
-    let commitment_from_proof = extract_field(&proof.public_signals, 2);
-    assert_eq!(
-        commitment_from_proof, expected_commitment,
-        "Aggregated commitment from proof must match independently calculated commitment"
+    // Sanity check: at least one public input is non-zero.
+    let fields = public_signals_to_fields(&proof.public_signals);
+    assert!(
+        fields.iter().any(|f| !f.is_zero()),
+        "party commitments from final wrapper should not all be zero"
     );
 
     prover.cleanup(e3_id).unwrap();

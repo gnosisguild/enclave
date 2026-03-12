@@ -7,8 +7,52 @@
 use std::collections::BTreeMap;
 
 use crate::error::ZkError;
+use crate::prover::ZkProver;
+use crate::witness::{CompiledCircuit, WitnessGenerator};
 use acir::FieldElement;
+use e3_events::{CircuitName, CircuitVariant, Proof};
 use noirc_abi::{input_parser::InputValue, InputMap};
+
+const FIELD_SIZE: usize = 32;
+
+/// Converts raw proof/public-signal bytes (32-byte big-endian chunks) to hex-encoded field strings.
+pub fn bytes_to_field_strings(bytes: &[u8]) -> Result<Vec<String>, ZkError> {
+    if bytes.len() % FIELD_SIZE != 0 {
+        return Err(ZkError::InvalidInput(format!(
+            "expected length multiple of {FIELD_SIZE}, got {}",
+            bytes.len()
+        )));
+    }
+    Ok(bytes
+        .chunks(FIELD_SIZE)
+        .map(|chunk| format!("0x{}", hex::encode(chunk)))
+        .collect())
+}
+
+/// Proves a circuit given a serializable input struct.
+///
+/// Handles the common pattern: serialize → load compiled circuit → generate witness → prove.
+pub fn prove_recursive_circuit(
+    prover: &ZkProver,
+    circuit_name: CircuitName,
+    input: &impl serde::Serialize,
+    e3_id: &str,
+) -> Result<Proof, ZkError> {
+    let recursive_dir = prover.circuits_dir(CircuitVariant::Recursive);
+    let circuit_path = recursive_dir
+        .join(circuit_name.dir_path())
+        .join(format!("{}.json", circuit_name.as_str()));
+    let compiled = CompiledCircuit::from_file(&circuit_path)?;
+
+    let json =
+        serde_json::to_value(input).map_err(|e| ZkError::SerializationError(e.to_string()))?;
+    let input_map = inputs_json_to_input_map(&json)?;
+
+    let witness_gen = WitnessGenerator::new();
+    let witness = witness_gen.generate_witness(&compiled, input_map)?;
+
+    prover.generate_proof_with_variant(circuit_name, &witness, e3_id, CircuitVariant::Recursive)
+}
 
 /// Converts inputs JSON (from `Inputs::to_json()`) to `InputMap` for Noir ABI.
 /// Expects the same structure: CRT fields as arrays of `{coefficients: [...]}`,

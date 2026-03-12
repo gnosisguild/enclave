@@ -186,7 +186,27 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
 
-        // Copy share_computation inner circuit (binds base + N chunks — IS the C2 proof)
+        // Copy share_computation_chunk_batch circuit (Level 1: base + CHUNKS_PER_BATCH chunks)
+        let share_comp_batch_dir = circuits_dir
+            .join("dkg")
+            .join("share_computation_chunk_batch");
+        tokio::fs::create_dir_all(&share_comp_batch_dir)
+            .await
+            .unwrap();
+        tokio::fs::copy(
+            dkg_target.join("share_computation_chunk_batch.json"),
+            share_comp_batch_dir.join("share_computation_chunk_batch.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            dkg_target.join("share_computation_chunk_batch.vk"),
+            share_comp_batch_dir.join("share_computation_chunk_batch.vk"),
+        )
+        .await
+        .unwrap();
+
+        // Copy share_computation final wrapper (Level 2: N_BATCHES batch proofs — IS the C2 proof)
         let share_comp_dir = circuits_dir.join("dkg").join("share_computation");
         tokio::fs::create_dir_all(&share_comp_dir).await.unwrap();
         tokio::fs::copy(

@@ -71,7 +71,10 @@ use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
 use e3_zk_helpers::Computation;
-use e3_zk_prover::{generate_share_computation_proof, Provable, ZkBackend, ZkProver};
+use e3_zk_prover::{
+    generate_chunk_batch_proof, generate_share_computation_final_proof, Provable, ZkBackend,
+    ZkProver,
+};
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
 use fhe_traits::{DeserializeParametrized, FheEncoder};
@@ -704,13 +707,12 @@ fn handle_share_computation_proof(
         })?;
 
     // 8. Determine number of chunks and prove each chunk circuit
-    let n_chunks = Configs::compute(req.params_preset.clone(), &circuit_data)
-        .map_err(|e| make_zk_error(&request, format!("Configs::compute: {}", e)))?
-        .n_chunks;
+    let configs = Configs::compute(req.params_preset.clone(), &circuit_data)
+        .map_err(|e| make_zk_error(&request, format!("Configs::compute: {}", e)))?;
 
     let chunk_circuit = ShareComputationChunkCircuit;
-    let mut chunk_proofs = Vec::with_capacity(n_chunks);
-    for chunk_idx in 0..n_chunks {
+    let mut chunk_proofs = Vec::with_capacity(configs.n_chunks);
+    for chunk_idx in 0..configs.n_chunks {
         let chunk_data = ShareComputationChunkCircuitData {
             share_data: circuit_data.clone(),
             chunk_idx,
@@ -731,22 +733,38 @@ fn handle_share_computation_proof(
         chunk_proofs.push(chunk_proof);
     }
 
-    // 9. Prove the share_computation circuit (binds base + N chunks) — this IS the C2 proof.
-    //    Wrapping happens later during aggregation (both SK + ESM wrapped together).
-    let proof = generate_share_computation_proof(
-        prover,
-        &base_proof,
-        &chunk_proofs,
-        &format!("{e3_id_str}_c2"),
-    )
-    .map_err(|e| {
-        ComputeRequestError::new(
-            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
-            request.clone(),
+    // 9. Level 1: group chunks into batches and prove each batch
+    let mut batch_proofs = Vec::with_capacity(configs.n_batches);
+    for batch_idx in 0..configs.n_batches {
+        let start = batch_idx * configs.chunks_per_batch;
+        let end = start + configs.chunks_per_batch;
+        let batch_proof = generate_chunk_batch_proof(
+            prover,
+            &base_proof,
+            &chunk_proofs[start..end],
+            batch_idx as u32,
+            &format!("{e3_id_str}_batch_{batch_idx}"),
         )
-    })?;
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+        batch_proofs.push(batch_proof);
+    }
 
-    // 10. Return inner proof
+    // 10. Level 2: aggregate batch proofs into final C2 proof
+    let proof =
+        generate_share_computation_final_proof(prover, &batch_proofs, &format!("{e3_id_str}_c2"))
+            .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
+    // 11. Return final C2 proof
     Ok(ComputeResponse::zk(
         ZkResponse::ShareComputation(ShareComputationProofResponse {
             proof,
