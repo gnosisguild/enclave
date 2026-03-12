@@ -331,9 +331,14 @@ impl<E: Event + fmt::Debug> Handler<TakeEvents<E>> for HistoryCollectorWaiter<E>
                 info!("take: given={:?}", timeout);
                 for i in 0..count {
                     let round = Instant::now();
-                    let tout = if i == 0 { MAX_TIMEOUT } else { timeout };
+                    let tout = if i == 0 {
+                        timeout
+                    } else {
+                        timeout - Duration::from_secs(1)
+                    };
                     match tokio::time::timeout(tout, rx.recv()).await {
                         Ok(Some(e)) => {
+                            info!("HistoryCollectorWaiter got event {:?}", e.event_type());
                             if i > 0 {
                                 max_time = Duration::max(round.elapsed(), max_time);
                             }
