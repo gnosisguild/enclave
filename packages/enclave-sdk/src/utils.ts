@@ -78,8 +78,7 @@ export const DEFAULT_COMPUTE_PROVIDER_PARAMS: ComputeProviderParams = {
 
 // Default E3 configuration
 export const DEFAULT_E3_CONFIG = {
-  threshold_min: 2,
-  threshold_max: 5,
+  committeeSize: 1, // Small
   duration: 1800, // 30 minutes in seconds
   payment_amount: '0', // 0 ETH in wei
 } as const

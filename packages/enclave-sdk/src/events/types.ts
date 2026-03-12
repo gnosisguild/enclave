@@ -36,7 +36,7 @@ export interface E3RequestedData {
   e3Id: bigint
   e3: {
     seed: bigint
-    threshold: readonly [number, number]
+    committeeSize: number
     requestBlock: bigint
     inputWindow: readonly [bigint, bigint]
     encryptionSchemeId: string

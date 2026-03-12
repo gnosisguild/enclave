@@ -57,7 +57,7 @@ export type {
 } from './types'
 
 // Enums and constants
-export { EnclaveEventType, RegistryEventType, ThresholdBfvParamsPresetNames, E3Stage, FailureReason } from './types'
+export { EnclaveEventType, RegistryEventType, ThresholdBfvParamsPresetNames, E3Stage, FailureReason, CommitteeSize } from './types'
 export { DEFAULT_THRESHOLD_BFV_PARAMS_PRESET_NAME } from './constants'
 
 // Export utilities

@@ -212,6 +212,14 @@ interface IEnclave {
     /// @notice Emitted when timeout config is updated
     event TimeoutConfigUpdated(E3TimeoutConfig config);
 
+    /// @notice Emitted when committee thresholds are updated
+    /// @param size The committee size enum value.
+    /// @param threshold The M/N threshold values.
+    event CommitteeThresholdsUpdated(
+        CommitteeSize indexed size,
+        uint32[2] threshold
+    );
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                  Structs                               //
@@ -451,4 +459,12 @@ interface IEnclave {
     /// @notice Set timeout configuration
     /// @param config The new timeout config
     function setTimeoutConfig(E3TimeoutConfig calldata config) external;
+
+    /// @notice Set the threshold values for a committee size
+    /// @param size The committee size enum value
+    /// @param threshold The M/N threshold values [quorum, total]
+    function setCommitteeThresholds(
+        CommitteeSize size,
+        uint32[2] calldata threshold
+    ) external;
 }

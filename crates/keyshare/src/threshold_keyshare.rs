@@ -1012,11 +1012,16 @@ impl ThresholdKeyshare {
                 }),
             party_id,
             e3_id,
+            threshold_m,
+            threshold_n,
             ..
         }) = self.state.get()
         else {
             bail!("Invalid state - expected GeneratingThresholdShare with all data");
         };
+
+        let derived_committee_size =
+            CiphernodesCommitteeSize::from_threshold(*threshold_m as usize, *threshold_n as usize);
 
         // Get collected BFV public keys from all parties (from persisted state)
         let encryption_keys = &collected_encryption_keys;
@@ -1090,7 +1095,7 @@ impl ThresholdKeyshare {
             proof_request_data.eek_raw.clone(),
             e_sm_raw.clone(),
             threshold_preset,
-            CiphernodesCommitteeSize::Small, // TODO: derive from config
+            derived_committee_size,
         );
 
         // Build C2a request (SkShareComputation)
@@ -1099,7 +1104,7 @@ impl ThresholdKeyshare {
             secret_sss_raw: sk_sss_raw,
             dkg_input_type: DkgInputType::SecretKey,
             params_preset: threshold_preset,
-            committee_size: CiphernodesCommitteeSize::Small, // TODO: derive from config
+            committee_size: derived_committee_size,
         };
 
         // Build C2b request (ESmShareComputation)
@@ -1111,7 +1116,7 @@ impl ThresholdKeyshare {
                 .ok_or_else(|| anyhow!("esi_sss_raw is empty — expected at least one entry"))?,
             dkg_input_type: DkgInputType::SmudgingNoise,
             params_preset: threshold_preset,
-            committee_size: CiphernodesCommitteeSize::Small, // TODO: derive from config
+            committee_size: derived_committee_size,
         };
 
         // Build C3a proof requests (SK share encryption) from witnesses
@@ -1133,7 +1138,7 @@ impl ThresholdKeyshare {
                     e1_rns_raw: SensitiveBytes::new(witness.e1_rns.to_bytes(), &self.cipher)?,
                     dkg_input_type: DkgInputType::SecretKey,
                     params_preset: threshold_preset,
-                    committee_size: CiphernodesCommitteeSize::Small,
+                    committee_size: derived_committee_size,
                     recipient_party_id: recipient_idx,
                     row_index: row_idx,
                     esi_index: 0,
@@ -1161,7 +1166,7 @@ impl ThresholdKeyshare {
                         e1_rns_raw: SensitiveBytes::new(witness.e1_rns.to_bytes(), &self.cipher)?,
                         dkg_input_type: DkgInputType::SmudgingNoise,
                         params_preset: threshold_preset,
-                        committee_size: CiphernodesCommitteeSize::Small,
+                        committee_size: derived_committee_size,
                         recipient_party_id: recipient_idx,
                         row_index: row_idx,
                         esi_index: esi_idx,

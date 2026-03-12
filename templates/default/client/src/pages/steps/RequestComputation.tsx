@@ -16,6 +16,7 @@ import {
   calculateStartWindow,
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
   DEFAULT_E3_CONFIG,
+  CommitteeSize,
 } from '@enclave-e3/sdk'
 import { getContractAddresses } from '@/utils/env-config'
 
@@ -107,7 +108,7 @@ const RequestComputation: React.FC = () => {
         throw new Error('SDK not initialized')
       }
 
-      const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
+      const committeeSize = DEFAULT_E3_CONFIG.committeeSize
       const startWindow = calculateStartWindow(60) // 1 minute
       const duration = BigInt(60) // 1 minute
       const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
@@ -116,7 +117,7 @@ const RequestComputation: React.FC = () => {
 
       console.log('requestE3')
       const hash = await requestE3({
-        threshold,
+        committeeSize,
         startWindow,
         duration,
         e3Program: contracts.e3Program,

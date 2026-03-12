@@ -15,6 +15,7 @@ use e3_events::{E3Failed, E3Stage, E3StageChanged, FailureReason};
 use e3_fhe_params::decode_bfv_params_arc;
 use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::ArcBytes;
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use num_bigint::BigUint;
 use tracing::{error, info, trace, warn};
 
@@ -29,8 +30,17 @@ struct E3RequestedWithChainId(pub IEnclave::E3Requested, pub u64);
 impl From<E3RequestedWithChainId> for e3_events::E3Requested {
     fn from(value: E3RequestedWithChainId) -> Self {
         let params_bytes = value.0.e3.e3ProgramParams.to_vec();
-        let threshold_m = value.0.e3.threshold[0] as usize;
-        let threshold_n = value.0.e3.threshold[1] as usize;
+
+        // Derive threshold values from committee size enum
+        let committee_size = match value.0.e3.committeeSize {
+            0 => CiphernodesCommitteeSize::Micro,
+            1 => CiphernodesCommitteeSize::Small,
+            _ => panic!("Unsupported committee size: {}", value.0.e3.committeeSize),
+        };
+        let committee = committee_size.values();
+        let threshold_m = committee.threshold;
+        let threshold_n = committee.n;
+
         let params_arc = decode_bfv_params_arc(&params_bytes).expect("Failed to decode BFV params");
 
         // TODO: These should be delivered from the e3_program contract

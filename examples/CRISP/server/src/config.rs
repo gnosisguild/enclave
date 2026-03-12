@@ -23,8 +23,7 @@ pub struct Config {
     pub chain_id: u64,
     pub cron_api_key: String,
     // E3 parameters
-    pub e3_threshold_min: u32,
-    pub e3_threshold_max: u32,
+    pub e3_committee_size: u8, // 0=Micro, 1=Small, 2=Medium, 3=Large
     pub e3_duration: u64,
     pub e3_compute_provider_name: String,
     pub e3_compute_provider_parallel: bool,

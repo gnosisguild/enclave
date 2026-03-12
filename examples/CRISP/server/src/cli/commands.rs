@@ -19,7 +19,7 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::SolValue;
 use crisp::config::CONFIG;
 use e3_fhe_params::{build_bfv_params_from_set_arc, encode_bfv_params};
-use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, E3};
+use e3_sdk::evm_helpers::contracts::{CommitteeSize, EnclaveContract, EnclaveRead, EnclaveWrite, E3};
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
@@ -130,7 +130,13 @@ pub async fn initialize_crisp_round(
             .abi_encode(),
     );
 
-    let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
+    let committee_size = match CONFIG.e3_committee_size {
+        0 => CommitteeSize::Micro,
+        1 => CommitteeSize::Small,
+        2 => CommitteeSize::Medium,
+        3 => CommitteeSize::Large,
+        _ => panic!("Invalid committee size: {}", CONFIG.e3_committee_size),
+    };
     let e3_params = Bytes::from(encode_bfv_params(&generate_bfv_parameters()));
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.to_string(),
@@ -155,7 +161,7 @@ pub async fn initialize_crisp_round(
 
     let fee_amount = contract
         .get_e3_quote(
-            threshold,
+            committee_size.clone(),
             input_window,
             e3_program,
             e3_params.clone(),
@@ -178,7 +184,7 @@ pub async fn initialize_crisp_round(
 
     info!("Requesting E3 on contract: {}", CONFIG.enclave_address);
 
-    info!("Debug - threshold: {:?}", threshold);
+    info!("Debug - committee_size: {:?}", committee_size);
     info!("Debug - input_window: {:?}", input_window);
     info!("Debug - current timestamp: {:?}", current_timestamp);
     info!("Debug - e3_program: {}", e3_program);
@@ -200,7 +206,7 @@ pub async fn initialize_crisp_round(
 
     let (res, e3_id) = contract
         .request_e3(
-            threshold,
+            committee_size,
             input_window,
             e3_program,
             e3_params,

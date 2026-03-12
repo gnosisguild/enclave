@@ -98,8 +98,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice Maps E3 ID to the fee token used at request time
     mapping(uint256 e3Id => IERC20 token) internal _e3FeeTokens;
 
-    /// @notice 
-    mapping(CommitteSize => uint8[2] threshold) public committeeThresholds;
+    /// @notice Maps committee size to threshold values [quorum, total]
+    mapping(CommitteeSize => uint32[2] threshold) public committeeThresholds;
 
     /// @notice Global timeout configuration
     E3TimeoutConfig internal _timeoutConfig;
@@ -145,9 +145,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param output The invalid output data.
     error InvalidOutput(bytes output);
 
-    /// @notice Thrown when the threshold parameters are invalid (e.g., M > N or M = 0).
-    /// @param threshold The invalid threshold array [M, N].
-    error InvalidThreshold(uint32[2] threshold);
+    /// @notice Thrown when the committee size has not been configured with thresholds.
+    /// @param committeeSize The unconfigured committee size.
+    error CommitteeSizeNotConfigured(CommitteeSize committeeSize);
 
     /// @notice Thrown when attempting to publish ciphertext output that has already been published.
     /// @param e3Id The ID of the E3.
@@ -287,11 +287,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function request(
         E3RequestParams calldata requestParams
     ) external returns (uint256 e3Id, E3 memory e3) {
-        // check whether the threshold config is valid
+        // Resolve committee size to threshold values
+        uint32[2] memory threshold = committeeThresholds[requestParams.committeeSize];
         require(
-            requestParams.threshold[1] >= requestParams.threshold[0] &&
-                requestParams.threshold[0] > 0,
-            InvalidThreshold(requestParams.threshold)
+            threshold[1] > 0,
+            CommitteeSizeNotConfigured(requestParams.committeeSize)
         );
 
         // input start date should be in the future
@@ -328,7 +328,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
         e3.seed = seed;
-        e3.threshold = requestParams.threshold;
+        e3.committeeSize = requestParams.committeeSize;
         e3.requestBlock = block.number;
         e3.inputWindow = requestParams.inputWindow;
         e3.e3Program = requestParams.e3Program;
@@ -371,7 +371,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             ciphernodeRegistry.requestCommittee(
                 e3Id,
                 seed,
-                requestParams.threshold
+                threshold
             ),
             CommitteeSelectionFailed()
         );
@@ -980,6 +980,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         _timeoutConfig = config;
 
         emit TimeoutConfigUpdated(config);
+    }
+
+    /// @inheritdoc IEnclave
+    function setCommitteeThresholds(
+        CommitteeSize size,
+        uint32[2] calldata threshold
+    ) external onlyOwner {
+        require(
+            threshold[1] >= threshold[0] && threshold[0] > 0,
+            "Invalid threshold"
+        );
+        committeeThresholds[size] = threshold;
+        emit CommitteeThresholdsUpdated(size, threshold);
     }
 
     ////////////////////////////////////////////////////////////
