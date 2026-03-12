@@ -4,9 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::path::Path;
+
 use clap::Parser;
-use cli::Cli;
+use cli::{Cli, SerializedCli};
 use e3_utils::{colorize, Color};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::UnixStream;
 use tracing::info;
 
 mod ciphernode;
@@ -57,14 +61,48 @@ pub fn owo() {
     println!("\n\n\n\n\n{}", OWO);
     println!("\n\n\n\n");
 }
+const SOCKET_PATH: &str = "/tmp/myapp.sock";
+
+async fn connect_socket() -> Option<UnixStream> {
+    if !Path::new(SOCKET_PATH).exists() {
+        return None;
+    }
+    UnixStream::connect(SOCKET_PATH).await.ok()
+}
+
+async fn run_on_socket<T>(cli: T, stream: UnixStream) -> anyhow::Result<()>
+where
+    T: TryInto<SerializedCli, Error = anyhow::Error>,
+{
+    let (reader, mut writer) = stream.into_split();
+    let cli: SerializedCli = cli.try_into()?;
+    let payload = serde_json::to_string(&cli)?;
+    writer.write_all(payload.as_bytes()).await?;
+    writer.write_all(b"\n").await?;
+    writer.shutdown().await?;
+
+    let mut lines = BufReader::new(reader).lines();
+    while let Some(line) = lines.next_line().await? {
+        println!("{}", line);
+    }
+
+    Ok(())
+}
 
 #[actix::main]
-pub async fn main() {
+pub async fn main() -> anyhow::Result<()> {
     info!("COMPILATION ID: '{}'", helpers::compile_id::generate_id());
 
-    // Execute the cli
-    if let Err(err) = Cli::parse().execute().await {
+    let cli = Cli::parse();
+
+    if let Err(err) = if let Some(stream) = connect_socket().await {
+        run_on_socket(cli, stream).await
+    } else {
+        cli.execute().await
+    } {
         eprintln!("{}", colorize(err, Color::Red));
         std::process::exit(1);
     }
+
+    Ok(())
 }

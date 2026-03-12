@@ -36,6 +36,7 @@ opentelemetry_sdk = { workspace = true }
 petname = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }

@@ -4,9 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::path::PathBuf;
-
-use crate::ciphernode::{self, CiphernodeCommands};
+use crate::ciphernode::{self, ChainArgs, CiphernodeCommands};
 use crate::helpers::telemetry::{setup_simple_tracing, setup_tracing};
 use crate::net::{self, NetCommands};
 use crate::nodes::{self, NodeCommands};
@@ -16,11 +14,13 @@ use crate::program::{self, ProgramCommands};
 use crate::wallet::WalletCommands;
 use crate::{init, noir, password, purge_all, rev, wallet};
 use crate::{print_env, start};
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
 use e3_config::validation::ValidUrl;
 use e3_config::{load_config, AppConfig};
 use e3_entrypoint::helpers::datastore::close_all_connections;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use tracing::{info, instrument, Level};
 
 #[derive(Parser, Debug)]
@@ -291,4 +291,48 @@ pub enum Commands {
         #[command(subcommand)]
         command: NetCommands,
     },
+}
+
+/// List of Cli Commands that can be executed while the node is running
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SerializedCli {
+    Rev,
+    PrintEnv { vite: bool, chain: String },
+    WalletGet,
+    NoirStatus,
+    CiphernodeStatus { chain: ChainArgs },
+    NodesPs,
+    NodesStatus { id: String },
+    NetGetPeerId,
+}
+
+impl TryInto<SerializedCli> for Cli {
+    type Error = anyhow::Error;
+    fn try_into(self) -> std::result::Result<SerializedCli, Self::Error> {
+        match self.command {
+            Commands::Rev => Ok(SerializedCli::Rev),
+            Commands::PrintEnv { vite, chain } => Ok(SerializedCli::PrintEnv { vite, chain }),
+            Commands::Wallet {
+                command: WalletCommands::Get,
+            } => Ok(SerializedCli::WalletGet),
+            Commands::Noir {
+                command: NoirCommands::Status,
+            } => Ok(SerializedCli::NoirStatus),
+            Commands::Ciphernode {
+                command: CiphernodeCommands::Status { chain },
+            } => Ok(SerializedCli::CiphernodeStatus { chain }),
+            Commands::Nodes {
+                command: NodeCommands::Ps,
+            } => Ok(SerializedCli::NodesPs),
+            Commands::Nodes {
+                command: NodeCommands::Status { id },
+            } => Ok(SerializedCli::NodesStatus { id }),
+            Commands::Net {
+                command: NetCommands::GetPeerId,
+            } => Ok(SerializedCli::NetGetPeerId),
+            _ => Err(anyhow!(
+                "This command cannot be run with an active node running. Stop your node and try again."
+            )),
+        }
+    }
 }

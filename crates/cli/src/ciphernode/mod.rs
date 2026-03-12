@@ -16,11 +16,12 @@ mod tickets;
 mod utils;
 
 use context::ChainContext;
+use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
 use crate::helpers::{ensure_hex_zeroizing, parse_zeroizing};
 
-#[derive(Debug, Args, Clone, Default)]
+#[derive(Debug, Args, Clone, Default, Serialize, Deserialize)]
 pub struct ChainArgs {
     /// Chain name as defined in the enclave config (defaults to the first entry)
     #[arg(long = "chain")]
