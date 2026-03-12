@@ -195,7 +195,7 @@ describe("SlashingManager", function () {
       await enclaveTicketToken.getAddress(),
       owner,
     );
-    const mockVerifier = MockCircuitVerifierFactory.connect(
+    const _mockVerifier = MockCircuitVerifierFactory.connect(
       await mockCircuitVerifier.getAddress(),
       owner,
     );
@@ -248,7 +248,7 @@ describe("SlashingManager", function () {
       enclaveToken,
       ticketToken,
       usdcToken,
-      mockVerifier,
+      _mockVerifier,
       mockCiphernodeRegistry,
     };
   }
@@ -297,13 +297,13 @@ describe("SlashingManager", function () {
 
   describe("setSlashPolicy()", function () {
     it("should set a valid proof-based slash policy", async function () {
-      const { slashingManager, mockVerifier } = await loadFixture(setup);
+      const { slashingManager, _mockVerifier } = await loadFixture(setup);
 
       const policy = {
         ticketPenalty: ethers.parseUnits("50", 6),
         licensePenalty: ethers.parseEther("100"),
         requiresProof: true,
-        proofVerifier: await mockVerifier.getAddress(),
+        proofVerifier: await _mockVerifier.getAddress(),
         banNode: false,
         appealWindow: 0,
         enabled: true,
@@ -448,13 +448,13 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if proof required but appeal window set", async function () {
-      const { slashingManager, mockVerifier } = await loadFixture(setup);
+      const { slashingManager, _mockVerifier } = await loadFixture(setup);
 
       const policy = {
         ticketPenalty: ethers.parseUnits("50", 6),
         licensePenalty: ethers.parseEther("100"),
         requiresProof: true,
-        proofVerifier: await mockVerifier.getAddress(),
+        proofVerifier: await _mockVerifier.getAddress(),
         banNode: false,
         appealWindow: APPEAL_WINDOW,
         enabled: true,
@@ -1471,13 +1471,13 @@ describe("SlashingManager", function () {
 
   describe("view functions", function () {
     it("should return correct slash policy", async function () {
-      const { slashingManager, mockVerifier } = await loadFixture(setup);
+      const { slashingManager, _mockVerifier } = await loadFixture(setup);
 
       const policy = {
         ticketPenalty: ethers.parseUnits("50", 6),
         licensePenalty: ethers.parseEther("100"),
         requiresProof: true,
-        proofVerifier: await mockVerifier.getAddress(),
+        proofVerifier: await _mockVerifier.getAddress(),
         banNode: true,
         appealWindow: 0,
         enabled: true,
