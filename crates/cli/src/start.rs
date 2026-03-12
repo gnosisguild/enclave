@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::owo;
+use crate::socket_server::start_socket_server;
 use anyhow::Result;
 use e3_config::{AppConfig, NodeRole};
 use e3_entrypoint::helpers::listen_for_shutdown;
@@ -42,7 +43,11 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
         node.peer_id
     );
 
+    let socket_server_handle = tokio::spawn(start_socket_server());
+
     tokio::spawn(listen_for_shutdown(node)).await?;
+
+    socket_server_handle.await??;
 
     Ok(())
 }

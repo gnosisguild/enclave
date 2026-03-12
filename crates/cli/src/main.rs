@@ -37,6 +37,7 @@ mod print_env;
 mod program;
 mod purge_all;
 mod rev;
+mod socket_server;
 mod start;
 mod wallet;
 mod wallet_get;
@@ -61,7 +62,7 @@ pub fn owo() {
     println!("\n\n\n\n\n{}", OWO);
     println!("\n\n\n\n");
 }
-const SOCKET_PATH: &str = "/tmp/myapp.sock";
+use crate::socket_server::SOCKET_PATH;
 
 async fn connect_socket() -> Option<UnixStream> {
     if !Path::new(SOCKET_PATH).exists() {
