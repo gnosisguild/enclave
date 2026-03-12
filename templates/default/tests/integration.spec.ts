@@ -58,11 +58,43 @@ type E3StateOutputPublished = E3Shared & {
 type E3State = E3StateRequested | E3StatePublished | E3StateOutputPublished
 
 async function setupEventListeners(sdk: EnclaveSDK, store: Map<bigint, E3State>) {
-  async function waitForEvent<T extends AllEventTypes>(type: T, trigger?: () => Promise<void>): Promise<EnclaveEvent<T>> {
+  async function waitForEvent<T extends AllEventTypes>(
+    type: T,
+    trigger?: () => Promise<void>,
+    timeoutMs?: number,
+  ): Promise<EnclaveEvent<T>> {
     return new Promise((resolve, reject) => {
-      sdk.once(type, resolve).catch(reject)
+      let settled = false
+      let timer: ReturnType<typeof setTimeout> | undefined
+
+      const handler = (event: EnclaveEvent<T>) => {
+        if (settled) return
+        settled = true
+        if (timer !== undefined) clearTimeout(timer)
+        sdk.off(type, handler)
+        resolve(event)
+      }
+
+      const fail = (err: unknown) => {
+        if (settled) return
+        settled = true
+        if (timer !== undefined) clearTimeout(timer)
+        sdk.off(type, handler)
+        reject(err)
+      }
+
+      // Use onEnclaveEvent so `handler` is the actual registered reference
+      // (sdk.once wraps in an internal closure, making sdk.off unable to remove it)
+      sdk.onEnclaveEvent(type, handler).catch(fail)
+
+      if (timeoutMs !== undefined) {
+        timer = setTimeout(() => {
+          fail(new Error(`Timed out waiting for event: ${type} after ${timeoutMs}ms`))
+        }, timeoutMs)
+      }
+
       if (trigger) {
-        trigger().catch(reject)
+        trigger().catch(fail)
       }
     })
   }
@@ -102,6 +134,7 @@ async function setupEventListeners(sdk: EnclaveSDK, store: Map<bigint, E3State>)
 
   await sdk.onEnclaveEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED, (event) => {
     const id = event.data.e3Id
+
     const state = store.get(id)
 
     if (!state) {
@@ -156,7 +189,7 @@ describe('Integration', () => {
     const { waitForEvent } = await setupEventListeners(sdk, store)
 
     const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
-    const duration = 250
+    const duration = 600
     const inputWindow = await calculateInputWindow(publicClient, duration)
     const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
     const e3ProgramParams = encodeBfvParams(thresholdBfvParams)
@@ -189,10 +222,16 @@ describe('Integration', () => {
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
     // REQUEST phase
-    await waitForEvent(EnclaveEventType.E3_REQUESTED, async () => {
-      console.log('Requested E3...')
-      await sdk.requestE3(requestParams)
-    })
+    const timeoutMs = duration * 1000
+
+    await waitForEvent(
+      EnclaveEventType.E3_REQUESTED,
+      async () => {
+        console.log('Requested E3...')
+        await sdk.requestE3(requestParams)
+      },
+      timeoutMs,
+    )
 
     state = store.get(0n)
     assert(state, 'store should have E3State but it was falsey')
@@ -205,7 +244,7 @@ describe('Integration', () => {
     assert.strictEqual(stageAfterRequest, E3Stage.Requested, 'E3 stage should be Requested after requestE3')
 
     // Ciphernodes will publish a public key within the COMMITTEE_PUBLISHED event
-    event = await waitForEvent(RegistryEventType.COMMITTEE_PUBLISHED)
+    event = await waitForEvent(RegistryEventType.COMMITTEE_PUBLISHED, undefined, timeoutMs)
 
     const publicKeyBytes = hexToBytes(event.data.publicKey as `0x${string}`)
 
@@ -244,7 +283,7 @@ describe('Integration', () => {
     )
     await sdk.waitForTransaction(txHash)
 
-    const plaintextEvent = await waitForEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED)
+    const plaintextEvent = await waitForEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED, undefined, timeoutMs)
 
     const result = decodePlaintextOutput(plaintextEvent.data.plaintextOutput)
     assert(result !== null, 'Failed to decode plaintext output')
