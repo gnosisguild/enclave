@@ -4,102 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Proof aggregation for recursive circuits.
+//! Generic proof aggregation for recursive circuits.
 //!
-//! Aggregates proofs by executing a wrapper circuit (e.g. dkg pk) that verifies
-//! inner proofs and produces a non-ZK aggregated proof.
+//! Contains the wrapper circuit (verifies 1-2 inner proofs) and the fold circuit
+//! (folds two wrapper proofs). Share-computation-specific logic lives in
+//! `circuits::dkg::share_computation`.
 
-mod utils;
-mod vk;
-
-use crate::circuits::utils::inputs_json_to_input_map;
+use crate::circuits::utils::{bytes_to_field_strings, inputs_json_to_input_map};
+use crate::circuits::vk;
 use crate::error::ZkError;
 use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
 use e3_events::{CircuitName, CircuitVariant, Proof};
-
-use self::utils::bytes_to_field_strings;
-
-//////////////////////////////////////////////////////////////////////////////
-// Share Computation inner circuit proof
-//////////////////////////////////////////////////////////////////////////////
-
-/// Input for the share_computation circuit that binds 1 base proof + N chunk proofs.
-/// Field names match Noir parameter names exactly for witness generation.
-#[derive(serde::Serialize)]
-struct ShareComputationInput {
-    base_verification_key: Vec<String>,
-    base_proof: Vec<String>,
-    base_public_inputs: Vec<String>,
-    base_key_hash: String,
-    chunk_verification_key: Vec<String>,
-    chunk_proofs: Vec<Vec<String>>,
-    chunk_public_inputs: Vec<Vec<String>>,
-    chunk_key_hash: String,
-}
-
-/// Proves the share_computation circuit that binds 1 base proof + N chunk proofs.
-///
-/// This IS the C2a/C2b proof — the successor to the old monolithic SkShareComputation /
-/// ESmShareComputation circuits. The returned proof (tagged `ShareComputation`) is then
-/// passed to [`generate_wrapper_proof`] exactly like the old circuit proofs were.
-///
-/// # Arguments
-/// * `prover` - ZK prover with bb and circuits configured
-/// * `base_proof` - The proved base circuit (SkShareComputationBase or ESmShareComputationBase)
-/// * `chunk_proofs` - The N proved chunk circuits (ShareComputationChunk)
-/// * `e3_id` - Job identifier for work dir
-pub fn generate_share_computation_proof(
-    prover: &ZkProver,
-    base_proof: &Proof,
-    chunk_proofs: &[Proof],
-    e3_id: &str,
-) -> Result<Proof, ZkError> {
-    let recursive_dir = prover.circuits_dir(CircuitVariant::Recursive);
-
-    let base_vk = vk::load_vk_artifacts(&recursive_dir, base_proof.circuit)?;
-    let chunk_vk = vk::load_vk_artifacts(&recursive_dir, CircuitName::ShareComputationChunk)?;
-
-    let base_proof_fields = bytes_to_field_strings(&base_proof.data)?;
-    let base_public_inputs = bytes_to_field_strings(&base_proof.public_signals)?;
-
-    let mut chunk_proof_fields = Vec::with_capacity(chunk_proofs.len());
-    let mut chunk_public_inputs = Vec::with_capacity(chunk_proofs.len());
-    for cp in chunk_proofs {
-        chunk_proof_fields.push(bytes_to_field_strings(&cp.data)?);
-        chunk_public_inputs.push(bytes_to_field_strings(&cp.public_signals)?);
-    }
-
-    let full_input = ShareComputationInput {
-        base_verification_key: base_vk.verification_key,
-        base_proof: base_proof_fields,
-        base_public_inputs,
-        base_key_hash: base_vk.key_hash,
-        chunk_verification_key: chunk_vk.verification_key,
-        chunk_proofs: chunk_proof_fields,
-        chunk_public_inputs,
-        chunk_key_hash: chunk_vk.key_hash,
-    };
-
-    let circuit_path = recursive_dir
-        .join(CircuitName::ShareComputation.dir_path())
-        .join(format!("{}.json", CircuitName::ShareComputation.as_str()));
-    let compiled = CompiledCircuit::from_file(&circuit_path)?;
-
-    let json = serde_json::to_value(&full_input)
-        .map_err(|e| ZkError::SerializationError(e.to_string()))?;
-    let input_map = inputs_json_to_input_map(&json)?;
-
-    let witness_gen = WitnessGenerator::new();
-    let witness = witness_gen.generate_witness(&compiled, input_map)?;
-
-    prover.generate_proof_with_variant(
-        CircuitName::ShareComputation,
-        &witness,
-        e3_id,
-        CircuitVariant::Recursive,
-    )
-}
 
 /// Full input for the recursive wrapper circuit.
 struct WrapperInput {

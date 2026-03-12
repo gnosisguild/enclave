@@ -4,10 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE
 
-use crate::circuits::recursive_aggregation::generate_share_computation_proof;
+use crate::circuits::utils::{bytes_to_field_strings, prove_recursive_circuit};
+use crate::circuits::vk;
+use crate::error::ZkError;
 use crate::prover::ZkProver;
 use crate::traits::Provable;
-use e3_events::CircuitName;
+use e3_events::{CircuitName, CircuitVariant, Proof};
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_computation::{
@@ -16,7 +18,109 @@ use e3_zk_helpers::dkg::share_computation::{
 };
 use e3_zk_helpers::Computation;
 
-/// Full share-computation proof (base + chunks + aggregation + wrapper).
+//////////////////////////////////////////////////////////////////////////////
+// Two-level wrapper proof generation
+//////////////////////////////////////////////////////////////////////////////
+
+/// Level 1: Input for the chunk_batch circuit (base + CHUNKS_PER_BATCH chunks).
+/// Field names match Noir parameter names exactly for witness generation.
+#[derive(serde::Serialize)]
+struct ChunkBatchInput {
+    base_verification_key: Vec<String>,
+    base_proof: Vec<String>,
+    base_public_inputs: Vec<String>,
+    base_key_hash: String,
+    chunk_verification_key: Vec<String>,
+    chunk_proofs: Vec<Vec<String>>,
+    chunk_public_inputs: Vec<Vec<String>>,
+    chunk_key_hash: String,
+    batch_idx: String,
+}
+
+/// Level 1: Proves the share_computation_chunk_batch circuit that binds
+/// 1 base proof + CHUNKS_PER_BATCH chunk proofs for a single batch.
+pub fn generate_chunk_batch_proof(
+    prover: &ZkProver,
+    base_proof: &Proof,
+    chunk_proofs: &[Proof],
+    batch_idx: u32,
+    e3_id: &str,
+) -> Result<Proof, ZkError> {
+    let recursive_dir = prover.circuits_dir(CircuitVariant::Recursive);
+
+    let base_vk = vk::load_vk_artifacts(&recursive_dir, base_proof.circuit)?;
+    let chunk_vk = vk::load_vk_artifacts(&recursive_dir, CircuitName::ShareComputationChunk)?;
+
+    let mut chunk_proof_fields = Vec::with_capacity(chunk_proofs.len());
+    let mut chunk_public_inputs = Vec::with_capacity(chunk_proofs.len());
+    for cp in chunk_proofs {
+        chunk_proof_fields.push(bytes_to_field_strings(&cp.data)?);
+        chunk_public_inputs.push(bytes_to_field_strings(&cp.public_signals)?);
+    }
+
+    let input = ChunkBatchInput {
+        base_verification_key: base_vk.verification_key,
+        base_proof: bytes_to_field_strings(&base_proof.data)?,
+        base_public_inputs: bytes_to_field_strings(&base_proof.public_signals)?,
+        base_key_hash: base_vk.key_hash,
+        chunk_verification_key: chunk_vk.verification_key,
+        chunk_proofs: chunk_proof_fields,
+        chunk_public_inputs,
+        chunk_key_hash: chunk_vk.key_hash,
+        batch_idx: batch_idx.to_string(),
+    };
+
+    prove_recursive_circuit(
+        prover,
+        CircuitName::ShareComputationChunkBatch,
+        &input,
+        e3_id,
+    )
+}
+
+/// Level 2: Input for the final share_computation wrapper (N_BATCHES batch proofs).
+/// Field names match Noir parameter names exactly for witness generation.
+#[derive(serde::Serialize)]
+struct ShareComputationFinalInput {
+    batch_verification_key: Vec<String>,
+    batch_proofs: Vec<Vec<String>>,
+    batch_public_inputs: Vec<Vec<String>>,
+    batch_key_hash: String,
+}
+
+/// Level 2: Proves the final share_computation circuit that aggregates N_BATCHES
+/// batch wrapper proofs into a single C2 proof.
+pub fn generate_share_computation_final_proof(
+    prover: &ZkProver,
+    batch_proofs: &[Proof],
+    e3_id: &str,
+) -> Result<Proof, ZkError> {
+    let recursive_dir = prover.circuits_dir(CircuitVariant::Recursive);
+
+    let batch_vk = vk::load_vk_artifacts(&recursive_dir, CircuitName::ShareComputationChunkBatch)?;
+
+    let mut batch_proof_fields = Vec::with_capacity(batch_proofs.len());
+    let mut batch_public_inputs = Vec::with_capacity(batch_proofs.len());
+    for bp in batch_proofs {
+        batch_proof_fields.push(bytes_to_field_strings(&bp.data)?);
+        batch_public_inputs.push(bytes_to_field_strings(&bp.public_signals)?);
+    }
+
+    let input = ShareComputationFinalInput {
+        batch_verification_key: batch_vk.verification_key,
+        batch_proofs: batch_proof_fields,
+        batch_public_inputs,
+        batch_key_hash: batch_vk.key_hash,
+    };
+
+    prove_recursive_circuit(prover, CircuitName::ShareComputation, &input, e3_id)
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Provable impls
+//////////////////////////////////////////////////////////////////////////////
+
+/// Full share-computation proof (base + chunks + two-level wrapper).
 /// Used by local e2e tests; the enclave uses the same pipeline via multithread handler.
 impl Provable for ShareComputationCircuit {
     type Params = BfvPreset;
@@ -37,17 +141,16 @@ impl Provable for ShareComputationCircuit {
         params: &Self::Params,
         input: &Self::Input,
         e3_id: &str,
-    ) -> Result<e3_events::Proof, crate::error::ZkError> {
+    ) -> Result<Proof, ZkError> {
         let base_circuit = ShareComputationBaseCircuit;
         let base_proof = base_circuit.prove(prover, params, input, &format!("{e3_id}_base"))?;
 
-        let n_chunks = Configs::compute(params.clone(), input)
-            .map_err(|e| crate::error::ZkError::InputsGenerationFailed(e.to_string()))?
-            .n_chunks;
+        let configs = Configs::compute(params.clone(), input)
+            .map_err(|e| ZkError::InputsGenerationFailed(e.to_string()))?;
 
         let chunk_circuit = ShareComputationChunkCircuit;
-        let mut chunk_proofs = Vec::with_capacity(n_chunks);
-        for chunk_idx in 0..n_chunks {
+        let mut chunk_proofs = Vec::with_capacity(configs.n_chunks);
+        for chunk_idx in 0..configs.n_chunks {
             let chunk_data = ShareComputationChunkCircuitData {
                 share_data: input.clone(),
                 chunk_idx,
@@ -61,26 +164,34 @@ impl Provable for ShareComputationCircuit {
             chunk_proofs.push(chunk_proof);
         }
 
-        let c2_proof = generate_share_computation_proof(prover, &base_proof, &chunk_proofs, e3_id)?;
-        // Return the inner share_computation proof (no wrapper). Tests verify with Recursive variant.
-        Ok(c2_proof)
+        // Level 1: group chunks into batches and prove each batch
+        let mut batch_proofs = Vec::with_capacity(configs.n_batches);
+        for batch_idx in 0..configs.n_batches {
+            let start = batch_idx * configs.chunks_per_batch;
+            let end = start + configs.chunks_per_batch;
+            let batch_proof = generate_chunk_batch_proof(
+                prover,
+                &base_proof,
+                &chunk_proofs[start..end],
+                batch_idx as u32,
+                &format!("{e3_id}_batch_{batch_idx}"),
+            )?;
+            batch_proofs.push(batch_proof);
+        }
+
+        // Level 2: aggregate batch proofs into final C2 proof
+        generate_share_computation_final_proof(prover, &batch_proofs, e3_id)
     }
 
     /// Inner share_computation proof is verified with Recursive variant.
     fn verify(
         &self,
         prover: &ZkProver,
-        proof: &e3_events::Proof,
+        proof: &Proof,
         e3_id: &str,
         party_id: u64,
-    ) -> Result<bool, crate::error::ZkError> {
-        self.verify_with_variant(
-            prover,
-            proof,
-            e3_id,
-            party_id,
-            e3_events::CircuitVariant::Recursive,
-        )
+    ) -> Result<bool, ZkError> {
+        self.verify_with_variant(prover, proof, e3_id, party_id, CircuitVariant::Recursive)
     }
 }
 

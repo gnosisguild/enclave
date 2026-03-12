@@ -87,7 +87,9 @@ pub enum CircuitName {
     ESmShareComputationBase,
     /// Share computation chunk proof (C2c, proven N times).
     ShareComputationChunk,
-    /// Share computation inner circuit proof (C2 — binds base + N chunks).
+    /// Share computation chunk batch proof (C2d — binds base + CHUNKS_PER_BATCH chunks).
+    ShareComputationChunkBatch,
+    /// Share computation final wrapper proof (C2 — binds N_BATCHES batch proofs).
     ShareComputation,
     /// Share encryption proof (C3).
     ShareEncryption,
@@ -111,6 +113,7 @@ impl CircuitName {
             CircuitName::SkShareComputationBase => "sk_share_computation_base",
             CircuitName::ESmShareComputationBase => "e_sm_share_computation_base",
             CircuitName::ShareComputationChunk => "share_computation_chunk",
+            CircuitName::ShareComputationChunkBatch => "share_computation_chunk_batch",
             CircuitName::ShareComputation => "share_computation",
             CircuitName::ShareEncryption => "share_encryption",
             CircuitName::DkgShareDecryption => "share_decryption",
@@ -127,6 +130,7 @@ impl CircuitName {
             CircuitName::SkShareComputationBase => "dkg",
             CircuitName::ESmShareComputationBase => "dkg",
             CircuitName::ShareComputationChunk => "dkg",
+            CircuitName::ShareComputationChunkBatch => "dkg",
             CircuitName::ShareComputation => "dkg",
             CircuitName::ShareEncryption => "dkg",
             CircuitName::DkgShareDecryption => "dkg",
