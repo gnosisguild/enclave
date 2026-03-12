@@ -317,6 +317,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     );
     await enclave.setSlashingManager(await slashingManager.getAddress());
 
+    // Set up committee thresholds
+    await enclave.setCommitteeThresholds(0, [1, 3]); // Micro
+    await enclave.setCommitteeThresholds(1, [2, 3]); // Small
+    await enclave.setCommitteeThresholds(2, [2, 4]); // Medium
+
     await bondingRegistry.setRewardDistributor(enclaveAddress);
     await bondingRegistry.setSlashingManager(
       await slashingManager.getAddress(),
@@ -379,10 +384,10 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await bondingRegistry.connect(operator).addTicketBalance(ticketAmount);
     }
 
-    async function makeRequest(threshold: [number, number] = [2, 3]) {
+    async function makeRequest(committeeSize: number = 1) {
       const startTime = (await time.latest()) + 100;
       const requestParams = {
-        threshold,
+        committeeSize,
         inputWindow: [startTime + 100, startTime + ONE_DAY] as [number, number],
         e3Program: await e3Program.getAddress(),
         e3ProgramParams: encodedE3ProgramParams,
@@ -457,8 +462,8 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator2);
       await setupOperator(operator3);
 
-      // threshold [2, 3] means M=2, N=3
-      await makeRequest([2, 3]);
+      // Small (committeeSize=1) means M=2, N=3
+      await makeRequest(1);
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -511,7 +516,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator2);
       await setupOperator(operator3);
 
-      await makeRequest([2, 3]); // M=2, N=3
+      await makeRequest(1); // Small: M=2, N=3
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -579,7 +584,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const SLASHER_ROLE = await slashingManager.SLASHER_ROLE();
       await slashingManager.grantRole(SLASHER_ROLE, await owner.getAddress());
 
-      await makeRequest([2, 3]); // M=2, N=3
+      await makeRequest(1); // Small: M=2, N=3
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -648,7 +653,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator2);
       await setupOperator(operator3);
 
-      await makeRequest([2, 3]);
+      await makeRequest(1);
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -708,7 +713,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator2);
       await setupOperator(operator3);
 
-      await makeRequest([2, 3]);
+      await makeRequest(1);
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -761,7 +766,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
       await setupOperator(operator4);
 
-      await makeRequest([2, 4]); // M=2, N=4
+      await makeRequest(2); // Medium: M=2, N=4
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -843,7 +848,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const SLASHER_ROLE = await slashingManager.SLASHER_ROLE();
       await slashingManager.grantRole(SLASHER_ROLE, await owner.getAddress());
 
-      await makeRequest([2, 2]); // M=2, N=2 — no room for error
+      await makeRequest(0); // Micro: M=1, N=3 — no room for error
       await finalizeCommitteeWithOperators(0, [operator1, operator2]);
 
       // Lane A cannot slash at M active when the accused is excluded from voting.
@@ -891,7 +896,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
       await setupOperator(operator4);
 
-      await makeRequest([2, 4]); // M=2, N=4
+      await makeRequest(2); // Medium: M=2, N=4
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -978,7 +983,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator2);
       await setupOperator(operator3);
 
-      await makeRequest([2, 3]);
+      await makeRequest(1);
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,

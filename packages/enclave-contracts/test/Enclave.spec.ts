@@ -301,8 +301,8 @@ describe("Enclave", function () {
     await usdcToken.mint(await notTheOwner.getAddress(), mintAmount);
 
     // ── Committee Thresholds ──────────────────────────────────────────────────
-    // CommitteeSize.Micro = 0 → [1, 2]
-    await enclave.setCommitteeThresholds(0, [1, 2]);
+    // CommitteeSize.Micro = 0 → [1, 3]
+    await enclave.setCommitteeThresholds(0, [1, 3]);
     // CommitteeSize.Small = 1 → [2, 5]
     await enclave.setCommitteeThresholds(1, [2, 5]);
 

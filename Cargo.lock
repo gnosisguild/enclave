@@ -3328,6 +3328,7 @@ dependencies = [
  "e3-test-helpers",
  "e3-trbfv",
  "e3-utils",
+ "e3-zk-helpers",
  "futures-util",
  "hex",
  "num-bigint",
@@ -3351,6 +3352,7 @@ dependencies = [
  "futures",
  "futures-util",
  "once_cell",
+ "serde",
  "tokio",
  "tracing",
 ]

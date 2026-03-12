@@ -288,7 +288,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         E3RequestParams calldata requestParams
     ) external returns (uint256 e3Id, E3 memory e3) {
         // Resolve committee size to threshold values
-        uint32[2] memory threshold = committeeThresholds[requestParams.committeeSize];
+        uint32[2] memory threshold = committeeThresholds[
+            requestParams.committeeSize
+        ];
         require(
             threshold[1] > 0,
             CommitteeSizeNotConfigured(requestParams.committeeSize)
@@ -368,11 +370,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         _e3FeeTokens[e3Id] = feeToken;
 
         require(
-            ciphernodeRegistry.requestCommittee(
-                e3Id,
-                seed,
-                threshold
-            ),
+            ciphernodeRegistry.requestCommittee(e3Id, seed, threshold),
             CommitteeSelectionFailed()
         );
 

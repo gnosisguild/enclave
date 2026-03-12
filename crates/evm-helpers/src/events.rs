@@ -23,9 +23,17 @@ sol! {
     }
 
     #[derive(Debug)]
+    enum CommitteeSize {
+        Micro,
+        Small,
+        Medium,
+        Large,
+    }
+
+    #[derive(Debug)]
     struct E3 {
         uint256 seed;
-        uint32[2] threshold;
+        CommitteeSize committeeSize;
         uint256 requestBlock;
         uint256[2] inputWindow;
         bytes32 encryptionSchemeId;

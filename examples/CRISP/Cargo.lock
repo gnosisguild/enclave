@@ -2398,6 +2398,7 @@ dependencies = [
  "futures 0.3.31",
  "futures-util",
  "once_cell",
+ "serde",
  "tokio",
  "tracing",
 ]

@@ -211,11 +211,11 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   // Initialize committee size thresholds [threshold, total]
   console.log("Setting committee thresholds...");
-  // Micro: threshold=1, total=2
-  await enclave.setCommitteeThresholds(0, [1, 2]);
+  // Micro: threshold=1, total=3
+  await enclave.setCommitteeThresholds(0, [1, 3]);
   // Small: threshold=2, total=5
   await enclave.setCommitteeThresholds(1, [2, 5]);
-  console.log("Committee thresholds set (Micro=[1,2], Small=[2,5])");
+  console.log("Committee thresholds set (Micro=[1,3], Small=[2,5])");
 
   if (shouldDeployMocks) {
     const { decryptionVerifierAddress, e3ProgramAddress } = await deployMocks();

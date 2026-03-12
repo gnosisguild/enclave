@@ -35,7 +35,7 @@ impl CiphernodesCommitteeSize {
     /// Derives the committee size from threshold values (M, N).
     pub fn from_threshold(threshold_m: usize, threshold_n: usize) -> Self {
         match (threshold_m, threshold_n) {
-            (1, 2) => Self::Micro,
+            (1, 3) => Self::Micro,
             (2, 5) => Self::Small,
             _ => panic!(
                 "Unknown committee size for threshold ({}, {})",
@@ -48,8 +48,8 @@ impl CiphernodesCommitteeSize {
     pub fn values(self) -> CiphernodesCommittee {
         match self {
             CiphernodesCommitteeSize::Micro => CiphernodesCommittee {
-                n: 2,
-                h: 2,
+                n: 3,
+                h: 3,
                 threshold: 1,
             },
             CiphernodesCommitteeSize::Small => CiphernodesCommittee {

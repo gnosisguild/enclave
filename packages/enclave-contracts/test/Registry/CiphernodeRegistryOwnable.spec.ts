@@ -229,6 +229,9 @@ describe("CiphernodeRegistryOwnable", function () {
       await mockDecryptionVerifier.getAddress(),
     );
 
+    // Set up committee thresholds
+    await enclave.setCommitteeThresholds(0, [1, 3]); // Micro
+
     // ── Operators ──────────────────────────────────────────────────────────────
     await licenseToken.setTransferRestriction(false);
 
@@ -260,7 +263,7 @@ describe("CiphernodeRegistryOwnable", function () {
       mockDecryptionVerifier,
       request: {
         e3Id: 0,
-        threshold: [2, 2] as [number, number],
+        committeeSize: 0,
       },
     };
   }
@@ -284,7 +287,7 @@ describe("CiphernodeRegistryOwnable", function () {
 
     const currentTime = await networkHelpers.time.latest();
     const requestParams = {
-      threshold: [2, 2] as [number, number],
+      committeeSize: 0,
       inputWindow: [currentTime + 100, currentTime + 300] as [number, number],
       e3Program: await mockE3Program.getAddress(),
       e3ProgramParams: encodedE3ProgramParams,

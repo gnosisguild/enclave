@@ -21,7 +21,7 @@ contract MockEnclave {
   function request(address program) external {
     e3s[nextE3Id] = E3({
       seed: 0,
-      threshold: [uint32(1), uint32(2)],
+      committeeSize: IEnclave.CommitteeSize.Micro,
       requestBlock: 0,
       inputWindow: [uint256(0), uint256(0)],
       encryptionSchemeId: bytes32(0),
@@ -56,7 +56,7 @@ contract MockEnclave {
     return
       E3({
         seed: 0,
-        threshold: [uint32(1), uint32(2)],
+        committeeSize: IEnclave.CommitteeSize.Micro,
         requestBlock: 0,
         inputWindow: [uint256(0), block.timestamp + 100],
         encryptionSchemeId: bytes32(0),

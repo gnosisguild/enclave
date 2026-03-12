@@ -314,6 +314,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await decryptionVerifier.getAddress(),
     );
 
+    // Set up committee thresholds
+    await enclave.setCommitteeThresholds(0, [1, 3]); // Micro
+
     await bondingRegistry.setRewardDistributor(enclaveAddress);
     await bondingRegistry.setSlashingManager(
       await slashingManager.getAddress(),
@@ -352,12 +355,12 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     // ── Helpers ────────────────────────────────────────────────────────────────
     const makeRequest = async (
       signer: Signer = requester,
-      threshold: [number, number] = [2, 2],
+      committeeSize: number = 0,
     ): Promise<{ e3Id: number }> => {
       const startTime = (await time.latest()) + 100;
 
       const requestParams = {
-        threshold,
+        committeeSize,
         inputWindow: [startTime + 100, startTime + ONE_DAY] as [number, number],
         e3Program: await e3Program.getAddress(),
         e3ProgramParams: encodedE3ProgramParams,
@@ -1268,7 +1271,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const makeRequestN = async (n: number) => {
         const startTime = (await time.latest()) + 100;
         const requestParams = {
-          threshold: [2, 2] as [number, number],
+          committeeSize: 0,
           inputWindow: [startTime, startTime + ONE_DAY] as [number, number],
           e3Program: await e3Program.getAddress(),
           e3ProgramParams: encodedE3ProgramParams,
@@ -1348,7 +1351,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       for (let i = 0; i < 2; i++) {
         const startTime = (await time.latest()) + 100;
         const requestParams = {
-          threshold: [2, 2] as [number, number],
+          committeeSize: 0,
           inputWindow: [startTime, startTime + ONE_DAY] as [number, number],
           e3Program: await e3Program.getAddress(),
           e3ProgramParams: encodedE3ProgramParams,

@@ -5,3 +5,4 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 pub mod small;
+pub mod micro;
