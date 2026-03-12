@@ -653,8 +653,8 @@ async fn test_trbfv_actor() -> Result<()> {
         committee_finalized_timer.elapsed(),
     ));
 
-    // Wait for KeyshareCreated + C1 verification + C5 proof + PublicKeyAggregated
-    // - KeyshareCreated × 3 (forwarded from committee nodes)
+    // Wait for KeyshareCreated + C1 verification + C5 proof + cross-node DKG fold + PublicKeyAggregated
+    // - KeyshareCreated × 5 (forwarded from committee nodes)
     // - ShareVerificationDispatched (C1 proof verification dispatched by PublicKeyAggregator)
     // - ComputeRequest (C1 ZK verification)
     // - ComputeResponse (C1 ZK verification result)
@@ -664,6 +664,9 @@ async fn test_trbfv_actor() -> Result<()> {
     // - ComputeRequest (C5 proof generation)
     // - ComputeResponse (C5 proof result)
     // - PkAggregationProofSigned (C5 proof signed by ProofRequestActor)
+    // - DKGRecursiveAggregationComplete × 5 (per-node aggregation from NodeProofAggregator)
+    // - ComputeRequest (cross-node DKG fold)
+    // - ComputeResponse (cross-node DKG fold result)
     // - PublicKeyAggregated × 1
     let shares_to_pubkey_agg_timer = Instant::now();
     let h = nodes
@@ -683,6 +686,13 @@ async fn test_trbfv_actor() -> Result<()> {
                 "ComputeRequest",
                 "ComputeResponse",
                 "PkAggregationProofSigned",
+                "DKGRecursiveAggregationComplete",
+                "DKGRecursiveAggregationComplete",
+                "DKGRecursiveAggregationComplete",
+                "DKGRecursiveAggregationComplete",
+                "DKGRecursiveAggregationComplete",
+                "ComputeRequest",
+                "ComputeResponse",
                 "PublicKeyAggregated",
             ],
             Duration::from_secs(5000),
@@ -771,11 +781,13 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 ComputeRequest (C7 proof generation)
     // - 1 ComputeResponse (C7 proof result)
     // - 1 AggregationProofSigned (C7 proof signed by ProofRequestActor)
-    // - 1 PlaintextAggregated (with C7 proofs)
+    // - 1 ComputeRequest (C6 fold)
+    // - 1 ComputeResponse (C6 fold result)
+    // - 1 PlaintextAggregated (with C7 + C6 proofs)
     // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
     // stay on their local buses.
-    // Total: 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 1 = 24 events
-    let expected_count = 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 1;
+    // Total: 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 2 + 1 = 26 events
+    let expected_count = 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 2 + 1;
 
     let h = nodes
         .take_history_with_timeouts(
