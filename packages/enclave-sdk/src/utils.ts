@@ -78,7 +78,7 @@ export const DEFAULT_COMPUTE_PROVIDER_PARAMS: ComputeProviderParams = {
 
 // Default E3 configuration
 export const DEFAULT_E3_CONFIG = {
-  committeeSize: 1, // Small
+  committeeSize: 0, // Micro
   duration: 1800, // 30 minutes in seconds
   payment_amount: '0', // 0 ETH in wei
 } as const
