@@ -887,13 +887,15 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 ComputeRequest (C7 proof generation)
     // - 1 ComputeResponse (C7 proof result)
     // - 1 AggregationProofSigned (C7 proof signed by ProofRequestActor)
-    // - 1 ComputeRequest (C6 fold)
-    // - 1 ComputeResponse (C6 fold result)
+    // - 8 ComputeRequest + 8 ComputeResponse (C6 fold: 9 proofs -> 8 pairwise steps)
     // - 1 PlaintextAggregated (with C7 + C6 proofs)
     // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
     // stay on their local buses.
-    // Total: 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 2 + 1 = 26 events
-    let expected_count = 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 2 + 1;
+    let c6_proof_count = threshold_n as usize * num_votes_per_voter;
+    let c6_fold_steps = c6_proof_count.saturating_sub(1);
+    let c6_fold_events = 2 * c6_fold_steps;
+    let expected_count =
+        1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 2 + c6_fold_events + 1;
 
     let h = nodes
         .take_history_with_timeouts(
