@@ -299,9 +299,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // input start date should be in the future
         require(
             requestParams.inputWindow[0] >= block.timestamp,
-            // &&
-            // requestParams.inputWindow[0] >= block.timestamp +
-            //     _timeoutConfig.dkgWindow,
             InvalidInputDeadlineStart(requestParams.inputWindow[0])
         );
         // the end of the input window should be after the start
@@ -421,15 +418,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         bytes32 ciphertextOutputHash = keccak256(ciphertextOutput);
         e3s[e3Id].ciphertextOutput = ciphertextOutputHash;
-
-        (success) = e3.e3Program.verify(e3Id, ciphertextOutputHash, proof);
-        require(success, InvalidOutput(ciphertextOutput));
-
-        // Update lifecycle stage
         _e3Stages[e3Id] = E3Stage.CiphertextReady;
         _e3Deadlines[e3Id].decryptionDeadline =
             block.timestamp +
             _timeoutConfig.decryptionWindow;
+
+        (success) = e3.e3Program.verify(e3Id, ciphertextOutputHash, proof);
+        require(success, InvalidOutput(ciphertextOutput));
 
         emit CiphertextOutputPublished(e3Id, ciphertextOutput);
         emit E3StageChanged(
@@ -464,6 +459,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
 
         e3s[e3Id].plaintextOutput = plaintextOutput;
+        _e3Stages[e3Id] = E3Stage.Complete;
 
         (success) = e3.decryptionVerifier.verify(
             e3Id,
@@ -471,9 +467,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             proof
         );
         require(success, InvalidOutput(plaintextOutput));
-
-        // Update lifecycle stage to Complete
-        _e3Stages[e3Id] = E3Stage.Complete;
 
         _distributeRewards(e3Id);
 
