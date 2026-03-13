@@ -26,6 +26,7 @@ import {
 } from "../types";
 import type { Enclave } from "../types/contracts/Enclave";
 import type { MockUSDC } from "../types/contracts/test/MockStableToken.sol/MockUSDC";
+import { setupOperatorForSortition } from "./fixtures";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time, mine } = networkHelpers;
@@ -97,40 +98,6 @@ describe("Enclave", function () {
     await tokenContract.approve(await enclave.getAddress(), fee);
     return enclaveContract.request(requestParams);
   };
-
-  async function setupOperatorForSortition(
-    operator: Signer,
-    bondingRegistry: any,
-    licenseToken: any,
-    usdcToken: any,
-    ticketToken: any,
-    registry: any,
-  ): Promise<void> {
-    const operatorAddress = await operator.getAddress();
-
-    await licenseToken.mintAllocation(
-      operatorAddress,
-      ethers.parseEther("10000"),
-      "Test allocation",
-    );
-    await usdcToken.mint(operatorAddress, ethers.parseUnits("100000", 6));
-
-    await licenseToken
-      .connect(operator)
-      .approve(await bondingRegistry.getAddress(), ethers.parseEther("2000"));
-    await bondingRegistry
-      .connect(operator)
-      .bondLicense(ethers.parseEther("1000"));
-    await bondingRegistry.connect(operator).registerOperator();
-
-    const ticketAmount = ethers.parseUnits("100", 6);
-    await usdcToken
-      .connect(operator)
-      .approve(await ticketToken.getAddress(), ticketAmount);
-    await bondingRegistry.connect(operator).addTicketBalance(ticketAmount);
-
-    await registry.addCiphernode(operatorAddress);
-  }
 
   const setup = async () => {
     // ── Signers ──────────────────────────────────────────────────────────────

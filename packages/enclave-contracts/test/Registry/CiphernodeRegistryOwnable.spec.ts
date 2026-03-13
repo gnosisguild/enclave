@@ -22,6 +22,7 @@ import {
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
   Enclave__factory as EnclaveFactory,
 } from "../../types";
+import { setupOperatorForSortition } from "../fixtures";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -42,39 +43,6 @@ describe("CiphernodeRegistryOwnable", function () {
     await registry.finalizeCommittee(e3Id);
   }
 
-  async function setupOperatorForSortition(
-    operator: Signer,
-    bondingRegistry: any,
-    licenseToken: any,
-    usdcToken: any,
-    ticketToken: any,
-    registry: any,
-  ): Promise<void> {
-    const operatorAddress = await operator.getAddress();
-
-    await licenseToken.mintAllocation(
-      operatorAddress,
-      ethers.parseEther("10000"),
-      "Test allocation",
-    );
-    await usdcToken.mint(operatorAddress, ethers.parseUnits("100000", 6));
-
-    await licenseToken
-      .connect(operator)
-      .approve(await bondingRegistry.getAddress(), ethers.parseEther("2000"));
-    await bondingRegistry
-      .connect(operator)
-      .bondLicense(ethers.parseEther("1000"));
-    await bondingRegistry.connect(operator).registerOperator();
-
-    const ticketAmount = ethers.parseUnits("100", 6);
-    await usdcToken
-      .connect(operator)
-      .approve(await ticketToken.getAddress(), ticketAmount);
-    await bondingRegistry.connect(operator).addTicketBalance(ticketAmount);
-
-    await registry.addCiphernode(operatorAddress);
-  }
   async function setup() {
     // ── Signers ────────────────────────────────────────────────────────────────
     const [owner, notTheOwner, operator1, operator2, operator3] =
