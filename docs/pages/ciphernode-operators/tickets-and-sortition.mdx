@@ -101,30 +101,40 @@ When `CommitteeRequested` fires, nodes check if they're eligible:
 For each ticket you hold, a score is calculated:
 
 ```
-score = keccak256(seed, operator, ticketNumber)
+score = keccak256(node, ticketNumber, e3Id, seed)
 ```
 
-The same inputs always produce the same scores, so all honest nodes converge on the same committee.
+The **lowest** score wins — each node submits its single best (lowest-scoring) ticket. The same
+inputs always produce the same scores, so all honest nodes converge on the same committee.
 
 ### 3. Ticket Submission
 
-Operators submit their winning tickets during the submission window (300 seconds on Sepolia):
+Operators submit their winning tickets during the submission window (10 seconds on Sepolia):
 
 ```bash
 # The CLI handles this automatically when running
 submitTicket(e3Id, ticketNumber)
 ```
 
-Each submission emits `TicketSubmitted(e3Id, operator, ticketNumber, score)`.
+Each submission emits `TicketSubmitted(e3Id, node, ticketId, score)`.
+
+> The sortition algorithm actually selects `threshold_n + buffer` nodes, where the buffer provides
+> backup nodes in case of failures. The buffer size depends on the `threshold_m / threshold_n`
+> ratio:
+>
+> - Ratio ≥ 0.8 → buffer = `(n - m) + 3`
+> - Ratio ≥ 0.6 → buffer = `(n - m) + 2`
+> - Ratio < 0.6 → buffer = `(n - m) + 1`
 
 ### 4. Committee Finalization
 
-After the window closes and ≥ `threshold_m` tickets are present:
+After the window closes and ≥ `threshold_n` tickets are present:
 
 1. Anyone can call `finalizeCommittee(e3Id)`
-2. Registry emits `CommitteeFinalized`
-3. Selected nodes generate and publish key shares
-4. Aggregated public key is published via `publishCommittee`
+2. If enough operators submitted, the registry emits `CommitteeFinalized(e3Id, committee)`
+3. If the threshold isn't met, `CommitteeFormationFailed` is emitted and the E3 fails
+4. Selected nodes generate and publish key shares
+5. Aggregated public key is published via `publishCommittee`
 
 ## Parameters
 
@@ -140,20 +150,24 @@ After the window closes and ≥ `threshold_m` tickets are present:
 
 ### Events to Watch
 
-| Event                | Meaning                              |
-| -------------------- | ------------------------------------ |
-| `CommitteeRequested` | New committee formation started      |
-| `TicketSubmitted`    | A ticket was submitted for selection |
-| `CommitteeFinalized` | Committee members confirmed          |
-| `CommitteePublished` | Aggregated public key ready          |
+| Event                      | Meaning                                |
+| -------------------------- | -------------------------------------- |
+| `CommitteeRequested`       | New committee formation started        |
+| `TicketSubmitted`          | A ticket was submitted for selection   |
+| `CommitteeFinalized`       | Committee members confirmed            |
+| `CommitteeFormationFailed` | Not enough operators submitted tickets |
+| `CommitteePublished`       | Aggregated public key ready            |
 
 ### Log Messages
 
 Watch your node logs for:
 
-- `sortition::submitted` - Successfully submitted tickets
-- `sortition::missed` - Failed to submit in time
-- `jobs::selected` - You were selected for a committee
+- `"This node was SELECTED for sortition"` - You have a winning ticket for an E3
+- `"This node was NOT selected for sortition"` - Your tickets didn't score low enough
+- `"Ticket generated for score sortition"` - Winning ticket emitted to the event bus
+- `"Ciphernode was not selected"` - Node wasn't in the selection set
+- `"Performing Sortition with buffer"` - Sortition started (shows threshold_m, threshold_n, buffer)
+- `"Node is in finalized committee"` - Committee confirmed, CiphernodeSelected emitted
 
 ## Troubleshooting
 

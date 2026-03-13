@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+mod accusation_quorum_reached;
+mod accusation_vote;
 mod aggregation_proof_pending;
 mod aggregation_proof_signed;
 mod ciphernode_added;
@@ -32,7 +34,7 @@ mod encryption_key_created;
 mod encryption_key_pending;
 mod encryption_key_received;
 mod keyshare_created;
-mod net_sync_events_received;
+mod net_ready;
 mod operator_activation_changed;
 mod outgoing_sync_requested;
 mod pk_aggregation_proof_pending;
@@ -41,6 +43,9 @@ mod pk_generation_proof_signed;
 mod plaintext_aggregated;
 mod plaintext_output_published;
 mod proof;
+mod proof_failure_accusation;
+mod proof_verification_failed;
+mod proof_verification_passed;
 mod publickey_aggregated;
 mod publish_document;
 mod share_computation_proof_signed;
@@ -48,6 +53,7 @@ mod share_decryption_proof_pending;
 mod share_verification;
 mod shutdown;
 mod signed_proof;
+mod slash_executed;
 mod sync_effect;
 mod sync_end;
 mod sync_start;
@@ -60,6 +66,8 @@ mod ticket_generated;
 mod ticket_submitted;
 mod typed_event;
 
+pub use accusation_quorum_reached::*;
+pub use accusation_vote::*;
 pub use aggregation_proof_pending::*;
 pub use aggregation_proof_signed::*;
 pub use ciphernode_added::*;
@@ -89,7 +97,7 @@ pub use encryption_key_created::*;
 pub use encryption_key_pending::*;
 pub use encryption_key_received::*;
 pub use keyshare_created::*;
-pub use net_sync_events_received::*;
+pub use net_ready::*;
 pub use operator_activation_changed::*;
 pub use outgoing_sync_requested::*;
 pub use pk_aggregation_proof_pending::*;
@@ -98,6 +106,9 @@ pub use pk_generation_proof_signed::*;
 pub use plaintext_aggregated::*;
 pub use plaintext_output_published::*;
 pub use proof::*;
+pub use proof_failure_accusation::*;
+pub use proof_verification_failed::*;
+pub use proof_verification_passed::*;
 pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use share_computation_proof_signed::*;
@@ -105,6 +116,7 @@ pub use share_decryption_proof_pending::*;
 pub use share_verification::*;
 pub use shutdown::*;
 pub use signed_proof::*;
+pub use slash_executed::*;
 use strum::IntoStaticStr;
 pub use sync_effect::*;
 pub use sync_end::*;
@@ -214,6 +226,11 @@ macro_rules! impl_event_types {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, IntoStaticStr, Serialize, Deserialize)]
 pub enum EnclaveEventData {
+    AccusationQuorumReached(AccusationQuorumReached),
+    AccusationVote(AccusationVote),
+    ProofFailureAccusation(ProofFailureAccusation),
+    ProofVerificationFailed(ProofVerificationFailed),
+    ProofVerificationPassed(ProofVerificationPassed),
     KeyshareCreated(KeyshareCreated),
     E3Requested(E3Requested),
     PublicKeyAggregated(PublicKeyAggregated),
@@ -257,13 +274,16 @@ pub enum EnclaveEventData {
     DecryptionShareProofsPending(DecryptionShareProofsPending),
     ShareVerificationDispatched(ShareVerificationDispatched),
     ShareVerificationComplete(ShareVerificationComplete),
+    SlashExecuted(SlashExecuted),
+    CommitteeMemberExpelled(CommitteeMemberExpelled),
     OutgoingSyncRequested(OutgoingSyncRequested),
-    NetSyncEventsReceived(NetSyncEventsReceived),
     HistoricalEvmSyncStart(HistoricalEvmSyncStart),
     HistoricalNetSyncStart(HistoricalNetSyncStart),
+    HistoricalNetSyncEventsReceived(HistoricalNetSyncEventsReceived),
     SyncEffect(SyncEffect),
     SyncEnded(SyncEnded),
     EffectsEnabled(EffectsEnabled),
+    NetReady(NetReady),
     DecryptionShareProofSigned(DecryptionShareProofSigned),
     ShareDecryptionProofPending(ShareDecryptionProofPending),
     PkAggregationProofPending(PkAggregationProofPending),
@@ -401,6 +421,14 @@ impl EnclaveEvent<Unsequenced> {
     }
 }
 
+impl TryFrom<Vec<u8>> for EnclaveEvent<Unsequenced> {
+    type Error = bincode::Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        EnclaveEvent::from_bytes(&value)
+    }
+}
+
 #[cfg(feature = "test-helpers")]
 impl EnclaveEvent<Sequenced> {
     /// test-helpers only utility function to create a new sequenced event
@@ -492,6 +520,11 @@ impl<S: SeqState> From<&EnclaveEvent<S>> for EventId {
 impl EnclaveEventData {
     pub fn get_e3_id(&self) -> Option<E3id> {
         match self {
+            EnclaveEventData::AccusationQuorumReached(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::AccusationVote(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ProofFailureAccusation(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ProofVerificationFailed(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ProofVerificationPassed(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::KeyshareCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3Requested(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::PublicKeyAggregated(ref data) => Some(data.e3_id.clone()),
@@ -520,6 +553,8 @@ impl EnclaveEventData {
             EnclaveEventData::DecryptionShareProofsPending(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ShareVerificationDispatched(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ShareVerificationComplete(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::SlashExecuted(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::CommitteeMemberExpelled(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3Failed(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3StageChanged(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::DecryptionShareProofSigned(ref data) => Some(data.e3_id.clone()),
@@ -553,6 +588,11 @@ impl<S: SeqState> WithAggregateId for EnclaveEvent<S> {
 }
 
 impl_event_types!(
+    AccusationQuorumReached,
+    AccusationVote,
+    ProofFailureAccusation,
+    ProofVerificationFailed,
+    ProofVerificationPassed,
     KeyshareCreated,
     E3Requested,
     PublicKeyAggregated,
@@ -597,13 +637,16 @@ impl_event_types!(
     DecryptionShareProofsPending,
     ShareVerificationDispatched,
     ShareVerificationComplete,
+    SlashExecuted,
+    CommitteeMemberExpelled,
     OutgoingSyncRequested,
-    NetSyncEventsReceived,
     HistoricalEvmSyncStart,
     HistoricalNetSyncStart,
+    HistoricalNetSyncEventsReceived,
     SyncEffect,
     SyncEnded,
     EffectsEnabled,
+    NetReady,
     DecryptionShareProofSigned,
     ShareDecryptionProofPending,
     PkAggregationProofPending,
@@ -678,5 +721,130 @@ impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
                 .map(|cause| EventContext::from_cause(id, cause, ts, aggregate_id, block, source))
                 .unwrap_or_else(|| EventContext::new_origin(id, ts, aggregate_id, block, source)),
         }
+    }
+}
+
+#[cfg(feature = "test-helpers")]
+impl<S: SeqState> EnclaveEvent<S> {
+    /// Create a test event using the TestEventBuilder struct
+    pub fn test_event(label: &str) -> TestEventBuilder<Unsequenced> {
+        TestEventBuilder::<Unsequenced>::new(label)
+    }
+}
+
+/// Build out a test event
+pub struct TestEventBuilder<S: SeqState> {
+    label: String,
+    seq: S::Seq,
+    id: Option<u64>,
+    data: Option<EnclaveEventData>,
+    aggregate_id: Option<u64>,
+    e3_id: Option<E3id>,
+    ts: Option<u128>,
+}
+
+impl TestEventBuilder<Unsequenced> {
+    /// Create a new test event
+    pub fn new(label: &str) -> Self {
+        Self {
+            label: label.to_owned(),
+            seq: (),
+            id: None,
+            aggregate_id: None,
+            data: None,
+            e3_id: None,
+            ts: None,
+        }
+    }
+
+    /// make it a sequenced event
+    pub fn seq(self, seq: u64) -> TestEventBuilder<Sequenced> {
+        TestEventBuilder::<Sequenced> {
+            seq,
+            label: self.label,
+            id: self.id,
+            data: self.data,
+            aggregate_id: self.aggregate_id,
+            e3_id: self.e3_id,
+            ts: self.ts,
+        }
+    }
+}
+
+impl<S: SeqState> TestEventBuilder<S> {
+    /// Add an e3_id based on a u64 this takes preference over e3_id()
+    pub fn id(mut self, id: u64) -> Self {
+        self.id = Some(id);
+        self
+    }
+
+    /// Ensure the event holds the given aggregate_id this takes preference over e3_id()
+    pub fn aggregate_id(mut self, id: u64) -> Self {
+        self.aggregate_id = Some(id);
+        self
+    }
+
+    /// Ensure the event holds the given e3_id.
+    pub fn e3_id(mut self, e3_id: E3id) -> Self {
+        self.e3_id = Some(e3_id);
+        self
+    }
+
+    /// Ensure the event holds a ts
+    pub fn ts(mut self, ts: u128) -> Self {
+        self.ts = Some(ts);
+        self
+    }
+
+    /// Ensure the event holds the given EnclaveEventData object. This overrides all other params
+    /// aiside from seq(n)
+    pub fn data(mut self, data: impl Into<EnclaveEventData>) -> Self {
+        self.data = Some(data.into());
+        self
+    }
+
+    fn get_built_event(self) -> EnclaveEvent<Unsequenced> {
+        let event = self.data.unwrap_or(
+            TestEvent {
+                msg: self.label,
+                entropy: self.id.unwrap_or(0),
+                e3_id: resolve_e3_id(self.e3_id, self.id, self.aggregate_id),
+            }
+            .into(),
+        );
+
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(
+            event,
+            None,
+            self.ts.unwrap_or(0),
+            None,
+            EventSource::Evm,
+        )
+    }
+}
+
+impl TestEventBuilder<Unsequenced> {
+    /// Build the event
+    pub fn build(self) -> EnclaveEvent<Unsequenced> {
+        self.get_built_event()
+    }
+}
+
+impl TestEventBuilder<Sequenced> {
+    /// Build the event
+    pub fn build(self) -> EnclaveEvent<Sequenced> {
+        let seq = self.seq;
+        let unseq = self.get_built_event();
+        unseq.into_sequenced(seq)
+    }
+}
+
+fn resolve_e3_id(e3_id: Option<E3id>, id: Option<u64>, aggregate_id: Option<u64>) -> Option<E3id> {
+    match (e3_id, id, aggregate_id) {
+        (Some(_), Some(id), Some(agg)) if agg != 0 => Some(E3id::new(id.to_string(), agg)),
+        (Some(e3), Some(id), _) => Some(E3id::new(id.to_string(), e3.chain_id())),
+        (Some(e3), _, Some(agg)) if agg != 0 => Some(E3id::new(e3.e3_id(), agg)),
+        (None, Some(id), Some(agg)) if agg != 0 => Some(E3id::new(id.to_string(), agg)),
+        (e3, _, _) => e3,
     }
 }

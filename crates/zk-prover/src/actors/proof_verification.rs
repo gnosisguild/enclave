@@ -4,35 +4,25 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Core business logic actor for verifying received encryption keys.
-//!
-//! This actor verifies `EncryptionKeyReceived` events and converts them
-//! to `EncryptionKeyCreated` events after validation.
-//!
-//! ## Signature Verification
-//!
-//! Every received key must carry a [`SignedProofPayload`]. This actor:
-//! 1. Recovers the address from the ECDSA signature.
-//! 2. Delegates the ZK proof to `ZkActor` for verification.
-//! 3. On ZK failure, emits [`SignedProofFailed`] with the full evidence bundle
-//!    and [`E3Failed`] to stop the E3 computation.
-//!
-//! Keys without a signed proof are rejected outright.
+//! Verifies `EncryptionKeyReceived` events: recovers ECDSA address, delegates
+//! ZK proof to `ZkActor`, and on failure emits [`SignedProofFailed`] for
+//! on-chain fault attribution.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, Recipient};
-use alloy::primitives::Address;
+use alloy::primitives::{keccak256, Address, Bytes};
+use alloy::sol_types::SolValue;
 use e3_events::{
-    BusHandle, E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCreated, EncryptionKeyReceived, EventContext, EventPublisher, EventSubscriber,
-    EventType, FailureReason, Proof, Sequenced, SignedProofFailed, SignedProofPayload, TypedEvent,
+    BusHandle, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated,
+    EncryptionKeyReceived, EventContext, EventPublisher, EventSubscriber, EventType, Proof,
+    ProofType, ProofVerificationFailed, ProofVerificationPassed, Sequenced, SignedProofFailed,
+    SignedProofPayload, TypedEvent,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
 
-/// Request to verify a ZK proof.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct ZkVerificationRequest {
@@ -42,7 +32,6 @@ pub struct ZkVerificationRequest {
     pub sender: Recipient<TypedEvent<ZkVerificationResponse>>,
 }
 
-/// Response from ZK proof verification with context.
 #[derive(Debug, Clone, Message)]
 #[rtype(result = "()")]
 pub struct ZkVerificationResponse {
@@ -52,23 +41,15 @@ pub struct ZkVerificationResponse {
     pub key: Arc<EncryptionKey>,
 }
 
-/// Tracks a pending verification including the signed payload for fault evidence.
 #[derive(Clone, Debug)]
 struct PendingVerification {
     signed_payload: SignedProofPayload,
     recovered_signer: Address,
 }
 
-/// Core actor that handles encryption key verification.
-///
-/// Requires every received key to carry a [`SignedProofPayload`].
-/// On ZK verification failure, emits both [`SignedProofFailed`] (for fault
-/// attribution) and [`E3Failed`] (to stop the E3 computation).
 pub struct ProofVerificationActor {
     bus: BusHandle,
     verifier: Recipient<TypedEvent<ZkVerificationRequest>>,
-    /// Tracks signed payloads for keys currently being verified,
-    /// keyed by `(e3_id, party_id)`.
     pending: HashMap<(E3id, u64), PendingVerification>,
 }
 
@@ -98,13 +79,12 @@ impl ProofVerificationActor {
         let (msg, ec) = msg.into_components();
         let Some(ref proof) = msg.key.proof else {
             error!(
-                "External key from party {} is missing T0 proof - rejecting",
+                "External key from party {} is missing C0 proof - rejecting",
                 msg.key.party_id
             );
             return;
         };
 
-        // Signed proofs are mandatory — reject keys without a signed payload
         let signed = match &msg.key.signed_payload {
             Some(signed) => signed.clone(),
             None => {
@@ -116,7 +96,6 @@ impl ProofVerificationActor {
             }
         };
 
-        // Recover the address from the signature
         let recovered_address = match signed.recover_address() {
             Ok(addr) => {
                 info!(
@@ -228,19 +207,56 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
         let pending = self.pending.remove(&pending_key);
 
         if msg.verified {
+            let Some(PendingVerification {
+                signed_payload,
+                recovered_signer,
+            }) = pending
+            else {
+                warn!(
+                    "No pending verification for verified party {} — ignoring duplicate response",
+                    msg.key.party_id
+                );
+                return;
+            };
+
             info!(
-                "T0 proof verified for party {} - accepting key",
+                "C0 proof verified for party {} - accepting key",
                 msg.key.party_id
             );
+            let party_id = msg.key.party_id;
+            let e3_id = msg.e3_id.clone();
             self.publish_key_created(msg.e3_id, msg.key, ec.clone());
+
+            // Emit ProofVerificationPassed so AccusationManager can cache success
+            {
+                let data_hash: [u8; 32] = {
+                    let msg = (
+                        Bytes::copy_from_slice(&signed_payload.payload.proof.data),
+                        Bytes::copy_from_slice(&signed_payload.payload.proof.public_signals),
+                    )
+                        .abi_encode();
+                    keccak256(&msg).into()
+                };
+                if let Err(err) = self.bus.publish(
+                    ProofVerificationPassed {
+                        e3_id,
+                        party_id,
+                        address: recovered_signer,
+                        proof_type: ProofType::C0PkBfv,
+                        data_hash,
+                    },
+                    ec,
+                ) {
+                    error!("Failed to publish ProofVerificationPassed: {err}");
+                }
+            }
         } else {
             let error_msg = msg.error.unwrap_or_else(|| "unknown error".to_string());
             error!(
-                "T0 proof verification FAILED for party {} - rejecting key and stopping E3: {}",
+                "C0 proof verification FAILED for party {} - rejecting key and stopping E3: {}",
                 msg.key.party_id, error_msg
             );
 
-            // Emit SignedProofFailed for fault attribution
             if let Some(PendingVerification {
                 signed_payload,
                 recovered_signer,
@@ -255,25 +271,42 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
                         e3_id: msg.e3_id.clone(),
                         faulting_node: recovered_signer,
                         proof_type: signed_payload.payload.proof_type,
-                        signed_payload,
+                        signed_payload: signed_payload.clone(),
                     },
                     ec.clone(),
                 ) {
                     error!("Failed to publish SignedProofFailed: {err}");
                 }
+
+                // Emit ProofVerificationFailed for AccusationManager
+                let data_hash: [u8; 32] = {
+                    let msg = (
+                        Bytes::copy_from_slice(&signed_payload.payload.proof.data),
+                        Bytes::copy_from_slice(&signed_payload.payload.proof.public_signals),
+                    )
+                        .abi_encode();
+                    keccak256(&msg).into()
+                };
+                if let Err(err) = self.bus.publish(
+                    ProofVerificationFailed {
+                        e3_id: msg.e3_id.clone(),
+                        accused_party_id: msg.key.party_id,
+                        accused_address: recovered_signer,
+                        proof_type: ProofType::C0PkBfv,
+                        data_hash,
+                        signed_payload,
+                    },
+                    ec.clone(),
+                ) {
+                    error!("Failed to publish ProofVerificationFailed: {err}");
+                }
             }
 
-            // Stop the E3 computation — proof verification failure is fatal
-            if let Err(err) = self.bus.publish(
-                E3Failed {
-                    e3_id: msg.e3_id,
-                    failed_at_stage: E3Stage::CommitteeFinalized,
-                    reason: FailureReason::VerificationFailed,
-                },
-                ec,
-            ) {
-                error!("Failed to publish E3Failed: {err}");
-            }
+            // NOTE: We do NOT emit E3Failed here. The on-chain SlashingManager
+            // will expel the faulting node and check if the committee drops below
+            // threshold. If it does, the contract emits E3Failed on-chain, which
+            // the EVM reader picks up and propagates to all actors. If the committee
+            // is still above threshold, the DKG continues with N-1 nodes.
         }
     }
 }

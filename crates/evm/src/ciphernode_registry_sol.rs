@@ -23,7 +23,7 @@ use e3_events::{
     EffectsEnabled, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, OrderedSet,
     PublicKeyAggregated, Seed, Shutdown, TicketGenerated, TicketId,
 };
-use e3_utils::{NotifySync, MAILBOX_LIMIT};
+use e3_utils::{ArcBytes, NotifySync, MAILBOX_LIMIT};
 use tracing::{error, info, trace};
 
 sol!(
@@ -157,6 +157,30 @@ impl From<TicketSubmittedWithChainId> for EnclaveEventData {
     }
 }
 
+struct CommitteeMemberExpelledWithChainId(
+    pub ICiphernodeRegistry::CommitteeMemberExpelled,
+    pub u64,
+);
+
+impl From<CommitteeMemberExpelledWithChainId> for e3_events::CommitteeMemberExpelled {
+    fn from(value: CommitteeMemberExpelledWithChainId) -> Self {
+        e3_events::CommitteeMemberExpelled {
+            e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
+            node: value.0.node,
+            reason: value.0.reason.into(),
+            active_count_after: value.0.activeCountAfter.to(),
+            party_id: None,
+        }
+    }
+}
+
+impl From<CommitteeMemberExpelledWithChainId> for EnclaveEventData {
+    fn from(value: CommitteeMemberExpelledWithChainId) -> Self {
+        let payload: e3_events::CommitteeMemberExpelled = value.into();
+        EnclaveEventData::from(payload)
+    }
+}
+
 pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEventData> {
     match topic {
         Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {
@@ -201,6 +225,20 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 return None;
             };
             Some(EnclaveEventData::from(TicketSubmittedWithChainId(
+                event, chain_id,
+            )))
+        }
+        Some(&ICiphernodeRegistry::CommitteeMemberExpelled::SIGNATURE_HASH) => {
+            let Ok(event) = ICiphernodeRegistry::CommitteeMemberExpelled::decode_log_data(data)
+            else {
+                error!("Error parsing event CommitteeMemberExpelled after topic was matched!");
+                return None;
+            };
+            info!(
+                "CommitteeMemberExpelled event received: e3_id={}, node={}, reason={:?}, active_count_after={}",
+                event.e3Id, event.node, event.reason, event.activeCountAfter
+            );
+            Some(EnclaveEventData::from(CommitteeMemberExpelledWithChainId(
                 event, chain_id,
             )))
         }
@@ -501,11 +539,11 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
     contract_address: Address,
     e3_id: E3id,
     nodes: OrderedSet<String>,
-    public_key: Vec<u8>,
+    public_key: ArcBytes,
     public_key_hash: [u8; 32],
 ) -> Result<TransactionReceipt> {
     let e3_id_u256: U256 = e3_id.try_into()?;
-    let public_key_bytes = Bytes::from(public_key);
+    let public_key_bytes = Bytes::from(public_key.extract_bytes());
     let public_key_hash_fixed = FixedBytes::from(public_key_hash);
     let nodes_vec: Vec<Address> = nodes
         .into_iter()

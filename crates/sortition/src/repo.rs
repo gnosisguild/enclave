@@ -7,7 +7,7 @@
 use crate::backends::SortitionBackend;
 use crate::sortition::NodeStateStore;
 use e3_data::{Repositories, Repository};
-use e3_events::{E3id, StoreKeys};
+use e3_events::{Committee, E3id, StoreKeys};
 use e3_request::E3Meta;
 use std::collections::HashMap;
 
@@ -42,11 +42,11 @@ impl NodeStateRepositoryFactory for Repositories {
 }
 
 pub trait FinalizedCommitteesRepositoryFactory {
-    fn finalized_committees(&self) -> Repository<HashMap<E3id, Vec<String>>>;
+    fn finalized_committees(&self) -> Repository<HashMap<E3id, Committee>>;
 }
 
 impl FinalizedCommitteesRepositoryFactory for Repositories {
-    fn finalized_committees(&self) -> Repository<HashMap<E3id, Vec<String>>> {
+    fn finalized_committees(&self) -> Repository<HashMap<E3id, Committee>> {
         Repository::new(self.store.scope(StoreKeys::finalized_committees()))
     }
 }

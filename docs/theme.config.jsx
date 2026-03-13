@@ -10,11 +10,21 @@ import Footer from './components/Footer'
 
 export default {
   logo: (
-    <Link href='https://enclave.gg' target='_self'>
-      <img src='/enclave-logo-solid.svg' style={{ maxWidth: '150px' }} />
+    <Link href='https://theinterfold.com' target='_self'>
+      <img src='/interfold-logo.png' style={{ maxWidth: '150px', borderRadius: '0px' }} />
     </Link>
   ),
   logoLink: false,
+
+  banner: {
+    key: 'interfold-rename',
+    text: (
+      <span>
+        Enclave is now <strong>The Interfold</strong>. Documentation is being updated.
+      </span>
+    ),
+  },
+
   project: {
     link: 'https://github.com/gnosisguild/enclave',
   },
@@ -33,7 +43,7 @@ export default {
     const { asPath } = useRouter()
     if (asPath !== '/') {
       return {
-        titleTemplate: '%s - Enclave',
+        titleTemplate: '%s - The Interfold',
       }
     }
   },
@@ -43,8 +53,8 @@ export default {
     } = useConfig()
     return (
       <>
-        <title>{title ? title : 'Enclave'}</title>
-        <meta name='title' content={title ? title : 'Enclave'} />
+        <title>{title ? title : 'The Interfold'}</title>
+        <meta name='title' content={title ? title : 'The Interfold'} />
         <meta
           name='description'
           content={
@@ -55,30 +65,30 @@ export default {
         />
 
         <meta property='og:type' content='website' />
-        <meta property='og:url' content='https://docs.enclave.gg' />
-        <meta property='og:title' content={title ? title : 'Enclave'} />
+        <meta property='og:url' content='https://docs.theinterfold.com' />
+        <meta property='og:title' content={title ? title : 'The Interfold'} />
         <meta
           property='og:description'
           content={
             description
               ? `${description}`
-              : 'An open-source protocol for Encrypted Execution Environments (E3) enabling a new class of secure applications.'
+              : 'Infrastructure for confidential coordination powered by Encrypted Execution Environments (E3).'
           }
         />
-        <meta property='og:image' content='https://docs.enclave.gg/enclave-meta.jpg' />
+        <meta property='og:image' content='https://docs.theinterfold.com/interfold-meta.jpg' />
 
         <meta property='twitter:card' content='summary_large_image' />
-        <meta property='twitter:url' content='https://docs.enclave.gg' />
-        <meta property='twitter:title' content={title ? title : 'Enclave'} />
+        <meta property='twitter:url' content='https://docs.theinterfold.com' />
+        <meta property='twitter:title' content={title ? title : 'The Interfold'} />
         <meta
           property='twitter:description'
           content={
             description
               ? `${description}`
-              : 'An open-source protocol for Encrypted Execution Environments (E3) enabling a new class of secure applications.'
+              : 'Infrastructure for confidential coordination powered by Encrypted Execution Environments (E3).'
           }
         />
-        <meta property='twitter:image' content='/enclave-meta.jpg' />
+        <meta property='twitter:image' content='/interfold-meta.jpg' />
 
         <link rel='apple-touch-icon' sizes='180x180' href='/apple-touch-icon.png' />
         <link rel='icon' type='image/png' sizes='32x32' href='/favicon-32x32.png' />

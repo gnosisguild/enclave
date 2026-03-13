@@ -74,52 +74,85 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
   const encryptionSchemeId =
     "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
 
-  // Slash-related constants for E2E tests
-  const REASON_BAD_PROOF = ethers.keccak256(ethers.toUtf8Bytes("E3_BAD_PROOF"));
-  const PROOF_PAYLOAD_TYPEHASH = ethers.keccak256(
+  // Lane A reason derived on-chain as keccak256(abi.encodePacked(proofType))
+  const REASON_PT_0 = ethers.keccak256(ethers.solidityPacked(["uint256"], [0]));
+  const VOTE_TYPEHASH = ethers.keccak256(
     ethers.toUtf8Bytes(
-      "ProofPayload(uint256 chainId,uint256 e3Id,uint256 proofType,bytes zkProof,bytes publicSignals)",
+      "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)",
     ),
   );
 
   /**
-   * Helper to create a signed proof evidence bundle for proposeSlash.
+   * Helper to create a committee-attestation evidence bundle for proposeSlash.
+   * Voters sign an AccusationVote digest via personal_sign (EIP-191).
    */
-  async function signAndEncodeProof(
-    signer: Signer,
+  async function signAndEncodeAttestation(
+    voters: Signer[],
     e3Id: number,
-    verifierAddress: string,
-    zkProof: string = "0x1234",
-    publicInputs: string[] = [ethers.ZeroHash],
-    chainId: number = 31337,
+    operator: string,
     proofType: number = 0,
+    chainId: number = 31337,
+    dataHash: string = ethers.ZeroHash,
   ): Promise<string> {
-    const messageHash = ethers.keccak256(
-      abiCoder.encode(
-        ["bytes32", "uint256", "uint256", "uint256", "bytes32", "bytes32"],
-        [
-          PROOF_PAYLOAD_TYPEHASH,
-          chainId,
-          e3Id,
-          proofType,
-          ethers.keccak256(zkProof),
-          ethers.keccak256(
-            ethers.solidityPacked(["bytes32[]"], [publicInputs]),
-          ),
-        ],
+    const accusationId = ethers.keccak256(
+      ethers.solidityPacked(
+        ["uint256", "uint256", "address", "uint256"],
+        [chainId, e3Id, operator, proofType],
       ),
     );
-    const signature = await signer.signMessage(ethers.getBytes(messageHash));
+
+    // Sort voters by address ascending
+    const voterData = await Promise.all(
+      voters.map(async (v) => ({ signer: v, address: await v.getAddress() })),
+    );
+    voterData.sort((a, b) =>
+      a.address.toLowerCase().localeCompare(b.address.toLowerCase()),
+    );
+
+    const sortedAddresses: string[] = [];
+    const agrees: boolean[] = [];
+    const dataHashes: string[] = [];
+    const signatures: string[] = [];
+
+    for (const { signer, address } of voterData) {
+      const digest = ethers.keccak256(
+        abiCoder.encode(
+          [
+            "bytes32",
+            "uint256",
+            "uint256",
+            "bytes32",
+            "address",
+            "bool",
+            "bytes32",
+          ],
+          [VOTE_TYPEHASH, chainId, e3Id, accusationId, address, true, dataHash],
+        ),
+      );
+      const sig = await signer.signMessage(ethers.getBytes(digest));
+      sortedAddresses.push(address);
+      agrees.push(true);
+      dataHashes.push(dataHash);
+      signatures.push(sig);
+    }
+
     return abiCoder.encode(
-      ["bytes", "bytes32[]", "bytes", "uint256", "uint256", "address"],
-      [zkProof, publicInputs, signature, chainId, proofType, verifierAddress],
+      ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]"],
+      [proofType, sortedAddresses, agrees, dataHashes, signatures],
     );
   }
 
   const setup = async () => {
     // ── Signers ────────────────────────────────────────────────────────────────
-    const [owner, requester, treasury, operator1, operator2, computeProvider] =
-      await ethers.getSigners();
+    const [
+      owner,
+      requester,
+      treasury,
+      operator1,
+      operator2,
+      computeProvider,
+      operator3,
+    ] = await ethers.getSigners();
 
     const ownerAddress = await owner.getAddress();
     const treasuryAddress = await treasury.getAddress();
@@ -300,11 +333,11 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     await enclaveTicketToken.setRegistry(await bondingRegistry.getAddress());
 
     // ── Slash Policy (for E2E routing tests) ───────────────────────────────────
-    await slashingManagerTyped.setSlashPolicy(REASON_BAD_PROOF, {
+    await slashingManagerTyped.setSlashPolicy(REASON_PT_0, {
       ticketPenalty: ethers.parseUnits("50", 6),
       licensePenalty: ethers.parseEther("100"),
       requiresProof: true,
-      proofVerifier: await circuitVerifier.getAddress(),
+      proofVerifier: ethers.ZeroAddress,
       banNode: false,
       appealWindow: 0,
       enabled: true,
@@ -319,11 +352,12 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     // ── Helpers ────────────────────────────────────────────────────────────────
     const makeRequest = async (
       signer: Signer = requester,
+      threshold: [number, number] = [2, 2],
     ): Promise<{ e3Id: number }> => {
       const startTime = (await time.latest()) + 100;
 
       const requestParams = {
-        threshold: [2, 2] as [number, number],
+        threshold,
         inputWindow: [startTime + 100, startTime + ONE_DAY] as [number, number],
         e3Program: await e3Program.getAddress(),
         e3ProgramParams: encodedE3ProgramParams,
@@ -388,6 +422,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       treasury,
       operator1,
       operator2,
+      operator3,
       computeProvider,
       makeRequest,
       setupOperator,
@@ -718,22 +753,26 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         requester,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // 1. Request E3, form committee, publish key
-      await makeRequest();
+      await makeRequest(requester, [2, 3]);
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
       const nodes = [
         await operator1.getAddress(),
         await operator2.getAddress(),
+        await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const publicKeyHash = ethers.keccak256(publicKey);
@@ -762,16 +801,15 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       // 4. Slash operator1 via proposeSlash (Lane A) — real on-chain flow
       //    This triggers: _executeSlash → slashTicketBalance → redirectSlashedTicketFunds
       //    → ticketToken.payout(refundManager, amount) → enclave.escrowSlashedFunds → e3RefundManager.escrowSlashedFunds
-      const proof = await signAndEncodeProof(
-        operator1,
+      const proof = await signAndEncodeAttestation(
+        [operator2, operator3],
         0,
-        await circuitVerifier.getAddress(),
+        await operator1.getAddress(),
       );
 
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_PROOF,
         proof,
       );
 
@@ -820,22 +858,26 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         makeRequest,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // 1. Request E3, form committee, publish key
-      await makeRequest();
+      await makeRequest(undefined, [2, 3]);
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
       const nodes = [
         await operator1.getAddress(),
         await operator2.getAddress(),
+        await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const publicKeyHash = ethers.keccak256(publicKey);
@@ -854,15 +896,14 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const honestNodeAmountBefore = distributionBefore.honestNodeAmount;
 
       // 4. Slash operator1 — this routes funds into the refund pool
-      const proof = await signAndEncodeProof(
-        operator1,
+      const proof = await signAndEncodeAttestation(
+        [operator2, operator3],
         0,
-        await circuitVerifier.getAddress(),
+        await operator1.getAddress(),
       );
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_PROOF,
         proof,
       );
 
@@ -1370,23 +1411,27 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         makeRequest,
         operator1,
         operator2,
+        operator3,
         treasury,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // 1. Request E3, form committee, publish key
-      await makeRequest();
+      await makeRequest(undefined, [2, 3]);
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
       const nodes = [
         await operator1.getAddress(),
         await operator2.getAddress(),
+        await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const publicKeyHash = ethers.keccak256(publicKey);
@@ -1400,15 +1445,14 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const refundBalanceBefore =
         await usdcToken.balanceOf(refundManagerAddress);
 
-      const proof = await signAndEncodeProof(
-        operator1,
+      const proof = await signAndEncodeAttestation(
+        [operator2, operator3],
         0,
-        await circuitVerifier.getAddress(),
+        await operator1.getAddress(),
       );
       await slashingManager.proposeSlash(
         0,
         await operator1.getAddress(),
-        REASON_BAD_PROOF,
         proof,
       );
 
@@ -1439,6 +1483,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const op2BalanceBefore = await usdcToken.balanceOf(
         await operator2.getAddress(),
       );
+      const op3BalanceBefore = await usdcToken.balanceOf(
+        await operator3.getAddress(),
+      );
 
       const plaintextOutput = "0x" + "cd".repeat(100);
       await enclave.publishPlaintextOutput(0, plaintextOutput, proofBytes);
@@ -1468,10 +1515,14 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const op2BalanceAfter = await usdcToken.balanceOf(
         await operator2.getAddress(),
       );
+      const op3BalanceAfter = await usdcToken.balanceOf(
+        await operator3.getAddress(),
+      );
       const nodesReceivedTotal =
         op1BalanceAfter -
         op1BalanceBefore +
-        (op2BalanceAfter - op2BalanceBefore);
+        (op2BalanceAfter - op2BalanceBefore) +
+        (op3BalanceAfter - op3BalanceBefore);
       expect(nodesReceivedTotal).to.equal(e3Payment + expectedSlashedToNodes);
 
       // Verify refund manager escrowed balance was drained

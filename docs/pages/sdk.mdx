@@ -1,11 +1,11 @@
 ---
-title: 'Enclave SDK'
+title: 'Interfold SDK'
 description: 'Use the TypeScript + React SDKs to drive E3 programs from clients and services'
 ---
 
-# Enclave SDK Overview
+# Interfold SDK Overview
 
-The Enclave SDK (`@enclave-e3/sdk`) and React helpers (`@enclave-e3/react`) provide a
+The Interfold SDK (`@enclave-e3/sdk`) and React helpers (`@enclave-e3/react`) provide a
 batteries-included client stack for requesting E3 computations, subscribing to protocol events, and
 coordinating custom frontends or backend services. Both packages ship in this repository (see
 `packages/enclave-sdk` and `packages/enclave-react`).
@@ -80,6 +80,15 @@ const sdk = EnclaveSDK.create({
 })
 ```
 
+### BFV Parameter Presets
+
+The SDK supports two BFV parameter presets:
+
+| Preset Name              | Degree | Security | Use Case                     |
+| ------------------------ | ------ | -------- | ---------------------------- |
+| `INSECURE_THRESHOLD_512` | 512    | Insecure | Development and testing only |
+| `SECURE_THRESHOLD_8192`  | 8192   | Secure   | Production deployments       |
+
 ### Requesting computations
 
 ```ts
@@ -119,7 +128,17 @@ sdk.off(EnclaveEventType.E3_REQUESTED, e3Handler)
 import { useEnclaveSDK } from '@enclave-e3/react'
 
 export function Dashboard() {
-  const { isInitialized, requestE3, onEnclaveEvent, off, EnclaveEventType } = useEnclaveSDK({
+  const {
+    sdk,
+    isInitialized,
+    error,
+    requestE3,
+    getThresholdBfvParamsSet,
+    onEnclaveEvent,
+    off,
+    EnclaveEventType,
+    RegistryEventType,
+  } = useEnclaveSDK({
     autoConnect: true,
     contracts: {
       enclave: import.meta.env.VITE_ENCLAVE_ADDRESS,
@@ -135,6 +154,8 @@ export function Dashboard() {
     onEnclaveEvent(EnclaveEventType.E3_REQUESTED, handle)
     return () => off(EnclaveEventType.E3_REQUESTED, handle)
   }, [isInitialized])
+
+  if (error) return <div>Error: {error}</div>
 
   return <button onClick={() => requestE3(/* params */)}>Request E3</button>
 }
@@ -152,7 +173,15 @@ imported directly:
 // Via SDK instance (uses the configured preset name automatically)
 const publicKey = await sdk.generatePublicKey()
 const encrypted = await sdk.encryptNumber(42n, publicKey)
+const encryptedVec = await sdk.encryptVector(new BigUint64Array([1n, 2n, 3n]), publicKey)
 const { encryptedData, proof } = await sdk.encryptNumberAndGenProof(42n, publicKey)
+const { encryptedData: vecData, proof: vecProof } = await sdk.encryptVectorAndGenProof(
+  new BigUint64Array([1n, 2n]),
+  publicKey,
+)
+
+// Generate circuit inputs without proof (useful for debugging)
+const { encryptedData, circuitInputs } = await sdk.encryptNumberAndGenInputs(42n, publicKey)
 
 // Standalone import (pass preset name explicitly)
 import { generatePublicKey, encryptNumber } from '@enclave-e3/sdk'
@@ -161,9 +190,24 @@ const pk = await generatePublicKey('INSECURE_THRESHOLD_512')
 const ct = await encryptNumber(42n, pk, 'INSECURE_THRESHOLD_512')
 ```
 
-## Modular sub-module imports
+### Full encryption method reference
 
-The SDK is organized into three sub-modules (`contracts`, `events`, `crypto`) that can be imported
+| Method                             | Description                                           |
+| ---------------------------------- | ----------------------------------------------------- |
+| `generatePublicKey()`              | Generate a BFV public key                             |
+| `computePublicKeyCommitment(pk)`   | Compute a commitment for a public key                 |
+| `encryptNumber(n, pk)`             | Encrypt a single bigint                               |
+| `encryptVector(vec, pk)`           | Encrypt a `BigUint64Array`                            |
+| `encryptNumberAndGenInputs(n, pk)` | Encrypt and return circuit inputs for ZK verification |
+| `encryptNumberAndGenProof(n, pk)`  | Encrypt and generate a ZK proof of valid encryption   |
+| `encryptVectorAndGenInputs(v, pk)` | Vector version of `encryptNumberAndGenInputs`         |
+| `encryptVectorAndGenProof(v, pk)`  | Vector version of `encryptNumberAndGenProof`          |
+| `getThresholdBfvParamsSet()`       | Get the parameter set for the configured preset       |
+| `generateProof(circuitInputs)`     | Generate a ZK proof from circuit inputs directly      |
+
+## Modular submodule imports
+
+The SDK is organized into three submodules (`contracts`, `events`, `crypto`) that can be imported
 independently for tree-shaking:
 
 ```ts
@@ -174,9 +218,103 @@ import { EventListener, EnclaveEventType } from '@enclave-e3/sdk/events'
 
 All exports are also available from the main `@enclave-e3/sdk` entry point.
 
+## Event types
+
+The SDK provides two event type enums for subscribing to on-chain events:
+
+### `EnclaveEventType`
+
+| Enum Key                         | Solidity Event Name          |
+| -------------------------------- | ---------------------------- |
+| `E3_REQUESTED`                   | `E3Requested`                |
+| `CIPHERTEXT_OUTPUT_PUBLISHED`    | `CiphertextOutputPublished`  |
+| `PLAINTEXT_OUTPUT_PUBLISHED`     | `PlaintextOutputPublished`   |
+| `E3_PROGRAM_ENABLED`             | `E3ProgramEnabled`           |
+| `E3_PROGRAM_DISABLED`            | `E3ProgramDisabled`          |
+| `ENCRYPTION_SCHEME_ENABLED`      | `EncryptionSchemeEnabled`    |
+| `ENCRYPTION_SCHEME_DISABLED`     | `EncryptionSchemeDisabled`   |
+| `CIPHERNODE_REGISTRY_SET`        | `CiphernodeRegistrySet`      |
+| `MAX_DURATION_SET`               | `MaxDurationSet`             |
+| `ALLOWED_E3_PROGRAMS_PARAMS_SET` | `AllowedE3ProgramsParamsSet` |
+| `OWNERSHIP_TRANSFERRED`          | `OwnershipTransferred`       |
+| `INITIALIZED`                    | `Initialized`                |
+
+### `RegistryEventType`
+
+| Enum Key                | Solidity Event Name    |
+| ----------------------- | ---------------------- |
+| `COMMITTEE_REQUESTED`   | `CommitteeRequested`   |
+| `COMMITTEE_PUBLISHED`   | `CommitteePublished`   |
+| `COMMITTEE_FINALIZED`   | `CommitteeFinalized`   |
+| `ENCLAVE_SET`           | `EnclaveSet`           |
+| `OWNERSHIP_TRANSFERRED` | `OwnershipTransferred` |
+| `INITIALIZED`           | `Initialized`          |
+
+## E3 lifecycle enums
+
+### `E3Stage`
+
+| Value | Stage                |
+| ----- | -------------------- |
+| 0     | `None`               |
+| 1     | `Requested`          |
+| 2     | `CommitteeFinalized` |
+| 3     | `KeyPublished`       |
+| 4     | `CiphertextReady`    |
+| 5     | `Complete`           |
+| 6     | `Failed`             |
+
+### `FailureReason`
+
+| Value | Reason                         |
+| ----- | ------------------------------ |
+| 0     | `None`                         |
+| 1     | `CommitteeFormationTimeout`    |
+| 2     | `InsufficientCommitteeMembers` |
+| 3     | `DKGTimeout`                   |
+| 4     | `DKGInvalidShares`             |
+| 5     | `NoInputsReceived`             |
+| 6     | `ComputeTimeout`               |
+| 7     | `ComputeProviderExpired`       |
+| 8     | `ComputeProviderFailed`        |
+| 9     | `RequesterCancelled`           |
+| 10    | `DecryptionTimeout`            |
+| 11    | `DecryptionInvalidShares`      |
+| 12    | `VerificationFailed`           |
+
+## Utility exports
+
+The SDK also exports several utility functions and constants from the main entry point:
+
+```ts
+import {
+  SDKError,
+  encodeBfvParams,
+  encodeComputeProviderParams,
+  encodeCustomParams,
+  calculateInputWindow,
+  decodePlaintextOutput,
+  getCurrentTimestamp,
+  DEFAULT_COMPUTE_PROVIDER_PARAMS,
+  DEFAULT_E3_CONFIG,
+} from '@enclave-e3/sdk'
+```
+
+| Export                            | Description                                                       |
+| --------------------------------- | ----------------------------------------------------------------- |
+| `SDKError`                        | Custom error class with an error `code` property                  |
+| `encodeBfvParams(params)`         | ABI-encode BFV parameters for smart contract calls                |
+| `encodeComputeProviderParams`     | Encode compute provider params (supports mock mode)               |
+| `encodeCustomParams(params)`      | Encode arbitrary custom parameters as hex                         |
+| `calculateInputWindow`            | Compute an input window `[start, end]` from current on-chain time |
+| `decodePlaintextOutput(hex)`      | Decode a plaintext output hex string to a number                  |
+| `getCurrentTimestamp(client)`     | Fetch the current block timestamp from the chain                  |
+| `DEFAULT_COMPUTE_PROVIDER_PARAMS` | Default compute provider configuration object                     |
+| `DEFAULT_E3_CONFIG`               | Default E3 config (threshold, duration, payment)                  |
+
 ## Configuration contract map
 
-Provide the Enclave, CiphernodeRegistry, and FeeToken addresses. The template exposes these via
+Provide the Interfold, CiphernodeRegistry, and FeeToken addresses. The template exposes these via
 `.env` / `enclave.config.yaml`. For multi-chain apps, instantiate separate SDK instances per chain.
 
 ## Working with the template
@@ -195,7 +333,7 @@ addresses, then restart the dev server so the SDK reconnects.
 ## Application-specific SDKs
 
 For complex E3 programs with specialized requirements, you may want to build an application-specific
-SDK on top of or alongside the Enclave SDK. For example,
+SDK on top of or alongside the Interfold SDK. For example,
 [CRISP](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP) uses `@crisp-e3/sdk`, which
 provides:
 
@@ -207,22 +345,39 @@ provides:
 
 If your E3 program requires specialized cryptographic operations, domain-specific logic, or
 application-level abstractions beyond basic protocol interactions, consider building a dedicated SDK
-that wraps or complements the core Enclave SDK.
+that wraps or complements the core Interfold SDK.
 
 ## Advanced usage
 
 - **Historical events**: `sdk.getHistoricalEvents(type, fromBlock, toBlock)` fetches logs without a
   WebSocket provider; useful for CRON jobs or health checks.
+- **Publish ciphertext output**:
+  `sdk.publishCiphertextOutput(e3Id, ciphertextOutput, proof, gasLimit?)` submits the computed
+  ciphertext output for an E3.
 - **Gas controls**: pass `gasLimit` to `requestE3`, `publishCiphertextOutput`, or other write
-  methods if you want fixed limits when interacting with Enclave on L2s.
-- **Event polling**: `sdk.startEventPolling()` is handy in serverless environments where websockets
-  are unavailable.
+  methods if you want fixed limits when interacting with Interfold on L2s.
+- **Gas estimation**: `sdk.estimateGas(functionName, args, contractAddress, abi)` returns the
+  estimated gas for a contract call before sending.
+- **Transaction confirmation**: `sdk.waitForTransaction(hash)` blocks until a transaction is mined
+  and returns the `TransactionReceipt`.
+- **One-shot events**: `sdk.once(eventType, callback)` listens for an event and automatically
+  unsubscribes after the first occurrence.
+- **Event polling**: `sdk.startEventPolling()` / `sdk.stopEventPolling()` are handy in serverless
+  environments where websockets are unavailable.
 - **Custom transports**: on the server, call `createWalletClient({ account, transport: http(rpc) })`
   and load the private key from Vaults/KMS.
 - **Get E3 quote**: call `sdk.getE3Quote(requestParams)` to get the fee amount required for an E3
   request.
 - **Fee token approval**: call `sdk.approveFeeToken(amount)` before `requestE3` to approve the fee
   token spend.
+- **Query E3 data**: use `sdk.getE3(e3Id)` to read the full E3 struct, `sdk.getE3Stage(e3Id)` for
+  the current lifecycle stage (returns `E3Stage` enum), and `sdk.getFailureReason(e3Id)` if the E3
+  has failed (returns `FailureReason` enum).
+- **Public key retrieval**: `sdk.getE3PublicKey(e3Id)` returns the committee's aggregated public key
+  for a given E3.
+- **Access the public client**: `sdk.getPublicClient()` returns the underlying viem `PublicClient`.
+- **Cleanup**: call `sdk.cleanup()` when shutting down to unsubscribe all event listeners and stop
+  polling.
 
 ## Troubleshooting
 

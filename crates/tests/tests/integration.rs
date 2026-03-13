@@ -28,8 +28,8 @@ use e3_test_helpers::{
     create_seed_from_u64, create_shared_rng_from_u64, with_tracing, AddToCommittee,
 };
 use e3_trbfv::helpers::calculate_error_size;
-use e3_utils::rand_eth_addr;
 use e3_utils::utility_types::ArcBytes;
+use e3_utils::{colorize, rand_eth_addr, Color};
 use e3_zk_prover::test_utils::get_tempdir;
 use e3_zk_prover::ZkBackend;
 use fhe::bfv::PublicKey;
@@ -102,7 +102,7 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             .join("circuits")
             .join("bin");
 
-        // Copy T0 (pk) circuit
+        // Copy C0 (pk) circuit
         let pk_circuit_dir = circuits_dir.join("dkg").join("pk");
         tokio::fs::create_dir_all(&pk_circuit_dir).await.unwrap();
         let dkg_target = circuits_build_root.join("dkg").join("target");
@@ -389,31 +389,62 @@ async fn setup_score_sortition_environment(
     Ok(())
 }
 
-fn serialize_report(report: &[(&str, Duration)]) -> String {
-    let max_key_len = report.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+#[derive(Default)]
+struct Report {
+    inner: Vec<(String, Duration)>,
+}
 
-    report
-        .iter()
-        .map(|(key, duration)| {
-            format!(
-                "{:width$}: {:.3}s",
-                key,
-                duration.as_secs_f64(),
-                width = max_key_len
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+fn repeat(ch: char, num: usize) -> String {
+    let mut s = String::new();
+    while s.len() < num {
+        s.push(ch);
+    }
+    s
+}
+
+impl Report {
+    pub fn push(&mut self, repo: (&str, Duration)) {
+        let (label, dur) = repo;
+        self.show(label);
+        self.inner.push((label.to_owned(), dur));
+    }
+
+    pub fn show(&self, label: &str) {
+        println!(
+            "\n\n {}\n {}{}{}\n {}\n",
+            colorize(repeat('#', label.len() + 6), Color::Yellow),
+            colorize("## ", Color::Yellow),
+            colorize(label.to_uppercase(), Color::White),
+            colorize(" ##", Color::Yellow),
+            colorize(repeat('#', label.len() + 6), Color::Yellow),
+        );
+    }
+
+    pub fn serialize(&self) -> String {
+        let max_key_len = self.inner.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+
+        self.inner
+            .iter()
+            .map(|(key, duration)| {
+                format!(
+                    "{:width$}: {:.3}s",
+                    key,
+                    duration.as_secs_f64(),
+                    width = max_key_len
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 }
 
 /// Test trbfv
 #[actix::test]
 #[serial_test::serial]
 async fn test_trbfv_actor() -> Result<()> {
-    println!("Running test_trbfv_actor...");
-    let mut report: Vec<(&str, Duration)> = vec![];
+    let mut report = Report::default();
+    report.push(("Starting trbfv actor test", Duration::from_secs(0)));
     let whole_test = Instant::now();
-
     let _guard = with_tracing("info");
 
     // NOTE: Here we are trying to make it as clear as possible as to what is going on so attempting to
@@ -520,7 +551,7 @@ async fn test_trbfv_actor() -> Result<()> {
         .build()
         .await?;
 
-    report.push(("Setup", setup.elapsed()));
+    report.push(("Setup completed", setup.elapsed()));
 
     let committee_setup = Instant::now();
     let chain_id = 1u64;
@@ -545,8 +576,9 @@ async fn test_trbfv_actor() -> Result<()> {
     setup_score_sortition_environment(&bus, &eth_addrs, chain_id).await?;
 
     // Flush all events
-    nodes.flush_all_history(100).await?;
-    report.push(("Committee Setup", committee_setup.elapsed()));
+    nodes.flush_all_history(10000).await?;
+
+    report.push(("Committee Setup Completed", committee_setup.elapsed()));
 
     ///////////////////////////////////////////////////////////////////////////////////
     // 2. Trigger E3Requested
@@ -586,16 +618,13 @@ async fn test_trbfv_actor() -> Result<()> {
         &collector_addr,
     )?;
 
-    println!(
+    report.show(&format!(
         "Committee selected: {} nodes, {} buffer nodes",
         committee.len(),
         buffer_nodes.len()
-    );
+    ));
 
-    let expected = vec!["E3Requested"];
-    let _ = nodes
-        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
-        .await?;
+    nodes.expect_events(&["E3Requested"]).await?;
 
     bus.publish_without_context(CommitteeFinalized {
         e3_id: e3_id.clone(),
@@ -605,60 +634,11 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let committee_finalized_timer = Instant::now();
 
-    let expected = vec!["CommitteeFinalized"];
-    let _ = nodes
-        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
-        .await?;
+    nodes.expect_events(&["CommitteeFinalized"]).await?;
 
     report.push((
-        "Committee Finalization",
+        "Committee Finalization Complete",
         committee_finalized_timer.elapsed(),
-    ));
-
-    // First, wait for all EncryptionKeyCreated events (BFV key exchange)
-    // The collector (node 0) only sees events forwarded by simulate_libp2p:
-    // - EncryptionKeyCreated × 5 (one per party, passes is_document_publisher_event filter)
-    // Internal events (EncryptionKeyPending, ComputeRequest/Response) stay on committee nodes' local buses.
-    let encryption_keys_timer = Instant::now();
-    let expected = vec![
-        "EncryptionKeyCreated",
-        "EncryptionKeyCreated",
-        "EncryptionKeyCreated",
-        "EncryptionKeyCreated",
-        "EncryptionKeyCreated",
-    ];
-    let _ = nodes
-        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
-        .await?;
-    report.push((
-        "All EncryptionKeyCreated events",
-        encryption_keys_timer.elapsed(),
-    ));
-
-    // Then wait for all ThresholdShareCreated events
-    // Each of the 5 parties publishes 5 events (one per target party) = 25 total
-    // Only ThresholdShareCreated passes the simulate_libp2p filter (is_document_publisher_event).
-    // Internal events (ComputeRequest/Response for GenPk, GenEsi, ZK proofs, ThresholdSharePending,
-    // PkGenerationProofSigned, DkgProofSigned) stay on committee nodes' local buses.
-    let shares_timer = Instant::now();
-    let expected: Vec<&str> = (0..25).map(|_| "ThresholdShareCreated").collect();
-    let _ = nodes
-        .take_history_with_timeout(0, expected.len(), Duration::from_secs(3000))
-        .await?;
-    report.push(("All ThresholdShareCreated events", shares_timer.elapsed()));
-
-    // Wait for DecryptionKeyShared (Exchange #3) events
-    // - DecryptionKeyShared × 5 (passes is_document_publisher_event filter)
-    // Each committee node publishes DecryptionKeyShared after computing its decryption key
-    // and generating C4 (share decryption) proofs.
-    let decryption_key_shared_timer = Instant::now();
-    let expected: Vec<&str> = (0..5).map(|_| "DecryptionKeyShared").collect();
-    let _ = nodes
-        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
-        .await?;
-    report.push((
-        "All DecryptionKeyShared events",
-        decryption_key_shared_timer.elapsed(),
     ));
 
     // Wait for KeyshareCreated + C1 verification + C5 proof + PublicKeyAggregated
@@ -666,6 +646,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // - ShareVerificationDispatched (C1 proof verification dispatched by PublicKeyAggregator)
     // - ComputeRequest (C1 ZK verification)
     // - ComputeResponse (C1 ZK verification result)
+    // - ProofVerificationPassed × 5 (one per party's C1 proof)
     // - ShareVerificationComplete (C1 verification done)
     // - PkAggregationProofPending (C5 proof requested by PublicKeyAggregator)
     // - ComputeRequest (C5 proof generation)
@@ -673,24 +654,32 @@ async fn test_trbfv_actor() -> Result<()> {
     // - PkAggregationProofSigned (C5 proof signed by ProofRequestActor)
     // - PublicKeyAggregated × 1
     let shares_to_pubkey_agg_timer = Instant::now();
-    let expected = vec![
-        "KeyshareCreated",
-        "KeyshareCreated",
-        "KeyshareCreated",
-        "KeyshareCreated",
-        "KeyshareCreated",
-        "ShareVerificationDispatched",
-        "ComputeRequest",
-        "ComputeResponse",
-        "ShareVerificationComplete",
-        "PkAggregationProofPending",
-        "ComputeRequest",
-        "ComputeResponse",
-        "PkAggregationProofSigned",
-        "PublicKeyAggregated",
-    ];
     let h = nodes
-        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
+        .expect_events_with_timeouts(
+            &[
+                "KeyshareCreated",
+                "KeyshareCreated",
+                "KeyshareCreated",
+                "KeyshareCreated",
+                "KeyshareCreated",
+                "ShareVerificationDispatched",
+                "ComputeRequest",
+                "ComputeResponse",
+                "ProofVerificationPassed",
+                "ProofVerificationPassed",
+                "ProofVerificationPassed",
+                "ProofVerificationPassed",
+                "ProofVerificationPassed",
+                "ShareVerificationComplete",
+                "PkAggregationProofPending",
+                "ComputeRequest",
+                "ComputeResponse",
+                "PkAggregationProofSigned",
+                "PublicKeyAggregated",
+            ],
+            Duration::from_secs(5000),
+            Duration::from_secs(5000),
+        )
         .await?;
 
     report.push((
@@ -766,6 +755,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 ShareVerificationDispatched (C6 verification dispatched by ThresholdPlaintextAggregator)
     // - 1 ComputeRequest (C6 ZK verification)
     // - 1 ComputeResponse (C6 ZK verification result)
+    // - 15 ProofVerificationPassed (5 parties × 3 C6 proofs per ciphertext)
     // - 1 ShareVerificationComplete (C6 verification done)
     // - 1 ComputeRequest (TrBFV CalculateThresholdDecryption)
     // - 1 ComputeResponse (TrBFV CalculateThresholdDecryption)
@@ -776,11 +766,16 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 PlaintextAggregated (with C7 proofs)
     // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
     // stay on their local buses.
-    // Total: 1 + 5 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 1 = 17 events
-    let expected_count = 1 + 5 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 1;
+    // Total: 1 + 5 + 1 + 2 + 15 + 1 + 2 + 1 + 2 + 1 + 1 = 32 events
+    let expected_count = 1 + 5 + 1 + 2 + 15 + 1 + 2 + 1 + 2 + 1 + 1;
 
     let h = nodes
-        .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))
+        .take_history_with_timeouts(
+            0,
+            expected_count,
+            Some(Duration::from_secs(1000)),
+            Some(Duration::from_secs(1000)),
+        )
         .await?;
 
     report.push((
@@ -833,7 +828,7 @@ async fn test_trbfv_actor() -> Result<()> {
     println!("{}", mt_report);
 
     report.push(("Entire Test", whole_test.elapsed()));
-    println!("{}", serialize_report(&report));
+    println!("{}", report.serialize());
 
     Ok(())
 }
@@ -926,6 +921,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     assert_eq!(
         history
+            .events
             .into_iter()
             .map(|e| e.into_data())
             .collect::<Vec<_>>(),
@@ -972,6 +968,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
 
     assert_eq!(
         history
+            .events
             .into_iter()
             .map(|e| e.into_data())
             .collect::<Vec<EnclaveEventData>>(),
@@ -987,6 +984,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
 
 /// Test that stopped keyshares retain their state after restart.
 /// This test needs to be ported to the new trBFV system once Sync is completed.
+// XXX: ENABLE THIS!!
 #[actix::test]
 #[ignore = "Needs to be ported to trBFV system after Sync is completed"]
 async fn test_stopped_keyshares_retain_state() -> Result<()> {
@@ -1050,7 +1048,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
                     .await?;
             result.push(tuple);
         }
-        simulate_libp2p_net(&result);
+        simulate_libp2p_net(&result).await;
         Ok(result)
     }
 
@@ -1145,12 +1143,13 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     )
     .await?;
     let history_collector = cn1.history().unwrap();
-    simulate_libp2p_net(&[cn1, cn2]);
+    simulate_libp2p_net(&[cn1, cn2]).await;
 
     println!("getting collector from cn1.6");
 
     // get the public key from history.
     let pubkey: PublicKey = history
+        .events
         .iter()
         .filter_map(|evt| match evt.get_data() {
             EnclaveEventData::KeyshareCreated(data) => {
@@ -1177,6 +1176,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .await?;
 
     let actual = history
+        .events
         .into_iter()
         .filter_map(|e| match e.into_data() {
             EnclaveEventData::PlaintextAggregated(data) => Some(data),
@@ -1268,7 +1268,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
                     .await?;
             result.push(tuple);
         }
-        simulate_libp2p_net(&result);
+        simulate_libp2p_net(&result).await;
         Ok(result)
     }
 
@@ -1350,9 +1350,9 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         .await?;
 
     assert_eq!(
-        history.last().cloned().unwrap().into_data(),
+        history.events.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
-            pubkey: test_pubkey.to_bytes(),
+            pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
             public_key_hash,
             e3_id: E3id::new("1234", 1),
             nodes: OrderedSet::from(eth_addrs.clone()),
@@ -1393,9 +1393,9 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         .await?;
 
     assert_eq!(
-        history.last().cloned().unwrap().into_data(),
+        history.events.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
-            pubkey: test_pubkey.to_bytes(),
+            pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
             public_key_hash,
             e3_id: E3id::new("1234", 2),
             nodes: OrderedSet::from(eth_addrs.clone()),

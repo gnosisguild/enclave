@@ -23,7 +23,7 @@ We'll create a simple E3 program that:
 
 Before starting, ensure you have:
 
-- [Enclave CLI installed](/installation)
+- [Interfold CLI installed](/installation)
 - Basic knowledge of Rust and TypeScript
 - Rust, Docker, Node.js, and pnpm installed
 
@@ -44,7 +44,7 @@ hello-world-e3/
 ├── contracts/         # Smart contracts (Solidity)
 ├── client/           # Frontend application (React/TypeScript)
 ├── server/           # Coordination server (TypeScript)
-├── enclave.config.yaml # Enclave configuration
+├── enclave.config.yaml # Interfold configuration
 └── README.md         # Project documentation
 ```
 
@@ -98,7 +98,7 @@ use fhe_traits::{DeserializeParametrized, Serialize};
 pub fn fhe_processor(fhe_inputs: &FHEInputs) -> Vec<u8> {
     let params = decode_bfv_params_arc(&fhe_inputs.params);
 
-    // Get the two input ciphertexts
+    // Extract the two input ciphertexts
     if fhe_inputs.ciphertexts.len() != 2 {
         panic!("Expected exactly 2 inputs");
     }
@@ -160,8 +160,8 @@ pnpm dev:all
 The client application (in `./client/`) handles:
 
 1. **Encryption**: User inputs → encrypted ciphertexts
-2. **Submission**: Publish encrypted data to the Enclave contract
-3. **Result retrieval**: Get the decrypted result from the Enclave contract
+2. **Submission**: Publish encrypted data to the Interfold contract
+3. **Result retrieval**: Get the decrypted result from the Interfold contract
 
 ## Step 7: Test Your Program
 
@@ -187,13 +187,13 @@ let result = &a_squared + &b_squared;
 
 ### Add More Inputs
 
-Modify your program to accept 3 or more encrypted inputs.
+Modify your program to accept three or more encrypted inputs.
 
 ### Update the UI
 
 Customize the client application in `./client/src/` to match your computation.
 
-Happy building with Enclave! 🚀
+Happy building with the Interfold! 🚀
 
 ## Next Steps
 

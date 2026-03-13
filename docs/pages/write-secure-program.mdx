@@ -5,22 +5,22 @@ description: ''
 
 # Secure Process
 
-The Secure Process is the core FHE logic for your E3 Program. It runs within your selected Compute
-Provider's environment, ultimately producing and publishing a ciphertext output that is decrypted by
-your Ciphernode Committee. To facilitate this, Enclave provides a
+The Secure Process defines the core computation for your E3 Program. It runs within your selected
+Compute Provider's environment, ultimately producing a ciphertext output that is decrypted by your
+Ciphernode Committee. To facilitate this, Interfold provides a
 [Compute Provider package](https://github.com/gnosisguild/enclave/tree/main/crates/compute-provider)
 to simplify writing the Secure Process with any Compute Provider.
 
 ### Using the Compute Provider Package
 
-To simplify integration with Enclave, use the provided Compute Provider package.
+To simplify integration with the Interfold, use the provided Compute Provider package.
 
 **Benefits:**
 
-- **Handles Merkle Tree Construction**: Recreates the input Merkle tree inside the compute
+- **Handles Merkle tree construction**: Recreates the input Merkle tree inside the compute
   environment.
-- **Simplifies Proof Generation**: Manages proof creation for computation verification.
-- **Abstracts Complexity**: Allows you to focus on your computation logic.
+- **Simplifies proof generation**: Manages proof creation for computation verification.
+- **Abstracts complexity**: Allows you to focus on your computation logic.
 
 **Implementation:**
 
@@ -56,21 +56,22 @@ environment. Below are the key steps to implement it effectively:
 1. **Define the Computation**: Specify the exact computation your E3 program needs to perform.
 2. **Implement the Logic**: Write the Secure Process using the Compute Provider's supported language
    (e.g., Rust for RISC Zero).
-3. **Handle Encrypted Inputs**: Ensure the program can process encrypted data correctly.
+3. **Handle Program Inputs**: Ensure the program can process encrypted data correctly.
 4. **Focus on Computation**: Use the Compute Provider package to handle additional tasks like Merkle
-   tree verification and proof verification, so you can focus on your computation logic.
+   tree verification and proof generation, so you can focus on your computation logic.
 
 **Example (Rust with RISC Zero + Boundless):**
 
 ```rust
-use fhe::bfv::{BfvParameters, Ciphertext};
-use fhe_traits::{Deserialize, Serialize};
-use std::sync::Arc;
+use e3_fhe_params::decode_bfv_params_arc;
+use e3_compute_provider::FHEInputs;
+use fhe::bfv::Ciphertext;
+use fhe_traits::{DeserializeParametrized, Serialize};
 
 /// Your secure computation function
 pub fn fhe_processor(fhe_inputs: &FHEInputs) -> Vec<u8> {
-    // Deserialize parameters
-    let params = Arc::new(BfvParameters::try_deserialize(&fhe_inputs.params).unwrap());
+    // Decode the FHE parameters
+    let params = decode_bfv_params_arc(&fhe_inputs.params).unwrap();
 
     // Initialize sum
     let mut sum = Ciphertext::zero(&params);
@@ -92,10 +93,20 @@ To run the Secure Process, use the Compute Provider `ComputeManager` to execute 
 expects:
 
 - The `ComputeProvider` implementation
-- The `FHEInputs` struct that consists of the FHE parameters and the ciphertexts to use.
+- The `FHEInputs` struct that consists of the FHE parameters and the ciphertexts to use. Each
+  ciphertext is a tuple of `(bytes, index)` where `index` is the position in the input set.
 - The Secure Process function `fhe_processor`
 - A boolean flag `use_parallel` to indicate whether to use parallel processing.
 - An optional `batch_size` that will be used for parallel processing. Must be a power of 2.
+
+The `FHEInputs` struct is defined as:
+
+```rust
+pub struct FHEInputs {
+    pub ciphertexts: Vec<(Vec<u8>, u64)>,  // (ciphertext_bytes, index)
+    pub params: Vec<u8>,                    // serialized BFV parameters
+}
+```
 
 ```rs
 // Run the secure process inside the Compute Provider

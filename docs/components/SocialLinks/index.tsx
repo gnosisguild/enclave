@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { FarcasterLogo, TelegramLogo, XLogo } from './SocialIcons'
+import { TelegramLogo, XLogo } from './SocialIcons'
 import { ReactElement } from 'react'
 
 interface SocialLinksProps {
@@ -17,12 +17,7 @@ export const socialLinks: SocialLinksProps[] = [
   {
     name: 'twitter',
     icon: <XLogo size={24} />,
-    url: 'https://x.com/EnclaveE3',
-  },
-  {
-    name: 'farcaster',
-    icon: <FarcasterLogo size={24} />,
-    url: 'https://warpcast.com/enclavee3',
+    url: 'https://x.com/theinterfold',
   },
   {
     name: 'telegram',

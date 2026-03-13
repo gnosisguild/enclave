@@ -6,6 +6,8 @@
 
 mod common;
 
+use std::env;
+
 use common::test_backend;
 use e3_zk_prover::{test_utils::get_tempdir, ZkConfig, ZkProver};
 use tokio::fs;
@@ -84,6 +86,11 @@ async fn test_work_dir_path_traversal_protection() {
 
 #[test]
 fn test_prover_requires_bb() {
+    if env::var("E3_CUSTOM_BB").is_ok() {
+        // Cannot run this test when E3_CUSTOM_BB is set
+        return;
+    }
+
     let temp = get_tempdir().unwrap();
     let backend = test_backend(temp.path(), ZkConfig::default());
     let prover = ZkProver::new(&backend);

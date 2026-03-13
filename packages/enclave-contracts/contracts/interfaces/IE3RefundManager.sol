@@ -73,6 +73,8 @@ interface IE3RefundManager {
     );
     /// @notice Emitted when work allocation is updated
     event WorkAllocationUpdated(WorkValueAllocation allocation);
+    /// @notice Emitted when orphaned slashed funds are withdrawn to treasury
+    event OrphanedSlashedFundsWithdrawn(uint256 indexed e3Id, uint256 amount);
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                        Errors                          //

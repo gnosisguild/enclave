@@ -33,22 +33,29 @@ pub enum PublicKeyAggregatorState {
         c1_proofs: Vec<Option<SignedProofPayload>>,
         seed: Seed,
         nodes: OrderedSet<String>,
+        /// Insertion-ordered (node, keyshare) pairs.
+        /// Index matches `c1_proofs`, giving the party ID for verification.
+        #[serde(default)]
+        submission_order: Vec<(String, ArcBytes)>,
     },
     VerifyingC1 {
-        keyshares: OrderedSet<ArcBytes>,
-        nodes: OrderedSet<String>,
+        /// Insertion-ordered (node, keyshare) pairs from Collecting.
+        /// Index matches `c1_proofs`, giving the party ID used in verification.
+        submission_order: Vec<(String, ArcBytes)>,
         threshold_m: usize,
+        /// C1 proofs in the same insertion order as `submission_order`.
+        c1_proofs: Vec<Option<SignedProofPayload>>,
         /// Party indices that submitted no C1 proof — treated as dishonest.
         no_proof_parties: Vec<u64>,
     },
     GeneratingC5Proof {
-        public_key: Vec<u8>,
+        public_key: ArcBytes,
         public_key_hash: [u8; 32],
         keyshare_bytes: Vec<ArcBytes>,
         nodes: OrderedSet<String>,
     },
     Complete {
-        public_key: Vec<u8>,
+        public_key: ArcBytes,
         keyshares: OrderedSet<ArcBytes>,
         nodes: OrderedSet<String>,
     },
@@ -63,6 +70,7 @@ impl PublicKeyAggregatorState {
             c1_proofs: Vec::new(),
             seed,
             nodes: OrderedSet::new(),
+            submission_order: Vec::new(),
         }
     }
 }
@@ -113,15 +121,17 @@ impl PublicKeyAggregator {
                 keyshares,
                 c1_proofs,
                 nodes,
+                submission_order,
                 ..
             } = &mut state
             else {
                 return Err(anyhow::anyhow!("Can only add keyshare in Collecting state"));
             };
 
-            keyshares.insert(keyshare);
+            keyshares.insert(keyshare.clone());
             c1_proofs.push(c1_proof);
-            nodes.insert(node);
+            nodes.insert(node.clone());
+            submission_order.push((node, keyshare));
             let n = *threshold_n;
             let m = *threshold_m;
             info!(
@@ -132,9 +142,9 @@ impl PublicKeyAggregator {
             if keyshares.len() == n {
                 info!("All keyshares collected, transitioning to VerifyingC1...");
                 return Ok(PublicKeyAggregatorState::VerifyingC1 {
-                    keyshares: std::mem::take(keyshares),
-                    nodes: std::mem::take(nodes),
+                    submission_order: std::mem::take(submission_order),
                     threshold_m: m,
+                    c1_proofs: std::mem::take(c1_proofs),
                     no_proof_parties: Vec::new(),
                 });
             }
@@ -223,8 +233,7 @@ impl PublicKeyAggregator {
         }
 
         let PublicKeyAggregatorState::VerifyingC1 {
-            keyshares,
-            nodes,
+            submission_order,
             threshold_m,
             ..
         } = self
@@ -239,16 +248,13 @@ impl PublicKeyAggregator {
 
         let dishonest_parties = &msg.dishonest_parties;
 
-        // Filter out dishonest parties from keyshares and nodes
-        let keyshares_vec: Vec<ArcBytes> = keyshares.into_iter().collect();
-        let nodes_vec: Vec<String> = nodes.into_iter().collect();
-
-        let (honest_keyshares, honest_nodes): (Vec<ArcBytes>, Vec<String>) = keyshares_vec
+        // Filter out dishonest parties using submission_order (insertion-order indexed,
+        // matching the party IDs sent to dispatch_c1_verification).
+        let (honest_keyshares, honest_nodes): (Vec<ArcBytes>, Vec<String>) = submission_order
             .into_iter()
-            .zip(nodes_vec.into_iter())
             .enumerate()
             .filter(|(idx, _)| !dishonest_parties.contains(&(*idx as u64)))
-            .map(|(_, (ks, node))| (ks, node))
+            .map(|(_, (node, ks))| (ks, node))
             .unzip();
 
         if !dishonest_parties.is_empty() {
@@ -293,12 +299,13 @@ impl PublicKeyAggregator {
         let committee_h = honest_keyshares.len();
 
         info!("Publishing PkAggregationProofPending for C5 proof generation...");
+        let pubkey = ArcBytes::from_bytes(&pubkey);
         self.bus.publish(
             PkAggregationProofPending {
                 e3_id: self.e3_id.clone(),
                 proof_request: PkAggregationProofRequest {
                     keyshare_bytes: honest_keyshares.clone(),
-                    aggregated_pk_bytes: ArcBytes::from_bytes(&pubkey),
+                    aggregated_pk_bytes: pubkey.clone(),
                     params_preset: self.params_preset.clone(),
                     // this field is not really used in the circuit, we only use H
                     committee_n: committee_h,
@@ -316,7 +323,7 @@ impl PublicKeyAggregator {
         // Transition to GeneratingC5Proof
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
-                public_key: pubkey,
+                public_key: pubkey.clone(),
                 public_key_hash,
                 keyshare_bytes: honest_keyshares,
                 nodes: honest_nodes_set,
@@ -376,6 +383,68 @@ impl PublicKeyAggregator {
         })?;
         Ok(())
     }
+
+    pub fn handle_member_expelled(
+        &mut self,
+        node: &str,
+        ec: &EventContext<Sequenced>,
+    ) -> Result<()> {
+        self.state.try_mutate(ec, |mut state| {
+            let PublicKeyAggregatorState::Collecting {
+                threshold_n,
+                threshold_m,
+                keyshares,
+                c1_proofs,
+                nodes,
+                submission_order,
+                ..
+            } = &mut state
+            else {
+                return Ok(state);
+            };
+
+            let node_str = node.to_string();
+
+            // Find the expelled node's index in submission_order and remove from
+            // all parallel collections so they stay aligned.
+            if let Some(idx) = submission_order.iter().position(|(n, _)| n == &node_str) {
+                let (_, expelled_keyshare) = submission_order.remove(idx);
+                keyshares.remove(&expelled_keyshare);
+                c1_proofs.remove(idx);
+            }
+
+            nodes.remove(&node_str);
+
+            if *threshold_n > 0 {
+                *threshold_n -= 1;
+                info!(
+                    "PublicKeyAggregator: reduced threshold_n to {} after expelling {}",
+                    threshold_n, node
+                );
+            }
+
+            if *threshold_n < *threshold_m {
+                warn!(
+                    "PublicKeyAggregator: threshold_n ({}) < threshold_m ({}) after expulsion — committee unviable",
+                    threshold_n, threshold_m
+                );
+                return Ok(state);
+            }
+
+            if keyshares.len() == *threshold_n && *threshold_n > 0 {
+                let m = *threshold_m;
+                info!("PublicKeyAggregator: enough keyshares after expulsion, transitioning to VerifyingC1");
+                return Ok(PublicKeyAggregatorState::VerifyingC1 {
+                    submission_order: std::mem::take(submission_order),
+                    threshold_m: m,
+                    c1_proofs: std::mem::take(c1_proofs),
+                    no_proof_parties: Vec::new(),
+                });
+            }
+
+            Ok(state)
+        })
+    }
 }
 
 impl Actor for PublicKeyAggregator {
@@ -403,6 +472,44 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
                 error!("PublicKeyAggregator received ComputeRequestError: {}", data);
             }
             EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
+            EnclaveEventData::CommitteeMemberExpelled(data) => {
+                // Only process raw events from chain (party_id not yet resolved).
+                if data.party_id.is_some() {
+                    return;
+                }
+
+                let node_addr = data.node.to_string();
+
+                if data.e3_id != self.e3_id {
+                    error!("Wrong e3_id sent to PublicKeyAggregator for expulsion. This should not happen.");
+                    return;
+                }
+
+                info!(
+                    "PublicKeyAggregator: committee member expelled: {} for e3_id={}",
+                    node_addr, data.e3_id
+                );
+                trap(EType::PublickeyAggregation, &self.bus.with_ec(&ec), || {
+                    let was_collecting = matches!(
+                        self.state.get(),
+                        Some(PublicKeyAggregatorState::Collecting { .. })
+                    );
+
+                    self.handle_member_expelled(&node_addr, &ec)?;
+
+                    // If we just transitioned to VerifyingC1, dispatch C1 verification
+                    // using the c1_proofs now stored in the VerifyingC1 state (already
+                    // cleaned of the expelled node's entry).
+                    if was_collecting {
+                        if let Some(PublicKeyAggregatorState::VerifyingC1 { c1_proofs, .. }) =
+                            self.state.get()
+                        {
+                            self.dispatch_c1_verification(&c1_proofs, ec.clone())?;
+                        }
+                    }
+                    Ok(())
+                });
+            }
             _ => (),
         };
     }
@@ -428,26 +535,13 @@ impl Handler<TypedEvent<KeyshareCreated>> for PublicKeyAggregator {
                 return Ok(());
             }
 
-            // Extract c1_proofs before state mutation
-            let c1_proofs_snapshot = match self.state.get() {
-                Some(PublicKeyAggregatorState::Collecting { c1_proofs, .. }) => {
-                    let mut proofs = c1_proofs.clone();
-                    proofs.push(c1_proof.clone());
-                    Some(proofs)
-                }
-                _ => None,
-            };
-
             self.add_keyshare(pubkey, node, c1_proof, &ec)?;
 
             // If we just transitioned to VerifyingC1, dispatch verification
-            if matches!(
-                self.state.get(),
-                Some(PublicKeyAggregatorState::VerifyingC1 { .. })
-            ) {
-                if let Some(c1_proofs) = c1_proofs_snapshot {
-                    self.dispatch_c1_verification(&c1_proofs, ec)?;
-                }
+            // using c1_proofs stored in the new state.
+            if let Some(PublicKeyAggregatorState::VerifyingC1 { c1_proofs, .. }) = self.state.get()
+            {
+                self.dispatch_c1_verification(&c1_proofs, ec)?;
             }
 
             Ok(())
