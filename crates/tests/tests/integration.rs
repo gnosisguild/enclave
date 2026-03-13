@@ -95,181 +95,125 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         #[cfg(not(unix))]
         compile_error!("Integration tests require unix symlink support");
 
-        // Copy circuit artifacts from the compiled circuit build output
         let circuits_build_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join("..")
             .join("circuits")
             .join("bin");
-
-        // Copy circuit artifacts under the "recursive" variant subdirectory,
-        // because prove() defaults to CircuitVariant::Recursive.
-        //
-        // The build system (build-circuits.ts) generates three VK flavors per circuit:
-        //   - {name}.vk          → evm verifier target (for on-chain verification)
-        //   - {name}.vk_recursive → noir-recursive-no-zk target (Default variant)
-        //   - {name}.vk_noir      → noir-recursive target (Recursive variant)
-        //
-        // Each variant directory stores its VK as just ".vk", so for the recursive/
-        // directory we must copy .vk_noir as .vk (matching what the build system does).
-        let recursive_dir = circuits_dir.join("recursive");
-
-        // Copy T0 (pk) circuit
-        let pk_circuit_dir = recursive_dir.join("dkg").join("pk");
-        tokio::fs::create_dir_all(&pk_circuit_dir).await.unwrap();
         let dkg_target = circuits_build_root.join("dkg").join("target");
-        tokio::fs::copy(dkg_target.join("pk.json"), pk_circuit_dir.join("pk.json"))
-            .await
-            .unwrap();
-        tokio::fs::copy(dkg_target.join("pk.vk_noir"), pk_circuit_dir.join("pk.vk"))
-            .await
-            .unwrap();
-
-        // Copy C1 (pk_generation) circuit
-        let pk_gen_circuit_dir = recursive_dir.join("threshold").join("pk_generation");
-        tokio::fs::create_dir_all(&pk_gen_circuit_dir)
-            .await
-            .unwrap();
         let threshold_target = circuits_build_root.join("threshold").join("target");
-        tokio::fs::copy(
-            threshold_target.join("pk_generation.json"),
-            pk_gen_circuit_dir.join("pk_generation.json"),
-        )
-        .await
-        .unwrap();
-        tokio::fs::copy(
-            threshold_target.join("pk_generation.vk_noir"),
-            pk_gen_circuit_dir.join("pk_generation.vk"),
-        )
-        .await
-        .unwrap();
-
-        // Copy C2a (sk_share_computation) circuit
-        let sk_share_comp_circuit_dir = recursive_dir.join("dkg").join("sk_share_computation");
-        tokio::fs::create_dir_all(&sk_share_comp_circuit_dir)
-            .await
-            .unwrap();
-        tokio::fs::copy(
-            dkg_target.join("sk_share_computation.json"),
-            sk_share_comp_circuit_dir.join("sk_share_computation.json"),
-        )
-        .await
-        .unwrap();
-        tokio::fs::copy(
-            dkg_target.join("sk_share_computation.vk_noir"),
-            sk_share_comp_circuit_dir.join("sk_share_computation.vk"),
-        )
-        .await
-        .unwrap();
-
-        // Copy C2b (e_sm_share_computation) circuit
-        let e_sm_share_comp_circuit_dir = recursive_dir.join("dkg").join("e_sm_share_computation");
-        tokio::fs::create_dir_all(&e_sm_share_comp_circuit_dir)
-            .await
-            .unwrap();
-        tokio::fs::copy(
-            dkg_target.join("e_sm_share_computation.json"),
-            e_sm_share_comp_circuit_dir.join("e_sm_share_computation.json"),
-        )
-        .await
-        .unwrap();
-        tokio::fs::copy(
-            dkg_target.join("e_sm_share_computation.vk_noir"),
-            e_sm_share_comp_circuit_dir.join("e_sm_share_computation.vk"),
-        )
-        .await
-        .unwrap();
-
-        // Copy C3 (share_encryption) circuit — single circuit used for both SK and E_SM
-        let share_enc_circuit_dir = recursive_dir.join("dkg").join("share_encryption");
-        tokio::fs::create_dir_all(&share_enc_circuit_dir)
-            .await
-            .unwrap();
-        tokio::fs::copy(
-            dkg_target.join("share_encryption.json"),
-            share_enc_circuit_dir.join("share_encryption.json"),
-        )
-        .await
-        .unwrap();
-        tokio::fs::copy(
-            dkg_target.join("share_encryption.vk_noir"),
-            share_enc_circuit_dir.join("share_encryption.vk"),
-        )
-        .await
-        .unwrap();
-
-        // Copy C4 (share_decryption) circuit — used for DKG share decryption proofs (Exchange #3)
-        let share_dec_circuit_dir = recursive_dir.join("dkg").join("share_decryption");
-        tokio::fs::create_dir_all(&share_dec_circuit_dir)
-            .await
-            .unwrap();
-        tokio::fs::copy(
-            dkg_target.join("share_decryption.json"),
-            share_dec_circuit_dir.join("share_decryption.json"),
-        )
-        .await
-        .unwrap();
-        tokio::fs::copy(
-            dkg_target.join("share_decryption.vk_noir"),
-            share_dec_circuit_dir.join("share_decryption.vk"),
-        )
-        .await
-        .unwrap();
-
-        // Copy C5 (pk_aggregation) circuit
-        let pk_agg_circuit_dir = recursive_dir.join("threshold").join("pk_aggregation");
-        tokio::fs::create_dir_all(&pk_agg_circuit_dir)
-            .await
-            .unwrap();
-        tokio::fs::copy(
-            threshold_target.join("pk_aggregation.json"),
-            pk_agg_circuit_dir.join("pk_aggregation.json"),
-        )
-        .await
-        .unwrap();
-        tokio::fs::copy(
-            threshold_target.join("pk_aggregation.vk_noir"),
-            pk_agg_circuit_dir.join("pk_aggregation.vk"),
-        )
-        .await
-        .unwrap();
-
-        // Copy C6 (threshold/share_decryption) circuit for C6 verification
-        let threshold_share_dec_circuit_dir =
-            recursive_dir.join("threshold").join("share_decryption");
-        tokio::fs::create_dir_all(&threshold_share_dec_circuit_dir)
-            .await
-            .unwrap();
-        tokio::fs::copy(
-            threshold_target.join("share_decryption.json"),
-            threshold_share_dec_circuit_dir.join("share_decryption.json"),
-        )
-        .await
-        .unwrap();
-        tokio::fs::copy(
-            threshold_target.join("share_decryption.vk_noir"),
-            threshold_share_dec_circuit_dir.join("share_decryption.vk"),
-        )
-        .await
-        .unwrap();
-
-        // Copy C7 (decrypted_shares_aggregation_mod) circuit
-        let dsa_circuit_dir = recursive_dir
+        let wrapper_dkg_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("wrapper")
+            .join("dkg")
+            .join("target");
+        let wrapper_threshold_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("wrapper")
             .join("threshold")
-            .join("decrypted_shares_aggregation_mod");
-        tokio::fs::create_dir_all(&dsa_circuit_dir).await.unwrap();
-        tokio::fs::copy(
-            threshold_target.join("decrypted_shares_aggregation_mod.json"),
-            dsa_circuit_dir.join("decrypted_shares_aggregation_mod.json"),
-        )
-        .await
-        .unwrap();
-        tokio::fs::copy(
-            threshold_target.join("decrypted_shares_aggregation_mod.vk_noir"),
-            dsa_circuit_dir.join("decrypted_shares_aggregation_mod.vk"),
-        )
-        .await
-        .unwrap();
+            .join("target");
+        let fold_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("fold")
+            .join("target");
+
+        // Helper: copy {name}.json + VK artifacts into a destination directory.
+        // vk_suffix/vk_hash_suffix select the source VK flavor:
+        //   ".vk_noir" / ".vk_noir_hash"       → Recursive variant (inner proofs)
+        //   ".vk_recursive" / ".vk_recursive_hash" → Default variant (wrapper/fold proofs)
+        //   ".vk" / ".vk_hash"                  → EVM variant
+        async fn copy_circuit(
+            src_dir: &std::path::Path,
+            dst_dir: &std::path::Path,
+            name: &str,
+            vk_suffix: &str,
+            vk_hash_suffix: &str,
+        ) {
+            tokio::fs::create_dir_all(dst_dir).await.unwrap();
+            tokio::fs::copy(
+                src_dir.join(format!("{name}.json")),
+                dst_dir.join(format!("{name}.json")),
+            )
+            .await
+            .unwrap();
+            tokio::fs::copy(
+                src_dir.join(format!("{name}{vk_suffix}")),
+                dst_dir.join(format!("{name}.vk")),
+            )
+            .await
+            .unwrap();
+            tokio::fs::copy(
+                src_dir.join(format!("{name}{vk_hash_suffix}")),
+                dst_dir.join(format!("{name}.vk_hash")),
+            )
+            .await
+            .unwrap();
+        }
+
+        // ── recursive/ variant (inner/base proofs, uses .vk_noir) ──────────
+
+        let rv = circuits_dir.join("recursive");
+
+        // T0 (pk)
+        copy_circuit(&dkg_target, &rv.join("dkg/pk"), "pk", ".vk_noir", ".vk_noir_hash").await;
+        // C1 (pk_generation)
+        copy_circuit(&threshold_target, &rv.join("threshold/pk_generation"), "pk_generation", ".vk_noir", ".vk_noir_hash").await;
+        // C2a (sk_share_computation)
+        copy_circuit(&dkg_target, &rv.join("dkg/sk_share_computation"), "sk_share_computation", ".vk_noir", ".vk_noir_hash").await;
+        // C2b (e_sm_share_computation)
+        copy_circuit(&dkg_target, &rv.join("dkg/e_sm_share_computation"), "e_sm_share_computation", ".vk_noir", ".vk_noir_hash").await;
+        // C3 (share_encryption)
+        copy_circuit(&dkg_target, &rv.join("dkg/share_encryption"), "share_encryption", ".vk_noir", ".vk_noir_hash").await;
+        // C4 (dkg/share_decryption)
+        copy_circuit(&dkg_target, &rv.join("dkg/share_decryption"), "share_decryption", ".vk_noir", ".vk_noir_hash").await;
+        // C5 (pk_aggregation)
+        copy_circuit(&threshold_target, &rv.join("threshold/pk_aggregation"), "pk_aggregation", ".vk_noir", ".vk_noir_hash").await;
+        // C6 (threshold/share_decryption)
+        copy_circuit(&threshold_target, &rv.join("threshold/share_decryption"), "share_decryption", ".vk_noir", ".vk_noir_hash").await;
+        // C7 (decrypted_shares_aggregation_mod)
+        copy_circuit(&threshold_target, &rv.join("threshold/decrypted_shares_aggregation_mod"), "decrypted_shares_aggregation_mod", ".vk_noir", ".vk_noir_hash").await;
+
+        // ── default/ variant (wrapper & fold proofs, uses .vk_recursive) ───
+
+        let dv = circuits_dir.join("default");
+
+        // DKG wrapper circuits
+        let dkg_wrapper_base = dv.join("recursive_aggregation/wrapper/dkg");
+        copy_circuit(&wrapper_dkg_target, &dkg_wrapper_base.join("pk"), "pk", ".vk_recursive", ".vk_recursive_hash").await;
+        copy_circuit(&wrapper_dkg_target, &dkg_wrapper_base.join("share_computation"), "share_computation", ".vk_recursive", ".vk_recursive_hash").await;
+        copy_circuit(&wrapper_dkg_target, &dkg_wrapper_base.join("share_encryption"), "share_encryption", ".vk_recursive", ".vk_recursive_hash").await;
+        copy_circuit(&wrapper_dkg_target, &dkg_wrapper_base.join("share_decryption"), "share_decryption", ".vk_recursive", ".vk_recursive_hash").await;
+
+        // share_computation aliases (sk_share_computation, e_sm_share_computation)
+        for alias in ["sk_share_computation", "e_sm_share_computation"] {
+            let alias_dir = dkg_wrapper_base.join(alias);
+            tokio::fs::create_dir_all(&alias_dir).await.unwrap();
+            let sc_dir = dkg_wrapper_base.join("share_computation");
+            tokio::fs::copy(sc_dir.join("share_computation.json"), alias_dir.join(format!("{alias}.json"))).await.unwrap();
+            tokio::fs::copy(sc_dir.join("share_computation.vk"), alias_dir.join(format!("{alias}.vk"))).await.unwrap();
+            tokio::fs::copy(sc_dir.join("share_computation.vk_hash"), alias_dir.join(format!("{alias}.vk_hash"))).await.unwrap();
+        }
+
+        // Threshold wrapper circuits
+        let threshold_wrapper_base = dv.join("recursive_aggregation/wrapper/threshold");
+        copy_circuit(&wrapper_threshold_target, &threshold_wrapper_base.join("pk_generation"), "pk_generation", ".vk_recursive", ".vk_recursive_hash").await;
+        copy_circuit(&wrapper_threshold_target, &threshold_wrapper_base.join("pk_aggregation"), "pk_aggregation", ".vk_recursive", ".vk_recursive_hash").await;
+        copy_circuit(&wrapper_threshold_target, &threshold_wrapper_base.join("share_decryption"), "share_decryption", ".vk_recursive", ".vk_recursive_hash").await;
+        copy_circuit(&wrapper_threshold_target, &threshold_wrapper_base.join("decrypted_shares_aggregation"), "decrypted_shares_aggregation", ".vk_recursive", ".vk_recursive_hash").await;
+
+        // Fold circuit (default variant)
+        copy_circuit(&fold_target, &dv.join("recursive_aggregation/fold"), "fold", ".vk_recursive", ".vk_recursive_hash").await;
+
+        // ── evm/ variant (on-chain verification: C5, C7, fold) ───────────
+
+        let ev = circuits_dir.join("evm");
+
+        // C5 (pk_aggregation) — EVM-targeted
+        copy_circuit(&threshold_target, &ev.join("threshold/pk_aggregation"), "pk_aggregation", ".vk", ".vk_hash").await;
+        // C7 (decrypted_shares_aggregation_mod) — EVM-targeted
+        copy_circuit(&threshold_target, &ev.join("threshold/decrypted_shares_aggregation_mod"), "decrypted_shares_aggregation_mod", ".vk", ".vk_hash").await;
+        // Fold circuit — final EVM fold
+        copy_circuit(&fold_target, &ev.join("recursive_aggregation/fold"), "fold", ".vk", ".vk_hash").await;
 
         let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
         (backend, temp)
@@ -654,7 +598,7 @@ async fn test_trbfv_actor() -> Result<()> {
     ));
 
     // Wait for KeyshareCreated + C1 verification + C5 proof + cross-node DKG fold + PublicKeyAggregated
-    // - KeyshareCreated × 5 (forwarded from committee nodes)
+    // - KeyshareCreated × 3 (forwarded from committee nodes)
     // - ShareVerificationDispatched (C1 proof verification dispatched by PublicKeyAggregator)
     // - ComputeRequest (C1 ZK verification)
     // - ComputeResponse (C1 ZK verification result)
@@ -664,9 +608,9 @@ async fn test_trbfv_actor() -> Result<()> {
     // - ComputeRequest (C5 proof generation)
     // - ComputeResponse (C5 proof result)
     // - PkAggregationProofSigned (C5 proof signed by ProofRequestActor)
-    // - DKGRecursiveAggregationComplete × 5 (per-node aggregation from NodeProofAggregator)
-    // - ComputeRequest (cross-node DKG fold)
-    // - ComputeResponse (cross-node DKG fold result)
+    // - DKGRecursiveAggregationComplete × 3 (per-node aggregation from NodeProofAggregator)
+    // - ComputeRequest × 2 (cross-node DKG fold, 3 proofs → 2 pairwise steps)
+    // - ComputeResponse × 2 (cross-node DKG fold results)
     // - PublicKeyAggregated × 1
     let shares_to_pubkey_agg_timer = Instant::now();
     let h = nodes
@@ -689,8 +633,8 @@ async fn test_trbfv_actor() -> Result<()> {
                 "DKGRecursiveAggregationComplete",
                 "DKGRecursiveAggregationComplete",
                 "DKGRecursiveAggregationComplete",
-                "DKGRecursiveAggregationComplete",
-                "DKGRecursiveAggregationComplete",
+                "ComputeRequest",
+                "ComputeResponse",
                 "ComputeRequest",
                 "ComputeResponse",
                 "PublicKeyAggregated",
