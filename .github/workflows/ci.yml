@@ -787,7 +787,7 @@ jobs:
           find circuits/bin/evm -name '*.vk' | head -20
 
       - name: Run ZK prover e2e tests
-        run: cargo test -p e3-zk-prover --test local_e2e_tests -- --nocapture
+        run: cargo test -p e3-zk-prover --test local_e2e_tests -- --nocapture --test-threads=1
 
   build_e3_support_dev:
     needs: [detect_changes]

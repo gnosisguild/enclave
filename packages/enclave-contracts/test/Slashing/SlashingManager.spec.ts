@@ -291,7 +291,7 @@ describe("SlashingManager", function () {
       await enclaveTicketToken.getAddress(),
       owner,
     );
-    const mockVerifier = MockCircuitVerifierFactory.connect(
+    const _mockVerifier = MockCircuitVerifierFactory.connect(
       await mockCircuitVerifier.getAddress(),
       owner,
     );
@@ -344,7 +344,7 @@ describe("SlashingManager", function () {
       enclaveToken,
       ticketToken,
       usdcToken,
-      mockVerifier,
+      _mockVerifier,
       mockCiphernodeRegistry,
     };
   }
@@ -393,13 +393,13 @@ describe("SlashingManager", function () {
 
   describe("setSlashPolicy()", function () {
     it("should set a valid proof-based slash policy", async function () {
-      const { slashingManager, mockVerifier } = await loadFixture(setup);
+      const { slashingManager, _mockVerifier } = await loadFixture(setup);
 
       const policy = {
         ticketPenalty: ethers.parseUnits("50", 6),
         licensePenalty: ethers.parseEther("100"),
         requiresProof: true,
-        proofVerifier: await mockVerifier.getAddress(),
+        proofVerifier: await _mockVerifier.getAddress(),
         banNode: false,
         appealWindow: 0,
         enabled: true,
@@ -544,13 +544,13 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if proof required but appeal window set", async function () {
-      const { slashingManager, mockVerifier } = await loadFixture(setup);
+      const { slashingManager, _mockVerifier } = await loadFixture(setup);
 
       const policy = {
         ticketPenalty: ethers.parseUnits("50", 6),
         licensePenalty: ethers.parseEther("100"),
         requiresProof: true,
-        proofVerifier: await mockVerifier.getAddress(),
+        proofVerifier: await _mockVerifier.getAddress(),
         banNode: false,
         appealWindow: APPEAL_WINDOW,
         enabled: true,
@@ -1071,7 +1071,7 @@ describe("SlashingManager", function () {
 
   describe("proposeSlashEvidence() — Lane B (evidence-based, SLASHER_ROLE)", function () {
     it("should propose evidence-based slash with appeal window", async function () {
-      const { slashingManager, slasher, operatorAddress, mockVerifier } =
+      const { slashingManager, slasher, operatorAddress, _mockVerifier } =
         await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1100,7 +1100,7 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if caller is not slasher", async function () {
-      const { slashingManager, notTheOwner, operatorAddress, mockVerifier } =
+      const { slashingManager, notTheOwner, operatorAddress, _mockVerifier } =
         await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1120,7 +1120,7 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if operator is zero address", async function () {
-      const { slashingManager, slasher, mockVerifier } =
+      const { slashingManager, slasher, _mockVerifier } =
         await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1140,7 +1140,7 @@ describe("SlashingManager", function () {
 
   describe("executeSlash() — Lane B execution", function () {
     it("should execute evidence-based slash after appeal window", async function () {
-      const { slashingManager, slasher, operatorAddress, mockVerifier } =
+      const { slashingManager, slasher, operatorAddress, _mockVerifier } =
         await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1216,7 +1216,7 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if already executed", async function () {
-      const { slashingManager, slasher, operatorAddress, mockVerifier } =
+      const { slashingManager, slasher, operatorAddress, _mockVerifier } =
         await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1246,7 +1246,7 @@ describe("SlashingManager", function () {
         slasher,
         operator,
         operatorAddress,
-        mockVerifier,
+        _mockVerifier,
       } = await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1276,7 +1276,7 @@ describe("SlashingManager", function () {
         slasher,
         notTheOwner,
         operatorAddress,
-        mockVerifier,
+        _mockVerifier,
       } = await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1301,7 +1301,7 @@ describe("SlashingManager", function () {
         slasher,
         operator,
         operatorAddress,
-        mockVerifier,
+        _mockVerifier,
       } = await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1328,7 +1328,7 @@ describe("SlashingManager", function () {
         slasher,
         operator,
         operatorAddress,
-        mockVerifier,
+        _mockVerifier,
       } = await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1393,7 +1393,7 @@ describe("SlashingManager", function () {
         operator,
         owner,
         operatorAddress,
-        mockVerifier,
+        _mockVerifier,
       } = await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1434,7 +1434,7 @@ describe("SlashingManager", function () {
         operator,
         owner,
         operatorAddress,
-        mockVerifier,
+        _mockVerifier,
       } = await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1464,7 +1464,7 @@ describe("SlashingManager", function () {
         slasher,
         operator,
         operatorAddress,
-        mockVerifier,
+        _mockVerifier,
       } = await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1493,7 +1493,7 @@ describe("SlashingManager", function () {
         operator,
         owner,
         operatorAddress,
-        mockVerifier,
+        _mockVerifier,
       } = await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1523,7 +1523,7 @@ describe("SlashingManager", function () {
         operator,
         owner,
         operatorAddress,
-        mockVerifier,
+        _mockVerifier,
       } = await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1617,13 +1617,13 @@ describe("SlashingManager", function () {
 
   describe("view functions", function () {
     it("should return correct slash policy", async function () {
-      const { slashingManager, mockVerifier } = await loadFixture(setup);
+      const { slashingManager, _mockVerifier } = await loadFixture(setup);
 
       const policy = {
         ticketPenalty: ethers.parseUnits("50", 6),
         licensePenalty: ethers.parseEther("100"),
         requiresProof: true,
-        proofVerifier: await mockVerifier.getAddress(),
+        proofVerifier: await _mockVerifier.getAddress(),
         banNode: true,
         appealWindow: 0,
         enabled: true,

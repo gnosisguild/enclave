@@ -16,7 +16,8 @@ use e3_fhe_params::{BfvPreset, ParameterType};
 use e3_zk_helpers::ciphernodes_committee::CiphernodesCommitteeSize;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
 use e3_zk_helpers::circuits::dkg::share_computation::circuit::{
-    ShareComputationCircuit, ShareComputationCircuitData,
+    ShareComputationBaseCircuit, ShareComputationChunkCircuit, ShareComputationChunkCircuitData,
+    ShareComputationCircuitData,
 };
 use e3_zk_helpers::codegen::{write_artifacts, write_toml, CircuitCodegen};
 use e3_zk_helpers::computation::DkgInputType;
@@ -46,7 +47,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-/// DKG input type for share-computation circuit: secret key or smudging noise.
+/// DKG input type for circuits that derive witnesses from secret-key or smudging-noise samples.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DkgInputTypeArg {
     SecretKey,
@@ -145,15 +146,18 @@ struct Cli {
     /// List all available circuits and exit.
     #[arg(long)]
     list_circuits: bool,
-    /// Circuit name to generate artifacts for (e.g. pk, share-computation).
+    /// Circuit name to generate artifacts for (e.g. pk, share-computation-base).
     #[arg(long, required_unless_present = "list_circuits")]
     circuit: Option<String>,
     /// Preset: "insecure"|"secure" or λ (2|80). Drives both threshold and DKG params.
     #[arg(long, required_unless_present = "list_circuits")]
     preset: Option<String>,
-    /// For share-computation only: inputs type "secret-key" or "smudging-noise". Required when writing Prover.toml for share-computation. Ignored for pk (always secret key).
+    /// Select the witness family when sample generation depends on it.
     #[arg(long)]
     inputs: Option<String>,
+    /// For `share-computation-chunk`: which `y` slice to export as `y_chunk`.
+    #[arg(long, default_value_t = 0)]
+    chunk_idx: usize,
     /// Output directory for generated artifacts.
     #[arg(long, default_value = "output")]
     output: PathBuf,
@@ -171,7 +175,8 @@ fn main() -> Result<()> {
     // Register all circuits in the registry (metadata only).
     let mut registry = CircuitRegistry::new();
     registry.register(Arc::new(PkCircuit));
-    registry.register(Arc::new(ShareComputationCircuit));
+    registry.register(Arc::new(ShareComputationBaseCircuit));
+    registry.register(Arc::new(ShareComputationChunkCircuit));
     registry.register(Arc::new(UserDataEncryptionCircuit));
     registry.register(Arc::new(PkGenerationCircuit));
     registry.register(Arc::new(ShareEncryptionCircuit));
@@ -227,13 +232,18 @@ fn main() -> Result<()> {
 
     let write_prover_toml = args.toml;
     let no_configs = args.no_configs && args.toml;
-    // DKG circuits have a inputs-type choice (secret-key vs smudging-noise) excluding `pk` or C0 circuit.
-    let has_inputs_type = circuit_meta.name() == ShareComputationCircuit::NAME
+    let circuit_name = circuit_meta.name();
+
+    // Some circuits reuse one helper entrypoint for multiple witness families, so `--inputs`
+    // selects whether we derive secret-key or smudging-noise sample data.
+    let requires_inputs_arg = circuit_name == ShareComputationChunkCircuit::NAME
         || circuit_meta.name() == ShareEncryptionCircuit::NAME
         || circuit_meta.name() == DkgShareDecryptionCircuit::NAME;
 
-    let dkg_input_type = if has_inputs_type {
-        // Share-computation: require --inputs when generating Prover.toml; default secret-key for configs-only.
+    let show_input_type = requires_inputs_arg || circuit_name == ShareComputationBaseCircuit::NAME;
+
+    let dkg_input_type = if circuit_name == ShareComputationBaseCircuit::NAME || requires_inputs_arg
+    {
         let inputs_str = if !args.toml {
             args.inputs.as_deref().unwrap_or("secret-key")
         } else {
@@ -250,7 +260,6 @@ fn main() -> Result<()> {
             DkgInputTypeArg::SmudgingNoise => DkgInputType::SmudgingNoise,
         }
     } else {
-        // pk circuit: always secret key (no smudging noise).
         DkgInputType::SecretKey
     };
 
@@ -258,7 +267,7 @@ fn main() -> Result<()> {
     print_generation_info(
         &circuit,
         preset,
-        has_inputs_type,
+        show_input_type,
         dkg_input_type.clone(),
         &args.output,
         write_prover_toml,
@@ -266,7 +275,6 @@ fn main() -> Result<()> {
     );
 
     run_with_spinner(|| {
-        let circuit_name = circuit_meta.name();
         let committee = CiphernodesCommitteeSize::Small.values();
         let artifacts = match circuit_name {
             name if name == <PkCircuit as Circuit>::NAME => {
@@ -275,14 +283,25 @@ fn main() -> Result<()> {
                 let circuit = PkCircuit;
                 circuit.codegen(preset, &sample)?
             }
-            name if name == <ShareComputationCircuit as Circuit>::NAME => {
+            name if name == <ShareComputationBaseCircuit as Circuit>::NAME => {
                 let sample = ShareComputationCircuitData::generate_sample(
                     preset,
                     committee,
                     dkg_input_type,
                 )?;
 
-                let circuit = ShareComputationCircuit;
+                let circuit = ShareComputationBaseCircuit;
+                circuit.codegen(preset, &sample)?
+            }
+            name if name == <ShareComputationChunkCircuit as Circuit>::NAME => {
+                let sample = ShareComputationChunkCircuitData::generate_sample(
+                    preset,
+                    committee,
+                    dkg_input_type,
+                    args.chunk_idx,
+                )?;
+
+                let circuit = ShareComputationChunkCircuit;
                 circuit.codegen(preset, &sample)?
             }
             name if name == <ShareEncryptionCircuit as Circuit>::NAME => {

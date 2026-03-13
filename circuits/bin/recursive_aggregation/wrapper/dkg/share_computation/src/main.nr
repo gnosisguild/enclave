@@ -4,23 +4,23 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
-use lib::configs::default::dkg::L_THRESHOLD;
-use lib::{configs::default::N_PARTIES, math::commitments::compute_recursive_aggregation_commitment};
+use bb_proof_verification::{UltraHonkVerificationKey, UltraHonkZKProof, verify_honk_proof};
+use lib::math::commitments::compute_recursive_aggregation_commitment;
 
-// Number of proofs.
+// Both SK and ESM share_computation inner proofs wrapped together during aggregation.
 pub global N_PROOFS: u32 = 2;
-/// Number of public inputs/outputs per proof.
-pub global N_PUBLIC_INPUTS: u32 = (L_THRESHOLD * N_PARTIES) + 1;
+// The share_computation inner circuit has 3 public outputs:
+//   base_key_hash, chunk_key_hash, aggregated_commitment (return value).
+pub global N_PUBLIC_INPUTS: u32 = 3;
 
 fn main(
     verification_key: UltraHonkVerificationKey,
-    proofs: [UltraHonkProof; N_PROOFS],
+    proofs: [UltraHonkZKProof; N_PROOFS],
     public_inputs: [[Field; N_PUBLIC_INPUTS]; N_PROOFS],
     key_hash: pub Field,
 ) -> pub Field {
     for i in 0..N_PROOFS {
-        verify_honk_proof_non_zk(verification_key, proofs[i], public_inputs[i], key_hash);
+        verify_honk_proof(verification_key, proofs[i], public_inputs[i], key_hash);
     }
 
     let mut aggregated_public_inputs = Vec::new();

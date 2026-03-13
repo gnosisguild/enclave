@@ -61,13 +61,20 @@ use e3_zk_helpers::circuits::threshold::pk_generation::circuit::{
     PkGenerationCircuit, PkGenerationCircuitData,
 };
 use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComputationCircuitData};
+use e3_zk_helpers::dkg::share_computation::{
+    Configs, ShareComputationBaseCircuit, ShareComputationChunkCircuit,
+    ShareComputationChunkCircuitData, ShareComputationCircuitData,
+};
 use e3_zk_helpers::dkg::share_decryption::{ShareDecryptionCircuit, ShareDecryptionCircuitData};
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
-use e3_zk_prover::{Provable, ZkBackend, ZkProver};
+use e3_zk_helpers::Computation;
+use e3_zk_prover::{
+    generate_chunk_batch_proof, generate_share_computation_final_proof, Provable, ZkBackend,
+    ZkProver,
+};
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
 use fhe_traits::{DeserializeParametrized, FheEncoder};
@@ -665,13 +672,13 @@ fn handle_share_computation_proof(
         .map(|arr| arr.mapv(|v| BigInt::from(v)))
         .collect();
 
-    // 4. Compute parity matrix
+    // 5. Compute parity matrix
     let committee = req.committee_size.values();
     let parity_matrix =
         compute_parity_matrix(threshold_params.moduli(), committee.n, committee.threshold)
             .map_err(|e| make_zk_error(&request, format!("compute_parity_matrix: {}", e)))?;
 
-    // 5. Build circuit data
+    // 6. Build circuit data
     let circuit_data = ShareComputationCircuitData {
         dkg_input_type: req.dkg_input_type,
         secret,
@@ -681,12 +688,17 @@ fn handle_share_computation_proof(
         threshold: committee.threshold as u32,
     };
 
-    // 6. Generate proof
-    let circuit = ShareComputationCircuit;
     let e3_id_str = request.e3_id.to_string();
 
-    let proof = circuit
-        .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+    // 7. Prove base circuit (C2a or C2b base)
+    let base_circuit = ShareComputationBaseCircuit;
+    let base_proof = base_circuit
+        .prove(
+            prover,
+            &req.params_preset,
+            &circuit_data,
+            &format!("{e3_id_str}_base"),
+        )
         .map_err(|e| {
             ComputeRequestError::new(
                 ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
@@ -694,7 +706,65 @@ fn handle_share_computation_proof(
             )
         })?;
 
-    // 7. Return response
+    // 8. Determine number of chunks and prove each chunk circuit
+    let configs = Configs::compute(req.params_preset.clone(), &circuit_data)
+        .map_err(|e| make_zk_error(&request, format!("Configs::compute: {}", e)))?;
+
+    let chunk_circuit = ShareComputationChunkCircuit;
+    let mut chunk_proofs = Vec::with_capacity(configs.n_chunks);
+    for chunk_idx in 0..configs.n_chunks {
+        let chunk_data = ShareComputationChunkCircuitData {
+            share_data: circuit_data.clone(),
+            chunk_idx,
+        };
+        let chunk_proof = chunk_circuit
+            .prove(
+                prover,
+                &req.params_preset,
+                &chunk_data,
+                &format!("{e3_id_str}_chunk_{chunk_idx}"),
+            )
+            .map_err(|e| {
+                ComputeRequestError::new(
+                    ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                    request.clone(),
+                )
+            })?;
+        chunk_proofs.push(chunk_proof);
+    }
+
+    // 9. Level 1: group chunks into batches and prove each batch
+    let mut batch_proofs = Vec::with_capacity(configs.n_batches);
+    for batch_idx in 0..configs.n_batches {
+        let start = batch_idx * configs.chunks_per_batch;
+        let end = start + configs.chunks_per_batch;
+        let batch_proof = generate_chunk_batch_proof(
+            prover,
+            &base_proof,
+            &chunk_proofs[start..end],
+            batch_idx as u32,
+            &format!("{e3_id_str}_batch_{batch_idx}"),
+        )
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+        batch_proofs.push(batch_proof);
+    }
+
+    // 10. Level 2: aggregate batch proofs into final C2 proof
+    let proof =
+        generate_share_computation_final_proof(prover, &batch_proofs, &format!("{e3_id_str}_c2"))
+            .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
+    // 11. Return final C2 proof
     Ok(ComputeResponse::zk(
         ZkResponse::ShareComputation(ShareComputationProofResponse {
             proof,
