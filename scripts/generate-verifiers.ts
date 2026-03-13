@@ -293,7 +293,7 @@ class VerifierGenerator {
 
   /**
    * Convert group/name to a PascalCase Solidity contract name.
-   * e.g. (dkg, pk) → DkgPkVerifier
+   * e.g. (threshold, pk_aggregation) → ThresholdPkAggregationVerifier
    *      (threshold, pk_generation) → ThresholdPkGenerationVerifier
    *      (recursive_aggregation, fold) → RecursiveAggregationFoldVerifier
    */

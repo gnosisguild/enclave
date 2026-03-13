@@ -34,16 +34,18 @@
 
 # Verifier contracts
 !/artifacts/contracts/verifier/
-!/artifacts/contracts/verifier/DkgPkVerifier.sol/
-!/artifacts/contracts/verifier/DkgPkVerifier.sol/DkgPkVerifier.json
-!/artifacts/contracts/verifier/DkgPkVerifier.sol/ZKTranscriptLib.json
-
-
-# Verifier contracts
-!/artifacts/contracts/verifier/
-!/artifacts/contracts/verifier/DkgPkVerifier.sol/
-!/artifacts/contracts/verifier/DkgPkVerifier.sol/DkgPkVerifier.json
-!/artifacts/contracts/verifier/DkgPkVerifier.sol/ZKTranscriptLib.json
+!/artifacts/contracts/verifier/ThresholdPkAggregationVerifier.sol/
+!/artifacts/contracts/verifier/ThresholdPkAggregationVerifier.sol/ThresholdPkAggregationVerifier.json
+!/artifacts/contracts/verifier/ThresholdPkAggregationVerifier.sol/ZKTranscriptLib.json
+!/artifacts/contracts/verifier/ThresholdDecryptedSharesAggregationBnVerifier.sol/
+!/artifacts/contracts/verifier/ThresholdDecryptedSharesAggregationBnVerifier.sol/ThresholdDecryptedSharesAggregationBnVerifier.json
+!/artifacts/contracts/verifier/ThresholdDecryptedSharesAggregationBnVerifier.sol/ZKTranscriptLib.json
+!/artifacts/contracts/verifier/ThresholdDecryptedSharesAggregationModVerifier.sol/
+!/artifacts/contracts/verifier/ThresholdDecryptedSharesAggregationModVerifier.sol/ThresholdDecryptedSharesAggregationModVerifier.json
+!/artifacts/contracts/verifier/ThresholdDecryptedSharesAggregationModVerifier.sol/ZKTranscriptLib.json
+!/artifacts/contracts/verifier/RecursiveAggregationFoldVerifier.sol/
+!/artifacts/contracts/verifier/RecursiveAggregationFoldVerifier.sol/RecursiveAggregationFoldVerifier.json
+!/artifacts/contracts/verifier/RecursiveAggregationFoldVerifier.sol/ZKTranscriptLib.json
 
 build
 cache

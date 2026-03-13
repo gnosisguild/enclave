@@ -125,10 +125,6 @@
     "ZKTranscriptLib": {
       "blockNumber": 10395628,
       "address": "0xBf0A32A7D546944561a8773628e6c0036C16354C"
-    },
-    "DkgPkVerifier": {
-      "blockNumber": 10395629,
-      "address": "0x6997eCF2926a94c439599f7275219Cb2BfBA300C"
     }
   },
   "localhost": {
