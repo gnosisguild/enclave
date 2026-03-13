@@ -155,23 +155,86 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         let rv = circuits_dir.join("recursive");
 
         // T0 (pk)
-        copy_circuit(&dkg_target, &rv.join("dkg/pk"), "pk", ".vk_noir", ".vk_noir_hash").await;
+        copy_circuit(
+            &dkg_target,
+            &rv.join("dkg/pk"),
+            "pk",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
         // C1 (pk_generation)
-        copy_circuit(&threshold_target, &rv.join("threshold/pk_generation"), "pk_generation", ".vk_noir", ".vk_noir_hash").await;
+        copy_circuit(
+            &threshold_target,
+            &rv.join("threshold/pk_generation"),
+            "pk_generation",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
         // C2a (sk_share_computation)
-        copy_circuit(&dkg_target, &rv.join("dkg/sk_share_computation"), "sk_share_computation", ".vk_noir", ".vk_noir_hash").await;
+        copy_circuit(
+            &dkg_target,
+            &rv.join("dkg/sk_share_computation"),
+            "sk_share_computation",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
         // C2b (e_sm_share_computation)
-        copy_circuit(&dkg_target, &rv.join("dkg/e_sm_share_computation"), "e_sm_share_computation", ".vk_noir", ".vk_noir_hash").await;
+        copy_circuit(
+            &dkg_target,
+            &rv.join("dkg/e_sm_share_computation"),
+            "e_sm_share_computation",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
         // C3 (share_encryption)
-        copy_circuit(&dkg_target, &rv.join("dkg/share_encryption"), "share_encryption", ".vk_noir", ".vk_noir_hash").await;
+        copy_circuit(
+            &dkg_target,
+            &rv.join("dkg/share_encryption"),
+            "share_encryption",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
         // C4 (dkg/share_decryption)
-        copy_circuit(&dkg_target, &rv.join("dkg/share_decryption"), "share_decryption", ".vk_noir", ".vk_noir_hash").await;
+        copy_circuit(
+            &dkg_target,
+            &rv.join("dkg/share_decryption"),
+            "share_decryption",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
         // C5 (pk_aggregation)
-        copy_circuit(&threshold_target, &rv.join("threshold/pk_aggregation"), "pk_aggregation", ".vk_noir", ".vk_noir_hash").await;
+        copy_circuit(
+            &threshold_target,
+            &rv.join("threshold/pk_aggregation"),
+            "pk_aggregation",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
         // C6 (threshold/share_decryption)
-        copy_circuit(&threshold_target, &rv.join("threshold/share_decryption"), "share_decryption", ".vk_noir", ".vk_noir_hash").await;
+        copy_circuit(
+            &threshold_target,
+            &rv.join("threshold/share_decryption"),
+            "share_decryption",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
         // C7 (decrypted_shares_aggregation_mod)
-        copy_circuit(&threshold_target, &rv.join("threshold/decrypted_shares_aggregation_mod"), "decrypted_shares_aggregation_mod", ".vk_noir", ".vk_noir_hash").await;
+        copy_circuit(
+            &threshold_target,
+            &rv.join("threshold/decrypted_shares_aggregation_mod"),
+            "decrypted_shares_aggregation_mod",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
 
         // ── default/ variant (wrapper & fold proofs, uses .vk_recursive) ───
 
@@ -179,41 +242,140 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
 
         // DKG wrapper circuits
         let dkg_wrapper_base = dv.join("recursive_aggregation/wrapper/dkg");
-        copy_circuit(&wrapper_dkg_target, &dkg_wrapper_base.join("pk"), "pk", ".vk_recursive", ".vk_recursive_hash").await;
-        copy_circuit(&wrapper_dkg_target, &dkg_wrapper_base.join("share_computation"), "share_computation", ".vk_recursive", ".vk_recursive_hash").await;
-        copy_circuit(&wrapper_dkg_target, &dkg_wrapper_base.join("share_encryption"), "share_encryption", ".vk_recursive", ".vk_recursive_hash").await;
-        copy_circuit(&wrapper_dkg_target, &dkg_wrapper_base.join("share_decryption"), "share_decryption", ".vk_recursive", ".vk_recursive_hash").await;
+        copy_circuit(
+            &wrapper_dkg_target,
+            &dkg_wrapper_base.join("pk"),
+            "pk",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &wrapper_dkg_target,
+            &dkg_wrapper_base.join("share_computation"),
+            "share_computation",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &wrapper_dkg_target,
+            &dkg_wrapper_base.join("share_encryption"),
+            "share_encryption",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &wrapper_dkg_target,
+            &dkg_wrapper_base.join("share_decryption"),
+            "share_decryption",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
 
         // share_computation aliases (sk_share_computation, e_sm_share_computation)
         for alias in ["sk_share_computation", "e_sm_share_computation"] {
             let alias_dir = dkg_wrapper_base.join(alias);
             tokio::fs::create_dir_all(&alias_dir).await.unwrap();
             let sc_dir = dkg_wrapper_base.join("share_computation");
-            tokio::fs::copy(sc_dir.join("share_computation.json"), alias_dir.join(format!("{alias}.json"))).await.unwrap();
-            tokio::fs::copy(sc_dir.join("share_computation.vk"), alias_dir.join(format!("{alias}.vk"))).await.unwrap();
-            tokio::fs::copy(sc_dir.join("share_computation.vk_hash"), alias_dir.join(format!("{alias}.vk_hash"))).await.unwrap();
+            tokio::fs::copy(
+                sc_dir.join("share_computation.json"),
+                alias_dir.join(format!("{alias}.json")),
+            )
+            .await
+            .unwrap();
+            tokio::fs::copy(
+                sc_dir.join("share_computation.vk"),
+                alias_dir.join(format!("{alias}.vk")),
+            )
+            .await
+            .unwrap();
+            tokio::fs::copy(
+                sc_dir.join("share_computation.vk_hash"),
+                alias_dir.join(format!("{alias}.vk_hash")),
+            )
+            .await
+            .unwrap();
         }
 
         // Threshold wrapper circuits
         let threshold_wrapper_base = dv.join("recursive_aggregation/wrapper/threshold");
-        copy_circuit(&wrapper_threshold_target, &threshold_wrapper_base.join("pk_generation"), "pk_generation", ".vk_recursive", ".vk_recursive_hash").await;
-        copy_circuit(&wrapper_threshold_target, &threshold_wrapper_base.join("pk_aggregation"), "pk_aggregation", ".vk_recursive", ".vk_recursive_hash").await;
-        copy_circuit(&wrapper_threshold_target, &threshold_wrapper_base.join("share_decryption"), "share_decryption", ".vk_recursive", ".vk_recursive_hash").await;
-        copy_circuit(&wrapper_threshold_target, &threshold_wrapper_base.join("decrypted_shares_aggregation"), "decrypted_shares_aggregation", ".vk_recursive", ".vk_recursive_hash").await;
+        copy_circuit(
+            &wrapper_threshold_target,
+            &threshold_wrapper_base.join("pk_generation"),
+            "pk_generation",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &wrapper_threshold_target,
+            &threshold_wrapper_base.join("pk_aggregation"),
+            "pk_aggregation",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &wrapper_threshold_target,
+            &threshold_wrapper_base.join("share_decryption"),
+            "share_decryption",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &wrapper_threshold_target,
+            &threshold_wrapper_base.join("decrypted_shares_aggregation"),
+            "decrypted_shares_aggregation",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
 
         // Fold circuit (default variant)
-        copy_circuit(&fold_target, &dv.join("recursive_aggregation/fold"), "fold", ".vk_recursive", ".vk_recursive_hash").await;
+        copy_circuit(
+            &fold_target,
+            &dv.join("recursive_aggregation/fold"),
+            "fold",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
 
         // ── evm/ variant (on-chain verification: C5, C7, fold) ───────────
 
         let ev = circuits_dir.join("evm");
 
         // C5 (pk_aggregation) — EVM-targeted
-        copy_circuit(&threshold_target, &ev.join("threshold/pk_aggregation"), "pk_aggregation", ".vk", ".vk_hash").await;
+        copy_circuit(
+            &threshold_target,
+            &ev.join("threshold/pk_aggregation"),
+            "pk_aggregation",
+            ".vk",
+            ".vk_hash",
+        )
+        .await;
         // C7 (decrypted_shares_aggregation_mod) — EVM-targeted
-        copy_circuit(&threshold_target, &ev.join("threshold/decrypted_shares_aggregation_mod"), "decrypted_shares_aggregation_mod", ".vk", ".vk_hash").await;
+        copy_circuit(
+            &threshold_target,
+            &ev.join("threshold/decrypted_shares_aggregation_mod"),
+            "decrypted_shares_aggregation_mod",
+            ".vk",
+            ".vk_hash",
+        )
+        .await;
         // Fold circuit — final EVM fold
-        copy_circuit(&fold_target, &ev.join("recursive_aggregation/fold"), "fold", ".vk", ".vk_hash").await;
+        copy_circuit(
+            &fold_target,
+            &ev.join("recursive_aggregation/fold"),
+            "fold",
+            ".vk",
+            ".vk_hash",
+        )
+        .await;
 
         let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
         (backend, temp)
