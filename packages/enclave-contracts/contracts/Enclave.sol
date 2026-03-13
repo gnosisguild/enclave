@@ -633,7 +633,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     /// @inheritdoc IEnclave
-    function enableE3Program(IE3Program e3Program) public onlyOwner {
+    function enableE3Program(IE3Program e3Program) public {
         require(
             !e3Programs[e3Program],
             ModuleAlreadyEnabled(address(e3Program))
