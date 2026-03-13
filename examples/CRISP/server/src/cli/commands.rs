@@ -19,7 +19,9 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::SolValue;
 use crisp::config::CONFIG;
 use e3_fhe_params::{build_bfv_params_from_set_arc, encode_bfv_params};
-use e3_sdk::evm_helpers::contracts::{CommitteeSize, EnclaveContract, EnclaveRead, EnclaveWrite, E3};
+use e3_sdk::evm_helpers::contracts::{
+    CommitteeSize, EnclaveContract, EnclaveRead, EnclaveWrite, E3,
+};
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
@@ -196,7 +198,7 @@ pub async fn initialize_crisp_round(
         CONFIG.ciphernode_registry_address
     );
 
-    // Recompute the current timestamp to ensure it's as up-to-date as possible before sending the transaction, 
+    // Recompute the current timestamp to ensure it's as up-to-date as possible before sending the transaction,
     // since there are multiple steps (fee quote, token approval) that could take time.
     let mut current_timestamp = get_current_timestamp().await?;
     // Buffer so tx can mine before window opens; end = start + duration so voting window equals e3_duration
