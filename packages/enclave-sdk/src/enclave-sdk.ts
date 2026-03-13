@@ -134,7 +134,7 @@ export class EnclaveSDK {
   }
 
   public async requestE3(params: {
-    threshold: [number, number]
+    committeeSize: number
     inputWindow: [bigint, bigint]
     e3Program: `0x${string}`
     e3ProgramParams: `0x${string}`

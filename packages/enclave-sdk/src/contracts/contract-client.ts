@@ -149,7 +149,7 @@ export class ContractClient {
         functionName: 'request',
         args: [
           {
-            threshold: params.threshold,
+            committeeSize: params.committeeSize,
             inputWindow: params.inputWindow,
             e3Program: params.e3Program,
             e3ProgramParams: params.e3ProgramParams,
@@ -221,7 +221,7 @@ export class ContractClient {
         functionName: 'getE3Quote',
         args: [
           {
-            threshold: requestParams.threshold,
+            committeeSize: requestParams.committeeSize,
             inputWindow: requestParams.inputWindow,
             e3Program: requestParams.e3Program,
             e3ProgramParams: requestParams.e3ProgramParams,

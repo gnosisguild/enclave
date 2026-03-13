@@ -7,6 +7,7 @@ pragma solidity >=0.8.27;
 
 import { IE3Program } from "./IE3Program.sol";
 import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
+import { IEnclave } from "./IEnclave.sol";
 
 /**
  * @title E3
@@ -14,7 +15,7 @@ import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
  * @dev This struct tracks all parameters, state, and results of an encrypted computation
  *      from request through completion
  * @param seed Random seed for committee selection and computation initialization
- * @param threshold M/N threshold for the committee (M required out of N total members)
+ * @param committeeSize The committee size enum value for this computation
  * @param requestBlock Block number when the E3 computation was requested
  * @param inputWindow When to start and stop accepting inputs from data providers
  * @param encryptionSchemeId Identifier for the encryption scheme used in this computation
@@ -29,7 +30,7 @@ import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
  */
 struct E3 {
     uint256 seed;
-    uint32[2] threshold;
+    IEnclave.CommitteeSize committeeSize;
     uint256 requestBlock;
     uint256[2] inputWindow;
     bytes32 encryptionSchemeId;

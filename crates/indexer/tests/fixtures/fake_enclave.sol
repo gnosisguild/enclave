@@ -36,7 +36,7 @@ contract FakeEnclave {
   function getE3(uint256 _e3Id) external view returns (E3 memory e3) {
     e3 = E3({
       seed: 123456789012,
-      threshold: [uint32(2), uint32(3)],
+      committeeSize: CommitteeSize.Micro,
       requestBlock: 18750000,
       inputWindow: [uint256(18750100), uint256(18750200)],
       encryptionSchemeId: bytes32(keccak256("AES-256-GCM")),
@@ -46,14 +46,22 @@ contract FakeEnclave {
       customParams: abi.encode("custom_params"),
       committeePublicKey: bytes32(keccak256("committee_public_key")),
       ciphertextOutput: bytes32(keccak256("encrypted_data")),
-      plaintextOutput: abi.encode("decrypted_result")
+      plaintextOutput: abi.encode("decrypted_result"),
+      requester: 0xdead000000000000000000000000000000000001
     });
   }
 }
 
+enum CommitteeSize {
+  Micro,
+  Small,
+  Medium,
+  Large
+}
+
 struct E3 {
   uint256 seed;
-  uint32[2] threshold;
+  CommitteeSize committeeSize;
   uint256 requestBlock;
   uint256[2] inputWindow;
   bytes32 encryptionSchemeId;
@@ -64,4 +72,5 @@ struct E3 {
   bytes32 committeePublicKey;
   bytes32 ciphertextOutput;
   bytes plaintextOutput;
+  address requester;
 }

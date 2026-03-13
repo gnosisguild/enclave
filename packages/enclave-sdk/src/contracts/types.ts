@@ -10,9 +10,16 @@ export interface ContractAddresses {
   feeToken: `0x${string}`
 }
 
+export enum CommitteeSize {
+  Micro = 0,
+  Small = 1,
+  Medium = 2,
+  Large = 3,
+}
+
 export interface E3 {
   seed: bigint
-  threshold: readonly [number, number]
+  committeeSize: number
   requestBlock: bigint
   inputWindow: readonly [bigint, bigint]
   encryptionSchemeId: string
@@ -29,7 +36,7 @@ export interface RequestParams {
 }
 
 export interface E3RequestParams extends RequestParams {
-  threshold: readonly [number, number]
+  committeeSize: number
   inputWindow: readonly [bigint, bigint]
   e3Program: `0x${string}`
   e3ProgramParams: `0x${string}`

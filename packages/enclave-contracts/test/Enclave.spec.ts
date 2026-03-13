@@ -72,11 +72,11 @@ describe("Enclave", function () {
     e3Id: number,
     nodes: string[],
     publicKey: string,
-    operator1: Signer,
-    operator2: Signer,
+    operators: Signer[],
   ): Promise<void> => {
-    await registry.connect(operator1).submitTicket(e3Id, 1);
-    await registry.connect(operator2).submitTicket(e3Id, 1);
+    for (const operator of operators) {
+      await registry.connect(operator).submitTicket(e3Id, 1);
+    }
     await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
     await registry.finalizeCommittee(e3Id);
     const publicKeyHash = ethers.id(publicKey);
@@ -134,7 +134,7 @@ describe("Enclave", function () {
 
   const setup = async () => {
     // ── Signers ──────────────────────────────────────────────────────────────
-    const [owner, notTheOwner, operator1, operator2] =
+    const [owner, notTheOwner, operator1, operator2, operator3] =
       await ethers.getSigners();
     const ownerAddress = await owner.getAddress();
 
@@ -283,7 +283,7 @@ describe("Enclave", function () {
     // ── Operators ─────────────────────────────────────────────────────────────
     await licenseToken.setTransferRestriction(false);
 
-    for (const operator of [operator1, operator2]) {
+    for (const operator of [operator1, operator2, operator3]) {
       await setupOperatorForSortition(
         operator,
         bondingRegistry,
@@ -300,10 +300,16 @@ describe("Enclave", function () {
     await usdcToken.mint(ownerAddress, mintAmount);
     await usdcToken.mint(await notTheOwner.getAddress(), mintAmount);
 
+    // ── Committee Thresholds ──────────────────────────────────────────────────
+    // CommitteeSize.Micro = 0 → [1, 3]
+    await enclave.setCommitteeThresholds(0, [1, 3]);
+    // CommitteeSize.Small = 1 → [2, 5]
+    await enclave.setCommitteeThresholds(1, [2, 5]);
+
     // ── Request ───────────────────────────────────────────────────────────────
     const now = await time.latest();
     const request = {
-      threshold: [2, 2] as [number, number],
+      committeeSize: 0, // Micro
       inputWindow: [now + 10, now + inputWindowDuration] as [number, number],
       e3Program: await e3Program.getAddress(),
       e3ProgramParams: encodedE3ProgramParams,
@@ -323,6 +329,7 @@ describe("Enclave", function () {
       notTheOwner,
       operator1,
       operator2,
+      operator3,
       enclave,
       ciphernodeRegistryContract,
       bondingRegistry,
@@ -483,7 +490,7 @@ describe("Enclave", function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
+        committeeSize: request.committeeSize,
         inputWindow: request.inputWindow,
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
@@ -493,7 +500,7 @@ describe("Enclave", function () {
 
       const e3 = await enclave.getE3(0);
 
-      expect(e3.threshold).to.deep.equal(request.threshold);
+      expect(e3.committeeSize).to.equal(request.committeeSize);
       expect(e3.inputWindow[0]).to.equal(request.inputWindow[0]);
       expect(e3.inputWindow[1]).to.equal(request.inputWindow[1]);
       expect(e3.e3Program).to.equal(request.e3Program);
@@ -697,7 +704,7 @@ describe("Enclave", function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
       await expect(
         enclave.request({
-          threshold: request.threshold,
+          committeeSize: request.committeeSize,
           inputWindow: request.inputWindow,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -706,36 +713,12 @@ describe("Enclave", function () {
         }),
       ).to.be.revertedWithCustomError(usdcToken, "ERC20InsufficientAllowance");
     });
-    it("reverts if threshold is 0", async function () {
+    it("reverts if committee size is not configured", async function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
-      const fee = await enclave.getE3Quote({
-        threshold: [0, 2],
-        inputWindow: request.inputWindow,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-      await usdcToken.approve(await enclave.getAddress(), fee);
-      await expect(
-        enclave.request({
-          threshold: [0, 2],
-          inputWindow: request.inputWindow,
-          e3Program: request.e3Program,
-          e3ProgramParams: request.e3ProgramParams,
-          computeProviderParams: request.computeProviderParams,
-          customParams: request.customParams,
-        }),
-      )
-        .to.be.revertedWithCustomError(enclave, "InvalidThreshold")
-        .withArgs([0, 2]);
-    });
-    it("reverts if threshold is greater than number", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
-
+      // CommitteeSize.Large (3) is not configured in the fixture
       await expect(
         makeRequest(enclave, usdcToken, {
-          threshold: [3, 2],
+          committeeSize: 3,
           inputWindow: request.inputWindow,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -743,15 +726,15 @@ describe("Enclave", function () {
           customParams: request.customParams,
         }),
       )
-        .to.be.revertedWithCustomError(enclave, "InvalidThreshold")
-        .withArgs([3, 2]);
+        .to.be.revertedWithCustomError(enclave, "CommitteeSizeNotConfigured")
+        .withArgs(3);
     });
     it("reverts if total duration is greater than maxDuration", async function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
 
       await expect(
         makeRequest(enclave, usdcToken, {
-          threshold: [2, 3],
+          committeeSize: request.committeeSize,
           inputWindow: [
             request.inputWindow[0],
             request.inputWindow[1] + time.duration.days(31),
@@ -768,7 +751,7 @@ describe("Enclave", function () {
 
       await expect(
         makeRequest(enclave, usdcToken, {
-          threshold: [2, 3],
+          committeeSize: request.committeeSize,
           inputWindow: request.inputWindow,
           e3Program: ethers.ZeroAddress,
           e3ProgramParams: request.e3ProgramParams,
@@ -784,7 +767,7 @@ describe("Enclave", function () {
       await enclave.disableEncryptionScheme(encryptionSchemeId);
       await expect(
         makeRequest(enclave, usdcToken, {
-          threshold: request.threshold,
+          committeeSize: request.committeeSize,
           inputWindow: request.inputWindow,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -799,7 +782,7 @@ describe("Enclave", function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
+        committeeSize: request.committeeSize,
         inputWindow: request.inputWindow,
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
@@ -810,7 +793,7 @@ describe("Enclave", function () {
       const e3 = await enclave.getE3(0);
       const block = await ethers.provider.getBlock("latest").catch((e) => e);
 
-      expect(e3.threshold).to.deep.equal(request.threshold);
+      expect(e3.committeeSize).to.equal(request.committeeSize);
       expect(e3.inputWindow[0]).to.equal(request.inputWindow[0]);
       expect(e3.inputWindow[1]).to.equal(request.inputWindow[1]);
       expect(e3.e3Program).to.equal(request.e3Program);
@@ -825,7 +808,7 @@ describe("Enclave", function () {
     it("emits E3Requested event", async function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
       const tx = await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
+        committeeSize: request.committeeSize,
         inputWindow: request.inputWindow,
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
@@ -857,11 +840,12 @@ describe("Enclave", function () {
         ciphernodeRegistryContract,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
+        committeeSize: request.committeeSize,
         inputWindow: request.inputWindow,
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
@@ -872,10 +856,13 @@ describe("Enclave", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
-        operator1,
-        operator2,
+        [operator1, operator2, operator3],
       );
       await mine(2, { interval: inputWindowDuration });
 
@@ -892,6 +879,7 @@ describe("Enclave", function () {
         ciphernodeRegistryContract,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -903,10 +891,13 @@ describe("Enclave", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
-        operator1,
-        operator2,
+        [operator1, operator2, operator3],
       );
       await mine(2, {
         interval: inputWindowDuration + timeoutConfig.computeWindow,
@@ -923,11 +914,12 @@ describe("Enclave", function () {
         ciphernodeRegistryContract,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
+        committeeSize: request.committeeSize,
         inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
@@ -938,10 +930,13 @@ describe("Enclave", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
-        operator1,
-        operator2,
+        [operator1, operator2, operator3],
       );
       await mine(2, { interval: inputWindowDuration });
       await expect(
@@ -956,6 +951,7 @@ describe("Enclave", function () {
         ciphernodeRegistryContract,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -967,10 +963,13 @@ describe("Enclave", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
-        operator1,
-        operator2,
+        [operator1, operator2, operator3],
       );
       await mine(2, { interval: inputWindowDuration });
       expect(await enclave.publishCiphertextOutput(e3Id, data, proof));
@@ -985,6 +984,7 @@ describe("Enclave", function () {
         ciphernodeRegistryContract,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -996,10 +996,13 @@ describe("Enclave", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
-        operator1,
-        operator2,
+        [operator1, operator2, operator3],
       );
       await mine(2, { interval: inputWindowDuration });
       expect(
@@ -1014,6 +1017,7 @@ describe("Enclave", function () {
         ciphernodeRegistryContract,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1025,10 +1029,13 @@ describe("Enclave", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
-        operator1,
-        operator2,
+        [operator1, operator2, operator3],
       );
       await mine(2, { interval: inputWindowDuration });
       await expect(enclave.publishCiphertextOutput(e3Id, data, proof))
@@ -1055,6 +1062,7 @@ describe("Enclave", function () {
         ciphernodeRegistryContract,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1066,10 +1074,13 @@ describe("Enclave", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
-        operator1,
-        operator2,
+        [operator1, operator2, operator3],
       );
       await expect(
         enclave.publishPlaintextOutput(e3Id, data, "0x"),
@@ -1083,6 +1094,7 @@ describe("Enclave", function () {
         ciphernodeRegistryContract,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1094,10 +1106,13 @@ describe("Enclave", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
-        operator1,
-        operator2,
+        [operator1, operator2, operator3],
       );
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
@@ -1114,6 +1129,7 @@ describe("Enclave", function () {
         ciphernodeRegistryContract,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1125,10 +1141,13 @@ describe("Enclave", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
-        operator1,
-        operator2,
+        [operator1, operator2, operator3],
       );
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
@@ -1144,6 +1163,7 @@ describe("Enclave", function () {
         ciphernodeRegistryContract,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1155,10 +1175,13 @@ describe("Enclave", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
-        operator1,
-        operator2,
+        [operator1, operator2, operator3],
       );
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
@@ -1175,6 +1198,7 @@ describe("Enclave", function () {
         ciphernodeRegistryContract,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1186,10 +1210,13 @@ describe("Enclave", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
-        operator1,
-        operator2,
+        [operator1, operator2, operator3],
       );
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
@@ -1205,6 +1232,7 @@ describe("Enclave", function () {
         ciphernodeRegistryContract,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1216,10 +1244,13 @@ describe("Enclave", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
-        operator1,
-        operator2,
+        [operator1, operator2, operator3],
       );
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);

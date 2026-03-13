@@ -17,7 +17,7 @@ use alloy::primitives::{Address, Bytes, U256};
 use alloy::sol_types::SolValue;
 use e3_fhe_params::default_param_set;
 use e3_fhe_params::{build_bfv_params_from_set_arc, encode_bfv_params};
-use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
+use e3_sdk::evm_helpers::contracts::{CommitteeSize, EnclaveContract, EnclaveRead, EnclaveWrite};
 use log::{error, info};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
@@ -208,7 +208,13 @@ pub async fn initialize_crisp_round(
     let custom_params_bytes = Bytes::from((token_address, balance_threshold).abi_encode());
 
     info!("Requesting E3...");
-    let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
+    let committee_size = match CONFIG.e3_committee_size {
+        0 => CommitteeSize::Micro,
+        1 => CommitteeSize::Small,
+        2 => CommitteeSize::Medium,
+        3 => CommitteeSize::Large,
+        _ => return Err(format!("Invalid committee size: {}", CONFIG.e3_committee_size).into()),
+    };
 
     let current_timestamp = get_current_timestamp_rpc().await?;
     // Buffer so tx can mine before window opens; end = start + duration so voting window equals e3_duration
@@ -226,7 +232,7 @@ pub async fn initialize_crisp_round(
     let compute_provider_params = Bytes::from(bincode::serialize(&compute_provider_params)?);
     let (receipt, e3_id) = contract
         .request_e3(
-            threshold,
+            committee_size,
             input_window,
             e3_program,
             e3_params,

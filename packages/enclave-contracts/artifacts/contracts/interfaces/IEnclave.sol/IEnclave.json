@@ -92,6 +92,25 @@
       "inputs": [
         {
           "indexed": true,
+          "internalType": "enum IEnclave.CommitteeSize",
+          "name": "size",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32[2]",
+          "name": "threshold",
+          "type": "uint32[2]"
+        }
+      ],
+      "name": "CommitteeThresholdsUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
@@ -206,9 +225,9 @@
               "type": "uint256"
             },
             {
-              "internalType": "uint32[2]",
-              "name": "threshold",
-              "type": "uint32[2]"
+              "internalType": "enum IEnclave.CommitteeSize",
+              "name": "committeeSize",
+              "type": "uint8"
             },
             {
               "internalType": "uint256",
@@ -675,9 +694,9 @@
               "type": "uint256"
             },
             {
-              "internalType": "uint32[2]",
-              "name": "threshold",
-              "type": "uint32[2]"
+              "internalType": "enum IEnclave.CommitteeSize",
+              "name": "committeeSize",
+              "type": "uint8"
             },
             {
               "internalType": "uint256",
@@ -748,9 +767,9 @@
         {
           "components": [
             {
-              "internalType": "uint32[2]",
-              "name": "threshold",
-              "type": "uint32[2]"
+              "internalType": "enum IEnclave.CommitteeSize",
+              "name": "committeeSize",
+              "type": "uint8"
             },
             {
               "internalType": "uint256[2]",
@@ -908,19 +927,6 @@
           "type": "uint256"
         }
       ],
-      "name": "processE3Failure",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "e3Id",
-          "type": "uint256"
-        }
-      ],
       "name": "onCommitteeFinalized",
       "outputs": [],
       "stateMutability": "nonpayable",
@@ -958,6 +964,19 @@
         }
       ],
       "name": "onE3Failed",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "processE3Failure",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -1038,9 +1057,9 @@
         {
           "components": [
             {
-              "internalType": "uint32[2]",
-              "name": "threshold",
-              "type": "uint32[2]"
+              "internalType": "enum IEnclave.CommitteeSize",
+              "name": "committeeSize",
+              "type": "uint8"
             },
             {
               "internalType": "uint256[2]",
@@ -1088,9 +1107,9 @@
               "type": "uint256"
             },
             {
-              "internalType": "uint32[2]",
-              "name": "threshold",
-              "type": "uint32[2]"
+              "internalType": "enum IEnclave.CommitteeSize",
+              "name": "committeeSize",
+              "type": "uint8"
             },
             {
               "internalType": "uint256",
@@ -1178,6 +1197,24 @@
         }
       ],
       "name": "setCiphernodeRegistry",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum IEnclave.CommitteeSize",
+          "name": "size",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint32[2]",
+          "name": "threshold",
+          "type": "uint32[2]"
+        }
+      ],
+      "name": "setCommitteeThresholds",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -1276,5 +1313,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-aabfcbf9eb9905bf16af29953ad33064524f63a7"
+  "buildInfoId": "solc-0_8_28-dbd94fb7bf5c147a4effe4d89ec8d62bae78112f"
 }

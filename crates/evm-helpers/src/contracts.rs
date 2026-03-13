@@ -19,6 +19,7 @@ use alloy::{
 use async_trait::async_trait;
 use eyre::Result;
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -38,10 +39,18 @@ where
 }
 
 sol! {
+    #[derive(Debug, Serialize, Deserialize)]
+    enum CommitteeSize {
+        Micro,
+        Small,
+        Medium,
+        Large,
+    }
+
     #[derive(Debug)]
     struct E3 {
         uint256 seed;
-        uint32[2] threshold;
+        CommitteeSize committeeSize;
         uint256 requestBlock;
         uint256[2] inputWindow;
         bytes32 encryptionSchemeId;
@@ -57,7 +66,7 @@ sol! {
 
     #[derive(Debug)]
     struct E3RequestParams {
-        uint32[2] threshold;
+        CommitteeSize committeeSize;
         uint256[2] inputWindow;
         address e3Program;
         bytes e3ProgramParams;
@@ -157,7 +166,7 @@ pub trait EnclaveRead {
     /// Get the fee quote for an E3 request
     async fn get_e3_quote(
         &self,
-        threshold: [u32; 2],
+        commitee_size: CommitteeSize,
         input_window: [U256; 2],
         e3_program: Address,
         e3_params: Bytes,
@@ -181,7 +190,7 @@ pub trait EnclaveWrite {
     /// Request a new E3
     async fn request_e3(
         &self,
-        threshold: [u32; 2],
+        committee_size: CommitteeSize,
         input_window: [U256; 2],
         e3_program: Address,
         e3_params: Bytes,
@@ -385,14 +394,14 @@ where
 
     async fn get_e3_quote(
         &self,
-        threshold: [u32; 2],
+        committee_size: CommitteeSize,
         input_window: [U256; 2],
         e3_program: Address,
         e3_params: Bytes,
         compute_provider_params: Bytes,
     ) -> Result<U256> {
         let e3_request = E3RequestParams {
-            threshold,
+            committeeSize: committee_size,
             inputWindow: input_window,
             e3Program: e3_program,
             e3ProgramParams: e3_params,
@@ -441,7 +450,7 @@ where
 impl EnclaveWrite for EnclaveContract<ReadWrite> {
     async fn request_e3(
         &self,
-        threshold: [u32; 2],
+        committee_size: CommitteeSize,
         input_window: [U256; 2],
         e3_program: Address,
         e3_params: Bytes,
@@ -458,7 +467,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         let e3_id = contract.nexte3Id().call().await?;
 
         let e3_request = E3RequestParams {
-            threshold,
+            committeeSize: committee_size,
             inputWindow: input_window,
             e3Program: e3_program,
             e3ProgramParams: e3_params.clone(),

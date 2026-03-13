@@ -18,6 +18,14 @@ interface IEnclave {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @notice Sizes of committees for E3 computations
+    enum CommitteeSize {
+        Micro,
+        Small,
+        Medium,
+        Large
+    }
+
     /// @notice Lifecycle stages of an E3 computation
     enum E3Stage {
         None,
@@ -204,6 +212,14 @@ interface IEnclave {
     /// @notice Emitted when timeout config is updated
     event TimeoutConfigUpdated(E3TimeoutConfig config);
 
+    /// @notice Emitted when committee thresholds are updated
+    /// @param size The committee size enum value.
+    /// @param threshold The M/N threshold values.
+    event CommitteeThresholdsUpdated(
+        CommitteeSize indexed size,
+        uint32[2] threshold
+    );
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                  Structs                               //
@@ -211,14 +227,14 @@ interface IEnclave {
     ////////////////////////////////////////////////////////////
 
     /// @notice This struct contains the parameters to submit a request to Enclave.
-    /// @param threshold The M/N threshold for the committee.
+    /// @param committeeSize The M/N threshold and honest parties for the committee.
     /// @param inputWindow When the program will start and stop accepting inputs.
     /// @param e3Program The address of the E3 Program.
     /// @param e3ProgramParams The ABI encoded computation parameters.
     /// @param computeProviderParams The ABI encoded compute provider parameters.
     /// @param customParams Arbitrary ABI-encoded application-defined parameters.
     struct E3RequestParams {
-        uint32[2] threshold;
+        CommitteeSize committeeSize;
         uint256[2] inputWindow;
         IE3Program e3Program;
         bytes e3ProgramParams;
@@ -443,4 +459,12 @@ interface IEnclave {
     /// @notice Set timeout configuration
     /// @param config The new timeout config
     function setTimeoutConfig(E3TimeoutConfig calldata config) external;
+
+    /// @notice Set the threshold values for a committee size
+    /// @param size The committee size enum value
+    /// @param threshold The M/N threshold values [quorum, total]
+    function setCommitteeThresholds(
+        CommitteeSize size,
+        uint32[2] calldata threshold
+    ) external;
 }
