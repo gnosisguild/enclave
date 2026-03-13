@@ -889,6 +889,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 AggregationProofSigned (C7 proof signed by ProofRequestActor)
     // - 8 ComputeRequest + 8 ComputeResponse (C6 fold: 9 proofs -> 8 pairwise steps)
     // - 1 PlaintextAggregated (with C7 + C6 proofs)
+    // - 1 E3RequestComplete (published after PlaintextAggregated by request router)
     // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
     // stay on their local buses.
     let c6_proof_count = threshold_n as usize * num_votes_per_voter;
@@ -910,17 +911,27 @@ async fn test_trbfv_actor() -> Result<()> {
         publishing_ct_timer.elapsed(),
     ));
 
-    let Some(EnclaveEventData::PlaintextAggregated(PlaintextAggregated {
-        decrypted_output: plaintext,
-        aggregation_proofs,
-        ..
-    })) = h.last().map(|e| e.get_data())
-    else {
-        bail!(
-            "Expected last event to be PlaintextAggregated, got: {:?}",
-            h.event_types()
-        )
-    };
+    let (plaintext, aggregation_proofs) = h
+        .iter()
+        .rev()
+        .find_map(|e| {
+            if let EnclaveEventData::PlaintextAggregated(PlaintextAggregated {
+                decrypted_output,
+                aggregation_proofs,
+                ..
+            }) = e.get_data()
+            {
+                Some((decrypted_output.clone(), aggregation_proofs.clone()))
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Expected PlaintextAggregated in events, got: {:?}",
+                h.event_types()
+            )
+        })?;
 
     assert!(
         !aggregation_proofs.is_empty(),
