@@ -47,6 +47,7 @@ tracing.workspace = true
 walkdir = "2.5"
 
 [dev-dependencies]
+e3-test-helpers = { workspace = true }
 paste = "1"
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 

@@ -5,34 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use e3_config::BBPath;
+pub use e3_test_helpers::{find_anvil, find_bb};
 use e3_zk_prover::{ZkBackend, ZkConfig};
 use std::{env, path::PathBuf};
 use tempfile::TempDir;
-use tokio::{fs, process::Command};
-
-/// Returns `None` when bb is not found — tests should skip gracefully.
-pub async fn find_bb() -> Option<PathBuf> {
-    if let Ok(output) = Command::new("which").arg("bb").output().await {
-        if output.status.success() {
-            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !path.is_empty() {
-                return Some(PathBuf::from(path));
-            }
-        }
-    }
-    if let Ok(home) = std::env::var("HOME") {
-        for path in [
-            format!("{}/.bb/bb", home),
-            format!("{}/.nargo/bin/bb", home),
-            format!("{}/.enclave/noir/bin/bb", home),
-        ] {
-            if std::path::Path::new(&path).exists() {
-                return Some(PathBuf::from(path));
-            }
-        }
-    }
-    None
-}
+use tokio::fs;
 
 /// Root of the compiled circuit artifacts: `{workspace}/circuits/bin/`.
 fn circuits_build_root() -> PathBuf {
@@ -152,21 +129,6 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
         .await
         .unwrap();
     }
-}
-
-pub async fn find_anvil() -> bool {
-    if let Ok(output) = Command::new("which").arg("anvil").output().await {
-        if output.status.success() {
-            return true;
-        }
-    }
-    if let Ok(home) = std::env::var("HOME") {
-        let path = format!("{}/.foundry/bin/anvil", home);
-        if std::path::Path::new(&path).exists() {
-            return true;
-        }
-    }
-    false
 }
 
 /// Creates a temp ZkBackend with the real bb binary symlinked in.
