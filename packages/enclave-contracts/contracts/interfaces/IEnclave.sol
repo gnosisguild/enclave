@@ -83,7 +83,6 @@ interface IEnclave {
         uint256 availabilityPerNodePerSec;
         uint256 decryptionPerNode;
         uint256 publicationBase;
-        uint256 publicationPerByte;
         address protocolTreasury;
         uint16 marginBps;
         uint16 protocolShareBps;

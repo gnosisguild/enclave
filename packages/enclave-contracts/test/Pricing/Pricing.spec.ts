@@ -49,7 +49,6 @@ describe("E3 Pricing", function () {
     availabilityPerNodePerSec: 20n,
     decryptionPerNode: 150000n,
     publicationBase: 500000n,
-    publicationPerByte: 10n,
     protocolTreasury: ethers.ZeroAddress,
     marginBps: 1000,
     protocolShareBps: 0,
@@ -64,7 +63,6 @@ describe("E3 Pricing", function () {
     availabilityPerNodePerSec: pc.availabilityPerNodePerSec,
     decryptionPerNode: pc.decryptionPerNode,
     publicationBase: pc.publicationBase,
-    publicationPerByte: pc.publicationPerByte,
     protocolTreasury: pc.protocolTreasury,
     marginBps: pc.marginBps,
     protocolShareBps: pc.protocolShareBps,
@@ -463,7 +461,6 @@ describe("E3 Pricing", function () {
         availabilityPerNodePerSec: 40n,
         decryptionPerNode: 300000n,
         publicationBase: 1000000n,
-        publicationPerByte: 20n,
       };
 
       await expect(enclave.setPricingConfig(newConfig)).to.emit(
@@ -477,7 +474,6 @@ describe("E3 Pricing", function () {
       expect(stored.availabilityPerNodePerSec).to.equal(40n);
       expect(stored.decryptionPerNode).to.equal(300000n);
       expect(stored.publicationBase).to.equal(1000000n);
-      expect(stored.publicationPerByte).to.equal(20n);
     });
 
     it("changes the fee returned by getE3Quote", async function () {
@@ -493,7 +489,6 @@ describe("E3 Pricing", function () {
         availabilityPerNodePerSec: 40n,
         decryptionPerNode: 300000n,
         publicationBase: 1000000n,
-        publicationPerByte: 20n,
       });
 
       const feeAfter = await enclave.getE3Quote(request);
@@ -739,7 +734,6 @@ describe("E3 Pricing", function () {
       expect(pc.availabilityPerNodePerSec).to.equal(20);
       expect(pc.decryptionPerNode).to.equal(150000);
       expect(pc.publicationBase).to.equal(500000);
-      expect(pc.publicationPerByte).to.equal(10);
       expect(pc.marginBps).to.equal(1000);
       expect(pc.protocolShareBps).to.equal(0);
       expect(pc.protocolTreasury).to.equal(ethers.ZeroAddress);

@@ -288,7 +288,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             availabilityPerNodePerSec: 20, // 0.00002 USDC
             decryptionPerNode: 150000, // 0.15 USDC
             publicationBase: 500000, // 0.50 USDC
-            publicationPerByte: 10, // 0.00001 USDC
             protocolTreasury: address(0),
             marginBps: 1000, // 10%
             protocolShareBps: 0,

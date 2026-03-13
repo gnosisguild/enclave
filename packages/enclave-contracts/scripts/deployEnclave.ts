@@ -226,7 +226,6 @@ export const deployEnclave = async (withMocks?: boolean) => {
     availabilityPerNodePerSec: 20, // 0.00002 USDC
     decryptionPerNode: 150000, // 0.15 USDC
     publicationBase: 500000, // 0.50 USDC
-    publicationPerByte: 10, // 0.00001 USDC
     protocolTreasury: ownerAddress,
     marginBps: 1000, // 10%
     protocolShareBps: 2000, // 20%
