@@ -102,7 +102,7 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             .join("circuits")
             .join("bin");
 
-        // Copy T0 (pk) circuit
+        // Copy C0 (pk) circuit
         let pk_circuit_dir = circuits_dir.join("dkg").join("pk");
         tokio::fs::create_dir_all(&pk_circuit_dir).await.unwrap();
         let dkg_target = circuits_build_root.join("dkg").join("target");
@@ -646,6 +646,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // - ShareVerificationDispatched (C1 proof verification dispatched by PublicKeyAggregator)
     // - ComputeRequest (C1 ZK verification)
     // - ComputeResponse (C1 ZK verification result)
+    // - ProofVerificationPassed × 5 (one per party's C1 proof)
     // - ShareVerificationComplete (C1 verification done)
     // - PkAggregationProofPending (C5 proof requested by PublicKeyAggregator)
     // - ComputeRequest (C5 proof generation)
@@ -664,6 +665,11 @@ async fn test_trbfv_actor() -> Result<()> {
                 "ShareVerificationDispatched",
                 "ComputeRequest",
                 "ComputeResponse",
+                "ProofVerificationPassed",
+                "ProofVerificationPassed",
+                "ProofVerificationPassed",
+                "ProofVerificationPassed",
+                "ProofVerificationPassed",
                 "ShareVerificationComplete",
                 "PkAggregationProofPending",
                 "ComputeRequest",
@@ -672,7 +678,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 "PublicKeyAggregated",
             ],
             Duration::from_secs(5000),
-            Duration::from_secs(600),
+            Duration::from_secs(5000),
         )
         .await?;
 
@@ -749,6 +755,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 ShareVerificationDispatched (C6 verification dispatched by ThresholdPlaintextAggregator)
     // - 1 ComputeRequest (C6 ZK verification)
     // - 1 ComputeResponse (C6 ZK verification result)
+    // - 15 ProofVerificationPassed (5 parties × 3 C6 proofs per ciphertext)
     // - 1 ShareVerificationComplete (C6 verification done)
     // - 1 ComputeRequest (TrBFV CalculateThresholdDecryption)
     // - 1 ComputeResponse (TrBFV CalculateThresholdDecryption)
@@ -759,8 +766,8 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 PlaintextAggregated (with C7 proofs)
     // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
     // stay on their local buses.
-    // Total: 1 + 5 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 1 = 17 events
-    let expected_count = 1 + 5 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 1;
+    // Total: 1 + 5 + 1 + 2 + 15 + 1 + 2 + 1 + 2 + 1 + 1 = 32 events
+    let expected_count = 1 + 5 + 1 + 2 + 15 + 1 + 2 + 1 + 2 + 1 + 1;
 
     let h = nodes
         .take_history_with_timeouts(

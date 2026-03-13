@@ -33,6 +33,10 @@ impl<T: Ord> OrderedSet<T> {
         self.0.is_empty()
     }
 
+    pub fn remove(&mut self, value: &T) -> bool {
+        self.0.remove(value)
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.0.iter()
     }

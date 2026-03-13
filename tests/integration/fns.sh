@@ -65,7 +65,13 @@ strip_ansi() {
 
 waiton() {
     local file_path="$1"
+    local timeout="${2:-600}"  # default 10 minutes
+    local start_time=$(date +%s)
     until [ -f "$file_path" ]; do
+        if [ $(($(date +%s) - start_time)) -ge $timeout ]; then
+            echo "Timeout after ${timeout}s waiting for: $file_path" >&2
+            return 1
+        fi
         sleep 1
     done
 }

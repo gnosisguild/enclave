@@ -38,18 +38,16 @@ impl CiphernodesCommitteeSize {
                 h: 5,
                 threshold: 2,
             },
-            _ => unreachable!(),
+            CiphernodesCommitteeSize::Medium => CiphernodesCommittee {
+                n: 10,
+                h: 8,
+                threshold: 4,
+            },
+            CiphernodesCommitteeSize::Large => CiphernodesCommittee {
+                n: 20,
+                h: 15,
+                threshold: 7,
+            },
         }
-        // @todo add the other committee sizes
-        // CiphernodesCommitteeSize::Medium => CiphernodesCommittee {
-        //     n: 5,
-        //     h: 5,
-        //     threshold: 2,
-        // },
-        // CiphernodesCommitteeSize::Large => CiphernodesCommittee {
-        //     n: 5,
-        //     h: 5,
-        //     threshold: 2,
-        // },
     }
 }

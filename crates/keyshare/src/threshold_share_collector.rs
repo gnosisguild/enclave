@@ -12,8 +12,8 @@ use std::{
 
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, SpawnHandle};
 use e3_events::{
-    E3id, SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed,
-    ThresholdShareCreated, TypedEvent,
+    E3id, EventContext, Sequenced, SignedProofPayload, ThresholdShare,
+    ThresholdShareCollectionFailed, ThresholdShareCreated, TypedEvent,
 };
 use e3_trbfv::PartyId;
 use e3_utils::MAILBOX_LIMIT;
@@ -46,6 +46,15 @@ pub(crate) enum CollectorState {
 #[derive(Message, Clone, Debug)]
 #[rtype(result = "()")]
 pub struct ThresholdShareCollectionTimeout;
+
+/// Removes this party from the `todo` set so the DKG can complete with
+/// N-1 shares instead of waiting for a share that will never arrive.
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "()")]
+pub struct ExpelPartyFromShareCollection {
+    pub party_id: PartyId,
+    pub ec: EventContext<Sequenced>,
+}
 
 pub struct ThresholdShareCollector {
     /// The E3id for the round
@@ -195,7 +204,75 @@ impl Handler<ThresholdShareCollectionTimeout> for ThresholdShareCollector {
             missing_parties,
         });
 
-        // Stop the actor
         ctx.stop();
+    }
+}
+
+impl Handler<ExpelPartyFromShareCollection> for ThresholdShareCollector {
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: ExpelPartyFromShareCollection,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        // Only handle if we're still collecting
+        if !matches!(self.state, CollectorState::Collecting) {
+            return;
+        }
+
+        let party_id = msg.party_id;
+
+        // Remove expelled party from the todo set
+        if !self.todo.remove(&party_id) {
+            // Party already delivered their share — remove from collected data
+            let had_share = self.shares.remove(&party_id).is_some();
+            let had_proofs = self.share_proofs.remove(&party_id).is_some();
+            if had_share || had_proofs {
+                info!(
+                    e3_id = %self.e3_id,
+                    party_id = party_id,
+                    "Expelled party {} already delivered share — removed from collected data",
+                    party_id
+                );
+            } else {
+                info!(
+                    e3_id = %self.e3_id,
+                    party_id = party_id,
+                    "Expelled party {} was not in share collection todo set and had no collected data",
+                    party_id
+                );
+            }
+            return;
+        }
+
+        info!(
+            e3_id = %self.e3_id,
+            party_id = party_id,
+            remaining = self.todo.len(),
+            "Removed expelled party {} from threshold share collection, {} remaining",
+            party_id,
+            self.todo.len()
+        );
+
+        // Check if all remaining shares have been collected
+        if self.todo.is_empty() {
+            info!(
+                e3_id = %self.e3_id,
+                "All remaining threshold shares collected after party expulsion!"
+            );
+            self.state = CollectorState::Finished;
+
+            // Cancel the timeout since we're done
+            if let Some(handle) = self.timeout_handle.take() {
+                ctx.cancel_future(handle);
+            }
+
+            let proofs = std::mem::take(&mut self.share_proofs);
+            let event: TypedEvent<AllThresholdSharesCollected> = TypedEvent::new(
+                AllThresholdSharesCollected::new(self.shares.clone(), proofs),
+                msg.ec,
+            );
+            self.parent.do_send(event);
+        }
     }
 }

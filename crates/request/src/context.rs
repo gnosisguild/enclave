@@ -24,6 +24,7 @@ fn init_recipients() -> HashMap<String, Option<Recipient<EnclaveEvent>>> {
         ("threshold_keyshare".to_owned(), None),
         ("plaintext".to_owned(), None),
         ("publickey".to_owned(), None),
+        ("accusation_manager".to_owned(), None),
     ])
 }
 
