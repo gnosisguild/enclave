@@ -851,7 +851,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await slashingManager.grantRole(SLASHER_ROLE, await owner.getAddress());
 
       await makeRequest(1); // Small: M=2, N=3
-      await finalizeCommitteeWithOperators(0, [operator1, operator2, operator3]);
+      await finalizeCommitteeWithOperators(0, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
 
       // Step 1: Lane A slash op1 — still viable (3→2 active, >= M=2)
       const laneAProof = await signAndEncodeAttestation(

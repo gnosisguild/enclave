@@ -1021,7 +1021,7 @@ impl ThresholdKeyshare {
         };
 
         let derived_committee_size =
-            CiphernodesCommitteeSize::from_threshold(threshold_m as usize, threshold_n as usize);
+            CiphernodesCommitteeSize::from_threshold(threshold_m as usize, threshold_n as usize)?;
 
         // Get collected BFV public keys from all parties (from persisted state)
         let encryption_keys = &collected_encryption_keys;

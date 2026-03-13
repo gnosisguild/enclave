@@ -658,7 +658,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // - ShareVerificationDispatched (C1 proof verification dispatched by PublicKeyAggregator)
     // - ComputeRequest (C1 ZK verification)
     // - ComputeResponse (C1 ZK verification result)
-    // - ProofVerificationPassed × 5 (one per party's C1 proof)
+    // - ProofVerificationPassed × 3 (one per party's C1 proof)
     // - ShareVerificationComplete (C1 verification done)
     // - PkAggregationProofPending (C5 proof requested by PublicKeyAggregator)
     // - ComputeRequest (C5 proof generation)
@@ -675,8 +675,6 @@ async fn test_trbfv_actor() -> Result<()> {
                 "ShareVerificationDispatched",
                 "ComputeRequest",
                 "ComputeResponse",
-                "ProofVerificationPassed",
-                "ProofVerificationPassed",
                 "ProofVerificationPassed",
                 "ProofVerificationPassed",
                 "ProofVerificationPassed",
@@ -765,7 +763,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 ShareVerificationDispatched (C6 verification dispatched by ThresholdPlaintextAggregator)
     // - 1 ComputeRequest (C6 ZK verification)
     // - 1 ComputeResponse (C6 ZK verification result)
-    // - 15 ProofVerificationPassed (5 parties × 3 C6 proofs per ciphertext)
+    // - 9 ProofVerificationPassed (3 parties × 3 C6 proofs per ciphertext)
     // - 1 ShareVerificationComplete (C6 verification done)
     // - 1 ComputeRequest (TrBFV CalculateThresholdDecryption)
     // - 1 ComputeResponse (TrBFV CalculateThresholdDecryption)
@@ -776,8 +774,8 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 PlaintextAggregated (with C7 proofs)
     // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
     // stay on their local buses.
-    // Total: 1 + 3 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 1 = 15 events
-    let expected_count = 1 + 3 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 1;
+    // Total: 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 1 = 24 events
+    let expected_count = 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 1;
 
     let h = nodes
         .take_history_with_timeouts(

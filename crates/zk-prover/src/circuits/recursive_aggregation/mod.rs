@@ -377,7 +377,7 @@ mod tests {
         }
 
         let preset = BfvPreset::InsecureThreshold512;
-        let committee = CiphernodesCommitteeSize::Small.values();
+        let committee = CiphernodesCommitteeSize::Micro.values();
         let sample_a = ShareDecryptionCircuitData::generate_sample(
             preset,
             committee.clone(),
@@ -476,7 +476,7 @@ mod tests {
         }
 
         let preset = BfvPreset::InsecureThreshold512;
-        let committee = CiphernodesCommitteeSize::Small.values();
+        let committee = CiphernodesCommitteeSize::Micro.values();
         let sd = preset.search_defaults().expect("search_defaults");
 
         let pk_sample =

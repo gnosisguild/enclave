@@ -13,10 +13,9 @@ import { useWizard, WizardStep } from '../../context/WizardContext'
 import {
   encodeBfvParams,
   encodeComputeProviderParams,
-  calculateStartWindow,
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
   DEFAULT_E3_CONFIG,
-  CommitteeSize,
+  calculateInputWindow,
 } from '@enclave-e3/sdk'
 import { getContractAddresses } from '@/utils/env-config'
 
@@ -109,8 +108,9 @@ const RequestComputation: React.FC = () => {
       }
 
       const committeeSize = DEFAULT_E3_CONFIG.committeeSize
-      const startWindow = calculateStartWindow(60) // 1 minute
-      const duration = BigInt(60) // 1 minute
+      const publicClient = sdk.sdk.getPublicClient()
+
+      const inputWindow = await calculateInputWindow(publicClient, 60) // 1 minute
       const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
       const e3ProgramParams = encodeBfvParams(thresholdBfvParams)
       const computeProviderParams = encodeComputeProviderParams(DEFAULT_COMPUTE_PROVIDER_PARAMS)
@@ -118,8 +118,7 @@ const RequestComputation: React.FC = () => {
       console.log('requestE3')
       const hash = await requestE3({
         committeeSize,
-        startWindow,
-        duration,
+        inputWindow,
         e3Program: contracts.e3Program,
         e3ProgramParams,
         computeProviderParams,

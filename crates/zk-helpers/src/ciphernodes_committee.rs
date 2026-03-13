@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
 /// @todo this must be integrated inside Ciphernodes & Smart Contract
@@ -33,13 +34,16 @@ pub struct CiphernodesCommittee {
 
 impl CiphernodesCommitteeSize {
     /// Derives the committee size from threshold values (M, N).
-    pub fn from_threshold(threshold_m: usize, threshold_n: usize) -> Self {
+    pub fn from_threshold(threshold_m: usize, threshold_n: usize) -> Result<Self> {
         match (threshold_m, threshold_n) {
-            (1, 3) => Self::Micro,
-            (2, 5) => Self::Small,
-            _ => panic!(
+            (1, 3) => Ok(Self::Micro),
+            (2, 5) => Ok(Self::Small),
+            (4, 10) => Ok(Self::Medium),
+            (7, 20) => Ok(Self::Large),
+            _ => bail!(
                 "Unknown committee size for threshold ({}, {})",
-                threshold_m, threshold_n
+                threshold_m,
+                threshold_n
             ),
         }
     }

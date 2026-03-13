@@ -49,7 +49,7 @@ async fn setup_share_encryption_e_sm_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Small.values();
+    let committee = CiphernodesCommitteeSize::Micro.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
@@ -89,7 +89,7 @@ async fn setup_share_encryption_sk_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Small.values();
+    let committee = CiphernodesCommitteeSize::Micro.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
@@ -129,7 +129,7 @@ async fn setup_share_computation_sk_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Small.values();
+    let committee = CiphernodesCommitteeSize::Micro.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
@@ -161,7 +161,7 @@ async fn setup_share_computation_e_sm_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Small.values();
+    let committee = CiphernodesCommitteeSize::Micro.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
@@ -196,7 +196,7 @@ async fn setup_pk_generation_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Small.values();
+    let committee = CiphernodesCommitteeSize::Micro.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
@@ -226,7 +226,7 @@ async fn setup_share_decryption_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Small.values();
+    let committee = CiphernodesCommitteeSize::Micro.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
@@ -256,7 +256,7 @@ async fn setup_pk_aggregation_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Small.values();
+    let committee = CiphernodesCommitteeSize::Micro.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
@@ -286,7 +286,7 @@ async fn setup_decrypted_shares_aggregation_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Small.values();
+    let committee = CiphernodesCommitteeSize::Micro.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;

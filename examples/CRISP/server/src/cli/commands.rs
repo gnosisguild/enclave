@@ -135,7 +135,9 @@ pub async fn initialize_crisp_round(
         1 => CommitteeSize::Small,
         2 => CommitteeSize::Medium,
         3 => CommitteeSize::Large,
-        _ => panic!("Invalid committee size: {}", CONFIG.e3_committee_size),
+        invalid => {
+            return Err(anyhow::anyhow!("Invalid committee size: {}", invalid).into());
+        }
     };
     let e3_params = Bytes::from(encode_bfv_params(&generate_bfv_parameters()));
     let compute_provider_params = ComputeProviderParams {

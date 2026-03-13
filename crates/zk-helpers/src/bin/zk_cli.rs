@@ -57,8 +57,10 @@ fn parse_committee(s: &str) -> Result<CiphernodesCommitteeSize> {
     match s.trim().to_lowercase().as_str() {
         "micro" => Ok(CiphernodesCommitteeSize::Micro),
         "small" => Ok(CiphernodesCommitteeSize::Small),
+        "medium" => Ok(CiphernodesCommitteeSize::Medium),
+        "large" => Ok(CiphernodesCommitteeSize::Large),
         _ => Err(anyhow!(
-            "unknown committee: {s}. Use \"micro\" or \"small\""
+            "unknown committee: {s}. Use \"micro\", \"small\", \"medium\", or \"large\""
         )),
     }
 }

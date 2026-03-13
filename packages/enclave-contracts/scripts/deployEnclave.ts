@@ -215,6 +215,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
   await enclave.setCommitteeThresholds(0, [1, 3]);
   // Small: threshold=2, total=5
   await enclave.setCommitteeThresholds(1, [2, 5]);
+  // Medium and Large can be set later as needed
   console.log("Committee thresholds set (Micro=[1,3], Small=[2,5])");
 
   if (shouldDeployMocks) {

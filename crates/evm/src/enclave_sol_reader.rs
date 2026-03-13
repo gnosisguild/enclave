@@ -27,15 +27,17 @@ sol!(
 
 struct E3RequestedWithChainId(pub IEnclave::E3Requested, pub u64);
 
-impl From<E3RequestedWithChainId> for e3_events::E3Requested {
-    fn from(value: E3RequestedWithChainId) -> Self {
-        let params_bytes = value.0.e3.e3ProgramParams.to_vec();
+impl E3RequestedWithChainId {
+    fn try_into_e3_requested(self) -> anyhow::Result<e3_events::E3Requested> {
+        let params_bytes = self.0.e3.e3ProgramParams.to_vec();
 
         // Derive threshold values from committee size enum
-        let committee_size = match value.0.e3.committeeSize {
+        let committee_size = match self.0.e3.committeeSize {
             0 => CiphernodesCommitteeSize::Micro,
             1 => CiphernodesCommitteeSize::Small,
-            _ => panic!("Unsupported committee size: {}", value.0.e3.committeeSize),
+            2 => CiphernodesCommitteeSize::Medium,
+            3 => CiphernodesCommitteeSize::Large,
+            other => anyhow::bail!("Unsupported committee size: {}", other),
         };
         let committee = committee_size.values();
         let threshold_m = committee.threshold;
@@ -76,22 +78,15 @@ impl From<E3RequestedWithChainId> for e3_events::E3Requested {
             }
         };
 
-        e3_events::E3Requested {
+        Ok(e3_events::E3Requested {
             params: ArcBytes::from_bytes(&params_bytes),
             threshold_m,
             threshold_n,
-            seed: value.0.e3.seed.into(),
+            seed: self.0.e3.seed.into(),
             error_size,
             esi_per_ct,
-            e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
-        }
-    }
-}
-
-impl From<E3RequestedWithChainId> for EnclaveEventData {
-    fn from(value: E3RequestedWithChainId) -> Self {
-        let payload: e3_events::E3Requested = value.into();
-        payload.into()
+            e3_id: E3id::new(self.0.e3Id.to_string(), self.1),
+        })
     }
 }
 
@@ -193,9 +188,13 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 error!("Error parsing event E3Requested after topic matched!");
                 return None;
             };
-            Some(EnclaveEventData::from(E3RequestedWithChainId(
-                event, chain_id,
-            )))
+            match E3RequestedWithChainId(event, chain_id).try_into_e3_requested() {
+                Ok(payload) => Some(payload.into()),
+                Err(e) => {
+                    error!("Error processing E3Requested event: {}", e);
+                    None
+                }
+            }
         }
         Some(&IEnclave::CiphertextOutputPublished::SIGNATURE_HASH) => {
             let Ok(event) = IEnclave::CiphertextOutputPublished::decode_log_data(data) else {

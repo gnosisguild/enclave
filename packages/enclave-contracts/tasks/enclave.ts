@@ -23,7 +23,7 @@ export const requestCommittee = task(
   .addOption({
     name: "committeeSize",
     description: "committee size (0=Micro, 1=Small, 2=Medium, 3=Large)",
-    defaultValue: 1,
+    defaultValue: 0,
     type: ArgumentType.INT,
   })
   .addOption({
@@ -75,6 +75,12 @@ export const requestCommittee = task(
       },
       hre,
     ) => {
+      if (![0, 1, 2, 3].includes(committeeSize)) {
+        throw new Error(
+          "Invalid committee size - expected 0 (Micro), 1 (Small), 2 (Medium), or 3 (Large).",
+        );
+      }
+
       const connection = await hre.network.connect();
       const { ethers } = connection;
 
