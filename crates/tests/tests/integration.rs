@@ -894,8 +894,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let c6_proof_count = threshold_n as usize * num_votes_per_voter;
     let c6_fold_steps = c6_proof_count.saturating_sub(1);
     let c6_fold_events = 2 * c6_fold_steps;
-    let expected_count =
-        1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 2 + c6_fold_events + 1;
+    let expected_count = 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 2 + c6_fold_events + 1;
 
     let h = nodes
         .take_history_with_timeouts(
