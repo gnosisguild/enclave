@@ -329,6 +329,18 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         nexte3Id++;
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
+        e3Payments[e3Id] = e3Fee;
+        _e3FeeTokens[e3Id] = feeToken;
+
+        // Initialize E3 Lifecycle
+        _e3Stages[e3Id] = E3Stage.Requested;
+        _e3Requesters[e3Id] = msg.sender;
+
+        // the compute deadline is end of input window + compute window
+        _e3Deadlines[e3Id].computeDeadline =
+            requestParams.inputWindow[1] +
+            _timeoutConfig.computeWindow;
+
         e3.seed = seed;
         e3.committeeSize = requestParams.committeeSize;
         e3.requestBlock = block.number;
@@ -340,6 +352,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.ciphertextOutput = hex"";
         e3.plaintextOutput = hex"";
         e3.requester = msg.sender;
+
+        feeToken.safeTransferFrom(msg.sender, address(this), e3Fee);
 
         bytes32 encryptionSchemeId = requestParams.e3Program.validate(
             e3Id,
@@ -360,28 +374,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         e3.encryptionSchemeId = encryptionSchemeId;
         e3.decryptionVerifier = decryptionVerifier;
-
         e3s[e3Id] = e3;
-        e3Payments[e3Id] = e3Fee;
-
-        feeToken.safeTransferFrom(msg.sender, address(this), e3Fee);
-
-        // Store the fee token used for this E3 (survives global token rotations)
-        _e3FeeTokens[e3Id] = feeToken;
 
         require(
             ciphernodeRegistry.requestCommittee(e3Id, seed, threshold),
             CommitteeSelectionFailed()
         );
-
-        // Initialize E3 lifecycle
-        _e3Stages[e3Id] = E3Stage.Requested;
-        _e3Requesters[e3Id] = msg.sender;
-
-        // the compute deadline is end of input window + compute window
-        _e3Deadlines[e3Id].computeDeadline =
-            e3.inputWindow[1] +
-            _timeoutConfig.computeWindow;
 
         emit E3Requested(e3Id, e3, requestParams.e3Program);
         emit E3StageChanged(e3Id, E3Stage.None, E3Stage.Requested);
