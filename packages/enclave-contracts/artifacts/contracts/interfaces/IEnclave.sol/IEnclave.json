@@ -431,6 +431,76 @@
       "anonymous": false,
       "inputs": [
         {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "keyGenPerNode",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "coordinationPerPair",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "availabilityPerNodePerSec",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "decryptionPerNode",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "publicationBase",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "publicationPerByte",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "protocolTreasury",
+              "type": "address"
+            },
+            {
+              "internalType": "uint16",
+              "name": "marginBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "protocolShareBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint32",
+              "name": "minCommitteeSize",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "minThreshold",
+              "type": "uint32"
+            }
+          ],
+          "indexed": false,
+          "internalType": "struct IEnclave.PricingConfig",
+          "name": "config",
+          "type": "tuple"
+        }
+      ],
+      "name": "PricingConfigUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
           "indexed": true,
           "internalType": "uint256",
           "name": "e3Id",
@@ -846,6 +916,76 @@
           "internalType": "enum IEnclave.FailureReason",
           "name": "reason",
           "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getPricingConfig",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "keyGenPerNode",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "coordinationPerPair",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "availabilityPerNodePerSec",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "decryptionPerNode",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "publicationBase",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "publicationPerByte",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "protocolTreasury",
+              "type": "address"
+            },
+            {
+              "internalType": "uint16",
+              "name": "marginBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "protocolShareBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint32",
+              "name": "minCommitteeSize",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "minThreshold",
+              "type": "uint32"
+            }
+          ],
+          "internalType": "struct IEnclave.PricingConfig",
+          "name": "",
+          "type": "tuple"
         }
       ],
       "stateMutability": "view",
@@ -1282,6 +1422,76 @@
           "components": [
             {
               "internalType": "uint256",
+              "name": "keyGenPerNode",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "coordinationPerPair",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "availabilityPerNodePerSec",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "decryptionPerNode",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "publicationBase",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "publicationPerByte",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "protocolTreasury",
+              "type": "address"
+            },
+            {
+              "internalType": "uint16",
+              "name": "marginBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "protocolShareBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint32",
+              "name": "minCommitteeSize",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "minThreshold",
+              "type": "uint32"
+            }
+          ],
+          "internalType": "struct IEnclave.PricingConfig",
+          "name": "config",
+          "type": "tuple"
+        }
+      ],
+      "name": "setPricingConfig",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
               "name": "dkgWindow",
               "type": "uint256"
             },
@@ -1313,5 +1523,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-dbd94fb7bf5c147a4effe4d89ec8d62bae78112f"
+  "buildInfoId": "solc-0_8_28-75e601a049b1858741992bf4de30d4f4d471421f"
 }
