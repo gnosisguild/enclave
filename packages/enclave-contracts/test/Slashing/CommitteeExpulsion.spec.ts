@@ -822,6 +822,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         owner,
         operator1,
         operator2,
+        operator3,
         setupOperator,
         makeRequest,
         finalizeCommitteeWithOperators,
@@ -829,6 +830,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // Lane B evidence-based policy with no appeal window
       const REASON_EVIDENCE = ethers.keccak256(
@@ -848,17 +850,27 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const SLASHER_ROLE = await slashingManager.SLASHER_ROLE();
       await slashingManager.grantRole(SLASHER_ROLE, await owner.getAddress());
 
-      await makeRequest(0); // Micro: M=1, N=3 — no room for error
-      await finalizeCommitteeWithOperators(0, [operator1, operator2]);
+      await makeRequest(1); // Small: M=2, N=3
+      await finalizeCommitteeWithOperators(0, [operator1, operator2, operator3]);
 
-      // Lane A cannot slash at M active when the accused is excluded from voting.
-      // With M=2, N=2: expelling 1 member needs M=2 non-accused votes, but only
-      // 1 non-accused active voter exists. Lane B (SLASHER_ROLE) is required.
-      // TODO: See GitHub issue — "Lane B governance flow for M-threshold slashing"
+      // Step 1: Lane A slash op1 — still viable (3→2 active, >= M=2)
+      const laneAProof = await signAndEncodeAttestation(
+        [operator2, operator3],
+        0,
+        await operator1.getAddress(),
+      );
+      await slashingManager.proposeSlash(
+        0,
+        await operator1.getAddress(),
+        laneAProof,
+      );
+
+      // Step 2: Lane A cannot slash op2 (only op3 can vote, 1 < M=2).
+      // Lane B (SLASHER_ROLE) is required for the final expulsion.
       const nextProposalId = await slashingManager.totalProposals();
       await slashingManager.proposeSlashEvidence(
         0,
-        await operator1.getAddress(),
+        await operator2.getAddress(),
         REASON_EVIDENCE,
         ethers.toUtf8Bytes("evidence-data"),
       );
@@ -870,6 +882,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await expect(tx).to.emit(enclave, "E3Failed");
 
       // Should emit CommitteeViabilityUpdated(viable=false)
+      // activeCount drops to 1, which is < M=2
       await expect(tx)
         .to.emit(registry, "CommitteeViabilityUpdated")
         .withArgs(0, 1, 2, false);
