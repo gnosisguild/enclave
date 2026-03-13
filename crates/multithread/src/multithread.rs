@@ -67,7 +67,9 @@ use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncrypti
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
-use e3_zk_prover::{generate_fold_proof, generate_wrapper_proof, Provable, ZkBackend, ZkProver};
+use e3_zk_prover::{
+    generate_fold_proof, generate_wrapper_proof, CircuitVariant, Provable, ZkBackend, ZkProver,
+};
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
 use fhe_traits::{DeserializeParametrized, FheEncoder};
@@ -314,11 +316,11 @@ fn handle_pk_aggregation_proof(
         a,
     };
 
-    // 7. Generate proof via Provable trait
+    // 7. Generate proof via Provable trait (C5 is always EVM-targeted for on-chain verification)
     let circuit = PkAggregationCircuit;
     let e3_id_str = request.e3_id.to_string();
     let proof = circuit
-        .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+        .prove_with_variant(prover, &req.params_preset, &circuit_data, &e3_id_str, CircuitVariant::Evm)
         .map_err(|e| {
             ComputeRequestError::new(
                 ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
@@ -1290,7 +1292,7 @@ fn handle_decrypted_shares_aggregation_proof(
             threshold: req.threshold_m as usize,
         };
 
-        // e. Build circuit data and generate proof
+        // e. Build circuit data and generate proof (C7 is always EVM-targeted for on-chain verification)
         let circuit_data = DecryptedSharesAggregationCircuitData {
             committee,
             d_share_polys,
@@ -1301,7 +1303,7 @@ fn handle_decrypted_shares_aggregation_proof(
         let circuit = DecryptedSharesAggregationCircuit;
         let e3_id_str = request.e3_id.to_string();
         let proof = circuit
-            .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+            .prove_with_variant(prover, &req.params_preset, &circuit_data, &e3_id_str, CircuitVariant::Evm)
             .map_err(|e| {
                 ComputeRequestError::new(
                     ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
