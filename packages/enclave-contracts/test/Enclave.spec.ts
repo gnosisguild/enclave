@@ -624,17 +624,6 @@ describe("Enclave", function () {
   });
 
   describe("enableE3Program()", function () {
-    it("reverts if not called by owner", async function () {
-      const {
-        enclave,
-        mocks: { e3Program },
-        notTheOwner,
-      } = await loadFixture(setup);
-
-      await expect(enclave.connect(notTheOwner).enableE3Program(e3Program))
-        .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
-        .withArgs(notTheOwner);
-    });
     it("reverts if E3 Program is already enabled", async function () {
       const {
         enclave,

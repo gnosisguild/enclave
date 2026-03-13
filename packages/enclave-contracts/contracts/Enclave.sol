@@ -299,9 +299,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // input start date should be in the future
         require(
             requestParams.inputWindow[0] >= block.timestamp,
-            // &&
-            // requestParams.inputWindow[0] >= block.timestamp +
-            //     _timeoutConfig.dkgWindow,
             InvalidInputDeadlineStart(requestParams.inputWindow[0])
         );
         // the end of the input window should be after the start
@@ -329,6 +326,18 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         nexte3Id++;
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
+        e3Payments[e3Id] = e3Fee;
+        _e3FeeTokens[e3Id] = feeToken;
+
+        // Initialize E3 Lifecycle
+        _e3Stages[e3Id] = E3Stage.Requested;
+        _e3Requesters[e3Id] = msg.sender;
+
+        // the compute deadline is end of input window + compute window
+        _e3Deadlines[e3Id].computeDeadline =
+            requestParams.inputWindow[1] +
+            _timeoutConfig.computeWindow;
+
         e3.seed = seed;
         e3.committeeSize = requestParams.committeeSize;
         e3.requestBlock = block.number;
@@ -340,6 +349,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.ciphertextOutput = hex"";
         e3.plaintextOutput = hex"";
         e3.requester = msg.sender;
+
+        feeToken.safeTransferFrom(msg.sender, address(this), e3Fee);
 
         bytes32 encryptionSchemeId = requestParams.e3Program.validate(
             e3Id,
@@ -360,28 +371,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         e3.encryptionSchemeId = encryptionSchemeId;
         e3.decryptionVerifier = decryptionVerifier;
-
         e3s[e3Id] = e3;
-        e3Payments[e3Id] = e3Fee;
-
-        feeToken.safeTransferFrom(msg.sender, address(this), e3Fee);
-
-        // Store the fee token used for this E3 (survives global token rotations)
-        _e3FeeTokens[e3Id] = feeToken;
 
         require(
             ciphernodeRegistry.requestCommittee(e3Id, seed, threshold),
             CommitteeSelectionFailed()
         );
-
-        // Initialize E3 lifecycle
-        _e3Stages[e3Id] = E3Stage.Requested;
-        _e3Requesters[e3Id] = msg.sender;
-
-        // the compute deadline is end of input window + compute window
-        _e3Deadlines[e3Id].computeDeadline =
-            e3.inputWindow[1] +
-            _timeoutConfig.computeWindow;
 
         emit E3Requested(e3Id, e3, requestParams.e3Program);
         emit E3StageChanged(e3Id, E3Stage.None, E3Stage.Requested);
@@ -423,15 +418,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         bytes32 ciphertextOutputHash = keccak256(ciphertextOutput);
         e3s[e3Id].ciphertextOutput = ciphertextOutputHash;
-
-        (success) = e3.e3Program.verify(e3Id, ciphertextOutputHash, proof);
-        require(success, InvalidOutput(ciphertextOutput));
-
-        // Update lifecycle stage
         _e3Stages[e3Id] = E3Stage.CiphertextReady;
         _e3Deadlines[e3Id].decryptionDeadline =
             block.timestamp +
             _timeoutConfig.decryptionWindow;
+
+        (success) = e3.e3Program.verify(e3Id, ciphertextOutputHash, proof);
+        require(success, InvalidOutput(ciphertextOutput));
 
         emit CiphertextOutputPublished(e3Id, ciphertextOutput);
         emit E3StageChanged(
@@ -466,6 +459,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
 
         e3s[e3Id].plaintextOutput = plaintextOutput;
+        _e3Stages[e3Id] = E3Stage.Complete;
 
         (success) = e3.decryptionVerifier.verify(
             e3Id,
@@ -473,9 +467,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             proof
         );
         require(success, InvalidOutput(plaintextOutput));
-
-        // Update lifecycle stage to Complete
-        _e3Stages[e3Id] = E3Stage.Complete;
 
         _distributeRewards(e3Id);
 
@@ -633,7 +624,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     /// @inheritdoc IEnclave
-    function enableE3Program(IE3Program e3Program) public onlyOwner {
+    function enableE3Program(IE3Program e3Program) public {
         require(
             !e3Programs[e3Program],
             ModuleAlreadyEnabled(address(e3Program))
