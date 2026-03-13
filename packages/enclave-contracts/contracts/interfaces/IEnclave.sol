@@ -76,6 +76,21 @@ interface IEnclave {
         uint256 decryptionDeadline;
     }
 
+    /// @notice All pricing-related configuration for parametric E3 fee calculation
+    struct PricingConfig {
+        uint256 keyGenPerNode;
+        uint256 coordinationPerPair;
+        uint256 availabilityPerNodePerSec;
+        uint256 decryptionPerNode;
+        uint256 publicationBase;
+        uint256 publicationPerByte;
+        address protocolTreasury;
+        uint16 marginBps;
+        uint16 protocolShareBps;
+        uint32 minCommitteeSize;
+        uint32 minThreshold;
+    }
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                         Events                         //
@@ -220,6 +235,9 @@ interface IEnclave {
         uint32[2] threshold
     );
 
+    /// @notice Emitted when pricing configuration is updated
+    event PricingConfigUpdated(PricingConfig config);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                  Structs                               //
@@ -340,6 +358,10 @@ interface IEnclave {
     /// @param _e3ProgramsParams Array of ABI encoded parameter sets to remove.
     function removeE3ProgramsParams(bytes[] memory _e3ProgramsParams) external;
 
+    /// @notice Sets the full pricing configuration.
+    /// @param config The new pricing configuration.
+    function setPricingConfig(PricingConfig calldata config) external;
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Get Functions                        //
@@ -359,6 +381,9 @@ interface IEnclave {
     function getE3Quote(
         E3RequestParams calldata e3Params
     ) external view returns (uint256 fee);
+
+    /// @notice Returns the full pricing configuration.
+    function getPricingConfig() external view returns (PricingConfig memory);
 
     /// @notice Returns the decryption verifier for a given encryption scheme.
     /// @param encryptionSchemeId The unique identifier for the encryption scheme.

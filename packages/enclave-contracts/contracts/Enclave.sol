@@ -104,6 +104,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice Global timeout configuration
     E3TimeoutConfig internal _timeoutConfig;
 
+    /// @notice All pricing-related configuration
+    PricingConfig internal _pricingConfig;
+
+    /// @notice Basis points denominator
+    uint16 internal constant BPS_BASE = 10000;
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                        Errors                          //
@@ -274,6 +280,22 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         setFeeToken(_feeToken);
         _setTimeoutConfig(config);
         setE3ProgramsParams(_e3ProgramsParams);
+
+        // Set default pricing parameters
+        _pricingConfig = PricingConfig({
+            keyGenPerNode: 100000, // 0.10 USDC
+            coordinationPerPair: 5000, // 0.005 USDC
+            availabilityPerNodePerSec: 20, // 0.00002 USDC
+            decryptionPerNode: 150000, // 0.15 USDC
+            publicationBase: 500000, // 0.50 USDC
+            publicationPerByte: 10, // 0.00001 USDC
+            protocolTreasury: address(0),
+            marginBps: 1000, // 10%
+            protocolShareBps: 0,
+            minCommitteeSize: 0,
+            minThreshold: 0
+        });
+
         if (_owner != owner()) transferOwnership(_owner);
     }
 
@@ -530,19 +552,34 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         uint256[] memory amounts = new uint256[](activeLength);
 
-        // Distribute equally among active (non-expelled) committee members
-        uint256 amount = totalAmount / activeLength;
+        // Split between protocol treasury and CN rewards
+        uint256 protocolAmount = 0;
+        uint16 _protocolShareBps = _pricingConfig.protocolShareBps;
+        address _protocolTreasury = _pricingConfig.protocolTreasury;
+        if (_protocolShareBps > 0 && _protocolTreasury != address(0)) {
+            protocolAmount =
+                (totalAmount * uint256(_protocolShareBps)) /
+                uint256(BPS_BASE);
+            if (protocolAmount > 0) {
+                paymentToken.safeTransfer(_protocolTreasury, protocolAmount);
+            }
+        }
+
+        uint256 cnAmount = totalAmount - protocolAmount;
+
+        // Distribute CN share equally among active (non-expelled) committee members
+        uint256 amount = cnAmount / activeLength;
         uint256 distributed = 0;
         for (uint256 i = 0; i < activeLength; i++) {
             amounts[i] = amount;
             distributed += amount;
         }
-        uint256 dust = totalAmount - distributed;
+        uint256 dust = cnAmount - distributed;
         if (dust > 0) {
             amounts[activeLength - 1] += dust;
         }
 
-        paymentToken.forceApprove(address(bondingRegistry), totalAmount);
+        paymentToken.forceApprove(address(bondingRegistry), cnAmount);
 
         bondingRegistry.distributeRewards(paymentToken, activeNodes, amounts);
 
@@ -989,8 +1026,31 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             threshold[1] >= threshold[0] && threshold[0] > 0,
             "Invalid threshold"
         );
+        // Enforce minimum committee bounds if configured
+        PricingConfig memory pc = _pricingConfig;
+        if (pc.minCommitteeSize > 0) {
+            require(
+                threshold[1] >= pc.minCommitteeSize,
+                "Below min committee size"
+            );
+        }
+        if (pc.minThreshold > 0) {
+            require(threshold[0] >= pc.minThreshold, "Below min threshold");
+        }
         committeeThresholds[size] = threshold;
         emit CommitteeThresholdsUpdated(size, threshold);
+    }
+
+    /// @inheritdoc IEnclave
+    function setPricingConfig(PricingConfig calldata config) public onlyOwner {
+        require(config.marginBps <= BPS_BASE, "Margin exceeds 100%");
+        require(config.protocolShareBps <= BPS_BASE, "Share exceeds 100%");
+        require(
+            config.minCommitteeSize >= config.minThreshold,
+            "Min size must be >= min threshold"
+        );
+        _pricingConfig = config;
+        emit PricingConfigUpdated(config);
     }
 
     ////////////////////////////////////////////////////////////
@@ -1007,10 +1067,51 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @inheritdoc IEnclave
     function getE3Quote(
-        E3RequestParams calldata
-    ) public pure returns (uint256 fee) {
-        fee = 1 * 10 ** 6;
+        E3RequestParams calldata requestParams
+    ) public view returns (uint256 fee) {
+        uint32[2] memory threshold = committeeThresholds[
+            requestParams.committeeSize
+        ];
+        uint256 n = uint256(threshold[1]); // total committee size
+        uint256 m = uint256(threshold[0]); // quorum/decryption threshold
+
+        PricingConfig memory pc = _pricingConfig;
+
+        // Duration covers the full availability period
+        uint256 duration = requestParams.inputWindow[1] -
+            requestParams.inputWindow[0] +
+            _timeoutConfig.dkgWindow +
+            _timeoutConfig.computeWindow +
+            _timeoutConfig.decryptionWindow;
+
+        // Key generation cost (linear in n)
+        uint256 baseFee = pc.keyGenPerNode * n;
+        // Key generation coordination cost (quadratic in n)
+        if (n > 1) {
+            baseFee += (pc.coordinationPerPair * (n * (n - 1))) / 2;
+        }
+        // Availability cost (linear in n * duration)
+        baseFee += pc.availabilityPerNodePerSec * n * duration;
+        // Decryption cost (linear in m)
+        baseFee += pc.decryptionPerNode * m;
+        // Decryption coordination cost (quadratic in m)
+        if (m > 1) {
+            baseFee += (pc.coordinationPerPair * (m * (m - 1))) / 2;
+        }
+        // Publication base cost
+        baseFee += pc.publicationBase;
+
+        // Apply margin markup
+        fee =
+            (baseFee * (uint256(BPS_BASE) + uint256(pc.marginBps))) /
+            uint256(BPS_BASE);
+
         require(fee > 0, PaymentRequired(fee));
+    }
+
+    /// @inheritdoc IEnclave
+    function getPricingConfig() external view returns (PricingConfig memory) {
+        return _pricingConfig;
     }
 
     /// @inheritdoc IEnclave

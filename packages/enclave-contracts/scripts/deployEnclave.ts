@@ -218,6 +218,23 @@ export const deployEnclave = async (withMocks?: boolean) => {
   // Medium and Large can be set later as needed
   console.log("Committee thresholds set (Micro=[1,3], Small=[2,5])");
 
+  // Set pricing config with protocol treasury
+  console.log("Setting pricing config...");
+  await enclave.setPricingConfig({
+    keyGenPerNode: 100000, // 0.10 USDC
+    coordinationPerPair: 5000, // 0.005 USDC
+    availabilityPerNodePerSec: 20, // 0.00002 USDC
+    decryptionPerNode: 150000, // 0.15 USDC
+    publicationBase: 500000, // 0.50 USDC
+    publicationPerByte: 10, // 0.00001 USDC
+    protocolTreasury: ownerAddress,
+    marginBps: 1000, // 10%
+    protocolShareBps: 2000, // 20%
+    minCommitteeSize: 0,
+    minThreshold: 0,
+  });
+  console.log("Pricing config set (treasury:", ownerAddress, ")");
+
   if (shouldDeployMocks) {
     const { decryptionVerifierAddress, e3ProgramAddress } = await deployMocks();
 
