@@ -320,7 +320,13 @@ fn handle_pk_aggregation_proof(
     let circuit = PkAggregationCircuit;
     let e3_id_str = request.e3_id.to_string();
     let proof = circuit
-        .prove_with_variant(prover, &req.params_preset, &circuit_data, &e3_id_str, CircuitVariant::Evm)
+        .prove_with_variant(
+            prover,
+            &req.params_preset,
+            &circuit_data,
+            &e3_id_str,
+            CircuitVariant::Evm,
+        )
         .map_err(|e| {
             ComputeRequestError::new(
                 ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
@@ -1303,7 +1309,13 @@ fn handle_decrypted_shares_aggregation_proof(
         let circuit = DecryptedSharesAggregationCircuit;
         let e3_id_str = request.e3_id.to_string();
         let proof = circuit
-            .prove_with_variant(prover, &req.params_preset, &circuit_data, &e3_id_str, CircuitVariant::Evm)
+            .prove_with_variant(
+                prover,
+                &req.params_preset,
+                &circuit_data,
+                &e3_id_str,
+                CircuitVariant::Evm,
+            )
             .map_err(|e| {
                 ComputeRequestError::new(
                     ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
