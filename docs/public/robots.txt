@@ -1,0 +1,5 @@
+User-agent: *
+Content-Signal: search=yes,ai-train=no
+Allow: /
+
+Sitemap: https://docs.theinterfold.com/sitemap.xml
