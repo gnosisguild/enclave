@@ -65,7 +65,7 @@ strip_ansi() {
 
 waiton() {
     local file_path="$1"
-    local timeout="${2:-1200}"  # default ~20 minutes
+    local timeout="${2:-1300}"  # default ~22 minutes
     local start_time=$(date +%s)
     until [ -f "$file_path" ]; do
         if [ $(($(date +%s) - start_time)) -ge $timeout ]; then
@@ -77,7 +77,7 @@ waiton() {
 }
 
 waiton-files() {
-  local timeout=1200  # ~20 minutes timeout
+  local timeout=1300  # ~22 minutes timeout
   local start_time=$(date +%s)
   while true; do
     all_exist=true
