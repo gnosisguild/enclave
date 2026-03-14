@@ -7,7 +7,7 @@
 use anyhow::*;
 use clap::Subcommand;
 use e3_config::AppConfig;
-use e3_console::Out;
+use e3_console::Console;
 use zeroize::Zeroizing;
 
 use crate::{helpers::parse_zeroizing, password_delete, password_set};
@@ -25,7 +25,7 @@ pub enum PasswordCommands {
     Delete,
 }
 
-pub async fn execute(out: Out, command: PasswordCommands, config: &AppConfig) -> Result<()> {
+pub async fn execute(out: Console, command: PasswordCommands, config: &AppConfig) -> Result<()> {
     match command {
         PasswordCommands::Set { password } => password_set::execute(out, &config, password).await?,
         PasswordCommands::Delete => password_delete::execute(&out, &config).await?,

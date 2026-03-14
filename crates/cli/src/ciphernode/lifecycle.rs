@@ -6,12 +6,12 @@
 
 use alloy::primitives::U256;
 use anyhow::{bail, Result};
-use e3_console::Out;
+use e3_console::Console;
 
 use super::context::ChainContext;
 use super::utils::{format_amount, parse_amount};
 
-pub(crate) async fn register(out: Out, ctx: &ChainContext) -> Result<()> {
+pub(crate) async fn register(out: Console, ctx: &ChainContext) -> Result<()> {
     let receipt = ctx
         .bonding()
         .registerOperator()
@@ -28,7 +28,7 @@ pub(crate) async fn register(out: Out, ctx: &ChainContext) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn deregister(out: Out, ctx: &ChainContext) -> Result<()> {
+pub(crate) async fn deregister(out: Console, ctx: &ChainContext) -> Result<()> {
     let receipt = ctx
         .bonding()
         .deregisterOperator()
@@ -44,12 +44,12 @@ pub(crate) async fn deregister(out: Out, ctx: &ChainContext) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn activate(out: Out, ctx: &ChainContext) -> Result<()> {
+pub(crate) async fn activate(out: Console, ctx: &ChainContext) -> Result<()> {
     register(out, ctx).await
 }
 
 pub(crate) async fn deactivate(
-    out: Out,
+    out: Console,
     ctx: &ChainContext,
     ticket_amount: Option<String>,
     license_amount: Option<String>,
@@ -105,7 +105,7 @@ pub(crate) async fn deactivate(
     Ok(())
 }
 
-pub(crate) async fn status(out: Out, ctx: &ChainContext) -> Result<()> {
+pub(crate) async fn status(out: Console, ctx: &ChainContext) -> Result<()> {
     let contract = ctx.bonding();
     let operator = ctx.operator();
     let ticket_balance: U256 = contract.getTicketBalance(operator).call().await?;

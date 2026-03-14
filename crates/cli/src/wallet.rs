@@ -7,7 +7,7 @@
 use anyhow::*;
 use clap::Subcommand;
 use e3_config::AppConfig;
-use e3_console::Out;
+use e3_console::Console;
 use zeroize::Zeroizing;
 
 use crate::{helpers::ensure_hex_zeroizing, wallet_get, wallet_set};
@@ -25,7 +25,7 @@ pub enum WalletCommands {
     Get,
 }
 
-pub async fn execute(out: Out, command: WalletCommands, config: AppConfig) -> Result<()> {
+pub async fn execute(out: Console, command: WalletCommands, config: AppConfig) -> Result<()> {
     match command {
         WalletCommands::Set { private_key } => {
             wallet_set::execute(out, &config, private_key).await?

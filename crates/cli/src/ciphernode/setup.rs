@@ -8,7 +8,7 @@ use alloy::primitives::Address;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input};
 use e3_config::AppConfig;
-use e3_console::Out;
+use e3_console::Console;
 use e3_entrypoint::config::setup;
 use e3_utils::{colorize, Color};
 use std::path::PathBuf;
@@ -20,7 +20,7 @@ use crate::wallet_set::ask_for_private_key;
 
 #[instrument(name = "app", skip_all)]
 pub async fn execute(
-    out: Out,
+    out: Console,
     rpc_url: Option<String>,
     password: Option<Zeroizing<String>>,
     private_key: Option<Zeroizing<String>>,
@@ -71,7 +71,7 @@ pub async fn execute(
 }
 
 fn print_info(
-    out: Out,
+    out: Console,
     config: &AppConfig,
     address: Address,
     peer_id: &str,

@@ -1,11 +1,11 @@
 use tokio::sync::mpsc;
 
 #[derive(Clone)]
-pub struct Out {
+pub struct Console {
     tx: mpsc::UnboundedSender<String>,
 }
 
-impl Out {
+impl Console {
     /// Output goes to stdout.
     pub fn stdout() -> Self {
         let (tx, mut rx) = mpsc::unbounded_channel();

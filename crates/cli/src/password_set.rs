@@ -6,7 +6,7 @@
 
 use anyhow::{bail, Result};
 use e3_config::AppConfig;
-use e3_console::Out;
+use e3_console::Console;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::helpers::prompt_password::prompt_password;
@@ -44,7 +44,11 @@ pub fn ask_for_password(input: Option<Zeroizing<String>>) -> Result<Zeroizing<St
     Ok(trimmed)
 }
 
-pub async fn execute(out: Out, config: &AppConfig, input: Option<Zeroizing<String>>) -> Result<()> {
+pub async fn execute(
+    out: Console,
+    config: &AppConfig,
+    input: Option<Zeroizing<String>>,
+) -> Result<()> {
     e3_console::log!(out, "Setting password...");
     e3_entrypoint::password::set::preflight(config).await?;
 

@@ -6,13 +6,17 @@
 
 use alloy::primitives::U256;
 use anyhow::Result;
-use e3_console::Out;
+use e3_console::Console;
 
 use super::context::ChainContext;
 use super::utils::{ensure_allowance, parse_amount};
 use super::LicenseCommands;
 
-pub(crate) async fn execute(out: Out, ctx: &ChainContext, command: LicenseCommands) -> Result<()> {
+pub(crate) async fn execute(
+    out: Console,
+    ctx: &ChainContext,
+    command: LicenseCommands,
+) -> Result<()> {
     match command {
         LicenseCommands::Bond { amount } => {
             bond_license(out, ctx, &amount).await?;
@@ -74,7 +78,7 @@ pub(crate) async fn execute(out: Out, ctx: &ChainContext, command: LicenseComman
     Ok(())
 }
 
-async fn bond_license(out: Out, ctx: &ChainContext, amount: &str) -> Result<()> {
+async fn bond_license(out: Console, ctx: &ChainContext, amount: &str) -> Result<()> {
     let license = ctx.license_token_address().await?;
     let erc20 = ctx.erc20(license);
     let decimals = erc20.decimals().call().await?;
