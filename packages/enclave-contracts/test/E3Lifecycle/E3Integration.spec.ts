@@ -314,6 +314,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await decryptionVerifier.getAddress(),
     );
 
+    // Set up committee thresholds
+    await enclave.setCommitteeThresholds(0, [1, 3]); // Micro
+
     await bondingRegistry.setRewardDistributor(enclaveAddress);
     await bondingRegistry.setSlashingManager(
       await slashingManager.getAddress(),
@@ -352,12 +355,12 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     // ── Helpers ────────────────────────────────────────────────────────────────
     const makeRequest = async (
       signer: Signer = requester,
-      threshold: [number, number] = [2, 2],
+      committeeSize: number = 0,
     ): Promise<{ e3Id: number }> => {
       const startTime = (await time.latest()) + 100;
 
       const requestParams = {
-        threshold,
+        committeeSize,
         inputWindow: [startTime + 100, startTime + ONE_DAY] as [number, number],
         e3Program: await e3Program.getAddress(),
         e3ProgramParams: encodedE3ProgramParams,
@@ -437,11 +440,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         requester,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       await makeRequest();
 
@@ -463,11 +468,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         makeRequest,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // Make a request first
       await makeRequest();
@@ -479,6 +486,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       // Submit tickets for sortition
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
 
       // Fast forward past submission window
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
@@ -490,6 +498,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const nodes = [
         await operator1.getAddress(),
         await operator2.getAddress(),
+        await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const publicKeyHash = ethers.keccak256(publicKey);
@@ -512,11 +521,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         makeRequest,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // Make a request
       await makeRequest();
@@ -524,6 +535,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       // Complete sortition process
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
@@ -531,6 +543,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const nodes = [
         await operator1.getAddress(),
         await operator2.getAddress(),
+        await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const publicKeyHash = ethers.keccak256(publicKey);
@@ -551,11 +564,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         makeRequest,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       await makeRequest();
 
@@ -584,11 +599,18 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     });
 
     it("reverts if E3 not in failed state", async function () {
-      const { enclave, makeRequest, operator1, operator2, setupOperator } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        makeRequest,
+        operator1,
+        operator2,
+        operator3,
+        setupOperator,
+      } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       await makeRequest();
 
@@ -605,11 +627,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         makeRequest,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       await makeRequest();
 
@@ -642,11 +666,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         usdcToken,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       await makeRequest();
 
@@ -670,11 +696,18 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     });
 
     it("reverts if trying to process failure twice", async function () {
-      const { enclave, makeRequest, operator1, operator2, setupOperator } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        makeRequest,
+        operator1,
+        operator2,
+        operator3,
+        setupOperator,
+      } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       await makeRequest();
 
@@ -696,11 +729,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         requester,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       await makeRequest();
 
@@ -724,11 +759,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         requester,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       await makeRequest();
 
@@ -762,7 +799,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await setupOperator(operator3);
 
       // 1. Request E3, form committee, publish key
-      await makeRequest(requester, [2, 3]);
+      await makeRequest(requester, 0);
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
       await registry.connect(operator3).submitTicket(0, 1);
@@ -867,7 +904,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await setupOperator(operator3);
 
       // 1. Request E3, form committee, publish key
-      await makeRequest(undefined, [2, 3]);
+      await makeRequest(undefined, 0);
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
       await registry.connect(operator3).submitTicket(0, 1);
@@ -935,11 +972,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         owner,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       await makeRequest();
 
@@ -984,11 +1023,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         owner,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       await makeRequest();
 
@@ -1035,11 +1076,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         requester,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // 1. Make request
       await makeRequest();
@@ -1049,6 +1092,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       // 2. Complete sortition (committee finalized, DKG starts)
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
@@ -1099,11 +1143,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         requester,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // 1. Make request
       await makeRequest();
@@ -1113,12 +1159,14 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       // 2. Complete sortition and DKG
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
       const nodes = [
         await operator1.getAddress(),
         await operator2.getAddress(),
+        await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const publicKeyHash = ethers.keccak256(publicKey);
@@ -1174,11 +1222,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         requester,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // 1. Make request
       await makeRequest();
@@ -1188,12 +1238,14 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       // 2. Complete sortition and DKG
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
       const nodes = [
         await operator1.getAddress(),
         await operator2.getAddress(),
+        await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const publicKeyHash = ethers.keccak256(publicKey);
@@ -1256,11 +1308,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         decryptionVerifier,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       const enclaveAddress = await enclave.getAddress();
 
@@ -1268,7 +1322,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const makeRequestN = async (n: number) => {
         const startTime = (await time.latest()) + 100;
         const requestParams = {
-          threshold: [2, 2] as [number, number],
+          committeeSize: 0,
           inputWindow: [startTime, startTime + ONE_DAY] as [number, number],
           e3Program: await e3Program.getAddress(),
           e3ProgramParams: encodedE3ProgramParams,
@@ -1336,11 +1390,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         decryptionVerifier,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       const enclaveAddress = await enclave.getAddress();
 
@@ -1348,7 +1404,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       for (let i = 0; i < 2; i++) {
         const startTime = (await time.latest()) + 100;
         const requestParams = {
-          threshold: [2, 2] as [number, number],
+          committeeSize: 0,
           inputWindow: [startTime, startTime + ONE_DAY] as [number, number],
           e3Program: await e3Program.getAddress(),
           e3ProgramParams: encodedE3ProgramParams,
@@ -1421,7 +1477,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await setupOperator(operator3);
 
       // 1. Request E3, form committee, publish key
-      await makeRequest(undefined, [2, 3]);
+      await makeRequest(undefined, 0);
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
       await registry.connect(operator3).submitTicket(0, 1);
@@ -1538,11 +1594,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         makeRequest,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // 1. Make request
       await makeRequest();
@@ -1551,6 +1609,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       // 2. Complete sortition and publish committee (CommitteeFinalized -> KeyPublished)
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
@@ -1559,6 +1618,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const nodes = [
         await operator1.getAddress(),
         await operator2.getAddress(),
+        await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const publicKeyHash = ethers.keccak256(publicKey);
@@ -1596,11 +1656,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         requester,
         operator1,
         operator2,
+        operator3,
         setupOperator,
       } = await loadFixture(setup);
 
       await setupOperator(operator1);
       await setupOperator(operator2);
+      await setupOperator(operator3);
 
       // Complete full E3 flow
       await makeRequest();
@@ -1608,12 +1670,14 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       // Complete sortition
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
       const nodes = [
         await operator1.getAddress(),
         await operator2.getAddress(),
+        await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const publicKeyHash = ethers.keccak256(publicKey);

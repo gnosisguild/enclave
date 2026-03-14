@@ -364,7 +364,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
                 request_block,
                 seed,
                 input_window,
-                threshold: e3.threshold,
+                committee_size: e3.committeeSize,
                 requester: e3.requester.to_string(),
             };
 

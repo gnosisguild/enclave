@@ -27,16 +27,8 @@ pk (CIRCUIT 0)
 pub global PK_BIT_PK: u32 = 50;
 
 pub global PARITY_MATRIX: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L_THRESHOLD] = [
-    [
-        [68719403008, 3, 68719403006, 1, 0, 0],
-        [68719403006, 8, 68719403003, 0, 1, 0],
-        [68719403003, 15, 68719402999, 0, 0, 1],
-    ],
-    [
-        [68719230976, 3, 68719230974, 1, 0, 0],
-        [68719230974, 8, 68719230971, 0, 1, 0],
-        [68719230971, 15, 68719230967, 0, 0, 1],
-    ],
+    [[1, 68719403007, 1, 0], [2, 68719403006, 0, 1]],
+    [[1, 68719230975, 1, 0], [2, 68719230974, 0, 1]],
 ];
 
 /************************************
@@ -60,7 +52,7 @@ share_computation_e_sm (CIRCUIT 2b)
 ************************************/
 
 // share_computation_e_sm - bit parameters
-pub global SHARE_COMPUTATION_E_SM_BIT_SECRET: u32 = 24;
+pub global SHARE_COMPUTATION_E_SM_BIT_SECRET: u32 = 23;
 
 // verify_shares - configs
 pub global SHARE_COMPUTATION_E_SM_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =

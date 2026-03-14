@@ -102,19 +102,31 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             .join("circuits")
             .join("bin");
 
-        // Copy C0 (pk) circuit
-        let pk_circuit_dir = circuits_dir.join("dkg").join("pk");
+        // Copy circuit artifacts under the "recursive" variant subdirectory,
+        // because prove() defaults to CircuitVariant::Recursive.
+        //
+        // The build system (build-circuits.ts) generates three VK flavors per circuit:
+        //   - {name}.vk          → evm verifier target (for on-chain verification)
+        //   - {name}.vk_recursive → noir-recursive-no-zk target (Default variant)
+        //   - {name}.vk_noir      → noir-recursive target (Recursive variant)
+        //
+        // Each variant directory stores its VK as just ".vk", so for the recursive/
+        // directory we must copy .vk_noir as .vk (matching what the build system does).
+        let recursive_dir = circuits_dir.join("recursive");
+
+        // Copy T0 (pk) circuit
+        let pk_circuit_dir = recursive_dir.join("dkg").join("pk");
         tokio::fs::create_dir_all(&pk_circuit_dir).await.unwrap();
         let dkg_target = circuits_build_root.join("dkg").join("target");
         tokio::fs::copy(dkg_target.join("pk.json"), pk_circuit_dir.join("pk.json"))
             .await
             .unwrap();
-        tokio::fs::copy(dkg_target.join("pk.vk"), pk_circuit_dir.join("pk.vk"))
+        tokio::fs::copy(dkg_target.join("pk.vk_noir"), pk_circuit_dir.join("pk.vk"))
             .await
             .unwrap();
 
         // Copy C1 (pk_generation) circuit
-        let pk_gen_circuit_dir = circuits_dir.join("threshold").join("pk_generation");
+        let pk_gen_circuit_dir = recursive_dir.join("threshold").join("pk_generation");
         tokio::fs::create_dir_all(&pk_gen_circuit_dir)
             .await
             .unwrap();
@@ -126,14 +138,14 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
         tokio::fs::copy(
-            threshold_target.join("pk_generation.vk"),
+            threshold_target.join("pk_generation.vk_noir"),
             pk_gen_circuit_dir.join("pk_generation.vk"),
         )
         .await
         .unwrap();
 
         // Copy C2a (sk_share_computation) circuit
-        let sk_share_comp_circuit_dir = circuits_dir.join("dkg").join("sk_share_computation");
+        let sk_share_comp_circuit_dir = recursive_dir.join("dkg").join("sk_share_computation");
         tokio::fs::create_dir_all(&sk_share_comp_circuit_dir)
             .await
             .unwrap();
@@ -144,14 +156,14 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
         tokio::fs::copy(
-            dkg_target.join("sk_share_computation.vk"),
+            dkg_target.join("sk_share_computation.vk_noir"),
             sk_share_comp_circuit_dir.join("sk_share_computation.vk"),
         )
         .await
         .unwrap();
 
         // Copy C2b (e_sm_share_computation) circuit
-        let e_sm_share_comp_circuit_dir = circuits_dir.join("dkg").join("e_sm_share_computation");
+        let e_sm_share_comp_circuit_dir = recursive_dir.join("dkg").join("e_sm_share_computation");
         tokio::fs::create_dir_all(&e_sm_share_comp_circuit_dir)
             .await
             .unwrap();
@@ -162,14 +174,14 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
         tokio::fs::copy(
-            dkg_target.join("e_sm_share_computation.vk"),
+            dkg_target.join("e_sm_share_computation.vk_noir"),
             e_sm_share_comp_circuit_dir.join("e_sm_share_computation.vk"),
         )
         .await
         .unwrap();
 
         // Copy C3 (share_encryption) circuit — single circuit used for both SK and E_SM
-        let share_enc_circuit_dir = circuits_dir.join("dkg").join("share_encryption");
+        let share_enc_circuit_dir = recursive_dir.join("dkg").join("share_encryption");
         tokio::fs::create_dir_all(&share_enc_circuit_dir)
             .await
             .unwrap();
@@ -180,14 +192,14 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
         tokio::fs::copy(
-            dkg_target.join("share_encryption.vk"),
+            dkg_target.join("share_encryption.vk_noir"),
             share_enc_circuit_dir.join("share_encryption.vk"),
         )
         .await
         .unwrap();
 
         // Copy C4 (share_decryption) circuit — used for DKG share decryption proofs (Exchange #3)
-        let share_dec_circuit_dir = circuits_dir.join("dkg").join("share_decryption");
+        let share_dec_circuit_dir = recursive_dir.join("dkg").join("share_decryption");
         tokio::fs::create_dir_all(&share_dec_circuit_dir)
             .await
             .unwrap();
@@ -198,14 +210,14 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
         tokio::fs::copy(
-            dkg_target.join("share_decryption.vk"),
+            dkg_target.join("share_decryption.vk_noir"),
             share_dec_circuit_dir.join("share_decryption.vk"),
         )
         .await
         .unwrap();
 
         // Copy C5 (pk_aggregation) circuit
-        let pk_agg_circuit_dir = circuits_dir.join("threshold").join("pk_aggregation");
+        let pk_agg_circuit_dir = recursive_dir.join("threshold").join("pk_aggregation");
         tokio::fs::create_dir_all(&pk_agg_circuit_dir)
             .await
             .unwrap();
@@ -216,7 +228,7 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
         tokio::fs::copy(
-            threshold_target.join("pk_aggregation.vk"),
+            threshold_target.join("pk_aggregation.vk_noir"),
             pk_agg_circuit_dir.join("pk_aggregation.vk"),
         )
         .await
@@ -224,7 +236,7 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
 
         // Copy C6 (threshold/share_decryption) circuit for C6 verification
         let threshold_share_dec_circuit_dir =
-            circuits_dir.join("threshold").join("share_decryption");
+            recursive_dir.join("threshold").join("share_decryption");
         tokio::fs::create_dir_all(&threshold_share_dec_circuit_dir)
             .await
             .unwrap();
@@ -235,14 +247,14 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
         tokio::fs::copy(
-            threshold_target.join("share_decryption.vk"),
+            threshold_target.join("share_decryption.vk_noir"),
             threshold_share_dec_circuit_dir.join("share_decryption.vk"),
         )
         .await
         .unwrap();
 
         // Copy C7 (decrypted_shares_aggregation_mod) circuit
-        let dsa_circuit_dir = circuits_dir
+        let dsa_circuit_dir = recursive_dir
             .join("threshold")
             .join("decrypted_shares_aggregation_mod");
         tokio::fs::create_dir_all(&dsa_circuit_dir).await.unwrap();
@@ -253,7 +265,7 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
         tokio::fs::copy(
-            threshold_target.join("decrypted_shares_aggregation_mod.vk"),
+            threshold_target.join("decrypted_shares_aggregation_mod.vk_noir"),
             dsa_circuit_dir.join("decrypted_shares_aggregation_mod.vk"),
         )
         .await
@@ -457,7 +469,7 @@ async fn test_trbfv_actor() -> Result<()> {
     //   - E3Router
     //   - ThresholdKeyshare
     //   - Multithread actor
-    //   - 7 nodes (so as to check for some nodes not getting selected)
+    //   - 20 nodes (so as to check for some nodes not getting selected)
     //   - Loopback libp2p simulation
     ///////////////////////////////////////////////////////////////////////////////////
 
@@ -477,8 +489,8 @@ async fn test_trbfv_actor() -> Result<()> {
     let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));
 
     // round information
-    let threshold_m = 2;
-    let threshold_n = 5;
+    let threshold_m = 1;
+    let threshold_n = 3;
     let esi_per_ct = 1;
 
     // WARNING: INSECURE SECURITY PARAMETER LAMBDA.
@@ -509,7 +521,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let (zk_backend, _zk_temp) = setup_test_zk_backend().await;
 
     let nodes = CiphernodeSystemBuilder::new()
-        // Adding 20 total nodes: 5 for committee + 4 buffer = 9 selected, 11 unselected
+        // Adding 20 total nodes: 3 for committee + 3 buffer = 6 selected, 14 unselected
         .add_group(1, || async {
             let addr = rand_eth_addr(&rng);
             println!("Building collector {}!", addr);
@@ -583,8 +595,8 @@ async fn test_trbfv_actor() -> Result<()> {
     ///////////////////////////////////////////////////////////////////////////////////
     // 2. Trigger E3Requested
     //
-    //   - m=2.
-    //   - n=5
+    //   - m=1.
+    //   - n=3
     //   - lambda=2
     //   - error_size -> calculate using calculate_error_size
     //   - esi_per_ciphertext = 1
@@ -642,11 +654,11 @@ async fn test_trbfv_actor() -> Result<()> {
     ));
 
     // Wait for KeyshareCreated + C1 verification + C5 proof + PublicKeyAggregated
-    // - KeyshareCreated × 5 (forwarded from committee nodes)
+    // - KeyshareCreated × 3 (forwarded from committee nodes)
     // - ShareVerificationDispatched (C1 proof verification dispatched by PublicKeyAggregator)
     // - ComputeRequest (C1 ZK verification)
     // - ComputeResponse (C1 ZK verification result)
-    // - ProofVerificationPassed × 5 (one per party's C1 proof)
+    // - ProofVerificationPassed × 3 (one per party's C1 proof)
     // - ShareVerificationComplete (C1 verification done)
     // - PkAggregationProofPending (C5 proof requested by PublicKeyAggregator)
     // - ComputeRequest (C5 proof generation)
@@ -660,13 +672,9 @@ async fn test_trbfv_actor() -> Result<()> {
                 "KeyshareCreated",
                 "KeyshareCreated",
                 "KeyshareCreated",
-                "KeyshareCreated",
-                "KeyshareCreated",
                 "ShareVerificationDispatched",
                 "ComputeRequest",
                 "ComputeResponse",
-                "ProofVerificationPassed",
-                "ProofVerificationPassed",
                 "ProofVerificationPassed",
                 "ProofVerificationPassed",
                 "ProofVerificationPassed",
@@ -751,11 +759,11 @@ async fn test_trbfv_actor() -> Result<()> {
     // Lets grab decryption share events
     // The collector sees:
     // - 1 CiphertextOutputPublished (from shared bus)
-    // - 5 DecryptionshareCreated (from simulate_libp2p, passes is_forwardable_event)
+    // - 3 DecryptionshareCreated (from simulate_libp2p, passes is_forwardable_event)
     // - 1 ShareVerificationDispatched (C6 verification dispatched by ThresholdPlaintextAggregator)
     // - 1 ComputeRequest (C6 ZK verification)
     // - 1 ComputeResponse (C6 ZK verification result)
-    // - 15 ProofVerificationPassed (5 parties × 3 C6 proofs per ciphertext)
+    // - 9 ProofVerificationPassed (3 parties × 3 C6 proofs per ciphertext)
     // - 1 ShareVerificationComplete (C6 verification done)
     // - 1 ComputeRequest (TrBFV CalculateThresholdDecryption)
     // - 1 ComputeResponse (TrBFV CalculateThresholdDecryption)
@@ -766,8 +774,8 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 PlaintextAggregated (with C7 proofs)
     // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
     // stay on their local buses.
-    // Total: 1 + 5 + 1 + 2 + 15 + 1 + 2 + 1 + 2 + 1 + 1 = 32 events
-    let expected_count = 1 + 5 + 1 + 2 + 15 + 1 + 2 + 1 + 2 + 1 + 1;
+    // Total: 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 1 = 24 events
+    let expected_count = 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 1;
 
     let h = nodes
         .take_history_with_timeouts(

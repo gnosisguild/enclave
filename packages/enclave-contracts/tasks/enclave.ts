@@ -21,15 +21,9 @@ export const requestCommittee = task(
     type: ArgumentType.STRING,
   })
   .addOption({
-    name: "thresholdQuorum",
-    description: "threshold quorum for committee",
-    defaultValue: 2,
-    type: ArgumentType.INT,
-  })
-  .addOption({
-    name: "thresholdTotal",
-    description: "threshold total for committee",
-    defaultValue: 2,
+    name: "committeeSize",
+    description: "committee size (0=Micro, 1=Small, 2=Medium, 3=Large)",
+    defaultValue: 0,
     type: ArgumentType.INT,
   })
   .addOption({
@@ -71,8 +65,7 @@ export const requestCommittee = task(
   .setAction(async () => ({
     default: async (
       {
-        thresholdQuorum,
-        thresholdTotal,
+        committeeSize,
         inputWindowStart,
         inputWindowEnd,
         e3Address,
@@ -82,6 +75,12 @@ export const requestCommittee = task(
       },
       hre,
     ) => {
+      if (![0, 1, 2, 3].includes(committeeSize)) {
+        throw new Error(
+          "Invalid committee size - expected 0 (Micro), 1 (Small), 2 (Medium), or 3 (Large).",
+        );
+      }
+
       const connection = await hre.network.connect();
       const { ethers } = connection;
 
@@ -155,7 +154,7 @@ export const requestCommittee = task(
       });
 
       const requestParams = {
-        threshold: [thresholdQuorum, thresholdTotal] as [number, number],
+        committeeSize,
         inputWindow: [inputWindowStart, inputWindowEnd] as [
           BigNumberish,
           BigNumberish,

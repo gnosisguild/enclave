@@ -8,10 +8,10 @@ import {
   EnclaveSDK,
   calculateInputWindow,
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
-  DEFAULT_E3_CONFIG,
   encodeBfvParams,
   encodeComputeProviderParams,
   decodePlaintextOutput,
+  CommitteeSize,
 } from '@enclave-e3/sdk'
 import { EnclaveEventType, RegistryEventType } from '@enclave-e3/sdk/events'
 import type { AllEventTypes, EnclaveEvent } from '@enclave-e3/sdk/events'
@@ -188,8 +188,8 @@ describe('Integration', () => {
   it('should run an integration test', async () => {
     const { waitForEvent } = await setupEventListeners(sdk, store)
 
-    const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
-    const duration = 600
+    const committeeSize = CommitteeSize.Micro
+    const duration = 300
     const inputWindow = await calculateInputWindow(publicClient, duration)
     const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
     const e3ProgramParams = encodeBfvParams(thresholdBfvParams)
@@ -204,7 +204,7 @@ describe('Integration', () => {
 
     // Verify fee quoting works
     const requestParams = {
-      threshold,
+      committeeSize,
       inputWindow,
       e3Program: contracts.e3Program,
       e3ProgramParams,

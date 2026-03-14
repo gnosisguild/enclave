@@ -53,6 +53,18 @@ enum DkgInputTypeArg {
     SmudgingNoise,
 }
 
+fn parse_committee(s: &str) -> Result<CiphernodesCommitteeSize> {
+    match s.trim().to_lowercase().as_str() {
+        "micro" => Ok(CiphernodesCommitteeSize::Micro),
+        "small" => Ok(CiphernodesCommitteeSize::Small),
+        "medium" => Ok(CiphernodesCommitteeSize::Medium),
+        "large" => Ok(CiphernodesCommitteeSize::Large),
+        _ => Err(anyhow!(
+            "unknown committee: {s}. Use \"micro\", \"small\", \"medium\", or \"large\""
+        )),
+    }
+}
+
 fn parse_input_type(s: &str) -> Result<DkgInputTypeArg> {
     match s.trim().to_lowercase().as_str() {
         "secret-key" => Ok(DkgInputTypeArg::SecretKey),
@@ -73,6 +85,7 @@ fn clear_terminal() {
 fn print_generation_info(
     circuit: &str,
     preset: BfvPreset,
+    committee_size: CiphernodesCommitteeSize,
     has_inputs: bool,
     dkg_input_type: DkgInputType,
     output: &std::path::Path,
@@ -80,12 +93,17 @@ fn print_generation_info(
     no_configs: bool,
 ) {
     let meta = preset.metadata();
-    println!("  Circuit:  {}", circuit);
+    let committee = committee_size.values();
+    println!("  Circuit:    {}", circuit);
     println!(
-        "  Preset:   {} (degree {}, {} moduli)",
+        "  Preset:     {} (degree {}, {} moduli)",
         meta.security.as_config_str(),
         meta.degree,
         meta.num_moduli
+    );
+    println!(
+        "  Committee:  {:?} (n={}, t={}, h={})",
+        committee_size, committee.n, committee.threshold, committee.h
     );
     if has_inputs {
         println!(
@@ -154,6 +172,9 @@ struct Cli {
     /// For share-computation only: inputs type "secret-key" or "smudging-noise". Required when writing Prover.toml for share-computation. Ignored for pk (always secret key).
     #[arg(long)]
     inputs: Option<String>,
+    /// Committee size: "micro" or "small".
+    #[arg(long, default_value = "micro")]
+    committee: String,
     /// Output directory for generated artifacts.
     #[arg(long, default_value = "output")]
     output: PathBuf,
@@ -254,10 +275,13 @@ fn main() -> Result<()> {
         DkgInputType::SecretKey
     };
 
+    let committee_size = parse_committee(&args.committee)?;
+
     clear_terminal();
     print_generation_info(
         &circuit,
         preset,
+        committee_size,
         has_inputs_type,
         dkg_input_type.clone(),
         &args.output,
@@ -267,7 +291,7 @@ fn main() -> Result<()> {
 
     run_with_spinner(|| {
         let circuit_name = circuit_meta.name();
-        let committee = CiphernodesCommitteeSize::Small.values();
+        let committee = committee_size.values();
         let artifacts = match circuit_name {
             name if name == <PkCircuit as Circuit>::NAME => {
                 let sample = PkCircuitData::generate_sample(preset)?;

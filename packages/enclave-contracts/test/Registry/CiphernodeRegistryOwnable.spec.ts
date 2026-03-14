@@ -77,7 +77,7 @@ describe("CiphernodeRegistryOwnable", function () {
   }
   async function setup() {
     // ── Signers ────────────────────────────────────────────────────────────────
-    const [owner, notTheOwner, operator1, operator2] =
+    const [owner, notTheOwner, operator1, operator2, operator3] =
       await ethers.getSigners();
     const ownerAddress = await owner.getAddress();
 
@@ -229,10 +229,13 @@ describe("CiphernodeRegistryOwnable", function () {
       await mockDecryptionVerifier.getAddress(),
     );
 
+    // Set up committee thresholds
+    await enclave.setCommitteeThresholds(0, [1, 3]); // Micro
+
     // ── Operators ──────────────────────────────────────────────────────────────
     await licenseToken.setTransferRestriction(false);
 
-    for (const operator of [operator1, operator2]) {
+    for (const operator of [operator1, operator2, operator3]) {
       await setupOperatorForSortition(
         operator,
         bondingRegistry,
@@ -250,6 +253,7 @@ describe("CiphernodeRegistryOwnable", function () {
       notTheOwner,
       operator1,
       operator2,
+      operator3,
       registry,
       enclave,
       bondingRegistry,
@@ -260,7 +264,7 @@ describe("CiphernodeRegistryOwnable", function () {
       mockDecryptionVerifier,
       request: {
         e3Id: 0,
-        threshold: [2, 2] as [number, number],
+        committeeSize: 0,
       },
     };
   }
@@ -284,7 +288,7 @@ describe("CiphernodeRegistryOwnable", function () {
 
     const currentTime = await networkHelpers.time.latest();
     const requestParams = {
-      threshold: [2, 2] as [number, number],
+      committeeSize: 0,
       inputWindow: [currentTime + 100, currentTime + 300] as [number, number],
       e3Program: await mockE3Program.getAddress(),
       e3ProgramParams: encodedE3ProgramParams,
@@ -438,6 +442,7 @@ describe("CiphernodeRegistryOwnable", function () {
         notTheOwner,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       await makeRequest(
         enclave,
@@ -448,6 +453,7 @@ describe("CiphernodeRegistryOwnable", function () {
 
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await finalizeCommitteeAfterWindow(registry, 0);
 
       await expect(
@@ -455,7 +461,11 @@ describe("CiphernodeRegistryOwnable", function () {
           .connect(notTheOwner)
           .publishCommittee(
             0,
-            [await operator1.getAddress(), await operator2.getAddress()],
+            [
+              await operator1.getAddress(),
+              await operator2.getAddress(),
+              await operator3.getAddress(),
+            ],
             data,
             dataHash,
           ),
@@ -470,6 +480,7 @@ describe("CiphernodeRegistryOwnable", function () {
         mockDecryptionVerifier,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       await makeRequest(
         enclave,
@@ -478,15 +489,18 @@ describe("CiphernodeRegistryOwnable", function () {
         mockDecryptionVerifier,
       );
 
-      await networkHelpers.mine(1);
-
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await finalizeCommitteeAfterWindow(registry, 0);
 
       await registry.publishCommittee(
         0,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
         dataHash,
       );
@@ -501,6 +515,7 @@ describe("CiphernodeRegistryOwnable", function () {
         mockDecryptionVerifier,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       await makeRequest(
         enclave,
@@ -509,15 +524,20 @@ describe("CiphernodeRegistryOwnable", function () {
         mockDecryptionVerifier,
       );
 
-      // Submit tickets from both operators and finalize
+      // Submit tickets from all operators and finalize
       await registry.connect(operator1).submitTicket(0, 1);
       await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
       await finalizeCommitteeAfterWindow(registry, 0);
 
       await expect(
         await registry.publishCommittee(
           0,
-          [await operator1.getAddress(), await operator2.getAddress()],
+          [
+            await operator1.getAddress(),
+            await operator2.getAddress(),
+            await operator3.getAddress(),
+          ],
           data,
           dataHash,
         ),
@@ -525,7 +545,11 @@ describe("CiphernodeRegistryOwnable", function () {
         .to.emit(registry, "CommitteePublished")
         .withArgs(
           0,
-          [await operator1.getAddress(), await operator2.getAddress()],
+          [
+            await operator1.getAddress(),
+            await operator2.getAddress(),
+            await operator3.getAddress(),
+          ],
           data,
         );
     });
@@ -633,6 +657,7 @@ describe("CiphernodeRegistryOwnable", function () {
         mockDecryptionVerifier,
         operator1,
         operator2,
+        operator3,
       } = await loadFixture(setup);
       const e3Id = 0;
       await makeRequest(
@@ -644,11 +669,16 @@ describe("CiphernodeRegistryOwnable", function () {
 
       await registry.connect(operator1).submitTicket(e3Id, 1);
       await registry.connect(operator2).submitTicket(e3Id, 1);
+      await registry.connect(operator3).submitTicket(e3Id, 1);
       await finalizeCommitteeAfterWindow(registry, e3Id);
 
       await registry.publishCommittee(
         e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
+        [
+          await operator1.getAddress(),
+          await operator2.getAddress(),
+          await operator3.getAddress(),
+        ],
         data,
         dataHash,
       );
@@ -728,8 +758,8 @@ describe("CiphernodeRegistryOwnable", function () {
   describe("treeSize()", function () {
     it("returns the size of the ciphernode registry merkle tree", async function () {
       const { registry } = await loadFixture(setup);
-      // Two operators registered in setup
-      expect(await registry.treeSize()).to.equal(2);
+      // Three operators registered in setup
+      expect(await registry.treeSize()).to.equal(3);
     });
   });
 });
