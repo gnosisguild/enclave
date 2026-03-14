@@ -15,12 +15,13 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 pub fn setup_simple_tracing(log_level: Level) {
-    tracing_subscriber::registry()
+    // Will be idempotent if already setup
+    let _ = tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(tracing_subscriber::filter::LevelFilter::from_level(
             log_level,
         ))
-        .init();
+        .try_init();
 }
 
 pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
@@ -51,7 +52,8 @@ pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
                 .with(tracing_subscriber::filter::LevelFilter::from_level(
                     log_level,
                 ))
-                .init();
+                .try_init()
+                .ok();
         }
         None => {
             // TODO: we might be able to dedupe this with above but there were
@@ -61,7 +63,8 @@ pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
                 .with(tracing_subscriber::filter::LevelFilter::from_level(
                     log_level,
                 ))
-                .init();
+                .try_init()
+                .ok();
         }
     }
 

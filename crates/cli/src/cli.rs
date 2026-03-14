@@ -92,11 +92,11 @@ impl Cli {
                     Some(ioe) if ioe.kind() == std::io::ErrorKind::NotFound
                 ) =>
             {
+                setup_simple_tracing(log_level);
                 // Existing init branch
                 match self.command {
                     Commands::Rev => rev::execute().await?,
                     Commands::Init {path, template, skip_cleanup} => {
-                        setup_simple_tracing(log_level);
                         init::execute(path, template, skip_cleanup, self.verbose > 0).await?
                     },
                     Commands::Ciphernode {
@@ -123,7 +123,6 @@ impl Cli {
                         .await?;
                     },
                     Commands::Noir { command } => {
-                        setup_simple_tracing(log_level);
                         noir::execute_without_config(command).await?
                     },
                     _ => bail!(
@@ -334,5 +333,40 @@ impl TryInto<SerializedCli> for Cli {
                 "This command cannot be run with an active node running. Stop your node and try again."
             )),
         }
+    }
+}
+
+impl TryFrom<SerializedCli> for Cli {
+    type Error = anyhow::Error;
+    fn try_from(value: SerializedCli) -> std::result::Result<Self, Self::Error> {
+        Ok(Cli {
+            config: None,
+            verbose: 0,
+            quiet: false,
+            otel: None,
+            name: None,
+            command: match value {
+                SerializedCli::Rev => Commands::Rev,
+                SerializedCli::PrintEnv { vite, chain } => Commands::PrintEnv { vite, chain },
+                SerializedCli::WalletGet => Commands::Wallet {
+                    command: WalletCommands::Get,
+                },
+                SerializedCli::NoirStatus => Commands::Noir {
+                    command: NoirCommands::Status,
+                },
+                SerializedCli::CiphernodeStatus { chain } => Commands::Ciphernode {
+                    command: CiphernodeCommands::Status { chain },
+                },
+                SerializedCli::NodesPs => Commands::Nodes {
+                    command: NodeCommands::Ps,
+                },
+                SerializedCli::NodesStatus { id } => Commands::Nodes {
+                    command: NodeCommands::Status { id },
+                },
+                SerializedCli::NetGetPeerId => Commands::Net {
+                    command: NetCommands::GetPeerId,
+                },
+            },
+        })
     }
 }

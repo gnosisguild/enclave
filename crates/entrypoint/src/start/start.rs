@@ -20,7 +20,6 @@ pub async fn execute(config: &AppConfig) -> Result<CiphernodeHandle> {
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
     let backend = ZkBackend::new(config.bb_binary(), config.circuits_dir(), config.work_dir());
     backend.ensure_installed().await?;
-
     let node = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_persistence(&config.log_file(), &config.db_file())
         .with_sortition_score()
@@ -35,6 +34,5 @@ pub async fn execute(config: &AppConfig) -> Result<CiphernodeHandle> {
         .with_net(config.peers(), config.quic_port())
         .build()
         .await?;
-
     Ok(node)
 }
