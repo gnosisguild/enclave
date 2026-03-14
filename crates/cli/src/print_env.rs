@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use e3_config::AppConfig;
-use e3_console::Console;
+use e3_console::{log, Console};
 
 pub fn extract_env_vars_vite(config: &AppConfig, chain: &str) -> String {
     let mut env_vars = Vec::new();
@@ -73,9 +73,9 @@ pub fn extract_env_vars(config: &AppConfig, chain: &str) -> String {
 }
 pub async fn execute(out: Console, config: &AppConfig, chain: &str, as_vite: bool) -> Result<()> {
     if as_vite {
-        e3_console::log!(out, "{}", extract_env_vars_vite(config, chain));
+        log!(out, "{}", extract_env_vars_vite(config, chain));
     } else {
-        e3_console::log!(out, "{}", extract_env_vars(config, chain));
+        log!(out, "{}", extract_env_vars(config, chain));
     }
     Ok(())
 }

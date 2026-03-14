@@ -8,7 +8,7 @@ use crate::helpers::prompt_password::prompt_password;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Confirm};
 use e3_config::AppConfig;
-use e3_console::Console;
+use e3_console::{log, Console};
 use zeroize::Zeroize;
 
 pub async fn prompt_delete(out: Console, config: &AppConfig) -> Result<bool> {
@@ -21,7 +21,7 @@ pub async fn prompt_delete(out: Console, config: &AppConfig) -> Result<bool> {
     }
 
     let Ok(mut cur_pw) = e3_entrypoint::password::delete::get_current_password(config).await else {
-        e3_console::log!(out, "Password is not set. Nothing to do.");
+        log!(out, "Password is not set. Nothing to do.");
         return Ok(false);
     };
 
@@ -39,9 +39,9 @@ pub async fn prompt_delete(out: Console, config: &AppConfig) -> Result<bool> {
 pub async fn execute(out: &Console, config: &AppConfig) -> Result<()> {
     if prompt_delete(out.clone(), config).await? {
         e3_entrypoint::password::delete::execute(config).await?;
-        e3_console::log!(out, "Password successfully deleted.");
+        log!(out, "Password successfully deleted.");
     } else {
-        e3_console::log!(out, "Operation cancelled.");
+        log!(out, "Operation cancelled.");
     }
     Ok(())
 }

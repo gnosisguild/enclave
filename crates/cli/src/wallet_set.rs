@@ -7,7 +7,7 @@
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Password};
 use e3_config::AppConfig;
-use e3_console::Console;
+use e3_console::{log, Console};
 use e3_entrypoint::wallet::set::validate_private_key;
 use zeroize::Zeroizing;
 
@@ -36,7 +36,7 @@ pub async fn execute(
 ) -> Result<()> {
     let input = ask_for_private_key(private_key)?;
     e3_entrypoint::wallet::set::execute(config, input).await?;
-    e3_console::log!(
+    log!(
         out,
         "Wallet key has been successfully stored and encrypted."
     );
