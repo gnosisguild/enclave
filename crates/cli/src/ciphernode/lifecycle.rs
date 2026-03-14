@@ -6,11 +6,12 @@
 
 use alloy::primitives::U256;
 use anyhow::{bail, Result};
+use e3_console::Out;
 
 use super::context::ChainContext;
 use super::utils::{format_amount, parse_amount};
 
-pub(crate) async fn register(ctx: &ChainContext) -> Result<()> {
+pub(crate) async fn register(out: Out, ctx: &ChainContext) -> Result<()> {
     let receipt = ctx
         .bonding()
         .registerOperator()
@@ -18,7 +19,8 @@ pub(crate) async fn register(ctx: &ChainContext) -> Result<()> {
         .await?
         .get_receipt()
         .await?;
-    println!(
+    e3_console::log!(
+        out,
         "Registered ciphernode on {} (tx: {:#x})",
         ctx.chain_label(),
         receipt.transaction_hash
@@ -26,7 +28,7 @@ pub(crate) async fn register(ctx: &ChainContext) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn deregister(ctx: &ChainContext) -> Result<()> {
+pub(crate) async fn deregister(out: Out, ctx: &ChainContext) -> Result<()> {
     let receipt = ctx
         .bonding()
         .deregisterOperator()
@@ -34,18 +36,20 @@ pub(crate) async fn deregister(ctx: &ChainContext) -> Result<()> {
         .await?
         .get_receipt()
         .await?;
-    println!(
+    e3_console::log!(
+        out,
         "Deregistration requested (tx: {:#x})",
         receipt.transaction_hash
     );
     Ok(())
 }
 
-pub(crate) async fn activate(ctx: &ChainContext) -> Result<()> {
-    register(ctx).await
+pub(crate) async fn activate(out: Out, ctx: &ChainContext) -> Result<()> {
+    register(out, ctx).await
 }
 
 pub(crate) async fn deactivate(
+    out: Out,
     ctx: &ChainContext,
     ticket_amount: Option<String>,
     license_amount: Option<String>,
@@ -67,9 +71,11 @@ pub(crate) async fn deactivate(
             .await?
             .get_receipt()
             .await?;
-        println!(
+        e3_console::log!(
+            out,
             "Removed {} tickets (tx: {:#x})",
-            amount, receipt.transaction_hash
+            amount,
+            receipt.transaction_hash
         );
     }
 
@@ -84,17 +90,22 @@ pub(crate) async fn deactivate(
             .await?
             .get_receipt()
             .await?;
-        println!(
+        e3_console::log!(
+            out,
             "Queued {} ENCL for exit (tx: {:#x})",
-            amount, receipt.transaction_hash
+            amount,
+            receipt.transaction_hash
         );
     }
 
-    println!("Submitted deactivation transactions; monitor exit delays before claiming.");
+    e3_console::log!(
+        out,
+        "Submitted deactivation transactions; monitor exit delays before claiming."
+    );
     Ok(())
 }
 
-pub(crate) async fn status(ctx: &ChainContext) -> Result<()> {
+pub(crate) async fn status(out: Out, ctx: &ChainContext) -> Result<()> {
     let contract = ctx.bonding();
     let operator = ctx.operator();
     let ticket_balance: U256 = contract.getTicketBalance(operator).call().await?;
@@ -115,26 +126,30 @@ pub(crate) async fn status(ctx: &ChainContext) -> Result<()> {
     let ticket_decimals = ctx.erc20(ticket_token).decimals().call().await?;
     let license_decimals = ctx.erc20(license_token).decimals().call().await?;
 
-    println!("Ciphernode status on {}:", ctx.chain_label());
-    println!("  Address: {:#x}", operator);
-    println!("  Registered: {}", is_registered);
-    println!("  Active: {}", is_active);
-    println!("  Exit pending: {}", has_exit);
-    println!(
+    e3_console::log!(out, "Ciphernode status on {}:", ctx.chain_label());
+    e3_console::log!(out, "  Address: {:#x}", operator);
+    e3_console::log!(out, "  Registered: {}", is_registered);
+    e3_console::log!(out, "  Active: {}", is_active);
+    e3_console::log!(out, "  Exit pending: {}", has_exit);
+    e3_console::log!(
+        out,
         "  Ticket balance: {} ({} available)",
         format_amount(ticket_balance, ticket_decimals),
         format_amount(available_tickets, ticket_decimals)
     );
-    println!(
+    e3_console::log!(
+        out,
         "  License bond: {}",
         format_amount(license_bond, license_decimals)
     );
-    println!(
+    e3_console::log!(
+        out,
         "  Pending exits: tickets={}, license={}",
         format_amount(pending_tickets, ticket_decimals),
         format_amount(pending_license, license_decimals)
     );
-    println!(
+    e3_console::log!(
+        out,
         "  Requirements: minTickets={}, ticketPrice={} EKT, licenseBond={} ENCL",
         format_amount(min_ticket_balance, ticket_decimals),
         format_amount(ticket_price, ticket_decimals),

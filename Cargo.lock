@@ -3126,6 +3126,7 @@ dependencies = [
  "dialoguer",
  "dirs 5.0.1",
  "e3-config",
+ "e3-console",
  "e3-crypto",
  "e3-entrypoint",
  "e3-events",
@@ -3189,6 +3190,13 @@ dependencies = [
  "tempfile",
  "tracing",
  "url",
+]
+
+[[package]]
+name = "e3-console"
+version = "0.1.15"
+dependencies = [
+ "tokio",
 ]
 
 [[package]]

@@ -6,10 +6,11 @@
 
 use anyhow::Result;
 use e3_config::AppConfig;
+use e3_console::Out;
 
-pub async fn execute(config: &AppConfig) -> Result<()> {
+pub async fn execute(out: Out, config: &AppConfig) -> Result<()> {
     let address = e3_entrypoint::wallet::get::execute(config).await?;
-    println!("{}", address);
+    e3_console::log!(out, "{}", address);
 
     Ok(())
 }
