@@ -28,10 +28,15 @@ export const discoverVerifierContracts = (): string[] => {
 /**
  * Deploys ZKTranscriptLib library required by BB-generated verifiers.
  * Reuses existing deployment if already deployed on the chain.
+ *
+ * Uses a fully-qualified name (FQN) because Hardhat has multiple ZKTranscriptLib
+ * artifacts (one per verifier .sol file). All are identical; we pick one.
  */
 const deployZKTranscriptLib = async (
   hre: HardhatRuntimeEnvironment,
   chain: string,
+  /** Verifier contract whose .sol file contains ZKTranscriptLib; used to form FQN */
+  referenceContract: string,
 ): Promise<string> => {
   const libName = "ZKTranscriptLib";
 
@@ -42,10 +47,11 @@ const deployZKTranscriptLib = async (
     return existing.address;
   }
 
-  // Deploy the library
+  // Deploy the library — use FQN to disambiguate multiple ZKTranscriptLib artifacts
+  const libFQN = `contracts/verifier/${referenceContract}.sol:ZKTranscriptLib`;
   console.log(`   Deploying ${libName}...`);
   const { ethers } = await hre.network.connect();
-  const factory = await ethers.getContractFactory(libName);
+  const factory = await ethers.getContractFactory(libFQN);
   const contract = await factory.deploy();
   await contract.waitForDeployment();
 
@@ -139,7 +145,11 @@ export const deployAndSaveAllVerifiers = async (
   console.log(`   Found ${contractNames.length} verifier contract(s)`);
 
   // Deploy ZKTranscriptLib once, reused by all verifiers
-  const zkTranscriptLibAddress = await deployZKTranscriptLib(hre, chain);
+  const zkTranscriptLibAddress = await deployZKTranscriptLib(
+    hre,
+    chain,
+    contractNames[0],
+  );
 
   const deployments: VerifierDeployments = {};
 

@@ -8,11 +8,15 @@ use alloy::{
     network::{Ethereum, EthereumWallet},
     primitives::{Address, Bytes, I256, U256},
     providers::{
-        Identity, ProviderBuilder, RootProvider, fillers::{
+        fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
-        }
-    }, rpc::types::TransactionReceipt, signers::local::PrivateKeySigner, sol
+        },
+        Identity, ProviderBuilder, RootProvider,
+    },
+    rpc::types::TransactionReceipt,
+    signers::local::PrivateKeySigner,
+    sol,
 };
 use eyre::Result;
 use std::sync::Arc;
@@ -100,11 +104,7 @@ impl CRISPContract<CRISPWriteProvider> {
     }
 
     // publish an input to the CRISPProgram contract
-    pub async fn publish_input(
-        &self,
-        e3_id: U256,
-        data: Bytes,
-    ) -> Result<TransactionReceipt> {
+    pub async fn publish_input(&self, e3_id: U256, data: Bytes) -> Result<TransactionReceipt> {
         let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
         let receipt = contract
             .publishInput(e3_id, data.into())

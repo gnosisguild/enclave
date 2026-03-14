@@ -7,7 +7,7 @@ pragma solidity >=0.8.27;
 
 /**
  * @title ICircuitVerifier
- * @notice Interface for on-chain ZK circuit verifiers (e.g., DkgPkVerifier, Honk verifiers)
+ * @notice Interface for on-chain ZK circuit verifiers (e.g., ThresholdPkAggregationVerifier, Honk verifiers)
  * @dev Standard interface matching the verification pattern used by Honk-generated verifiers.
  *      Set the circuit verifier address directly as the proofVerifier in a SlashPolicy.
  */

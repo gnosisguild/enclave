@@ -35,6 +35,7 @@
 
 pub mod accusation_manager;
 pub mod accusation_manager_ext;
+pub mod node_proof_aggregator;
 pub mod proof_request;
 pub mod proof_verification;
 pub mod share_verification;
@@ -42,6 +43,7 @@ pub mod zk_actor;
 
 pub use accusation_manager::AccusationManager;
 pub use accusation_manager_ext::AccusationManagerExtension;
+pub use node_proof_aggregator::NodeProofAggregator;
 pub use proof_request::ProofRequestActor;
 pub use proof_verification::{
     ProofVerificationActor, ZkVerificationRequest, ZkVerificationResponse,
@@ -66,12 +68,14 @@ pub fn setup_zk_actors(bus: &BusHandle, backend: &ZkBackend, signer: PrivateKeyS
     let proof_request = ProofRequestActor::setup(bus, signer);
     let proof_verification = ProofVerificationActor::setup(bus, verifier);
     let share_verification = ShareVerificationActor::setup(bus);
+    let node_proof_aggregator = NodeProofAggregator::setup(bus);
 
     ZkActors {
         zk_actor,
         proof_request,
         proof_verification,
         share_verification,
+        node_proof_aggregator,
     }
 }
 
@@ -81,4 +85,5 @@ pub struct ZkActors {
     pub proof_request: Addr<ProofRequestActor>,
     pub proof_verification: Addr<ProofVerificationActor>,
     pub share_verification: Addr<ShareVerificationActor>,
+    pub node_proof_aggregator: Addr<NodeProofAggregator>,
 }
