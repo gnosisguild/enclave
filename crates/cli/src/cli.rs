@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use crate::ciphernode::{self, CiphernodeCommands};
+use crate::ciphernode::{self, ChainArgs, CiphernodeCommands};
 use crate::helpers::telemetry::{setup_simple_tracing, setup_tracing};
 use crate::net::{self, NetCommands};
 use crate::nodes::{self, NodeCommands};
@@ -291,4 +291,96 @@ pub enum Commands {
         #[command(subcommand)]
         command: NetCommands,
     },
+}
+
+pub struct SocketCli {
+    name: Option<String>,
+    otel: Option<ValidUrl>,
+    quiet: bool,
+    config: Option<String>,
+    verbose: u8,
+    command: SocketCommand,
+}
+
+pub enum SocketCommand {
+    NetGetPeerId,
+    NodePs,
+    NodeStatus { id: String },
+    CiphernodeStatus { chain: ChainArgs },
+    NoirStatus,
+    WalletGet,
+    Rev,
+    PrintEnv { vite: bool, chain: String },
+}
+
+impl TryFrom<Commands> for SocketCommand {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Commands) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Commands::Rev => Ok(SocketCommand::Rev),
+            Commands::Net {
+                command: NetCommands::GetPeerId,
+            } => Ok(SocketCommand::NetGetPeerId),
+            Commands::Noir {
+                command: NoirCommands::Status,
+            } => Ok(SocketCommand::NoirStatus),
+            Commands::Nodes {
+                command: NodeCommands::Ps,
+            } => Ok(SocketCommand::NodePs),
+            Commands::Nodes {
+                command: NodeCommands::Status { id },
+            } => Ok(SocketCommand::NodeStatus { id }),
+            Commands::Ciphernode {
+                command: CiphernodeCommands::Status { chain },
+            } => Ok(SocketCommand::CiphernodeStatus { chain }),
+            Commands::PrintEnv { chain, vite } => Ok(SocketCommand::PrintEnv { vite, chain }),
+            Commands::Wallet {
+                command: WalletCommands::Get,
+            } => Ok(SocketCommand::WalletGet),
+            _ => bail!("Command not allowed while node is running."),
+        }
+    }
+}
+
+impl TryFrom<SocketCli> for Cli {
+    type Error = anyhow::Error;
+    fn try_from(value: SocketCli) -> std::result::Result<Self, Self::Error> {
+        Ok(Cli {
+            verbose: value.verbose,
+            config: value.config,
+            quiet: value.quiet,
+            otel: value.otel,
+            command: value.command.try_into()?,
+            name: value.name,
+        })
+    }
+}
+
+impl TryFrom<SocketCommand> for Commands {
+    type Error = anyhow::Error;
+    fn try_from(value: SocketCommand) -> std::result::Result<Self, Self::Error> {
+        let command = match value {
+            SocketCommand::Rev => Commands::Rev,
+            SocketCommand::WalletGet => Commands::Wallet {
+                command: WalletCommands::Get,
+            },
+            SocketCommand::PrintEnv { vite, chain } => Commands::PrintEnv { vite, chain },
+            SocketCommand::CiphernodeStatus { chain } => Commands::Ciphernode {
+                command: CiphernodeCommands::Status { chain },
+            },
+            SocketCommand::NodeStatus { id } => Commands::Nodes {
+                command: NodeCommands::Status { id },
+            },
+            SocketCommand::NodePs => Commands::Nodes {
+                command: NodeCommands::Ps,
+            },
+            SocketCommand::NetGetPeerId => Commands::Net {
+                command: NetCommands::GetPeerId,
+            },
+            _ => bail!("Command not allowed while node is running"),
+        };
+        // We might have to hold this stuff on SocketCommand
+        Ok(command)
+    }
 }
