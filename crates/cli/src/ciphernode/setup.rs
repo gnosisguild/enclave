@@ -8,6 +8,7 @@ use alloy::primitives::Address;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input};
 use e3_config::AppConfig;
+use e3_console::Out;
 use e3_entrypoint::config::setup;
 use e3_utils::{colorize, Color};
 use std::path::PathBuf;
@@ -19,6 +20,7 @@ use crate::wallet_set::ask_for_private_key;
 
 #[instrument(name = "app", skip_all)]
 pub async fn execute(
+    out: Out,
     rpc_url: Option<String>,
     password: Option<Zeroizing<String>>,
     private_key: Option<Zeroizing<String>>,
@@ -64,26 +66,34 @@ pub async fn execute(
     e3_entrypoint::password::set::execute(&config, pw).await?;
 
     let (address, peer_id) = e3_entrypoint::wallet::set::execute(&config, private_key).await?;
-    print_info(&config, address, &peer_id.to_string(), &rpc_url)?;
+    print_info(out, &config, address, &peer_id.to_string(), &rpc_url)?;
     Ok(())
 }
 
-fn print_info(config: &AppConfig, address: Address, peer_id: &str, rpc_url: &str) -> Result<()> {
+fn print_info(
+    out: Out,
+    config: &AppConfig,
+    address: Address,
+    peer_id: &str,
+    rpc_url: &str,
+) -> Result<()> {
     let abs_config = config.config_file().canonicalize()?;
 
-    println!("\nEnclave configuration successfully created!");
-    println!(
+    e3_console::log!(out, "\nEnclave configuration successfully created!");
+    e3_console::log!(
+        out,
         "Editable configuration has been written to:\n\n {}",
         colorize(abs_config.to_string_lossy(), Color::Yellow)
     );
-    println!("");
-    println!("Data written:");
-    println!(" address: {}", colorize(address, Color::Cyan));
-    println!(" peer_id: {}", colorize(peer_id, Color::Cyan));
-    println!(" rpc_url: {}", colorize(rpc_url, Color::Cyan));
-    println!("");
+    e3_console::log!(out, "");
+    e3_console::log!(out, "Data written:");
+    e3_console::log!(out, " address: {}", colorize(address, Color::Cyan));
+    e3_console::log!(out, " peer_id: {}", colorize(peer_id, Color::Cyan));
+    e3_console::log!(out, " rpc_url: {}", colorize(rpc_url, Color::Cyan));
+    e3_console::log!(out, "");
     if config.using_custom_config() {
-        println!(
+        e3_console::log!(
+            out,
             "Run future commands from within this directory tree, or pass\n {}\n",
             colorize(
                 format!("--config {}", abs_config.to_string_lossy()),
@@ -91,7 +101,8 @@ fn print_info(config: &AppConfig, address: Address, peer_id: &str, rpc_url: &str
             )
         );
     }
-    println!(
+    e3_console::log!(
+        out,
         "You can start your node using:\n `{}`\n",
         colorize("enclave start", Color::Yellow)
     );

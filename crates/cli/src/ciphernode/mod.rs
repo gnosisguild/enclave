@@ -16,6 +16,7 @@ mod tickets;
 mod utils;
 
 use context::ChainContext;
+use e3_console::Out;
 use zeroize::Zeroizing;
 
 use crate::helpers::{ensure_hex_zeroizing, parse_zeroizing};
@@ -129,27 +130,27 @@ pub enum TicketCommands {
     },
 }
 
-pub async fn execute(command: CiphernodeCommands, config: &AppConfig) -> Result<()> {
+pub async fn execute(out: Out, command: CiphernodeCommands, config: &AppConfig) -> Result<()> {
     match command {
         CiphernodeCommands::License { chain, command } => {
             let ctx = ChainContext::new(config, chain.selection()).await?;
-            license::execute(&ctx, command).await?
+            license::execute(out, &ctx, command).await?
         }
         CiphernodeCommands::Tickets { chain, command } => {
             let ctx = ChainContext::new(config, chain.selection()).await?;
-            tickets::execute(&ctx, command).await?
+            tickets::execute(out, &ctx, command).await?
         }
         CiphernodeCommands::Register { chain } => {
             let ctx = ChainContext::new(config, chain.selection()).await?;
-            lifecycle::register(&ctx).await?
+            lifecycle::register(out, &ctx).await?
         }
         CiphernodeCommands::Deregister { chain } => {
             let ctx = ChainContext::new(config, chain.selection()).await?;
-            lifecycle::deregister(&ctx).await?
+            lifecycle::deregister(out, &ctx).await?
         }
         CiphernodeCommands::Activate { chain } => {
             let ctx = ChainContext::new(config, chain.selection()).await?;
-            lifecycle::activate(&ctx).await?
+            lifecycle::activate(out, &ctx).await?
         }
         CiphernodeCommands::Deactivate {
             chain,
@@ -157,11 +158,11 @@ pub async fn execute(command: CiphernodeCommands, config: &AppConfig) -> Result<
             license_amount,
         } => {
             let ctx = ChainContext::new(config, chain.selection()).await?;
-            lifecycle::deactivate(&ctx, ticket_amount, license_amount).await?
+            lifecycle::deactivate(out, &ctx, ticket_amount, license_amount).await?
         }
         CiphernodeCommands::Status { chain } => {
             let ctx = ChainContext::new(config, chain.selection()).await?;
-            lifecycle::status(&ctx).await?
+            lifecycle::status(out, &ctx).await?
         }
         CiphernodeCommands::Setup { .. } => {
             bail!(

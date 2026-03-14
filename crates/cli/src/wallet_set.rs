@@ -7,6 +7,7 @@
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Password};
 use e3_config::AppConfig;
+use e3_console::Out;
 use e3_entrypoint::wallet::set::validate_private_key;
 use zeroize::Zeroizing;
 
@@ -28,10 +29,17 @@ pub fn ask_for_private_key(given_key: Option<Zeroizing<String>>) -> Result<Zeroi
     Ok(key)
 }
 
-pub async fn execute(config: &AppConfig, private_key: Option<Zeroizing<String>>) -> Result<()> {
+pub async fn execute(
+    out: Out,
+    config: &AppConfig,
+    private_key: Option<Zeroizing<String>>,
+) -> Result<()> {
     let input = ask_for_private_key(private_key)?;
     e3_entrypoint::wallet::set::execute(config, input).await?;
-    println!("Wallet key has been successfully stored and encrypted.");
+    e3_console::log!(
+        out,
+        "Wallet key has been successfully stored and encrypted."
+    );
 
     Ok(())
 }

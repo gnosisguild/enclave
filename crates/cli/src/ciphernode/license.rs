@@ -6,15 +6,16 @@
 
 use alloy::primitives::U256;
 use anyhow::Result;
+use e3_console::Out;
 
 use super::context::ChainContext;
 use super::utils::{ensure_allowance, parse_amount};
 use super::LicenseCommands;
 
-pub(crate) async fn execute(ctx: &ChainContext, command: LicenseCommands) -> Result<()> {
+pub(crate) async fn execute(out: Out, ctx: &ChainContext, command: LicenseCommands) -> Result<()> {
     match command {
         LicenseCommands::Bond { amount } => {
-            bond_license(ctx, &amount).await?;
+            bond_license(out, ctx, &amount).await?;
         }
         LicenseCommands::Unbond { amount } => {
             let license = ctx.license_token_address().await?;
@@ -27,9 +28,11 @@ pub(crate) async fn execute(ctx: &ChainContext, command: LicenseCommands) -> Res
                 .await?
                 .get_receipt()
                 .await?;
-            println!(
+            e3_console::log!(
+                out,
                 "Queued {} ENCL for exit (tx: {:#x})",
-                amount, receipt.transaction_hash
+                amount,
+                receipt.transaction_hash
             );
         }
         LicenseCommands::Claim {
@@ -64,14 +67,14 @@ pub(crate) async fn execute(ctx: &ChainContext, command: LicenseCommands) -> Res
                 .await?
                 .get_receipt()
                 .await?;
-            println!("Claimed exits (tx: {:#x})", receipt.transaction_hash);
+            e3_console::log!(out, "Claimed exits (tx: {:#x})", receipt.transaction_hash);
         }
     }
 
     Ok(())
 }
 
-async fn bond_license(ctx: &ChainContext, amount: &str) -> Result<()> {
+async fn bond_license(out: Out, ctx: &ChainContext, amount: &str) -> Result<()> {
     let license = ctx.license_token_address().await?;
     let erc20 = ctx.erc20(license);
     let decimals = erc20.decimals().call().await?;
@@ -84,9 +87,11 @@ async fn bond_license(ctx: &ChainContext, amount: &str) -> Result<()> {
         .await?
         .get_receipt()
         .await?;
-    println!(
+    e3_console::log!(
+        out,
         "Bonded {} ENCL (tx: {:#x})",
-        amount, receipt.transaction_hash
+        amount,
+        receipt.transaction_hash
     );
     Ok(())
 }
