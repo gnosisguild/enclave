@@ -5,13 +5,17 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
-use e3_console::Out;
+use e3_console::Console;
 
 use super::context::ChainContext;
 use super::utils::{ensure_allowance, parse_amount};
 use super::TicketCommands;
 
-pub(crate) async fn execute(out: Out, ctx: &ChainContext, command: TicketCommands) -> Result<()> {
+pub(crate) async fn execute(
+    out: Console,
+    ctx: &ChainContext,
+    command: TicketCommands,
+) -> Result<()> {
     match command {
         TicketCommands::Buy { amount } => {
             let ticket_contract = ctx.ticket_token_address().await?;

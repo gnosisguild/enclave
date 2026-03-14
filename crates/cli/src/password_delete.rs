@@ -8,10 +8,10 @@ use crate::helpers::prompt_password::prompt_password;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Confirm};
 use e3_config::AppConfig;
-use e3_console::Out;
+use e3_console::Console;
 use zeroize::Zeroize;
 
-pub async fn prompt_delete(out: Out, config: &AppConfig) -> Result<bool> {
+pub async fn prompt_delete(out: Console, config: &AppConfig) -> Result<bool> {
     if !Confirm::with_theme(&ColorfulTheme::default())
         .with_prompt("Are you sure you want to delete the key? This action cannot be undone.")
         .default(false)
@@ -36,7 +36,7 @@ pub async fn prompt_delete(out: Out, config: &AppConfig) -> Result<bool> {
     Ok(true)
 }
 
-pub async fn execute(out: &Out, config: &AppConfig) -> Result<()> {
+pub async fn execute(out: &Console, config: &AppConfig) -> Result<()> {
     if prompt_delete(out.clone(), config).await? {
         e3_entrypoint::password::delete::execute(config).await?;
         e3_console::log!(out, "Password successfully deleted.");

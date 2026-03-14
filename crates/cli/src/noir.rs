@@ -7,7 +7,7 @@
 use anyhow::*;
 use clap::Subcommand;
 use e3_config::AppConfig;
-use e3_console::Out;
+use e3_console::Console;
 use e3_zk_prover::{SetupStatus, ZkBackend};
 
 #[derive(Subcommand, Debug)]
@@ -19,7 +19,7 @@ pub enum NoirCommands {
     },
 }
 
-pub async fn execute(out: Out, command: NoirCommands, config: &AppConfig) -> Result<()> {
+pub async fn execute(out: Console, command: NoirCommands, config: &AppConfig) -> Result<()> {
     let backend = ZkBackend::new(config.bb_binary(), config.circuits_dir(), config.work_dir());
 
     match command {
@@ -34,7 +34,7 @@ pub async fn execute(out: Out, command: NoirCommands, config: &AppConfig) -> Res
     Ok(())
 }
 
-pub async fn execute_without_config(out: Out, command: NoirCommands) -> Result<()> {
+pub async fn execute_without_config(out: Console, command: NoirCommands) -> Result<()> {
     let backend = ZkBackend::with_default_dir("default")
         .map_err(|e| anyhow!("Failed to initialize ZK backend: {}", e))?;
 
@@ -50,7 +50,7 @@ pub async fn execute_without_config(out: Out, command: NoirCommands) -> Result<(
     Ok(())
 }
 
-async fn execute_status(out: Out, backend: &ZkBackend) -> Result<()> {
+async fn execute_status(out: Console, backend: &ZkBackend) -> Result<()> {
     let status = backend.check_status().await;
     let version_info = backend.load_version_info().await;
 
@@ -121,7 +121,7 @@ async fn execute_status(out: Out, backend: &ZkBackend) -> Result<()> {
     Ok(())
 }
 
-async fn execute_setup(out: Out, backend: &ZkBackend, force: bool) -> Result<()> {
+async fn execute_setup(out: Console, backend: &ZkBackend, force: bool) -> Result<()> {
     e3_console::log!(out, "Setting up ZK prover...\n");
     e3_console::log!(
         out,

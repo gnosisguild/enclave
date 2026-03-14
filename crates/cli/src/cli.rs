@@ -20,7 +20,7 @@ use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
 use e3_config::validation::ValidUrl;
 use e3_config::{load_config, AppConfig};
-use e3_console::Out;
+use e3_console::Console;
 use e3_entrypoint::helpers::datastore::close_all_connections;
 use tracing::{info, instrument, Level};
 
@@ -80,7 +80,7 @@ impl Cli {
     }
 
     #[instrument(skip_all)]
-    pub async fn execute(self, out: Out) -> Result<()> {
+    pub async fn execute(self, out: Console) -> Result<()> {
         let log_level = self.log_level();
         // Attempt to load the config, but only treat "not found" as
         // the trigger for the init flow.  All other errors bubble up.

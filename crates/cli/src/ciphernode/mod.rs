@@ -16,7 +16,7 @@ mod tickets;
 mod utils;
 
 use context::ChainContext;
-use e3_console::Out;
+use e3_console::Console;
 use zeroize::Zeroizing;
 
 use crate::helpers::{ensure_hex_zeroizing, parse_zeroizing};
@@ -130,7 +130,7 @@ pub enum TicketCommands {
     },
 }
 
-pub async fn execute(out: Out, command: CiphernodeCommands, config: &AppConfig) -> Result<()> {
+pub async fn execute(out: Console, command: CiphernodeCommands, config: &AppConfig) -> Result<()> {
     match command {
         CiphernodeCommands::License { chain, command } => {
             let ctx = ChainContext::new(config, chain.selection()).await?;

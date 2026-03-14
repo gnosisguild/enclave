@@ -7,7 +7,7 @@
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Password};
 use e3_config::AppConfig;
-use e3_console::Out;
+use e3_console::Console;
 use e3_entrypoint::wallet::set::validate_private_key;
 use zeroize::Zeroizing;
 
@@ -30,7 +30,7 @@ pub fn ask_for_private_key(given_key: Option<Zeroizing<String>>) -> Result<Zeroi
 }
 
 pub async fn execute(
-    out: Out,
+    out: Console,
     config: &AppConfig,
     private_key: Option<Zeroizing<String>>,
 ) -> Result<()> {
