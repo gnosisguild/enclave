@@ -8,7 +8,7 @@ use alloy::primitives::Address;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input};
 use e3_config::AppConfig;
-use e3_console::Console;
+use e3_console::{log, Console};
 use e3_entrypoint::config::setup;
 use e3_utils::{colorize, Color};
 use std::path::PathBuf;
@@ -79,20 +79,20 @@ fn print_info(
 ) -> Result<()> {
     let abs_config = config.config_file().canonicalize()?;
 
-    e3_console::log!(out, "\nEnclave configuration successfully created!");
-    e3_console::log!(
+    log!(out, "\nEnclave configuration successfully created!");
+    log!(
         out,
         "Editable configuration has been written to:\n\n {}",
         colorize(abs_config.to_string_lossy(), Color::Yellow)
     );
-    e3_console::log!(out, "");
-    e3_console::log!(out, "Data written:");
-    e3_console::log!(out, " address: {}", colorize(address, Color::Cyan));
-    e3_console::log!(out, " peer_id: {}", colorize(peer_id, Color::Cyan));
-    e3_console::log!(out, " rpc_url: {}", colorize(rpc_url, Color::Cyan));
-    e3_console::log!(out, "");
+    log!(out, "");
+    log!(out, "Data written:");
+    log!(out, " address: {}", colorize(address, Color::Cyan));
+    log!(out, " peer_id: {}", colorize(peer_id, Color::Cyan));
+    log!(out, " rpc_url: {}", colorize(rpc_url, Color::Cyan));
+    log!(out, "");
     if config.using_custom_config() {
-        e3_console::log!(
+        log!(
             out,
             "Run future commands from within this directory tree, or pass\n {}\n",
             colorize(
@@ -101,7 +101,7 @@ fn print_info(
             )
         );
     }
-    e3_console::log!(
+    log!(
         out,
         "You can start your node using:\n `{}`\n",
         colorize("enclave start", Color::Yellow)

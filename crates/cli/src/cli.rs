@@ -20,7 +20,7 @@ use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
 use e3_config::validation::ValidUrl;
 use e3_config::{load_config, AppConfig};
-use e3_console::Console;
+use e3_console::{log, Console};
 use e3_entrypoint::helpers::datastore::close_all_connections;
 use tracing::{info, instrument, Level};
 
@@ -116,7 +116,7 @@ impl Cli {
                         .await?;
                     }
                     Commands::Start { .. } => {
-                        e3_console::log!(out,"No configuration found. Setting up enclave configuration...");
+                        log!(out,"No configuration found. Setting up enclave configuration...");
                         ciphernode::setup::execute(
                             out,
                             None,

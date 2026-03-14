@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
-use e3_console::Console;
+use e3_console::{log, Console};
 
 use super::context::ChainContext;
 use super::utils::{ensure_allowance, parse_amount};
@@ -31,7 +31,7 @@ pub(crate) async fn execute(
                 .await?
                 .get_receipt()
                 .await?;
-            e3_console::log!(
+            log!(
                 out,
                 "Purchased {} tickets (tx: {:#x})",
                 amount,
@@ -49,7 +49,7 @@ pub(crate) async fn execute(
                 .await?
                 .get_receipt()
                 .await?;
-            e3_console::log!(
+            log!(
                 out,
                 "Removed {} tickets (tx: {:#x})",
                 amount,

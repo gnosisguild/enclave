@@ -6,7 +6,7 @@
 
 use alloy::primitives::U256;
 use anyhow::Result;
-use e3_console::Console;
+use e3_console::{log, Console};
 
 use super::context::ChainContext;
 use super::utils::{ensure_allowance, parse_amount};
@@ -32,7 +32,7 @@ pub(crate) async fn execute(
                 .await?
                 .get_receipt()
                 .await?;
-            e3_console::log!(
+            log!(
                 out,
                 "Queued {} ENCL for exit (tx: {:#x})",
                 amount,
@@ -71,7 +71,7 @@ pub(crate) async fn execute(
                 .await?
                 .get_receipt()
                 .await?;
-            e3_console::log!(out, "Claimed exits (tx: {:#x})", receipt.transaction_hash);
+            log!(out, "Claimed exits (tx: {:#x})", receipt.transaction_hash);
         }
     }
 
@@ -91,7 +91,7 @@ async fn bond_license(out: Console, ctx: &ChainContext, amount: &str) -> Result<
         .await?
         .get_receipt()
         .await?;
-    e3_console::log!(
+    log!(
         out,
         "Bonded {} ENCL (tx: {:#x})",
         amount,
