@@ -221,6 +221,12 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
+
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
 
@@ -822,6 +828,12 @@ jobs:
         with:
           path: /usr/local/bin/bb
           key: bb-bin-${{ env.BB_VERSION }}-amd64-linux
+
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
 
       - name: Install Barretenberg (bb)
         if: steps.cache-bb.outputs.cache-hit != 'true'
