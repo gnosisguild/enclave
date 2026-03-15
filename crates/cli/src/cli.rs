@@ -293,16 +293,16 @@ pub enum Commands {
     },
 }
 
-pub struct SocketCli {
+pub struct RemoteCli {
     name: Option<String>,
     otel: Option<ValidUrl>,
     quiet: bool,
     config: Option<String>,
     verbose: u8,
-    command: SocketCommand,
+    command: RemoteCommand,
 }
 
-pub enum SocketCommand {
+pub enum RemoteCommand {
     NetGetPeerId,
     NodePs,
     NodeStatus { id: String },
@@ -313,39 +313,39 @@ pub enum SocketCommand {
     PrintEnv { vite: bool, chain: String },
 }
 
-impl TryFrom<Commands> for SocketCommand {
+impl TryFrom<Commands> for RemoteCommand {
     type Error = anyhow::Error;
 
     fn try_from(value: Commands) -> std::result::Result<Self, Self::Error> {
         match value {
-            Commands::Rev => Ok(SocketCommand::Rev),
+            Commands::Rev => Ok(RemoteCommand::Rev),
             Commands::Net {
                 command: NetCommands::GetPeerId,
-            } => Ok(SocketCommand::NetGetPeerId),
+            } => Ok(RemoteCommand::NetGetPeerId),
             Commands::Noir {
                 command: NoirCommands::Status,
-            } => Ok(SocketCommand::NoirStatus),
+            } => Ok(RemoteCommand::NoirStatus),
             Commands::Nodes {
                 command: NodeCommands::Ps,
-            } => Ok(SocketCommand::NodePs),
+            } => Ok(RemoteCommand::NodePs),
             Commands::Nodes {
                 command: NodeCommands::Status { id },
-            } => Ok(SocketCommand::NodeStatus { id }),
+            } => Ok(RemoteCommand::NodeStatus { id }),
             Commands::Ciphernode {
                 command: CiphernodeCommands::Status { chain },
-            } => Ok(SocketCommand::CiphernodeStatus { chain }),
-            Commands::PrintEnv { chain, vite } => Ok(SocketCommand::PrintEnv { vite, chain }),
+            } => Ok(RemoteCommand::CiphernodeStatus { chain }),
+            Commands::PrintEnv { chain, vite } => Ok(RemoteCommand::PrintEnv { vite, chain }),
             Commands::Wallet {
                 command: WalletCommands::Get,
-            } => Ok(SocketCommand::WalletGet),
+            } => Ok(RemoteCommand::WalletGet),
             _ => bail!("Command not allowed while node is running."),
         }
     }
 }
 
-impl TryFrom<SocketCli> for Cli {
+impl TryFrom<RemoteCli> for Cli {
     type Error = anyhow::Error;
-    fn try_from(value: SocketCli) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: RemoteCli) -> std::result::Result<Self, Self::Error> {
         Ok(Cli {
             verbose: value.verbose,
             config: value.config,
@@ -357,30 +357,30 @@ impl TryFrom<SocketCli> for Cli {
     }
 }
 
-impl TryFrom<SocketCommand> for Commands {
+impl TryFrom<RemoteCommand> for Commands {
     type Error = anyhow::Error;
-    fn try_from(value: SocketCommand) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: RemoteCommand) -> std::result::Result<Self, Self::Error> {
         let command = match value {
-            SocketCommand::Rev => Commands::Rev,
-            SocketCommand::WalletGet => Commands::Wallet {
+            RemoteCommand::Rev => Commands::Rev,
+            RemoteCommand::WalletGet => Commands::Wallet {
                 command: WalletCommands::Get,
             },
-            SocketCommand::PrintEnv { vite, chain } => Commands::PrintEnv { vite, chain },
-            SocketCommand::CiphernodeStatus { chain } => Commands::Ciphernode {
+            RemoteCommand::PrintEnv { vite, chain } => Commands::PrintEnv { vite, chain },
+            RemoteCommand::CiphernodeStatus { chain } => Commands::Ciphernode {
                 command: CiphernodeCommands::Status { chain },
             },
-            SocketCommand::NodeStatus { id } => Commands::Nodes {
+            RemoteCommand::NodeStatus { id } => Commands::Nodes {
                 command: NodeCommands::Status { id },
             },
-            SocketCommand::NodePs => Commands::Nodes {
+            RemoteCommand::NodePs => Commands::Nodes {
                 command: NodeCommands::Ps,
             },
-            SocketCommand::NetGetPeerId => Commands::Net {
+            RemoteCommand::NetGetPeerId => Commands::Net {
                 command: NetCommands::GetPeerId,
             },
             _ => bail!("Command not allowed while node is running"),
         };
-        // We might have to hold this stuff on SocketCommand
+        // We might have to hold this stuff on RemoteCommand
         Ok(command)
     }
 }
