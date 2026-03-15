@@ -64,6 +64,7 @@ COPY crates/ciphernode-builder/Cargo.toml crates/ciphernode-builder/Cargo.toml
 COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
 COPY crates/compute-provider/Cargo.toml crates/compute-provider/Cargo.toml
 COPY crates/config/Cargo.toml crates/config/Cargo.toml
+COPY crates/console/Cargo.toml crates/console/Cargo.toml
 COPY crates/crypto/Cargo.toml crates/crypto/Cargo.toml
 COPY crates/data/Cargo.toml crates/data/Cargo.toml
 COPY crates/entrypoint/Cargo.toml crates/entrypoint/Cargo.toml

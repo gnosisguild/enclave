@@ -6,6 +6,7 @@
 
 use clap::Parser;
 use cli::Cli;
+use e3_console::Console;
 use e3_utils::{colorize, Color};
 use tracing::info;
 
@@ -61,9 +62,9 @@ pub fn owo() {
 #[actix::main]
 pub async fn main() {
     info!("COMPILATION ID: '{}'", helpers::compile_id::generate_id());
-
+    let out = Console::stdout();
     // Execute the cli
-    if let Err(err) = Cli::parse().execute().await {
+    if let Err(err) = Cli::parse().execute(out).await {
         eprintln!("{}", colorize(err, Color::Red));
         std::process::exit(1);
     }

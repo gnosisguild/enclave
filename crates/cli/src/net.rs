@@ -7,6 +7,7 @@
 use anyhow::*;
 use clap::Subcommand;
 use e3_config::AppConfig;
+use e3_console::Console;
 
 use crate::net_get_peer_id;
 
@@ -16,9 +17,9 @@ pub enum NetCommands {
     GetPeerId,
 }
 
-pub async fn execute(command: NetCommands, config: &AppConfig) -> Result<()> {
+pub async fn execute(out: &Console, command: NetCommands, config: &AppConfig) -> Result<()> {
     match command {
-        NetCommands::GetPeerId => net_get_peer_id::execute(config).await?,
+        NetCommands::GetPeerId => net_get_peer_id::execute(out, config).await?,
     };
 
     Ok(())
