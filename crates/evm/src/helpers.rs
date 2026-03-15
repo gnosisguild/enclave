@@ -142,19 +142,10 @@ impl ProviderConfig {
     ) -> Result<EthProvider<ConcreteWriteProvider>> {
         let wallet = EthereumWallet::from(signer.clone());
 
-        let provider = if self.rpc.is_websocket() {
-            ProviderBuilder::new()
-                .with_simple_nonce_management()
-                .wallet(wallet)
-                .connect_ws(self.create_ws_connect()?)
-                .await
-                .context("Failed to connect to WebSocket RPC. Check if the node is running and URL is correct.")?
-        } else {
-            ProviderBuilder::new()
-                .with_simple_nonce_management()
-                .wallet(wallet)
-                .connect_client(self.create_http_client()?)
-        };
+        let provider = ProviderBuilder::new()
+            .with_simple_nonce_management()
+            .wallet(wallet)
+            .connect_client(self.create_http_client()?);
 
         EthProvider::new(provider).await
     }

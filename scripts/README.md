@@ -278,15 +278,17 @@ Automates the full pipeline from Noir circuits to on-chain Solidity verifiers:
 3. **Generates verification keys** using `bb write_vk -t evm`
 4. **Generates Solidity verifiers** using `bb write_solidity_verifier`
 5. **Post-processes** the generated Solidity:
-   - Renames contract from `HonkVerifier` to descriptive name (e.g., `DkgPkVerifier`,
+   - Renames contract from `HonkVerifier` to descriptive name (e.g., `ThresholdPkAggregationVerifier`,
      `ThresholdPkGenerationVerifier`)
    - Replaces Apache-2.0 license header with LGPL-3.0-only
 6. **Outputs** to `packages/enclave-contracts/contracts/verifier/`
 
 ### Options
 
+The `generate:verifiers` script in package.json passes `--circuits` with the on-chain used list.
+
+- `--circuits <list>` - Circuit names, comma-separated. Omit to generate all.
 - `--group <groups>` - Circuit groups (comma-separated: dkg,threshold,recursive_aggregation)
-- `--circuit <name>` - Generate verifier for specific circuit(s) (repeatable)
 - `--clean` - Remove existing verifier directory before generating
 - `--no-compile` - Don't compile circuits automatically (fail if not already compiled)
 - `--dry-run` - Show what would be generated without doing anything
@@ -302,14 +304,14 @@ Automates the full pipeline from Noir circuits to on-chain Solidity verifiers:
 ```
 🔮 Generating Solidity verifiers from Noir circuits...
 
-   Found 13 circuit(s)
+   Found 4 circuit(s)
 
-   ✓ dkg/pk → DkgPkVerifier.sol
-   ✓ dkg/sk_share_computation → DkgSkShareComputationVerifier.sol
-   ✓ threshold/pk_generation → ThresholdPkGenerationVerifier.sol
-   ...
+   ✓ threshold/pk_aggregation → ThresholdPkAggregationVerifier.sol
+   ✓ threshold/decrypted_shares_aggregation_bn → ThresholdDecryptedSharesAggregationBnVerifier.sol
+   ✓ threshold/decrypted_shares_aggregation_mod → ThresholdDecryptedSharesAggregationModVerifier.sol
+   ✓ recursive_aggregation/fold → RecursiveAggregationFoldVerifier.sol
 
-✅ Generated 13 Solidity verifier(s) in:
+✅ Generated 4 Solidity verifier(s) in:
    packages/enclave-contracts/contracts/verifier/
 ```
 

@@ -14,5 +14,6 @@ else
 fi
 
 echo "TEST E2E SCRIPT STARTING..."
-pnpm concurrently -krs first ./scripts/dev.sh "wait-on tcp:3000 && sleep 20 && ${PLAYWRIGHT_CMD} && sleep 3"
+# Wait for client then give ciphernodes extra time to fully initialize DKG listeners
+pnpm concurrently -krs first ./scripts/dev.sh "wait-on tcp:3000 && sleep 45 && ${PLAYWRIGHT_CMD} && sleep 3"
   
