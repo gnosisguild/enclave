@@ -38,6 +38,32 @@ use e3_events::{
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
 
+/// Trait for party types whose signed proofs can be ECDSA-validated and ZK-verified.
+trait VerifiableParty: Clone {
+    fn party_id(&self) -> u64;
+    fn signed_proofs(&self) -> Vec<SignedProofPayload>;
+}
+
+impl VerifiableParty for PartyProofsToVerify {
+    fn party_id(&self) -> u64 {
+        self.sender_party_id
+    }
+    fn signed_proofs(&self) -> Vec<SignedProofPayload> {
+        self.signed_proofs.clone()
+    }
+}
+
+impl VerifiableParty for PartyShareDecryptionProofsToVerify {
+    fn party_id(&self) -> u64 {
+        self.sender_party_id
+    }
+    fn signed_proofs(&self) -> Vec<SignedProofPayload> {
+        std::iter::once(self.signed_sk_decryption_proof.clone())
+            .chain(self.signed_e_sm_decryption_proofs.iter().cloned())
+            .collect()
+    }
+}
+
 /// ECDSA validation result for a single party.
 struct EcdsaPartyResult {
     passed: bool,
@@ -106,22 +132,57 @@ impl ShareVerificationActor {
             VerificationKind::ShareProofs
             | VerificationKind::ThresholdDecryptionProofs
             | VerificationKind::PkGenerationProofs => {
-                self.verify_share_proofs(e3_id, msg.kind, msg.share_proofs, msg.pre_dishonest, ec);
+                let kind = msg.kind.clone();
+                self.verify_proofs(
+                    e3_id,
+                    kind.clone(),
+                    msg.share_proofs,
+                    msg.pre_dishonest,
+                    ec,
+                    |passed, corr_id, e3| {
+                        ComputeRequest::zk(
+                            ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
+                                party_proofs: passed,
+                            }),
+                            corr_id,
+                            e3,
+                        )
+                    },
+                );
             }
             VerificationKind::DecryptionProofs => {
-                self.verify_decryption_proofs(e3_id, msg.decryption_proofs, msg.pre_dishonest, ec);
+                self.verify_proofs(
+                    e3_id,
+                    VerificationKind::DecryptionProofs,
+                    msg.decryption_proofs,
+                    msg.pre_dishonest,
+                    ec,
+                    |passed, corr_id, e3| {
+                        ComputeRequest::zk(
+                            ZkRequest::VerifyShareDecryptionProofs(
+                                VerifyShareDecryptionProofsRequest {
+                                    party_proofs: passed,
+                                },
+                            ),
+                            corr_id,
+                            e3,
+                        )
+                    },
+                );
             }
         }
     }
 
-    /// C2/C3/C6/C1 verification: ECDSA check on each party, then dispatch ZK.
-    fn verify_share_proofs(
+    /// Generic ECDSA + ZK verification: validates signed proofs for each party,
+    /// then dispatches ZK verification for ECDSA-passed parties.
+    fn verify_proofs<P: VerifiableParty>(
         &mut self,
         e3_id: E3id,
         kind: VerificationKind,
-        party_proofs: Vec<PartyProofsToVerify>,
+        party_proofs: Vec<P>,
         pre_dishonest: BTreeSet<u64>,
         ec: EventContext<Sequenced>,
+        build_request: impl FnOnce(Vec<P>, CorrelationId, E3id) -> ComputeRequest,
     ) {
         let e3_id_str = e3_id.to_string();
         let label = match &kind {
@@ -135,28 +196,26 @@ impl ShareVerificationActor {
         let mut party_addresses: HashMap<u64, Address> = HashMap::new();
 
         for party in &party_proofs {
-            let result = self.ecdsa_validate_signed_proofs(
-                party.sender_party_id,
-                &party.signed_proofs,
-                &e3_id_str,
-                label,
-            );
+            let proofs = party.signed_proofs();
+            let result =
+                self.ecdsa_validate_signed_proofs(party.party_id(), &proofs, &e3_id_str, label);
             if result.passed {
                 ecdsa_passed_parties.push(party.clone());
             } else {
-                ecdsa_dishonest.insert(party.sender_party_id);
+                ecdsa_dishonest.insert(party.party_id());
                 if let Some((ref signed, addr)) = result.failed_payload {
-                    self.emit_signed_proof_failed(&e3_id, signed, addr, party.sender_party_id, &ec);
+                    self.emit_signed_proof_failed(&e3_id, signed, addr, party.party_id(), &ec);
                 }
             }
         }
 
         // Store recovered addresses for passed parties
         for party in &party_proofs {
-            if !ecdsa_dishonest.contains(&party.sender_party_id) {
-                if let Some(first_signed) = party.signed_proofs.first() {
+            if !ecdsa_dishonest.contains(&party.party_id()) {
+                let proofs = party.signed_proofs();
+                if let Some(first_signed) = proofs.first() {
                     if let Ok(addr) = first_signed.recover_address() {
-                        party_addresses.insert(party.sender_party_id, addr);
+                        party_addresses.insert(party.party_id(), addr);
                     }
                 }
             }
@@ -172,16 +231,14 @@ impl ShareVerificationActor {
 
         // Dispatch ZK-only verification to multithread
         let correlation_id = CorrelationId::new();
-        let dispatched_party_ids: HashSet<u64> = ecdsa_passed_parties
-            .iter()
-            .map(|p| p.sender_party_id)
-            .collect();
+        let dispatched_party_ids: HashSet<u64> =
+            ecdsa_passed_parties.iter().map(|p| p.party_id()).collect();
 
         // Compute proof hashes for ECDSA-passed parties (for ProofVerificationPassed on success)
         let mut party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>> = HashMap::new();
         for party in &ecdsa_passed_parties {
             let hashes: Vec<(ProofType, [u8; 32])> = party
-                .signed_proofs
+                .signed_proofs()
                 .iter()
                 .map(|signed| {
                     let msg = (
@@ -192,7 +249,7 @@ impl ShareVerificationActor {
                     (signed.payload.proof_type, keccak256(&msg).into())
                 })
                 .collect();
-            party_proof_hashes.insert(party.sender_party_id, hashes);
+            party_proof_hashes.insert(party.party_id(), hashes);
         }
 
         self.pending.insert(
@@ -209,13 +266,7 @@ impl ShareVerificationActor {
             },
         );
 
-        let request = ComputeRequest::zk(
-            ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
-                party_proofs: ecdsa_passed_parties,
-            }),
-            correlation_id,
-            e3_id.clone(),
-        );
+        let request = build_request(ecdsa_passed_parties, correlation_id, e3_id.clone());
 
         if let Err(err) = self.bus.publish(request, ec.clone()) {
             error!("Failed to dispatch {} ZK verification: {err}", label);
@@ -225,122 +276,6 @@ impl ShareVerificationActor {
                 // Dispatched parties were never ZK-verified — treat as dishonest
                 all_dishonest.extend(pending.dispatched_party_ids);
                 self.publish_complete(e3_id, kind, all_dishonest, ec);
-            }
-        }
-    }
-
-    /// C4 verification: ECDSA check on each party, then dispatch ZK.
-    fn verify_decryption_proofs(
-        &mut self,
-        e3_id: E3id,
-        party_proofs: Vec<PartyShareDecryptionProofsToVerify>,
-        pre_dishonest: BTreeSet<u64>,
-        ec: EventContext<Sequenced>,
-    ) {
-        let e3_id_str = e3_id.to_string();
-        let mut ecdsa_dishonest = HashSet::new();
-        let mut ecdsa_passed_parties = Vec::new();
-        let mut party_addresses: HashMap<u64, Address> = HashMap::new();
-
-        for party in &party_proofs {
-            // Flatten all signed proofs (SK + ESMs)
-            let all_signed: Vec<&SignedProofPayload> =
-                std::iter::once(&party.signed_sk_decryption_proof)
-                    .chain(party.signed_esm_decryption_proofs.iter())
-                    .collect();
-            let all_signed_cloned: Vec<SignedProofPayload> =
-                all_signed.iter().map(|s| (*s).clone()).collect();
-
-            let result = self.ecdsa_validate_signed_proofs(
-                party.sender_party_id,
-                &all_signed_cloned,
-                &e3_id_str,
-                "C4",
-            );
-
-            if result.passed {
-                ecdsa_passed_parties.push(party.clone());
-            } else {
-                ecdsa_dishonest.insert(party.sender_party_id);
-                if let Some((ref signed, addr)) = result.failed_payload {
-                    self.emit_signed_proof_failed(&e3_id, signed, addr, party.sender_party_id, &ec);
-                }
-            }
-        }
-
-        // Store recovered addresses for passed parties
-        for party in &party_proofs {
-            if !ecdsa_dishonest.contains(&party.sender_party_id) {
-                if let Ok(addr) = party.signed_sk_decryption_proof.recover_address() {
-                    party_addresses.insert(party.sender_party_id, addr);
-                }
-            }
-        }
-
-        if ecdsa_passed_parties.is_empty() {
-            let mut all_dishonest: BTreeSet<u64> = pre_dishonest;
-            all_dishonest.extend(ecdsa_dishonest);
-            self.publish_complete(e3_id, VerificationKind::DecryptionProofs, all_dishonest, ec);
-            return;
-        }
-
-        let correlation_id = CorrelationId::new();
-        let dispatched_party_ids: HashSet<u64> = ecdsa_passed_parties
-            .iter()
-            .map(|p| p.sender_party_id)
-            .collect();
-
-        // Compute proof hashes for ECDSA-passed parties (for ProofVerificationPassed on success)
-        let mut party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>> = HashMap::new();
-        for party in &ecdsa_passed_parties {
-            let all_signed: Vec<&SignedProofPayload> =
-                std::iter::once(&party.signed_sk_decryption_proof)
-                    .chain(party.signed_esm_decryption_proofs.iter())
-                    .collect();
-            let hashes: Vec<(ProofType, [u8; 32])> = all_signed
-                .iter()
-                .map(|signed| {
-                    let msg = (
-                        Bytes::copy_from_slice(&signed.payload.proof.data),
-                        Bytes::copy_from_slice(&signed.payload.proof.public_signals),
-                    )
-                        .abi_encode();
-                    (signed.payload.proof_type, keccak256(&msg).into())
-                })
-                .collect();
-            party_proof_hashes.insert(party.sender_party_id, hashes);
-        }
-
-        self.pending.insert(
-            correlation_id,
-            PendingVerification {
-                e3_id: e3_id.clone(),
-                kind: VerificationKind::DecryptionProofs,
-                ec: ec.clone(),
-                ecdsa_dishonest,
-                pre_dishonest,
-                dispatched_party_ids,
-                party_addresses,
-                party_proof_hashes,
-            },
-        );
-
-        let request = ComputeRequest::zk(
-            ZkRequest::VerifyShareDecryptionProofs(VerifyShareDecryptionProofsRequest {
-                party_proofs: ecdsa_passed_parties,
-            }),
-            correlation_id,
-            e3_id.clone(),
-        );
-
-        if let Err(err) = self.bus.publish(request, ec.clone()) {
-            error!("Failed to dispatch C4 ZK verification: {err}");
-            if let Some(pending) = self.pending.remove(&correlation_id) {
-                let mut all_dishonest: BTreeSet<u64> = pending.pre_dishonest;
-                all_dishonest.extend(pending.ecdsa_dishonest);
-                // Dispatched parties were never ZK-verified — treat as dishonest
-                all_dishonest.extend(pending.dispatched_party_ids);
-                self.publish_complete(e3_id, VerificationKind::DecryptionProofs, all_dishonest, ec);
             }
         }
     }
