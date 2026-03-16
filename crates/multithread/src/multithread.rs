@@ -1159,7 +1159,7 @@ fn handle_verify_share_decryption_proofs(
 
             // Guard: an empty esm_decryption_proofs vec would make this loop
             // vacuously true.  Defence-in-depth: reject any party with zero ESM proofs.
-            if party.signed_esm_decryption_proofs.is_empty() {
+            if party.signed_e_sm_decryption_proofs.is_empty() {
                 return PartyVerificationResult {
                     sender_party_id: sender,
                     all_verified: false,
@@ -1171,7 +1171,7 @@ fn handle_verify_share_decryption_proofs(
             // Flatten all signed proofs (SK + ESMs) and verify uniformly.
             let all_signed: Vec<&e3_events::SignedProofPayload> =
                 std::iter::once(&party.signed_sk_decryption_proof)
-                    .chain(party.signed_esm_decryption_proofs.iter())
+                    .chain(party.signed_e_sm_decryption_proofs.iter())
                     .collect();
 
             for signed_proof in &all_signed {

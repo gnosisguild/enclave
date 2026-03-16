@@ -1924,11 +1924,11 @@ impl ThresholdKeyshare {
         let party_proofs: Vec<PartyShareDecryptionProofsToVerify> = collected_shares
             .iter()
             .filter_map(|(&party_id, share)| {
-                if share.signed_esm_decryption_proofs.len() != expected_esm {
+                if share.signed_e_sm_decryption_proofs.len() != expected_esm {
                     warn!(
                         "Party {} has wrong ESM proof count ({} vs expected {}) for E3 {} — treating as dishonest",
                         party_id,
-                        share.signed_esm_decryption_proofs.len(),
+                        share.signed_e_sm_decryption_proofs.len(),
                         expected_esm,
                         e3_id
                     );
@@ -1938,7 +1938,7 @@ impl ThresholdKeyshare {
                     Some(PartyShareDecryptionProofsToVerify {
                         sender_party_id: party_id,
                         signed_sk_decryption_proof: share.signed_sk_decryption_proof.clone(),
-                        signed_esm_decryption_proofs: share.signed_esm_decryption_proofs.clone(),
+                        signed_e_sm_decryption_proofs: share.signed_e_sm_decryption_proofs.clone(),
                     })
                 }
             })

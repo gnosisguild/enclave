@@ -697,7 +697,7 @@ impl ProofRequestActor {
         // Sign C4a (SK decryption proof)
         let Some(signed_sk) = self.sign_proof(
             e3_id,
-            ProofType::T2DkgShareDecryption,
+            ProofType::C4DkgShareDecryption,
             pending.sk_proof.expect("checked in is_complete"),
         ) else {
             error!("Failed to sign C4a SK proof — DecryptionKeyShared will not be published");
@@ -712,7 +712,7 @@ impl ProofRequestActor {
                 .get(&idx)
                 .expect("checked in is_complete")
                 .clone();
-            let Some(signed) = self.sign_proof(e3_id, ProofType::T2DkgShareDecryption, proof)
+            let Some(signed) = self.sign_proof(e3_id, ProofType::C4DkgShareDecryption, proof)
             else {
                 error!(
                     "Failed to sign C4b ESM proof [{}] — DecryptionKeyShared will not be published",
@@ -738,7 +738,7 @@ impl ProofRequestActor {
                 sk_poly_sum: pending.sk_poly_sum,
                 es_poly_sum: pending.es_poly_sum,
                 signed_sk_decryption_proof: signed_sk,
-                signed_esm_decryption_proofs: signed_esms,
+                signed_e_sm_decryption_proofs: signed_esms,
                 external: false,
             },
             pending.ec,
@@ -826,7 +826,9 @@ impl ProofRequestActor {
         // Sign raw C6 proofs (for ShareVerification)
         let mut signed_proofs = Vec::with_capacity(proofs.len());
         for proof in proofs {
-            let Some(signed) = self.sign_proof(&e3_id, ProofType::T5ShareDecryption, proof) else {
+            let Some(signed) =
+                self.sign_proof(&e3_id, ProofType::C6ThresholdShareDecryption, proof)
+            else {
                 error!("Failed to sign C6 proof — DecryptionshareCreated will not be published");
                 return;
             };
@@ -1004,7 +1006,7 @@ impl ProofRequestActor {
         let mut signed_proofs = Vec::with_capacity(proofs.len());
         for proof in proofs {
             let Some(signed) =
-                self.sign_proof(&e3_id, ProofType::T6DecryptedSharesAggregation, proof)
+                self.sign_proof(&e3_id, ProofType::C7DecryptedSharesAggregation, proof)
             else {
                 error!("Failed to sign C7 proof — AggregationProofSigned will not be published");
                 return;
