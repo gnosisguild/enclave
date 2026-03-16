@@ -93,10 +93,8 @@ pub enum CircuitName {
     PkAggregation,
     /// Decryption share proof (C6).
     ThresholdShareDecryption,
-    /// Decrypted shares aggregation proof — BigNum variant (C7a).
-    DecryptedSharesAggregationBn,
-    /// Decrypted shares aggregation proof — Modular variant (C7b).
-    DecryptedSharesAggregationMod,
+    /// Decrypted shares aggregation proof (C7).
+    DecryptedSharesAggregation,
     /// Recursive aggregation fold circuit (independent; lives at recursive_aggregation/fold).
     Fold,
 }
@@ -112,8 +110,7 @@ impl CircuitName {
             CircuitName::DkgShareDecryption => "share_decryption",
             CircuitName::PkAggregation => "pk_aggregation",
             CircuitName::ThresholdShareDecryption => "share_decryption",
-            CircuitName::DecryptedSharesAggregationBn => "decrypted_shares_aggregation_bn",
-            CircuitName::DecryptedSharesAggregationMod => "decrypted_shares_aggregation_mod",
+            CircuitName::DecryptedSharesAggregation => "decrypted_shares_aggregation",
             CircuitName::Fold => "fold",
         }
     }
@@ -128,8 +125,7 @@ impl CircuitName {
             CircuitName::PkGeneration => "threshold",
             CircuitName::ThresholdShareDecryption => "threshold",
             CircuitName::PkAggregation => "threshold",
-            CircuitName::DecryptedSharesAggregationBn => "threshold",
-            CircuitName::DecryptedSharesAggregationMod => "threshold",
+            CircuitName::DecryptedSharesAggregation => "threshold",
             CircuitName::Fold => "recursive_aggregation",
         }
     }

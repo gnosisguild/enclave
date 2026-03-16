@@ -61,10 +61,7 @@ impl ProofType {
             ProofType::C3bESmShareEncryption => vec![CircuitName::ShareEncryption],
             ProofType::C4DkgShareDecryption => vec![CircuitName::DkgShareDecryption],
             ProofType::C6ThresholdShareDecryption => vec![CircuitName::ThresholdShareDecryption],
-            ProofType::C7DecryptedSharesAggregation => vec![
-                CircuitName::DecryptedSharesAggregationBn,
-                CircuitName::DecryptedSharesAggregationMod,
-            ],
+            ProofType::C7DecryptedSharesAggregation => vec![CircuitName::DecryptedSharesAggregation],
             ProofType::C5PkAggregation => vec![CircuitName::PkAggregation],
         }
     }
@@ -401,10 +398,7 @@ mod tests {
         );
         assert_eq!(
             ProofType::C7DecryptedSharesAggregation.circuit_names(),
-            vec![
-                CircuitName::DecryptedSharesAggregationBn,
-                CircuitName::DecryptedSharesAggregationMod,
-            ]
+            vec![CircuitName::DecryptedSharesAggregation]
         );
     }
 }

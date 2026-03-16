@@ -399,7 +399,7 @@ Options:
   -h, --help             Show this help message
 
 Examples:
-  pnpm generate:verifiers --circuits pk,pk_aggregation,decrypted_shares_aggregation_bn,decrypted_shares_aggregation_mod,fold
+  pnpm generate:verifiers --circuits pk,pk_aggregation,decrypted_shares_aggregation,fold
   pnpm generate:verifiers --circuits pk --clean
 `)
 }

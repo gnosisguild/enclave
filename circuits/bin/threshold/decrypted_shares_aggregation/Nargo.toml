@@ -1,5 +1,5 @@
 [package]
-name = "decrypted_shares_aggregation_bn"
+name = "decrypted_shares_aggregation"
 type = "bin"
 authors = ["Gnosis Guild / Enclave"]
 

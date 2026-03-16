@@ -198,11 +198,11 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             ".vk_noir_hash",
         )
         .await;
-        // C7 (decrypted_shares_aggregation_mod)
+        // C7 (decrypted_shares_aggregation)
         copy_circuit(
             &threshold_target,
-            &rv.join("threshold/decrypted_shares_aggregation_mod"),
-            "decrypted_shares_aggregation_mod",
+            &rv.join("threshold/decrypted_shares_aggregation"),
+            "decrypted_shares_aggregation",
             ".vk_noir",
             ".vk_noir_hash",
         )
@@ -330,11 +330,11 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             ".vk_hash",
         )
         .await;
-        // C7 (decrypted_shares_aggregation_mod) — EVM-targeted
+        // C7 (decrypted_shares_aggregation) — EVM-targeted
         copy_circuit(
             &threshold_target,
-            &ev.join("threshold/decrypted_shares_aggregation_mod"),
-            "decrypted_shares_aggregation_mod",
+            &ev.join("threshold/decrypted_shares_aggregation"),
+            "decrypted_shares_aggregation",
             ".vk",
             ".vk_hash",
         )

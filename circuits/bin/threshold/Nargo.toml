@@ -6,7 +6,5 @@ members = [
     "user_data_encryption_ct0",
     "user_data_encryption_ct1",
     "share_decryption",
-    "decrypted_shares_aggregation_bn",
-    "decrypted_shares_aggregation_mod"  
-    
+    "decrypted_shares_aggregation",
 ]

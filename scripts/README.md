@@ -307,8 +307,7 @@ The `generate:verifiers` script in package.json passes `--circuits` with the on-
    Found 4 circuit(s)
 
    ✓ threshold/pk_aggregation → ThresholdPkAggregationVerifier.sol
-   ✓ threshold/decrypted_shares_aggregation_bn → ThresholdDecryptedSharesAggregationBnVerifier.sol
-   ✓ threshold/decrypted_shares_aggregation_mod → ThresholdDecryptedSharesAggregationModVerifier.sol
+   ✓ threshold/decrypted_shares_aggregation → ThresholdDecryptedSharesAggregationVerifier.sol
    ✓ recursive_aggregation/fold → RecursiveAggregationFoldVerifier.sol
 
 ✅ Generated 4 Solidity verifier(s) in:
