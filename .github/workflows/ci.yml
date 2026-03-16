@@ -25,6 +25,7 @@ env:
   RUST_BACKTRACE: 1
 
 permissions:
+  actions: write
   contents: read
   packages: write
 
@@ -161,6 +162,12 @@ jobs:
 
       - name: Run Unit Tests
         run: 'cargo test --lib && cargo test --doc'
+
+      - name: Cancel workflow on failure
+        if: failure()
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   rust_integration_tests:
     needs: [detect_changes]
@@ -369,6 +376,12 @@ jobs:
         run: |
           echo "## Test results" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cancel workflow on failure
+        if: failure()
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   test_net:
     needs: [detect_changes]
