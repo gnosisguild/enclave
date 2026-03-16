@@ -24,6 +24,7 @@ import {
 } from "../../types";
 import type { MockCircuitVerifier } from "../../types";
 import type { SlashingManager } from "../../types/contracts/slashing/SlashingManager";
+import { VOTE_TYPEHASH, signAndEncodeAttestation } from "../fixtures";
 
 const { ethers, networkHelpers, ignition } = await network.connect();
 const { loadFixture, time } = networkHelpers;
@@ -46,103 +47,6 @@ describe("SlashingManager", function () {
   const addressOne = "0x0000000000000000000000000000000000000001";
 
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-
-  // Must match the VOTE_TYPEHASH in SlashingManager.sol
-  const VOTE_TYPEHASH = ethers.keccak256(
-    ethers.toUtf8Bytes(
-      "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)",
-    ),
-  );
-
-  /**
-   * Helper to create signed committee attestation evidence for Lane A.
-   * Each voter signs a VOTE_TYPEHASH-structured digest via personal_sign (EIP-191).
-   * Returns abi.encode(proofType, voters, agrees, dataHashes, signatures)
-   * with voters sorted ascending by address.
-   */
-  async function signAndEncodeAttestation(
-    voterSigners: any[],
-    e3Id: number,
-    operator: string,
-    proofType: number = 0,
-    chainId: number = 31337,
-    dataHash: string = ethers.ZeroHash,
-    agreesOverride?: boolean[],
-  ): Promise<string> {
-    // Compute accusationId matching AccusationManager::accusation_id() on Rust side
-    const accusationId = ethers.keccak256(
-      ethers.solidityPacked(
-        ["uint256", "uint256", "address", "uint256"],
-        [chainId, e3Id, operator, proofType],
-      ),
-    );
-
-    // Sort voters by address ascending (required by contract to prevent duplicates)
-    const signersWithAddrs = await Promise.all(
-      voterSigners.map(async (s, idx) => ({
-        signer: s,
-        address: await s.getAddress(),
-        originalIndex: idx,
-      })),
-    );
-    signersWithAddrs.sort((a, b) =>
-      a.address.toLowerCase() < b.address.toLowerCase()
-        ? -1
-        : a.address.toLowerCase() > b.address.toLowerCase()
-          ? 1
-          : 0,
-    );
-
-    const voters: string[] = [];
-    const agrees: boolean[] = [];
-    const dataHashes: string[] = [];
-    const signatures: string[] = [];
-
-    for (let i = 0; i < signersWithAddrs.length; i++) {
-      const {
-        signer,
-        address: voterAddress,
-        originalIndex,
-      } = signersWithAddrs[i];
-      const voteAgrees =
-        agreesOverride !== undefined ? agreesOverride[originalIndex] : true;
-
-      voters.push(voterAddress);
-      agrees.push(voteAgrees);
-      dataHashes.push(dataHash);
-
-      // Reconstruct vote digest matching _verifyAttestationEvidence
-      const messageHash = ethers.keccak256(
-        abiCoder.encode(
-          [
-            "bytes32",
-            "uint256",
-            "uint256",
-            "bytes32",
-            "address",
-            "bool",
-            "bytes32",
-          ],
-          [
-            VOTE_TYPEHASH,
-            chainId,
-            e3Id,
-            accusationId,
-            voterAddress,
-            voteAgrees,
-            dataHash,
-          ],
-        ),
-      );
-      const signature = await signer.signMessage(ethers.getBytes(messageHash));
-      signatures.push(signature);
-    }
-
-    return abiCoder.encode(
-      ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]"],
-      [proofType, voters, agrees, dataHashes, signatures],
-    );
-  }
 
   /**
    * Encodes a minimal attestation evidence for tests that check early
