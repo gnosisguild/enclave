@@ -6,7 +6,6 @@
 
 pub mod block_listener;
 pub mod contracts;
-pub mod error_decoder;
 pub mod event_listener;
 pub mod events;
 pub mod retry;

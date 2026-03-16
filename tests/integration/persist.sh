@@ -13,7 +13,7 @@ heading "Start the EVM node"
 
 launch_evm
 
-until curl -sf -X POST http://0.0.0.0:8545 -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' > /dev/null; do
+until curl -sf -X POST http://localhost:8545 -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' > /dev/null; do
   sleep 1
 done
 

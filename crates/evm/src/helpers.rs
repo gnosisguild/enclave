@@ -264,7 +264,7 @@ where
                 match fut.await {
                     Ok(receipt) => Ok(receipt),
                     Err(e) => {
-                        let error_str = format!("{}", e);
+                        let error_str = format!("{e:#}");
                         let decoded = decode_error_from_str(&error_str);
                         let display_error = decoded.as_deref().unwrap_or(&error_str);
                         let retry_refs: Vec<&str> =

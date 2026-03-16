@@ -7,7 +7,6 @@
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
 use e3_fhe_params::default_param_set;
 use e3_sdk::evm_helpers::contracts::E3Stage;
-use e3_sdk::evm_helpers::error_decoder::format_evm_error;
 use evm_helpers::CRISPContract;
 use log::info;
 use reqwest::Client;
@@ -103,13 +102,13 @@ pub async fn initialize_crisp_round(
                 info!("E3 Program not enabled, attempting to enable...");
                 match contract.enable_e3_program(e3_program).await {
                     Ok(res) => info!("E3 Program enabled. TxHash: {:?}", res.transaction_hash),
-                    Err(e) => info!("Error enabling E3 Program: {}", format_evm_error(&anyhow::anyhow!("{:?}", e))),
+                    Err(e) => info!("Error enabling E3 Program: {:?}", e),
                 }
             } else {
                 info!("E3 Program already enabled");
             }
         }
-        Err(e) => info!("Error checking E3 Program enabled: {}", format_evm_error(&anyhow::anyhow!("{:?}", e))),
+        Err(e) => info!("Error checking E3 Program enabled: {:?}", e),
     }
 
     let token_address: Address = token_address.parse()?;
