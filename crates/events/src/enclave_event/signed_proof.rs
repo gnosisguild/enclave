@@ -61,7 +61,9 @@ impl ProofType {
             ProofType::C3bESmShareEncryption => vec![CircuitName::ShareEncryption],
             ProofType::C4DkgShareDecryption => vec![CircuitName::DkgShareDecryption],
             ProofType::C6ThresholdShareDecryption => vec![CircuitName::ThresholdShareDecryption],
-            ProofType::C7DecryptedSharesAggregation => vec![CircuitName::DecryptedSharesAggregation],
+            ProofType::C7DecryptedSharesAggregation => {
+                vec![CircuitName::DecryptedSharesAggregation]
+            }
             ProofType::C5PkAggregation => vec![CircuitName::PkAggregation],
         }
     }
