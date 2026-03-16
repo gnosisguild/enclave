@@ -3,7 +3,6 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-use crate::{trap, EType, PanicDispatcher};
 use actix::{Actor, Addr, AsyncContext, Handler, Message, Recipient};
 use e3_utils::MAILBOX_LIMIT;
 use std::{
@@ -150,25 +149,22 @@ impl Handler<StartTimelock> for TimelockQueue {
 impl Handler<Tick> for TimelockQueue {
     type Result = ();
     fn handle(&mut self, _: Tick, _: &mut Self::Context) -> Self::Result {
-        trap(EType::IO, &PanicDispatcher::new(), || {
-            let now_time = Duration::from_micros(self.clock.now_micros());
-            debug!(
-                "Running timelock tick. waiting times: {:?}.",
-                self.timelocks
-                    .iter()
-                    .map(|t| t.0.expiry.saturating_sub(now_time))
-                    .collect::<Vec<_>>(),
-            );
+        let now_time = Duration::from_micros(self.clock.now_micros());
+        debug!(
+            "Running timelock tick. waiting times: {:?}.",
+            self.timelocks
+                .iter()
+                .map(|t| t.0.expiry.saturating_sub(now_time))
+                .collect::<Vec<_>>(),
+        );
 
-            while self.timelocks.len() > 0 && self.next_timelock_lt(now_time) {
-                if let Some(tl) = self.timelocks.pop() {
-                    let seq = tl.0.seq;
-                    debug!("Flushing seq {}", seq);
-                    self.batch_router.try_send(FlushSeq(seq))?;
-                }
+        while self.timelocks.len() > 0 && self.next_timelock_lt(now_time) {
+            if let Some(tl) = self.timelocks.pop() {
+                let seq = tl.0.seq;
+                debug!("Flushing seq {}", seq);
+                self.batch_router.do_send(FlushSeq(seq));
             }
-            Ok(())
-        })
+        }
     }
 }
 

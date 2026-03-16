@@ -8,7 +8,7 @@ use super::{
     timelock_queue::{Clock, StartTimelock, SystemClock, Tick, TimelockQueue},
     AggregateConfig,
 };
-use crate::{trap, EType, EnclaveEvent, Insert, InsertBatch, PanicDispatcher};
+use crate::{EnclaveEvent, Insert, InsertBatch};
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Result;
 use e3_utils::MAILBOX_LIMIT;
@@ -94,24 +94,18 @@ impl Actor for SnapshotBuffer {
 impl Handler<FlushSeq> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: FlushSeq, _: &mut Self::Context) -> Self::Result {
-        trap(EType::IO, &PanicDispatcher::new(), || {
-            if let Some(ref router) = self.router {
-                router.try_send(msg)?;
-            }
-            Ok(())
-        })
+        if let Some(ref router) = self.router {
+            router.do_send(msg);
+        }
     }
 }
 
 impl Handler<StartTimelock> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: StartTimelock, _: &mut Self::Context) -> Self::Result {
-        trap(EType::IO, &PanicDispatcher::new(), || {
-            if let Some(ref timelock) = self.timelock {
-                timelock.try_send(msg)?;
-            }
-            Ok(())
-        })
+        if let Some(ref timelock) = self.timelock {
+            timelock.do_send(msg);
+        }
     }
 }
 
@@ -128,49 +122,37 @@ impl Handler<SetDependencies> for SnapshotBuffer {
 impl Handler<Insert> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: Insert, _: &mut Self::Context) -> Self::Result {
-        trap(EType::IO, &PanicDispatcher::new(), || {
-            if let Some(ref router) = self.router {
-                trace!("Forwarding Insert message to batch router...");
-                router.try_send(msg)?;
-            };
-            Ok(())
-        })
+        if let Some(ref router) = self.router {
+            trace!("Forwarding Insert message to batch router...");
+            router.do_send(msg);
+        }
     }
 }
 
 impl Handler<EnclaveEvent> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
-        trap(EType::IO, &PanicDispatcher::new(), || {
-            if let Some(ref router) = self.router {
-                router.try_send(msg)?;
-            }
-            Ok(())
-        })
+        if let Some(ref router) = self.router {
+            router.do_send(msg);
+        }
     }
 }
 
 impl Handler<Tick> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: Tick, _: &mut Self::Context) -> Self::Result {
-        trap(EType::IO, &PanicDispatcher::new(), || {
-            if let Some(ref tickable) = self.tickable {
-                tickable.try_send(msg)?;
-            }
-            Ok(())
-        })
+        if let Some(ref tickable) = self.tickable {
+            tickable.do_send(msg);
+        }
     }
 }
 
 impl Handler<UpdateDestination> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: UpdateDestination, _: &mut Self::Context) -> Self::Result {
-        trap(EType::IO, &PanicDispatcher::new(), || {
-            if let Some(ref router) = self.router {
-                router.try_send(msg)?;
-            }
-            Ok(())
-        })
+        if let Some(ref router) = self.router {
+            router.do_send(msg);
+        }
     }
 }
 
