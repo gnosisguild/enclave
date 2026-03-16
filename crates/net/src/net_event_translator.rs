@@ -92,6 +92,7 @@ impl NetEventTranslator {
         // Add a list of events allowed to be forwarded to libp2p
         match event.get_data() {
             EnclaveEventData::DecryptionshareCreated(_) => true,
+            EnclaveEventData::DKGRecursiveAggregationComplete(_) => true,
             EnclaveEventData::KeyshareCreated(_) => true,
             EnclaveEventData::PlaintextAggregated(_) => true,
             EnclaveEventData::PublicKeyAggregated(_) => true,

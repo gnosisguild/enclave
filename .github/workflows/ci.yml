@@ -424,6 +424,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
       - name: 'Install the dependencies'
         run: 'pnpm install --frozen-lockfile'
       - name: 'Download build artifacts'
@@ -736,6 +738,9 @@ jobs:
           path: |
             circuits/bin/dkg/target/
             circuits/bin/threshold/target/
+            circuits/bin/recursive_aggregation/wrapper/dkg/target/
+            circuits/bin/recursive_aggregation/wrapper/threshold/target/
+            circuits/bin/recursive_aggregation/fold/target/
           retention-days: 1
           if-no-files-found: error
 

@@ -20,8 +20,7 @@ use e3_sdk::{
     evm_helpers::{
         contracts::{EnclaveRead, ReadWrite},
         events::{
-            CiphertextOutputPublished, CommitteePublished, E3Requested,
-            PlaintextOutputPublished,
+            CiphertextOutputPublished, CommitteePublished, E3Requested, PlaintextOutputPublished,
         },
         retry::call_with_retry,
     },
@@ -320,7 +319,7 @@ pub async fn register_plaintext_output_published(
                 // The plaintextOutput from the event contains the result of the FHE computation.
                 // Decode the tally using the utility function.
                 let vote_counts = decode_tally(&event.plaintextOutput, num_options)?;
-                
+
                 for (i, count) in vote_counts.iter().enumerate() {
                     info!("[e3_id={}] Option index: {} votes: {:?}", e3_id, i, count);
                 }

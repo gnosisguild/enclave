@@ -1071,7 +1071,7 @@ describe("SlashingManager", function () {
 
   describe("proposeSlashEvidence() — Lane B (evidence-based, SLASHER_ROLE)", function () {
     it("should propose evidence-based slash with appeal window", async function () {
-      const { slashingManager, slasher, operatorAddress, mockVerifier } =
+      const { slashingManager, slasher, operatorAddress } =
         await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1100,7 +1100,7 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if caller is not slasher", async function () {
-      const { slashingManager, notTheOwner, operatorAddress, mockVerifier } =
+      const { slashingManager, notTheOwner, operatorAddress } =
         await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1120,8 +1120,7 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if operator is zero address", async function () {
-      const { slashingManager, slasher, mockVerifier } =
-        await loadFixture(setup);
+      const { slashingManager, slasher } = await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1140,7 +1139,7 @@ describe("SlashingManager", function () {
 
   describe("executeSlash() — Lane B execution", function () {
     it("should execute evidence-based slash after appeal window", async function () {
-      const { slashingManager, slasher, operatorAddress, mockVerifier } =
+      const { slashingManager, slasher, operatorAddress } =
         await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1216,7 +1215,7 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if already executed", async function () {
-      const { slashingManager, slasher, operatorAddress, mockVerifier } =
+      const { slashingManager, slasher, operatorAddress } =
         await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1241,13 +1240,8 @@ describe("SlashingManager", function () {
 
   describe("appeal system", function () {
     it("should allow operator to file appeal on evidence-based slash", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1271,13 +1265,8 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if non-operator tries to appeal", async function () {
-      const {
-        slashingManager,
-        slasher,
-        notTheOwner,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, notTheOwner, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1296,13 +1285,8 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if appeal window expired", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1323,13 +1307,8 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if already appealed", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1387,14 +1366,8 @@ describe("SlashingManager", function () {
     });
 
     it("should allow governance to resolve appeal (approve)", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        owner,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, owner, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1428,14 +1401,8 @@ describe("SlashingManager", function () {
     });
 
     it("should allow governance to resolve appeal (deny)", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        owner,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, owner, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1459,13 +1426,8 @@ describe("SlashingManager", function () {
     });
 
     it("should block execution if appeal is pending", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1487,14 +1449,8 @@ describe("SlashingManager", function () {
     });
 
     it("should block execution if appeal was approved", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        owner,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, owner, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1517,14 +1473,8 @@ describe("SlashingManager", function () {
     });
 
     it("should allow execution if appeal was denied", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        owner,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, owner, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 

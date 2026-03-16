@@ -5,8 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-export default buildModule("DkgPkVerifier", (m) => {
-  const dkgPkVerifier = m.contract("DkgPkVerifier");
+export default buildModule("ThresholdPkAggregationVerifier", (m) => {
+  const thresholdPkAggregationVerifier = m.contract("ThresholdPkAggregationVerifier");
 
-  return { dkgPkVerifier };
+  return { thresholdPkAggregationVerifier };
 }) as any;
