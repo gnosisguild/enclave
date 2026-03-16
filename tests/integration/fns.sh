@@ -185,11 +185,7 @@ kill_em_all() {
 }
 
 launch_evm() {
-  if [ ! -z "${SILENT_EVM:-}" ]; then
-    pnpm evm:node &> /dev/null &
-  else
-    pnpm evm:node &
-  fi
+  anvil --host 0.0.0.0 --chain-id 31337 --block-time 1 --mnemonic 'test test test test test test test test test test test junk' --silent &
 }
 
 ensure_process_count_equals() {
