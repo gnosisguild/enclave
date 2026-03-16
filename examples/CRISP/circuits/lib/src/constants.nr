@@ -11,4 +11,4 @@ pub global MAX_OPTIONS: u32 = 10;
 
 // This constant defines the size of the coefficient region allocated for encoding vote amounts
 /// in binary format within each half of the polynomial. Votes are encoded as binary numbers.
-pub global MAX_VOTE_BITS: u32 = 50; 
+pub global MAX_VOTE_BITS: u32 = 50;

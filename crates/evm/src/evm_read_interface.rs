@@ -35,6 +35,11 @@ const PROVIDER_RECREATE_MAX_ATTEMPTS: u32 = 3;
 const PROVIDER_RECREATE_INITIAL_DELAY_MS: u64 = 2000;
 /// Consecutive failures before we assume the provider is dead and recreate it.
 const MAX_RETRIES_BEFORE_RECREATE: u32 = 3;
+/// How often to check if the subscription is still delivering events (seconds).
+/// If the chain head has advanced beyond our last received block and no events
+/// arrive within this window, we assume the subscription is stale and
+/// resubscribe.
+const SUBSCRIPTION_STALENESS_CHECK_SECS: u64 = 30;
 
 #[derive(Default, serde::Serialize, serde::Deserialize, Clone)]
 pub struct EvmReadInterfaceState {
@@ -404,11 +409,18 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
                 let mut stream = subscription.into_stream();
                 info!(chain_id, "Live event subscription active");
 
+                let mut staleness_check =
+                    tokio::time::interval(Duration::from_secs(SUBSCRIPTION_STALENESS_CHECK_SECS));
+                // Skip the immediate first tick
+                staleness_check.tick().await;
+
                 loop {
                     select! {
                         maybe_log = stream.next() => {
                             match maybe_log {
                                 Some(log) => {
+                                    // Reset staleness timer on every received event
+                                    staleness_check.reset();
                                     if let Some(bn) = log.block_number {
                                         last_block = last_block.max(bn);
                                     }
@@ -422,6 +434,29 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
                                     consecutive_failures += 1;
                                     warn!(chain_id, consecutive_failures, "Live event stream ended, will reconnect");
                                     break;
+                                }
+                            }
+                        }
+                        _ = staleness_check.tick() => {
+                            // Periodically check if chain has advanced past our last block.
+                            // If so, the subscription may be stale (server stopped pushing).
+                            match current_provider.provider().get_block_number().await {
+                                Ok(head) if head > last_block => {
+                                    warn!(
+                                        chain_id,
+                                        last_block,
+                                        head,
+                                        "Subscription appears stale (chain advanced but no events received), resubscribing"
+                                    );
+                                    let _ = current_provider.provider().unsubscribe(sub_id).await;
+                                    break;
+                                }
+                                Err(e) => {
+                                    warn!(chain_id, error = %e, "Staleness check failed, resubscribing");
+                                    break;
+                                }
+                                _ => {
+                                    // Chain hasn't advanced, subscription is fine
                                 }
                             }
                         }

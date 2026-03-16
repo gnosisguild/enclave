@@ -24,6 +24,9 @@ pub struct PublicKeyAggregated {
     /// C5 proof: proof of correct pk aggregation.
     #[serde(default)]
     pub pk_aggregation_proof: Option<Proof>,
+    /// Cross-node aggregated DKG proof: all honest nodes' recursive proofs folded into one.
+    #[serde(default)]
+    pub dkg_aggregated_proof: Option<Proof>,
 }
 
 impl Display for PublicKeyAggregated {

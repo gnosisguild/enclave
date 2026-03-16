@@ -14,12 +14,10 @@
  *     will compile them automatically.
  *
  * Usage:
- *   pnpm generate:verifiers                  # Generate all verifiers
- *   pnpm generate:verifiers --group dkg      # Only DKG circuits
- *   pnpm generate:verifiers --group threshold # Only Threshold circuits
- *   pnpm generate:verifiers --circuit pk      # Only a specific circuit
- *   pnpm generate:verifiers --clean           # Remove existing verifiers first
- *   pnpm generate:verifiers --dry-run         # Show what would be generated
+ *   pnpm generate:verifiers                  # All circuits (or --circuits from package.json)
+ *   pnpm generate:verifiers --circuits pk,fold  # Specific circuits
+ *   pnpm generate:verifiers --clean          # Remove existing verifiers first
+ *   pnpm generate:verifiers --dry-run        # Show what would be generated
  */
 
 import { execSync } from 'child_process'
@@ -140,6 +138,9 @@ class VerifierGenerator {
     const circuits: CircuitInfo[] = []
     if (!existsSync(this.circuitsDir)) return circuits
 
+    // When --circuits not specified, include all circuits
+    const circuitFilter = this.options.circuits?.length ? this.options.circuits : undefined
+
     for (const group of this.options.groups ?? ALL_GROUPS) {
       const groupDir = join(this.circuitsDir, group)
       if (!existsSync(groupDir)) continue
@@ -147,7 +148,7 @@ class VerifierGenerator {
       for (const entry of readdirSync(groupDir)) {
         const circuitPath = join(groupDir, entry)
         if (statSync(circuitPath).isDirectory() && existsSync(join(circuitPath, 'Nargo.toml'))) {
-          if (!this.options.circuits || this.options.circuits.includes(entry)) {
+          if (!circuitFilter || circuitFilter.includes(entry)) {
             const packageName = this.getPackageName(circuitPath)
             circuits.push({ name: entry, group, path: circuitPath, packageName })
           }
@@ -292,7 +293,7 @@ class VerifierGenerator {
 
   /**
    * Convert group/name to a PascalCase Solidity contract name.
-   * e.g. (dkg, pk) → DkgPkVerifier
+   * e.g. (threshold, pk_aggregation) → ThresholdPkAggregationVerifier
    *      (threshold, pk_generation) → ThresholdPkGenerationVerifier
    *      (recursive_aggregation, fold) → RecursiveAggregationFoldVerifier
    */
@@ -368,13 +369,13 @@ async function main() {
         process.exit(1)
       }
       options.groups = value.split(',') as CircuitGroup[]
-    } else if (arg === '--circuit') {
+    } else if (arg === '--circuits') {
       const value = args[++i]
       if (!value || value.startsWith('--')) {
-        console.error('Error: --circuit requires a value')
+        console.error('Error: --circuits requires a value')
         process.exit(1)
       }
-      ;(options.circuits ??= []).push(value)
+      options.circuits = value.split(',').map((s) => s.trim())
     }
   }
 
@@ -390,18 +391,16 @@ Generates Solidity verifier contracts from compiled Noir circuits
 and places them in packages/enclave-contracts/contracts/verifier/.
 
 Options:
+  --circuits <list>      Circuit names (comma-separated). When omitted, generates all circuits.
   --group <groups>       Circuit groups (comma-separated: dkg,threshold,recursive_aggregation)
-  --circuit <name>       Generate verifier for specific circuit(s) (repeatable)
   --clean                Remove existing verifier directory before generating
   --no-compile           Don't compile circuits automatically (fail if not already compiled)
   --dry-run              Show what would be generated without doing anything
   -h, --help             Show this help message
 
 Examples:
-  pnpm generate:verifiers                          # All circuits
-  pnpm generate:verifiers --group dkg               # Only DKG circuits
-  pnpm generate:verifiers --group threshold --clean  # Threshold only, clean first
-  pnpm generate:verifiers --circuit pk --circuit fold # Specific circuits
+  pnpm generate:verifiers --circuits pk,pk_aggregation,decrypted_shares_aggregation_bn,decrypted_shares_aggregation_mod,fold
+  pnpm generate:verifiers --circuits pk --clean
 `)
 }
 
