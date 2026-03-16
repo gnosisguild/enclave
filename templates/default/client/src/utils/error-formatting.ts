@@ -16,7 +16,6 @@ export function formatContractError(error: any): string {
 
     const contractErrors: Record<string, string> = {
       publishInput: 'Failed to submit encrypted inputs. The computation may not be ready or inputs are invalid.',
-      activate: 'Failed to activate the computation environment. Please ensure the committee has been published.',
       request: 'Failed to request computation. Please check your parameters and try again.',
       addCiphernode: 'Failed to add ciphernode. You may not have permission or the node is already registered.',
       removeCiphernode: 'Failed to remove ciphernode. You may not have permission or invalid parameters.',

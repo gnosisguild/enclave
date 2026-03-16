@@ -20,7 +20,7 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, showDetails, onToggl
   const technicalMessage = error.message || JSON.stringify(error, null, 2)
 
   return (
-    <div className='rounded-lg border border-red-200 bg-red-50 p-4'>
+    <div role='alert' className='rounded-lg border border-red-200 bg-red-50 p-4'>
       <p className='mb-2 text-sm text-red-600'>
         <strong>Error:</strong> {userMessage}
       </p>

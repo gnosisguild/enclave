@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
+import { WalletClient } from 'viem'
+
+const myProgramAbi = [
+  {
+    inputs: [
+      { internalType: 'uint256', name: 'e3Id', type: 'uint256' },
+      { internalType: 'bytes', name: 'data', type: 'bytes' },
+    ],
+    name: 'publishInput',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+] as const
+
+/**
+ * Publish an input to the program
+ * @param walletClient - The wallet client to use for the transaction
+ * @param e3Id - The E3 ID
+ * @param input - The input data
+ * @param sender - The sender address
+ * @param programAddress - The program contract address
+ */
+export const publishInput = async (
+  walletClient: WalletClient,
+  e3Id: bigint,
+  input: `0x${string}`,
+  sender: `0x${string}`,
+  programAddress: `0x${string}`,
+): Promise<`0x${string}`> => {
+  return walletClient.writeContract({
+    address: programAddress,
+    abi: myProgramAbi,
+    functionName: 'publishInput',
+    args: [e3Id, input],
+    chain: walletClient.chain,
+    account: sender,
+  })
+}
