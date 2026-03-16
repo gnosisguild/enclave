@@ -1036,6 +1036,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(config.marginBps <= BPS_BASE, "Margin exceeds 100%");
         require(config.protocolShareBps <= BPS_BASE, "Share exceeds 100%");
         require(
+            config.protocolShareBps == 0 || config.protocolTreasury != address(0),
+            "Treasury required when protocol share > 0"
+        );
+        require(
             config.minCommitteeSize >= config.minThreshold,
             "Min size must be >= min threshold"
         );
@@ -1062,6 +1066,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint32[2] memory threshold = committeeThresholds[
             requestParams.committeeSize
         ];
+        require(
+            threshold[1] > 0,
+            CommitteeSizeNotConfigured(requestParams.committeeSize)
+        );
         uint256 n = uint256(threshold[1]); // total committee size
         uint256 m = uint256(threshold[0]); // quorum/decryption threshold
 
