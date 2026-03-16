@@ -7,6 +7,7 @@
 //! Subscribes to `AccusationQuorumReached` events and submits `proposeSlash`
 //! transactions on the SlashingManager contract with committee attestation evidence.
 
+use crate::error_decoder::format_evm_error;
 use crate::helpers::EthProvider;
 use crate::send_tx_with_retry;
 use actix::prelude::*;
@@ -158,17 +159,18 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<AccusationQuorumRea
                         info!(tx=%receipt.transaction_hash, "Submitted attestation-based slash proposal on-chain");
                     }
                     Err(err) => {
+                        let decoded = format_evm_error(&err);
                         if rank > 0 {
                             // Fallback submitters expect DuplicateEvidence reverts
                             // when the primary submitter has already landed the tx.
                             warn!(
                                 "Fallback submitter (rank {rank}): slash submission failed \
-                                 (likely already submitted by primary): {err:?}"
+                                 (likely already submitted by primary): {decoded}"
                             );
                         } else {
                             bus.err(
                                 EType::Evm,
-                                anyhow::anyhow!("Error submitting slash proposal: {:?}", err),
+                                anyhow::anyhow!("Error submitting slash proposal: {decoded}"),
                             );
                         }
                     }

@@ -230,7 +230,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     const { mockCircuitVerifier } = await ignition.deploy(
       MockCircuitVerifierModule,
     );
-    const circuitVerifier = MockCircuitVerifierFactory.connect(
+    const _circuitVerifier = MockCircuitVerifierFactory.connect(
       await mockCircuitVerifier.getAddress(),
       owner,
     );
@@ -351,7 +351,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       bondingRegistry,
       registry,
       slashingManager: slashingManagerTyped,
-      circuitVerifier,
+      _circuitVerifier,
       usdcToken,
       enclToken,
       e3Program,

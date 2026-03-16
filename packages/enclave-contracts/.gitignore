@@ -11,6 +11,10 @@
 /artifacts/**
 !/artifacts/contracts/
 
+# Contracts
+!/artifacts/contracts/registry/CiphernodeRegistryOwnable.sol/CiphernodeRegistryOwnable.json
+!/artifacts/contracts/Enclave.sol/Enclave.json
+
 # Interfaces
 
 # Interfaces

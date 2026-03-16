@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::error_decoder::decode_error_from_str;
 use alloy::{
     network::EthereumWallet,
     providers::{
@@ -233,11 +234,13 @@ pub async fn get_current_timestamp() -> Result<u64> {
 const TX_RETRY_MAX_ATTEMPTS: u32 = 3;
 const TX_RETRY_INITIAL_DELAY_MS: u64 = 2000;
 
-fn should_retry_error(error: &str, retry_on_errors: &[&str]) -> bool {
+fn should_retry_error(error: &str, decoded_error: Option<&str>, retry_on_errors: &[&str]) -> bool {
     if retry_on_errors.is_empty() {
         return true;
     }
-    retry_on_errors.iter().any(|code| error.contains(code))
+    retry_on_errors.iter().any(|code| {
+        error.contains(code) || decoded_error.map_or(false, |decoded| decoded.contains(code))
+    })
 }
 
 pub async fn send_tx_with_retry<F, Fut>(
@@ -261,13 +264,16 @@ where
                 match fut.await {
                     Ok(receipt) => Ok(receipt),
                     Err(e) => {
-                        let error_str = format!("{}", e);
+                        let error_str = format!("{e:#}");
+                        let decoded = decode_error_from_str(&error_str);
+                        let display_error = decoded.as_deref().unwrap_or(&error_str);
                         let retry_refs: Vec<&str> =
                             retry_codes.iter().map(|s| s.as_str()).collect();
-                        if should_retry_error(&error_str, &retry_refs) {
-                            info!("{}: error, will retry: {}", op_name, e);
+                        if should_retry_error(&error_str, decoded.as_deref(), &retry_refs) {
+                            info!("{}: error, will retry: {}", op_name, display_error);
                             Err(RetryError::Retry(e))
                         } else {
+                            info!("{}: error: {}", op_name, display_error);
                             Err(RetryError::Failure(e))
                         }
                     }
