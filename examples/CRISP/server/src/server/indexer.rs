@@ -49,8 +49,7 @@ pub async fn register_e3_requested(
             info!("[e3_id={}] E3Requested: {:?}", e3_id, event);
 
             async move {
-                // 0xcd6f4a4f = E3DoesNotExist()
-                let e3 = call_with_retry("get_e3", &["0xcd6f4a4f"], || {
+                let e3 = call_with_retry("get_e3", &["E3DoesNotExist"], || {
                     let contract = contract.clone();
                     let event_e3_id = event.e3Id;
                     async move {

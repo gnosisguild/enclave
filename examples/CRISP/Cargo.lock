@@ -2397,6 +2397,7 @@ dependencies = [
  "eyre",
  "futures 0.3.31",
  "futures-util",
+ "hex",
  "once_cell",
  "serde",
  "tokio",

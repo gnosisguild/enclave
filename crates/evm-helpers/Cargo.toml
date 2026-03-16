@@ -11,6 +11,7 @@ alloy.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
 eyre.workspace = true
+hex.workspace = true
 serde.workspace = true
 futures.workspace = true
 futures-util.workspace = true

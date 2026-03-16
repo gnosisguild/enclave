@@ -4,10 +4,5 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod block_listener;
-pub mod contracts;
-pub mod error_decoder;
-pub mod event_listener;
-pub mod events;
-pub mod retry;
-pub mod threshold_queue;
+// Re-export the error decoder from the shared e3-evm-helpers crate.
+pub use e3_evm_helpers::error_decoder::*;

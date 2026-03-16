@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
+    error_decoder::format_evm_error,
     events::{EnclaveEvmEvent, EvmEventProcessor},
     evm_parser::EvmParser,
     helpers::{send_tx_with_retry, EthProvider},
@@ -388,7 +389,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<TicketGenerated>
                             info!(tx=%receipt.transaction_hash, "Ticket submitted to registry");
                         }
                         Err(err) => {
-                            error!("Failed to submit ticket: {:?}", err);
+                            error!("Failed to submit ticket: {}", format_evm_error(&err));
                             bus.err(EType::Evm, err);
                         }
                     }
@@ -418,7 +419,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<CommitteeFinalizeRe
                     info!(tx=%receipt.transaction_hash, "Committee finalized on registry");
                 }
                 Err(err) => {
-                    error!("Failed to finalize committee: {:?}", err);
+                    error!("Failed to finalize committee: {}", format_evm_error(&err));
                     bus.err(EType::Evm, err);
                 }
             }
@@ -454,7 +455,10 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                 Ok(receipt) => {
                     info!(tx=%receipt.transaction_hash, "Committee published to registry");
                 }
-                Err(err) => bus.err(EType::Evm, err),
+                Err(err) => {
+                    error!("Failed to publish committee: {}", format_evm_error(&err));
+                    bus.err(EType::Evm, err);
+                }
             }
         })
     }
@@ -479,8 +483,7 @@ pub async fn submit_ticket_to_registry<P: Provider + WalletProvider + Clone + 's
     let e3_id_u256: U256 = e3_id.try_into()?;
     let ticket_number_u256 = U256::from(ticket_number);
 
-    // 0xd4c1d970 = CommitteeNotRequested()
-    send_tx_with_retry("submitTicket", &["0xd4c1d970"], || {
+    send_tx_with_retry("submitTicket", &["CommitteeNotRequested"], || {
         let provider = provider.clone();
         async move {
             info!("Calling: contract.submitTicket(..)");
@@ -508,12 +511,13 @@ pub async fn finalize_committee_on_registry<P: Provider + WalletProvider + Clone
 ) -> Result<TransactionReceipt> {
     let e3_id_u256: U256 = e3_id.try_into()?;
 
-    // 0x5e043d1a = SubmissionWindowNotClosed(),
-    // 0xd4c1d970 = CommitteeNotRequested()
-    // 0x59fa4a93 = ThresholdNotMet()
     send_tx_with_retry(
         "finalizeCommittee",
-        &["0x5e043d1a", "0xd4c1d970", "0x59fa4a93"],
+        &[
+            "SubmissionWindowNotClosed",
+            "CommitteeNotRequested",
+            "ThresholdNotMet",
+        ],
         || {
             let provider = provider.clone();
             async move {
@@ -550,8 +554,8 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
         .filter_map(|node| node.parse().ok())
         .collect();
 
-    // 0x9e968c3e = CommitteeNotFinalized() - RPC may not have synced finalization yet
-    send_tx_with_retry("publishCommittee", &["0x9e968c3e"], || {
+    // RPC may not have synced finalization yet
+    send_tx_with_retry("publishCommittee", &["CommitteeNotFinalized"], || {
         let provider = provider.clone();
         let nodes_vec = nodes_vec.clone();
         let public_key_bytes = public_key_bytes.clone();
