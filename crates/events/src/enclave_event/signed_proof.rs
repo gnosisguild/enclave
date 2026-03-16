@@ -68,7 +68,7 @@ impl ProofType {
         }
     }
 
-    /// Slash reason identifier for on-chain policies.
+    /// Slash reason identifier for on-chain policies
     pub fn slash_reason(&self) -> &'static str {
         match self {
             ProofType::C0PkBfv
