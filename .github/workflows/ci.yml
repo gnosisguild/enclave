@@ -122,6 +122,9 @@ jobs:
     if: needs.detect_changes.outputs.rust_unit_tests == 'true'
     timeout-minutes: 20
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v6
 
@@ -161,6 +164,12 @@ jobs:
 
       - name: Run Unit Tests
         run: 'cargo test --lib && cargo test --doc'
+
+      - name: Cancel workflow on failure
+        if: failure()
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   rust_integration_tests:
     needs: [detect_changes]
@@ -337,6 +346,9 @@ jobs:
     if: needs.detect_changes.outputs.contracts == 'true'
     timeout-minutes: 15
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: read
+      actions: write
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -369,6 +381,12 @@ jobs:
         run: |
           echo "## Test results" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cancel workflow on failure
+        if: failure()
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   test_net:
     needs: [detect_changes]
@@ -520,6 +538,9 @@ jobs:
     if: needs.detect_changes.outputs.build_enclave_cli == 'true'
     timeout-minutes: 20
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -548,6 +569,12 @@ jobs:
           name: enclave-binary
           path: ~/.cargo/bin/enclave
           retention-days: 1
+
+      - name: Cancel workflow on failure
+        if: failure()
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   crisp_unit:
     needs: [detect_changes, build_crisp_sdk]
@@ -744,6 +771,9 @@ jobs:
     if: needs.detect_changes.outputs.build_circuits == 'true'
     timeout-minutes: 30
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -807,6 +837,12 @@ jobs:
             circuits/bin/recursive_aggregation/fold/target/
           retention-days: 1
           if-no-files-found: error
+
+      - name: Cancel workflow on failure
+        if: failure()
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   zk_prover_e2e:
     needs: [detect_changes, build_circuits]

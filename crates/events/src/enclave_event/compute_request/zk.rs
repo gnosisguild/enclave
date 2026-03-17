@@ -389,7 +389,7 @@ pub struct PartyShareDecryptionProofsToVerify {
     /// Signed C4a proof (SecretKey decryption).
     pub signed_sk_decryption_proof: SignedProofPayload,
     /// Signed C4b proofs (SmudgingNoise decryption), one per smudging noise index.
-    pub signed_esm_decryption_proofs: Vec<SignedProofPayload>,
+    pub signed_e_sm_decryption_proofs: Vec<SignedProofPayload>,
 }
 
 /// Batch verification results for C4 proofs.
