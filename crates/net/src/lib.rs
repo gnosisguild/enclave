@@ -10,6 +10,7 @@ mod dialer;
 pub mod direct_requester;
 pub mod direct_responder;
 mod document_publisher;
+mod document_rebroadcaster;
 pub mod events;
 mod net_event_batch;
 mod net_event_buffer;
@@ -101,6 +102,7 @@ pub fn setup_net(
         move |_| {
             NetEventTranslator::setup(&bus, &tx, &rx, &topic);
             DocumentPublisher::setup(&bus, &tx, &rx, &topic);
+            document_rebroadcaster::DocumentRebroadcaster::setup(&bus, &tx, &rx, &topic);
             Ok(())
         }
     });

@@ -390,7 +390,7 @@ async fn get_record(
 }
 
 /// Broadcasts document published notification on Libp2pNetInterface
-async fn broadcast_document_published_notification(
+pub(crate) async fn broadcast_document_published_notification(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
     payload: DocumentPublishedNotification,
