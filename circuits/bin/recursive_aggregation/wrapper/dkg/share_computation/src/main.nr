@@ -9,9 +9,9 @@ use lib::math::commitments::compute_recursive_aggregation_commitment;
 
 // Each SK/ESM final C2 proof is wrapped individually after the two-level pipeline.
 pub global N_PROOFS: u32 = 1;
-// The final share_computation circuit exposes 5 public outputs:
-//   batch_key_hash (pub param) + [Field; 4] return (base_key_hash, chunk_key_hash, batch_idx, commitment).
-pub global N_PUBLIC_INPUTS: u32 = 5;
+// The final share_computation circuit exposes 3 public outputs:
+//   batch_key_hash (pub param) + (key_hash, commitment) return tuple.
+pub global N_PUBLIC_INPUTS: u32 = 3;
 
 fn main(
     verification_key: UltraHonkVerificationKey,

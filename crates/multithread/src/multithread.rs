@@ -62,8 +62,7 @@ use e3_zk_helpers::circuits::threshold::pk_generation::circuit::{
 };
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_computation::{
-    Configs, ShareComputationBaseCircuit, ShareComputationChunkCircuit,
-    ShareComputationChunkCircuitData, ShareComputationCircuitData,
+    ChunkInputs, Configs, Inputs, ShareComputationBaseCircuit, ShareComputationCircuitData,
 };
 use e3_zk_helpers::dkg::share_decryption::{ShareDecryptionCircuit, ShareDecryptionCircuitData};
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
@@ -72,8 +71,9 @@ use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
 use e3_zk_helpers::Computation;
 use e3_zk_prover::{
-    generate_chunk_batch_proof, generate_fold_proof, generate_share_computation_final_proof,
-    generate_wrapper_proof, CircuitVariant, Provable, ZkBackend, ZkProver,
+    generate_chunk_batch_proof, generate_chunk_proof, generate_fold_proof,
+    generate_share_computation_final_proof, generate_wrapper_proof, CircuitVariant, Provable,
+    ZkBackend, ZkProver,
 };
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
@@ -751,21 +751,19 @@ fn handle_share_computation_proof(
     let configs = Configs::compute(req.params_preset.clone(), &circuit_data)
         .map_err(|e| make_zk_error(&request, format!("Configs::compute: {}", e)))?;
 
-    let chunk_circuit = ShareComputationChunkCircuit;
+    let base_inputs = Inputs::compute(req.params_preset.clone(), &circuit_data)
+        .map_err(|e| make_zk_error(&request, format!("Inputs::compute: {}", e)))?;
+
     let mut chunk_proofs = Vec::with_capacity(configs.n_chunks);
     for chunk_idx in 0..configs.n_chunks {
-        let chunk_data = ShareComputationChunkCircuitData {
-            share_data: circuit_data.clone(),
-            chunk_idx,
-        };
-        let chunk_proof = chunk_circuit
-            .prove(
-                prover,
-                &req.params_preset,
-                &chunk_data,
-                &format!("{e3_id_str}_chunk_{chunk_idx}"),
-            )
-            .map_err(|e| {
+        let chunk_inputs = ChunkInputs::from_inputs(&base_inputs, &configs, chunk_idx)
+            .map_err(|e| make_zk_error(&request, format!("ChunkInputs::from_inputs: {}", e)))?;
+        let chunk_proof = generate_chunk_proof(
+            prover,
+            &chunk_inputs,
+            &format!("{e3_id_str}_chunk_{chunk_idx}"),
+        )
+        .map_err(|e| {
                 ComputeRequestError::new(
                     ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
                     request.clone(),
@@ -778,11 +776,20 @@ fn handle_share_computation_proof(
     let mut batch_proofs = Vec::with_capacity(configs.n_batches);
     for batch_idx in 0..configs.n_batches {
         let start = batch_idx * configs.chunks_per_batch;
-        let end = start + configs.chunks_per_batch;
+        let end = usize::min(start + configs.chunks_per_batch, chunk_proofs.len());
+        let batch_chunks = chunk_proofs.get(start..end).ok_or_else(|| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                    "chunk_proofs slice out of bounds: batch_idx={batch_idx}, start={start}, end={end}, len={}",
+                    chunk_proofs.len()
+                ))),
+                request.clone(),
+            )
+        })?;
         let batch_proof = generate_chunk_batch_proof(
             prover,
             &base_proof,
-            &chunk_proofs[start..end],
+            batch_chunks,
             batch_idx as u32,
             &format!("{e3_id_str}_batch_{batch_idx}"),
         )

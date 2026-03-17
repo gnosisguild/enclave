@@ -4,7 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE
 
-use crate::circuits::utils::{bytes_to_field_strings, prove_recursive_circuit};
+use crate::circuits::utils::{
+    bytes_to_field_strings, prove_recursive_circuit, prove_recursive_circuit_non_zk,
+};
 use crate::circuits::vk;
 use crate::error::ZkError;
 use crate::prover::ZkProver;
@@ -70,7 +72,9 @@ pub fn generate_chunk_batch_proof(
         batch_idx: batch_idx.to_string(),
     };
 
-    prove_recursive_circuit(
+    // Non-ZK: chunk_batch proofs are intermediate, consumed by the final
+    // share_computation circuit which verifies with verify_honk_proof_non_zk.
+    prove_recursive_circuit_non_zk(
         prover,
         CircuitName::ShareComputationChunkBatch,
         &input,
@@ -116,6 +120,34 @@ pub fn generate_share_computation_final_proof(
     prove_recursive_circuit(prover, CircuitName::ShareComputation, &input, e3_id)
 }
 
+/// Proves a single chunk circuit from pre-computed [`ChunkInputs`].
+/// Avoids redundant `Inputs::compute` when proving multiple chunks in a loop.
+pub fn generate_chunk_proof(
+    prover: &ZkProver,
+    chunk_inputs: &ChunkInputs,
+    e3_id: &str,
+) -> Result<Proof, ZkError> {
+    use crate::circuits::utils::inputs_json_to_input_map;
+    use crate::witness::{CompiledCircuit, WitnessGenerator};
+
+    let circuit_name = CircuitName::ShareComputationChunk;
+    let recursive_dir = prover.circuits_dir(CircuitVariant::Recursive);
+    let circuit_path = recursive_dir
+        .join(circuit_name.dir_path())
+        .join(format!("{}.json", circuit_name.as_str()));
+    let compiled = CompiledCircuit::from_file(&circuit_path)?;
+
+    let json = chunk_inputs
+        .to_json()
+        .map_err(|e| ZkError::SerializationError(e.to_string()))?;
+    let input_map = inputs_json_to_input_map(&json)?;
+
+    let witness_gen = WitnessGenerator::new();
+    let witness = witness_gen.generate_witness(&compiled, input_map)?;
+
+    prover.generate_proof_with_variant(circuit_name, &witness, e3_id, CircuitVariant::Recursive)
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // Provable impls
 //////////////////////////////////////////////////////////////////////////////
@@ -147,18 +179,16 @@ impl Provable for ShareComputationCircuit {
 
         let configs = Configs::compute(params.clone(), input)
             .map_err(|e| ZkError::InputsGenerationFailed(e.to_string()))?;
+        let base_inputs = Inputs::compute(params.clone(), input)
+            .map_err(|e| ZkError::InputsGenerationFailed(e.to_string()))?;
 
-        let chunk_circuit = ShareComputationChunkCircuit;
         let mut chunk_proofs = Vec::with_capacity(configs.n_chunks);
         for chunk_idx in 0..configs.n_chunks {
-            let chunk_data = ShareComputationChunkCircuitData {
-                share_data: input.clone(),
-                chunk_idx,
-            };
-            let chunk_proof = chunk_circuit.prove(
+            let chunk_inputs = ChunkInputs::from_inputs(&base_inputs, &configs, chunk_idx)
+                .map_err(|e| ZkError::InputsGenerationFailed(e.to_string()))?;
+            let chunk_proof = generate_chunk_proof(
                 prover,
-                params,
-                &chunk_data,
+                &chunk_inputs,
                 &format!("{e3_id}_chunk_{chunk_idx}"),
             )?;
             chunk_proofs.push(chunk_proof);
@@ -168,11 +198,17 @@ impl Provable for ShareComputationCircuit {
         let mut batch_proofs = Vec::with_capacity(configs.n_batches);
         for batch_idx in 0..configs.n_batches {
             let start = batch_idx * configs.chunks_per_batch;
-            let end = start + configs.chunks_per_batch;
+            let end = usize::min(start + configs.chunks_per_batch, chunk_proofs.len());
+            let batch_chunks = chunk_proofs.get(start..end).ok_or_else(|| {
+                ZkError::ProveFailed(format!(
+                    "chunk_proofs slice out of bounds: batch_idx={batch_idx}, start={start}, end={end}, len={}",
+                    chunk_proofs.len()
+                ))
+            })?;
             let batch_proof = generate_chunk_batch_proof(
                 prover,
                 &base_proof,
-                &chunk_proofs[start..end],
+                batch_chunks,
                 batch_idx as u32,
                 &format!("{e3_id}_batch_{batch_idx}"),
             )?;

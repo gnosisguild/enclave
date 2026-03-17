@@ -68,6 +68,25 @@ impl ZkProver {
         self.generate_proof_impl(circuit, witness_data, e3_id, &circuit.dir_path(), variant)
     }
 
+    /// Generate a non-ZK proof using circuit artifacts from the Recursive directory.
+    /// Useful for intermediate proofs that don't need ZK blinding but whose artifacts
+    /// only exist in the recursive dir (e.g., chunk_batch proofs).
+    pub fn generate_recursive_non_zk_proof(
+        &self,
+        circuit: CircuitName,
+        witness_data: &[u8],
+        e3_id: &str,
+    ) -> Result<Proof, ZkError> {
+        self.generate_proof_impl_with_dir(
+            circuit,
+            witness_data,
+            e3_id,
+            &circuit.dir_path(),
+            CircuitVariant::Default,
+            self.circuits_dir(CircuitVariant::Recursive),
+        )
+    }
+
     /// Wrapper proof (Default variant, wrapper dir).
     pub fn generate_wrapper_proof(
         &self,
@@ -120,13 +139,32 @@ impl ZkProver {
         dir_path: &str,
         variant: CircuitVariant,
     ) -> Result<Proof, ZkError> {
+        self.generate_proof_impl_with_dir(
+            circuit,
+            witness_data,
+            e3_id,
+            dir_path,
+            variant,
+            self.circuits_dir(variant),
+        )
+    }
+
+    fn generate_proof_impl_with_dir(
+        &self,
+        circuit: CircuitName,
+        witness_data: &[u8],
+        e3_id: &str,
+        dir_path: &str,
+        variant: CircuitVariant,
+        base_dir: std::path::PathBuf,
+    ) -> Result<Proof, ZkError> {
         if !self.bb_binary.exists() {
             return Err(ZkError::BbNotInstalled);
         }
 
         let verifier_target = variant.verifier_target();
 
-        let circuit_dir = self.circuits_dir(variant).join(dir_path);
+        let circuit_dir = base_dir.join(dir_path);
         let circuit_path = circuit_dir.join(format!("{}.json", circuit.as_str()));
         let vk_path = circuit_dir.join(format!("{}.vk", circuit.as_str()));
 

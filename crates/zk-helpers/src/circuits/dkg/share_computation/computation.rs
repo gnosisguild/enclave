@@ -337,6 +337,27 @@ impl Inputs {
     }
 }
 
+impl ChunkInputs {
+    /// Select chunk inputs from pre-computed base inputs and configs.
+    /// Avoids redundant recomputation when generating multiple chunk proofs.
+    pub fn from_inputs(
+        inputs: &Inputs,
+        configs: &Configs,
+        chunk_idx: usize,
+    ) -> Result<Self, CircuitsErrors> {
+        let chunks = inputs.split_into_chunks(configs.chunk_size)?;
+        chunks
+            .into_iter()
+            .find(|chunk| chunk.chunk_idx == chunk_idx)
+            .ok_or_else(|| {
+                CircuitsErrors::Sample(format!(
+                    "chunk index {} out of range for {} chunks",
+                    chunk_idx, configs.n_chunks
+                ))
+            })
+    }
+}
+
 impl Computation for ChunkInputs {
     type Preset = BfvPreset;
     type Data = ShareComputationChunkCircuitData;
