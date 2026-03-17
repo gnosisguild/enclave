@@ -25,7 +25,7 @@ use e3_net::NetEventTranslator;
 use e3_sortition::{calculate_buffer_size, RegisteredNode, ScoreSortition, Ticket};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{
-    create_seed_from_u64, create_shared_rng_from_u64, with_tracing, AddToCommittee,
+    create_seed_from_u64, create_shared_rng_from_u64, find_bb, with_tracing, AddToCommittee,
 };
 use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::utility_types::ArcBytes;
@@ -43,34 +43,6 @@ use tokio::{
     sync::{broadcast, mpsc},
     time::sleep,
 };
-
-/// Find the bb binary on the system.
-async fn find_bb() -> Option<PathBuf> {
-    if let Ok(output) = tokio::process::Command::new("which")
-        .arg("bb")
-        .output()
-        .await
-    {
-        if output.status.success() {
-            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !path.is_empty() {
-                return Some(PathBuf::from(path));
-            }
-        }
-    }
-    if let Ok(home) = std::env::var("HOME") {
-        for path in [
-            format!("{}/.bb/bb", home),
-            format!("{}/.nargo/bin/bb", home),
-            format!("{}/.enclave/noir/bin/bb", home),
-        ] {
-            if std::path::Path::new(&path).exists() {
-                return Some(PathBuf::from(path));
-            }
-        }
-    }
-    None
-}
 
 /// Create a ZkBackend for integration tests.
 /// If a local bb binary is found, uses it with fixture files (fast path).
@@ -226,11 +198,11 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             ".vk_noir_hash",
         )
         .await;
-        // C7 (decrypted_shares_aggregation_mod)
+        // C7 (decrypted_shares_aggregation)
         copy_circuit(
             &threshold_target,
-            &rv.join("threshold/decrypted_shares_aggregation_mod"),
-            "decrypted_shares_aggregation_mod",
+            &rv.join("threshold/decrypted_shares_aggregation"),
+            "decrypted_shares_aggregation",
             ".vk_noir",
             ".vk_noir_hash",
         )
@@ -358,11 +330,11 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             ".vk_hash",
         )
         .await;
-        // C7 (decrypted_shares_aggregation_mod) — EVM-targeted
+        // C7 (decrypted_shares_aggregation) — EVM-targeted
         copy_circuit(
             &threshold_target,
-            &ev.join("threshold/decrypted_shares_aggregation_mod"),
-            "decrypted_shares_aggregation_mod",
+            &ev.join("threshold/decrypted_shares_aggregation"),
+            "decrypted_shares_aggregation",
             ".vk",
             ".vk_hash",
         )

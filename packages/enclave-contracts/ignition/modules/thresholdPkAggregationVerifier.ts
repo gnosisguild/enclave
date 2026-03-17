@@ -6,7 +6,9 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 export default buildModule("ThresholdPkAggregationVerifier", (m) => {
-  const thresholdPkAggregationVerifier = m.contract("ThresholdPkAggregationVerifier");
+  const thresholdPkAggregationVerifier = m.contract(
+    "ThresholdPkAggregationVerifier",
+  );
 
   return { thresholdPkAggregationVerifier };
 }) as any;
