@@ -49,7 +49,10 @@ const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/enclave/kad/1.0.0");
 const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
 const DHT_MAX_RECORDS: usize = 4096;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
-const MAX_CONSECUTIVE_DIAL_FAILURES: u32 = 3;
+/// Number of consecutive dial failures before a peer is evicted from the routing table.
+/// Set high enough to survive transient network issues during DKG, but low enough to
+/// eventually clean up genuinely unreachable peers.
+const MAX_CONSECUTIVE_DIAL_FAILURES: u32 = 5;
 
 use crate::{
     dialer::dial_peers,
@@ -317,21 +320,45 @@ async fn process_swarm_event(
             connection_id,
         } => {
             if let Some(ref failed_peer) = peer_id {
-                let is_peer_id_mismatch = matches!(error, DialError::WrongPeerId { .. });
-                let count = peer_failures.record_failure(failed_peer);
-                let should_evict = is_peer_id_mismatch || count >= MAX_CONSECUTIVE_DIAL_FAILURES;
-
-                if should_evict {
-                    let reason = if is_peer_id_mismatch {
-                        "peer ID mismatch"
-                    } else {
-                        "consecutive dial failures"
-                    };
-                    info!("Evicting stale peer {failed_peer} ({reason}, attempts: {count})");
+                if let DialError::WrongPeerId {
+                    obtained,
+                    ref endpoint,
+                } = error
+                {
+                    // The node at this address has a new PeerId (e.g. restarted with new keys).
+                    // Remove the stale entry and add the new one so we don't loop.
+                    let remote_addr = endpoint.get_remote_address().clone();
+                    info!(
+                        "Peer ID mismatch at {remote_addr}: expected {failed_peer}, got {obtained} — \
+                         replacing stale routing entry"
+                    );
                     swarm.behaviour_mut().kademlia.remove_peer(failed_peer);
+                    swarm
+                        .behaviour_mut()
+                        .kademlia
+                        .add_address(&obtained, remote_addr);
                     peer_failures.reset(failed_peer);
+
+                    // Trigger Kademlia bootstrap to discover peers beyond direct connections.
+                    if let Err(e) = swarm.behaviour_mut().kademlia.bootstrap() {
+                        debug!(
+                            "Kademlia bootstrap after peer ID replacement not possible yet: {e}"
+                        );
+                    }
                 } else {
-                    debug!("Failed to dial {failed_peer} (attempt {count}/{MAX_CONSECUTIVE_DIAL_FAILURES}): {error}");
+                    let count = peer_failures.record_failure(failed_peer);
+
+                    if count >= MAX_CONSECUTIVE_DIAL_FAILURES {
+                        info!(
+                            "Evicting unreachable peer {failed_peer} after {count} consecutive failures"
+                        );
+                        swarm.behaviour_mut().kademlia.remove_peer(failed_peer);
+                        peer_failures.reset(failed_peer);
+                    } else {
+                        debug!(
+                            "Dial failure for {failed_peer} (attempt {count}/{MAX_CONSECUTIVE_DIAL_FAILURES}): {error}"
+                        );
+                    }
                 }
             } else {
                 warn!("Failed to dial unknown peer: {error}");
