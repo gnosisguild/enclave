@@ -4,7 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-mod dkg;
+pub(crate) mod dkg;
 pub mod recursive_aggregation;
 mod threshold;
 pub(crate) mod utils;
+pub(crate) mod vk;
