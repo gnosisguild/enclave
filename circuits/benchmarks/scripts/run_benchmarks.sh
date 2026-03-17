@@ -129,7 +129,6 @@ echo "  Base Directory: $CIRCUITS_BASE_DIR"
 echo "  Output Directory: ${OUTPUT_DIR}"
 echo ""
 
-# decrypted_shares_aggregation_mod is for insecure only (Q < 128bit); _bn is for secure (large Q)
 # Circuit-specific modes come from config.json (e.g. "config" has "modes": ["secure"]); see circuits/benchmarks/config.json
 RUN_CIRCUITS=""
 CIRCUIT_MODES=$(jq -r '.circuits[] | (if type == "string" then . else .name end) as $path | (if type == "object" and (.modes != null) then (.modes | join(",")) else "insecure,secure" end) | "\($path)\t\(.)"' "$CONFIG_FILE")
@@ -147,14 +146,6 @@ while IFS= read -r line; do
             echo "  Skipping $c (config.json restricts to mode(s): $modes; current mode: $MODE)"
             continue
         fi
-    fi
-    if [ "$MODE" = "secure" ] && [ "$c" = "threshold/decrypted_shares_aggregation_mod" ]; then
-        echo "  Skipping $c (modular variant is insecure-only, Q < 128bit)"
-        continue
-    fi
-    if [ "$MODE" = "insecure" ] && [ "$c" = "threshold/decrypted_shares_aggregation_bn" ]; then
-        echo "  Skipping $c (BigNum variant is for secure/large Q only)"
-        continue
     fi
     RUN_CIRCUITS="${RUN_CIRCUITS} ${c}"
 done <<< "$CIRCUIT_MODES"

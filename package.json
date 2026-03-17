@@ -15,7 +15,7 @@
   "scripts": {
     "bump:versions": "tsx scripts/bump-versions.ts",
     "build:circuits": "tsx scripts/build-circuits.ts",
-    "generate:verifiers": "tsx scripts/generate-verifiers.ts --circuits pk_aggregation,decrypted_shares_aggregation_bn,decrypted_shares_aggregation_mod,fold",
+    "generate:verifiers": "tsx scripts/generate-verifiers.ts --circuits pk_aggregation,decrypted_shares_aggregation,fold",
     "store:circuits": "tsx scripts/circuit-artifacts.ts",
     "clean": "tsx scripts/clean.ts",
     "compile": "pnpm build:ts && pnpm rust:build",

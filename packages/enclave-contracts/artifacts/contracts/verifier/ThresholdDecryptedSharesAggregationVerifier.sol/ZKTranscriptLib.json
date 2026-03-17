@@ -1,7 +1,7 @@
 {
   "_format": "hh3-artifact-1",
   "contractName": "ZKTranscriptLib",
-  "sourceName": "contracts/verifier/ThresholdDecryptedSharesAggregationBnVerifier.sol",
+  "sourceName": "contracts/verifier/ThresholdDecryptedSharesAggregationVerifier.sol",
   "abi": [
     {
       "inputs": [
@@ -390,6 +390,6 @@
   "linkReferences": {},
   "deployedLinkReferences": {},
   "immutableReferences": {},
-  "inputSourceName": "project/contracts/verifier/ThresholdDecryptedSharesAggregationBnVerifier.sol",
-  "buildInfoId": "solc-0_8_28-bd46eae6f77be9a8538850385226c1ee4fc57e42"
+  "inputSourceName": "project/contracts/verifier/ThresholdDecryptedSharesAggregationVerifier.sol",
+  "buildInfoId": "solc-0_8_28-ea784e9448f647a2ad29ccdb24e4cacb8fdc4660"
 }

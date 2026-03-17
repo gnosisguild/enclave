@@ -80,7 +80,7 @@ get_zk_args() {
             echo "threshold-share-decryption"
             return
             ;;
-        threshold/decrypted_shares_aggregation_bn|threshold/decrypted_shares_aggregation_mod)
+        threshold/decrypted_shares_aggregation)
             echo "decrypted-shares-aggregation"
             return
             ;;
