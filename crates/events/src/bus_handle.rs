@@ -178,6 +178,10 @@ impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle<Enabled> {
 }
 
 impl BusHandle<Enabled> {
+    pub async fn naked_dispatch_async(&self, event: EnclaveEvent<Unsequenced>) -> Result<()> {
+        self.sequencer.send(event).await?;
+        Ok(())
+    }
     fn publish_from_remote_impl(
         &self,
         data: impl Into<EnclaveEventData>,

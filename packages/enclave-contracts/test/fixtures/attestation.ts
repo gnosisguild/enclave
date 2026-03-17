@@ -3,7 +3,6 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-
 // Shared attestation helpers for committee-based slashing tests.
 import type { Signer } from "ethers";
 import { network } from "hardhat";

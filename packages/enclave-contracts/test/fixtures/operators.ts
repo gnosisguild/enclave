@@ -3,7 +3,6 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-
 // Shared operator setup helpers for sortition-based tests.
 import type { Signer } from "ethers";
 import { network } from "hardhat";
