@@ -189,7 +189,7 @@ describe('Integration', () => {
     const { waitForEvent } = await setupEventListeners(sdk, store)
 
     const committeeSize = CommitteeSize.Micro
-    const duration = 700
+    const duration = 1000
     const inputWindow = await calculateInputWindow(publicClient, duration)
     const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
     const e3ProgramParams = encodeBfvParams(thresholdBfvParams)

@@ -102,7 +102,7 @@
     }
   },
   "immutableReferences": {
-    "65407": [
+    "27970": [
       {
         "length": 32,
         "start": 91
@@ -152,13 +152,13 @@
         "start": 11167
       }
     ],
-    "65409": [
+    "27972": [
       {
         "length": 32,
         "start": 398
       }
     ],
-    "65411": [
+    "27974": [
       {
         "length": 32,
         "start": 432
@@ -168,7 +168,7 @@
         "start": 2303
       }
     ],
-    "65413": [
+    "27976": [
       {
         "length": 32,
         "start": 3156
@@ -184,5 +184,5 @@
     ]
   },
   "inputSourceName": "project/contracts/verifier/ThresholdPkAggregationVerifier.sol",
-  "buildInfoId": "solc-0_8_28-bd46eae6f77be9a8538850385226c1ee4fc57e42"
+  "buildInfoId": "solc-0_8_28-543ccb35c9b85334df682667ad98480ea27e7555"
 }
