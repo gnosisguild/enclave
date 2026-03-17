@@ -1,7 +1,7 @@
 # Enclave — Agent Rules
 
 These rules apply to any LLM agent working on this codebase. Tool-specific config files
-(CLAUDE.md, .cursorrules, etc.) should reference this file rather than duplicating its content.
+(.cursor/rules/enclave.mdc, CLAUDE.md, etc.) should reference this file rather than duplicating its content.
 
 ## Project Structure
 
