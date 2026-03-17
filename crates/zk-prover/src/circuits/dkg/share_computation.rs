@@ -186,11 +186,8 @@ impl Provable for ShareComputationCircuit {
         for chunk_idx in 0..configs.n_chunks {
             let chunk_inputs = ChunkInputs::from_inputs(&base_inputs, &configs, chunk_idx)
                 .map_err(|e| ZkError::InputsGenerationFailed(e.to_string()))?;
-            let chunk_proof = generate_chunk_proof(
-                prover,
-                &chunk_inputs,
-                &format!("{e3_id}_chunk_{chunk_idx}"),
-            )?;
+            let chunk_proof =
+                generate_chunk_proof(prover, &chunk_inputs, &format!("{e3_id}_chunk_{chunk_idx}"))?;
             chunk_proofs.push(chunk_proof);
         }
 

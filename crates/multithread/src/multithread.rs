@@ -764,11 +764,11 @@ fn handle_share_computation_proof(
             &format!("{e3_id_str}_chunk_{chunk_idx}"),
         )
         .map_err(|e| {
-                ComputeRequestError::new(
-                    ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
-                    request.clone(),
-                )
-            })?;
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
         chunk_proofs.push(chunk_proof);
     }
 
