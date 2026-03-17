@@ -538,13 +538,14 @@ async fn test_share_computation_sk_commitment_consistency() {
     let proof = generate_share_computation_final_proof(&prover, &batch_proofs, e3_id)
         .expect("final share_computation proof should succeed");
 
-    // Final wrapper now exposes:
+    // Final circuit exposes 3 public outputs:
     //   [0] batch_key_hash (pub param)
-    //   [1..=4] batch wrapper public inputs (length 4 fields).
+    //   [1] key_hash (from return tuple)
+    //   [2] final_commitment (from return tuple)
     assert_eq!(
         proof.public_signals.len(),
-        5 * 32,
-        "final share_computation wrapper should expose 5 field public inputs (160 bytes)"
+        3 * 32,
+        "final share_computation should expose 3 field public inputs (96 bytes)"
     );
 
     // Sanity check: at least one public input is non-zero.
@@ -610,13 +611,14 @@ async fn test_share_computation_e_sm_commitment_consistency() {
     let proof = generate_share_computation_final_proof(&prover, &batch_proofs, e3_id)
         .expect("final share_computation proof should succeed");
 
-    // Final wrapper now exposes:
+    // Final circuit exposes 3 public outputs:
     //   [0] batch_key_hash (pub param)
-    //   [1..=4] batch wrapper public inputs (length 4 fields).
+    //   [1] key_hash (from return tuple)
+    //   [2] final_commitment (from return tuple)
     assert_eq!(
         proof.public_signals.len(),
-        5 * 32,
-        "final share_computation wrapper should expose 5 field public inputs (160 bytes)"
+        3 * 32,
+        "final share_computation should expose 3 field public inputs (96 bytes)"
     );
 
     // Sanity check: at least one public input is non-zero.

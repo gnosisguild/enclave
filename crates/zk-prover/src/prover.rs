@@ -77,6 +77,9 @@ impl ZkProver {
         witness_data: &[u8],
         e3_id: &str,
     ) -> Result<Proof, ZkError> {
+        // Intentionally crossing variant and directory:
+        // - CircuitVariant::Default → "noir-recursive-no-zk" verifier target (non-ZK proof, 457 fields)
+        // - circuits_dir(Recursive) → read artifacts from recursive/ (where chunk_batch lives)
         self.generate_proof_impl_with_dir(
             circuit,
             witness_data,
