@@ -4,21 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Proof aggregation for recursive circuits.
+//! Generic proof aggregation for recursive circuits.
 //!
-//! Aggregates proofs by executing a wrapper circuit (e.g. dkg pk) that verifies
-//! inner proofs and produces a non-ZK aggregated proof.
+//! Contains the wrapper circuit (verifies 1-2 inner proofs) and the fold circuit
+//! (folds two wrapper proofs). Share-computation-specific logic lives in
+//! `circuits::dkg::share_computation`.
 
-mod utils;
-mod vk;
-
-use crate::circuits::utils::inputs_json_to_input_map;
+use crate::circuits::utils::{bytes_to_field_strings, inputs_json_to_input_map};
+use crate::circuits::vk;
 use crate::error::ZkError;
 use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
 use e3_events::{CircuitName, CircuitVariant, Proof};
-
-use self::utils::bytes_to_field_strings;
 
 /// Full input for the recursive wrapper circuit.
 struct WrapperInput {

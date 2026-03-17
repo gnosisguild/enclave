@@ -144,20 +144,47 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             ".vk_noir_hash",
         )
         .await;
-        // C2a (sk_share_computation)
+        // C2a base (sk_share_computation_base)
         copy_circuit(
             &dkg_target,
-            &rv.join("dkg/sk_share_computation"),
-            "sk_share_computation",
+            &rv.join("dkg/sk_share_computation_base"),
+            "sk_share_computation_base",
             ".vk_noir",
             ".vk_noir_hash",
         )
         .await;
-        // C2b (e_sm_share_computation)
+        // C2b base (e_sm_share_computation_base)
         copy_circuit(
             &dkg_target,
-            &rv.join("dkg/e_sm_share_computation"),
-            "e_sm_share_computation",
+            &rv.join("dkg/e_sm_share_computation_base"),
+            "e_sm_share_computation_base",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
+        // C2 chunk (share_computation_chunk)
+        copy_circuit(
+            &dkg_target,
+            &rv.join("dkg/share_computation_chunk"),
+            "share_computation_chunk",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
+        // C2 chunk_batch (share_computation_chunk_batch)
+        copy_circuit(
+            &dkg_target,
+            &rv.join("dkg/share_computation_chunk_batch"),
+            "share_computation_chunk_batch",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
+        // C2 final (share_computation)
+        copy_circuit(
+            &dkg_target,
+            &rv.join("dkg/share_computation"),
+            "share_computation",
             ".vk_noir",
             ".vk_noir_hash",
         )

@@ -2,9 +2,7 @@
 //
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
-// or FITNESS FOR A PARTICULAR PURPOSE
+// or FITNESS FOR A PARTICULAR PURPOSE.
 
-mod pk;
-pub(crate) mod share_computation;
-mod share_decryption;
-mod share_encryption;
+pub mod base;
+pub mod chunk;
