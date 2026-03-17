@@ -164,7 +164,7 @@
     "upgrade:bondingRegistry": "hardhat run scripts/upgrade/bondingRegistry.ts",
     "upgrade:ciphernodeRegistryOwnable": "hardhat run scripts/upgrade/ciphernodeRegistryOwnable.ts",
     "e3:activate": "hardhat e3:activate",
-    "e3:enable": "hardhat e3:enable",
+    "e3:enable": "hardhat enclave:enableE3",
     "ciphernode:add": "hardhat ciphernode:add",
     "ciphernode:admin-add": "hardhat ciphernode:admin-add",
     "ciphernode:mint-tokens": "hardhat ciphernode:mint-tokens",

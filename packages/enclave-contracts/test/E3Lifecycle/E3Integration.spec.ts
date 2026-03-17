@@ -30,6 +30,7 @@ import {
   MockUSDC__factory as MockUSDCFactory,
   SlashingManager__factory as SlashingManagerFactory,
 } from "../../types";
+import { signAndEncodeAttestation } from "../fixtures";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time } = networkHelpers;
@@ -76,71 +77,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
   // Lane A reason derived on-chain as keccak256(abi.encodePacked(proofType))
   const REASON_PT_0 = ethers.keccak256(ethers.solidityPacked(["uint256"], [0]));
-  const VOTE_TYPEHASH = ethers.keccak256(
-    ethers.toUtf8Bytes(
-      "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)",
-    ),
-  );
-
-  /**
-   * Helper to create a committee-attestation evidence bundle for proposeSlash.
-   * Voters sign an AccusationVote digest via personal_sign (EIP-191).
-   */
-  async function signAndEncodeAttestation(
-    voters: Signer[],
-    e3Id: number,
-    operator: string,
-    proofType: number = 0,
-    chainId: number = 31337,
-    dataHash: string = ethers.ZeroHash,
-  ): Promise<string> {
-    const accusationId = ethers.keccak256(
-      ethers.solidityPacked(
-        ["uint256", "uint256", "address", "uint256"],
-        [chainId, e3Id, operator, proofType],
-      ),
-    );
-
-    // Sort voters by address ascending
-    const voterData = await Promise.all(
-      voters.map(async (v) => ({ signer: v, address: await v.getAddress() })),
-    );
-    voterData.sort((a, b) =>
-      a.address.toLowerCase().localeCompare(b.address.toLowerCase()),
-    );
-
-    const sortedAddresses: string[] = [];
-    const agrees: boolean[] = [];
-    const dataHashes: string[] = [];
-    const signatures: string[] = [];
-
-    for (const { signer, address } of voterData) {
-      const digest = ethers.keccak256(
-        abiCoder.encode(
-          [
-            "bytes32",
-            "uint256",
-            "uint256",
-            "bytes32",
-            "address",
-            "bool",
-            "bytes32",
-          ],
-          [VOTE_TYPEHASH, chainId, e3Id, accusationId, address, true, dataHash],
-        ),
-      );
-      const sig = await signer.signMessage(ethers.getBytes(digest));
-      sortedAddresses.push(address);
-      agrees.push(true);
-      dataHashes.push(dataHash);
-      signatures.push(sig);
-    }
-
-    return abiCoder.encode(
-      ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]"],
-      [proofType, sortedAddresses, agrees, dataHashes, signatures],
-    );
-  }
 
   const setup = async () => {
     // ── Signers ────────────────────────────────────────────────────────────────
@@ -294,7 +230,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     const { mockCircuitVerifier } = await ignition.deploy(
       MockCircuitVerifierModule,
     );
-    const circuitVerifier = MockCircuitVerifierFactory.connect(
+    const _circuitVerifier = MockCircuitVerifierFactory.connect(
       await mockCircuitVerifier.getAddress(),
       owner,
     );
@@ -415,7 +351,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       bondingRegistry,
       registry,
       slashingManager: slashingManagerTyped,
-      circuitVerifier,
+      _circuitVerifier,
       usdcToken,
       enclToken,
       e3Program,

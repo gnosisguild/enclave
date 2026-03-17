@@ -37,6 +37,58 @@ use rand_chacha::ChaCha20Rng;
 use std::sync::Arc;
 pub use utils::*;
 
+use std::path::PathBuf;
+
+/// Find the bb binary on the system.
+pub async fn find_bb() -> Option<PathBuf> {
+    // Check PATH first via `which`
+    if let Ok(output) = tokio::process::Command::new("which")
+        .arg("bb")
+        .output()
+        .await
+    {
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() {
+                return Some(PathBuf::from(path));
+            }
+        }
+    }
+    // Check common install locations
+    if let Ok(home) = std::env::var("HOME") {
+        for path in [
+            format!("{}/.bb/bb", home),
+            format!("{}/.nargo/bin/bb", home),
+            format!("{}/.enclave/noir/bin/bb", home),
+        ] {
+            if std::path::Path::new(&path).exists() {
+                return Some(PathBuf::from(path));
+            }
+        }
+    }
+    None
+}
+
+/// Check if anvil is available on the system.
+pub async fn find_anvil() -> bool {
+    if let Ok(output) = tokio::process::Command::new("which")
+        .arg("anvil")
+        .output()
+        .await
+    {
+        if output.status.success() {
+            return true;
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        let path = format!("{}/.foundry/bin/anvil", home);
+        if std::path::Path::new(&path).exists() {
+            return true;
+        }
+    }
+    false
+}
+
 pub fn create_shared_rng_from_u64(value: u64) -> Arc<std::sync::Mutex<ChaCha20Rng>> {
     Arc::new(std::sync::Mutex::new(ChaCha20Rng::seed_from_u64(value)))
 }

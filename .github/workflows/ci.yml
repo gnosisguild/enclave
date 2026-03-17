@@ -30,9 +30,11 @@ permissions:
 
 jobs:
   detect_changes:
+    timeout-minutes: 5
     runs-on: 'ubuntu-latest'
     outputs:
-      rust_tests: ${{ steps.jobs.outputs.rust_tests }}
+      rust_unit_tests: ${{ steps.jobs.outputs.rust_unit_tests }}
+      rust_integration_tests: ${{ steps.jobs.outputs.rust_integration_tests }}
       ciphernode_e2e: ${{ steps.jobs.outputs.ciphernode_e2e }}
       crisp: ${{ steps.jobs.outputs.crisp }}
       templates: ${{ steps.jobs.outputs.templates }}
@@ -47,6 +49,7 @@ jobs:
       build_circuits: ${{ steps.jobs.outputs.build_circuits }}
       integration_prebuild: ${{ steps.jobs.outputs.integration_prebuild }}
       zk_prover_integration: ${{ steps.jobs.outputs.zk_prover_integration }}
+      build_enclave_cli: ${{ steps.jobs.outputs.build_enclave_cli }}
     steps:
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
@@ -96,11 +99,12 @@ jobs:
 
           any() { for v in "$@"; do [ "$v" = "true" ] && echo "true" && return; done; echo "false"; }
 
-          echo "rust_tests=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $CI)" >> $GITHUB_OUTPUT
+          echo "rust_unit_tests=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $CI)" >> $GITHUB_OUTPUT
+          echo "rust_integration_tests=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $CI)" >> $GITHUB_OUTPUT
           echo "ciphernode_e2e=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $INTEGRATION $CI)" >> $GITHUB_OUTPUT
           echo "build_sdk=$(any $FORCE $RUST $CONTRACTS $SDK $INTEGRATION $CIRCUITS $CI $TEMPLATES)" >> $GITHUB_OUTPUT
           echo "crisp=$(any $FORCE $CRISP $CONTRACTS $CIRCUITS $RUST $CI)" >> $GITHUB_OUTPUT
-          echo "templates=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $SDK $CI)" >> $GITHUB_OUTPUT
+          echo "templates=$(any $FORCE $TEMPLATES $CI)" >> $GITHUB_OUTPUT
           echo "zk=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
           echo "contracts=$(any $FORCE $CONTRACTS $CI)" >> $GITHUB_OUTPUT
           echo "docker_support=$(any $FORCE $DOCKER $CI)" >> $GITHUB_OUTPUT
@@ -111,13 +115,16 @@ jobs:
           echo "build_circuits=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
           echo "integration_prebuild=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $INTEGRATION $CI)" >> $GITHUB_OUTPUT
           echo "zk_prover_integration=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
+          echo "build_enclave_cli=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $INTEGRATION $TEMPLATES $CRISP $CI)" >> $GITHUB_OUTPUT
 
-  rust_tests:
+  rust_unit_tests:
     needs: [detect_changes]
-    if: needs.detect_changes.outputs.rust_tests == 'true'
-    runs-on:
-      group: enclave-ci
-      labels: [enclave-ci-runner]
+    if: needs.detect_changes.outputs.rust_unit_tests == 'true'
+    timeout-minutes: 20
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v6
 
@@ -158,13 +165,19 @@ jobs:
       - name: Run Unit Tests
         run: 'cargo test --lib && cargo test --doc'
 
-      - name: Run Integration Tests
-        run: 'cargo test --test integration -- --nocapture'
+      - name: Cancel workflow on failure
+        if: failure()
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
 
-  zk_prover_integration:
+  rust_integration_tests:
     needs: [detect_changes]
-    if: needs.detect_changes.outputs.zk_prover_integration == 'true'
-    runs-on: 'ubuntu-latest'
+    if: needs.detect_changes.outputs.rust_integration_tests == 'true'
+    timeout-minutes: 45
+    runs-on:
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
 
@@ -175,6 +188,15 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
 
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
@@ -189,12 +211,57 @@ jobs:
       - name: 'Install the dependencies'
         run: 'pnpm install --frozen-lockfile'
 
+      - name: Run Integration Tests
+        run: 'cargo test --test integration -- --nocapture'
+
+  zk_prover_integration:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.zk_prover_integration == 'true'
+    timeout-minutes: 30
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache Rust dependencies
+        uses: ./.github/actions/cache-dependencies
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
+
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+
+      - name: 'Setup node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: 'Install the dependencies'
+        run: 'pnpm install --frozen-lockfile'
+
+      - name: Cache Barretenberg binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.bb
+          key: bb-${{ env.BB_VERSION }}-${{ runner.arch }}
+
       - name: Run ZK Prover Integration Tests (with network downloads)
         run: 'cargo test -p e3-zk-prover --features integration-tests --test integration_tests -- --nocapture'
 
   build_e3_support_risc0:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.docker_support == 'true'
+    timeout-minutes: 30
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -234,6 +301,7 @@ jobs:
   build_ciphernode_image:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.docker_ciphernode == 'true'
+    timeout-minutes: 30
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -276,7 +344,11 @@ jobs:
   test_contracts:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.contracts == 'true'
+    timeout-minutes: 15
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: read
+      actions: write
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -310,9 +382,16 @@ jobs:
           echo "## Test results" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
+      - name: Cancel workflow on failure
+        if: failure()
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   test_net:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.net == 'true'
+    timeout-minutes: 15
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
@@ -328,6 +407,7 @@ jobs:
   integration_prebuild:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.integration_prebuild == 'true'
+    timeout-minutes: 30
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
@@ -386,6 +466,7 @@ jobs:
   ciphernode_integration_test:
     needs: [detect_changes, integration_prebuild, build_enclave_cli, build_sdk]
     if: needs.detect_changes.outputs.ciphernode_e2e == 'true'
+    timeout-minutes: 45
     runs-on:
       group: enclave-ci
       labels: [enclave-ci-runner]
@@ -410,6 +491,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
       - name: 'Install the dependencies'
         run: 'pnpm install --frozen-lockfile'
       - name: 'Download build artifacts'
@@ -450,9 +533,14 @@ jobs:
           echo "## Test results for ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
-  # Always runs — shared artifact dependency for many downstream jobs
   build_enclave_cli:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.build_enclave_cli == 'true'
+    timeout-minutes: 20
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -482,9 +570,16 @@ jobs:
           path: ~/.cargo/bin/enclave
           retention-days: 1
 
+      - name: Cancel workflow on failure
+        if: failure()
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   crisp_unit:
     needs: [detect_changes, build_crisp_sdk]
     if: needs.detect_changes.outputs.crisp == 'true'
+    timeout-minutes: 30
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -559,6 +654,7 @@ jobs:
   crisp_e2e:
     needs: [detect_changes, build_enclave_cli, build_crisp_sdk]
     if: needs.detect_changes.outputs.crisp == 'true'
+    timeout-minutes: 45
     runs-on:
       group: enclave-ci
       labels: [enclave-ci-runner]
@@ -673,7 +769,11 @@ jobs:
   build_circuits:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.build_circuits == 'true'
+    timeout-minutes: 30
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -684,14 +784,24 @@ jobs:
         with:
           toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
+      - name: Cache Barretenberg binary
+        id: cache-bb
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/bb
+          key: bb-bin-${{ env.BB_VERSION }}-amd64-linux
+
       - name: Install Barretenberg (bb)
+        if: steps.cache-bb.outputs.cache-hit != 'true'
         run: |
           curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
           mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
           BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
           sudo mv "$BB_BIN" /usr/local/bin/bb
           chmod +x /usr/local/bin/bb
-          bb --version
+
+      - name: Verify bb
+        run: bb --version
 
       - name: Check formatting
         run: ./scripts/lint-circuits.sh
@@ -728,9 +838,16 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+      - name: Cancel workflow on failure
+        if: failure()
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   zk_prover_e2e:
     needs: [detect_changes, build_circuits]
     if: needs.detect_changes.outputs.zk == 'true'
+    timeout-minutes: 30
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -743,14 +860,30 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
+      - name: Cache Barretenberg binary
+        id: cache-bb
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/bb
+          key: bb-bin-${{ env.BB_VERSION }}-amd64-linux
+
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
+
       - name: Install Barretenberg (bb)
+        if: steps.cache-bb.outputs.cache-hit != 'true'
         run: |
           curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
           mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
           BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
           sudo mv "$BB_BIN" /usr/local/bin/bb
           chmod +x /usr/local/bin/bb
-          bb --version
+
+      - name: Verify bb
+        run: bb --version
 
       - name: Download compiled circuit artifacts
         uses: actions/download-artifact@v4
@@ -795,6 +928,7 @@ jobs:
   build_e3_support_dev:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.build_e3_support_dev == 'true'
+    timeout-minutes: 20
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -826,6 +960,7 @@ jobs:
   build_sdk:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.build_sdk == 'true'
+    timeout-minutes: 30
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -884,6 +1019,7 @@ jobs:
   build_crisp_sdk:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.crisp == 'true'
+    timeout-minutes: 20
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6
@@ -933,6 +1069,7 @@ jobs:
   template_integration:
     needs: [detect_changes, build_enclave_cli, build_e3_support_dev, build_sdk]
     if: needs.detect_changes.outputs.templates == 'true'
+    timeout-minutes: 30
     runs-on:
       group: enclave-ci
       labels: [enclave-ci-runner]
@@ -1008,6 +1145,7 @@ jobs:
   test_enclave_init:
     needs: [detect_changes, build_enclave_cli, build_e3_support_dev]
     if: needs.detect_changes.outputs.init == 'true'
+    timeout-minutes: 10
     runs-on: 'ubuntu-latest'
     steps:
       - name: Install pnpm
@@ -1044,6 +1182,7 @@ jobs:
           enclave init mycitest --verbose --template=${{ github.server_url }}/${{ github.repository }}.git#${BRANCH}:templates/default
 
   contrib-readme-job:
+    timeout-minutes: 10
     runs-on: 'ubuntu-latest'
     name: Populate Contributors List
     # Only run on main branch to avoid branch conflicts
