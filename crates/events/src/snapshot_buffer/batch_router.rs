@@ -9,14 +9,13 @@ use super::{
     AggregateConfig, UpdateDestination,
 };
 use crate::{
-    trap, AggregateId, EType, EnclaveEvent, EventContextAccessors, EventContextSeq, Insert,
-    InsertBatch, PanicDispatcher, Sequenced, StoreKeys,
+    AggregateId, EnclaveEvent, EventContextAccessors, EventContextSeq, Insert, InsertBatch,
+    Sequenced, StoreKeys,
 };
 use actix::{Actor, Addr, Handler, Message, Recipient};
-use anyhow::Context;
 use e3_utils::MAILBOX_LIMIT;
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use tracing::debug;
+use tracing::{debug, error};
 
 type Seq = u64;
 
@@ -93,32 +92,29 @@ impl BatchRouter {
 impl Handler<Insert> for BatchRouter {
     type Result = ();
     fn handle(&mut self, msg: Insert, _: &mut Self::Context) -> Self::Result {
-        trap(EType::IO, &PanicDispatcher::new(), || {
-            // Messages without context go straight to disk
-            // This is probably direct datastore manipulation
-            let Some(ctx) = msg.ctx() else {
-                debug!("Message without context. Flushing straight to disk.");
-                self.db.try_send(InsertBatch::new(vec![msg]))?;
-                return Ok(());
-            };
+        // Messages without context go straight to disk
+        // This is probably direct datastore manipulation
+        let Some(ctx) = msg.ctx() else {
+            debug!("Message without context. Flushing straight to disk.");
+            self.db.do_send(InsertBatch::new(vec![msg]));
+            return;
+        };
 
-            // Route to existing batch, or fall back to disk
-            match self.batches.get(&ctx.seq()) {
-                Some(batch) => {
-                    debug!("Forwarding to batch actor for seq={}", ctx.seq());
-                    batch.try_send(msg)?;
-                }
-                // This must mean that this insert is late
-                None => {
-                    debug!(
-                        "No batch available for seq={} assuming this is late. Flushing to disk.",
-                        ctx.seq()
-                    );
-                    self.db.try_send(InsertBatch::new(vec![msg]))?;
-                }
+        // Route to existing batch, or fall back to disk
+        match self.batches.get(&ctx.seq()) {
+            Some(batch) => {
+                debug!("Forwarding to batch actor for seq={}", ctx.seq());
+                batch.do_send(msg);
             }
-            Ok(())
-        })
+            // This must mean that this insert is late
+            None => {
+                debug!(
+                    "No batch available for seq={} assuming this is late. Flushing to disk.",
+                    ctx.seq()
+                );
+                self.db.do_send(InsertBatch::new(vec![msg]));
+            }
+        }
     }
 }
 
@@ -126,80 +122,73 @@ impl Handler<EnclaveEvent<Sequenced>> for BatchRouter {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
         let ec = msg.get_ctx();
-        trap(EType::IO, &PanicDispatcher::new(), || {
-            let prev_seq = ec.seq() - 1;
-            if self.batches.contains_key(&prev_seq) {
-                let prev_agg = self
-                    .aggregates
-                    .get(&prev_seq)
-                    .context("invariant: prev_agg MUST exist if batches has a batch")?;
-
-                debug!(
-                    "Preparing timelock to clear batch for seq={}, agg={}",
-                    prev_seq, prev_agg
+        let prev_seq = ec.seq() - 1;
+        if self.batches.contains_key(&prev_seq) {
+            let Some(prev_agg) = self.aggregates.get(&prev_seq) else {
+                error!(
+                    "invariant violation: prev_agg must exist if batches has a batch for seq={}",
+                    prev_seq
                 );
-                let delay = self.config.get_delay(prev_agg);
+                return;
+            };
 
-                let now = Duration::from_micros(self.clock.now_micros());
-
-                self.timelock_queue
-                    .try_send(StartTimelock::new(prev_seq, now, delay))?;
-            }
-
-            debug!("Creating batch for {}", ec.seq());
-            let agg_id = ec.aggregate_id();
-            let highest_block = self.get_highest_block(agg_id, ec.block());
-            let batch = Batch::spawn(
-                self.db.clone(),
-                vec![
-                    Insert::new_with_context(
-                        &StoreKeys::aggregate_seq(agg_id),
-                        encode_u64(ec.seq()),
-                        ec.clone(),
-                    ),
-                    Insert::new_with_context(
-                        &StoreKeys::aggregate_block(agg_id),
-                        encode_u64(highest_block),
-                        ec.clone(),
-                    ),
-                    Insert::new_with_context(
-                        &StoreKeys::aggregate_ts(agg_id),
-                        encode_u128(ec.ts()),
-                        ec.clone(),
-                    ),
-                ],
+            debug!(
+                "Preparing timelock to clear batch for seq={}, agg={}",
+                prev_seq, prev_agg
             );
+            let delay = self.config.get_delay(prev_agg);
 
-            self.batches.insert(ec.seq(), batch);
-            self.aggregates.insert(ec.seq(), ec.aggregate_id());
+            let now = Duration::from_micros(self.clock.now_micros());
 
-            Ok(())
-        })
+            self.timelock_queue
+                .do_send(StartTimelock::new(prev_seq, now, delay));
+        }
+
+        debug!("Creating batch for {}", ec.seq());
+        let agg_id = ec.aggregate_id();
+        let highest_block = self.get_highest_block(agg_id, ec.block());
+        let batch = Batch::spawn(
+            self.db.clone(),
+            vec![
+                Insert::new_with_context(
+                    &StoreKeys::aggregate_seq(agg_id),
+                    encode_u64(ec.seq()),
+                    ec.clone(),
+                ),
+                Insert::new_with_context(
+                    &StoreKeys::aggregate_block(agg_id),
+                    encode_u64(highest_block),
+                    ec.clone(),
+                ),
+                Insert::new_with_context(
+                    &StoreKeys::aggregate_ts(agg_id),
+                    encode_u128(ec.ts()),
+                    ec.clone(),
+                ),
+            ],
+        );
+
+        self.batches.insert(ec.seq(), batch);
+        self.aggregates.insert(ec.seq(), ec.aggregate_id());
     }
 }
 
 impl Handler<FlushSeq> for BatchRouter {
     type Result = ();
     fn handle(&mut self, msg: FlushSeq, _: &mut Self::Context) -> Self::Result {
-        trap(EType::IO, &PanicDispatcher::new(), || {
-            debug!("Flushing sequence... {}", msg.seq());
-            if let Some(batch) = self.batches.get(&msg.seq()) {
-                batch.try_send(Flush)?;
-                self.batches.remove(&msg.seq());
-                self.aggregates.remove(&msg.seq());
-            }
-            Ok(())
-        })
+        debug!("Flushing sequence... {}", msg.seq());
+        if let Some(batch) = self.batches.get(&msg.seq()) {
+            batch.do_send(Flush);
+            self.batches.remove(&msg.seq());
+            self.aggregates.remove(&msg.seq());
+        }
     }
 }
 
 impl Handler<UpdateDestination> for BatchRouter {
     type Result = ();
     fn handle(&mut self, msg: UpdateDestination, _: &mut Self::Context) -> Self::Result {
-        trap(EType::IO, &PanicDispatcher::new(), || {
-            self.db = msg.0;
-            Ok(())
-        })
+        self.db = msg.0;
     }
 }
 

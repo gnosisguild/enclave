@@ -131,7 +131,7 @@ pub async fn sync(
     // 9. Publish the new sorted events to the eventstore
     info!("Publishing historical events to actors...");
     for event in historical {
-        bus.naked_dispatch(event);
+        bus.naked_dispatch_async(event).await?;
     }
     info!("Historical events published.");
 
