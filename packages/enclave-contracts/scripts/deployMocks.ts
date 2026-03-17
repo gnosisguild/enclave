@@ -11,25 +11,29 @@ import { deployAndSaveMockProgram } from "./deployAndSave/mockProgram";
 
 export interface MockDeployments {
   computeProviderAddress: string;
-  decryptionVerifierAddress: string;
+  decryptionVerifierAddress: string | undefined;
   e3ProgramAddress: string;
 }
 
 /**
  * Deploys the mock contracts and returns the addresses.
- * @param enclaveAddress - The address of the enclave contract.
- * @returns The addresses of the mock contracts.
+ * @param shouldHaveZKVerification - When true, skips MockDecryptionVerifier (real BfvDecryptionVerifier will be used).
  */
-export const deployMocks = async (): Promise<MockDeployments> => {
+export const deployMocks = async (
+  shouldHaveZKVerification?: boolean,
+): Promise<MockDeployments> => {
   console.log("Deploying Compute Provider");
   const { computeProvider } = await deployAndSaveMockComputeProvider(hre);
 
   const computeProviderAddress = await computeProvider.getAddress();
 
-  console.log("Deploying Decryption Verifier");
-  const { decryptionVerifier } = await deployAndSaveMockDecryptionVerifier(hre);
-
-  const decryptionVerifierAddress = await decryptionVerifier.getAddress();
+  let decryptionVerifierAddress: string | undefined;
+  if (!shouldHaveZKVerification) {
+    console.log("Deploying Decryption Verifier");
+    const { decryptionVerifier } =
+      await deployAndSaveMockDecryptionVerifier(hre);
+    decryptionVerifierAddress = await decryptionVerifier.getAddress();
+  }
 
   console.log("Deploying E3 Program");
   const { e3Program } = await deployAndSaveMockProgram({
@@ -42,7 +46,7 @@ export const deployMocks = async (): Promise<MockDeployments> => {
         MockDeployments:
         ----------------------------------------------------------------------
         MockComputeProvider:${computeProviderAddress}
-        MockDecryptionVerifier:${decryptionVerifierAddress}
+        MockDecryptionVerifier:${decryptionVerifierAddress ?? "(skipped - using real ZK)"}
         MockE3Program:${e3ProgramAddress}
         `);
 

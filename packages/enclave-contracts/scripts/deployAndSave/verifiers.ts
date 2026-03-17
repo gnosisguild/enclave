@@ -6,21 +6,50 @@
 import fs from "fs";
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 import path from "path";
+import { fileURLToPath } from "url";
 
 import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 
+const BFV_HONK_VERIFIER_DIR = "contracts/verifiers/bfv/honk";
+const NPM_HONK_SOURCE_PREFIX =
+  "@enclave-e3/contracts/contracts/verifiers/bfv/honk";
+// Hardhat uses npm/package@version/ for library linking when built from npm deps (pnpm workspace: @local)
+const NPM_HONK_LIBRARY_LINK_PREFIX =
+  "npm/@enclave-e3/contracts@local/contracts/verifiers/bfv/honk";
+
+/** True when Hardhat artifacts use npm paths (consuming project like CRISP). */
+const isNpmArtifactContext = (): boolean =>
+  !fs.existsSync(path.join(process.cwd(), BFV_HONK_VERIFIER_DIR));
+
+/** Package root of enclave-contracts. Used when script runs from another project (e.g. CRISP). */
+const getEnclaveContractsRoot = (): string => {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  // scripts/deployAndSave -> package root (2 levels up)
+  // dist/scripts/deployAndSave -> package root (3 levels up)
+  for (const honkDir of [
+    path.join(__dirname, "..", "..", BFV_HONK_VERIFIER_DIR),
+    path.join(__dirname, "..", "..", "..", BFV_HONK_VERIFIER_DIR),
+  ]) {
+    if (fs.existsSync(honkDir)) {
+      return path.join(honkDir, "..", "..", "..", ".."); // honk -> bfv -> verifiers -> contracts -> root
+    }
+  }
+  return path.join(__dirname, "..", "..");
+};
+
 /**
- * Discovers all Solidity verifier contracts in contracts/verifier/ directory.
- * Returns an array of contract names (without .sol extension).
+ * Discovers Honk/BB verifier contracts in contracts/verifiers/bfv/honk/
+ * (excluding BfvDecryptionVerifier which lives in bfv/ and does not use ZKTranscriptLib).
+ * Uses enclave-contracts package root so discovery works when run from consuming projects (e.g. CRISP).
  */
 export const discoverVerifierContracts = (): string[] => {
-  const verifierDir = path.join(process.cwd(), "contracts/verifier");
-  if (!fs.existsSync(verifierDir)) {
+  const honkDir = path.join(getEnclaveContractsRoot(), BFV_HONK_VERIFIER_DIR);
+  if (!fs.existsSync(honkDir)) {
     return [];
   }
 
   return fs
-    .readdirSync(verifierDir)
+    .readdirSync(honkDir)
     .filter((f) => f.endsWith(".sol"))
     .map((f) => f.replace(".sol", ""));
 };
@@ -47,8 +76,12 @@ const deployZKTranscriptLib = async (
     return existing.address;
   }
 
-  // Deploy the library — use FQN to disambiguate multiple ZKTranscriptLib artifacts
-  const libFQN = `contracts/verifier/${referenceContract}.sol:ZKTranscriptLib`;
+  // Deploy the library — use FQN to disambiguate multiple ZKTranscriptLib artifacts.
+  // Npm context (CRISP): @enclave-e3/contracts/contracts/verifiers/bfv/honk/X.sol
+  // Project context (enclave-contracts): contracts/verifiers/bfv/honk/X.sol
+  const libFQN = isNpmArtifactContext()
+    ? `${NPM_HONK_SOURCE_PREFIX}/${referenceContract}.sol:ZKTranscriptLib`
+    : `${BFV_HONK_VERIFIER_DIR}/${referenceContract}.sol:ZKTranscriptLib`;
   console.log(`   Deploying ${libName}...`);
   const { ethers } = await hre.network.connect();
   const factory = await ethers.getContractFactory(libFQN);
@@ -70,7 +103,7 @@ const deployZKTranscriptLib = async (
  * Skips deployment if the contract is already deployed on the target chain.
  *
  * Note: The library FQN (fully-qualified name) uses the pattern:
- * "contracts/verifier/<ContractName>.sol:ZKTranscriptLib"
+ * "contracts/verifiers/bfv/honk/<ContractName>.sol:ZKTranscriptLib"
  * If you get linking errors, check the contract's compiled artifact for the exact FQN.
  */
 export const deployAndSaveVerifier = async (
@@ -89,8 +122,12 @@ export const deployAndSaveVerifier = async (
     return { address: existing.address };
   }
 
-  // Link ZKTranscriptLib - FQN pattern: "contracts/verifier/<ContractName>.sol:ZKTranscriptLib"
-  const libraryFQN = `project/contracts/verifier/${contractName}.sol:ZKTranscriptLib`;
+  // Link ZKTranscriptLib — key must match Hardhat's expected format for library linking.
+  // Npm context: npm/@enclave-e3/contracts@local/contracts/... (pnpm workspace)
+  // Project context: project/contracts/...
+  const libraryFQN = isNpmArtifactContext()
+    ? `${NPM_HONK_LIBRARY_LINK_PREFIX}/${contractName}.sol:ZKTranscriptLib`
+    : `project/${BFV_HONK_VERIFIER_DIR}/${contractName}.sol:ZKTranscriptLib`;
   const libraries = {
     [libraryFQN]: zkTranscriptLibAddress,
   };
@@ -121,7 +158,7 @@ export interface VerifierDeployments {
 }
 
 /**
- * Deploys all verifier contracts found in contracts/verifier/.
+ * Deploys all Honk verifier contracts found in contracts/verifiers/bfv/honk/.
  * Skips any that are already deployed on the target chain.
  *
  * @returns A mapping of contract names to their deployed addresses.
@@ -137,7 +174,7 @@ export const deployAndSaveAllVerifiers = async (
 
   if (contractNames.length === 0) {
     console.log(
-      "   No verifier contracts found in contracts/verifier/. Skipping.",
+      "   No verifier contracts found in contracts/verifiers/bfv/honk/. Skipping.",
     );
     return {};
   }

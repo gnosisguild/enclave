@@ -12,6 +12,7 @@ use alloy::{
     primitives::Address,
     providers::{Provider, WalletProvider},
     sol,
+    sol_types::SolValue,
 };
 use alloy::{
     primitives::{Bytes, U256},
@@ -24,8 +25,8 @@ use e3_events::EventType;
 use e3_events::Shutdown;
 use e3_events::{prelude::*, EffectsEnabled};
 use e3_events::{run_once, EnclaveEvent};
-use e3_events::{E3Stage, E3StageChanged, E3id};
-use e3_events::{EType, PlaintextAggregated};
+use e3_events::{E3Stage, E3StageChanged};
+use e3_events::{E3id, EType, PlaintextAggregated, Proof};
 use e3_utils::NotifySync;
 use e3_utils::MAILBOX_LIMIT;
 use tracing::info;
@@ -35,6 +36,25 @@ sol!(
     IEnclave,
     "../../packages/enclave-contracts/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json"
 );
+
+/// ABI-encodes a C7 proof for DecryptionVerifier.verify: abi.encode(rawProof, publicInputs).
+/// Public input count is derived from proof data; the contract rejects invalid counts.
+fn encode_c7_proof(proof: &Proof) -> Option<Bytes> {
+    let signals: &[u8] = &*proof.public_signals;
+    if signals.is_empty() || signals.len() % 32 != 0 {
+        return None;
+    }
+    let count = signals.len() / 32;
+    let mut inputs = Vec::with_capacity(count);
+    for chunk in signals.chunks_exact(32) {
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(chunk);
+        inputs.push(arr);
+    }
+    let raw = Bytes::from((&*proof.data).to_vec());
+    let encoded = (raw, inputs).abi_encode();
+    Some(Bytes::from(encoded))
+}
 
 /// Consumes events from the event bus and calls EVM methods on the Enclave.sol contract
 pub struct EnclaveSolWriter<P> {
@@ -142,11 +162,24 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                     );
                     return;
                 }
+                if decrypted_output.len() != msg.aggregation_proofs.len() {
+                    bus.err(
+                        EType::Evm,
+                        anyhow::anyhow!(
+                            "E3 {} decrypted_output len ({}) != aggregation_proofs len ({})",
+                            e3_id,
+                            decrypted_output.len(),
+                            msg.aggregation_proofs.len()
+                        ),
+                    );
+                    return;
+                }
                 let result = publish_plaintext_output(
                     provider,
                     contract_address,
                     e3_id,
                     decrypted.extract_bytes(),
+                    msg.aggregation_proofs.first(),
                 )
                 .await;
                 match result {
@@ -185,7 +218,6 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<E3StageChanged>
         Box::pin({
             let contract_address = self.contract_address;
             let provider = self.provider.clone();
-            let bus = self.bus.clone();
             async move {
                 let result =
                     process_e3_failure(provider, contract_address, msg.e3_id.clone()).await;
@@ -211,6 +243,7 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     contract_address: Address,
     e3_id: E3id,
     decrypted_output: Vec<u8>,
+    aggregation_proof: Option<&Proof>,
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = e3_id.try_into()?;
 
@@ -221,14 +254,19 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         .pending()
         .await?;
 
-    // RPC may not have synced ciphertext output being published yet
+    let proof = aggregation_proof.and_then(encode_c7_proof).ok_or_else(|| {
+        anyhow::anyhow!(
+            "C7 proof missing or invalid (expected non-empty public_signals divisible by 32)"
+        )
+    })?;
+
     send_tx_with_retry(
         "publishPlaintextOutput",
         &["CiphertextOutputNotPublished"],
         || {
             info!("publishPlaintextOutput() e3_id={:?}", e3_id);
-            let proof = Bytes::from(vec![1]);
             let decrypted_output = Bytes::from(decrypted_output.clone());
+            let proof = proof.clone();
             let contract = IEnclave::new(contract_address, provider.provider());
 
             async move {
