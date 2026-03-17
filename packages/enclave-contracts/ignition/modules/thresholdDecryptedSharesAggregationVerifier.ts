@@ -5,10 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-export default buildModule("ThresholdDecryptedSharesAggregationVerifier", (m) => {
-  const thresholdDecryptedSharesAggregationVerifier = m.contract(
-    "ThresholdDecryptedSharesAggregationVerifier",
-  );
+export default buildModule(
+  "ThresholdDecryptedSharesAggregationVerifier",
+  (m) => {
+    const thresholdDecryptedSharesAggregationVerifier = m.contract(
+      "ThresholdDecryptedSharesAggregationVerifier",
+    );
 
-  return { thresholdDecryptedSharesAggregationVerifier };
-}) as any;
+    return { thresholdDecryptedSharesAggregationVerifier };
+  },
+) as any;

@@ -278,8 +278,8 @@ Automates the full pipeline from Noir circuits to on-chain Solidity verifiers:
 3. **Generates verification keys** using `bb write_vk -t evm`
 4. **Generates Solidity verifiers** using `bb write_solidity_verifier`
 5. **Post-processes** the generated Solidity:
-   - Renames contract from `HonkVerifier` to descriptive name (e.g., `ThresholdPkAggregationVerifier`,
-     `ThresholdPkGenerationVerifier`)
+   - Renames contract from `HonkVerifier` to descriptive name (e.g.,
+     `ThresholdPkAggregationVerifier`, `ThresholdPkGenerationVerifier`)
    - Replaces Apache-2.0 license header with LGPL-3.0-only
 6. **Outputs** to `packages/enclave-contracts/contracts/verifier/`
 
