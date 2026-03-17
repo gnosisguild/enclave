@@ -4,8 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::path::PathBuf;
-
 use crate::ciphernode::{self, ChainArgs, CiphernodeCommands};
 use crate::helpers::telemetry::{setup_simple_tracing, setup_tracing};
 use crate::net::{self, NetCommands};
@@ -22,6 +20,9 @@ use e3_config::validation::ValidUrl;
 use e3_config::{load_config, AppConfig};
 use e3_console::{log, Console};
 use e3_entrypoint::helpers::datastore::close_all_connections;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::str::FromStr;
 use tracing::{info, instrument, Level};
 
 #[derive(Parser, Debug)]
@@ -298,15 +299,17 @@ pub enum Commands {
     },
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct RemoteCli {
     name: Option<String>,
-    otel: Option<ValidUrl>,
+    otel: Option<String>,
     quiet: bool,
     config: Option<String>,
     verbose: u8,
     command: RemoteCommand,
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum RemoteCommand {
     NetGetPeerId,
     NodePs,
@@ -348,6 +351,20 @@ impl TryFrom<Commands> for RemoteCommand {
     }
 }
 
+impl TryFrom<Cli> for RemoteCli {
+    type Error = anyhow::Error;
+    fn try_from(value: Cli) -> Result<Self> {
+        Ok(RemoteCli {
+            otel: value.otel.map(|o| o.to_string()),
+            verbose: value.verbose,
+            config: value.config,
+            name: value.name,
+            quiet: value.quiet,
+            command: value.command.try_into()?,
+        })
+    }
+}
+
 impl TryFrom<RemoteCli> for Cli {
     type Error = anyhow::Error;
     fn try_from(value: RemoteCli) -> std::result::Result<Self, Self::Error> {
@@ -355,7 +372,7 @@ impl TryFrom<RemoteCli> for Cli {
             verbose: value.verbose,
             config: value.config,
             quiet: value.quiet,
-            otel: value.otel,
+            otel: value.otel.and_then(|o| ValidUrl::from_str(&o).ok()),
             command: value.command.try_into()?,
             name: value.name,
         })

@@ -3132,6 +3132,7 @@ dependencies = [
  "e3-events",
  "e3-evm",
  "e3-init",
+ "e3-socket-server",
  "e3-support-scripts",
  "e3-utils",
  "e3-zk-prover",
@@ -3639,6 +3640,17 @@ dependencies = [
  "e3-evm-helpers",
  "e3-fhe-params",
  "e3-indexer",
+]
+
+[[package]]
+name = "e3-socket-server"
+version = "0.1.15"
+dependencies = [
+ "anyhow",
+ "e3-console",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

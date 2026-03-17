@@ -4,9 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use anyhow::Result;
 use clap::Parser;
-use cli::Cli;
+use cli::{Cli, RemoteCli};
 use e3_console::Console;
+use e3_socket_server::{connect_socket, run_on_socket};
 use e3_utils::{colorize, Color};
 use tracing::info;
 
@@ -60,12 +62,22 @@ pub fn owo() {
 }
 
 #[actix::main]
-pub async fn main() {
+pub async fn main() -> Result<()> {
     info!("COMPILATION ID: '{}'", helpers::compile_id::generate_id());
     let out = Console::stdout();
-    // Execute the cli
-    if let Err(err) = Cli::parse().execute(out).await {
+    let cli = Cli::parse();
+
+    // If the socket exists
+    if let Err(err) = if let Some(stream) = connect_socket().await {
+        let cli: RemoteCli = cli.try_into()?;
+        // Run the command over the socket
+        run_on_socket(out, stream, cli).await
+    } else {
+        // Run the command locally
+        cli.execute(out).await
+    } {
         eprintln!("{}", colorize(err, Color::Red));
         std::process::exit(1);
     }
+    Ok(())
 }
