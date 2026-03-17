@@ -136,6 +136,8 @@ impl Multithread {
     ) -> Addr<Self> {
         let addr = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report).start();
 
+        // Gate ComputeRequest behind EffectsEnabled — proof generation should
+        // not trigger during historical event replay.
         bus.subscribe(
             EventType::EffectsEnabled,
             run_once::<EffectsEnabled>({
@@ -184,7 +186,6 @@ impl Actor for Multithread {
 impl Handler<EnclaveEvent> for Multithread {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        info!("Multithread received EnclaveEvent!");
         let (data, ec) = msg.into_components();
         match data {
             EnclaveEventData::ComputeRequest(data) => ctx.notify(TypedEvent::new(data, ec)),
