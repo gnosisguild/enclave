@@ -747,13 +747,6 @@ fn handle_share_computation_proof(
             )
         })?;
 
-    let wrapped_proof = generate_wrapper_proof(prover, &base_proof, &e3_id_str).map_err(|e| {
-        ComputeRequestError::new(
-            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
-            request.clone(),
-        )
-    })?;
-
     // 8. Determine number of chunks and prove each chunk circuit
     let configs = Configs::compute(req.params_preset.clone(), &circuit_data)
         .map_err(|e| make_zk_error(&request, format!("Configs::compute: {}", e)))?;
@@ -812,7 +805,15 @@ fn handle_share_computation_proof(
             )
         })?;
 
-    // 11. Return final C2 proof
+    // 11. Wrap the final C2 proof for fold aggregation
+    let wrapped_proof = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
+
+    // 12. Return final C2 proof
     Ok(ComputeResponse::zk(
         ZkResponse::ShareComputation(ShareComputationProofResponse {
             proof,

@@ -7,11 +7,11 @@
 use bb_proof_verification::{UltraHonkVerificationKey, UltraHonkZKProof, verify_honk_proof};
 use lib::math::commitments::compute_recursive_aggregation_commitment;
 
-// Both SK and ESM share_computation inner proofs wrapped together during aggregation.
-pub global N_PROOFS: u32 = 2;
-// The share_computation inner circuit has 3 public outputs:
-//   base_key_hash, chunk_key_hash, aggregated_commitment (return value).
-pub global N_PUBLIC_INPUTS: u32 = 3;
+// Each SK/ESM final C2 proof is wrapped individually after the two-level pipeline.
+pub global N_PROOFS: u32 = 1;
+// The final share_computation circuit exposes 5 public outputs:
+//   batch_key_hash (pub param) + [Field; 4] return (base_key_hash, chunk_key_hash, batch_idx, commitment).
+pub global N_PUBLIC_INPUTS: u32 = 5;
 
 fn main(
     verification_key: UltraHonkVerificationKey,
@@ -20,7 +20,6 @@ fn main(
     key_hash: pub Field,
 ) -> pub Field {
     for i in 0..N_PROOFS {
-        verify_honk_proof(verification_key, proofs[i], public_inputs[i], key_hash);
         verify_honk_proof(verification_key, proofs[i], public_inputs[i], key_hash);
     }
 

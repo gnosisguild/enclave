@@ -145,10 +145,9 @@ impl ZkProver {
         }
 
         let job_dir = self.work_dir.join(e3_id);
-        fs::create_dir_all(&job_dir)?;
-
         let witness_path = job_dir.join("witness.gz");
         let output_dir = job_dir.join("out");
+        fs::create_dir_all(&job_dir)?;
 
         fs::write(&witness_path, witness_data)?;
 
