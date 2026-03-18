@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Actor, Recipient};
+use actix::Actor;
 use anyhow::Result;
 use e3_ciphernode_builder::global_eventstore_cache::{get_shared_eventstore, EventStoreReader};
 use e3_ciphernode_builder::global_store_cache::get_cached_store;
@@ -12,7 +12,7 @@ use e3_ciphernode_builder::{get_enclave_bus_handle, EventSystem};
 use e3_config::AppConfig;
 use e3_data::{DataStore, InMemStore, SledDb, SledStore};
 use e3_data::{Repositories, RepositoriesFactory};
-use e3_events::{BusHandle, Disabled, EventStoreQueryBy, SeqAgg, TsAgg};
+use e3_events::{BusHandle, Disabled};
 use std::path::PathBuf;
 
 pub fn get_sled_store(bus: &BusHandle<Disabled>, db_file: &PathBuf) -> Result<DataStore> {
