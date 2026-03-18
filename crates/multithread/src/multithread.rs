@@ -167,7 +167,29 @@ impl Multithread {
         let actor = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report)
             .with_zk_prover(zk_prover);
         let addr = actor.start();
-        bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
+        bus.subscribe_all(
+            &[
+                EventType::E3Failed,
+                EventType::E3StageChanged,
+                EventType::E3RequestComplete,
+            ],
+            addr.clone().into(),
+        );
+
+        bus.subscribe(
+            EventType::EffectsEnabled,
+            run_once::<EffectsEnabled>({
+                let bus = bus.clone();
+                let addr = addr.clone();
+                move |_| {
+                    bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
+                    info!("Multithread actor with ZK listening for events.");
+                    Ok(())
+                }
+            })
+            .recipient(),
+        );
+
         addr
     }
 

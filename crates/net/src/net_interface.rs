@@ -10,6 +10,14 @@ use crate::{
     events::{IncomingResponse, OutgoingRequest, ProtocolResponse},
     net_interface_handle::NetInterfaceHandle,
 };
+use crate::{
+    dialer::dial_peers,
+    events::{
+        GossipData, IncomingRequest, NetCommand, NetEvent, OutgoingRequestFailed,
+        OutgoingRequestSucceeded, PeerTarget, PutOrStoreError,
+    },
+    ContentHash,
+};
 use anyhow::{bail, Context, Result};
 use e3_events::CorrelationId;
 use e3_utils::ArcBytes;
@@ -25,12 +33,13 @@ use libp2p::{
         Behaviour as KademliaBehaviour, Config as KademliaConfig, GetRecordOk, QueryResult, Quorum,
         Record, RecordKey,
     },
+    multiaddr::Protocol,
     request_response::{
         self, cbor, Event as RequestResponseEvent, Message as RequestResponseMessage,
         ProtocolSupport,
     },
     swarm::{dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent},
-    PeerId, StreamProtocol, Swarm,
+    Multiaddr, PeerId, StreamProtocol, Swarm,
 };
 use rand::prelude::IteratorRandom;
 use std::{
@@ -49,19 +58,22 @@ const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/enclave/kad/1.0.0");
 const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
 const DHT_MAX_RECORDS: usize = 4096;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
-/// Number of consecutive dial failures before a peer is evicted from the routing table.
-/// Set high enough to survive transient network issues during DKG, but low enough to
-/// eventually clean up genuinely unreachable peers.
-const MAX_CONSECUTIVE_DIAL_FAILURES: u32 = 5;
+const MAX_CONSECUTIVE_DIAL_FAILURES: u32 = 3;
+const EVENT_CHANNEL_SIZE: usize = 1000;
+const CMD_CHANNEL_SIZE: usize = 1000;
+const PEER_FAILURE_TTL: Duration = Duration::from_secs(300);
 
-use crate::{
-    dialer::dial_peers,
-    events::{
-        GossipData, IncomingRequest, NetCommand, NetEvent, OutgoingRequestFailed,
-        OutgoingRequestSucceeded, PeerTarget, PutOrStoreError,
-    },
-    ContentHash,
-};
+/// Returns true if the multiaddr contains a loopback IP (127.0.0.0/8 or ::1).
+/// Loopback addresses are only meaningful on the local machine and must not be
+/// added to the Kademlia routing table, otherwise they get propagated to remote
+/// peers via FIND_NODE responses, causing those peers to dial themselves.
+fn is_loopback_addr(addr: &Multiaddr) -> bool {
+    addr.iter().any(|p| match p {
+        Protocol::Ip4(ip) => ip.is_loopback(),
+        Protocol::Ip6(ip) => ip.is_loopback(),
+        _ => false,
+    })
+}
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -99,8 +111,8 @@ impl Libp2pNetInterface {
         udp_port: Option<u16>,
         topic: &str,
     ) -> Result<Self> {
-        let (event_tx, _) = broadcast::channel(1000); // TODO : tune this param
-        let (cmd_tx, cmd_rx) = mpsc::channel(1000); // TODO : tune this param
+        let (event_tx, _) = broadcast::channel(EVENT_CHANNEL_SIZE);
+        let (cmd_tx, cmd_rx) = mpsc::channel(CMD_CHANNEL_SIZE);
 
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.into_keypair())
             .with_tokio()
@@ -182,6 +194,10 @@ impl Libp2pNetInterface {
                     match process_swarm_event(&mut self.swarm, &event_tx, &cmd_tx, &mut correlator, &mut peer_failures, event).await {
                         Ok(_) => (),
                         Err(e) => error!("Error processing NetEvent: {e}")
+                    }
+                    let queued = event_tx.len();
+                    if queued > EVENT_CHANNEL_SIZE * 3 / 4 {
+                        warn!("Event broadcast channel backpressure: {queued}/{EVENT_CHANNEL_SIZE} queued");
                     }
                 }
 
@@ -292,17 +308,19 @@ async fn process_swarm_event(
             num_established,
             ..
         } => {
-            // Only log on first connection to this peer to avoid spam
-            if num_established.get() == 1 {
-                info!("Connected to {peer_id}");
-            }
             // Reset failure count on successful connection
             peer_failures.reset(&peer_id);
+            if num_established.get() == 1 {
+                let total = swarm.connected_peers().count();
+                info!("Peer connected: {peer_id} (total: {total})");
+            }
             let remote_addr = endpoint.get_remote_address().clone();
-            swarm
-                .behaviour_mut()
-                .kademlia
-                .add_address(&peer_id, remote_addr.clone());
+            if !is_loopback_addr(&remote_addr) {
+                swarm
+                    .behaviour_mut()
+                    .kademlia
+                    .add_address(&peer_id, remote_addr.clone());
+            }
 
             // Trigger Kademlia bootstrap to discover peers beyond direct connections
             if num_established.get() == 1 {
@@ -554,8 +572,47 @@ async fn process_swarm_event(
             debug!("Response sent to peer={}, id={}", peer, request_id);
         }
 
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Identify(
+            libp2p::identify::Event::Received { peer_id, info, .. },
+        )) => {
+            debug!("Identify received from {peer_id}: {:?}", info.observed_addr);
+            for addr in &info.listen_addrs {
+                if !is_loopback_addr(addr) {
+                    swarm
+                        .behaviour_mut()
+                        .kademlia
+                        .add_address(&peer_id, addr.clone());
+                }
+            }
+            if !is_loopback_addr(&info.observed_addr) {
+                swarm.add_external_address(info.observed_addr);
+            }
+        }
+
+        SwarmEvent::ConnectionClosed {
+            peer_id,
+            num_established,
+            cause,
+            ..
+        } => {
+            if num_established == 0 {
+                let total = swarm.connected_peers().count();
+                info!("Peer disconnected: {peer_id} (total: {total}, cause: {cause:?})");
+            }
+        }
+
+        SwarmEvent::ListenerClosed {
+            addresses, reason, ..
+        } => {
+            warn!("Listener closed on {addresses:?}: {reason:?}");
+        }
+
+        SwarmEvent::ListenerError { error, .. } => {
+            error!("Listener error: {error}");
+        }
+
         unknown => {
-            trace!("Unknown event: {:?}", unknown);
+            debug!("Unhandled swarm event: {:?}", unknown);
         }
     };
     Ok(())
@@ -867,8 +924,9 @@ fn handle_response(swarm: &mut Swarm<NodeBehaviour>, responder: DirectResponder)
 }
 
 /// Tracks consecutive connection failures per peer to detect and evict stale peers.
+/// Entries are automatically cleaned up after PEER_FAILURE_TTL to prevent unbounded growth.
 struct PeerFailureTracker {
-    failures: HashMap<PeerId, u32>,
+    failures: HashMap<PeerId, (u32, Instant)>,
 }
 
 impl PeerFailureTracker {
@@ -880,14 +938,23 @@ impl PeerFailureTracker {
 
     /// Record a failure for the given peer and return the new consecutive failure count.
     fn record_failure(&mut self, peer_id: &PeerId) -> u32 {
-        let count = self.failures.entry(*peer_id).or_insert(0);
-        *count += 1;
-        *count
+        self.cleanup_stale();
+        let entry = self.failures.entry(*peer_id).or_insert((0, Instant::now()));
+        entry.0 += 1;
+        entry.1 = Instant::now();
+        entry.0
     }
 
     /// Reset the failure count for a peer (e.g. on successful connection or after eviction).
     fn reset(&mut self, peer_id: &PeerId) {
         self.failures.remove(peer_id);
+    }
+
+    /// Remove entries older than PEER_FAILURE_TTL to prevent unbounded growth
+    fn cleanup_stale(&mut self) {
+        let now = Instant::now();
+        self.failures
+            .retain(|_, (_, last_seen)| now.duration_since(*last_seen) < PEER_FAILURE_TTL);
     }
 }
 
