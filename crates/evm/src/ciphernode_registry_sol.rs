@@ -550,8 +550,9 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
     let public_key_bytes = Bytes::from(public_key.extract_bytes());
 
     let proof: Bytes = pk_aggregation_proof
-        .and_then(encode_zk_proof)
-        .ok_or_else(|| anyhow::anyhow!("pk_aggregation_proof required and must encode"))?;
+        .map(encode_zk_proof)
+        .transpose()?
+        .ok_or_else(|| anyhow::anyhow!("pk_aggregation_proof required"))?;
 
     let nodes_vec: Vec<Address> = nodes
         .into_iter()

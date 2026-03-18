@@ -234,11 +234,10 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         .pending()
         .await?;
 
-    let proof = aggregation_proof.and_then(encode_zk_proof).ok_or_else(|| {
-        anyhow::anyhow!(
-            "C7 proof missing or invalid (expected non-empty public_signals divisible by 32)"
-        )
-    })?;
+    let proof = aggregation_proof
+        .map(encode_zk_proof)
+        .transpose()?
+        .ok_or_else(|| anyhow::anyhow!("C7 proof missing or invalid"))?;
 
     send_tx_with_retry(
         "publishPlaintextOutput",

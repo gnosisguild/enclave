@@ -3311,6 +3311,7 @@ version = "0.1.15"
 dependencies = [
  "actix",
  "alloy",
+ "alloy-dyn-abi",
  "alloy-primitives",
  "anyhow",
  "async-trait",
