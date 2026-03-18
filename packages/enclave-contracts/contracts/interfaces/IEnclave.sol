@@ -395,10 +395,13 @@ interface IEnclave {
     function onCommitteeFinalized(uint256 e3Id) external;
 
     /// @notice Called by CiphernodeRegistry when committee public key is published (DKG complete).
-    /// @dev Updates E3 lifecycle to KeyPublished stage. Aggregate commitment extracted from proof.
+    /// @dev Updates E3 lifecycle to KeyPublished stage.
     /// @param e3Id ID of the E3.
-    /// @param proof C5 proof; aggregate commitment extracted as committeePublicKey.
-    function onCommitteePublished(uint256 e3Id, bytes calldata proof) external;
+    /// @param committeePublicKey Hash of the committee's aggregated public key.
+    function onCommitteePublished(
+        uint256 e3Id,
+        bytes32 committeePublicKey
+    ) external;
 
     /// @notice Called by authorized contracts to mark an E3 as failed with a specific reason.
     /// @dev Updates E3 lifecycle to Failed stage with the given reason.

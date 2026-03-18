@@ -7,6 +7,7 @@ pragma solidity >=0.8.27;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
+import { E3 } from "../interfaces/IE3.sol";
 import { IEnclave } from "../interfaces/IEnclave.sol";
 import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
 import {
@@ -298,11 +299,16 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             (bytes, bytes32[])
         );
         require(publicInputs.length > 0, "C5: no public inputs");
-        bytes32 commitment = publicInputs[publicInputs.length - 1];
+        bytes32 publicKeyHash = publicInputs[publicInputs.length - 1];
 
-        c.publicKey = commitment;
-        publicKeyHashes[e3Id] = commitment;
-        enclave.onCommitteePublished(e3Id, proof);
+        E3 memory e3 = enclave.getE3(e3Id);
+        e3.pkVerifier.verify(proof);
+
+        c.publicKey = publicKeyHash;
+        publicKeyHashes[e3Id] = publicKeyHash;
+
+        enclave.onCommitteePublished(e3Id, publicKeyHash);
+
         emit CommitteePublished(e3Id, nodes, publicKey);
     }
 
