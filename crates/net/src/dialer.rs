@@ -53,18 +53,22 @@ fn trace_error(r: Result<()>) {
 /// * `cmd_tx` - Sender for network peer commands
 /// * `event_tx` - Broadcast sender for peer events
 /// * `peers` - List of peer addresses to connect to
+///
+/// # Returns
+/// The number of peers that were successfully connected to.
 pub async fn dial_peers(
     cmd_tx: &mpsc::Sender<NetCommand>,
     event_tx: &broadcast::Sender<NetEvent>,
     peers: &Vec<String>,
-) -> Result<()> {
+) -> Result<usize> {
     let futures: Vec<_> = peers
         .iter()
         .map(|addr| dial_multiaddr(cmd_tx, event_tx, addr))
         .collect();
     let results = join_all(futures).await;
+    let connected = results.iter().filter(|r| r.is_ok()).count();
     results.into_iter().for_each(trace_error);
-    Ok(())
+    Ok(connected)
 }
 
 /// Attempt a connection with retries to a multiaddr.

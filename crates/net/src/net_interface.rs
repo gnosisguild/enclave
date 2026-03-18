@@ -190,8 +190,9 @@ impl Libp2pNetInterface {
             let cmd_tx = cmd_tx.clone();
             let peers = self.peers.clone();
             async move {
-                dial_peers(&cmd_tx, &event_tx, &peers).await?;
-                event_tx.send(NetEvent::AllPeersDialed)?;
+                let total = peers.len();
+                let connected = dial_peers(&cmd_tx, &event_tx, &peers).await?;
+                event_tx.send(NetEvent::AllPeersDialed { connected, total })?;
                 return anyhow::Ok(());
             }
         });
@@ -420,11 +421,14 @@ async fn process_swarm_event(
 
         SwarmEvent::IncomingConnectionError { error, .. } => {
             let error_str = format!("{:#}", anyhow::Error::from(error));
-            // Downgrade self dial attempts to debug
-            if error_str.contains("Local peer ID") {
+            // Downgrade benign handshake failures to debug:
+            // - "Local peer ID": self-dial attempt
+            // - "aborted by peer": simultaneous connection dedup (both sides dialed,
+            //   libp2p keeps one connection and the other side aborts the handshake)
+            if error_str.contains("Local peer ID") || error_str.contains("aborted by peer") {
                 debug!("{}", error_str);
             } else {
-                warn!("{}", error_str);
+                warn!("Incoming connection error: {}", error_str);
             }
         }
 
