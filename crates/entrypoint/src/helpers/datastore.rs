@@ -32,6 +32,7 @@ pub fn setup_datastore(config: &AppConfig, bus: &BusHandle<Disabled>) -> Result<
     Ok(store)
 }
 
+/// Command helper to get a store
 pub fn get_repositories(config: &AppConfig) -> Result<Repositories> {
     // We are probably in a socket command so get the shared store
     if let Some(store) = get_cached_store() {
@@ -44,6 +45,7 @@ pub fn get_repositories(config: &AppConfig) -> Result<Repositories> {
     Ok(store.repositories())
 }
 
+/// Command helper to get an eventstore reader for reading events from the event store
 pub fn get_eventstore_reader(config: &AppConfig) -> Result<EventStoreReader> {
     // We are probably in a socket command so get the shared eventstore reader
     if let Some(es) = get_shared_eventstore() {
