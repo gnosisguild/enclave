@@ -16,6 +16,7 @@ use e3_config::{AppConfig, NodeRole};
 use e3_console::Console;
 use e3_events::{prelude::*, Shutdown};
 use e3_socket_server::start_socket_server;
+use e3_utils::{colorize, Color};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::signal::unix::{signal, SignalKind};
 use tracing::{error, info, instrument};
@@ -61,6 +62,7 @@ pub fn launch_socket_server() {
 
         if let Some(line) = lines.next_line().await? {
             let (out, mut rx) = Console::channel();
+            info!("CMD: {}", &colorize(&line, Color::Blue));
             let remote_cli: RemoteCli = serde_json::from_str(&line)?;
             let cli: Cli = remote_cli.try_into()?;
             cli.execute(out).await?;
