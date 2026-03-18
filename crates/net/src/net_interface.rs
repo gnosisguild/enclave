@@ -75,6 +75,26 @@ fn is_loopback_addr(addr: &Multiaddr) -> bool {
     })
 }
 
+/// Returns true only when we should filter loopback addresses from Kademlia.
+/// This is the case when the node has at least one non-loopback listener,
+/// meaning it's in a production-like environment where propagating loopback
+/// addresses to remote peers would cause them to dial themselves.
+/// In localhost test environments (all listeners on 127.0.0.1) we allow
+/// loopback so that peers can discover each other.
+fn should_filter_loopback(swarm: &Swarm<NodeBehaviour>) -> bool {
+    swarm
+        .listeners()
+        .any(|addr| !is_loopback_addr(addr) && !is_unspecified_addr(addr))
+}
+
+fn is_unspecified_addr(addr: &Multiaddr) -> bool {
+    addr.iter().any(|p| match p {
+        Protocol::Ip4(ip) => ip.is_unspecified(),
+        Protocol::Ip6(ip) => ip.is_unspecified(),
+        _ => false,
+    })
+}
+
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
     gossipsub: gossipsub::Behaviour,
@@ -320,7 +340,7 @@ async fn process_swarm_event(
                 info!("Peer connected: {peer_id} (total: {total})");
             }
             let remote_addr = endpoint.get_remote_address().clone();
-            if !is_loopback_addr(&remote_addr) {
+            if !(should_filter_loopback(swarm) && is_loopback_addr(&remote_addr)) {
                 swarm
                     .behaviour_mut()
                     .kademlia
@@ -355,11 +375,16 @@ async fn process_swarm_event(
                         "Peer ID mismatch at {remote_addr}: expected {failed_peer}, got {obtained} — \
                          replacing stale routing entry"
                     );
+                    let local_peer = *swarm.local_peer_id();
                     swarm.behaviour_mut().kademlia.remove_peer(failed_peer);
-                    swarm
-                        .behaviour_mut()
-                        .kademlia
-                        .add_address(&obtained, remote_addr);
+                    if obtained != local_peer
+                        && !(should_filter_loopback(swarm) && is_loopback_addr(&remote_addr))
+                    {
+                        swarm
+                            .behaviour_mut()
+                            .kademlia
+                            .add_address(&obtained, remote_addr);
+                    }
                     peer_failures.reset(failed_peer);
 
                     // Trigger Kademlia bootstrap to discover peers beyond direct connections.
@@ -581,8 +606,9 @@ async fn process_swarm_event(
             libp2p::identify::Event::Received { peer_id, info, .. },
         )) => {
             debug!("Identify received from {peer_id}: {:?}", info.observed_addr);
+            let filter = should_filter_loopback(swarm);
             for addr in &info.listen_addrs {
-                if !is_loopback_addr(addr) {
+                if !(filter && is_loopback_addr(addr)) {
                     swarm
                         .behaviour_mut()
                         .kademlia

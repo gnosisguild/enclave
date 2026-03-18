@@ -16,7 +16,7 @@ use e3_utils::MAILBOX_LIMIT;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryInto, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::{
     direct_requester::DirectRequester,
@@ -293,15 +293,56 @@ async fn handle_sync_request_event(
     let mut all_events: Vec<EnclaveEvent<Unsequenced>> = Vec::new();
     let mut latest_timestamp: u128 = 0;
 
+    // Retry net sync with delays long enough to survive QUIC reconnection after a
+    // hard restart. When a node restarts, peers may still hold stale QUIC connections
+    // (~10s idle timeout). We retry so Kademlia has time to re-establish connections.
+    const NET_SYNC_RETRIES: u32 = 3;
+    const NET_SYNC_RETRY_DELAY: Duration = Duration::from_secs(5);
+
     for (aggregate_id, since) in event.since.iter() {
         info!(
             "Requesting batched events for aggregate_id={} since={}",
             aggregate_id, since
         );
-        let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone()).build();
-        let events: Vec<EnclaveEvent<Unsequenced>> =
-            fetch_all_batched_events(requester, PeerTarget::Random, *aggregate_id, *since, 100)
-                .await?;
+
+        let mut events: Vec<EnclaveEvent<Unsequenced>> = Vec::new();
+        let mut last_err = None;
+
+        for attempt in 1..=NET_SYNC_RETRIES {
+            let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone()).build();
+            match fetch_all_batched_events(
+                requester,
+                PeerTarget::Random,
+                *aggregate_id,
+                *since,
+                100,
+            )
+            .await
+            {
+                Ok(fetched) => {
+                    events = fetched;
+                    last_err = None;
+                    break;
+                }
+                Err(e) => {
+                    warn!(
+                        "Net sync attempt {attempt}/{NET_SYNC_RETRIES} failed for \
+                         aggregate_id={aggregate_id}: {e}"
+                    );
+                    last_err = Some(e);
+                    if attempt < NET_SYNC_RETRIES {
+                        tokio::time::sleep(NET_SYNC_RETRY_DELAY).await;
+                    }
+                }
+            }
+        }
+
+        if let Some(e) = last_err {
+            warn!(
+                "All net sync attempts failed for aggregate_id={aggregate_id}: {e}. \
+                 Proceeding without net events for this aggregate."
+            );
+        }
 
         info!(
             "Received {} events for aggregate_id={}",
