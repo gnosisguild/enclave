@@ -136,6 +136,8 @@ impl Multithread {
     ) -> Addr<Self> {
         let addr = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report).start();
 
+        // Gate ComputeRequest behind EffectsEnabled — proof generation should
+        // not trigger during historical event replay.
         bus.subscribe(
             EventType::EffectsEnabled,
             run_once::<EffectsEnabled>({
@@ -165,7 +167,29 @@ impl Multithread {
         let actor = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report)
             .with_zk_prover(zk_prover);
         let addr = actor.start();
-        bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
+        bus.subscribe_all(
+            &[
+                EventType::E3Failed,
+                EventType::E3StageChanged,
+                EventType::E3RequestComplete,
+            ],
+            addr.clone().into(),
+        );
+
+        bus.subscribe(
+            EventType::EffectsEnabled,
+            run_once::<EffectsEnabled>({
+                let bus = bus.clone();
+                let addr = addr.clone();
+                move |_| {
+                    bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
+                    info!("Multithread actor with ZK listening for events.");
+                    Ok(())
+                }
+            })
+            .recipient(),
+        );
+
         addr
     }
 
@@ -184,7 +208,6 @@ impl Actor for Multithread {
 impl Handler<EnclaveEvent> for Multithread {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        info!("Multithread received EnclaveEvent!");
         let (data, ec) = msg.into_components();
         match data {
             EnclaveEventData::ComputeRequest(data) => ctx.notify(TypedEvent::new(data, ec)),

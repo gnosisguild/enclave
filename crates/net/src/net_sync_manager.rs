@@ -16,7 +16,7 @@ use e3_utils::MAILBOX_LIMIT;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryInto, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, info};
+use tracing::{debug, error, info, warn};
 
 use crate::{
     direct_requester::DirectRequester,
@@ -24,6 +24,13 @@ use crate::{
     events::{await_event, IncomingRequest, NetCommand, NetEvent, PeerTarget},
     net_event_batch::{fetch_all_batched_events, BatchCursor, EventBatch, FetchEventsSince},
 };
+
+/// Maximum time to wait for a `ConnectionEstablished` event after all dials
+/// failed before publishing `NetReady` anyway.
+const NET_READY_CONNECT_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Maximum time to wait for the `AllPeersDialed` event before giving up.
+const ALL_PEERS_DIALED_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncResponseValue {
@@ -61,7 +68,9 @@ pub struct NetSyncManager {
     rx: Arc<broadcast::Receiver<NetEvent>>,
     eventstore: Recipient<EventStoreQueryBy<TsAgg>>,
     requests: HashMap<CorrelationId, DirectResponder>,
-    peers_ready: bool,
+    all_peers_dialed: bool,
+    has_connections: bool,
+    net_ready_published: bool,
 }
 
 impl NetSyncManager {
@@ -77,8 +86,19 @@ impl NetSyncManager {
             rx: Arc::clone(rx),
             eventstore,
             requests: HashMap::new(),
-            peers_ready: false,
+            all_peers_dialed: false,
+            has_connections: false,
+            net_ready_published: false,
         }
+    }
+
+    fn publish_net_ready(&mut self) -> Result<()> {
+        if !self.net_ready_published {
+            self.net_ready_published = true;
+            info!("NetSyncManager: publishing NetReady");
+            self.bus.publish_without_context(NetReady::new())?;
+        }
+        Ok(())
     }
 
     pub fn setup(
@@ -102,7 +122,10 @@ impl NetSyncManager {
                     match event {
                         // Someone is asking for our sync
                         NetEvent::IncomingRequest(value) => addr.do_send(value),
-                        NetEvent::AllPeersDialed => addr.do_send(AllPeersDialed),
+                        NetEvent::AllPeersDialed { connected, total } => {
+                            addr.do_send(AllPeersDialed { connected, total })
+                        }
+                        NetEvent::ConnectionEstablished { .. } => addr.do_send(PeerConnected),
                         _ => (),
                     }
                 }
@@ -150,7 +173,7 @@ impl Handler<TypedEvent<HistoricalNetSyncStart>> for NetSyncManager {
                 self.rx.clone(),
                 msg,
                 ctx.address(),
-                !self.peers_ready,
+                !self.all_peers_dialed,
             ),
         )
     }
@@ -249,19 +272,64 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
 
 impl Handler<AllPeersDialed> for NetSyncManager {
     type Result = ();
-    fn handle(&mut self, _: AllPeersDialed, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: AllPeersDialed, ctx: &mut Self::Context) -> Self::Result {
         trap(EType::Sync, &self.bus.clone(), || {
-            info!("NetSyncManager: AllPeersDialed");
-            self.peers_ready = true;
-            self.bus.publish_without_context(NetReady::new())?;
+            info!(
+                "NetSyncManager: AllPeersDialed (connected={}, total={})",
+                msg.connected, msg.total
+            );
+            self.all_peers_dialed = true;
+            if msg.connected > 0 {
+                self.has_connections = true;
+            }
+            if msg.total == 0 || self.has_connections {
+                // No peers configured or connections already established
+                self.publish_net_ready()?;
+            } else {
+                // All dials failed — wait for a ConnectionEstablished event.
+                // Fall back to a 60-second timeout so we don't hang forever.
+                info!(
+                    "All peer dials failed, waiting for connections before publishing NetReady..."
+                );
+                let bus = self.bus.clone();
+                ctx.run_later(NET_READY_CONNECT_TIMEOUT, move |this, _| {
+                    if !this.net_ready_published {
+                        warn!("No peer connections established within 60s timeout, publishing NetReady anyway");
+                        this.net_ready_published = true;
+                        if let Err(e) = bus.publish_without_context(NetReady::new()) {
+                            error!("Failed to publish NetReady: {e}");
+                        }
+                    }
+                });
+            }
             Ok(())
         })
     }
 }
 
+impl Handler<PeerConnected> for NetSyncManager {
+    type Result = ();
+    fn handle(&mut self, _: PeerConnected, _: &mut Self::Context) -> Self::Result {
+        if !self.has_connections {
+            info!("NetSyncManager: first peer connected");
+            self.has_connections = true;
+            if self.all_peers_dialed {
+                trap(EType::Sync, &self.bus.clone(), || self.publish_net_ready());
+            }
+        }
+    }
+}
+
 #[derive(Message)]
 #[rtype(result = "()")]
-struct AllPeersDialed;
+struct AllPeersDialed {
+    connected: usize,
+    total: usize,
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+struct PeerConnected;
 
 async fn handle_sync_request_event(
     net_cmds: mpsc::Sender<NetCommand>,
@@ -277,14 +345,14 @@ async fn handle_sync_request_event(
         await_event(
             &net_events,
             |e| {
-                if matches!(e, &NetEvent::AllPeersDialed) {
+                if matches!(e, &NetEvent::AllPeersDialed { .. }) {
                     info!("AllPeersDialed matched!");
                     Some(e.clone())
                 } else {
                     None
                 }
             },
-            Duration::from_secs(30),
+            ALL_PEERS_DIALED_TIMEOUT,
         )
         .await?;
     }
