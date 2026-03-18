@@ -146,6 +146,8 @@ impl Libp2pNetInterface {
         let cmd_rx = &mut self.cmd_rx;
         let mut correlator = Correlator::new();
         let mut peer_failures = PeerFailureTracker::new();
+        // This is to make sure we dont spam warnings in the logs
+        let mut last_backpressure_warn = Instant::now();
 
         // Subscribe to topic
         self.swarm
@@ -196,8 +198,11 @@ impl Libp2pNetInterface {
                         Err(e) => error!("Error processing NetEvent: {e}")
                     }
                     let queued = event_tx.len();
-                    if queued > EVENT_CHANNEL_SIZE * 3 / 4 {
+                    if queued > EVENT_CHANNEL_SIZE * 3 / 4
+                        && last_backpressure_warn.elapsed() > Duration::from_secs(10)
+                    {
                         warn!("Event broadcast channel backpressure: {queued}/{EVENT_CHANNEL_SIZE} queued");
+                        last_backpressure_warn = Instant::now();
                     }
                 }
 
@@ -939,9 +944,10 @@ impl PeerFailureTracker {
     /// Record a failure for the given peer and return the new consecutive failure count.
     fn record_failure(&mut self, peer_id: &PeerId) -> u32 {
         self.cleanup_stale();
-        let entry = self.failures.entry(*peer_id).or_insert((0, Instant::now()));
+        let now = Instant::now();
+        let entry = self.failures.entry(*peer_id).or_insert((0, now));
         entry.0 += 1;
-        entry.1 = Instant::now();
+        entry.1 = now;
         entry.0
     }
 
