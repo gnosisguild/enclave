@@ -24,6 +24,7 @@ pub use backend::{SetupStatus, ZkBackend};
 pub use circuits::dkg::share_computation::{
     generate_chunk_batch_proof, generate_chunk_proof, generate_share_computation_final_proof,
 };
+pub use circuits::public_signals;
 pub use circuits::recursive_aggregation::{generate_fold_proof, generate_wrapper_proof};
 pub use config::{verify_checksum, BbTarget, CircuitInfo, VersionInfo, ZkConfig};
 pub use e3_events::CircuitVariant;

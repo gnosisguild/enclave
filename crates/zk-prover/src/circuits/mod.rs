@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 pub(crate) mod dkg;
+pub mod public_signals;
 pub mod recursive_aggregation;
 mod threshold;
 pub(crate) mod utils;
