@@ -24,6 +24,10 @@ use e3_utils::{retry_with_backoff, to_retry, OnceTake, RetryError};
 const DIAL_DELAY: u64 = 3000;
 const DIAL_RETRIES: u32 = 10;
 
+/// Per-connection timeout: if no swarm events arrive within this window during
+/// a single dial attempt, we treat it as timed out and retry.
+const DIAL_EVENT_TIMEOUT: Duration = Duration::from_secs(60);
+
 /// Dial a single Multiaddr with retries and return an error should those retries not work
 async fn dial_multiaddr(
     cmd_tx: &mpsc::Sender<NetCommand>,
@@ -144,8 +148,8 @@ async fn wait_for_connection(
                     _ => (),
                 }
             }
-            _ = sleep(Duration::from_secs(60)) => {
-                warn!("Connection attempt timed out after 60 seconds of no events");
+            _ = sleep(DIAL_EVENT_TIMEOUT) => {
+                warn!("Connection attempt timed out after {:?} of no events", DIAL_EVENT_TIMEOUT);
                 return Err(RetryError::Retry(std::io::Error::new(
                     std::io::ErrorKind::TimedOut,
                     "Connection attempt timed out",

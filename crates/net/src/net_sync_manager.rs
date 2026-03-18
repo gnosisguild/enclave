@@ -25,6 +25,13 @@ use crate::{
     net_event_batch::{fetch_all_batched_events, BatchCursor, EventBatch, FetchEventsSince},
 };
 
+/// Maximum time to wait for a `ConnectionEstablished` event after all dials
+/// failed before publishing `NetReady` anyway.
+const NET_READY_CONNECT_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Maximum time to wait for the `AllPeersDialed` event before giving up.
+const ALL_PEERS_DIALED_TIMEOUT: Duration = Duration::from_secs(30);
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncResponseValue {
     pub events: Vec<EnclaveEvent<Unsequenced>>,
@@ -285,7 +292,7 @@ impl Handler<AllPeersDialed> for NetSyncManager {
                     "All peer dials failed, waiting for connections before publishing NetReady..."
                 );
                 let bus = self.bus.clone();
-                ctx.run_later(Duration::from_secs(60), move |this, _| {
+                ctx.run_later(NET_READY_CONNECT_TIMEOUT, move |this, _| {
                     if !this.net_ready_published {
                         warn!("No peer connections established within 60s timeout, publishing NetReady anyway");
                         this.net_ready_published = true;
@@ -345,7 +352,7 @@ async fn handle_sync_request_event(
                     None
                 }
             },
-            Duration::from_secs(30),
+            ALL_PEERS_DIALED_TIMEOUT,
         )
         .await?;
     }
@@ -354,56 +361,15 @@ async fn handle_sync_request_event(
     let mut all_events: Vec<EnclaveEvent<Unsequenced>> = Vec::new();
     let mut latest_timestamp: u128 = 0;
 
-    // Retry net sync with delays long enough to survive QUIC reconnection after a
-    // hard restart. When a node restarts, peers may still hold stale QUIC connections
-    // (~10s idle timeout). We retry so Kademlia has time to re-establish connections.
-    const NET_SYNC_RETRIES: u32 = 3;
-    const NET_SYNC_RETRY_DELAY: Duration = Duration::from_secs(5);
-
     for (aggregate_id, since) in event.since.iter() {
         info!(
             "Requesting batched events for aggregate_id={} since={}",
             aggregate_id, since
         );
-
-        let mut events: Vec<EnclaveEvent<Unsequenced>> = Vec::new();
-        let mut last_err = None;
-
-        for attempt in 1..=NET_SYNC_RETRIES {
-            let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone()).build();
-            match fetch_all_batched_events(
-                requester,
-                PeerTarget::Random,
-                *aggregate_id,
-                *since,
-                100,
-            )
-            .await
-            {
-                Ok(fetched) => {
-                    events = fetched;
-                    last_err = None;
-                    break;
-                }
-                Err(e) => {
-                    warn!(
-                        "Net sync attempt {attempt}/{NET_SYNC_RETRIES} failed for \
-                         aggregate_id={aggregate_id}: {e}"
-                    );
-                    last_err = Some(e);
-                    if attempt < NET_SYNC_RETRIES {
-                        tokio::time::sleep(NET_SYNC_RETRY_DELAY).await;
-                    }
-                }
-            }
-        }
-
-        if let Some(e) = last_err {
-            warn!(
-                "All net sync attempts failed for aggregate_id={aggregate_id}: {e}. \
-                 Proceeding without net events for this aggregate."
-            );
-        }
+        let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone()).build();
+        let events: Vec<EnclaveEvent<Unsequenced>> =
+            fetch_all_batched_events(requester, PeerTarget::Random, *aggregate_id, *since, 100)
+                .await?;
 
         info!(
             "Received {} events for aggregate_id={}",
