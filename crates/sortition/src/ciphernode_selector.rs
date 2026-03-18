@@ -57,6 +57,7 @@ impl CiphernodeSelector {
         let e3_cache = selector_store.load_or_default(HashMap::new()).await?;
         let addr = CiphernodeSelector::new(bus, e3_cache, address).start();
 
+        bus.subscribe(EventType::E3Requested, addr.clone().recipient());
         bus.subscribe(EventType::E3RequestComplete, addr.clone().recipient());
         bus.subscribe(EventType::CommitteeFinalized, addr.clone().recipient());
         bus.subscribe(EventType::Shutdown, addr.clone().recipient());
@@ -71,6 +72,7 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
+            EnclaveEventData::E3Requested(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
             EnclaveEventData::E3RequestComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
@@ -80,6 +82,26 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
             EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
+    }
+}
+
+impl Handler<TypedEvent<E3Requested>> for CiphernodeSelector {
+    type Result = ();
+
+    fn handle(&mut self, msg: TypedEvent<E3Requested>, _: &mut Self::Context) -> Self::Result {
+        trap(EType::Sortition, &self.bus.with_ec(msg.get_ctx()), || {
+            self.e3_cache.try_mutate(msg.get_ctx(), |mut cache| {
+                cache.entry(msg.e3_id.clone()).or_insert(E3Meta {
+                    seed: msg.seed,
+                    threshold_n: msg.threshold_n,
+                    threshold_m: msg.threshold_m,
+                    params: msg.params.clone(),
+                    esi_per_ct: msg.esi_per_ct,
+                    error_size: msg.error_size.clone(),
+                });
+                Ok(cache)
+            })
+        })
     }
 }
 
