@@ -57,13 +57,21 @@ where
     };
 
     let handler = Arc::new(handler);
+    loop {
+        match listener.accept().await {
+            Ok((stream, _)) => {
+                let handler = Arc::clone(&handler);
 
-    while let Ok((stream, _)) = listener.accept().await {
-        let handler = Arc::clone(&handler);
-        tokio::task::spawn_local(async move {
-            if let Err(e) = handler(stream).await {
-                error!("Connection error: {e}");
+                tokio::task::spawn_local(async move {
+                    if let Err(e) = handler(stream).await {
+                        error!("Connection error: {e}");
+                    }
+                });
             }
-        });
+            Err(e) => {
+                error!("Accept error: {e}");
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+        }
     }
 }
