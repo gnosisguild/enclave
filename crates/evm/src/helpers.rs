@@ -60,7 +60,9 @@ pub fn encode_zk_proof(proof: &Proof) -> Result<Bytes> {
         inputs.push(arr);
     }
 
-    Ok(Bytes::from(((&*proof.data).to_vec(), inputs).abi_encode()))
+    Ok(Bytes::from(
+        ((&*proof.data).to_vec(), inputs).abi_encode_params(),
+    ))
 }
 
 pub trait AuthConversions {
