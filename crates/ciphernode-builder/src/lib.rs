@@ -9,6 +9,7 @@ mod ciphernode_builder;
 mod event_system;
 mod eventbus_factory;
 mod evm_system;
+pub mod global_store_cache;
 mod provider_caches;
 pub use ciphernode::*;
 pub use ciphernode_builder::*;

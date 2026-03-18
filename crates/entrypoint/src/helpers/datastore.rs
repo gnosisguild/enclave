@@ -4,15 +4,15 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::path::PathBuf;
-
 use actix::Actor;
 use anyhow::Result;
 use e3_ciphernode_builder::get_enclave_bus_handle;
+use e3_ciphernode_builder::global_store_cache::get_cached_store;
 use e3_config::AppConfig;
 use e3_data::{DataStore, InMemStore, SledDb, SledStore};
 use e3_data::{Repositories, RepositoriesFactory};
 use e3_events::{BusHandle, Disabled};
+use std::path::PathBuf;
 
 pub fn get_sled_store(bus: &BusHandle<Disabled>, db_file: &PathBuf) -> Result<DataStore> {
     Ok((&SledStore::new(bus, db_file)?).into())
@@ -32,6 +32,12 @@ pub fn setup_datastore(config: &AppConfig, bus: &BusHandle<Disabled>) -> Result<
 }
 
 pub fn get_repositories(config: &AppConfig) -> Result<Repositories> {
+    // If there is a cache set get it and use it
+    if let Some(store) = get_cached_store() {
+        return Ok(store.repositories());
+    }
+
+    // Setup a fresh data store
     let bus = get_enclave_bus_handle()?;
     let store = setup_datastore(config, &bus)?;
     Ok(store.repositories())

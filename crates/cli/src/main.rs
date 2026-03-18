@@ -64,7 +64,8 @@ pub fn owo() {
 #[actix::main]
 pub async fn main() -> Result<()> {
     info!("COMPILATION ID: '{}'", helpers::compile_id::generate_id());
-    let out = Console::stdout();
+    let handle = Console::stdout();
+    let out = handle.writer();
     let cli = Cli::parse();
 
     // If the socket exists
@@ -79,5 +80,7 @@ pub async fn main() -> Result<()> {
         eprintln!("{}", colorize(err, Color::Red));
         std::process::exit(1);
     }
+
+    handle.flush().await;
     Ok(())
 }

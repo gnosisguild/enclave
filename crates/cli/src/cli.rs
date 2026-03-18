@@ -299,7 +299,7 @@ pub enum Commands {
     },
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RemoteCli {
     name: Option<String>,
     otel: Option<String>,
@@ -309,11 +309,11 @@ pub struct RemoteCli {
     command: RemoteCommand,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum RemoteCommand {
     NetGetPeerId,
-    NodePs,
-    NodeStatus { id: String },
+    // NodePs,
+    // NodeStatus { id: String },
     CiphernodeStatus { chain: ChainArgs },
     NoirStatus,
     WalletGet,
@@ -333,12 +333,12 @@ impl TryFrom<Commands> for RemoteCommand {
             Commands::Noir {
                 command: NoirCommands::Status,
             } => Ok(RemoteCommand::NoirStatus),
-            Commands::Nodes {
-                command: NodeCommands::Ps,
-            } => Ok(RemoteCommand::NodePs),
-            Commands::Nodes {
-                command: NodeCommands::Status { id },
-            } => Ok(RemoteCommand::NodeStatus { id }),
+            // Commands::Nodes {
+            //     command: NodeCommands::Ps,
+            // } => Ok(RemoteCommand::NodePs),
+            // Commands::Nodes {
+            //     command: NodeCommands::Status { id },
+            // } => Ok(RemoteCommand::NodeStatus { id }),
             Commands::Ciphernode {
                 command: CiphernodeCommands::Status { chain },
             } => Ok(RemoteCommand::CiphernodeStatus { chain }),
@@ -391,16 +391,18 @@ impl TryFrom<RemoteCommand> for Commands {
             RemoteCommand::CiphernodeStatus { chain } => Commands::Ciphernode {
                 command: CiphernodeCommands::Status { chain },
             },
-            RemoteCommand::NodeStatus { id } => Commands::Nodes {
-                command: NodeCommands::Status { id },
-            },
-            RemoteCommand::NodePs => Commands::Nodes {
-                command: NodeCommands::Ps,
+            // RemoteCommand::NodeStatus { id } => Commands::Nodes {
+            //     command: NodeCommands::Status { id },
+            // },
+            // RemoteCommand::NodePs => Commands::Nodes {
+            //     command: NodeCommands::Ps,
+            // },
+            RemoteCommand::NoirStatus => Commands::Noir {
+                command: NoirCommands::Status,
             },
             RemoteCommand::NetGetPeerId => Commands::Net {
                 command: NetCommands::GetPeerId,
             },
-            _ => bail!("Command not allowed while node is running"),
         };
         // We might have to hold this stuff on RemoteCommand
         Ok(command)

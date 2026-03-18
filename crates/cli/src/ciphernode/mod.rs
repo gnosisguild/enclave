@@ -44,11 +44,11 @@ pub enum CiphernodeCommands {
         rpc_url: Option<String>,
 
         /// The password
-        #[arg(short, long, value_parser = parse_zeroizing)]
+        #[arg(short='p', long, value_parser = parse_zeroizing)]
         password: Option<Zeroizing<String>>,
 
         /// Wallet Private Key
-        #[arg(short, long, value_parser = ensure_hex_zeroizing)]
+        #[arg(short='k', long, value_parser = ensure_hex_zeroizing)]
         private_key: Option<Zeroizing<String>>,
     },
     /// Manage ENCL license tokens and bonding state

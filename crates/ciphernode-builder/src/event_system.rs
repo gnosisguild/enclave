@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::get_enclave_event_bus;
+use crate::global_store_cache::share_store;
 use actix::{Actor, Addr, Handler, Recipient};
 use anyhow::{anyhow, Result};
 use e3_data::{
@@ -87,6 +88,8 @@ pub struct EventSystem {
     aggregate_config: OnceCell<AggregateConfig>,
     /// Cached EventStoreAddrs for idempotency
     eventstore_addrs: OnceCell<EventStoreAddrs>,
+    /// Global shared store
+    global_shared_store: bool,
 }
 
 impl EventSystem {
@@ -108,6 +111,7 @@ impl EventSystem {
             handle: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
+            global_shared_store: false,
         }
     }
 
@@ -124,6 +128,7 @@ impl EventSystem {
             handle: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
+            global_shared_store: false,
         }
     }
 
@@ -142,6 +147,7 @@ impl EventSystem {
             handle: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
+            global_shared_store: false,
         }
     }
 
@@ -162,6 +168,12 @@ impl EventSystem {
     /// Add aggregate configuration including delays and other settings
     pub fn with_aggregate_config(self, config: AggregateConfig) -> Self {
         let _ = self.aggregate_config.set(config);
+        self
+    }
+
+    /// Share the store with other processes
+    pub fn with_global_shared_store(mut self, value: bool) -> Self {
+        self.global_shared_store = value;
         self
     }
 
@@ -336,6 +348,10 @@ impl EventSystem {
                 )
             }
         };
+
+        if self.global_shared_store {
+            share_store(&store)
+        }
 
         Ok(store)
     }

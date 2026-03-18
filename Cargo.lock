@@ -3125,6 +3125,7 @@ dependencies = [
  "compile-time",
  "dialoguer",
  "dirs 5.0.1",
+ "e3-ciphernode-builder",
  "e3-config",
  "e3-console",
  "e3-crypto",
@@ -3144,6 +3145,7 @@ dependencies = [
  "petname",
  "rand 0.8.5",
  "serde",
+ "serde_json",
  "tokio",
  "toml 0.8.23",
  "tracing",
@@ -3261,6 +3263,7 @@ dependencies = [
  "e3-logger",
  "e3-net",
  "e3-request",
+ "e3-socket-server",
  "e3-sortition",
  "e3-test-helpers",
  "e3-zk-prover",
@@ -3651,6 +3654,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

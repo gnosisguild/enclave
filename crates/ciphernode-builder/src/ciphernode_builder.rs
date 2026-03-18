@@ -81,6 +81,7 @@ pub struct CiphernodeBuilder {
     zk_backend: Option<ZkBackend>,
     net_config: Option<NetConfig>,
     ignore_address_check: bool,
+    global_shared_store: bool,
 }
 
 // Simple Net Configuration
@@ -148,6 +149,7 @@ impl CiphernodeBuilder {
             net_config: None,
             zk_backend: None,
             ignore_address_check: false,
+            global_shared_store: false,
         }
     }
 
@@ -311,6 +313,11 @@ impl CiphernodeBuilder {
         self
     }
 
+    pub fn with_shared_store(mut self) -> Self {
+        self.global_shared_store = true;
+        self
+    }
+
     /// Setup net package components.
     pub fn with_net(mut self, peers: Vec<String>, quic_port: u16) -> Self {
         self.net_config = Some(NetConfig::new(peers, quic_port));
@@ -388,18 +395,20 @@ impl CiphernodeBuilder {
                 EventSystem::persisted(log_path, kv_path)
                     .with_event_bus(local_bus)
                     .with_aggregate_config(aggregate_config.clone())
+                    .with_global_shared_store(self.global_shared_store)
             } else {
                 if let Some(ref store) = self.in_mem_store {
                     EventSystem::in_mem_from_store(store)
                         .with_event_bus(local_bus)
                         .with_aggregate_config(aggregate_config.clone())
+                        .with_global_shared_store(self.global_shared_store)
                 } else {
                     EventSystem::in_mem()
                         .with_event_bus(local_bus)
                         .with_aggregate_config(aggregate_config.clone())
+                        .with_global_shared_store(self.global_shared_store)
                 }
             };
-
         let store = event_system.store()?;
         let eventstore_ts = event_system.eventstore_getter_ts()?;
         let eventstore_seq = event_system.eventstore_getter_seq()?;
@@ -455,6 +464,8 @@ impl CiphernodeBuilder {
                 .zk_backend
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("ZK backend is required for threshold keyshare"))?;
+
+            backend.ensure_installed().await?;
 
             // Ensure signer is available before setting up extensions that need it
             let signer = provider_cache.ensure_signer().await?;

@@ -20,7 +20,8 @@ pub fn setup_simple_tracing(log_level: Level) {
         .with(tracing_subscriber::filter::LevelFilter::from_level(
             log_level,
         ))
-        .init();
+        .try_init()
+        .ok();
 }
 
 pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
@@ -51,7 +52,8 @@ pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
                 .with(tracing_subscriber::filter::LevelFilter::from_level(
                     log_level,
                 ))
-                .init();
+                .try_init()
+                .ok();
         }
         None => {
             // TODO: we might be able to dedupe this with above but there were
@@ -61,7 +63,8 @@ pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
                 .with(tracing_subscriber::filter::LevelFilter::from_level(
                     log_level,
                 ))
-                .init();
+                .try_init()
+                .ok();
         }
     }
 
