@@ -15,7 +15,7 @@ pnpm concurrently \
     --prefix-colors "blue,cyan,magenta,yellow,green" \
     --kill-others-on-fail \
     "pnpm dev:frontend" \
-    "pnpm dev:evm" \
+    "anvil --host 0.0.0.0 --chain-id 31337 --block-time 1 --mnemonic 'test test test test test test test test test test test junk' --silent" \
     "pnpm dev:ciphernodes" \
     "TEST_MODE=1 pnpm dev:server" \
     "enclave program start"

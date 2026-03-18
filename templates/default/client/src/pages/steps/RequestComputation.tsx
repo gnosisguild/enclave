@@ -42,30 +42,27 @@ const RequestComputation: React.FC = () => {
     if (!isInitialized) return
 
     const handleE3Requested = (event: any) => {
-      const e3Id = event.data.e3Id
+      const { e3Id, e3 } = event.data
       setE3State((prev) => ({
         ...prev,
         id: e3Id,
         isRequested: true,
+        expiresAt: e3.inputWindow?.[1] ?? null,
       }))
     }
 
     const handleCommitteePublished = (event: any) => {
       const { e3Id, publicKey } = event.data
-
-      // Add a 2 second delay to show the waiting state
-      setTimeout(() => {
-        setE3State((prev) => {
-          if (prev.id !== null && e3Id === prev.id) {
-            return {
-              ...prev,
-              isCommitteePublished: true,
-              publicKey: publicKey as `0x${string}`,
-            }
+      setE3State((prev) => {
+        if (prev.id !== null && e3Id === prev.id) {
+          return {
+            ...prev,
+            isCommitteePublished: true,
+            publicKey: publicKey as `0x${string}`,
           }
-          return prev
-        })
-      }, 2000)
+        }
+        return prev
+      })
     }
 
     onEnclaveEvent(EnclaveEventType.E3_REQUESTED, handleE3Requested)
@@ -80,12 +77,11 @@ const RequestComputation: React.FC = () => {
   // Auto-advance to next step when committee publishes
   useEffect(() => {
     if (e3State.isCommitteePublished && e3State.publicKey) {
-      setCurrentStep(WizardStep.ACTIVATE_E3)
+      setCurrentStep(WizardStep.ENTER_INPUTS)
     }
   }, [e3State.isCommitteePublished, e3State.publicKey, setCurrentStep])
 
   const handleRequestComputation = async () => {
-    console.log('handleRequestComputation')
     setIsRequesting(true)
     setRequestError(null)
     setRequestSuccess(false)
@@ -95,7 +91,7 @@ const RequestComputation: React.FC = () => {
       id: null,
       isRequested: false,
       isCommitteePublished: false,
-      isActivated: false,
+      isCiphertextPublished: false,
       publicKey: null,
       expiresAt: null,
       plaintextOutput: null,
@@ -110,19 +106,24 @@ const RequestComputation: React.FC = () => {
       const committeeSize = DEFAULT_E3_CONFIG.committeeSize
       const publicClient = sdk.sdk.getPublicClient()
 
-      const inputWindow = await calculateInputWindow(publicClient, 60) // 1 minute
+      const inputWindow = await calculateInputWindow(publicClient, 600) // 10 min
       const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
       const e3ProgramParams = encodeBfvParams(thresholdBfvParams)
       const computeProviderParams = encodeComputeProviderParams(DEFAULT_COMPUTE_PROVIDER_PARAMS)
 
-      console.log('requestE3')
-      const hash = await requestE3({
+      const requestParams = {
         committeeSize,
         inputWindow,
         e3Program: contracts.e3Program,
         e3ProgramParams,
         computeProviderParams,
-      })
+      }
+
+      const fee = await sdk.sdk.getE3Quote(requestParams)
+      const approveTx = await sdk.sdk.approveFeeToken(fee)
+      await publicClient.waitForTransactionReceipt({ hash: approveTx })
+
+      const hash = await requestE3(requestParams)
 
       setLocalTransactionHash(hash)
       setLastTransactionHash(hash)
@@ -150,7 +151,7 @@ const RequestComputation: React.FC = () => {
           </p>
           <div className='rounded-lg border border-blue-200 bg-blue-50 p-4'>
             <p className='text-sm text-slate-600'>
-              <strong>Process:</strong> Request E3 → Committee Selection via Sortition → Key Generation → Ready for Activation
+              <strong>Process:</strong> Request E3 → Committee Selection via Sortition → Key Generation → Ready for Input
             </p>
           </div>
 
@@ -172,7 +173,7 @@ const RequestComputation: React.FC = () => {
                     <br />
                     <strong>Public Key:</strong> {e3State.publicKey.slice(0, 20)}...{e3State.publicKey.slice(-10)}
                     <br />
-                    Ready to activate E3 environment.
+                    Ready for encrypted input.
                   </p>
                 </div>
               ) : (
@@ -224,7 +225,7 @@ const RequestComputation: React.FC = () => {
             ? 'Submitting to Blockchain...'
             : e3State.isRequested
               ? e3State.isCommitteePublished
-                ? 'Committee Ready - Proceeding to Activation!'
+                ? 'Committee Ready - Proceeding to Input!'
                 : 'Waiting for Committee...'
               : 'Request E3 Computation (0.001 ETH)'}
         </button>

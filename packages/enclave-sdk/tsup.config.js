@@ -29,6 +29,8 @@ export default defineConfig([
     entry,
     include: ['./src/**/*.ts'],
     format: ['cjs'],
+    // Avoid running DTS build twice for the same entries.
+    dts: false,
     outExtension: () => ({
       js: '.cjs',
     }),

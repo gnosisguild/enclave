@@ -391,5 +391,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/verifier/ThresholdDecryptedSharesAggregationVerifier.sol",
-  "buildInfoId": "solc-0_8_28-ea784e9448f647a2ad29ccdb24e4cacb8fdc4660"
+  "buildInfoId": "solc-0_8_28-543ccb35c9b85334df682667ad98480ea27e7555"
 }
