@@ -4,14 +4,15 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::Actor;
+use actix::{Actor, Recipient};
 use anyhow::Result;
-use e3_ciphernode_builder::get_enclave_bus_handle;
+use e3_ciphernode_builder::global_eventstore_cache::{get_shared_eventstore, EventStoreReader};
 use e3_ciphernode_builder::global_store_cache::get_cached_store;
+use e3_ciphernode_builder::{get_enclave_bus_handle, EventSystem};
 use e3_config::AppConfig;
 use e3_data::{DataStore, InMemStore, SledDb, SledStore};
 use e3_data::{Repositories, RepositoriesFactory};
-use e3_events::{BusHandle, Disabled};
+use e3_events::{BusHandle, Disabled, EventStoreQueryBy, SeqAgg, TsAgg};
 use std::path::PathBuf;
 
 pub fn get_sled_store(bus: &BusHandle<Disabled>, db_file: &PathBuf) -> Result<DataStore> {
@@ -32,15 +33,27 @@ pub fn setup_datastore(config: &AppConfig, bus: &BusHandle<Disabled>) -> Result<
 }
 
 pub fn get_repositories(config: &AppConfig) -> Result<Repositories> {
-    // If there is a cache set get it and use it
+    // We are probably in a socket command so get the shared store
     if let Some(store) = get_cached_store() {
         return Ok(store.repositories());
     }
 
-    // Setup a fresh data store
+    // We are probably in a standalone command so setup a fresh data store
     let bus = get_enclave_bus_handle()?;
     let store = setup_datastore(config, &bus)?;
     Ok(store.repositories())
+}
+
+pub fn get_eventstore_reader(config: &AppConfig) -> Result<EventStoreReader> {
+    // We are probably in a socket command so get the shared eventstore reader
+    if let Some(es) = get_shared_eventstore() {
+        return Ok(es);
+    }
+
+    // We are probably in a standalone command so get a new reader
+    let system = EventSystem::persisted(config.log_file(), config.db_file());
+    let es = system.eventstore_reader()?;
+    Ok(es)
 }
 
 pub fn close_all_connections() {

@@ -33,6 +33,7 @@ pub async fn execute(config: &AppConfig) -> Result<CiphernodeHandle> {
         .with_zkproof(backend)
         .with_net(config.peers(), config.quic_port())
         .with_shared_store()
+        .with_shared_eventstore()
         .build()
         .await?;
 

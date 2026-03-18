@@ -82,6 +82,7 @@ pub struct CiphernodeBuilder {
     net_config: Option<NetConfig>,
     ignore_address_check: bool,
     global_shared_store: bool,
+    global_shared_eventstore: bool,
 }
 
 // Simple Net Configuration
@@ -150,6 +151,7 @@ impl CiphernodeBuilder {
             zk_backend: None,
             ignore_address_check: false,
             global_shared_store: false,
+            global_shared_eventstore: false,
         }
     }
 
@@ -313,8 +315,15 @@ impl CiphernodeBuilder {
         self
     }
 
+    /// Share the store this ciphernode uses with socket server commands
     pub fn with_shared_store(mut self) -> Self {
         self.global_shared_store = true;
+        self
+    }
+
+    /// Share the eventstore this ciphernode uses with socket server commands
+    pub fn with_shared_eventstore(mut self) -> Self {
+        self.global_shared_eventstore = true;
         self
     }
 
@@ -410,8 +419,7 @@ impl CiphernodeBuilder {
                 }
             };
         let store = event_system.store()?;
-        let eventstore_ts = event_system.eventstore_getter_ts()?;
-        let eventstore_seq = event_system.eventstore_getter_seq()?;
+        let eventstore = event_system.eventstore_reader()?;
         let cipher = &self.cipher;
         let repositories = Arc::new(store.repositories());
         let mut provider_cache =
@@ -550,7 +558,7 @@ impl CiphernodeBuilder {
             (peer_id, interface, channel_bridge)
         };
 
-        setup_net(topic, bus.clone(), eventstore_ts, interface)?;
+        setup_net(topic, bus.clone(), eventstore.ts(), interface)?;
 
         // Run the sync routine
         sync(
@@ -558,7 +566,7 @@ impl CiphernodeBuilder {
             &evm_config,
             &repositories,
             &aggregate_config,
-            &eventstore_seq,
+            &eventstore.seq(),
         )
         .await?;
 
