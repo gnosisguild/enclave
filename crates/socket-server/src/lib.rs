@@ -8,24 +8,24 @@ use anyhow::Result;
 use e3_console::{log, Console};
 use serde::Serialize;
 use std::future::Future;
-use std::path::Path;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::UnixStream;
+use tokio::net::TcpStream;
 use tracing::error;
 
-pub const SOCKET_PATH: &str = "/tmp/enclave.sock";
+pub const TCP_PORT: u16 = 50505;
+const TCP_ADDRESS: &str = "127.0.0.1"; // using localhost specifically so that it is not mounted
+                                       // externally. We might change this if we need to control
+                                       // externally and add authentication or TLS
 
-pub async fn connect_socket() -> Option<UnixStream> {
-    if !Path::new(SOCKET_PATH).exists() {
-        return None;
-    }
-    UnixStream::connect(SOCKET_PATH).await.ok()
+pub async fn connect_socket() -> Option<TcpStream> {
+    let addr = format!("{}:{}", TCP_ADDRESS, TCP_PORT);
+    TcpStream::connect(addr).await.ok()
 }
 
 pub async fn run_on_socket<T: Serialize>(
     out: Console,
-    stream: UnixStream,
+    stream: TcpStream,
     cli: T,
 ) -> anyhow::Result<()> {
     let (reader, mut writer) = stream.into_split();
@@ -42,18 +42,13 @@ pub async fn run_on_socket<T: Serialize>(
     Ok(())
 }
 
-pub fn remove_socket() -> Result<()> {
-    std::fs::remove_file(SOCKET_PATH)?;
-    Ok(())
-}
-
 pub async fn start_socket_server<F, Fut>(handler: F)
 where
-    F: Fn(UnixStream) -> Fut + Send + Sync + 'static,
+    F: Fn(TcpStream) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<()>> + 'static,
 {
-    let _ = std::fs::remove_file(SOCKET_PATH);
-    let listener = match tokio::net::UnixListener::bind(SOCKET_PATH) {
+    let addr = format!("{}:{}", TCP_ADDRESS, TCP_PORT);
+    let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(l) => l,
         Err(e) => {
             error!("Failed to bind socket: {e}");

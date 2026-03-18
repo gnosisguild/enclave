@@ -15,7 +15,7 @@ use e3_ciphernode_builder::CiphernodeHandle;
 use e3_config::{AppConfig, NodeRole};
 use e3_console::Console;
 use e3_events::{prelude::*, Shutdown};
-use e3_socket_server::{remove_socket, start_socket_server};
+use e3_socket_server::start_socket_server;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::signal::unix::{signal, SignalKind};
 use tracing::{error, info, instrument};
@@ -123,10 +123,6 @@ pub async fn graceful_shutdown(node: Option<CiphernodeHandle>) {
         if let Err(e) = node.bus.publish_without_context(Shutdown) {
             error!("Shutdown failed to publish! {e}");
         }
-    }
-
-    if let Err(e) = remove_socket() {
-        error!("FAILED TO REMOVE SOCKET! {e}");
     }
 
     tokio::time::sleep(Duration::from_secs(2)).await;
