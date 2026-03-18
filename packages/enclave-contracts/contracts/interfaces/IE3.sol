@@ -44,4 +44,5 @@ struct E3 {
     bytes32 ciphertextOutput;
     bytes plaintextOutput;
     address requester;
+    bool proofAggregationEnabled;
 }

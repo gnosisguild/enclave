@@ -79,6 +79,29 @@ impl NodeProofAggregator {
         let (msg, ec) = msg.into_components();
         let e3_id = msg.e3_id.clone();
 
+        // When proof aggregation is disabled, skip wrapping/folding entirely
+        // and immediately signal completion with no aggregated proof.
+        if !msg.proof_aggregation_enabled {
+            info!(
+                "NodeProofAggregator: proof aggregation disabled for E3 {} — skipping",
+                e3_id
+            );
+            if let Err(err) = self.bus.publish(
+                DKGRecursiveAggregationComplete {
+                    e3_id: e3_id.clone(),
+                    party_id: msg.full_share.party_id,
+                    aggregated_proof: None,
+                },
+                ec,
+            ) {
+                error!(
+                    "NodeProofAggregator: failed to publish DKGRecursiveAggregationComplete (skipped) for E3 {}: {err}",
+                    e3_id
+                );
+            }
+            return;
+        }
+
         let sk_enc_count = msg.sk_share_encryption_requests.len();
         let e_sm_enc_count = msg.e_sm_share_encryption_requests.len();
         // Must mirror the formula in ProofRequestActor::handle_threshold_share_pending:
@@ -263,7 +286,7 @@ impl NodeProofAggregator {
             DKGRecursiveAggregationComplete {
                 e3_id: e3_id.clone(),
                 party_id: state.party_id,
-                aggregated_proof,
+                aggregated_proof: Some(aggregated_proof),
             },
             state.last_ec,
         ) {

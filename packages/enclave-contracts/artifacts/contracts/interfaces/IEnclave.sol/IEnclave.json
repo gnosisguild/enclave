@@ -288,6 +288,11 @@
               "internalType": "address",
               "name": "requester",
               "type": "address"
+            },
+            {
+              "internalType": "bool",
+              "name": "proofAggregationEnabled",
+              "type": "bool"
             }
           ],
           "indexed": false,
@@ -762,6 +767,11 @@
               "internalType": "address",
               "name": "requester",
               "type": "address"
+            },
+            {
+              "internalType": "bool",
+              "name": "proofAggregationEnabled",
+              "type": "bool"
             }
           ],
           "internalType": "struct E3",
@@ -805,6 +815,11 @@
               "internalType": "bytes",
               "name": "customParams",
               "type": "bytes"
+            },
+            {
+              "internalType": "bool",
+              "name": "proofAggregationEnabled",
+              "type": "bool"
             }
           ],
           "internalType": "struct IEnclave.E3RequestParams",
@@ -969,9 +984,9 @@
           "type": "uint256"
         },
         {
-          "internalType": "bytes",
-          "name": "proof",
-          "type": "bytes"
+          "internalType": "bytes32",
+          "name": "committeePublicKey",
+          "type": "bytes32"
         }
       ],
       "name": "onCommitteePublished",
@@ -1114,6 +1129,11 @@
               "internalType": "bytes",
               "name": "customParams",
               "type": "bytes"
+            },
+            {
+              "internalType": "bool",
+              "name": "proofAggregationEnabled",
+              "type": "bool"
             }
           ],
           "internalType": "struct IEnclave.E3RequestParams",
@@ -1199,6 +1219,11 @@
               "internalType": "address",
               "name": "requester",
               "type": "address"
+            },
+            {
+              "internalType": "bool",
+              "name": "proofAggregationEnabled",
+              "type": "bool"
             }
           ],
           "internalType": "struct E3",
@@ -1365,5 +1390,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-16cf43f6814888a6b7f512f8d4a2a360fcb66d4c"
+  "buildInfoId": "solc-0_8_28-48efe0838d1e7fb2ef1a3cba330cb80744c9a50e"
 }

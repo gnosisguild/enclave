@@ -34,7 +34,8 @@ contract MockEnclave {
       committeePublicKey: committeePublicKey,
       ciphertextOutput: bytes32(0),
       plaintextOutput: plaintextOutput,
-      requester: address(0)
+      requester: address(0),
+      proofAggregationEnabled: false
     });
 
     IE3Program(program).validate(nextE3Id, 0, bytes(""), bytes(""), abi.encode(address(0), nextE3Id, 2, 0, 0));
@@ -70,7 +71,8 @@ contract MockEnclave {
         committeePublicKey: committeePublicKey,
         ciphertextOutput: bytes32(0),
         plaintextOutput: plaintextOutput,
-        requester: address(0)
+        requester: address(0),
+        proofAggregationEnabled: false
       });
   }
 }

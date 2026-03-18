@@ -20,7 +20,7 @@ use alloy::sol_types::SolValue;
 use crisp::config::CONFIG;
 use e3_fhe_params::{build_bfv_params_from_set_arc, encode_bfv_params};
 use e3_sdk::evm_helpers::contracts::{
-    CommitteeSize, EnclaveContract, EnclaveRead, EnclaveWrite, E3,
+    CommitteeSize, EnclaveContract, EnclaveRead, EnclaveWrite,
 };
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{
@@ -163,6 +163,8 @@ pub async fn initialize_crisp_round(
         U256::from(window_start + CONFIG.e3_duration),
     ];
 
+    let proof_aggregation_enabled = CONFIG.e3_proof_aggregation_enabled;
+
     let fee_amount = contract
         .get_e3_quote(
             committee_size.clone(),
@@ -170,6 +172,7 @@ pub async fn initialize_crisp_round(
             e3_program,
             e3_params.clone(),
             compute_provider_params_bytes.clone(),
+            proof_aggregation_enabled,
         )
         .await?;
     info!("Fee required: {} tokens", fee_amount);
@@ -216,6 +219,7 @@ pub async fn initialize_crisp_round(
             e3_params,
             compute_provider_params_bytes,
             custom_params_bytes,
+            proof_aggregation_enabled,
         )
         .await?;
     info!("E3 request sent. TxHash: {:?}", res.transaction_hash);

@@ -73,6 +73,7 @@ sol! {
         bytes e3ProgramParams;
         bytes computeProviderParams;
         bytes customParams;
+        bool proofAggregationEnabled;
     }
 
     #[derive(Debug, PartialEq)]
@@ -159,6 +160,7 @@ pub trait EnclaveRead {
         e3_program: Address,
         e3_params: Bytes,
         compute_provider_params: Bytes,
+        proof_aggregation_enabled: bool,
     ) -> Result<U256>;
 
     async fn get_e3_stage(&self, e3_id: U256) -> Result<E3Stage>;
@@ -184,6 +186,7 @@ pub trait EnclaveWrite {
         e3_params: Bytes,
         compute_provider_params: Bytes,
         custom_params: Bytes,
+        proof_aggregation_enabled: bool,
     ) -> Result<(TransactionReceipt, U256)>;
 
     /// Enable an E3 program
@@ -369,6 +372,7 @@ where
         e3_program: Address,
         e3_params: Bytes,
         compute_provider_params: Bytes,
+        proof_aggregation_enabled: bool,
     ) -> Result<U256> {
         let e3_request = E3RequestParams {
             committeeSize: committee_size,
@@ -377,6 +381,7 @@ where
             e3ProgramParams: e3_params,
             computeProviderParams: compute_provider_params,
             customParams: Bytes::new(),
+            proofAggregationEnabled: proof_aggregation_enabled,
         };
 
         let contract = Enclave::new(self.contract_address, &self.provider);
@@ -426,6 +431,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         e3_params: Bytes,
         compute_provider_params: Bytes,
         custom_params: Bytes,
+        proof_aggregation_enabled: bool,
     ) -> Result<(TransactionReceipt, U256)> {
         let _guard = NONCE_LOCK.lock().await;
         let wallet_addr = self
@@ -443,6 +449,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
             e3ProgramParams: e3_params.clone(),
             computeProviderParams: compute_provider_params.clone(),
             customParams: custom_params.clone(),
+            proofAggregationEnabled: proof_aggregation_enabled,
         };
 
         let builder = contract.request(e3_request).nonce(nonce);

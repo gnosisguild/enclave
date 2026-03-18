@@ -209,6 +209,7 @@ describe('Integration', () => {
       e3Program: contracts.e3Program,
       e3ProgramParams,
       computeProviderParams,
+      proofAggregationEnabled: false,
     }
     const quote = await sdk.getE3Quote(requestParams)
     console.log('E3 quote:', quote)

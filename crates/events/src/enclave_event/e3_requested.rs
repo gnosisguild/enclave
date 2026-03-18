@@ -28,6 +28,15 @@ pub struct E3Requested {
     pub esi_per_ct: usize,
     /// The FHE parameters
     pub params: ArcBytes,
+    /// When true, ciphernodes generate wrapper/fold proofs for DKG proof
+    /// aggregation (public verifiability). When false, wrapper/fold proofs
+    /// are skipped to reduce latency. C5 and C7 proofs are always generated.
+    #[serde(default = "default_proof_aggregation")]
+    pub proof_aggregation_enabled: bool,
+}
+
+fn default_proof_aggregation() -> bool {
+    true
 }
 
 impl Default for E3Requested {
@@ -40,6 +49,7 @@ impl Default for E3Requested {
             seed: Seed([0u8; 32]),
             threshold_m: 0,
             threshold_n: 0,
+            proof_aggregation_enabled: true,
         }
     }
 }

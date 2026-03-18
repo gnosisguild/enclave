@@ -294,6 +294,7 @@ describe("Enclave", function () {
         ["address"],
         ["0x1234567890123456789012345678901234567890"],
       ),
+      proofAggregationEnabled: true,
     };
 
     // ── Return ────────────────────────────────────────────────────────────────
@@ -469,6 +470,7 @@ describe("Enclave", function () {
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
+        proofAggregationEnabled: false,
       });
 
       const e3 = await enclave.getE3(0);
@@ -672,6 +674,7 @@ describe("Enclave", function () {
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
+          proofAggregationEnabled: false,
         }),
       ).to.be.revertedWithCustomError(usdcToken, "ERC20InsufficientAllowance");
     });
@@ -686,6 +689,7 @@ describe("Enclave", function () {
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
+          proofAggregationEnabled: false,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "CommitteeSizeNotConfigured")
@@ -705,6 +709,7 @@ describe("Enclave", function () {
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
+          proofAggregationEnabled: false,
         }),
       ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
     });
@@ -719,6 +724,7 @@ describe("Enclave", function () {
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
+          proofAggregationEnabled: false,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "E3ProgramNotAllowed")
@@ -735,6 +741,7 @@ describe("Enclave", function () {
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
+          proofAggregationEnabled: false,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
@@ -750,6 +757,7 @@ describe("Enclave", function () {
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
+        proofAggregationEnabled: false,
       });
 
       const e3 = await enclave.getE3(0);
@@ -776,6 +784,7 @@ describe("Enclave", function () {
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
+        proofAggregationEnabled: false,
       });
       const e3 = await enclave.getE3(0);
 
@@ -813,6 +822,7 @@ describe("Enclave", function () {
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
+        proofAggregationEnabled: false,
       });
 
       await setupAndPublishCommittee(
@@ -887,6 +897,7 @@ describe("Enclave", function () {
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
+        proofAggregationEnabled: false,
       });
 
       await setupAndPublishCommittee(

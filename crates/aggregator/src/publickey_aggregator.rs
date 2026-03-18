@@ -57,7 +57,7 @@ pub enum PublicKeyAggregatorState {
         keyshare_bytes: Vec<ArcBytes>,
         nodes: OrderedSet<String>,
         /// DKG recursive proofs per party (restart-critical).
-        dkg_node_proofs: HashMap<u64, Proof>,
+        dkg_node_proofs: HashMap<u64, Option<Proof>>,
         honest_party_ids: BTreeSet<u64>,
         dishonest_parties: BTreeSet<u64>,
         cross_node_fold: ProofFoldState,
@@ -497,13 +497,22 @@ impl PublicKeyAggregator {
             return Ok(());
         }
 
+        // Collect non-None proofs from honest parties for cross-node folding.
+        // If any proof is None (aggregation disabled), skip folding entirely.
         let mut pairs: Vec<_> = dkg_node_proofs
             .iter()
             .filter(|(pid, _)| honest_party_ids.contains(pid))
-            .map(|(pid, p)| (*pid, p.clone()))
+            .filter_map(|(pid, p)| p.as_ref().map(|proof| (*pid, proof.clone())))
             .collect();
         pairs.sort_by_key(|(pid, _)| *pid);
         let proofs: Vec<Proof> = pairs.into_iter().map(|(_, p)| p).collect();
+
+        // If no proofs to fold (aggregation was disabled), try publishing immediately
+        if proofs.is_empty() {
+            info!("PublicKeyAggregator: proof aggregation disabled — skipping cross-node fold");
+            self.try_publish_complete()?;
+            return Ok(());
+        }
 
         self.state.try_mutate(ec, |state| {
             let PublicKeyAggregatorState::GeneratingC5Proof {
@@ -566,17 +575,46 @@ impl PublicKeyAggregator {
             return Ok(());
         };
 
-        let (Some(c5_proof), Some(cross_node_proof)) =
-            (c5_proof_pending.as_ref(), cross_node_fold.result.as_ref())
-        else {
+        let Some(c5_proof) = c5_proof_pending.as_ref() else {
             return Ok(());
         };
+
+        // Cross-node fold result is optional — None when proof aggregation is disabled
+        let dkg_aggregated_proof = cross_node_fold.result.clone();
+
+        // If aggregation is enabled but fold hasn't completed yet, wait
+        let all_proofs_are_none = self
+            .state
+            .get()
+            .and_then(|s| {
+                if let PublicKeyAggregatorState::GeneratingC5Proof {
+                    dkg_node_proofs, ..
+                } = &s
+                {
+                    Some(dkg_node_proofs.values().all(|p| p.is_none()))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(false);
+
+        if dkg_aggregated_proof.is_none() && !all_proofs_are_none {
+            // Aggregation is enabled but fold not done yet — wait
+            return Ok(());
+        }
 
         let ec = last_ec
             .clone()
             .ok_or_else(|| anyhow::anyhow!("No EventContext for publish"))?;
 
-        info!("Both C5 and cross-node DKG proof ready — publishing PublicKeyAggregated");
+        info!(
+            "C5 proof ready — publishing PublicKeyAggregated (dkg_aggregated_proof={})",
+            if dkg_aggregated_proof.is_some() {
+                "present"
+            } else {
+                "skipped"
+            }
+        );
 
         let event = PublicKeyAggregated {
             pubkey: public_key.clone(),
@@ -584,7 +622,7 @@ impl PublicKeyAggregator {
             e3_id: self.e3_id.clone(),
             nodes: nodes.clone(),
             pk_aggregation_proof: Some(c5_proof.clone()),
-            dkg_aggregated_proof: Some(cross_node_proof.clone()),
+            dkg_aggregated_proof,
         };
         self.bus.publish(event, ec.clone())?;
 

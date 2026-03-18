@@ -314,6 +314,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
           ["address"],
           ["0x1234567890123456789012345678901234567890"],
         ),
+        proofAggregationEnabled: true,
       };
 
       const fee = await enclave.getE3Quote(requestParams);
@@ -1272,6 +1273,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
             ["address"],
             ["0x1234567890123456789012345678901234567890"],
           ),
+          proofAggregationEnabled: false,
         };
         const fee = await enclave.getE3Quote(requestParams);
         await usdcToken.connect(requester).approve(enclaveAddress, fee);
@@ -1354,6 +1356,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
             ["address"],
             ["0x1234567890123456789012345678901234567890"],
           ),
+          proofAggregationEnabled: false,
         };
         const fee = await enclave.getE3Quote(requestParams);
         await usdcToken.connect(requester).approve(enclaveAddress, fee);

@@ -48,6 +48,8 @@ struct NodeAggregationMeta {
     total_expected: usize,
     /// Buffered C0 wrapped proof, if it arrived before meta was stored.
     pending_c0: Option<Proof>,
+    /// When false, skip emitting DKGInnerProofReady (no wrapping/folding).
+    proof_aggregation_enabled: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -260,6 +262,13 @@ impl ProofRequestActor {
         addr
     }
 
+    /// Returns true if proof aggregation (wrapping/folding) is enabled for this E3.
+    fn is_proof_aggregation_enabled(&self, e3_id: &E3id) -> bool {
+        self.node_agg_meta
+            .get(e3_id)
+            .map_or(true, |m| m.proof_aggregation_enabled)
+    }
+
     fn handle_encryption_key_pending(&mut self, msg: TypedEvent<EncryptionKeyPending>) {
         let (msg, ec) = msg.into_components();
         let correlation_id = CorrelationId::new();
@@ -305,20 +314,23 @@ impl ProofRequestActor {
                 party_id: msg.full_share.party_id,
                 total_expected,
                 pending_c0: None,
+                proof_aggregation_enabled: msg.proof_aggregation_enabled,
             },
         );
         // If C0 wrapped proof arrived before meta, emit DKGInnerProofReady now
         if let Some(c0_proof) = pending_c0 {
-            if let Err(err) = self.bus.publish(
-                DKGInnerProofReady {
-                    e3_id: e3_id.clone(),
-                    party_id: msg.full_share.party_id,
-                    wrapped_proof: c0_proof,
-                    seq: 0,
-                },
-                ec.clone(),
-            ) {
-                error!("Failed to publish DKGInnerProofReady for C0: {err}");
+            if msg.proof_aggregation_enabled {
+                if let Err(err) = self.bus.publish(
+                    DKGInnerProofReady {
+                        e3_id: e3_id.clone(),
+                        party_id: msg.full_share.party_id,
+                        wrapped_proof: c0_proof,
+                        seq: 0,
+                    },
+                    ec.clone(),
+                ) {
+                    error!("Failed to publish DKGInnerProofReady for C0: {err}");
+                }
             }
         }
 
@@ -662,19 +674,21 @@ impl ProofRequestActor {
         }
 
         if let Some(meta) = self.node_agg_meta.get(&e3_id) {
-            if let Err(err) = self.bus.publish(
-                DKGInnerProofReady {
-                    e3_id: e3_id.clone(),
-                    party_id: meta.party_id,
-                    wrapped_proof,
-                    seq,
-                },
-                ec.clone(),
-            ) {
-                error!(
-                    "Failed to publish DKGInnerProofReady for C4 seq={}: {err}",
-                    seq
-                );
+            if meta.proof_aggregation_enabled {
+                if let Err(err) = self.bus.publish(
+                    DKGInnerProofReady {
+                        e3_id: e3_id.clone(),
+                        party_id: meta.party_id,
+                        wrapped_proof,
+                        seq,
+                    },
+                    ec.clone(),
+                ) {
+                    error!(
+                        "Failed to publish DKGInnerProofReady for C4 seq={}: {err}",
+                        seq
+                    );
+                }
             }
         }
 
@@ -1060,19 +1074,21 @@ impl ProofRequestActor {
         );
 
         if let Some(meta) = self.node_agg_meta.get(&e3_id) {
-            if let Err(err) = self.bus.publish(
-                DKGInnerProofReady {
-                    e3_id: e3_id.clone(),
-                    party_id: meta.party_id,
-                    wrapped_proof,
-                    seq,
-                },
-                ec.clone(),
-            ) {
-                error!(
-                    "Failed to publish DKGInnerProofReady for {:?} seq={}: {err}",
-                    kind, seq
-                );
+            if meta.proof_aggregation_enabled {
+                if let Err(err) = self.bus.publish(
+                    DKGInnerProofReady {
+                        e3_id: e3_id.clone(),
+                        party_id: meta.party_id,
+                        wrapped_proof,
+                        seq,
+                    },
+                    ec.clone(),
+                ) {
+                    error!(
+                        "Failed to publish DKGInnerProofReady for {:?} seq={}: {err}",
+                        kind, seq
+                    );
+                }
             }
         }
 
@@ -1352,16 +1368,18 @@ impl ProofRequestActor {
 
         // Emit DKGInnerProofReady for C0, or buffer if meta not yet available
         if let Some(meta) = self.node_agg_meta.get(&e3_id) {
-            if let Err(err) = self.bus.publish(
-                DKGInnerProofReady {
-                    e3_id: e3_id.clone(),
-                    party_id: meta.party_id,
-                    wrapped_proof,
-                    seq: 0,
-                },
-                ec.clone(),
-            ) {
-                error!("Failed to publish DKGInnerProofReady for C0: {err}");
+            if meta.proof_aggregation_enabled {
+                if let Err(err) = self.bus.publish(
+                    DKGInnerProofReady {
+                        e3_id: e3_id.clone(),
+                        party_id: meta.party_id,
+                        wrapped_proof: wrapped_proof.clone(),
+                        seq: 0,
+                    },
+                    ec.clone(),
+                ) {
+                    error!("Failed to publish DKGInnerProofReady for C0: {err}");
+                }
             }
         } else {
             // ThresholdSharePending hasn't arrived yet — buffer C0 wrapped proof
@@ -1371,6 +1389,7 @@ impl ProofRequestActor {
                     party_id: 0,
                     total_expected: 0,
                     pending_c0: Some(wrapped_proof),
+                    proof_aggregation_enabled: true, // will be overwritten by ThresholdSharePending
                 },
             );
         }

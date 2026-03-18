@@ -241,6 +241,12 @@ interface IEnclave {
         bytes e3ProgramParams;
         bytes computeProviderParams;
         bytes customParams;
+        /// @notice When true, ciphernodes generate and fold wrapper proofs
+        ///         for DKG proof aggregation (public verifiability). When
+        ///         false, wrapper/fold proofs are skipped to reduce latency.
+        ///         C5 and C7 proofs are always generated and verified on-chain
+        ///         regardless of this flag.
+        bool proofAggregationEnabled;
     }
 
     ////////////////////////////////////////////////////////////

@@ -14,9 +14,10 @@ use crate::{E3id, Proof};
 use serde::{Deserialize, Serialize};
 
 /// NodeProofAggregator -> PublicKeyAggregator: fully aggregated DKG node proof.
+/// When proof aggregation is disabled for the E3, `aggregated_proof` is `None`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DKGRecursiveAggregationComplete {
     pub e3_id: E3id,
     pub party_id: u64,
-    pub aggregated_proof: Proof,
+    pub aggregated_proof: Option<Proof>,
 }

@@ -164,6 +164,7 @@ export const requestCommittee = task(
         e3ProgramParams,
         computeProviderParams,
         customParams,
+        proofAggregationEnabled: true,
       };
 
       console.log("Request parameters:", requestParams);
