@@ -12,7 +12,7 @@ use zeroize::Zeroizing;
 
 use crate::{helpers::parse_zeroizing, password_delete, password_set};
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum PasswordCommands {
     /// Set (or overwrite) a password
     Set {

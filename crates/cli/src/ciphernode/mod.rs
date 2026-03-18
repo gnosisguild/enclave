@@ -35,7 +35,7 @@ impl ChainArgs {
     }
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum CiphernodeCommands {
     /// Setup local ciphernode configuration
     Setup {
@@ -96,7 +96,7 @@ pub enum CiphernodeCommands {
     },
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum LicenseCommands {
     /// Bond ENCL into the bonding registry
     Bond {
@@ -117,7 +117,7 @@ pub enum LicenseCommands {
     },
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum TicketCommands {
     /// Deposit stablecoins to mint tickets
     Buy {

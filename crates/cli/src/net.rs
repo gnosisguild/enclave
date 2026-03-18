@@ -11,7 +11,7 @@ use e3_console::Console;
 
 use crate::net_get_peer_id;
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum NetCommands {
     /// Get the ciphernode's libp2p PeerId
     GetPeerId,

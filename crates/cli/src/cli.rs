@@ -25,7 +25,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use tracing::{info, instrument, Level};
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Clone, Debug)]
 #[command(name = "enclave")]
 #[command(about = "A CLI for interacting with Enclave the open-source protocol for Encrypted Execution Environments (E3)", long_about = None)]
 #[command(version = env!("CARGO_PKG_VERSION"))]
@@ -204,7 +204,7 @@ impl Cli {
     }
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum Commands {
     /// Start the application
     Start {
@@ -312,8 +312,6 @@ pub struct RemoteCli {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum RemoteCommand {
     NetGetPeerId,
-    // NodePs,
-    // NodeStatus { id: String },
     CiphernodeStatus { chain: ChainArgs },
     NoirStatus,
     WalletGet,
@@ -333,12 +331,6 @@ impl TryFrom<Commands> for RemoteCommand {
             Commands::Noir {
                 command: NoirCommands::Status,
             } => Ok(RemoteCommand::NoirStatus),
-            // Commands::Nodes {
-            //     command: NodeCommands::Ps,
-            // } => Ok(RemoteCommand::NodePs),
-            // Commands::Nodes {
-            //     command: NodeCommands::Status { id },
-            // } => Ok(RemoteCommand::NodeStatus { id }),
             Commands::Ciphernode {
                 command: CiphernodeCommands::Status { chain },
             } => Ok(RemoteCommand::CiphernodeStatus { chain }),
@@ -391,12 +383,6 @@ impl TryFrom<RemoteCommand> for Commands {
             RemoteCommand::CiphernodeStatus { chain } => Commands::Ciphernode {
                 command: CiphernodeCommands::Status { chain },
             },
-            // RemoteCommand::NodeStatus { id } => Commands::Nodes {
-            //     command: NodeCommands::Status { id },
-            // },
-            // RemoteCommand::NodePs => Commands::Nodes {
-            //     command: NodeCommands::Ps,
-            // },
             RemoteCommand::NoirStatus => Commands::Noir {
                 command: NoirCommands::Status,
             },

@@ -10,7 +10,7 @@ use e3_config::AppConfig;
 use e3_console::{log, Console};
 use e3_zk_prover::{SetupStatus, ZkBackend};
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum NoirCommands {
     Status,
     Setup {

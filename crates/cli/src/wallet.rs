@@ -12,7 +12,7 @@ use zeroize::Zeroizing;
 
 use crate::{helpers::ensure_hex_zeroizing, wallet_get, wallet_set};
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum WalletCommands {
     /// Set wallet private key
     Set {
