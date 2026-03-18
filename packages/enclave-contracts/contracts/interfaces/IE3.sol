@@ -7,6 +7,7 @@ pragma solidity >=0.8.27;
 
 import { IE3Program } from "./IE3Program.sol";
 import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
+import { IPkVerifier } from "./IPkVerifier.sol";
 import { IEnclave } from "./IEnclave.sol";
 
 /**
@@ -38,6 +39,7 @@ struct E3 {
     bytes e3ProgramParams;
     bytes customParams;
     IDecryptionVerifier decryptionVerifier;
+    IPkVerifier pkVerifier;
     bytes32 committeePublicKey;
     bytes32 ciphertextOutput;
     bytes plaintextOutput;

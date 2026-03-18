@@ -9,6 +9,7 @@ import { E3, IE3Program } from "./IE3.sol";
 import { ICiphernodeRegistry } from "./ICiphernodeRegistry.sol";
 import { IBondingRegistry } from "./IBondingRegistry.sol";
 import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
+import { IPkVerifier } from "./IPkVerifier.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IEnclave {
@@ -325,6 +326,14 @@ interface IEnclave {
         IDecryptionVerifier decryptionVerifier
     ) external;
 
+    /// @notice Sets the C5 (pk_aggregation) proof verifier for an encryption scheme.
+    /// @param encryptionSchemeId The encryption scheme identifier.
+    /// @param pkVerifier The pk verifier contract (optional; address(0) to disable).
+    function setPkVerifier(
+        bytes32 encryptionSchemeId,
+        IPkVerifier pkVerifier
+    ) external;
+
     /// @notice Disables a previously enabled encryption scheme.
     /// @dev This function MUST revert if the encryption scheme is not currently enabled.
     /// @param encryptionSchemeId The unique identifier for the encryption scheme to disable.
@@ -367,6 +376,13 @@ interface IEnclave {
         bytes32 encryptionSchemeId
     ) external view returns (IDecryptionVerifier);
 
+    /// @notice Returns the C5 pk verifier for an encryption scheme.
+    /// @param encryptionSchemeId The encryption scheme identifier.
+    /// @return The pk verifier contract (address(0) if not set).
+    function getPkVerifier(
+        bytes32 encryptionSchemeId
+    ) external view returns (IPkVerifier);
+
     /// @notice Returns the ERC20 token used to pay for E3 fees.
     function feeToken() external view returns (IERC20);
 
@@ -379,13 +395,10 @@ interface IEnclave {
     function onCommitteeFinalized(uint256 e3Id) external;
 
     /// @notice Called by CiphernodeRegistry when committee public key is published (DKG complete).
-    /// @dev Updates E3 lifecycle to KeyPublished stage.
+    /// @dev Updates E3 lifecycle to KeyPublished stage. Aggregate commitment extracted from proof.
     /// @param e3Id ID of the E3.
-    /// @param committeePublicKeyHash Hash of the committee public key.
-    function onCommitteePublished(
-        uint256 e3Id,
-        bytes32 committeePublicKeyHash
-    ) external;
+    /// @param proof C5 proof; aggregate commitment extracted as committeePublicKey.
+    function onCommitteePublished(uint256 e3Id, bytes calldata proof) external;
 
     /// @notice Called by authorized contracts to mark an E3 as failed with a specific reason.
     /// @dev Updates E3 lifecycle to Failed stage with the given reason.

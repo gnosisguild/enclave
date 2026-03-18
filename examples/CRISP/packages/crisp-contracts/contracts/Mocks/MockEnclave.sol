@@ -9,6 +9,7 @@ import { E3 } from "@enclave-e3/contracts/contracts/interfaces/IE3.sol";
 import { IEnclave } from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import { IE3Program } from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import { IDecryptionVerifier } from "@enclave-e3/contracts/contracts/interfaces/IDecryptionVerifier.sol";
+import { IPkVerifier } from "@enclave-e3/contracts/contracts/interfaces/IPkVerifier.sol";
 
 contract MockEnclave {
   bytes public plaintextOutput;
@@ -29,6 +30,7 @@ contract MockEnclave {
       e3ProgramParams: bytes(""),
       customParams: abi.encode(address(0), nextE3Id, 2, 0, 0),
       decryptionVerifier: IDecryptionVerifier(address(0)),
+      pkVerifier: IPkVerifier(address(0)),
       committeePublicKey: committeePublicKey,
       ciphertextOutput: bytes32(0),
       plaintextOutput: plaintextOutput,
@@ -64,6 +66,7 @@ contract MockEnclave {
         e3ProgramParams: bytes(""),
         customParams: abi.encode(address(0), 0, 2, 0, 0),
         decryptionVerifier: IDecryptionVerifier(address(0)),
+        pkVerifier: IPkVerifier(address(0)),
         committeePublicKey: committeePublicKey,
         ciphertextOutput: bytes32(0),
         plaintextOutput: plaintextOutput,

@@ -112,8 +112,7 @@ export const deployAndSaveVerifier = async (
   zkTranscriptLibAddress: string,
 ): Promise<{ address: string }> => {
   const { ethers } = await hre.network.connect();
-  const [signer] = await ethers.getSigners();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = hre.globalOptions.network ?? "localhost";
 
   // Check if already deployed
   const existing = readDeploymentArgs(contractName, chain);
@@ -167,9 +166,8 @@ export const deployAndSaveAllVerifiers = async (
   hre: HardhatRuntimeEnvironment,
 ): Promise<VerifierDeployments> => {
   const contractNames = discoverVerifierContracts();
-  const { ethers } = await hre.network.connect();
-  const [signer] = await ethers.getSigners();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  await hre.network.connect();
+  const chain = hre.globalOptions.network ?? "localhost";
   console.log(`   Deploying to network: ${chain}`);
 
   if (contractNames.length === 0) {

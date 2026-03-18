@@ -3,23 +3,23 @@ chains:
     rpc_url: "ws://localhost:8545"
     contracts:
       e3_program:
-        address: "0x851356ae760d987E095750cCeb3bC6014560891C"
-        deploy_block: 64
+        address: "0x8f86403A4DE0BB5791fa46B8e795C547942fE4Cf"
+        deploy_block: 28
       enclave:
         address: "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
-        deploy_block: 42
+        deploy_block: 12
       ciphernode_registry:
         address: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
-        deploy_block: 36
+        deploy_block: 8
       bonding_registry:
         address: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
-        deploy_block: 39
+        deploy_block: 9
       slashing_manager:
         address: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
-        deploy_block: 32
+        deploy_block: 7
       fee_token:
         address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-        deploy_block: 17
+        deploy_block: 3
 program:
   dev: true
   # risc0:

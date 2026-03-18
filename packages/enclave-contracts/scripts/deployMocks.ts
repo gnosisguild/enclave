@@ -7,11 +7,13 @@ import hre from "hardhat";
 
 import { deployAndSaveMockComputeProvider } from "./deployAndSave/mockComputeProvider";
 import { deployAndSaveMockDecryptionVerifier } from "./deployAndSave/mockDecryptionVerifier";
+import { deployAndSaveMockPkVerifier } from "./deployAndSave/mockPkVerifier";
 import { deployAndSaveMockProgram } from "./deployAndSave/mockProgram";
 
 export interface MockDeployments {
   computeProviderAddress: string;
   decryptionVerifierAddress: string | undefined;
+  pkVerifierAddress: string | undefined;
   e3ProgramAddress: string;
 }
 
@@ -28,11 +30,15 @@ export const deployMocks = async (
   const computeProviderAddress = await computeProvider.getAddress();
 
   let decryptionVerifierAddress: string | undefined;
+  let pkVerifierAddress: string | undefined;
   if (!shouldHaveZKVerification) {
-    console.log("Deploying Decryption Verifier");
+    console.log("Deploying Mock Decryption Verifier");
     const { decryptionVerifier } =
       await deployAndSaveMockDecryptionVerifier(hre);
     decryptionVerifierAddress = await decryptionVerifier.getAddress();
+    console.log("Deploying Mock Pk Verifier");
+    const { pkVerifier } = await deployAndSaveMockPkVerifier(hre);
+    pkVerifierAddress = await pkVerifier.getAddress();
   }
 
   console.log("Deploying E3 Program");
@@ -47,12 +53,14 @@ export const deployMocks = async (
         ----------------------------------------------------------------------
         MockComputeProvider:${computeProviderAddress}
         MockDecryptionVerifier:${decryptionVerifierAddress ?? "(skipped - using real ZK)"}
+        MockPkVerifier:${pkVerifierAddress ?? "(skipped - using real ZK)"}
         MockE3Program:${e3ProgramAddress}
         `);
 
   return {
     computeProviderAddress,
     decryptionVerifierAddress,
+    pkVerifierAddress,
     e3ProgramAddress,
   };
 };

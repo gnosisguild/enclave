@@ -23,6 +23,11 @@ sol! {
     }
 
     #[derive(Debug)]
+    interface IPkVerifier {
+        function verify(bytes memory proof) external view returns (bytes32 pkCommitment);
+    }
+
+    #[derive(Debug)]
     enum CommitteeSize {
         Micro,
         Small,
@@ -41,6 +46,7 @@ sol! {
         bytes e3ProgramParams;
         bytes customParams;
         IDecryptionVerifier decryptionVerifier;
+        IPkVerifier pkVerifier;
         bytes32 committeePublicKey;
         bytes32 ciphertextOutput;
         bytes plaintextOutput;

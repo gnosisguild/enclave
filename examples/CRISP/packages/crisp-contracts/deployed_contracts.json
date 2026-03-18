@@ -288,27 +288,31 @@
       "blockNumber": 23,
       "address": "0xf5059a5D33d5853360D16C683c16e67980206f36"
     },
+    "BfvPkVerifier": {
+      "blockNumber": 25,
+      "address": "0x998abeb3E57409262aE5b751f60747921B33613E"
+    },
     "MockRISC0Verifier": {
-      "address": "0x998abeb3E57409262aE5b751f60747921B33613E",
-      "blockNumber": 25
+      "address": "0x4826533B4897376654Bb4d4AD88B7faFD0C98528",
+      "blockNumber": 27
     },
     "HonkVerifier": {
-      "address": "0x4826533B4897376654Bb4d4AD88B7faFD0C98528",
-      "blockNumber": 26
+      "address": "0x0E801D84Fa97b50751Dbf25036d067dCf18858bF",
+      "blockNumber": 28
     },
     "CRISPProgram": {
-      "address": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf",
-      "blockNumber": 26,
+      "address": "0x8f86403A4DE0BB5791fa46B8e795C547942fE4Cf",
+      "blockNumber": 28,
       "constructorArgs": {
         "enclave": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
-        "verifierAddress": "0x998abeb3E57409262aE5b751f60747921B33613E",
-        "honkVerifierAddress": "0x4826533B4897376654Bb4d4AD88B7faFD0C98528",
+        "verifierAddress": "0x4826533B4897376654Bb4d4AD88B7faFD0C98528",
+        "honkVerifierAddress": "0x0E801D84Fa97b50751Dbf25036d067dCf18858bF",
         "imageId": "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
       }
     },
     "MockVotingToken": {
-      "address": "0x8f86403A4DE0BB5791fa46B8e795C547942fE4Cf",
-      "blockNumber": 28
+      "address": "0x5eb3Bc0a489C5A8288765d2336659EbCA68FCd00",
+      "blockNumber": 30
     }
   }
 }

@@ -273,16 +273,16 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     /// @notice Publishes a committee for an E3 computation
-    /// @dev Only callable by owner. Verifies committee is finalized and matches provided nodes.
+    /// @dev Only callable by owner. Verification of C5 proof is done in Enclave.onCommitteePublished.
     /// @param e3Id ID of the E3 computation
     /// @param nodes Array of ciphernode addresses selected for the committee
     /// @param publicKey Aggregated public key of the committee
-    /// @param publicKeyHash The hash of the public key
+    /// @param proof C5 proof; aggregate commitment extracted as last public input
     function publishCommittee(
         uint256 e3Id,
         address[] calldata nodes,
         bytes calldata publicKey,
-        bytes32 publicKeyHash
+        bytes calldata proof
     ) external onlyOwner {
         Committee storage c = committees[e3Id];
 
@@ -293,16 +293,16 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         require(c.publicKey == bytes32(0), CommitteeAlreadyPublished());
         require(nodes.length == c.topNodes.length, "Node count mismatch");
 
-        // TODO: Currently we trust the owner to publish the correct committee.
-        // TODO: Need a Proof that the public key is generated from the committee
-        // SECURITY: Without DKG correctness proofs, a malicious owner could publish a key they
-        // control, enabling decryption of all E3 results. This is a centralization assumption
-        // accepted for the current phase. DKG proof verification must be added before
-        // decentralizing the owner role.
-        c.publicKey = publicKeyHash;
-        publicKeyHashes[e3Id] = publicKeyHash;
-        // Progress E3 to KeyPublished stage
-        enclave.onCommitteePublished(e3Id, publicKeyHash);
+        (, bytes32[] memory publicInputs) = abi.decode(
+            proof,
+            (bytes, bytes32[])
+        );
+        require(publicInputs.length > 0, "C5: no public inputs");
+        bytes32 commitment = publicInputs[publicInputs.length - 1];
+
+        c.publicKey = commitment;
+        publicKeyHashes[e3Id] = commitment;
+        enclave.onCommitteePublished(e3Id, proof);
         emit CommitteePublished(e3Id, nodes, publicKey);
     }
 

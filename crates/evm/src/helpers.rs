@@ -28,15 +28,34 @@ use alloy::{
         Authorization,
     },
 };
+use alloy::{primitives::Bytes, sol_types::SolValue};
 use anyhow::{Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use e3_config::{RpcAuth, RPC};
 use e3_crypto::Cipher;
 use e3_data::Repository;
+use e3_events::Proof;
 use e3_utils::{retry_with_backoff, RetryError};
 use std::{env, future::Future, pin::Pin, sync::Arc};
 use tracing::info;
 use zeroize::{Zeroize, Zeroizing};
+
+/// ABI-encodes a ZK proof for EVM verifiers (C5 pk, C7 decryption, etc.).
+/// Format: abi.encode(rawProof, publicInputs). Public inputs as bytes32[].
+pub fn encode_zk_proof(proof: &Proof) -> Option<Bytes> {
+    let signals: &[u8] = &*proof.public_signals;
+    if signals.is_empty() || signals.len() % 32 != 0 {
+        return None;
+    }
+    let mut inputs = Vec::with_capacity(signals.len() / 32);
+    for chunk in signals.chunks_exact(32) {
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(chunk);
+        inputs.push(arr);
+    }
+    let raw = Bytes::from((&*proof.data).to_vec());
+    Some(Bytes::from((raw, inputs).abi_encode()))
+}
 
 pub trait AuthConversions {
     fn to_header_value(&self) -> Option<HeaderValue>;

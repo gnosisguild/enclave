@@ -15,6 +15,7 @@ import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken"
 import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
 import MockDecryptionVerifierModule from "../../ignition/modules/mockDecryptionVerifier";
 import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
+import MockPkVerifierModule from "../../ignition/modules/mockPkVerifier";
 import MockStableTokenModule from "../../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../../ignition/modules/slashingManager";
 import {
@@ -22,7 +23,7 @@ import {
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
   Enclave__factory as EnclaveFactory,
 } from "../../types";
-import { setupOperatorForSortition } from "../fixtures";
+import { encodePkProof, setupOperatorForSortition } from "../fixtures";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -32,6 +33,7 @@ const { loadFixture } = networkHelpers;
 
 const data = "0xda7a";
 const dataHash = ethers.id(data);
+const c5Proof = encodePkProof(dataHash);
 const SORTITION_SUBMISSION_WINDOW = 3;
 
 describe("CiphernodeRegistryOwnable", function () {
@@ -189,12 +191,17 @@ describe("CiphernodeRegistryOwnable", function () {
     const { mockDecryptionVerifier } = await ignition.deploy(
       MockDecryptionVerifierModule,
     );
+    const { mockPkVerifier } = await ignition.deploy(MockPkVerifierModule);
 
     await enclave.enableE3Program(await mockE3Program.getAddress());
     await enclave.setE3ProgramsParams([encodedE3ProgramParams]);
     await enclave.setDecryptionVerifier(
       encryptionSchemeId,
       await mockDecryptionVerifier.getAddress(),
+    );
+    await enclave.setPkVerifier(
+      encryptionSchemeId,
+      await mockPkVerifier.getAddress(),
     );
 
     // Set up committee thresholds
@@ -435,7 +442,7 @@ describe("CiphernodeRegistryOwnable", function () {
               await operator3.getAddress(),
             ],
             data,
-            dataHash,
+            c5Proof,
           ),
       ).to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount");
     });
@@ -470,7 +477,7 @@ describe("CiphernodeRegistryOwnable", function () {
           await operator3.getAddress(),
         ],
         data,
-        dataHash,
+        c5Proof,
       );
       expect(await registry.committeePublicKey(0)).to.equal(dataHash);
     });
@@ -507,7 +514,7 @@ describe("CiphernodeRegistryOwnable", function () {
             await operator3.getAddress(),
           ],
           data,
-          dataHash,
+          c5Proof,
         ),
       )
         .to.emit(registry, "CommitteePublished")
@@ -648,7 +655,7 @@ describe("CiphernodeRegistryOwnable", function () {
           await operator3.getAddress(),
         ],
         data,
-        dataHash,
+        c5Proof,
       );
       expect(await registry.committeePublicKey(e3Id)).to.equal(dataHash);
     });

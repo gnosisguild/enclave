@@ -265,6 +265,11 @@
               "type": "address"
             },
             {
+              "internalType": "contract IPkVerifier",
+              "name": "pkVerifier",
+              "type": "address"
+            },
+            {
               "internalType": "bytes32",
               "name": "committeePublicKey",
               "type": "bytes32"
@@ -734,6 +739,11 @@
               "type": "address"
             },
             {
+              "internalType": "contract IPkVerifier",
+              "name": "pkVerifier",
+              "type": "address"
+            },
+            {
               "internalType": "bytes32",
               "name": "committeePublicKey",
               "type": "bytes32"
@@ -854,6 +864,25 @@
     {
       "inputs": [
         {
+          "internalType": "bytes32",
+          "name": "encryptionSchemeId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getPkVerifier",
+      "outputs": [
+        {
+          "internalType": "contract IPkVerifier",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
@@ -940,9 +969,9 @@
           "type": "uint256"
         },
         {
-          "internalType": "bytes32",
-          "name": "committeePublicKeyHash",
-          "type": "bytes32"
+          "internalType": "bytes",
+          "name": "proof",
+          "type": "bytes"
         }
       ],
       "name": "onCommitteePublished",
@@ -1147,6 +1176,11 @@
               "type": "address"
             },
             {
+              "internalType": "contract IPkVerifier",
+              "name": "pkVerifier",
+              "type": "address"
+            },
+            {
               "internalType": "bytes32",
               "name": "committeePublicKey",
               "type": "bytes32"
@@ -1279,6 +1313,24 @@
     {
       "inputs": [
         {
+          "internalType": "bytes32",
+          "name": "encryptionSchemeId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "contract IPkVerifier",
+          "name": "pkVerifier",
+          "type": "address"
+        }
+      ],
+      "name": "setPkVerifier",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "components": [
             {
               "internalType": "uint256",
@@ -1313,5 +1365,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-69c949b7ddb3f16519fd68579dabe246a9022d23"
+  "buildInfoId": "solc-0_8_28-16cf43f6814888a6b7f512f8d4a2a360fcb66d4c"
 }

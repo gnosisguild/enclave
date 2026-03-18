@@ -58,6 +58,7 @@ sol! {
         bytes e3ProgramParams;
         bytes customParams;
         address decryptionVerifier;
+        address pkVerifier;
         bytes32 committeePublicKey;
         bytes32 ciphertextOutput;
         bytes plaintextOutput;
@@ -107,7 +108,6 @@ sol! {
         uint256 dkgWindow;
         uint256 computeWindow;
         uint256 decryptionWindow;
-        uint256 gracePeriod;
     }
 
     #[derive(Debug)]
@@ -121,15 +121,12 @@ sol! {
     #[sol(rpc)]
     contract Enclave {
         uint256 public nexte3Id = 0;
-        mapping(uint256 e3Id => uint256 inputCount) public inputCounts;
-        mapping(uint256 e3Id => bytes params) public e3Params;
         mapping(address e3Program => bool allowed) public e3Programs;
         function request(E3RequestParams calldata requestParams) external returns (uint256 e3Id, E3 memory e3);
         function enableE3Program(address e3Program) public returns (bool success);
         function publishCiphertextOutput(uint256 e3Id, bytes calldata ciphertextOutput, bytes calldata proof) external returns (bool success);
         function publishPlaintextOutput(uint256 e3Id, bytes calldata data, bytes calldata proof) external returns (bool success);
         function getE3(uint256 e3Id) external view returns (E3 memory e3);
-        function getInputRoot(uint256 e3Id) public view returns (uint256);
         function getE3Quote(E3RequestParams memory request) external view returns (uint256 fee);
         function getE3Stage(uint256 e3Id) external view returns (E3Stage stage);
         function getFailureReason(uint256 e3Id) external view returns (FailureReason reason);
@@ -148,17 +145,8 @@ pub trait EnclaveRead {
     /// Get the details of an E3 by ID
     async fn get_e3(&self, e3_id: U256) -> Result<E3>;
 
-    /// Get the input count for a specific E3 ID
-    async fn get_input_count(&self, e3_id: U256) -> Result<U256>;
-
     /// Get the latest block number
     async fn get_latest_block(&self) -> Result<u64>;
-
-    /// Get the root for a specific ID
-    async fn get_input_root(&self, id: U256) -> Result<U256>;
-
-    /// Get E3 parameters for a specific E3 ID
-    async fn get_e3_params(&self, e3_id: U256) -> Result<Bytes>;
 
     /// Check if an E3 program is enabled
     async fn is_e3_program_enabled(&self, e3_program: Address) -> Result<bool>;
@@ -363,27 +351,9 @@ where
         Ok(e3_return)
     }
 
-    async fn get_input_count(&self, e3_id: U256) -> Result<U256> {
-        let contract = Enclave::new(self.contract_address, &self.provider);
-        let input_count = contract.inputCounts(e3_id).call().await?;
-        Ok(input_count)
-    }
-
     async fn get_latest_block(&self) -> Result<u64> {
         let block = self.provider.get_block_number().await?;
         Ok(block)
-    }
-
-    async fn get_input_root(&self, id: U256) -> Result<U256> {
-        let contract = Enclave::new(self.contract_address, &self.provider);
-        let root = contract.getInputRoot(id).call().await?;
-        Ok(root)
-    }
-
-    async fn get_e3_params(&self, e3_id: U256) -> Result<Bytes> {
-        let contract = Enclave::new(self.contract_address, &self.provider);
-        let params = contract.e3Params(e3_id).call().await?;
-        Ok(params)
     }
 
     async fn is_e3_program_enabled(&self, e3_program: Address) -> Result<bool> {

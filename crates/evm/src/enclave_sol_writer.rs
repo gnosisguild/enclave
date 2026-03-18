@@ -5,14 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::error_decoder::format_evm_error;
-use crate::helpers::EthProvider;
+use crate::helpers::{encode_zk_proof, EthProvider};
 use crate::send_tx_with_retry;
 use actix::prelude::*;
 use alloy::{
     primitives::Address,
     providers::{Provider, WalletProvider},
     sol,
-    sol_types::SolValue,
 };
 use alloy::{
     primitives::{Bytes, U256},
@@ -36,25 +35,6 @@ sol!(
     IEnclave,
     "../../packages/enclave-contracts/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json"
 );
-
-/// ABI-encodes a C7 proof for DecryptionVerifier.verify: abi.encode(rawProof, publicInputs).
-/// Public input count is derived from proof data; the contract rejects invalid counts.
-fn encode_c7_proof(proof: &Proof) -> Option<Bytes> {
-    let signals: &[u8] = &*proof.public_signals;
-    if signals.is_empty() || signals.len() % 32 != 0 {
-        return None;
-    }
-    let count = signals.len() / 32;
-    let mut inputs = Vec::with_capacity(count);
-    for chunk in signals.chunks_exact(32) {
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(chunk);
-        inputs.push(arr);
-    }
-    let raw = Bytes::from((&*proof.data).to_vec());
-    let encoded = (raw, inputs).abi_encode();
-    Some(Bytes::from(encoded))
-}
 
 /// Consumes events from the event bus and calls EVM methods on the Enclave.sol contract
 pub struct EnclaveSolWriter<P> {
@@ -254,7 +234,7 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         .pending()
         .await?;
 
-    let proof = aggregation_proof.and_then(encode_c7_proof).ok_or_else(|| {
+    let proof = aggregation_proof.and_then(encode_zk_proof).ok_or_else(|| {
         anyhow::anyhow!(
             "C7 proof missing or invalid (expected non-empty public_signals divisible by 32)"
         )
