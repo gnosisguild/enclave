@@ -6,8 +6,9 @@
 
 use actix::prelude::*;
 use e3_events::{
-    prelude::*, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, E3Failed, E3Stage,
-    E3StageChanged, EType, EnclaveEvent, EnclaveEventData, EventType, Shutdown, TypedEvent,
+    prelude::*, run_once, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested,
+    E3Failed, E3Stage, E3StageChanged, EType, EffectsEnabled, EnclaveEvent, EnclaveEventData,
+    EventType, Shutdown, TypedEvent,
 };
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use std::collections::HashMap;
@@ -32,14 +33,29 @@ impl CommitteeFinalizer {
     pub fn attach(bus: &BusHandle) -> Addr<Self> {
         let addr = CommitteeFinalizer::new(bus).start();
 
+        // Subscribe to state-building / cleanup events immediately
         bus.subscribe_all(
             &[
-                EventType::CommitteeRequested,
                 EventType::Shutdown,
                 EventType::E3Failed,
                 EventType::E3StageChanged,
             ],
             addr.clone().recipient(),
+        );
+
+        // Gate CommitteeRequested behind EffectsEnabled — finalization should not
+        // be scheduled during historical event replay.
+        bus.subscribe(
+            EventType::EffectsEnabled,
+            run_once::<EffectsEnabled>({
+                let bus = bus.clone();
+                let addr = addr.clone();
+                move |_| {
+                    bus.subscribe(EventType::CommitteeRequested, addr.into());
+                    Ok(())
+                }
+            })
+            .recipient(),
         );
 
         addr
