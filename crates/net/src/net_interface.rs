@@ -185,6 +185,14 @@ impl Libp2pNetInterface {
         self.swarm.listen_on(addr.parse()?)?;
 
         trace!("Peers to dial: {:?}", self.peers);
+        if self.peers.is_empty() {
+            info!("Found 0 peers to dial");
+        } else {
+            info!("Found {} peer(s) to dial:", self.peers.len());
+            for peer in &self.peers {
+                info!("  -> {}", peer);
+            }
+        }
         tokio::spawn({
             let event_tx = event_tx.clone();
             let cmd_tx = cmd_tx.clone();
