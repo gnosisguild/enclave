@@ -360,6 +360,7 @@ async fn handle_sync_request_event(
 
     let mut all_events: Vec<EnclaveEvent<Unsequenced>> = Vec::new();
     let mut latest_timestamp: u128 = 0;
+    let mut failed_aggregates: Vec<AggregateId> = Vec::new();
 
     for (aggregate_id, since) in event.since.iter() {
         info!(
@@ -395,8 +396,16 @@ async fn handle_sync_request_event(
                     "Failed to fetch events for aggregate_id={}: {e}. Continuing with available events.",
                     aggregate_id
                 );
+                failed_aggregates.push(*aggregate_id);
             }
         }
+    }
+
+    if !failed_aggregates.is_empty() {
+        bail!(
+            "failed to fetch historical net events for aggregates: {:?}",
+            failed_aggregates
+        );
     }
 
     info!(
