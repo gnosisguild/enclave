@@ -3650,6 +3650,7 @@ name = "e3-socket-server"
 version = "0.1.15"
 dependencies = [
  "anyhow",
+ "e3-config",
  "e3-console",
  "serde",
  "serde_json",

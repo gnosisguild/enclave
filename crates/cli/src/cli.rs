@@ -81,11 +81,11 @@ impl Cli {
     }
 
     #[instrument(skip_all)]
-    pub async fn execute(self, out: Console) -> Result<()> {
+    pub async fn execute(self, out: Console, config_result: Result<AppConfig>) -> Result<()> {
         let log_level = self.log_level();
         // Attempt to load the config, but only treat "not found" as
         // the trigger for the init flow.  All other errors bubble up.
-        let config = match self.load_config() {
+        let config = match config_result {
             Ok(cfg) => cfg,
             // If the file truly doesn't exist, fall back to init
             Err(e)

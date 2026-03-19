@@ -28,7 +28,7 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
     tokio::pin!(shutdown);
 
     owo();
-    launch_socket_server();
+    launch_socket_server(config.ctrl_port());
 
     let node = tokio::select! {
         // build the ciphernode and if it completes first return the result
@@ -54,9 +54,9 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
 }
 
 /// Launch a socket server to read RemoteCli commands
-pub fn launch_socket_server() {
+pub fn launch_socket_server(ctrl_port: u16) {
     // Setup socket server for daemon
-    tokio::task::spawn_local(start_socket_server(|stream| async move {
+    tokio::task::spawn_local(start_socket_server(ctrl_port, |stream| async move {
         let (reader, mut writer) = stream.into_split();
         let mut lines = BufReader::new(reader).lines();
 
@@ -65,7 +65,8 @@ pub fn launch_socket_server() {
             info!("CMD: {}", &colorize(&line, Color::Blue));
             let remote_cli: RemoteCli = serde_json::from_str(&line)?;
             let cli: Cli = remote_cli.try_into()?;
-            cli.execute(out).await?;
+            let config_result = cli.load_config();
+            cli.execute(out, config_result).await?;
             while let Some(msg) = rx.recv().await {
                 writer.write_all(format!("{msg}\n").as_bytes()).await?;
             }

@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
+use e3_config::AppConfig;
 use e3_console::{log, Console};
 use serde::Serialize;
 use std::future::Future;
@@ -13,13 +14,13 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tracing::error;
 
-pub const TCP_PORT: u16 = 50505;
 const TCP_ADDRESS: &str = "127.0.0.1"; // using localhost specifically so that it is not mounted
                                        // externally. We might change this if we need to control
                                        // externally and add authentication or TLS
 
-pub async fn connect_socket() -> Option<TcpStream> {
-    let addr = format!("{}:{}", TCP_ADDRESS, TCP_PORT);
+pub async fn connect_socket(maybe_config: Option<&AppConfig>) -> Option<TcpStream> {
+    let config = maybe_config?;
+    let addr = format!("{}:{}", TCP_ADDRESS, config.ctrl_port());
     TcpStream::connect(addr).await.ok()
 }
 
@@ -42,12 +43,12 @@ pub async fn run_on_socket<T: Serialize>(
     Ok(())
 }
 
-pub async fn start_socket_server<F, Fut>(handler: F)
+pub async fn start_socket_server<F, Fut>(tcp_port: u16, handler: F)
 where
     F: Fn(TcpStream) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<()>> + 'static,
 {
-    let addr = format!("{}:{}", TCP_ADDRESS, TCP_PORT);
+    let addr = format!("{}:{}", TCP_ADDRESS, tcp_port);
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(l) => l,
         Err(e) => {

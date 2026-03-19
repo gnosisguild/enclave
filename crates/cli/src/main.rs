@@ -67,16 +67,16 @@ pub async fn main() -> Result<()> {
     let handle = Console::stdout();
     let out = handle.writer();
     let cli = Cli::parse();
-
+    let config_result = cli.load_config();
     // If the socket exists and the command can be parsed as remote
-    let maybe_stream = connect_socket().await;
+    let maybe_stream = connect_socket(config_result.as_ref().ok()).await;
     let maybe_remote_command = TryInto::<RemoteCli>::try_into(cli.clone()).ok();
     if let Err(err) = if let (Some(stream), Some(command)) = (maybe_stream, maybe_remote_command) {
         // Run the command over the socket
         run_on_socket(out, stream, command).await
     } else {
         // Run the command locally
-        cli.execute(out).await
+        cli.execute(out, config_result).await
     } {
         eprintln!("{}", colorize(err, Color::Red));
         std::process::exit(1);

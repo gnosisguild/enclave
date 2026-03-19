@@ -7,9 +7,10 @@ description.workspace = true
 repository.workspace = true
 
 [dependencies]
-tokio.workspace = true
 anyhow.workspace = true
-serde_json.workspace = true
-serde.workspace = true
 e3-console.workspace = true
+e3-config.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
 tracing.workspace = true
