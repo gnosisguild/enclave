@@ -66,6 +66,7 @@ use e3_zk_helpers::dkg::share_computation::{
 };
 use e3_zk_helpers::dkg::share_decryption::{ShareDecryptionCircuit, ShareDecryptionCircuitData};
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
+use e3_zk_helpers::threshold::pk_aggregation::computation::Inputs as PkAggInputs;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
@@ -343,6 +344,46 @@ fn handle_pk_aggregation_proof(
         pk0_shares,
         a,
     };
+
+    // 6b. Verify C1 commitments from signed proofs match computed commitments
+    if req.c1_commitments.len() != req.committee_h {
+        return Err(make_zk_error(
+            &request,
+            format!(
+                "c1_commitments length {} != committee_h {}",
+                req.c1_commitments.len(),
+                req.committee_h
+            ),
+        ));
+    }
+
+    let pk_agg_inputs = PkAggInputs::compute(req.params_preset.clone(), &circuit_data)
+        .map_err(|e| make_zk_error(&request, format!("PkAggInputs::compute: {}", e)))?;
+
+    // public_signals from bb are big-endian 32-byte field elements
+    let expected = &pk_agg_inputs.expected_threshold_pk_commitments;
+    let mut mismatched_indices = Vec::new();
+    for (i, (computed, extracted)) in expected.iter().zip(req.c1_commitments.iter()).enumerate() {
+        let (_, be_bytes) = computed.to_bytes_be();
+        let mut padded = vec![0u8; 32];
+        let start = 32_usize.saturating_sub(be_bytes.len());
+        padded[start..].copy_from_slice(&be_bytes);
+        if padded[..] != extracted[..] {
+            mismatched_indices.push(i);
+        }
+    }
+
+    if !mismatched_indices.is_empty() {
+        return Err(ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::C1CommitmentMismatch { mismatched_indices }),
+            request,
+        ));
+    }
+
+    info!(
+        "C1 commitment cross-check passed for {} parties",
+        expected.len()
+    );
 
     // 7. Generate proof via Provable trait (C5 is always EVM-targeted for on-chain verification)
     let circuit = PkAggregationCircuit;

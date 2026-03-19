@@ -9,12 +9,12 @@ use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, BusHandle, ComputeResponse, ComputeResponseKind, DKGRecursiveAggregationComplete,
-    Die, E3id, EnclaveEvent, EnclaveEventData, EventContext, KeyshareCreated, OrderedSet,
-    PartyProofsToVerify, PkAggregationProofPending, PkAggregationProofRequest,
-    PkAggregationProofSigned, Proof, PublicKeyAggregated, Seed, Sequenced,
-    ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload, TypedEvent,
-    VerificationKind, ZkResponse,
+    prelude::*, BusHandle, ComputeRequestErrorKind, ComputeResponse, ComputeResponseKind,
+    DKGRecursiveAggregationComplete, Die, E3id, EnclaveEvent, EnclaveEventData, EventContext,
+    KeyshareCreated, OrderedSet, PartyProofsToVerify, PkAggregationProofPending,
+    PkAggregationProofRequest, PkAggregationProofSigned, Proof, ProofType, PublicKeyAggregated,
+    Seed, Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed,
+    SignedProofPayload, TypedEvent, VerificationKind, ZkError, ZkResponse,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -24,6 +24,17 @@ use e3_utils::{ArcBytes, MAILBOX_LIMIT};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use tracing::{error, info, warn};
+
+/// Derive c1_commitments from signed proofs by extracting pk_commitment from each.
+fn derive_c1_commitments(signed_proofs: &[Option<SignedProofPayload>]) -> Vec<ArcBytes> {
+    signed_proofs
+        .iter()
+        .filter_map(|opt| {
+            opt.as_ref()
+                .and_then(|sp| sp.payload.proof.extract_output("pk_commitment"))
+        })
+        .collect()
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublicKeyAggregatorState {
@@ -53,6 +64,11 @@ pub enum PublicKeyAggregatorState {
     GeneratingC5Proof {
         public_key: ArcBytes,
         keyshare_bytes: Vec<ArcBytes>,
+        /// Signed C1 proofs from honest parties, aligned with `keyshare_bytes`.
+        /// Commitments are extracted on the fly via `extract_output("pk_commitment")`.
+        /// Retained for fault attribution if a commitment mismatch is detected later.
+        #[serde(default)]
+        c1_signed_proofs: Vec<Option<SignedProofPayload>>,
         nodes: OrderedSet<String>,
         /// DKG recursive proofs per party (restart-critical).
         dkg_node_proofs: HashMap<u64, Option<Proof>>,
@@ -246,6 +262,7 @@ impl PublicKeyAggregator {
         let PublicKeyAggregatorState::VerifyingC1 {
             submission_order,
             threshold_m,
+            c1_proofs,
             ..
         } = self
             .state
@@ -262,12 +279,22 @@ impl PublicKeyAggregator {
 
         // Filter out dishonest parties using submission_order (insertion-order indexed,
         // matching the party IDs sent to dispatch_c1_verification).
-        let (honest_keyshares, honest_nodes): (Vec<ArcBytes>, Vec<String>) = submission_order
+        let honest_entries: Vec<(usize, (String, ArcBytes))> = submission_order
             .into_iter()
             .enumerate()
             .filter(|(idx, _)| !dishonest_parties.contains(&(*idx as u64)))
-            .map(|(_, (node, ks))| (ks, node))
+            .collect();
+
+        let (honest_keyshares, honest_nodes): (Vec<ArcBytes>, Vec<String>) = honest_entries
+            .iter()
+            .map(|(_, (node, ks))| (ks.clone(), node.clone()))
             .unzip();
+
+        // Collect signed C1 proofs from honest parties (commitments derived on the fly)
+        let c1_signed_proofs: Vec<Option<SignedProofPayload>> = honest_entries
+            .iter()
+            .map(|(idx, _)| c1_proofs.get(*idx).and_then(|opt| opt.clone()))
+            .collect();
 
         if !dishonest_parties.is_empty() {
             warn!(
@@ -319,6 +346,7 @@ impl PublicKeyAggregator {
                     committee_n: committee_h,
                     committee_h,
                     committee_threshold: 0,
+                    c1_commitments: derive_c1_commitments(&c1_signed_proofs),
                 },
                 public_key: pubkey.clone(),
                 nodes: honest_nodes_set.clone(),
@@ -329,7 +357,9 @@ impl PublicKeyAggregator {
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key: pubkey.clone(),
-                keyshare_bytes,
+                public_key_hash,
+                keyshare_bytes: honest_keyshares,
+                c1_signed_proofs,
                 nodes: honest_nodes_set,
                 dkg_node_proofs: HashMap::new(),
                 honest_party_ids: honest_party_ids.clone(),
@@ -377,6 +407,7 @@ impl PublicKeyAggregator {
             let PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
                 keyshare_bytes,
+                c1_signed_proofs,
                 nodes,
                 dkg_node_proofs,
                 honest_party_ids,
@@ -390,6 +421,7 @@ impl PublicKeyAggregator {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
                 keyshare_bytes,
+                c1_signed_proofs,
                 nodes,
                 dkg_node_proofs,
                 honest_party_ids,
@@ -444,6 +476,7 @@ impl PublicKeyAggregator {
             let PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
                 keyshare_bytes,
+                c1_signed_proofs,
                 nodes,
                 mut dkg_node_proofs,
                 honest_party_ids,
@@ -459,6 +492,7 @@ impl PublicKeyAggregator {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
                 keyshare_bytes,
+                c1_signed_proofs,
                 nodes,
                 dkg_node_proofs,
                 honest_party_ids,
@@ -516,6 +550,7 @@ impl PublicKeyAggregator {
             let PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
                 keyshare_bytes,
+                c1_signed_proofs,
                 nodes,
                 dkg_node_proofs,
                 honest_party_ids,
@@ -541,6 +576,7 @@ impl PublicKeyAggregator {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
                 keyshare_bytes,
+                c1_signed_proofs,
                 nodes,
                 dkg_node_proofs,
                 honest_party_ids,
@@ -656,6 +692,7 @@ impl PublicKeyAggregator {
                 let PublicKeyAggregatorState::GeneratingC5Proof {
                     public_key,
                     keyshare_bytes,
+                    c1_signed_proofs,
                     nodes,
                     dkg_node_proofs,
                     honest_party_ids,
@@ -678,6 +715,7 @@ impl PublicKeyAggregator {
                 Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                     public_key,
                     keyshare_bytes,
+                    c1_signed_proofs,
                     nodes,
                     dkg_node_proofs,
                     honest_party_ids,
@@ -689,6 +727,196 @@ impl PublicKeyAggregator {
             })?;
             self.try_publish_complete()?;
         }
+        Ok(())
+    }
+
+    fn handle_c1_commitment_mismatch(
+        &mut self,
+        mismatched_indices: &[usize],
+        ec: EventContext<Sequenced>,
+    ) -> Result<()> {
+        let PublicKeyAggregatorState::GeneratingC5Proof {
+            keyshare_bytes,
+            c1_signed_proofs: stored_c1_signed_proofs,
+            nodes,
+            dkg_node_proofs,
+            honest_party_ids,
+            dishonest_parties,
+            ..
+        } = self
+            .state
+            .get()
+            .ok_or_else(|| anyhow::anyhow!("Expected GeneratingC5Proof state"))?
+        else {
+            return Err(anyhow::anyhow!(
+                "handle_c1_commitment_mismatch called outside GeneratingC5Proof state"
+            ));
+        };
+
+        // Map keyshare-order indices to original party IDs.
+        // keyshare_bytes[i] corresponds to the i-th element in honest_party_ids (sorted).
+        let honest_ids_sorted: Vec<u64> = honest_party_ids.iter().copied().collect();
+        let mut newly_dishonest: BTreeSet<u64> = BTreeSet::new();
+        for &idx in mismatched_indices {
+            if let Some(&party_id) = honest_ids_sorted.get(idx) {
+                warn!(
+                    "C1 commitment mismatch for party {} (index {}) — marking as dishonest",
+                    party_id, idx
+                );
+                newly_dishonest.insert(party_id);
+            } else {
+                warn!(
+                    "C1 commitment mismatch index {} out of range (honest parties: {})",
+                    idx,
+                    honest_ids_sorted.len()
+                );
+            }
+        }
+
+        if newly_dishonest.is_empty() {
+            return Err(anyhow::anyhow!(
+                "C1 commitment mismatch reported but no valid party indices"
+            ));
+        }
+
+        // Emit SignedProofFailed for each mismatched party that has a signed C1 proof
+        for &idx in mismatched_indices {
+            if let Some(Some(signed_payload)) = stored_c1_signed_proofs.get(idx) {
+                match signed_payload.recover_address() {
+                    Ok(faulting_node) => {
+                        if let Err(err) = self.bus.publish(
+                            SignedProofFailed {
+                                e3_id: self.e3_id.clone(),
+                                faulting_node,
+                                proof_type: ProofType::C1PkGeneration,
+                                signed_payload: signed_payload.clone(),
+                            },
+                            ec.clone(),
+                        ) {
+                            error!("Failed to publish SignedProofFailed for C1 mismatch at index {}: {err}", idx);
+                        }
+                    }
+                    Err(err) => {
+                        warn!(
+                            "Could not recover address from C1 signed proof at index {}: {err}",
+                            idx
+                        );
+                    }
+                }
+            }
+        }
+
+        // Filter out the newly dishonest parties
+        let remaining_keyshares: Vec<ArcBytes> = keyshare_bytes
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !mismatched_indices.contains(i))
+            .map(|(_, ks)| ks.clone())
+            .collect();
+
+        let remaining_ids: BTreeSet<u64> = honest_party_ids
+            .iter()
+            .copied()
+            .filter(|id| !newly_dishonest.contains(id))
+            .collect();
+
+        let remaining_nodes: OrderedSet<String> = {
+            let nodes_vec: Vec<String> = nodes
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !mismatched_indices.contains(i))
+                .map(|(_, n)| n.clone())
+                .collect();
+            OrderedSet::from(nodes_vec)
+        };
+
+        let mut all_dishonest = dishonest_parties.clone();
+        all_dishonest.extend(newly_dishonest.iter());
+
+        // Check if enough honest parties remain
+        let remaining_count = remaining_keyshares.len();
+        // We need > 0 honest parties; the circuit enforces the threshold check
+        if remaining_count == 0 {
+            return Err(anyhow::anyhow!(
+                "No honest parties remaining after C1 commitment mismatch filtering"
+            ));
+        }
+
+        info!(
+            "Re-aggregating public key from {} remaining honest parties (removed {} dishonest)",
+            remaining_count,
+            newly_dishonest.len()
+        );
+
+        // Re-aggregate the public key without the dishonest parties
+        let remaining_keyshares_set = OrderedSet::from(remaining_keyshares.clone());
+        let pubkey = self.fhe.get_aggregate_public_key(GetAggregatePublicKey {
+            keyshares: remaining_keyshares_set,
+        })?;
+
+        let public_key_hash = compute_pk_commitment(
+            pubkey.clone(),
+            self.fhe.params.degree(),
+            self.fhe.params.plaintext(),
+            self.fhe.params.moduli().to_vec(),
+        )?;
+
+        let committee_h = remaining_count;
+        let pubkey = ArcBytes::from_bytes(&pubkey);
+
+        // Filter c1_signed_proofs to match remaining honest parties
+        let remaining_c1_signed_proofs: Vec<Option<SignedProofPayload>> = stored_c1_signed_proofs
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !mismatched_indices.contains(i))
+            .map(|(_, sp)| sp.clone())
+            .collect();
+
+        // Publish new PkAggregationProofPending
+        self.bus.publish(
+            PkAggregationProofPending {
+                e3_id: self.e3_id.clone(),
+                proof_request: PkAggregationProofRequest {
+                    keyshare_bytes: remaining_keyshares.clone(),
+                    aggregated_pk_bytes: pubkey.clone(),
+                    params_preset: self.params_preset.clone(),
+                    committee_n: committee_h,
+                    committee_h,
+                    committee_threshold: 0,
+                    c1_commitments: derive_c1_commitments(&remaining_c1_signed_proofs),
+                },
+                public_key: pubkey.clone(),
+                public_key_hash,
+                nodes: remaining_nodes.clone(),
+            },
+            ec.clone(),
+        )?;
+
+        // Keep DKG proofs from remaining honest parties — they won't be re-delivered.
+        let remaining_dkg_proofs: HashMap<u64, Proof> = dkg_node_proofs
+            .into_iter()
+            .filter(|(pid, _)| remaining_ids.contains(pid))
+            .collect();
+
+        // Transition state: reset fold but preserve honest DKG proofs
+        self.state.try_mutate(&ec, |_| {
+            Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                public_key: pubkey.clone(),
+                public_key_hash,
+                keyshare_bytes: remaining_keyshares,
+                c1_signed_proofs: remaining_c1_signed_proofs,
+                nodes: remaining_nodes,
+                dkg_node_proofs: remaining_dkg_proofs,
+                honest_party_ids: remaining_ids,
+                dishonest_parties: all_dishonest,
+                cross_node_fold: ProofFoldState::new(),
+                c5_proof_pending: None,
+                last_ec: Some(ec.clone()),
+            })
+        })?;
+
+        self.try_start_cross_node_fold(&ec)?;
+
         Ok(())
     }
 
@@ -783,7 +1011,20 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::ComputeRequestError(data) => {
-                error!("PublicKeyAggregator received ComputeRequestError: {}", data);
+                if data.request().e3_id != self.e3_id {
+                    return;
+                }
+                if let ComputeRequestErrorKind::Zk(ZkError::C1CommitmentMismatch {
+                    ref mismatched_indices,
+                }) = data.get_err()
+                {
+                    let indices = mismatched_indices.clone();
+                    trap(EType::PublickeyAggregation, &self.bus.with_ec(&ec), || {
+                        self.handle_c1_commitment_mismatch(&indices, ec.clone())
+                    });
+                } else {
+                    error!("PublicKeyAggregator received ComputeRequestError: {}", data);
+                }
             }
             EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
             EnclaveEventData::CommitteeMemberExpelled(data) => {
