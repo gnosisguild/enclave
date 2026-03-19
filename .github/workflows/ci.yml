@@ -473,7 +473,7 @@ jobs:
     strategy:
       matrix:
         # TODO removed base test for now
-        test-suite: [persist]
+        test-suite: [base, persist]
       fail-fast: false
     steps:
       - name: 'Check out the repo'
