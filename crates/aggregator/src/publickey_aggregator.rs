@@ -7,7 +7,6 @@
 use crate::proof_fold::ProofFoldState;
 use actix::prelude::*;
 use anyhow::Result;
-use e3_bfv_client::client::compute_pk_commitment;
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, ComputeResponse, ComputeResponseKind, DKGRecursiveAggregationComplete,
@@ -53,7 +52,6 @@ pub enum PublicKeyAggregatorState {
     },
     GeneratingC5Proof {
         public_key: ArcBytes,
-        public_key_hash: [u8; 32],
         keyshare_bytes: Vec<ArcBytes>,
         nodes: OrderedSet<String>,
         /// DKG recursive proofs per party (restart-critical).
@@ -299,48 +297,36 @@ impl PublicKeyAggregator {
             keyshares: honest_keyshares_set.clone(),
         })?;
 
-        let public_key_hash = compute_pk_commitment(
-            pubkey.clone(),
-            self.fhe.params.degree(),
-            self.fhe.params.plaintext(),
-            self.fhe.params.moduli().to_vec(),
-        )?;
-
+        let committee_h = honest_keyshares.len();
         let honest_nodes_set = OrderedSet::from(honest_nodes);
+        let keyshare_bytes: Vec<_> = honest_keyshares_set.iter().cloned().collect();
 
         // Publish pending event before transitioning state so a publish
         // failure leaves us in VerifyingC1 (retryable) rather than
         // GeneratingC5Proof (no retry path).
-        let committee_h = honest_keyshares.len();
-
-        info!("Publishing PkAggregationProofPending for C5 proof generation...");
         let pubkey = ArcBytes::from_bytes(&pubkey);
+        info!("Publishing PkAggregationProofPending for C5 proof generation...");
         self.bus.publish(
             PkAggregationProofPending {
                 e3_id: self.e3_id.clone(),
                 proof_request: PkAggregationProofRequest {
-                    keyshare_bytes: honest_keyshares.clone(),
+                    keyshare_bytes: keyshare_bytes.clone(),
                     aggregated_pk_bytes: pubkey.clone(),
                     params_preset: self.params_preset.clone(),
-                    // this field is not really used in the circuit, we only use H
                     committee_n: committee_h,
                     committee_h,
-                    // this field is not really used in the circuit, we only use H
                     committee_threshold: 0,
                 },
                 public_key: pubkey.clone(),
-                public_key_hash,
                 nodes: honest_nodes_set.clone(),
             },
             ec.clone(),
         )?;
 
-        // Transition to GeneratingC5Proof with restart-critical fold fields
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key: pubkey.clone(),
-                public_key_hash,
-                keyshare_bytes: honest_keyshares,
+                keyshare_bytes,
                 nodes: honest_nodes_set,
                 dkg_node_proofs: HashMap::new(),
                 honest_party_ids: honest_party_ids.clone(),
@@ -381,7 +367,6 @@ impl PublicKeyAggregator {
         self.state.try_mutate(&ec, |state| {
             let PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
-                public_key_hash,
                 keyshare_bytes,
                 nodes,
                 dkg_node_proofs,
@@ -395,7 +380,6 @@ impl PublicKeyAggregator {
             };
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
-                public_key_hash,
                 keyshare_bytes,
                 nodes,
                 dkg_node_proofs,
@@ -445,7 +429,6 @@ impl PublicKeyAggregator {
         self.state.try_mutate(&ec, |state| {
             let PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
-                public_key_hash,
                 keyshare_bytes,
                 nodes,
                 mut dkg_node_proofs,
@@ -461,7 +444,6 @@ impl PublicKeyAggregator {
             dkg_node_proofs.insert(msg.party_id, msg.aggregated_proof);
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
-                public_key_hash,
                 keyshare_bytes,
                 nodes,
                 dkg_node_proofs,
@@ -519,7 +501,6 @@ impl PublicKeyAggregator {
         self.state.try_mutate(ec, |state| {
             let PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
-                public_key_hash,
                 keyshare_bytes,
                 nodes,
                 dkg_node_proofs,
@@ -545,7 +526,6 @@ impl PublicKeyAggregator {
             )?;
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
-                public_key_hash,
                 keyshare_bytes,
                 nodes,
                 dkg_node_proofs,
@@ -563,7 +543,6 @@ impl PublicKeyAggregator {
     fn try_publish_complete(&mut self) -> Result<()> {
         let PublicKeyAggregatorState::GeneratingC5Proof {
             public_key,
-            public_key_hash,
             nodes,
             c5_proof_pending,
             cross_node_fold,
@@ -593,10 +572,7 @@ impl PublicKeyAggregator {
                     dkg_node_proofs, ..
                 } = &s
                 {
-                    Some(
-                        !dkg_node_proofs.is_empty()
-                            && dkg_node_proofs.values().all(|p| p.is_none()),
-                    )
+                    Some(dkg_node_proofs.values().all(|p| p.is_none()))
                 } else {
                     None
                 }
@@ -623,7 +599,6 @@ impl PublicKeyAggregator {
 
         let event = PublicKeyAggregated {
             pubkey: public_key.clone(),
-            public_key_hash,
             e3_id: self.e3_id.clone(),
             nodes: nodes.clone(),
             pk_aggregation_proof: Some(c5_proof.clone()),
@@ -661,7 +636,6 @@ impl PublicKeyAggregator {
             self.state.try_mutate_without_context(|state| {
                 let PublicKeyAggregatorState::GeneratingC5Proof {
                     public_key,
-                    public_key_hash,
                     keyshare_bytes,
                     nodes,
                     dkg_node_proofs,
@@ -684,7 +658,6 @@ impl PublicKeyAggregator {
                 )?;
                 Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                     public_key,
-                    public_key_hash,
                     keyshare_bytes,
                     nodes,
                     dkg_node_proofs,

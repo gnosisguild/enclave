@@ -272,8 +272,8 @@ impl Computation for Bounds {
 
             let k0qi = BigInt::from(k0is[i]);
 
-            // PK and R2 bounds (same as qi_bound)
-            pk_bounds.push(qi_bound.clone());
+            // PK bounds: [0, qi) for commitment consistency with pk_aggregation
+            pk_bounds.push((&qi_bigint - BigInt::from(1)).clone());
             r2_bounds.push(qi_bound.clone());
 
             let e0_bound_i = e0_bound % qi_bigint.clone();
@@ -403,8 +403,9 @@ impl Computation for Inputs {
 
         ct0.center(&moduli)?;
         ct1.center(&moduli)?;
-        pk0.center(&moduli)?;
-        pk1.center(&moduli)?;
+
+        // pk0, pk1: keep [0, q_i) to match C5 (pk_aggregation) commitment.
+
         e0.center(&moduli)?;
 
         let CrtPolynomial { limbs: ct0_limbs } = ct0;
@@ -604,7 +605,7 @@ mod tests {
         let max_pk_bound = bounds.pk_bounds.iter().max().unwrap();
         let expected_bits = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
 
-        assert_eq!(max_pk_bound.clone(), BigUint::from(34359701504u64));
+        assert_eq!(max_pk_bound.clone(), BigUint::from(68719403008u64));
         assert_eq!(bits.pk_bit, expected_bits);
     }
 

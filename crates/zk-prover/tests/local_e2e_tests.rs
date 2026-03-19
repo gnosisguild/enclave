@@ -43,10 +43,13 @@ use e3_zk_helpers::threshold::{
 };
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_helpers::Computation;
-use e3_zk_helpers::{compute_share_computation_sk_commitment, compute_threshold_pk_commitment};
+use e3_zk_helpers::{
+    compute_pk_aggregation_commitment, compute_share_computation_sk_commitment,
+    compute_threshold_pk_commitment,
+};
 use e3_zk_prover::{
-    generate_chunk_batch_proof, generate_share_computation_final_proof, Provable, ZkBackend,
-    ZkProver,
+    generate_chunk_batch_proof, generate_share_computation_final_proof, CircuitVariant, Provable,
+    ZkBackend, ZkProver,
 };
 
 /// Convert raw public signals bytes (32-byte big-endian chunks) to ark_bn254::Fr field elements.
@@ -640,8 +643,10 @@ async fn test_pk_aggregation_commitment_consistency() {
         return;
     };
 
+    // C5 uses Evm variant in production; Recursive fails because commitment hashes (256-bit)
+    // exceed the noir-recursive verifier's limb bound.
     let proof = circuit
-        .prove(&prover, &preset, &sample, e3_id)
+        .prove_with_variant(&prover, &preset, &sample, e3_id, CircuitVariant::Evm)
         .expect("proof generation should succeed");
 
     let computation_output = PkAggregationCircuit::compute(preset, &sample).unwrap();
@@ -655,10 +660,21 @@ async fn test_pk_aggregation_commitment_consistency() {
         let commitment_from_proof = extract_field(&proof.public_signals, i);
         assert_eq!(
             commitment_from_proof, *expected,
-            "pk_aggregation commitment {} mismatch",
+            "pk_aggregation per-party commitment {} mismatch",
             i
         );
     }
+
+    let expected_final_commitment = compute_pk_aggregation_commitment(
+        &computation_output.inputs.pk0_agg,
+        &computation_output.inputs.pk1_agg,
+        computation_output.bits.pk_bit,
+    );
+    let final_commitment_from_proof = extract_field_from_end(&proof.public_signals, 0);
+    assert_eq!(
+        final_commitment_from_proof, expected_final_commitment,
+        "pk_aggregation final commitment mismatch"
+    );
 
     prover.cleanup(e3_id).unwrap();
 }

@@ -32845,7 +32845,7 @@ pk_aggregation (CIRCUIT 5)
 -------------------------------------
 ************************************/
 
-pub global PK_AGGREGATION_BIT_PK: u32 = 52;
+pub global PK_AGGREGATION_BIT_PK: u32 = 53;
 pub global PK_AGGREGATION_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS);
 
 /************************************
@@ -32854,8 +32854,8 @@ user_data_encryption (USED FOR DATA ENCRYPTION)
 -------------------------------------
 ************************************/
 
-pub global USER_DATA_ENCRYPTION_BIT_PK: u32 = 52;
-pub global USER_DATA_ENCRYPTION_BIT_CT: u32 = 52;
+pub global USER_DATA_ENCRYPTION_BIT_PK: u32 = 53;
+pub global USER_DATA_ENCRYPTION_BIT_CT: u32 = 53;
 pub global USER_DATA_ENCRYPTION_BIT_U: u32 = 1;
 pub global USER_DATA_ENCRYPTION_BIT_E0: u32 = 105;
 pub global USER_DATA_ENCRYPTION_BIT_E1: u32 = 5;
@@ -32868,7 +32868,7 @@ pub global USER_DATA_ENCRYPTION_BIT_P2: u32 = 52;
 pub global USER_DATA_ENCRYPTION_K0IS: [Field; L] =
     [1553741877321401, 3467771713378059, 3107483745689273, 4188347660158895];
 pub global USER_DATA_ENCRYPTION_PK_BOUNDS: [Field; L] =
-    [1125899911102464, 2251799813881856, 2251799815716864, 2251799817289728];
+    [2251799822204928, 4503599627763712, 4503599631433728, 4503599634579456];
 pub global USER_DATA_ENCRYPTION_E0_BOUND: Field = 39614081257132168796771975168000;
 pub global USER_DATA_ENCRYPTION_E1_BOUND: Field = 20;
 pub global USER_DATA_ENCRYPTION_U_BOUND: Field = 1;

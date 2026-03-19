@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::math::fhe_poly_to_crt_centered;
-use crate::utils::{compute_modulus_bit, ZkHelpersUtilsError};
+use crate::utils::{compute_modulus_bit, compute_pk_bit_unsigned_mod, ZkHelpersUtilsError};
 use e3_polynomial::{CrtPolynomial, CrtPolynomialError};
 use fhe::bfv::{BfvParameters, Ciphertext, PublicKey};
 
@@ -35,10 +35,10 @@ pub fn bfv_ciphertext_to_greco(
     Ok((ct0is, ct1is))
 }
 
-/// Converts a BFV public key to Greco format.
+/// Converts a BFV public key to Greco format for commitment computation.
 ///
-/// Takes a BFV public key and converts it to Greco format, returning pk0is and pk1is
-/// as CRT polynomials.
+/// Uses [0, q_i) coefficient representation (no centering) to match the C5
+/// (pk_aggregation) circuit, so the commitment hash matches the C5 proof output.
 ///
 /// # Arguments
 /// * `params` - BFV parameters
@@ -50,14 +50,13 @@ pub fn bfv_ciphertext_to_greco(
 /// # Errors
 /// Returns [`CrtPolynomialError::ModuliLengthMismatch`] if `moduli.len() != self.limbs.len()`.
 pub fn bfv_public_key_to_greco(
-    params: &BfvParameters,
+    _params: &BfvParameters,
     public_key: &PublicKey,
 ) -> Result<(CrtPolynomial, CrtPolynomial), CrtPolynomialError> {
-    let moduli = params.moduli();
-
-    let pk0is = fhe_poly_to_crt_centered(&public_key.c.c[0], moduli)?;
-    let pk1is = fhe_poly_to_crt_centered(&public_key.c.c[1], moduli)?;
-
+    let mut pk0is = CrtPolynomial::from_fhe_polynomial(&public_key.c.c[0]);
+    let mut pk1is = CrtPolynomial::from_fhe_polynomial(&public_key.c.c[1]);
+    pk0is.reverse();
+    pk1is.reverse();
     Ok((pk0is, pk1is))
 }
 
@@ -86,7 +85,7 @@ pub fn compute_public_key_commitment(
         ))
     })?;
 
-    let pk_bit = compute_modulus_bit(params);
+    let pk_bit = compute_pk_bit_unsigned_mod(params);
     let commitment = compute_pk_aggregation_commitment(&pk0is, &pk1is, pk_bit);
 
     let bytes = commitment.to_bytes_be().1;
