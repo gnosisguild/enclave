@@ -498,7 +498,9 @@ impl PublicKeyAggregator {
         }
 
         // Collect non-None proofs from honest parties for cross-node folding.
-        // If any proof is None (aggregation disabled), skip folding entirely.
+        // Folding is skipped only when all honest-party proofs are None (every node
+        // reported aggregation disabled). A mixed Some/None scenario should not occur
+        // in practice because proof_aggregation_enabled is an E3-level flag shared by all nodes.
         let mut pairs: Vec<_> = dkg_node_proofs
             .iter()
             .filter(|(pid, _)| honest_party_ids.contains(pid))
@@ -591,7 +593,10 @@ impl PublicKeyAggregator {
                     dkg_node_proofs, ..
                 } = &s
                 {
-                    Some(dkg_node_proofs.values().all(|p| p.is_none()))
+                    Some(
+                        !dkg_node_proofs.is_empty()
+                            && dkg_node_proofs.values().all(|p| p.is_none()),
+                    )
                 } else {
                     None
                 }

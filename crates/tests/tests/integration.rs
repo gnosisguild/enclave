@@ -720,6 +720,7 @@ async fn test_trbfv_actor() -> Result<()> {
         error_size,
         esi_per_ct: esi_per_ct as usize,
         params,
+        proof_aggregation_enabled: true,
     };
 
     bus.publish_without_context(e3_requested)?;
