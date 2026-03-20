@@ -1,0 +1,13 @@
+[workspace]
+
+[package]
+name = "auction-example"
+version = "0.1.0"
+edition = "2021"
+license = "LGPL-3.0-only"
+description = "Sealed-bid auction demo using BFV SIMD encoding"
+
+[dependencies]
+fhe = { git = "https://github.com/gnosisguild/fhe.rs" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
+rand = "0.8"
