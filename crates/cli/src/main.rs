@@ -69,10 +69,9 @@ pub async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let config_result = cli.load_config();
-    // let maybe_stream = connect_socket(config_result.as_ref().ok()).await;
-    // let maybe_remote_command = TryInto::<RemoteCli>::try_into(cli.clone()).ok();
-    let maybe_stream = None;
-    let maybe_remote_command: Option<RemoteCli> = None;
+    let maybe_stream = connect_socket(config_result.as_ref().ok()).await;
+    let maybe_remote_command = TryInto::<RemoteCli>::try_into(cli.clone()).ok();
+
     // If the socket exists and the command can be parsed as remote
     if let Err(err) = if let (Some(stream), Some(command)) = (maybe_stream, maybe_remote_command) {
         // Run the command over the socket
