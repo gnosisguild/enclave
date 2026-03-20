@@ -360,6 +360,7 @@ async fn handle_sync_request_event(
 
     let mut all_events: Vec<EnclaveEvent<Unsequenced>> = Vec::new();
     let mut latest_timestamp: u128 = 0;
+    let mut failed_aggregates: Vec<AggregateId> = Vec::new();
 
     for (aggregate_id, since) in event.since.iter() {
         info!(
@@ -367,23 +368,44 @@ async fn handle_sync_request_event(
             aggregate_id, since
         );
         let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone()).build();
-        let events: Vec<EnclaveEvent<Unsequenced>> =
-            fetch_all_batched_events(requester, PeerTarget::Random, *aggregate_id, *since, 100)
-                .await?;
-
-        info!(
-            "Received {} events for aggregate_id={}",
-            events.len(),
-            aggregate_id
-        );
-
-        for enclave_event in events {
-            let ts = enclave_event.ts();
-            if ts > latest_timestamp {
-                latest_timestamp = ts;
+        match fetch_all_batched_events::<EnclaveEvent<Unsequenced>>(
+            requester,
+            PeerTarget::Random,
+            *aggregate_id,
+            *since,
+            100,
+        )
+        .await
+        {
+            Ok(events) => {
+                info!(
+                    "Received {} events for aggregate_id={}",
+                    events.len(),
+                    aggregate_id
+                );
+                for enclave_event in events {
+                    let ts = enclave_event.ts();
+                    if ts > latest_timestamp {
+                        latest_timestamp = ts;
+                    }
+                    all_events.push(enclave_event);
+                }
             }
-            all_events.push(enclave_event);
+            Err(e) => {
+                warn!(
+                    "Failed to fetch events for aggregate_id={}: {e}. Continuing with available events.",
+                    aggregate_id
+                );
+                failed_aggregates.push(*aggregate_id);
+            }
         }
+    }
+
+    if !failed_aggregates.is_empty() {
+        bail!(
+            "failed to fetch historical net events for aggregates: {:?}",
+            failed_aggregates
+        );
     }
 
     info!(

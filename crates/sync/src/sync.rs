@@ -29,6 +29,7 @@ fn is_infrastructure_event(event: &EnclaveEvent) -> bool {
         EnclaveEventData::SyncEnded(_)
             | EnclaveEventData::EffectsEnabled(_)
             | EnclaveEventData::HistoricalEvmSyncStart(_)
+            | EnclaveEventData::HistoricalNetSyncStart(_)
     )
 }
 
