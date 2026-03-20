@@ -73,7 +73,10 @@ pub fn create_channel_bridge() -> (NetInterfaceHandle, NetChannelBridge) {
     tokio::spawn(async move {
         let _rx_guard = keep_alive;
         sleep(Duration::from_millis(100)).await;
-        let _ = startup_event_tx.send(NetEvent::AllPeersDialed);
+        let _ = startup_event_tx.send(NetEvent::AllPeersDialed {
+            connected: 0,
+            total: 0,
+        });
         while let Some(cmd) = m_cmd_rx.recv().await {
             let _ = tx.send(cmd);
         }
