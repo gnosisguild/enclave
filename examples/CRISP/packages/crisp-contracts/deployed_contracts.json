@@ -264,55 +264,63 @@
       "blockNumber": 17,
       "address": "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E"
     },
-    "MockE3Program": {
+    "MockDecryptionVerifier": {
       "blockNumber": 18,
       "address": "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690"
     },
-    "ZKTranscriptLib": {
+    "MockPkVerifier": {
+      "blockNumber": 19,
+      "address": "0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB"
+    },
+    "MockE3Program": {
       "blockNumber": 20,
       "address": "0x9E545E3C0baAB3E08CdfD552C960A1050f373042"
     },
-    "RecursiveAggregationFoldVerifier": {
-      "blockNumber": 21,
-      "address": "0xa82fF9aFd8f496c3d6ac40E2a0F282E47488CFc9"
-    },
-    "ThresholdDecryptedSharesAggregationVerifier": {
+    "ZKTranscriptLib": {
       "blockNumber": 22,
       "address": "0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8"
     },
-    "ThresholdPkAggregationVerifier": {
+    "RecursiveAggregationFoldVerifier": {
       "blockNumber": 23,
       "address": "0x851356ae760d987E095750cCeb3bC6014560891C"
     },
-    "BfvDecryptionVerifier": {
+    "ThresholdDecryptedSharesAggregationVerifier": {
       "blockNumber": 24,
       "address": "0xf5059a5D33d5853360D16C683c16e67980206f36"
     },
-    "BfvPkVerifier": {
+    "ThresholdPkAggregationVerifier": {
+      "blockNumber": 25,
+      "address": "0x95401dc811bb5740090279Ba06cfA8fcF6113778"
+    },
+    "BfvDecryptionVerifier": {
       "blockNumber": 26,
       "address": "0x998abeb3E57409262aE5b751f60747921B33613E"
     },
+    "BfvPkVerifier": {
+      "blockNumber": 28,
+      "address": "0x4826533B4897376654Bb4d4AD88B7faFD0C98528"
+    },
     "MockRISC0Verifier": {
-      "address": "0x4826533B4897376654Bb4d4AD88B7faFD0C98528",
-      "blockNumber": 28
+      "address": "0x0E801D84Fa97b50751Dbf25036d067dCf18858bF",
+      "blockNumber": 30
     },
     "HonkVerifier": {
-      "address": "0x0E801D84Fa97b50751Dbf25036d067dCf18858bF",
-      "blockNumber": 29
+      "address": "0x9d4454B023096f34B160D6B654540c56A1F81688",
+      "blockNumber": 31
     },
     "CRISPProgram": {
-      "address": "0x8f86403A4DE0BB5791fa46B8e795C547942fE4Cf",
-      "blockNumber": 29,
+      "address": "0x5eb3Bc0a489C5A8288765d2336659EbCA68FCd00",
+      "blockNumber": 31,
       "constructorArgs": {
         "enclave": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
-        "verifierAddress": "0x4826533B4897376654Bb4d4AD88B7faFD0C98528",
-        "honkVerifierAddress": "0x0E801D84Fa97b50751Dbf25036d067dCf18858bF",
+        "verifierAddress": "0x0E801D84Fa97b50751Dbf25036d067dCf18858bF",
+        "honkVerifierAddress": "0x9d4454B023096f34B160D6B654540c56A1F81688",
         "imageId": "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
       }
     },
     "MockVotingToken": {
-      "address": "0x5eb3Bc0a489C5A8288765d2336659EbCA68FCd00",
-      "blockNumber": 31
+      "address": "0x809d550fca64d94Bd9F66E60752A544199cfAC3D",
+      "blockNumber": 33
     }
   }
 }
