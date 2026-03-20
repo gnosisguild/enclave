@@ -2139,6 +2139,7 @@ impl ThresholdKeyshare {
                     es_poly_sum: decrypting.es_poly_sum,
                     d_share_bytes: d_share_poly.clone(),
                     params_preset: threshold_preset,
+                    proof_aggregation_enabled: state.proof_aggregation_enabled,
                 },
             },
             ec.clone(),

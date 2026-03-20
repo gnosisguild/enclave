@@ -9,7 +9,7 @@ use e3_events::{
     prelude::*, BusHandle, ComputeRequest, CorrelationId, E3id, EventContext, Proof, Sequenced,
     ZkRequest,
 };
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 /// Manages the state of a sequential `FoldProofs` operation.
 ///
@@ -28,6 +28,9 @@ pub struct ProofFoldState {
     total_steps: Option<usize>,
     /// Set when all fold steps have completed.
     pub result: Option<Proof>,
+    /// `start` was called with zero proofs — folding is complete with no aggregate.
+    #[serde(default)]
+    pub fold_input_was_empty: bool,
 }
 
 impl ProofFoldState {
@@ -38,6 +41,7 @@ impl ProofFoldState {
             remaining: Vec::new(),
             total_steps: None,
             result: None,
+            fold_input_was_empty: false,
         }
     }
 
@@ -59,7 +63,7 @@ impl ProofFoldState {
 
     /// Begin folding `proofs` sequentially.
     ///
-    /// - 0 proofs → `result` stays `None`
+    /// - 0 proofs → `result` stays `None`, `fold_input_was_empty` is set (caller can treat fold as done)
     /// - 1 proof  → `result` is set immediately, no ZK request dispatched
     /// - N proofs → first fold step dispatched; subsequent steps follow via `handle_response`
     pub fn start(
@@ -70,9 +74,17 @@ impl ProofFoldState {
         e3_id: &E3id,
         ec: &EventContext<Sequenced>,
     ) -> Result<()> {
+        self.correlation = None;
+        self.accumulated = None;
+        self.remaining.clear();
+        self.total_steps = None;
+        self.result = None;
+        self.fold_input_was_empty = false;
+
         match proofs.len() {
             0 => {
                 info!("{label}: no proofs to fold");
+                self.fold_input_was_empty = true;
                 Ok(())
             }
             1 => {

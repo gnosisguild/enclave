@@ -536,12 +536,13 @@ impl ThresholdPlaintextAggregator {
 
     /// Publish `PlaintextAggregated` when both C7 proofs and C6 fold are complete.
     fn try_publish_complete(&mut self) -> Result<()> {
-        let (Some(c7_proofs), Some(c6_proof)) = (
-            self.c7_proofs_pending.as_ref(),
-            self.c6_fold.result.as_ref(),
-        ) else {
+        let Some(c7_proofs) = self.c7_proofs_pending.as_ref() else {
             return Ok(());
         };
+        let c6_ready = self.c6_fold.result.is_some() || self.c6_fold.fold_input_was_empty;
+        if !c6_ready {
+            return Ok(());
+        }
 
         let state: GeneratingC7Proof = self
             .state
@@ -575,7 +576,7 @@ impl ThresholdPlaintextAggregator {
             decrypted_output,
             e3_id: self.e3_id.clone(),
             aggregation_proofs: c7_proofs.clone(),
-            c6_aggregated_proof: Some(c6_proof.clone()),
+            c6_aggregated_proof: self.c6_fold.result.clone(),
         };
 
         info!(

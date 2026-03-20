@@ -828,7 +828,8 @@ impl ProofRequestActor {
             return;
         };
 
-        if proofs.len() != wrapped_proofs.len() {
+        let aggregation_enabled = self.is_proof_aggregation_enabled(&e3_id);
+        if aggregation_enabled && proofs.len() != wrapped_proofs.len() {
             error!(
                 "C6 proofs and wrapped_proofs length mismatch: {} vs {} — DecryptionshareCreated will not be published",
                 proofs.len(),
@@ -858,6 +859,12 @@ impl ProofRequestActor {
 
         let ec = pending.ec;
 
+        let wrapped_to_publish = if aggregation_enabled {
+            wrapped_proofs
+        } else {
+            Vec::new()
+        };
+
         match self.bus.publish(
             DecryptionshareCreated {
                 party_id: pending.party_id,
@@ -865,7 +872,7 @@ impl ProofRequestActor {
                 e3_id: e3_id.clone(),
                 decryption_share: pending.decryption_share,
                 signed_decryption_proofs: signed_proofs,
-                wrapped_proofs,
+                wrapped_proofs: wrapped_to_publish,
             },
             ec.clone(),
         ) {
