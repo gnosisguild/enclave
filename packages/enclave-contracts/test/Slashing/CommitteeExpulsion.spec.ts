@@ -39,6 +39,7 @@ import {
   MockUSDC__factory as MockUSDCFactory,
   SlashingManager__factory as SlashingManagerFactory,
 } from "../../types";
+import { signAndEncodeAttestation } from "../fixtures";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time } = networkHelpers;
@@ -76,88 +77,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     decryptionWindow: ONE_DAY,
   };
 
-  // Must match the VOTE_TYPEHASH in SlashingManager.sol
-  const VOTE_TYPEHASH = ethers.keccak256(
-    ethers.toUtf8Bytes(
-      "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)",
-    ),
-  );
-
-  /**
-   * Helper to create signed committee attestation evidence for Lane A.
-   * Voters (other committee members) sign votes confirming the accused is faulty.
-   * Returns abi.encode(proofType, voters, agrees, dataHashes, signatures)
-   */
-  async function signAndEncodeAttestation(
-    voterSigners: Signer[],
-    e3Id: number,
-    operator: string,
-    proofType: number = 0,
-    chainId: number = 31337,
-    dataHash: string = ethers.ZeroHash,
-  ): Promise<string> {
-    const accusationId = ethers.keccak256(
-      ethers.solidityPacked(
-        ["uint256", "uint256", "address", "uint256"],
-        [chainId, e3Id, operator, proofType],
-      ),
-    );
-
-    const signersWithAddrs = await Promise.all(
-      voterSigners.map(async (s) => ({
-        signer: s,
-        address: await s.getAddress(),
-      })),
-    );
-    signersWithAddrs.sort((a, b) =>
-      a.address.toLowerCase() < b.address.toLowerCase()
-        ? -1
-        : a.address.toLowerCase() > b.address.toLowerCase()
-          ? 1
-          : 0,
-    );
-
-    const voters: string[] = [];
-    const agrees: boolean[] = [];
-    const dataHashes: string[] = [];
-    const signatures: string[] = [];
-
-    for (const { signer, address: voterAddress } of signersWithAddrs) {
-      voters.push(voterAddress);
-      agrees.push(true);
-      dataHashes.push(dataHash);
-
-      const messageHash = ethers.keccak256(
-        abiCoder.encode(
-          [
-            "bytes32",
-            "uint256",
-            "uint256",
-            "bytes32",
-            "address",
-            "bool",
-            "bytes32",
-          ],
-          [
-            VOTE_TYPEHASH,
-            chainId,
-            e3Id,
-            accusationId,
-            voterAddress,
-            true,
-            dataHash,
-          ],
-        ),
-      );
-      const signature = await signer.signMessage(ethers.getBytes(messageHash));
-      signatures.push(signature);
-    }
-
-    return abiCoder.encode(
-      ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]"],
-      [proofType, voters, agrees, dataHashes, signatures],
-    );
-  }
   const setup = async () => {
     // ── Signers ────────────────────────────────────────────────────────────────
     const [
@@ -678,12 +597,12 @@ describe("Committee Expulsion & Fault Tolerance", function () {
 
       // Slash operator1 again for a different proof type to verify expulsion is idempotent.
       // Same (e3Id, operator, proofType) would revert DuplicateEvidence — that's correct.
-      // Using proofType=7 (T5ShareDecryption) with REASON_PT_7 instead.
+      // Using proofType=7 (C6ThresholdShareDecryption) with REASON_PT_7 instead.
       const proof2 = await signAndEncodeAttestation(
         [operator2, operator3],
         0,
         await operator1.getAddress(),
-        7, // T5ShareDecryption — different proofType
+        7, // C6ThresholdShareDecryption — different proofType
         31337,
         ethers.keccak256(ethers.toUtf8Bytes("second")),
       );

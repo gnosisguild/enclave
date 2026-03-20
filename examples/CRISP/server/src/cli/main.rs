@@ -54,7 +54,7 @@ enum Commands {
     CheckE3Ready {
         #[arg(short, long)]
         e3id: u64,
-    }
+    },
 }
 
 #[tokio::main]

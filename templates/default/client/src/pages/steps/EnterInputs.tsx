@@ -7,11 +7,14 @@
 import React, { useState } from 'react'
 import { NumberSquareOneIcon } from '@phosphor-icons/react'
 import { hexToBytes } from 'viem'
+import { useAccount, useWalletClient } from 'wagmi'
 import CardContent from '../components/CardContent'
 import { useWizard, WizardStep } from '../../context/WizardContext'
+import { publishInput } from '../../utils/input'
+import { getContractAddresses } from '../../utils/env-config'
 
 /**
- * EnterInputs component - Fourth step in the Enclave wizard flow
+ * EnterInputs component - Third step in the Enclave wizard flow
  *
  * This component handles the input of two numbers for a privacy-preserving addition
  * using fully homomorphic encryption (FHE). It provides feedback on the input process
@@ -22,13 +25,13 @@ const EnterInputs: React.FC = () => {
   const [input2, setInput2] = useState('')
   const { e3State, setCurrentStep, setLastTransactionHash, setInputPublishError, setInputPublishSuccess, setSubmittedInputs, sdk } =
     useWizard()
-  const { publishInput } = sdk
+  const { address } = useAccount()
+  const { data: walletClient } = useWalletClient()
+  const contracts = getContractAddresses()
 
   const handleInputSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('handleInputSubmit')
-    if (!input1 || !input2 || e3State.publicKey === null || e3State.id === null) {
-      console.log('Refusing to submit input because input is empty or publickey is null or is is null')
+    if (!input1 || !input2 || e3State.publicKey === null || e3State.id === null || !walletClient || !address) {
       return
     }
 
@@ -55,14 +58,13 @@ const EnterInputs: React.FC = () => {
         throw new Error('Failed to encrypt inputs')
       }
 
+      const toHex = (bytes: Uint8Array): `0x${string}` => `0x${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`
+
       // Publish first input
-      await publishInput(e3State.id, `0x${Array.from(encryptedInput1, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`)
+      await publishInput(walletClient, e3State.id, toHex(encryptedInput1), address, contracts.e3Program)
 
       // Publish second input
-      const hash2 = await publishInput(
-        e3State.id,
-        `0x${Array.from(encryptedInput2, (b: any) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`,
-      )
+      const hash2 = await publishInput(walletClient, e3State.id, toHex(encryptedInput2), address, contracts.e3Program)
 
       setLastTransactionHash(hash2)
       setInputPublishSuccess(true)
@@ -78,7 +80,7 @@ const EnterInputs: React.FC = () => {
         <div className='flex justify-center'>
           <NumberSquareOneIcon size={48} className='text-enclave-400' />
         </div>
-        <p className='text-base font-extrabold uppercase text-slate-600/50'>Step 4: Enter Your Numbers</p>
+        <p className='text-base font-extrabold uppercase text-slate-600/50'>Step 3: Enter Your Numbers</p>
         <div className='space-y-4'>
           <h3 className='text-lg font-semibold text-slate-700'>Homomorphic Encrypted Computation</h3>
           <p className='leading-relaxed text-slate-600'>
@@ -134,10 +136,14 @@ const EnterInputs: React.FC = () => {
 
         <button
           type='submit'
-          disabled={!input1 || !input2 || !e3State.isActivated}
+          disabled={!input1 || !input2 || !e3State.isCommitteePublished || !e3State.publicKey || !walletClient || !address}
           className='w-full rounded-lg bg-enclave-400 px-6 py-3 font-semibold text-slate-800 transition-all duration-200 hover:bg-enclave-300 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500'
         >
-          {!e3State.isActivated ? 'E3 Not Activated Yet' : !input1 || !input2 ? 'Enter Both Numbers' : 'Proceed to Encryption'}
+          {!e3State.isCommitteePublished || !e3State.publicKey
+            ? 'Waiting for Committee Key...'
+            : !input1 || !input2
+              ? 'Enter Both Numbers'
+              : 'Proceed to Encryption'}
         </button>
       </form>
     </CardContent>

@@ -12,13 +12,14 @@ use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
     AggregationProofPending, AggregationProofSigned, BusHandle, ComputeRequest,
     ComputeRequestError, ComputeRequestErrorKind, ComputeResponse, ComputeResponseKind,
-    CorrelationId, DecryptionKeyShared, DecryptionShareProofSigned, DecryptionShareProofsPending,
-    DecryptionshareCreated, DkgProofSigned, E3Failed, E3Stage, E3id, EnclaveEvent,
-    EnclaveEventData, EncryptionKey, EncryptionKeyCreated, EncryptionKeyPending, EventContext,
-    EventPublisher, EventSubscriber, EventType, FailureReason, PkAggregationProofPending,
-    PkAggregationProofSigned, PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload,
-    ProofType, Sequenced, ShareDecryptionProofPending, SignedProofPayload, ThresholdShare,
-    ThresholdShareCreated, ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
+    CorrelationId, DKGInnerProofReady, DecryptionKeyShared, DecryptionShareProofSigned,
+    DecryptionShareProofsPending, DecryptionshareCreated, DkgProofSigned, E3Failed, E3Stage, E3id,
+    EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated, EncryptionKeyPending,
+    EventContext, EventPublisher, EventSubscriber, EventType, FailureReason,
+    PkAggregationProofPending, PkAggregationProofSigned, PkBfvProofRequest,
+    PkGenerationProofSigned, Proof, ProofPayload, ProofType, Sequenced,
+    ShareDecryptionProofPending, SignedProofPayload, ThresholdShare, ThresholdShareCreated,
+    ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
@@ -38,6 +39,15 @@ enum ThresholdProofKind {
         recipient_party_id: usize,
         row_index: usize,
     },
+}
+
+/// Per-E3 metadata for streaming DKG inner proof aggregation.
+#[derive(Clone, Debug)]
+struct NodeAggregationMeta {
+    party_id: u64,
+    total_expected: usize,
+    /// Buffered C0 wrapped proof, if it arrived before meta was stored.
+    pending_c0: Option<Proof>,
 }
 
 #[derive(Clone, Debug)]
@@ -195,10 +205,12 @@ pub struct ProofRequestActor {
     bus: BusHandle,
     signer: PrivateKeySigner,
     pending: HashMap<CorrelationId, PendingProofRequest>,
-    threshold_correlation: HashMap<CorrelationId, (E3id, ThresholdProofKind)>,
+    threshold_correlation: HashMap<CorrelationId, (E3id, ThresholdProofKind, usize)>,
     pending_threshold: HashMap<E3id, PendingThresholdProofs>,
-    /// C4 proof staging: correlation -> (e3_id, kind)
-    decryption_correlation: HashMap<CorrelationId, (E3id, DecryptionProofKind)>,
+    /// C4 proof staging: correlation -> (e3_id, kind, seq)
+    decryption_correlation: HashMap<CorrelationId, (E3id, DecryptionProofKind, usize)>,
+    /// Per-E3 metadata for DKGInnerProofReady emission.
+    node_agg_meta: HashMap<E3id, NodeAggregationMeta>,
     /// C4 pending proofs per E3
     pending_decryption: HashMap<E3id, PendingDecryptionProofs>,
     /// C6 proof staging: correlation -> e3_id
@@ -225,6 +237,7 @@ impl ProofRequestActor {
             threshold_correlation: HashMap::new(),
             decryption_correlation: HashMap::new(),
             pending_decryption: HashMap::new(),
+            node_agg_meta: HashMap::new(),
             share_decryption_correlation: HashMap::new(),
             pending_share_decryption: HashMap::new(),
             pk_aggregation_correlation: HashMap::new(),
@@ -281,6 +294,34 @@ impl ProofRequestActor {
         let sk_enc_count = msg.sk_share_encryption_requests.len();
         let e_sm_enc_count = msg.e_sm_share_encryption_requests.len();
 
+        let total_expected = 4 + sk_enc_count + e_sm_enc_count + 2;
+        let pending_c0 = self
+            .node_agg_meta
+            .get(&e3_id)
+            .and_then(|m| m.pending_c0.clone());
+        self.node_agg_meta.insert(
+            e3_id.clone(),
+            NodeAggregationMeta {
+                party_id: msg.full_share.party_id,
+                total_expected,
+                pending_c0: None,
+            },
+        );
+        // If C0 wrapped proof arrived before meta, emit DKGInnerProofReady now
+        if let Some(c0_proof) = pending_c0 {
+            if let Err(err) = self.bus.publish(
+                DKGInnerProofReady {
+                    e3_id: e3_id.clone(),
+                    party_id: msg.full_share.party_id,
+                    wrapped_proof: c0_proof,
+                    seq: 0,
+                },
+                ec.clone(),
+            ) {
+                error!("Failed to publish DKGInnerProofReady for C0: {err}");
+            }
+        }
+
         self.pending_threshold.insert(
             e3_id.clone(),
             PendingThresholdProofs::new(
@@ -295,8 +336,10 @@ impl ProofRequestActor {
 
         // C1: PkGeneration
         let t1_corr = CorrelationId::new();
-        self.threshold_correlation
-            .insert(t1_corr, (e3_id.clone(), ThresholdProofKind::PkGeneration));
+        self.threshold_correlation.insert(
+            t1_corr,
+            (e3_id.clone(), ThresholdProofKind::PkGeneration, 1),
+        );
         info!("Requesting C1 PkGeneration proof");
         if let Err(err) = self.bus.publish(
             ComputeRequest::zk(
@@ -316,7 +359,7 @@ impl ProofRequestActor {
         let t2a_corr = CorrelationId::new();
         self.threshold_correlation.insert(
             t2a_corr,
-            (e3_id.clone(), ThresholdProofKind::SkShareComputation),
+            (e3_id.clone(), ThresholdProofKind::SkShareComputation, 2),
         );
         info!("Requesting C2a SkShareComputation proof");
         if let Err(err) = self.bus.publish(
@@ -329,7 +372,7 @@ impl ProofRequestActor {
         ) {
             error!("Failed to publish C2a proof request: {err}");
             self.threshold_correlation
-                .retain(|_, (eid, _)| *eid != e3_id);
+                .retain(|_, (eid, _, _)| *eid != e3_id);
             self.pending_threshold.remove(&e3_id);
             return;
         }
@@ -338,7 +381,7 @@ impl ProofRequestActor {
         let t2b_corr = CorrelationId::new();
         self.threshold_correlation.insert(
             t2b_corr,
-            (e3_id.clone(), ThresholdProofKind::ESmShareComputation),
+            (e3_id.clone(), ThresholdProofKind::ESmShareComputation, 3),
         );
         info!("Requesting C2b ESmShareComputation proof");
         if let Err(err) = self.bus.publish(
@@ -351,7 +394,7 @@ impl ProofRequestActor {
         ) {
             error!("Failed to publish C2b proof request: {err}");
             self.threshold_correlation
-                .retain(|_, (eid, _)| *eid != e3_id);
+                .retain(|_, (eid, _, _)| *eid != e3_id);
             self.pending_threshold.remove(&e3_id);
             return;
         }
@@ -361,7 +404,7 @@ impl ProofRequestActor {
             "Requesting {} C3a SkShareEncryption proofs for E3 {}",
             sk_enc_count, e3_id
         );
-        for req in msg.sk_share_encryption_requests {
+        for (i, req) in msg.sk_share_encryption_requests.into_iter().enumerate() {
             let corr = CorrelationId::new();
             self.threshold_correlation.insert(
                 corr,
@@ -371,6 +414,7 @@ impl ProofRequestActor {
                         recipient_party_id: req.recipient_party_id,
                         row_index: req.row_index,
                     },
+                    4 + i,
                 ),
             );
             if let Err(err) = self.bus.publish(
@@ -379,7 +423,7 @@ impl ProofRequestActor {
             ) {
                 error!("Failed to publish C3a proof request: {err}");
                 self.threshold_correlation
-                    .retain(|_, (eid, _)| *eid != e3_id);
+                    .retain(|_, (eid, _, _)| *eid != e3_id);
                 self.pending_threshold.remove(&e3_id);
                 return;
             }
@@ -390,7 +434,7 @@ impl ProofRequestActor {
             "Requesting {} C3b ESmShareEncryption proofs for E3 {}",
             e_sm_enc_count, e3_id
         );
-        for req in msg.e_sm_share_encryption_requests {
+        for (j, req) in msg.e_sm_share_encryption_requests.into_iter().enumerate() {
             let corr = CorrelationId::new();
             self.threshold_correlation.insert(
                 corr,
@@ -401,6 +445,7 @@ impl ProofRequestActor {
                         recipient_party_id: req.recipient_party_id,
                         row_index: req.row_index,
                     },
+                    4 + sk_enc_count + j,
                 ),
             );
             if let Err(err) = self.bus.publish(
@@ -409,7 +454,7 @@ impl ProofRequestActor {
             ) {
                 error!("Failed to publish C3b proof request: {err}");
                 self.threshold_correlation
-                    .retain(|_, (eid, _)| *eid != e3_id);
+                    .retain(|_, (eid, _, _)| *eid != e3_id);
                 self.pending_threshold.remove(&e3_id);
                 return;
             }
@@ -420,16 +465,36 @@ impl ProofRequestActor {
         let (msg, ec) = msg.into_components();
         match &msg.response {
             ComputeResponseKind::Zk(ZkResponse::PkBfv(resp)) => {
-                self.handle_pk_bfv_response(&msg.correlation_id, resp.proof.clone(), &ec);
+                self.handle_pk_bfv_response(
+                    &msg.correlation_id,
+                    resp.proof.clone(),
+                    resp.wrapped_proof.clone(),
+                    &ec,
+                );
             }
             ComputeResponseKind::Zk(ZkResponse::PkGeneration(resp)) => {
-                self.handle_threshold_proof_response(&msg.correlation_id, resp.proof.clone());
+                self.handle_threshold_proof_response(
+                    &msg.correlation_id,
+                    resp.proof.clone(),
+                    resp.wrapped_proof.clone(),
+                    &ec,
+                );
             }
             ComputeResponseKind::Zk(ZkResponse::ShareComputation(resp)) => {
-                self.handle_threshold_proof_response(&msg.correlation_id, resp.proof.clone());
+                self.handle_threshold_proof_response(
+                    &msg.correlation_id,
+                    resp.proof.clone(),
+                    resp.wrapped_proof.clone(),
+                    &ec,
+                );
             }
             ComputeResponseKind::Zk(ZkResponse::ShareEncryption(resp)) => {
-                self.handle_threshold_proof_response(&msg.correlation_id, resp.proof.clone());
+                self.handle_threshold_proof_response(
+                    &msg.correlation_id,
+                    resp.proof.clone(),
+                    resp.wrapped_proof.clone(),
+                    &ec,
+                );
             }
             ComputeResponseKind::Zk(ZkResponse::DkgShareDecryption(resp)) => {
                 // Try C4 decryption proof first, then fall back to C1/C2/C3 threshold
@@ -437,15 +502,26 @@ impl ProofRequestActor {
                     .decryption_correlation
                     .contains_key(&msg.correlation_id)
                 {
-                    self.handle_decryption_proof_response(&msg.correlation_id, resp.proof.clone());
+                    self.handle_decryption_proof_response(
+                        &msg.correlation_id,
+                        resp.proof.clone(),
+                        resp.wrapped_proof.clone(),
+                        &ec,
+                    );
                 } else {
-                    self.handle_threshold_proof_response(&msg.correlation_id, resp.proof.clone());
+                    self.handle_threshold_proof_response(
+                        &msg.correlation_id,
+                        resp.proof.clone(),
+                        resp.wrapped_proof.clone(),
+                        &ec,
+                    );
                 }
             }
             ComputeResponseKind::Zk(ZkResponse::ThresholdShareDecryption(resp)) => {
                 self.handle_share_decryption_proof_response(
                     &msg.correlation_id,
                     resp.proofs.clone(),
+                    resp.wrapped_proofs.clone(),
                 );
             }
             ComputeResponseKind::Zk(ZkResponse::PkAggregation(resp)) => {
@@ -491,8 +567,15 @@ impl ProofRequestActor {
 
         // C4a: SecretKey decryption proof
         let sk_corr = CorrelationId::new();
-        self.decryption_correlation
-            .insert(sk_corr, (e3_id.clone(), DecryptionProofKind::SecretKey));
+        let c4_base_seq = self
+            .node_agg_meta
+            .get(&e3_id)
+            .map(|m| m.total_expected.saturating_sub(2))
+            .unwrap_or(0);
+        self.decryption_correlation.insert(
+            sk_corr,
+            (e3_id.clone(), DecryptionProofKind::SecretKey, c4_base_seq),
+        );
         info!(
             "Requesting C4a DkgShareDecryption proof (SecretKey) for E3 {}",
             e3_id
@@ -507,7 +590,7 @@ impl ProofRequestActor {
         ) {
             error!("Failed to publish C4a proof request: {err}");
             self.decryption_correlation
-                .retain(|_, (eid, _)| *eid != e3_id);
+                .retain(|_, (eid, _, _)| *eid != e3_id);
             self.pending_decryption.remove(&e3_id);
             return;
         }
@@ -520,6 +603,7 @@ impl ProofRequestActor {
                 (
                     e3_id.clone(),
                     DecryptionProofKind::SmudgingNoise { esi_idx },
+                    c4_base_seq + 1 + esi_idx,
                 ),
             );
             info!(
@@ -536,7 +620,7 @@ impl ProofRequestActor {
             ) {
                 error!("Failed to publish C4b proof request: {err}");
                 self.decryption_correlation
-                    .retain(|_, (eid, _)| *eid != e3_id);
+                    .retain(|_, (eid, _, _)| *eid != e3_id);
                 self.pending_decryption.remove(&e3_id);
                 return;
             }
@@ -544,8 +628,14 @@ impl ProofRequestActor {
     }
 
     /// Handle a C4 proof response — store and check completeness.
-    fn handle_decryption_proof_response(&mut self, correlation_id: &CorrelationId, proof: Proof) {
-        let Some((e3_id, kind)) = self.decryption_correlation.remove(correlation_id) else {
+    fn handle_decryption_proof_response(
+        &mut self,
+        correlation_id: &CorrelationId,
+        proof: Proof,
+        wrapped_proof: Proof,
+        ec: &EventContext<Sequenced>,
+    ) {
+        let Some((e3_id, kind, seq)) = self.decryption_correlation.remove(correlation_id) else {
             return;
         };
 
@@ -571,6 +661,23 @@ impl ProofRequestActor {
             }
         }
 
+        if let Some(meta) = self.node_agg_meta.get(&e3_id) {
+            if let Err(err) = self.bus.publish(
+                DKGInnerProofReady {
+                    e3_id: e3_id.clone(),
+                    party_id: meta.party_id,
+                    wrapped_proof,
+                    seq,
+                },
+                ec.clone(),
+            ) {
+                error!(
+                    "Failed to publish DKGInnerProofReady for C4 seq={}: {err}",
+                    seq
+                );
+            }
+        }
+
         if pending.is_complete() {
             info!(
                 "All C4 proofs complete for E3 {} — signing and publishing DecryptionKeyShared",
@@ -590,7 +697,7 @@ impl ProofRequestActor {
         // Sign C4a (SK decryption proof)
         let Some(signed_sk) = self.sign_proof(
             e3_id,
-            ProofType::T2DkgShareDecryption,
+            ProofType::C4DkgShareDecryption,
             pending.sk_proof.expect("checked in is_complete"),
         ) else {
             error!("Failed to sign C4a SK proof — DecryptionKeyShared will not be published");
@@ -605,7 +712,7 @@ impl ProofRequestActor {
                 .get(&idx)
                 .expect("checked in is_complete")
                 .clone();
-            let Some(signed) = self.sign_proof(e3_id, ProofType::T2DkgShareDecryption, proof)
+            let Some(signed) = self.sign_proof(e3_id, ProofType::C4DkgShareDecryption, proof)
             else {
                 error!(
                     "Failed to sign C4b ESM proof [{}] — DecryptionKeyShared will not be published",
@@ -631,7 +738,7 @@ impl ProofRequestActor {
                 sk_poly_sum: pending.sk_poly_sum,
                 es_poly_sum: pending.es_poly_sum,
                 signed_sk_decryption_proof: signed_sk,
-                signed_esm_decryption_proofs: signed_esms,
+                signed_e_sm_decryption_proofs: signed_esms,
                 external: false,
             },
             pending.ec,
@@ -688,11 +795,12 @@ impl ProofRequestActor {
         }
     }
 
-    /// Handle C6 proof response — sign proofs and publish DecryptionshareCreated.
+    /// Handle C6 proof response — sign raw proofs, keep wrapped for fold, publish DecryptionshareCreated.
     fn handle_share_decryption_proof_response(
         &mut self,
         correlation_id: &CorrelationId,
         proofs: Vec<Proof>,
+        wrapped_proofs: Vec<Proof>,
     ) {
         let Some(e3_id) = self.share_decryption_correlation.remove(correlation_id) else {
             return;
@@ -706,10 +814,21 @@ impl ProofRequestActor {
             return;
         };
 
-        // Sign each C6 proof
+        if proofs.len() != wrapped_proofs.len() {
+            error!(
+                "C6 proofs and wrapped_proofs length mismatch: {} vs {} — DecryptionshareCreated will not be published",
+                proofs.len(),
+                wrapped_proofs.len()
+            );
+            return;
+        }
+
+        // Sign raw C6 proofs (for ShareVerification)
         let mut signed_proofs = Vec::with_capacity(proofs.len());
         for proof in proofs {
-            let Some(signed) = self.sign_proof(&e3_id, ProofType::T5ShareDecryption, proof) else {
+            let Some(signed) =
+                self.sign_proof(&e3_id, ProofType::C6ThresholdShareDecryption, proof)
+            else {
                 error!("Failed to sign C6 proof — DecryptionshareCreated will not be published");
                 return;
             };
@@ -732,6 +851,7 @@ impl ProofRequestActor {
                 e3_id: e3_id.clone(),
                 decryption_share: pending.decryption_share,
                 signed_decryption_proofs: signed_proofs,
+                wrapped_proofs,
             },
             ec.clone(),
         ) {
@@ -886,7 +1006,7 @@ impl ProofRequestActor {
         let mut signed_proofs = Vec::with_capacity(proofs.len());
         for proof in proofs {
             let Some(signed) =
-                self.sign_proof(&e3_id, ProofType::T6DecryptedSharesAggregation, proof)
+                self.sign_proof(&e3_id, ProofType::C7DecryptedSharesAggregation, proof)
             else {
                 error!("Failed to sign C7 proof — AggregationProofSigned will not be published");
                 return;
@@ -911,8 +1031,14 @@ impl ProofRequestActor {
         }
     }
 
-    fn handle_threshold_proof_response(&mut self, correlation_id: &CorrelationId, proof: Proof) {
-        let Some((e3_id, kind)) = self.threshold_correlation.remove(correlation_id) else {
+    fn handle_threshold_proof_response(
+        &mut self,
+        correlation_id: &CorrelationId,
+        proof: Proof,
+        wrapped_proof: Proof,
+        ec: &EventContext<Sequenced>,
+    ) {
+        let Some((e3_id, kind, seq)) = self.threshold_correlation.remove(correlation_id) else {
             return;
         };
 
@@ -932,6 +1058,23 @@ impl ProofRequestActor {
             pending.total_received(),
             pending.total_expected()
         );
+
+        if let Some(meta) = self.node_agg_meta.get(&e3_id) {
+            if let Err(err) = self.bus.publish(
+                DKGInnerProofReady {
+                    e3_id: e3_id.clone(),
+                    party_id: meta.party_id,
+                    wrapped_proof,
+                    seq,
+                },
+                ec.clone(),
+            ) {
+                error!(
+                    "Failed to publish DKGInnerProofReady for {:?} seq={}: {err}",
+                    kind, seq
+                );
+            }
+        }
 
         if pending.is_complete() {
             info!(
@@ -1158,6 +1301,7 @@ impl ProofRequestActor {
         &mut self,
         correlation_id: &CorrelationId,
         proof: Proof,
+        wrapped_proof: Proof,
         ec: &EventContext<Sequenced>,
     ) {
         let Some(pending) = self.pending.remove(&correlation_id) else {
@@ -1168,12 +1312,14 @@ impl ProofRequestActor {
             return;
         };
 
+        let e3_id = pending.e3_id.clone();
+
         let mut key = (*pending.key).clone();
         key.proof = Some(proof.clone());
 
         // Always sign the proof payload — unsigned proofs are not published
         let payload = ProofPayload {
-            e3_id: pending.e3_id.clone(),
+            e3_id: e3_id.clone(),
             proof_type: ProofType::C0PkBfv,
             proof: proof.clone(),
         };
@@ -1195,13 +1341,38 @@ impl ProofRequestActor {
 
         if let Err(err) = self.bus.publish(
             EncryptionKeyCreated {
-                e3_id: pending.e3_id,
+                e3_id: e3_id.clone(),
                 key: Arc::new(key),
                 external: false,
             },
             ec.clone(),
         ) {
             error!("Failed to publish EncryptionKeyCreated: {err}");
+        }
+
+        // Emit DKGInnerProofReady for C0, or buffer if meta not yet available
+        if let Some(meta) = self.node_agg_meta.get(&e3_id) {
+            if let Err(err) = self.bus.publish(
+                DKGInnerProofReady {
+                    e3_id: e3_id.clone(),
+                    party_id: meta.party_id,
+                    wrapped_proof,
+                    seq: 0,
+                },
+                ec.clone(),
+            ) {
+                error!("Failed to publish DKGInnerProofReady for C0: {err}");
+            }
+        } else {
+            // ThresholdSharePending hasn't arrived yet — buffer C0 wrapped proof
+            self.node_agg_meta.insert(
+                e3_id.clone(),
+                NodeAggregationMeta {
+                    party_id: 0,
+                    total_expected: 0,
+                    pending_c0: Some(wrapped_proof),
+                },
+            );
         }
     }
 
@@ -1219,24 +1390,25 @@ impl ProofRequestActor {
             return;
         }
 
-        if let Some((e3_id, kind)) = self.threshold_correlation.remove(msg.correlation_id()) {
+        if let Some((e3_id, kind, _seq)) = self.threshold_correlation.remove(msg.correlation_id()) {
             error!(
                 "DKG {:?} proof request failed for E3 {}: {err} — threshold share will not be published without proof",
                 kind, e3_id
             );
             self.threshold_correlation
-                .retain(|_, (eid, _)| *eid != e3_id);
+                .retain(|_, (eid, _, _)| *eid != e3_id);
             self.pending_threshold.remove(&e3_id);
             return;
         }
 
-        if let Some((e3_id, kind)) = self.decryption_correlation.remove(msg.correlation_id()) {
+        if let Some((e3_id, kind, _seq)) = self.decryption_correlation.remove(msg.correlation_id())
+        {
             error!(
                 "C4 {:?} proof request failed for E3 {}: {err} — DecryptionKeyShared will not be published",
                 kind, e3_id
             );
             self.decryption_correlation
-                .retain(|_, (eid, _)| *eid != e3_id);
+                .retain(|_, (eid, _, _)| *eid != e3_id);
             self.pending_decryption.remove(&e3_id);
             return;
         }

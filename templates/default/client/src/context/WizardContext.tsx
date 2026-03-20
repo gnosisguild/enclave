@@ -17,17 +17,16 @@ import { getEnclaveSDKConfig } from '@/utils/sdk-config'
 export enum WizardStep {
   CONNECT_WALLET = 1,
   REQUEST_COMPUTATION = 2,
-  ACTIVATE_E3 = 3,
-  ENTER_INPUTS = 4,
-  ENCRYPT_SUBMIT = 5,
-  RESULTS = 6,
+  ENTER_INPUTS = 3,
+  ENCRYPT_SUBMIT = 4,
+  RESULTS = 5,
 }
 
 export interface E3State {
   id: bigint | null
   isRequested: boolean
   isCommitteePublished: boolean
-  isActivated: boolean
+  isCiphertextPublished: boolean
   publicKey: `0x${string}` | null
   expiresAt: bigint | null
   plaintextOutput: string | null
@@ -38,7 +37,7 @@ const INITIAL_E3_STATE: E3State = {
   id: null,
   isRequested: false,
   isCommitteePublished: false,
-  isActivated: false,
+  isCiphertextPublished: false,
   publicKey: null,
   expiresAt: null,
   plaintextOutput: null,

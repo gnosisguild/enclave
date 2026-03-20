@@ -8,6 +8,7 @@ mod bonding_registry_sol;
 mod ciphernode_registry_sol;
 mod enclave_sol_reader;
 mod enclave_sol_writer;
+pub mod error_decoder;
 mod events;
 mod evm_chain_gateway;
 mod evm_hub;

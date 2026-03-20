@@ -27,10 +27,10 @@ use e3_events::{
     ComputeResponse, DecryptedSharesAggregationProofRequest,
     DecryptedSharesAggregationProofResponse, DkgShareDecryptionProofRequest,
     DkgShareDecryptionProofResponse, EnclaveEvent, EnclaveEventData, EventPublisher,
-    EventSubscriber, EventType, PartyVerificationResult, PkAggregationProofRequest,
-    PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest,
-    PkGenerationProofResponse, ShareComputationProofRequest, ShareComputationProofResponse,
-    ShareEncryptionProofRequest, ShareEncryptionProofResponse,
+    EventSubscriber, EventType, FoldProofsResponse, PartyVerificationResult,
+    PkAggregationProofRequest, PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse,
+    PkGenerationProofRequest, PkGenerationProofResponse, ShareComputationProofRequest,
+    ShareComputationProofResponse, ShareEncryptionProofRequest, ShareEncryptionProofResponse,
     ThresholdShareDecryptionProofRequest, ThresholdShareDecryptionProofResponse, TypedEvent,
     VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
     VerifyShareProofsRequest, VerifyShareProofsResponse, ZkError as ZkEventError, ZkRequest,
@@ -61,13 +61,20 @@ use e3_zk_helpers::circuits::threshold::pk_generation::circuit::{
     PkGenerationCircuit, PkGenerationCircuitData,
 };
 use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComputationCircuitData};
+use e3_zk_helpers::dkg::share_computation::{
+    ChunkInputs, Configs, Inputs, ShareComputationBaseCircuit, ShareComputationCircuitData,
+};
 use e3_zk_helpers::dkg::share_decryption::{ShareDecryptionCircuit, ShareDecryptionCircuitData};
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
-use e3_zk_prover::{Provable, ZkBackend, ZkProver};
+use e3_zk_helpers::Computation;
+use e3_zk_prover::{
+    generate_chunk_batch_proof, generate_chunk_proof, generate_fold_proof,
+    generate_share_computation_final_proof, generate_wrapper_proof, CircuitVariant, Provable,
+    ZkBackend, ZkProver,
+};
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
 use fhe_traits::{DeserializeParametrized, FheEncoder};
@@ -129,6 +136,8 @@ impl Multithread {
     ) -> Addr<Self> {
         let addr = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report).start();
 
+        // Gate ComputeRequest behind EffectsEnabled — proof generation should
+        // not trigger during historical event replay.
         bus.subscribe(
             EventType::EffectsEnabled,
             run_once::<EffectsEnabled>({
@@ -158,7 +167,29 @@ impl Multithread {
         let actor = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report)
             .with_zk_prover(zk_prover);
         let addr = actor.start();
-        bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
+        bus.subscribe_all(
+            &[
+                EventType::E3Failed,
+                EventType::E3StageChanged,
+                EventType::E3RequestComplete,
+            ],
+            addr.clone().into(),
+        );
+
+        bus.subscribe(
+            EventType::EffectsEnabled,
+            run_once::<EffectsEnabled>({
+                let bus = bus.clone();
+                let addr = addr.clone();
+                move |_| {
+                    bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
+                    info!("Multithread actor with ZK listening for events.");
+                    Ok(())
+                }
+            })
+            .recipient(),
+        );
+
         addr
     }
 
@@ -177,7 +208,6 @@ impl Actor for Multithread {
 impl Handler<EnclaveEvent> for Multithread {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        info!("Multithread received EnclaveEvent!");
         let (data, ec) = msg.into_components();
         match data {
             EnclaveEventData::ComputeRequest(data) => ctx.notify(TypedEvent::new(data, ec)),
@@ -314,11 +344,17 @@ fn handle_pk_aggregation_proof(
         a,
     };
 
-    // 7. Generate proof via Provable trait
+    // 7. Generate proof via Provable trait (C5 is always EVM-targeted for on-chain verification)
     let circuit = PkAggregationCircuit;
     let e3_id_str = request.e3_id.to_string();
     let proof = circuit
-        .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+        .prove_with_variant(
+            prover,
+            &req.params_preset,
+            &circuit_data,
+            &e3_id_str,
+            CircuitVariant::Evm,
+        )
         .map_err(|e| {
             ComputeRequestError::new(
                 ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
@@ -369,6 +405,8 @@ fn handle_threshold_share_decryption_proof(
         ));
     }
     let mut proofs = Vec::with_capacity(num_indices);
+    let mut wrapped_proofs = Vec::with_capacity(num_indices);
+    let e3_id_str = request.e3_id.to_string();
 
     for i in 0..num_indices {
         // Deserialize ciphertext
@@ -405,7 +443,6 @@ fn handle_threshold_share_decryption_proof(
 
         // Generate proof
         let circuit = e3_zk_helpers::threshold::share_decryption::ShareDecryptionCircuit;
-        let e3_id_str = request.e3_id.to_string();
         let proof = circuit
             .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
             .map_err(|e| {
@@ -417,11 +454,27 @@ fn handle_threshold_share_decryption_proof(
                     request.clone(),
                 )
             })?;
+
+        // Wrap for recursive folding
+        let wrapped = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                    "C6 wrapper proof[{}]: {}",
+                    i, e
+                ))),
+                request.clone(),
+            )
+        })?;
+
         proofs.push(proof);
+        wrapped_proofs.push(wrapped);
     }
 
     Ok(ComputeResponse::zk(
-        ZkResponse::ThresholdShareDecryption(ThresholdShareDecryptionProofResponse { proofs }),
+        ZkResponse::ThresholdShareDecryption(ThresholdShareDecryptionProofResponse {
+            proofs,
+            wrapped_proofs,
+        }),
         request.correlation_id,
         request.e3_id,
     ))
@@ -613,6 +666,24 @@ fn handle_zk_request(
                 handle_decrypted_shares_aggregation_proof(&prover, req, request.clone())
             })
         }
+        ZkRequest::FoldProofs {
+            proof1,
+            proof2,
+            target_evm,
+        } => timefunc("zk_fold_proofs", id, || {
+            let e3_id_str = request.e3_id.to_string();
+            match generate_fold_proof(&prover, &proof1, &proof2, &e3_id_str, target_evm) {
+                Ok(proof) => Ok(ComputeResponse::zk(
+                    ZkResponse::FoldProofs(FoldProofsResponse { proof }),
+                    request.correlation_id,
+                    request.e3_id.clone(),
+                )),
+                Err(e) => Err(ComputeRequestError::new(
+                    ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                    request.clone(),
+                )),
+            }
+        }),
     }
 }
 
@@ -665,13 +736,13 @@ fn handle_share_computation_proof(
         .map(|arr| arr.mapv(|v| BigInt::from(v)))
         .collect();
 
-    // 4. Compute parity matrix
+    // 5. Compute parity matrix
     let committee = req.committee_size.values();
     let parity_matrix =
         compute_parity_matrix(threshold_params.moduli(), committee.n, committee.threshold)
             .map_err(|e| make_zk_error(&request, format!("compute_parity_matrix: {}", e)))?;
 
-    // 5. Build circuit data
+    // 6. Build circuit data
     let circuit_data = ShareComputationCircuitData {
         dkg_input_type: req.dkg_input_type,
         secret,
@@ -681,12 +752,17 @@ fn handle_share_computation_proof(
         threshold: committee.threshold as u32,
     };
 
-    // 6. Generate proof
-    let circuit = ShareComputationCircuit;
     let e3_id_str = request.e3_id.to_string();
 
-    let proof = circuit
-        .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+    // 7. Prove base circuit (C2a or C2b base)
+    let base_circuit = ShareComputationBaseCircuit;
+    let base_proof = base_circuit
+        .prove(
+            prover,
+            &req.params_preset,
+            &circuit_data,
+            &format!("{e3_id_str}_base"),
+        )
         .map_err(|e| {
             ComputeRequestError::new(
                 ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
@@ -694,10 +770,84 @@ fn handle_share_computation_proof(
             )
         })?;
 
-    // 7. Return response
+    // 8. Determine number of chunks and prove each chunk circuit
+    let configs = Configs::compute(req.params_preset.clone(), &circuit_data)
+        .map_err(|e| make_zk_error(&request, format!("Configs::compute: {}", e)))?;
+
+    let base_inputs = Inputs::compute(req.params_preset.clone(), &circuit_data)
+        .map_err(|e| make_zk_error(&request, format!("Inputs::compute: {}", e)))?;
+
+    let mut chunk_proofs = Vec::with_capacity(configs.n_chunks);
+    for chunk_idx in 0..configs.n_chunks {
+        let chunk_inputs = ChunkInputs::from_inputs(&base_inputs, &configs, chunk_idx)
+            .map_err(|e| make_zk_error(&request, format!("ChunkInputs::from_inputs: {}", e)))?;
+        let chunk_proof = generate_chunk_proof(
+            prover,
+            &chunk_inputs,
+            &format!("{e3_id_str}_chunk_{chunk_idx}"),
+        )
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+        chunk_proofs.push(chunk_proof);
+    }
+
+    // 9. Level 1: group chunks into batches and prove each batch
+    let mut batch_proofs = Vec::with_capacity(configs.n_batches);
+    for batch_idx in 0..configs.n_batches {
+        let start = batch_idx * configs.chunks_per_batch;
+        let end = usize::min(start + configs.chunks_per_batch, chunk_proofs.len());
+        let batch_chunks = chunk_proofs.get(start..end).ok_or_else(|| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                    "chunk_proofs slice out of bounds: batch_idx={batch_idx}, start={start}, end={end}, len={}",
+                    chunk_proofs.len()
+                ))),
+                request.clone(),
+            )
+        })?;
+        let batch_proof = generate_chunk_batch_proof(
+            prover,
+            &base_proof,
+            batch_chunks,
+            batch_idx as u32,
+            &format!("{e3_id_str}_batch_{batch_idx}"),
+        )
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+        batch_proofs.push(batch_proof);
+    }
+
+    // 10. Level 2: aggregate batch proofs into final C2 proof
+    let proof =
+        generate_share_computation_final_proof(prover, &batch_proofs, &format!("{e3_id_str}_c2"))
+            .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
+    // 11. Wrap the final C2 proof for fold aggregation
+    let wrapped_proof = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
+
+    // 12. Return final C2 proof
     Ok(ComputeResponse::zk(
         ZkResponse::ShareComputation(ShareComputationProofResponse {
             proof,
+            wrapped_proof,
             dkg_input_type: req.dkg_input_type,
         }),
         request.correlation_id,
@@ -770,9 +920,16 @@ fn handle_pk_generation_proof(
             )
         })?;
 
+    let wrapped_proof = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
+
     // 6. Return response
     Ok(ComputeResponse::zk(
-        ZkResponse::PkGeneration(PkGenerationProofResponse::new(proof)),
+        ZkResponse::PkGeneration(PkGenerationProofResponse::new(proof, wrapped_proof)),
         request.correlation_id,
         request.e3_id,
     ))
@@ -814,8 +971,15 @@ fn handle_pk_bfv_proof(
             )
         })?;
 
+    let wrapped_proof = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
+
     Ok(ComputeResponse::zk(
-        ZkResponse::PkBfv(PkBfvProofResponse::new(proof)),
+        ZkResponse::PkBfv(PkBfvProofResponse::new(proof, wrapped_proof)),
         request.correlation_id,
         request.e3_id,
     ))
@@ -894,9 +1058,17 @@ fn handle_share_encryption_proof(
             )
         })?;
 
+    let wrapped_proof = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
+
     Ok(ComputeResponse::zk(
         ZkResponse::ShareEncryption(ShareEncryptionProofResponse {
             proof,
+            wrapped_proof,
             dkg_input_type: req.dkg_input_type,
             recipient_party_id: req.recipient_party_id,
             row_index: req.row_index,
@@ -979,10 +1151,18 @@ fn handle_dkg_share_decryption_proof(
             )
         })?;
 
+    let wrapped_proof = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
+
     // 6. Return response
     Ok(ComputeResponse::zk(
         ZkResponse::DkgShareDecryption(DkgShareDecryptionProofResponse {
             proof,
+            wrapped_proof,
             dkg_input_type: req.dkg_input_type,
         }),
         request.correlation_id,
@@ -1078,7 +1258,7 @@ fn handle_verify_share_decryption_proofs(
 
             // Guard: an empty esm_decryption_proofs vec would make this loop
             // vacuously true.  Defence-in-depth: reject any party with zero ESM proofs.
-            if party.signed_esm_decryption_proofs.is_empty() {
+            if party.signed_e_sm_decryption_proofs.is_empty() {
                 return PartyVerificationResult {
                     sender_party_id: sender,
                     all_verified: false,
@@ -1090,7 +1270,7 @@ fn handle_verify_share_decryption_proofs(
             // Flatten all signed proofs (SK + ESMs) and verify uniformly.
             let all_signed: Vec<&e3_events::SignedProofPayload> =
                 std::iter::once(&party.signed_sk_decryption_proof)
-                    .chain(party.signed_esm_decryption_proofs.iter())
+                    .chain(party.signed_e_sm_decryption_proofs.iter())
                     .collect();
 
             for signed_proof in &all_signed {
@@ -1217,7 +1397,7 @@ fn handle_decrypted_shares_aggregation_proof(
             threshold: req.threshold_m as usize,
         };
 
-        // e. Build circuit data and generate proof
+        // e. Build circuit data and generate proof (C7 is always EVM-targeted for on-chain verification)
         let circuit_data = DecryptedSharesAggregationCircuitData {
             committee,
             d_share_polys,
@@ -1228,7 +1408,13 @@ fn handle_decrypted_shares_aggregation_proof(
         let circuit = DecryptedSharesAggregationCircuit;
         let e3_id_str = request.e3_id.to_string();
         let proof = circuit
-            .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+            .prove_with_variant(
+                prover,
+                &req.params_preset,
+                &circuit_data,
+                &e3_id_str,
+                CircuitVariant::Evm,
+            )
             .map_err(|e| {
                 ComputeRequestError::new(
                     ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(

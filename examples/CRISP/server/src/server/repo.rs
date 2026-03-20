@@ -228,7 +228,9 @@ impl<S: DataStore> CrispE3Repository<S> {
     pub async fn set_votes(&mut self, votes: Vec<BigUint>) -> Result<()> {
         info!(
             "set_votes: [{}]",
-            votes.iter().enumerate()
+            votes
+                .iter()
+                .enumerate()
                 .map(|(i, v)| format!("option_{}: {}", i, v))
                 .collect::<Vec<_>>()
                 .join(", ")
@@ -236,14 +238,14 @@ impl<S: DataStore> CrispE3Repository<S> {
 
         let key = self.crisp_key();
         self.store
-        .modify(&key, |e3_obj: Option<E3Crisp>| {
-            e3_obj.map(|mut e| {
-                e.tally = votes.iter().map(|v| v.to_string()).collect();
-                e
+            .modify(&key, |e3_obj: Option<E3Crisp>| {
+                e3_obj.map(|mut e| {
+                    e.tally = votes.iter().map(|v| v.to_string()).collect();
+                    e
+                })
             })
-        })
-        .await
-        .map_err(|_| eyre::eyre!("Could not set votes for '{key}'"))?;
+            .await
+            .map_err(|_| eyre::eyre!("Could not set votes for '{key}'"))?;
         Ok(())
     }
 

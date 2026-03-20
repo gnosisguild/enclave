@@ -65,7 +65,7 @@ strip_ansi() {
 
 waiton() {
     local file_path="$1"
-    local timeout="${2:-600}"  # default 10 minutes
+    local timeout="${2:-1300}"  # default ~22 minutes
     local start_time=$(date +%s)
     until [ -f "$file_path" ]; do
         if [ $(($(date +%s) - start_time)) -ge $timeout ]; then
@@ -77,7 +77,7 @@ waiton() {
 }
 
 waiton-files() {
-  local timeout=600  # 10 minutes timeout
+  local timeout=1300  # ~22 minutes timeout
   local start_time=$(date +%s)
   while true; do
     all_exist=true
@@ -185,11 +185,7 @@ kill_em_all() {
 }
 
 launch_evm() {
-  if [ ! -z "${SILENT_EVM:-}" ]; then
-    pnpm evm:node &> /dev/null &
-  else
-    pnpm evm:node &
-  fi
+  anvil --host 0.0.0.0 --chain-id 31337 --block-time 1 --mnemonic 'test test test test test test test test test test test junk' --silent &
 }
 
 ensure_process_count_equals() {

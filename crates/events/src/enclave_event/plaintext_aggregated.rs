@@ -20,6 +20,9 @@ pub struct PlaintextAggregated {
     /// C7 proofs: one proof of correct aggregation per ciphertext index.
     #[serde(default)]
     pub aggregation_proofs: Vec<Proof>,
+    /// Cross-node folded C6 proof: all honest nodes' threshold share decryption proofs folded into one.
+    #[serde(default)]
+    pub c6_aggregated_proof: Option<Proof>,
 }
 
 impl Display for PlaintextAggregated {

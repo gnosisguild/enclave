@@ -49,7 +49,16 @@ The Interfold protocol uses several contracts that work together:
 | EnclaveTicketToken   | `0x7D3D17F0A60cF227aaC78cB0cE6B25E00768dbe8` | 10395613     |
 | EnclaveToken (ENCL)  | `0x24b28471AE7BdF1fdBcfDd183c73D13ff0689B99` | 10395612     |
 | MockUSDC (fee token) | `0x01AbD7D8e6547c943c2fE082C3Ce194fDCe57396` | 10395611     |
-| DkgPkVerifier        | `0x6997eCF2926a94c439599f7275219Cb2BfBA300C` | 10395629     |
+
+Circuit verifiers (C5, C7, Fold) are deployed with the main flow. The DecryptedSharesAggregation
+circuit (C7) is deployed as a single ThresholdDecryptedSharesAggregationVerifier. See
+`deployed_contracts.json` for addresses.
+
+| Verifier                                         | Address                                    |
+| ------------------------------------------------ | ------------------------------------------ |
+| ThresholdPkAggregationVerifier (C5)              | See `deployed_contracts.json` after deploy |
+| ThresholdDecryptedSharesAggregationVerifier (C7) | See `deployed_contracts.json` after deploy |
+| RecursiveAggregationFoldVerifier (Fold)          | See `deployed_contracts.json` after deploy |
 
 > Always verify addresses from `packages/enclave-contracts/deployed_contracts.json` or your
 > deployment output. Addresses differ per network.

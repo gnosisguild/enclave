@@ -5,6 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE
 
 mod pk;
-mod share_computation;
+pub(crate) mod share_computation;
 mod share_decryption;
 mod share_encryption;

@@ -24,6 +24,7 @@ import {
 } from "../../types";
 import type { MockCircuitVerifier } from "../../types";
 import type { SlashingManager } from "../../types/contracts/slashing/SlashingManager";
+import { VOTE_TYPEHASH, signAndEncodeAttestation } from "../fixtures";
 
 const { ethers, networkHelpers, ignition } = await network.connect();
 const { loadFixture, time } = networkHelpers;
@@ -46,103 +47,6 @@ describe("SlashingManager", function () {
   const addressOne = "0x0000000000000000000000000000000000000001";
 
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-
-  // Must match the VOTE_TYPEHASH in SlashingManager.sol
-  const VOTE_TYPEHASH = ethers.keccak256(
-    ethers.toUtf8Bytes(
-      "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)",
-    ),
-  );
-
-  /**
-   * Helper to create signed committee attestation evidence for Lane A.
-   * Each voter signs a VOTE_TYPEHASH-structured digest via personal_sign (EIP-191).
-   * Returns abi.encode(proofType, voters, agrees, dataHashes, signatures)
-   * with voters sorted ascending by address.
-   */
-  async function signAndEncodeAttestation(
-    voterSigners: any[],
-    e3Id: number,
-    operator: string,
-    proofType: number = 0,
-    chainId: number = 31337,
-    dataHash: string = ethers.ZeroHash,
-    agreesOverride?: boolean[],
-  ): Promise<string> {
-    // Compute accusationId matching AccusationManager::accusation_id() on Rust side
-    const accusationId = ethers.keccak256(
-      ethers.solidityPacked(
-        ["uint256", "uint256", "address", "uint256"],
-        [chainId, e3Id, operator, proofType],
-      ),
-    );
-
-    // Sort voters by address ascending (required by contract to prevent duplicates)
-    const signersWithAddrs = await Promise.all(
-      voterSigners.map(async (s, idx) => ({
-        signer: s,
-        address: await s.getAddress(),
-        originalIndex: idx,
-      })),
-    );
-    signersWithAddrs.sort((a, b) =>
-      a.address.toLowerCase() < b.address.toLowerCase()
-        ? -1
-        : a.address.toLowerCase() > b.address.toLowerCase()
-          ? 1
-          : 0,
-    );
-
-    const voters: string[] = [];
-    const agrees: boolean[] = [];
-    const dataHashes: string[] = [];
-    const signatures: string[] = [];
-
-    for (let i = 0; i < signersWithAddrs.length; i++) {
-      const {
-        signer,
-        address: voterAddress,
-        originalIndex,
-      } = signersWithAddrs[i];
-      const voteAgrees =
-        agreesOverride !== undefined ? agreesOverride[originalIndex] : true;
-
-      voters.push(voterAddress);
-      agrees.push(voteAgrees);
-      dataHashes.push(dataHash);
-
-      // Reconstruct vote digest matching _verifyAttestationEvidence
-      const messageHash = ethers.keccak256(
-        abiCoder.encode(
-          [
-            "bytes32",
-            "uint256",
-            "uint256",
-            "bytes32",
-            "address",
-            "bool",
-            "bytes32",
-          ],
-          [
-            VOTE_TYPEHASH,
-            chainId,
-            e3Id,
-            accusationId,
-            voterAddress,
-            voteAgrees,
-            dataHash,
-          ],
-        ),
-      );
-      const signature = await signer.signMessage(ethers.getBytes(messageHash));
-      signatures.push(signature);
-    }
-
-    return abiCoder.encode(
-      ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]"],
-      [proofType, voters, agrees, dataHashes, signatures],
-    );
-  }
 
   /**
    * Encodes a minimal attestation evidence for tests that check early
@@ -291,7 +195,7 @@ describe("SlashingManager", function () {
       await enclaveTicketToken.getAddress(),
       owner,
     );
-    const mockVerifier = MockCircuitVerifierFactory.connect(
+    const _mockVerifier = MockCircuitVerifierFactory.connect(
       await mockCircuitVerifier.getAddress(),
       owner,
     );
@@ -344,7 +248,7 @@ describe("SlashingManager", function () {
       enclaveToken,
       ticketToken,
       usdcToken,
-      mockVerifier,
+      _mockVerifier,
       mockCiphernodeRegistry,
     };
   }
@@ -393,13 +297,13 @@ describe("SlashingManager", function () {
 
   describe("setSlashPolicy()", function () {
     it("should set a valid proof-based slash policy", async function () {
-      const { slashingManager, mockVerifier } = await loadFixture(setup);
+      const { slashingManager, _mockVerifier } = await loadFixture(setup);
 
       const policy = {
         ticketPenalty: ethers.parseUnits("50", 6),
         licensePenalty: ethers.parseEther("100"),
         requiresProof: true,
-        proofVerifier: await mockVerifier.getAddress(),
+        proofVerifier: await _mockVerifier.getAddress(),
         banNode: false,
         appealWindow: 0,
         enabled: true,
@@ -544,13 +448,13 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if proof required but appeal window set", async function () {
-      const { slashingManager, mockVerifier } = await loadFixture(setup);
+      const { slashingManager, _mockVerifier } = await loadFixture(setup);
 
       const policy = {
         ticketPenalty: ethers.parseUnits("50", 6),
         licensePenalty: ethers.parseEther("100"),
         requiresProof: true,
-        proofVerifier: await mockVerifier.getAddress(),
+        proofVerifier: await _mockVerifier.getAddress(),
         banNode: false,
         appealWindow: APPEAL_WINDOW,
         enabled: true,
@@ -1071,7 +975,7 @@ describe("SlashingManager", function () {
 
   describe("proposeSlashEvidence() — Lane B (evidence-based, SLASHER_ROLE)", function () {
     it("should propose evidence-based slash with appeal window", async function () {
-      const { slashingManager, slasher, operatorAddress, mockVerifier } =
+      const { slashingManager, slasher, operatorAddress } =
         await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1100,7 +1004,7 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if caller is not slasher", async function () {
-      const { slashingManager, notTheOwner, operatorAddress, mockVerifier } =
+      const { slashingManager, notTheOwner, operatorAddress } =
         await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1120,8 +1024,7 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if operator is zero address", async function () {
-      const { slashingManager, slasher, mockVerifier } =
-        await loadFixture(setup);
+      const { slashingManager, slasher } = await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1140,7 +1043,7 @@ describe("SlashingManager", function () {
 
   describe("executeSlash() — Lane B execution", function () {
     it("should execute evidence-based slash after appeal window", async function () {
-      const { slashingManager, slasher, operatorAddress, mockVerifier } =
+      const { slashingManager, slasher, operatorAddress } =
         await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1216,7 +1119,7 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if already executed", async function () {
-      const { slashingManager, slasher, operatorAddress, mockVerifier } =
+      const { slashingManager, slasher, operatorAddress } =
         await loadFixture(setup);
 
       await setupPolicies(slashingManager);
@@ -1241,13 +1144,8 @@ describe("SlashingManager", function () {
 
   describe("appeal system", function () {
     it("should allow operator to file appeal on evidence-based slash", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1271,13 +1169,8 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if non-operator tries to appeal", async function () {
-      const {
-        slashingManager,
-        slasher,
-        notTheOwner,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, notTheOwner, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1296,13 +1189,8 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if appeal window expired", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1323,13 +1211,8 @@ describe("SlashingManager", function () {
     });
 
     it("should revert if already appealed", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1387,14 +1270,8 @@ describe("SlashingManager", function () {
     });
 
     it("should allow governance to resolve appeal (approve)", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        owner,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, owner, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1428,14 +1305,8 @@ describe("SlashingManager", function () {
     });
 
     it("should allow governance to resolve appeal (deny)", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        owner,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, owner, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1459,13 +1330,8 @@ describe("SlashingManager", function () {
     });
 
     it("should block execution if appeal is pending", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1487,14 +1353,8 @@ describe("SlashingManager", function () {
     });
 
     it("should block execution if appeal was approved", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        owner,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, owner, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1517,14 +1377,8 @@ describe("SlashingManager", function () {
     });
 
     it("should allow execution if appeal was denied", async function () {
-      const {
-        slashingManager,
-        slasher,
-        operator,
-        owner,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
+      const { slashingManager, slasher, operator, owner, operatorAddress } =
+        await loadFixture(setup);
 
       await setupPolicies(slashingManager);
 
@@ -1617,13 +1471,13 @@ describe("SlashingManager", function () {
 
   describe("view functions", function () {
     it("should return correct slash policy", async function () {
-      const { slashingManager, mockVerifier } = await loadFixture(setup);
+      const { slashingManager, _mockVerifier } = await loadFixture(setup);
 
       const policy = {
         ticketPenalty: ethers.parseUnits("50", 6),
         licensePenalty: ethers.parseEther("100"),
         requiresProof: true,
-        proofVerifier: await mockVerifier.getAddress(),
+        proofVerifier: await _mockVerifier.getAddress(),
         banNode: true,
         appealWindow: 0,
         enabled: true,

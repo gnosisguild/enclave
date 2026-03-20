@@ -148,10 +148,6 @@ pub struct OutgoingRequestFailed {
     pub error: String,
 }
 
-#[derive(Message, Debug, Clone)]
-#[rtype("()")]
-pub struct AllPeersDialed;
-
 /// Libp2pNetInterface Commands are sent to the network peer over a mspc channel
 #[derive(Debug, Clone)]
 pub enum NetCommand {
@@ -259,7 +255,13 @@ pub enum NetEvent {
     /// Received response from a peer in response to an outgoing request
     OutgoingRequestSucceeded(OutgoingRequestSucceeded),
     OutgoingRequestFailed(OutgoingRequestFailed),
-    AllPeersDialed,
+    /// All configured peers have been dialed (not all necessarily connected).
+    AllPeersDialed {
+        /// Number of peers that successfully connected.
+        connected: usize,
+        /// Total number of peers that were dialed.
+        total: usize,
+    },
 }
 
 #[derive(Clone, Debug)]

@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::error_decoder::format_evm_error;
 use crate::helpers::EthProvider;
 use crate::send_tx_with_retry;
 use actix::prelude::*;
@@ -23,8 +24,8 @@ use e3_events::EventType;
 use e3_events::Shutdown;
 use e3_events::{prelude::*, EffectsEnabled};
 use e3_events::{run_once, EnclaveEvent};
-use e3_events::{E3Stage, E3StageChanged};
-use e3_events::{E3id, EType, PlaintextAggregated};
+use e3_events::{E3Stage, E3StageChanged, E3id};
+use e3_events::{EType, PlaintextAggregated};
 use e3_utils::NotifySync;
 use e3_utils::MAILBOX_LIMIT;
 use tracing::info;
@@ -155,7 +156,10 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                     Err(err) => {
                         bus.err(
                             EType::Evm,
-                            anyhow::anyhow!("Error publishing plaintext output: {:?}", err),
+                            anyhow::anyhow!(
+                                "Error publishing plaintext output: {}",
+                                format_evm_error(&err)
+                            ),
                         );
                     }
                 }
@@ -217,21 +221,25 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         .pending()
         .await?;
 
-    // 0x0cb083bc = CiphertextOutputNotPublished() - RPC may not have synced ciphertext output being published yet
-    send_tx_with_retry("publishPlaintextOutput", &["0x0cb083bc"], || {
-        info!("publishPlaintextOutput() e3_id={:?}", e3_id);
-        let proof = Bytes::from(vec![1]);
-        let decrypted_output = Bytes::from(decrypted_output.clone());
-        let contract = IEnclave::new(contract_address, provider.provider());
+    // RPC may not have synced ciphertext output being published yet
+    send_tx_with_retry(
+        "publishPlaintextOutput",
+        &["CiphertextOutputNotPublished"],
+        || {
+            info!("publishPlaintextOutput() e3_id={:?}", e3_id);
+            let proof = Bytes::from(vec![1]);
+            let decrypted_output = Bytes::from(decrypted_output.clone());
+            let contract = IEnclave::new(contract_address, provider.provider());
 
-        async move {
-            let builder = contract
-                .publishPlaintextOutput(e3_id, decrypted_output, proof)
-                .nonce(current_nonce);
-            let receipt = builder.send().await?.get_receipt().await?;
-            Ok(receipt)
-        }
-    })
+            async move {
+                let builder = contract
+                    .publishPlaintextOutput(e3_id, decrypted_output, proof)
+                    .nonce(current_nonce);
+                let receipt = builder.send().await?.get_receipt().await?;
+                Ok(receipt)
+            }
+        },
+    )
     .await
 }
 

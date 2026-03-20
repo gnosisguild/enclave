@@ -11,8 +11,7 @@
     "threshold/pk_generation",
     "threshold/pk_aggregation",
     "threshold/share_decryption",
-    "threshold/decrypted_shares_aggregation_bn",
-    "threshold/decrypted_shares_aggregation_mod"
+    "threshold/decrypted_shares_aggregation"
   ],
   "oracles": ["default"],
   "mode": "insecure",

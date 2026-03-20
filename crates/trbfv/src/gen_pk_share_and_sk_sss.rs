@@ -62,11 +62,11 @@ pub struct GenPkShareAndSkSssResponse {
     pub pk_share: ArcBytes,
     /// SecretKey Shamir Shares for other parties
     pub sk_sss: Encrypted<SharedSecret>,
-    /// Raw pk0 share polynomial (RNS form) for ZK proof generation (T1a).
+    /// Raw pk0 share polynomial (RNS form) for ZK proof generation (C1).
     pub pk0_share_raw: ArcBytes,
-    /// Raw secret key polynomial (RNS form) for ZK proof generation (T1a) — encrypted at rest.
+    /// Raw secret key polynomial (RNS form) for ZK proof generation (C1) — encrypted at rest.
     pub sk_raw: SensitiveBytes,
-    /// Raw error polynomial from key generation (RNS form) for ZK proof generation (T1a) — encrypted at rest.
+    /// Raw error polynomial from key generation (RNS form) for ZK proof generation (C1) — encrypted at rest.
     pub eek_raw: SensitiveBytes,
     /// Raw smudging noise polynomial (RNS form) for ZK proof generation (C1) — encrypted at rest.
     pub e_sm_raw: SensitiveBytes,
