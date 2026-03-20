@@ -34,7 +34,7 @@ export const deploy = async () => {
   const shouldPrintEnv = Boolean(process.env.PRINT_ENV_VARS)
 
   if (shouldDeployEnclave) {
-    await deployEnclave(true)
+    await deployEnclave(true, true)
   }
   await deployCRISPContracts()
 

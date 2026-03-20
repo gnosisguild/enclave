@@ -30,6 +30,7 @@ fn e3_meta_from(req: &E3Requested) -> E3Meta {
         params: req.params.clone(),
         esi_per_ct: req.esi_per_ct,
         error_size: req.error_size.clone(),
+        proof_aggregation_enabled: req.proof_aggregation_enabled,
     }
 }
 

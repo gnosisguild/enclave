@@ -36,17 +36,7 @@
 !/artifacts/contracts/token/EnclaveTicketToken.sol/
 !/artifacts/contracts/token/EnclaveTicketToken.sol/EnclaveTicketToken.json
 
-# Verifier contracts
-!/artifacts/contracts/verifier/
-!/artifacts/contracts/verifier/ThresholdPkAggregationVerifier.sol/
-!/artifacts/contracts/verifier/ThresholdPkAggregationVerifier.sol/ThresholdPkAggregationVerifier.json
-!/artifacts/contracts/verifier/ThresholdPkAggregationVerifier.sol/ZKTranscriptLib.json
-!/artifacts/contracts/verifier/ThresholdDecryptedSharesAggregationVerifier.sol/
-!/artifacts/contracts/verifier/ThresholdDecryptedSharesAggregationVerifier.sol/ThresholdDecryptedSharesAggregationVerifier.json
-!/artifacts/contracts/verifier/ThresholdDecryptedSharesAggregationVerifier.sol/ZKTranscriptLib.json
-!/artifacts/contracts/verifier/RecursiveAggregationFoldVerifier.sol/
-!/artifacts/contracts/verifier/RecursiveAggregationFoldVerifier.sol/RecursiveAggregationFoldVerifier.json
-!/artifacts/contracts/verifier/RecursiveAggregationFoldVerifier.sol/ZKTranscriptLib.json
+# Verifier build artifacts under artifacts/contracts/verifiers/ stay ignored (see /artifacts/**).
 
 build
 cache

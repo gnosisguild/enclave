@@ -21,7 +21,7 @@ async function main() {
   console.log('Account balance:', ethers.formatEther(await ethers.provider.getBalance(deployer.address)))
 
   // Execute the deployment
-  await deployEnclave(true)
+  await deployEnclave(true, true)
   await deployTemplate()
 }
 

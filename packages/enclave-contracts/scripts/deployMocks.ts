@@ -7,18 +7,22 @@ import hre from "hardhat";
 
 import { deployAndSaveMockComputeProvider } from "./deployAndSave/mockComputeProvider";
 import { deployAndSaveMockDecryptionVerifier } from "./deployAndSave/mockDecryptionVerifier";
+import { deployAndSaveMockPkVerifier } from "./deployAndSave/mockPkVerifier";
 import { deployAndSaveMockProgram } from "./deployAndSave/mockProgram";
 
 export interface MockDeployments {
   computeProviderAddress: string;
+  /** Mock verifier addresses; deployment args are always saved for tooling (e.g. `committee:new` default `computeProviderParams`). */
   decryptionVerifierAddress: string;
+  pkVerifierAddress: string;
   e3ProgramAddress: string;
 }
 
 /**
  * Deploys the mock contracts and returns the addresses.
- * @param enclaveAddress - The address of the enclave contract.
- * @returns The addresses of the mock contracts.
+ * Mock decryption/pk verifiers are always deployed and saved so deployment artifacts exist for tasks that derive
+ * default `computeProviderParams` (see `tasks/enclave.ts`). When ZK verification is enabled, `deployEnclave` still
+ * registers the real BFV verifiers on Enclave instead of these mocks.
  */
 export const deployMocks = async (): Promise<MockDeployments> => {
   console.log("Deploying Compute Provider");
@@ -26,10 +30,13 @@ export const deployMocks = async (): Promise<MockDeployments> => {
 
   const computeProviderAddress = await computeProvider.getAddress();
 
-  console.log("Deploying Decryption Verifier");
-  const { decryptionVerifier } = await deployAndSaveMockDecryptionVerifier(hre);
-
+  console.log("Deploying Mock Decryption Verifier");
+  const { decryptionVerifier } =
+    await deployAndSaveMockDecryptionVerifier(hre);
   const decryptionVerifierAddress = await decryptionVerifier.getAddress();
+  console.log("Deploying Mock Pk Verifier");
+  const { pkVerifier } = await deployAndSaveMockPkVerifier(hre);
+  const pkVerifierAddress = await pkVerifier.getAddress();
 
   console.log("Deploying E3 Program");
   const { e3Program } = await deployAndSaveMockProgram({
@@ -43,12 +50,14 @@ export const deployMocks = async (): Promise<MockDeployments> => {
         ----------------------------------------------------------------------
         MockComputeProvider:${computeProviderAddress}
         MockDecryptionVerifier:${decryptionVerifierAddress}
+        MockPkVerifier:${pkVerifierAddress}
         MockE3Program:${e3ProgramAddress}
         `);
 
   return {
     computeProviderAddress,
     decryptionVerifierAddress,
+    pkVerifierAddress,
     e3ProgramAddress,
   };
 };

@@ -41,7 +41,7 @@ export const deployCRISPContracts = async () => {
     throw new Error('PoseidonT3 address not found, it must be deployed first')
   }
 
-  const zkTranscriptLib = await ethers.deployContract('ZKTranscriptLib')
+  const zkTranscriptLib = await ethers.deployContract('contracts/CRISPVerifier.sol:ZKTranscriptLib')
   await zkTranscriptLib.waitForDeployment()
   const zkTranscriptLibAddress = await zkTranscriptLib.getAddress()
 

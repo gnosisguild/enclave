@@ -6,6 +6,8 @@
 import hre from "hardhat";
 
 import { autoCleanForLocalhost } from "./cleanIgnitionState";
+import { deployAndSaveBfvDecryptionVerifier } from "./deployAndSave/bfvDecryptionVerifier";
+import { deployAndSaveBfvPkVerifier } from "./deployAndSave/bfvPkVerifier";
 import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
 import { deployAndSaveE3RefundManager } from "./deployAndSave/e3RefundManager";
@@ -28,10 +30,18 @@ const DEFAULT_TIMEOUT_CONFIG = {
   decryptionWindow: 3600,
 };
 
+/** Circuit names required for BFV ZK verification in this script */
+const THRESHOLD_DECRYPTED_SHARES_AGGREGATION_VERIFIER =
+  "ThresholdDecryptedSharesAggregationVerifier";
+const THRESHOLD_PK_AGGREGATION_VERIFIER = "ThresholdPkAggregationVerifier";
+
 /**
  * Deploys the Enclave contracts
  */
-export const deployEnclave = async (withMocks?: boolean) => {
+export const deployEnclave = async (
+  withMocks?: boolean,
+  withZKVerification?: boolean,
+) => {
   const { ethers } = await hre.network.connect();
 
   // Auto-clean state for local networks to prevent stale state issues
@@ -63,6 +73,9 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const poseidonT3 = await deployAndSavePoseidonT3({ hre });
 
   const shouldDeployMocks = process.env.DEPLOY_MOCKS === "true" || withMocks;
+  const shouldHaveZKVerification =
+    process.env.ENABLE_ZK_VERIFICATION === "true" || withZKVerification;
+
   let feeTokenAddress: string;
 
   if (shouldDeployMocks) {
@@ -218,28 +231,46 @@ export const deployEnclave = async (withMocks?: boolean) => {
   // Medium and Large can be set later as needed
   console.log("Committee thresholds set (Micro=[1,3], Small=[2,5])");
 
-  if (shouldDeployMocks) {
-    const { decryptionVerifierAddress, e3ProgramAddress } = await deployMocks();
+  const encryptionSchemeId = ethers.keccak256(ethers.toUtf8Bytes("fhe.rs:BFV"));
 
-    const encryptionSchemeId = ethers.keccak256(
-      ethers.toUtf8Bytes("fhe.rs:BFV"),
-    );
+  if (shouldDeployMocks) {
+    const {
+      decryptionVerifierAddress: mockDecryptionVerifierAddress,
+      pkVerifierAddress: mockPkVerifierAddress,
+      e3ProgramAddress,
+    } = await deployMocks();
 
     console.log("encryptionSchemeId", encryptionSchemeId);
 
-    const deployedDecryptionVerifier =
-      await enclave.decryptionVerifiers(encryptionSchemeId);
-    if (deployedDecryptionVerifier === decryptionVerifierAddress) {
-      console.log(`DecryptionVerifier already set in Enclave contract`);
-    } else {
-      const tx = await enclave.setDecryptionVerifier(
-        encryptionSchemeId,
-        decryptionVerifierAddress,
-      );
-      await tx.wait();
-      console.log(
-        `Successfully set MockDecryptionVerifier in Enclave contract`,
-      );
+    if (!shouldHaveZKVerification && mockDecryptionVerifierAddress) {
+      const deployedDecryptionVerifier =
+        await enclave.decryptionVerifiers(encryptionSchemeId);
+      if (deployedDecryptionVerifier === mockDecryptionVerifierAddress) {
+        console.log(`DecryptionVerifier already set in Enclave contract`);
+      } else {
+        const tx = await enclave.setDecryptionVerifier(
+          encryptionSchemeId,
+          mockDecryptionVerifierAddress,
+        );
+        await tx.wait();
+        console.log(
+          `Successfully set MockDecryptionVerifier in Enclave contract`,
+        );
+      }
+    }
+
+    if (!shouldHaveZKVerification && mockPkVerifierAddress) {
+      const deployedPkVerifier = await enclave.pkVerifiers(encryptionSchemeId);
+      if (deployedPkVerifier === mockPkVerifierAddress) {
+        console.log(`PkVerifier already set in Enclave contract`);
+      } else {
+        const tx = await enclave.setPkVerifier(
+          encryptionSchemeId,
+          mockPkVerifierAddress,
+        );
+        await tx.wait();
+        console.log(`Successfully set MockPkVerifier in Enclave contract`);
+      }
     }
 
     const tx = await enclave.enableE3Program(e3ProgramAddress);
@@ -247,15 +278,70 @@ export const deployEnclave = async (withMocks?: boolean) => {
     console.log(`Successfully enabled E3 Program in Enclave contract`);
   }
 
-  // Deploy circuit verifiers (if any exist in contracts/verifier/)
-  console.log("Deploying circuit verifiers...");
-  const verifierDeployments = await deployAndSaveAllVerifiers(hre);
+  let verifierDeployments: Record<string, string> = {};
+  if (shouldHaveZKVerification) {
+    console.log("Deploying circuit verifiers...");
+    verifierDeployments = await deployAndSaveAllVerifiers(hre);
+    const requiredVerifierNames = [
+      THRESHOLD_DECRYPTED_SHARES_AGGREGATION_VERIFIER,
+      THRESHOLD_PK_AGGREGATION_VERIFIER,
+    ] as const;
+    for (const name of requiredVerifierNames) {
+      const addr = verifierDeployments[name];
+      if (!addr?.trim()) {
+        throw new Error(
+          `ZK verification enabled but "${name}" is missing from verifier deployments ` +
+            `(got ${verifierDeployments[name] === undefined ? "undefined" : JSON.stringify(addr)}). ` +
+            `Ensure deployAndSaveAllVerifiers discovers and deploys this circuit, or fix verifier artifacts.`,
+        );
+      }
+    }
+  } else {
+    console.log("Skipping circuit verifiers (ENABLE_ZK_VERIFICATION not set)");
+  }
   const verifierEntries = Object.entries(verifierDeployments);
+
+  if (shouldHaveZKVerification) {
+    console.log("Deploying BfvDecryptionVerifier and registering for prod...");
+    const { bfvDecryptionVerifier } =
+      await deployAndSaveBfvDecryptionVerifier(hre);
+    const bfvDecryptionVerifierAddress =
+      await bfvDecryptionVerifier.getAddress();
+    const deployedDecryptionVerifier =
+      await enclave.decryptionVerifiers(encryptionSchemeId);
+    if (deployedDecryptionVerifier !== bfvDecryptionVerifierAddress) {
+      const tx = await enclave.setDecryptionVerifier(
+        encryptionSchemeId,
+        bfvDecryptionVerifierAddress,
+      );
+      await tx.wait();
+      console.log("Successfully set BfvDecryptionVerifier in Enclave contract");
+    }
+  }
+
+  if (shouldHaveZKVerification) {
+    console.log("Deploying BfvPkVerifier and registering for prod...");
+    const { bfvPkVerifier } = await deployAndSaveBfvPkVerifier(hre);
+    const bfvPkVerifierAddress = await bfvPkVerifier.getAddress();
+    const deployedPkVerifier = await enclave.pkVerifiers(encryptionSchemeId);
+    if (deployedPkVerifier !== bfvPkVerifierAddress) {
+      const tx = await enclave.setPkVerifier(
+        encryptionSchemeId,
+        bfvPkVerifierAddress,
+      );
+      await tx.wait();
+      console.log("Successfully set BfvPkVerifier in Enclave contract");
+    }
+  }
 
   const verifierLines =
     verifierEntries.length > 0
       ? verifierEntries.map(([name, addr]) => `    ${name}: ${addr}`).join("\n")
       : "    (none)";
+
+  const decryptionVerifierAddress =
+    await enclave.decryptionVerifiers(encryptionSchemeId);
+  const pkVerifierAddress = await enclave.pkVerifiers(encryptionSchemeId);
 
   console.log(`
     ============================================
@@ -269,6 +355,8 @@ export const deployEnclave = async (withMocks?: boolean) => {
     CiphernodeRegistry: ${ciphernodeRegistryAddress}
     E3RefundManager: ${e3RefundManagerAddress}
     Enclave: ${enclaveAddress}
+    DecryptionVerifier (BFV): ${decryptionVerifierAddress}
+    PkVerifier (BFV): ${pkVerifierAddress}
     Circuit Verifiers:
 ${verifierLines}
     ============================================
