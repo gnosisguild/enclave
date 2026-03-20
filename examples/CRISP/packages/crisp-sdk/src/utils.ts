@@ -10,7 +10,6 @@ import type { MerkleProof } from './types'
 import { MAX_MSG_NON_ZERO_COEFFS, MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE_HASH } from './constants'
 import { publicKeyToAddress } from 'viem/utils'
 import { hexToBytes, recoverPublicKey } from 'viem'
-import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 
 /**
  * Hash a leaf node for the Merkle tree
