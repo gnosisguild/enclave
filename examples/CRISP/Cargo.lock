@@ -2076,7 +2076,6 @@ dependencies = [
  "e3-bfv-client",
  "e3-sdk",
  "eyre",
- "hex",
  "num-bigint",
 ]
 

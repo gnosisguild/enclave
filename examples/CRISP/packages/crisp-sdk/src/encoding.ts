@@ -9,13 +9,14 @@
  *
  * Encodes vote choices (numbers per option) into polynomial coefficient arrays
  * suitable for BFV homomorphic encryption. Each choice is represented as a
- * segment of binary digits, padded to fit the polynomial degree. Supports
+ * segment of binary digits within the first MAX_MSG_NON_ZERO_COEFFS coeffs, then
+ * zero-padded to the BFV polynomial degree. Supports
  * encoding, encryption, decryption, and tally decoding.
  */
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
-import { toBinary, numberArrayToBigInt64Array, decodeBytesToNumbers } from './utils'
-import { MAX_VOTE_BITS } from './constants'
+import { toBinary, numberArrayToBigInt64Array, decodeBytesToNumbers, getMaxVoteValue } from './utils'
+import { MAX_MSG_NON_ZERO_COEFFS } from './constants'
 import { hexToBytes } from 'viem'
 import type { Hex } from 'viem'
 import type { Vote } from './types'
@@ -34,29 +35,33 @@ export const getZkInputsGenerator = () => {
 
 /**
  * Encodes vote choices into a polynomial coefficient array for BFV encryption.
- * Each choice is split into a segment of binary digits; segments are padded
- * to align with the polynomial degree.
+ * Each choice occupies floor(MAX_MSG_NON_ZERO_COEFFS / n) binary coefficients;
+ * remaining slots in the first MAX_MSG_NON_ZERO_COEFFS coeffs are zero; then
+ * the vector is padded to the BFV degree.
  *
  * @param vote - Array of numeric values per choice (e.g. [10, 5] for 2 options)
  * @returns Array of 0s and 1s representing coefficients
- * @throws If vote has fewer than 2 choices or any value exceeds max bits
+ * @throws If vote has fewer than 2 choices, any value exceeds max for its segment, or degree is too small
  */
 export const encodeVote = (vote: Vote): number[] => {
-  if (vote.length < 2) {
+  const numChoices = vote.length
+
+  if (numChoices < 2) {
     throw new Error('Vote must have at least two choices')
   }
 
   const bfvParams = getZkInputsGenerator().getBFVParams()
   const degree = bfvParams.degree
-  const n = vote.length
+  if (degree < MAX_MSG_NON_ZERO_COEFFS) {
+    throw new Error(`BFV degree (${degree}) must be at least MAX_MSG_NON_ZERO_COEFFS (${MAX_MSG_NON_ZERO_COEFFS})`)
+  }
 
-  const segmentSize = Math.floor(degree / n)
-  const maxBits = Math.min(segmentSize, MAX_VOTE_BITS)
-  const maxValue = 2 ** maxBits - 1
+  const segmentSize = Math.floor(MAX_MSG_NON_ZERO_COEFFS / numChoices)
+  const maxValue = getMaxVoteValue(numChoices)
   const voteArray: number[] = []
 
-  for (let choiceIdx = 0; choiceIdx < n; choiceIdx += 1) {
-    const value = choiceIdx < vote.length ? vote[choiceIdx] : 0
+  for (let choiceIdx = 0; choiceIdx < numChoices; choiceIdx += 1) {
+    const value = vote[choiceIdx]
 
     if (value > maxValue) {
       throw new Error(`Vote value for choice ${choiceIdx} exceeds maximum (${maxValue})`)
@@ -66,12 +71,16 @@ export const encodeVote = (vote: Vote): number[] => {
 
     for (let i = 0; i < segmentSize; i += 1) {
       const offset = segmentSize - binary.length
-      voteArray.push(i < offset ? 0 : parseInt(binary[i - offset]))
+      voteArray.push(i < offset ? 0 : parseInt(binary[i - offset], 10))
     }
   }
 
-  const remainder = degree - segmentSize * n
-  for (let i = 0; i < remainder; i++) {
+  const msgCoeffsUsed = segmentSize * numChoices
+  for (let i = msgCoeffsUsed; i < MAX_MSG_NON_ZERO_COEFFS; i += 1) {
+    voteArray.push(0)
+  }
+
+  for (let i = 0; i < degree - MAX_MSG_NON_ZERO_COEFFS; i += 1) {
     voteArray.push(0)
   }
 
@@ -109,14 +118,12 @@ export const decodeTally = (tallyBytes: string | number[], numChoices: number): 
     throw new Error('Number of choices must be positive')
   }
 
-  const segmentSize = Math.floor(tallyBytes.length / numChoices)
-  const effectiveSize = Math.min(segmentSize, MAX_VOTE_BITS)
+  const segmentSize = Math.floor(MAX_MSG_NON_ZERO_COEFFS / numChoices)
   const results: Vote = []
 
   for (let choiceIdx = 0; choiceIdx < numChoices; choiceIdx++) {
     const segmentStart = choiceIdx * segmentSize
-    const readStart = segmentStart + segmentSize - effectiveSize
-    const segment = tallyBytes.slice(readStart, readStart + effectiveSize)
+    const segment = tallyBytes.slice(segmentStart, segmentStart + segmentSize)
 
     let value = 0
     for (let i = 0; i < segment.length; i++) {

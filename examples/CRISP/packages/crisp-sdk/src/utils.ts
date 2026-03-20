@@ -7,7 +7,7 @@
 import { poseidon2 } from 'poseidon-lite'
 import { LeanIMT } from '@zk-kit/lean-imt'
 import type { MerkleProof } from './types'
-import { MAX_VOTE_BITS, MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE_HASH } from './constants'
+import { MAX_MSG_NON_ZERO_COEFFS, MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE_HASH } from './constants'
 import { publicKeyToAddress } from 'viem/utils'
 import { hexToBytes, recoverPublicKey } from 'viem'
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
@@ -130,10 +130,8 @@ export const getAddressFromSignature = async (signature: `0x${string}`, messageH
  * @returns Maximum value per choice.
  */
 export const getMaxVoteValue = (numChoices: number): number => {
-  const bfvParams = ZKInputsGenerator.withDefaults().getBFVParams()
-  const segmentSize = Math.floor(bfvParams.degree / numChoices)
-  const effectiveBits = Math.min(segmentSize, MAX_VOTE_BITS)
-  return 2 ** effectiveBits - 1
+  const segmentSize = Math.floor(MAX_MSG_NON_ZERO_COEFFS / numChoices)
+  return 2 ** segmentSize - 1
 }
 
 /**

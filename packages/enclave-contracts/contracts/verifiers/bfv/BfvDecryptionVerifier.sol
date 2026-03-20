@@ -18,9 +18,9 @@ import { ICircuitVerifier } from "../../interfaces/ICircuitVerifier.sol";
  *      keccak256("fhe.rs:BFV"). Other encryption schemes will have their own verifiers.
  */
 contract BfvDecryptionVerifier is IDecryptionVerifier {
-    /// @dev Message is always the last 80 public inputs (80 uint64 coeffs = 640 bytes plaintext).
+    /// @dev Message is always the last 100 public inputs (100 uint64 coeffs = 800 bytes plaintext).
     ///      Layout-agnostic: works for prod and insecure circuit configs.
-    uint256 constant MESSAGE_COEFFS_COUNT = 80;
+    uint256 constant MESSAGE_COEFFS_COUNT = 100;
 
     ICircuitVerifier public immutable circuitVerifier;
 

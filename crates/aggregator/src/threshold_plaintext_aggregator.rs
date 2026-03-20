@@ -25,6 +25,7 @@ use e3_trbfv::{
 };
 use e3_utils::NotifySync;
 use e3_utils::{utility_types::ArcBytes, MAILBOX_LIMIT};
+use e3_zk_helpers::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
 use tracing::{debug, info, trace, warn};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -555,8 +556,23 @@ impl ThresholdPlaintextAggregator {
 
         info!("Both C7 and C6 fold proof ready — publishing PlaintextAggregated");
 
+        let len = MAX_MSG_NON_ZERO_COEFFS * 8;
+        let decrypted_output: Vec<ArcBytes> = state
+            .plaintext
+            .iter()
+            .map(|pt| {
+                let mut bytes = pt.extract_bytes();
+                if bytes.len() >= len {
+                    bytes.truncate(len);
+                } else {
+                    bytes.resize(len, 0);
+                }
+                ArcBytes::from_bytes(&bytes)
+            })
+            .collect();
+
         let event = PlaintextAggregated {
-            decrypted_output: state.plaintext.clone(),
+            decrypted_output,
             e3_id: self.e3_id.clone(),
             aggregation_proofs: c7_proofs.clone(),
             c6_aggregated_proof: Some(c6_proof.clone()),

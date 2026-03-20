@@ -15,7 +15,8 @@ import {
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture } = networkHelpers;
 
-const MESSAGE_COEFFS_COUNT = 80;
+/** Must match `BfvDecryptionVerifier.MESSAGE_COEFFS_COUNT` / circuit `MAX_MSG_NON_ZERO_COEFFS`. */
+const MESSAGE_COEFFS_COUNT = 100;
 
 function buildPublicInputsWithMessage(
   messageCoeffs: bigint[],
@@ -91,7 +92,7 @@ describe("BfvDecryptionVerifier", function () {
       ).to.be.revert(ethers);
     });
 
-    it("returns false when publicInputs.length < 80", async function () {
+    it("returns false when publicInputs.length < MESSAGE_COEFFS_COUNT", async function () {
       const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
       );
@@ -101,7 +102,7 @@ describe("BfvDecryptionVerifier", function () {
       const publicInputs = buildPublicInputsWithMessage(
         messageCoeffs,
         100,
-      ).slice(0, 79);
+      ).slice(0, MESSAGE_COEFFS_COUNT - 1);
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
@@ -168,14 +169,17 @@ describe("BfvDecryptionVerifier", function () {
       expect(result).to.equal(true);
     });
 
-    it("returns true with fewer public inputs (insecure-style config)", async function () {
+    it("returns true with minimal public inputs (message-only vector)", async function () {
       const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
       );
       await mockCircuit.setReturnValue(true);
 
       const messageCoeffs = [1n, 2n, 3n];
-      const publicInputs = buildPublicInputsWithMessage(messageCoeffs, 82); // 2 prefix + 80 message
+      const publicInputs = buildPublicInputsWithMessage(
+        messageCoeffs,
+        MESSAGE_COEFFS_COUNT,
+      );
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
