@@ -16,9 +16,9 @@ export const deployAndSaveBfvPkVerifier = async (
 ): Promise<{
   bfvPkVerifier: BfvPkVerifier;
 }> => {
-  const { ethers } = await hre.network.connect();
+  const { ethers, networkName } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = hre.globalOptions.network ?? "localhost";
+  const chain = networkName ?? "localhost";
 
   const circuitVerifierArgs = readDeploymentArgs(
     "ThresholdPkAggregationVerifier",

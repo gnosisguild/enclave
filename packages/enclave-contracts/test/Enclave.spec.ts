@@ -81,7 +81,7 @@ describe("Enclave", function () {
     }
     await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
     await registry.finalizeCommittee(e3Id);
-    const proof = encodePkProof(ethers.id(publicKey));
+    const proof = encodePkProof(ethers.keccak256(publicKey));
     await registry.publishCommittee(e3Id, nodes, publicKey, proof);
   };
 

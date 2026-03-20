@@ -30,6 +30,11 @@ const DEFAULT_TIMEOUT_CONFIG = {
   decryptionWindow: 3600,
 };
 
+/** Circuit names required for BFV ZK verification in this script */
+const THRESHOLD_DECRYPTED_SHARES_AGGREGATION_VERIFIER =
+  "ThresholdDecryptedSharesAggregationVerifier";
+const THRESHOLD_PK_AGGREGATION_VERIFIER = "ThresholdPkAggregationVerifier";
+
 /**
  * Deploys the Enclave contracts
  */
@@ -233,7 +238,7 @@ export const deployEnclave = async (
       decryptionVerifierAddress: mockDecryptionVerifierAddress,
       pkVerifierAddress: mockPkVerifierAddress,
       e3ProgramAddress,
-    } = await deployMocks(shouldHaveZKVerification);
+    } = await deployMocks();
 
     console.log("encryptionSchemeId", encryptionSchemeId);
 
@@ -277,14 +282,26 @@ export const deployEnclave = async (
   if (shouldHaveZKVerification) {
     console.log("Deploying circuit verifiers...");
     verifierDeployments = await deployAndSaveAllVerifiers(hre);
+    const requiredVerifierNames = [
+      THRESHOLD_DECRYPTED_SHARES_AGGREGATION_VERIFIER,
+      THRESHOLD_PK_AGGREGATION_VERIFIER,
+    ] as const;
+    for (const name of requiredVerifierNames) {
+      const addr = verifierDeployments[name];
+      if (!addr?.trim()) {
+        throw new Error(
+          `ZK verification enabled but "${name}" is missing from verifier deployments ` +
+            `(got ${verifierDeployments[name] === undefined ? "undefined" : JSON.stringify(addr)}). ` +
+            `Ensure deployAndSaveAllVerifiers discovers and deploys this circuit, or fix verifier artifacts.`,
+        );
+      }
+    }
   } else {
     console.log("Skipping circuit verifiers (ENABLE_ZK_VERIFICATION not set)");
   }
   const verifierEntries = Object.entries(verifierDeployments);
 
-  const circuitVerifierAddr =
-    verifierDeployments["ThresholdDecryptedSharesAggregationVerifier"];
-  if (circuitVerifierAddr && shouldHaveZKVerification) {
+  if (shouldHaveZKVerification) {
     console.log("Deploying BfvDecryptionVerifier and registering for prod...");
     const { bfvDecryptionVerifier } =
       await deployAndSaveBfvDecryptionVerifier(hre);
@@ -302,9 +319,7 @@ export const deployEnclave = async (
     }
   }
 
-  const pkCircuitVerifierAddr =
-    verifierDeployments["ThresholdPkAggregationVerifier"];
-  if (pkCircuitVerifierAddr && shouldHaveZKVerification) {
+  if (shouldHaveZKVerification) {
     console.log("Deploying BfvPkVerifier and registering for prod...");
     const { bfvPkVerifier } = await deployAndSaveBfvPkVerifier(hre);
     const bfvPkVerifierAddress = await bfvPkVerifier.getAddress();

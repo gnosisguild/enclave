@@ -36,9 +36,7 @@
 !/artifacts/contracts/token/EnclaveTicketToken.sol/
 !/artifacts/contracts/token/EnclaveTicketToken.sol/EnclaveTicketToken.json
 
-# Verifier contracts (all under verifiers/bfv/)
-!/artifacts/contracts/verifiers/
-!/artifacts/contracts/verifiers/bfv/
+# Verifier build artifacts under artifacts/contracts/verifiers/ stay ignored (see /artifacts/**).
 
 build
 cache

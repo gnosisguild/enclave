@@ -12,34 +12,31 @@ import { deployAndSaveMockProgram } from "./deployAndSave/mockProgram";
 
 export interface MockDeployments {
   computeProviderAddress: string;
-  decryptionVerifierAddress: string | undefined;
-  pkVerifierAddress: string | undefined;
+  /** Mock verifier addresses; deployment args are always saved for tooling (e.g. `committee:new` default `computeProviderParams`). */
+  decryptionVerifierAddress: string;
+  pkVerifierAddress: string;
   e3ProgramAddress: string;
 }
 
 /**
  * Deploys the mock contracts and returns the addresses.
- * @param shouldHaveZKVerification - When true, skips MockDecryptionVerifier (real BfvDecryptionVerifier will be used).
+ * Mock decryption/pk verifiers are always deployed and saved so deployment artifacts exist for tasks that derive
+ * default `computeProviderParams` (see `tasks/enclave.ts`). When ZK verification is enabled, `deployEnclave` still
+ * registers the real BFV verifiers on Enclave instead of these mocks.
  */
-export const deployMocks = async (
-  shouldHaveZKVerification?: boolean,
-): Promise<MockDeployments> => {
+export const deployMocks = async (): Promise<MockDeployments> => {
   console.log("Deploying Compute Provider");
   const { computeProvider } = await deployAndSaveMockComputeProvider(hre);
 
   const computeProviderAddress = await computeProvider.getAddress();
 
-  let decryptionVerifierAddress: string | undefined;
-  let pkVerifierAddress: string | undefined;
-  if (!shouldHaveZKVerification) {
-    console.log("Deploying Mock Decryption Verifier");
-    const { decryptionVerifier } =
-      await deployAndSaveMockDecryptionVerifier(hre);
-    decryptionVerifierAddress = await decryptionVerifier.getAddress();
-    console.log("Deploying Mock Pk Verifier");
-    const { pkVerifier } = await deployAndSaveMockPkVerifier(hre);
-    pkVerifierAddress = await pkVerifier.getAddress();
-  }
+  console.log("Deploying Mock Decryption Verifier");
+  const { decryptionVerifier } =
+    await deployAndSaveMockDecryptionVerifier(hre);
+  const decryptionVerifierAddress = await decryptionVerifier.getAddress();
+  console.log("Deploying Mock Pk Verifier");
+  const { pkVerifier } = await deployAndSaveMockPkVerifier(hre);
+  const pkVerifierAddress = await pkVerifier.getAddress();
 
   console.log("Deploying E3 Program");
   const { e3Program } = await deployAndSaveMockProgram({
@@ -52,8 +49,8 @@ export const deployMocks = async (
         MockDeployments:
         ----------------------------------------------------------------------
         MockComputeProvider:${computeProviderAddress}
-        MockDecryptionVerifier:${decryptionVerifierAddress ?? "(skipped - using real ZK)"}
-        MockPkVerifier:${pkVerifierAddress ?? "(skipped - using real ZK)"}
+        MockDecryptionVerifier:${decryptionVerifierAddress}
+        MockPkVerifier:${pkVerifierAddress}
         MockE3Program:${e3ProgramAddress}
         `);
 
