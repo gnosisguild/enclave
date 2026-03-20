@@ -90,13 +90,13 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> PkAggregation<N, H, L,
         for coeff_idx in 0..N {
             let mut sum_shifted: Field = 0;
             for party_idx in 0..H {
-                sum_shifted = sum_shifted
-                    + pk[party_idx][basis_idx].coefficients[coeff_idx]
-                    + half_qi;
+                sum_shifted =
+                    sum_shifted + pk[party_idx][basis_idx].coefficients[coeff_idx] + half_qi;
             }
             let sum_reduced = mod_q_l.reduce_mod(sum_shifted);
 
-            let expected = mod_q_l.reduce_mod(pk_agg[basis_idx].coefficients[coeff_idx] + h_half_qi);
+            let expected =
+                mod_q_l.reduce_mod(pk_agg[basis_idx].coefficients[coeff_idx] + h_half_qi);
             assert(sum_reduced == expected, "pk0 aggregation mismatch");
         }
     }
