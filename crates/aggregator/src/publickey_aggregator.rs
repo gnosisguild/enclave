@@ -89,6 +89,8 @@ pub struct PublicKeyAggregator {
     e3_id: E3id,
     state: Persistable<PublicKeyAggregatorState>,
     params_preset: BfvPreset,
+    /// DKG recursive aggregation events received before entering GeneratingC5Proof.
+    early_dkg_proofs: Vec<TypedEvent<DKGRecursiveAggregationComplete>>,
 }
 
 pub struct PublicKeyAggregatorParams {
@@ -112,6 +114,7 @@ impl PublicKeyAggregator {
             e3_id: params.e3_id,
             state,
             params_preset: params.params_preset,
+            early_dkg_proofs: Vec::new(),
         }
     }
 
@@ -337,6 +340,12 @@ impl PublicKeyAggregator {
             })
         })?;
 
+        // Replay any DKG proofs that arrived before we entered GeneratingC5Proof.
+        let early = std::mem::take(&mut self.early_dkg_proofs);
+        for event in early {
+            self.handle_dkg_recursive_aggregation_complete(event)?;
+        }
+
         self.try_start_cross_node_fold(&ec)?;
 
         Ok(())
@@ -410,6 +419,12 @@ impl PublicKeyAggregator {
             dkg_node_proofs, ..
         }) = state.as_ref()
         else {
+            info!(
+                "PublicKeyAggregator: early DKG proof from party {} — buffering until GeneratingC5Proof",
+                msg.party_id
+            );
+            self.early_dkg_proofs
+                .push(TypedEvent::new(msg, ec));
             return Ok(());
         };
         if dkg_node_proofs.contains_key(&msg.party_id) {
@@ -569,10 +584,14 @@ impl PublicKeyAggregator {
             .get()
             .and_then(|s| {
                 if let PublicKeyAggregatorState::GeneratingC5Proof {
-                    dkg_node_proofs, ..
+                    dkg_node_proofs,
+                    honest_party_ids,
+                    ..
                 } = &s
                 {
-                    Some(dkg_node_proofs.values().all(|p| p.is_none()))
+                    let all_present =
+                        honest_party_ids.iter().all(|id| dkg_node_proofs.contains_key(id));
+                    Some(all_present && dkg_node_proofs.values().all(|p| p.is_none()))
                 } else {
                     None
                 }
