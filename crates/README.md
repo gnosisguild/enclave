@@ -7,7 +7,7 @@ $ rustc --version
 rustc 1.81.0 (eeb90cda1 2024-09-04)
 ```
 
-We need `solc` available for compiling contract fixtures that are used under test
+We need `solc` available for compiling contract fixtures that are used under test.
 
 ```
 $ solc --version
