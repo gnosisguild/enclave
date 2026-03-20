@@ -21,6 +21,18 @@ use e3_utils::MAILBOX_LIMIT;
 use std::collections::HashMap;
 use tracing::info;
 
+/// Build an `E3Meta` from an `E3Requested` event's fields.
+fn e3_meta_from(req: &E3Requested) -> E3Meta {
+    E3Meta {
+        seed: req.seed,
+        threshold_n: req.threshold_n,
+        threshold_m: req.threshold_m,
+        params: req.params.clone(),
+        esi_per_ct: req.esi_per_ct,
+        error_size: req.error_size.clone(),
+    }
+}
+
 /// CiphernodeSelector is an actor that determines if a ciphernode is part of a committee and if so
 /// emits a TicketGenerated event (score sortition) to the event bus
 pub struct CiphernodeSelector {
@@ -57,6 +69,7 @@ impl CiphernodeSelector {
         let e3_cache = selector_store.load_or_default(HashMap::new()).await?;
         let addr = CiphernodeSelector::new(bus, e3_cache, address).start();
 
+        bus.subscribe(EventType::E3Requested, addr.clone().recipient());
         bus.subscribe(EventType::E3RequestComplete, addr.clone().recipient());
         bus.subscribe(EventType::CommitteeFinalized, addr.clone().recipient());
         bus.subscribe(EventType::Shutdown, addr.clone().recipient());
@@ -71,6 +84,7 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
+            EnclaveEventData::E3Requested(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
             EnclaveEventData::E3RequestComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
@@ -80,6 +94,31 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
             EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
+    }
+}
+
+/// Handles `E3Requested` events received directly from the EventBus.
+///
+/// This handler populates `e3_cache` during sync replay, when `Sortition` gates its
+/// `E3Requested` subscription behind `EffectsEnabled` and therefore does NOT forward
+/// `WithSortitionTicket` messages to us. Without this handler the cache would be empty
+/// when `CommitteeFinalized` arrives during replay, causing a missing-meta error.
+///
+/// During live operation both this handler AND the `WithSortitionTicket` handler fire for
+/// the same E3. `or_insert` ensures the first write wins; the `WithSortitionTicket`
+/// handler then overwrites with identical data via `insert`.
+impl Handler<TypedEvent<E3Requested>> for CiphernodeSelector {
+    type Result = ();
+
+    fn handle(&mut self, msg: TypedEvent<E3Requested>, _: &mut Self::Context) -> Self::Result {
+        trap(EType::Sortition, &self.bus.with_ec(msg.get_ctx()), || {
+            self.e3_cache.try_mutate(msg.get_ctx(), |mut cache| {
+                cache
+                    .entry(msg.e3_id.clone())
+                    .or_insert_with(|| e3_meta_from(&msg));
+                Ok(cache)
+            })
+        })
     }
 }
 
@@ -97,17 +136,7 @@ impl Handler<WithSortitionTicket<TypedEvent<E3Requested>>> for CiphernodeSelecto
                     "Mutating e3_cache: appending data: {:?}",
                     data.e3_id.clone()
                 );
-                cache.insert(
-                    data.e3_id.clone(),
-                    E3Meta {
-                        seed: data.seed,
-                        threshold_n: data.threshold_n,
-                        threshold_m: data.threshold_m,
-                        params: data.params.clone(),
-                        esi_per_ct: data.esi_per_ct,
-                        error_size: data.error_size.clone(),
-                    },
-                );
+                cache.insert(data.e3_id.clone(), e3_meta_from(&data));
                 Ok(cache)
             })?;
 
