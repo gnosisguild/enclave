@@ -423,8 +423,7 @@ impl PublicKeyAggregator {
                 "PublicKeyAggregator: early DKG proof from party {} — buffering until GeneratingC5Proof",
                 msg.party_id
             );
-            self.early_dkg_proofs
-                .push(TypedEvent::new(msg, ec));
+            self.early_dkg_proofs.push(TypedEvent::new(msg, ec));
             return Ok(());
         };
         if dkg_node_proofs.contains_key(&msg.party_id) {
@@ -589,8 +588,9 @@ impl PublicKeyAggregator {
                     ..
                 } = &s
                 {
-                    let all_present =
-                        honest_party_ids.iter().all(|id| dkg_node_proofs.contains_key(id));
+                    let all_present = honest_party_ids
+                        .iter()
+                        .all(|id| dkg_node_proofs.contains_key(id));
                     Some(all_present && dkg_node_proofs.values().all(|p| p.is_none()))
                 } else {
                     None
