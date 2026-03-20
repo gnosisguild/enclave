@@ -31,6 +31,17 @@ export const deployAndSaveBfvPkVerifier = async (
     );
   }
 
+  const foldVerifierArgs = readDeploymentArgs(
+    "RecursiveAggregationFoldVerifier",
+    chain,
+  );
+  if (!foldVerifierArgs?.address) {
+    throw new Error(
+      "RecursiveAggregationFoldVerifier must be deployed first. " +
+        "Run deployAndSaveAllVerifiers or deploy verifiers.",
+    );
+  }
+
   const existing = readDeploymentArgs("BfvPkVerifier", chain);
   if (existing?.address) {
     console.log(`   BfvPkVerifier already deployed at ${existing.address}`);
@@ -44,6 +55,7 @@ export const deployAndSaveBfvPkVerifier = async (
   const bfvPkVerifierFactory = await ethers.getContractFactory("BfvPkVerifier");
   const bfvPkVerifier = await bfvPkVerifierFactory.deploy(
     circuitVerifierArgs.address,
+    foldVerifierArgs.address,
   );
 
   await bfvPkVerifier.waitForDeployment();

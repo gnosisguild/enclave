@@ -444,6 +444,7 @@ describe("CiphernodeRegistryOwnable", function () {
             ],
             data,
             c5Proof,
+            "0x",
           ),
       ).to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount");
     });
@@ -479,6 +480,7 @@ describe("CiphernodeRegistryOwnable", function () {
         ],
         data,
         c5Proof,
+        "0x",
       );
       expect(await registry.committeePublicKey(0)).to.equal(dataHash);
     });
@@ -516,6 +518,7 @@ describe("CiphernodeRegistryOwnable", function () {
           ],
           data,
           c5Proof,
+          "0x",
         ),
       )
         .to.emit(registry, "CommitteePublished")
@@ -657,6 +660,7 @@ describe("CiphernodeRegistryOwnable", function () {
         ],
         data,
         c5Proof,
+        "0x",
       );
       expect(await registry.committeePublicKey(e3Id)).to.equal(dataHash);
     });

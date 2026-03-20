@@ -20,6 +20,8 @@ function encodeProof(rawProof: string, publicInputs: string[]): string {
   return abiCoder.encode(["bytes", "bytes32[]"], [rawProof, publicInputs]);
 }
 
+const EMPTY_FOLD = "0x";
+
 describe("BfvPkVerifier", function () {
   const deployWithMockCircuit = async () => {
     const [owner] = await ethers.getSigners();
@@ -27,10 +29,15 @@ describe("BfvPkVerifier", function () {
       MockCircuitVerifierModule,
     );
     const mockAddr = await mockCircuitVerifier.getAddress();
+    const mockFold = await (
+      await ethers.getContractFactory("MockCircuitVerifier")
+    ).deploy();
+    await mockFold.waitForDeployment();
+    const mockFoldAddr = await mockFold.getAddress();
 
     const bfvPkVerifier = await (
       await ethers.getContractFactory("BfvPkVerifier")
-    ).deploy(mockAddr);
+    ).deploy(mockAddr, mockFoldAddr);
 
     await bfvPkVerifier.waitForDeployment();
     const pk = BfvPkVerifierFactory.connect(
@@ -38,7 +45,8 @@ describe("BfvPkVerifier", function () {
       owner,
     );
     const mc = MockCircuitVerifierFactory.connect(mockAddr, owner);
-    return { bfvPkVerifier: pk, mockCircuit: mc };
+    const mf = MockCircuitVerifierFactory.connect(mockFoldAddr, owner);
+    return { bfvPkVerifier: pk, mockCircuit: mc, mockFold: mf };
   };
 
   describe("reverts", function () {
@@ -46,16 +54,18 @@ describe("BfvPkVerifier", function () {
       const { bfvPkVerifier } = await loadFixture(deployWithMockCircuit);
       const invalidProof = "0xdeadbeef";
 
-      await expect(bfvPkVerifier.verify.staticCall(invalidProof)).to.be.revert(
-        ethers,
-      );
+      await expect(
+        bfvPkVerifier.verify.staticCall(invalidProof, EMPTY_FOLD),
+      ).to.be.revert(ethers);
     });
 
     it("reverts when publicInputs is empty", async function () {
       const { bfvPkVerifier } = await loadFixture(deployWithMockCircuit);
       const proof = encodeProof("0x01", []);
 
-      await expect(bfvPkVerifier.verify.staticCall(proof)).to.be.revert(ethers);
+      await expect(
+        bfvPkVerifier.verify.staticCall(proof, EMPTY_FOLD),
+      ).to.be.revert(ethers);
     });
 
     it("reverts when circuit verifier returns false", async function () {
@@ -67,7 +77,26 @@ describe("BfvPkVerifier", function () {
       const commitment = ethers.keccak256("0x1234");
       const proof = encodeProof("0x01", [commitment]);
 
-      await expect(bfvPkVerifier.verify.staticCall(proof)).to.be.revert(ethers);
+      await expect(
+        bfvPkVerifier.verify.staticCall(proof, EMPTY_FOLD),
+      ).to.be.revert(ethers);
+    });
+
+    it("reverts when fold verifier returns false and fold proof is present", async function () {
+      const { bfvPkVerifier, mockCircuit, mockFold } = await loadFixture(
+        deployWithMockCircuit,
+      );
+      await mockCircuit.setReturnValue(true);
+      await mockFold.setReturnValue(false);
+
+      const commitment = ethers.keccak256("0x1234");
+      const proof = encodeProof("0x01", [commitment]);
+      const foldPi = ["0x" + "01".repeat(32)];
+      const foldProof = encodeProof("0x02", foldPi);
+
+      await expect(
+        bfvPkVerifier.verify.staticCall(proof, foldProof),
+      ).to.be.revert(ethers);
     });
   });
 
@@ -85,7 +114,7 @@ describe("BfvPkVerifier", function () {
         commitment,
       ]);
 
-      const result = await bfvPkVerifier.verify.staticCall(proof);
+      const result = await bfvPkVerifier.verify.staticCall(proof, EMPTY_FOLD);
       expect(result).to.equal(commitment);
     });
 
@@ -98,7 +127,27 @@ describe("BfvPkVerifier", function () {
       const commitment = ethers.id("committee-pk");
       const proof = encodeProof("0x", [commitment]);
 
-      const result = await bfvPkVerifier.verify.staticCall(proof);
+      const result = await bfvPkVerifier.verify.staticCall(proof, EMPTY_FOLD);
+      expect(result).to.equal(commitment);
+    });
+
+    it("returns commitment when fold proof is present and fold verifies", async function () {
+      const { bfvPkVerifier, mockCircuit, mockFold } = await loadFixture(
+        deployWithMockCircuit,
+      );
+      await mockCircuit.setReturnValue(true);
+      await mockFold.setReturnValue(true);
+
+      const commitment = ethers.keccak256("0xabcd");
+      const proof = encodeProof("0x0102", [
+        "0x" + "00".repeat(32),
+        "0x" + "00".repeat(32),
+        commitment,
+      ]);
+      const foldPi = ["0x" + "02".repeat(32)];
+      const foldProof = encodeProof("0x99", foldPi);
+
+      const result = await bfvPkVerifier.verify.staticCall(proof, foldProof);
       expect(result).to.equal(commitment);
     });
   });

@@ -345,7 +345,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const nodes = await Promise.all(operators.map((op) => op.getAddress()));
       const publicKey = ethers.toUtf8Bytes("fake-public-key");
       const proof = encodePkProof(ethers.keccak256(publicKey));
-      await registry.publishCommittee(e3Id, nodes, publicKey, proof);
+      await registry.publishCommittee(e3Id, nodes, publicKey, proof, "0x");
     }
 
     // ── Return ─────────────────────────────────────────────────────────────────
