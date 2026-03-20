@@ -338,7 +338,8 @@ mod tests {
             DynSolType::Bytes,
             DynSolType::Array(Box::new(DynSolType::FixedBytes(32))),
         ]);
-        tuple_type.abi_decode(&encoded).expect(
+        // Pair encode_zk_proof's abi_encode_params with abi_decode_params (not abi_decode).
+        tuple_type.abi_decode_params(&encoded).expect(
             "encoded proof should decode as (bytes, bytes32[]) - matches contract abi.decode",
         );
     }
