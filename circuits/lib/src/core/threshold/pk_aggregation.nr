@@ -23,7 +23,8 @@ impl<let L: u32> Configs<L> {
 /// Public Key Aggregation (Circuit 5).
 ///
 /// Verifies that for each CRT basis l and each coefficient i:
-/// - pk0_agg[l][i] = sum_h(pk0[h][l][i]) mod q_l
+/// - pk0_agg[l][i] = sum_h(pk0[h][l][i]) mod q_l (witnesses use centered coefficients; aggregation
+///   uses a half-q shift so [`ModU128::reduce_mod`] sees small non-negative integers)
 /// - pk1_agg[l][i] = pk1[0][l][i] (all parties share pk1 = a, aggregated pk1 = a)
 pub struct PkAggregation<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> {
     /// Circuit parameters including CRT moduli
@@ -83,16 +84,20 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> PkAggregation<N, H, L,
         let q_l = self.configs.qis[basis_idx];
         let mod_q_l = ModU128::new(q_l);
 
+        let half_qi: Field = (q_l - 1) / 2;
+        let h_half_qi: Field = H as Field * half_qi;
+
         for coeff_idx in 0..N {
-            let mut sum_pk: Field = 0;
+            let mut sum_shifted: Field = 0;
             for party_idx in 0..H {
-                sum_pk = sum_pk + pk[party_idx][basis_idx].coefficients[coeff_idx];
+                sum_shifted = sum_shifted
+                    + pk[party_idx][basis_idx].coefficients[coeff_idx]
+                    + half_qi;
             }
-            let sum_pk_reduced = mod_q_l.reduce_mod(sum_pk);
-            assert(
-                sum_pk_reduced == pk_agg[basis_idx].coefficients[coeff_idx],
-                "pk0 aggregation mismatch",
-            );
+            let sum_reduced = mod_q_l.reduce_mod(sum_shifted);
+
+            let expected = mod_q_l.reduce_mod(pk_agg[basis_idx].coefficients[coeff_idx] + h_half_qi);
+            assert(sum_reduced == expected, "pk0 aggregation mismatch");
         }
     }
 

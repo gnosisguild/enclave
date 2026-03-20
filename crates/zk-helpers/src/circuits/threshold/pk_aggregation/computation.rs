@@ -10,7 +10,7 @@
 //! and (for input) public key shares and aggregated public key. They implement [`Computation`] and are used by codegen.
 
 use crate::bigint_1d_to_json_values;
-use crate::compute_pk_bit_unsigned_mod;
+use crate::compute_modulus_bit;
 use crate::compute_threshold_pk_commitment;
 use crate::crt_polynomial_to_toml_json;
 use crate::threshold::pk_aggregation::circuit::PkAggregationCircuit;
@@ -113,7 +113,7 @@ impl Computation for Bits {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
-        let pk_bit = compute_pk_bit_unsigned_mod(&threshold_params);
+        let pk_bit = compute_modulus_bit(&threshold_params);
 
         Ok(Bits { pk_bit })
     }
@@ -131,7 +131,7 @@ impl Computation for Bounds {
         let mut pk_bound_max = BigUint::from(0u32);
 
         for &qi in threshold_params.moduli() {
-            let qi_bound: BigUint = BigUint::from(qi) - 1u32;
+            let qi_bound: BigUint = (BigUint::from(qi) - 1u32) / 2u32;
 
             if qi_bound > pk_bound_max {
                 pk_bound_max = qi_bound;
@@ -155,12 +155,7 @@ impl Computation for Inputs {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
-        let bit_pk = compute_pk_bit_unsigned_mod(&threshold_params);
-
-        // Coefficients must be in [0, q_i), not centered to (-q_i/2, q_i/2]. The circuit sums
-        // party coefficients then applies reduce_mod to get a value in [0, q_l); the aggregated
-        // key is also in [0, q_i). Centered representatives would make the sum before reduction
-        // inconsistent and could break the aggregation check.
+        let bit_pk = compute_modulus_bit(&threshold_params);
 
         let mut pk0: Vec<CrtPolynomial> = data.pk0_shares.clone();
         // pk1 is the same (common random polynomial a) for all parties
@@ -174,12 +169,16 @@ impl Computation for Inputs {
         let mut expected_threshold_pk_commitments = Vec::new();
 
         pk0_agg.reverse();
+        pk0_agg.center(threshold_params.moduli())?;
         pk1_agg.reverse();
+        pk1_agg.center(threshold_params.moduli())?;
 
         for party_index in 0..data.committee.h {
             pk0[party_index].reverse();
+            pk0[party_index].center(threshold_params.moduli())?;
 
             pk1[party_index].reverse();
+            pk1[party_index].center(threshold_params.moduli())?;
 
             let commitment =
                 compute_threshold_pk_commitment(&pk0[party_index], &pk1[party_index], bit_pk);
@@ -236,9 +235,9 @@ mod tests {
         let bounds = Bounds::compute(preset, &()).unwrap();
         let bits = Bits::compute(preset, &()).unwrap();
 
-        let expected_bits = compute_pk_bit_unsigned_mod(&threshold_params);
+        let expected_bits = compute_modulus_bit(&threshold_params);
 
-        assert_eq!(bounds.pk_bound, BigUint::from(68719403008u128));
+        assert_eq!(bounds.pk_bound, BigUint::from(34359701504u128));
         assert_eq!(bits.pk_bit, expected_bits);
     }
 }

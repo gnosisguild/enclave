@@ -166,14 +166,6 @@ pub fn compute_modulus_bit(params: &BfvParameters) -> u32 {
     calculate_bit_width(bound)
 }
 
-/// Bit width for pk coefficients in [0, qi) (no centering).
-/// Used by pk_aggregation and user_data_encryption for aligned pk representation.
-pub fn compute_pk_bit_unsigned_mod(params: &BfvParameters) -> u32 {
-    let modulus = BigInt::from(compute_max_modulus(params.moduli()));
-    let bound = modulus - BigInt::from(1);
-    calculate_bit_width(bound)
-}
-
 /// Computes the maximum modulus from a vector of moduli.
 ///
 /// # Arguments
