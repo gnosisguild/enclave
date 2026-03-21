@@ -367,7 +367,10 @@ async fn handle_sync_request_event(
             "Requesting batched events for aggregate_id={} since={}",
             aggregate_id, since
         );
-        let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone()).build();
+        let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone())
+            .max_retries(10)
+            .retry_timeout(Duration::from_secs(30))
+            .build();
         match fetch_all_batched_events::<EnclaveEvent<Unsequenced>>(
             requester,
             PeerTarget::Random,
