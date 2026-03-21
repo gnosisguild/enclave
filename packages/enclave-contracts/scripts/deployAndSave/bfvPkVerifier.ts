@@ -1,0 +1,71 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
+
+import {
+  BfvPkVerifier,
+  BfvPkVerifier__factory as BfvPkVerifierFactory,
+} from "../../types";
+import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+
+export const deployAndSaveBfvPkVerifier = async (
+  hre: HardhatRuntimeEnvironment,
+): Promise<{
+  bfvPkVerifier: BfvPkVerifier;
+}> => {
+  const { ethers, networkName } = await hre.network.connect();
+  const [signer] = await ethers.getSigners();
+  const chain = networkName ?? "localhost";
+
+  const circuitVerifierArgs = readDeploymentArgs(
+    "ThresholdPkAggregationVerifier",
+    chain,
+  );
+  if (!circuitVerifierArgs?.address) {
+    throw new Error(
+      "ThresholdPkAggregationVerifier must be deployed first. " +
+        "Run deployAndSaveAllVerifiers or deploy verifiers.",
+    );
+  }
+
+  const existing = readDeploymentArgs("BfvPkVerifier", chain);
+  if (existing?.address) {
+    console.log(`   BfvPkVerifier already deployed at ${existing.address}`);
+    const bfvPkVerifier = BfvPkVerifierFactory.connect(
+      existing.address,
+      signer,
+    );
+    return { bfvPkVerifier };
+  }
+
+  const bfvPkVerifierFactory = await ethers.getContractFactory("BfvPkVerifier");
+  const bfvPkVerifier = await bfvPkVerifierFactory.deploy(
+    circuitVerifierArgs.address,
+  );
+
+  await bfvPkVerifier.waitForDeployment();
+  const bfvPkVerifierAddress = await bfvPkVerifier.getAddress();
+
+  const blockNumber = await ethers.provider.getBlockNumber();
+
+  storeDeploymentArgs(
+    {
+      blockNumber,
+      address: bfvPkVerifierAddress,
+    },
+    "BfvPkVerifier",
+    chain,
+  );
+
+  console.log(`   BfvPkVerifier deployed to: ${bfvPkVerifierAddress}`);
+
+  const bfvPkVerifierContract = BfvPkVerifierFactory.connect(
+    bfvPkVerifierAddress,
+    signer,
+  );
+
+  return { bfvPkVerifier: bfvPkVerifierContract };
+};

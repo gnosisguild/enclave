@@ -3061,6 +3061,7 @@ dependencies = [
  "e3-sortition",
  "e3-trbfv",
  "e3-utils",
+ "e3-zk-helpers",
  "serde",
  "tracing",
 ]
@@ -3323,6 +3324,7 @@ version = "0.1.15"
 dependencies = [
  "actix",
  "alloy",
+ "alloy-dyn-abi",
  "alloy-primitives",
  "anyhow",
  "async-trait",

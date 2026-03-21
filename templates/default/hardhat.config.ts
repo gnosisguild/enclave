@@ -110,12 +110,19 @@ const config: HardhatUserConfig = {
       '@enclave-e3/contracts/contracts/registry/CiphernodeRegistryOwnable.sol',
       '@enclave-e3/contracts/contracts/registry/BondingRegistry.sol',
       '@enclave-e3/contracts/contracts/slashing/SlashingManager.sol',
+      '@enclave-e3/contracts/contracts/E3RefundManager.sol',
       '@enclave-e3/contracts/contracts/token/EnclaveToken.sol',
       '@enclave-e3/contracts/contracts/token/EnclaveTicketToken.sol',
+      '@enclave-e3/contracts/contracts/verifiers/bfv/BfvDecryptionVerifier.sol',
+      '@enclave-e3/contracts/contracts/verifiers/bfv/BfvPkVerifier.sol',
+      '@enclave-e3/contracts/contracts/verifiers/bfv/honk/RecursiveAggregationFoldVerifier.sol',
+      '@enclave-e3/contracts/contracts/verifiers/bfv/honk/ThresholdDecryptedSharesAggregationVerifier.sol',
+      '@enclave-e3/contracts/contracts/verifiers/bfv/honk/ThresholdPkAggregationVerifier.sol',
       '@enclave-e3/contracts/contracts/test/MockCiphernodeRegistry.sol',
       '@enclave-e3/contracts/contracts/test/MockComputeProvider.sol',
       '@enclave-e3/contracts/contracts/test/MockDecryptionVerifier.sol',
       '@enclave-e3/contracts/contracts/test/MockE3Program.sol',
+      '@enclave-e3/contracts/contracts/test/MockPkVerifier.sol',
       '@enclave-e3/contracts/contracts/test/MockSlashingVerifier.sol',
       '@enclave-e3/contracts/contracts/test/MockStableToken.sol',
     ],
@@ -125,7 +132,8 @@ const config: HardhatUserConfig = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 800,
+            // Low runs shrinks deployment bytecode (EIP-170); higher runs favor runtime gas.
+            runs: 100,
           },
           metadata: {
             bytecodeHash: 'none',

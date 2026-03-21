@@ -155,6 +155,7 @@ export class ContractClient {
             e3ProgramParams: params.e3ProgramParams,
             computeProviderParams: params.computeProviderParams,
             customParams: params.customParams || '0x',
+            proofAggregationEnabled: params.proofAggregationEnabled ?? true,
           },
         ],
         account,
@@ -227,6 +228,7 @@ export class ContractClient {
             e3ProgramParams: requestParams.e3ProgramParams,
             computeProviderParams: requestParams.computeProviderParams,
             customParams: requestParams.customParams || '0x',
+            proofAggregationEnabled: requestParams.proofAggregationEnabled ?? true,
           },
         ],
       })

@@ -21,6 +21,7 @@ pub struct E3Meta {
     pub params: ArcBytes,
     pub esi_per_ct: usize,
     pub error_size: ArcBytes,
+    pub proof_aggregation_enabled: bool,
 }
 
 pub struct E3MetaExtension;
@@ -45,6 +46,7 @@ impl E3Extension for E3MetaExtension {
             params,
             esi_per_ct,
             error_size,
+            proof_aggregation_enabled,
             ..
         } = data.clone();
 
@@ -56,6 +58,7 @@ impl E3Extension for E3MetaExtension {
             params,
             esi_per_ct,
             error_size,
+            proof_aggregation_enabled,
         };
         ctx.repositories().meta(&e3_id).write(&meta);
         let _ = ctx.set_dependency(META_KEY, meta);

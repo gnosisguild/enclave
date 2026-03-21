@@ -229,6 +229,9 @@ pub async fn initialize_crisp_round(
         parallel: CONFIG.e3_compute_provider_parallel,
         batch_size: CONFIG.e3_compute_provider_batch_size,
     };
+
+    let proof_aggregation_enabled = CONFIG.e3_proof_aggregation_enabled;
+
     let compute_provider_params = Bytes::from(bincode::serialize(&compute_provider_params)?);
     let (receipt, e3_id) = contract
         .request_e3(
@@ -238,6 +241,7 @@ pub async fn initialize_crisp_round(
             e3_params,
             compute_provider_params,
             custom_params_bytes,
+            proof_aggregation_enabled,
         )
         .await?;
     info!(

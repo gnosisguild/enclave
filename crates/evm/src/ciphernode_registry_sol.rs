@@ -8,11 +8,11 @@ use crate::{
     error_decoder::format_evm_error,
     events::{EnclaveEvmEvent, EvmEventProcessor},
     evm_parser::EvmParser,
-    helpers::{send_tx_with_retry, EthProvider},
+    helpers::{encode_zk_proof, send_tx_with_retry, EthProvider},
 };
 use actix::prelude::*;
 use alloy::{
-    primitives::{Address, Bytes, FixedBytes, LogData, B256, U256},
+    primitives::{Address, Bytes, LogData, B256, U256},
     providers::{Provider, WalletProvider},
     rpc::types::TransactionReceipt,
     sol,
@@ -21,7 +21,7 @@ use alloy::{
 use anyhow::Result;
 use e3_events::{
     prelude::*, run_once, BusHandle, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EType,
-    EffectsEnabled, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, OrderedSet,
+    EffectsEnabled, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, OrderedSet, Proof,
     PublicKeyAggregated, Seed, Shutdown, TicketGenerated, TicketId,
 };
 use e3_utils::{ArcBytes, NotifySync, MAILBOX_LIMIT};
@@ -435,8 +435,8 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
     fn handle(&mut self, msg: PublicKeyAggregated, _: &mut Self::Context) -> Self::Result {
         let e3_id = msg.e3_id.clone();
         let pubkey = msg.pubkey.clone();
-        let public_key_hash = msg.public_key_hash.clone();
         let nodes = msg.nodes.clone();
+        let pk_aggregation_proof = msg.pk_aggregation_proof.clone();
         let contract_address = self.contract_address;
         let provider = self.provider.clone();
         let bus = self.bus.clone();
@@ -448,7 +448,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                 e3_id,
                 nodes,
                 pubkey,
-                public_key_hash,
+                pk_aggregation_proof.as_ref(),
             )
             .await;
             match result {
@@ -544,11 +544,15 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
     e3_id: E3id,
     nodes: OrderedSet<String>,
     public_key: ArcBytes,
-    public_key_hash: [u8; 32],
+    pk_aggregation_proof: Option<&Proof>,
 ) -> Result<TransactionReceipt> {
     let e3_id_u256: U256 = e3_id.try_into()?;
     let public_key_bytes = Bytes::from(public_key.extract_bytes());
-    let public_key_hash_fixed = FixedBytes::from(public_key_hash);
+
+    let proof: Bytes = encode_zk_proof(
+        pk_aggregation_proof.ok_or_else(|| anyhow::anyhow!("pk_aggregation_proof required"))?,
+    )?;
+
     let nodes_vec: Vec<Address> = nodes
         .into_iter()
         .filter_map(|node| node.parse().ok())
@@ -559,6 +563,7 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
         let provider = provider.clone();
         let nodes_vec = nodes_vec.clone();
         let public_key_bytes = public_key_bytes.clone();
+        let proof = proof.clone();
         async move {
             info!("Calling: contract.publishCommittee(..)");
             let from_address = provider.provider().default_signer_address();
@@ -569,12 +574,7 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
                 .await?;
             let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
             let builder = contract
-                .publishCommittee(
-                    e3_id_u256,
-                    nodes_vec,
-                    public_key_bytes,
-                    public_key_hash_fixed,
-                )
+                .publishCommittee(e3_id_u256, nodes_vec, public_key_bytes, proof)
                 .nonce(current_nonce);
             let receipt = builder.send().await?.get_receipt().await?;
             Ok(receipt)

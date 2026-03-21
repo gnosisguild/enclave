@@ -164,6 +164,7 @@ export const requestCommittee = task(
         e3ProgramParams,
         computeProviderParams,
         customParams,
+        proofAggregationEnabled: true,
       };
 
       console.log("Request parameters:", requestParams);
@@ -250,13 +251,14 @@ export const publishCommittee = task(
     type: ArgumentType.STRING,
   })
   .addOption({
-    name: "publicKeyHash",
-    description: "hash of the public key (bytes32)",
+    name: "proof",
+    description:
+      "ABI-encoded pk proof (bytes rawProof, bytes32[] publicInputs); commitment is last input",
     defaultValue: "",
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async ({ e3Id, nodes, publicKey, publicKeyHash }, hre) => {
+    default: async ({ e3Id, nodes, publicKey, proof }, hre) => {
       const { deployAndSaveCiphernodeRegistryOwnable } = await import(
         "../scripts/deployAndSave/ciphernodeRegistryOwnable"
       );
@@ -281,15 +283,15 @@ export const publishCommittee = task(
         throw new Error("Invalid nodes format: no valid addresses found");
       }
 
-      if (!publicKeyHash) {
-        throw new Error("publicKeyHash is required");
+      if (!proof) {
+        throw new Error("proof is required");
       }
 
       const tx = await ciphernodeRegistry.publishCommittee(
         e3Id,
         nodesToSend,
         publicKey,
-        publicKeyHash,
+        proof,
       );
 
       console.log("Publishing committee... ", tx.hash);

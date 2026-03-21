@@ -455,19 +455,19 @@ fn handle_threshold_share_decryption_proof(
                 )
             })?;
 
-        // Wrap for recursive folding
-        let wrapped = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
-            ComputeRequestError::new(
-                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
-                    "C6 wrapper proof[{}]: {}",
-                    i, e
-                ))),
-                request.clone(),
-            )
-        })?;
-
+        if req.proof_aggregation_enabled {
+            let wrapped = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+                ComputeRequestError::new(
+                    ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
+                        "C6 wrapper proof[{}]: {}",
+                        i, e
+                    ))),
+                    request.clone(),
+                )
+            })?;
+            wrapped_proofs.push(wrapped);
+        }
         proofs.push(proof);
-        wrapped_proofs.push(wrapped);
     }
 
     Ok(ComputeResponse::zk(

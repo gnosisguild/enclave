@@ -64,7 +64,7 @@ class VerifierGenerator {
   constructor(rootDir?: string, options: GenerateOptions = {}) {
     this.rootDir = rootDir ?? resolve(__dirname, '..')
     this.circuitsDir = join(this.rootDir, 'circuits', 'bin')
-    this.verifierDir = join(this.rootDir, 'packages', 'enclave-contracts', 'contracts', 'verifier')
+    this.verifierDir = join(this.rootDir, 'packages', 'enclave-contracts', 'contracts', 'verifiers', 'bfv', 'honk')
     this.options = {
       groups: ALL_GROUPS,
       clean: false,
@@ -388,7 +388,7 @@ function showHelp() {
 Usage: generate-verifiers [options]
 
 Generates Solidity verifier contracts from compiled Noir circuits
-and places them in packages/enclave-contracts/contracts/verifier/.
+and places them in packages/enclave-contracts/contracts/verifiers/bfv/honk/.
 
 Options:
   --circuits <list>      Circuit names (comma-separated). When omitted, generates all circuits.

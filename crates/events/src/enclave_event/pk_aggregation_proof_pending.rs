@@ -21,6 +21,5 @@ pub struct PkAggregationProofPending {
     pub e3_id: E3id,
     pub proof_request: PkAggregationProofRequest,
     pub public_key: ArcBytes,
-    pub public_key_hash: [u8; 32],
     pub nodes: OrderedSet<String>,
 }

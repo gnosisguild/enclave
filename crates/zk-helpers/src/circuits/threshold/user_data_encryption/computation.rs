@@ -272,7 +272,7 @@ impl Computation for Bounds {
 
             let k0qi = BigInt::from(k0is[i]);
 
-            // PK and R2 bounds (same as qi_bound)
+            // PK bounds: centered magnitude (qi-1)/2; matches pk_aggregation / C1 commitment
             pk_bounds.push(qi_bound.clone());
             r2_bounds.push(qi_bound.clone());
 
@@ -403,8 +403,10 @@ impl Computation for Inputs {
 
         ct0.center(&moduli)?;
         ct1.center(&moduli)?;
+
         pk0.center(&moduli)?;
         pk1.center(&moduli)?;
+
         e0.center(&moduli)?;
 
         let CrtPolynomial { limbs: ct0_limbs } = ct0;

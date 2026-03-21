@@ -16,6 +16,7 @@ import EnclaveTokenModule from "../ignition/modules/enclaveToken";
 import mockComputeProviderModule from "../ignition/modules/mockComputeProvider";
 import MockDecryptionVerifierModule from "../ignition/modules/mockDecryptionVerifier";
 import MockE3ProgramModule from "../ignition/modules/mockE3Program";
+import MockPkVerifierModule from "../ignition/modules/mockPkVerifier";
 import MockStableTokenModule from "../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../ignition/modules/slashingManager";
 import {
@@ -26,7 +27,7 @@ import {
 } from "../types";
 import type { Enclave } from "../types/contracts/Enclave";
 import type { MockUSDC } from "../types/contracts/test/MockStableToken.sol/MockUSDC";
-import { setupOperatorForSortition } from "./fixtures";
+import { encodePkProof, setupOperatorForSortition } from "./fixtures";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time, mine } = networkHelpers;
@@ -80,8 +81,8 @@ describe("Enclave", function () {
     }
     await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
     await registry.finalizeCommittee(e3Id);
-    const publicKeyHash = ethers.id(publicKey);
-    await registry.publishCommittee(e3Id, nodes, publicKey, publicKeyHash);
+    const proof = encodePkProof(ethers.keccak256(publicKey));
+    await registry.publishCommittee(e3Id, nodes, publicKey, proof);
   };
 
   // Helper function to approve USDC and make request
@@ -237,6 +238,7 @@ describe("Enclave", function () {
     );
     const { mockDecryptionVerifier: decryptionVerifier } =
       await ignition.deploy(MockDecryptionVerifierModule);
+    const { mockPkVerifier } = await ignition.deploy(MockPkVerifierModule);
     const { mockE3Program: e3Program } =
       await ignition.deploy(MockE3ProgramModule);
 
@@ -245,6 +247,10 @@ describe("Enclave", function () {
     await enclave.setDecryptionVerifier(
       encryptionSchemeId,
       await decryptionVerifier.getAddress(),
+    );
+    await enclave.setPkVerifier(
+      encryptionSchemeId,
+      await mockPkVerifier.getAddress(),
     );
 
     // ── Operators ─────────────────────────────────────────────────────────────
@@ -288,6 +294,7 @@ describe("Enclave", function () {
         ["address"],
         ["0x1234567890123456789012345678901234567890"],
       ),
+      proofAggregationEnabled: true,
     };
 
     // ── Return ────────────────────────────────────────────────────────────────
@@ -463,6 +470,7 @@ describe("Enclave", function () {
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
+        proofAggregationEnabled: false,
       });
 
       const e3 = await enclave.getE3(0);
@@ -666,6 +674,7 @@ describe("Enclave", function () {
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
+          proofAggregationEnabled: false,
         }),
       ).to.be.revertedWithCustomError(usdcToken, "ERC20InsufficientAllowance");
     });
@@ -680,6 +689,7 @@ describe("Enclave", function () {
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
+          proofAggregationEnabled: false,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "CommitteeSizeNotConfigured")
@@ -699,6 +709,7 @@ describe("Enclave", function () {
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
+          proofAggregationEnabled: false,
         }),
       ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
     });
@@ -713,6 +724,7 @@ describe("Enclave", function () {
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
+          proofAggregationEnabled: false,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "E3ProgramNotAllowed")
@@ -729,6 +741,7 @@ describe("Enclave", function () {
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
+          proofAggregationEnabled: false,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
@@ -744,6 +757,7 @@ describe("Enclave", function () {
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
+        proofAggregationEnabled: false,
       });
 
       const e3 = await enclave.getE3(0);
@@ -770,6 +784,7 @@ describe("Enclave", function () {
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
+        proofAggregationEnabled: false,
       });
       const e3 = await enclave.getE3(0);
 
@@ -807,6 +822,7 @@ describe("Enclave", function () {
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
+        proofAggregationEnabled: false,
       });
 
       await setupAndPublishCommittee(
@@ -881,6 +897,7 @@ describe("Enclave", function () {
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
+        proofAggregationEnabled: false,
       });
 
       await setupAndPublishCommittee(

@@ -131,7 +131,7 @@ impl Computation for Bounds {
         let mut pk_bound_max = BigUint::from(0u32);
 
         for &qi in threshold_params.moduli() {
-            let qi_bound: BigUint = (&BigUint::from(qi) - 1u32) / 2u32;
+            let qi_bound: BigUint = (BigUint::from(qi) - 1u32) / 2u32;
 
             if qi_bound > pk_bound_max {
                 pk_bound_max = qi_bound;
@@ -156,34 +156,29 @@ impl Computation for Inputs {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
         let bit_pk = compute_modulus_bit(&threshold_params);
-        let moduli = threshold_params.moduli();
-
-        // Coefficients must be in [0, q_i), not centered to (-q_i/2, q_i/2]. The circuit sums
-        // party coefficients then applies reduce_mod to get a value in [0, q_l); the aggregated
-        // key is also in [0, q_i). Centered representatives would make the sum before reduction
-        // inconsistent and could break the aggregation check.
 
         let mut pk0: Vec<CrtPolynomial> = data.pk0_shares.clone();
         // pk1 is the same (common random polynomial a) for all parties
         let mut pk1: Vec<CrtPolynomial> = (0..data.committee.h).map(|_| data.a.clone()).collect();
-        // Extract pk0_agg from aggregated public key
+        // Extract pk0_agg and pk1_agg from aggregated public key (c[1] = a)
         let mut pk0_agg = CrtPolynomial::from_fhe_polynomial(&data.public_key.c.c[0]);
-        let mut pk1_agg = data.a.clone();
+        let mut pk1_agg = CrtPolynomial::from_fhe_polynomial(&data.public_key.c.c[1]);
 
         // Compute expected_threshold_pk_commitments for each honest party
         // Each commitment is computed from pk0[i] and pk1[i] for party i
         let mut expected_threshold_pk_commitments = Vec::new();
 
         pk0_agg.reverse();
-
+        pk0_agg.center(threshold_params.moduli())?;
         pk1_agg.reverse();
-        pk1_agg.scalar_mul(&BigInt::from(data.committee.h));
-        pk1_agg.reduce(moduli)?;
+        pk1_agg.center(threshold_params.moduli())?;
 
         for party_index in 0..data.committee.h {
             pk0[party_index].reverse();
+            pk0[party_index].center(threshold_params.moduli())?;
 
             pk1[party_index].reverse();
+            pk1[party_index].center(threshold_params.moduli())?;
 
             let commitment =
                 compute_threshold_pk_commitment(&pk0[party_index], &pk1[party_index], bit_pk);

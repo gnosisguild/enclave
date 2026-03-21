@@ -12,7 +12,7 @@ use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_polynomial::CrtPolynomial;
 
 /// Returns the deterministic CRP (common random polynomial) as a CRT polynomial with limbs
-/// reversed per modulus, matching the representation used in the circuit.
+/// reversed and coefficients centered per modulus, matching the representation used in the circuit.
 pub fn deterministic_crp_crt_polynomial(
     threshold_params: &std::sync::Arc<fhe::bfv::BfvParameters>,
 ) -> Result<CrtPolynomial, CircuitsErrors> {
@@ -20,6 +20,7 @@ pub fn deterministic_crp_crt_polynomial(
     let mut a = CrtPolynomial::from_fhe_polynomial(crp.poly());
 
     a.reverse();
+    a.center(threshold_params.moduli())?;
 
     Ok(a)
 }
