@@ -62,6 +62,12 @@ export const requestCommittee = task(
     defaultValue: ZeroAddress,
     type: ArgumentType.STRING,
   })
+  .addOption({
+    name: "proofAggregationEnabled",
+    description: "whether to enable proof aggregation (default: false)",
+    defaultValue: true,
+    type: ArgumentType.BOOLEAN,
+  })
   .setAction(async () => ({
     default: async (
       {
@@ -72,6 +78,7 @@ export const requestCommittee = task(
         e3Params,
         computeParams,
         customParams,
+        proofAggregationEnabled,
       },
       hre,
     ) => {
@@ -164,7 +171,7 @@ export const requestCommittee = task(
         e3ProgramParams,
         computeProviderParams,
         customParams,
-        proofAggregationEnabled: true,
+        proofAggregationEnabled,
       };
 
       console.log("Request parameters:", requestParams);
