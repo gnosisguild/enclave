@@ -101,6 +101,14 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
     pub fn handle_store_event_requested(&mut self, msg: StoreEventRequested) {
         debug!("Handling store event requested....");
         let aggregate_id = msg.event.aggregate_id();
+        let has_store = self.stores.contains_key(&aggregate_id);
+        if !has_store {
+            tracing::warn!(
+                "EventStoreRouter: no store for aggregate={}, falling back to 0 (source={:?})",
+                aggregate_id,
+                msg.event.source()
+            );
+        }
         let store_addr = self.stores.get(&aggregate_id).unwrap_or_else(|| {
             self.stores
                 .get(&AggregateId::new(0))

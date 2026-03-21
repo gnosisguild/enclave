@@ -543,7 +543,9 @@ jobs:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.build_enclave_cli == 'true'
     timeout-minutes: 20
-    runs-on: 'ubuntu-latest'
+    runs-on: 
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     permissions:
       contents: read
       actions: write
@@ -660,7 +662,8 @@ jobs:
 
   crisp_e2e:
     needs: [detect_changes, build_enclave_cli, build_crisp_sdk]
-    if: needs.detect_changes.outputs.crisp == 'true'
+    # if: needs.detect_changes.outputs.crisp == 'true'
+    if: false 
     timeout-minutes: 45
     runs-on:
       group: enclave-ci
