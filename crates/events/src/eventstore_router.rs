@@ -131,17 +131,23 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         let filter = msg.filter().cloned();
         let sender = msg.sender();
 
+        let available_stores: Vec<_> = self.stores.keys().collect();
         let sub_queries: Vec<_> = query
             .into_iter()
             .filter_map(|(aggregate_id, ts)| {
-                self.stores
-                    .get(&aggregate_id)
-                    .map(|store_addr| (aggregate_id, ts, CorrelationId::new(), store_addr.clone()))
+                let store = self.stores.get(&aggregate_id);
+                if store.is_none() {
+                    warn!(
+                        "EventStoreRouter: no store for aggregate={} during TS query (available: {:?})",
+                        aggregate_id, available_stores
+                    );
+                }
+                store.map(|store_addr| (aggregate_id, ts, CorrelationId::new(), store_addr.clone()))
             })
             .collect();
 
         if sub_queries.is_empty() {
-            debug!("No valid stores to query, sending empty response immediately");
+            info!("EventStoreRouter: no valid stores to query, sending empty response immediately");
             let response = EventStoreQueryResponse::new(parent_id, Vec::new());
             sender.do_send(response);
             return Ok(());
@@ -157,7 +163,10 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
             let get_events_msg =
                 EventStoreQueryBy::<Ts>::new(sub_query_id, ts, aggregator_addr.clone().recipient())
                     .with_options(limit, filter.clone());
-            debug!("Sending query for aggregate {:?}", aggregate_id);
+            info!(
+                "EventStoreRouter: sending TS query for aggregate={} ts={}",
+                aggregate_id, ts
+            );
             store_addr.do_send(get_events_msg);
         }
 
