@@ -30,7 +30,7 @@ use crate::{
 const NET_READY_CONNECT_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Maximum time to wait for the `AllPeersDialed` event before giving up.
-const ALL_PEERS_DIALED_TIMEOUT: Duration = Duration::from_secs(30);
+const ALL_PEERS_DIALED_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncResponseValue {
@@ -342,19 +342,24 @@ async fn handle_sync_request_event(
     let (event, ctx) = event.into_components();
     info!("Checking for AllPeersDialed...");
     if wait_for_event {
+        info!("Waiting for peer connection...");
         await_event(
             &net_events,
-            |e| {
-                if matches!(e, &NetEvent::AllPeersDialed { .. }) {
-                    info!("AllPeersDialed matched!");
-                    Some(e.clone())
-                } else {
-                    None
+            |e| match e {
+                NetEvent::ConnectionEstablished { .. } => {
+                    info!("Peer connection established");
+                    Some(())
                 }
+                NetEvent::AllPeersDialed { total: 0, .. } => {
+                    info!("No peers configured, proceeding without sync");
+                    Some(())
+                }
+                _ => None,
             },
-            ALL_PEERS_DIALED_TIMEOUT,
+            NET_READY_CONNECT_TIMEOUT,
         )
-        .await?;
+        .await
+        .context("No peer connections established within timeout")?;
     }
     info!("handle_sync_request_event: AllPeersDialed");
 
