@@ -289,11 +289,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         // Set default pricing parameters
         _pricingConfig = PricingConfig({
-            keyGenPerNode: 100000, // 0.10 USDC
+            keyGenFixedPerNode: 50000, // 0.05 USDC
+            keyGenPerEncryptionProof: 25000, // 0.025 USDC
             coordinationPerPair: 5000, // 0.005 USDC
             availabilityPerNodePerSec: 20, // 0.00002 USDC
             decryptionPerNode: 150000, // 0.15 USDC
             publicationBase: 500000, // 0.50 USDC
+            verificationPerProof: 2000, // 0.002 USDC
             protocolTreasury: address(0),
             marginBps: 1000, // 10%
             protocolShareBps: 0,
@@ -1062,7 +1064,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(config.marginBps <= BPS_BASE, "Margin exceeds 100%");
         require(config.protocolShareBps <= BPS_BASE, "Share exceeds 100%");
         require(
-            config.protocolShareBps == 0 || config.protocolTreasury != address(0),
+            config.protocolShareBps == 0 ||
+                config.protocolTreasury != address(0),
             "Treasury required when protocol share > 0"
         );
         require(
@@ -1108,20 +1111,32 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             _timeoutConfig.computeWindow +
             _timeoutConfig.decryptionWindow;
 
-        // Key generation cost (linear in n)
-        uint256 baseFee = pc.keyGenPerNode * n;
+        // ZK proof count per node: 6 fixed + 2 × (N-1) × L_dkg scaling
+        // TODO: get dkgModuliCount from E3 params instead of hardcoding
+        uint256 proofsPerNode = 6 + 2 * (n - 1) * 2;
+
+        // Key generation cost: fixed per-node + per-proof (quadratic in n)
+        uint256 baseFee = pc.keyGenFixedPerNode * n;
+        baseFee += pc.keyGenPerEncryptionProof * n * proofsPerNode;
+
         // Key generation coordination cost (quadratic in n)
         if (n > 1) {
             baseFee += (pc.coordinationPerPair * (n * (n - 1))) / 2;
         }
-        // Availability cost (linear in n * duration)
+
+        // Proof verification cost: each node verifies all others' proofs (quadratic)
+        baseFee += pc.verificationPerProof * n * proofsPerNode;
+
+        // Availability cost (linear in n × duration)
         baseFee += pc.availabilityPerNodePerSec * n * duration;
+
         // Decryption cost (linear in m)
         baseFee += pc.decryptionPerNode * m;
         // Decryption coordination cost (quadratic in m)
         if (m > 1) {
             baseFee += (pc.coordinationPerPair * (m * (m - 1))) / 2;
         }
+
         // Publication base cost
         baseFee += pc.publicationBase;
 

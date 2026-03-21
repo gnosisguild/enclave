@@ -79,11 +79,13 @@ interface IEnclave {
 
     /// @notice All pricing-related configuration for parametric E3 fee calculation
     struct PricingConfig {
-        uint256 keyGenPerNode;
+        uint256 keyGenFixedPerNode;
+        uint256 keyGenPerEncryptionProof;
         uint256 coordinationPerPair;
         uint256 availabilityPerNodePerSec;
         uint256 decryptionPerNode;
         uint256 publicationBase;
+        uint256 verificationPerProof;
         address protocolTreasury;
         uint16 marginBps;
         uint16 protocolShareBps;

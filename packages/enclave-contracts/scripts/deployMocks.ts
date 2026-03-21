@@ -31,8 +31,7 @@ export const deployMocks = async (): Promise<MockDeployments> => {
   const computeProviderAddress = await computeProvider.getAddress();
 
   console.log("Deploying Mock Decryption Verifier");
-  const { decryptionVerifier } =
-    await deployAndSaveMockDecryptionVerifier(hre);
+  const { decryptionVerifier } = await deployAndSaveMockDecryptionVerifier(hre);
   const decryptionVerifierAddress = await decryptionVerifier.getAddress();
   console.log("Deploying Mock Pk Verifier");
   const { pkVerifier } = await deployAndSaveMockPkVerifier(hre);

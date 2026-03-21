@@ -444,7 +444,12 @@
           "components": [
             {
               "internalType": "uint256",
-              "name": "keyGenPerNode",
+              "name": "keyGenFixedPerNode",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "keyGenPerEncryptionProof",
               "type": "uint256"
             },
             {
@@ -465,6 +470,11 @@
             {
               "internalType": "uint256",
               "name": "publicationBase",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "verificationPerProof",
               "type": "uint256"
             },
             {
@@ -942,6 +952,25 @@
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "encryptionSchemeId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getPkVerifier",
+      "outputs": [
+        {
+          "internalType": "contract IPkVerifier",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "getPricingConfig",
       "outputs": [
@@ -949,7 +978,12 @@
           "components": [
             {
               "internalType": "uint256",
-              "name": "keyGenPerNode",
+              "name": "keyGenFixedPerNode",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "keyGenPerEncryptionProof",
               "type": "uint256"
             },
             {
@@ -970,6 +1004,11 @@
             {
               "internalType": "uint256",
               "name": "publicationBase",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "verificationPerProof",
               "type": "uint256"
             },
             {
@@ -1001,25 +1040,6 @@
           "internalType": "struct IEnclave.PricingConfig",
           "name": "",
           "type": "tuple"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "encryptionSchemeId",
-          "type": "bytes32"
-        }
-      ],
-      "name": "getPkVerifier",
-      "outputs": [
-        {
-          "internalType": "contract IPkVerifier",
-          "name": "",
-          "type": "address"
         }
       ],
       "stateMutability": "view",
@@ -1489,7 +1509,12 @@
           "components": [
             {
               "internalType": "uint256",
-              "name": "keyGenPerNode",
+              "name": "keyGenFixedPerNode",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "keyGenPerEncryptionProof",
               "type": "uint256"
             },
             {
@@ -1510,6 +1535,11 @@
             {
               "internalType": "uint256",
               "name": "publicationBase",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "verificationPerProof",
               "type": "uint256"
             },
             {
@@ -1585,5 +1615,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-48efe0838d1e7fb2ef1a3cba330cb80744c9a50e"
+  "buildInfoId": "solc-0_8_28-37fb927866c741fdeff7bc0d84b6ce759b2dcddc"
 }

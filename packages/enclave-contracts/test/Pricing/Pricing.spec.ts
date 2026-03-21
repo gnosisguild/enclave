@@ -16,6 +16,7 @@ import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
 import mockComputeProviderModule from "../../ignition/modules/mockComputeProvider";
 import MockDecryptionVerifierModule from "../../ignition/modules/mockDecryptionVerifier";
 import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
+import MockPkVerifierModule from "../../ignition/modules/mockPkVerifier";
 import MockStableTokenModule from "../../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../../ignition/modules/slashingManager";
 import {
@@ -26,6 +27,7 @@ import {
 } from "../../types";
 import type { Enclave } from "../../types/contracts/Enclave";
 import type { MockUSDC } from "../../types/contracts/test/MockStableToken.sol/MockUSDC";
+import { encodePkProof } from "../fixtures";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time, mine } = networkHelpers;
@@ -44,11 +46,13 @@ describe("E3 Pricing", function () {
 
   // Default pricing config matching initialize() defaults
   const defaultPricingConfig = {
-    keyGenPerNode: 100000n,
+    keyGenFixedPerNode: 50000n,
+    keyGenPerEncryptionProof: 25000n,
     coordinationPerPair: 5000n,
     availabilityPerNodePerSec: 20n,
     decryptionPerNode: 150000n,
     publicationBase: 500000n,
+    verificationPerProof: 2000n,
     protocolTreasury: ethers.ZeroAddress,
     marginBps: 1000,
     protocolShareBps: 0,
@@ -58,11 +62,13 @@ describe("E3 Pricing", function () {
 
   // Convert ethers Result to a plain object that can be spread
   const toPlainConfig = (pc: any) => ({
-    keyGenPerNode: pc.keyGenPerNode,
+    keyGenFixedPerNode: pc.keyGenFixedPerNode,
+    keyGenPerEncryptionProof: pc.keyGenPerEncryptionProof,
     coordinationPerPair: pc.coordinationPerPair,
     availabilityPerNodePerSec: pc.availabilityPerNodePerSec,
     decryptionPerNode: pc.decryptionPerNode,
     publicationBase: pc.publicationBase,
+    verificationPerProof: pc.verificationPerProof,
     protocolTreasury: pc.protocolTreasury,
     marginBps: pc.marginBps,
     protocolShareBps: pc.protocolShareBps,
@@ -131,8 +137,8 @@ describe("E3 Pricing", function () {
     }
     await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
     await registry.finalizeCommittee(e3Id);
-    const publicKeyHash = ethers.id(publicKey);
-    await registry.publishCommittee(e3Id, nodes, publicKey, publicKeyHash);
+    const proof = encodePkProof(ethers.keccak256(publicKey));
+    await registry.publishCommittee(e3Id, nodes, publicKey, proof);
   };
 
   const setup = async () => {
@@ -259,12 +265,18 @@ describe("E3 Pricing", function () {
       await ignition.deploy(MockDecryptionVerifierModule);
     const { mockE3Program: e3Program } =
       await ignition.deploy(MockE3ProgramModule);
+    const { mockPkVerifier: pkVerifier } =
+      await ignition.deploy(MockPkVerifierModule);
 
     await enclave.enableE3Program(await e3Program.getAddress());
     await enclave.setE3ProgramsParams([encodedE3ProgramParams]);
     await enclave.setDecryptionVerifier(
       encryptionSchemeId,
       await decryptionVerifier.getAddress(),
+    );
+    await enclave.setPkVerifier(
+      encryptionSchemeId,
+      await pkVerifier.getAddress(),
     );
 
     // Operators
@@ -305,6 +317,7 @@ describe("E3 Pricing", function () {
         ["address"],
         ["0x1234567890123456789012345678901234567890"],
       ),
+      proofAggregationEnabled: false,
     };
 
     return {
@@ -323,7 +336,7 @@ describe("E3 Pricing", function () {
       slashingManager,
       e3RefundManager,
       request,
-      mocks: { decryptionVerifier, e3Program, mockComputeProvider },
+      mocks: { decryptionVerifier, e3Program, mockComputeProvider, pkVerifier },
     };
   };
 
@@ -372,9 +385,12 @@ describe("E3 Pricing", function () {
       // Get pricing config
       const pc = await enclave.getPricingConfig();
 
-      // Calculate expected fee
-      let baseFee = pc.keyGenPerNode * n;
+      // Calculate expected fee (proof-aware)
+      const proofsPerNode = 6n + 2n * (n - 1n) * 2n;
+      let baseFee = pc.keyGenFixedPerNode * n;
+      baseFee += pc.keyGenPerEncryptionProof * n * proofsPerNode;
       if (n > 1n) baseFee += (pc.coordinationPerPair * n * (n - 1n)) / 2n;
+      baseFee += pc.verificationPerProof * n * proofsPerNode;
       baseFee += pc.availabilityPerNodePerSec * n * duration;
       baseFee += pc.decryptionPerNode * m;
       if (m > 1n) baseFee += (pc.coordinationPerPair * m * (m - 1n)) / 2n;
@@ -456,7 +472,8 @@ describe("E3 Pricing", function () {
       const { enclave } = await loadFixture(setup);
       const newConfig = {
         ...defaultPricingConfig,
-        keyGenPerNode: 200000n,
+        keyGenFixedPerNode: 100000n,
+        keyGenPerEncryptionProof: 50000n,
         coordinationPerPair: 10000n,
         availabilityPerNodePerSec: 40n,
         decryptionPerNode: 300000n,
@@ -469,7 +486,8 @@ describe("E3 Pricing", function () {
       );
 
       const stored = await enclave.getPricingConfig();
-      expect(stored.keyGenPerNode).to.equal(200000n);
+      expect(stored.keyGenFixedPerNode).to.equal(100000n);
+      expect(stored.keyGenPerEncryptionProof).to.equal(50000n);
       expect(stored.coordinationPerPair).to.equal(10000n);
       expect(stored.availabilityPerNodePerSec).to.equal(40n);
       expect(stored.decryptionPerNode).to.equal(300000n);
@@ -484,7 +502,8 @@ describe("E3 Pricing", function () {
       // Double base costs
       await enclave.setPricingConfig({
         ...defaultPricingConfig,
-        keyGenPerNode: 200000n,
+        keyGenFixedPerNode: 100000n,
+        keyGenPerEncryptionProof: 50000n,
         coordinationPerPair: 10000n,
         availabilityPerNodePerSec: 40n,
         decryptionPerNode: 300000n,
@@ -591,6 +610,7 @@ describe("E3 Pricing", function () {
           ["address"],
           ["0x1234567890123456789012345678901234567890"],
         ),
+        proofAggregationEnabled: false,
       };
 
       // Make request with large approval to avoid fee mismatch
@@ -673,6 +693,7 @@ describe("E3 Pricing", function () {
           ["address"],
           ["0x1234567890123456789012345678901234567890"],
         ),
+        proofAggregationEnabled: false,
       };
 
       // Make request with large approval
@@ -729,11 +750,13 @@ describe("E3 Pricing", function () {
     it("has correct default pricing config from initialize", async function () {
       const { enclave } = await loadFixture(setup);
       const pc = await enclave.getPricingConfig();
-      expect(pc.keyGenPerNode).to.equal(100000);
+      expect(pc.keyGenFixedPerNode).to.equal(50000);
+      expect(pc.keyGenPerEncryptionProof).to.equal(25000);
       expect(pc.coordinationPerPair).to.equal(5000);
       expect(pc.availabilityPerNodePerSec).to.equal(20);
       expect(pc.decryptionPerNode).to.equal(150000);
       expect(pc.publicationBase).to.equal(500000);
+      expect(pc.verificationPerProof).to.equal(2000);
       expect(pc.marginBps).to.equal(1000);
       expect(pc.protocolShareBps).to.equal(0);
       expect(pc.protocolTreasury).to.equal(ethers.ZeroAddress);
