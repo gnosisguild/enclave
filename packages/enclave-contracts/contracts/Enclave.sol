@@ -205,6 +205,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice The input deadline end is before the start
     error InvalidInputDeadlineEnd(uint256 end);
 
+    /// @notice Below minimum committee size
+    error CommitteeSizeTooSmall(CommitteeSize committeeSize);
+    /// @notice Below minimum threshold
+    error ThresholdTooSmall(uint256 threshold);
+
     /// @notice The duties are completed, and ciphernodes are not required to act anymore for this E3
     /// @param e3Id The ID of the E3
     /// @param expiration The expiration timestamp of the E3
@@ -1103,6 +1108,24 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 m = uint256(threshold[0]); // quorum/decryption threshold
 
         PricingConfig memory pc = _pricingConfig;
+
+        if (pc.minCommitteeSize > 0) {
+            require(
+                threshold[1] >= pc.minCommitteeSize,
+                CommitteeSizeTooSmall(requestParams.committeeSize)
+            );
+        }
+        if (pc.minThreshold > 0) {
+            require(
+                threshold[0] >= pc.minThreshold,
+                ThresholdTooSmall(threshold[0])
+            );
+        }
+
+        require(
+            requestParams.inputWindow[1] >= requestParams.inputWindow[0],
+            InvalidInputDeadlineEnd(requestParams.inputWindow[1])
+        );
 
         // Duration covers the full availability period
         uint256 duration = requestParams.inputWindow[1] -
