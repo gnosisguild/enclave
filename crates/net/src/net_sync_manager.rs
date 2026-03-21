@@ -249,13 +249,19 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
                 return Ok(());
             }
             let aggregate_id = fetch_request.aggregate_id();
-            let events: Vec<EnclaveEvent<Unsequenced>> = msg
-                .into_events()
+            let since = fetch_request.since();
+            let all_events: Vec<_> = msg.into_events();
+            let total_before_filter = all_events.len();
+            let events: Vec<EnclaveEvent<Unsequenced>> = all_events
                 .into_iter()
                 .filter(|e| e.source() == EventSource::Net)
                 .take(limit)
                 .map(|ev| ev.clone_unsequenced())
                 .collect();
+            info!(
+                "Sync response for aggregate={}: {} total events from store (since={}), {} after source=Net filter",
+                aggregate_id, total_before_filter, since, events.len()
+            );
 
             let next = if events.len() == limit {
                 let last_event_ts = events.last().map(|e| e.ts()).unwrap_or(0);

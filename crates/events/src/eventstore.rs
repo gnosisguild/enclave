@@ -76,9 +76,17 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         limit: Option<u64>,
     ) -> Result<Vec<EnclaveEvent<Sequenced>>> {
         let Some(seq) = self.index.seek(query)? else {
+            tracing::debug!("query_by_ts: no index entry at or after ts={}", query);
             return Ok(vec![]);
         };
-        Ok(self.collect_events(self.log.read_from(seq), filter, limit))
+        let events: Vec<_> = self.log.read_from(seq).collect();
+        let total = events.len();
+        let result = self.collect_events(Box::new(events.into_iter()), filter, limit);
+        tracing::debug!(
+            "query_by_ts: ts={} -> seq={}, {} raw events, {} after filter",
+            query, seq, total, result.len()
+        );
+        Ok(result)
     }
 
     /// Query events by sequence number. Returns events at or after the given sequence.
