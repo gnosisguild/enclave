@@ -249,8 +249,8 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
                 return Ok(());
             }
             let aggregate_id = fetch_request.aggregate_id();
-            let events: Vec<EnclaveEvent<Unsequenced>> = msg
-                .into_events()
+            let all_events: Vec<_> = msg.into_events();
+            let events: Vec<EnclaveEvent<Unsequenced>> = all_events
                 .into_iter()
                 .filter(|e| e.source() == EventSource::Net)
                 .take(limit)
