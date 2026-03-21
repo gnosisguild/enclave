@@ -42,7 +42,6 @@ nodes:
     quic_port: 9202
     ctrl_port: 50502
     autonetkey: true
-    autonetkey: true
     autopassword: true
   cn3:
     address: "0x90F79bf6EB2c4f870365E785982E1f101E93b906"
