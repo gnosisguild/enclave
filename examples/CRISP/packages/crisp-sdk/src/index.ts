@@ -6,7 +6,7 @@
 
 export * from './token'
 export * from './state'
-export { MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE, SIGNATURE_MESSAGE_HASH } from './constants'
+export { MAX_MSG_NON_ZERO_COEFFS, MAX_VOTE_OPTIONS, MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE, SIGNATURE_MESSAGE_HASH } from './constants'
 export { hashLeaf, generateMerkleProof, generateMerkleTree, getAddressFromSignature, getMaxVoteValue, getZeroVote } from './utils'
 export {
   decodeTally,

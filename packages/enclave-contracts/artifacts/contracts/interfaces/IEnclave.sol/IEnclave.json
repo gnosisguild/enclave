@@ -265,6 +265,11 @@
               "type": "address"
             },
             {
+              "internalType": "contract IPkVerifier",
+              "name": "pkVerifier",
+              "type": "address"
+            },
+            {
               "internalType": "bytes32",
               "name": "committeePublicKey",
               "type": "bytes32"
@@ -283,6 +288,11 @@
               "internalType": "address",
               "name": "requester",
               "type": "address"
+            },
+            {
+              "internalType": "bool",
+              "name": "proofAggregationEnabled",
+              "type": "bool"
             }
           ],
           "indexed": false,
@@ -799,6 +809,11 @@
               "type": "address"
             },
             {
+              "internalType": "contract IPkVerifier",
+              "name": "pkVerifier",
+              "type": "address"
+            },
+            {
               "internalType": "bytes32",
               "name": "committeePublicKey",
               "type": "bytes32"
@@ -817,6 +832,11 @@
               "internalType": "address",
               "name": "requester",
               "type": "address"
+            },
+            {
+              "internalType": "bool",
+              "name": "proofAggregationEnabled",
+              "type": "bool"
             }
           ],
           "internalType": "struct E3",
@@ -860,6 +880,11 @@
               "internalType": "bytes",
               "name": "customParams",
               "type": "bytes"
+            },
+            {
+              "internalType": "bool",
+              "name": "proofAggregationEnabled",
+              "type": "bool"
             }
           ],
           "internalType": "struct IEnclave.E3RequestParams",
@@ -984,6 +1009,25 @@
     {
       "inputs": [
         {
+          "internalType": "bytes32",
+          "name": "encryptionSchemeId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getPkVerifier",
+      "outputs": [
+        {
+          "internalType": "contract IPkVerifier",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
@@ -1071,7 +1115,7 @@
         },
         {
           "internalType": "bytes32",
-          "name": "committeePublicKeyHash",
+          "name": "committeePublicKey",
           "type": "bytes32"
         }
       ],
@@ -1215,6 +1259,11 @@
               "internalType": "bytes",
               "name": "customParams",
               "type": "bytes"
+            },
+            {
+              "internalType": "bool",
+              "name": "proofAggregationEnabled",
+              "type": "bool"
             }
           ],
           "internalType": "struct IEnclave.E3RequestParams",
@@ -1277,6 +1326,11 @@
               "type": "address"
             },
             {
+              "internalType": "contract IPkVerifier",
+              "name": "pkVerifier",
+              "type": "address"
+            },
+            {
               "internalType": "bytes32",
               "name": "committeePublicKey",
               "type": "bytes32"
@@ -1295,6 +1349,11 @@
               "internalType": "address",
               "name": "requester",
               "type": "address"
+            },
+            {
+              "internalType": "bool",
+              "name": "proofAggregationEnabled",
+              "type": "bool"
             }
           ],
           "internalType": "struct E3",
@@ -1409,6 +1468,24 @@
     {
       "inputs": [
         {
+          "internalType": "bytes32",
+          "name": "encryptionSchemeId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "contract IPkVerifier",
+          "name": "pkVerifier",
+          "type": "address"
+        }
+      ],
+      "name": "setPkVerifier",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "components": [
             {
               "internalType": "uint256",
@@ -1508,5 +1585,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-bd46eae6f77be9a8538850385226c1ee4fc57e42"
+  "buildInfoId": "solc-0_8_28-48efe0838d1e7fb2ef1a3cba330cb80744c9a50e"
 }

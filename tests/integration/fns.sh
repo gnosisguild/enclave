@@ -47,6 +47,7 @@ cleanup() {
     jobs -p | xargs -r kill -9 2>/dev/null || true
     pkill -9 -f "target/debug/enclave" || true
     pkill -9 -f "hardhat" || true
+    pkill -9 -f "anvil" || true
     exit ${1:-1}
 }
 
@@ -127,11 +128,6 @@ enclave_nodes_up() {
      --config "$SCRIPT_DIR/enclave.config.yaml" & 
 }
 
-# enclave_nodes_up() {
-#    $ENCLAVE_BIN nodes up -v \
-#      --config "$SCRIPT_DIR/enclave.config.yaml" & 
-# }
-
 enclave_nodes_down() {
   $ENCLAVE_BIN nodes down  
 }
@@ -181,15 +177,11 @@ kill_em_all() {
   echo "Killing enclave"
   pkill -9 -f "target/debug/enclave" || true
   pkill -9 -f "enclave start" || true
-  pkill -9 -f "hardhat" || true
+  pkill -9 -f "anvil" || true
 }
 
 launch_evm() {
-  if [ ! -z "${SILENT_EVM:-}" ]; then
-    pnpm evm:node &> /dev/null &
-  else
-    pnpm evm:node &
-  fi
+  anvil --host 0.0.0.0 --chain-id 31337 --block-time 1 --mnemonic 'test test test test test test test test test test test junk' --silent &
 }
 
 ensure_process_count_equals() {

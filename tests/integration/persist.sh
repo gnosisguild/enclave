@@ -13,7 +13,7 @@ heading "Start the EVM node"
 
 launch_evm
 
-until curl -f -s "http://localhost:8545" > /dev/null; do
+until curl -sf -X POST http://localhost:8545 -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' > /dev/null; do
   sleep 1
 done
 
@@ -68,7 +68,8 @@ pnpm committee:new \
   --input-window-start "$INPUT_WINDOW_START" \
   --input-window-end "$INPUT_WINDOW_END" \
   --e3-params "$ENCODED_PARAMS" \
-  --committee-size 0
+  --committee-size 0 \
+  --proof-aggregation-enabled false
 
 waiton "$SCRIPT_DIR/output/pubkey.bin"
 

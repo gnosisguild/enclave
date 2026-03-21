@@ -259,6 +259,12 @@ pub struct ThresholdKeyshareState {
     pub aggregated_pk: Option<ArcBytes>,
     pub expelled_parties: HashSet<u64>,
     pub honest_parties: Option<HashSet<u64>>,
+    #[serde(default = "default_proof_agg")]
+    pub proof_aggregation_enabled: bool,
+}
+
+fn default_proof_agg() -> bool {
+    true
 }
 
 impl ThresholdKeyshareState {
@@ -270,6 +276,7 @@ impl ThresholdKeyshareState {
         threshold_n: u64,
         params: ArcBytes,
         address: String,
+        proof_aggregation_enabled: bool,
     ) -> Self {
         Self {
             e3_id,
@@ -282,6 +289,7 @@ impl ThresholdKeyshareState {
             aggregated_pk: None,
             expelled_parties: HashSet::new(),
             honest_parties: None,
+            proof_aggregation_enabled,
         }
     }
 
@@ -1198,6 +1206,11 @@ impl ThresholdKeyshare {
                 sk_share_encryption_requests,
                 e_sm_share_encryption_requests,
                 recipient_party_ids,
+                proof_aggregation_enabled: self
+                    .state
+                    .try_get()
+                    .map(|s| s.proof_aggregation_enabled)
+                    .unwrap_or(true),
             },
             ec.clone(),
         )?;
@@ -1924,11 +1937,11 @@ impl ThresholdKeyshare {
         let party_proofs: Vec<PartyShareDecryptionProofsToVerify> = collected_shares
             .iter()
             .filter_map(|(&party_id, share)| {
-                if share.signed_esm_decryption_proofs.len() != expected_esm {
+                if share.signed_e_sm_decryption_proofs.len() != expected_esm {
                     warn!(
                         "Party {} has wrong ESM proof count ({} vs expected {}) for E3 {} — treating as dishonest",
                         party_id,
-                        share.signed_esm_decryption_proofs.len(),
+                        share.signed_e_sm_decryption_proofs.len(),
                         expected_esm,
                         e3_id
                     );
@@ -1938,7 +1951,7 @@ impl ThresholdKeyshare {
                     Some(PartyShareDecryptionProofsToVerify {
                         sender_party_id: party_id,
                         signed_sk_decryption_proof: share.signed_sk_decryption_proof.clone(),
-                        signed_esm_decryption_proofs: share.signed_esm_decryption_proofs.clone(),
+                        signed_e_sm_decryption_proofs: share.signed_e_sm_decryption_proofs.clone(),
                     })
                 }
             })
@@ -2126,6 +2139,7 @@ impl ThresholdKeyshare {
                     es_poly_sum: decrypting.es_poly_sum,
                     d_share_bytes: d_share_poly.clone(),
                     params_preset: threshold_preset,
+                    proof_aggregation_enabled: state.proof_aggregation_enabled,
                 },
             },
             ec.clone(),

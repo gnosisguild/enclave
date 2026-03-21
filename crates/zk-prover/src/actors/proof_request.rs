@@ -48,6 +48,8 @@ struct NodeAggregationMeta {
     total_expected: usize,
     /// Buffered C0 wrapped proof, if it arrived before meta was stored.
     pending_c0: Option<Proof>,
+    /// When false, skip emitting DKGInnerProofReady (no wrapping/folding).
+    proof_aggregation_enabled: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -260,6 +262,13 @@ impl ProofRequestActor {
         addr
     }
 
+    /// Returns true if proof aggregation (wrapping/folding) is enabled for this E3.
+    fn is_proof_aggregation_enabled(&self, e3_id: &E3id) -> bool {
+        self.node_agg_meta
+            .get(e3_id)
+            .map_or(true, |m| m.proof_aggregation_enabled)
+    }
+
     fn handle_encryption_key_pending(&mut self, msg: TypedEvent<EncryptionKeyPending>) {
         let (msg, ec) = msg.into_components();
         let correlation_id = CorrelationId::new();
@@ -305,20 +314,23 @@ impl ProofRequestActor {
                 party_id: msg.full_share.party_id,
                 total_expected,
                 pending_c0: None,
+                proof_aggregation_enabled: msg.proof_aggregation_enabled,
             },
         );
         // If C0 wrapped proof arrived before meta, emit DKGInnerProofReady now
         if let Some(c0_proof) = pending_c0 {
-            if let Err(err) = self.bus.publish(
-                DKGInnerProofReady {
-                    e3_id: e3_id.clone(),
-                    party_id: msg.full_share.party_id,
-                    wrapped_proof: c0_proof,
-                    seq: 0,
-                },
-                ec.clone(),
-            ) {
-                error!("Failed to publish DKGInnerProofReady for C0: {err}");
+            if msg.proof_aggregation_enabled {
+                if let Err(err) = self.bus.publish(
+                    DKGInnerProofReady {
+                        e3_id: e3_id.clone(),
+                        party_id: msg.full_share.party_id,
+                        wrapped_proof: c0_proof,
+                        seq: 0,
+                    },
+                    ec.clone(),
+                ) {
+                    error!("Failed to publish DKGInnerProofReady for C0: {err}");
+                }
             }
         }
 
@@ -662,19 +674,21 @@ impl ProofRequestActor {
         }
 
         if let Some(meta) = self.node_agg_meta.get(&e3_id) {
-            if let Err(err) = self.bus.publish(
-                DKGInnerProofReady {
-                    e3_id: e3_id.clone(),
-                    party_id: meta.party_id,
-                    wrapped_proof,
-                    seq,
-                },
-                ec.clone(),
-            ) {
-                error!(
-                    "Failed to publish DKGInnerProofReady for C4 seq={}: {err}",
-                    seq
-                );
+            if meta.proof_aggregation_enabled {
+                if let Err(err) = self.bus.publish(
+                    DKGInnerProofReady {
+                        e3_id: e3_id.clone(),
+                        party_id: meta.party_id,
+                        wrapped_proof,
+                        seq,
+                    },
+                    ec.clone(),
+                ) {
+                    error!(
+                        "Failed to publish DKGInnerProofReady for C4 seq={}: {err}",
+                        seq
+                    );
+                }
             }
         }
 
@@ -697,7 +711,7 @@ impl ProofRequestActor {
         // Sign C4a (SK decryption proof)
         let Some(signed_sk) = self.sign_proof(
             e3_id,
-            ProofType::T2DkgShareDecryption,
+            ProofType::C4DkgShareDecryption,
             pending.sk_proof.expect("checked in is_complete"),
         ) else {
             error!("Failed to sign C4a SK proof — DecryptionKeyShared will not be published");
@@ -712,7 +726,7 @@ impl ProofRequestActor {
                 .get(&idx)
                 .expect("checked in is_complete")
                 .clone();
-            let Some(signed) = self.sign_proof(e3_id, ProofType::T2DkgShareDecryption, proof)
+            let Some(signed) = self.sign_proof(e3_id, ProofType::C4DkgShareDecryption, proof)
             else {
                 error!(
                     "Failed to sign C4b ESM proof [{}] — DecryptionKeyShared will not be published",
@@ -738,7 +752,7 @@ impl ProofRequestActor {
                 sk_poly_sum: pending.sk_poly_sum,
                 es_poly_sum: pending.es_poly_sum,
                 signed_sk_decryption_proof: signed_sk,
-                signed_esm_decryption_proofs: signed_esms,
+                signed_e_sm_decryption_proofs: signed_esms,
                 external: false,
             },
             pending.ec,
@@ -814,7 +828,8 @@ impl ProofRequestActor {
             return;
         };
 
-        if proofs.len() != wrapped_proofs.len() {
+        let aggregation_enabled = self.is_proof_aggregation_enabled(&e3_id);
+        if aggregation_enabled && proofs.len() != wrapped_proofs.len() {
             error!(
                 "C6 proofs and wrapped_proofs length mismatch: {} vs {} — DecryptionshareCreated will not be published",
                 proofs.len(),
@@ -826,7 +841,9 @@ impl ProofRequestActor {
         // Sign raw C6 proofs (for ShareVerification)
         let mut signed_proofs = Vec::with_capacity(proofs.len());
         for proof in proofs {
-            let Some(signed) = self.sign_proof(&e3_id, ProofType::T5ShareDecryption, proof) else {
+            let Some(signed) =
+                self.sign_proof(&e3_id, ProofType::C6ThresholdShareDecryption, proof)
+            else {
                 error!("Failed to sign C6 proof — DecryptionshareCreated will not be published");
                 return;
             };
@@ -842,6 +859,12 @@ impl ProofRequestActor {
 
         let ec = pending.ec;
 
+        let wrapped_to_publish = if aggregation_enabled {
+            wrapped_proofs
+        } else {
+            Vec::new()
+        };
+
         match self.bus.publish(
             DecryptionshareCreated {
                 party_id: pending.party_id,
@@ -849,7 +872,7 @@ impl ProofRequestActor {
                 e3_id: e3_id.clone(),
                 decryption_share: pending.decryption_share,
                 signed_decryption_proofs: signed_proofs,
-                wrapped_proofs,
+                wrapped_proofs: wrapped_to_publish,
             },
             ec.clone(),
         ) {
@@ -1004,7 +1027,7 @@ impl ProofRequestActor {
         let mut signed_proofs = Vec::with_capacity(proofs.len());
         for proof in proofs {
             let Some(signed) =
-                self.sign_proof(&e3_id, ProofType::T6DecryptedSharesAggregation, proof)
+                self.sign_proof(&e3_id, ProofType::C7DecryptedSharesAggregation, proof)
             else {
                 error!("Failed to sign C7 proof — AggregationProofSigned will not be published");
                 return;
@@ -1058,19 +1081,21 @@ impl ProofRequestActor {
         );
 
         if let Some(meta) = self.node_agg_meta.get(&e3_id) {
-            if let Err(err) = self.bus.publish(
-                DKGInnerProofReady {
-                    e3_id: e3_id.clone(),
-                    party_id: meta.party_id,
-                    wrapped_proof,
-                    seq,
-                },
-                ec.clone(),
-            ) {
-                error!(
-                    "Failed to publish DKGInnerProofReady for {:?} seq={}: {err}",
-                    kind, seq
-                );
+            if meta.proof_aggregation_enabled {
+                if let Err(err) = self.bus.publish(
+                    DKGInnerProofReady {
+                        e3_id: e3_id.clone(),
+                        party_id: meta.party_id,
+                        wrapped_proof,
+                        seq,
+                    },
+                    ec.clone(),
+                ) {
+                    error!(
+                        "Failed to publish DKGInnerProofReady for {:?} seq={}: {err}",
+                        kind, seq
+                    );
+                }
             }
         }
 
@@ -1350,16 +1375,18 @@ impl ProofRequestActor {
 
         // Emit DKGInnerProofReady for C0, or buffer if meta not yet available
         if let Some(meta) = self.node_agg_meta.get(&e3_id) {
-            if let Err(err) = self.bus.publish(
-                DKGInnerProofReady {
-                    e3_id: e3_id.clone(),
-                    party_id: meta.party_id,
-                    wrapped_proof,
-                    seq: 0,
-                },
-                ec.clone(),
-            ) {
-                error!("Failed to publish DKGInnerProofReady for C0: {err}");
+            if meta.proof_aggregation_enabled {
+                if let Err(err) = self.bus.publish(
+                    DKGInnerProofReady {
+                        e3_id: e3_id.clone(),
+                        party_id: meta.party_id,
+                        wrapped_proof: wrapped_proof.clone(),
+                        seq: 0,
+                    },
+                    ec.clone(),
+                ) {
+                    error!("Failed to publish DKGInnerProofReady for C0: {err}");
+                }
             }
         } else {
             // ThresholdSharePending hasn't arrived yet — buffer C0 wrapped proof
@@ -1369,6 +1396,7 @@ impl ProofRequestActor {
                     party_id: 0,
                     total_expected: 0,
                     pending_c0: Some(wrapped_proof),
+                    proof_aggregation_enabled: true, // will be overwritten by ThresholdSharePending
                 },
             );
         }

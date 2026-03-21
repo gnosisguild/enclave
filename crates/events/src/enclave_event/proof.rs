@@ -81,10 +81,16 @@ pub enum CircuitName {
     PkBfv,
     /// TrBFV public key share proof (C1).
     PkGeneration,
-    /// Sk Share computation proof (C2a).
-    SkShareComputation,
-    /// E_SM share computation proof (C2b).
-    ESmShareComputation,
+    /// Sk share computation base proof (C2a base).
+    SkShareComputationBase,
+    /// E_SM share computation base proof (C2b base).
+    ESmShareComputationBase,
+    /// Share computation chunk proof (C2c, proven N times).
+    ShareComputationChunk,
+    /// Share computation chunk batch proof (C2d — binds base + CHUNKS_PER_BATCH chunks).
+    ShareComputationChunkBatch,
+    /// Share computation final wrapper proof (C2 — binds N_BATCHES batch proofs).
+    ShareComputation,
     /// Share encryption proof (C3).
     ShareEncryption,
     /// DKG share decryption proof (C4).
@@ -93,10 +99,8 @@ pub enum CircuitName {
     PkAggregation,
     /// Decryption share proof (C6).
     ThresholdShareDecryption,
-    /// Decrypted shares aggregation proof — BigNum variant (C7a).
-    DecryptedSharesAggregationBn,
-    /// Decrypted shares aggregation proof — Modular variant (C7b).
-    DecryptedSharesAggregationMod,
+    /// Decrypted shares aggregation proof (C7).
+    DecryptedSharesAggregation,
     /// Recursive aggregation fold circuit (independent; lives at recursive_aggregation/fold).
     Fold,
 }
@@ -106,14 +110,16 @@ impl CircuitName {
         match self {
             CircuitName::PkBfv => "pk",
             CircuitName::PkGeneration => "pk_generation",
-            CircuitName::SkShareComputation => "sk_share_computation",
-            CircuitName::ESmShareComputation => "e_sm_share_computation",
+            CircuitName::SkShareComputationBase => "sk_share_computation_base",
+            CircuitName::ESmShareComputationBase => "e_sm_share_computation_base",
+            CircuitName::ShareComputationChunk => "share_computation_chunk",
+            CircuitName::ShareComputationChunkBatch => "share_computation_chunk_batch",
+            CircuitName::ShareComputation => "share_computation",
             CircuitName::ShareEncryption => "share_encryption",
             CircuitName::DkgShareDecryption => "share_decryption",
             CircuitName::PkAggregation => "pk_aggregation",
             CircuitName::ThresholdShareDecryption => "share_decryption",
-            CircuitName::DecryptedSharesAggregationBn => "decrypted_shares_aggregation_bn",
-            CircuitName::DecryptedSharesAggregationMod => "decrypted_shares_aggregation_mod",
+            CircuitName::DecryptedSharesAggregation => "decrypted_shares_aggregation",
             CircuitName::Fold => "fold",
         }
     }
@@ -121,15 +127,17 @@ impl CircuitName {
     pub fn group(&self) -> &'static str {
         match self {
             CircuitName::PkBfv => "dkg",
-            CircuitName::SkShareComputation => "dkg",
-            CircuitName::ESmShareComputation => "dkg",
+            CircuitName::SkShareComputationBase => "dkg",
+            CircuitName::ESmShareComputationBase => "dkg",
+            CircuitName::ShareComputationChunk => "dkg",
+            CircuitName::ShareComputationChunkBatch => "dkg",
+            CircuitName::ShareComputation => "dkg",
             CircuitName::ShareEncryption => "dkg",
             CircuitName::DkgShareDecryption => "dkg",
             CircuitName::PkGeneration => "threshold",
             CircuitName::ThresholdShareDecryption => "threshold",
             CircuitName::PkAggregation => "threshold",
-            CircuitName::DecryptedSharesAggregationBn => "threshold",
-            CircuitName::DecryptedSharesAggregationMod => "threshold",
+            CircuitName::DecryptedSharesAggregation => "threshold",
             CircuitName::Fold => "recursive_aggregation",
         }
     }

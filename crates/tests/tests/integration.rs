@@ -25,7 +25,7 @@ use e3_net::NetEventTranslator;
 use e3_sortition::{calculate_buffer_size, RegisteredNode, ScoreSortition, Ticket};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{
-    create_seed_from_u64, create_shared_rng_from_u64, with_tracing, AddToCommittee,
+    create_seed_from_u64, create_shared_rng_from_u64, find_bb, with_tracing, AddToCommittee,
 };
 use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::utility_types::ArcBytes;
@@ -43,34 +43,6 @@ use tokio::{
     sync::{broadcast, mpsc},
     time::sleep,
 };
-
-/// Find the bb binary on the system.
-async fn find_bb() -> Option<PathBuf> {
-    if let Ok(output) = tokio::process::Command::new("which")
-        .arg("bb")
-        .output()
-        .await
-    {
-        if output.status.success() {
-            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !path.is_empty() {
-                return Some(PathBuf::from(path));
-            }
-        }
-    }
-    if let Ok(home) = std::env::var("HOME") {
-        for path in [
-            format!("{}/.bb/bb", home),
-            format!("{}/.nargo/bin/bb", home),
-            format!("{}/.enclave/noir/bin/bb", home),
-        ] {
-            if std::path::Path::new(&path).exists() {
-                return Some(PathBuf::from(path));
-            }
-        }
-    }
-    None
-}
 
 /// Create a ZkBackend for integration tests.
 /// If a local bb binary is found, uses it with fixture files (fast path).
@@ -172,20 +144,47 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             ".vk_noir_hash",
         )
         .await;
-        // C2a (sk_share_computation)
+        // C2a base (sk_share_computation_base)
         copy_circuit(
             &dkg_target,
-            &rv.join("dkg/sk_share_computation"),
-            "sk_share_computation",
+            &rv.join("dkg/sk_share_computation_base"),
+            "sk_share_computation_base",
             ".vk_noir",
             ".vk_noir_hash",
         )
         .await;
-        // C2b (e_sm_share_computation)
+        // C2b base (e_sm_share_computation_base)
         copy_circuit(
             &dkg_target,
-            &rv.join("dkg/e_sm_share_computation"),
-            "e_sm_share_computation",
+            &rv.join("dkg/e_sm_share_computation_base"),
+            "e_sm_share_computation_base",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
+        // C2 chunk (share_computation_chunk)
+        copy_circuit(
+            &dkg_target,
+            &rv.join("dkg/share_computation_chunk"),
+            "share_computation_chunk",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
+        // C2 chunk_batch (share_computation_chunk_batch)
+        copy_circuit(
+            &dkg_target,
+            &rv.join("dkg/share_computation_chunk_batch"),
+            "share_computation_chunk_batch",
+            ".vk_noir",
+            ".vk_noir_hash",
+        )
+        .await;
+        // C2 final (share_computation)
+        copy_circuit(
+            &dkg_target,
+            &rv.join("dkg/share_computation"),
+            "share_computation",
             ".vk_noir",
             ".vk_noir_hash",
         )
@@ -226,11 +225,11 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             ".vk_noir_hash",
         )
         .await;
-        // C7 (decrypted_shares_aggregation_mod)
+        // C7 (decrypted_shares_aggregation)
         copy_circuit(
             &threshold_target,
-            &rv.join("threshold/decrypted_shares_aggregation_mod"),
-            "decrypted_shares_aggregation_mod",
+            &rv.join("threshold/decrypted_shares_aggregation"),
+            "decrypted_shares_aggregation",
             ".vk_noir",
             ".vk_noir_hash",
         )
@@ -358,11 +357,11 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             ".vk_hash",
         )
         .await;
-        // C7 (decrypted_shares_aggregation_mod) — EVM-targeted
+        // C7 (decrypted_shares_aggregation) — EVM-targeted
         copy_circuit(
             &threshold_target,
-            &ev.join("threshold/decrypted_shares_aggregation_mod"),
-            "decrypted_shares_aggregation_mod",
+            &ev.join("threshold/decrypted_shares_aggregation"),
+            "decrypted_shares_aggregation",
             ".vk",
             ".vk_hash",
         )
@@ -721,6 +720,7 @@ async fn test_trbfv_actor() -> Result<()> {
         error_size,
         esi_per_ct: esi_per_ct as usize,
         params,
+        proof_aggregation_enabled: true,
     };
 
     bus.publish_without_context(e3_requested)?;
@@ -1347,7 +1347,6 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 #[actix::test]
 #[ignore = "Needs to be ported to trBFV system"]
 async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
-    use e3_bfv_client::compute_pk_commitment;
     use e3_events::{OrderedSet, PublicKeyAggregated, TakeEvents};
     use e3_test_helpers::{
         create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,
@@ -1477,13 +1476,6 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     let test_pubkey = aggregate_public_key(&generate_pk_shares(
         &params, &crpoly, &rng_test, &eth_addrs,
     )?)?;
-    let public_key_hash = compute_pk_commitment(
-        test_pubkey.to_bytes(),
-        params.degree(),
-        params.plaintext(),
-        params.moduli().to_vec(),
-    )?;
-
     let history_collector = ciphernodes.last().unwrap().history().unwrap();
     let history = history_collector
         .send(TakeEvents::<e3_events::EnclaveEvent>::new(28))
@@ -1493,7 +1485,6 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         history.events.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
             pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
-            public_key_hash,
             e3_id: E3id::new("1234", 1),
             nodes: OrderedSet::from(eth_addrs.clone()),
             pk_aggregation_proof: None,
@@ -1522,13 +1513,6 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         &params, &crpoly, &rng_test, &eth_addrs,
     )?)?;
 
-    let public_key_hash = compute_pk_commitment(
-        test_pubkey.to_bytes(),
-        params.degree(),
-        params.plaintext(),
-        params.moduli().to_vec(),
-    )?;
-
     let history = history_collector
         .send(TakeEvents::<e3_events::EnclaveEvent>::new(8))
         .await?;
@@ -1537,7 +1521,6 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         history.events.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
             pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
-            public_key_hash,
             e3_id: E3id::new("1234", 2),
             nodes: OrderedSet::from(eth_addrs.clone()),
             pk_aggregation_proof: None,

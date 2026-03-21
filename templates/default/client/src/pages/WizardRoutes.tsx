@@ -12,13 +12,11 @@ import {
   NumberSquareThreeIcon,
   NumberSquareFourIcon,
   NumberSquareFiveIcon,
-  NumberSquareSixIcon,
 } from '@phosphor-icons/react'
 
 // Step components
 import ConnectWallet from './steps/ConnectWallet'
 import RequestComputation from './steps/RequestComputation'
-import ActivateE3 from './steps/ActivateE3'
 import EnterInputs from './steps/EnterInputs'
 import EncryptSubmit from './steps/EncryptSubmit'
 import Results from './steps/Results'
@@ -41,10 +39,9 @@ interface StepConfig {
 const STEPS: StepConfig[] = [
   { step: WizardStep.CONNECT_WALLET, path: '/step1', component: ConnectWallet, icon: NumberSquareOneIcon },
   { step: WizardStep.REQUEST_COMPUTATION, path: '/step2', component: RequestComputation, icon: NumberSquareTwoIcon },
-  { step: WizardStep.ACTIVATE_E3, path: '/step3', component: ActivateE3, icon: NumberSquareThreeIcon },
-  { step: WizardStep.ENTER_INPUTS, path: '/step4', component: EnterInputs, icon: NumberSquareFourIcon },
-  { step: WizardStep.ENCRYPT_SUBMIT, path: '/step5', component: EncryptSubmit, icon: NumberSquareFiveIcon },
-  { step: WizardStep.RESULTS, path: '/step6', component: Results, icon: NumberSquareSixIcon },
+  { step: WizardStep.ENTER_INPUTS, path: '/step3', component: EnterInputs, icon: NumberSquareThreeIcon },
+  { step: WizardStep.ENCRYPT_SUBMIT, path: '/step4', component: EncryptSubmit, icon: NumberSquareFourIcon },
+  { step: WizardStep.RESULTS, path: '/step5', component: Results, icon: NumberSquareFiveIcon },
 ]
 
 /**

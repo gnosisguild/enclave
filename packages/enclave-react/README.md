@@ -122,7 +122,6 @@ function MyComponent() {
 - `isInitialized`: Boolean indicating if SDK is ready
 - `error`: Error message if initialization failed
 - `requestE3`: Function to request E3 computation
-- `activateE3`: Function to activate E3 environment
 - `publishInput`: Function to publish encrypted inputs
 - `onEnclaveEvent`: Function to subscribe to events
 - `off`: Function to unsubscribe from events

@@ -8,8 +8,10 @@ use e3_bfv_client::decode_bytes_to_vec_u64;
 use eyre::Result;
 use num_bigint::BigUint;
 
-/// Maximum number of bits that can fit each vote option.
-pub const MAX_VOTE_BITS: usize = 50;
+/// Number of polynomial coefficients used for the vote payload (must match `@crisp-e3/sdk` / circuits).
+///
+/// Splits evenly across options: `segment_size = MAX_MSG_NON_ZERO_COEFFS / num_choices` (e.g. 2 → 50 bits each).
+pub const MAX_MSG_NON_ZERO_COEFFS: usize = 100;
 
 /// Represents decoded vote counts from a tally
 #[derive(Debug, Clone)]
@@ -22,32 +24,14 @@ pub struct VoteCounts {
 ///
 /// # Encoding scheme
 ///
-/// The BFV plaintext polynomial has `degree` coefficients (e.g., 512).
-/// When encoding a vote with `n` choices, the polynomial is divided into
-/// `n` equal segments of `floor(degree / n)` coefficients each.
+/// Only the first [`MAX_MSG_NON_ZERO_COEFFS`] coefficients carry the vote; the rest are zero padding
+/// to the BFV polynomial degree. With `n` choices, each choice uses
+/// `segment_size = floor(MAX_MSG_NON_ZERO_COEFFS / n)` binary coefficients (MSB at the start of the segment).
 ///
-/// Each segment represents one choice's vote count in binary (big-endian):
+///   |-- choice 0 --|-- choice 1 --| ... | unused in msg region |-- degree padding --|
 ///
-///   |---- segment 0 ----|---- segment 1 ----|---- segment 2 ----|-- padding --|
-///   |  choice 0 (Yes)   |  choice 1 (No)    |  choice 2 (Abst)  |   zeros    |
-///   |  binary, MSB first|  binary, MSB first |  binary, MSB first|            |
-///
-/// Within each segment, the binary representation is right-aligned:
-///   [0, 0, 0, ..., 0, 1, 0, 1, 1]  ← represents decimal 11
-///    ^-- leading zeros    ^-- MSB     ^-- LSB
-///
-/// Because FHE addition is performed coefficient-wise on the polynomial,
-/// summing N encrypted votes produces the total count per coefficient.
-/// The binary reconstruction then recovers the final tally per choice.
-///
-/// # MAX_VOTE_BITS
-///
-/// To prevent overflow during FHE computation, only the last `MAX_VOTE_BITS`
-/// coefficients of each segment are used (MAX_VOTE_BITS = 50). This caps the
-/// maximum representable vote count at `2^50 - 1` (~1.1 quadrillion).
-///
-/// We read from the right side of each segment (the significant bits)
-/// and ignore leading zeros on the left.
+/// Homomorphic addition is coefficient-wise, so summed ciphertexts yield per-coefficient sums and this
+/// decode recovers each option’s total.
 ///
 /// # Arguments
 ///
@@ -60,66 +44,28 @@ pub struct VoteCounts {
 /// A `Vec<BigUint>` of length `num_choices`, where `results[i]` is the
 /// total vote weight for choice `i`.
 ///
-/// # Example
-///
-/// Given degree=512, MAX_VOTE_BITS=50, num_choices=2:
-///   segment_size   = 512 / 2 = 256 coefficients per choice
-///   effective_size = min(256, 50) = 50
-///
-///   Choice 0 reads coefficients [206..256)   (last 50 of segment 0)
-///   Choice 1 reads coefficients [462..512)   (last 50 of segment 1)
-///
-/// Given degree=512, MAX_VOTE_BITS=50, num_choices=4:
-///   segment_size   = 512 / 4 = 128 coefficients per choice
-///   effective_size = min(128, 50) = 50
-///   remainder      = 512 - (128 * 4) = 0
-///
-///   Choice 0 reads coefficients [ 78..128)   (last 50 of segment 0)
-///   Choice 1 reads coefficients [206..256)   (last 50 of segment 1)
-///   Choice 2 reads coefficients [334..384)   (last 50 of segment 2)
-///   Choice 3 reads coefficients [462..512)   (last 50 of segment 3)
-///
-/// Given degree=512, MAX_VOTE_BITS=50, num_choices=3:
-///   segment_size   = 512 / 3 = 170 coefficients per choice
-///   effective_size = min(170, 50) = 50
-///   remainder      = 512 - (170 * 3) = 2 coefficients (trailing zeros, ignored)
-///
-///   Choice 0 reads coefficients [120..170)
-///   Choice 1 reads coefficients [290..340)
-///   Choice 2 reads coefficients [460..510)
-///
 pub fn decode_tally(tally_bytes: &[u8], num_choices: usize) -> Result<Vec<BigUint>> {
     if num_choices == 0 {
         return Err(eyre::eyre!("Number of choices must be positive"));
     }
 
-    // Each u64 coefficient is stored as 8 little-endian bytes.
-    // This gives us the full polynomial coefficient array.
     let values = decode_bytes_to_vec_u64(tally_bytes)?;
 
-    // Divide the polynomial evenly into num_choices segments.
-    // Any leftover coefficients (degree % num_choices) are trailing
-    // zeros and are ignored.
-    let segment_size = values.len() / num_choices;
+    if values.len() < MAX_MSG_NON_ZERO_COEFFS {
+        return Err(eyre::eyre!(
+            "decoded coefficient count ({}) is less than MAX_MSG_NON_ZERO_COEFFS ({})",
+            values.len(),
+            MAX_MSG_NON_ZERO_COEFFS
+        ));
+    }
 
-    // Only read the rightmost MAX_VOTE_BITS (50) coefficients from each
-    // segment to avoid overflow. If the segment is smaller than
-    // MAX_VOTE_BITS (unlikely with degree=512), use the full segment.
-    let effective_size = segment_size.min(MAX_VOTE_BITS);
-
+    let segment_size = MAX_MSG_NON_ZERO_COEFFS / num_choices;
     let mut results = Vec::with_capacity(num_choices);
 
     for choice_idx in 0..num_choices {
-        // Find where this choice's segment starts in the array
         let segment_start = choice_idx * segment_size;
+        let segment = &values[segment_start..segment_start + segment_size];
 
-        // Right-align: skip leading zeros, read only the significant bits
-        // at the end of the segment
-        let read_start = segment_start + segment_size - effective_size;
-        let segment = &values[read_start..read_start + effective_size];
-
-        // Reconstruct the vote count from binary (big-endian within segment):
-        //   value = segment[0] * 2^(n-1) + segment[1] * 2^(n-2) + ... + segment[n-1] * 2^0
         let mut value = BigUint::from(0u64);
         for (i, &v) in segment.iter().enumerate() {
             let weight = BigUint::from(2u64).pow((segment.len() - 1 - i) as u32);
@@ -136,27 +82,71 @@ pub fn decode_tally(tally_bytes: &[u8], num_choices: usize) -> Result<Vec<BigUin
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_decode_tally_fhe_output() {
-        // Expected: yes = 10000000000, no = 30000000000
-        let tally_hex = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000001000000000000000000000000000000010000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000300000000000000000000000000000003000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000030000000000000003000000000000000300000000000000030000000000000003000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    /// Mirrors `@crisp-e3/sdk` `encodeVote` (binary coeffs, first `MAX_MSG_NON_ZERO_COEFFS`, then zeros).
+    fn encode_vote_like_sdk(vote: &[u64], degree: usize) -> Vec<u64> {
+        assert!(vote.len() >= 2);
+        assert!(degree >= MAX_MSG_NON_ZERO_COEFFS);
 
-        let bytes = hex::decode(tally_hex.strip_prefix("0x").unwrap_or(tally_hex)).unwrap();
-        let result = decode_tally(&bytes, 2).unwrap();
+        let n = vote.len();
+        let segment_size = MAX_MSG_NON_ZERO_COEFFS / n;
+        let max_val = (1u128 << segment_size) - 1;
 
-        assert_eq!(result[0], BigUint::from(10000000000u64));
-        assert_eq!(result[1], BigUint::from(30000000000u64));
+        let mut out = vec![0u64; degree];
+        let mut idx = 0;
+
+        for &value in vote {
+            assert!(
+                (value as u128) <= max_val,
+                "value {value} exceeds max for segment_size {segment_size}"
+            );
+            let bits = format!("{value:b}");
+            let bin_len = bits.len();
+            for i in 0..segment_size {
+                let offset = segment_size.saturating_sub(bin_len);
+                out[idx] = if i < offset {
+                    0
+                } else {
+                    u64::from(bits.as_bytes()[i - offset] - b'0')
+                };
+                idx += 1;
+            }
+        }
+
+        while idx < MAX_MSG_NON_ZERO_COEFFS {
+            out[idx] = 0;
+            idx += 1;
+        }
+
+        out
+    }
+
+    fn coeffs_to_le_bytes(coeffs: &[u64]) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(coeffs.len() * 8);
+        for c in coeffs {
+            bytes.extend_from_slice(&c.to_le_bytes());
+        }
+        bytes
     }
 
     #[test]
-    fn test_decode_tally_with_wrong_num_options() {
-        // Expected: yes = 10000000000, no = 30000000000
-        let tally_hex = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000001000000000000000000000000000000010000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000300000000000000000000000000000003000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000030000000000000003000000000000000300000000000000030000000000000003000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    fn test_decode_tally_matches_sdk_layout() {
+        let degree = 512;
+        let coeffs = encode_vote_like_sdk(&[10_000_000_000u64, 30_000_000_000u64], degree);
+        let bytes = coeffs_to_le_bytes(&coeffs);
+        let result = decode_tally(&bytes, 2).unwrap();
 
-        let bytes = hex::decode(tally_hex.strip_prefix("0x").unwrap_or(tally_hex)).unwrap();
+        assert_eq!(result[0], BigUint::from(10_000_000_000u64));
+        assert_eq!(result[1], BigUint::from(30_000_000_000u64));
+    }
+
+    #[test]
+    fn test_decode_tally_wrong_num_options_differs() {
+        let degree = 512;
+        let coeffs = encode_vote_like_sdk(&[10_000_000_000u64, 30_000_000_000u64], degree);
+        let bytes = coeffs_to_le_bytes(&coeffs);
         let result = decode_tally(&bytes, 3).unwrap();
 
-        assert!(result[0] != BigUint::from(10000000000u64));
-        assert!(result[1] != BigUint::from(30000000000u64));
+        assert_ne!(result[0], BigUint::from(10_000_000_000u64));
+        assert_ne!(result[1], BigUint::from(30_000_000_000u64));
     }
 }

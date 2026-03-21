@@ -6,7 +6,9 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 export default buildModule("RecursiveAggregationFoldVerifier", (m) => {
-  const recursiveAggregationFoldVerifier = m.contract("RecursiveAggregationFoldVerifier");
+  const recursiveAggregationFoldVerifier = m.contract(
+    "RecursiveAggregationFoldVerifier",
+  );
 
   return { recursiveAggregationFoldVerifier };
 }) as any;

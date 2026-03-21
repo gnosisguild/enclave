@@ -241,6 +241,13 @@ pub struct ThresholdShareDecryptionProofRequest {
     pub d_share_bytes: Vec<ArcBytes>,
     /// BFV preset for parameter resolution.
     pub params_preset: BfvPreset,
+    /// When false, skip wrapper proofs for recursive C6 folding (mirrors DKG `proof_aggregation_enabled`).
+    #[serde(default = "default_proof_aggregation_enabled")]
+    pub proof_aggregation_enabled: bool,
+}
+
+fn default_proof_aggregation_enabled() -> bool {
+    true
 }
 
 /// Response containing generated proofs for threshold share decryption (C6).
@@ -389,7 +396,7 @@ pub struct PartyShareDecryptionProofsToVerify {
     /// Signed C4a proof (SecretKey decryption).
     pub signed_sk_decryption_proof: SignedProofPayload,
     /// Signed C4b proofs (SmudgingNoise decryption), one per smudging noise index.
-    pub signed_esm_decryption_proofs: Vec<SignedProofPayload>,
+    pub signed_e_sm_decryption_proofs: Vec<SignedProofPayload>,
 }
 
 /// Batch verification results for C4 proofs.

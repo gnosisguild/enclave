@@ -189,7 +189,7 @@ describe('Integration', () => {
     const { waitForEvent } = await setupEventListeners(sdk, store)
 
     const committeeSize = CommitteeSize.Micro
-    const duration = 900
+    const duration = 600
     const inputWindow = await calculateInputWindow(publicClient, duration)
     const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
     const e3ProgramParams = encodeBfvParams(thresholdBfvParams)
@@ -209,6 +209,7 @@ describe('Integration', () => {
       e3Program: contracts.e3Program,
       e3ProgramParams,
       computeProviderParams,
+      proofAggregationEnabled: false,
     }
     const quote = await sdk.getE3Quote(requestParams)
     console.log('E3 quote:', quote)

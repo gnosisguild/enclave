@@ -15,7 +15,7 @@ import crispCircuit from '../../../circuits/bin/crisp/target/crisp.json'
 import foldCircuit from '../../../circuits/bin/fold/target/crisp_fold.json'
 import userDataEncryptionCt0Circuit from '../../../../../circuits/bin/threshold/target/user_data_encryption_ct0.json'
 import userDataEncryptionCt1Circuit from '../../../../../circuits/bin/threshold/target/user_data_encryption_ct1.json'
-import userDataEncryptionCircuit from '../../../../../circuits/bin/recursive_aggregation/wrapper/threshold/target/user_data_encryption.json'
+import userDataEncryptionCircuit from '../../../../../circuits/bin/threshold/target/user_data_encryption.json'
 import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress } from 'viem/utils'
 import { Hex } from 'viem'
 

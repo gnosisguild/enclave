@@ -21,7 +21,7 @@ if ! (cd "$ENCLAVE_CIRCUITS/bin/threshold/user_data_encryption_ct1" && nargo com
 fi
 
 echo "Compiling user_data_encryption..."
-if ! (cd "$ENCLAVE_CIRCUITS/bin/recursive_aggregation/wrapper/threshold/user_data_encryption" && nargo compile); then
+if ! (cd "$ENCLAVE_CIRCUITS/bin/threshold/user_data_encryption" && nargo compile); then
     echo "Error: user_data_encryption compilation failed"
     exit 1
 fi

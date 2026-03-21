@@ -11,6 +11,7 @@ import { IBondingRegistry } from "./interfaces/IBondingRegistry.sol";
 import { ISlashingManager } from "./interfaces/ISlashingManager.sol";
 import { IE3RefundManager } from "./interfaces/IE3RefundManager.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
+import { IPkVerifier } from "./interfaces/IPkVerifier.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -74,6 +75,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @dev Each encryption scheme ID maps to a contract that can verify decrypted outputs.
     mapping(bytes32 encryptionSchemeId => IDecryptionVerifier decryptionVerifier)
         public decryptionVerifiers;
+
+    /// @notice Mapping of encryption schemes to their C5 (pk_aggregation) proof verifiers.
+    /// @dev Required per scheme; gates E3 requests like decryptionVerifier.
+    mapping(bytes32 encryptionSchemeId => IPkVerifier pkVerifier)
+        public pkVerifiers;
 
     /// @notice Mapping storing valid E3 program ABI encoded parameter sets.
     /// @dev Stores allowed encryption scheme parameters (e.g., BFV parameters).
@@ -366,6 +372,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.e3Program = requestParams.e3Program;
         e3.e3ProgramParams = requestParams.e3ProgramParams;
         e3.customParams = requestParams.customParams;
+        e3.proofAggregationEnabled = requestParams.proofAggregationEnabled;
         e3.committeePublicKey = hex"";
         e3.ciphertextOutput = hex"";
         e3.plaintextOutput = hex"";
@@ -390,8 +397,15 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InvalidEncryptionScheme(encryptionSchemeId)
         );
 
+        IPkVerifier pkVerifier = pkVerifiers[encryptionSchemeId];
+        require(
+            address(pkVerifier) != address(0),
+            InvalidEncryptionScheme(encryptionSchemeId)
+        );
+
         e3.encryptionSchemeId = encryptionSchemeId;
         e3.decryptionVerifier = decryptionVerifier;
+        e3.pkVerifier = pkVerifier;
         e3s[e3Id] = e3;
 
         require(
@@ -483,7 +497,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         _e3Stages[e3Id] = E3Stage.Complete;
 
         (success) = e3.decryptionVerifier.verify(
-            e3Id,
             keccak256(plaintextOutput),
             proof
         );
@@ -691,6 +704,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     /// @inheritdoc IEnclave
+    function setPkVerifier(
+        bytes32 encryptionSchemeId,
+        IPkVerifier pkVerifier
+    ) public onlyOwner {
+        require(
+            address(pkVerifier) != address(0) &&
+                pkVerifiers[encryptionSchemeId] != pkVerifier,
+            InvalidEncryptionScheme(encryptionSchemeId)
+        );
+        pkVerifiers[encryptionSchemeId] = pkVerifier;
+    }
+
+    /// @inheritdoc IEnclave
     function disableEncryptionScheme(
         bytes32 encryptionSchemeId
     ) public onlyOwner {
@@ -815,16 +841,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @inheritdoc IEnclave
     function onCommitteePublished(
         uint256 e3Id,
-        bytes32 committeePublicKeyHash
+        bytes32 committeePublicKey
     ) external onlyCiphernodeRegistry {
-        // DKG complete, key published
+        E3 storage e3 = e3s[e3Id];
         E3Stage current = _e3Stages[e3Id];
         if (current != E3Stage.CommitteeFinalized) {
             revert InvalidStage(e3Id, E3Stage.CommitteeFinalized, current);
         }
-        _e3Stages[e3Id] = E3Stage.KeyPublished;
 
-        e3s[e3Id].committeePublicKey = committeePublicKeyHash;
+        _e3Stages[e3Id] = E3Stage.KeyPublished;
+        e3.committeePublicKey = committeePublicKey;
 
         emit CommitteeFormed(e3Id);
         emit E3StageChanged(
@@ -1117,5 +1143,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes32 encryptionSchemeId
     ) public view returns (IDecryptionVerifier) {
         return decryptionVerifiers[encryptionSchemeId];
+    }
+
+    /// @inheritdoc IEnclave
+    function getPkVerifier(
+        bytes32 encryptionSchemeId
+    ) public view returns (IPkVerifier) {
+        return pkVerifiers[encryptionSchemeId];
     }
 }
