@@ -12,6 +12,9 @@ use e3_events::{EnclaveEvent, EventLog, Unsequenced};
 use std::path::PathBuf;
 use tracing::error;
 
+/// Maximum message size for both reads and writes (32 MB).
+const MAX_MESSAGE_BYTES: usize = 32 * 1024 * 1024;
+
 pub struct CommitLogEventLog {
     log: CommitLog,
 }
@@ -19,8 +22,8 @@ pub struct CommitLogEventLog {
 impl CommitLogEventLog {
     pub fn new(path: &PathBuf) -> Result<Self> {
         let mut opts = LogOptions::new(path);
-        // TODO: drive this from config - currently set high to be permissive
-        opts.message_max_bytes(32 * 1024 * 1024);
+        // TODO: derive this from config - currently set high to be permissive
+        opts.message_max_bytes(MAX_MESSAGE_BYTES);
         let log = CommitLog::new(opts)?;
         Ok(Self { log })
     }
@@ -47,7 +50,10 @@ impl EventLog for CommitLogEventLog {
         let mut events = Vec::new();
 
         loop {
-            let message_buf = match self.log.read(current_offset, ReadLimit::default()) {
+            let message_buf = match self
+                .log
+                .read(current_offset, ReadLimit::max_bytes(MAX_MESSAGE_BYTES))
+            {
                 Ok(msgs) => msgs,
                 Err(_) => break,
             };
