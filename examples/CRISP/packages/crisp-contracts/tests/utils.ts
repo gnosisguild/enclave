@@ -51,7 +51,7 @@ export async function deployMockEnclave() {
  * @returns The address of the deployed HonkVerifier contract.
  */
 export async function deployHonkVerifier() {
-  const zkTranscriptLib = await deployContract('ZKTranscriptLib')
+  const zkTranscriptLib = await deployContract('contracts/CRISPVerifier.sol:ZKTranscriptLib')
 
   const HonkVerifierFactory = await ethers.getContractFactory('HonkVerifier', {
     libraries: {

@@ -28,15 +28,42 @@ use alloy::{
         Authorization,
     },
 };
+use alloy::{primitives::Bytes, sol_types::SolValue};
 use anyhow::{Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use e3_config::{RpcAuth, RPC};
 use e3_crypto::Cipher;
 use e3_data::Repository;
+use e3_events::Proof;
 use e3_utils::{retry_with_backoff, RetryError};
 use std::{env, future::Future, pin::Pin, sync::Arc};
 use tracing::info;
 use zeroize::{Zeroize, Zeroizing};
+
+/// ABI-encodes a ZK proof for EVM verifiers (C5 pk, C7 decryption, etc.).
+/// Format: abi.encode(rawProof, publicInputs). Public inputs as bytes32[].
+pub fn encode_zk_proof(proof: &Proof) -> Result<Bytes> {
+    let signals: &[u8] = &*proof.public_signals;
+    if signals.is_empty() {
+        anyhow::bail!("public_signals must be non-empty");
+    }
+    if signals.len() % 32 != 0 {
+        anyhow::bail!(
+            "public_signals length must be a multiple of 32, got {}",
+            signals.len()
+        );
+    }
+    let mut inputs = Vec::with_capacity(signals.len() / 32);
+    for chunk in signals.chunks_exact(32) {
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(chunk);
+        inputs.push(arr);
+    }
+
+    Ok(Bytes::from(
+        ((&*proof.data).to_vec(), inputs).abi_encode_params(),
+    ))
+}
 
 pub trait AuthConversions {
     fn to_header_value(&self) -> Option<HeaderValue>;
@@ -289,6 +316,50 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_dyn_abi::DynSolType;
+    use e3_events::{CircuitName, Proof};
+    use e3_utils::ArcBytes;
+
+    /// Verifies encode_zk_proof produces ABI that matches BfvPkVerifier/BfvDecryptionVerifier:
+    /// abi.decode(proof, (bytes, bytes32[]))
+    #[test]
+    fn test_encode_zk_proof_abi_format() {
+        let raw_proof = vec![1u8, 2, 3, 4, 5];
+        let public_signals: Vec<u8> = (0..64).map(|i| i as u8).collect(); // 2 × 32-byte fields
+        let proof = Proof::new(
+            CircuitName::PkAggregation,
+            ArcBytes::from_bytes(&raw_proof),
+            ArcBytes::from_bytes(&public_signals),
+        );
+
+        let encoded = encode_zk_proof(&proof).expect("encoding should succeed");
+
+        let tuple_type = DynSolType::Tuple(vec![
+            DynSolType::Bytes,
+            DynSolType::Array(Box::new(DynSolType::FixedBytes(32))),
+        ]);
+        // Pair encode_zk_proof's abi_encode_params with abi_decode_params (not abi_decode).
+        tuple_type.abi_decode_params(&encoded).expect(
+            "encoded proof should decode as (bytes, bytes32[]) - matches contract abi.decode",
+        );
+    }
+
+    #[test]
+    fn test_encode_zk_proof_rejects_invalid() {
+        let proof = Proof::new(
+            CircuitName::PkAggregation,
+            ArcBytes::from_bytes(&[1, 2, 3]),
+            ArcBytes::from_bytes(&[0u8; 31]), // not divisible by 32
+        );
+        assert!(encode_zk_proof(&proof).is_err());
+
+        let proof_empty = Proof::new(
+            CircuitName::PkAggregation,
+            ArcBytes::from_bytes(&[1, 2, 3]),
+            ArcBytes::from_bytes(&[]),
+        );
+        assert!(encode_zk_proof(&proof_empty).is_err());
+    }
 
     #[test]
     fn test_rpc_conversions() -> Result<()> {

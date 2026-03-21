@@ -69,6 +69,7 @@ impl E3Extension for ThresholdKeyshareExtension {
             meta.threshold_n as u64,
             meta.params.clone(),
             self.address.clone(),
+            meta.proof_aggregation_enabled,
         )));
 
         // New container with None
