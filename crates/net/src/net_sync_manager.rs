@@ -369,7 +369,7 @@ async fn handle_sync_request_event(
         );
         let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone())
             .max_retries(10)
-            .retry_timeout(Duration::from_secs(30))
+            .retry_timeout(Duration::from_secs(20))
             .build();
         match fetch_all_batched_events::<EnclaveEvent<Unsequenced>>(
             requester,
