@@ -10,7 +10,8 @@
 //! Circuit artifacts (`.json` + `.vk`) are expected in `circuits/bin/{group}/target/`,
 //! produced by `pnpm build:circuits` locally or the `build_circuits` CI job.
 //!
-//! To add a new circuit: add setup_*_test() and one line in `e2e_proof_tests!`.
+//! To add a new circuit: add setup_*_test() and one line in `e2e_proof_tests!`
+//! `(name, setup, CircuitVariant::Recursive | Evm)` (C5 pk_aggregation uses Evm).
 //! Commitment consistency tests are defined separately.
 
 mod common;
@@ -43,10 +44,13 @@ use e3_zk_helpers::threshold::{
 };
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_helpers::Computation;
-use e3_zk_helpers::{compute_share_computation_sk_commitment, compute_threshold_pk_commitment};
+use e3_zk_helpers::{
+    compute_pk_aggregation_commitment, compute_share_computation_sk_commitment,
+    compute_threshold_pk_commitment,
+};
 use e3_zk_prover::{
-    generate_chunk_batch_proof, generate_share_computation_final_proof, Provable, ZkBackend,
-    ZkProver,
+    generate_chunk_batch_proof, generate_share_computation_final_proof, CircuitVariant, Provable,
+    ZkBackend, ZkProver,
 };
 
 /// Convert raw public signals bytes (32-byte big-endian chunks) to ark_bn254::Fr field elements.
@@ -356,7 +360,7 @@ async fn setup_pk_test() -> Option<(
 }
 
 macro_rules! e2e_proof_tests {
-    ($(($name:ident, $setup:expr)),* $(,)?) => {
+    ($(($name:ident, $setup:expr, $variant:expr)),* $(,)?) => {
         $(
             paste::paste! {
                 #[tokio::test]
@@ -369,14 +373,15 @@ macro_rules! e2e_proof_tests {
                     };
 
                     let proof = circuit
-                        .prove(&prover, &preset, &sample, e3_id)
+                        .prove_with_variant(&prover, &preset, &sample, e3_id, $variant)
                         .expect("proof generation should succeed");
 
                     assert!(!proof.data.is_empty(), "proof data should not be empty");
                     assert!(!proof.public_signals.is_empty(), "public signals should not be empty");
 
                     let party_id = 1;
-                    let verification_result = circuit.verify(&prover, &proof, e3_id, party_id);
+                    let verification_result =
+                        circuit.verify_with_variant(&prover, &proof, e3_id, party_id, $variant);
                     assert!(
                         verification_result.as_ref().is_ok_and(|&v| v),
                         "Proof verification failed: {:?}",
@@ -391,15 +396,15 @@ macro_rules! e2e_proof_tests {
 }
 
 e2e_proof_tests! {
-    (pk_generation, setup_pk_generation_test()),
-    (pk, setup_pk_test()),
-    (share_computation_sk, setup_share_computation_sk_base_chunk_test()),
-    (share_computation_e_sm, setup_share_computation_e_sm_base_chunk_test()),
-    (share_encryption_sk, setup_share_encryption_sk_test()),
-    (share_encryption_e_sm, setup_share_encryption_e_sm_test()),
-    (share_decryption, setup_share_decryption_test()),
-    (pk_aggregation, setup_pk_aggregation_test()),
-    (decrypted_shares_aggregation, setup_decrypted_shares_aggregation_test()),
+    (pk_generation, setup_pk_generation_test(), CircuitVariant::Recursive),
+    (pk, setup_pk_test(), CircuitVariant::Recursive),
+    (share_computation_sk, setup_share_computation_sk_base_chunk_test(), CircuitVariant::Recursive),
+    (share_computation_e_sm, setup_share_computation_e_sm_base_chunk_test(), CircuitVariant::Recursive),
+    (share_encryption_sk, setup_share_encryption_sk_test(), CircuitVariant::Recursive),
+    (share_encryption_e_sm, setup_share_encryption_e_sm_test(), CircuitVariant::Recursive),
+    (share_decryption, setup_share_decryption_test(), CircuitVariant::Recursive),
+    (pk_aggregation, setup_pk_aggregation_test(), CircuitVariant::Evm),
+    (decrypted_shares_aggregation, setup_decrypted_shares_aggregation_test(), CircuitVariant::Recursive),
 }
 
 #[tokio::test]
@@ -640,8 +645,10 @@ async fn test_pk_aggregation_commitment_consistency() {
         return;
     };
 
+    // C5 uses Evm variant in production; Recursive fails because commitment hashes (256-bit)
+    // exceed the noir-recursive verifier's limb bound.
     let proof = circuit
-        .prove(&prover, &preset, &sample, e3_id)
+        .prove_with_variant(&prover, &preset, &sample, e3_id, CircuitVariant::Evm)
         .expect("proof generation should succeed");
 
     let computation_output = PkAggregationCircuit::compute(preset, &sample).unwrap();
@@ -655,10 +662,21 @@ async fn test_pk_aggregation_commitment_consistency() {
         let commitment_from_proof = extract_field(&proof.public_signals, i);
         assert_eq!(
             commitment_from_proof, *expected,
-            "pk_aggregation commitment {} mismatch",
+            "pk_aggregation per-party commitment {} mismatch",
             i
         );
     }
+
+    let expected_final_commitment = compute_pk_aggregation_commitment(
+        &computation_output.inputs.pk0_agg,
+        &computation_output.inputs.pk1_agg,
+        computation_output.bits.pk_bit,
+    );
+    let final_commitment_from_proof = extract_field_from_end(&proof.public_signals, 0);
+    assert_eq!(
+        final_commitment_from_proof, expected_final_commitment,
+        "pk_aggregation final commitment mismatch"
+    );
 
     prover.cleanup(e3_id).unwrap();
 }

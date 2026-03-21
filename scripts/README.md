@@ -281,7 +281,7 @@ Automates the full pipeline from Noir circuits to on-chain Solidity verifiers:
    - Renames contract from `HonkVerifier` to descriptive name (e.g.,
      `ThresholdPkAggregationVerifier`, `ThresholdPkGenerationVerifier`)
    - Replaces Apache-2.0 license header with LGPL-3.0-only
-6. **Outputs** to `packages/enclave-contracts/contracts/verifier/`
+6. **Outputs** to `packages/enclave-contracts/contracts/verifiers/bfv/honk/`
 
 ### Options
 
@@ -311,7 +311,7 @@ The `generate:verifiers` script in package.json passes `--circuits` with the on-
    ✓ recursive_aggregation/fold → RecursiveAggregationFoldVerifier.sol
 
 ✅ Generated 4 Solidity verifier(s) in:
-   packages/enclave-contracts/contracts/verifier/
+   packages/enclave-contracts/contracts/verifiers/bfv/honk/
 ```
 
 ### Integration

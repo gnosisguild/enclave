@@ -241,6 +241,13 @@ pub struct ThresholdShareDecryptionProofRequest {
     pub d_share_bytes: Vec<ArcBytes>,
     /// BFV preset for parameter resolution.
     pub params_preset: BfvPreset,
+    /// When false, skip wrapper proofs for recursive C6 folding (mirrors DKG `proof_aggregation_enabled`).
+    #[serde(default = "default_proof_aggregation_enabled")]
+    pub proof_aggregation_enabled: bool,
+}
+
+fn default_proof_aggregation_enabled() -> bool {
+    true
 }
 
 /// Response containing generated proofs for threshold share decryption (C6).

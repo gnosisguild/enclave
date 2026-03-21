@@ -19,6 +19,7 @@ use e3_zk_helpers::dkg::share_computation::{
     ShareComputationChunkCircuitData, ShareComputationCircuit, ShareComputationCircuitData,
 };
 use e3_zk_helpers::Computation;
+use std::fmt::Display;
 
 //////////////////////////////////////////////////////////////////////////////
 // Two-level wrapper proof generation
@@ -214,6 +215,27 @@ impl Provable for ShareComputationCircuit {
 
         // Level 2: aggregate batch proofs into final C2 proof
         generate_share_computation_final_proof(prover, &batch_proofs, e3_id)
+    }
+
+    fn prove_with_variant(
+        &self,
+        prover: &ZkProver,
+        params: &Self::Params,
+        input: &Self::Input,
+        e3_id: &str,
+        variant: CircuitVariant,
+    ) -> Result<Proof, ZkError>
+    where
+        Self::Inputs: Computation<Preset = Self::Params, Data = Self::Input> + serde::Serialize,
+        <Self::Inputs as Computation>::Error: Display,
+    {
+        if variant != CircuitVariant::Recursive {
+            return Err(ZkError::ProveFailed(format!(
+                "share_computation only supports CircuitVariant::Recursive, got {:?}",
+                variant
+            )));
+        }
+        self.prove(prover, params, input, e3_id)
     }
 
     /// Inner share_computation proof is verified with Recursive variant.

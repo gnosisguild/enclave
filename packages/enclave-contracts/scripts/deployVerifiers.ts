@@ -18,7 +18,9 @@ const main = async () => {
   const entries = Object.entries(verifierDeployments);
 
   if (entries.length === 0) {
-    console.log("No verifier contracts found in contracts/verifier/.");
+    console.log(
+      "No verifier contracts found in contracts/verifiers/bfv/honk/.",
+    );
     return;
   }
 

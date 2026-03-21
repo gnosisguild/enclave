@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
+
+import {
+  BfvDecryptionVerifier,
+  BfvDecryptionVerifier__factory as BfvDecryptionVerifierFactory,
+} from "../../types";
+import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+
+export const deployAndSaveBfvDecryptionVerifier = async (
+  hre: HardhatRuntimeEnvironment,
+): Promise<{
+  bfvDecryptionVerifier: BfvDecryptionVerifier;
+}> => {
+  const { ethers } = await hre.network.connect();
+  const [signer] = await ethers.getSigners();
+  const chain = hre.globalOptions.network ?? "localhost";
+
+  const circuitVerifierArgs = readDeploymentArgs(
+    "ThresholdDecryptedSharesAggregationVerifier",
+    chain,
+  );
+  if (!circuitVerifierArgs?.address) {
+    throw new Error(
+      "ThresholdDecryptedSharesAggregationVerifier must be deployed first. " +
+        "Run deployAndSaveAllVerifiers or deploy verifiers.",
+    );
+  }
+
+  const existing = readDeploymentArgs("BfvDecryptionVerifier", chain);
+  if (existing?.address) {
+    console.log(
+      `   BfvDecryptionVerifier already deployed at ${existing.address}`,
+    );
+    const bfvDecryptionVerifier = BfvDecryptionVerifierFactory.connect(
+      existing.address,
+      signer,
+    );
+    return { bfvDecryptionVerifier };
+  }
+
+  const bfvDecryptionVerifierFactory = await ethers.getContractFactory(
+    "BfvDecryptionVerifier",
+  );
+  const bfvDecryptionVerifier = await bfvDecryptionVerifierFactory.deploy(
+    circuitVerifierArgs.address,
+  );
+
+  await bfvDecryptionVerifier.waitForDeployment();
+  const bfvDecryptionVerifierAddress = await bfvDecryptionVerifier.getAddress();
+
+  const blockNumber = await ethers.provider.getBlockNumber();
+
+  storeDeploymentArgs(
+    {
+      blockNumber,
+      address: bfvDecryptionVerifierAddress,
+    },
+    "BfvDecryptionVerifier",
+    chain,
+  );
+
+  console.log(
+    `   BfvDecryptionVerifier deployed to: ${bfvDecryptionVerifierAddress}`,
+  );
+
+  const bfvDecryptionVerifierContract = BfvDecryptionVerifierFactory.connect(
+    bfvDecryptionVerifierAddress,
+    signer,
+  );
+
+  return { bfvDecryptionVerifier: bfvDecryptionVerifierContract };
+};

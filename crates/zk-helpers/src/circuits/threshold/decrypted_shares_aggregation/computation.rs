@@ -11,6 +11,9 @@
 //! with [`e3_polynomial::CrtPolynomial::reduce`]; all input coefficients are reduced to
 //! [0, zkp_modulus) with [`e3_polynomial::reduce`] inside [`Inputs::compute`].
 
+/// Max message coefficients in the C7 circuit (matches Noir's MAX_MSG_NON_ZERO_COEFFS).
+pub const MAX_MSG_NON_ZERO_COEFFS: usize = 100;
+
 use crate::calculate_bit_width;
 use crate::compute_q_mod_t;
 use crate::compute_q_mod_t_centered;
@@ -155,9 +158,8 @@ impl Computation for Configs {
             q_inverse_mod_t,
             bits,
             bounds,
-            // TODO: make this configurable based on the application (e.g., CRISP = 80,
-            //       since there's just CRISP for now we can hardcode it).
-            max_msg_non_zero_coeffs: 80, // Default; matches Noir's MAX_MSG_NON_ZERO_COEFFS.
+            // TODO: make this configurable based on the application (e.g., CRISP = 80).
+            max_msg_non_zero_coeffs: MAX_MSG_NON_ZERO_COEFFS,
         })
     }
 }
