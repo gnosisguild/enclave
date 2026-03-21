@@ -75,12 +75,12 @@ waiton "$SCRIPT_DIR/output/pubkey.bin"
 # kill aggregator
 enclave_nodes_stop ag
 
-sleep 2
+sleep 8
 
 # relaunch the aggregator
 enclave_nodes_start ag
 
-sleep 4
+sleep 8
 
 heading "Mock encrypted plaintext"
 $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
