@@ -343,16 +343,16 @@ async fn handle_sync_request_event(
     info!("Checking for AllPeersDialed...");
     if wait_for_event {
         info!("Waiting for peer connection...");
-        await_event(
+        let has_peers = await_event(
             &net_events,
             |e| match e {
                 NetEvent::ConnectionEstablished { .. } => {
                     info!("Peer connection established");
-                    Some(())
+                    Some(true)
                 }
                 NetEvent::AllPeersDialed { total: 0, .. } => {
                     info!("No peers configured, proceeding without sync");
-                    Some(())
+                    Some(false)
                 }
                 _ => None,
             },
@@ -360,6 +360,18 @@ async fn handle_sync_request_event(
         )
         .await
         .context("No peer connections established within timeout")?;
+
+        if !has_peers {
+            let value = SyncRequestSucceeded {
+                response: SyncResponseValue {
+                    events: vec![],
+                    ts: 0,
+                },
+            };
+
+            address.into().try_send(TypedEvent::new(value, ctx))?;
+            return Ok(());
+        }
     }
     info!("handle_sync_request_event: AllPeersDialed");
 
