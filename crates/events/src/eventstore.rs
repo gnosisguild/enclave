@@ -42,6 +42,12 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         }
         let seq = self.log.append(&event)?;
         self.index.insert(ts, seq)?;
+        if event.source() == crate::EventSource::Net {
+            tracing::info!(
+                "EventStore: stored Net event ts={} seq={} aggregate={}",
+                ts, seq, event.aggregate_id()
+            );
+        }
         Ok(Some(event.into_sequenced(seq)))
     }
 
