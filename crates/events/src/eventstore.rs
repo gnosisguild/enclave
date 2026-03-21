@@ -42,14 +42,6 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         }
         let seq = self.log.append(&event)?;
         self.index.insert(ts, seq)?;
-        if event.source() == crate::EventSource::Net {
-            tracing::info!(
-                "EventStore: stored Net event ts={} seq={} aggregate={}",
-                ts,
-                seq,
-                event.aggregate_id()
-            );
-        }
         Ok(Some(event.into_sequenced(seq)))
     }
 
@@ -84,19 +76,10 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         limit: Option<u64>,
     ) -> Result<Vec<EnclaveEvent<Sequenced>>> {
         let Some(seq) = self.index.seek(query)? else {
-            tracing::info!("query_by_ts: no index entry at or after ts={}", query);
             return Ok(vec![]);
         };
         let events: Vec<_> = self.log.read_from(seq).collect();
-        let total = events.len();
         let result = self.collect_events(Box::new(events.into_iter()), filter, limit);
-        tracing::info!(
-            "query_by_ts: ts={} -> seq={}, {} raw events, {} after filter",
-            query,
-            seq,
-            total,
-            result.len()
-        );
         Ok(result)
     }
 

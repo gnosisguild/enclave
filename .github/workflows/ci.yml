@@ -119,8 +119,7 @@ jobs:
 
   rust_unit_tests:
     needs: [detect_changes]
-    # if: needs.detect_changes.outputs.rust_unit_tests == 'true'
-    if: false
+    if: needs.detect_changes.outputs.rust_unit_tests == 'true'
     timeout-minutes: 20
     runs-on: 'ubuntu-latest'
     permissions:
@@ -174,8 +173,7 @@ jobs:
 
   rust_integration_tests:
     needs: [detect_changes]
-    # if: needs.detect_changes.outputs.rust_integration_tests == 'true'
-    if: false
+    if: needs.detect_changes.outputs.rust_integration_tests == 'true'
     timeout-minutes: 45
     runs-on:
       group: enclave-ci
@@ -218,8 +216,7 @@ jobs:
 
   zk_prover_integration:
     needs: [detect_changes]
-    # if: needs.detect_changes.outputs.zk_prover_integration == 'true'
-    if: false
+    if: needs.detect_changes.outputs.zk_prover_integration == 'true'
     timeout-minutes: 30
     runs-on: 'ubuntu-latest'
     steps:
@@ -303,8 +300,7 @@ jobs:
 
   build_ciphernode_image:
     needs: [detect_changes]
-    # if: needs.detect_changes.outputs.docker_ciphernode == 'true'
-    if: false
+    if: needs.detect_changes.outputs.docker_ciphernode == 'true'
     timeout-minutes: 30
     runs-on: 'ubuntu-latest'
     steps:
@@ -347,8 +343,7 @@ jobs:
 
   test_contracts:
     needs: [detect_changes]
-    # if: needs.detect_changes.outputs.contracts == 'true'
-    if: false
+    if: needs.detect_changes.outputs.contracts == 'true'
     timeout-minutes: 15
     runs-on: 'ubuntu-latest'
     permissions:
@@ -395,8 +390,7 @@ jobs:
 
   test_net:
     needs: [detect_changes]
-    # if: needs.detect_changes.outputs.net == 'true'
-    if: false
+    if: needs.detect_changes.outputs.net == 'true'
     timeout-minutes: 15
     runs-on: 'ubuntu-latest'
     steps:
@@ -586,8 +580,7 @@ jobs:
 
   crisp_unit:
     needs: [detect_changes, build_crisp_sdk]
-    # if: needs.detect_changes.outputs.crisp == 'true'
-    if: false
+    if: needs.detect_changes.outputs.crisp == 'true'
     timeout-minutes: 30
     runs-on: 'ubuntu-latest'
     steps:
@@ -662,8 +655,7 @@ jobs:
 
   crisp_e2e:
     needs: [detect_changes, build_enclave_cli, build_crisp_sdk]
-    # if: needs.detect_changes.outputs.crisp == 'true'
-    if: false 
+    if: needs.detect_changes.outputs.crisp == 'true' 
     timeout-minutes: 45
     runs-on:
       group: enclave-ci
@@ -778,8 +770,7 @@ jobs:
 
   build_circuits:
     needs: [detect_changes]
-    # if: needs.detect_changes.outputs.build_circuits == 'true'
-    if: false
+    if: needs.detect_changes.outputs.build_circuits == 'true'
     timeout-minutes: 30
     runs-on: 'ubuntu-latest'
     permissions:
@@ -938,8 +929,7 @@ jobs:
 
   build_e3_support_dev:
     needs: [detect_changes]
-    # if: needs.detect_changes.outputs.build_e3_support_dev == 'true'
-    if: false
+    if: needs.detect_changes.outputs.build_e3_support_dev == 'true'
     timeout-minutes: 20
     runs-on: 'ubuntu-latest'
     steps:
@@ -1030,8 +1020,7 @@ jobs:
 
   build_crisp_sdk:
     needs: [detect_changes]
-    # if: needs.detect_changes.outputs.crisp == 'true'
-    if: false
+    if: needs.detect_changes.outputs.crisp == 'true'
     timeout-minutes: 20
     runs-on: 'ubuntu-latest'
     steps:
@@ -1081,8 +1070,7 @@ jobs:
 
   template_integration:
     needs: [detect_changes, build_enclave_cli, build_e3_support_dev, build_sdk]
-    # if: needs.detect_changes.outputs.templates == 'true'
-    if: false
+    if: needs.detect_changes.outputs.templates == 'true'
     timeout-minutes: 30
     runs-on:
       group: enclave-ci
@@ -1158,8 +1146,7 @@ jobs:
 
   test_enclave_init:
     needs: [detect_changes, build_enclave_cli, build_e3_support_dev]
-    # if: needs.detect_changes.outputs.init == 'true'
-    if: false
+    if: needs.detect_changes.outputs.init == 'true'
     timeout-minutes: 10
     runs-on: 'ubuntu-latest'
     steps:

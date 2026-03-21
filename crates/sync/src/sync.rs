@@ -112,13 +112,6 @@ pub async fn sync(
             (id, ts)
         })
         .collect();
-    info!(
-        "Net sync config: {:?}",
-        net_config
-            .iter()
-            .map(|(id, ts)| format!("{}={}", id, ts))
-            .collect::<Vec<_>>()
-    );
 
     // 6. Load the historical libp2p events to memory
     info!("Waiting until NetReady...");
