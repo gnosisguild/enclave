@@ -55,7 +55,7 @@ pub async fn sync(
 
     // 2. Determine the evm blocks to read from based on the SnapshotMeta
     let evm_config = snapshot.to_evm_config();
-    let _net_config = snapshot.to_net_config();
+    let snapshot_net_config = snapshot.to_net_config();
 
     // 3. Load EventStore events since the sequence number found in the snapshot into memory.
     info!("Loading EventStore events...");
@@ -96,13 +96,28 @@ pub async fn sync(
         "{} historical blockchain events loaded.",
         historical_evm_events.len()
     );
-    let net_config = find_net_hlc(&historical_evm_events);
+    // Build the net sync cursor using snapshot timestamps (the original HLC timestamps
+    // from before the restart). We cannot use find_net_hlc(&historical_evm_events) because
+    // re-read EVM events get NEW HLC timestamps from hlc.receive() — the HLC is fresh on
+    // restart so it uses the current wallclock, producing timestamps that are later than what
+    // ciphernodes stored. This makes the sync query return 0 events.
+    //
+    // We still use find_net_hlc to determine WHICH aggregates need syncing (filtering out
+    // closed E3s), but replace the timestamps with the original ones from the snapshot.
+    let open_aggregates = find_net_hlc(&historical_evm_events);
+    let net_config: BTreeMap<AggregateId, u128> = open_aggregates
+        .into_iter()
+        .map(|(id, _)| {
+            let ts = snapshot_net_config.get(&id).copied().unwrap_or(0);
+            (id, ts)
+        })
+        .collect();
+
     // 6. Load the historical libp2p events to memory
     info!("Waiting until NetReady...");
     net_ready.await?;
     info!("NetReady!");
     info!("Loading historical libp2p events...");
-    // let (addr, rx) = actix_toolbox::oneshot::<HistoricalNetSyncEventsReceived>();
     let events_received = bus.wait_for(EventType::HistoricalNetSyncEventsReceived);
     bus.publish_without_context(HistoricalNetSyncStart::new(net_config.clone()))?;
     let EnclaveEventData::HistoricalNetSyncEventsReceived(event) =

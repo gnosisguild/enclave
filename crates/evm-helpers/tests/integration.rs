@@ -130,8 +130,10 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
                 println!("PublishMessage '{}' ({} since sent)", msg, time_diff);
 
                 let _ = tx.try_send("waiting".to_string());
-                // Wait 200ms before publishing to simulate long running handlers
-                sleep(Duration::from_millis(200)).await;
+                // Wait long enough to simulate a long-running handler. Must be large
+                // enough that "two" (sent 100ms later) arrives before this completes,
+                // even on slow CI runners with ~50ms event delivery latency.
+                sleep(Duration::from_millis(1000)).await;
                 println!("Sending message: '{msg}'");
                 let _ = tx.try_send(msg);
                 Ok(())
@@ -155,11 +157,11 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
     let _ = tokio::spawn(async move { spawn_event_listener.listen().await });
 
     // Events should be returned roughly in this order:
-    // 0ms : one
-    // 0ms : waiting
-    // 100ms : two
-    // 200ms : three
-    // 300ms : four
+    // 0ms    : one
+    // 0ms    : waiting
+    // 100ms  : two
+    // 1000ms : three  (after long-running handler completes)
+    // 1300ms : four
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
     contract
@@ -187,7 +189,9 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
         .watch()
         .await?;
 
-    sleep(Duration::from_millis(300)).await;
+    // Wait for the long-running PublishMessage handler (1000ms) to complete
+    // before sending "four", so "three" arrives before "four".
+    sleep(Duration::from_millis(1200)).await;
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
     contract

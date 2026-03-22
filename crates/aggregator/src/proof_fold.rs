@@ -24,12 +24,10 @@ pub struct ProofFoldState {
     accumulated: Option<Proof>,
     remaining: Vec<Proof>,
     /// Total fold steps (for progress logging). Set when fold starts.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     total_steps: Option<usize>,
     /// Set when all fold steps have completed.
     pub result: Option<Proof>,
     /// `start` was called with zero proofs — folding is complete with no aggregate.
-    #[serde(default)]
     pub fold_input_was_empty: bool,
 }
 

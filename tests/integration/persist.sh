@@ -68,7 +68,8 @@ pnpm committee:new \
   --input-window-start "$INPUT_WINDOW_START" \
   --input-window-end "$INPUT_WINDOW_END" \
   --e3-params "$ENCODED_PARAMS" \
-  --committee-size 0
+  --committee-size 0 \
+  --proof-aggregation-enabled true
 
 waiton "$SCRIPT_DIR/output/pubkey.bin"
 
