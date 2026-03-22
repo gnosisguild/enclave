@@ -555,21 +555,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             return;
         }
 
-        if (activeLength == 0) {
-            address requester = _e3Requesters[e3Id];
-            if (requester != address(0)) {
-                paymentToken.safeTransfer(requester, totalAmount);
-            }
-            e3RefundManager.distributeSlashedFundsOnSuccess(
-                e3Id,
-                activeNodes,
-                paymentToken
-            );
-            return;
-        }
-
-        uint256[] memory amounts = new uint256[](activeLength);
-
         // Split between protocol treasury and CN rewards
         uint256 protocolAmount = 0;
         uint16 _protocolShareBps = _e3ProtocolShareBps[e3Id];
@@ -584,6 +569,21 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         }
 
         uint256 cnAmount = totalAmount - protocolAmount;
+
+        if (activeLength == 0) {
+            address requester = _e3Requesters[e3Id];
+            if (requester != address(0) && cnAmount > 0) {
+                paymentToken.safeTransfer(requester, cnAmount);
+            }
+            e3RefundManager.distributeSlashedFundsOnSuccess(
+                e3Id,
+                activeNodes,
+                paymentToken
+            );
+            return;
+        }
+
+        uint256[] memory amounts = new uint256[](activeLength);
 
         // Distribute CN share equally among active (non-expelled) committee members
         uint256 amount = cnAmount / activeLength;
