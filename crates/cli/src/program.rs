@@ -8,7 +8,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use e3_config::AppConfig;
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum ProgramCommands {
     /// Start the program
     Start {
@@ -38,7 +38,7 @@ pub enum ProgramCommands {
     },
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum ProgramCacheCommands {
     /// Purge program compilation caches. Will make program compilation take longer.
     Purge,

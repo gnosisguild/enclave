@@ -4,8 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use anyhow::Result;
 use clap::Parser;
-use cli::Cli;
+use cli::{Cli, RemoteCli};
+use e3_console::Console;
+use e3_socket_server::{connect_socket, run_on_socket};
 use e3_utils::{colorize, Color};
 use tracing::info;
 
@@ -59,12 +62,27 @@ pub fn owo() {
 }
 
 #[actix::main]
-pub async fn main() {
+pub async fn main() -> Result<()> {
     info!("COMPILATION ID: '{}'", helpers::compile_id::generate_id());
+    let handle = Console::stdout();
+    let out = handle.writer();
+    let cli = Cli::parse();
 
-    // Execute the cli
-    if let Err(err) = Cli::parse().execute().await {
+    let config_result = cli.load_config();
+    let maybe_stream = connect_socket(config_result.as_ref().ok()).await;
+    let maybe_remote_command = TryInto::<RemoteCli>::try_into(cli.clone()).ok();
+
+    // If the socket exists and the command can be parsed as remote
+    if let Err(err) = if let (Some(stream), Some(command)) = (maybe_stream, maybe_remote_command) {
+        // Run the command over the socket
+        run_on_socket(out, stream, command).await
+    } else {
+        // Run the command locally
+        cli.execute(out, config_result).await
+    } {
         eprintln!("{}", colorize(err, Color::Red));
         std::process::exit(1);
     }
+    handle.flush().await;
+    Ok(())
 }

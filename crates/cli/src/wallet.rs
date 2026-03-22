@@ -7,11 +7,12 @@
 use anyhow::*;
 use clap::Subcommand;
 use e3_config::AppConfig;
+use e3_console::Console;
 use zeroize::Zeroizing;
 
 use crate::{helpers::ensure_hex_zeroizing, wallet_get, wallet_set};
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum WalletCommands {
     /// Set wallet private key
     Set {
@@ -24,10 +25,12 @@ pub enum WalletCommands {
     Get,
 }
 
-pub async fn execute(command: WalletCommands, config: AppConfig) -> Result<()> {
+pub async fn execute(out: Console, command: WalletCommands, config: AppConfig) -> Result<()> {
     match command {
-        WalletCommands::Set { private_key } => wallet_set::execute(&config, private_key).await?,
-        WalletCommands::Get => wallet_get::execute(&config).await?,
+        WalletCommands::Set { private_key } => {
+            wallet_set::execute(out, &config, private_key).await?
+        }
+        WalletCommands::Get => wallet_get::execute(out, &config).await?,
     };
 
     Ok(())

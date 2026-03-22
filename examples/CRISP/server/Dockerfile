@@ -64,6 +64,7 @@ COPY crates/ciphernode-builder/Cargo.toml crates/ciphernode-builder/Cargo.toml
 COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
 COPY crates/compute-provider/Cargo.toml crates/compute-provider/Cargo.toml
 COPY crates/config/Cargo.toml crates/config/Cargo.toml
+COPY crates/console/Cargo.toml crates/console/Cargo.toml
 COPY crates/crypto/Cargo.toml crates/crypto/Cargo.toml
 COPY crates/data/Cargo.toml crates/data/Cargo.toml
 COPY crates/entrypoint/Cargo.toml crates/entrypoint/Cargo.toml
@@ -84,6 +85,7 @@ COPY crates/program-server/Cargo.toml crates/program-server/Cargo.toml
 COPY crates/request/Cargo.toml crates/request/Cargo.toml
 COPY crates/sdk/Cargo.toml crates/sdk/Cargo.toml
 COPY crates/sortition/Cargo.toml crates/sortition/Cargo.toml
+COPY crates/socket-server/Cargo.toml crates/socket-server/Cargo.toml
 COPY crates/support-scripts/Cargo.toml crates/support-scripts/Cargo.toml
 COPY crates/sync/Cargo.toml crates/sync/Cargo.toml
 COPY crates/test-helpers/Cargo.toml crates/test-helpers/Cargo.toml

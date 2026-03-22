@@ -4,9 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use e3_console::{log, Console};
+
 pub const GIT_SHA: &str = env!("GIT_SHA");
 
-pub async fn execute() -> anyhow::Result<()> {
-    println!("{}", GIT_SHA);
+pub async fn execute(out: Console) -> anyhow::Result<()> {
+    log!(out, "{}", GIT_SHA);
     Ok(())
 }
