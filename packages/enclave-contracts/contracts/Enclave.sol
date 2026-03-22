@@ -107,12 +107,18 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice Maps committee size to threshold values [quorum, total]
     mapping(CommitteeSize => uint32[2] threshold) public committeeThresholds;
 
+    /// @notice Maps E3 ID to the protocol share BPS snapshotted at request time
+    mapping(uint256 e3Id => uint16 protocolShareBps)
+        internal _e3ProtocolShareBps;
+
+    /// @notice Maps E3 ID to the protocol treasury snapshotted at request time
+    mapping(uint256 e3Id => address protocolTreasury)
+        internal _e3ProtocolTreasury;
     /// @notice Global timeout configuration
     E3TimeoutConfig internal _timeoutConfig;
 
     /// @notice All pricing-related configuration
     PricingConfig internal _pricingConfig;
-
     /// @notice Basis points denominator
     uint16 internal constant BPS_BASE = 10000;
 
@@ -362,6 +368,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         e3Payments[e3Id] = e3Fee;
         _e3FeeTokens[e3Id] = feeToken;
+        _e3ProtocolShareBps[e3Id] = _pricingConfig.protocolShareBps;
+        _e3ProtocolTreasury[e3Id] = _pricingConfig.protocolTreasury;
 
         // Initialize E3 Lifecycle
         _e3Stages[e3Id] = E3Stage.Requested;
@@ -564,8 +572,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         // Split between protocol treasury and CN rewards
         uint256 protocolAmount = 0;
-        uint16 _protocolShareBps = _pricingConfig.protocolShareBps;
-        address _protocolTreasury = _pricingConfig.protocolTreasury;
+        uint16 _protocolShareBps = _e3ProtocolShareBps[e3Id];
+        address _protocolTreasury = _e3ProtocolTreasury[e3Id];
         if (_protocolShareBps > 0 && _protocolTreasury != address(0)) {
             protocolAmount =
                 (totalAmount * uint256(_protocolShareBps)) /

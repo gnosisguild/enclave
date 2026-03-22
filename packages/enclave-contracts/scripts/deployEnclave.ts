@@ -234,6 +234,7 @@ export const deployEnclave = async (
   const encryptionSchemeId = ethers.keccak256(ethers.toUtf8Bytes("fhe.rs:BFV"));
 
   // Set pricing config with protocol treasury
+  const protocolTreasury = process.env.PROTOCOL_TREASURY || ownerAddress;
   console.log("Setting pricing config...");
   await enclave.setPricingConfig({
     keyGenFixedPerNode: 50000, // 0.05 USDC
@@ -243,13 +244,13 @@ export const deployEnclave = async (
     decryptionPerNode: 150000, // 0.15 USDC
     publicationBase: 500000, // 0.50 USDC
     verificationPerProof: 2000, // 0.002 USDC
-    protocolTreasury: ownerAddress,
+    protocolTreasury: protocolTreasury,
     marginBps: 1000, // 10%
     protocolShareBps: 2000, // 20%
     minCommitteeSize: 0,
     minThreshold: 0,
   });
-  console.log("Pricing config set (treasury:", ownerAddress, ")");
+  console.log("Pricing config set (treasury:", protocolTreasury, ")");
 
   if (shouldDeployMocks) {
     const {
