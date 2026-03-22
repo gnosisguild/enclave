@@ -13,7 +13,7 @@ use crate::{
     nodes_stop, nodes_up,
 };
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum NodeCommands {
     /// Launch all nodes
     Up {

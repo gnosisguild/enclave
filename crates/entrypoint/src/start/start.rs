@@ -19,7 +19,6 @@ pub async fn execute(config: &AppConfig) -> Result<CiphernodeHandle> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
     let backend = ZkBackend::new(config.bb_binary(), config.circuits_dir(), config.work_dir());
-    backend.ensure_installed().await?;
 
     let node = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_persistence(&config.log_file(), &config.db_file())
@@ -33,6 +32,8 @@ pub async fn execute(config: &AppConfig) -> Result<CiphernodeHandle> {
         .with_trbfv()
         .with_zkproof(backend)
         .with_net(config.peers(), config.quic_port())
+        .with_shared_store()
+        .with_shared_eventstore()
         .build()
         .await?;
 

@@ -23,6 +23,7 @@ dirs = { workspace = true }
 e3-events = { workspace = true }
 e3-evm = { workspace = true }
 e3-fhe = { workspace = true }
+e3-socket-server = { workspace = true }
 hex = { workspace = true }
 e3-keyshare = { workspace = true }
 e3-logger = { workspace = true }

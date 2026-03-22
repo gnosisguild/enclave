@@ -30,7 +30,7 @@ use crate::{
 const NET_READY_CONNECT_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Maximum time to wait for the `AllPeersDialed` event before giving up.
-const ALL_PEERS_DIALED_TIMEOUT: Duration = Duration::from_secs(30);
+const ALL_PEERS_DIALED_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// Maximum time to wait for a peer to reconnect after sync fetch fails.
 /// On restart, peers may briefly connect then disconnect (the remote side still
@@ -347,20 +347,36 @@ async fn handle_sync_request_event(
     let (event, ctx) = event.into_components();
     info!("Checking for AllPeersDialed...");
     if wait_for_event {
-        await_event(
+        info!("Waiting for peer connection...");
+        let has_peers = await_event(
             &net_events,
-            |e| {
-                if matches!(e, &NetEvent::AllPeersDialed { .. }) {
-                    info!("AllPeersDialed matched!");
-                    Some(e.clone())
-                } else {
-                    None
+            |e| match e {
+                NetEvent::ConnectionEstablished { .. } => {
+                    info!("Peer connection established");
+                    Some(true)
                 }
+                NetEvent::AllPeersDialed { total: 0, .. } => {
+                    info!("No peers configured, proceeding without sync");
+                    Some(false)
+                }
+                _ => None,
             },
-            ALL_PEERS_DIALED_TIMEOUT,
+            NET_READY_CONNECT_TIMEOUT,
         )
         .await
-        .ok(); // Timeout is non-fatal — proceed regardless
+        .context("No peer connections established within timeout")?;
+
+        if !has_peers {
+            let value = SyncRequestSucceeded {
+                response: SyncResponseValue {
+                    events: vec![],
+                    ts: 0,
+                },
+            };
+
+            address.into().try_send(TypedEvent::new(value, ctx))?;
+            return Ok(());
+        }
     }
     info!("handle_sync_request_event: ready to sync");
 
@@ -373,7 +389,10 @@ async fn handle_sync_request_event(
             "Requesting batched events for aggregate_id={} since={}",
             aggregate_id, since
         );
-        let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone()).build();
+        let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone())
+            .max_retries(10)
+            .retry_timeout(Duration::from_secs(5))
+            .build();
         match fetch_all_batched_events::<EnclaveEvent<Unsequenced>>(
             requester,
             PeerTarget::Random,

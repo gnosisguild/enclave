@@ -25,7 +25,6 @@ pub async fn execute(
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(config.key_file()).await?);
     let backend = ZkBackend::new(config.bb_binary(), config.circuits_dir(), config.work_dir());
-    backend.ensure_installed().await?;
 
     let node = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_persistence(&config.log_file(), &config.db_file())
@@ -40,6 +39,8 @@ pub async fn execute(
         .with_pubkey_aggregation()
         .with_threshold_plaintext_aggregation()
         .with_net(config.peers(), config.quic_port())
+        .with_shared_store()
+        .with_shared_eventstore()
         .build()
         .await?;
 
