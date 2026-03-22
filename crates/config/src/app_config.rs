@@ -53,6 +53,8 @@ pub struct NodeDefinition {
     pub peers: Vec<String>,
     /// The port to use for the quic listener
     pub quic_port: u16,
+    /// The port to use for the ctrl socket listener
+    pub ctrl_port: u16,
     /// The name for the database
     pub db_file: PathBuf,
     /// The name for the keyfile
@@ -80,6 +82,7 @@ impl Default for NodeDefinition {
             peers: vec![], // NOTE: We should look at generation via ipns fetch for the latest nodes
             address: None,
             quic_port: 9091,
+            ctrl_port: 50505,
             key_file: PathBuf::from("key"), // ~/.config/enclave/key
             db_file: PathBuf::from("db"),   // ~/.config/enclave/db
             log_file: PathBuf::from("log"), // ~/.config/enclave/log
@@ -333,6 +336,11 @@ impl AppConfig {
     /// get the quic port
     pub fn quic_port(&self) -> u16 {
         self.node_def().quic_port
+    }
+
+    /// get the ctrl port
+    pub fn ctrl_port(&self) -> u16 {
+        self.node_def().ctrl_port
     }
 
     /// Get the config file path

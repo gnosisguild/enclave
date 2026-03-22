@@ -289,6 +289,9 @@ Open the following ports:
 | ------ | -------- | -------------------------- |
 | `9091` | UDP      | QUIC/libp2p P2P networking |
 
+> **Important:** Port `50505` (TCP) is used for local CLI commands and binds to `localhost` only.
+> **Do not expose this port externally** - it provides control plane access to your node.
+
 ### Bootstrap Peers
 
 Connect to the Interfold bootstrap network:

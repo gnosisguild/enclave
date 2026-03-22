@@ -20,12 +20,15 @@ compile-time = { workspace = true }
 dialoguer = { workspace = true }
 dirs = { workspace = true }
 e3-config = { workspace = true }
+e3-console = { workspace = true }
+e3-ciphernode-builder = { workspace = true }
 e3-crypto = { workspace = true }
 e3-entrypoint = { workspace = true }
 e3-events = { workspace = true }
 e3-evm = { workspace = true }
 e3-init = { workspace = true }
 e3-support-scripts = { workspace = true }
+e3-socket-server = { workspace = true }
 e3-utils = { workspace = true }
 e3-zk-prover = { workspace = true }
 hex = { workspace = true }
@@ -36,6 +39,7 @@ opentelemetry_sdk = { workspace = true }
 petname = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }

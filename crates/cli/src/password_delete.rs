@@ -8,9 +8,10 @@ use crate::helpers::prompt_password::prompt_password;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Confirm};
 use e3_config::AppConfig;
+use e3_console::{log, Console};
 use zeroize::Zeroize;
 
-pub async fn prompt_delete(config: &AppConfig) -> Result<bool> {
+pub async fn prompt_delete(out: Console, config: &AppConfig) -> Result<bool> {
     if !Confirm::with_theme(&ColorfulTheme::default())
         .with_prompt("Are you sure you want to delete the key? This action cannot be undone.")
         .default(false)
@@ -20,7 +21,7 @@ pub async fn prompt_delete(config: &AppConfig) -> Result<bool> {
     }
 
     let Ok(mut cur_pw) = e3_entrypoint::password::delete::get_current_password(config).await else {
-        println!("Password is not set. Nothing to do.");
+        log!(out, "Password is not set. Nothing to do.");
         return Ok(false);
     };
 
@@ -35,12 +36,12 @@ pub async fn prompt_delete(config: &AppConfig) -> Result<bool> {
     Ok(true)
 }
 
-pub async fn execute(config: &AppConfig) -> Result<()> {
-    if prompt_delete(config).await? {
+pub async fn execute(out: &Console, config: &AppConfig) -> Result<()> {
+    if prompt_delete(out.clone(), config).await? {
         e3_entrypoint::password::delete::execute(config).await?;
-        println!("Password successfully deleted.");
+        log!(out, "Password successfully deleted.");
     } else {
-        println!("Operation cancelled.");
+        log!(out, "Operation cancelled.");
     }
     Ok(())
 }

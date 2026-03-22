@@ -3126,12 +3126,15 @@ dependencies = [
  "compile-time",
  "dialoguer",
  "dirs 5.0.1",
+ "e3-ciphernode-builder",
  "e3-config",
+ "e3-console",
  "e3-crypto",
  "e3-entrypoint",
  "e3-events",
  "e3-evm",
  "e3-init",
+ "e3-socket-server",
  "e3-support-scripts",
  "e3-utils",
  "e3-zk-prover",
@@ -3143,6 +3146,7 @@ dependencies = [
  "petname",
  "rand 0.8.5",
  "serde",
+ "serde_json",
  "tokio",
  "toml 0.8.23",
  "tracing",
@@ -3190,6 +3194,13 @@ dependencies = [
  "tempfile",
  "tracing",
  "url",
+]
+
+[[package]]
+name = "e3-console"
+version = "0.1.15"
+dependencies = [
+ "tokio",
 ]
 
 [[package]]
@@ -3253,6 +3264,7 @@ dependencies = [
  "e3-logger",
  "e3-net",
  "e3-request",
+ "e3-socket-server",
  "e3-sortition",
  "e3-test-helpers",
  "e3-zk-prover",
@@ -3633,6 +3645,19 @@ dependencies = [
  "e3-evm-helpers",
  "e3-fhe-params",
  "e3-indexer",
+]
+
+[[package]]
+name = "e3-socket-server"
+version = "0.1.15"
+dependencies = [
+ "anyhow",
+ "e3-config",
+ "e3-console",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

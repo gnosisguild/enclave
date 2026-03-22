@@ -4,9 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::path::PathBuf;
-
-use crate::ciphernode::{self, CiphernodeCommands};
+use crate::ciphernode::{self, ChainArgs, CiphernodeCommands};
 use crate::helpers::telemetry::{setup_simple_tracing, setup_tracing};
 use crate::net::{self, NetCommands};
 use crate::nodes::{self, NodeCommands};
@@ -20,10 +18,14 @@ use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
 use e3_config::validation::ValidUrl;
 use e3_config::{load_config, AppConfig};
+use e3_console::{log, Console};
 use e3_entrypoint::helpers::datastore::close_all_connections;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::str::FromStr;
 use tracing::{info, instrument, Level};
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Clone, Debug)]
 #[command(name = "enclave")]
 #[command(about = "A CLI for interacting with Enclave the open-source protocol for Encrypted Execution Environments (E3)", long_about = None)]
 #[command(version = env!("CARGO_PKG_VERSION"))]
@@ -79,11 +81,11 @@ impl Cli {
     }
 
     #[instrument(skip_all)]
-    pub async fn execute(self) -> Result<()> {
+    pub async fn execute(self, out: Console, config_result: Result<AppConfig>) -> Result<()> {
         let log_level = self.log_level();
         // Attempt to load the config, but only treat "not found" as
         // the trigger for the init flow.  All other errors bubble up.
-        let config = match self.load_config() {
+        let config = match config_result {
             Ok(cfg) => cfg,
             // If the file truly doesn't exist, fall back to init
             Err(e)
@@ -94,7 +96,7 @@ impl Cli {
             {
                 // Existing init branch
                 match self.command {
-                    Commands::Rev => rev::execute().await?,
+                    Commands::Rev => rev::execute(out).await?,
                     Commands::Init {path, template, skip_cleanup} => {
                         setup_simple_tracing(log_level);
                         init::execute(path, template, skip_cleanup, self.verbose > 0).await?
@@ -107,6 +109,7 @@ impl Cli {
                         }
                     } => {
                         ciphernode::setup::execute(
+                            out,
                             rpc_url,
                             password,
                             private_key,
@@ -114,8 +117,9 @@ impl Cli {
                         .await?;
                     }
                     Commands::Start { .. } => {
-                        println!("No configuration found. Setting up enclave configuration...");
+                        log!(out,"No configuration found. Setting up enclave configuration...");
                         ciphernode::setup::execute(
+                            out,
                             None,
                             None,
                             None,
@@ -124,7 +128,7 @@ impl Cli {
                     },
                     Commands::Noir { command } => {
                         setup_simple_tracing(log_level);
-                        noir::execute_without_config(command).await?
+                        noir::execute_without_config(out, command).await?
                     },
                     _ => bail!(
                         "Configuration file not found. Run `enclave ciphernode setup` to create a configuration."
@@ -155,7 +159,9 @@ impl Cli {
             Commands::Compile { dev } => {
                 e3_support_scripts::program_compile(config.program().clone(), dev).await?
             }
-            Commands::PrintEnv { vite, chain } => print_env::execute(&config, &chain, vite).await?,
+            Commands::PrintEnv { vite, chain } => {
+                print_env::execute(out, &config, &chain, vite).await?
+            }
             Commands::Program { command } => program::execute(command, &config).await?,
             Commands::PurgeAll => {
                 purge_all::execute().await?;
@@ -170,12 +176,12 @@ impl Cli {
                 )
                 .await?
             }
-            Commands::Password { command } => password::execute(command, &config).await?,
-            Commands::Wallet { command } => wallet::execute(command, config).await?,
-            Commands::Ciphernode { command } => ciphernode::execute(command, &config).await?,
-            Commands::Noir { command } => noir::execute(command, &config).await?,
-            Commands::Net { command } => net::execute(command, &config).await?,
-            Commands::Rev => rev::execute().await?,
+            Commands::Password { command } => password::execute(out, command, &config).await?,
+            Commands::Wallet { command } => wallet::execute(out, command, config).await?,
+            Commands::Ciphernode { command } => ciphernode::execute(out, command, &config).await?,
+            Commands::Noir { command } => noir::execute(out, command, &config).await?,
+            Commands::Net { command } => net::execute(&out, command, &config).await?,
+            Commands::Rev => rev::execute(out).await?,
         }
 
         close_all_connections();
@@ -198,7 +204,7 @@ impl Cli {
     }
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum Commands {
     /// Start the application
     Start {
@@ -291,4 +297,100 @@ pub enum Commands {
         #[command(subcommand)]
         command: NetCommands,
     },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RemoteCli {
+    name: Option<String>,
+    otel: Option<String>,
+    quiet: bool,
+    config: Option<String>,
+    verbose: u8,
+    command: RemoteCommand,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum RemoteCommand {
+    NetGetPeerId,
+    CiphernodeStatus { chain: ChainArgs },
+    NoirStatus,
+    WalletGet,
+    Rev,
+    PrintEnv { vite: bool, chain: String },
+}
+
+impl TryFrom<Commands> for RemoteCommand {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Commands) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Commands::Rev => Ok(RemoteCommand::Rev),
+            Commands::Net {
+                command: NetCommands::GetPeerId,
+            } => Ok(RemoteCommand::NetGetPeerId),
+            Commands::Noir {
+                command: NoirCommands::Status,
+            } => Ok(RemoteCommand::NoirStatus),
+            Commands::Ciphernode {
+                command: CiphernodeCommands::Status { chain },
+            } => Ok(RemoteCommand::CiphernodeStatus { chain }),
+            Commands::PrintEnv { chain, vite } => Ok(RemoteCommand::PrintEnv { vite, chain }),
+            Commands::Wallet {
+                command: WalletCommands::Get,
+            } => Ok(RemoteCommand::WalletGet),
+            _ => bail!("Command not allowed while node is running."),
+        }
+    }
+}
+
+impl TryFrom<Cli> for RemoteCli {
+    type Error = anyhow::Error;
+    fn try_from(value: Cli) -> Result<Self> {
+        Ok(RemoteCli {
+            otel: value.otel.map(|o| o.to_string()),
+            verbose: value.verbose,
+            config: value.config,
+            name: value.name,
+            quiet: value.quiet,
+            command: value.command.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<RemoteCli> for Cli {
+    type Error = anyhow::Error;
+    fn try_from(value: RemoteCli) -> std::result::Result<Self, Self::Error> {
+        Ok(Cli {
+            verbose: value.verbose,
+            config: value.config,
+            quiet: value.quiet,
+            otel: value.otel.and_then(|o| ValidUrl::from_str(&o).ok()),
+            command: value.command.try_into()?,
+            name: value.name,
+        })
+    }
+}
+
+impl TryFrom<RemoteCommand> for Commands {
+    type Error = anyhow::Error;
+    fn try_from(value: RemoteCommand) -> std::result::Result<Self, Self::Error> {
+        let command = match value {
+            RemoteCommand::Rev => Commands::Rev,
+            RemoteCommand::WalletGet => Commands::Wallet {
+                command: WalletCommands::Get,
+            },
+            RemoteCommand::PrintEnv { vite, chain } => Commands::PrintEnv { vite, chain },
+            RemoteCommand::CiphernodeStatus { chain } => Commands::Ciphernode {
+                command: CiphernodeCommands::Status { chain },
+            },
+            RemoteCommand::NoirStatus => Commands::Noir {
+                command: NoirCommands::Status,
+            },
+            RemoteCommand::NetGetPeerId => Commands::Net {
+                command: NetCommands::GetPeerId,
+            },
+        };
+        // We might have to hold this stuff on RemoteCommand
+        Ok(command)
+    }
 }
