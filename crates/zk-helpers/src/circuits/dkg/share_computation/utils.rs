@@ -124,16 +124,13 @@ fn field_to_noir_hex(fr: Fr) -> String {
 pub fn share_computation_expected_vk_hash_hex_literals(
     recursive_vk_root: &Path,
 ) -> Result<(String, String), String> {
-    let sk_base = fr_from_vk_hash_file(
-        &recursive_vk_root.join("sk_share_computation_base/vk_hash"),
-    )?;
-    let esm_base = fr_from_vk_hash_file(
-        &recursive_vk_root.join("e_sm_share_computation_base/vk_hash"),
-    )?;
+    let sk_base =
+        fr_from_vk_hash_file(&recursive_vk_root.join("sk_share_computation_base/vk_hash"))?;
+    let esm_base =
+        fr_from_vk_hash_file(&recursive_vk_root.join("e_sm_share_computation_base/vk_hash"))?;
     let chunk = fr_from_vk_hash_file(&recursive_vk_root.join("share_computation_chunk/vk_hash"))?;
-    let batch = fr_from_vk_hash_file(
-        &recursive_vk_root.join("share_computation_chunk_batch/vk_hash"),
-    )?;
+    let batch =
+        fr_from_vk_hash_file(&recursive_vk_root.join("share_computation_chunk_batch/vk_hash"))?;
     let sk_chain = compute_vk_hash(vec![sk_base, chunk, batch]);
     let esm_chain = compute_vk_hash(vec![esm_base, chunk, batch]);
     Ok((field_to_noir_hex(sk_chain), field_to_noir_hex(esm_chain)))
