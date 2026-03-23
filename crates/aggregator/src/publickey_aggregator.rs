@@ -29,9 +29,31 @@ use tracing::{error, info, warn};
 fn derive_c1_commitments(signed_proofs: &[Option<SignedProofPayload>]) -> Vec<ArcBytes> {
     signed_proofs
         .iter()
-        .filter_map(|opt| {
-            opt.as_ref()
-                .and_then(|sp| sp.payload.proof.extract_output("pk_commitment"))
+        .enumerate()
+        .filter_map(|(i, opt)| {
+            let sp = opt.as_ref()?;
+            let proof = &sp.payload.proof;
+            tracing::info!(
+                "C1 proof[{}]: circuit={:?}, public_signals_len={}, signals_hex={}",
+                i,
+                proof.circuit,
+                proof.public_signals.len(),
+                proof.public_signals[..std::cmp::min(128, proof.public_signals.len())]
+                    .iter()
+                    .map(|b| format!("{:02x}", b))
+                    .collect::<String>()
+            );
+            let commitment = proof.extract_output("pk_commitment");
+            if let Some(ref c) = commitment {
+                tracing::info!(
+                    "C1 proof[{}]: extracted pk_commitment={}",
+                    i,
+                    c.iter().map(|b| format!("{:02x}", b)).collect::<String>()
+                );
+            } else {
+                tracing::warn!("C1 proof[{}]: failed to extract pk_commitment", i);
+            }
+            commitment
         })
         .collect()
 }
@@ -67,7 +89,6 @@ pub enum PublicKeyAggregatorState {
         /// Signed C1 proofs from honest parties, aligned with `keyshare_bytes`.
         /// Commitments are extracted on the fly via `extract_output("pk_commitment")`.
         /// Retained for fault attribution if a commitment mismatch is detected later.
-        #[serde(default)]
         c1_signed_proofs: Vec<Option<SignedProofPayload>>,
         nodes: OrderedSet<String>,
         /// DKG recursive proofs per party (restart-critical).
@@ -329,7 +350,23 @@ impl PublicKeyAggregator {
 
         let committee_h = honest_keyshares.len();
         let honest_nodes_set = OrderedSet::from(honest_nodes);
+        // keyshare_bytes follows OrderedSet ordering (used by C5 prover).
+        // Re-align c1_signed_proofs to the same order so c1_commitments[i]
+        // corresponds to keyshare_bytes[i].
         let keyshare_bytes: Vec<_> = honest_keyshares_set.iter().cloned().collect();
+        let c1_signed_proofs = {
+            // Build a map from keyshare → c1 proof, then iterate in OrderedSet order.
+            let ks_to_proof: std::collections::HashMap<Vec<u8>, &Option<SignedProofPayload>> =
+                honest_keyshares
+                    .iter()
+                    .zip(c1_signed_proofs.iter())
+                    .map(|(ks, proof)| (ks.to_vec(), proof))
+                    .collect();
+            keyshare_bytes
+                .iter()
+                .map(|ks| ks_to_proof.get(&ks.to_vec()).and_then(|opt| (*opt).clone()))
+                .collect::<Vec<_>>()
+        };
 
         // Publish pending event before transitioning state so a publish
         // failure leaves us in VerifyingC1 (retryable) rather than
@@ -357,7 +394,6 @@ impl PublicKeyAggregator {
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key: pubkey.clone(),
-                public_key_hash,
                 keyshare_bytes: honest_keyshares,
                 c1_signed_proofs,
                 nodes: honest_nodes_set,
@@ -854,13 +890,6 @@ impl PublicKeyAggregator {
             keyshares: remaining_keyshares_set,
         })?;
 
-        let public_key_hash = compute_pk_commitment(
-            pubkey.clone(),
-            self.fhe.params.degree(),
-            self.fhe.params.plaintext(),
-            self.fhe.params.moduli().to_vec(),
-        )?;
-
         let committee_h = remaining_count;
         let pubkey = ArcBytes::from_bytes(&pubkey);
 
@@ -886,14 +915,13 @@ impl PublicKeyAggregator {
                     c1_commitments: derive_c1_commitments(&remaining_c1_signed_proofs),
                 },
                 public_key: pubkey.clone(),
-                public_key_hash,
                 nodes: remaining_nodes.clone(),
             },
             ec.clone(),
         )?;
 
         // Keep DKG proofs from remaining honest parties — they won't be re-delivered.
-        let remaining_dkg_proofs: HashMap<u64, Proof> = dkg_node_proofs
+        let remaining_dkg_proofs: HashMap<u64, Option<Proof>> = dkg_node_proofs
             .into_iter()
             .filter(|(pid, _)| remaining_ids.contains(pid))
             .collect();
@@ -902,7 +930,6 @@ impl PublicKeyAggregator {
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key: pubkey.clone(),
-                public_key_hash,
                 keyshare_bytes: remaining_keyshares,
                 c1_signed_proofs: remaining_c1_signed_proofs,
                 nodes: remaining_nodes,

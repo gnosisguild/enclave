@@ -368,6 +368,18 @@ fn handle_pk_aggregation_proof(
         let mut padded = vec![0u8; 32];
         let start = 32_usize.saturating_sub(be_bytes.len());
         padded[start..].copy_from_slice(&be_bytes);
+        info!(
+            "C1 commitment check party {}: computed={:?} extracted={:?}",
+            i,
+            padded
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>(),
+            extracted
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>()
+        );
         if padded[..] != extracted[..] {
             mismatched_indices.push(i);
         }
