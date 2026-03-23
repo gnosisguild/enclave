@@ -1,6 +1,17 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use anyhow::Result;
 use clap::Subcommand;
-use serde::Serialize;
+use e3_events::{
+    E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated,
+    EventConstructorWithTimestamp, PublicKeyAggregated, Unsequenced,
+};
+use e3_utils::ArcBytes;
+use std::sync::Arc;
 
 #[derive(Subcommand, Clone, Debug)]
 pub enum EventsCommands {
@@ -15,14 +26,6 @@ pub enum EventsCommands {
         #[arg(long)]
         limit: u64,
     },
-}
-
-#[derive(Serialize, Debug)]
-struct Event {
-    id: u64,
-    aggregate: u64,
-    event_type: String,
-    data: serde_json::Value,
 }
 
 pub async fn execute(command: EventsCommands) -> Result<()> {
@@ -46,29 +49,38 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
         limit
     );
 
-    let events = vec![
-        Event {
-            id: since + 1,
-            aggregate,
-            event_type: "PublicKeyAggregated".to_string(),
-            data: serde_json::json!({
-                "public_key": "0x1234567890abcdef",
-                "threshold": 3,
-                "total_shares": 5
-            }),
-        },
-        Event {
-            id: since + 2,
-            aggregate,
-            event_type: "EncryptionKeyCreated".to_string(),
-            data: serde_json::json!({
-                "key_id": "key_abc123",
-                "ciphernode": "node_42"
-            }),
-        },
-    ];
+    let event1 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::PublicKeyAggregated(PublicKeyAggregated {
+            pubkey: ArcBytes::from_bytes(&[0x12, 0x34, 0x56]),
+            e3_id: E3id::new("test1", 1),
+            nodes: Default::default(),
+            pk_aggregation_proof: None,
+            dkg_aggregated_proof: None,
+        }),
+        None,
+        1700000000000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(1);
 
-    for event in events {
+    let event2 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::EncryptionKeyCreated(EncryptionKeyCreated {
+            e3_id: E3id::new("test2", 1),
+            key: Arc::new(EncryptionKey::new(
+                42,
+                ArcBytes::from_bytes(&[0xab, 0xcd, 0xef]),
+            )),
+            external: false,
+        }),
+        None,
+        1700000001000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(2);
+
+    for event in [event1, event2] {
         println!("{}", serde_json::to_string(&event)?);
     }
     Ok(())
