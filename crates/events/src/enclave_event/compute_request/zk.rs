@@ -244,6 +244,9 @@ pub struct ThresholdShareDecryptionProofRequest {
     /// When false, skip wrapper proofs for recursive C6 folding (mirrors DKG `proof_aggregation_enabled`).
     #[serde(default = "default_proof_aggregation_enabled")]
     pub proof_aggregation_enabled: bool,
+    /// C5 output commitment — used to verify the aggregated PK matches what C5 certified.
+    #[serde(default)]
+    pub c5_pk_commitment: Option<ArcBytes>,
 }
 
 fn default_proof_aggregation_enabled() -> bool {

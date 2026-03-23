@@ -2151,6 +2151,7 @@ impl ThresholdKeyshare {
                     d_share_bytes: d_share_poly.clone(),
                     params_preset: threshold_preset,
                     proof_aggregation_enabled: state.proof_aggregation_enabled,
+                    c5_pk_commitment: None,
                 },
             },
             ec.clone(),

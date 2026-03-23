@@ -37,7 +37,17 @@ use e3_events::{
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
+use e3_zk_helpers::circuits::output_layout::FIELD_BYTE_LEN;
 use tracing::{error, info, warn};
+
+/// Cached C4 return commitments for a single party.
+#[derive(Debug, Clone)]
+struct C4Commitments {
+    /// C4a: commitment to aggregated SK shares.
+    sk_commitment: ArcBytes,
+    /// C4b: commitment(s) to aggregated ESM shares, one per ESI.
+    e_sm_commitments: Vec<ArcBytes>,
+}
 
 /// Trait for party types whose signed proofs can be ECDSA-validated and ZK-verified.
 trait VerifiableParty: Clone {
@@ -101,6 +111,9 @@ pub struct ShareVerificationActor {
     bus: BusHandle,
     /// Tracks pending verifications by correlation ID.
     pending: HashMap<CorrelationId, PendingVerification>,
+    /// Cached C4 return commitments per party, keyed by E3 ID.
+    /// Populated after C4 verification passes; consumed during C6 verification.
+    c4_cache: HashMap<E3id, HashMap<u64, C4Commitments>>,
 }
 
 impl ShareVerificationActor {
@@ -108,6 +121,7 @@ impl ShareVerificationActor {
         Self {
             bus: bus.clone(),
             pending: HashMap::new(),
+            c4_cache: HashMap::new(),
         }
     }
 
@@ -132,9 +146,7 @@ impl ShareVerificationActor {
         );
 
         match msg.kind {
-            VerificationKind::ShareProofs
-            | VerificationKind::ThresholdDecryptionProofs
-            | VerificationKind::PkGenerationProofs => {
+            VerificationKind::ShareProofs | VerificationKind::PkGenerationProofs => {
                 let kind = msg.kind.clone();
                 self.verify_proofs(
                     e3_id,
@@ -153,7 +165,44 @@ impl ShareVerificationActor {
                     },
                 );
             }
+            VerificationKind::ThresholdDecryptionProofs => {
+                // C4→C6 cross-check: compare C6 expected commitments against cached C4 values.
+                // Mismatched parties are added to pre_dishonest before ZK dispatch.
+                let mut pre_dishonest = msg.pre_dishonest;
+                for party in &msg.share_proofs {
+                    if let Some(mismatch_signed) = self.check_c6_party_against_c4(&e3_id, party) {
+                        pre_dishonest.insert(party.sender_party_id);
+                        self.emit_signed_proof_failed(
+                            &e3_id,
+                            &mismatch_signed,
+                            None,
+                            party.sender_party_id,
+                            &ec,
+                        );
+                    }
+                }
+
+                self.verify_proofs(
+                    e3_id,
+                    VerificationKind::ThresholdDecryptionProofs,
+                    msg.share_proofs,
+                    pre_dishonest,
+                    ec,
+                    |passed, corr_id, e3| {
+                        ComputeRequest::zk(
+                            ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
+                                party_proofs: passed,
+                            }),
+                            corr_id,
+                            e3,
+                        )
+                    },
+                );
+            }
             VerificationKind::DecryptionProofs => {
+                // Cache C4 return commitments for later C6 cross-check.
+                self.cache_c4_commitments(&e3_id, &msg.decryption_proofs);
+
                 self.verify_proofs(
                     e3_id,
                     VerificationKind::DecryptionProofs,
@@ -372,6 +421,82 @@ impl ShareVerificationActor {
             passed: true,
             failed_payload: None,
         }
+    }
+
+    /// Cache C4 return commitments from decryption proofs for later C6 cross-check.
+    fn cache_c4_commitments(
+        &mut self,
+        e3_id: &E3id,
+        parties: &[PartyShareDecryptionProofsToVerify],
+    ) {
+        let cache = self.c4_cache.entry(e3_id.clone()).or_default();
+        for party in parties {
+            let sk = party
+                .signed_sk_decryption_proof
+                .payload
+                .proof
+                .extract_output("commitment");
+            let esm: Vec<ArcBytes> = party
+                .signed_e_sm_decryption_proofs
+                .iter()
+                .filter_map(|p| p.payload.proof.extract_output("commitment"))
+                .collect();
+
+            if let Some(sk_commitment) = sk {
+                cache.insert(
+                    party.sender_party_id,
+                    C4Commitments {
+                        sk_commitment,
+                        e_sm_commitments: esm,
+                    },
+                );
+            }
+        }
+        info!(
+            "Cached C4 commitments for {} parties (E3 {})",
+            cache.len(),
+            e3_id
+        );
+    }
+
+    /// Check one party's C6 expected commitments against cached C4 return values.
+    /// Returns the first mismatched signed proof (for fault attribution), or None if OK.
+    fn check_c6_party_against_c4(
+        &self,
+        e3_id: &E3id,
+        party: &PartyProofsToVerify,
+    ) -> Option<SignedProofPayload> {
+        let c4_cache = self.c4_cache.get(e3_id)?;
+        let c4 = c4_cache.get(&party.sender_party_id)?;
+        let first_proof = party.signed_proofs.first()?;
+
+        let ps = &first_proof.payload.proof.public_signals;
+        if ps.len() < 2 * FIELD_BYTE_LEN {
+            return None;
+        }
+
+        let c6_sk = &ps[..FIELD_BYTE_LEN];
+        let c6_esm = &ps[FIELD_BYTE_LEN..2 * FIELD_BYTE_LEN];
+
+        if c4.sk_commitment[..] != c6_sk[..] {
+            warn!(
+                "C4→C6 SK commitment mismatch for party {}",
+                party.sender_party_id
+            );
+            return Some(first_proof.clone());
+        }
+
+        if let Some(c4_esm) = c4.e_sm_commitments.first() {
+            if c4_esm[..] != c6_esm[..] {
+                warn!(
+                    "C4→C6 ESM commitment mismatch for party {}",
+                    party.sender_party_id
+                );
+                return Some(first_proof.clone());
+            }
+        }
+
+        None
     }
 
     /// Handle ZK verification response from multithread.
