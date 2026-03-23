@@ -511,10 +511,7 @@ impl ThresholdPlaintextAggregator {
             // C6 cross-node fold response (ignore unrelated FoldProofs, e.g. PK C5 fold on same bus)
             ComputeResponseKind::Zk(ZkResponse::FoldProofs(resp)) => {
                 if self.c6_fold.awaits_correlation(&correlation_id) {
-                    let fold_ec = self
-                        .last_ec
-                        .clone()
-                        .unwrap_or_else(|| ec.clone());
+                    let fold_ec = self.last_ec.clone().unwrap_or_else(|| ec.clone());
                     if self.c6_fold.handle_response(
                         &correlation_id,
                         resp.proof,
