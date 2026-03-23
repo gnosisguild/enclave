@@ -68,19 +68,20 @@ pnpm committee:new \
   --input-window-start "$INPUT_WINDOW_START" \
   --input-window-end "$INPUT_WINDOW_END" \
   --e3-params "$ENCODED_PARAMS" \
-  --committee-size 0
+  --committee-size 0 \
+  --proof-aggregation-enabled true
 
 waiton "$SCRIPT_DIR/output/pubkey.bin"
 
 # kill aggregator
 enclave_nodes_stop ag
 
-sleep 2
+sleep 8
 
 # relaunch the aggregator
 enclave_nodes_start ag
 
-sleep 4
+sleep 8
 
 heading "Mock encrypted plaintext"
 $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"

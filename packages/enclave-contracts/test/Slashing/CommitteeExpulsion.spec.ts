@@ -25,6 +25,7 @@ import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken"
 import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
 import MockDecryptionVerifierModule from "../../ignition/modules/mockDecryptionVerifier";
 import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
+import MockPkVerifierModule from "../../ignition/modules/mockPkVerifier";
 import MockCircuitVerifierModule from "../../ignition/modules/mockSlashingVerifier";
 import MockStableTokenModule from "../../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../../ignition/modules/slashingManager";
@@ -39,7 +40,7 @@ import {
   MockUSDC__factory as MockUSDCFactory,
   SlashingManager__factory as SlashingManagerFactory,
 } from "../../types";
-import { signAndEncodeAttestation } from "../fixtures";
+import { encodePkProof, signAndEncodeAttestation } from "../fixtures";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time } = networkHelpers;
@@ -219,6 +220,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     const { mockDecryptionVerifier } = await ignition.deploy(
       MockDecryptionVerifierModule,
     );
+    const { mockPkVerifier } = await ignition.deploy(MockPkVerifierModule);
     const decryptionVerifier = MockDecryptionVerifierFactory.connect(
       await mockDecryptionVerifier.getAddress(),
       owner,
@@ -233,6 +235,10 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     await enclave.setDecryptionVerifier(
       encryptionSchemeId,
       await decryptionVerifier.getAddress(),
+    );
+    await enclave.setPkVerifier(
+      encryptionSchemeId,
+      await mockPkVerifier.getAddress(),
     );
     await enclave.setSlashingManager(await slashingManager.getAddress());
 
@@ -318,6 +324,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
           ["address"],
           ["0x1234567890123456789012345678901234567890"],
         ),
+        proofAggregationEnabled: true,
       };
 
       const fee = await enclave.getE3Quote(requestParams);
@@ -337,8 +344,8 @@ describe("Committee Expulsion & Fault Tolerance", function () {
 
       const nodes = await Promise.all(operators.map((op) => op.getAddress()));
       const publicKey = ethers.toUtf8Bytes("fake-public-key");
-      const publicKeyHash = ethers.keccak256(publicKey);
-      await registry.publishCommittee(e3Id, nodes, publicKey, publicKeyHash);
+      const proof = encodePkProof(ethers.keccak256(publicKey));
+      await registry.publishCommittee(e3Id, nodes, publicKey, proof);
     }
 
     // ── Return ─────────────────────────────────────────────────────────────────

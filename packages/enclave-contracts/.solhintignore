@@ -3,4 +3,4 @@
 **/node_modules
 
 # auto-generated verifier contracts (BB/Barretenberg)
-contracts/verifier/**/*.sol
+contracts/verifiers/**/*.sol

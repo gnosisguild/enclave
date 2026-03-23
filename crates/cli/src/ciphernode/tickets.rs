@@ -5,12 +5,17 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
+use e3_console::{log, Console};
 
 use super::context::ChainContext;
 use super::utils::{ensure_allowance, parse_amount};
 use super::TicketCommands;
 
-pub(crate) async fn execute(ctx: &ChainContext, command: TicketCommands) -> Result<()> {
+pub(crate) async fn execute(
+    out: Console,
+    ctx: &ChainContext,
+    command: TicketCommands,
+) -> Result<()> {
     match command {
         TicketCommands::Buy { amount } => {
             let ticket_contract = ctx.ticket_token_address().await?;
@@ -26,9 +31,11 @@ pub(crate) async fn execute(ctx: &ChainContext, command: TicketCommands) -> Resu
                 .await?
                 .get_receipt()
                 .await?;
-            println!(
+            log!(
+                out,
                 "Purchased {} tickets (tx: {:#x})",
-                amount, receipt.transaction_hash
+                amount,
+                receipt.transaction_hash
             );
         }
         TicketCommands::Burn { amount } => {
@@ -42,9 +49,11 @@ pub(crate) async fn execute(ctx: &ChainContext, command: TicketCommands) -> Resu
                 .await?
                 .get_receipt()
                 .await?;
-            println!(
+            log!(
+                out,
                 "Removed {} tickets (tx: {:#x})",
-                amount, receipt.transaction_hash
+                amount,
+                receipt.transaction_hash
             );
         }
     }

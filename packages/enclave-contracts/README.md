@@ -108,8 +108,7 @@ pnpm run hardhat committee:new --network [network]
 To publish the public key of a committee, run
 
 ```sh
-pnpm run hardhat --network [network] committee:publish --e3-id [e3-id] --nodes [node address],
-[node address] --public-key [publickey]
+pnpm run hardhat --network [network] committee:publish --e3-id [e3-id] --nodes [node address],[node address] --public-key [publickey] --proof [hex-encoded pk proof]
 ```
 
 To activate an E3, run

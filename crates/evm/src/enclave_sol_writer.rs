@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::error_decoder::format_evm_error;
-use crate::helpers::EthProvider;
+use crate::helpers::{encode_zk_proof, EthProvider};
 use crate::send_tx_with_retry;
 use actix::prelude::*;
 use alloy::{
@@ -25,7 +25,7 @@ use e3_events::Shutdown;
 use e3_events::{prelude::*, EffectsEnabled};
 use e3_events::{run_once, EnclaveEvent};
 use e3_events::{E3Stage, E3StageChanged};
-use e3_events::{E3id, EType, PlaintextAggregated};
+use e3_events::{E3id, EType, PlaintextAggregated, Proof};
 use e3_utils::NotifySync;
 use e3_utils::MAILBOX_LIMIT;
 use tracing::info;
@@ -142,11 +142,24 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                     );
                     return;
                 }
+                if decrypted_output.len() != msg.aggregation_proofs.len() {
+                    bus.err(
+                        EType::Evm,
+                        anyhow::anyhow!(
+                            "E3 {} decrypted_output len ({}) != aggregation_proofs len ({})",
+                            e3_id,
+                            decrypted_output.len(),
+                            msg.aggregation_proofs.len()
+                        ),
+                    );
+                    return;
+                }
                 let result = publish_plaintext_output(
                     provider,
                     contract_address,
                     e3_id,
                     decrypted.extract_bytes(),
+                    msg.aggregation_proofs.first(),
                 )
                 .await;
                 match result {
@@ -185,7 +198,6 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<E3StageChanged>
         Box::pin({
             let contract_address = self.contract_address;
             let provider = self.provider.clone();
-            let bus = self.bus.clone();
             async move {
                 let result =
                     process_e3_failure(provider, contract_address, msg.e3_id.clone()).await;
@@ -211,6 +223,7 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     contract_address: Address,
     e3_id: E3id,
     decrypted_output: Vec<u8>,
+    aggregation_proof: Option<&Proof>,
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = e3_id.try_into()?;
 
@@ -221,14 +234,18 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         .pending()
         .await?;
 
-    // RPC may not have synced ciphertext output being published yet
+    let proof = aggregation_proof
+        .map(encode_zk_proof)
+        .transpose()?
+        .ok_or_else(|| anyhow::anyhow!("C7 proof missing or invalid"))?;
+
     send_tx_with_retry(
         "publishPlaintextOutput",
         &["CiphertextOutputNotPublished"],
         || {
             info!("publishPlaintextOutput() e3_id={:?}", e3_id);
-            let proof = Bytes::from(vec![1]);
             let decrypted_output = Bytes::from(decrypted_output.clone());
+            let proof = proof.clone();
             let contract = IEnclave::new(contract_address, provider.provider());
 
             async move {

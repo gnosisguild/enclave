@@ -34,7 +34,7 @@ pub struct ReceivedShareProofs {
     pub signed_c3b_proofs: Vec<SignedProofPayload>,
 }
 
-const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(1200);
+const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(800);
 
 pub(crate) enum CollectorState {
     Collecting,

@@ -35,10 +35,9 @@ pub fn bfv_ciphertext_to_greco(
     Ok((ct0is, ct1is))
 }
 
-/// Converts a BFV public key to Greco format.
+/// Converts a BFV public key to Greco format for commitment computation.
 ///
-/// Takes a BFV public key and converts it to Greco format, returning pk0is and pk1is
-/// as CRT polynomials.
+/// Coefficients are reversed then centered per modulus, matching C1 / C5 threshold PK proofs.
 ///
 /// # Arguments
 /// * `params` - BFV parameters
@@ -54,10 +53,12 @@ pub fn bfv_public_key_to_greco(
     public_key: &PublicKey,
 ) -> Result<(CrtPolynomial, CrtPolynomial), CrtPolynomialError> {
     let moduli = params.moduli();
-
-    let pk0is = fhe_poly_to_crt_centered(&public_key.c.c[0], moduli)?;
-    let pk1is = fhe_poly_to_crt_centered(&public_key.c.c[1], moduli)?;
-
+    let mut pk0is = CrtPolynomial::from_fhe_polynomial(&public_key.c.c[0]);
+    let mut pk1is = CrtPolynomial::from_fhe_polynomial(&public_key.c.c[1]);
+    pk0is.reverse();
+    pk1is.reverse();
+    pk0is.center(moduli)?;
+    pk1is.center(moduli)?;
     Ok((pk0is, pk1is))
 }
 

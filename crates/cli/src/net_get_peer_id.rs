@@ -6,9 +6,10 @@
 
 use anyhow::Result;
 use e3_config::AppConfig;
+use e3_console::{log, Console};
 
-pub async fn execute(config: &AppConfig) -> Result<()> {
+pub async fn execute(out: &Console, config: &AppConfig) -> Result<()> {
     let peer_id = e3_entrypoint::net::get_peer_id::execute(config).await?;
-    println!("{}", peer_id);
+    log!(out, "{}", peer_id);
     Ok(())
 }

@@ -245,7 +245,7 @@ async fn handle_vote_error(
 
     let user_message = extract_error_message(&e);
 
-    HttpResponse::Ok().json(VoteResponse {
+    HttpResponse::InternalServerError().json(VoteResponse {
         status: VoteResponseStatus::FailedBroadcast,
         tx_hash: None,
         message: Some(user_message),

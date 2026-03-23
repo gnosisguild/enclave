@@ -86,6 +86,7 @@ impl E3RequestedWithChainId {
             error_size,
             esi_per_ct,
             e3_id: E3id::new(self.0.e3Id.to_string(), self.1),
+            proof_aggregation_enabled: self.0.e3.proofAggregationEnabled,
         })
     }
 }

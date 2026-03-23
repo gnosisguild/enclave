@@ -278,10 +278,9 @@ impl Sortition {
         })
         .start();
 
-        // Subscribe to all relevant events
+        // Subscribe to state-building events immediately (needed during EventStore replay)
         bus.subscribe_all(
             &[
-                EventType::E3Requested,
                 EventType::CiphernodeAdded,
                 EventType::CiphernodeRemoved,
                 EventType::TicketBalanceUpdated,
@@ -295,6 +294,21 @@ impl Sortition {
                 EventType::E3StageChanged,
             ],
             addr.clone().into(),
+        );
+
+        // Gate E3Requested behind EffectsEnabled — sortition should not trigger
+        // ticket generation during historical event replay.
+        bus.subscribe(
+            EventType::EffectsEnabled,
+            e3_events::run_once::<e3_events::EffectsEnabled>({
+                let bus = bus.clone();
+                let addr = addr.clone();
+                move |_| {
+                    bus.subscribe(EventType::E3Requested, addr.into());
+                    Ok(())
+                }
+            })
+            .recipient(),
         );
 
         info!("Sortition actor started");

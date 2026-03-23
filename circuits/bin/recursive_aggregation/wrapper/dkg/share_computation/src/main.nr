@@ -5,13 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use bb_proof_verification::{UltraHonkVerificationKey, UltraHonkZKProof, verify_honk_proof};
-use lib::configs::default::dkg::L_THRESHOLD;
-use lib::{configs::default::N_PARTIES, math::commitments::compute_recursive_aggregation_commitment};
+use lib::math::commitments::compute_recursive_aggregation_commitment;
 
-// Number of proofs.
+// Each SK/ESM final C2 proof is wrapped individually after the two-level pipeline.
 pub global N_PROOFS: u32 = 1;
-/// Number of public inputs/outputs per proof.
-pub global N_PUBLIC_INPUTS: u32 = (L_THRESHOLD * N_PARTIES) + 1;
+// The final share_computation circuit exposes 3 public outputs:
+//   batch_key_hash (pub param) + (key_hash, commitment) return tuple.
+pub global N_PUBLIC_INPUTS: u32 = 3;
 
 fn main(
     verification_key: UltraHonkVerificationKey,

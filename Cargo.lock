@@ -3061,6 +3061,7 @@ dependencies = [
  "e3-sortition",
  "e3-trbfv",
  "e3-utils",
+ "e3-zk-helpers",
  "serde",
  "tracing",
 ]
@@ -3125,12 +3126,15 @@ dependencies = [
  "compile-time",
  "dialoguer",
  "dirs 5.0.1",
+ "e3-ciphernode-builder",
  "e3-config",
+ "e3-console",
  "e3-crypto",
  "e3-entrypoint",
  "e3-events",
  "e3-evm",
  "e3-init",
+ "e3-socket-server",
  "e3-support-scripts",
  "e3-utils",
  "e3-zk-prover",
@@ -3142,6 +3146,7 @@ dependencies = [
  "petname",
  "rand 0.8.5",
  "serde",
+ "serde_json",
  "tokio",
  "toml 0.8.23",
  "tracing",
@@ -3189,6 +3194,13 @@ dependencies = [
  "tempfile",
  "tracing",
  "url",
+]
+
+[[package]]
+name = "e3-console"
+version = "0.1.15"
+dependencies = [
+ "tokio",
 ]
 
 [[package]]
@@ -3252,6 +3264,7 @@ dependencies = [
  "e3-logger",
  "e3-net",
  "e3-request",
+ "e3-socket-server",
  "e3-sortition",
  "e3-test-helpers",
  "e3-zk-prover",
@@ -3311,6 +3324,7 @@ version = "0.1.15"
 dependencies = [
  "actix",
  "alloy",
+ "alloy-dyn-abi",
  "alloy-primitives",
  "anyhow",
  "async-trait",
@@ -3634,6 +3648,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-socket-server"
+version = "0.1.15"
+dependencies = [
+ "anyhow",
+ "e3-config",
+ "e3-console",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "e3-sortition"
 version = "0.1.15"
 dependencies = [
@@ -3859,6 +3886,8 @@ dependencies = [
  "acvm",
  "alloy",
  "anyhow",
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
  "async-trait",
  "base64",
  "bincode 1.3.3",

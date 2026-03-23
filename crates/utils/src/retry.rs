@@ -46,33 +46,31 @@ where
     loop {
         match operation().await {
             Ok(value) => return Ok(value),
-            Err(re) => {
-                tracing::error!("RETRY FAILED {:?}", re);
-                match re {
-                    RetryError::Retry(e) => {
-                        if current_attempt >= max_attempts {
-                            return Err(anyhow::anyhow!(
-                                "Operation failed after {} attempts. Last error: {}",
-                                max_attempts,
-                                e
-                            ));
-                        }
-
-                        warn!(
-                            "Attempt {}/{} failed, retrying in {}ms: {}",
-                            current_attempt, max_attempts, delay_ms, e
-                        );
-
-                        sleep(Duration::from_millis(delay_ms)).await;
-                        current_attempt += 1;
-                        delay_ms *= 2; // Exponential backoff
+            Err(re) => match re {
+                RetryError::Retry(e) => {
+                    if current_attempt >= max_attempts {
+                        error!("Operation failed after {} attempts: {}", max_attempts, e);
+                        return Err(anyhow::anyhow!(
+                            "Operation failed after {} attempts. Last error: {}",
+                            max_attempts,
+                            e
+                        ));
                     }
-                    RetryError::Failure(e) => {
-                        error!("FAILURE!: returning to caller.");
-                        return Err(e);
-                    }
+
+                    warn!(
+                        "Attempt {}/{} failed, retrying in {}ms: {}",
+                        current_attempt, max_attempts, delay_ms, e
+                    );
+
+                    sleep(Duration::from_millis(delay_ms)).await;
+                    current_attempt += 1;
+                    delay_ms *= 2; // Exponential backoff
                 }
-            }
+                RetryError::Failure(e) => {
+                    error!("Non-retryable failure: {}", e);
+                    return Err(e);
+                }
+            },
         }
     }
 }

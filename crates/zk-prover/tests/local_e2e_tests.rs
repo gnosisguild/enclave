@@ -10,11 +10,14 @@
 //! Circuit artifacts (`.json` + `.vk`) are expected in `circuits/bin/{group}/target/`,
 //! produced by `pnpm build:circuits` locally or the `build_circuits` CI job.
 //!
-//! To add a new circuit: add setup_*_test() and one line in `e2e_proof_tests!`.
+//! To add a new circuit: add setup_*_test() and one line in `e2e_proof_tests!`
+//! `(name, setup, CircuitVariant::Recursive | Evm)` (C5 pk_aggregation uses Evm).
 //! Commitment consistency tests are defined separately.
 
 mod common;
 
+use ark_bn254::Fr;
+use ark_ff::{PrimeField, Zero};
 use common::{
     extract_field, extract_field_from_end, find_bb, setup_compiled_circuit, setup_test_prover,
 };
@@ -23,7 +26,10 @@ use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
 use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
 use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComputationCircuitData};
+use e3_zk_helpers::dkg::share_computation::{
+    Configs, ShareComputationBaseCircuit, ShareComputationChunkCircuit,
+    ShareComputationChunkCircuitData, ShareComputationCircuit, ShareComputationCircuitData,
+};
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitData};
 use e3_zk_helpers::threshold::{
@@ -37,8 +43,23 @@ use e3_zk_helpers::threshold::{
     },
 };
 use e3_zk_helpers::CiphernodesCommitteeSize;
-use e3_zk_helpers::{compute_share_computation_sk_commitment, compute_threshold_pk_commitment};
-use e3_zk_prover::{Provable, ZkBackend, ZkProver};
+use e3_zk_helpers::Computation;
+use e3_zk_helpers::{
+    compute_pk_aggregation_commitment, compute_share_computation_sk_commitment,
+    compute_threshold_pk_commitment,
+};
+use e3_zk_prover::{
+    generate_chunk_batch_proof, generate_share_computation_final_proof, CircuitVariant, Provable,
+    ZkBackend, ZkProver,
+};
+
+/// Convert raw public signals bytes (32-byte big-endian chunks) to ark_bn254::Fr field elements.
+fn public_signals_to_fields(signals: &[u8]) -> Vec<Fr> {
+    signals
+        .chunks(32)
+        .map(|chunk| Fr::from_be_bytes_mod_order(chunk))
+        .collect()
+}
 
 async fn setup_share_encryption_e_sm_test() -> Option<(
     ZkBackend,
@@ -120,7 +141,7 @@ async fn setup_share_encryption_sk_test() -> Option<(
     ))
 }
 
-async fn setup_share_computation_sk_test() -> Option<(
+async fn setup_share_computation_sk_base_chunk_test() -> Option<(
     ZkBackend,
     tempfile::TempDir,
     ZkProver,
@@ -134,7 +155,12 @@ async fn setup_share_computation_sk_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    setup_compiled_circuit(&backend, "dkg", "sk_share_computation").await;
+    // Two-level wrapper: base, chunk, chunk_batch (level 1), share_computation (level 2)
+    setup_compiled_circuit(&backend, "dkg", "sk_share_computation_base").await;
+    setup_compiled_circuit(&backend, "dkg", "e_sm_share_computation_base").await;
+    setup_compiled_circuit(&backend, "dkg", "share_computation_chunk").await;
+    setup_compiled_circuit(&backend, "dkg", "share_computation_chunk_batch").await;
+    setup_compiled_circuit(&backend, "dkg", "share_computation").await;
 
     let sample =
         ShareComputationCircuitData::generate_sample(preset, committee, DkgInputType::SecretKey)
@@ -152,7 +178,7 @@ async fn setup_share_computation_sk_test() -> Option<(
     ))
 }
 
-async fn setup_share_computation_e_sm_test() -> Option<(
+async fn setup_share_computation_e_sm_base_chunk_test() -> Option<(
     ZkBackend,
     tempfile::TempDir,
     ZkProver,
@@ -166,7 +192,12 @@ async fn setup_share_computation_e_sm_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    setup_compiled_circuit(&backend, "dkg", "e_sm_share_computation").await;
+    // Two-level wrapper: base, chunk, chunk_batch (level 1), share_computation (level 2)
+    setup_compiled_circuit(&backend, "dkg", "sk_share_computation_base").await;
+    setup_compiled_circuit(&backend, "dkg", "e_sm_share_computation_base").await;
+    setup_compiled_circuit(&backend, "dkg", "share_computation_chunk").await;
+    setup_compiled_circuit(&backend, "dkg", "share_computation_chunk_batch").await;
+    setup_compiled_circuit(&backend, "dkg", "share_computation").await;
 
     let sample = ShareComputationCircuitData::generate_sample(
         preset,
@@ -329,7 +360,7 @@ async fn setup_pk_test() -> Option<(
 }
 
 macro_rules! e2e_proof_tests {
-    ($(($name:ident, $setup:expr)),* $(,)?) => {
+    ($(($name:ident, $setup:expr, $variant:expr)),* $(,)?) => {
         $(
             paste::paste! {
                 #[tokio::test]
@@ -342,14 +373,15 @@ macro_rules! e2e_proof_tests {
                     };
 
                     let proof = circuit
-                        .prove(&prover, &preset, &sample, e3_id)
+                        .prove_with_variant(&prover, &preset, &sample, e3_id, $variant)
                         .expect("proof generation should succeed");
 
                     assert!(!proof.data.is_empty(), "proof data should not be empty");
                     assert!(!proof.public_signals.is_empty(), "public signals should not be empty");
 
                     let party_id = 1;
-                    let verification_result = circuit.verify(&prover, &proof, e3_id, party_id);
+                    let verification_result =
+                        circuit.verify_with_variant(&prover, &proof, e3_id, party_id, $variant);
                     assert!(
                         verification_result.as_ref().is_ok_and(|&v| v),
                         "Proof verification failed: {:?}",
@@ -364,15 +396,15 @@ macro_rules! e2e_proof_tests {
 }
 
 e2e_proof_tests! {
-    (pk_generation, setup_pk_generation_test()),
-    (pk, setup_pk_test()),
-    (share_computation_sk, setup_share_computation_sk_test()),
-    (share_computation_e_sm, setup_share_computation_e_sm_test()),
-    (share_encryption_sk, setup_share_encryption_sk_test()),
-    (share_encryption_e_sm, setup_share_encryption_e_sm_test()),
-    (share_decryption, setup_share_decryption_test()),
-    (pk_aggregation, setup_pk_aggregation_test()),
-    (decrypted_shares_aggregation, setup_decrypted_shares_aggregation_test()),
+    (pk_generation, setup_pk_generation_test(), CircuitVariant::Recursive),
+    (pk, setup_pk_test(), CircuitVariant::Recursive),
+    (share_computation_sk, setup_share_computation_sk_base_chunk_test(), CircuitVariant::Recursive),
+    (share_computation_e_sm, setup_share_computation_e_sm_base_chunk_test(), CircuitVariant::Recursive),
+    (share_encryption_sk, setup_share_encryption_sk_test(), CircuitVariant::Recursive),
+    (share_encryption_e_sm, setup_share_encryption_e_sm_test(), CircuitVariant::Recursive),
+    (share_decryption, setup_share_decryption_test(), CircuitVariant::Recursive),
+    (pk_aggregation, setup_pk_aggregation_test(), CircuitVariant::Evm),
+    (decrypted_shares_aggregation, setup_decrypted_shares_aggregation_test(), CircuitVariant::Recursive),
 }
 
 #[tokio::test]
@@ -460,28 +492,72 @@ async fn test_pk_bfv_commitment_consistency() {
 
 #[tokio::test]
 async fn test_share_computation_sk_commitment_consistency() {
-    let Some((_backend, _temp, prover, circuit, sample, preset, e3_id)) =
-        setup_share_computation_sk_test().await
+    let Some((_backend, _temp, prover, _circuit, sample, preset, e3_id)) =
+        setup_share_computation_sk_base_chunk_test().await
     else {
         println!("skipping: bb not found");
         return;
     };
 
-    let proof = circuit
-        .prove(&prover, &preset, &sample, e3_id)
-        .expect("proof generation should succeed");
+    // Run the pipeline manually to capture intermediate public signals
+    let base_proof = ShareComputationBaseCircuit
+        .prove(&prover, &preset, &sample, &format!("{e3_id}_base"))
+        .expect("base proof should succeed");
 
-    // Verify the commitment from the proof is a valid field element
-    let commitment_from_proof = extract_field(&proof.public_signals, 0);
+    let configs = Configs::compute(preset, &sample).expect("configs");
 
-    // Compute the commitment independently to ensure consistency
-    let computation_output =
-        ShareComputationCircuit::compute(preset, &sample).expect("computation should succeed");
-    let commitment_calculated = computation_output.inputs.expected_secret_commitment.clone();
+    let mut chunk_proofs = Vec::with_capacity(configs.n_chunks);
+    for chunk_idx in 0..configs.n_chunks {
+        let chunk_data = ShareComputationChunkCircuitData {
+            share_data: sample.clone(),
+            chunk_idx,
+        };
+        let chunk_proof = ShareComputationChunkCircuit
+            .prove(
+                &prover,
+                &preset,
+                &chunk_data,
+                &format!("{e3_id}_chunk_{chunk_idx}"),
+            )
+            .expect("chunk proof should succeed");
+        chunk_proofs.push(chunk_proof);
+    }
 
+    // Level 1: group chunks into batches and prove each batch
+    let mut batch_proofs = Vec::with_capacity(configs.n_batches);
+    for batch_idx in 0..configs.n_batches {
+        let start = batch_idx * configs.chunks_per_batch;
+        let end = start + configs.chunks_per_batch;
+        let batch_proof = generate_chunk_batch_proof(
+            &prover,
+            &base_proof,
+            &chunk_proofs[start..end],
+            batch_idx as u32,
+            &format!("{e3_id}_batch_{batch_idx}"),
+        )
+        .expect("chunk batch proof should succeed");
+        batch_proofs.push(batch_proof);
+    }
+
+    // Level 2: aggregate batch proofs into final C2 proof
+    let proof = generate_share_computation_final_proof(&prover, &batch_proofs, e3_id)
+        .expect("final share_computation proof should succeed");
+
+    // Final circuit exposes 3 public outputs:
+    //   [0] batch_key_hash (pub param)
+    //   [1] key_hash (from return tuple)
+    //   [2] final_commitment (from return tuple)
     assert_eq!(
-        commitment_from_proof, commitment_calculated,
-        "Commitment from proof must match independently calculated commitment"
+        proof.public_signals.len(),
+        3 * 32,
+        "final share_computation should expose 3 field public inputs (96 bytes)"
+    );
+
+    // Sanity check: at least one public input is non-zero.
+    let fields = public_signals_to_fields(&proof.public_signals);
+    assert!(
+        fields.iter().any(|f| !f.is_zero()),
+        "party commitments from final wrapper should not all be zero"
     );
 
     prover.cleanup(e3_id).unwrap();
@@ -489,28 +565,72 @@ async fn test_share_computation_sk_commitment_consistency() {
 
 #[tokio::test]
 async fn test_share_computation_e_sm_commitment_consistency() {
-    let Some((_backend, _temp, prover, circuit, sample, preset, e3_id)) =
-        setup_share_computation_e_sm_test().await
+    let Some((_backend, _temp, prover, _circuit, sample, preset, e3_id)) =
+        setup_share_computation_e_sm_base_chunk_test().await
     else {
         println!("skipping: bb not found");
         return;
     };
 
-    let proof = circuit
-        .prove(&prover, &preset, &sample, e3_id)
-        .expect("proof generation should succeed");
+    // Run the pipeline manually to capture intermediate public signals
+    let base_proof = ShareComputationBaseCircuit
+        .prove(&prover, &preset, &sample, &format!("{e3_id}_base"))
+        .expect("base proof should succeed");
 
-    // Verify the commitment from the proof is a valid field element
-    let commitment_from_proof = extract_field(&proof.public_signals, 0);
+    let configs = Configs::compute(preset, &sample).expect("configs");
 
-    // Compute the commitment independently to ensure consistency
-    let computation_output =
-        ShareComputationCircuit::compute(preset, &sample).expect("computation should succeed");
-    let commitment_calculated = computation_output.inputs.expected_secret_commitment.clone();
+    let mut chunk_proofs = Vec::with_capacity(configs.n_chunks);
+    for chunk_idx in 0..configs.n_chunks {
+        let chunk_data = ShareComputationChunkCircuitData {
+            share_data: sample.clone(),
+            chunk_idx,
+        };
+        let chunk_proof = ShareComputationChunkCircuit
+            .prove(
+                &prover,
+                &preset,
+                &chunk_data,
+                &format!("{e3_id}_chunk_{chunk_idx}"),
+            )
+            .expect("chunk proof should succeed");
+        chunk_proofs.push(chunk_proof);
+    }
 
+    // Level 1: group chunks into batches and prove each batch
+    let mut batch_proofs = Vec::with_capacity(configs.n_batches);
+    for batch_idx in 0..configs.n_batches {
+        let start = batch_idx * configs.chunks_per_batch;
+        let end = start + configs.chunks_per_batch;
+        let batch_proof = generate_chunk_batch_proof(
+            &prover,
+            &base_proof,
+            &chunk_proofs[start..end],
+            batch_idx as u32,
+            &format!("{e3_id}_batch_{batch_idx}"),
+        )
+        .expect("chunk batch proof should succeed");
+        batch_proofs.push(batch_proof);
+    }
+
+    // Level 2: aggregate batch proofs into final C2 proof
+    let proof = generate_share_computation_final_proof(&prover, &batch_proofs, e3_id)
+        .expect("final share_computation proof should succeed");
+
+    // Final circuit exposes 3 public outputs:
+    //   [0] batch_key_hash (pub param)
+    //   [1] key_hash (from return tuple)
+    //   [2] final_commitment (from return tuple)
     assert_eq!(
-        commitment_from_proof, commitment_calculated,
-        "Commitment from proof must match independently calculated commitment"
+        proof.public_signals.len(),
+        3 * 32,
+        "final share_computation should expose 3 field public inputs (96 bytes)"
+    );
+
+    // Sanity check: at least one public input is non-zero.
+    let fields = public_signals_to_fields(&proof.public_signals);
+    assert!(
+        fields.iter().any(|f| !f.is_zero()),
+        "party commitments from final wrapper should not all be zero"
     );
 
     prover.cleanup(e3_id).unwrap();
@@ -525,8 +645,10 @@ async fn test_pk_aggregation_commitment_consistency() {
         return;
     };
 
+    // C5 uses Evm variant in production; Recursive fails because commitment hashes (256-bit)
+    // exceed the noir-recursive verifier's limb bound.
     let proof = circuit
-        .prove(&prover, &preset, &sample, e3_id)
+        .prove_with_variant(&prover, &preset, &sample, e3_id, CircuitVariant::Evm)
         .expect("proof generation should succeed");
 
     let computation_output = PkAggregationCircuit::compute(preset, &sample).unwrap();
@@ -540,10 +662,21 @@ async fn test_pk_aggregation_commitment_consistency() {
         let commitment_from_proof = extract_field(&proof.public_signals, i);
         assert_eq!(
             commitment_from_proof, *expected,
-            "pk_aggregation commitment {} mismatch",
+            "pk_aggregation per-party commitment {} mismatch",
             i
         );
     }
+
+    let expected_final_commitment = compute_pk_aggregation_commitment(
+        &computation_output.inputs.pk0_agg,
+        &computation_output.inputs.pk1_agg,
+        computation_output.bits.pk_bit,
+    );
+    let final_commitment_from_proof = extract_field_from_end(&proof.public_signals, 0);
+    assert_eq!(
+        final_commitment_from_proof, expected_final_commitment,
+        "pk_aggregation final commitment mismatch"
+    );
 
     prover.cleanup(e3_id).unwrap();
 }

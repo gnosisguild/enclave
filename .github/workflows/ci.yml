@@ -473,7 +473,7 @@ jobs:
     strategy:
       matrix:
         # TODO removed base test for now
-        test-suite: [persist]
+        test-suite: [base, persist]
       fail-fast: false
     steps:
       - name: 'Check out the repo'
@@ -537,7 +537,9 @@ jobs:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.build_enclave_cli == 'true'
     timeout-minutes: 20
-    runs-on: 'ubuntu-latest'
+    runs-on: 
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     permissions:
       contents: read
       actions: write
@@ -653,7 +655,7 @@ jobs:
 
   crisp_e2e:
     needs: [detect_changes, build_enclave_cli, build_crisp_sdk]
-    if: needs.detect_changes.outputs.crisp == 'true'
+    if: needs.detect_changes.outputs.crisp == 'true' 
     timeout-minutes: 45
     runs-on:
       group: enclave-ci
@@ -923,7 +925,7 @@ jobs:
           find circuits/bin/evm -name '*.vk' | head -20
 
       - name: Run ZK prover e2e tests
-        run: cargo test -p e3-zk-prover --test local_e2e_tests -- --nocapture
+        run: cargo test -p e3-zk-prover --test local_e2e_tests -- --nocapture --test-threads=1
 
   build_e3_support_dev:
     needs: [detect_changes]
