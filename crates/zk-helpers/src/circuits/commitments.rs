@@ -80,6 +80,14 @@ const DS_AGGREGATED_SHARES: [u8; 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
+/// String: "VK_HASH"
+const DS_VK_HASH: [u8; 64] = [
+    0x56, 0x4b, 0x5f, 0x48, 0x41, 0x53, 0x48, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+
 /// String: "RECURSIVE_AGGREGATION"
 const DS_RECURSIVE_AGGREGATION: [u8; 64] = [
     0x52, 0x45, 0x43, 0x55, 0x52, 0x53, 0x49, 0x56, 0x45, 0x5f, 0x41, 0x47, 0x47, 0x52, 0x45, 0x47,
@@ -142,6 +150,15 @@ pub fn compute_commitments(
     io_pattern: [u32; 2],
 ) -> Vec<Field> {
     compute_safe(domain_separator, payload, io_pattern)
+}
+
+/// Combine verification-key hashes with the `VK_HASH` domain separator (SAFE sponge).
+///
+/// Matches Noir `lib::math::commitments::compute_vk_hash`.
+pub fn compute_vk_hash(vk_hashes: Vec<Field>) -> Field {
+    let input_size = vk_hashes.len() as u32;
+    let io_pattern = [0x80000000 | input_size, 1];
+    compute_commitments(vk_hashes, DS_VK_HASH, io_pattern)[0]
 }
 
 // ============================================================================
@@ -642,5 +659,19 @@ mod tests {
 
         let actual = compute_threshold_share_decryption_challenge(payload);
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn compute_vk_hash_matches_manual_commitment() {
+        let vk_hashes = vec![
+            Field::from(7u64),
+            Field::from(8u64),
+            Field::from(9u64),
+            Field::from(10u64),
+        ];
+        let input_size = vk_hashes.len() as u32;
+        let io_pattern = [0x80000000 | input_size, 1];
+        let expected = compute_commitments(vk_hashes.clone(), super::DS_VK_HASH, io_pattern)[0];
+        assert_eq!(compute_vk_hash(vk_hashes), expected);
     }
 }

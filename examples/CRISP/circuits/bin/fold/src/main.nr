@@ -7,6 +7,11 @@
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
 use enclave_lib::math::commitments::compute_vk_hash;
 
+/// Binds the four inner `vk_hash` witnesses;
+// update when ct0 / ct1 / user_data_encryption / crisp change (`pnpm compute:vk-hash`).
+pub global CRISP_FOLD_EXPECTED_KEY_HASH: Field =
+    0x2e53e3285d47eebd65eb932cf6a57ecaa5e43f90b1673165715c92b78e493a9c;
+
 fn main(
     // User Data Encryption Section.
     user_data_encryption_verification_key: UltraHonkVerificationKey,
@@ -25,7 +30,7 @@ fn main(
     final_ct_commitment: pub Field,
     ct_commitment: Field,
     k1_commitment: Field,
-) -> pub (Field, Field) {
+) -> pub Field {
     verify_honk_proof_non_zk(
         user_data_encryption_verification_key,
         user_data_encryption_proof,
@@ -54,15 +59,14 @@ fn main(
     // Verify that the k1_commitment from the crisp proof matches the one computed from user data encryption.
     assert(k1_commitment == user_data_encryption_public_inputs[4]);
 
-    // Hash the full VK chain: key hashes from both proofs (user_data_encryption, crisp, ct0, ct1) so the verifier can
-    // check the entire proof genealogy.
     let mut vk_hashes = Vec::new();
     vk_hashes.push(user_data_encryption_key_hash);
     vk_hashes.push(crisp_key_hash);
     vk_hashes.push(user_data_encryption_public_inputs[0]); // ct0_key_hash
     vk_hashes.push(user_data_encryption_public_inputs[1]); // ct1_key_hash
-    let key_hash = compute_vk_hash(vk_hashes);
 
-    // Return pk_commitment from user data encryption proof and the combined VK hash (verified in crisp contract).
-    (user_data_encryption_public_inputs[2], key_hash)
+    // Verify that the computed key hash matches the expected key hash.
+    assert(compute_vk_hash(vk_hashes) == CRISP_FOLD_EXPECTED_KEY_HASH);
+
+    user_data_encryption_public_inputs[2]
 }

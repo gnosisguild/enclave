@@ -41,9 +41,6 @@ contract CRISPProgram is IE3Program, Ownable {
   uint8 public constant TREE_DEPTH = 20;
   /// @notice Maximum number of bits allocated for vote counts in the plaintext output per option.
   uint256 constant MAX_VOTE_BITS = 50;
-  /// @notice The zero-knowledge verification key hash for the CRISP program.
-  bytes32 public constant ZK_VK_HASH = 0x2e53e3285d47eebd65eb932cf6a57ecaa5e43f90b1673165715c92b78e493a9c;
-
   // State variables
   IEnclave public enclave;
   IRiscZeroVerifier public risc0Verifier;
@@ -173,15 +170,15 @@ contract CRISPProgram is IE3Program, Ownable {
 
     if (data.length == 0) revert EmptyInputData();
 
-    (bytes memory noirProof, address slotAddress, bytes32 encryptedVoteCommitment, bytes32 zkKeyHash, bytes memory encryptedVote) = abi
-      .decode(data, (bytes, address, bytes32, bytes32, bytes));
-
-    if (zkKeyHash != ZK_VK_HASH) revert InvalidNoirProof();
+    (bytes memory noirProof, address slotAddress, bytes32 encryptedVoteCommitment, bytes memory encryptedVote) = abi.decode(
+      data,
+      (bytes, address, bytes32, bytes)
+    );
 
     (uint40 voteIndex, bytes32 previousEncryptedVoteCommitment) = _processVote(e3Id, slotAddress, encryptedVoteCommitment);
 
     // Set the public inputs for the proof. Order must match Noir circuit.
-    bytes32[] memory noirPublicInputs = new bytes32[](8);
+    bytes32[] memory noirPublicInputs = new bytes32[](7);
     noirPublicInputs[0] = previousEncryptedVoteCommitment;
     noirPublicInputs[1] = bytes32(e3Data[e3Id].merkleRoot);
     noirPublicInputs[2] = bytes32(uint256(uint160(slotAddress)));
@@ -189,7 +186,6 @@ contract CRISPProgram is IE3Program, Ownable {
     noirPublicInputs[4] = bytes32(e3Data[e3Id].numOptions);
     noirPublicInputs[5] = encryptedVoteCommitment;
     noirPublicInputs[6] = e3.committeePublicKey;
-    noirPublicInputs[7] = zkKeyHash;
 
     // Check if the ciphertext was encrypted correctly
     if (!honkVerifier.verify(noirProof, noirPublicInputs)) {
