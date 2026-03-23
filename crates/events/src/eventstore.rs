@@ -78,7 +78,9 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         let Some(seq) = self.index.seek(query)? else {
             return Ok(vec![]);
         };
-        Ok(self.collect_events(self.log.read_from(seq), filter, limit))
+        let events: Vec<_> = self.log.read_from(seq).collect();
+        let result = self.collect_events(Box::new(events.into_iter()), filter, limit);
+        Ok(result)
     }
 
     /// Query events by sequence number. Returns events at or after the given sequence.

@@ -48,6 +48,7 @@ COPY crates/cli/Cargo.toml ./cli/Cargo.toml
 COPY crates/ciphernode-builder/Cargo.toml ./ciphernode-builder/Cargo.toml
 COPY crates/compute-provider/Cargo.toml ./compute-provider/Cargo.toml
 COPY crates/config/Cargo.toml ./config/Cargo.toml
+COPY crates/console/Cargo.toml ./console/Cargo.toml
 COPY crates/crypto/Cargo.toml ./crypto/Cargo.toml
 COPY crates/data/Cargo.toml ./data/Cargo.toml
 COPY crates/enclaveup/Cargo.toml ./enclaveup/Cargo.toml
@@ -74,6 +75,7 @@ COPY crates/request/Cargo.toml ./request/Cargo.toml
 COPY crates/safe/Cargo.toml ./safe/Cargo.toml
 COPY crates/sdk/Cargo.toml ./sdk/Cargo.toml
 COPY crates/sortition/Cargo.toml ./sortition/Cargo.toml
+COPY crates/socket-server/Cargo.toml ./socket-server/Cargo.toml
 COPY crates/support-scripts/Cargo.toml ./support-scripts/Cargo.toml
 COPY crates/sync/Cargo.toml ./sync/Cargo.toml
 COPY crates/test-helpers/Cargo.toml ./test-helpers/Cargo.toml

@@ -58,7 +58,7 @@ const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/enclave/kad/1.0.0");
 const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
 const DHT_MAX_RECORDS: usize = 4096;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
-const MAX_CONSECUTIVE_DIAL_FAILURES: u32 = 5;
+const MAX_CONSECUTIVE_DIAL_FAILURES: u32 = 40;
 const EVENT_CHANNEL_SIZE: usize = 1000;
 const CMD_CHANNEL_SIZE: usize = 1000;
 const PEER_FAILURE_TTL: Duration = Duration::from_secs(300);
@@ -210,7 +210,7 @@ impl Libp2pNetInterface {
                  // Process commands
                 Some(command) = cmd_rx.recv() => {
                     if let NetCommand::Shutdown = command {
-                        if let Err(e) = handle_shutdown(&mut self.swarm) {
+                        if let Err(e) = handle_shutdown(&mut self.swarm).await {
                             error!("Error processing NetCommand: {e}");
                         }
                         break;
@@ -907,16 +907,20 @@ fn handle_get_record(
     Ok(())
 }
 
-fn handle_shutdown(swarm: &mut Swarm<NodeBehaviour>) -> Result<()> {
+async fn handle_shutdown(swarm: &mut Swarm<NodeBehaviour>) -> Result<()> {
     info!("Starting graceful shutdown");
-
-    // Disconnect all peers
     let peers: Vec<_> = swarm.connected_peers().copied().collect();
     for peer in peers {
-        info!("Disconnecting from peer: {}", peer);
         let _ = swarm.disconnect_peer_id(peer);
     }
-
+    // Drive the swarm briefly to flush QUIC CONNECTION_CLOSE frames
+    let drain_deadline = Instant::now() + Duration::from_secs(2);
+    while Instant::now() < drain_deadline {
+        match tokio::time::timeout(Duration::from_millis(100), swarm.select_next_some()).await {
+            Ok(_event) => continue,
+            Err(_timeout) => break, // No more events, frames flushed
+        }
+    }
     info!("Graceful shutdown complete");
     Ok(())
 }
