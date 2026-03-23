@@ -58,6 +58,8 @@ function encodeProof(rawProof: string, publicInputs: string[]): string {
   return abiCoder.encode(["bytes", "bytes32[]"], [rawProof, publicInputs]);
 }
 
+const EMPTY_FOLD = "0x";
+
 describe("BfvDecryptionVerifier", function () {
   const deployWithMockCircuit = async () => {
     const [owner] = await ethers.getSigners();
@@ -65,10 +67,15 @@ describe("BfvDecryptionVerifier", function () {
       MockCircuitVerifierModule,
     );
     const mockAddr = await mockCircuitVerifier.getAddress();
+    const mockFold = await (
+      await ethers.getContractFactory("MockCircuitVerifier")
+    ).deploy();
+    await mockFold.waitForDeployment();
+    const mockFoldAddr = await mockFold.getAddress();
 
     const bfvDecryptionVerifier = await (
       await ethers.getContractFactory("BfvDecryptionVerifier")
-    ).deploy(mockAddr);
+    ).deploy(mockAddr, mockFoldAddr);
 
     await bfvDecryptionVerifier.waitForDeployment();
     const dv = BfvDecryptionVerifierFactory.connect(
@@ -76,7 +83,8 @@ describe("BfvDecryptionVerifier", function () {
       owner,
     );
     const mc = MockCircuitVerifierFactory.connect(mockAddr, owner);
-    return { bfvDecryptionVerifier: dv, mockCircuit: mc };
+    const mf = MockCircuitVerifierFactory.connect(mockFoldAddr, owner);
+    return { bfvDecryptionVerifier: dv, mockCircuit: mc, mockFold: mf };
   };
 
   describe("reverts", function () {
@@ -88,7 +96,11 @@ describe("BfvDecryptionVerifier", function () {
       const invalidProof = "0xdeadbeef"; // not abi.encode(bytes, bytes32[])
 
       await expect(
-        bfvDecryptionVerifier.verify.staticCall(plaintextHash, invalidProof),
+        bfvDecryptionVerifier.verify.staticCall(
+          plaintextHash,
+          invalidProof,
+          EMPTY_FOLD,
+        ),
       ).to.be.revert(ethers);
     });
 
@@ -109,6 +121,7 @@ describe("BfvDecryptionVerifier", function () {
       const result = await bfvDecryptionVerifier.verify.staticCall(
         plaintextHash,
         proof,
+        EMPTY_FOLD,
       );
       expect(result).to.equal(false);
     });
@@ -127,6 +140,7 @@ describe("BfvDecryptionVerifier", function () {
       const result = await bfvDecryptionVerifier.verify.staticCall(
         wrongHash,
         proof,
+        EMPTY_FOLD,
       );
       expect(result).to.equal(false);
     });
@@ -145,6 +159,29 @@ describe("BfvDecryptionVerifier", function () {
       const result = await bfvDecryptionVerifier.verify.staticCall(
         plaintextHash,
         proof,
+        EMPTY_FOLD,
+      );
+      expect(result).to.equal(false);
+    });
+
+    it("returns false when fold proof is present but fold verifier returns false", async function () {
+      const { bfvDecryptionVerifier, mockCircuit, mockFold } = await loadFixture(
+        deployWithMockCircuit,
+      );
+      await mockCircuit.setReturnValue(true);
+      await mockFold.setReturnValue(false);
+
+      const messageCoeffs = [1n, 2n, 3n];
+      const publicInputs = buildPublicInputsWithMessage(messageCoeffs);
+      const plaintextHash = plaintextToHash(messageCoeffs);
+      const foldPi = ["0x" + "01".repeat(32)];
+      const foldProof = encodeProof("0x02", foldPi);
+      const proof = encodeProof("0x01", publicInputs);
+
+      const result = await bfvDecryptionVerifier.verify.staticCall(
+        plaintextHash,
+        proof,
+        foldProof,
       );
       expect(result).to.equal(false);
     });
@@ -165,6 +202,7 @@ describe("BfvDecryptionVerifier", function () {
       const result = await bfvDecryptionVerifier.verify.staticCall(
         plaintextHash,
         proof,
+        EMPTY_FOLD,
       );
       expect(result).to.equal(true);
     });
@@ -186,6 +224,29 @@ describe("BfvDecryptionVerifier", function () {
       const result = await bfvDecryptionVerifier.verify.staticCall(
         plaintextHash,
         proof,
+        EMPTY_FOLD,
+      );
+      expect(result).to.equal(true);
+    });
+
+    it("returns true when fold proof is present and fold verifies", async function () {
+      const { bfvDecryptionVerifier, mockCircuit, mockFold } = await loadFixture(
+        deployWithMockCircuit,
+      );
+      await mockCircuit.setReturnValue(true);
+      await mockFold.setReturnValue(true);
+
+      const messageCoeffs = [1n, 2n, 3n];
+      const publicInputs = buildPublicInputsWithMessage(messageCoeffs);
+      const plaintextHash = plaintextToHash(messageCoeffs);
+      const foldPi = ["0x" + "01".repeat(32)];
+      const foldProof = encodeProof("0xaa", foldPi);
+      const proof = encodeProof("0x01", publicInputs);
+
+      const result = await bfvDecryptionVerifier.verify.staticCall(
+        plaintextHash,
+        proof,
+        foldProof,
       );
       expect(result).to.equal(true);
     });

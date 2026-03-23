@@ -9,7 +9,8 @@ import { IPkVerifier } from "../interfaces/IPkVerifier.sol";
 
 contract MockPkVerifier is IPkVerifier {
     function verify(
-        bytes memory proof
+        bytes memory proof,
+        bytes memory /* foldProof */
     ) external pure returns (bytes32 pkCommitment) {
         (, bytes32[] memory publicInputs) = abi.decode(
             proof,

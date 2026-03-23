@@ -311,6 +311,7 @@ pub async fn decrypt_and_publish_result(
             U256::from(input_crisp_id),
             Bytes::from(votes.to_be_bytes()),
             proof,
+            Bytes::new(),
         )
         .await?;
     info!("Vote broadcast. TxHash: {:?}", res.transaction_hash);

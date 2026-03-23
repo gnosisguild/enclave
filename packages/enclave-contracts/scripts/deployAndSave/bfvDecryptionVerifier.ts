@@ -31,6 +31,17 @@ export const deployAndSaveBfvDecryptionVerifier = async (
     );
   }
 
+  const foldVerifierArgs = readDeploymentArgs(
+    "RecursiveAggregationFoldVerifier",
+    chain,
+  );
+  if (!foldVerifierArgs?.address) {
+    throw new Error(
+      "RecursiveAggregationFoldVerifier must be deployed first. " +
+        "Run deployAndSaveAllVerifiers or deploy verifiers.",
+    );
+  }
+
   const existing = readDeploymentArgs("BfvDecryptionVerifier", chain);
   if (existing?.address) {
     console.log(
@@ -48,6 +59,7 @@ export const deployAndSaveBfvDecryptionVerifier = async (
   );
   const bfvDecryptionVerifier = await bfvDecryptionVerifierFactory.deploy(
     circuitVerifierArgs.address,
+    foldVerifierArgs.address,
   );
 
   await bfvDecryptionVerifier.waitForDeployment();

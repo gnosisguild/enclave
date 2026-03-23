@@ -82,7 +82,7 @@ describe("Enclave", function () {
     await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
     await registry.finalizeCommittee(e3Id);
     const proof = encodePkProof(ethers.keccak256(publicKey));
-    await registry.publishCommittee(e3Id, nodes, publicKey, proof);
+    await registry.publishCommittee(e3Id, nodes, publicKey, proof, "0x");
   };
 
   // Helper function to approve USDC and make request
@@ -1022,7 +1022,7 @@ describe("Enclave", function () {
       const { enclave } = await loadFixture(setup);
       const e3Id = 0;
 
-      await expect(enclave.publishPlaintextOutput(e3Id, data, "0x"))
+      await expect(enclave.publishPlaintextOutput(e3Id, data, "0x", "0x"))
         .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
         .withArgs(e3Id);
     });
@@ -1056,7 +1056,7 @@ describe("Enclave", function () {
         [operator1, operator2, operator3],
       );
       await expect(
-        enclave.publishPlaintextOutput(e3Id, data, "0x"),
+        enclave.publishPlaintextOutput(e3Id, data, "0x", "0x"),
       ).to.be.revertedWithCustomError(enclave, "InvalidStage");
     });
     it("reverts if plaintextOutput has already been published", async function () {
@@ -1089,9 +1089,9 @@ describe("Enclave", function () {
       );
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
-      await enclave.publishPlaintextOutput(e3Id, data, proof);
+      await enclave.publishPlaintextOutput(e3Id, data, proof, "0x");
       await expect(
-        enclave.publishPlaintextOutput(e3Id, data, proof),
+        enclave.publishPlaintextOutput(e3Id, data, proof, "0x"),
       ).to.be.revertedWithCustomError(enclave, "InvalidStage");
     });
     it("reverts if output is not valid", async function () {
@@ -1124,7 +1124,7 @@ describe("Enclave", function () {
       );
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
-      await expect(enclave.publishPlaintextOutput(e3Id, data, "0x"))
+      await expect(enclave.publishPlaintextOutput(e3Id, data, "0x", "0x"))
         .to.be.revertedWithCustomError(enclave, "InvalidOutput")
         .withArgs(data);
     });
@@ -1158,7 +1158,7 @@ describe("Enclave", function () {
       );
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
-      expect(await enclave.publishPlaintextOutput(e3Id, data, proof));
+      expect(await enclave.publishPlaintextOutput(e3Id, data, proof, "0x"));
 
       const e3 = await enclave.getE3(e3Id);
       expect(e3.plaintextOutput).to.equal(data);
@@ -1194,7 +1194,12 @@ describe("Enclave", function () {
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       expect(
-        await enclave.publishPlaintextOutput.staticCall(e3Id, data, proof),
+        await enclave.publishPlaintextOutput.staticCall(
+          e3Id,
+          data,
+          proof,
+          "0x",
+        ),
       ).to.equal(true);
     });
     it("emits PlaintextOutputPublished event", async function () {
@@ -1227,7 +1232,9 @@ describe("Enclave", function () {
       );
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
-      await expect(await enclave.publishPlaintextOutput(e3Id, data, proof))
+      await expect(
+        await enclave.publishPlaintextOutput(e3Id, data, proof, "0x"),
+      )
         .to.emit(enclave, "PlaintextOutputPublished")
         .withArgs(e3Id, data);
     });
