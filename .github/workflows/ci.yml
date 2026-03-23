@@ -108,7 +108,7 @@ jobs:
           echo "zk=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
           echo "contracts=$(any $FORCE $CONTRACTS $CI)" >> $GITHUB_OUTPUT
           echo "docker_support=$(any $FORCE $DOCKER $CI)" >> $GITHUB_OUTPUT
-          echo "docker_ciphernode=$(any $FORCE $RUST $CONTRACTS $DOCKER $CI)" >> $GITHUB_OUTPUT
+          echo "docker_ciphernode=$(any $FORCE $RUST $DOCKER $CI)" >> $GITHUB_OUTPUT
           echo "net=$(any $FORCE $INTEGRATION $CI)" >> $GITHUB_OUTPUT
           echo "init=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $CI)" >> $GITHUB_OUTPUT
           echo "build_e3_support_dev=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $SDK $CI)" >> $GITHUB_OUTPUT
@@ -472,9 +472,8 @@ jobs:
       labels: [enclave-ci-runner]
     strategy:
       matrix:
-        # TODO removed base test for now
         test-suite: [base, persist]
-      fail-fast: false
+      fail-fast: true
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -583,6 +582,10 @@ jobs:
     if: needs.detect_changes.outputs.crisp == 'true'
     timeout-minutes: 30
     runs-on: 'ubuntu-latest'
+    strategy:
+      matrix:
+        test-suite: [test:circuits, test:sdk, test:contracts, cargo test]
+      fail-fast: false
     steps:
       - uses: actions/checkout@v6
         with:
@@ -631,27 +634,15 @@ jobs:
           && sudo apt-get update -y \
           && sudo apt-get install -y solc
 
-      - name: Run Rust tests
-        working-directory: ./examples/CRISP
-        run: 'cargo test'
-
       - name: Download Crisp SDK artifacts
         uses: actions/download-artifact@v4
         with:
           name: crisp-sdk-artifacts
           path: .
 
-      - name: Run Noir tests
+      - name: Run ${{ matrix.test-suite }}
         working-directory: ./examples/CRISP
-        run: 'pnpm test:circuits'
-
-      - name: Run JavaScript tests
-        working-directory: ./examples/CRISP
-        run: 'pnpm test:sdk'
-
-      - name: Run Solidity tests
-        working-directory: ./examples/CRISP
-        run: 'pnpm test:contracts'
+        run: 'pnpm ${{ matrix.test-suite }}'
 
   crisp_e2e:
     needs: [detect_changes, build_enclave_cli, build_crisp_sdk]
