@@ -14,6 +14,7 @@ use tracing::info;
 
 mod ciphernode;
 mod cli;
+mod events;
 pub mod helpers;
 mod init;
 mod net;
