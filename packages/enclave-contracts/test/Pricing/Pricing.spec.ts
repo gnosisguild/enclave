@@ -643,7 +643,7 @@ describe("E3 Pricing", function () {
       const op3Before = await usdcToken.balanceOf(nodes[2]);
 
       // Publish plaintext (triggers _distributeRewards)
-      await enclave.publishPlaintextOutput(e3Id, data, proof);
+      await enclave.publishPlaintextOutput(e3Id, data, proof, proof);
 
       const op1After = await usdcToken.balanceOf(nodes[0]);
       const op2After = await usdcToken.balanceOf(nodes[1]);
@@ -725,7 +725,7 @@ describe("E3 Pricing", function () {
       const op2Before = await usdcToken.balanceOf(nodes[1]);
       const op3Before = await usdcToken.balanceOf(nodes[2]);
 
-      await enclave.publishPlaintextOutput(e3Id, data, proof);
+      await enclave.publishPlaintextOutput(e3Id, data, proof, proof);
 
       const treasuryAfter = await usdcToken.balanceOf(treasuryAddr);
       const op1After = await usdcToken.balanceOf(nodes[0]);
