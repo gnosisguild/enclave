@@ -182,10 +182,18 @@ impl ShareVerificationActor {
                     }
                 }
 
+                // Filter out parties already marked dishonest by the cross-check
+                // to avoid wasting ZK verification on them.
+                let share_proofs: Vec<_> = msg
+                    .share_proofs
+                    .into_iter()
+                    .filter(|p| !pre_dishonest.contains(&p.sender_party_id))
+                    .collect();
+
                 self.verify_proofs(
                     e3_id,
                     VerificationKind::ThresholdDecryptionProofs,
-                    msg.share_proofs,
+                    share_proofs,
                     pre_dishonest,
                     ec,
                     |passed, corr_id, e3| {
