@@ -18,7 +18,7 @@ chains:
         address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
         deploy_block: 5
       e3_program:
-        address: "0x9d4454B023096f34B160D6B654540c56A1F81688"
+        address: "0x5eb3Bc0a489C5A8288765d2336659EbCA68FCd00"
         deploy_block: 34
 program:
   dev: true
