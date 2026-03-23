@@ -37,7 +37,6 @@ use e3_events::{
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
-use e3_zk_helpers::circuits::output_layout::FIELD_BYTE_LEN;
 use tracing::{error, info, warn};
 
 /// Cached C4 return commitments for a single party.
@@ -477,14 +476,11 @@ impl ShareVerificationActor {
         let c4_cache = self.c4_cache.get(e3_id)?;
         let c4 = c4_cache.get(&party.sender_party_id)?;
         let first_proof = party.signed_proofs.first()?;
+        let proof = &first_proof.payload.proof;
 
-        let ps = &first_proof.payload.proof.public_signals;
-        if ps.len() < 2 * FIELD_BYTE_LEN {
-            return None;
-        }
-
-        let c6_sk = &ps[..FIELD_BYTE_LEN];
-        let c6_esm = &ps[FIELD_BYTE_LEN..2 * FIELD_BYTE_LEN];
+        // Extract C6 expected commitments using the input layout
+        let c6_sk = proof.extract_input("expected_sk_commitment")?;
+        let c6_esm = proof.extract_input("expected_e_sm_commitment")?;
 
         if c4.sk_commitment[..] != c6_sk[..] {
             warn!(
