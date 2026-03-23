@@ -279,11 +279,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @param nodes Array of ciphernode addresses selected for the committee
     /// @param publicKey Aggregated public key of the committee
     /// @param proof C5 proof; aggregate commitment extracted as last public input
+    /// @param foldProof Optional ABI-encoded fold proof (bytes, bytes32[]); empty to skip
     function publishCommittee(
         uint256 e3Id,
         address[] calldata nodes,
         bytes calldata publicKey,
-        bytes calldata proof
+        bytes calldata proof,
+        bytes calldata foldProof
     ) external onlyOwner {
         Committee storage c = committees[e3Id];
 
@@ -302,7 +304,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         bytes32 publicKeyHash = publicInputs[publicInputs.length - 1];
 
         E3 memory e3 = enclave.getE3(e3Id);
-        e3.pkVerifier.verify(proof);
+        e3.pkVerifier.verify(proof, foldProof);
 
         c.publicKey = publicKeyHash;
         publicKeyHashes[e3Id] = publicKeyHash;

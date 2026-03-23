@@ -10,7 +10,8 @@ import { IDecryptionVerifier } from "../interfaces/IDecryptionVerifier.sol";
 contract MockDecryptionVerifier is IDecryptionVerifier {
     function verify(
         bytes32,
-        bytes memory data
+        bytes memory data,
+        bytes memory /* foldProof */
     ) external pure returns (bool success) {
         data;
 

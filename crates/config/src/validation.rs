@@ -18,6 +18,12 @@ impl FromStr for ValidUrl {
     }
 }
 
+impl ToString for ValidUrl {
+    fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+}
+
 impl From<ValidUrl> for String {
     fn from(value: ValidUrl) -> Self {
         value.0.to_string()

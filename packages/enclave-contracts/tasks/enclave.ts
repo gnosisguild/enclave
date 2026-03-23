@@ -62,6 +62,12 @@ export const requestCommittee = task(
     defaultValue: ZeroAddress,
     type: ArgumentType.STRING,
   })
+  .addOption({
+    name: "proofAggregationEnabled",
+    description: "whether to enable proof aggregation (default: false)",
+    defaultValue: true,
+    type: ArgumentType.BOOLEAN,
+  })
   .setAction(async () => ({
     default: async (
       {
@@ -72,6 +78,7 @@ export const requestCommittee = task(
         e3Params,
         computeParams,
         customParams,
+        proofAggregationEnabled,
       },
       hre,
     ) => {
@@ -164,7 +171,7 @@ export const requestCommittee = task(
         e3ProgramParams,
         computeProviderParams,
         customParams,
-        proofAggregationEnabled: true,
+        proofAggregationEnabled,
       };
 
       console.log("Request parameters:", requestParams);
@@ -257,8 +264,14 @@ export const publishCommittee = task(
     defaultValue: "",
     type: ArgumentType.STRING,
   })
+  .addOption({
+    name: "foldProof",
+    description: "fold proof to publish",
+    defaultValue: "0x",
+    type: ArgumentType.STRING,
+  })
   .setAction(async () => ({
-    default: async ({ e3Id, nodes, publicKey, proof }, hre) => {
+    default: async ({ e3Id, nodes, publicKey, proof, foldProof }, hre) => {
       const { deployAndSaveCiphernodeRegistryOwnable } = await import(
         "../scripts/deployAndSave/ciphernodeRegistryOwnable"
       );
@@ -292,6 +305,7 @@ export const publishCommittee = task(
         nodesToSend,
         publicKey,
         proof,
+        foldProof,
       );
 
       console.log("Publishing committee... ", tx.hash);
@@ -407,8 +421,23 @@ export const publishPlaintext = task(
     defaultValue: "",
     type: ArgumentType.STRING,
   })
+  .addOption({
+    name: "foldProof",
+    description: "fold proof to publish",
+    defaultValue: "0x",
+    type: ArgumentType.STRING,
+  })
+  .addOption({
+    name: "foldProofFile",
+    description: "file containing fold proof to publish",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
   .setAction(async () => ({
-    default: async ({ e3Id, data, dataFile, proof, proofFile }, hre) => {
+    default: async (
+      { e3Id, data, dataFile, proof, proofFile, foldProof, foldProofFile },
+      hre,
+    ) => {
       const { deployAndSaveEnclave } = await import(
         "../scripts/deployAndSave/enclave"
       );
@@ -425,16 +454,23 @@ export const publishPlaintext = task(
       }
 
       let proofToSend = proof;
+      let foldProofToSend = foldProof;
 
       if (proofFile) {
         const file = fs.readFileSync(proofFile);
         proofToSend = file.toString();
       }
 
+      if (foldProofFile) {
+        const file = fs.readFileSync(foldProofFile);
+        foldProofToSend = file.toString();
+      }
+
       const tx = await enclave.publishPlaintextOutput(
         e3Id,
         dataToSend,
         proofToSend,
+        foldProofToSend,
       );
 
       console.log("Publishing plaintext... ", tx.hash);

@@ -160,6 +160,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                     e3_id,
                     decrypted.extract_bytes(),
                     msg.aggregation_proofs.first(),
+                    msg.c6_aggregated_proof.as_ref(),
                 )
                 .await;
                 match result {
@@ -224,6 +225,7 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     e3_id: E3id,
     decrypted_output: Vec<u8>,
     aggregation_proof: Option<&Proof>,
+    c6_fold_proof: Option<&Proof>,
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = e3_id.try_into()?;
 
@@ -234,10 +236,13 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         .pending()
         .await?;
 
-    let proof = aggregation_proof
-        .map(encode_zk_proof)
-        .transpose()?
-        .ok_or_else(|| anyhow::anyhow!("C7 proof missing or invalid"))?;
+    let proof = encode_zk_proof(
+        aggregation_proof.ok_or_else(|| anyhow::anyhow!("C7 proof missing or invalid"))?,
+    )?;
+    let fold_proof: Bytes = match c6_fold_proof {
+        Some(p) => encode_zk_proof(p)?,
+        None => Bytes::new(),
+    };
 
     send_tx_with_retry(
         "publishPlaintextOutput",
@@ -245,12 +250,13 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         || {
             info!("publishPlaintextOutput() e3_id={:?}", e3_id);
             let decrypted_output = Bytes::from(decrypted_output.clone());
+            let fold_proof = fold_proof.clone();
             let proof = proof.clone();
             let contract = IEnclave::new(contract_address, provider.provider());
 
             async move {
                 let builder = contract
-                    .publishPlaintextOutput(e3_id, decrypted_output, proof)
+                    .publishPlaintextOutput(e3_id, decrypted_output, proof, fold_proof)
                     .nonce(current_nonce);
                 let receipt = builder.send().await?.get_receipt().await?;
                 Ok(receipt)

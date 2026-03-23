@@ -624,6 +624,11 @@
           "internalType": "bytes",
           "name": "proof",
           "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
+          "name": "foldProof",
+          "type": "bytes"
         }
       ],
       "name": "publishCommittee",
@@ -782,5 +787,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-48efe0838d1e7fb2ef1a3cba330cb80744c9a50e"
+  "buildInfoId": "solc-0_8_28-561f4408bcfee777a1360e3f4f4b4e2d1bea7249"
 }
