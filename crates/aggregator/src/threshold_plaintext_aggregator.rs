@@ -508,21 +508,23 @@ impl ThresholdPlaintextAggregator {
                 })?;
             }
 
-            // C6 cross-node fold response
+            // C6 cross-node fold response (ignore unrelated FoldProofs, e.g. PK C5 fold on same bus)
             ComputeResponseKind::Zk(ZkResponse::FoldProofs(resp)) => {
-                let ec = self
-                    .last_ec
-                    .clone()
-                    .ok_or_else(|| anyhow!("No EventContext for C6 fold response"))?;
-                if self.c6_fold.handle_response(
-                    &correlation_id,
-                    resp.proof,
-                    "ThresholdPlaintextAggregator C6 fold",
-                    &self.bus,
-                    &self.e3_id,
-                    &ec,
-                )? {
-                    self.try_publish_complete()?;
+                if self.c6_fold.awaits_correlation(&correlation_id) {
+                    let fold_ec = self
+                        .last_ec
+                        .clone()
+                        .unwrap_or_else(|| ec.clone());
+                    if self.c6_fold.handle_response(
+                        &correlation_id,
+                        resp.proof,
+                        "ThresholdPlaintextAggregator C6 fold",
+                        &self.bus,
+                        &self.e3_id,
+                        &fold_ec,
+                    )? {
+                        self.try_publish_complete()?;
+                    }
                 }
             }
 
