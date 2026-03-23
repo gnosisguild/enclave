@@ -314,7 +314,19 @@ fn handle_pk_aggregation_proof(
     // 2. Create deterministic CRP
     let crp = create_deterministic_crp_from_default_seed(&threshold_params);
 
-    // 3. Deserialize each keyshare as PublicKeyShare and extract pk0
+    // 3. Validate keyshare count before deserialization
+    if req.keyshare_bytes.len() != req.committee_h {
+        return Err(make_zk_error(
+            &request,
+            format!(
+                "keyshare_bytes length {} != committee_h {}",
+                req.keyshare_bytes.len(),
+                req.committee_h
+            ),
+        ));
+    }
+
+    // 4. Deserialize each keyshare as PublicKeyShare and extract pk0
     let mut pk0_shares = Vec::with_capacity(req.keyshare_bytes.len());
     for (i, ks_bytes) in req.keyshare_bytes.iter().enumerate() {
         let pk_share = PublicKeyShare::deserialize(ks_bytes, &threshold_params, crp.clone())
