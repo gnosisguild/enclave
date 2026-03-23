@@ -69,6 +69,21 @@ pub global SHARE_COMPUTATION_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRES
 
 /************************************
 -------------------------------------
+share_computation final (C2) - combined VK hash (noir-recursive-no-zk)
+Regenerate for secure preset after compiling lib with configs::secure::dkg as default.
+-------------------------------------
+************************************/
+
+// Placeholder: set lib default to secure::dkg, run nargo compile in circuits/bin/dkg, bb write_vk
+// into target/recursive_vk/* (noir-recursive-no-zk), then compute-vk-hash (base,chunk,batch) per SK/ESM.
+// TODO: update with actual hashes once we use secure parameters.
+pub global SHARE_COMPUTATION_EXPECTED_VK_HASH_SK: Field =
+    0x0000000000000000000000000000000000000000000000000000000000000001;
+pub global SHARE_COMPUTATION_EXPECTED_VK_HASH_ESM: Field =
+    0x0000000000000000000000000000000000000000000000000000000000000001;
+
+/************************************
+-------------------------------------
 share_encryption_sk (CIRCUIT 3a)
 share_encryption_e_sm (CIRCUIT 3b)
 -------------------------------------

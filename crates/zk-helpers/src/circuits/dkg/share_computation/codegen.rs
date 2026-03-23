@@ -8,14 +8,19 @@
 
 use crate::circuits::computation::{CircuitComputation, Computation};
 use crate::circuits::dkg::share_computation::{
-    utils::parity_matrix_constant_string, Bits, Bounds, ChunkInputs, Configs, Inputs,
-    ShareComputationBaseCircuit, ShareComputationChunkCircuit, ShareComputationChunkCircuitData,
-    ShareComputationCircuit, ShareComputationCircuitData, ShareComputationOutput,
+    utils::{
+        parity_matrix_constant_string, resolve_enclave_circuits_root,
+        share_computation_expected_vk_hash_hex_literals,
+    },
+    Bits, Bounds, ChunkInputs, Configs, Inputs, ShareComputationBaseCircuit,
+    ShareComputationChunkCircuit, ShareComputationChunkCircuitData, ShareComputationCircuit,
+    ShareComputationCircuitData, ShareComputationOutput,
 };
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
 use crate::registry::Circuit;
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
+use std::env;
 
 /// Implementation of [`CircuitCodegen`] for the shared share-computation input builder.
 impl CircuitCodegen for ShareComputationCircuit {
@@ -103,6 +108,19 @@ pub fn generate_chunk_toml(witness: &ChunkInputs) -> Result<CodegenToml, Circuit
     Ok(toml::to_string(&json)?)
 }
 
+const SHARE_COMPUTATION_VK_HASH_NR_HEADER: &str = r#"
+
+/************************************
+-------------------------------------
+share_computation final (C2) - combined VK hash (noir-recursive-no-zk)
+Matches circuits/bin/dkg/share_computation: compute_vk_hash(base, chunk, batch).
+Regenerate: bb write_vk -t noir-recursive-no-zk into bin/dkg/target/recursive_vk/<crate>/
+for sk_share_computation_base, e_sm_share_computation_base, share_computation_chunk,
+share_computation_chunk_batch (after nargo compile in bin/dkg), then re-run zk_cli codegen.
+-------------------------------------
+************************************/
+"#;
+
 /// Builds the configs.nr string used by the split base/chunk share-computation circuits.
 pub fn generate_configs(
     preset: BfvPreset,
@@ -118,6 +136,44 @@ pub fn generate_configs(
     let config_name = preset.metadata().security.as_config_str();
     let parity_matrix_str = parity_matrix_constant_string(&threshold_params, n_parties, threshold)?;
     let prefix = <ShareComputationCircuit as Circuit>::PREFIX;
+
+    let explicit_circuits_root = env::var("ENCLAVE_CIRCUITS_ROOT").is_ok();
+    let (vk_sk, vk_esm) = match resolve_enclave_circuits_root() {
+        Some(root) => {
+            let rv = root.join("bin/dkg/target/recursive_vk");
+            match share_computation_expected_vk_hash_hex_literals(&rv) {
+                Ok(pair) => pair,
+                Err(e) if explicit_circuits_root => {
+                    return Err(CircuitsErrors::Sample(format!(
+                        "C2 share_computation VK literals: {e}"
+                    )));
+                }
+                Err(_) => (String::new(), String::new()),
+            }
+        }
+        None if explicit_circuits_root => {
+            return Err(CircuitsErrors::Sample(
+                "ENCLAVE_CIRCUITS_ROOT is set but does not point to a tree with bin/dkg/target"
+                    .into(),
+            ));
+        }
+        None => (String::new(), String::new()),
+    };
+
+    let vk_block = if vk_sk.is_empty() {
+        String::new()
+    } else {
+        let mut s = String::with_capacity(
+            SHARE_COMPUTATION_VK_HASH_NR_HEADER.len() + vk_sk.len() + vk_esm.len() + 96,
+        );
+        s.push_str(SHARE_COMPUTATION_VK_HASH_NR_HEADER);
+        s.push_str("pub global SHARE_COMPUTATION_EXPECTED_VK_HASH_SK: Field = ");
+        s.push_str(&vk_sk);
+        s.push_str(";\npub global SHARE_COMPUTATION_EXPECTED_VK_HASH_ESM: Field = ");
+        s.push_str(&vk_esm);
+        s.push_str(";\n");
+        s
+    };
 
     Ok(format!(
         r#"use crate::core::dkg::share_computation::chunk::Configs as ShareComputationChunkConfigs;
@@ -158,8 +214,7 @@ pub global {prefix}_N_BATCHES: u32 =
     {prefix}_N_CHUNKS / {prefix}_CHUNKS_PER_BATCH;
 
 pub global {prefix}_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
-    ShareComputationChunkConfigs::new(QIS_THRESHOLD);
-"#,
+    ShareComputationChunkConfigs::new(QIS_THRESHOLD);{vk_block}"#,
         config_name = config_name,
         degree = preset.metadata().degree,
         parity_matrix = parity_matrix_str,
@@ -169,6 +224,7 @@ pub global {prefix}_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
         bit_e_sm_secret = bits.bit_e_sm_secret,
         chunk_size = chunk_size,
         chunks_per_batch = chunks_per_batch,
+        vk_block = vk_block,
     ))
 }
 
@@ -182,7 +238,30 @@ mod tests {
     use crate::computation::DkgInputType;
     use crate::Circuit;
     use e3_fhe_params::BfvPreset;
+    use std::fs;
     use tempfile::TempDir;
+
+    #[test]
+    fn share_computation_expected_vk_hash_hex_literals_differ_for_sk_and_esm() {
+        let tmp = TempDir::new().unwrap();
+        let rv = tmp.path().join("recursive_vk");
+        for (name, tag) in [
+            ("sk_share_computation_base", 1u8),
+            ("e_sm_share_computation_base", 2u8),
+            ("share_computation_chunk", 3u8),
+            ("share_computation_chunk_batch", 4u8),
+        ] {
+            let d = rv.join(name);
+            fs::create_dir_all(&d).unwrap();
+            let mut b = [0u8; 32];
+            b[31] = tag;
+            fs::write(d.join("vk_hash"), b).unwrap();
+        }
+        let (sk, esm) = share_computation_expected_vk_hash_hex_literals(&rv).unwrap();
+        assert!(sk.starts_with("0x") && sk.len() == 66);
+        assert!(esm.starts_with("0x") && esm.len() == 66);
+        assert_ne!(sk, esm);
+    }
 
     #[test]
     fn test_toml_generation_and_structure() {

@@ -9,6 +9,14 @@
 //! This binary lists available circuits and generates Prover.toml and configs.nr
 //! for use with the Noir prover. Use `--list_circuits` to see circuits and
 //! `--circuit <name> --preset insecure|secure|2|80` to generate artifacts.
+//!
+//! **Share-computation (C2) configs.nr:** set `ENCLAVE_CIRCUITS_ROOT` to the repo `circuits`
+//! directory (or run from the Enclave repo so it is auto-discovered). After `nargo compile`
+//! in `circuits/bin/dkg`, run `bb write_vk -t noir-recursive-no-zk` into
+//! `circuits/bin/dkg/target/recursive_vk/{sk_share_computation_base,e_sm_share_computation_base,share_computation_chunk,share_computation_chunk_batch}/`
+//! (see `scripts/dkg_recursive_vk.sh`). If `ENCLAVE_CIRCUITS_ROOT` is set and those `vk_hash`
+//! files are missing, codegen fails; if unset and artifacts are absent, the C2 literals are omitted
+//! from the generated fragment.
 
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser};

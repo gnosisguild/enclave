@@ -66,6 +66,18 @@ pub global SHARE_COMPUTATION_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRES
 
 /************************************
 -------------------------------------
+share_computation final (C2) - combined VK hash (noir-recursive-no-zk)
+Regenerate: zk_cli share_computation codegen with ENCLAVE_CIRCUITS_ROOT + recursive_vk artifacts.
+-------------------------------------
+************************************/
+
+pub global SHARE_COMPUTATION_EXPECTED_VK_HASH_SK: Field =
+    0x166f69fac410d14aef0357cc8544aaa9e4466d50e2629c14c3e666b3a08fb25f;
+pub global SHARE_COMPUTATION_EXPECTED_VK_HASH_ESM: Field =
+    0x12d9d8102a32f8750061596b14144ac6209e039421e684e595082c92e31ceb71;
+
+/************************************
+-------------------------------------
 share_encryption_sk (CIRCUIT 3a)
 share_encryption_e_sm (CIRCUIT 3b)
 -------------------------------------
