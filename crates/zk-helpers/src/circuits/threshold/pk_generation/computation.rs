@@ -130,12 +130,22 @@ impl Computation for Bits {
     type Data = Bounds;
     type Error = CircuitsErrors;
 
-    fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         // Calculate bit widths for each bound type
         let eek_bit = calculate_bit_width(BigInt::from(data.eek_bound.clone()));
         let sk_bit = calculate_bit_width(BigInt::from(data.sk_bound.clone()));
         let e_sm_bit = calculate_bit_width(BigInt::from(data.e_sm_bound.clone()));
-        let pk_bit = calculate_bit_width(BigInt::from(data.pk_bound.clone()));
+
+        // pk_bit: iterate over moduli (aligned with C2 share_computation approach).
+        // Uses qi - 1 (full modulus range) rather than (qi - 1) / 2, which naturally
+        // gives one extra bit for the centered (signed) representation.
+        let (threshold_params, _) =
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
+        let mut pk_bit = 0;
+        for &qi in threshold_params.moduli() {
+            let bound = BigUint::from(qi - 1);
+            pk_bit = pk_bit.max(calculate_bit_width(BigInt::from(bound)));
+        }
 
         // For r1, use the maximum of all low and up bounds
         let mut r1_bit = 0;
@@ -370,10 +380,17 @@ mod tests {
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &()).unwrap();
-        let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
+        let preset = BfvPreset::InsecureThreshold512;
+        let bounds = Bounds::compute(preset, &()).unwrap();
+        let bits = Bits::compute(preset, &bounds).unwrap();
 
-        let expected_bit = calculate_bit_width(BigInt::from(bounds.pk_bound.clone()));
+        // pk_bit is computed from max(qi - 1) over all moduli (aligned with C2)
+        let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
+        let mut expected_bit = 0u32;
+        for &qi in threshold_params.moduli() {
+            expected_bit =
+                expected_bit.max(calculate_bit_width(BigInt::from(BigUint::from(qi - 1))));
+        }
 
         assert_eq!(bits.pk_bit, expected_bit);
     }
