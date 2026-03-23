@@ -19,25 +19,25 @@ use std::sync::Arc;
 pub enum EventsCommands {
     /// Query events
     Query {
+        /// Aggregate ID - will default to 0
         #[arg(long)]
-        aggregate: u64,
+        agg: Option<u64>,
 
+        /// Sequence to read from will read from 0 if absent
         #[arg(long)]
-        since: u64,
+        since: Option<u64>,
 
+        /// Max limit to read at a time. If this is greater than the internal limit the internal
+        /// limit will be respected.
         #[arg(long)]
-        limit: u64,
+        limit: Option<u64>,
     },
 }
 
 pub async fn execute(command: EventsCommands) -> Result<()> {
     match command {
-        EventsCommands::Query {
-            aggregate,
-            since,
-            limit,
-        } => {
-            query_events(aggregate, since, limit).await?;
+        EventsCommands::Query { agg, since, limit } => {
+            query_events(agg.unwrap_or(0), since.unwrap_or(0), limit.unwrap_or(10)).await?;
         }
     }
     Ok(())
