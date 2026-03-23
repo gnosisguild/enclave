@@ -38,6 +38,7 @@ members = [
   "crates/tests",
   "crates/trbfv",
   "crates/utils",
+  "crates/utils-derive",
   "crates/wasm",
   "crates/zk-helpers",
   "crates/zk-prover",
@@ -108,6 +109,7 @@ e3-test-helpers = { version = "0.1.15", path = "./crates/test-helpers" }
 e3-tests = { version = "0.1.15", path = "./crates/tests" }
 e3-trbfv = { version = "0.1.15", path = "./crates/trbfv" }
 e3-utils = { version = "0.1.15", path = "./crates/utils" }
+e3-utils-derive = { version = "0.1.15", path = "./crates/utils-derive" }
 e3-safe = { version = "0.1.15", path = "./crates/safe" }
 e3-zk-prover = { version = "0.1.15", path = "./crates/zk-prover" }
 e3-zk-helpers = { version = "0.1.15", path = "./crates/zk-helpers" }
@@ -169,6 +171,8 @@ path-clean = "=1.0.1"
 petname = "=2.0.2"
 phf = { version = "=0.11.3", features = ["macros"] }
 proptest = "=1.9.0"
+proc-macro2 = "=1.0.106"
+quote = "=1.0.45"
 rand_chacha = "=0.3.1"
 rand = "=0.8.5"
 rayon = "=1.10.0"
@@ -183,6 +187,7 @@ sha2 = "=0.10.9"
 shellexpand = "=3.1.1"
 sled = "=0.34.7"
 strum = { version = "=0.27.2", features = ["derive"] }
+syn = { version = "=2.0.117", features = ["full"] }
 tempfile = "=3.20.0"
 thiserror =  { version = "=1.0.69" }
 tokio = { version = "=1.46.1", features = ["full"] }
