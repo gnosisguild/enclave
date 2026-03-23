@@ -26,34 +26,29 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 
 /// Derive c1_commitments from signed proofs by extracting pk_commitment from each.
-fn derive_c1_commitments(signed_proofs: &[Option<SignedProofPayload>]) -> Vec<ArcBytes> {
+fn derive_c1_commitments(signed_proofs: &[Option<SignedProofPayload>]) -> Vec<Option<ArcBytes>> {
     signed_proofs
         .iter()
         .enumerate()
-        .filter_map(|(i, opt)| {
+        .map(|(i, opt)| {
             let sp = opt.as_ref()?;
-            let proof = &sp.payload.proof;
-            tracing::info!(
-                "C1 proof[{}]: circuit={:?}, public_signals_len={}, signals_hex={}",
-                i,
-                proof.circuit,
-                proof.public_signals.len(),
-                proof.public_signals[..std::cmp::min(128, proof.public_signals.len())]
-                    .iter()
-                    .map(|b| format!("{:02x}", b))
-                    .collect::<String>()
-            );
-            let commitment = proof.extract_output("pk_commitment");
-            if let Some(ref c) = commitment {
-                tracing::info!(
-                    "C1 proof[{}]: extracted pk_commitment={}",
-                    i,
-                    c.iter().map(|b| format!("{:02x}", b)).collect::<String>()
-                );
-            } else {
+            let commitment = sp.payload.proof.extract_output("pk_commitment");
+            if commitment.is_none() {
                 tracing::warn!("C1 proof[{}]: failed to extract pk_commitment", i);
             }
             commitment
+        })
+        .collect()
+}
+
+/// Convert `Vec<Option<ArcBytes>>` to `Vec<ArcBytes>`, substituting 32 zero bytes
+/// for any `None` entry. The C5 prover will detect these as commitment mismatches.
+fn unwrap_c1_commitments(commitments: &[Option<ArcBytes>]) -> Vec<ArcBytes> {
+    commitments
+        .iter()
+        .map(|opt| {
+            opt.clone()
+                .unwrap_or_else(|| ArcBytes::from_bytes(&[0u8; 32]))
         })
         .collect()
 }
@@ -98,6 +93,8 @@ pub enum PublicKeyAggregatorState {
         cross_node_fold: ProofFoldState,
         c5_proof_pending: Option<Proof>,
         last_ec: Option<EventContext<Sequenced>>,
+        /// Cryptographic threshold M, carried from Collecting for re-aggregation checks.
+        threshold_m: usize,
     },
     Complete {
         public_key: ArcBytes,
@@ -383,7 +380,9 @@ impl PublicKeyAggregator {
                     committee_n: committee_h,
                     committee_h,
                     committee_threshold: 0,
-                    c1_commitments: derive_c1_commitments(&c1_signed_proofs),
+                    c1_commitments: unwrap_c1_commitments(&derive_c1_commitments(
+                        &c1_signed_proofs,
+                    )),
                 },
                 public_key: pubkey.clone(),
                 nodes: honest_nodes_set.clone(),
@@ -403,6 +402,7 @@ impl PublicKeyAggregator {
                 cross_node_fold: ProofFoldState::new(),
                 c5_proof_pending: None,
                 last_ec: Some(ec.clone()),
+                threshold_m,
             })
         })?;
 
@@ -449,6 +449,7 @@ impl PublicKeyAggregator {
                 honest_party_ids,
                 dishonest_parties,
                 cross_node_fold,
+                threshold_m,
                 ..
             } = state
             else {
@@ -465,6 +466,7 @@ impl PublicKeyAggregator {
                 cross_node_fold,
                 c5_proof_pending: Some(c5_proof),
                 last_ec: Some(ec.clone()),
+                threshold_m,
             })
         })?;
         self.try_publish_complete()
@@ -520,6 +522,7 @@ impl PublicKeyAggregator {
                 cross_node_fold,
                 c5_proof_pending,
                 last_ec: _,
+                threshold_m,
             } = state
             else {
                 return Ok(state);
@@ -536,6 +539,7 @@ impl PublicKeyAggregator {
                 cross_node_fold,
                 c5_proof_pending,
                 last_ec: Some(ec.clone()),
+                threshold_m,
             })
         })?;
 
@@ -594,6 +598,7 @@ impl PublicKeyAggregator {
                 mut cross_node_fold,
                 c5_proof_pending,
                 last_ec,
+                threshold_m,
             } = state
             else {
                 return Ok(state);
@@ -620,6 +625,7 @@ impl PublicKeyAggregator {
                 cross_node_fold,
                 c5_proof_pending,
                 last_ec,
+                threshold_m,
             })
         })?;
         self.try_publish_complete()
@@ -736,6 +742,7 @@ impl PublicKeyAggregator {
                     mut cross_node_fold,
                     c5_proof_pending,
                     last_ec,
+                    threshold_m,
                 } = state
                 else {
                     return Ok(state);
@@ -759,6 +766,7 @@ impl PublicKeyAggregator {
                     cross_node_fold,
                     c5_proof_pending,
                     last_ec,
+                    threshold_m,
                 })
             })?;
             self.try_publish_complete()?;
@@ -778,6 +786,7 @@ impl PublicKeyAggregator {
             dkg_node_proofs,
             honest_party_ids,
             dishonest_parties,
+            threshold_m,
             ..
         } = self
             .state
@@ -871,10 +880,11 @@ impl PublicKeyAggregator {
 
         // Check if enough honest parties remain
         let remaining_count = remaining_keyshares.len();
-        // We need > 0 honest parties; the circuit enforces the threshold check
-        if remaining_count == 0 {
+        if remaining_count <= threshold_m {
             return Err(anyhow::anyhow!(
-                "No honest parties remaining after C1 commitment mismatch filtering"
+                "Not enough honest parties after C1 commitment mismatch filtering: {} (need at least {})",
+                remaining_count,
+                threshold_m + 1
             ));
         }
 
@@ -911,8 +921,10 @@ impl PublicKeyAggregator {
                     params_preset: self.params_preset.clone(),
                     committee_n: committee_h,
                     committee_h,
-                    committee_threshold: 0,
-                    c1_commitments: derive_c1_commitments(&remaining_c1_signed_proofs),
+                    committee_threshold: threshold_m,
+                    c1_commitments: unwrap_c1_commitments(&derive_c1_commitments(
+                        &remaining_c1_signed_proofs,
+                    )),
                 },
                 public_key: pubkey.clone(),
                 nodes: remaining_nodes.clone(),
@@ -939,6 +951,7 @@ impl PublicKeyAggregator {
                 cross_node_fold: ProofFoldState::new(),
                 c5_proof_pending: None,
                 last_ec: Some(ec.clone()),
+                threshold_m,
             })
         })?;
 
