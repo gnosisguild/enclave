@@ -320,8 +320,7 @@ mod tests {
     use e3_events::{CircuitName, Proof};
     use e3_utils::ArcBytes;
 
-    /// Verifies encode_zk_proof produces ABI that matches BfvPkVerifier/BfvDecryptionVerifier:
-    /// abi.decode(proof, (bytes, bytes32[]))
+    /// Verifies encode_zk_proof produces ABI: abi.decode(proof, (bytes, bytes32[]))
     #[test]
     fn test_encode_zk_proof_abi_format() {
         let raw_proof = vec![1u8, 2, 3, 4, 5];

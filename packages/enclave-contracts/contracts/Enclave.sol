@@ -488,7 +488,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function publishPlaintextOutput(
         uint256 e3Id,
         bytes calldata plaintextOutput,
-        bytes calldata proof
+        bytes calldata proof,
+        bytes calldata foldProof
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
@@ -513,7 +514,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         (success) = e3.decryptionVerifier.verify(
             keccak256(plaintextOutput),
-            proof
+            proof,
+            foldProof
         );
         require(success, InvalidOutput(plaintextOutput));
 

@@ -624,6 +624,11 @@
           "internalType": "bytes",
           "name": "proof",
           "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
+          "name": "foldProof",
+          "type": "bytes"
         }
       ],
       "name": "publishCommittee",
