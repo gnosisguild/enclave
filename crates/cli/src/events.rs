@@ -57,7 +57,7 @@ fn dummy_accusation_vote(e3_id: E3id, voter: Address, agrees: bool) -> Accusatio
         voter,
         agrees,
         data_hash: [0xbb; 32],
-        signature: vec![0xcc; 64],
+        signature: ArcBytes::from_bytes(&[0xcc; 64]),
     }
 }
 
@@ -338,7 +338,7 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
                 "0x2222222222222222222222222222222222222222".to_string(),
                 "0x3333333333333333333333333333333333333333".to_string(),
             ],
-            public_key: vec![0xAB; 64],
+            public_key: ArcBytes::from_bytes(&[0xAB; 64]),
         }),
         None,
         1700000012000_u128,
@@ -446,7 +446,7 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
                 .unwrap(),
             agrees: true,
             data_hash: [0xbb; 32],
-            signature: vec![0xcc; 64],
+            signature: ArcBytes::from_bytes(&[0xcc; 64]),
         }),
         None,
         1700000019000_u128,

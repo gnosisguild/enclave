@@ -6,6 +6,7 @@
 
 use crate::E3id;
 use actix::Message;
+use e3_utils::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
@@ -13,7 +14,7 @@ use std::fmt::{self, Display};
 #[rtype(result = "()")]
 pub struct PlaintextOutputPublished {
     pub e3_id: E3id,
-    pub plaintext_output: Vec<u8>,
+    pub plaintext_output: ArcBytes,
 }
 
 impl Display for PlaintextOutputPublished {

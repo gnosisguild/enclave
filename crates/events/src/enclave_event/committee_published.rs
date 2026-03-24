@@ -6,6 +6,7 @@
 
 use crate::E3id;
 use actix::Message;
+use e3_utils::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
@@ -14,7 +15,7 @@ use std::fmt::{self, Display};
 pub struct CommitteePublished {
     pub e3_id: E3id,
     pub nodes: Vec<String>,
-    pub public_key: Vec<u8>,
+    pub public_key: ArcBytes,
 }
 
 impl Display for CommitteePublished {
