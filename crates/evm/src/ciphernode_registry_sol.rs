@@ -449,6 +449,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                 nodes,
                 pubkey,
                 pk_aggregation_proof.as_ref(),
+                msg.dkg_aggregated_proof.as_ref(),
             )
             .await;
             match result {
@@ -545,6 +546,7 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
     nodes: OrderedSet<String>,
     public_key: ArcBytes,
     pk_aggregation_proof: Option<&Proof>,
+    dkg_aggregated_proof: Option<&Proof>,
 ) -> Result<TransactionReceipt> {
     let e3_id_u256: U256 = e3_id.try_into()?;
     let public_key_bytes = Bytes::from(public_key.extract_bytes());
@@ -552,6 +554,10 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
     let proof: Bytes = encode_zk_proof(
         pk_aggregation_proof.ok_or_else(|| anyhow::anyhow!("pk_aggregation_proof required"))?,
     )?;
+    let fold_proof: Bytes = match dkg_aggregated_proof {
+        Some(p) => encode_zk_proof(p)?,
+        None => Bytes::new(),
+    };
 
     let nodes_vec: Vec<Address> = nodes
         .into_iter()
@@ -563,6 +569,7 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
         let provider = provider.clone();
         let nodes_vec = nodes_vec.clone();
         let public_key_bytes = public_key_bytes.clone();
+        let fold_proof = fold_proof.clone();
         let proof = proof.clone();
         async move {
             info!("Calling: contract.publishCommittee(..)");
@@ -574,7 +581,7 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
                 .await?;
             let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
             let builder = contract
-                .publishCommittee(e3_id_u256, nodes_vec, public_key_bytes, proof)
+                .publishCommittee(e3_id_u256, nodes_vec, public_key_bytes, proof, fold_proof)
                 .nonce(current_nonce);
             let receipt = builder.send().await?.get_receipt().await?;
             Ok(receipt)

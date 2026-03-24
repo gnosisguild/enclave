@@ -14,6 +14,8 @@ import { ICircuitVerifier } from "../../interfaces/ICircuitVerifier.sol";
  *         (decrypted_shares_aggregation) proofs on-chain by delegating to the Honk
  *         ThresholdDecryptedSharesAggregationVerifier and validating that the
  *         plaintext extracted from public inputs matches the claimed hash.
+ *         Optional `foldProof` is ABI-encoded (bytes, bytes32[]) for RecursiveAggregationFoldVerifier
+ *         (C6 cross-node fold); pass empty bytes to skip.
  * @dev Use this verifier when the Enclave is configured with encryptionSchemeId
  *      keccak256("fhe.rs:BFV"). Other encryption schemes will have their own verifiers.
  */
@@ -23,15 +25,18 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
     uint256 constant MESSAGE_COEFFS_COUNT = 100;
 
     ICircuitVerifier public immutable circuitVerifier;
+    ICircuitVerifier public immutable foldVerifier;
 
-    constructor(address _circuitVerifier) {
+    constructor(address _circuitVerifier, address _foldVerifier) {
         circuitVerifier = ICircuitVerifier(_circuitVerifier);
+        foldVerifier = ICircuitVerifier(_foldVerifier);
     }
 
     /// @inheritdoc IDecryptionVerifier
     function verify(
         bytes32 plaintextOutputHash,
-        bytes memory proof
+        bytes memory proof,
+        bytes memory foldProof
     ) external view override returns (bool success) {
         (bytes memory rawProof, bytes32[] memory publicInputs) = abi.decode(
             proof,
@@ -50,7 +55,26 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
             return false;
         }
 
+        if (!_verifyFold(foldProof)) {
+            return false;
+        }
+
         return true;
+    }
+
+    function _verifyFold(bytes memory foldProof) internal view returns (bool) {
+        if (foldProof.length == 0) {
+            return true;
+        }
+
+        (bytes memory foldRawProof, bytes32[] memory foldPublicInputs) = abi
+            .decode(foldProof, (bytes, bytes32[]));
+
+        if (foldRawProof.length == 0 || foldPublicInputs.length == 0) {
+            return false;
+        }
+
+        return foldVerifier.verify(foldRawProof, foldPublicInputs);
     }
 
     function _verifyPlaintextHash(
