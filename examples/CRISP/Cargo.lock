@@ -2521,12 +2521,24 @@ dependencies = [
  "alloy",
  "anyhow",
  "derivative",
+ "e3-utils-derive",
+ "hex",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "regex",
  "serde",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "e3-utils-derive"
+version = "0.1.15"
+dependencies = [
+ "hex",
+ "proc-macro2 1.0.106",
+ "quote 1.0.44",
+ "syn 2.0.116",
 ]
 
 [[package]]
