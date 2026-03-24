@@ -182,7 +182,7 @@ impl Cli {
             Commands::Ciphernode { command } => ciphernode::execute(out, command, &config).await?,
             Commands::Noir { command } => noir::execute(out, command, &config).await?,
             Commands::Net { command } => net::execute(&out, command, &config).await?,
-            Commands::Events { command } => events::execute(command).await?,
+            Commands::Events { command } => events::execute(out, command, &config).await?,
             Commands::Rev => rev::execute(out).await?,
         }
 
@@ -320,11 +320,21 @@ pub struct RemoteCli {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum RemoteCommand {
     NetGetPeerId,
-    CiphernodeStatus { chain: ChainArgs },
+    CiphernodeStatus {
+        chain: ChainArgs,
+    },
     NoirStatus,
     WalletGet,
+    EventsQuery {
+        agg: Option<usize>,
+        since: Option<u64>,
+        limit: Option<u64>,
+    },
     Rev,
-    PrintEnv { vite: bool, chain: String },
+    PrintEnv {
+        vite: bool,
+        chain: String,
+    },
 }
 
 impl TryFrom<Commands> for RemoteCommand {
@@ -343,6 +353,9 @@ impl TryFrom<Commands> for RemoteCommand {
                 command: CiphernodeCommands::Status { chain },
             } => Ok(RemoteCommand::CiphernodeStatus { chain }),
             Commands::PrintEnv { chain, vite } => Ok(RemoteCommand::PrintEnv { vite, chain }),
+            Commands::Events {
+                command: EventsCommands::Query { agg, since, limit },
+            } => Ok(RemoteCommand::EventsQuery { agg, since, limit }),
             Commands::Wallet {
                 command: WalletCommands::Get,
             } => Ok(RemoteCommand::WalletGet),
@@ -396,6 +409,9 @@ impl TryFrom<RemoteCommand> for Commands {
             },
             RemoteCommand::NetGetPeerId => Commands::Net {
                 command: NetCommands::GetPeerId,
+            },
+            RemoteCommand::EventsQuery { agg, since, limit } => Commands::Events {
+                command: EventsCommands::Query { agg, since, limit },
             },
         };
         // We might have to hold this stuff on RemoteCommand
