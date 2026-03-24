@@ -187,7 +187,7 @@ sha2 = "=0.10.9"
 shellexpand = "=3.1.1"
 sled = "=0.34.7"
 strum = { version = "=0.27.2", features = ["derive"] }
-syn = { version = "=2.0.117", features = ["full"] }
+syn = { version = "=2.0.116", features = ["full"] }
 tempfile = "=3.20.0"
 thiserror =  { version = "=1.0.69" }
 tokio = { version = "=1.46.1", features = ["full"] }
