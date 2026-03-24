@@ -172,7 +172,7 @@ petname = "=2.0.2"
 phf = { version = "=0.11.3", features = ["macros"] }
 proptest = "=1.9.0"
 proc-macro2 = "=1.0.106"
-quote = "=1.0.45"
+quote = "=1.0.44"
 rand_chacha = "=0.3.1"
 rand = "=0.8.5"
 rayon = "=1.10.0"

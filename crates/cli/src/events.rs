@@ -8,28 +8,42 @@ use alloy::primitives::{Address, FixedBytes, I256, U256};
 use anyhow::Result;
 use chrono::Utc;
 use clap::Subcommand;
-use e3_events::{
-    AccusationOutcome, AccusationQuorumReached, AccusationVote, CiphernodeAdded, CiphernodeRemoved,
-    CiphernodeSelected, CiphertextOutputPublished, CircuitName, CommitteeFinalizeRequested,
-    CommitteeFinalized, CommitteeMemberExpelled, CommitteeRequested, CommitteePublished,
-    ConfigurationUpdated, DecryptionKeyShared, DecryptionShareProofSigned, DecryptionshareCreated,
-    DocumentKind, DocumentMeta, DocumentReceived, DkgProofSigned, E3Failed, E3RequestComplete,
-    E3Requested, E3Stage, E3StageChanged, E3id, EffectsEnabled, EncryptionKey,
-    EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending, EncryptionKeyReceived,
-    EnclaveError, EnclaveEvent, EnclaveEventData, EvmEventConfig, EvmEventConfigChain,
-    EventConstructorWithTimestamp, FailureReason, HistoricalEvmSyncStart,
-    HistoricalNetSyncEventsReceived, HistoricalNetSyncStart, KeyshareCreated, NetReady,
-    OperatorActivationChanged, OutgoingSyncRequested, PkGenerationProofSigned,
-    PlaintextAggregated, PlaintextOutputPublished, Proof, ProofPayload, ProofType,
-    ProofVerificationFailed, ProofVerificationPassed, ProofFailureAccusation, PublicKeyAggregated,
-    PublishDocumentRequested, Seed, SignedProofFailed, SignedProofPayload, SlashExecuted,
-    SyncEffect, SyncEnded, TestEvent, ThresholdShareCollectionFailed, Shutdown,
-    TicketBalanceUpdated, TicketGenerated, TicketId, TicketSubmitted, Unsequenced, EType,
-    DKGInnerProofReady, DKGRecursiveAggregationComplete, AggregationProofSigned,
-};
+use e3_crypto::SensitiveBytes;
 use e3_events::AggregateId;
+use e3_events::{
+    AccusationOutcome, AccusationQuorumReached, AccusationVote, AggregationProofPending,
+    AggregationProofSigned, CiphernodeAdded, CiphernodeRemoved, CiphernodeSelected,
+    CiphertextOutputPublished, CircuitName, CommitteeFinalizeRequested, CommitteeFinalized,
+    CommitteeMemberExpelled, CommitteePublished, CommitteeRequested, ComputeRequest,
+    ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind, ComputeResponse,
+    ComputeResponseKind, ConfigurationUpdated, CorrelationId, DKGInnerProofReady,
+    DKGRecursiveAggregationComplete, DecryptedSharesAggregationProofRequest, DecryptionKeyShared,
+    DecryptionShareProofSigned, DecryptionShareProofsPending, DecryptionshareCreated,
+    DkgProofSigned, DkgShareDecryptionProofRequest, DocumentKind, DocumentMeta, DocumentReceived,
+    E3Failed, E3RequestComplete, E3Requested, E3Stage, E3StageChanged, E3id, EType, EffectsEnabled,
+    EnclaveError, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed,
+    EncryptionKeyCreated, EncryptionKeyPending, EncryptionKeyReceived,
+    EventConstructorWithTimestamp, EvmEventConfig, EvmEventConfigChain, FailureReason,
+    HistoricalEvmSyncStart, HistoricalNetSyncEventsReceived, HistoricalNetSyncStart,
+    KeyshareCreated, NetReady, OperatorActivationChanged, OrderedSet, OutgoingSyncRequested,
+    PartyProofsToVerify, PkAggregationProofPending, PkAggregationProofRequest,
+    PkAggregationProofSigned, PkBfvProofResponse, PkGenerationProofRequest,
+    PkGenerationProofSigned, PlaintextAggregated, PlaintextOutputPublished, Proof,
+    ProofFailureAccusation, ProofPayload, ProofType, ProofVerificationFailed,
+    ProofVerificationPassed, PublicKeyAggregated, PublishDocumentRequested, Seed,
+    ShareComputationProofRequest, ShareDecryptionProofPending, ShareEncryptionProofRequest,
+    ShareVerificationComplete, ShareVerificationDispatched, Shutdown, SignedProofFailed,
+    SignedProofPayload, SlashExecuted, SyncEffect, SyncEnded, TestEvent, ThresholdShare,
+    ThresholdShareCollectionFailed, ThresholdShareCreated, ThresholdShareDecryptionProofRequest,
+    ThresholdSharePending, TicketBalanceUpdated, TicketGenerated, TicketId, TicketSubmitted,
+    Unsequenced, VerificationKind, ZkResponse,
+};
+use e3_fhe_params::BfvPreset;
+use e3_trbfv::shares::BfvEncryptedShares;
 use e3_utils::ArcBytes;
+use e3_zk_helpers::{computation::DkgInputType, CiphernodesCommitteeSize};
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 fn dummy_proof(circuit: CircuitName) -> Proof {
@@ -71,6 +85,101 @@ fn dummy_accusation_vote(e3_id: E3id, voter: Address, agrees: bool) -> Accusatio
         agrees,
         data_hash: [0xbb; 32],
         signature: ArcBytes::from_bytes(&[0xcc; 64]),
+    }
+}
+
+fn dummy_sensitive_bytes(data: &[u8]) -> SensitiveBytes {
+    SensitiveBytes::from_encrypted(data)
+}
+
+fn dummy_threshold_share() -> ThresholdShare {
+    ThresholdShare {
+        party_id: 1,
+        pk_share: ArcBytes::from_bytes(&[0x11; 32]),
+        sk_sss: BfvEncryptedShares::default(),
+        esi_sss: vec![BfvEncryptedShares::default()],
+    }
+}
+
+fn dummy_pk_generation_proof_request() -> PkGenerationProofRequest {
+    PkGenerationProofRequest::new(
+        ArcBytes::from_bytes(&[0x22; 32]),
+        dummy_sensitive_bytes(&[0x33; 32]),
+        dummy_sensitive_bytes(&[0x44; 32]),
+        dummy_sensitive_bytes(&[0x55; 32]),
+        BfvPreset::InsecureThreshold512,
+        CiphernodesCommitteeSize::Small,
+    )
+}
+
+fn dummy_share_computation_proof_request() -> ShareComputationProofRequest {
+    ShareComputationProofRequest {
+        secret_raw: dummy_sensitive_bytes(&[0x66; 32]),
+        secret_sss_raw: dummy_sensitive_bytes(&[0x77; 32]),
+        dkg_input_type: DkgInputType::SecretKey,
+        params_preset: BfvPreset::InsecureThreshold512,
+        committee_size: CiphernodesCommitteeSize::Small,
+    }
+}
+
+fn dummy_share_encryption_proof_request() -> ShareEncryptionProofRequest {
+    ShareEncryptionProofRequest {
+        share_row_raw: dummy_sensitive_bytes(&[0x88; 32]),
+        ciphertext_raw: ArcBytes::from_bytes(&[0x99; 64]),
+        recipient_pk_raw: ArcBytes::from_bytes(&[0xaa; 32]),
+        u_rns_raw: dummy_sensitive_bytes(&[0xbb; 32]),
+        e0_rns_raw: dummy_sensitive_bytes(&[0xcc; 32]),
+        e1_rns_raw: dummy_sensitive_bytes(&[0xdd; 32]),
+        dkg_input_type: DkgInputType::SecretKey,
+        params_preset: BfvPreset::InsecureThreshold512,
+        committee_size: CiphernodesCommitteeSize::Small,
+        recipient_party_id: 2,
+        row_index: 0,
+        esi_index: 0,
+    }
+}
+
+fn dummy_dkg_share_decryption_proof_request() -> DkgShareDecryptionProofRequest {
+    DkgShareDecryptionProofRequest {
+        sk_bfv: dummy_sensitive_bytes(&[0xee; 32]),
+        honest_ciphertexts_raw: vec![ArcBytes::from_bytes(&[0xff; 64])],
+        num_honest_parties: 3,
+        num_moduli: 2,
+        dkg_input_type: DkgInputType::SecretKey,
+        params_preset: BfvPreset::InsecureThreshold512,
+    }
+}
+
+fn dummy_threshold_share_decryption_proof_request() -> ThresholdShareDecryptionProofRequest {
+    ThresholdShareDecryptionProofRequest {
+        ciphertext_bytes: vec![ArcBytes::from_bytes(&[0x11; 64])],
+        aggregated_pk_bytes: ArcBytes::from_bytes(&[0x22; 32]),
+        sk_poly_sum: dummy_sensitive_bytes(&[0x33; 64]),
+        es_poly_sum: vec![dummy_sensitive_bytes(&[0x44; 64])],
+        d_share_bytes: vec![ArcBytes::from_bytes(&[0x55; 32])],
+        params_preset: BfvPreset::InsecureThreshold512,
+        proof_aggregation_enabled: true,
+    }
+}
+
+fn dummy_pk_aggregation_proof_request() -> PkAggregationProofRequest {
+    PkAggregationProofRequest {
+        keyshare_bytes: vec![ArcBytes::from_bytes(&[0x66; 32])],
+        aggregated_pk_bytes: ArcBytes::from_bytes(&[0x77; 32]),
+        params_preset: BfvPreset::InsecureThreshold512,
+        committee_n: 5,
+        committee_h: 3,
+        committee_threshold: 3,
+    }
+}
+
+fn dummy_decrypted_shares_aggregation_proof_request() -> DecryptedSharesAggregationProofRequest {
+    DecryptedSharesAggregationProofRequest {
+        d_share_polys: vec![(1, vec![ArcBytes::from_bytes(&[0x88; 64])])],
+        plaintext: vec![ArcBytes::from_bytes(&[0x99; 32])],
+        params_preset: BfvPreset::InsecureThreshold512,
+        threshold_m: 3,
+        threshold_n: 5,
     }
 }
 
@@ -472,8 +581,12 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
     let event21 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
         EnclaveEventData::ProofFailureAccusation(ProofFailureAccusation {
             e3_id: E3id::new("test21", 1),
-            accuser: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".parse().unwrap(),
-            accused: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".parse().unwrap(),
+            accuser: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .parse()
+                .unwrap(),
+            accused: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                .parse()
+                .unwrap(),
             accused_party_id: 2,
             proof_type: ProofType::C3aSkShareEncryption,
             data_hash: [0xdd; 32],
@@ -481,7 +594,7 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
                 E3id::new("test21", 1),
                 ProofType::C3aSkShareEncryption,
             )),
-            signature: vec![0xee; 64],
+            signature: ArcBytes::from_bytes(&[0xee; 64]),
         }),
         None,
         1700000020000_u128,
@@ -494,7 +607,9 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
         EnclaveEventData::ProofVerificationPassed(ProofVerificationPassed {
             e3_id: E3id::new("test22", 1),
             party_id: 1,
-            address: "0x1111111111111111111111111111111111111111".parse().unwrap(),
+            address: "0x1111111111111111111111111111111111111111"
+                .parse()
+                .unwrap(),
             proof_type: ProofType::C1PkGeneration,
             data_hash: [0x22; 32],
         }),
@@ -728,10 +843,7 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
     let event38 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
         EnclaveEventData::EncryptionKeyPending(EncryptionKeyPending {
             e3_id: E3id::new("test40", 1),
-            key: Arc::new(EncryptionKey::new(
-                42,
-                ArcBytes::from_bytes(&[0x33; 16]),
-            )),
+            key: Arc::new(EncryptionKey::new(42, ArcBytes::from_bytes(&[0x33; 16]))),
             params_preset: e3_fhe_params::BfvPreset::InsecureThreshold512,
         }),
         None,
@@ -744,10 +856,7 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
     let event39 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
         EnclaveEventData::EncryptionKeyReceived(EncryptionKeyReceived {
             e3_id: E3id::new("test41", 1),
-            key: Arc::new(EncryptionKey::new(
-                42,
-                ArcBytes::from_bytes(&[0x44; 16]),
-            )),
+            key: Arc::new(EncryptionKey::new(42, ArcBytes::from_bytes(&[0x44; 16]))),
         }),
         None,
         1700000040000_u128,
@@ -785,7 +894,9 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
     let event42 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
         EnclaveEventData::SignedProofFailed(SignedProofFailed {
             e3_id: E3id::new("test47", 1),
-            faulting_node: "0x7777777777777777777777777777777777777777".parse().unwrap(),
+            faulting_node: "0x7777777777777777777777777777777777777777"
+                .parse()
+                .unwrap(),
             proof_type: ProofType::C1PkGeneration,
             signed_payload: dummy_signed_proof_payload(
                 E3id::new("test47", 1),
@@ -803,7 +914,9 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
         EnclaveEventData::SlashExecuted(SlashExecuted {
             e3_id: E3id::new("test51", 1),
             proposal_id: 12345,
-            operator: "0x9999999999999999999999999999999999999999".parse().unwrap(),
+            operator: "0x9999999999999999999999999999999999999999"
+                .parse()
+                .unwrap(),
             reason: [0xaa; 32],
             ticket_amount: 1000,
             license_amount: 500,
@@ -818,7 +931,9 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
     let event44 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
         EnclaveEventData::CommitteeMemberExpelled(CommitteeMemberExpelled {
             e3_id: E3id::new("test52", 1),
-            node: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".parse().unwrap(),
+            node: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .parse()
+                .unwrap(),
             reason: [0xbb; 32],
             active_count_after: 9,
             party_id: Some(2),
@@ -844,7 +959,9 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
     let event46 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
         EnclaveEventData::HistoricalEvmSyncStart(HistoricalEvmSyncStart {
             evm_config: EvmEventConfig::from_config(
-                [(1, EvmEventConfigChain::new(100))].into_iter().collect::<BTreeMap<_, _>>(),
+                [(1, EvmEventConfigChain::new(100))]
+                    .into_iter()
+                    .collect::<BTreeMap<_, _>>(),
             ),
             sender: None,
         }),
@@ -966,13 +1083,183 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
     )
     .into_sequenced(56);
 
+    let event57 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::ThresholdSharePending(ThresholdSharePending {
+            e3_id: E3id::new("test57", 1),
+            full_share: Arc::new(dummy_threshold_share()),
+            proof_request: dummy_pk_generation_proof_request(),
+            sk_share_computation_request: dummy_share_computation_proof_request(),
+            e_sm_share_computation_request: dummy_share_computation_proof_request(),
+            sk_share_encryption_requests: vec![dummy_share_encryption_proof_request()],
+            e_sm_share_encryption_requests: vec![dummy_share_encryption_proof_request()],
+            recipient_party_ids: vec![1, 2, 3, 4, 5],
+            proof_aggregation_enabled: true,
+        }),
+        None,
+        1700000070000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(57);
+
+    let event58 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::ThresholdShareCreated(ThresholdShareCreated {
+            e3_id: E3id::new("test58", 1),
+            share: Arc::new(dummy_threshold_share()),
+            target_party_id: 1,
+            external: false,
+            signed_c2a_proof: Some(dummy_signed_proof_payload(
+                E3id::new("test58", 1),
+                ProofType::C2aSkShareComputation,
+            )),
+            signed_c2b_proof: None,
+            signed_c3a_proofs: vec![],
+            signed_c3b_proofs: vec![],
+        }),
+        None,
+        1700000071000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(58);
+
+    let event59 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::ShareDecryptionProofPending(ShareDecryptionProofPending {
+            e3_id: E3id::new("test59", 1),
+            party_id: 1,
+            node: "0x1111111111111111111111111111111111111111".to_string(),
+            decryption_share: vec![ArcBytes::from_bytes(&[0x11; 64])],
+            proof_request: dummy_threshold_share_decryption_proof_request(),
+        }),
+        None,
+        1700000072000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(59);
+
+    let event60 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::DecryptionShareProofsPending(DecryptionShareProofsPending {
+            e3_id: E3id::new("test60", 1),
+            party_id: 1,
+            node: "0x2222222222222222222222222222222222222222".to_string(),
+            sk_poly_sum: ArcBytes::from_bytes(&[0x33; 32]),
+            es_poly_sum: vec![ArcBytes::from_bytes(&[0x44; 32])],
+            sk_request: dummy_dkg_share_decryption_proof_request(),
+            esm_requests: vec![dummy_dkg_share_decryption_proof_request()],
+        }),
+        None,
+        1700000073000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(60);
+
+    let event61 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::PkAggregationProofPending(PkAggregationProofPending {
+            e3_id: E3id::new("test61", 1),
+            proof_request: dummy_pk_aggregation_proof_request(),
+            public_key: ArcBytes::from_bytes(&[0x55; 32]),
+            nodes: vec![
+                "0x1111111111111111111111111111111111111111".to_string(),
+                "0x2222222222222222222222222222222222222222".to_string(),
+            ]
+            .into(),
+        }),
+        None,
+        1700000074000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(61);
+
+    let event62 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::AggregationProofPending(AggregationProofPending {
+            e3_id: E3id::new("test62", 1),
+            proof_request: dummy_decrypted_shares_aggregation_proof_request(),
+            plaintext: vec![ArcBytes::from_bytes(&[0x66; 32])],
+            shares: vec![(1, vec![ArcBytes::from_bytes(&[0x77; 32])])],
+        }),
+        None,
+        1700000075000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(62);
+
+    let event63 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::ShareVerificationDispatched(ShareVerificationDispatched {
+            e3_id: E3id::new("test63", 1),
+            kind: VerificationKind::ShareProofs,
+            share_proofs: vec![PartyProofsToVerify {
+                sender_party_id: 2,
+                signed_proofs: vec![dummy_signed_proof_payload(
+                    E3id::new("test63", 1),
+                    ProofType::C2aSkShareComputation,
+                )],
+            }],
+            decryption_proofs: vec![],
+            pre_dishonest: BTreeSet::new(),
+        }),
+        None,
+        1700000076000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(63);
+
+    let event64 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::ShareVerificationComplete(ShareVerificationComplete {
+            e3_id: E3id::new("test64", 1),
+            kind: VerificationKind::ShareProofs,
+            dishonest_parties: BTreeSet::from([3, 5]),
+        }),
+        None,
+        1700000077000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(64);
+
+    let event65 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::ComputeResponse(ComputeResponse {
+            response: ComputeResponseKind::Zk(ZkResponse::PkBfv(PkBfvProofResponse {
+                proof: dummy_proof(CircuitName::PkBfv),
+                wrapped_proof: dummy_proof(CircuitName::PkBfv),
+            })),
+            correlation_id: CorrelationId::new(),
+            e3_id: E3id::new("test65", 1),
+        }),
+        None,
+        1700000078000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(65);
+
+    let event66 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::PkAggregationProofSigned(PkAggregationProofSigned {
+            e3_id: E3id::new("test66", 1),
+            signed_proof: dummy_signed_proof_payload(
+                E3id::new("test66", 1),
+                ProofType::C5PkAggregation,
+            ),
+        }),
+        None,
+        1700000079000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(66);
+
     for event in [
         event1, event2, event3, event4, event5, event6, event7, event8, event9, event10, event11,
         event12, event13, event14, event15, event16, event17, event18, event19, event20, event21,
         event22, event23, event24, event25, event26, event27, event28, event29, event30, event31,
         event32, event33, event34, event35, event36, event37, event38, event39, event40, event41,
         event42, event43, event44, event45, event46, event47, event48, event49, event50, event51,
-        event52, event53, event54, event55, event56,
+        event52, event53, event54, event55, event56, event57, event58, event59, event60, event61,
+        event62, event63, event64, event65, event66,
     ] {
         println!("{}", serde_json::to_string(&event)?);
     }

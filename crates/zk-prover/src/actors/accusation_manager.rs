@@ -244,7 +244,9 @@ impl AccusationManager {
 
     fn verify_accusation_signature(&self, accusation: &ProofFailureAccusation) -> bool {
         let digest = Self::accusation_digest(accusation);
-        let sig = match alloy::primitives::Signature::try_from(accusation.signature.as_slice()) {
+        let sig = match alloy::primitives::Signature::try_from(
+            accusation.signature.extract_bytes().as_ref(),
+        ) {
             Ok(s) => s,
             Err(_) => return false,
         };
@@ -373,9 +375,9 @@ impl AccusationManager {
             proof_type: event.proof_type,
             data_hash: event.data_hash,
             signed_payload: forwarded_payload,
-            signature: Vec::new(),
+            signature: ArcBytes::default(),
         };
-        accusation.signature = self.sign_accusation_digest(&accusation);
+        accusation.signature = ArcBytes::from_bytes(&self.sign_accusation_digest(&accusation));
 
         let accusation_id = Self::accusation_id(&accusation);
 
