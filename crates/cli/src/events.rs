@@ -1263,5 +1263,6 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
     ] {
         println!("{}", serde_json::to_string(&event)?);
     }
+
     Ok(())
 }
