@@ -257,6 +257,9 @@ pub struct ThresholdKeyshareState {
     pub params: ArcBytes,
     /// Aggregated public key bytes, captured from PublicKeyAggregated event for C6 proof.
     pub aggregated_pk: Option<ArcBytes>,
+    /// Own C0 pk_commitment, extracted from our C0 proof for C0→C3 cross-check.
+    #[serde(default)]
+    pub c0_pk_commitment: Option<ArcBytes>,
     pub expelled_parties: HashSet<u64>,
     pub honest_parties: Option<HashSet<u64>>,
     #[serde(default = "default_proof_agg")]
@@ -287,6 +290,7 @@ impl ThresholdKeyshareState {
             threshold_n,
             params,
             aggregated_pk: None,
+            c0_pk_commitment: None,
             expelled_parties: HashSet::new(),
             honest_parties: None,
             proof_aggregation_enabled,
@@ -614,6 +618,21 @@ impl ThresholdKeyshare {
             );
             return Ok(());
         }
+        // If this is our own key, extract and cache the C0 pk_commitment
+        // for later C0→C3 cross-check during share verification.
+        if msg.key.party_id == state.party_id {
+            if let Some(ref proof) = msg.key.proof {
+                if let Some(commitment) = proof.extract_output("pk_commitment") {
+                    let ec = msg.get_ctx().clone();
+                    self.state.try_mutate(&ec, |mut s| {
+                        s.c0_pk_commitment = Some(commitment.clone());
+                        Ok(s)
+                    })?;
+                    info!("Cached own C0 pk_commitment for C0→C3 cross-check");
+                }
+            }
+        }
+
         info!("Received EncryptionKeyCreated forwarding to encryption key collector!");
         let collector = self.ensure_encryption_key_collector(self_addr)?;
         collector.do_send(msg);
@@ -1374,6 +1393,7 @@ impl ThresholdKeyshare {
             pre_dishonest.len()
         );
 
+        let receiver_c0_pk_commitment = state.c0_pk_commitment.clone();
         self.bus.publish(
             ShareVerificationDispatched {
                 e3_id: e3_id.clone(),
@@ -1381,6 +1401,7 @@ impl ThresholdKeyshare {
                 share_proofs: party_proofs_to_verify,
                 decryption_proofs: Vec::new(),
                 pre_dishonest,
+                receiver_c0_pk_commitment,
             },
             ec,
         )?;
@@ -2013,6 +2034,7 @@ impl ThresholdKeyshare {
                 share_proofs: Vec::new(),
                 decryption_proofs: party_proofs,
                 pre_dishonest,
+                receiver_c0_pk_commitment: None,
             },
             ec,
         )?;

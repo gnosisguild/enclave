@@ -110,6 +110,46 @@ impl CircuitOutputLayout {
     }
 }
 
+// ── Public input layout (fields at the HEAD of public_signals) ──────────────
+
+/// Describes the public input fields of a circuit.
+/// Inputs sit at the **start** of `public_signals`, before any return values.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CircuitInputLayout {
+    /// Fixed number of named `Field`-sized inputs, known at compile time.
+    Fixed { fields: &'static [OutputField] },
+    /// No public inputs.
+    None,
+}
+
+impl CircuitInputLayout {
+    /// Extract a named public input field from raw `public_signals` bytes.
+    /// Inputs sit at the **start** of `public_signals`.
+    pub fn extract_field<'a>(&self, public_signals: &'a [u8], name: &str) -> Option<&'a [u8]> {
+        let fields = match self {
+            CircuitInputLayout::Fixed { fields } => fields,
+            _ => return None,
+        };
+        let idx = fields.iter().position(|f| f.name == name)?;
+        let offset = idx * FIELD_BYTE_LEN;
+        let end = offset + FIELD_BYTE_LEN;
+        if public_signals.len() < end {
+            return None;
+        }
+        Some(&public_signals[offset..end])
+    }
+}
+
+/// C3 — Share encryption public inputs.
+pub const SHARE_ENCRYPTION_INPUTS: &[OutputField] = &[
+    f("expected_pk_commitment"),
+    f("expected_message_commitment"),
+];
+
+/// C6 — Threshold share decryption public inputs.
+pub const THRESHOLD_SHARE_DECRYPTION_INPUTS: &[OutputField] =
+    &[f("expected_sk_commitment"), f("expected_e_sm_commitment")];
+
 // ── Per-circuit output field constants ──────────────────────────────────────
 
 const fn f(name: &'static str) -> OutputField {

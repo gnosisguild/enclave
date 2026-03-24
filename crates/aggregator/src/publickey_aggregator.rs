@@ -263,6 +263,7 @@ impl PublicKeyAggregator {
                 share_proofs: party_proofs,
                 decryption_proofs: vec![],
                 pre_dishonest: no_proof_parties.into_iter().collect(),
+                receiver_c0_pk_commitment: None,
             },
             ec,
         )?;

@@ -14,6 +14,7 @@
 //! when verification finishes, carrying the set of dishonest party IDs.
 
 use crate::{E3id, PartyProofsToVerify, PartyShareDecryptionProofsToVerify};
+use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -42,6 +43,9 @@ pub struct ShareVerificationDispatched {
     /// Parties already identified as dishonest before verification
     /// (e.g., missing/incomplete proofs). Merged into the final result.
     pub pre_dishonest: BTreeSet<u64>,
+    /// Receiver's C0 pk_commitment (for C0→C3 cross-check during ShareProofs verification).
+    /// C3 proofs must have expected_pk_commitment matching this value.
+    pub receiver_c0_pk_commitment: Option<ArcBytes>,
 }
 
 /// ShareVerificationActor → ThresholdKeyshare: verification results.

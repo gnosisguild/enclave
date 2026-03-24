@@ -35,8 +35,11 @@ use e3_events::{
     SignedProofPayload, TypedEvent, VerificationKind, VerifyShareDecryptionProofsRequest,
     VerifyShareProofsRequest, ZkRequest, ZkResponse,
 };
+use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
+
+const FIELD_BYTE_LEN: usize = 32;
 
 /// Trait for party types whose signed proofs can be ECDSA-validated and ZK-verified.
 trait VerifiableParty: Clone {
@@ -129,13 +132,76 @@ impl ShareVerificationActor {
         );
 
         match msg.kind {
-            VerificationKind::ShareProofs
-            | VerificationKind::ThresholdDecryptionProofs
-            | VerificationKind::PkGenerationProofs => {
-                let kind = msg.kind.clone();
+            VerificationKind::ShareProofs => {
+                // C0→C3 cross-check: verify each sender's C3 expected_pk_commitment
+                // matches the receiver's own C0 pk_commitment.
+                let mut pre_dishonest = msg.pre_dishonest;
+                if let Some(ref receiver_commitment) = msg.receiver_c0_pk_commitment {
+                    for party in &msg.share_proofs {
+                        if let Some(mismatch_signed) =
+                            Self::check_c3_pk_commitment(party, receiver_commitment)
+                        {
+                            warn!(
+                                "C0→C3 pk_commitment mismatch for sender party {}",
+                                party.sender_party_id
+                            );
+                            pre_dishonest.insert(party.sender_party_id);
+                            self.emit_signed_proof_failed(
+                                &e3_id,
+                                &mismatch_signed,
+                                None,
+                                party.sender_party_id,
+                                &ec,
+                            );
+                        }
+                    }
+                }
+
+                let share_proofs: Vec<_> = msg
+                    .share_proofs
+                    .into_iter()
+                    .filter(|p| !pre_dishonest.contains(&p.sender_party_id))
+                    .collect();
+
                 self.verify_proofs(
                     e3_id,
-                    kind.clone(),
+                    VerificationKind::ShareProofs,
+                    share_proofs,
+                    pre_dishonest,
+                    ec,
+                    |passed, corr_id, e3| {
+                        ComputeRequest::zk(
+                            ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
+                                party_proofs: passed,
+                            }),
+                            corr_id,
+                            e3,
+                        )
+                    },
+                );
+            }
+            VerificationKind::PkGenerationProofs => {
+                self.verify_proofs(
+                    e3_id,
+                    VerificationKind::PkGenerationProofs,
+                    msg.share_proofs,
+                    msg.pre_dishonest,
+                    ec,
+                    |passed, corr_id, e3| {
+                        ComputeRequest::zk(
+                            ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
+                                party_proofs: passed,
+                            }),
+                            corr_id,
+                            e3,
+                        )
+                    },
+                );
+            }
+            VerificationKind::ThresholdDecryptionProofs => {
+                self.verify_proofs(
+                    e3_id,
+                    VerificationKind::ThresholdDecryptionProofs,
                     msg.share_proofs,
                     msg.pre_dishonest,
                     ec,
@@ -461,6 +527,23 @@ impl ShareVerificationActor {
         }
 
         self.publish_complete(pending.e3_id, pending.kind, all_dishonest, pending.ec);
+    }
+
+    /// Check if any C3 proof in a party's signed proofs has an expected_pk_commitment
+    /// that doesn't match the receiver's C0 pk_commitment.
+    fn check_c3_pk_commitment(
+        party: &PartyProofsToVerify,
+        receiver_commitment: &ArcBytes,
+    ) -> Option<SignedProofPayload> {
+        for signed in &party.signed_proofs {
+            // extract_input returns None for non-C3 proofs (their input_layout is None)
+            if let Some(c3_pk) = signed.payload.proof.extract_input("expected_pk_commitment") {
+                if c3_pk[..] != receiver_commitment[..] {
+                    return Some(signed.clone());
+                }
+            }
+        }
+        None
     }
 
     fn emit_signed_proof_failed(

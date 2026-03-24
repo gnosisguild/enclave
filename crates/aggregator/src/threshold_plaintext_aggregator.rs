@@ -283,6 +283,7 @@ impl ThresholdPlaintextAggregator {
                 share_proofs: party_proofs,
                 decryption_proofs: vec![],
                 pre_dishonest: BTreeSet::new(),
+                receiver_c0_pk_commitment: None,
             },
             ec,
         )?;
