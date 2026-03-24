@@ -135,7 +135,7 @@ impl Computation for Bits {
         let eek_bit = calculate_bit_width(BigInt::from(data.eek_bound.clone()));
         let sk_bit = calculate_bit_width(BigInt::from(data.sk_bound.clone()));
         let e_sm_bit = calculate_bit_width(BigInt::from(data.e_sm_bound.clone()));
-        
+
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let mut pk_bit = 0;

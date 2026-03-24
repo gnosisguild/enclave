@@ -41,14 +41,20 @@ fn derive_c1_commitments(signed_proofs: &[Option<SignedProofPayload>]) -> Vec<Op
         .collect()
 }
 
-/// Convert `Vec<Option<ArcBytes>>` to `Vec<ArcBytes>`, substituting 32 zero bytes
-/// for any `None` entry. The C5 prover will detect these as commitment mismatches.
-fn unwrap_c1_commitments(commitments: &[Option<ArcBytes>]) -> Vec<ArcBytes> {
+/// Convert `Vec<Option<ArcBytes>>` to `Vec<ArcBytes>`, failing if any entry is `None`.
+/// A `None` means pk_commitment extraction failed for that party's C1 proof —
+/// this is a bug or a corrupted proof, not a normal mismatch.
+fn unwrap_c1_commitments(commitments: &[Option<ArcBytes>]) -> Result<Vec<ArcBytes>> {
     commitments
         .iter()
-        .map(|opt| {
-            opt.clone()
-                .unwrap_or_else(|| ArcBytes::from_bytes(&[0u8; 32]))
+        .enumerate()
+        .map(|(i, opt)| {
+            opt.clone().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Failed to extract pk_commitment from C1 proof at index {}",
+                    i
+                )
+            })
         })
         .collect()
 }
@@ -382,7 +388,7 @@ impl PublicKeyAggregator {
                     committee_threshold: 0,
                     c1_commitments: unwrap_c1_commitments(&derive_c1_commitments(
                         &c1_signed_proofs,
-                    )),
+                    ))?,
                 },
                 public_key: pubkey.clone(),
                 nodes: honest_nodes_set.clone(),
@@ -924,7 +930,7 @@ impl PublicKeyAggregator {
                     committee_threshold: threshold_m,
                     c1_commitments: unwrap_c1_commitments(&derive_c1_commitments(
                         &remaining_c1_signed_proofs,
-                    )),
+                    ))?,
                 },
                 public_key: pubkey.clone(),
                 nodes: remaining_nodes.clone(),
