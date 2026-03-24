@@ -6,17 +6,30 @@
 
 use alloy::primitives::{Address, FixedBytes, I256, U256};
 use anyhow::Result;
+use chrono::Utc;
 use clap::Subcommand;
 use e3_events::{
-    AccusationOutcome, AccusationQuorumReached, AccusationVote, CiphernodeAdded,
-    CiphernodeSelected, CiphertextOutputPublished, CircuitName, CommitteePublished,
-    ConfigurationUpdated, DecryptionshareCreated, E3Failed, E3Requested, E3Stage, E3id, EType,
-    EnclaveError, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated,
-    EventConstructorWithTimestamp, FailureReason, KeyshareCreated, PlaintextAggregated, Proof,
-    ProofPayload, ProofType, ProofVerificationFailed, PublicKeyAggregated, Seed,
-    SignedProofPayload, TestEvent, TicketBalanceUpdated, TicketGenerated, TicketId, Unsequenced,
+    AccusationOutcome, AccusationQuorumReached, AccusationVote, CiphernodeAdded, CiphernodeRemoved,
+    CiphernodeSelected, CiphertextOutputPublished, CircuitName, CommitteeFinalizeRequested,
+    CommitteeFinalized, CommitteeMemberExpelled, CommitteeRequested, CommitteePublished,
+    ConfigurationUpdated, DecryptionKeyShared, DecryptionShareProofSigned, DecryptionshareCreated,
+    DocumentKind, DocumentMeta, DocumentReceived, DkgProofSigned, E3Failed, E3RequestComplete,
+    E3Requested, E3Stage, E3StageChanged, E3id, EffectsEnabled, EncryptionKey,
+    EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending, EncryptionKeyReceived,
+    EnclaveError, EnclaveEvent, EnclaveEventData, EvmEventConfig, EvmEventConfigChain,
+    EventConstructorWithTimestamp, FailureReason, HistoricalEvmSyncStart,
+    HistoricalNetSyncEventsReceived, HistoricalNetSyncStart, KeyshareCreated, NetReady,
+    OperatorActivationChanged, OutgoingSyncRequested, PkGenerationProofSigned,
+    PlaintextAggregated, PlaintextOutputPublished, Proof, ProofPayload, ProofType,
+    ProofVerificationFailed, ProofVerificationPassed, ProofFailureAccusation, PublicKeyAggregated,
+    PublishDocumentRequested, Seed, SignedProofFailed, SignedProofPayload, SlashExecuted,
+    SyncEffect, SyncEnded, TestEvent, ThresholdShareCollectionFailed, Shutdown,
+    TicketBalanceUpdated, TicketGenerated, TicketId, TicketSubmitted, Unsequenced, EType,
+    DKGInnerProofReady, DKGRecursiveAggregationComplete, AggregationProofSigned,
 };
+use e3_events::AggregateId;
 use e3_utils::ArcBytes;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 fn dummy_proof(circuit: CircuitName) -> Proof {
@@ -455,9 +468,511 @@ async fn query_events(aggregate: u64, since: u64, limit: u64) -> Result<()> {
     )
     .into_sequenced(20);
 
+    // Missing event types start here (event21 onwards)
+    let event21 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::ProofFailureAccusation(ProofFailureAccusation {
+            e3_id: E3id::new("test21", 1),
+            accuser: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".parse().unwrap(),
+            accused: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".parse().unwrap(),
+            accused_party_id: 2,
+            proof_type: ProofType::C3aSkShareEncryption,
+            data_hash: [0xdd; 32],
+            signed_payload: Some(dummy_signed_proof_payload(
+                E3id::new("test21", 1),
+                ProofType::C3aSkShareEncryption,
+            )),
+            signature: vec![0xee; 64],
+        }),
+        None,
+        1700000020000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(21);
+
+    let event22 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::ProofVerificationPassed(ProofVerificationPassed {
+            e3_id: E3id::new("test22", 1),
+            party_id: 1,
+            address: "0x1111111111111111111111111111111111111111".parse().unwrap(),
+            proof_type: ProofType::C1PkGeneration,
+            data_hash: [0x22; 32],
+        }),
+        None,
+        1700000021000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(22);
+
+    let event23 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::DecryptionKeyShared(DecryptionKeyShared {
+            e3_id: E3id::new("test23", 1),
+            party_id: 1,
+            node: "0x3333333333333333333333333333333333333333".to_string(),
+            sk_poly_sum: ArcBytes::from_bytes(&[0x44; 32]),
+            es_poly_sum: vec![ArcBytes::from_bytes(&[0x55; 32])],
+            signed_sk_decryption_proof: dummy_signed_proof_payload(
+                E3id::new("test23", 1),
+                ProofType::C4DkgShareDecryption,
+            ),
+            signed_e_sm_decryption_proofs: vec![dummy_signed_proof_payload(
+                E3id::new("test23", 1),
+                ProofType::C4DkgShareDecryption,
+            )],
+            external: false,
+        }),
+        None,
+        1700000022000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(23);
+
+    let event24 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::PublishDocumentRequested(PublishDocumentRequested {
+            meta: DocumentMeta::new(
+                E3id::new("test24", 1),
+                DocumentKind::TrBFV,
+                vec![],
+                Some(Utc::now()),
+            ),
+            value: ArcBytes::from_bytes(&[0x66; 64]),
+        }),
+        None,
+        1700000023000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(24);
+
+    let event25 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::PkGenerationProofSigned(PkGenerationProofSigned {
+            e3_id: E3id::new("test25", 1),
+            party_id: 1,
+            signed_proof: dummy_signed_proof_payload(
+                E3id::new("test25", 1),
+                ProofType::C1PkGeneration,
+            ),
+        }),
+        None,
+        1700000024000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(25);
+
+    let event26 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::DkgProofSigned(DkgProofSigned {
+            e3_id: E3id::new("test26", 1),
+            party_id: 1,
+            signed_proof: dummy_signed_proof_payload(
+                E3id::new("test26", 1),
+                ProofType::C2aSkShareComputation,
+            ),
+        }),
+        None,
+        1700000025000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(26);
+
+    let event27 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::E3RequestComplete(E3RequestComplete {
+            e3_id: E3id::new("test27", 1),
+        }),
+        None,
+        1700000026000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(27);
+
+    let event28 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::E3StageChanged(E3StageChanged {
+            e3_id: E3id::new("test28", 1),
+            previous_stage: E3Stage::CiphertextReady,
+            new_stage: E3Stage::Complete,
+        }),
+        None,
+        1700000027000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(28);
+
+    let event29 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::CiphernodeRemoved(CiphernodeRemoved {
+            address: "0x9999999999999999999999999999999999999999".to_string(),
+            index: 3,
+            num_nodes: 9,
+            chain_id: 1,
+        }),
+        None,
+        1700000028000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(29);
+
+    let event30 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::OperatorActivationChanged(OperatorActivationChanged {
+            operator: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+            active: true,
+            chain_id: 1,
+        }),
+        None,
+        1700000029000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(30);
+
+    let event31 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::CommitteeRequested(CommitteeRequested {
+            e3_id: E3id::new("test31", 1),
+            seed: Seed([0xaa; 32]),
+            threshold: [3, 5],
+            request_block: 100,
+            committee_deadline: 200,
+            chain_id: 1,
+        }),
+        None,
+        1700000030000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(31);
+
+    let event32 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::CommitteeFinalizeRequested(CommitteeFinalizeRequested {
+            e3_id: E3id::new("test32", 1),
+        }),
+        None,
+        1700000031000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(32);
+
+    let event33 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::CommitteeFinalized(CommitteeFinalized {
+            e3_id: E3id::new("test33", 1),
+            committee: vec![
+                "0x1111111111111111111111111111111111111111".to_string(),
+                "0x2222222222222222222222222222222222222222".to_string(),
+            ],
+            chain_id: 1,
+        }),
+        None,
+        1700000032000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(33);
+
+    let event34 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::TicketSubmitted(TicketSubmitted {
+            e3_id: E3id::new("test34", 1),
+            node: "0x4444444444444444444444444444444444444444".to_string(),
+            ticket_id: 123,
+            score: "0.95".to_string(),
+            chain_id: 1,
+        }),
+        None,
+        1700000033000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(34);
+
+    let event35 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::PlaintextOutputPublished(PlaintextOutputPublished {
+            e3_id: E3id::new("test35", 1),
+            plaintext_output: ArcBytes::from_bytes(&[0x55; 32]),
+        }),
+        None,
+        1700000034000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(35);
+
+    let event36 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::Shutdown(Shutdown),
+        None,
+        1700000035000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(36);
+
+    let event37 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::DocumentReceived(DocumentReceived {
+            meta: DocumentMeta::new(
+                E3id::new("test37", 1),
+                DocumentKind::TrBFV,
+                vec![],
+                Some(Utc::now()),
+            ),
+            value: ArcBytes::from_bytes(&[0x66; 64]),
+        }),
+        None,
+        1700000036000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(37);
+
+    let event38 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::EncryptionKeyPending(EncryptionKeyPending {
+            e3_id: E3id::new("test40", 1),
+            key: Arc::new(EncryptionKey::new(
+                42,
+                ArcBytes::from_bytes(&[0x33; 16]),
+            )),
+            params_preset: e3_fhe_params::BfvPreset::InsecureThreshold512,
+        }),
+        None,
+        1700000039000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(38);
+
+    let event39 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::EncryptionKeyReceived(EncryptionKeyReceived {
+            e3_id: E3id::new("test41", 1),
+            key: Arc::new(EncryptionKey::new(
+                42,
+                ArcBytes::from_bytes(&[0x44; 16]),
+            )),
+        }),
+        None,
+        1700000040000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(39);
+
+    let event40 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::EncryptionKeyCollectionFailed(EncryptionKeyCollectionFailed {
+            e3_id: E3id::new("test42", 1),
+            reason: "Timeout waiting for encryption keys".to_string(),
+            missing_parties: vec![2, 4],
+        }),
+        None,
+        1700000041000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(40);
+
+    let event41 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::ThresholdShareCollectionFailed(ThresholdShareCollectionFailed {
+            e3_id: E3id::new("test43", 1),
+            reason: "Insufficient shares received".to_string(),
+            missing_parties: vec![3, 5],
+        }),
+        None,
+        1700000042000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(41);
+
+    let event42 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::SignedProofFailed(SignedProofFailed {
+            e3_id: E3id::new("test47", 1),
+            faulting_node: "0x7777777777777777777777777777777777777777".parse().unwrap(),
+            proof_type: ProofType::C1PkGeneration,
+            signed_payload: dummy_signed_proof_payload(
+                E3id::new("test47", 1),
+                ProofType::C1PkGeneration,
+            ),
+        }),
+        None,
+        1700000046000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(42);
+
+    let event43 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::SlashExecuted(SlashExecuted {
+            e3_id: E3id::new("test51", 1),
+            proposal_id: 12345,
+            operator: "0x9999999999999999999999999999999999999999".parse().unwrap(),
+            reason: [0xaa; 32],
+            ticket_amount: 1000,
+            license_amount: 500,
+        }),
+        None,
+        1700000050000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(43);
+
+    let event44 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::CommitteeMemberExpelled(CommitteeMemberExpelled {
+            e3_id: E3id::new("test52", 1),
+            node: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".parse().unwrap(),
+            reason: [0xbb; 32],
+            active_count_after: 9,
+            party_id: Some(2),
+        }),
+        None,
+        1700000051000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(44);
+
+    let event45 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::OutgoingSyncRequested(OutgoingSyncRequested {
+            since: vec![(AggregateId::new(0), 1700000000000_u128)],
+        }),
+        None,
+        1700000052000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(45);
+
+    let event46 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::HistoricalEvmSyncStart(HistoricalEvmSyncStart {
+            evm_config: EvmEventConfig::from_config(
+                [(1, EvmEventConfigChain::new(100))].into_iter().collect::<BTreeMap<_, _>>(),
+            ),
+            sender: None,
+        }),
+        None,
+        1700000053000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(46);
+
+    let event47 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::HistoricalNetSyncStart(HistoricalNetSyncStart {
+            since: BTreeMap::from([(AggregateId::new(0), 1700000000000_u128)]),
+        }),
+        None,
+        1700000054000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(47);
+
+    let event48 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::HistoricalNetSyncEventsReceived(HistoricalNetSyncEventsReceived {
+            events: vec![],
+        }),
+        None,
+        1700000055000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(48);
+
+    let event49 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::SyncEffect(SyncEffect::new()),
+        None,
+        1700000056000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(49);
+
+    let event50 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::SyncEnded(SyncEnded::new()),
+        None,
+        1700000057000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(50);
+
+    let event51 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::EffectsEnabled(EffectsEnabled::new()),
+        None,
+        1700000058000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(51);
+
+    let event52 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::NetReady(NetReady::new()),
+        None,
+        1700000059000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(52);
+
+    let event53 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::DecryptionShareProofSigned(DecryptionShareProofSigned {
+            e3_id: E3id::new("test61", 1),
+        }),
+        None,
+        1700000060000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(53);
+
+    let event54 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::AggregationProofSigned(AggregationProofSigned {
+            e3_id: E3id::new("test66", 1),
+            signed_proofs: vec![dummy_signed_proof_payload(
+                E3id::new("test66", 1),
+                ProofType::C7DecryptedSharesAggregation,
+            )],
+        }),
+        None,
+        1700000065000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(54);
+
+    let event55 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::DKGInnerProofReady(DKGInnerProofReady {
+            e3_id: E3id::new("test67", 1),
+            party_id: 1,
+            wrapped_proof: dummy_proof(CircuitName::Fold),
+            seq: 0,
+        }),
+        None,
+        1700000066000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(55);
+
+    let event56 = EnclaveEvent::<Unsequenced>::new_with_timestamp(
+        EnclaveEventData::DKGRecursiveAggregationComplete(DKGRecursiveAggregationComplete {
+            e3_id: E3id::new("test68", 1),
+            party_id: 1,
+            aggregated_proof: Some(dummy_proof(CircuitName::Fold)),
+        }),
+        None,
+        1700000067000_u128,
+        None,
+        e3_events::EventSource::Local,
+    )
+    .into_sequenced(56);
+
     for event in [
         event1, event2, event3, event4, event5, event6, event7, event8, event9, event10, event11,
-        event12, event13, event14, event15, event16, event17, event18, event19, event20,
+        event12, event13, event14, event15, event16, event17, event18, event19, event20, event21,
+        event22, event23, event24, event25, event26, event27, event28, event29, event30, event31,
+        event32, event33, event34, event35, event36, event37, event38, event39, event40, event41,
+        event42, event43, event44, event45, event46, event47, event48, event49, event50, event51,
+        event52, event53, event54, event55, event56,
     ] {
         println!("{}", serde_json::to_string(&event)?);
     }
