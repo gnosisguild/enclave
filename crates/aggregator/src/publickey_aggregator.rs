@@ -346,22 +346,6 @@ impl PublicKeyAggregator {
             .map(|(_, (node, ks))| (ks.clone(), node.clone()))
             .unzip();
 
-        // Collect signed C1 proofs from honest parties (submission order).
-        // All honest parties should have a signed C1 proof (parties without
-        // proofs are marked dishonest in dispatch_c1_verification).
-        let c1_signed_proofs_submission_order: Vec<SignedProofPayload> = honest_entries
-            .iter()
-            .filter_map(|(idx, _)| c1_proofs.get(*idx).and_then(|opt| opt.clone()))
-            .collect();
-
-        if c1_signed_proofs_submission_order.len() != honest_keyshares.len() {
-            return Err(anyhow::anyhow!(
-                "C1 proof count ({}) != honest keyshare count ({}) — data misalignment",
-                c1_signed_proofs_submission_order.len(),
-                honest_keyshares.len()
-            ));
-        }
-
         if !dishonest_parties.is_empty() {
             warn!(
                 "Total dishonest parties (ZK + commitment): {:?}",
@@ -404,18 +388,6 @@ impl PublicKeyAggregator {
         let committee_h = honest_keyshares.len();
         let honest_nodes_set = OrderedSet::from(honest_nodes.clone());
         let keyshare_bytes: Vec<_> = honest_keyshares_set.iter().cloned().collect();
-        let c1_signed_proofs: Vec<SignedProofPayload> = {
-            let ks_to_proof: std::collections::HashMap<Vec<u8>, &SignedProofPayload> =
-                honest_keyshares
-                    .iter()
-                    .zip(c1_signed_proofs_submission_order.iter())
-                    .map(|(ks, sp)| (ks.to_vec(), sp))
-                    .collect();
-            keyshare_bytes
-                .iter()
-                .filter_map(|ks| ks_to_proof.get(&ks.to_vec()).map(|sp| (*sp).clone()))
-                .collect()
-        };
 
         let pubkey = ArcBytes::from_bytes(&pubkey);
         info!("Publishing PkAggregationProofPending for C5 proof generation...");
@@ -429,7 +401,6 @@ impl PublicKeyAggregator {
                     committee_n: committee_h,
                     committee_h,
                     committee_threshold: 0,
-                    c1_signed_proofs,
                 },
                 public_key: pubkey.clone(),
                 nodes: honest_nodes_set.clone(),
@@ -800,109 +771,6 @@ impl PublicKeyAggregator {
             })?;
             self.try_publish_complete()?;
         }
-        Ok(())
-    }
-
-    /// Handle C5 proof error. On C1CommitmentMismatch, re-aggregate without
-    /// the faulting parties and re-dispatch C5. On other errors, just log.
-    fn handle_c5_error(
-        &mut self,
-        error: ComputeRequestError,
-        ec: EventContext<Sequenced>,
-    ) -> Result<()> {
-        let ComputeRequestErrorKind::Zk(ZkError::C1CommitmentMismatch {
-            ref mismatched_indices,
-        }) = error.get_err()
-        else {
-            error!(
-                "PublicKeyAggregator received ComputeRequestError: {}",
-                error
-            );
-            return Ok(());
-        };
-
-        // Extract the original request from the error
-        let pk_req = match &error.request().request {
-            ComputeRequestKind::Zk(ZkRequest::PkAggregation(req)) => req.clone(),
-            _ => {
-                error!("C1CommitmentMismatch error with non-PkAggregation request");
-                return Ok(());
-            }
-        };
-
-        warn!(
-            "C1 commitment mismatch at indices {:?} — re-aggregating without faulting parties",
-            mismatched_indices
-        );
-
-        // Filter out mismatched parties
-        let remaining_keyshares: Vec<ArcBytes> = pk_req
-            .keyshare_bytes
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| !mismatched_indices.contains(i))
-            .map(|(_, ks)| ks.clone())
-            .collect();
-        let remaining_c1_proofs: Vec<SignedProofPayload> = pk_req
-            .c1_signed_proofs
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| !mismatched_indices.contains(i))
-            .map(|(_, sp)| sp.clone())
-            .collect();
-
-        if remaining_keyshares.len() <= pk_req.committee_threshold {
-            error!(
-                "Not enough honest parties after C1 commitment mismatch filtering: {} (need > {})",
-                remaining_keyshares.len(),
-                pk_req.committee_threshold
-            );
-            self.bus.publish(
-                e3_events::E3Failed {
-                    e3_id: self.e3_id.clone(),
-                    failed_at_stage: e3_events::E3Stage::CommitteeFinalized,
-                    reason: e3_events::FailureReason::DKGInvalidShares,
-                },
-                ec,
-            )?;
-            return Ok(());
-        }
-
-        // Re-aggregate the public key from remaining honest keyshares
-        let remaining_set = OrderedSet::from(remaining_keyshares.clone());
-        let pubkey = self.fhe.get_aggregate_public_key(GetAggregatePublicKey {
-            keyshares: remaining_set,
-        })?;
-
-        let committee_h = remaining_keyshares.len();
-        let pubkey = ArcBytes::from_bytes(&pubkey);
-
-        // Re-dispatch C5 with the filtered data
-        self.bus.publish(
-            PkAggregationProofPending {
-                e3_id: self.e3_id.clone(),
-                proof_request: PkAggregationProofRequest {
-                    keyshare_bytes: remaining_keyshares,
-                    aggregated_pk_bytes: pubkey.clone(),
-                    params_preset: self.params_preset.clone(),
-                    committee_n: committee_h,
-                    committee_h,
-                    committee_threshold: 0,
-                    c1_signed_proofs: remaining_c1_proofs,
-                },
-                public_key: pubkey,
-                nodes: self
-                    .state
-                    .get()
-                    .map(|s| match s {
-                        PublicKeyAggregatorState::GeneratingC5Proof { nodes, .. } => nodes,
-                        _ => OrderedSet::new(),
-                    })
-                    .unwrap_or_default(),
-            },
-            ec,
-        )?;
-
         Ok(())
     }
 
