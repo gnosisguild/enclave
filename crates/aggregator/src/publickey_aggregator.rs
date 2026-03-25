@@ -99,8 +99,6 @@ pub enum PublicKeyAggregatorState {
         cross_node_fold: ProofFoldState,
         c5_proof_pending: Option<Proof>,
         last_ec: Option<EventContext<Sequenced>>,
-        /// Cryptographic threshold M, carried from Collecting for re-aggregation checks.
-        threshold_m: usize,
     },
     Complete {
         public_key: ArcBytes,
@@ -482,7 +480,6 @@ impl PublicKeyAggregator {
                 cross_node_fold: ProofFoldState::new(),
                 c5_proof_pending: None,
                 last_ec: Some(ec.clone()),
-                threshold_m,
             })
         })?;
 
@@ -529,7 +526,6 @@ impl PublicKeyAggregator {
                 honest_party_ids,
                 dishonest_parties,
                 cross_node_fold,
-                threshold_m,
                 ..
             } = state
             else {
@@ -546,7 +542,6 @@ impl PublicKeyAggregator {
                 cross_node_fold,
                 c5_proof_pending: Some(c5_proof),
                 last_ec: Some(ec.clone()),
-                threshold_m,
             })
         })?;
         self.try_publish_complete()
@@ -602,7 +597,6 @@ impl PublicKeyAggregator {
                 cross_node_fold,
                 c5_proof_pending,
                 last_ec: _,
-                threshold_m,
             } = state
             else {
                 return Ok(state);
@@ -619,7 +613,6 @@ impl PublicKeyAggregator {
                 cross_node_fold,
                 c5_proof_pending,
                 last_ec: Some(ec.clone()),
-                threshold_m,
             })
         })?;
 
@@ -678,7 +671,6 @@ impl PublicKeyAggregator {
                 mut cross_node_fold,
                 c5_proof_pending,
                 last_ec,
-                threshold_m,
             } = state
             else {
                 return Ok(state);
@@ -705,7 +697,6 @@ impl PublicKeyAggregator {
                 cross_node_fold,
                 c5_proof_pending,
                 last_ec,
-                threshold_m,
             })
         })?;
         self.try_publish_complete()
@@ -822,7 +813,6 @@ impl PublicKeyAggregator {
                     mut cross_node_fold,
                     c5_proof_pending,
                     last_ec,
-                    threshold_m,
                 } = state
                 else {
                     return Ok(state);
@@ -846,7 +836,6 @@ impl PublicKeyAggregator {
                     cross_node_fold,
                     c5_proof_pending,
                     last_ec,
-                    threshold_m,
                 })
             })?;
             self.try_publish_complete()?;
@@ -1148,5 +1137,26 @@ impl Handler<Die> for PublicKeyAggregator {
     type Result = ();
     fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
         ctx.stop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unwrap_c1_commitments_succeeds_when_all_present() {
+        let commitments = vec![
+            Some(ArcBytes::from_bytes(&[0x11; 32])),
+            Some(ArcBytes::from_bytes(&[0x22; 32])),
+        ];
+        assert_eq!(unwrap_c1_commitments(&commitments).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn unwrap_c1_commitments_fails_on_missing_entry() {
+        let commitments = vec![Some(ArcBytes::from_bytes(&[0x11; 32])), None];
+        let err = unwrap_c1_commitments(&commitments).unwrap_err();
+        assert!(err.to_string().contains("index 1"));
     }
 }
