@@ -108,7 +108,7 @@ jobs:
           echo "zk=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
           echo "contracts=$(any $FORCE $CONTRACTS $CI)" >> $GITHUB_OUTPUT
           echo "docker_support=$(any $FORCE $DOCKER $CI)" >> $GITHUB_OUTPUT
-          echo "docker_ciphernode=$(any $FORCE $RUST $CONTRACTS $DOCKER $CI)" >> $GITHUB_OUTPUT
+          echo "docker_ciphernode=$(any $FORCE $RUST $DOCKER $CI $CONTRACTS)" >> $GITHUB_OUTPUT
           echo "net=$(any $FORCE $INTEGRATION $CI)" >> $GITHUB_OUTPUT
           echo "init=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $CI)" >> $GITHUB_OUTPUT
           echo "build_e3_support_dev=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $SDK $CI)" >> $GITHUB_OUTPUT
@@ -486,9 +486,8 @@ jobs:
       labels: [enclave-ci-runner]
     strategy:
       matrix:
-        # TODO removed base test for now
         test-suite: [base, persist]
-      fail-fast: false
+      fail-fast: true
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -551,7 +550,7 @@ jobs:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.build_enclave_cli == 'true'
     timeout-minutes: 20
-    runs-on: 
+    runs-on:
       group: enclave-ci
       labels: [enclave-ci-runner]
     permissions:
@@ -597,34 +596,59 @@ jobs:
     if: needs.detect_changes.outputs.crisp == 'true'
     timeout-minutes: 30
     runs-on: 'ubuntu-latest'
+    strategy:
+      matrix:
+        include:
+          - test-suite: test:circuits
+            command: pnpm test:circuits
+          - test-suite: test:sdk
+            command: pnpm test:sdk
+          - test-suite: test:contracts
+            command: pnpm test:contracts
+          - test-suite: cargo test
+            command: cargo test
+      fail-fast: false
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
 
       - name: Cache Rust dependencies
+        if: matrix.test-suite == 'cargo test'
         uses: ./.github/actions/cache-dependencies
         with:
           cargo-lock-path: examples/CRISP/Cargo.lock
           rust-target-path: examples/CRISP/target/
 
       - name: Install Rust
+        if: matrix.test-suite == 'cargo test'
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
       - name: Install Foundry
+        if: matrix.test-suite == 'cargo test'
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Install solc
+        if: matrix.test-suite == 'cargo test'
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
+
       - name: Install Nargo
+        if: matrix.test-suite == 'test:circuits'
         uses: noir-lang/noirup@v0.1.4
         with:
           toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
       - name: Setup pnpm
+        if: matrix.test-suite != 'cargo test'
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
+        if: matrix.test-suite != 'cargo test'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -632,44 +656,29 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
+        if: matrix.test-suite != 'cargo test'
         working-directory: .
         run: pnpm install --frozen-lockfile
 
       - name: Compile Enclave contracts
+        if: matrix.test-suite == 'test:contracts'
         working-directory: .
         run: pnpm evm:build
 
-      - name: Install solc
-        run: |
-          sudo add-apt-repository ppa:ethereum/ethereum \
-          && sudo apt-get update -y \
-          && sudo apt-get install -y solc
-
-      - name: Run Rust tests
-        working-directory: ./examples/CRISP
-        run: 'cargo test'
-
       - name: Download Crisp SDK artifacts
+        if: matrix.test-suite == 'test:sdk' || matrix.test-suite == 'test:contracts'
         uses: actions/download-artifact@v4
         with:
           name: crisp-sdk-artifacts
           path: .
 
-      - name: Run Noir tests
+      - name: Run ${{ matrix.test-suite }}
         working-directory: ./examples/CRISP
-        run: 'pnpm test:circuits'
-
-      - name: Run JavaScript tests
-        working-directory: ./examples/CRISP
-        run: 'pnpm test:sdk'
-
-      - name: Run Solidity tests
-        working-directory: ./examples/CRISP
-        run: 'pnpm test:contracts'
+        run: ${{ matrix.command }}
 
   crisp_e2e:
     needs: [detect_changes, build_enclave_cli, build_crisp_sdk]
-    if: needs.detect_changes.outputs.crisp == 'true' 
+    if: needs.detect_changes.outputs.crisp == 'true'
     timeout-minutes: 45
     runs-on:
       group: enclave-ci
@@ -810,7 +819,7 @@ jobs:
       - name: Install Barretenberg (bb)
         if: steps.cache-bb.outputs.cache-hit != 'true'
         run: |
-          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+          curl -fsSL "https://github.com/gnosisguild/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
           mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
           BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
           sudo mv "$BB_BIN" /usr/local/bin/bb
@@ -892,7 +901,7 @@ jobs:
       - name: Install Barretenberg (bb)
         if: steps.cache-bb.outputs.cache-hit != 'true'
         run: |
-          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+          curl -fsSL "https://github.com/gnosisguild/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
           mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
           BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
           sudo mv "$BB_BIN" /usr/local/bin/bb

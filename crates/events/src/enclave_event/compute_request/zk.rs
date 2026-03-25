@@ -120,7 +120,7 @@ pub struct ShareEncryptionProofRequest {
 pub struct DkgShareDecryptionProofRequest {
     /// BFV secret key used for decryption (witness — encrypted at rest).
     pub sk_bfv: SensitiveBytes,
-    /// Serialized BFV Ciphertext bytes from H honest parties, flattened as [H * L].
+    /// BFV ciphertexts from H honest parties, flattened [H * L] in ascending party_id order.
     /// Layout: party 0 mod 0, party 0 mod 1, ..., party 1 mod 0, ...
     pub honest_ciphertexts_raw: Vec<ArcBytes>,
     /// Number of honest parties (H).

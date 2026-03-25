@@ -286,4 +286,41 @@ mod tests {
             sample.honest_ciphertexts.len()
         );
     }
+
+    /// Verify expected_commitments[i][j] matches direct commitment computation
+    /// for honest_ciphertexts[i][j], proving row ordering is consistent.
+    #[test]
+    fn test_commitment_ordering_consistency() {
+        let committee = CiphernodesCommitteeSize::Small.values();
+        let preset = BfvPreset::InsecureThreshold512;
+        let sample =
+            ShareDecryptionCircuitData::generate_sample(preset, committee, DkgInputType::SecretKey)
+                .unwrap();
+
+        let (threshold_params, dkg_params) = build_pair_for_preset(preset).unwrap();
+        let threshold_l = threshold_params.moduli().len();
+        let msg_bit = calculate_bit_width(BigInt::from(dkg_params.plaintext()));
+
+        let inputs = Inputs::compute(preset, &sample).unwrap();
+        assert_eq!(
+            inputs.expected_commitments.len(),
+            sample.honest_ciphertexts.len()
+        );
+
+        for (party_idx, party_cts) in sample.honest_ciphertexts.iter().enumerate() {
+            for mod_idx in 0..threshold_l {
+                let decrypted_pt = sample.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
+                let share_coeffs = decrypted_pt.value.deref().to_vec();
+                let direct_commitment = compute_share_encryption_commitment_from_message(
+                    &Polynomial::from_u64_vector(share_coeffs),
+                    msg_bit,
+                );
+                assert_eq!(
+                    inputs.expected_commitments[party_idx][mod_idx], direct_commitment,
+                    "expected_commitments[{}][{}] doesn't match direct computation",
+                    party_idx, mod_idx
+                );
+            }
+        }
+    }
 }

@@ -59,6 +59,11 @@ impl ProofFoldState {
             && self.result.is_none()
     }
 
+    /// `true` if a fold step is in flight and expects this `ComputeResponse` correlation.
+    pub fn awaits_correlation(&self, correlation_id: &CorrelationId) -> bool {
+        self.correlation.as_ref() == Some(correlation_id)
+    }
+
     /// Begin folding `proofs` sequentially.
     ///
     /// - 0 proofs → `result` stays `None`, `fold_input_was_empty` is set (caller can treat fold as done)
