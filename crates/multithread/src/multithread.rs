@@ -377,9 +377,13 @@ fn handle_pk_aggregation_proof(
     let mut mismatched_indices = Vec::new();
     for (i, (computed, extracted)) in expected.iter().zip(req.c1_commitments.iter()).enumerate() {
         let (_, be_bytes) = computed.to_bytes_be();
-        let mut padded = vec![0u8; 32];
-        let start = 32_usize.saturating_sub(be_bytes.len());
-        padded[start..].copy_from_slice(&be_bytes);
+        if be_bytes.len() > 32 {
+            // Commitment exceeds field size — treat as mismatch
+            mismatched_indices.push(i);
+            continue;
+        }
+        let mut padded = [0u8; 32];
+        padded[32 - be_bytes.len()..].copy_from_slice(&be_bytes);
         if padded[..] != extracted[..] {
             mismatched_indices.push(i);
         }

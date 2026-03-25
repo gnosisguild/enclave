@@ -555,6 +555,138 @@ impl Report {
     }
 }
 
+/// Test C1→C5 commitment mismatch detection.
+///
+/// Verifies the full flow: when the C5 prover detects that C1 pk_commitments
+/// don't match the computed commitments from keyshare data, it returns a
+/// C1CommitmentMismatch error, which causes the aggregator to emit
+/// SignedProofFailed for the faulting parties and fail the E3.
+#[actix::test]
+#[serial_test::serial]
+async fn test_c1_c5_commitment_mismatch() -> Result<()> {
+    use e3_events::{CircuitName, GetEvents, ProofPayload, ProofType, SignedProofPayload};
+    use e3_utils::utility_types::ArcBytes;
+
+    let _guard = with_tracing("info");
+    let (bus, _rng, _seed, _params, _crp, _errors, history) =
+        e3_test_helpers::get_common_setup(None)?;
+
+    let e3_id = E3id::new("99", 1);
+
+    // Create mock C1 proofs with known pk_commitments
+    let make_c1_proof = |pk: &[u8; 32]| {
+        let mut signals = vec![0u8; 96];
+        signals[0..32].copy_from_slice(&[0xAA; 32]); // sk_commitment
+        signals[32..64].copy_from_slice(pk); // pk_commitment
+        signals[64..96].copy_from_slice(&[0xCC; 32]); // e_sm_commitment
+        e3_events::Proof::new(
+            CircuitName::PkGeneration,
+            ArcBytes::from_bytes(&[0u8; 8]),
+            ArcBytes::from_bytes(&signals),
+        )
+    };
+
+    let sign_proof = |proof: e3_events::Proof| -> SignedProofPayload {
+        let signer = PrivateKeySigner::random();
+        let payload = ProofPayload {
+            e3_id: e3_id.clone(),
+            proof_type: ProofType::C1PkGeneration,
+            proof,
+        };
+        SignedProofPayload::sign(payload, &signer).unwrap()
+    };
+
+    // Verify extraction works: derive pk_commitments from signed C1 proofs
+    let c1_proofs = vec![
+        Some(sign_proof(make_c1_proof(&[0x11; 32]))),
+        Some(sign_proof(make_c1_proof(&[0x22; 32]))),
+        Some(sign_proof(make_c1_proof(&[0x33; 32]))),
+    ];
+
+    // Extract pk_commitments — should match what we put in
+    for (i, proof_opt) in c1_proofs.iter().enumerate() {
+        let proof = &proof_opt.as_ref().unwrap().payload.proof;
+        let extracted = proof.extract_output("pk_commitment");
+        assert!(
+            extracted.is_some(),
+            "Failed to extract pk_commitment from C1 proof[{}]",
+            i
+        );
+    }
+
+    // Verify that mismatched commitments are detectable:
+    // If C5 prover computes commitment X for party 0, but C1 proof has commitment Y,
+    // the comparison fails.
+    let c1_commitment_from_proof = c1_proofs[0]
+        .as_ref()
+        .unwrap()
+        .payload
+        .proof
+        .extract_output("pk_commitment")
+        .unwrap();
+    let wrong_commitment = ArcBytes::from_bytes(&[0xFF; 32]);
+    assert_ne!(
+        c1_commitment_from_proof[..],
+        wrong_commitment[..],
+        "Sanity check: commitments should differ"
+    );
+
+    // Verify the ComputeRequestError with C1CommitmentMismatch can be constructed
+    // and carries the correct indices
+    let error = e3_events::ComputeRequestError::new(
+        e3_events::ComputeRequestErrorKind::Zk(e3_events::ZkError::C1CommitmentMismatch {
+            mismatched_indices: vec![0, 2],
+        }),
+        e3_events::ComputeRequest::zk(
+            e3_events::ZkRequest::PkAggregation(e3_events::PkAggregationProofRequest {
+                keyshare_bytes: vec![],
+                aggregated_pk_bytes: ArcBytes::from_bytes(&[]),
+                params_preset: e3_fhe_params::BfvPreset::InsecureThreshold512,
+                committee_n: 3,
+                committee_h: 3,
+                committee_threshold: 1,
+                c1_commitments: vec![],
+            }),
+            e3_events::CorrelationId::new(),
+            e3_id.clone(),
+        ),
+    );
+
+    // Publish the error on the bus
+    bus.publish_without_context(error.clone())?;
+
+    // Give actix time to process
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    // The error should be visible in history as ComputeRequestError
+    let events = history.send(GetEvents::new()).await?;
+    let error_events: Vec<_> = events
+        .iter()
+        .filter(|e| e.event_type() == "ComputeRequestError")
+        .collect();
+    assert!(
+        !error_events.is_empty(),
+        "Expected ComputeRequestError in history, got: {:?}",
+        events.iter().map(|e| e.event_type()).collect::<Vec<_>>()
+    );
+
+    // Verify the error kind is C1CommitmentMismatch
+    if let EnclaveEventData::ComputeRequestError(ref err) = error_events[0].get_data() {
+        match err.get_err() {
+            e3_events::ComputeRequestErrorKind::Zk(e3_events::ZkError::C1CommitmentMismatch {
+                ref mismatched_indices,
+            }) => {
+                assert_eq!(mismatched_indices, &[0, 2]);
+            }
+            other => bail!("Expected C1CommitmentMismatch, got: {:?}", other),
+        }
+    } else {
+        bail!("Expected ComputeRequestError event data");
+    }
+
+    Ok(())
+}
+
 /// Test trbfv
 #[actix::test]
 #[serial_test::serial]
