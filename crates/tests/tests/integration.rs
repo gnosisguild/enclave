@@ -712,6 +712,8 @@ async fn test_trbfv_actor() -> Result<()> {
     // Trigger actor DKG
     let e3_id = E3id::new("0", 1);
 
+    let proof_aggregation_enabled = true;
+
     let e3_requested = E3Requested {
         e3_id: e3_id.clone(),
         threshold_m,
@@ -720,7 +722,7 @@ async fn test_trbfv_actor() -> Result<()> {
         error_size,
         esi_per_ct: esi_per_ct as usize,
         params,
-        proof_aggregation_enabled: true,
+        proof_aggregation_enabled,
     };
 
     bus.publish_without_context(e3_requested)?;
@@ -759,48 +761,48 @@ async fn test_trbfv_actor() -> Result<()> {
         committee_finalized_timer.elapsed(),
     ));
 
-    // Wait for KeyshareCreated + C1 verification + C5 proof + cross-node DKG fold + PublicKeyAggregated
-    // - KeyshareCreated × 3 (forwarded from committee nodes)
-    // - ShareVerificationDispatched (C1 proof verification dispatched by PublicKeyAggregator)
-    // - ComputeRequest (C1 ZK verification)
-    // - ComputeResponse (C1 ZK verification result)
-    // - ProofVerificationPassed × 3 (one per party's C1 proof)
-    // - ShareVerificationComplete (C1 verification done)
-    // - PkAggregationProofPending (C5 proof requested by PublicKeyAggregator)
-    // - ComputeRequest (C5 proof generation)
-    // - ComputeResponse (C5 proof result)
-    // - PkAggregationProofSigned (C5 proof signed by ProofRequestActor)
-    // - DKGRecursiveAggregationComplete × 3 (per-node aggregation from NodeProofAggregator)
-    // - ComputeRequest × 2 (cross-node DKG fold, 3 proofs → 2 pairwise steps)
-    // - ComputeResponse × 2 (cross-node DKG fold results)
-    // - PublicKeyAggregated × 1
+    // Collector (node 0): prefix order differs by `proof_aggregation_enabled` (see flow-trace DKG).
+    // Then C1/C5 verification, then if aggregation: DKGRecursive ×3 + cross-node fold ZK, then
+    // PublicKeyAggregated.
     let shares_to_pubkey_agg_timer = Instant::now();
+    const KS3: [&str; 3] = ["KeyshareCreated"; 3];
+    const DKG3: [&str; 3] = ["DKGRecursiveAggregationComplete"; 3];
+    const C1_C5: [&str; 11] = [
+        "ShareVerificationDispatched",
+        "ComputeRequest",
+        "ComputeResponse",
+        "ProofVerificationPassed",
+        "ProofVerificationPassed",
+        "ProofVerificationPassed",
+        "ShareVerificationComplete",
+        "PkAggregationProofPending",
+        "ComputeRequest",
+        "ComputeResponse",
+        "PkAggregationProofSigned",
+    ];
+    const DKG_FOLD: [&str; 4] = [
+        "ComputeRequest",
+        "ComputeResponse",
+        "ComputeRequest",
+        "ComputeResponse",
+    ];
+
+    let mut expected_events: Vec<&'static str> = Vec::new();
+    if proof_aggregation_enabled {
+        expected_events.extend_from_slice(&KS3);
+    } else {
+        expected_events.extend_from_slice(&DKG3);
+        expected_events.extend_from_slice(&KS3);
+    }
+    expected_events.extend_from_slice(&C1_C5);
+    if proof_aggregation_enabled {
+        expected_events.extend_from_slice(&DKG3);
+        expected_events.extend_from_slice(&DKG_FOLD);
+    }
+    expected_events.push("PublicKeyAggregated");
     let h = nodes
         .expect_events_with_timeouts(
-            &[
-                "KeyshareCreated",
-                "KeyshareCreated",
-                "KeyshareCreated",
-                "ShareVerificationDispatched",
-                "ComputeRequest",
-                "ComputeResponse",
-                "ProofVerificationPassed",
-                "ProofVerificationPassed",
-                "ProofVerificationPassed",
-                "ShareVerificationComplete",
-                "PkAggregationProofPending",
-                "ComputeRequest",
-                "ComputeResponse",
-                "PkAggregationProofSigned",
-                "DKGRecursiveAggregationComplete",
-                "DKGRecursiveAggregationComplete",
-                "DKGRecursiveAggregationComplete",
-                "ComputeRequest",
-                "ComputeResponse",
-                "ComputeRequest",
-                "ComputeResponse",
-                "PublicKeyAggregated",
-            ],
+            &expected_events,
             Duration::from_secs(5000),
             Duration::from_secs(5000),
         )
@@ -887,15 +889,21 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 ComputeRequest (C7 proof generation)
     // - 1 ComputeResponse (C7 proof result)
     // - 1 AggregationProofSigned (C7 proof signed by ProofRequestActor)
-    // - 8 ComputeRequest + 8 ComputeResponse (C6 fold: 9 proofs -> 8 pairwise steps)
+    // - If proof aggregation: ComputeRequest + ComputeResponse per C6 fold step (9 proofs -> 8 steps)
     // - 1 PlaintextAggregated (with C7 + C6 proofs)
     // - 1 E3RequestComplete (published after PlaintextAggregated by request router)
     // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
     // stay on their local buses.
     let c6_proof_count = threshold_n as usize * num_votes_per_voter;
     let c6_fold_steps = c6_proof_count.saturating_sub(1);
-    let c6_fold_events = 2 * c6_fold_steps;
-    let expected_count = 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + 2 + c6_fold_events + 1;
+    let c6_fold_events = if proof_aggregation_enabled {
+        2 * c6_fold_steps
+    } else {
+        0
+    };
+    // Sum matches the comment above through AggregationProofSigned, then fold, then PlaintextAggregated.
+    // E3RequestComplete is not included (arrives after; not needed for take).
+    let expected_count = 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + c6_fold_events + 1;
 
     let h = nodes
         .take_history_with_timeouts(
