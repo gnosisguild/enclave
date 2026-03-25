@@ -83,7 +83,7 @@ use ndarray::Array2;
 use num_bigint::BigInt;
 use rand::rngs::OsRng;
 use rand::Rng;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// Multithread actor
 pub struct Multithread {
@@ -357,34 +357,33 @@ fn handle_pk_aggregation_proof(
         a,
     };
 
-    // 6b. Verify C1 commitments from signed proofs match computed commitments
-    if req.c1_commitments.len() != req.committee_h {
-        return Err(make_zk_error(
-            &request,
-            format!(
-                "c1_commitments length {} != committee_h {}",
-                req.c1_commitments.len(),
-                req.committee_h
-            ),
-        ));
-    }
-
+    // 6b. Verify C1 commitments match computed commitments.
+    // On mismatch, return C1CommitmentMismatch error with the faulting indices.
+    // The ProofRequestActor emits SignedProofFailed for each faulting party,
+    // and the PublicKeyAggregator re-aggregates without them and retries.
     let pk_agg_inputs = PkAggInputs::compute(req.params_preset.clone(), &circuit_data)
         .map_err(|e| make_zk_error(&request, format!("PkAggInputs::compute: {}", e)))?;
 
-    // public_signals from bb are big-endian 32-byte field elements
     let expected = &pk_agg_inputs.expected_threshold_pk_commitments;
     let mut mismatched_indices = Vec::new();
-    for (i, (computed, extracted)) in expected.iter().zip(req.c1_commitments.iter()).enumerate() {
-        let (_, be_bytes) = computed.to_bytes_be();
-        if be_bytes.len() > 32 {
-            // Commitment exceeds field size — treat as mismatch
-            mismatched_indices.push(i);
-            continue;
-        }
-        let mut padded = [0u8; 32];
-        padded[32 - be_bytes.len()..].copy_from_slice(&be_bytes);
-        if padded[..] != extracted[..] {
+    for (i, sp) in req.c1_signed_proofs.iter().enumerate() {
+        let matches = if let Some(extracted) = sp.payload.proof.extract_output("pk_commitment") {
+            if let Some(computed) = expected.get(i) {
+                let (_, be_bytes) = computed.to_bytes_be();
+                if be_bytes.len() > 32 {
+                    false
+                } else {
+                    let mut padded = [0u8; 32];
+                    padded[32 - be_bytes.len()..].copy_from_slice(&be_bytes);
+                    padded[..] == extracted[..]
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        if !matches {
             mismatched_indices.push(i);
         }
     }

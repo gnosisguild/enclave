@@ -16,10 +16,10 @@ use e3_events::{
     DecryptionShareProofsPending, DecryptionshareCreated, DkgProofSigned, E3Failed, E3Stage, E3id,
     EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated, EncryptionKeyPending,
     EventContext, EventPublisher, EventSubscriber, EventType, FailureReason,
-    PkAggregationProofPending, PkAggregationProofSigned, PkBfvProofRequest,
-    PkGenerationProofSigned, Proof, ProofPayload, ProofType, Sequenced,
-    ShareDecryptionProofPending, SignedProofPayload, ThresholdShare, ThresholdShareCreated,
-    ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
+    PkAggregationProofPending, PkAggregationProofRequest, PkAggregationProofSigned,
+    PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload, ProofType, Sequenced,
+    ShareDecryptionProofPending, SignedProofFailed, SignedProofPayload, ThresholdShare,
+    ThresholdShareCreated, ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
@@ -181,6 +181,7 @@ impl PendingDecryptionProofs {
 #[derive(Clone, Debug)]
 struct PendingPkAggregationProof {
     ec: EventContext<Sequenced>,
+    request: PkAggregationProofRequest,
 }
 
 /// Pending C6 (ShareDecryptionProof) proof generation state.
@@ -905,8 +906,13 @@ impl ProofRequestActor {
             return;
         }
 
-        self.pending_pk_aggregation
-            .insert(e3_id.clone(), PendingPkAggregationProof { ec: ec.clone() });
+        self.pending_pk_aggregation.insert(
+            e3_id.clone(),
+            PendingPkAggregationProof {
+                ec: ec.clone(),
+                request: msg.proof_request.clone(),
+            },
+        );
 
         let correlation_id = CorrelationId::new();
         self.pk_aggregation_correlation
@@ -1466,16 +1472,56 @@ impl ProofRequestActor {
                 "C5 proof request failed for E3 {}: {err} — PkAggregationProofSigned will not be published",
                 e3_id
             );
-            self.pending_pk_aggregation.remove(&e3_id);
-            if let Err(e) = self.bus.publish(
-                E3Failed {
-                    e3_id,
-                    failed_at_stage: E3Stage::CommitteeFinalized,
-                    reason: FailureReason::DKGInvalidShares,
-                },
-                ec.clone(),
-            ) {
-                error!("Failed to publish E3Failed for C5 error: {e}");
+            let pending = self.pending_pk_aggregation.remove(&e3_id);
+
+            // Emit SignedProofFailed for C1 commitment mismatches before failing E3
+            if let ComputeRequestErrorKind::Zk(e3_events::ZkError::C1CommitmentMismatch {
+                ref mismatched_indices,
+            }) = msg.get_err()
+            {
+                if let Some(ref pending) = pending {
+                    for &idx in mismatched_indices {
+                        if let Some(signed_c1) = pending.request.c1_signed_proofs.get(idx) {
+                            match signed_c1.recover_address() {
+                                Ok(faulting_node) => {
+                                    if let Err(e) = self.bus.publish(
+                                        SignedProofFailed {
+                                            e3_id: e3_id.clone(),
+                                            faulting_node,
+                                            proof_type: ProofType::C1PkGeneration,
+                                            signed_payload: signed_c1.clone(),
+                                        },
+                                        ec.clone(),
+                                    ) {
+                                        error!("Failed to publish SignedProofFailed: {e}");
+                                    }
+                                }
+                                Err(e) => warn!(
+                                    "Could not recover address from C1 proof at index {idx}: {e}"
+                                ),
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Don't publish E3Failed for C1CommitmentMismatch — the aggregator
+            // will re-aggregate without the faulting parties and retry C5.
+            let is_mismatch = matches!(
+                msg.get_err(),
+                ComputeRequestErrorKind::Zk(e3_events::ZkError::C1CommitmentMismatch { .. })
+            );
+            if !is_mismatch {
+                if let Err(e) = self.bus.publish(
+                    E3Failed {
+                        e3_id,
+                        failed_at_stage: E3Stage::CommitteeFinalized,
+                        reason: FailureReason::DKGInvalidShares,
+                    },
+                    ec.clone(),
+                ) {
+                    error!("Failed to publish E3Failed for C5 error: {e}");
+                }
             }
             return;
         }
