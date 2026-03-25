@@ -258,6 +258,10 @@ interface ICiphernodeRegistry {
     /// @param _bondingRegistry Address of the bonding registry contract
     function setBondingRegistry(IBondingRegistry _bondingRegistry) external;
 
+    /// @notice Returns the current sortition submission window.
+    /// @return The sortition submission window in seconds.
+    function sortitionSubmissionWindow() external view returns (uint256);
+
     /// @notice This function should be called to set the submission window for the E3 sortition.
     /// @param _sortitionSubmissionWindow The submission window for the E3 sortition in seconds.
     function setSortitionSubmissionWindow(

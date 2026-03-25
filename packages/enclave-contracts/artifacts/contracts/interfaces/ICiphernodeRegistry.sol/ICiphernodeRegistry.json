@@ -756,6 +756,19 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "sortitionSubmissionWindow",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256",
@@ -793,5 +806,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-7be5abc9893f8994323749f03d05435db17c1751"
+  "buildInfoId": "solc-0_8_28-440e5066adc51df4f47f79b4332765e96b80c6bb"
 }

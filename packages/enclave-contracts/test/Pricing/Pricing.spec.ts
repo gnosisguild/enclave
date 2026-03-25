@@ -56,6 +56,9 @@ describe("E3 Pricing", function () {
     protocolTreasury: ethers.ZeroAddress,
     marginBps: 1000,
     protocolShareBps: 0,
+    dkgUtilizationBps: 2500,
+    computeUtilizationBps: 5000,
+    decryptUtilizationBps: 2500,
     minCommitteeSize: 0,
     minThreshold: 0,
   };
@@ -72,6 +75,9 @@ describe("E3 Pricing", function () {
     protocolTreasury: pc.protocolTreasury,
     marginBps: pc.marginBps,
     protocolShareBps: pc.protocolShareBps,
+    dkgUtilizationBps: pc.dkgUtilizationBps,
+    computeUtilizationBps: pc.computeUtilizationBps,
+    decryptUtilizationBps: pc.decryptUtilizationBps,
     minCommitteeSize: pc.minCommitteeSize,
     minThreshold: pc.minThreshold,
   });
@@ -138,7 +144,7 @@ describe("E3 Pricing", function () {
     await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
     await registry.finalizeCommittee(e3Id);
     const proof = encodePkProof(ethers.keccak256(publicKey));
-    await registry.publishCommittee(e3Id, nodes, publicKey, proof);
+    await registry.publishCommittee(e3Id, nodes, publicKey, proof, "0x");
   };
 
   const setup = async () => {
@@ -368,22 +374,26 @@ describe("E3 Pricing", function () {
     });
 
     it("computes fee correctly using the parametric formula", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave, request, ciphernodeRegistryContract } =
+        await loadFixture(setup);
 
       // Get the resolved threshold for Micro (committeeSize = 0) → [1, 3]
       const n = 3n; // total committee
       const m = 1n; // quorum
 
-      // Get timeout config
-      const config = await enclave.getTimeoutConfig();
-      const duration =
-        BigInt(request.inputWindow[1] - request.inputWindow[0]) +
-        config.dkgWindow +
-        config.computeWindow +
-        config.decryptionWindow;
-
       // Get pricing config
       const pc = await enclave.getPricingConfig();
+
+      // Get timeout config
+      const config = await enclave.getTimeoutConfig();
+      const sortitionWindow =
+        await ciphernodeRegistryContract.sortitionSubmissionWindow();
+      const duration =
+        sortitionWindow +
+        BigInt(request.inputWindow[1] - request.inputWindow[0]) +
+        (config.dkgWindow * BigInt(pc.dkgUtilizationBps)) / 10000n +
+        (config.computeWindow * BigInt(pc.computeUtilizationBps)) / 10000n +
+        (config.decryptionWindow * BigInt(pc.decryptUtilizationBps)) / 10000n;
 
       // Calculate expected fee (proof-aware)
       const proofsPerNode = 6n + 2n * (n - 1n) * 2n;
@@ -759,6 +769,9 @@ describe("E3 Pricing", function () {
       expect(pc.verificationPerProof).to.equal(2000);
       expect(pc.marginBps).to.equal(1000);
       expect(pc.protocolShareBps).to.equal(0);
+      expect(pc.dkgUtilizationBps).to.equal(2500);
+      expect(pc.computeUtilizationBps).to.equal(5000);
+      expect(pc.decryptUtilizationBps).to.equal(2500);
       expect(pc.protocolTreasury).to.equal(ethers.ZeroAddress);
       expect(pc.minCommitteeSize).to.equal(0);
       expect(pc.minThreshold).to.equal(0);

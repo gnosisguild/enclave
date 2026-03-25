@@ -89,6 +89,9 @@ interface IEnclave {
         address protocolTreasury;
         uint16 marginBps;
         uint16 protocolShareBps;
+        uint16 dkgUtilizationBps;
+        uint16 computeUtilizationBps;
+        uint16 decryptUtilizationBps;
         uint32 minCommitteeSize;
         uint32 minThreshold;
     }

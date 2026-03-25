@@ -499,6 +499,21 @@
               "type": "uint16"
             },
             {
+              "internalType": "uint16",
+              "name": "dkgUtilizationBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "computeUtilizationBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "decryptUtilizationBps",
+              "type": "uint16"
+            },
+            {
               "internalType": "uint32",
               "name": "minCommitteeSize",
               "type": "uint32"
@@ -1030,6 +1045,21 @@
             {
               "internalType": "uint16",
               "name": "protocolShareBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "dkgUtilizationBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "computeUtilizationBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "decryptUtilizationBps",
               "type": "uint16"
             },
             {
@@ -1569,6 +1599,21 @@
               "type": "uint16"
             },
             {
+              "internalType": "uint16",
+              "name": "dkgUtilizationBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "computeUtilizationBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "decryptUtilizationBps",
+              "type": "uint16"
+            },
+            {
               "internalType": "uint32",
               "name": "minCommitteeSize",
               "type": "uint32"
@@ -1626,5 +1671,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-7be5abc9893f8994323749f03d05435db17c1751"
+  "buildInfoId": "solc-0_8_28-440e5066adc51df4f47f79b4332765e96b80c6bb"
 }

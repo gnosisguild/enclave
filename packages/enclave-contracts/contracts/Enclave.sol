@@ -310,6 +310,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             protocolTreasury: address(0),
             marginBps: 1000, // 10%
             protocolShareBps: 0,
+            dkgUtilizationBps: 2500, // 25% — typical DKG completes in ~25% of window
+            computeUtilizationBps: 5000, // 50% — compute has moderate variance
+            decryptUtilizationBps: 2500, // 25% — decryption is fast when nodes cooperate
             minCommitteeSize: 0,
             minThreshold: 0
         });
@@ -1079,6 +1082,18 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(config.marginBps <= BPS_BASE, "Margin exceeds 100%");
         require(config.protocolShareBps <= BPS_BASE, "Share exceeds 100%");
         require(
+            config.dkgUtilizationBps <= BPS_BASE,
+            "DKG utilization exceeds 100%"
+        );
+        require(
+            config.computeUtilizationBps <= BPS_BASE,
+            "Compute utilization exceeds 100%"
+        );
+        require(
+            config.decryptUtilizationBps <= BPS_BASE,
+            "Decrypt utilization exceeds 100%"
+        );
+        require(
             config.protocolShareBps == 0 ||
                 config.protocolTreasury != address(0),
             "Treasury required when protocol share > 0"
@@ -1137,12 +1152,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InvalidInputDeadlineEnd(requestParams.inputWindow[1])
         );
 
-        // Duration covers the full availability period
-        uint256 duration = requestParams.inputWindow[1] -
+        // Duration covers the full availability period, using expected-case
+        // utilization fractions for protocol-controlled timeout windows.
+        // sortitionSubmissionWindow is included — CNs are locked during this phase.
+        uint256 duration = ciphernodeRegistry.sortitionSubmissionWindow() +
+            requestParams.inputWindow[1] -
             requestParams.inputWindow[0] +
-            _timeoutConfig.dkgWindow +
-            _timeoutConfig.computeWindow +
-            _timeoutConfig.decryptionWindow;
+            (_timeoutConfig.dkgWindow * uint256(pc.dkgUtilizationBps)) /
+            uint256(BPS_BASE) +
+            (_timeoutConfig.computeWindow * uint256(pc.computeUtilizationBps)) /
+            uint256(BPS_BASE) +
+            (_timeoutConfig.decryptionWindow *
+                uint256(pc.decryptUtilizationBps)) /
+            uint256(BPS_BASE);
 
         // ZK proof count per node: 6 fixed + 2 × (N-1) × L_dkg scaling
         // TODO: get dkgModuliCount from E3 params instead of hardcoding

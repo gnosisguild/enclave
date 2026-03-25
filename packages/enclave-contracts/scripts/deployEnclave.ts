@@ -247,6 +247,9 @@ export const deployEnclave = async (
     protocolTreasury: protocolTreasury,
     marginBps: 1000, // 10%
     protocolShareBps: 2000, // 20%
+    dkgUtilizationBps: 2500, // 25%
+    computeUtilizationBps: 5000, // 50%
+    decryptUtilizationBps: 2500, // 25%
     minCommitteeSize: 0,
     minThreshold: 0,
   });
