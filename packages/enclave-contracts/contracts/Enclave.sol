@@ -521,7 +521,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         _distributeRewards(e3Id);
 
-        emit PlaintextOutputPublished(e3Id, plaintextOutput);
+        emit PlaintextOutputPublished(e3Id, plaintextOutput, proof);
         emit E3StageChanged(e3Id, E3Stage.CiphertextReady, E3Stage.Complete);
     }
 

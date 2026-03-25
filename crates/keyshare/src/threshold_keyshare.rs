@@ -74,6 +74,7 @@ pub struct GenEsiSss {
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct AllThresholdSharesCollected {
+    /// Threshold shares sorted by ascending `party_id`.
     shares: Vec<Arc<ThresholdShare>>,
     /// Proofs from each sender, ordered by party_id (parallel to shares).
     share_proofs: Vec<ReceivedShareProofs>,
@@ -258,7 +259,9 @@ pub struct ThresholdKeyshareState {
     /// Aggregated public key bytes, captured from PublicKeyAggregated event for C6 proof.
     pub aggregated_pk: Option<ArcBytes>,
     pub expelled_parties: HashSet<u64>,
-    pub honest_parties: Option<HashSet<u64>>,
+    /// Honest party IDs in deterministic ascending order (`BTreeSet` guarantees this).
+    /// Downstream proof circuits index parties by position in this sorted set.
+    pub honest_parties: Option<BTreeSet<u64>>,
     #[serde(default = "default_proof_agg")]
     pub proof_aggregation_enabled: bool,
 }
@@ -1648,7 +1651,15 @@ impl ThresholdKeyshare {
         }
 
         // Store honest party IDs in state (after dimension exclusion)
-        let honest_party_ids: HashSet<u64> = honest_shares.iter().map(|s| s.party_id).collect();
+        let honest_party_ids: BTreeSet<u64> = honest_shares.iter().map(|s| s.party_id).collect();
+
+        // honest_shares inherits sorted order from AllThresholdSharesCollected.
+        debug_assert!(
+            honest_shares
+                .windows(2)
+                .all(|w| w[0].party_id < w[1].party_id),
+            "BUG: honest_shares must be in strictly ascending party_id order"
+        );
 
         let num_honest = honest_shares.len();
         info!(

@@ -9,8 +9,8 @@ pragma solidity >=0.4.24;
 contract FakeEnclave {
   event InputPublished(uint256 indexed e3Id, bytes data, uint256 inputHash, uint256 index);
   event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
-  event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
-  event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey);
+  event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput, bytes proof);
+  event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey, bytes proof);
 
   // Emit InputPublished event with passed test data
   function emitInputPublished(uint256 e3Id, bytes memory data, uint256 inputHash, uint256 index) public {
@@ -23,14 +23,14 @@ contract FakeEnclave {
   }
 
   // Emit PlaintextOutputPublished event with passed test data
-  function emitPlaintextOutputPublished(uint256 e3Id, bytes memory plaintextOutput) public {
-    emit PlaintextOutputPublished(e3Id, plaintextOutput);
+  function emitPlaintextOutputPublished(uint256 e3Id, bytes memory plaintextOutput, bytes memory proof) public {
+    emit PlaintextOutputPublished(e3Id, plaintextOutput, proof);
   }
 
   // Emit CommitteePublished event with passed test data
-  function emitCommitteePublished(uint256 e3Id, bytes memory publicKey) public {
+  function emitCommitteePublished(uint256 e3Id, bytes memory publicKey, bytes memory proof) public {
     address[] memory nodes = new address[](1);
-    emit CommitteePublished(e3Id, nodes, publicKey);
+    emit CommitteePublished(e3Id, nodes, publicKey, proof);
   }
 
   function getE3(uint256 _e3Id) external view returns (E3 memory e3) {

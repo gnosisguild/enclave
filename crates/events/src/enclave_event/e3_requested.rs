@@ -49,7 +49,7 @@ impl Default for E3Requested {
             seed: Seed([0u8; 32]),
             threshold_m: 0,
             threshold_n: 0,
-            proof_aggregation_enabled: true,
+            proof_aggregation_enabled: false,
         }
     }
 }

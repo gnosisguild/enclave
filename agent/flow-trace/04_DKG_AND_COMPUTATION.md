@@ -505,7 +505,7 @@ PublicKeyAggregator (AGGREGATOR) collects KeyshareCreated events
         │  │       │  │    Emit E3StageChanged(KeyPublished)  │  │
         │  │       │  │  }                                   │  │
         │  │       │  └──────────────────────────────────────┘  │
-        │  │    6. Emit CommitteePublished(e3Id, nodes, pk)      │
+        │  │    6. Emit CommitteePublished(e3Id, nodes, pk, C5 proof) │
         │  │       → Note: emits full pk bytes, NOT just pkHash  │
         │  │  }                                                  │
         │  └─────────────────────────────────────────────────────┘
@@ -706,7 +706,7 @@ ThresholdPlaintextAggregator receives DecryptionshareCreated events
         │  │       │  │       registered operator            │  │
         │  │       │  │  6. Emit RewardsDistributed          │  │
         │  │       │  └──────────────────────────────────────┘  │
-        │  │    7. Emit PlaintextOutputPublished(e3Id, output)   │
+        │  │    7. Emit PlaintextOutputPublished(e3Id, output, C7 proof) │
         │  │    8. Emit E3StageChanged(Complete)                 │
         │  │  }                                                  │
         │  └─────────────────────────────────────────────────────┘

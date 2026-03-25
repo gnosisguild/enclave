@@ -23,6 +23,7 @@ use crate::{
     direct_responder::DirectResponder,
     events::{await_event, IncomingRequest, NetCommand, NetEvent, PeerTarget},
     net_event_batch::{fetch_all_batched_events, BatchCursor, EventBatch, FetchEventsSince},
+    net_event_translator::NetEventTranslator,
 };
 
 /// Maximum time to wait for a `ConnectionEstablished` event after all dials
@@ -250,9 +251,17 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
             }
             let aggregate_id = fetch_request.aggregate_id();
             let all_events: Vec<_> = msg.into_events();
+            // Include Net events (received via gossip) and Local events that
+            // are gossip-forwardable. Without the Local check, a node's own
+            // gossip events (e.g. its DecryptionshareCreated) would be excluded
+            // from sync responses — causing syncing peers to miss them.
             let events: Vec<EnclaveEvent<Unsequenced>> = all_events
                 .into_iter()
-                .filter(|e| e.source() == EventSource::Net)
+                .filter(|e| {
+                    e.source() == EventSource::Net
+                        || (e.source() == EventSource::Local
+                            && NetEventTranslator::is_forwardable_event(e))
+                })
                 .take(limit)
                 .map(|ev| ev.clone_unsequenced())
                 .collect();

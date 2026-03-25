@@ -6,7 +6,7 @@ members = [
   "crates/zk-inputs",
   "crates/zk-inputs-wasm",
   "crates/evm_helpers",
-  "crates/crisp-utils"
+  "crates/crisp-utils",
 ]
 resolver = "3"
 
