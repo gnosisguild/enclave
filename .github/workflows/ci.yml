@@ -796,7 +796,7 @@ jobs:
       - name: Install Barretenberg (bb)
         if: steps.cache-bb.outputs.cache-hit != 'true'
         run: |
-          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+          curl -fsSL "https://github.com/gnosisguild/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
           mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
           BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
           sudo mv "$BB_BIN" /usr/local/bin/bb
@@ -878,7 +878,7 @@ jobs:
       - name: Install Barretenberg (bb)
         if: steps.cache-bb.outputs.cache-hit != 'true'
         run: |
-          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+          curl -fsSL "https://github.com/gnosisguild/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
           mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
           BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
           sudo mv "$BB_BIN" /usr/local/bin/bb

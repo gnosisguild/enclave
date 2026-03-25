@@ -1,12 +1,12 @@
 {
   "required_bb_version": "3.0.0-nightly.20260102",
   "required_circuits_version": "0.1.15",
-  "bb_download_url": "https://github.com/AztecProtocol/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz",
+  "bb_download_url": "https://github.com/gnosisguild/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz",
   "bb_checksums": {
-    "amd64-linux": "4847ae82a1d25f9489057da2c33d1abdee3ba457e8219028a2c2336f850f8cd7",
+    "amd64-linux": "5fa0d06de54c3cfc6d89e61b6ba309d3bd61d8c1a8057efe2205ef56a6278b0a",
     "amd64-darwin": "9137b49be56bfea5b62203b7ae4cb67c9ecc12fe1692a89badf2cf4b57323fdc",
     "arm64-linux": "a675221a823f6fada6d01b09a1c26c0f7356567f31a912a2475b6e3b63d438a2",
-    "arm64-darwin": "6a448b089b43918787dbfd201b32a757f562c80bf542d1b75aaf6fc9dba42b0c"
+    "arm64-darwin": "661fb3491d93c384299234a1f320bee6d682c5813b78bbe1ecba2e8bb8f7ab7d"
   },
   "circuits_download_url": "https://github.com/gnosisguild/enclave/releases/download/v{version}/circuits-{version}.tar.gz"
 }
