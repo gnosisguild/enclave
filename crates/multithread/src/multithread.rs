@@ -66,7 +66,6 @@ use e3_zk_helpers::dkg::share_computation::{
 };
 use e3_zk_helpers::dkg::share_decryption::{ShareDecryptionCircuit, ShareDecryptionCircuitData};
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
-use e3_zk_helpers::threshold::pk_aggregation::computation::Inputs as PkAggInputs;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
@@ -357,48 +356,9 @@ fn handle_pk_aggregation_proof(
         a,
     };
 
-    // 6b. Verify C1 commitments match computed commitments.
-    // On mismatch, return C1CommitmentMismatch error with the faulting indices.
-    // The ProofRequestActor emits SignedProofFailed for each faulting party,
-    // and the PublicKeyAggregator re-aggregates without them and retries.
-    let pk_agg_inputs = PkAggInputs::compute(req.params_preset.clone(), &circuit_data)
-        .map_err(|e| make_zk_error(&request, format!("PkAggInputs::compute: {}", e)))?;
-
-    let expected = &pk_agg_inputs.expected_threshold_pk_commitments;
-    let mut mismatched_indices = Vec::new();
-    for (i, sp) in req.c1_signed_proofs.iter().enumerate() {
-        let matches = if let Some(extracted) = sp.payload.proof.extract_output("pk_commitment") {
-            if let Some(computed) = expected.get(i) {
-                let (_, be_bytes) = computed.to_bytes_be();
-                if be_bytes.len() > 32 {
-                    false
-                } else {
-                    let mut padded = [0u8; 32];
-                    padded[32 - be_bytes.len()..].copy_from_slice(&be_bytes);
-                    padded[..] == extracted[..]
-                }
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-        if !matches {
-            mismatched_indices.push(i);
-        }
-    }
-
-    if !mismatched_indices.is_empty() {
-        return Err(ComputeRequestError::new(
-            ComputeRequestErrorKind::Zk(ZkEventError::C1CommitmentMismatch { mismatched_indices }),
-            request,
-        ));
-    }
-
-    info!(
-        "C1 commitment cross-check passed for {} parties",
-        expected.len()
-    );
+    // C1 commitment consistency is verified by the PublicKeyAggregator before
+    // dispatching this request (pre-aggregation check). By the time we reach
+    // the prover, all keyshares are guaranteed to match their C1 proofs.
 
     // 7. Generate proof via Provable trait (C5 is always EVM-targeted for on-chain verification)
     let circuit = PkAggregationCircuit;

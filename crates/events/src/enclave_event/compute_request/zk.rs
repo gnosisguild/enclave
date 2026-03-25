@@ -61,10 +61,6 @@ pub struct PkAggregationProofRequest {
     pub committee_h: usize,
     /// Threshold (T).
     pub committee_threshold: usize,
-    /// Signed C1 proofs per party, aligned with `keyshare_bytes`.
-    /// The C5 prover extracts pk_commitment from each proof for cross-checking,
-    /// and returns mismatched indices for fault attribution.
-    pub c1_signed_proofs: Vec<SignedProofPayload>,
 }
 
 /// Request to generate a proof for share computation (C2a or C2b).
@@ -450,10 +446,6 @@ pub enum ZkError {
     WitnessGenerationFailed(String),
     /// Invalid parameters.
     InvalidParams(String),
-    /// C1 commitment mismatch: not enough honest parties remain after filtering.
-    /// The mismatched indices identify which parties' C1 proofs are inconsistent
-    /// with their keyshare data.
-    C1CommitmentMismatch { mismatched_indices: Vec<usize> },
 }
 
 impl std::fmt::Display for ZkError {
@@ -464,11 +456,6 @@ impl std::fmt::Display for ZkError {
                 write!(f, "Witness generation failed: {}", msg)
             }
             ZkError::InvalidParams(msg) => write!(f, "Invalid parameters: {}", msg),
-            ZkError::C1CommitmentMismatch { mismatched_indices } => write!(
-                f,
-                "C1 commitment mismatch at indices {:?} — not enough honest parties",
-                mismatched_indices
-            ),
         }
     }
 }
