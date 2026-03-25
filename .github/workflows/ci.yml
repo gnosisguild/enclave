@@ -108,7 +108,7 @@ jobs:
           echo "zk=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
           echo "contracts=$(any $FORCE $CONTRACTS $CI)" >> $GITHUB_OUTPUT
           echo "docker_support=$(any $FORCE $DOCKER $CI)" >> $GITHUB_OUTPUT
-          echo "docker_ciphernode=$(any $FORCE $RUST $DOCKER $CI)" >> $GITHUB_OUTPUT
+          echo "docker_ciphernode=$(any $FORCE $RUST $DOCKER $CI $CONTRACTS)" >> $GITHUB_OUTPUT
           echo "net=$(any $FORCE $INTEGRATION $CI)" >> $GITHUB_OUTPUT
           echo "init=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $CI)" >> $GITHUB_OUTPUT
           echo "build_e3_support_dev=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $SDK $CI)" >> $GITHUB_OUTPUT
@@ -584,7 +584,15 @@ jobs:
     runs-on: 'ubuntu-latest'
     strategy:
       matrix:
-        test-suite: [test:circuits, test:sdk, test:contracts, cargo test]
+        include:
+          - test-suite: test:circuits
+            command: pnpm test:circuits
+          - test-suite: test:sdk
+            command: pnpm test:sdk
+          - test-suite: test:contracts
+            command: pnpm test:contracts
+          - test-suite: cargo test
+            command: cargo test
       fail-fast: false
     steps:
       - uses: actions/checkout@v6
@@ -642,7 +650,7 @@ jobs:
 
       - name: Run ${{ matrix.test-suite }}
         working-directory: ./examples/CRISP
-        run: 'pnpm ${{ matrix.test-suite }}'
+        run: ${{ matrix.command }}
 
   crisp_e2e:
     needs: [detect_changes, build_enclave_cli, build_crisp_sdk]
