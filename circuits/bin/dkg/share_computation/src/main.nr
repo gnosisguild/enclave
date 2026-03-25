@@ -6,7 +6,10 @@
 
 // Level 2: final_wrapper
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
-use lib::configs::default::dkg::SHARE_COMPUTATION_N_BATCHES as N_BATCHES;
+use lib::configs::default::dkg::{
+    SHARE_COMPUTATION_EXPECTED_VK_HASH_ESM, SHARE_COMPUTATION_EXPECTED_VK_HASH_SK,
+    SHARE_COMPUTATION_N_BATCHES as N_BATCHES,
+};
 use lib::math::commitments::{compute_recursive_aggregation_commitment, compute_vk_hash};
 
 // Public inputs of each batch wrapper proof (as exposed by `share_computation_chunk_batch`).
@@ -61,6 +64,10 @@ fn main(
     vk_hashes.push(batch_public_inputs[0][1]); // chunk_key_hash (same across all batches)
     vk_hashes.push(batch_key_hash); // VK hash of the batch circuit that produced these proofs
     let key_hash = compute_vk_hash(vk_hashes);
+    assert(
+        (key_hash == SHARE_COMPUTATION_EXPECTED_VK_HASH_SK)
+            | (key_hash == SHARE_COMPUTATION_EXPECTED_VK_HASH_ESM),
+    );
 
     (key_hash, final_commitment)
 }
