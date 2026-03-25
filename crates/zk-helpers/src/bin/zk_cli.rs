@@ -11,12 +11,12 @@
 //! `--circuit <name> --preset insecure|secure|2|80` to generate artifacts.
 //!
 //! **Share-computation (C2) configs.nr:** set `ENCLAVE_CIRCUITS_ROOT` to the repo `circuits`
-//! directory (or run from the Enclave repo so it is auto-discovered). After `nargo compile`
-//! in `circuits/bin/dkg`, run `bb write_vk -t noir-recursive-no-zk` into
-//! `circuits/bin/dkg/target/recursive_vk/{sk_share_computation_base,e_sm_share_computation_base,share_computation_chunk,share_computation_chunk_batch}/`
-//! (see `scripts/dkg_recursive_vk.sh`). If `ENCLAVE_CIRCUITS_ROOT` is set and those `vk_hash`
-//! files are missing, codegen fails; if unset and artifacts are absent, the C2 literals are omitted
-//! from the generated fragment.
+//! directory (or run from the Enclave repo so it is auto-discovered). After `pnpm build:circuits`,
+//! `circuits/bin/dkg/target/` contains `sk_share_computation_base.vk_recursive_hash`,
+//! `e_sm_share_computation_base.vk_recursive_hash`, `share_computation_chunk.vk_recursive_hash`,
+//! and `share_computation_chunk_batch.vk_recursive_hash` (from `scripts/build-circuits.ts`). If
+//! `ENCLAVE_CIRCUITS_ROOT` is set and those files are missing, codegen fails; if unset and artifacts
+//! are absent, the C2 literals are omitted from the generated fragment.
 
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser};

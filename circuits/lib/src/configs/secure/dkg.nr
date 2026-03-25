@@ -74,8 +74,8 @@ Regenerate for secure preset after compiling lib with configs::secure::dkg as de
 -------------------------------------
 ************************************/
 
-// Placeholder: set lib default to secure::dkg, run nargo compile in circuits/bin/dkg, bb write_vk
-// into target/recursive_vk/* (noir-recursive-no-zk), then compute-vk-hash (base,chunk,batch) per SK/ESM.
+// Placeholder: set lib default to secure::dkg, run pnpm build:circuits (or bb write_vk per crate into
+// circuits/bin/dkg/target as *.vk_recursive_hash), then compute-vk-hash (base,chunk,batch) per SK/ESM.
 // TODO: update with actual hashes once we use secure parameters.
 pub global SHARE_COMPUTATION_EXPECTED_VK_HASH_SK: Field =
     0x0000000000000000000000000000000000000000000000000000000000000001;

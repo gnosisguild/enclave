@@ -114,9 +114,9 @@ const SHARE_COMPUTATION_VK_HASH_NR_HEADER: &str = r#"
 -------------------------------------
 share_computation final (C2) - combined VK hash (noir-recursive-no-zk)
 Matches circuits/bin/dkg/share_computation: compute_vk_hash(base, chunk, batch).
-Regenerate: bb write_vk -t noir-recursive-no-zk into bin/dkg/target/recursive_vk/<crate>/
-for sk_share_computation_base, e_sm_share_computation_base, share_computation_chunk,
-share_computation_chunk_batch (after nargo compile in bin/dkg), then re-run zk_cli codegen.
+Regenerate: pnpm build:circuits (writes bin/dkg/target/*.vk_recursive_hash), or run bb write_vk
+-t noir-recursive-no-zk per crate into bin/dkg/target and rename to {package}.vk_recursive_hash;
+then re-run zk_cli codegen.
 -------------------------------------
 ************************************/
 "#;
@@ -140,8 +140,8 @@ pub fn generate_configs(
     let explicit_circuits_root = env::var("ENCLAVE_CIRCUITS_ROOT").is_ok();
     let (vk_sk, vk_esm) = match resolve_enclave_circuits_root() {
         Some(root) => {
-            let rv = root.join("bin/dkg/target/recursive_vk");
-            match share_computation_expected_vk_hash_hex_literals(&rv) {
+            let dkg_target = root.join("bin/dkg/target");
+            match share_computation_expected_vk_hash_hex_literals(&dkg_target) {
                 Ok(pair) => pair,
                 Err(e) if explicit_circuits_root => {
                     return Err(CircuitsErrors::Sample(format!(
@@ -244,20 +244,19 @@ mod tests {
     #[test]
     fn share_computation_expected_vk_hash_hex_literals_differ_for_sk_and_esm() {
         let tmp = TempDir::new().unwrap();
-        let rv = tmp.path().join("recursive_vk");
-        for (name, tag) in [
-            ("sk_share_computation_base", 1u8),
-            ("e_sm_share_computation_base", 2u8),
-            ("share_computation_chunk", 3u8),
-            ("share_computation_chunk_batch", 4u8),
+        let dkg_target = tmp.path().join("target");
+        fs::create_dir_all(&dkg_target).unwrap();
+        for (filename, tag) in [
+            ("sk_share_computation_base.vk_recursive_hash", 1u8),
+            ("e_sm_share_computation_base.vk_recursive_hash", 2u8),
+            ("share_computation_chunk.vk_recursive_hash", 3u8),
+            ("share_computation_chunk_batch.vk_recursive_hash", 4u8),
         ] {
-            let d = rv.join(name);
-            fs::create_dir_all(&d).unwrap();
             let mut b = [0u8; 32];
             b[31] = tag;
-            fs::write(d.join("vk_hash"), b).unwrap();
+            fs::write(dkg_target.join(filename), b).unwrap();
         }
-        let (sk, esm) = share_computation_expected_vk_hash_hex_literals(&rv).unwrap();
+        let (sk, esm) = share_computation_expected_vk_hash_hex_literals(&dkg_target).unwrap();
         assert!(sk.starts_with("0x") && sk.len() == 66);
         assert!(esm.starts_with("0x") && esm.len() == 66);
         assert_ne!(sk, esm);

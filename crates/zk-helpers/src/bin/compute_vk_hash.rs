@@ -15,6 +15,7 @@ use ark_bn254::Fr;
 use ark_ff::{BigInteger, PrimeField};
 use clap::Parser;
 use e3_zk_helpers::compute_vk_hash;
+use num_bigint::BigUint;
 use std::fs;
 use std::path::PathBuf;
 
@@ -32,9 +33,19 @@ fn field_from_vk_hash_file(path: &std::path::Path) -> Result<Fr> {
     if bytes.len() != 32 {
         bail!("{}: expected 32 bytes, got {}", path.display(), bytes.len());
     }
-    let mut arr = [0u8; 32];
-    arr.copy_from_slice(&bytes);
-    Ok(Fr::from_be_bytes_mod_order(&arr))
+    let n = BigUint::from_bytes_be(&bytes);
+    let bigint = <Fr as PrimeField>::BigInt::try_from(n).map_err(|_| {
+        anyhow::anyhow!(
+            "{}: vk_hash integer does not fit the field's BigInt representation",
+            path.display()
+        )
+    })?;
+    Fr::from_bigint(bigint).ok_or_else(|| {
+        anyhow::anyhow!(
+            "{}: vk_hash is not in the canonical range [0, p)",
+            path.display()
+        )
+    })
 }
 
 fn field_to_padded_be_hex(fr: Fr) -> String {

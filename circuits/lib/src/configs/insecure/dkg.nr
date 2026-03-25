@@ -67,7 +67,7 @@ pub global SHARE_COMPUTATION_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRES
 /************************************
 -------------------------------------
 share_computation final (C2) - combined VK hash (noir-recursive-no-zk)
-Regenerate: zk_cli share_computation codegen with ENCLAVE_CIRCUITS_ROOT + recursive_vk artifacts.
+Regenerate: zk_cli share_computation codegen with ENCLAVE_CIRCUITS_ROOT + bin/dkg/target/\*.vk_recursive_hash.
 -------------------------------------
 ************************************/
 
