@@ -65,6 +65,7 @@ export interface CiphertextOutputPublishedData {
 export interface PlaintextOutputPublishedData {
   e3Id: bigint
   plaintextOutput: string
+  proof: string
 }
 
 export interface CiphernodeAddedData {
@@ -93,6 +94,7 @@ export interface CommitteePublishedData {
   e3Id: bigint
   nodes: string[]
   publicKey: string
+  proof: string
 }
 
 export interface CommitteeFinalizedData {

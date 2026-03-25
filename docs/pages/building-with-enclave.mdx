@@ -223,7 +223,7 @@ event E3StageChanged(uint256 indexed e3Id, E3Stage previousStage, E3Stage newSta
 
 event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
 
-event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
+event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput, bytes proof);
 
 event E3Failed(uint256 indexed e3Id, E3Stage failedAtStage, FailureReason reason);
 
@@ -273,8 +273,8 @@ const e3Id = receipt.logs
 ### Monitoring Results
 
 ```javascript
-enclaveContract.on('PlaintextOutputPublished', (e3Id, plaintext) => {
-  console.log(`Computation ${e3Id} completed with result:`, plaintext)
+enclaveContract.on('PlaintextOutputPublished', (e3Id, plaintext, proof) => {
+  console.log(`Computation ${e3Id} completed with result:`, plaintext, proof)
 })
 ```
 

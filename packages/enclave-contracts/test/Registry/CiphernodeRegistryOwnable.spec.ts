@@ -530,6 +530,7 @@ describe("CiphernodeRegistryOwnable", function () {
             await operator3.getAddress(),
           ],
           data,
+          c5Proof,
         );
     });
   });
