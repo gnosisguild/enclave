@@ -99,10 +99,12 @@ interface ICiphernodeRegistry {
     /// @notice This event MUST be emitted when a committee is selected for an E3.
     /// @param e3Id ID of the E3 for which the committee was selected.
     /// @param publicKey Public key of the committee.
+    /// @param proof C5 proof bytes verified prior to publication.
     event CommitteePublished(
         uint256 indexed e3Id,
         address[] nodes,
-        bytes publicKey
+        bytes publicKey,
+        bytes proof
     );
 
     /// @notice This event MUST be emitted when a committee's active status changes.

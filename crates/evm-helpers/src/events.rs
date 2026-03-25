@@ -58,10 +58,10 @@ sol! {
     event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
 
     #[derive(Debug)]
-    event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
+    event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput, bytes proof);
 
     #[derive(Debug)]
-    event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey);
+    event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey, bytes proof);
 
     #[derive(Debug)]
     enum E3Stage {

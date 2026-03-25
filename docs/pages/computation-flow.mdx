@@ -113,7 +113,7 @@ function getE3(uint256 e3Id) external view returns (E3 memory e3);
 or by listening to the `PlaintextOutputPublished` event.
 
 ```solidity
-event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
+event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput, bytes proof);
 ```
 
 Upon successful decryption, rewards are distributed to the active committee members.

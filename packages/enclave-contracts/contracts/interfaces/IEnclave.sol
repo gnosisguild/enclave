@@ -104,7 +104,12 @@ interface IEnclave {
     /// is successfully published.
     /// @param e3Id ID of the E3.
     /// @param plaintextOutput ABI encoded plaintext output.
-    event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
+    /// @param proof ABI encoded verification proof (C7) for the plaintext output.
+    event PlaintextOutputPublished(
+        uint256 indexed e3Id,
+        bytes plaintextOutput,
+        bytes proof
+    );
 
     /// @notice This event MUST be emitted when the ciphertext output of an Encrypted Execution Environment (E3)
     /// is successfully published.

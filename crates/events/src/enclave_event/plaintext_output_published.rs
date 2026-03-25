@@ -14,15 +14,17 @@ use std::fmt::{self, Display};
 pub struct PlaintextOutputPublished {
     pub e3_id: E3id,
     pub plaintext_output: Vec<u8>,
+    pub proof: Vec<u8>,
 }
 
 impl Display for PlaintextOutputPublished {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "e3_id: {}, plaintext_output_len: {}",
+            "e3_id: {}, plaintext_output_len: {}, proof_len: {}",
             self.e3_id,
-            self.plaintext_output.len()
+            self.plaintext_output.len(),
+            self.proof.len()
         )
     }
 }
