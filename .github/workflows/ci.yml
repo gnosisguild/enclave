@@ -536,7 +536,7 @@ jobs:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.build_enclave_cli == 'true'
     timeout-minutes: 20
-    runs-on: 
+    runs-on:
       group: enclave-ci
       labels: [enclave-ci-runner]
     permissions:
@@ -600,28 +600,41 @@ jobs:
           submodules: recursive
 
       - name: Cache Rust dependencies
+        if: matrix.test-suite == 'cargo test'
         uses: ./.github/actions/cache-dependencies
         with:
           cargo-lock-path: examples/CRISP/Cargo.lock
           rust-target-path: examples/CRISP/target/
 
       - name: Install Rust
+        if: matrix.test-suite == 'cargo test'
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
       - name: Install Foundry
+        if: matrix.test-suite == 'cargo test'
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Install solc
+        if: matrix.test-suite == 'cargo test'
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
+
       - name: Install Nargo
+        if: matrix.test-suite == 'test:circuits'
         uses: noir-lang/noirup@v0.1.4
         with:
           toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
       - name: Setup pnpm
+        if: matrix.test-suite != 'cargo test'
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
+        if: matrix.test-suite != 'cargo test'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -629,20 +642,17 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
+        if: matrix.test-suite != 'cargo test'
         working-directory: .
         run: pnpm install --frozen-lockfile
 
       - name: Compile Enclave contracts
+        if: matrix.test-suite == 'test:contracts'
         working-directory: .
         run: pnpm evm:build
 
-      - name: Install solc
-        run: |
-          sudo add-apt-repository ppa:ethereum/ethereum \
-          && sudo apt-get update -y \
-          && sudo apt-get install -y solc
-
       - name: Download Crisp SDK artifacts
+        if: matrix.test-suite == 'test:sdk'
         uses: actions/download-artifact@v4
         with:
           name: crisp-sdk-artifacts
@@ -654,7 +664,7 @@ jobs:
 
   crisp_e2e:
     needs: [detect_changes, build_enclave_cli, build_crisp_sdk]
-    if: needs.detect_changes.outputs.crisp == 'true' 
+    if: needs.detect_changes.outputs.crisp == 'true'
     timeout-minutes: 45
     runs-on:
       group: enclave-ci
