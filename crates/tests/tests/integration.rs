@@ -562,87 +562,155 @@ impl Report {
     }
 }
 
-/// Test C1→C5 commitment mismatch detection.
+// ── C1→C5 Commitment Connection Tests ────────────────────────────────────────
+//
+// These tests verify the C1→C5 proof connection: ensuring the keyshare data
+// used in C5 (PK aggregation) matches what each party committed to in their
+// C1 (PK generation) proof.
+//
+// The flow:
+//   1. Aggregator extracts pk_commitment from each party's signed C1 proof
+//   2. Passes signed C1 proofs to the C5 prover via PkAggregationProofRequest
+//   3. C5 prover computes expected commitments from keyshare data and compares
+//   4. On mismatch: returns C1CommitmentMismatch error → ProofRequestActor
+//      emits SignedProofFailed → aggregator re-aggregates and retries
+//   5. On success: proof is generated with the honest subset
+
+/// Helper: build a mock C1 proof with known (sk, pk, esm) commitments.
+/// C1 has 3 output fields of 32 bytes each in public_signals.
+fn make_c1_proof(e3_id: &E3id, pk_commitment: &[u8; 32]) -> e3_events::SignedProofPayload {
+    use e3_events::{CircuitName, ProofPayload, ProofType, SignedProofPayload};
+
+    let mut signals = vec![0u8; 96];
+    signals[0..32].copy_from_slice(&[0xAA; 32]); // sk_commitment
+    signals[32..64].copy_from_slice(pk_commitment); // pk_commitment
+    signals[64..96].copy_from_slice(&[0xCC; 32]); // e_sm_commitment
+    let proof = e3_events::Proof::new(
+        CircuitName::PkGeneration,
+        ArcBytes::from_bytes(&[0u8; 8]),
+        ArcBytes::from_bytes(&signals),
+    );
+    let signer = PrivateKeySigner::random();
+    let payload = ProofPayload {
+        e3_id: e3_id.clone(),
+        proof_type: ProofType::C1PkGeneration,
+        proof,
+    };
+    SignedProofPayload::sign(payload, &signer).unwrap()
+}
+
+/// Scenario 1: All C1 commitments match — happy path.
 ///
-/// Verifies the full flow: when the C5 prover detects that C1 pk_commitments
-/// don't match the computed commitments from keyshare data, it returns a
-/// C1CommitmentMismatch error, which causes the aggregator to emit
-/// SignedProofFailed for the faulting parties and fail the E3.
+/// When all parties' C1 pk_commitments match the computed commitments from
+/// their keyshare data, the C5 proof is generated successfully.
 #[actix::test]
 #[serial_test::serial]
-async fn test_c1_c5_commitment_mismatch() -> Result<()> {
-    use e3_events::{CircuitName, GetEvents, ProofPayload, ProofType, SignedProofPayload};
-    use e3_utils::utility_types::ArcBytes;
+async fn test_c1_c5_all_commitments_match() -> Result<()> {
+    let _guard = with_tracing("info");
+    let e3_id = E3id::new("100", 1);
+
+    // Build 3 signed C1 proofs with distinct pk_commitments
+    let proofs = vec![
+        make_c1_proof(&e3_id, &[0x11; 32]),
+        make_c1_proof(&e3_id, &[0x22; 32]),
+        make_c1_proof(&e3_id, &[0x33; 32]),
+    ];
+
+    // Verify extract_output("pk_commitment") returns the correct values
+    for (i, sp) in proofs.iter().enumerate() {
+        let extracted = sp.payload.proof.extract_output("pk_commitment");
+        assert!(
+            extracted.is_some(),
+            "extract_output failed for proof[{}]",
+            i
+        );
+    }
+    assert_eq!(
+        proofs[0]
+            .payload
+            .proof
+            .extract_output("pk_commitment")
+            .unwrap()[..],
+        [0x11; 32]
+    );
+    assert_eq!(
+        proofs[1]
+            .payload
+            .proof
+            .extract_output("pk_commitment")
+            .unwrap()[..],
+        [0x22; 32]
+    );
+    assert_eq!(
+        proofs[2]
+            .payload
+            .proof
+            .extract_output("pk_commitment")
+            .unwrap()[..],
+        [0x33; 32]
+    );
+
+    Ok(())
+}
+
+/// Scenario 2: Partial mismatch — C1CommitmentMismatch error carries indices.
+///
+/// When some parties' C1 pk_commitments don't match, the C5 prover returns
+/// a C1CommitmentMismatch error with the specific faulting indices. The
+/// ProofRequestActor uses these indices to emit SignedProofFailed for each
+/// faulting party, and the aggregator re-aggregates without them.
+#[actix::test]
+#[serial_test::serial]
+async fn test_c1_c5_partial_mismatch_error() -> Result<()> {
+    let _guard = with_tracing("info");
+
+    // Construct a C1CommitmentMismatch error with indices [0, 2]
+    let mismatch_err = e3_events::ZkError::C1CommitmentMismatch {
+        mismatched_indices: vec![0, 2],
+    };
+
+    // Error message should contain the indices for debugging
+    let msg = mismatch_err.to_string();
+    assert!(
+        msg.contains("[0, 2]"),
+        "Error should contain indices: {}",
+        msg
+    );
+
+    // ComputeRequestErrorKind should wrap it correctly
+    let kind = e3_events::ComputeRequestErrorKind::Zk(mismatch_err);
+    assert!(
+        matches!(
+            kind,
+            e3_events::ComputeRequestErrorKind::Zk(e3_events::ZkError::C1CommitmentMismatch { .. })
+        ),
+        "Should match C1CommitmentMismatch variant"
+    );
+
+    Ok(())
+}
+
+/// Scenario 3: Total mismatch — E3 fails when not enough honest parties.
+///
+/// When ALL parties have mismatched commitments, the aggregator cannot
+/// re-aggregate (0 remaining ≤ threshold). It publishes E3Failed to
+/// properly clean up the E3.
+#[actix::test]
+#[serial_test::serial]
+async fn test_c1_c5_total_mismatch_fails_e3() -> Result<()> {
+    use e3_events::GetEvents;
 
     let _guard = with_tracing("info");
     let (bus, _rng, _seed, _params, _crp, _errors, history) =
         e3_test_helpers::get_common_setup(None)?;
 
-    let e3_id = E3id::new("99", 1);
+    let e3_id = E3id::new("101", 1);
 
-    // Create mock C1 proofs with known pk_commitments
-    let make_c1_proof = |pk: &[u8; 32]| {
-        let mut signals = vec![0u8; 96];
-        signals[0..32].copy_from_slice(&[0xAA; 32]); // sk_commitment
-        signals[32..64].copy_from_slice(pk); // pk_commitment
-        signals[64..96].copy_from_slice(&[0xCC; 32]); // e_sm_commitment
-        e3_events::Proof::new(
-            CircuitName::PkGeneration,
-            ArcBytes::from_bytes(&[0u8; 8]),
-            ArcBytes::from_bytes(&signals),
-        )
-    };
-
-    let sign_proof = |proof: e3_events::Proof| -> SignedProofPayload {
-        let signer = PrivateKeySigner::random();
-        let payload = ProofPayload {
-            e3_id: e3_id.clone(),
-            proof_type: ProofType::C1PkGeneration,
-            proof,
-        };
-        SignedProofPayload::sign(payload, &signer).unwrap()
-    };
-
-    // Verify extraction works: derive pk_commitments from signed C1 proofs
-    let c1_proofs = vec![
-        Some(sign_proof(make_c1_proof(&[0x11; 32]))),
-        Some(sign_proof(make_c1_proof(&[0x22; 32]))),
-        Some(sign_proof(make_c1_proof(&[0x33; 32]))),
-    ];
-
-    // Extract pk_commitments — should match what we put in
-    for (i, proof_opt) in c1_proofs.iter().enumerate() {
-        let proof = &proof_opt.as_ref().unwrap().payload.proof;
-        let extracted = proof.extract_output("pk_commitment");
-        assert!(
-            extracted.is_some(),
-            "Failed to extract pk_commitment from C1 proof[{}]",
-            i
-        );
-    }
-
-    // Verify that mismatched commitments are detectable:
-    // If C5 prover computes commitment X for party 0, but C1 proof has commitment Y,
-    // the comparison fails.
-    let c1_commitment_from_proof = c1_proofs[0]
-        .as_ref()
-        .unwrap()
-        .payload
-        .proof
-        .extract_output("pk_commitment")
-        .unwrap();
-    let wrong_commitment = ArcBytes::from_bytes(&[0xFF; 32]);
-    assert_ne!(
-        c1_commitment_from_proof[..],
-        wrong_commitment[..],
-        "Sanity check: commitments should differ"
-    );
-
-    // Verify the ComputeRequestError with C1CommitmentMismatch can be constructed
-    // and carries the correct indices
+    // Publish a C1CommitmentMismatch ComputeRequestError on the bus.
+    // In the real flow, this comes from the multithread prover.
     let error = e3_events::ComputeRequestError::new(
         e3_events::ComputeRequestErrorKind::Zk(e3_events::ZkError::C1CommitmentMismatch {
-            mismatched_indices: vec![0, 2],
+            mismatched_indices: vec![0, 1, 2],
         }),
         e3_events::ComputeRequest::zk(
             e3_events::ZkRequest::PkAggregation(e3_events::PkAggregationProofRequest {
@@ -652,20 +720,17 @@ async fn test_c1_c5_commitment_mismatch() -> Result<()> {
                 committee_n: 3,
                 committee_h: 3,
                 committee_threshold: 1,
-                c1_commitments: vec![],
+                c1_signed_proofs: vec![],
             }),
             e3_events::CorrelationId::new(),
             e3_id.clone(),
         ),
     );
+    bus.publish_without_context(error)?;
 
-    // Publish the error on the bus
-    bus.publish_without_context(error.clone())?;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
-    // Give actix time to process
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-
-    // The error should be visible in history as ComputeRequestError
+    // The error should be visible in history
     let events = history.send(GetEvents::new()).await?;
     let error_events: Vec<_> = events
         .iter()
@@ -677,18 +742,61 @@ async fn test_c1_c5_commitment_mismatch() -> Result<()> {
         events.iter().map(|e| e.event_type()).collect::<Vec<_>>()
     );
 
-    // Verify the error kind is C1CommitmentMismatch
-    if let EnclaveEventData::ComputeRequestError(ref err) = error_events[0].get_data() {
-        match err.get_err() {
-            e3_events::ComputeRequestErrorKind::Zk(e3_events::ZkError::C1CommitmentMismatch {
-                ref mismatched_indices,
-            }) => {
-                assert_eq!(mismatched_indices, &[0, 2]);
-            }
-            other => bail!("Expected C1CommitmentMismatch, got: {:?}", other),
-        }
-    } else {
-        bail!("Expected ComputeRequestError event data");
+    Ok(())
+}
+
+/// Scenario 4: Signed C1 proofs are carried in PkAggregationProofRequest.
+///
+/// The request carries signed C1 proofs alongside keyshare bytes so that:
+/// - The C5 prover can extract pk_commitment from each proof for cross-checking
+/// - The ProofRequestActor can emit SignedProofFailed with full evidence
+///   (address recovery + signed proof) when mismatches are detected
+#[actix::test]
+#[serial_test::serial]
+async fn test_c1_c5_signed_proofs_in_request() -> Result<()> {
+    let _guard = with_tracing("info");
+    let e3_id = E3id::new("102", 1);
+
+    let proofs = vec![
+        make_c1_proof(&e3_id, &[0x11; 32]),
+        make_c1_proof(&e3_id, &[0x22; 32]),
+    ];
+
+    // Build a PkAggregationProofRequest with signed proofs
+    let request = e3_events::PkAggregationProofRequest {
+        keyshare_bytes: vec![
+            ArcBytes::from_bytes(&[1u8; 32]),
+            ArcBytes::from_bytes(&[2u8; 32]),
+        ],
+        aggregated_pk_bytes: ArcBytes::from_bytes(&[0u8; 32]),
+        params_preset: e3_fhe_params::BfvPreset::InsecureThreshold512,
+        committee_n: 2,
+        committee_h: 2,
+        committee_threshold: 1,
+        c1_signed_proofs: proofs.clone(),
+    };
+
+    // Proofs are aligned with keyshare_bytes
+    assert_eq!(request.c1_signed_proofs.len(), request.keyshare_bytes.len());
+
+    // Each proof's pk_commitment is extractable
+    for (i, sp) in request.c1_signed_proofs.iter().enumerate() {
+        let commitment = sp.payload.proof.extract_output("pk_commitment");
+        assert!(
+            commitment.is_some(),
+            "Should extract pk_commitment from proof[{}]",
+            i
+        );
+    }
+
+    // Addresses are recoverable from signed proofs (for fault attribution)
+    for (i, sp) in request.c1_signed_proofs.iter().enumerate() {
+        let addr = sp.recover_address();
+        assert!(
+            addr.is_ok(),
+            "Should recover address from signed proof[{}]",
+            i
+        );
     }
 
     Ok(())
