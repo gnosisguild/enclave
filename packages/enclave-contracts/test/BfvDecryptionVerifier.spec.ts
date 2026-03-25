@@ -165,9 +165,8 @@ describe("BfvDecryptionVerifier", function () {
     });
 
     it("returns false when fold proof is present but fold verifier returns false", async function () {
-      const { bfvDecryptionVerifier, mockCircuit, mockFold } = await loadFixture(
-        deployWithMockCircuit,
-      );
+      const { bfvDecryptionVerifier, mockCircuit, mockFold } =
+        await loadFixture(deployWithMockCircuit);
       await mockCircuit.setReturnValue(true);
       await mockFold.setReturnValue(false);
 
@@ -230,9 +229,8 @@ describe("BfvDecryptionVerifier", function () {
     });
 
     it("returns true when fold proof is present and fold verifies", async function () {
-      const { bfvDecryptionVerifier, mockCircuit, mockFold } = await loadFixture(
-        deployWithMockCircuit,
-      );
+      const { bfvDecryptionVerifier, mockCircuit, mockFold } =
+        await loadFixture(deployWithMockCircuit);
       await mockCircuit.setReturnValue(true);
       await mockFold.setReturnValue(true);
 
