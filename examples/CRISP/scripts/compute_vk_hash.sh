@@ -4,12 +4,12 @@ set -euo pipefail
 
 CRISP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="$(cd "$CRISP/../.." && pwd)"
-R="$REPO/circuits/bin/threshold/target/recursive_vk"
+T="$REPO/circuits/bin/threshold/target"
 VK=(
-  "$R/user_data_encryption/vk_hash"
-  "$CRISP/circuits/bin/crisp/target/recursive_vk/crisp/vk_hash"
-  "$R/user_data_encryption_ct0/vk_hash"
-  "$R/user_data_encryption_ct1/vk_hash"
+  "$T/user_data_encryption.vk_recursive_hash"
+  "$CRISP/circuits/bin/crisp/target/crisp.vk_recursive_hash"
+  "$T/user_data_encryption_ct0.vk_recursive_hash"
+  "$T/user_data_encryption_ct1.vk_recursive_hash"
 )
 for f in "${VK[@]}"; do
   [[ -f "$f" ]] || { echo "missing $f (run pnpm compile:circuits in examples/CRISP)" >&2; exit 1; }
