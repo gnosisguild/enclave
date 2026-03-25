@@ -652,7 +652,7 @@ jobs:
         run: pnpm evm:build
 
       - name: Download Crisp SDK artifacts
-        if: matrix.test-suite == 'test:sdk'
+        if: matrix.test-suite == 'test:sdk' || matrix.test-suite == 'test:contracts'
         uses: actions/download-artifact@v4
         with:
           name: crisp-sdk-artifacts
