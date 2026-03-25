@@ -49,7 +49,7 @@
         pname = "barretenberg";
         version = bbVersion;
         src = pkgs.fetchurl {
-          url = "https://github.com/AztecProtocol/aztec-packages/releases/download/v${bbVersion}/barretenberg-${bbPlatform}.tar.gz";
+          url = "https://github.com/gnosisguild/aztec-packages/releases/download/v${bbVersion}/barretenberg-${bbPlatform}.tar.gz";
           sha256 = bbHashes.${bbPlatform};
         };
         nativeBuildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [pkgs.autoPatchelfHook];
