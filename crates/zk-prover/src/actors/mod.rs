@@ -35,6 +35,9 @@
 
 pub mod accusation_manager;
 pub mod accusation_manager_ext;
+pub mod commitment_consistency_checker;
+pub mod commitment_consistency_checker_ext;
+pub mod commitment_links;
 pub mod node_proof_aggregator;
 pub mod proof_request;
 pub mod proof_verification;
@@ -43,6 +46,8 @@ pub mod zk_actor;
 
 pub use accusation_manager::AccusationManager;
 pub use accusation_manager_ext::AccusationManagerExtension;
+pub use commitment_consistency_checker::CommitmentConsistencyChecker;
+pub use commitment_consistency_checker_ext::CommitmentConsistencyCheckerExtension;
 pub use node_proof_aggregator::NodeProofAggregator;
 pub use proof_request::ProofRequestActor;
 pub use proof_verification::{
