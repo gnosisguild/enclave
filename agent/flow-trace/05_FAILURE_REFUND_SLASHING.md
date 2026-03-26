@@ -835,7 +835,7 @@ Slash Reasons (derived from ProofType for Lane A):
   │ C0, C1-C4       │ E3_BAD_DKG_PROOF         │
   │ C5              │ E3_BAD_PK_AGGREGATION    │
   │ C6              │ E3_BAD_DECRYPTION_PROOF   │
-  │ C7a, C7b        │ E3_BAD_AGGREGATION_PROOF │
+  │ C7              │ E3_BAD_AGGREGATION_PROOF │
   └─────────────────┴──────────────────────────┘
 ```
 

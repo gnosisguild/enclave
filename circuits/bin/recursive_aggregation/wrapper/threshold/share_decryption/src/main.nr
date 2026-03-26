@@ -11,7 +11,7 @@ use lib::math::commitments::compute_recursive_aggregation_commitment;
 // Number of proofs.
 pub global N_PROOFS: u32 = 1;
 /// Number of public inputs/outputs per proof.
-pub global N_PUBLIC_INPUTS: u32 = 2 + 2 * L * N;
+pub global N_PUBLIC_INPUTS: u32 = 2 + 2 * L * N + 1;
 
 fn main(
     verification_key: UltraHonkVerificationKey,

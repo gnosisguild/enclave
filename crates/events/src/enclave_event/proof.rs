@@ -5,6 +5,7 @@ use e3_utils::utility_types::ArcBytes;
 use e3_zk_helpers::{
     CircuitOutputLayout, DKG_SHARE_DECRYPTION_OUTPUTS, PK_AGGREGATION_OUTPUTS, PK_BFV_OUTPUTS,
     PK_GENERATION_OUTPUTS, SHARE_COMPUTATION_CHUNK_BATCH_OUTPUTS, SHARE_COMPUTATION_OUTPUTS,
+    THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -191,10 +192,13 @@ impl CircuitName {
             CircuitName::PkAggregation => CircuitOutputLayout::Fixed {
                 fields: PK_AGGREGATION_OUTPUTS,
             },
-            CircuitName::ShareComputationChunk
-            | CircuitName::ShareEncryption
-            | CircuitName::ThresholdShareDecryption
-            | CircuitName::DecryptedSharesAggregation => CircuitOutputLayout::None,
+            CircuitName::ThresholdShareDecryption => CircuitOutputLayout::Fixed {
+                fields: THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
+            },
+            CircuitName::ShareComputationChunk | CircuitName::ShareEncryption => {
+                CircuitOutputLayout::None
+            }
+            CircuitName::DecryptedSharesAggregation => CircuitOutputLayout::None,
             CircuitName::Fold => CircuitOutputLayout::None,
         }
     }

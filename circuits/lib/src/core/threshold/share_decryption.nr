@@ -5,7 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::math::commitments::{
-    compute_aggregated_shares_commitment, compute_threshold_share_decryption_challenge,
+    compute_aggregated_shares_commitment, compute_threshold_decryption_share_commitment,
+    compute_threshold_share_decryption_challenge,
 };
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
@@ -32,7 +33,7 @@ impl<let L: u32> Configs<L> {
 /// 1. Commitment to sk matches expected (from DKG decryption circuit)
 /// 2. Commitment to e_sm matches expected (from DKG decryption circuit)
 /// 3. Correct computation: d_i = c_0i + c_1i * s_i + e_i + r_2i * (X^N + 1) + r_1i * q_i
-pub struct ShareDecryption<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> {
+pub struct ShareDecryption<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> {
     /// Circuit parameters including bounds and cryptographic constants
     configs: Configs<L>,
 
@@ -61,12 +62,11 @@ pub struct ShareDecryption<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: 
     r1: [Polynomial<2 * N - 1>; L],
     r2: [Polynomial<N - 1>; L],
 
-    /// Party's computed decryption share
-    /// (public witnesses)
+    /// Party's computed decryption share (secret witness)
     d: [Polynomial<N>; L],
 }
 
-impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> ShareDecryption<N, L, BIT_CT, BIT_SK, BIT_E_SM, BIT_R1, BIT_R2, BIT_D> {
+impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> ShareDecryption<N, MAX_MSG_NON_ZERO_COEFFS, L, BIT_CT, BIT_SK, BIT_E_SM, BIT_R1, BIT_R2, BIT_D> {
     pub fn new(
         configs: Configs<L>,
         expected_sk_commitment: Field,
@@ -79,6 +79,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
         r2: [Polynomial<N - 1>; L],
         d: [Polynomial<N>; L],
     ) -> Self {
+        assert(MAX_MSG_NON_ZERO_COEFFS <= N);
         ShareDecryption {
             configs,
             expected_sk_commitment,
@@ -111,6 +112,20 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
         );
     }
 
+    /// Truncates each CRT limb of `d` to `MAX_MSG_NON_ZERO_COEFFS` coefficients (for hashing).
+    fn get_truncated_polynomials(self) -> [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L] {
+        let mut out: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L] =
+            [Polynomial::new([0; MAX_MSG_NON_ZERO_COEFFS]); L];
+        for i in 0..L {
+            let mut coeffs = [0; MAX_MSG_NON_ZERO_COEFFS];
+            for j in 0..MAX_MSG_NON_ZERO_COEFFS {
+                coeffs[j] = self.d[i].coefficients[j];
+            }
+            out[i] = Polynomial::new(coeffs);
+        }
+        out
+    }
+
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation.
     ///
     /// This function serializes all polynomial coefficients (both public inputs and
@@ -124,7 +139,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
     /// 4. Ciphertext components `c_1` for each CRT basis (serialized coefficients)
     /// 5. Quotient polynomials `r_1` for each CRT basis (serialized coefficients)
     /// 6. Quotient polynomials `r_2` for each CRT basis (serialized coefficients)
-    /// 7. Decryption shares `d` for each CRT basis (serialized coefficients)
+    /// 7. Commitment to decryption shares `d` (first MAX_MSG_NON_ZERO_COEFFS coefficients per CRT limb)
     ///
     /// Note: Aggregated secret shares `sk` and noise shares `e_sm` are represented by their
     /// commitments rather than serialized coefficients. This saves constraints while
@@ -133,7 +148,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
     /// # Returns
     /// A vector containing commitments and polynomial coefficients in flattened form,
     /// ready for hashing to generate the Fiat-Shamir challenge.
-    fn payload(self) -> Vec<Field> {
+    fn payload(self, d_commitment: Field) -> Vec<Field> {
         let mut inputs = Vec::new();
 
         // Use commitments instead of full polynomials (saves constraints)
@@ -148,14 +163,15 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
         inputs = flatten::<_, _, BIT_R1>(inputs, self.r1);
         inputs = flatten::<_, _, BIT_R2>(inputs, self.r2);
 
-        // Flatten decryption shares (public outputs)
-        inputs = flatten::<_, _, BIT_D>(inputs, self.d);
+        // Bind decryption share via prefix commitment (matches circuit 7)
+        inputs.push(d_commitment);
 
         inputs
     }
 
-    /// Main verification function
-    pub fn execute(self) {
+    /// Main verification function. Returns the public commitment to the first
+    /// `MAX_MSG_NON_ZERO_COEFFS` coefficients of `d` per CRT limb.
+    pub fn execute(self) -> Field {
         // Step 1: Verify sk commitment matches expected
         self.verify_agg_sk_commitment();
 
@@ -167,13 +183,20 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
         // (the DKG decryption circuit already performed range checks on these values)
         self.check_range_bounds();
 
+        let d_truncated = self.get_truncated_polynomials();
+        let d_commitment = compute_threshold_decryption_share_commitment::<MAX_MSG_NON_ZERO_COEFFS, L, BIT_D>(
+            d_truncated,
+        );
+
         // Step 4: Generate Fiat-Shamir challenge from the transcript
-        let gamma = self.generate_challenge();
+        let gamma = self.generate_challenge(d_commitment);
 
         // Step 5: Verify decryption share computation for each CRT basis
         for i in 0..L {
             self.verify_decryption_share_computation(i, gamma);
         }
+
+        d_commitment
     }
 
     /// Performs range checks on quotient polynomial witnesses.
@@ -210,7 +233,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
     /// Generates Fiat-Shamir challenge value using the SAFE cryptographic sponge.
     ///
     /// This function implements the Fiat-Shamir transform for the decryption share circuit:
-    /// 1. Flattens all witness data (commitments for sk/e_sm, ciphertexts c_0/c_1, quotients r_1/r_2, decryption shares d) into a single array
+    /// 1. Flattens all witness data (commitments for sk/e_sm, ciphertexts c_0/c_1, quotients r_1/r_2, commitment to d) into a single array
     /// 2. Absorbs the flattened data into the SAFE sponge
     /// 3. Squeezes a single challenge value
     ///
@@ -221,8 +244,8 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
     /// # Returns
     /// A single challenge value `gamma` used as the evaluation point for verifying
     /// the decryption share computation formula for all CRT bases.
-    fn generate_challenge(self) -> Field {
-        let inputs = self.payload();
+    fn generate_challenge(self, d_commitment: Field) -> Field {
+        let inputs = self.payload(d_commitment);
 
         compute_threshold_share_decryption_challenge::<L>(inputs)
     }

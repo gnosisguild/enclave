@@ -135,6 +135,9 @@ pub const DKG_SHARE_DECRYPTION_OUTPUTS: &[OutputField] = &[f("commitment")];
 /// C5 — Public key aggregation.
 pub const PK_AGGREGATION_OUTPUTS: &[OutputField] = &[f("commitment")];
 
+/// C6 — Threshold share decryption (prefix commitment to `d`, per CRT limb).
+pub const THRESHOLD_SHARE_DECRYPTION_OUTPUTS: &[OutputField] = &[f("d_commitment")];
+
 #[cfg(test)]
 mod tests {
     use super::*;

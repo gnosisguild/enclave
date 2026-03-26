@@ -25,7 +25,11 @@ use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
 use e3_zk_helpers::circuits::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;
-use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
+use e3_zk_helpers::circuits::{
+    commitments::{compute_dkg_pk_commitment, compute_threshold_decryption_share_commitment},
+    threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS,
+    CircuitComputation,
+};
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_computation::{
     Configs, ShareComputationBaseCircuit, ShareComputationChunkCircuit,
@@ -680,6 +684,68 @@ async fn test_pk_aggregation_commitment_consistency() {
         final_commitment_from_proof, expected_final_commitment,
         "pk_aggregation final commitment mismatch"
     );
+
+    prover.cleanup(e3_id).unwrap();
+}
+
+#[tokio::test]
+async fn test_threshold_share_decryption_commitment_consistency() {
+    let Some((_backend, _temp, prover, circuit, sample, preset, e3_id)) =
+        setup_share_decryption_test().await
+    else {
+        println!("skipping: bb not found");
+        return;
+    };
+
+    let proof = circuit
+        .prove_with_variant(&prover, &preset, &sample, e3_id, CircuitVariant::Recursive)
+        .expect("proof generation should succeed");
+
+    let computation_output = ThresholdShareDecryptionCircuit::compute(preset, &sample).unwrap();
+
+    let expected_d_commitment = compute_threshold_decryption_share_commitment(
+        &computation_output.inputs.d,
+        computation_output.bits.d_bit,
+        MAX_MSG_NON_ZERO_COEFFS,
+    );
+
+    let d_commitment_from_proof = extract_field_from_end(&proof.public_signals, 0);
+    assert_eq!(
+        d_commitment_from_proof, expected_d_commitment,
+        "C6 d_commitment must match compute_threshold_decryption_share_commitment on witness d"
+    );
+
+    prover.cleanup(e3_id).unwrap();
+}
+
+#[tokio::test]
+async fn test_decrypted_shares_aggregation_commitment_consistency() {
+    let Some((_backend, _temp, prover, circuit, sample, preset, e3_id)) =
+        setup_decrypted_shares_aggregation_test().await
+    else {
+        println!("skipping: bb not found");
+        return;
+    };
+
+    let proof = circuit
+        .prove_with_variant(&prover, &preset, &sample, e3_id, CircuitVariant::Recursive)
+        .expect("proof generation should succeed");
+
+    let computation_output = DecryptedSharesAggregationCircuit::compute(preset, &sample).unwrap();
+
+    for (i, expected) in computation_output
+        .inputs
+        .expected_d_commitments
+        .iter()
+        .enumerate()
+    {
+        let from_proof = extract_field(&proof.public_signals, i);
+        assert_eq!(
+            from_proof, *expected,
+            "C7 public expected_d_commitments[{}] must match witness-derived commitment",
+            i
+        );
+    }
 
     prover.cleanup(e3_id).unwrap();
 }

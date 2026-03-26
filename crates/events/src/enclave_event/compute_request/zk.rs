@@ -416,7 +416,7 @@ pub struct DecryptedSharesAggregationProofRequest {
     pub d_share_polys: Vec<(u64, Vec<ArcBytes>)>,
     /// Decoded plaintext per ciphertext index.
     pub plaintext: Vec<ArcBytes>,
-    /// BFV preset (selects BN vs Mod circuit variant).
+    /// BFV preset (parameters for witness / circuit config).
     pub params_preset: BfvPreset,
     /// Threshold required for decryption.
     pub threshold_m: u64,
