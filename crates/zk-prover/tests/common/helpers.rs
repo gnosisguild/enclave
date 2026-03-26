@@ -139,7 +139,7 @@ pub async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, TempDir) {
 
     let temp_path = temp.path();
     let noir_dir = temp_path.join("noir");
-    let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
+    let bb_binary = BBPath::check(noir_dir.join("bin").join("bb")).unwrap();
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
     let backend = ZkBackend::new(bb_binary.clone(), circuits_dir.clone(), work_dir.clone());

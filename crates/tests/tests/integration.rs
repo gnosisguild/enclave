@@ -47,7 +47,7 @@ use tokio::{
 /// Create a ZkBackend for integration tests.
 /// If a local bb binary is found, uses it with fixture files (fast path).
 /// Otherwise, calls `ensure_installed()` to download bb + circuits (CI path).
-async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
+async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
     let temp = get_tempdir().unwrap();
     let temp_path = temp.path();
     let noir_dir = temp_path.join("noir");
@@ -375,9 +375,8 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             ".vk_hash",
         )
         .await;
-
-        let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
-        (backend, temp)
+        let backend = ZkBackend::new(BBPath::check(bb_binary)?, circuits_dir, work_dir);
+        Ok((backend, temp))
     } else {
         println!("bb binary not found locally, downloading via ensure_installed()...");
         let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
@@ -385,7 +384,7 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             .ensure_installed()
             .await
             .expect("Failed to download and install ZK backend");
-        (backend, temp)
+        Ok((backend, temp))
     }
 }
 
@@ -623,7 +622,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let multithread_report = MultithreadReport::new(max_threadroom, concurrent_jobs).start();
 
     // Setup ZK backend for proof generation/verification
-    let (zk_backend, _zk_temp) = setup_test_zk_backend().await;
+    let (zk_backend, _zk_temp) = setup_test_zk_backend().await?;
 
     let nodes = CiphernodeSystemBuilder::new()
         // Adding 20 total nodes: 3 for committee + 3 buffer = 6 selected, 14 unselected
@@ -1200,7 +1199,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         Ok(result)
     }
 
-    let (zk_backend, _zk_temp) = setup_test_zk_backend().await;
+    let (zk_backend, _zk_temp) = setup_test_zk_backend().await?;
 
     let e3_id = E3id::new("1234", 1);
     let (rng, cn1_address, cn1_data, cn2_address, cn2_data, cipher, history, params, crpoly) = {
@@ -1454,7 +1453,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     // Setup
     let (bus, rng, seed, params, crpoly, _, _) = get_common_setup(None)?;
     let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
-    let (zk_backend, _zk_temp) = setup_test_zk_backend().await;
+    let (zk_backend, _zk_temp) = setup_test_zk_backend().await?;
 
     // Setup actual ciphernodes and dispatch add events
     let ciphernodes = create_local_ciphernodes(&bus, &rng, 3, &cipher, zk_backend.clone()).await?;
