@@ -179,6 +179,12 @@
           "internalType": "bytes",
           "name": "publicKey",
           "type": "bytes"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "proof",
+          "type": "bytes"
         }
       ],
       "name": "CommitteePublished",
@@ -787,5 +793,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-561f4408bcfee777a1360e3f4f4b4e2d1bea7249"
+  "buildInfoId": "solc-0_8_28-4e1d4326aa586bce7ef3b38a9e93aeff5ca3ac8f"
 }

@@ -101,7 +101,9 @@ RUN for d in ./*/ ; do \
     done
 
 # Crates with [[bin]] in Cargo.toml need stub binaries so the first build succeeds
-RUN mkdir -p ./zk-helpers/src/bin && echo 'fn main() {}' > ./zk-helpers/src/bin/zk_cli.rs
+RUN mkdir -p ./zk-helpers/src/bin && \
+    echo 'fn main() {}' > ./zk-helpers/src/bin/zk_cli.rs && \
+    echo 'fn main() {}' > ./zk-helpers/src/bin/compute_vk_hash.rs
 RUN mkdir -p ./fhe-params/src/bin && echo 'fn main() {}' > ./fhe-params/src/bin/search_params.rs
 
 RUN cargo build --locked --release

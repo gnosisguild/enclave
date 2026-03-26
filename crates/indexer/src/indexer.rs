@@ -337,9 +337,10 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
             let e3_id = u64_try_from(e.e3Id)?;
 
             info!(
-                "CommitteePublished: id={}, public_key_len={}",
+                "CommitteePublished: id={}, public_key_len={}, proof_len={}",
                 e.e3Id,
-                e.publicKey.len()
+                e.publicKey.len(),
+                e.proof.len()
             );
 
             let e3 = contract.get_e3(e.e3Id).await?;
@@ -403,9 +404,10 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
         self.add_event_handler(move |e: PlaintextOutputPublished, ctx| async move {
             let store = ctx.store();
             info!(
-                "PlaintextOutputPublished: e3_id={}, output=0x{}...",
+                "PlaintextOutputPublished: e3_id={}, output=0x{}..., proof_len={}",
                 e.e3Id,
-                hex::encode(&e.plaintextOutput[..8.min(e.plaintextOutput.len())])
+                hex::encode(&e.plaintextOutput[..8.min(e.plaintextOutput.len())]),
+                e.proof.len()
             );
             let e3_id = u64_try_from(e.e3Id)?;
             let mut repo = E3Repository::new(store, e3_id);

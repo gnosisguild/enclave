@@ -3879,6 +3879,7 @@ dependencies = [
  "fhe",
  "fhe-math",
  "fhe-traits",
+ "hex",
  "itertools 0.14.0",
  "ndarray",
  "num-bigint",

@@ -491,7 +491,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkProof = encodePkProof(ethers.keccak256(publicKey));
 
-      await expect(registry.publishCommittee(0, nodes, publicKey, pkProof, "0x"))
+      await expect(
+        registry.publishCommittee(0, nodes, publicKey, pkProof, "0x"),
+      )
         .to.emit(enclave, "CommitteeFormed")
         .withArgs(0);
     });
@@ -1484,7 +1486,12 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       );
 
       const plaintextOutput = "0x" + "cd".repeat(100);
-      await enclave.publishPlaintextOutput(0, plaintextOutput, proofBytes, "0x");
+      await enclave.publishPlaintextOutput(
+        0,
+        plaintextOutput,
+        proofBytes,
+        "0x",
+      );
       expect(await enclave.getE3Stage(0)).to.equal(5); // Complete
 
       // 4. Verify escrowed slashed funds were distributed

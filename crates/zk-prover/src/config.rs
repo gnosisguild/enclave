@@ -367,7 +367,7 @@ mod tests {
         let version = &config.required_bb_version;
         let (arch, os) = target.url_parts();
         let url = format!(
-            "https://github.com/AztecProtocol/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz"
+            "https://github.com/gnosisguild/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz"
         );
 
         println!("downloading {} from {}", target, url);
@@ -430,7 +430,7 @@ mod tests {
         let version = &config.required_bb_version;
         let (arch, os) = target.url_parts();
         let url = format!(
-            "https://github.com/AztecProtocol/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz"
+            "https://github.com/gnosisguild/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz"
         );
 
         let client = reqwest::Client::new();

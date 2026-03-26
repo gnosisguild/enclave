@@ -15,17 +15,23 @@ use std::fmt::{self, Display};
 pub struct CommitteePublished {
     pub e3_id: E3id,
     pub nodes: Vec<String>,
+<<<<<<< ry/1468-event-feed
     pub public_key: ArcBytes,
+=======
+    pub public_key: Vec<u8>,
+    pub proof: Vec<u8>,
+>>>>>>> main
 }
 
 impl Display for CommitteePublished {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "e3_id: {}, nodes: {:?}, public_key_len: {}",
+            "e3_id: {}, nodes: {:?}, public_key_len: {}, proof_len: {}",
             self.e3_id,
             self.nodes,
-            self.public_key.len()
+            self.public_key.len(),
+            self.proof.len()
         )
     }
 }

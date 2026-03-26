@@ -32,6 +32,26 @@ if ! (cd "$CRISP_CIRCUITS/bin/crisp" && nargo compile); then
     exit 1
 fi
 
+# Inner recursive proofs use noir-recursive-no-zk; fold's compute_vk_hash chain reads
+# `{name}.vk_recursive_hash` in each package target/ (same layout as enclave `scripts/build-circuits.ts`).
+THRESHOLD_TARGET="${ENCLAVE_CIRCUITS}/bin/threshold/target"
+CRISP_TARGET="${CRISP_CIRCUITS}/bin/crisp/target"
+echo "Writing noir-recursive-no-zk VKs (user_data_encryption + crisp stack)..."
+for name in user_data_encryption_ct0 user_data_encryption_ct1 user_data_encryption; do
+    if ! bb write_vk -b "${THRESHOLD_TARGET}/${name}.json" -o "${THRESHOLD_TARGET}" -t noir-recursive-no-zk; then
+        echo "Error: bb write_vk (noir-recursive-no-zk) failed for ${name}"
+        exit 1
+    fi
+    mv "${THRESHOLD_TARGET}/vk" "${THRESHOLD_TARGET}/${name}.vk_recursive"
+    mv "${THRESHOLD_TARGET}/vk_hash" "${THRESHOLD_TARGET}/${name}.vk_recursive_hash"
+done
+if ! bb write_vk -b "${CRISP_TARGET}/crisp.json" -o "${CRISP_TARGET}" -t noir-recursive-no-zk; then
+    echo "Error: bb write_vk (noir-recursive-no-zk) failed for crisp"
+    exit 1
+fi
+mv "${CRISP_TARGET}/vk" "${CRISP_TARGET}/crisp.vk_recursive"
+mv "${CRISP_TARGET}/vk_hash" "${CRISP_TARGET}/crisp.vk_recursive_hash"
+
 echo "Compiling fold circuit (verifies user_data_encryption + crisp)..."
 if ! (cd "$CRISP_CIRCUITS/bin/fold" && nargo compile); then
     echo "Error: Fold circuit compilation failed"

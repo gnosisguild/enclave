@@ -311,7 +311,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         enclave.onCommitteePublished(e3Id, publicKeyHash);
 
-        emit CommitteePublished(e3Id, nodes, publicKey);
+        emit CommitteePublished(e3Id, nodes, publicKey, proof);
     }
 
     /// @inheritdoc ICiphernodeRegistry

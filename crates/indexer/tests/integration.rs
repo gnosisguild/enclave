@@ -113,7 +113,11 @@ async fn test_indexer() -> Result<()> {
 
     // first publish committee pk
     enclave_contract
-        .emitCommitteePublished(Uint::from(E3_ID), Bytes::from(pk.to_bytes()))
+        .emitCommitteePublished(
+            Uint::from(E3_ID),
+            Bytes::from(pk.to_bytes()),
+            Bytes::default(),
+        )
         .send()
         .await?
         .watch()
