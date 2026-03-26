@@ -510,6 +510,7 @@ async fn query_events_fake(aggregate: u64, since: u64, limit: u64) -> Result<()>
                 "0x3333333333333333333333333333333333333333".to_string(),
             ],
             public_key: ArcBytes::from_bytes(&[0xAB; 64]),
+            proof: ArcBytes::from_bytes(&[0xAB; 64]),
         }),
         None,
         1700000012000_u128,
@@ -855,6 +856,7 @@ async fn query_events_fake(aggregate: u64, since: u64, limit: u64) -> Result<()>
         EnclaveEventData::PlaintextOutputPublished(PlaintextOutputPublished {
             e3_id: E3id::new("test35", 1),
             plaintext_output: ArcBytes::from_bytes(&[0x55; 32]),
+            proof: ArcBytes::from_bytes(&[0x66; 64]),
         }),
         None,
         1700000034000_u128,

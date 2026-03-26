@@ -16,7 +16,7 @@ pub struct CommitteePublished {
     pub e3_id: E3id,
     pub nodes: Vec<String>,
     pub public_key: ArcBytes,
-    pub proof: Vec<u8>,
+    pub proof: ArcBytes,
 }
 
 impl Display for CommitteePublished {

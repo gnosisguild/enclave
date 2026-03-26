@@ -15,7 +15,7 @@ use std::fmt::{self, Display};
 pub struct PlaintextOutputPublished {
     pub e3_id: E3id,
     pub plaintext_output: ArcBytes,
-    pub proof: Vec<u8>,
+    pub proof: ArcBytes,
 }
 
 impl Display for PlaintextOutputPublished {
