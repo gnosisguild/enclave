@@ -12,6 +12,8 @@
 !pnpm-lock.yaml
 !rust-toolchain.toml
 !**/*.sh
+!flake.nix
+!flake.lock
 
 # Explicitly ignore build artifacts everywhere
 target/

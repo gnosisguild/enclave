@@ -23,10 +23,8 @@
 //! `expected_threshold_pk_commitments` array.
 
 use super::{CommitmentLink, FieldValue, LinkScope};
-use e3_events::ProofType;
-
-/// Size of one BN254 field element in bytes.
-const FIELD_SIZE: usize = 32;
+use e3_events::{CircuitName, ProofType};
+use e3_zk_helpers::{CircuitOutputLayout, FIELD_BYTE_LEN};
 
 /// C1 → C5 pk_commitment consistency link.
 pub struct C1ToC5PkCommitmentLink;
@@ -49,13 +47,12 @@ impl CommitmentLink for C1ToC5PkCommitmentLink {
     }
 
     fn extract_source_values(&self, public_signals: &[u8]) -> Vec<FieldValue> {
-        // C1 outputs: (sk_commitment, pk_commitment, e_sm_commitment) — 3 fields, no public inputs
-        // pk_commitment is at field index 1 (bytes 32..64)
-        if public_signals.len() < 3 * FIELD_SIZE {
+        let layout = CircuitName::PkGeneration.output_layout();
+        let Some(bytes) = layout.extract_field(public_signals, "pk_commitment") else {
             return vec![];
-        }
-        let mut value = [0u8; FIELD_SIZE];
-        value.copy_from_slice(&public_signals[FIELD_SIZE..2 * FIELD_SIZE]);
+        };
+        let mut value = [0u8; FIELD_BYTE_LEN];
+        value.copy_from_slice(bytes);
         vec![value]
     }
 
@@ -65,30 +62,27 @@ impl CommitmentLink for C1ToC5PkCommitmentLink {
         target_public_signals: &[u8],
     ) -> bool {
         if source_values.is_empty() {
-            // No source values to check — vacuously consistent.
             return true;
         }
 
-        if target_public_signals.len() < 2 * FIELD_SIZE {
-            // Target proof is present but has malformed/truncated signals — non-consistent.
+        // C5 public_signals layout: [pub inputs: pk_commitments[0..H]] [output: commitment]
+        // The output count comes from the circuit layout; everything before it is public inputs.
+        let output_count = CircuitName::PkAggregation
+            .output_layout()
+            .field_count()
+            .unwrap_or(1);
+        let total_fields = target_public_signals.len() / FIELD_BYTE_LEN;
+        if total_fields <= output_count {
             return false;
         }
+        let h = total_fields - output_count;
 
         let source_pk_commitment = &source_values[0];
 
-        // C5 public_signals: [expected_pk_commitments[0..H], pk_agg_commitment]
-        // H = total_fields - 1 (last field is the output)
-        let total_fields = target_public_signals.len() / FIELD_SIZE;
-        if total_fields < 2 {
-            // Target proof present but not enough fields — non-consistent.
-            return false;
-        }
-        let h = total_fields - 1;
-
         // Check if the source pk_commitment appears in any of the H input fields
         for i in 0..h {
-            let offset = i * FIELD_SIZE;
-            if target_public_signals[offset..offset + FIELD_SIZE] == *source_pk_commitment {
+            let offset = i * FIELD_BYTE_LEN;
+            if target_public_signals[offset..offset + FIELD_BYTE_LEN] == *source_pk_commitment {
                 return true;
             }
         }

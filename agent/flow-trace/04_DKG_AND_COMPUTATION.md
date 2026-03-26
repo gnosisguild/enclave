@@ -596,6 +596,7 @@ EnclaveSolReader decodes CiphertextOutputPublished event
     │   │   → Circuit: ThresholdShareDecryption (C6)
     │   │   → Proves decryption share was correctly computed from
     │   │     sk_poly_sum, es_poly_sum, and ciphertext
+    │   │   → Fiat-Shamir transcript absorbs full `d` (all coefficients per CRT limb)
     │   ├─ ZkActor generates proof via bb binary
     │   ├─ Signs proof
     │   └─ Publishes signed C6 proof
@@ -663,14 +664,13 @@ ThresholdPlaintextAggregator receives DecryptionshareCreated events
 │   │   ├─ Dispatches ComputeRequest::zk(
 │   │   │     ZkRequest::DecryptedSharesAggregation {...}
 │   │   │   )
-│   │   │   → Circuit: DecryptedSharesAggregation (C7a/b)
-│   │   │   → Two variants: BN (bn254 field) and Mod (modular arithmetic)
+│   │   │   → Circuit: DecryptedSharesAggregation (C7)
 │   │   │   → Proves plaintext was correctly reconstructed from M+1 shares
 │   │   ├─ ZkActor generates proof(s) via bb binary
-│   │   ├─ Signs each proof variant
+│   │   ├─ Signs each C7 proof (one per ciphertext index)
 │   │   └─ Publishes AggregationProofSigned {
 │   │        e3_id, party_id, signed_proof(C7)
-│   │      } × (per variant)
+│   │      }
 │   │
 │   └─ Publish PlaintextAggregated { e3_id, decrypted_output }
 │
@@ -748,13 +748,19 @@ ThresholdPlaintextAggregator receives DecryptionshareCreated events
 │      │                            │                   │ computed from all pk_shares  │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
 │ C6   │ Threshold Share Decryption │ Decryption        │ Decryption share correctly   │
-│      │ (T5)                       │                   │ derived from sk + ciphertext │
+│      │ (T5)                       │                   │ derived from sk + ciphertext;│
+│      │                            │                   │ public output: commitment to │
+│      │                            │                   │ first MAX_MSG_NON_ZERO_COEFFS│
+│      │                            │                   │ coeffs of d per CRT limb     │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
-│ C7a  │ Decrypted Shares Agg. (BN) │ Final Aggregation │ Plaintext correctly          │
-│      │                            │                   │ reconstructed (bn254 field)  │
-├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
-│ C7b  │ Decrypted Shares Agg. (Mod)│ Final Aggregation │ Plaintext correctly          │
-│      │                            │                   │ reconstructed (modular)      │
+│ C7   │ Decrypted Shares Agg.      │ Final Aggregation │ Plaintext correctly          │
+│      │                            │                   │ reconstructed from shares    │
+│      │                            │                   │ (modular decode over t);     │
+│      │                            │                   │ public inputs: C6 `d`         │
+│      │                            │                   │ commitments + party IDs + msg;│
+│      │                            │                   │ in-circuit equality vs        │
+│      │                            │                   │ commitments from witness      │
+│      │                            │                   │ decryption shares             │
 └──────┴────────────────────────────┴───────────────────┴──────────────────────────────┘
 
 Slash Reasons by Proof Type:

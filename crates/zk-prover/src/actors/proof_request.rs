@@ -16,10 +16,10 @@ use e3_events::{
     DecryptionShareProofsPending, DecryptionshareCreated, DkgProofSigned, E3Failed, E3Stage, E3id,
     EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated, EncryptionKeyPending,
     EventContext, EventPublisher, EventSubscriber, EventType, FailureReason,
-    PkAggregationProofPending, PkAggregationProofSigned, PkBfvProofRequest,
-    PkGenerationProofSigned, Proof, ProofPayload, ProofType, Sequenced,
-    ShareDecryptionProofPending, SignedProofPayload, ThresholdShare, ThresholdShareCreated,
-    ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
+    PkAggregationProofPending, PkAggregationProofRequest, PkAggregationProofSigned,
+    PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload, ProofType, Sequenced,
+    ShareDecryptionProofPending, SignedProofFailed, SignedProofPayload, ThresholdShare,
+    ThresholdShareCreated, ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
@@ -181,6 +181,7 @@ impl PendingDecryptionProofs {
 #[derive(Clone, Debug)]
 struct PendingPkAggregationProof {
     ec: EventContext<Sequenced>,
+    request: PkAggregationProofRequest,
 }
 
 /// Pending C6 (ShareDecryptionProof) proof generation state.
@@ -905,8 +906,13 @@ impl ProofRequestActor {
             return;
         }
 
-        self.pending_pk_aggregation
-            .insert(e3_id.clone(), PendingPkAggregationProof { ec: ec.clone() });
+        self.pending_pk_aggregation.insert(
+            e3_id.clone(),
+            PendingPkAggregationProof {
+                ec: ec.clone(),
+                request: msg.proof_request.clone(),
+            },
+        );
 
         let correlation_id = CorrelationId::new();
         self.pk_aggregation_correlation
@@ -1467,6 +1473,7 @@ impl ProofRequestActor {
                 e3_id
             );
             self.pending_pk_aggregation.remove(&e3_id);
+
             if let Err(e) = self.bus.publish(
                 E3Failed {
                     e3_id,
