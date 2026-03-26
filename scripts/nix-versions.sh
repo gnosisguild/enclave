@@ -15,7 +15,11 @@ check() {
 check "noir" \
   "https://github.com/noir-lang/noir/archive/${NOIR_REV}.tar.gz" \
   "$(val noirHash)" --unpack
-for p in amd64-linux arm64-linux amd64-darwin arm64-darwin; do
+
+# COMMENTING OUT WHILE WE ARE MISSING THE CORRECT VERSION
+# WAITING FOR UPGRADE OF BB VERSION
+# for p in amd64-linux arm64-linux amd64-darwin arm64-darwin; do
+for p in amd64-linux; do
   hex=$(jq -r ".bb_checksums[\"${p}\"]" "$VERSIONS_JSON")
   sri=$(nix hash convert --to sri --hash-algo sha256 "$hex")
   check "bb-${p}" \
