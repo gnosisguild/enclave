@@ -80,6 +80,14 @@ const DS_AGGREGATED_SHARES: [u8; 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
+/// String: "THRESHOLD_DECRYPTION_SHARE"
+const DS_THRESHOLD_DECRYPTION_SHARE: [u8; 64] = [
+    0x54, 0x48, 0x52, 0x45, 0x53, 0x48, 0x4f, 0x4c, 0x44, 0x5f, 0x44, 0x45, 0x43, 0x52, 0x59, 0x50,
+    0x54, 0x49, 0x4f, 0x4e, 0x5f, 0x53, 0x48, 0x41, 0x52, 0x45, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+
 /// String: "VK_HASH"
 const DS_VK_HASH: [u8; 64] = [
     0x56, 0x4b, 0x5f, 0x48, 0x41, 0x53, 0x48, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -467,6 +475,42 @@ pub fn compute_aggregated_shares_commitment(agg_shares: &CrtPolynomial, bit_msg:
     let io_pattern = [0x80000000 | input_size, 1];
 
     let commitment_field = compute_commitments(payload, DS_AGGREGATED_SHARES, io_pattern)[0];
+    let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
+    BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
+}
+
+// ============================================================================
+// THRESHOLD DECRYPTION SHARES (C6 / C7)
+// ============================================================================
+
+fn truncate_crt_polynomial_to_max_coeffs(crt: &CrtPolynomial, max_len: usize) -> CrtPolynomial {
+    let limbs = crt
+        .limbs
+        .iter()
+        .map(|limb| {
+            let v: Vec<_> = limb.coefficients().iter().take(max_len).cloned().collect();
+            Polynomial::new(v)
+        })
+        .collect();
+    CrtPolynomial::new(limbs)
+}
+
+/// Commitment to a threshold decryption share: all CRT limbs, first `max_k` coefficients
+/// per limb (matches Noir `compute_threshold_decryption_share_commitment`).
+pub fn compute_threshold_decryption_share_commitment(
+    d_share: &CrtPolynomial,
+    bit_d: u32,
+    max_k: usize,
+) -> BigInt {
+    let truncated = truncate_crt_polynomial_to_max_coeffs(d_share, max_k);
+    let mut payload = Vec::new();
+    payload = flatten(payload, &truncated.limbs, bit_d);
+
+    let input_size = payload.len() as u32;
+    let io_pattern = [0x80000000 | input_size, 1];
+
+    let commitment_field =
+        compute_commitments(payload, DS_THRESHOLD_DECRYPTION_SHARE, io_pattern)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }

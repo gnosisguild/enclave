@@ -15,6 +15,7 @@
 pub const MAX_MSG_NON_ZERO_COEFFS: usize = 100;
 
 use crate::calculate_bit_width;
+use crate::circuits::commitments::compute_threshold_decryption_share_commitment;
 use crate::compute_q_mod_t;
 use crate::compute_q_mod_t_centered;
 use crate::get_zkp_modulus;
@@ -69,6 +70,8 @@ pub struct Bounds {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Bits {
     pub noise_bit: u32,
+    /// Coefficient bit width for decryption-share commitments (aligned with threshold share_decryption BIT_D).
+    pub d_bit: u32,
 }
 
 /// Circuit config: moduli count, plaintext modulus, q_inverse_mod_t, bits, bounds, and message polynomial length.
@@ -92,7 +95,9 @@ pub struct Configs {
 /// coefficients are reduced to [0, zkp_modulus) by compute.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Inputs {
-    /// One CrtPolynomial per party (public witnesses); circuit: `[[Polynomial; L]; T+1]`
+    /// Public `d` commitments (one per party), same as circuit 6 outputs; checked in-circuit.
+    pub expected_d_commitments: Vec<BigInt>,
+    /// One CrtPolynomial per party (secret witness); circuit: `[[Polynomial; L]; T+1]`
     pub decryption_shares: Vec<CrtPolynomial>,
     /// Party IDs (1-based: 1, 2, ..., T+1)
     pub party_ids: Vec<BigInt>,
@@ -126,9 +131,19 @@ impl Computation for Bits {
     type Data = Bounds;
     type Error = CircuitsErrors;
 
-    fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let noise_bit = calculate_bit_width(BigInt::from(data.delta_half.clone()));
-        Ok(Bits { noise_bit })
+        let (threshold_params, _) =
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
+        let ctx = threshold_params
+            .ctx_at_level(0)
+            .map_err(|e| CircuitsErrors::Other(format!("ctx_at_level: {:?}", e)))?;
+        let mut d_bit = 0u32;
+        for qi in ctx.moduli_operators() {
+            let qi_bound = (BigInt::from(qi.modulus()) - 1) / 2;
+            d_bit = d_bit.max(calculate_bit_width(qi_bound));
+        }
+        Ok(Bits { noise_bit, d_bit })
     }
 }
 
@@ -310,7 +325,19 @@ impl Computation for Inputs {
                 .collect(),
         );
 
+        let expected_d_commitments: Vec<BigInt> = decryption_shares
+            .iter()
+            .map(|share| {
+                compute_threshold_decryption_share_commitment(
+                    share,
+                    configs.bits.d_bit,
+                    max_msg_non_zero_coeffs,
+                )
+            })
+            .collect();
+
         Ok(Inputs {
+            expected_d_commitments,
             decryption_shares,
             party_ids,
             message,
@@ -333,8 +360,10 @@ impl Computation for Inputs {
         let message_json = polynomial_to_toml_json(&self.message);
         let u_global_json = polynomial_to_toml_json(&self.u_global);
         let crt_quotients_json = crt_polynomial_to_toml_json(&self.crt_quotients);
+        let expected_d_commitments_json = bigint_1d_to_json_values(&self.expected_d_commitments);
 
         let json = serde_json::json!({
+            "expected_d_commitments": expected_d_commitments_json,
             "decryption_shares": decryption_shares_json,
             "party_ids": party_ids_json,
             "message": message_json,
@@ -362,6 +391,7 @@ mod tests {
         assert!(!bounds.delta_half.is_zero());
         assert!(bounds.delta_half < bounds.delta);
         assert!(bits.noise_bit > 0);
+        assert!(bits.d_bit > 0);
     }
 
     #[test]
@@ -385,6 +415,10 @@ mod tests {
 
         let configs = Configs::compute(preset, &()).unwrap();
         assert_eq!(out.inputs.decryption_shares.len(), committee.threshold + 1);
+        assert_eq!(
+            out.inputs.expected_d_commitments.len(),
+            committee.threshold + 1
+        );
         assert_eq!(out.inputs.party_ids.len(), committee.threshold + 1);
         assert_eq!(
             out.inputs.message.coefficients().len(),
@@ -400,5 +434,6 @@ mod tests {
             configs.max_msg_non_zero_coeffs
         );
         assert!(out.bits.noise_bit > 0);
+        assert!(out.bits.d_bit > 0);
     }
 }

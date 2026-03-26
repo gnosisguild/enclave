@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::math::commitments::compute_threshold_decryption_share_commitment;
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 use dep::bignum::BigNum;
@@ -30,14 +31,18 @@ impl<let L: u32> Configs<L> {
 /// Uses BigNum for Q values (works for both insecure and secure parameter sets).
 ///
 /// Verifies:
+/// 0. Each party's decryption share matches the corresponding C6 public `d` commitment
 /// 1. Lagrange interpolation to compute u^{(l)} for each CRT basis
 /// 2. CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
 /// 3. Decoding verification: message = -Q^{-1} * (t * u_global)_Q mod t
-pub struct DecryptedSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> {
+pub struct DecryptedSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32, let BIT_D: u32> {
     /// Circuit parameters including crypto constants
     configs: Configs<L>,
 
-    /// Decryption shares from t+1 parties (public witnesses)
+    /// Public `d` commitments from circuit 6 (one per reconstructing party), same order as `decryption_shares`
+    expected_d_commitments: [Field; T + 1],
+
+    /// Decryption shares from t+1 parties (secret witnesses)
     decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
 
     /// Party IDs (x-coordinates) for interpolation (public witnesses)
@@ -54,9 +59,10 @@ pub struct DecryptedSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u
     crt_quotients: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
 }
 
-impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32> DecryptedSharesAggregation<MAX_MSG_NON_ZERO_COEFFS, L, T, BIT_NOISE> {
+impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32, let BIT_D: u32> DecryptedSharesAggregation<MAX_MSG_NON_ZERO_COEFFS, L, T, BIT_NOISE, BIT_D> {
     pub fn new(
         configs: Configs<L>,
+        expected_d_commitments: [Field; T + 1],
         decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
         party_ids: [Field; T + 1],
         message: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
@@ -65,6 +71,7 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u3
     ) -> Self {
         DecryptedSharesAggregation {
             configs,
+            expected_d_commitments,
             decryption_shares,
             party_ids,
             message,
@@ -73,8 +80,15 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u3
         }
     }
 
-    /// Main verification function
+    /// Main verification function.
     pub fn execute(self) {
+        for party_idx in 0..(T + 1) {
+            let computed = compute_threshold_decryption_share_commitment::<MAX_MSG_NON_ZERO_COEFFS, L, BIT_D>(
+                self.decryption_shares[party_idx],
+            );
+            assert(computed == self.expected_d_commitments[party_idx], "d commitment mismatch");
+        }
+
         // Step 1: Compute Lagrange coefficients in-circuit
         let lagrange_coeffs = compute_all_lagrange_coeffs::<T, L>(self.configs.qis, self.party_ids);
 

@@ -6,15 +6,14 @@
 
 use bb_proof_verification::{UltraHonkVerificationKey, UltraHonkZKProof, verify_honk_proof};
 use lib::{
-    configs::default::{MAX_MSG_NON_ZERO_COEFFS, T, threshold::L},
+    configs::default::{MAX_MSG_NON_ZERO_COEFFS, T},
     math::commitments::compute_recursive_aggregation_commitment,
 };
 
 // Number of proofs.
 pub global N_PROOFS: u32 = 1;
 /// Number of public inputs/outputs per proof.
-pub global N_PUBLIC_INPUTS: u32 =
-    ((T + 1) * L * MAX_MSG_NON_ZERO_COEFFS) + (T + 1 + MAX_MSG_NON_ZERO_COEFFS);
+pub global N_PUBLIC_INPUTS: u32 = (T + 1) + MAX_MSG_NON_ZERO_COEFFS + (T + 1);
 
 fn main(
     verification_key: UltraHonkVerificationKey,
