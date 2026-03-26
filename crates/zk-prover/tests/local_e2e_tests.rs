@@ -21,9 +21,10 @@ use ark_ff::{PrimeField, Zero};
 use common::{
     extract_field, extract_field_from_end, find_bb, setup_compiled_circuit, setup_test_prover,
 };
-use e3_fhe_params::BfvPreset;
+use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
+use e3_zk_helpers::circuits::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;
 use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_computation::{
@@ -431,9 +432,11 @@ async fn test_pk_generation_commitment_consistency() {
         &computation_output.inputs.sk,
         computation_output.bits.sk_bit,
     );
+    let (threshold_params, _) = build_pair_for_preset(preset).expect("preset pair");
+    let a = deterministic_crp_crt_polynomial(&threshold_params).expect("crp polynomial");
     let pk_commitment_expected = compute_threshold_pk_commitment(
         &computation_output.inputs.pk0is,
-        &computation_output.inputs.pk1is,
+        &a,
         computation_output.bits.pk_bit,
     );
 
