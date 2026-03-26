@@ -15,12 +15,8 @@ use std::fmt::{self, Display};
 pub struct CommitteePublished {
     pub e3_id: E3id,
     pub nodes: Vec<String>,
-<<<<<<< ry/1468-event-feed
     pub public_key: ArcBytes,
-=======
-    pub public_key: Vec<u8>,
     pub proof: Vec<u8>,
->>>>>>> main
 }
 
 impl Display for CommitteePublished {
