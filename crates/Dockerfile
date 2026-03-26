@@ -93,6 +93,9 @@ RUN for d in ./*/ ; do \
           if [ "$d" = "./cli/" ] || [ "$d" = "./enclaveup/" ]; then \
             mkdir -p "$d/src" && \
             echo "fn main() {}" > "$d/src/main.rs"; \
+          elif [ "$d" = "./utils-derive/" ]; then \
+            mkdir -p "$d/src" && \
+            echo "" > "$d/src/lib.rs"; \
           else \
             mkdir -p "$d/src" && \
             echo "pub fn main() {}" > "$d/src/lib.rs"; \
