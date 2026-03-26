@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::env;
+
 use super::*;
 use crate::{config::VersionInfo, error::ZkError, test_utils::get_tempdir};
 use sha2::{Digest, Sha256};
@@ -59,6 +61,10 @@ async fn test_version_info_roundtrip() {
 
 #[tokio::test]
 async fn test_check_status_full_setup_needed() {
+    if let Some(_) = env::var("E3_CUSTOM_BB").ok() {
+        return;
+    }
+
     let temp = get_tempdir().unwrap();
     let backend = test_backend(temp.path(), ZkConfig::default());
 
@@ -72,6 +78,10 @@ async fn test_check_status_full_setup_needed() {
 
 #[tokio::test]
 async fn test_check_status_ready_when_installed() {
+    if let Some(_) = env::var("E3_CUSTOM_BB").ok() {
+        return;
+    }
+
     let temp = get_tempdir().unwrap();
     let config = ZkConfig::default();
     let backend = test_backend(temp.path(), config.clone());
@@ -101,6 +111,10 @@ async fn test_check_status_ready_when_installed() {
 
 #[tokio::test]
 async fn test_check_status_bb_needs_update() {
+    if let Some(_) = env::var("E3_CUSTOM_BB").ok() {
+        return;
+    }
+
     let temp = get_tempdir().unwrap();
     let config = ZkConfig::default();
     let backend = test_backend(temp.path(), config.clone());

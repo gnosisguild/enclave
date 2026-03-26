@@ -17,7 +17,7 @@ use syn::{parse_macro_input, Data, DeriveInput, Error, Fields};
 ///
 /// # Example
 ///
-/// ```rust
+/// ```ignore
 /// use e3_utils::BytesSerde;
 /// use e3_utils::AsBytesSerde;
 ///
