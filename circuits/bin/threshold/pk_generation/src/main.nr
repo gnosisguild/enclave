@@ -18,7 +18,6 @@ fn main(
     r1is: [Polynomial<(2 * N) - 1>; L],
     r2is: [Polynomial<N - 1>; L],
     pk0is: [Polynomial<N>; L],
-    pk1is: [Polynomial<N>; L],
 ) -> pub (Field, Field, Field) {
     let pk_generation: PkGeneration<N, L, PK_GENERATION_BIT_EEK, PK_GENERATION_BIT_SK, PK_GENERATION_BIT_E_SM, PK_GENERATION_BIT_R1, PK_GENERATION_BIT_R2, PK_GENERATION_BIT_PK> = PkGeneration::new(
         PK_GENERATION_CONFIGS,
@@ -29,7 +28,6 @@ fn main(
         r1is,
         r2is,
         pk0is,
-        pk1is,
     );
     pk_generation.execute()
 }

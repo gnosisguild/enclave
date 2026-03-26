@@ -45,7 +45,7 @@ impl<let N: u32, let L: u32> Configs<N, L> {
 /// Verifies:
 /// 1. Range checks on all secret witnesses (secret key, error, smudging noise, quotients)
 /// 2. Correct public key generation: pk0_i = -a_i * sk + eek + r2_i * (X^N + 1) + r1_i * q_i
-///    and pk1_i = a_i
+///    (pk1 is a_i from the hardcoded CRS `a`, not a separate witness)
 ///
 /// Outputs:
 /// - commit(threshold_sk)
@@ -77,11 +77,8 @@ pub struct PkGeneration<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u3
     /// r2[i] are quotients from cyclotomic reduction for modulus i (typically positive, degree N-1)
     r2: [Polynomial<N - 1>; L],
 
-    /// Threshold public key components (committed witnesses)
-    /// pk0[i] is the first component of the public key for modulus i
+    /// Threshold public key first component per modulus (committed witness). Second component is a[i].
     pk0: [Polynomial<N>; L],
-    /// pk1[i] is the second component of the public key for modulus i (should equal a[i])
-    pk1: [Polynomial<N>; L],
 }
 
 impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_PK: u32> PkGeneration<N, L, BIT_EEK, BIT_SK, BIT_E_SM, BIT_R1, BIT_R2, BIT_PK> {
@@ -94,9 +91,8 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         r1: [Polynomial<2 * N - 1>; L],
         r2: [Polynomial<N - 1>; L],
         pk0: [Polynomial<N>; L],
-        pk1: [Polynomial<N>; L],
     ) -> Self {
-        PkGeneration { configs, a, eek, sk, e_sm, r1, r2, pk0, pk1 }
+        PkGeneration { configs, a, eek, sk, e_sm, r1, r2, pk0 }
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
@@ -128,7 +124,8 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         let sk_commitment = compute_share_computation_sk_commitment::<N, BIT_SK>(self.sk);
         let e_sm_commitment =
             compute_share_computation_e_sm_commitment::<N, L, BIT_E_SM>(self.e_sm);
-        let pk_commitment = compute_threshold_pk_commitment::<N, L, BIT_PK>(self.pk0, self.pk1);
+        let pk_commitment =
+            compute_threshold_pk_commitment::<N, L, BIT_PK>(self.pk0, self.a);
 
         let gamma = self.generate_challenge(sk_commitment, pk_commitment);
         self.verify_evaluations(gamma);
@@ -182,10 +179,6 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
                 + self.r1[i].eval(gamma) * self.configs.qis[i];
 
             assert(self.pk0[i].eval(gamma) == expected_pk0, "Public key equation 1 failed");
-            assert(
-                self.pk1[i].eval(gamma) == self.a[i].eval(gamma),
-                "Public key equation 2 failed",
-            );
         }
     }
 }
