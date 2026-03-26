@@ -36,7 +36,7 @@ use tracing::{info, warn};
 struct VerifiedProofData {
     party_id: u64,
     address: Address,
-    public_outputs: ArcBytes,
+    public_signals: ArcBytes,
 }
 
 /// Per-E3 actor that enforces cross-circuit commitment consistency.
@@ -102,8 +102,8 @@ impl CommitmentConsistencyChecker {
         let target = self.verified.get(&(address, tgt_type));
 
         if let (Some(src), Some(tgt)) = (source, target) {
-            let source_values = link.extract_source_values(&src.public_outputs);
-            if !link.check_consistency(&source_values, &tgt.public_outputs) {
+            let source_values = link.extract_source_values(&src.public_signals);
+            if !link.check_consistency(&source_values, &tgt.public_signals) {
                 warn!(
                     "[{}] Commitment mismatch for E3 {} — party {} ({}): \
                      source {:?} vs target {:?} from same address",
@@ -146,12 +146,12 @@ impl CommitmentConsistencyChecker {
 
         // For each (source, target) pair, check consistency.
         for src in &sources {
-            let source_values = link.extract_source_values(&src.public_outputs);
+            let source_values = link.extract_source_values(&src.public_signals);
             if source_values.is_empty() {
                 continue;
             }
             for tgt in &targets {
-                if !link.check_consistency(&source_values, &tgt.public_outputs) {
+                if !link.check_consistency(&source_values, &tgt.public_signals) {
                     warn!(
                         "[{}] Commitment mismatch for E3 {} — source party {} ({}) {:?} \
                          not consistent with target party {} ({}) {:?}",
@@ -205,14 +205,14 @@ impl Handler<TypedEvent<ProofVerificationPassed>> for CommitmentConsistencyCheck
 
         let proof_type = data.proof_type;
         let address = data.address;
-        let public_outputs = data.public_outputs;
+        let public_signals = data.public_signals;
 
         self.verified.insert(
             (address, proof_type),
             VerifiedProofData {
                 party_id: data.party_id,
                 address,
-                public_outputs,
+                public_signals,
             },
         );
 
