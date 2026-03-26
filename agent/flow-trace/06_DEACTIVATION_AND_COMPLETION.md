@@ -165,7 +165,7 @@ publishPlaintextOutput() succeeds
 │   │   │     remainder sent to protocol treasury
 │   │   │   → If no escrowed funds: no-op
 │   │   └─ Emit RewardsDistributed(e3Id)
-│   └─ Emit PlaintextOutputPublished, E3StageChanged(Complete)
+│   └─ Emit PlaintextOutputPublished(e3Id, plaintext, proof), E3StageChanged(Complete)
 │
 └─ RUST-SIDE (cleanup via E3RequestComplete):
     │

@@ -1236,7 +1236,7 @@ describe("Enclave", function () {
         await enclave.publishPlaintextOutput(e3Id, data, proof, "0x"),
       )
         .to.emit(enclave, "PlaintextOutputPublished")
-        .withArgs(e3Id, data);
+        .withArgs(e3Id, data, proof);
     });
   });
 });
