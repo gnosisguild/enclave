@@ -261,13 +261,7 @@ impl Computation for Inputs {
         let cyclo = cyclotomic_polynomial(n);
 
         // Perform the main computation logic
-        let mut results: Vec<(
-            usize,
-            Polynomial,
-            Polynomial,
-            Polynomial,
-            Polynomial,
-        )> = izip!(
+        let mut results: Vec<(usize, Polynomial, Polynomial, Polynomial, Polynomial)> = izip!(
             moduli.clone(),
             data.pk0_share.limbs.clone(),
             a.limbs.clone(),
