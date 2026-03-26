@@ -39,14 +39,16 @@ pub enum ProofType {
     C3aSkShareEncryption = 4,
     /// C3b — Smudging noise share encryption proof (Proof 3b).
     C3bESmShareEncryption = 5,
-    /// C4 — DKG share decryption proof (Proof 4).
-    C4DkgShareDecryption = 6,
+    /// C4a — SK share decryption proof (Proof 4a).
+    C4aSkShareDecryption = 6,
+    /// C4b — Smudging noise share decryption proof (Proof 4b).
+    C4bESmShareDecryption = 7,
     /// C6 — Threshold share decryption proof (Proof 6).
-    C6ThresholdShareDecryption = 7,
+    C6ThresholdShareDecryption = 8,
     /// C7 — Decrypted shares aggregation proof (Proof 7).
-    C7DecryptedSharesAggregation = 8,
+    C7DecryptedSharesAggregation = 9,
     /// C5 — Public key aggregation proof (Proof 5).
-    C5PkAggregation = 9,
+    C5PkAggregation = 10,
 }
 
 impl ProofType {
@@ -59,7 +61,9 @@ impl ProofType {
             ProofType::C2bESmShareComputation => vec![CircuitName::ShareComputation],
             ProofType::C3aSkShareEncryption => vec![CircuitName::ShareEncryption],
             ProofType::C3bESmShareEncryption => vec![CircuitName::ShareEncryption],
-            ProofType::C4DkgShareDecryption => vec![CircuitName::DkgShareDecryption],
+            ProofType::C4aSkShareDecryption | ProofType::C4bESmShareDecryption => {
+                vec![CircuitName::DkgShareDecryption]
+            }
             ProofType::C6ThresholdShareDecryption => vec![CircuitName::ThresholdShareDecryption],
             ProofType::C7DecryptedSharesAggregation => {
                 vec![CircuitName::DecryptedSharesAggregation]
@@ -77,7 +81,8 @@ impl ProofType {
             | ProofType::C2bESmShareComputation
             | ProofType::C3aSkShareEncryption
             | ProofType::C3bESmShareEncryption
-            | ProofType::C4DkgShareDecryption => "E3_BAD_DKG_PROOF",
+            | ProofType::C4aSkShareDecryption
+            | ProofType::C4bESmShareDecryption => "E3_BAD_DKG_PROOF",
             ProofType::C6ThresholdShareDecryption => "E3_BAD_DECRYPTION_PROOF",
             ProofType::C7DecryptedSharesAggregation => "E3_BAD_AGGREGATION_PROOF",
             ProofType::C5PkAggregation => "E3_BAD_PK_AGGREGATION_PROOF",
@@ -391,7 +396,11 @@ mod tests {
             vec![CircuitName::ShareEncryption]
         );
         assert_eq!(
-            ProofType::C4DkgShareDecryption.circuit_names(),
+            ProofType::C4aSkShareDecryption.circuit_names(),
+            vec![CircuitName::DkgShareDecryption]
+        );
+        assert_eq!(
+            ProofType::C4bESmShareDecryption.circuit_names(),
             vec![CircuitName::DkgShareDecryption]
         );
         assert_eq!(

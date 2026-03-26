@@ -24,19 +24,20 @@ use super::commitment_links::{CommitmentLink, LinkScope};
 use actix::{Actor, Addr, Context, Handler};
 use alloy::primitives::Address;
 use e3_events::{
-    BusHandle, E3id, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, ProofType,
-    ProofVerificationPassed, TypedEvent,
+    BusHandle, E3id, EnclaveEvent, EnclaveEventData, EventPublisher, EventSubscriber, EventType,
+    ProofType, ProofVerificationPassed, SignedProofFailed, SignedProofPayload, TypedEvent,
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
 use std::collections::HashMap;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 /// Cached data from a verified proof.
 struct VerifiedProofData {
     party_id: u64,
     address: Address,
     public_signals: ArcBytes,
+    signed_payload: SignedProofPayload,
 }
 
 /// Per-E3 actor that enforces cross-circuit commitment consistency.
@@ -69,15 +70,39 @@ impl CommitmentConsistencyChecker {
         addr
     }
 
+    /// Emit SignedProofFailed for a party whose proof is inconsistent.
+    fn emit_fault(
+        &self,
+        data: &VerifiedProofData,
+        ec: &e3_events::EventContext<e3_events::Sequenced>,
+    ) {
+        if let Err(e) = self.bus.publish(
+            SignedProofFailed {
+                e3_id: self.e3_id.clone(),
+                faulting_node: data.address,
+                proof_type: data.signed_payload.payload.proof_type,
+                signed_payload: data.signed_payload.clone(),
+            },
+            ec.clone(),
+        ) {
+            error!("Failed to publish SignedProofFailed: {e}");
+        }
+    }
+
     /// Evaluate all registered links given a newly arrived proof.
-    fn check_links(&self, new_proof_type: ProofType, new_address: Address) {
+    fn check_links(
+        &self,
+        new_proof_type: ProofType,
+        new_address: Address,
+        ec: &e3_events::EventContext<e3_events::Sequenced>,
+    ) {
         for link in &self.links {
             match link.scope() {
                 LinkScope::SameParty => {
-                    self.check_same_party_link(link.as_ref(), new_proof_type, new_address);
+                    self.check_same_party_link(link.as_ref(), new_proof_type, new_address, ec);
                 }
                 LinkScope::CrossParty => {
-                    self.check_cross_party_link(link.as_ref(), new_proof_type);
+                    self.check_cross_party_link(link.as_ref(), new_proof_type, ec);
                 }
             }
         }
@@ -89,6 +114,7 @@ impl CommitmentConsistencyChecker {
         link: &dyn CommitmentLink,
         new_proof_type: ProofType,
         address: Address,
+        ec: &e3_events::EventContext<e3_events::Sequenced>,
     ) {
         let src_type = link.source_proof_type();
         let tgt_type = link.target_proof_type();
@@ -114,13 +140,21 @@ impl CommitmentConsistencyChecker {
                     src_type,
                     tgt_type,
                 );
+                // Report the target proof as faulting — its inputs don't match
+                // the source's outputs.
+                self.emit_fault(tgt, ec);
             }
         }
     }
 
     /// Cross-party: check all cached sources against the target (or the new
     /// source against all cached targets).
-    fn check_cross_party_link(&self, link: &dyn CommitmentLink, new_proof_type: ProofType) {
+    fn check_cross_party_link(
+        &self,
+        link: &dyn CommitmentLink,
+        new_proof_type: ProofType,
+        ec: &e3_events::EventContext<e3_events::Sequenced>,
+    ) {
         let src_type = link.source_proof_type();
         let tgt_type = link.target_proof_type();
 
@@ -164,6 +198,7 @@ impl CommitmentConsistencyChecker {
                         tgt.address,
                         tgt_type,
                     );
+                    self.emit_fault(src, ec);
                 }
             }
         }
@@ -201,11 +236,12 @@ impl Handler<TypedEvent<ProofVerificationPassed>> for CommitmentConsistencyCheck
         msg: TypedEvent<ProofVerificationPassed>,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let (data, _ec) = msg.into_components();
+        let (data, ec) = msg.into_components();
 
         let proof_type = data.proof_type;
         let address = data.address;
         let public_signals = data.public_signals;
+        let signed_payload = data.signed_payload;
 
         self.verified.insert(
             (address, proof_type),
@@ -213,9 +249,10 @@ impl Handler<TypedEvent<ProofVerificationPassed>> for CommitmentConsistencyCheck
                 party_id: data.party_id,
                 address,
                 public_signals,
+                signed_payload,
             },
         );
 
-        self.check_links(proof_type, address);
+        self.check_links(proof_type, address, &ec);
     }
 }

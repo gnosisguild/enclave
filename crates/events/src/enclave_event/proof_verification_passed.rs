@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{E3id, ProofType};
+use crate::{E3id, ProofType, SignedProofPayload};
 use actix::Message;
 use alloy::primitives::Address;
 use e3_utils::utility_types::ArcBytes;
@@ -34,6 +34,8 @@ pub struct ProofVerificationPassed {
     pub data_hash: [u8; 32],
     /// Raw public signals from the verified proof — for commitment consistency checks.
     pub public_signals: ArcBytes,
+    /// The full signed proof — for fault evidence if a commitment mismatch is detected.
+    pub signed_payload: SignedProofPayload,
 }
 
 impl Display for ProofVerificationPassed {

@@ -252,6 +252,7 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
                         proof_type: ProofType::C0PkBfv,
                         data_hash,
                         public_signals: signed_payload.payload.proof.public_signals.clone(),
+                        signed_payload: signed_payload.clone(),
                     },
                     ec,
                 ) {

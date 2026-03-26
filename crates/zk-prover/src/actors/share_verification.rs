@@ -23,6 +23,9 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use super::commitment_links::c4a_to_c6::C4aToC6SkCommitmentLink;
+use super::commitment_links::c4b_to_c6::C4bToC6ESmCommitmentLink;
+use super::commitment_links::CommitmentLink;
 use actix::{Actor, Addr, Context, Handler};
 use alloy::primitives::{keccak256, Address, Bytes};
 use alloy::sol_types::SolValue;
@@ -38,15 +41,6 @@ use e3_events::{
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
-
-/// Cached C4 return commitments for a single party.
-#[derive(Debug, Clone)]
-struct C4Commitments {
-    /// C4a: commitment to aggregated SK shares.
-    sk_commitment: ArcBytes,
-    /// C4b: commitment(s) to aggregated ESM shares, one per ESI.
-    e_sm_commitments: Vec<ArcBytes>,
-}
 
 /// Trait for party types whose signed proofs can be ECDSA-validated and ZK-verified.
 trait VerifiableParty: Clone {
@@ -98,6 +92,8 @@ struct PendingVerification {
     party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>>,
     /// Cached (proof_type, public_signals) per party — for commitment consistency checking.
     party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
+    /// Cached signed proofs per party — for fault evidence in ProofVerificationPassed.
+    party_signed_proofs: HashMap<u64, Vec<SignedProofPayload>>,
 }
 
 /// Actor that handles C2/C3/C4 share proof verification.
@@ -110,9 +106,10 @@ pub struct ShareVerificationActor {
     bus: BusHandle,
     /// Tracks pending verifications by correlation ID.
     pending: HashMap<CorrelationId, PendingVerification>,
-    /// Cached C4 return commitments per party, keyed by E3 ID.
-    /// Populated after C4 verification passes; consumed during C6 verification.
-    c4_cache: HashMap<E3id, HashMap<u64, C4Commitments>>,
+    /// Cached C4 public_signals per (e3_id, party_id) for the pre-verification
+    /// C4→C6 gate. Each party has two C4 proofs (C4a sk, C4b e_sm), so we store
+    /// a vec of (ProofType, public_signals) pairs.
+    c4_signals_cache: HashMap<E3id, HashMap<u64, Vec<(ProofType, ArcBytes)>>>,
 }
 
 impl ShareVerificationActor {
@@ -120,7 +117,7 @@ impl ShareVerificationActor {
         Self {
             bus: bus.clone(),
             pending: HashMap::new(),
-            c4_cache: HashMap::new(),
+            c4_signals_cache: HashMap::new(),
         }
     }
 
@@ -165,34 +162,72 @@ impl ShareVerificationActor {
                 );
             }
             VerificationKind::ThresholdDecryptionProofs => {
-                // C4→C6 cross-check: compare C6 expected commitments against cached C4 values.
-                // Mismatched parties are added to pre_dishonest before ZK dispatch.
+                // Pre-verification C4→C6 gate: check cached C4 signals against
+                // C6 public inputs before dispatching ZK verification.
                 let mut pre_dishonest = msg.pre_dishonest;
-                for party in &msg.share_proofs {
-                    if let Some(mismatch_signed) = self.check_c6_party_against_c4(&e3_id, party) {
-                        pre_dishonest.insert(party.sender_party_id);
-                        self.emit_signed_proof_failed(
-                            &e3_id,
-                            &mismatch_signed,
-                            None,
-                            party.sender_party_id,
-                            &ec,
-                        );
+                if let Some(c4_cache) = self.c4_signals_cache.get(&e3_id) {
+                    let c4a_link = C4aToC6SkCommitmentLink;
+                    let c4b_link = C4bToC6ESmCommitmentLink;
+
+                    for party in &msg.share_proofs {
+                        let party_id = party.sender_party_id;
+                        if pre_dishonest.contains(&party_id) {
+                            continue;
+                        }
+                        let Some(c4_signals) = c4_cache.get(&party_id) else {
+                            continue; // No cached C4 — skip gate, ZK will still verify
+                        };
+
+                        // Get C6 public_signals from the party's signed proof
+                        let c6_proofs = &party.signed_proofs;
+                        let Some(c6_proof) = c6_proofs.first() else {
+                            continue;
+                        };
+                        let c6_signals = &c6_proof.payload.proof.public_signals;
+
+                        let mut mismatch = false;
+                        for (proof_type, c4_ps) in c4_signals {
+                            match proof_type {
+                                ProofType::C4aSkShareDecryption => {
+                                    let src = c4a_link.extract_source_values(c4_ps);
+                                    if !src.is_empty()
+                                        && !c4a_link.check_consistency(&src, c6_signals)
+                                    {
+                                        warn!(
+                                            "C4→C6 gate: sk_commitment mismatch for E3 {} party {} — marking dishonest",
+                                            e3_id, party_id
+                                        );
+                                        mismatch = true;
+                                    }
+                                }
+                                ProofType::C4bESmShareDecryption => {
+                                    let src = c4b_link.extract_source_values(c4_ps);
+                                    if !src.is_empty()
+                                        && !c4b_link.check_consistency(&src, c6_signals)
+                                    {
+                                        warn!(
+                                            "C4→C6 gate: e_sm_commitment mismatch for E3 {} party {} — marking dishonest",
+                                            e3_id, party_id
+                                        );
+                                        mismatch = true;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        if mismatch {
+                            pre_dishonest.insert(party_id);
+                            let addr = c6_proof.recover_address().ok();
+                            self.emit_signed_proof_failed(&e3_id, c6_proof, addr, party_id, &ec);
+                        }
                     }
                 }
-
-                // Filter out parties already marked dishonest by the cross-check
-                // to avoid wasting ZK verification on them.
-                let share_proofs: Vec<_> = msg
-                    .share_proofs
-                    .into_iter()
-                    .filter(|p| !pre_dishonest.contains(&p.sender_party_id))
-                    .collect();
 
                 self.verify_proofs(
                     e3_id,
                     VerificationKind::ThresholdDecryptionProofs,
-                    share_proofs,
+                    msg.share_proofs,
                     pre_dishonest,
                     ec,
                     |passed, corr_id, e3| {
@@ -207,9 +242,6 @@ impl ShareVerificationActor {
                 );
             }
             VerificationKind::DecryptionProofs => {
-                // Cache C4 return commitments for later C6 cross-check.
-                self.cache_c4_commitments(&e3_id, &msg.decryption_proofs);
-
                 self.verify_proofs(
                     e3_id,
                     VerificationKind::DecryptionProofs,
@@ -255,6 +287,9 @@ impl ShareVerificationActor {
         let mut party_addresses: HashMap<u64, Address> = HashMap::new();
 
         for party in &party_proofs {
+            if pre_dishonest.contains(&party.party_id()) {
+                continue;
+            }
             let proofs = party.signed_proofs();
             let result =
                 self.ecdsa_validate_signed_proofs(party.party_id(), &proofs, &e3_id_str, label);
@@ -269,13 +304,11 @@ impl ShareVerificationActor {
         }
 
         // Store recovered addresses for passed parties
-        for party in &party_proofs {
-            if !ecdsa_dishonest.contains(&party.party_id()) {
-                let proofs = party.signed_proofs();
-                if let Some(first_signed) = proofs.first() {
-                    if let Ok(addr) = first_signed.recover_address() {
-                        party_addresses.insert(party.party_id(), addr);
-                    }
+        for party in &ecdsa_passed_parties {
+            let proofs = party.signed_proofs();
+            if let Some(first_signed) = proofs.first() {
+                if let Ok(addr) = first_signed.recover_address() {
+                    party_addresses.insert(party.party_id(), addr);
                 }
             }
         }
@@ -296,6 +329,7 @@ impl ShareVerificationActor {
         // Compute proof hashes for ECDSA-passed parties (for ProofVerificationPassed on success)
         let mut party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>> = HashMap::new();
         let mut party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>> = HashMap::new();
+        let mut party_signed_proofs: HashMap<u64, Vec<SignedProofPayload>> = HashMap::new();
         for party in &ecdsa_passed_parties {
             let hashes: Vec<(ProofType, [u8; 32])> = party
                 .signed_proofs()
@@ -319,8 +353,10 @@ impl ShareVerificationActor {
                     )
                 })
                 .collect();
+            let signed: Vec<SignedProofPayload> = party.signed_proofs().iter().cloned().collect();
             party_proof_hashes.insert(party.party_id(), hashes);
             party_public_signals.insert(party.party_id(), signals);
+            party_signed_proofs.insert(party.party_id(), signed);
         }
 
         self.pending.insert(
@@ -335,6 +371,7 @@ impl ShareVerificationActor {
                 party_addresses,
                 party_proof_hashes,
                 party_public_signals,
+                party_signed_proofs,
             },
         );
 
@@ -430,79 +467,6 @@ impl ShareVerificationActor {
         }
     }
 
-    /// Cache C4 return commitments from decryption proofs for later C6 cross-check.
-    fn cache_c4_commitments(
-        &mut self,
-        e3_id: &E3id,
-        parties: &[PartyShareDecryptionProofsToVerify],
-    ) {
-        let cache = self.c4_cache.entry(e3_id.clone()).or_default();
-        for party in parties {
-            let sk = party
-                .signed_sk_decryption_proof
-                .payload
-                .proof
-                .extract_output("commitment");
-            let esm: Vec<ArcBytes> = party
-                .signed_e_sm_decryption_proofs
-                .iter()
-                .filter_map(|p| p.payload.proof.extract_output("commitment"))
-                .collect();
-
-            if let Some(sk_commitment) = sk {
-                cache.insert(
-                    party.sender_party_id,
-                    C4Commitments {
-                        sk_commitment,
-                        e_sm_commitments: esm,
-                    },
-                );
-            }
-        }
-        info!(
-            "Cached C4 commitments for {} parties (E3 {})",
-            cache.len(),
-            e3_id
-        );
-    }
-
-    /// Check one party's C6 expected commitments against cached C4 return values.
-    /// Returns the first mismatched signed proof (for fault attribution), or None if OK.
-    fn check_c6_party_against_c4(
-        &self,
-        e3_id: &E3id,
-        party: &PartyProofsToVerify,
-    ) -> Option<SignedProofPayload> {
-        let c4_cache = self.c4_cache.get(e3_id)?;
-        let c4 = c4_cache.get(&party.sender_party_id)?;
-        let first_proof = party.signed_proofs.first()?;
-        let proof = &first_proof.payload.proof;
-
-        // Extract C6 expected commitments using the input layout
-        let c6_sk = proof.extract_input("expected_sk_commitment")?;
-        let c6_esm = proof.extract_input("expected_e_sm_commitment")?;
-
-        if c4.sk_commitment[..] != c6_sk[..] {
-            warn!(
-                "C4→C6 SK commitment mismatch for party {}",
-                party.sender_party_id
-            );
-            return Some(first_proof.clone());
-        }
-
-        if let Some(c4_esm) = c4.e_sm_commitments.first() {
-            if c4_esm[..] != c6_esm[..] {
-                warn!(
-                    "C4→C6 ESM commitment mismatch for party {}",
-                    party.sender_party_id
-                );
-                return Some(first_proof.clone());
-            }
-        }
-
-        None
-    }
-
     /// Handle ZK verification response from multithread.
     fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) {
         let (msg, _ec) = msg.into_components();
@@ -579,7 +543,7 @@ impl ShareVerificationActor {
                         &pending.ec,
                     );
                 }
-            } else {
+            } else if !all_dishonest.contains(&result.sender_party_id) {
                 // Emit ProofVerificationPassed for each proof type from this party
                 if let Some(hashes) = pending.party_proof_hashes.get(&result.sender_party_id) {
                     let addr = pending
@@ -588,11 +552,20 @@ impl ShareVerificationActor {
                         .copied()
                         .unwrap_or_default();
                     let signals = pending.party_public_signals.get(&result.sender_party_id);
+                    let signed_proofs = pending.party_signed_proofs.get(&result.sender_party_id);
                     for (i, &(proof_type, data_hash)) in hashes.iter().enumerate() {
                         let public_signals = signals
                             .and_then(|s| s.get(i))
                             .map(|(_, ps)| ps.clone())
                             .unwrap_or_default();
+                        let Some(signed_payload) = signed_proofs.and_then(|s| s.get(i)).cloned()
+                        else {
+                            warn!(
+                                "Missing signed proof for party {} proof index {} — skipping ProofVerificationPassed",
+                                result.sender_party_id, i
+                            );
+                            continue;
+                        };
                         if let Err(err) = self.bus.publish(
                             ProofVerificationPassed {
                                 e3_id: pending.e3_id.clone(),
@@ -601,11 +574,36 @@ impl ShareVerificationActor {
                                 proof_type,
                                 data_hash,
                                 public_signals,
+                                signed_payload,
                             },
                             pending.ec.clone(),
                         ) {
                             error!("Failed to publish ProofVerificationPassed: {err}");
                         }
+                    }
+                }
+            } else {
+                warn!(
+                    "Party {} passed ZK but is in all_dishonest — suppressing ProofVerificationPassed",
+                    result.sender_party_id
+                );
+            }
+        }
+
+        // Cache C4 signals for ZK-passed parties so the C4→C6 gate can use them later;
+        // evict the cache after C6 verification since the signals are no longer needed.
+        if pending.kind == VerificationKind::ThresholdDecryptionProofs {
+            self.c4_signals_cache.remove(&pending.e3_id);
+        } else if pending.kind == VerificationKind::DecryptionProofs {
+            let e3_cache = self
+                .c4_signals_cache
+                .entry(pending.e3_id.clone())
+                .or_default();
+            for result in &zk_results {
+                if result.all_verified && !all_dishonest.contains(&result.sender_party_id) {
+                    if let Some(signals) = pending.party_public_signals.get(&result.sender_party_id)
+                    {
+                        e3_cache.insert(result.sender_party_id, signals.clone());
                     }
                 }
             }
