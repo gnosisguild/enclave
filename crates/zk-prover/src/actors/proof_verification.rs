@@ -122,6 +122,13 @@ impl ProofVerificationActor {
             );
             return;
         }
+        if *proof != signed.payload.proof {
+            error!(
+                "Proof mismatch for key from party {}: key.proof differs from signed_payload.payload.proof — rejecting",
+                msg.key.party_id
+            );
+            return;
+        }
 
         // Store the signed payload so we can reference it in the verification response
         self.pending.insert(

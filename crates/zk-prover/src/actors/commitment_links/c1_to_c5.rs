@@ -64,9 +64,14 @@ impl CommitmentLink for C1ToC5PkCommitmentLink {
         source_values: &[FieldValue],
         target_public_signals: &[u8],
     ) -> bool {
-        if source_values.is_empty() || target_public_signals.len() < 2 * FIELD_SIZE {
-            // Not enough data to perform the check — treat as vacuously consistent.
+        if source_values.is_empty() {
+            // No source values to check — vacuously consistent.
             return true;
+        }
+
+        if target_public_signals.len() < 2 * FIELD_SIZE {
+            // Target proof is present but has malformed/truncated signals — non-consistent.
+            return false;
         }
 
         let source_pk_commitment = &source_values[0];
@@ -75,7 +80,8 @@ impl CommitmentLink for C1ToC5PkCommitmentLink {
         // H = total_fields - 1 (last field is the output)
         let total_fields = target_public_signals.len() / FIELD_SIZE;
         if total_fields < 2 {
-            return true;
+            // Target proof present but not enough fields — non-consistent.
+            return false;
         }
         let h = total_fields - 1;
 
@@ -148,11 +154,19 @@ mod tests {
     }
 
     #[test]
-    fn short_signals_treated_as_consistent() {
+    fn short_source_signals_treated_as_consistent() {
         let link = C1ToC5PkCommitmentLink;
-        // Too short for C1
+        // Too short for C1 — extract returns empty, so vacuously consistent
         assert!(link.extract_source_values(&[0u8; 60]).is_empty());
-        // Too short for C5
-        assert!(link.check_consistency(&[make_field(1)], &[0u8; 31]));
+        assert!(link.check_consistency(&[], &[0u8; 31]));
+    }
+
+    #[test]
+    fn short_target_signals_treated_as_inconsistent() {
+        let link = C1ToC5PkCommitmentLink;
+        // Source has valid data but target C5 is truncated — non-consistent
+        assert!(!link.check_consistency(&[make_field(1)], &[0u8; 31]));
+        // Only one field (< 2 required) — non-consistent
+        assert!(!link.check_consistency(&[make_field(1)], &make_field(1)));
     }
 }
