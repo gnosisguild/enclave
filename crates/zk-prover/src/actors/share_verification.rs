@@ -460,7 +460,7 @@ impl ShareVerificationActor {
                         .unwrap_or_default();
                     let signals = pending.party_public_signals.get(&result.sender_party_id);
                     for (i, &(proof_type, data_hash)) in hashes.iter().enumerate() {
-                        let public_outputs = signals
+                        let public_signals = signals
                             .and_then(|s| s.get(i))
                             .map(|(_, ps)| ps.clone())
                             .unwrap_or_default();
@@ -471,7 +471,7 @@ impl ShareVerificationActor {
                                 address: addr,
                                 proof_type,
                                 data_hash,
-                                public_outputs,
+                                public_signals,
                             },
                             pending.ec.clone(),
                         ) {

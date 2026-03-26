@@ -33,7 +33,7 @@ pub struct ProofVerificationPassed {
     /// keccak256 hash of the received data + proof bytes — for equivocation detection.
     pub data_hash: [u8; 32],
     /// Raw public signals from the verified proof — for commitment consistency checks.
-    pub public_outputs: ArcBytes,
+    pub public_signals: ArcBytes,
 }
 
 impl Display for ProofVerificationPassed {

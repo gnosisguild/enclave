@@ -217,6 +217,46 @@ pub fn compute_threshold_pk_commitment(
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
+/// Compute the pk_commitment for a serialized `PublicKeyShare`, matching what the C1 circuit outputs.
+///
+/// Deserializes the keyshare, extracts the pk0 polynomial, and hashes it
+/// together with the CRP (pk1) to produce the commitment. Returns 32
+/// big-endian bytes, ready to compare against
+/// `Proof::extract_output("pk_commitment")` from a C1 proof.
+///
+/// The caller supplies pre-built `params` and `crp` so that batch calls
+/// (multiple keyshares with the same parameters) don't rebuild them each time.
+pub fn compute_pk_commitment_from_keyshare_bytes(
+    keyshare_bytes: &[u8],
+    params: &std::sync::Arc<fhe::bfv::BfvParameters>,
+    crp: &fhe::mbfv::CommonRandomPoly,
+) -> Result<[u8; 32], crate::CircuitsErrors> {
+    let bit_pk = crate::compute_modulus_bit(params);
+    let moduli = params.moduli();
+
+    let pk_share = fhe::mbfv::PublicKeyShare::deserialize(keyshare_bytes, params, crp.clone())
+        .map_err(|e| {
+            crate::CircuitsErrors::Other(format!("PublicKeyShare deserialize: {:?}", e))
+        })?;
+
+    let mut pk0 = CrtPolynomial::from_fhe_polynomial(&pk_share.p0_share());
+    pk0.reverse();
+    pk0.center(moduli)
+        .map_err(|e| crate::CircuitsErrors::Other(format!("pk0 center: {}", e)))?;
+
+    let mut pk1 = CrtPolynomial::from_fhe_polynomial(&crp.poly());
+    pk1.reverse();
+    pk1.center(moduli)
+        .map_err(|e| crate::CircuitsErrors::Other(format!("pk1 center: {}", e)))?;
+
+    let commitment = compute_threshold_pk_commitment(&pk0, &pk1, bit_pk);
+    let (_, be_bytes) = commitment.to_bytes_be();
+    let mut padded = [0u8; 32];
+    let start = 32usize.saturating_sub(be_bytes.len());
+    padded[start..].copy_from_slice(&be_bytes[..be_bytes.len().min(32)]);
+    Ok(padded)
+}
+
 /// Compute a commitment to the threshold secret key share by flattening it and hashing.
 ///
 /// This matches the Noir `compute_share_computation_sk_commitment` function exactly.
@@ -673,5 +713,45 @@ mod tests {
         let io_pattern = [0x80000000 | input_size, 1];
         let expected = compute_commitments(vk_hashes.clone(), super::DS_VK_HASH, io_pattern)[0];
         assert_eq!(compute_vk_hash(vk_hashes), expected);
+    }
+
+    #[test]
+    fn compute_pk_commitment_from_keyshare_roundtrip() {
+        use e3_fhe_params::{
+            build_pair_for_preset, create_deterministic_crp_from_default_seed, BfvPreset,
+        };
+        use fhe::bfv::SecretKey;
+        use fhe::mbfv::PublicKeyShare;
+        use fhe_traits::Serialize;
+        use rand::rngs::OsRng;
+
+        let preset = BfvPreset::InsecureThreshold512;
+        let (params, _) = build_pair_for_preset(preset).unwrap();
+        let crp = create_deterministic_crp_from_default_seed(&params);
+
+        // Generate a real keyshare
+        let sk = SecretKey::random(&params, &mut OsRng);
+        let pk_share = PublicKeyShare::new(&sk, crp.clone(), &mut OsRng).unwrap();
+        let ks_bytes = pk_share.to_bytes();
+
+        // Compute commitment via the helper
+        let commitment =
+            compute_pk_commitment_from_keyshare_bytes(&ks_bytes, &params, &crp).unwrap();
+
+        // Compute commitment manually (same steps as PkAggInputs::compute)
+        let bit_pk = crate::compute_modulus_bit(&params);
+        let mut pk0 = CrtPolynomial::from_fhe_polynomial(&pk_share.p0_share());
+        pk0.reverse();
+        pk0.center(params.moduli()).unwrap();
+        let mut pk1 = CrtPolynomial::from_fhe_polynomial(&crp.poly());
+        pk1.reverse();
+        pk1.center(params.moduli()).unwrap();
+        let expected = compute_threshold_pk_commitment(&pk0, &pk1, bit_pk);
+        let (_, be_bytes) = expected.to_bytes_be();
+        let mut expected_padded = [0u8; 32];
+        let start = 32usize.saturating_sub(be_bytes.len());
+        expected_padded[start..].copy_from_slice(&be_bytes[..be_bytes.len().min(32)]);
+
+        assert_eq!(commitment, expected_padded);
     }
 }

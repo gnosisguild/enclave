@@ -130,12 +130,17 @@ impl Computation for Bits {
     type Data = Bounds;
     type Error = CircuitsErrors;
 
-    fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         // Calculate bit widths for each bound type
         let eek_bit = calculate_bit_width(BigInt::from(data.eek_bound.clone()));
         let sk_bit = calculate_bit_width(BigInt::from(data.sk_bound.clone()));
         let e_sm_bit = calculate_bit_width(BigInt::from(data.e_sm_bound.clone()));
-        let pk_bit = calculate_bit_width(BigInt::from(data.pk_bound.clone()));
+
+        // pk_bit: centered representation uses (max(qi) - 1) / 2 as the bound,
+        // matching compute_modulus_bit() used in C5 (pk_aggregation).
+        let (threshold_params, _) =
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
+        let pk_bit = crate::compute_modulus_bit(&threshold_params);
 
         // For r1, use the maximum of all low and up bounds
         let mut r1_bit = 0;
@@ -370,10 +375,13 @@ mod tests {
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &()).unwrap();
-        let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
+        let preset = BfvPreset::InsecureThreshold512;
+        let bounds = Bounds::compute(preset, &()).unwrap();
+        let bits = Bits::compute(preset, &bounds).unwrap();
 
-        let expected_bit = calculate_bit_width(BigInt::from(bounds.pk_bound.clone()));
+        // pk_bit uses compute_modulus_bit: (max(qi) - 1) / 2 for centered representation
+        let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
+        let expected_bit = crate::compute_modulus_bit(&threshold_params);
 
         assert_eq!(bits.pk_bit, expected_bit);
     }
