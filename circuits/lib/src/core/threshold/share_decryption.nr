@@ -112,8 +112,10 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         );
     }
 
-    /// Truncates each CRT limb of `d` to `MAX_MSG_NON_ZERO_COEFFS` coefficients (for hashing).
-    fn get_truncated_polynomials(self) -> [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L] {
+    /// Truncates each CRT limb of `d` to `MAX_MSG_NON_ZERO_COEFFS` coefficients.
+    /// Used only to build the C7 public commitment (`compute_threshold_decryption_share_commitment`);
+    /// the Fiat-Shamir transcript separately absorbs the full `d` witness via [`Self::payload`].
+    fn get_truncated_decryption_share(self) -> [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L] {
         let mut out: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L] =
             [Polynomial::new([0; MAX_MSG_NON_ZERO_COEFFS]); L];
         for i in 0..L {
@@ -139,7 +141,7 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
     /// 4. Ciphertext components `c_1` for each CRT basis (serialized coefficients)
     /// 5. Quotient polynomials `r_1` for each CRT basis (serialized coefficients)
     /// 6. Quotient polynomials `r_2` for each CRT basis (serialized coefficients)
-    /// 7. Commitment to decryption shares `d` (first MAX_MSG_NON_ZERO_COEFFS coefficients per CRT limb)
+    /// 7. Full decryption share polynomials `d` for each CRT basis (all N coefficients per limb)
     ///
     /// Note: Aggregated secret shares `sk` and noise shares `e_sm` are represented by their
     /// commitments rather than serialized coefficients. This saves constraints while
@@ -148,7 +150,7 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
     /// # Returns
     /// A vector containing commitments and polynomial coefficients in flattened form,
     /// ready for hashing to generate the Fiat-Shamir challenge.
-    fn payload(self, d_commitment: Field) -> Vec<Field> {
+    fn payload(self) -> Vec<Field> {
         let mut inputs = Vec::new();
 
         // Use commitments instead of full polynomials (saves constraints)
@@ -163,8 +165,8 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         inputs = flatten::<_, _, BIT_R1>(inputs, self.r1);
         inputs = flatten::<_, _, BIT_R2>(inputs, self.r2);
 
-        // Bind decryption share via prefix commitment (matches circuit 7)
-        inputs.push(d_commitment);
+        // Full `d` fixes the C7 prefix commitment (computed separately as the public output)
+        inputs = flatten::<N, L, BIT_D>(inputs, self.d);
 
         inputs
     }
@@ -183,13 +185,13 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         // (the DKG decryption circuit already performed range checks on these values)
         self.check_range_bounds();
 
-        let d_truncated = self.get_truncated_polynomials();
+        let d_truncated = self.get_truncated_decryption_share();
         let d_commitment = compute_threshold_decryption_share_commitment::<MAX_MSG_NON_ZERO_COEFFS, L, BIT_D>(
             d_truncated,
         );
 
         // Step 4: Generate Fiat-Shamir challenge from the transcript
-        let gamma = self.generate_challenge(d_commitment);
+        let gamma = self.generate_challenge();
 
         // Step 5: Verify decryption share computation for each CRT basis
         for i in 0..L {
@@ -233,7 +235,7 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
     /// Generates Fiat-Shamir challenge value using the SAFE cryptographic sponge.
     ///
     /// This function implements the Fiat-Shamir transform for the decryption share circuit:
-    /// 1. Flattens all witness data (commitments for sk/e_sm, ciphertexts c_0/c_1, quotients r_1/r_2, commitment to d) into a single array
+    /// 1. Flattens all witness data (commitments for sk/e_sm, ciphertexts c_0/c_1, quotients r_1/r_2, full d) into a single array
     /// 2. Absorbs the flattened data into the SAFE sponge
     /// 3. Squeezes a single challenge value
     ///
@@ -244,8 +246,8 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
     /// # Returns
     /// A single challenge value `gamma` used as the evaluation point for verifying
     /// the decryption share computation formula for all CRT bases.
-    fn generate_challenge(self, d_commitment: Field) -> Field {
-        let inputs = self.payload(d_commitment);
+    fn generate_challenge(self) -> Field {
+        let inputs = self.payload();
 
         compute_threshold_share_decryption_challenge::<L>(inputs)
     }

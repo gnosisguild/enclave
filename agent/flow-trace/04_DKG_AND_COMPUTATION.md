@@ -596,6 +596,7 @@ EnclaveSolReader decodes CiphertextOutputPublished event
     │   │   → Circuit: ThresholdShareDecryption (C6)
     │   │   → Proves decryption share was correctly computed from
     │   │     sk_poly_sum, es_poly_sum, and ciphertext
+    │   │   → Fiat-Shamir transcript absorbs full `d` (all coefficients per CRT limb)
     │   ├─ ZkActor generates proof via bb binary
     │   ├─ Signs proof
     │   └─ Publishes signed C6 proof
