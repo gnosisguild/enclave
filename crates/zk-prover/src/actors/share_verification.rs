@@ -35,6 +35,7 @@ use e3_events::{
     SignedProofPayload, TypedEvent, VerificationKind, VerifyShareDecryptionProofsRequest,
     VerifyShareProofsRequest, ZkRequest, ZkResponse,
 };
+use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
 
@@ -86,6 +87,8 @@ struct PendingVerification {
     party_addresses: HashMap<u64, Address>,
     /// Cached (proof_type, data_hash) per party — for emitting ProofVerificationPassed.
     party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>>,
+    /// Cached (proof_type, public_signals) per party — for commitment consistency checking.
+    party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
 }
 
 /// Actor that handles C2/C3/C4 share proof verification.
@@ -236,6 +239,7 @@ impl ShareVerificationActor {
 
         // Compute proof hashes for ECDSA-passed parties (for ProofVerificationPassed on success)
         let mut party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>> = HashMap::new();
+        let mut party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>> = HashMap::new();
         for party in &ecdsa_passed_parties {
             let hashes: Vec<(ProofType, [u8; 32])> = party
                 .signed_proofs()
@@ -249,7 +253,18 @@ impl ShareVerificationActor {
                     (signed.payload.proof_type, keccak256(&msg).into())
                 })
                 .collect();
+            let signals: Vec<(ProofType, ArcBytes)> = party
+                .signed_proofs()
+                .iter()
+                .map(|signed| {
+                    (
+                        signed.payload.proof_type,
+                        signed.payload.proof.public_signals.clone(),
+                    )
+                })
+                .collect();
             party_proof_hashes.insert(party.party_id(), hashes);
+            party_public_signals.insert(party.party_id(), signals);
         }
 
         self.pending.insert(
@@ -263,6 +278,7 @@ impl ShareVerificationActor {
                 dispatched_party_ids,
                 party_addresses,
                 party_proof_hashes,
+                party_public_signals,
             },
         );
 
@@ -442,7 +458,12 @@ impl ShareVerificationActor {
                         .get(&result.sender_party_id)
                         .copied()
                         .unwrap_or_default();
-                    for &(proof_type, data_hash) in hashes {
+                    let signals = pending.party_public_signals.get(&result.sender_party_id);
+                    for (i, &(proof_type, data_hash)) in hashes.iter().enumerate() {
+                        let public_signals = signals
+                            .and_then(|s| s.get(i))
+                            .map(|(_, ps)| ps.clone())
+                            .unwrap_or_default();
                         if let Err(err) = self.bus.publish(
                             ProofVerificationPassed {
                                 e3_id: pending.e3_id.clone(),
@@ -450,6 +471,7 @@ impl ShareVerificationActor {
                                 address: addr,
                                 proof_type,
                                 data_hash,
+                                public_signals,
                             },
                             pending.ec.clone(),
                         ) {

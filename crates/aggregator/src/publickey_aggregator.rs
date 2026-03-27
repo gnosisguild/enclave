@@ -10,11 +10,11 @@ use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, ComputeResponse, ComputeResponseKind, DKGRecursiveAggregationComplete,
-    Die, E3id, EnclaveEvent, EnclaveEventData, EventContext, KeyshareCreated, OrderedSet,
-    PartyProofsToVerify, PkAggregationProofPending, PkAggregationProofRequest,
-    PkAggregationProofSigned, Proof, PublicKeyAggregated, Seed, Sequenced,
-    ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload, TypedEvent,
-    VerificationKind, ZkResponse,
+    Die, E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EventContext, FailureReason,
+    KeyshareCreated, OrderedSet, PartyProofsToVerify, PkAggregationProofPending,
+    PkAggregationProofRequest, PkAggregationProofSigned, Proof, ProofType, ProofVerificationPassed,
+    PublicKeyAggregated, Seed, Sequenced, ShareVerificationComplete, ShareVerificationDispatched,
+    SignedProofFailed, SignedProofPayload, TypedEvent, VerificationKind, ZkResponse,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -246,6 +246,7 @@ impl PublicKeyAggregator {
         let PublicKeyAggregatorState::VerifyingC1 {
             submission_order,
             threshold_m,
+            c1_proofs,
             ..
         } = self
             .state
@@ -257,22 +258,97 @@ impl PublicKeyAggregator {
             ));
         };
 
-        let dishonest_parties = &msg.dishonest_parties;
+        let mut dishonest_parties = msg.dishonest_parties.clone();
         let total_parties = submission_order.len();
 
-        // Filter out dishonest parties using submission_order (insertion-order indexed,
-        // matching the party IDs sent to dispatch_c1_verification).
-        let (honest_keyshares, honest_nodes): (Vec<ArcBytes>, Vec<String>) = submission_order
+        // Filter out parties that failed C1 ZK verification.
+        let mut honest_entries: Vec<(usize, (String, ArcBytes))> = submission_order
             .into_iter()
             .enumerate()
             .filter(|(idx, _)| !dishonest_parties.contains(&(*idx as u64)))
-            .map(|(_, (node, ks))| (ks, node))
+            .collect();
+
+        // Cross-check: verify each party's keyshare matches their C1 pk_commitment.
+        // Parties that fail are marked dishonest and reported via SignedProofFailed.
+        let mut commitment_dishonest = Vec::new();
+        for (party_idx, (_node, ks)) in &honest_entries {
+            let signed_proof = match c1_proofs.get(*party_idx).and_then(|opt| opt.as_ref()) {
+                Some(proof) => proof,
+                None => {
+                    // No C1 proof for this party — should already be in dishonest_parties.
+                    // If not, treat as dishonest now (defensive).
+                    warn!(
+                        "Party {} has no C1 proof but was not marked dishonest",
+                        party_idx
+                    );
+                    dishonest_parties.insert(*party_idx as u64);
+                    continue;
+                }
+            };
+            let ok = match e3_zk_helpers::compute_pk_commitment_from_keyshare_bytes(
+                ks,
+                &self.fhe.params,
+                &self.fhe.crp,
+            ) {
+                Ok(computed) => signed_proof
+                    .payload
+                    .proof
+                    .extract_output("pk_commitment")
+                    .map_or(false, |extracted| extracted[..] == computed[..]),
+                Err(e) => {
+                    warn!(
+                        "Failed to compute pk_commitment for party {}: {}",
+                        party_idx, e
+                    );
+                    false
+                }
+            };
+            if !ok {
+                commitment_dishonest.push((*party_idx as u64, signed_proof.clone()));
+            }
+        }
+
+        // Emit SignedProofFailed for each commitment-mismatched party
+        for (party_idx, signed_proof) in &commitment_dishonest {
+            dishonest_parties.insert(*party_idx);
+            match signed_proof.recover_address() {
+                Ok(faulting_node) => {
+                    if let Err(e) = self.bus.publish(
+                        SignedProofFailed {
+                            e3_id: self.e3_id.clone(),
+                            faulting_node,
+                            proof_type: ProofType::C1PkGeneration,
+                            signed_payload: signed_proof.clone(),
+                        },
+                        ec.clone(),
+                    ) {
+                        error!("Failed to publish SignedProofFailed: {e}");
+                    }
+                }
+                Err(e) => warn!(
+                    "Could not recover address from C1 proof for party {}: {e}",
+                    party_idx
+                ),
+            }
+        }
+
+        if !commitment_dishonest.is_empty() {
+            warn!(
+                "C1 commitment mismatch for {} parties — filtering before aggregation",
+                commitment_dishonest.len()
+            );
+            // Re-filter honest_entries after commitment check
+            honest_entries.retain(|(idx, _)| !dishonest_parties.contains(&(*idx as u64)));
+        }
+
+        let (honest_keyshares, honest_nodes): (Vec<ArcBytes>, Vec<String>) = honest_entries
+            .iter()
+            .map(|(_, (node, ks))| (ks.clone(), node.clone()))
             .unzip();
 
         if !dishonest_parties.is_empty() {
             warn!(
-                "Filtered out {} dishonest parties from C1 verification: {:?}",
-                dishonest_parties.len(),
+                "Total dishonest parties (ZK + commitment): {:?}",
                 dishonest_parties
             );
         }
@@ -283,11 +359,20 @@ impl PublicKeyAggregator {
 
         // Need at least threshold + 1 honest parties for aggregation
         if honest_keyshares.len() <= threshold_m {
-            return Err(anyhow::anyhow!(
-                "Not enough honest parties after C1 verification: {} (need at least {})",
+            error!(
+                "Not enough honest parties after filtering: {} (need > {})",
                 honest_keyshares.len(),
-                threshold_m + 1
-            ));
+                threshold_m
+            );
+            self.bus.publish(
+                E3Failed {
+                    e3_id: self.e3_id.clone(),
+                    failed_at_stage: E3Stage::CommitteeFinalized,
+                    reason: FailureReason::DKGInvalidShares,
+                },
+                ec,
+            )?;
+            return Ok(());
         }
 
         // Synchronous aggregation
@@ -301,12 +386,9 @@ impl PublicKeyAggregator {
         })?;
 
         let committee_h = honest_keyshares.len();
-        let honest_nodes_set = OrderedSet::from(honest_nodes);
+        let honest_nodes_set = OrderedSet::from(honest_nodes.clone());
         let keyshare_bytes: Vec<_> = honest_keyshares_set.iter().cloned().collect();
 
-        // Publish pending event before transitioning state so a publish
-        // failure leaves us in VerifyingC1 (retryable) rather than
-        // GeneratingC5Proof (no retry path).
         let pubkey = ArcBytes::from_bytes(&pubkey);
         info!("Publishing PkAggregationProofPending for C5 proof generation...");
         self.bus.publish(
@@ -781,9 +863,6 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
             }
             EnclaveEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
-            }
-            EnclaveEventData::ComputeRequestError(data) => {
-                error!("PublicKeyAggregator received ComputeRequestError: {}", data);
             }
             EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
             EnclaveEventData::CommitteeMemberExpelled(data) => {

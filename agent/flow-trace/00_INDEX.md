@@ -63,7 +63,7 @@
                   → Broadcast to aggregator
 
 13. AGGREGATE   Aggregator combines M+1 shares → plaintext
-                  → C7a/C7b proofs (proves reconstruction correct)
+                  → C7 proof (proves reconstruction correct)
 
 14. COMPLETE    publishPlaintextOutput() → rewards distributed
                   → Each active committee member gets fee / N

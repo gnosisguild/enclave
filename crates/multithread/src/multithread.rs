@@ -82,7 +82,7 @@ use ndarray::Array2;
 use num_bigint::BigInt;
 use rand::rngs::OsRng;
 use rand::Rng;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// Multithread actor
 pub struct Multithread {
@@ -313,7 +313,19 @@ fn handle_pk_aggregation_proof(
     // 2. Create deterministic CRP
     let crp = create_deterministic_crp_from_default_seed(&threshold_params);
 
-    // 3. Deserialize each keyshare as PublicKeyShare and extract pk0
+    // 3. Validate keyshare count before deserialization
+    if req.keyshare_bytes.len() != req.committee_h {
+        return Err(make_zk_error(
+            &request,
+            format!(
+                "keyshare_bytes length {} != committee_h {}",
+                req.keyshare_bytes.len(),
+                req.committee_h
+            ),
+        ));
+    }
+
+    // 4. Deserialize each keyshare as PublicKeyShare and extract pk0
     let mut pk0_shares = Vec::with_capacity(req.keyshare_bytes.len());
     for (i, ks_bytes) in req.keyshare_bytes.iter().enumerate() {
         let pk_share = PublicKeyShare::deserialize(ks_bytes, &threshold_params, crp.clone())
@@ -343,6 +355,10 @@ fn handle_pk_aggregation_proof(
         pk0_shares,
         a,
     };
+
+    // C1 commitment consistency is verified by the PublicKeyAggregator before
+    // dispatching this request (pre-aggregation check). By the time we reach
+    // the prover, all keyshares are guaranteed to match their C1 proofs.
 
     // 7. Generate proof via Provable trait (C5 is always EVM-targeted for on-chain verification)
     let circuit = PkAggregationCircuit;

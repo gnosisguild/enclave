@@ -463,6 +463,20 @@ jobs:
             target/debug/pack_e3_params
           if-no-files-found: error
 
+  check-nix-flake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+        # if the following fails it means some of our git dependencies or bb has updated
+        # to fix this basically what you need to do here is copy the actual hashes
+        # into the flake.nix where those hashes are expected. if you want to do this locally
+        # install the nix package manager and try running the scripts below.
+      - run: bash ./scripts/nix-versions.sh # display bad versions when deps change
+
   ciphernode_integration_test:
     needs: [detect_changes, integration_prebuild, build_enclave_cli, build_sdk]
     if: needs.detect_changes.outputs.ciphernode_e2e == 'true'

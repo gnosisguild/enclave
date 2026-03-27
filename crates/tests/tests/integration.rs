@@ -14,14 +14,17 @@ use e3_config::BBPath;
 use e3_crypto::Cipher;
 use e3_events::{
     prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated,
-    E3Requested, E3id, EnclaveEvent, EnclaveEventData, OperatorActivationChanged,
-    PlaintextAggregated, Seed, TakeEvents, TicketBalanceUpdated,
+    E3Requested, E3id, EffectsEnabled, EnclaveEvent, EnclaveEventData, EventType, GetEvents,
+    HistoryCollector, OperatorActivationChanged, OrderedSet, PkAggregationProofPending,
+    PkAggregationProofRequest, PlaintextAggregated, Seed, TakeEvents, TicketBalanceUpdated,
 };
 use e3_fhe_params::DEFAULT_BFV_PRESET;
-use e3_fhe_params::{encode_bfv_params, BfvParamSet};
+use e3_fhe_params::{build_pair_for_preset, create_deterministic_crp_from_default_seed};
+use e3_fhe_params::{encode_bfv_params, BfvParamSet, BfvPreset};
 use e3_multithread::{Multithread, MultithreadReport, ToReport};
 use e3_net::events::{GossipData, NetEvent};
 use e3_net::NetEventTranslator;
+use e3_polynomial::CrtPolynomial;
 use e3_sortition::{calculate_buffer_size, RegisteredNode, ScoreSortition, Ticket};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{
@@ -30,11 +33,15 @@ use e3_test_helpers::{
 use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::{colorize, rand_eth_addr, Color};
+use e3_zk_helpers::{compute_modulus_bit, compute_threshold_pk_commitment};
 use e3_zk_prover::test_utils::get_tempdir;
-use e3_zk_prover::ZkBackend;
+use e3_zk_prover::{ProofRequestActor, ZkBackend};
 use fhe::bfv::PublicKey;
+use fhe::bfv::SecretKey;
+use fhe::mbfv::{AggregateIter, PublicKeyShare};
 use fhe_traits::{DeserializeParametrized, Serialize};
 use num_bigint::BigUint;
+use rand::rngs::OsRng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::time::{Duration, Instant};

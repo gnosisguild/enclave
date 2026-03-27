@@ -6,7 +6,7 @@
 
 //! Public key generation circuit.
 //!
-//! This circuit proves public key generation with a threshold BFV public key (pk0, pk1) and produces
+//! This circuit proves public key generation for pk0 (pk1 is the CRS polynomial `a`) and produces
 //! Prover.toml and configs.nr for the Noir prover. See [`PkGenerationCircuit`] and
 //! [`PkGenerationCircuitInput`].
 

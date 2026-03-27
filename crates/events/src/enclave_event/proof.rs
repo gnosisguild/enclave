@@ -2,6 +2,11 @@
 
 use derivative::Derivative;
 use e3_utils::utility_types::ArcBytes;
+use e3_zk_helpers::{
+    CircuitOutputLayout, DKG_SHARE_DECRYPTION_OUTPUTS, PK_AGGREGATION_OUTPUTS, PK_BFV_OUTPUTS,
+    PK_GENERATION_OUTPUTS, SHARE_COMPUTATION_CHUNK_BATCH_OUTPUTS, SHARE_COMPUTATION_OUTPUTS,
+    THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -30,6 +35,18 @@ impl Proof {
             data: data.into(),
             public_signals: public_signals.into(),
         }
+    }
+
+    /// Extract a named public output field from this proof's public signals.
+    ///
+    /// Return values sit at the **end** of `public_signals`, after any `pub`
+    /// input parameters.  The field name must match one declared in the
+    /// circuit's [`CircuitOutputLayout`].
+    pub fn extract_output(&self, field_name: &str) -> Option<ArcBytes> {
+        let layout = self.circuit.output_layout();
+        layout
+            .extract_field(&self.public_signals, field_name)
+            .map(ArcBytes::from_bytes)
     }
 }
 
@@ -150,10 +167,116 @@ impl CircuitName {
     pub fn wrapper_dir_path(&self) -> String {
         format!("recursive_aggregation/wrapper/{}", self.dir_path())
     }
+
+    /// Public output (return value) layout for this circuit.
+    pub fn output_layout(&self) -> CircuitOutputLayout {
+        match self {
+            CircuitName::PkBfv => CircuitOutputLayout::Fixed {
+                fields: PK_BFV_OUTPUTS,
+            },
+            CircuitName::PkGeneration => CircuitOutputLayout::Fixed {
+                fields: PK_GENERATION_OUTPUTS,
+            },
+            CircuitName::SkShareComputationBase | CircuitName::ESmShareComputationBase => {
+                CircuitOutputLayout::Dynamic
+            }
+            CircuitName::ShareComputationChunkBatch => CircuitOutputLayout::Fixed {
+                fields: SHARE_COMPUTATION_CHUNK_BATCH_OUTPUTS,
+            },
+            CircuitName::ShareComputation => CircuitOutputLayout::Fixed {
+                fields: SHARE_COMPUTATION_OUTPUTS,
+            },
+            CircuitName::DkgShareDecryption => CircuitOutputLayout::Fixed {
+                fields: DKG_SHARE_DECRYPTION_OUTPUTS,
+            },
+            CircuitName::PkAggregation => CircuitOutputLayout::Fixed {
+                fields: PK_AGGREGATION_OUTPUTS,
+            },
+            CircuitName::ThresholdShareDecryption => CircuitOutputLayout::Fixed {
+                fields: THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
+            },
+            CircuitName::ShareComputationChunk | CircuitName::ShareEncryption => {
+                CircuitOutputLayout::None
+            }
+            CircuitName::DecryptedSharesAggregation => CircuitOutputLayout::None,
+            CircuitName::Fold => CircuitOutputLayout::None,
+        }
+    }
 }
 
 impl fmt::Display for CircuitName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.dir_path())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_proof(circuit: CircuitName, signals: &[u8]) -> Proof {
+        Proof::new(
+            circuit,
+            ArcBytes::from_bytes(&[0u8; 8]),
+            ArcBytes::from_bytes(signals),
+        )
+    }
+
+    #[test]
+    fn extract_c1_pk_commitment() {
+        // C1 has 3 outputs: sk_commitment, pk_commitment, e_sm_commitment
+        let mut signals = vec![0u8; 96];
+        signals[0..32].copy_from_slice(&[0x11; 32]); // sk_commitment
+        signals[32..64].copy_from_slice(&[0x22; 32]); // pk_commitment
+        signals[64..96].copy_from_slice(&[0x33; 32]); // e_sm_commitment
+
+        let proof = make_proof(CircuitName::PkGeneration, &signals);
+        assert_eq!(
+            &*proof.extract_output("pk_commitment").unwrap(),
+            &[0x22; 32]
+        );
+        assert_eq!(
+            &*proof.extract_output("sk_commitment").unwrap(),
+            &[0x11; 32]
+        );
+        assert_eq!(
+            &*proof.extract_output("e_sm_commitment").unwrap(),
+            &[0x33; 32]
+        );
+    }
+
+    #[test]
+    fn extract_c5_commitment_after_pub_inputs() {
+        // C5 has H pub input fields + 1 output. Simulate H=2 → 96 bytes total.
+        let mut signals = vec![0xAA; 96];
+        signals[64..96].copy_from_slice(&[0xFF; 32]); // commitment (last output)
+
+        let proof = make_proof(CircuitName::PkAggregation, &signals);
+        assert_eq!(&*proof.extract_output("commitment").unwrap(), &[0xFF; 32]);
+    }
+
+    #[test]
+    fn extract_nonexistent_field() {
+        let proof = make_proof(CircuitName::PkBfv, &[0u8; 32]);
+        assert!(proof.extract_output("nonexistent").is_none());
+    }
+
+    #[test]
+    fn extract_from_void_circuit() {
+        let proof = make_proof(CircuitName::ShareEncryption, &[0u8; 64]);
+        assert!(proof.extract_output("commitment").is_none());
+    }
+
+    #[test]
+    fn extract_signals_too_short() {
+        // C1 needs 96 bytes for outputs, only 64 available
+        let proof = make_proof(CircuitName::PkGeneration, &[0u8; 64]);
+        assert!(proof.extract_output("pk_commitment").is_none());
+    }
+
+    #[test]
+    fn extract_empty_signals() {
+        let proof = make_proof(CircuitName::PkGeneration, &[]);
+        assert!(proof.extract_output("pk_commitment").is_none());
     }
 }

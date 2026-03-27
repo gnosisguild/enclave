@@ -7,13 +7,15 @@
 use crate::{E3id, ProofType};
 use actix::Message;
 use alloy::primitives::Address;
+use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
 /// Emitted locally when a node successfully verifies another node's ZK proof.
 ///
 /// This allows the [`AccusationManager`] to cache successful verification results
-/// so it can vote DISAGREE on false accusations from other nodes.
+/// so it can vote DISAGREE on false accusations from other nodes, and the
+/// [`CommitmentConsistencyChecker`] to cross-check commitment values across circuits.
 ///
 /// Emitted by:
 /// - [`ProofVerificationActor`] — for C0 (BFV public key) successes
@@ -30,6 +32,8 @@ pub struct ProofVerificationPassed {
     pub proof_type: ProofType,
     /// keccak256 hash of the received data + proof bytes — for equivocation detection.
     pub data_hash: [u8; 32],
+    /// Raw public signals from the verified proof — for commitment consistency checks.
+    pub public_signals: ArcBytes,
 }
 
 impl Display for ProofVerificationPassed {

@@ -37,7 +37,9 @@ use e3_sortition::{
 };
 use e3_sync::sync;
 use e3_utils::SharedRng;
-use e3_zk_prover::{setup_zk_actors, AccusationManagerExtension, ZkBackend};
+use e3_zk_prover::{
+    setup_zk_actors, AccusationManagerExtension, CommitmentConsistencyCheckerExtension, ZkBackend,
+};
 use libp2p::PeerId;
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
@@ -535,6 +537,12 @@ impl CiphernodeBuilder {
             let signer = provider_cache.ensure_signer().await?;
             info!("Setting up AccusationManagerExtension");
             e3_builder = e3_builder.with(AccusationManagerExtension::create(&bus, signer));
+        }
+
+        // CommitmentConsistencyChecker extension — per-E3 cross-circuit commitment validation
+        {
+            info!("Setting up CommitmentConsistencyCheckerExtension");
+            e3_builder = e3_builder.with(CommitmentConsistencyCheckerExtension::create(&bus));
         }
 
         info!("E3Router building...");

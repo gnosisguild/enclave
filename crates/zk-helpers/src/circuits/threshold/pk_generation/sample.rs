@@ -95,7 +95,6 @@ mod tests {
         let inputs = Inputs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         assert_eq!(inputs.pk0is.limbs.len(), 2);
-        assert_eq!(inputs.pk1is.limbs.len(), 2);
         assert_eq!(inputs.e_sm.limbs.len(), 2);
         assert_eq!(inputs.r1is.limbs.len(), 2);
         assert_eq!(inputs.r2is.limbs.len(), 2);
