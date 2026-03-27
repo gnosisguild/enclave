@@ -12,6 +12,7 @@ mod ciphernode_added;
 mod ciphernode_removed;
 mod ciphernode_selected;
 mod ciphertext_output_published;
+mod commitment_consistency;
 mod committee_finalize_requested;
 mod committee_finalized;
 mod committee_published;
@@ -76,6 +77,7 @@ pub use ciphernode_added::*;
 pub use ciphernode_removed::*;
 pub use ciphernode_selected::*;
 pub use ciphertext_output_published::*;
+pub use commitment_consistency::*;
 pub use committee_finalize_requested::*;
 pub use committee_finalized::*;
 pub use committee_published::*;
@@ -296,6 +298,8 @@ pub enum EnclaveEventData {
     AggregationProofSigned(AggregationProofSigned),
     DKGInnerProofReady(DKGInnerProofReady),
     DKGRecursiveAggregationComplete(DKGRecursiveAggregationComplete),
+    CommitmentConsistencyCheckRequested(CommitmentConsistencyCheckRequested),
+    CommitmentConsistencyCheckComplete(CommitmentConsistencyCheckComplete),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -571,6 +575,12 @@ impl EnclaveEventData {
             EnclaveEventData::AggregationProofSigned(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::DKGRecursiveAggregationComplete(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::DKGInnerProofReady(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::CommitmentConsistencyCheckRequested(ref data) => {
+                Some(data.e3_id.clone())
+            }
+            EnclaveEventData::CommitmentConsistencyCheckComplete(ref data) => {
+                Some(data.e3_id.clone())
+            }
             _ => None,
         }
     }
@@ -662,7 +672,9 @@ impl_event_types!(
     AggregationProofPending,
     AggregationProofSigned,
     DKGInnerProofReady,
-    DKGRecursiveAggregationComplete
+    DKGRecursiveAggregationComplete,
+    CommitmentConsistencyCheckRequested,
+    CommitmentConsistencyCheckComplete
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {

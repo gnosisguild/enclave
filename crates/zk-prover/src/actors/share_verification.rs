@@ -27,9 +27,10 @@ use actix::{Actor, Addr, Context, Handler};
 use alloy::primitives::{keccak256, Address, Bytes};
 use alloy::sol_types::SolValue;
 use e3_events::{
-    BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind,
-    CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EventContext, EventPublisher,
-    EventSubscriber, EventType, PartyProofsToVerify, PartyShareDecryptionProofsToVerify,
+    BusHandle, CommitmentConsistencyCheckComplete, CommitmentConsistencyCheckRequested,
+    ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind, CorrelationId, E3id,
+    EnclaveEvent, EnclaveEventData, EventContext, EventPublisher, EventSubscriber, EventType,
+    PartyProofData, PartyProofsToVerify, PartyShareDecryptionProofsToVerify,
     PartyVerificationResult, ProofType, ProofVerificationFailed, ProofVerificationPassed,
     Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed,
     SignedProofPayload, TypedEvent, VerificationKind, VerifyShareDecryptionProofsRequest,
@@ -91,16 +92,50 @@ struct PendingVerification {
     party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
 }
 
-/// Actor that handles C2/C3/C4 share proof verification.
+/// Pending consistency check — stored between ECDSA pass and ZK dispatch.
 ///
-/// Separates ECDSA validation (lightweight, done inline) from ZK proof
-/// verification (heavyweight, delegated to multithread). Emits
-/// [`SignedProofFailed`] for fault attribution and [`ShareVerificationComplete`]
-/// with the final dishonest party set.
+/// After ECDSA validation, the actor publishes
+/// [`CommitmentConsistencyCheckRequested`] and waits for the checker's
+/// response. This struct buffers the ECDSA results and the original party
+/// proofs so that ZK verification can be dispatched once the consistency
+/// check completes.
+struct PendingConsistencyCheck {
+    e3_id: E3id,
+    kind: VerificationKind,
+    ec: EventContext<Sequenced>,
+    /// Parties that failed ECDSA (dishonest before consistency runs).
+    ecdsa_dishonest: HashSet<u64>,
+    /// Pre-dishonest parties from the dispatch (missing/incomplete proofs).
+    pre_dishonest: BTreeSet<u64>,
+    /// Recovered address per ECDSA-passed party.
+    party_addresses: HashMap<u64, Address>,
+    /// (proof_type, data_hash) per party — for ProofVerificationPassed after ZK.
+    party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>>,
+    /// (proof_type, public_signals) per party — for consistency & ZK.
+    party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
+    /// Original ECDSA-passed share proofs for ZK dispatch.
+    /// Populated for ShareProofs / ThresholdDecryptionProofs / PkGenerationProofs.
+    ecdsa_passed_share_proofs: Vec<PartyProofsToVerify>,
+    /// Original ECDSA-passed decryption proofs for ZK dispatch.
+    /// Populated for DecryptionProofs.
+    ecdsa_passed_decryption_proofs: Vec<PartyShareDecryptionProofsToVerify>,
+}
+
+/// Actor that handles C1/C2/C3/C4/C6 share proof verification.
+///
+/// Three-stage pipeline:
+/// 1. ECDSA validation (lightweight, done inline)
+/// 2. Commitment consistency check (dispatched to per-E3 checker via event bus)
+/// 3. ZK proof verification (heavyweight, delegated to multithread)
+///
+/// Emits [`SignedProofFailed`] for fault attribution and
+/// [`ShareVerificationComplete`] with the final dishonest party set.
 pub struct ShareVerificationActor {
     bus: BusHandle,
-    /// Tracks pending verifications by correlation ID.
+    /// Tracks pending ZK verifications by correlation ID.
     pending: HashMap<CorrelationId, PendingVerification>,
+    /// Tracks pending consistency checks by correlation ID (between ECDSA and ZK).
+    pending_consistency: HashMap<CorrelationId, PendingConsistencyCheck>,
 }
 
 impl ShareVerificationActor {
@@ -108,6 +143,7 @@ impl ShareVerificationActor {
         Self {
             bus: bus.clone(),
             pending: HashMap::new(),
+            pending_consistency: HashMap::new(),
         }
     }
 
@@ -116,6 +152,10 @@ impl ShareVerificationActor {
         bus.subscribe(EventType::ShareVerificationDispatched, addr.clone().into());
         bus.subscribe(EventType::ComputeResponse, addr.clone().into());
         bus.subscribe(EventType::ComputeRequestError, addr.clone().into());
+        bus.subscribe(
+            EventType::CommitmentConsistencyCheckComplete,
+            addr.clone().into(),
+        );
         addr
     }
 
@@ -142,14 +182,8 @@ impl ShareVerificationActor {
                     msg.share_proofs,
                     msg.pre_dishonest,
                     ec,
-                    |passed, corr_id, e3| {
-                        ComputeRequest::zk(
-                            ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
-                                party_proofs: passed,
-                            }),
-                            corr_id,
-                            e3,
-                        )
+                    |pending, passed| {
+                        pending.ecdsa_passed_share_proofs = passed;
                     },
                 );
             }
@@ -160,24 +194,19 @@ impl ShareVerificationActor {
                     msg.decryption_proofs,
                     msg.pre_dishonest,
                     ec,
-                    |passed, corr_id, e3| {
-                        ComputeRequest::zk(
-                            ZkRequest::VerifyShareDecryptionProofs(
-                                VerifyShareDecryptionProofsRequest {
-                                    party_proofs: passed,
-                                },
-                            ),
-                            corr_id,
-                            e3,
-                        )
+                    |pending, passed| {
+                        pending.ecdsa_passed_decryption_proofs = passed;
                     },
                 );
             }
         }
     }
 
-    /// Generic ECDSA + ZK verification: validates signed proofs for each party,
-    /// then dispatches ZK verification for ECDSA-passed parties.
+    /// Generic ECDSA validation + consistency check dispatch.
+    ///
+    /// After ECDSA validation, publishes [`CommitmentConsistencyCheckRequested`]
+    /// and stores a [`PendingConsistencyCheck`]. ZK verification is deferred
+    /// until the consistency check response arrives.
     fn verify_proofs<P: VerifiableParty>(
         &mut self,
         e3_id: E3id,
@@ -185,7 +214,7 @@ impl ShareVerificationActor {
         party_proofs: Vec<P>,
         pre_dishonest: BTreeSet<u64>,
         ec: EventContext<Sequenced>,
-        build_request: impl FnOnce(Vec<P>, CorrelationId, E3id) -> ComputeRequest,
+        store_passed_proofs: impl FnOnce(&mut PendingConsistencyCheck, Vec<P>),
     ) {
         let e3_id_str = e3_id.to_string();
         let label = match &kind {
@@ -232,12 +261,7 @@ impl ShareVerificationActor {
             return;
         }
 
-        // Dispatch ZK-only verification to multithread
-        let correlation_id = CorrelationId::new();
-        let dispatched_party_ids: HashSet<u64> =
-            ecdsa_passed_parties.iter().map(|p| p.party_id()).collect();
-
-        // Compute proof hashes for ECDSA-passed parties (for ProofVerificationPassed on success)
+        // Compute proof hashes and public signals for ECDSA-passed parties
         let mut party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>> = HashMap::new();
         let mut party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>> = HashMap::new();
         for party in &ecdsa_passed_parties {
@@ -267,31 +291,215 @@ impl ShareVerificationActor {
             party_public_signals.insert(party.party_id(), signals);
         }
 
-        self.pending.insert(
-            correlation_id,
-            PendingVerification {
+        // Build consistency check request
+        let correlation_id = CorrelationId::new();
+        let party_proof_data: Vec<PartyProofData> = ecdsa_passed_parties
+            .iter()
+            .map(|party| {
+                let signals = party_public_signals
+                    .get(&party.party_id())
+                    .cloned()
+                    .unwrap_or_default();
+                PartyProofData {
+                    party_id: party.party_id(),
+                    address: party_addresses
+                        .get(&party.party_id())
+                        .copied()
+                        .unwrap_or_default(),
+                    proofs: signals,
+                }
+            })
+            .collect();
+
+        // Store pending consistency check with the original party proofs
+        let mut pending = PendingConsistencyCheck {
+            e3_id: e3_id.clone(),
+            kind: kind.clone(),
+            ec: ec.clone(),
+            ecdsa_dishonest,
+            pre_dishonest,
+            party_addresses,
+            party_proof_hashes,
+            party_public_signals,
+            ecdsa_passed_share_proofs: Vec::new(),
+            ecdsa_passed_decryption_proofs: Vec::new(),
+        };
+        store_passed_proofs(&mut pending, ecdsa_passed_parties);
+        self.pending_consistency.insert(correlation_id, pending);
+
+        // Publish consistency check request
+        if let Err(err) = self.bus.publish(
+            CommitmentConsistencyCheckRequested {
                 e3_id: e3_id.clone(),
                 kind: kind.clone(),
-                ec: ec.clone(),
-                ecdsa_dishonest,
-                pre_dishonest,
-                dispatched_party_ids,
+                correlation_id,
+                party_proofs: party_proof_data,
+            },
+            ec.clone(),
+        ) {
+            error!(
+                "Failed to dispatch {} consistency check: {err} — treating all as dishonest",
+                label
+            );
+            if let Some(pending) = self.pending_consistency.remove(&correlation_id) {
+                let mut all_dishonest: BTreeSet<u64> = pending.pre_dishonest;
+                all_dishonest.extend(pending.ecdsa_dishonest);
+                for p in &pending.ecdsa_passed_share_proofs {
+                    all_dishonest.insert(p.sender_party_id);
+                }
+                for p in &pending.ecdsa_passed_decryption_proofs {
+                    all_dishonest.insert(p.sender_party_id);
+                }
+                self.publish_complete(e3_id, kind, all_dishonest, ec);
+            }
+        }
+    }
+
+    /// Handle consistency check response: add inconsistent parties to the
+    /// dishonest set, then dispatch ZK verification for the remaining
+    /// consistent parties.
+    fn handle_consistency_check_complete(
+        &mut self,
+        msg: TypedEvent<CommitmentConsistencyCheckComplete>,
+    ) {
+        let (data, _ec) = msg.into_components();
+
+        let Some(pending) = self.pending_consistency.remove(&data.correlation_id) else {
+            return; // Not our correlation ID
+        };
+
+        let label = match &pending.kind {
+            VerificationKind::ShareProofs => "C2/C3",
+            VerificationKind::ThresholdDecryptionProofs => "C6",
+            VerificationKind::PkGenerationProofs => "C1",
+            VerificationKind::DecryptionProofs => "C4",
+        };
+
+        if !data.inconsistent_parties.is_empty() {
+            warn!(
+                "{} consistency check found {} inconsistent parties for E3 {}: {:?}",
+                label,
+                data.inconsistent_parties.len(),
+                pending.e3_id,
+                data.inconsistent_parties
+            );
+        }
+
+        // Accumulate all dishonest parties discovered so far
+        let mut dishonest_so_far: BTreeSet<u64> = pending.pre_dishonest.clone();
+        dishonest_so_far.extend(&pending.ecdsa_dishonest);
+        dishonest_so_far.extend(&data.inconsistent_parties);
+
+        // Filter ECDSA-passed proofs to only consistent parties and dispatch ZK
+        let inconsistent = &data.inconsistent_parties;
+        let zk_correlation_id = CorrelationId::new();
+
+        let (request, dispatched_party_ids) = match pending.kind {
+            VerificationKind::ShareProofs
+            | VerificationKind::ThresholdDecryptionProofs
+            | VerificationKind::PkGenerationProofs => {
+                let passed: Vec<PartyProofsToVerify> = pending
+                    .ecdsa_passed_share_proofs
+                    .into_iter()
+                    .filter(|p| !inconsistent.contains(&p.sender_party_id))
+                    .collect();
+                let ids: HashSet<u64> = passed.iter().map(|p| p.sender_party_id).collect();
+                if passed.is_empty() {
+                    self.publish_complete(
+                        pending.e3_id,
+                        pending.kind,
+                        dishonest_so_far,
+                        pending.ec,
+                    );
+                    return;
+                }
+                let req = ComputeRequest::zk(
+                    ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
+                        party_proofs: passed,
+                    }),
+                    zk_correlation_id,
+                    pending.e3_id.clone(),
+                );
+                (req, ids)
+            }
+            VerificationKind::DecryptionProofs => {
+                let passed: Vec<PartyShareDecryptionProofsToVerify> = pending
+                    .ecdsa_passed_decryption_proofs
+                    .into_iter()
+                    .filter(|p| !inconsistent.contains(&p.sender_party_id))
+                    .collect();
+                let ids: HashSet<u64> = passed.iter().map(|p| p.sender_party_id).collect();
+                if passed.is_empty() {
+                    self.publish_complete(
+                        pending.e3_id,
+                        pending.kind,
+                        dishonest_so_far,
+                        pending.ec,
+                    );
+                    return;
+                }
+                let req = ComputeRequest::zk(
+                    ZkRequest::VerifyShareDecryptionProofs(VerifyShareDecryptionProofsRequest {
+                        party_proofs: passed,
+                    }),
+                    zk_correlation_id,
+                    pending.e3_id.clone(),
+                );
+                (req, ids)
+            }
+        };
+
+        // Only keep proof hashes/signals/addresses for parties going to ZK
+        let party_addresses: HashMap<u64, Address> = pending
+            .party_addresses
+            .into_iter()
+            .filter(|(pid, _)| dispatched_party_ids.contains(pid))
+            .collect();
+        let party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>> = pending
+            .party_proof_hashes
+            .into_iter()
+            .filter(|(pid, _)| dispatched_party_ids.contains(pid))
+            .collect();
+        let party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>> = pending
+            .party_public_signals
+            .into_iter()
+            .filter(|(pid, _)| dispatched_party_ids.contains(pid))
+            .collect();
+
+        // Store pending ZK verification state.
+        // All prior dishonest parties (pre_dishonest + ECDSA + consistency) are
+        // folded into `pre_dishonest` so that `handle_compute_response` produces
+        // the correct final dishonest set when it adds ZK failures.
+        self.pending.insert(
+            zk_correlation_id,
+            PendingVerification {
+                e3_id: pending.e3_id.clone(),
+                kind: pending.kind.clone(),
+                ec: pending.ec.clone(),
+                ecdsa_dishonest: HashSet::new(),
+                pre_dishonest: dishonest_so_far,
+                dispatched_party_ids: dispatched_party_ids.clone(),
                 party_addresses,
                 party_proof_hashes,
                 party_public_signals,
             },
         );
 
-        let request = build_request(ecdsa_passed_parties, correlation_id, e3_id.clone());
-
-        if let Err(err) = self.bus.publish(request, ec.clone()) {
-            error!("Failed to dispatch {} ZK verification: {err}", label);
-            if let Some(pending) = self.pending.remove(&correlation_id) {
-                let mut all_dishonest: BTreeSet<u64> = pending.pre_dishonest;
-                all_dishonest.extend(pending.ecdsa_dishonest);
-                // Dispatched parties were never ZK-verified — treat as dishonest
-                all_dishonest.extend(pending.dispatched_party_ids);
-                self.publish_complete(e3_id, kind, all_dishonest, ec);
+        if let Err(err) = self.bus.publish(request, pending.ec.clone()) {
+            error!(
+                "Failed to dispatch {} ZK verification after consistency check: {err}",
+                label
+            );
+            if let Some(zk_pending) = self.pending.remove(&zk_correlation_id) {
+                let mut all_dishonest: BTreeSet<u64> = zk_pending.pre_dishonest;
+                all_dishonest.extend(zk_pending.ecdsa_dishonest);
+                all_dishonest.extend(zk_pending.dispatched_party_ids);
+                self.publish_complete(
+                    zk_pending.e3_id,
+                    zk_pending.kind,
+                    all_dishonest,
+                    zk_pending.ec,
+                );
             }
         }
     }
@@ -603,6 +811,9 @@ impl Handler<EnclaveEvent> for ShareVerificationActor {
             EnclaveEventData::ComputeRequestError(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
+            EnclaveEventData::CommitmentConsistencyCheckComplete(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             _ => (),
         }
     }
@@ -641,5 +852,17 @@ impl Handler<TypedEvent<ComputeRequestError>> for ShareVerificationActor {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         self.handle_compute_request_error(msg)
+    }
+}
+
+impl Handler<TypedEvent<CommitmentConsistencyCheckComplete>> for ShareVerificationActor {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CommitmentConsistencyCheckComplete>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.handle_consistency_check_complete(msg)
     }
 }
