@@ -392,7 +392,7 @@ impl AccusationManager {
             data.accused_party_id,
             data.proof_type,
             data.data_hash,
-            None, // No forwarded payload — consistency checks don't involve C3a/C3b
+            None, // No forwarding needed — violations are detected from public signals all nodes have
             ec,
             ctx,
         );
