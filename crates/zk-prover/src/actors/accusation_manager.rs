@@ -367,10 +367,10 @@ impl AccusationManager {
         );
     }
 
-    /// Called when the [`CommitmentConsistencyChecker`] detects a cross-circuit
+    /// Called when the `CommitmentConsistencyChecker` detects a cross-circuit
     /// commitment mismatch for a party.
     ///
-    /// Caches the failure and delegates to [`initiate_accusation`] — the same
+    /// Caches the failure and delegates to `initiate_accusation` — the same
     /// quorum protocol as ZK proof failures.
     fn on_consistency_violation(
         &mut self,

@@ -914,7 +914,19 @@ async fn test_trbfv_actor() -> Result<()> {
     };
     // Sum matches the comment above through AggregationProofSigned, then fold, then PlaintextAggregated.
     // E3RequestComplete is not included (arrives after; not needed for take).
-    let expected_count = 1 + 3 + 1 + 2 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + c6_fold_events + 1;
+    let expected_count = 1 // CiphertextOutputPublished
+        + 3               // DecryptionshareCreated
+        + 1               // ShareVerificationDispatched
+        + 2               // CommitmentConsistencyCheck (Requested + Complete)
+        + 2               // C6 ZK verification (ComputeRequest + ComputeResponse)
+        + 9               // ProofVerificationPassed (3 parties × 3 proofs)
+        + 1               // ShareVerificationComplete
+        + 2               // TrBFV computation (ComputeRequest + ComputeResponse)
+        + 1               // AggregationProofPending
+        + 2               // C7 proof (ComputeRequest + ComputeResponse)
+        + 1               // AggregationProofSigned
+        + c6_fold_events  // C6 fold steps
+        + 1; // PlaintextAggregated
 
     let h = nodes
         .take_history_with_timeouts(

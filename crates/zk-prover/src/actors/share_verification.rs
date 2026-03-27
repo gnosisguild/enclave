@@ -99,6 +99,11 @@ struct PendingVerification {
 /// response. This struct buffers the ECDSA results and the original party
 /// proofs so that ZK verification can be dispatched once the consistency
 /// check completes.
+///
+/// Several fields overlap with [`PendingVerification`] (e3_id, kind, ec,
+/// party_addresses, party_proof_hashes, party_public_signals). When the
+/// consistency check completes, they are transferred to a new
+/// `PendingVerification` entry for the ZK phase.
 struct PendingConsistencyCheck {
     e3_id: E3id,
     kind: VerificationKind,
@@ -119,6 +124,24 @@ struct PendingConsistencyCheck {
     /// Original ECDSA-passed decryption proofs for ZK dispatch.
     /// Populated for DecryptionProofs.
     ecdsa_passed_decryption_proofs: Vec<PartyShareDecryptionProofsToVerify>,
+}
+
+/// Filter out inconsistent parties and collect dispatched party IDs.
+/// Returns `None` if all parties were filtered out (nothing to verify).
+fn filter_consistent<P>(
+    proofs: Vec<P>,
+    inconsistent: &BTreeSet<u64>,
+    party_id_of: impl Fn(&P) -> u64,
+) -> Option<(Vec<P>, HashSet<u64>)> {
+    let passed: Vec<P> = proofs
+        .into_iter()
+        .filter(|p| !inconsistent.contains(&party_id_of(p)))
+        .collect();
+    if passed.is_empty() {
+        return None;
+    }
+    let ids = passed.iter().map(|p| party_id_of(p)).collect();
+    Some((passed, ids))
 }
 
 /// Actor that handles C1/C2/C3/C4/C6 share proof verification.
@@ -300,13 +323,22 @@ impl ShareVerificationActor {
                     .get(&party.party_id())
                     .cloned()
                     .unwrap_or_default();
+                let hashes = party_proof_hashes
+                    .get(&party.party_id())
+                    .cloned()
+                    .unwrap_or_default();
+                let proofs = signals
+                    .into_iter()
+                    .zip(hashes)
+                    .map(|((pt, ps), (_, dh))| (pt, ps, dh))
+                    .collect();
                 PartyProofData {
                     party_id: party.party_id(),
                     address: party_addresses
                         .get(&party.party_id())
                         .copied()
                         .unwrap_or_default(),
-                    proofs: signals,
+                    proofs,
                 }
             })
             .collect();
@@ -398,13 +430,11 @@ impl ShareVerificationActor {
             VerificationKind::ShareProofs
             | VerificationKind::ThresholdDecryptionProofs
             | VerificationKind::PkGenerationProofs => {
-                let passed: Vec<PartyProofsToVerify> = pending
-                    .ecdsa_passed_share_proofs
-                    .into_iter()
-                    .filter(|p| !inconsistent.contains(&p.sender_party_id))
-                    .collect();
-                let ids: HashSet<u64> = passed.iter().map(|p| p.sender_party_id).collect();
-                if passed.is_empty() {
+                let Some((passed, ids)) =
+                    filter_consistent(pending.ecdsa_passed_share_proofs, inconsistent, |p| {
+                        p.sender_party_id
+                    })
+                else {
                     self.publish_complete(
                         pending.e3_id,
                         pending.kind,
@@ -412,7 +442,7 @@ impl ShareVerificationActor {
                         pending.ec,
                     );
                     return;
-                }
+                };
                 let req = ComputeRequest::zk(
                     ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
                         party_proofs: passed,
@@ -423,13 +453,11 @@ impl ShareVerificationActor {
                 (req, ids)
             }
             VerificationKind::DecryptionProofs => {
-                let passed: Vec<PartyShareDecryptionProofsToVerify> = pending
-                    .ecdsa_passed_decryption_proofs
-                    .into_iter()
-                    .filter(|p| !inconsistent.contains(&p.sender_party_id))
-                    .collect();
-                let ids: HashSet<u64> = passed.iter().map(|p| p.sender_party_id).collect();
-                if passed.is_empty() {
+                let Some((passed, ids)) =
+                    filter_consistent(pending.ecdsa_passed_decryption_proofs, inconsistent, |p| {
+                        p.sender_party_id
+                    })
+                else {
                     self.publish_complete(
                         pending.e3_id,
                         pending.kind,
@@ -437,7 +465,7 @@ impl ShareVerificationActor {
                         pending.ec,
                     );
                     return;
-                }
+                };
                 let req = ComputeRequest::zk(
                     ZkRequest::VerifyShareDecryptionProofs(VerifyShareDecryptionProofsRequest {
                         party_proofs: passed,

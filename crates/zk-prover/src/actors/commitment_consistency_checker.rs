@@ -155,6 +155,19 @@ impl CommitmentConsistencyChecker {
                 continue;
             }
             for m in self.find_mismatches(link.as_ref()) {
+                // Defense-in-depth: skip entries with unresolved data_hash
+                // (should not happen now that pre-ZK caching uses real hashes,
+                // but guards against future regressions).
+                if m.data_hash == [0u8; 32] {
+                    warn!(
+                        "[{}] Skipping mismatch with zero data_hash for party {} ({}) {:?}",
+                        link.name(),
+                        m.party_id,
+                        m.address,
+                        m.proof_type,
+                    );
+                    continue;
+                }
                 warn!(
                     "[{}] Commitment mismatch for E3 {} — party {} ({}) {:?}",
                     link.name(),
@@ -258,25 +271,25 @@ impl Handler<TypedEvent<CommitmentConsistencyCheckRequested>> for CommitmentCons
 
         let mut inconsistent_parties = BTreeSet::new();
 
-        // Cache each party's proof data and evaluate links.
+        // Cache each party's proof data for link evaluation.
         for party in &data.party_proofs {
-            for (proof_type, public_signals) in &party.proofs {
-                // Cache for link evaluation (use zero data_hash — pre-ZK data
-                // doesn't have a meaningful hash yet; violations use the
-                // post-ZK ProofVerificationPassed data_hash instead).
+            for (proof_type, public_signals, data_hash) in &party.proofs {
                 self.verified.insert(
                     (party.address, *proof_type),
                     VerifiedProofData {
                         party_id: party.party_id,
                         address: party.address,
                         public_signals: public_signals.clone(),
-                        data_hash: [0u8; 32],
+                        data_hash: *data_hash,
                     },
                 );
             }
         }
 
         // Evaluate every link and collect inconsistent parties.
+        // Also emit violations so AccusationManager can initiate the quorum
+        // protocol — parties excluded pre-ZK would otherwise never trigger a
+        // post-ZK violation.
         for link in &self.links {
             for m in self.find_mismatches(link.as_ref()) {
                 warn!(
@@ -287,7 +300,15 @@ impl Handler<TypedEvent<CommitmentConsistencyCheckRequested>> for CommitmentCons
                     m.address,
                 );
                 inconsistent_parties.insert(m.party_id);
+                self.emit_violation(m.party_id, m.address, m.proof_type, m.data_hash, &ec);
             }
+        }
+
+        // Remove cached entries for inconsistent parties so they don't
+        // participate in future post-ZK `find_mismatches` evaluations.
+        if !inconsistent_parties.is_empty() {
+            self.verified
+                .retain(|_, v| !inconsistent_parties.contains(&v.party_id));
         }
 
         // Respond to ShareVerificationActor.

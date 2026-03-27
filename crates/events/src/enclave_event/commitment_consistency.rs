@@ -27,8 +27,11 @@ use std::collections::BTreeSet;
 pub struct PartyProofData {
     pub party_id: u64,
     pub address: Address,
-    /// Each entry is a `(proof_type, public_signals)` pair from a signed proof.
-    pub proofs: Vec<(ProofType, ArcBytes)>,
+    /// Each entry is a `(proof_type, public_signals, data_hash)` tuple from a
+    /// signed proof. The `data_hash` is `keccak256(abi.encode(proof.data,
+    /// public_signals))` — used for the accusation protocol if a consistency
+    /// violation is detected.
+    pub proofs: Vec<(ProofType, ArcBytes, [u8; 32])>,
 }
 
 /// Published by [`ShareVerificationActor`] after ECDSA validation, before ZK.
