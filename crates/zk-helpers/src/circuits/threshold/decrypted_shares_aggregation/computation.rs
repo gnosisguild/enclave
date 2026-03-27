@@ -11,6 +11,11 @@
 //! with [`e3_polynomial::CrtPolynomial::reduce`]; all input coefficients are reduced to
 //! [0, zkp_modulus) with [`e3_polynomial::reduce`] inside [`Inputs::compute`].
 
+/// Max message coefficients in the C7 circuit (matches Noir's MAX_MSG_NON_ZERO_COEFFS).
+pub const MAX_MSG_NON_ZERO_COEFFS: usize = 100;
+
+use crate::calculate_bit_width;
+use crate::circuits::commitments::compute_threshold_decryption_share_commitment;
 use crate::compute_q_mod_t;
 use crate::compute_q_mod_t_centered;
 use crate::get_zkp_modulus;
@@ -61,9 +66,13 @@ pub struct Bounds {
     pub delta_half: BigUint,
 }
 
-/// Bit widths used by the circuit.
+/// Bit widths used by the circuit (e.g. noise bit for range checks).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Bits {}
+pub struct Bits {
+    pub noise_bit: u32,
+    /// Coefficient bit width for decryption-share commitments (aligned with threshold share_decryption BIT_D).
+    pub d_bit: u32,
+}
 
 /// Circuit config: moduli count, plaintext modulus, q_inverse_mod_t, bits, bounds, and message polynomial length.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -122,8 +131,19 @@ impl Computation for Bits {
     type Data = Bounds;
     type Error = CircuitsErrors;
 
-    fn compute(_: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
-        Ok(Bits {})
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
+        let noise_bit = calculate_bit_width(BigInt::from(data.delta_half.clone()));
+        let (threshold_params, _) =
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
+        let ctx = threshold_params
+            .ctx_at_level(0)
+            .map_err(|e| CircuitsErrors::Other(format!("ctx_at_level: {:?}", e)))?;
+        let mut d_bit = 0u32;
+        for qi in ctx.moduli_operators() {
+            let qi_bound = (BigInt::from(qi.modulus()) - 1) / 2;
+            d_bit = d_bit.max(calculate_bit_width(qi_bound));
+        }
+        Ok(Bits { noise_bit, d_bit })
     }
 }
 
@@ -365,10 +385,13 @@ mod tests {
     fn test_bounds_and_bits_consistency() {
         let preset = BfvPreset::InsecureThreshold512;
         let bounds = Bounds::compute(preset, &()).unwrap();
+        let bits = Bits::compute(preset, &bounds).unwrap();
 
         assert!(!bounds.delta.is_zero());
         assert!(!bounds.delta_half.is_zero());
         assert!(bounds.delta_half < bounds.delta);
+        assert!(bits.noise_bit > 0);
+        assert!(bits.d_bit > 0);
     }
 
     #[test]
@@ -410,5 +433,7 @@ mod tests {
             out.inputs.crt_quotients.limb(0).coefficients().len(),
             configs.max_msg_non_zero_coeffs
         );
+        assert!(out.bits.noise_bit > 0);
+        assert!(out.bits.d_bit > 0);
     }
 }

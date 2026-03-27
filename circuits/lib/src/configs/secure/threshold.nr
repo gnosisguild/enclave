@@ -32931,6 +32931,8 @@ pub global THRESHOLD_SHARE_DECRYPTION_CONFIGS: ShareDecryptionConfigs<L> = Share
 decrypted_shares_aggregation (CIRCUIT 7)
 -------------------------------------
 ************************************/
+pub global DECRYPTED_SHARES_AGGREGATION_BIT_NOISE: u32 = 200;
+pub global DECRYPTED_SHARES_AGGREGATION_BIT_D: u32 = 52;
 
 pub global DECRYPTED_SHARES_AGGREGATION_CONFIGS: DecryptedSharesAggregationConfigs<L> =
     DecryptedSharesAggregationConfigs::new(QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);

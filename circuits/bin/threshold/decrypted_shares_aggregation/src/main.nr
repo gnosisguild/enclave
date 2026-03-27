@@ -5,8 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use lib::configs::default::{MAX_MSG_NON_ZERO_COEFFS, T};
-use lib::configs::default::threshold::{DECRYPTED_SHARES_AGGREGATION_CONFIGS, L};
-use lib::core::threshold::decrypted_shares_aggregation::DecryptedSharesAggregationBigNum;
+use lib::configs::default::threshold::{
+    DECRYPTED_SHARES_AGGREGATION_BIT_D, DECRYPTED_SHARES_AGGREGATION_BIT_NOISE,
+    DECRYPTED_SHARES_AGGREGATION_CONFIGS, L,
+};
+use lib::core::threshold::decrypted_shares_aggregation::DecryptedSharesAggregation;
 use lib::math::polynomial::Polynomial;
 
 fn main(
@@ -17,7 +20,7 @@ fn main(
     u_global: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
     crt_quotients: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
 ) {
-    let decrypted_shares_aggregation: DecryptedSharesAggregationBigNum<MAX_MSG_NON_ZERO_COEFFS, L, T> = DecryptedSharesAggregationBigNum::new(
+    let decrypted_shares_aggregation: DecryptedSharesAggregation<MAX_MSG_NON_ZERO_COEFFS, L, T, DECRYPTED_SHARES_AGGREGATION_BIT_NOISE, DECRYPTED_SHARES_AGGREGATION_BIT_D> = DecryptedSharesAggregation::new(
         DECRYPTED_SHARES_AGGREGATION_CONFIGS,
         expected_d_commitments,
         decryption_shares,

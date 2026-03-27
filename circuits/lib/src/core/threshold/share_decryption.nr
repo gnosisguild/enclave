@@ -15,9 +15,9 @@ use crate::math::polynomial::Polynomial;
 pub struct Configs<let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
-    /// Coefficient bounds for r1 polynomials (modulus switching quotients, per CRT basis)
+    /// Bounds for r1 polynomials (modulus switching quotients) for each CRT basis
     pub r1_bounds: [Field; L],
-    /// Coefficient bounds for r2 polynomials (cyclotomic reduction quotients, per CRT basis)
+    /// Bounds for r2 polynomials (cyclotomic reduction quotients) for each CRT basis
     pub r2_bounds: [Field; L],
 }
 
@@ -27,35 +27,8 @@ impl<let L: u32> Configs<L> {
     }
 }
 
-/// Decryption Share Circuit (C6).
+/// Threshold Share Decryption (Circuit 6).
 ///
-/// Proves that a ciphernode correctly computed its decryption share from the homomorphic
-/// result ciphertext, using the aggregated secret key share and smudging noise committed
-/// during P1 (DKG). Runs once per ciphernode; T+1 valid proofs are required before
-/// C7 can reconstruct the plaintext.
-///
-/// # Decryption Share Formula
-///
-/// For each CRT basis l:
-///   d[l] = ct0[l] + ct1[l] * sk[l] + e_sm[l] + r2[l] * (X^N + 1) + r1[l] * q_l
-///
-/// where:
-///   - sk      is the ciphernode's aggregated secret key share (sum of received shares, from C4a)
-///   - e_sm    is the ciphernode's aggregated smudging noise share (from C4b)
-///   - r1, r2  are quotient polynomials for modular reduction (secret witnesses)
-///
-/// Smudging:
-///
-/// The decryption share d is public but reveals nothing about sk. The smudging noise
-/// e_sm is chosen large enough to statistically mask the ct1 * sk term, so an adversary
-/// observing all T+1 decryption shares cannot extract information about any party's
-/// secret key share.
-///
-/// Outputs:
-///
-/// d[l] -> public decryption share per CRT basis, consumed by C7
-///         (decrypted_shares_aggregation_bn or decrypted_shares_aggregation_mod).
-pub struct ShareDecryption<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> {
 /// Verifies:
 /// 1. Commitment to sk matches expected (from DKG decryption circuit)
 /// 2. Commitment to e_sm matches expected (from DKG decryption circuit)
@@ -64,40 +37,29 @@ pub struct ShareDecryption<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: 
     /// Circuit parameters including bounds and cryptographic constants
     configs: Configs<L>,
 
-    /// Expected commitment to the aggregated secret key share, from C4a.
-    /// Binds this proof to the sk committed during DKG.
+    /// Expected commitment to aggregated sk shares (from DKG decryption circuit)
     /// (public witness)
     expected_sk_commitment: Field,
 
-    /// Expected commitment to the aggregated smudging noise share, from C4b.
-    /// Binds this proof to the e_sm committed during DKG.
+    /// Expected commitment to aggregated e_sm shares (from DKG decryption circuit)
     /// (public witness)
     expected_e_sm_commitment: Field,
 
-    /// First ciphertext component per CRT basis.
-    /// (public witnesses)
+    /// Ciphertext components (public witnesses)
+    /// ct0 components for each CRT basis (degree N-1 polynomials with N coefficients)
     ct0: [Polynomial<N>; L],
-
-    /// Second ciphertext component per CRT basis.
-    /// (public witnesses)
+    /// ct1 components for each CRT basis (degree N-1 polynomials with N coefficients)
     ct1: [Polynomial<N>; L],
 
-    /// Aggregated secret key share: sum of all received sk shares (from C4a).
-    /// Verified against expected_sk_commitment; range checks handled by DKG circuits.
-    /// (secret witness)
+    /// Aggregated sum of sk shares (secret witness)
     sk: [Polynomial<N>; L],
 
-    /// Aggregated smudging noise share: sum of all received e_sm shares (from C4b).
-    /// Verified against expected_e_sm_commitment; range checks handled by DKG circuits.
-    /// (secret witness)
+    /// Aggregated sum of e_sm shares (secret witness, direct input)
+    /// e_sm[basis] - sum of e_sm shares for each CRT basis (degree N-1 with N coefficients)
     e_sm: [Polynomial<N>; L],
 
-    /// Modulus switching quotient polynomials, per CRT basis.
-    /// (secret witnesses)
+    /// Quotient polynomials for lifting to Z (secret witnesses)
     r1: [Polynomial<2 * N - 1>; L],
-
-    /// Cyclotomic reduction quotient polynomials, per CRT basis.
-    /// (secret witnesses)
     r2: [Polynomial<N - 1>; L],
 
     /// Party's computed decryption share (secret witness)
@@ -132,10 +94,7 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         }
     }
 
-    /// Verifies that the aggregated secret key share hashes to its expected commitment from C4a.
-    ///
-    /// Ensures the ciphernode is using the exact sk committed during DKG.
-    /// Any substitution of a different key will cause this assertion to fail.
+    /// Verifies that aggregated secret shares hash to expected_sk_commitment
     fn verify_agg_sk_commitment(self) {
         assert(
             compute_aggregated_shares_commitment::<N, L, BIT_SK>(self.sk)
@@ -144,10 +103,7 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         );
     }
 
-    /// Verifies that the aggregated smudging noise share hashes to its expected commitment from C4b.
-    ///
-    /// Ensures the ciphernode is using the exact e_sm committed during DKG.
-    /// Any substitution of different noise will cause this assertion to fail.
+    /// Verifies that aggregated noise shares hash to expected_e_sm_commitment
     fn verify_agg_e_sm_commitment(self) {
         assert(
             compute_aggregated_shares_commitment::<N, L, BIT_E_SM>(self.e_sm)
@@ -191,7 +147,9 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
     /// commitments rather than serialized coefficients. This saves constraints while
     /// still binding them to the transcript.
     ///
-    /// Order: expected_sk_commitment, expected_e_sm_commitment, ct0, ct1, r1, r2, d.
+    /// # Returns
+    /// A vector containing commitments and polynomial coefficients in flattened form,
+    /// ready for hashing to generate the Fiat-Shamir challenge.
     fn payload(self) -> Vec<Field> {
         let mut inputs = Vec::new();
 
@@ -274,7 +232,7 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         }
     }
 
-    /// Derives the Fiat-Shamir challenge gamma via the SAFE cryptographic sponge.
+    /// Generates Fiat-Shamir challenge value using the SAFE cryptographic sponge.
     ///
     /// This function implements the Fiat-Shamir transform for the decryption share circuit:
     /// 1. Flattens all witness data (commitments for sk/e_sm, ciphertexts c_0/c_1, quotients r_1/r_2, full d) into a single array
@@ -294,13 +252,28 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         compute_threshold_share_decryption_challenge::<L>(inputs)
     }
 
-    /// Verifies the decryption share equation at the Fiat-Shamir challenge point for one CRT basis.
+    /// Verifies the lifted decryption share computation formula for a specific CRT basis using the Schwartz-Zippel lemma.
     ///
-    /// Checks that the claimed d[basis_idx] satisfies:
-    ///   d(gamma) = ct0(gamma) + ct1(gamma) * sk(gamma) + e_sm(gamma) + r2(gamma) * (gamma^N + 1) + r1(gamma) * q_l
+    /// This function verifies that the decryption share for basis `i` satisfies:
+    /// `d_i(gamma) = c_0i(gamma) + c_1i(gamma) * s_i(gamma) + e_i(gamma) + r_2i(gamma) * cyclo(gamma) + r_1i(gamma) * q_i`
     ///
-    /// By the Schwartz-Zippel lemma, if this holds at a random gamma, the underlying
-    /// polynomial equation holds with high probability.
+    /// Where:
+    /// - `c_0i`, `c_1i` are ciphertext components for basis i
+    /// - `s_i` is the aggregated secret key shares for basis i
+    /// - `e_i` is the aggregated noise shares for basis i
+    /// - `r_1i`, `r_2i` are quotient witnesses for basis i
+    /// - `cyclo(gamma) = gamma^N + 1` is the cyclotomic polynomial evaluated at gamma
+    /// - `q_i` is the CRT modulus for basis i
+    ///
+    /// The Schwartz-Zippel lemma ensures that if this equation holds at a random point
+    /// `gamma`, then the polynomials are identical with high probability.
+    ///
+    /// # Arguments
+    /// * `basis_idx` - The index of the CRT basis to verify (0 <= basis_idx < L)
+    /// * `gamma` - The Fiat-Shamir challenge value used as the evaluation point
+    ///
+    /// # Panics
+    /// The circuit will fail if the decryption share computation formula doesn't hold for the specified basis.
     fn verify_decryption_share_computation(self, basis_idx: u32, gamma: Field) {
         // Evaluate ciphertext components at gamma
         let c_0_at_gamma = self.ct0[basis_idx].eval(gamma);
