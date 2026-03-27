@@ -528,7 +528,7 @@ describe("E3 Pricing", function () {
       const { enclave } = await loadFixture(setup);
       await expect(
         enclave.setPricingConfig({ ...defaultPricingConfig, marginBps: 10001 }),
-      ).to.be.revertedWith("Margin exceeds 100%");
+      ).to.be.revertedWithCustomError(enclave, "BpsExceedsMax");
     });
 
     it("allows setting margin to 0", async function () {
@@ -545,7 +545,7 @@ describe("E3 Pricing", function () {
           ...defaultPricingConfig,
           protocolShareBps: 10001,
         }),
-      ).to.be.revertedWith("Share exceeds 100%");
+      ).to.be.revertedWithCustomError(enclave, "BpsExceedsMax");
     });
 
     it("reverts if minCommitteeSize < minThreshold", async function () {
@@ -556,7 +556,7 @@ describe("E3 Pricing", function () {
           minCommitteeSize: 2,
           minThreshold: 5,
         }),
-      ).to.be.revertedWith("Min size must be >= min threshold");
+      ).to.be.revertedWithCustomError(enclave, "MinSizeBelowMinThreshold");
     });
 
     it("enforces bounds on setCommitteeThresholds", async function () {
@@ -572,12 +572,12 @@ describe("E3 Pricing", function () {
       // Should fail: committee size 4 < min 5
       await expect(
         enclave.setCommitteeThresholds(0, [3, 4]),
-      ).to.be.revertedWith("Below min committee size");
+      ).to.be.revertedWithCustomError(enclave, "BelowMinCommitteeSize");
 
       // Should fail: threshold 2 < min 3
       await expect(
         enclave.setCommitteeThresholds(0, [2, 6]),
-      ).to.be.revertedWith("Below min threshold");
+      ).to.be.revertedWithCustomError(enclave, "BelowMinThreshold");
 
       // Should succeed: meets both minimums
       await expect(enclave.setCommitteeThresholds(0, [3, 5])).to.not.be.revert(

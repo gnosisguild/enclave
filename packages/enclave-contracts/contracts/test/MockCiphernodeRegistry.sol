@@ -176,8 +176,6 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 }
 
 contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
-    error CommitteeNotPublished();
-
     function requestCommittee(
         uint256,
         uint256,

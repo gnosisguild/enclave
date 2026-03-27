@@ -4,6 +4,154 @@
   "sourceName": "contracts/interfaces/ICiphernodeRegistry.sol",
   "abi": [
     {
+      "inputs": [],
+      "name": "BondingRegistryNotSet",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        }
+      ],
+      "name": "CiphernodeNotEnabled",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "CommitteeAlreadyFinalized",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "CommitteeAlreadyPublished",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "CommitteeAlreadyRequested",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "CommitteeDeadlineReached",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "CommitteeNotFinalized",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "CommitteeNotInitializedOrFinalized",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "CommitteeNotPublished",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "CommitteeNotRequested",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "requested",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "available",
+          "type": "uint256"
+        }
+      ],
+      "name": "InsufficientCiphernodes",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidTicketNumber",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NodeAlreadySubmitted",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        }
+      ],
+      "name": "NodeNotBonded",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NodeNotEligible",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NodeNotSubmitted",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotOwnerOrBondingRegistry",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotSlashingManager",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "OnlyBondingRegistry",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "OnlyEnclave",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "SubmissionWindowClosed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "SubmissionWindowNotClosed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ThresholdNotMet",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "Unauthorized",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ZeroAddress",
+      "type": "error"
+    },
+    {
       "anonymous": false,
       "inputs": [
         {
@@ -806,5 +954,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-440e5066adc51df4f47f79b4332765e96b80c6bb"
+  "buildInfoId": "solc-0_8_28-74ea8e366bd07fddf0065d16be962bc1ae5e80d7"
 }

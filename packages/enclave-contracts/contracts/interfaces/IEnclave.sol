@@ -250,6 +250,159 @@ interface IEnclave {
 
     ////////////////////////////////////////////////////////////
     //                                                        //
+    //                        Errors                          //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice Thrown when committee selection fails during E3 request or activation.
+    error CommitteeSelectionFailed();
+
+    /// @notice Thrown when an E3 request uses a program that is not enabled.
+    /// @param e3Program The E3 program address that is not allowed.
+    error E3ProgramNotAllowed(IE3Program e3Program);
+
+    /// @notice Thrown when attempting to access an E3 that does not exist.
+    /// @param e3Id The ID of the non-existent E3.
+    error E3DoesNotExist(uint256 e3Id);
+
+    /// @notice Thrown when attempting to enable a module or program that is already enabled.
+    /// @param module The address of the module that is already enabled.
+    error ModuleAlreadyEnabled(address module);
+
+    /// @notice Thrown when attempting to disable a module or program that is not enabled.
+    /// @param module The address of the module that is not enabled.
+    error ModuleNotEnabled(address module);
+
+    /// @notice Thrown when an invalid or disabled encryption scheme is used.
+    /// @param encryptionSchemeId The ID of the invalid encryption scheme.
+    error InvalidEncryptionScheme(bytes32 encryptionSchemeId);
+
+    /// @notice Thrown when attempting to set an invalid ciphernode registry address.
+    /// @param ciphernodeRegistry The invalid ciphernode registry address.
+    error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
+
+    /// @notice Thrown when the requested duration exceeds maxDuration or is zero.
+    /// @param duration The invalid duration value.
+    error InvalidDuration(uint256 duration);
+
+    /// @notice Thrown when output verification fails.
+    /// @param output The invalid output data.
+    error InvalidOutput(bytes output);
+
+    /// @notice Thrown when the committee size has not been configured with thresholds.
+    /// @param committeeSize The unconfigured committee size.
+    error CommitteeSizeNotConfigured(CommitteeSize committeeSize);
+
+    /// @notice Thrown when attempting to publish ciphertext output that has already been published.
+    /// @param e3Id The ID of the E3.
+    error CiphertextOutputAlreadyPublished(uint256 e3Id);
+
+    /// @notice Thrown when attempting to publish plaintext output before ciphertext output.
+    /// @param e3Id The ID of the E3.
+    error CiphertextOutputNotPublished(uint256 e3Id);
+
+    /// @notice Thrown when payment is required but not provided or insufficient.
+    /// @param value The required payment amount.
+    error PaymentRequired(uint256 value);
+
+    /// @notice Thrown when attempting to publish plaintext output that has already been published.
+    /// @param e3Id The ID of the E3.
+    error PlaintextOutputAlreadyPublished(uint256 e3Id);
+
+    /// @notice Thrown when attempting to set an invalid bonding registry address.
+    /// @param bondingRegistry The invalid bonding registry address.
+    error InvalidBondingRegistry(IBondingRegistry bondingRegistry);
+
+    /// @notice Thrown when attempting to set an invalid fee token address.
+    /// @param feeToken The invalid fee token address.
+    error InvalidFeeToken(IERC20 feeToken);
+
+    /// @notice E3 is not in expected stage
+    error InvalidStage(uint256 e3Id, E3Stage expected, E3Stage actual);
+
+    /// @notice E3 has already been marked as failed
+    error E3AlreadyFailed(uint256 e3Id);
+
+    /// @notice E3 has already completed
+    error E3AlreadyComplete(uint256 e3Id);
+
+    /// @notice Failure condition not yet met
+    error FailureConditionNotMet(uint256 e3Id);
+
+    /// @notice The Input deadline is invalid
+    error InvalidInputDeadline(uint256 deadline);
+
+    /// @notice The input deadline start is in the past
+    error InvalidInputDeadlineStart(uint256 start);
+
+    /// @notice The input deadline end is before the start
+    error InvalidInputDeadlineEnd(uint256 end);
+
+    /// @notice Below minimum committee size
+    error CommitteeSizeTooSmall(CommitteeSize committeeSize);
+
+    /// @notice Below minimum threshold
+    error ThresholdTooSmall(uint256 threshold);
+
+    /// @notice The duties are completed, and ciphernodes are not required to act anymore for this E3
+    /// @param e3Id The ID of the E3
+    /// @param expiration The expiration timestamp of the E3
+    error CommitteeDutiesCompleted(uint256 e3Id, uint256 expiration);
+
+    /// @notice The input deadline has not yet been reached
+    /// @param e3Id The ID of the E3
+    /// @param inputDeadline The input deadline timestamp of the E3
+    error InputDeadlineNotReached(uint256 e3Id, uint256 inputDeadline);
+
+    /// @notice Caller is not the CiphernodeRegistry
+    error OnlyCiphernodeRegistry();
+
+    /// @notice Caller is not the CiphernodeRegistry or SlashingManager
+    error OnlyCiphernodeRegistryOrSlashingManager();
+
+    /// @notice Caller is not the SlashingManager
+    error OnlySlashingManager();
+
+    /// @notice E3 is not in the Failed stage
+    /// @param e3Id The ID of the E3
+    error E3NotFailed(uint256 e3Id);
+
+    /// @notice No payment available to refund for this E3
+    /// @param e3Id The ID of the E3
+    error NoPaymentToRefund(uint256 e3Id);
+
+    /// @notice Timeout window value is invalid (must be > 0)
+    error InvalidTimeoutWindow();
+
+    /// @notice Threshold values are invalid
+    error InvalidThresholdValues();
+
+    /// @notice Committee size is below the configured minimum
+    /// @param size The provided committee size
+    /// @param minimum The required minimum
+    error BelowMinCommitteeSize(uint256 size, uint256 minimum);
+
+    /// @notice Threshold is below the configured minimum
+    /// @param threshold The provided threshold
+    /// @param minimum The required minimum
+    error BelowMinThreshold(uint256 threshold, uint256 minimum);
+
+    /// @notice A basis-points value exceeds 100% (10000)
+    /// @param value The invalid BPS value
+    error BpsExceedsMax(uint256 value);
+
+    /// @notice Protocol treasury address required when protocol share > 0
+    error TreasuryRequired();
+
+    /// @notice Minimum committee size must be >= minimum threshold
+    error MinSizeBelowMinThreshold();
+
+    /// @notice Utilization BPS exceeds 100%
+    /// @param value The invalid utilization BPS value
+    error UtilizationBpsExceedsMax(uint256 value);
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
     //                  Structs                               //
     //                                                        //
     ////////////////////////////////////////////////////////////

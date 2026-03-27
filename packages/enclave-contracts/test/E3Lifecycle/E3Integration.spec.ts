@@ -558,8 +558,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await makeRequest();
 
       // E3 is in Requested state, not Failed
-      await expect(enclave.processE3Failure(0)).to.be.revertedWith(
-        "E3 not failed",
+      await expect(enclave.processE3Failure(0)).to.be.revertedWithCustomError(
+        enclave,
+        "E3NotFailed",
       );
     });
 
@@ -659,8 +660,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await enclave.processE3Failure(0);
 
       // Second call should fail - payment already cleared
-      await expect(enclave.processE3Failure(0)).to.be.revertedWith(
-        "No payment to refund",
+      await expect(enclave.processE3Failure(0)).to.be.revertedWithCustomError(
+        enclave,
+        "NoPaymentToRefund",
       );
     });
 

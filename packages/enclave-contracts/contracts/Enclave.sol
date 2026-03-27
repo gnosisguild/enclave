@@ -124,110 +124,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     ////////////////////////////////////////////////////////////
     //                                                        //
-    //                        Errors                          //
-    //                                                        //
-    ////////////////////////////////////////////////////////////
-
-    /// @notice Thrown when committee selection fails during E3 request or activation.
-    error CommitteeSelectionFailed();
-
-    /// @notice Thrown when an E3 request uses a program that is not enabled.
-    /// @param e3Program The E3 program address that is not allowed.
-    error E3ProgramNotAllowed(IE3Program e3Program);
-
-    /// @notice Thrown when attempting to access an E3 that does not exist.
-    /// @param e3Id The ID of the non-existent E3.
-    error E3DoesNotExist(uint256 e3Id);
-
-    /// @notice Thrown when attempting to enable a module or program that is already enabled.
-    /// @param module The address of the module that is already enabled.
-    error ModuleAlreadyEnabled(address module);
-
-    /// @notice Thrown when attempting to disable a module or program that is not enabled.
-    /// @param module The address of the module that is not enabled.
-    error ModuleNotEnabled(address module);
-
-    /// @notice Thrown when an invalid or disabled encryption scheme is used.
-    /// @param encryptionSchemeId The ID of the invalid encryption scheme.
-    error InvalidEncryptionScheme(bytes32 encryptionSchemeId);
-
-    /// @notice Thrown when attempting to set an invalid ciphernode registry address.
-    /// @param ciphernodeRegistry The invalid ciphernode registry address.
-    error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
-
-    /// @notice Thrown when the requested duration exceeds maxDuration or is zero.
-    /// @param duration The invalid duration value.
-    error InvalidDuration(uint256 duration);
-
-    /// @notice Thrown when output verification fails.
-    /// @param output The invalid output data.
-    error InvalidOutput(bytes output);
-
-    /// @notice Thrown when the committee size has not been configured with thresholds.
-    /// @param committeeSize The unconfigured committee size.
-    error CommitteeSizeNotConfigured(CommitteeSize committeeSize);
-
-    /// @notice Thrown when attempting to publish ciphertext output that has already been published.
-    /// @param e3Id The ID of the E3.
-    error CiphertextOutputAlreadyPublished(uint256 e3Id);
-
-    /// @notice Thrown when attempting to publish plaintext output before ciphertext output.
-    /// @param e3Id The ID of the E3.
-    error CiphertextOutputNotPublished(uint256 e3Id);
-
-    /// @notice Thrown when payment is required but not provided or insufficient.
-    /// @param value The required payment amount.
-    error PaymentRequired(uint256 value);
-
-    /// @notice Thrown when attempting to publish plaintext output that has already been published.
-    /// @param e3Id The ID of the E3.
-    error PlaintextOutputAlreadyPublished(uint256 e3Id);
-
-    /// @notice Thrown when attempting to set an invalid bonding registry address.
-    /// @param bondingRegistry The invalid bonding registry address.
-    error InvalidBondingRegistry(IBondingRegistry bondingRegistry);
-
-    /// @notice Thrown when attempting to set an invalid fee token address.
-    /// @param feeToken The invalid fee token address.
-    error InvalidFeeToken(IERC20 feeToken);
-
-    /// @notice E3 is not in expected stage
-    error InvalidStage(uint256 e3Id, E3Stage expected, E3Stage actual);
-
-    /// @notice E3 has already been marked as failed
-    error E3AlreadyFailed(uint256 e3Id);
-
-    /// @notice E3 has already completed
-    error E3AlreadyComplete(uint256 e3Id);
-
-    /// @notice Failure condition not yet met
-    error FailureConditionNotMet(uint256 e3Id);
-
-    /// @notice The Input deadline is invalid
-    error InvalidInputDeadline(uint256 deadline);
-
-    /// @notice The input deadline start is in the past
-    error InvalidInputDeadlineStart(uint256 start);
-    /// @notice The input deadline end is before the start
-    error InvalidInputDeadlineEnd(uint256 end);
-
-    /// @notice Below minimum committee size
-    error CommitteeSizeTooSmall(CommitteeSize committeeSize);
-    /// @notice Below minimum threshold
-    error ThresholdTooSmall(uint256 threshold);
-
-    /// @notice The duties are completed, and ciphernodes are not required to act anymore for this E3
-    /// @param e3Id The ID of the E3
-    /// @param expiration The expiration timestamp of the E3
-    error CommitteeDutiesCompleted(uint256 e3Id, uint256 expiration);
-
-    /// @notice The input deadline has not yet been reached
-    /// @param e3Id The ID of the E3
-    /// @param inputDeadline The input deadline timestamp of the E3
-    error InputDeadlineNotReached(uint256 e3Id, uint256 inputDeadline);
-
-    ////////////////////////////////////////////////////////////
-    //                                                        //
     //                       Modifiers                        //
     //                                                        //
     ////////////////////////////////////////////////////////////
@@ -236,7 +132,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     modifier onlyCiphernodeRegistry() {
         require(
             msg.sender == address(ciphernodeRegistry),
-            "Only CiphernodeRegistry"
+            OnlyCiphernodeRegistry()
         );
         _;
     }
@@ -246,14 +142,14 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(
             msg.sender == address(ciphernodeRegistry) ||
                 msg.sender == address(slashingManager),
-            "Only Registry or SlashingMgr"
+            OnlyCiphernodeRegistryOrSlashingManager()
         );
         _;
     }
 
     /// @notice Restricts function to SlashingManager contract only
     modifier onlySlashingManager() {
-        require(msg.sender == address(slashingManager), "Only SlashingManager");
+        require(msg.sender == address(slashingManager), OnlySlashingManager());
         _;
     }
 
@@ -560,6 +456,22 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             return;
         }
 
+        // If all committee members were expelled (all malicious), refund the
+        // requester in full — the protocol should not profit from a
+        // compromised E3.
+        if (activeLength == 0) {
+            address requester = _e3Requesters[e3Id];
+            if (requester != address(0)) {
+                paymentToken.safeTransfer(requester, totalAmount);
+            }
+            e3RefundManager.distributeSlashedFundsOnSuccess(
+                e3Id,
+                activeNodes,
+                paymentToken
+            );
+            return;
+        }
+
         // Split between protocol treasury and CN rewards
         uint256 protocolAmount = 0;
         uint16 _protocolShareBps = _e3ProtocolShareBps[e3Id];
@@ -574,19 +486,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         }
 
         uint256 cnAmount = totalAmount - protocolAmount;
-
-        if (activeLength == 0) {
-            address requester = _e3Requesters[e3Id];
-            if (requester != address(0) && cnAmount > 0) {
-                paymentToken.safeTransfer(requester, cnAmount);
-            }
-            e3RefundManager.distributeSlashedFundsOnSuccess(
-                e3Id,
-                activeNodes,
-                paymentToken
-            );
-            return;
-        }
 
         uint256[] memory amounts = new uint256[](activeLength);
 
@@ -806,10 +705,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param e3Id The ID of the failed E3
     function processE3Failure(uint256 e3Id) external {
         E3Stage stage = _e3Stages[e3Id];
-        require(stage == E3Stage.Failed, "E3 not failed");
+        require(stage == E3Stage.Failed, E3NotFailed(e3Id));
 
         uint256 payment = e3Payments[e3Id];
-        require(payment > 0, "No payment to refund");
+        require(payment > 0, NoPaymentToRefund(e3Id));
         e3Payments[e3Id] = 0; // Prevent double processing
 
         address[] memory honestNodes = _getHonestNodes(e3Id);
@@ -1044,9 +943,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @notice Internal function to set timeout config
     function _setTimeoutConfig(E3TimeoutConfig calldata config) internal {
-        require(config.dkgWindow > 0, "Invalid DKG window");
-        require(config.computeWindow > 0, "Invalid compute window");
-        require(config.decryptionWindow > 0, "Invalid decryption window");
+        require(config.dkgWindow > 0, InvalidTimeoutWindow());
+        require(config.computeWindow > 0, InvalidTimeoutWindow());
+        require(config.decryptionWindow > 0, InvalidTimeoutWindow());
 
         _timeoutConfig = config;
 
@@ -1060,18 +959,21 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ) external onlyOwner {
         require(
             threshold[1] >= threshold[0] && threshold[0] > 0,
-            "Invalid threshold"
+            InvalidThresholdValues()
         );
         // Enforce minimum committee bounds if configured
         PricingConfig memory pc = _pricingConfig;
         if (pc.minCommitteeSize > 0) {
             require(
                 threshold[1] >= pc.minCommitteeSize,
-                "Below min committee size"
+                BelowMinCommitteeSize(threshold[1], pc.minCommitteeSize)
             );
         }
         if (pc.minThreshold > 0) {
-            require(threshold[0] >= pc.minThreshold, "Below min threshold");
+            require(
+                threshold[0] >= pc.minThreshold,
+                BelowMinThreshold(threshold[0], pc.minThreshold)
+            );
         }
         committeeThresholds[size] = threshold;
         emit CommitteeThresholdsUpdated(size, threshold);
@@ -1079,28 +981,31 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @inheritdoc IEnclave
     function setPricingConfig(PricingConfig calldata config) public onlyOwner {
-        require(config.marginBps <= BPS_BASE, "Margin exceeds 100%");
-        require(config.protocolShareBps <= BPS_BASE, "Share exceeds 100%");
+        require(config.marginBps <= BPS_BASE, BpsExceedsMax(config.marginBps));
+        require(
+            config.protocolShareBps <= BPS_BASE,
+            BpsExceedsMax(config.protocolShareBps)
+        );
         require(
             config.dkgUtilizationBps <= BPS_BASE,
-            "DKG utilization exceeds 100%"
+            UtilizationBpsExceedsMax(config.dkgUtilizationBps)
         );
         require(
             config.computeUtilizationBps <= BPS_BASE,
-            "Compute utilization exceeds 100%"
+            UtilizationBpsExceedsMax(config.computeUtilizationBps)
         );
         require(
             config.decryptUtilizationBps <= BPS_BASE,
-            "Decrypt utilization exceeds 100%"
+            UtilizationBpsExceedsMax(config.decryptUtilizationBps)
         );
         require(
             config.protocolShareBps == 0 ||
                 config.protocolTreasury != address(0),
-            "Treasury required when protocol share > 0"
+            TreasuryRequired()
         );
         require(
             config.minCommitteeSize >= config.minThreshold,
-            "Min size must be >= min threshold"
+            MinSizeBelowMinThreshold()
         );
         _pricingConfig = config;
         emit PricingConfigUpdated(config);

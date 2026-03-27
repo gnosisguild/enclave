@@ -4,6 +4,428 @@
   "sourceName": "contracts/interfaces/IEnclave.sol",
   "abi": [
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "size",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "minimum",
+          "type": "uint256"
+        }
+      ],
+      "name": "BelowMinCommitteeSize",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "threshold",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "minimum",
+          "type": "uint256"
+        }
+      ],
+      "name": "BelowMinThreshold",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "value",
+          "type": "uint256"
+        }
+      ],
+      "name": "BpsExceedsMax",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "CiphertextOutputAlreadyPublished",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "CiphertextOutputNotPublished",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "expiration",
+          "type": "uint256"
+        }
+      ],
+      "name": "CommitteeDutiesCompleted",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "CommitteeSelectionFailed",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum IEnclave.CommitteeSize",
+          "name": "committeeSize",
+          "type": "uint8"
+        }
+      ],
+      "name": "CommitteeSizeNotConfigured",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum IEnclave.CommitteeSize",
+          "name": "committeeSize",
+          "type": "uint8"
+        }
+      ],
+      "name": "CommitteeSizeTooSmall",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "E3AlreadyComplete",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "E3AlreadyFailed",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "E3DoesNotExist",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "E3NotFailed",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IE3Program",
+          "name": "e3Program",
+          "type": "address"
+        }
+      ],
+      "name": "E3ProgramNotAllowed",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "FailureConditionNotMet",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "inputDeadline",
+          "type": "uint256"
+        }
+      ],
+      "name": "InputDeadlineNotReached",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IBondingRegistry",
+          "name": "bondingRegistry",
+          "type": "address"
+        }
+      ],
+      "name": "InvalidBondingRegistry",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract ICiphernodeRegistry",
+          "name": "ciphernodeRegistry",
+          "type": "address"
+        }
+      ],
+      "name": "InvalidCiphernodeRegistry",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "duration",
+          "type": "uint256"
+        }
+      ],
+      "name": "InvalidDuration",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "encryptionSchemeId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "InvalidEncryptionScheme",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IERC20",
+          "name": "feeToken",
+          "type": "address"
+        }
+      ],
+      "name": "InvalidFeeToken",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "deadline",
+          "type": "uint256"
+        }
+      ],
+      "name": "InvalidInputDeadline",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "end",
+          "type": "uint256"
+        }
+      ],
+      "name": "InvalidInputDeadlineEnd",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "start",
+          "type": "uint256"
+        }
+      ],
+      "name": "InvalidInputDeadlineStart",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "output",
+          "type": "bytes"
+        }
+      ],
+      "name": "InvalidOutput",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "enum IEnclave.E3Stage",
+          "name": "expected",
+          "type": "uint8"
+        },
+        {
+          "internalType": "enum IEnclave.E3Stage",
+          "name": "actual",
+          "type": "uint8"
+        }
+      ],
+      "name": "InvalidStage",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidThresholdValues",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidTimeoutWindow",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "MinSizeBelowMinThreshold",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "module",
+          "type": "address"
+        }
+      ],
+      "name": "ModuleAlreadyEnabled",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "module",
+          "type": "address"
+        }
+      ],
+      "name": "ModuleNotEnabled",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "NoPaymentToRefund",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "OnlyCiphernodeRegistry",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "OnlyCiphernodeRegistryOrSlashingManager",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "OnlySlashingManager",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "value",
+          "type": "uint256"
+        }
+      ],
+      "name": "PaymentRequired",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "PlaintextOutputAlreadyPublished",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "threshold",
+          "type": "uint256"
+        }
+      ],
+      "name": "ThresholdTooSmall",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "TreasuryRequired",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "value",
+          "type": "uint256"
+        }
+      ],
+      "name": "UtilizationBpsExceedsMax",
+      "type": "error"
+    },
+    {
       "anonymous": false,
       "inputs": [
         {
@@ -1671,5 +2093,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-440e5066adc51df4f47f79b4332765e96b80c6bb"
+  "buildInfoId": "solc-0_8_28-74ea8e366bd07fddf0065d16be962bc1ae5e80d7"
 }
