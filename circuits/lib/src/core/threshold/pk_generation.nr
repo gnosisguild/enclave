@@ -11,7 +11,7 @@ use crate::math::commitments::{
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
 
-/// Cryptographic parameters for threshold public key generation circuit.
+/// Parameters for threshold public key generation (C1).
 pub struct Configs<let N: u32, let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
@@ -40,22 +40,17 @@ impl<let N: u32, let L: u32> Configs<N, L> {
     }
 }
 
-/// Correct Threshold Public Key Contribution Generation Circuit (C1).
+/// Threshold public key contribution (C1).
 ///
-/// This circuit proves that a contribution to the threshold BFV public key was generated correctly
-/// from secret values without revealing those secrets. Each ciphernode generates
-/// their own key contribution, and this circuit ensures the generation followed
-/// the BFV key generation equations.
+/// **Role:** Prove one party's TrBFV public-key contribution from hidden `sk`, `eek`, `e_sm`, and
+/// quotients (`pk1` limb is the CRS `a`).
 ///
-/// Verifies:
-/// 1. Range checks on all secret witnesses (secret key, error, smudging noise, quotients)
-/// 2. Correct public key generation: pk0_i = -a_i * sk + eek + r2_i * (X^N + 1) + r1_i * q_i
-///    (pk1 is a_i from the hardcoded CRS `a`, not a separate witness)
+/// **Verifies:** Range checks on witnesses; evaluation form of `pk0 = -a*sk + eek + ...` at the FS challenge.
 ///
-/// Outputs (in return order):
-/// - commit(sk) -> C2a (secret key share verification)
-/// - commit(pk_trbfv) -> C5 (public key aggregation)
-/// - commit(e_sm) -> C2b (smudging noise share verification)
+/// **Produces (tuple order):**
+/// - `commit(sk)` -> C2a (share computation).
+/// - `commit(pk_trbfv)` -> C5 (pk aggregation).
+/// - `commit(e_sm)` -> C2b (share computation).
 pub struct PkGeneration<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_PK: u32> {
     /// Cryptographic parameters including bounds, moduli, and constants.
     configs: Configs<N, L>,
@@ -126,25 +121,22 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
 
     /// Executes the threshold public key generation circuit.
     ///
-    /// Returns a tuple of three commitments in the following order:
-    /// - commit(sk) -> C2a (secret key share verification)
-    /// - commit(pk_trbfv) -> C5 (public key aggregation)
-    /// - commit(e_sm) -> C2b (smudging noise share verification)
+    /// Returns `(commit(sk), commit(pk_trbfv), commit(e_sm))` as documented on the struct.
     pub fn execute(self) -> (Field, Field, Field) {
-        // 1. Perform range checks on all secret witness values
+        // Step 1: Range-check secret witnesses (sk, eek, e_sm, quotients).
         self.perform_range_checks();
 
-        // 2. Compute commitments
+        // Step 2: Derive commitments for the FS transcript.
         let sk_commitment = compute_share_computation_sk_commitment::<N, BIT_SK>(self.sk);
         let e_sm_commitment =
             compute_share_computation_e_sm_commitment::<N, L, BIT_E_SM>(self.e_sm);
         let pk_commitment = compute_threshold_pk_commitment::<N, L, BIT_PK>(self.pk0, self.a);
 
-        // 3. Generate a single Fiat-Shamir challenge point (gamma)
+        // Step 3: Fiat-Shamir challenge and per-modulus evaluation checks.
         let gamma = self.generate_challenge(sk_commitment, pk_commitment);
         self.verify_evaluations(gamma);
 
-        // 4. Return all commitments
+        // Step 4: Return commitments for downstream circuits.
         (sk_commitment, pk_commitment, e_sm_commitment)
     }
 

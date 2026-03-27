@@ -1,6 +1,6 @@
 # `e_sm_share_computation_base` — C2 (inner)
 
-Base proof for the **smudging noise** Shamir tensor, bound to C1’s `e_sm` commitment.
+Base proof for the **smudging noise** Shamir share array `y`, bound to C1’s `e_sm` commitment.
 
 |           |                                                                                                     |
 | --------- | --------------------------------------------------------------------------------------------------- |

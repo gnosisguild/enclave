@@ -51,8 +51,8 @@ not a single crate.
 | Path                            | ID       | `CircuitName`                | Role                                          |
 | ------------------------------- | -------- | ---------------------------- | --------------------------------------------- |
 | `pk`                            | C0       | `PkBfv`                      | Commit to individual BFV public key           |
-| `sk_share_computation_base`     | C2 inner | `SkShareComputationBase`     | Shamir tensor for secret contribution         |
-| `e_sm_share_computation_base`   | C2 inner | `ESmShareComputationBase`    | Shamir tensor for smudging noise              |
+| `sk_share_computation_base`     | C2 inner | `SkShareComputationBase`     | Shamir shares (`y`) for secret contribution   |
+| `e_sm_share_computation_base`   | C2 inner | `ESmShareComputationBase`    | Shamir shares (`y`) for smudging noise          |
 | `share_computation_chunk`       | C2 inner | `ShareComputationChunk`      | Reed–Solomon parity on a coefficient slice    |
 | `share_computation_chunk_batch` | C2 inner | `ShareComputationChunkBatch` | Binds base proof to a batch of chunk proofs   |
 | `share_computation`             | **C2**   | `ShareComputation`           | Final C2 step; aggregates inner proofs        |
@@ -87,21 +87,6 @@ Wrapper parameters are documented in
 | Path     | Role                                                                    |
 | -------- | ----------------------------------------------------------------------- |
 | `config` | Validates secure preset constants (CRT moduli, bounds, parity matrices) |
-
-### Per-package READMEs (`bin/**/README.md`)
-
-Many packages include a **short** README for navigation in the file tree. Keep them that way: one or
-two sentences on what this binary proves, then a small table—**do not** duplicate
-[Cryptography](https://docs.theinterfold.com/cryptography) or the full package index.
-
-| Row | Purpose |
-| --- | ------- |
-| **Core** (or **Source**) | Link to the shared implementation in [`lib/src/`](lib/src/README.md), or to [`src/main.nr`](bin/dkg/pk/src/main.nr) when the crate is self-contained. |
-| **Index** | Link to [**Circuit package index**](#circuit-package-index) in this file. Use the right number of `../` so the path reaches `circuits/README.md` (depends on folder depth; all current READMEs are already consistent). |
-| **Docs** | [Noir Circuits](https://docs.theinterfold.com/noir-circuits) for toolchain and layout, plus the repo [source](../docs/pages/noir-circuits.mdx). |
-
-Optional extras (only when they save a click): **Wrappers** (recursive aggregation), or a second
-sentence naming the paired package (e.g. P3 `ct0` / `ct1`).
 
 ## Build and test
 

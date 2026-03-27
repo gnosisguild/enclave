@@ -11,7 +11,7 @@ use dep::bignum::BigNum;
 use dep::bignum::bignum::to_field;
 use dep::bignum::SecureThreshold8192;
 
-/// Cryptographic parameters for decryption share aggregation circuit.
+/// Parameters for decrypted shares aggregation (C7).
 pub struct Configs<let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
@@ -27,14 +27,14 @@ impl<let L: u32> Configs<L> {
     }
 }
 
-/// Decrypted Shares Aggregation Circuit (Circuit 7).
-/// Uses BigNum for Q values (works for both insecure and secure parameter sets).
+/// Decrypted shares aggregation (C7).
 ///
-/// Verifies:
-/// 0. Each party's decryption share matches the corresponding C6 public `d` commitment
-/// 1. Lagrange interpolation to compute u^{(l)} for each CRT basis
-/// 2. CRT reconstruction: u^{(l)} + r^{(l)} * q_l = u_global
-/// 3. Decoding verification: message = -Q^{-1} * (t * u_global)_Q mod t
+/// **Role:** Combine partial decryption shares into the plaintext message (CRT + decode). Uses
+/// BigNum where the product of CRT moduli exceeds the field.
+///
+/// **Consumes:** C6 `d` commitments for each reconstructing party (same order as shares).
+///
+/// **Verifies:** Share binding to C6; Lagrange combine per limb; CRT glue; decode mod `t`.
 pub struct DecryptedSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32, let BIT_D: u32> {
     /// Circuit parameters including crypto constants
     configs: Configs<L>,
@@ -80,7 +80,7 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u3
         }
     }
 
-    /// Main verification function.
+    /// Run all checks (no return value; asserts hold or the proof fails).
     pub fn execute(self) {
         for party_idx in 0..(T + 1) {
             let computed = compute_threshold_decryption_share_commitment::<MAX_MSG_NON_ZERO_COEFFS, L, BIT_D>(

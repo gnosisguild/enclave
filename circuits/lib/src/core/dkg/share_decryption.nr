@@ -9,21 +9,16 @@ use crate::math::commitments::{
 };
 use crate::math::polynomial::Polynomial;
 
-/// DKG Share Decryption & Aggregation Circuit (C4a / C4b).
+/// DKG share decryption and aggregation (C4a / C4b).
 ///
-/// Verifies that each ciphernode correctly decrypted the shares addressed to them
-/// and honestly aggregated all honest parties' contributions into a single combined value.
+/// **Role:** Verify decrypted shares against C2 commitments and publish a commitment to the sum
+/// over honest parties (run twice: sk path and e_sm path).
 ///
-/// This circuit runs twice in parallel:
-/// - C4a: verifies and aggregates secret key (sk) shares, consuming commit(sk_share) from C2a
-/// - C4b: verifies and aggregates smudging noise (e_sm) shares, consuming commit(e_sm_share) from C2b
+/// **Consumes:** Per-party share commitments from C2 (sk or e_sm branch).
 ///
-/// Both variants use identical verification logic. The source of `expected_commitments`
-/// is the only difference between the two instantiations.
-///
-/// Outputs:
-/// - C4a: `commit(agg_sk)` -> C6 ([`threshold/share_decryption`](../../threshold/share_decryption))
-/// - C4b: `commit(agg_e_sm)` -> C6 ([`threshold/share_decryption`](../../threshold/share_decryption))
+/// **Produces:**
+/// - C4a: `commit(agg_sk)` -> C6 (threshold share decryption).
+/// - C4b: `commit(agg_e_sm)` -> C6 (threshold share decryption).
 pub struct ShareDecryption<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32> {
     /// Expected commitments to the share polynomials, produced in C2a (for C4a) or C2b (for C4b)
     /// via commit_to_party_shares. Organised as [party_idx][mod_idx], covering all H honest
@@ -102,13 +97,13 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32> ShareDecryption<N, L,
     /// - C4a: commit(agg_sk), consumed by C6 in P4
     /// - C4b: commit(agg_e_sm), consumed by C6 in P4
     pub fn execute(self) -> Field {
-        // Step 1: Verify all commitments match
+        // Step 1: Verify decrypted shares match expected C2 commitments.
         self.verify_commitments();
 
-        // Step 2: Compute aggregated shares
+        // Step 2: Sum shares coefficient-wise per CRT limb.
         let aggregated = self.compute_aggregated_shares();
 
-        // Step 3: Return commitment to aggregated shares
+        // Step 3: Publish commitment to the aggregate (C6 input).
         compute_aggregated_shares_commitment::<N, L, BIT_MSG>(aggregated)
     }
 }

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-// Level 1: chunk_batch_wrapper
+// Level 1: chunk_batch wrapper (verifies base + per-batch chunk proofs).
 
 use bb_proof_verification::{UltraHonkVerificationKey, UltraHonkZKProof, verify_honk_proof};
 use lib::configs::default::dkg::{
@@ -19,10 +19,10 @@ pub global BASE_PUBLIC_INPUTS: u32 =
 
 pub global CHUNK_PUBLIC_INPUTS: u32 = SHARE_COMPUTATION_CHUNK_SIZE * L_THRESHOLD * (N_PARTIES + 1);
 
-// Each batch wrapper takes:
-// - base proof (for y consistency)
-// - CHUNKS_PER_BATCH chunk proofs
-// - CHUNK_BATCH_IDX to know which y slice to check
+// Each batch proof bundles:
+// - one base proof (`y` share-array layout for consistency),
+// - CHUNKS_PER_BATCH chunk proofs,
+// - batch_idx (which batch along the chunk sequence).
 
 fn main(
     base_verification_key: UltraHonkVerificationKey,

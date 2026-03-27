@@ -7,14 +7,12 @@
 use crate::math::commitments::compute_dkg_pk_commitment;
 use crate::math::polynomial::Polynomial;
 
-/// DKG Public Key Commitment Circuit (C0).
+/// DKG public key commitment (C0).
 ///
-/// This circuit establishes a binding cryptographic commitment to a ciphernode's
-/// DKG public key, which is used exclusively for encrypting secret shares during
-/// the Distributed Key Generation (DKG) phase.
+/// **Role:** Bind the ciphernode DKG public key used to encrypt outgoing shares in DKG.
 ///
-/// Outputs:
-/// - commit(pk_dkg) -> C3a / C3b (share encryption)
+/// **Produces:**
+/// - `commit(pk_dkg)` -> C3 (share encryption).
 pub struct Pk<let N: u32, let L: u32, let BIT_PK: u32> {
     /// DKG public key first component for each CRT modulus.
     /// pk0[i] is a degree N-1 polynomial for modulus q_i.

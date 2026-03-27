@@ -12,7 +12,7 @@ use crate::math::helpers::flatten;
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
-/// Cryptographic parameters for DKG share encryption circuit.
+/// Parameters for DKG share encryption (C3).
 pub struct Configs<let L: u32> {
     /// Plaintext modulus t
     pub t: Field,
@@ -80,21 +80,14 @@ impl<let L: u32> Configs<L> {
     }
 }
 
-/// DKG Share Encryption Circuit (C3a / C3b).
+/// DKG share encryption (C3a / C3b).
 ///
-/// Verifies that a secret share was correctly encrypted under a recipient's DKG public key.
-/// This circuit runs twice in parallel per ciphernode per recipient:
-/// - C3a: encrypts a secret key (sk) share, consuming commit(sk_share) from C2a
-/// - C3b: encrypts a smudging noise (e_sm) share, consuming commit(e_sm_share) from C2b
+/// **Role:** Prove BFV encryption of a share under the recipient DKG public key. Run twice per
+/// recipient (sk share and e_sm share).
 ///
-/// The key insight is that the commitment to the plaintext being encrypted must equal
-/// the commitment to the share produced in C2a/C2b. This binds the encryption to the
-/// previously verified share, we know the ciphertext contains the correct share without
-/// ever seeing it in plaintext.
+/// **Consumes:** `expected_pk_commitment` (C0); `expected_message_commitment` (C2 sk or C2 e_sm).
 ///
-/// Outputs:
-/// No new commitments are produced. The output ciphertexts (ct0, ct1) are broadcast
-/// to the intended recipient for decryption in C4a/C4b.
+/// **Produces:** Ciphertexts `ct0`, `ct1` for C4 (no new standalone commitment artifact).
 pub struct ShareEncryption<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     /// Circuit parameters
     configs: Configs<L>,

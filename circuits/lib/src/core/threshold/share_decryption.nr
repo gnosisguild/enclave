@@ -11,7 +11,7 @@ use crate::math::commitments::{
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
 
-/// Cryptographic parameters for Threshold decryption share circuit.
+/// Parameters for threshold share decryption (C6).
 pub struct Configs<let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
@@ -27,21 +27,23 @@ impl<let L: u32> Configs<L> {
     }
 }
 
-/// Threshold Share Decryption (Circuit 6).
+/// Threshold share decryption (C6).
 ///
-/// Verifies:
-/// 1. Commitment to sk matches expected (from DKG decryption circuit)
-/// 2. Commitment to e_sm matches expected (from DKG decryption circuit)
-/// 3. Correct computation: d_i = c_0i + c_1i * s_i + e_i + r_2i * (X^N + 1) + r_1i * q_i
+/// **Role:** Prove one party's partial decryption share `d` is consistent with the ciphertext and
+/// with aggregate `sk` / `e_sm` commitments from C4.
+///
+/// **Consumes:** `expected_sk_commitment`, `expected_e_sm_commitment` (C4); ciphertext limbs `ct0`, `ct1`.
+///
+/// **Produces:** Truncated-`d` commitment for C7 (`decrypted_shares_aggregation`).
 pub struct ShareDecryption<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> {
     /// Circuit parameters including bounds and cryptographic constants
     configs: Configs<L>,
 
-    /// Expected commitment to aggregated sk shares (from DKG decryption circuit)
+    /// Expected commitment to aggregated sk shares (from C4 / protocol transcript)
     /// (public witness)
     expected_sk_commitment: Field,
 
-    /// Expected commitment to aggregated e_sm shares (from DKG decryption circuit)
+    /// Expected commitment to aggregated e_sm shares (from C4 / protocol transcript)
     /// (public witness)
     expected_e_sm_commitment: Field,
 
@@ -171,8 +173,7 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         inputs
     }
 
-    /// Main verification function. Returns the public commitment to the first
-    /// `MAX_MSG_NON_ZERO_COEFFS` coefficients of `d` per CRT limb.
+    /// Returns the C7-facing commitment to the first `MAX_MSG_NON_ZERO_COEFFS` coeffs of `d` per limb.
     pub fn execute(self) -> Field {
         // Step 1: Verify sk commitment matches expected
         self.verify_agg_sk_commitment();
@@ -180,9 +181,9 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         // Step 2: Verify e_sm commitment matches expected
         self.verify_agg_e_sm_commitment();
 
-        // Step 3: Perform range checks on quotient polynomials
-        // Note: sk and e_sm range checks are handled by commitment verification
-        // (the DKG decryption circuit already performed range checks on these values)
+        // Step 3: Range-check quotient polynomials (r1, r2).
+        // sk and e_sm are enforced only via `verify_agg_*_commitment` against C4 outputs; C4
+        // aggregated per-party shares that passed verification against C2 (see `dkg/share_decryption`).
         self.check_range_bounds();
 
         let d_truncated = self.get_truncated_decryption_share();
@@ -208,10 +209,10 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
     /// attacks where malicious provers provide out-of-range values that could break the
     /// security properties of the Threshold scheme.
     ///
-    /// Note: Range checks on `sk` and `e_sm` are NOT performed here because:
-    /// - Their commitments are verified against expected values from the DKG circuit
-    /// - The DKG decryption circuit already performed range checks on these values
-    /// - Commitment binding ensures the values match what was previously verified
+    /// Note: `sk` / `e_sm` coefficients are not range-checked again here:
+    /// - `verify_agg_sk_commitment` / `verify_agg_e_sm_commitment` bind to the C4 aggregate commitments.
+    /// - C4 formed those aggregates from per-party shares verified against C2 in `dkg/share_decryption`.
+    /// - This step only range-checks fresh quotient witnesses `r1`, `r2`.
     ///
     /// # Panics
     /// This function will cause the circuit to fail if any quotient coefficient is

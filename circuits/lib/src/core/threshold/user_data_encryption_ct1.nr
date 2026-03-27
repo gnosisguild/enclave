@@ -4,7 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//user data encryption for ct1- the second part of the ciphertext
+//! User-data encryption - ct1 leg (P3).
+//!
+//! See `UserDataEncryptionCt1` for the circuit contract.
+
 use crate::math::commitments::compute_multiple_polynomial_commitment;
 use crate::math::commitments::compute_single_polynomial_commitment;
 use crate::math::commitments::compute_user_data_encryption_ct1_challenge;
@@ -14,6 +17,7 @@ use crate::math::commitments::DS_USER_DATA_ENCRYPTION_COMMITMENT;
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
 
+/// Parameters for user-data encryption ct1 (P3).
 pub struct Configs<let N: u32, let L: u32> {
     pub qis: [Field; L],
     pub e1_bound: Field,
@@ -33,11 +37,16 @@ impl<let N: u32, let L: u32> Configs<N, L> {
     }
 }
 
+/// User-data encryption ct1 (P3).
+///
+/// **Role:** Second ciphertext leg; `u` must match the ct0 `u_commitment`.
+///
+/// **Produces:** `(pk1_commitment, ct1_commitment, u_commitment)` public outputs.
 pub struct UserDataEncryptionCt1<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E1: u32, let BIT_P1: u32, let BIT_P2: u32> {
     configs: Configs<N, L>,
     pk1is: [Polynomial<N>; L],
     ct1is: [Polynomial<N>; L],
-    /// Re-witnessed privately, checked against commit_u from Circuit A
+    /// Re-witnessed privately; checked against `u_commitment` from ct0 (same P3 flow).
     u: Polynomial<N>,
     e1: Polynomial<N>,
     p1is: [Polynomial<(2 * N) - 1>; L],
@@ -130,12 +139,15 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         sum.0 == sum.1
     }
 
-    /// Returns pk1_commitment, ct1_commitment and u_commitment
+    /// Returns `(pk1_commitment, ct1_commitment, u_commitment)`.
     pub fn execute(self) -> (Field, Field, Field) {
+        // Step 1: Witness bounds.
         self.check_range_bounds();
 
+        // Step 2: Commitments for the FS transcript.
         let (pk1_commitment, ct1_commitment, u_commitment) = self.generate_commitments();
 
+        // Step 3: Fiat-Shamir challenge and evaluation check of ct1 equations.
         let gammas = self.generate_challenge(pk1_commitment, ct1_commitment, u_commitment);
 
         assert(self.verify_evaluations(gammas), "ct1 encryption check failed");

@@ -1,6 +1,6 @@
 # `share_computation_chunk` — C2 (inner)
 
-Reed–Solomon parity checks on a **slice** of the public `y` tensor (see `PARITY_MATRIX` in configs).
+Reed-Solomon parity checks on a **slice** of the public share array `y` (see `PARITY_MATRIX` in configs).
 
 |           |                                                                                                       |
 | --------- | ----------------------------------------------------------------------------------------------------- |

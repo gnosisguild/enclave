@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-// User data encryption circuit for ct0, which checks the correctness of ct0 encryption
-// and generates commitment for u, which will be used in ct1 to check consistency of u
-// across ct0 and ct1.
+//! User-data encryption - ct0 leg (P3).
+//!
+//! See `UserDataEncryptionCt0` for the circuit contract.
 
 use crate::math::commitments::compute_multiple_polynomial_commitment;
 use crate::math::commitments::compute_single_polynomial_commitment;
@@ -17,6 +17,7 @@ use crate::math::commitments::DS_USER_DATA_ENCRYPTION_COMMITMENT;
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
 
+/// Parameters for user-data encryption ct0 (P3).
 pub struct Configs<let N: u32, let L: u32> {
     pub qis: [Field; L],
     pub k0is: [Field; L],
@@ -55,9 +56,17 @@ impl<let N: u32, let L: u32> Configs<N, L> {
     }
 }
 
+/// User-data encryption ct0 (P3).
+///
+/// **Role:** Prove the first ciphertext leg and publish `pk0`, `ct0`, `k1`, and `u` commitments
+/// for the wrapper and ct1 circuit.
+///
+/// **Consumes:** Threshold PK from C5 (`pk0is` witness path).
+///
+/// **Produces:** `(pk0_commitment, ct0_commitment, k1_commitment, u_commitment)` public outputs.
 pub struct UserDataEncryptionCt0<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32> {
     configs: Configs<N, L>,
-    /// Public input from PkAggregation
+    /// Aggregated threshold `pk0` limb (from C5).
     pk0is: [Polynomial<N>; L],
     ct0is: [Polynomial<N>; L],
     u: Polynomial<N>,
@@ -182,14 +191,17 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         sum.0 == sum.1
     }
 
-    /// Returns pk0_commitment, ct0_commitment, k1_commitment and u_commitment
+    /// Returns `(pk0_commitment, ct0_commitment, k1_commitment, u_commitment)`.
     pub fn execute(self) -> (Field, Field, Field, Field) {
+        // Step 1: Witness bounds and CRT consistency of `e0`.
         self.check_range_bounds();
         self.check_e0_crt_consistency();
 
+        // Step 2: Domain-separated commitments for the FS transcript.
         let (pk0_commitment, ct0_commitment, k1_commitment, u_commitment) =
             self.generate_commitments();
 
+        // Step 3: Fiat-Shamir challenge and batched evaluation check of ct0 equations.
         let gammas =
             self.generate_challenge(pk0_commitment, ct0_commitment, k1_commitment, u_commitment);
 

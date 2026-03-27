@@ -260,7 +260,7 @@ circuit’s `verify_evaluations` only evaluates the **pk0** identity at γ.)
 a single monolithic proof: under
 [`dkg/`](https://github.com/gnosisguild/enclave/tree/main/circuits/bin/dkg) you will find the
 recursive chain—base, chunk, batch, wrapper—that proves Shamir-style sharing and Reed–Solomon parity
-on the contribution tensors while keeping proof size manageable. Intuitively, for each CRT limb and
+on the contribution arrays while keeping proof size manageable. Intuitively, for each CRT limb and
 coefficient column, the shares laid out as a vector **y** must satisfy parity with a fixed matrix
 **H** so that only low-degree Shamir-style codewords pass (the exact **PARITY_MATRIX** is preset and
 checked by `config`):

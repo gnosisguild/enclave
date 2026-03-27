@@ -30,7 +30,7 @@ fn main(
         proof2_key_hash,
     );
 
-    // Hash the two commitments with Poseidon so the verifier can check the folded proof used the expected public inputs.
+    // Combine the two inner commitments with SAFE (`compute_recursive_aggregation_commitment`).
     let mut commitments_vec = Vec::new();
     commitments_vec.push(proof1_public_inputs[1]);
     commitments_vec.push(proof2_public_inputs[1]);
