@@ -1,9 +1,9 @@
-# `pk` — C0
+# `user_data_encryption` — P3 (wrapper)
 
-BFV **individual** public key commitment: binds the ciphernode’s share-encryption key used in C3.
+Re-verifies **ct0** and **ct1** proofs, asserts identical **`u_commitment`**, and outputs aggregated
+pk / ciphertext / k1 commitments for downstream use.
 
 |           |                                                                   |
 | --------- | ----------------------------------------------------------------- |
-| **Core**  | [`lib/src/core/dkg/pk.nr`](../../../lib/src/core/dkg/pk.nr)       |
 | **Index** | [Circuit package index](../../../README.md#circuit-package-index) |
 | **Docs**  | [Noir Circuits](../../../../docs/pages/noir-circuits.mdx)         |

@@ -4,13 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! # lib - Enclave Zero-Knowledge Cryptographic Library
-//! - **`core`**: Core functions and structs for Public Verifiable
-//!   Secret Sharing (PVSS) circuits implementations.
-//! - **`math`**: Mathematical utilities including polynomial operations, SAFE sponge
-//!   API implementation, and helper functions for circuit construction.
-//! - **`configs`**: Cryptographic parameter configurations for different security
-//!   levels (insecure, production) and different circuit variants (DKG, Threshold).
+//! # lib - Interfold / Enclave ZK library
+//! - **`core`**: DKG and threshold TrBFV circuit logic (PV-TBFV / publicly verifiable
+//!   threshold BFV).
+//! - **`math`**: Polynomials, SAFE sponge (Poseidon2 + Keccak per `safe.nr`), helpers,
+//!   `ModU128`, commitments.
+//! - **`configs`**: Parameter presets (default -> secure / insecure / committee) for DKG
+//!   and threshold packages under `circuits/bin/`.
 
 pub mod math;
 pub mod core;
