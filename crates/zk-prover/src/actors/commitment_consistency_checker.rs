@@ -52,16 +52,20 @@ struct VerifiedProofData {
     data_hash: [u8; 32],
 }
 
+/// Describes a source entry whose commitments are inconsistent with a target.
+struct Mismatch {
+    party_id: u64,
+    address: Address,
+    proof_type: ProofType,
+    data_hash: [u8; 32],
+}
+
 /// Per-E3 actor that enforces cross-circuit commitment consistency.
 pub struct CommitmentConsistencyChecker {
     bus: BusHandle,
     e3_id: E3id,
     links: Vec<Box<dyn CommitmentLink>>,
     /// Verified proof outputs: `(address, proof_type) → data`.
-    ///
-    /// For cross-party links the target proof type may come from a different
-    /// address than the source, so lookups iterate over all entries whose
-    /// `proof_type` matches.
     verified: HashMap<(Address, ProofType), VerifiedProofData>,
 }
 
@@ -86,165 +90,82 @@ impl CommitmentConsistencyChecker {
         addr
     }
 
-    /// Evaluate all registered links given a newly arrived proof.
-    fn check_links(
-        &self,
-        new_proof_type: ProofType,
-        new_address: Address,
-        ec: &EventContext<Sequenced>,
-    ) {
-        for link in &self.links {
-            match link.scope() {
-                LinkScope::SameParty => {
-                    self.check_same_party_link(link.as_ref(), new_proof_type, new_address, ec);
-                }
-                LinkScope::CrossParty => {
-                    self.check_cross_party_link(link.as_ref(), new_proof_type, ec);
-                }
+    /// Find all source entries whose commitments are inconsistent with cached
+    /// targets for a given link.
+    fn find_mismatches(&self, link: &dyn CommitmentLink) -> Vec<Mismatch> {
+        let src_type = link.source_proof_type();
+        let tgt_type = link.target_proof_type();
+
+        match link.scope() {
+            LinkScope::SameParty => self
+                .verified
+                .keys()
+                .filter(|(_, pt)| *pt == src_type)
+                .filter_map(|(addr, _)| {
+                    let src = self.verified.get(&(*addr, src_type))?;
+                    let tgt = self.verified.get(&(*addr, tgt_type))?;
+                    let vals = link.extract_source_values(&src.public_signals);
+                    (!link.check_consistency(&vals, &tgt.public_signals)).then(|| Mismatch {
+                        party_id: src.party_id,
+                        address: *addr,
+                        proof_type: src_type,
+                        data_hash: src.data_hash,
+                    })
+                })
+                .collect(),
+
+            LinkScope::CrossParty => {
+                let targets: Vec<_> = self
+                    .verified
+                    .iter()
+                    .filter(|((_, pt), _)| *pt == tgt_type)
+                    .map(|(_, v)| v)
+                    .collect();
+
+                self.verified
+                    .iter()
+                    .filter(|((_, pt), _)| *pt == src_type)
+                    .filter_map(|(_, src)| {
+                        let vals = link.extract_source_values(&src.public_signals);
+                        if vals.is_empty() {
+                            return None;
+                        }
+                        targets
+                            .iter()
+                            .any(|tgt| !link.check_consistency(&vals, &tgt.public_signals))
+                            .then(|| Mismatch {
+                                party_id: src.party_id,
+                                address: src.address,
+                                proof_type: src_type,
+                                data_hash: src.data_hash,
+                            })
+                    })
+                    .collect()
             }
         }
     }
 
-    /// Same-party: compare source and target from the same address.
-    fn check_same_party_link(
-        &self,
-        link: &dyn CommitmentLink,
-        new_proof_type: ProofType,
-        address: Address,
-        ec: &EventContext<Sequenced>,
-    ) {
-        let src_type = link.source_proof_type();
-        let tgt_type = link.target_proof_type();
-
-        // Only run when the newly arrived proof completes a pair.
-        if new_proof_type != src_type && new_proof_type != tgt_type {
-            return;
-        }
-
-        let source = self.verified.get(&(address, src_type));
-        let target = self.verified.get(&(address, tgt_type));
-
-        if let (Some(src), Some(tgt)) = (source, target) {
-            let source_values = link.extract_source_values(&src.public_signals);
-            if !link.check_consistency(&source_values, &tgt.public_signals) {
+    /// Post-ZK: evaluate links relevant to a newly arrived proof and emit
+    /// violations on mismatch.
+    fn check_links(&self, new_proof_type: ProofType, ec: &EventContext<Sequenced>) {
+        for link in &self.links {
+            if new_proof_type != link.source_proof_type()
+                && new_proof_type != link.target_proof_type()
+            {
+                continue;
+            }
+            for m in self.find_mismatches(link.as_ref()) {
                 warn!(
-                    "[{}] Commitment mismatch for E3 {} — party {} ({}): \
-                     source {:?} vs target {:?} from same address",
+                    "[{}] Commitment mismatch for E3 {} — party {} ({}) {:?}",
                     link.name(),
                     self.e3_id,
-                    src.party_id,
-                    address,
-                    src_type,
-                    tgt_type,
+                    m.party_id,
+                    m.address,
+                    m.proof_type,
                 );
-                self.emit_violation(src.party_id, address, src_type, src.data_hash, ec);
+                self.emit_violation(m.party_id, m.address, m.proof_type, m.data_hash, ec);
             }
         }
-    }
-
-    /// Cross-party: check all cached sources against the target (or the new
-    /// source against all cached targets).
-    fn check_cross_party_link(
-        &self,
-        link: &dyn CommitmentLink,
-        new_proof_type: ProofType,
-        ec: &EventContext<Sequenced>,
-    ) {
-        let src_type = link.source_proof_type();
-        let tgt_type = link.target_proof_type();
-
-        if new_proof_type != src_type && new_proof_type != tgt_type {
-            return;
-        }
-
-        // Collect all entries matching the source proof type.
-        let sources: Vec<&VerifiedProofData> = self
-            .verified
-            .iter()
-            .filter(|((_, pt), _)| *pt == src_type)
-            .map(|(_, v)| v)
-            .collect();
-
-        // Collect all entries matching the target proof type.
-        let targets: Vec<&VerifiedProofData> = self
-            .verified
-            .iter()
-            .filter(|((_, pt), _)| *pt == tgt_type)
-            .map(|(_, v)| v)
-            .collect();
-
-        // For each (source, target) pair, check consistency.
-        for src in &sources {
-            let source_values = link.extract_source_values(&src.public_signals);
-            if source_values.is_empty() {
-                continue;
-            }
-            for tgt in &targets {
-                if !link.check_consistency(&source_values, &tgt.public_signals) {
-                    warn!(
-                        "[{}] Commitment mismatch for E3 {} — source party {} ({}) {:?} \
-                         not consistent with target party {} ({}) {:?}",
-                        link.name(),
-                        self.e3_id,
-                        src.party_id,
-                        src.address,
-                        src_type,
-                        tgt.party_id,
-                        tgt.address,
-                        tgt_type,
-                    );
-                    self.emit_violation(src.party_id, src.address, src_type, src.data_hash, ec);
-                }
-            }
-        }
-    }
-
-    /// Check if a same-party link has a mismatch for the given address.
-    /// Returns `true` if both sides are cached AND inconsistent.
-    fn check_same_party_mismatch(&self, link: &dyn CommitmentLink, address: Address) -> bool {
-        let source = self.verified.get(&(address, link.source_proof_type()));
-        let target = self.verified.get(&(address, link.target_proof_type()));
-        if let (Some(src), Some(tgt)) = (source, target) {
-            let source_values = link.extract_source_values(&src.public_signals);
-            !link.check_consistency(&source_values, &tgt.public_signals)
-        } else {
-            false
-        }
-    }
-
-    /// Check if a cross-party link has a mismatch involving the given party.
-    /// Returns `true` if any (source, target) pair is inconsistent where
-    /// the source party_id matches `party_id`.
-    fn check_cross_party_mismatch(&self, link: &dyn CommitmentLink, party_id: u64) -> bool {
-        let src_type = link.source_proof_type();
-        let tgt_type = link.target_proof_type();
-
-        let sources: Vec<&VerifiedProofData> = self
-            .verified
-            .iter()
-            .filter(|((_, pt), v)| *pt == src_type && v.party_id == party_id)
-            .map(|(_, v)| v)
-            .collect();
-
-        let targets: Vec<&VerifiedProofData> = self
-            .verified
-            .iter()
-            .filter(|((_, pt), _)| *pt == tgt_type)
-            .map(|(_, v)| v)
-            .collect();
-
-        for src in &sources {
-            let source_values = link.extract_source_values(&src.public_signals);
-            if source_values.is_empty() {
-                continue;
-            }
-            for tgt in &targets {
-                if !link.check_consistency(&source_values, &tgt.public_signals) {
-                    return true;
-                }
-            }
-        }
-        false
     }
 
     /// Publish a [`CommitmentConsistencyViolation`] for the accusation pipeline.
@@ -321,7 +242,7 @@ impl Handler<TypedEvent<ProofVerificationPassed>> for CommitmentConsistencyCheck
             },
         );
 
-        self.check_links(proof_type, address, &ec);
+        self.check_links(proof_type, &ec);
     }
 }
 
@@ -355,36 +276,17 @@ impl Handler<TypedEvent<CommitmentConsistencyCheckRequested>> for CommitmentCons
             }
         }
 
-        // Now evaluate links for each party's newly cached proofs.
-        for party in &data.party_proofs {
-            for (proof_type, _) in &party.proofs {
-                for link in &self.links {
-                    let is_relevant = *proof_type == link.source_proof_type()
-                        || *proof_type == link.target_proof_type();
-                    if !is_relevant {
-                        continue;
-                    }
-
-                    let mismatch = match link.scope() {
-                        LinkScope::SameParty => {
-                            self.check_same_party_mismatch(link.as_ref(), party.address)
-                        }
-                        LinkScope::CrossParty => {
-                            self.check_cross_party_mismatch(link.as_ref(), party.party_id)
-                        }
-                    };
-
-                    if mismatch {
-                        warn!(
-                            "[{}] Pre-ZK commitment mismatch for E3 {} — party {} ({})",
-                            link.name(),
-                            self.e3_id,
-                            party.party_id,
-                            party.address,
-                        );
-                        inconsistent_parties.insert(party.party_id);
-                    }
-                }
+        // Evaluate every link and collect inconsistent parties.
+        for link in &self.links {
+            for m in self.find_mismatches(link.as_ref()) {
+                warn!(
+                    "[{}] Pre-ZK commitment mismatch for E3 {} — party {} ({})",
+                    link.name(),
+                    self.e3_id,
+                    m.party_id,
+                    m.address,
+                );
+                inconsistent_parties.insert(m.party_id);
             }
         }
 
