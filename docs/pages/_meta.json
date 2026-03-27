@@ -19,6 +19,9 @@
   "computation-flow": {
     "title": "E3 Computation Flow"
   },
+  "cryptography": {
+    "title": "Cryptography"
+  },
   "use-cases": {
     "title": "Use Cases"
   },

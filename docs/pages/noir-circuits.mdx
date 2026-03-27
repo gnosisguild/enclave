@@ -1,128 +1,107 @@
 ---
 title: 'Noir Circuits'
-description: 'Build and reuse Noir circuits for Interfold programs'
+description:
+  'Toolchain, repo layout, compile/lint scripts, and integration hooks for Interfold Noir circuits'
 ---
 
-# Noir Circuits & Libraries
+# Noir Circuits
 
-The Interfold ships a dedicated Noir workspace under `circuits/` plus reusable libraries (SAFE
-sponge API, polynomial utilities, modular arithmetic, PVSS circuit primitives, etc.). Use these
-circuits as-is or vendor them into your own E3 programs.
+This page is for **building and integrating** the Noir workspace under `circuits/`: where packages
+live, which scripts to run, and how they connect to the Rust prover and on-chain verifiers.
+
+For **what** the circuits prove (PV-TBFV, phases **P1–P4**, **C0–C7**, commitments), read
+[Cryptography](./cryptography) first. For **Rust types and events** (`ProofType`, `CircuitName`,
+public inputs), use the repo’s
+[`agent/circuits/REFERENCE.md`](https://github.com/gnosisguild/enclave/blob/main/agent/circuits/REFERENCE.md).
+For **runtime ordering** (actors, gossip, proof pipeline), see
+[`agent/flow-trace/04_DKG_AND_COMPUTATION.md`](https://github.com/gnosisguild/enclave/blob/main/agent/flow-trace/04_DKG_AND_COMPUTATION.md).
+
+The canonical **package index** (paths, **CircuitName**, C0–C7 IDs) is
+[`circuits/README.md`](https://github.com/gnosisguild/enclave/blob/main/circuits/README.md) in the
+open-source tree—Noir sources are the source of truth; treat docs as orientation only.
 
 ## Workspace layout
 
-```
+```text
 circuits/
-├── lib/
-│   ├── Nargo.toml              # library manifest
+├── lib/                         # Shared library (all `bin/` packages depend on this)
 │   └── src/
-│       ├── lib.nr              # top-level library entry
-│       ├── configs/            # BFV parameter configurations (default, insecure, secure, committee)
-│       ├── core/               # DKG and threshold PVSS circuit implementations
-│       │   ├── dkg/            # pk, share_computation, share_encryption, share_decryption
-│       │   └── threshold/      # pk_generation, pk_aggregation, share_decryption,
-│       │                       # decrypted_shares_aggregation, user_data_encryption_ct0/ct1
-│       └── math/               # polynomial, SAFE sponge, modular arithmetic (U128), commitments
+│       ├── lib.nr
+│       ├── configs/             # BFV presets (default / secure / insecure / committee)
+│       ├── core/dkg/            # C0, C2–C4 (core logic)
+│       ├── core/threshold/      # C1, C5, P3, C6, C7 (core logic)
+│       └── math/                # Polynomials, SAFE sponge, ModU128, commitments
 ├── bin/
-│   ├── config/                 # configuration validation circuit
-│   ├── dkg/                    # DKG sub-circuits (pk, sk_share_computation, e_sm_share_computation,
-│   │                           # share_encryption, share_decryption)
-│   ├── threshold/              # threshold sub-circuits (pk_generation, pk_aggregation,
-│   │                           # share_decryption, user_data_encryption_ct0/ct1,
-│   │                           # decrypted_shares_aggregation)
-│   ├── insecure/               # legacy insecure-parameter circuits for development
-│   ├── production/             # production-parameter circuits (placeholder)
-│   └── recursive_aggregation/  # recursive proof aggregation
-│       ├── fold/               # fold circuit (uses Aztec bb_proof_verification)
-│       └── wrapper/            # recursive wrappers for DKG and threshold circuits
-│           ├── dkg/            # pk, share_computation, share_encryption, share_decryption
-│           └── threshold/      # pk_generation, pk_aggregation, share_decryption,
-│                               # decrypted_shares_aggregation, user_data_encryption
-├── benchmarks/                 # benchmark scripts and results
-└── .gitignore
+│   ├── config/                  # Pre-deployment preset consistency (`config` circuit)
+│   ├── dkg/                     # C0, C2 pipeline, C3, C4
+│   ├── threshold/               # C1, C5, user_data_encryption*, C6, C7
+│   └── recursive_aggregation/   # fold/ + wrapper/{dkg,threshold}/
+└── benchmarks/                  # Timing scripts and reports
 ```
 
-The core library at `circuits/lib/` contains reusable modules for polynomial arithmetic, the SAFE
-sponge API, modular reduction helpers (including `U128` large-integer operations), and BFV
-DKG/threshold PVSS primitives. Binary circuits under `circuits/bin/` implement specific proof
-programs (DKG key generation, share encryption/decryption, threshold aggregation, recursive folding,
-etc.). The library depends on `poseidon`, `keccak256` (from noir-lang), and `bignum` (from
-gnosisguild/noir-bignum).
+Binary packages map to **C0–C7** and operational phases as on the [Cryptography](./cryptography)
+page (**Phases & Circuits** section). Large statements (especially **C2**) use **inner** proofs plus
+**wrapper** + **fold** under `recursive_aggregation/`.
 
-To reference the library from an external project:
+## Using `circuits/lib` from another Noir project
+
+Add a path or git dependency in your `Nargo.toml` (pin a **tag or rev** that matches your prover):
 
 ```toml
 [dependencies]
 enclave_lib = { git = "https://github.com/gnosisguild/enclave", tag = "v0.1.15", directory = "circuits/lib" }
 ```
 
-## Tooling requirements
+Check `crates/zk-prover/Cargo.toml` / `versions.json` in the same release for compatible **nargo**
+and **bb** versions.
 
-Install the Noir toolchain:
+## Toolchain
+
+Install Noir (or rely on CI / Docker):
 
 ```bash
-curl -L https://noir-lang.org/install | bash   # installs nargo + bb
-nargo --version                                # v1.0.0-beta.16+ (see zk-prover Cargo.toml for exact tag)
-bb --version                                   # v3.0.0-nightly.20260102+ (see crates/zk-prover/versions.json)
+curl -L https://noir-lang.org/install | bash   # nargo + bb
+nargo --version                                # match zk-prover / versions.json
+bb --version
 ```
 
-> **Tip:** Use `enclave noir setup` instead of manual installation — it downloads and verifies the
-> exact versions of `bb` and pre-compiled circuit artifacts needed by the Enclave ZK prover.
-
-### CLI ZK Prover Setup
-
-The Enclave CLI can manage the ZK prover toolchain (Barretenberg and circuits) for you:
+**Recommended:** use the Enclave CLI so **bb** and artifacts match the prover:
 
 ```bash
-# Check current ZK prover status (installed versions, paths)
 enclave noir status
-
-# Install or update the ZK prover components (bb binary, circuit artifacts)
 enclave noir setup
-
-# Force reinstall all components
-enclave noir setup --force
+enclave noir setup --force   # reinstall
 ```
 
-`enclave noir status` shows installation paths, versions, and whether all components are present.
-`enclave noir setup` downloads and installs the correct versions of `bb` and pre-compiled circuit
-artifacts needed for proof generation.
+## Compile, format, test
 
-## Formatting & compilation
-
-Run the helper scripts from the repo root or reproduce them in your project:
+From the **repository root**:
 
 ```bash
-pnpm tsx scripts/build-circuits.ts  # compile circuits, generate VKs, prepare release artifacts
-./scripts/lint-circuits.sh          # nargo fmt --check && nargo check across all circuit directories
-./scripts/test-circuits.sh          # run circuit unit tests (nargo test on circuits/lib)
+pnpm tsx scripts/build-circuits.ts   # compile, VKs, release artifacts (see script for scope)
+./scripts/lint-circuits.sh           # nargo fmt --check && nargo check (lib + bin areas)
+./scripts/test-circuits.sh         # nargo test on circuits/lib
 ```
 
-`lint-circuits.sh` checks formatting and validates circuits across `lib`, `bin/config`,
-`bin/recursive_aggregation`, `bin/dkg`, and `bin/threshold`. Both shell scripts exit early (without
-failing the whole build) if `nargo` is not installed, which makes CI happy when Noir is optional.
+`lint-circuits.sh` and `test-circuits.sh` exit successfully when **nargo** is missing so
+optional-Noir CI stays green.
 
-## Exporting verifiers
+## Solidity verifiers (example: CRISP)
 
-Projects such as CRISP compile Noir circuits into Solidity verifiers using `bb`:
+Projects such as CRISP compile circuits with **bb** and emit a verifier contract. Example
+entrypoint:
 
 ```bash
 cd examples/CRISP
 ./scripts/compile_circuits.sh
 ```
 
-The script performs:
+That flow typically: compile dependency circuits (`user_data_encryption_ct0` / `ct1` / wrapper),
+compile the app-specific and fold circuits, `bb write_vk` (e.g. `--oracle_hash keccak` on the fold
+target), `bb write_solidity_verifier`, then copy/format into the package contracts. Adapt paths for
+your own fold root and output dir.
 
-1. Compiles enclave dependency circuits (`user_data_encryption_ct0`, `user_data_encryption_ct1`, and
-   the recursive wrapper for `user_data_encryption`)
-2. Compiles the CRISP-specific circuit and fold circuit (recursive aggregation)
-3. `bb write_vk` with `--oracle_hash keccak` on the fold circuit to emit the verification key
-4. `bb write_solidity_verifier` to produce `CRISPVerifier.sol` from the fold VK
-5. Copies the generated verifier into `packages/crisp-contracts/contracts/`
-6. Replaces the license header and formats with Prettier
-
-Adapt the script for your own circuits by changing the circuit paths and output directory. On-chain
-verification uses the `ICircuitVerifier` interface:
+On-chain verification matches the usual pattern:
 
 ```solidity
 interface ICircuitVerifier {
@@ -133,14 +112,12 @@ interface ICircuitVerifier {
 }
 ```
 
-## Integrating with E3 programs
+## Rust integration
 
-- Import the library in your circuit's `Nargo.toml` (see the dependency snippet above)
-- Generate Solidity verifiers and deploy them as `ICircuitVerifier` implementations
-- Reference the compiled artifacts when deploying via the template or CRISP scripts
-- For Rust-side proof generation, the `e3-zk-prover` crate handles witness generation, proof
-  generation (via `bb prove`), and verification (via `bb verify`) automatically
+- **`e3-zk-prover`** (`crates/zk-prover`) — witness wiring, `bb prove` / `bb verify`, artifact paths
+  aligned with `enclave noir setup`.
+- **Events / API** — `CircuitName`, `ProofType`, and request payloads are defined next to the node;
+  see `agent/circuits/REFERENCE.md`.
 
-When adding new circuits, remember to update `package.json` scripts (e.g., `pnpm dev:all`) so they
-call your compile script before spinning up the dev environment. This keeps your verifiers in sync
-with the Noir source.
+When you add or rename a circuit package, update root **`package.json`** / CI scripts that call
+`build-circuits.ts` or `lint-circuits.sh` so dev and deployment stay in sync with Noir sources.
