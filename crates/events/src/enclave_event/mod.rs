@@ -300,6 +300,7 @@ pub enum EnclaveEventData {
     DKGRecursiveAggregationComplete(DKGRecursiveAggregationComplete),
     CommitmentConsistencyCheckRequested(CommitmentConsistencyCheckRequested),
     CommitmentConsistencyCheckComplete(CommitmentConsistencyCheckComplete),
+    CommitmentConsistencyViolation(CommitmentConsistencyViolation),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -581,6 +582,7 @@ impl EnclaveEventData {
             EnclaveEventData::CommitmentConsistencyCheckComplete(ref data) => {
                 Some(data.e3_id.clone())
             }
+            EnclaveEventData::CommitmentConsistencyViolation(ref data) => Some(data.e3_id.clone()),
             _ => None,
         }
     }
@@ -674,7 +676,8 @@ impl_event_types!(
     DKGInnerProofReady,
     DKGRecursiveAggregationComplete,
     CommitmentConsistencyCheckRequested,
-    CommitmentConsistencyCheckComplete
+    CommitmentConsistencyCheckComplete,
+    CommitmentConsistencyViolation
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {

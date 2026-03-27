@@ -308,36 +308,34 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │   └─ Emit SignedProofFailed { accused, proof_type }
 │   │   │      → Triggers accusation pipeline (see Part 5)
 │   │   │
-│   │   └─ If ECDSA passes: cache recovered address + public signals
+│   │   └─ If ECDSA passes: cache recovered address, proceed
 │   │
 │   └─ Store PendingConsistencyCheck {
-│        ecdsa_dishonest, pre_dishonest, party_addresses,
-│        party_proof_hashes, party_public_signals,
-│        ecdsa_passed_share_proofs (original proofs for later ZK dispatch)
+│        ecdsa_dishonest, pre_dishonest, dispatched_party_ids,
+│        recovered_addresses, party_proofs (for ZK dispatch)
 │      }
 │
 ├─ PHASE 2: Commitment Consistency Check (dispatched to per-E3 checker):
 │   │
 │   ├─ Publishes CommitmentConsistencyCheckRequested {
-│   │     e3_id, kind, correlation_id,
-│   │     party_proofs: [{ party_id, address, proofs: [(proof_type, public_signals)] }]
+│   │     correlation_id, kind, party_proofs: [(party_id, address, proofs)]
 │   │   }
-│   │   → CommitmentConsistencyChecker (per-E3 actor) receives this
-│   │   → Caches proof data, evaluates all registered CommitmentLinks
-│   │   → Responds with CommitmentConsistencyCheckComplete {
-│   │       inconsistent_parties: BTreeSet<u64>
-│   │     }
+│   │
+│   ├─ CommitmentConsistencyChecker (per-E3 actor) receives this:
+│   │   ├─ Caches each party's (address, proof_type) → {public_signals, data_hash}
+│   │   ├─ Evaluates all registered CommitmentLinks (e.g. C1→C5 pk_commitment)
+│   │   ├─ On mismatch: publishes CommitmentConsistencyViolation
+│   │   │   → AccusationManager initiates accusation quorum (see Part 5)
+│   │   └─ Responds with CommitmentConsistencyCheckComplete { inconsistent_parties }
 │   │
 │   └─ On CommitmentConsistencyCheckComplete:
-│       ├─ Add inconsistent_parties to dishonest set
-│       ├─ Filter ECDSA-passed proofs to only consistent parties
-│       ├─ If no consistent parties remain → publish ShareVerificationComplete
-│       └─ Otherwise → dispatch ZK for consistent parties (Phase 3)
+│       ├─ Merge inconsistent_parties into dishonest set
+│       └─ Proceed to Phase 3 with remaining honest parties
 │
 ├─ PHASE 3: Heavy ZK Verification (dispatched to multithread):
 │   │
 │   ├─ Publishes ComputeRequest::zk(VerifyShareProofsRequest {
-│   │     party_proofs, // only consistency-passing parties' ZK proof data
+│   │     party_proofs, // consistency-passing parties' ZK proof data
 │   │   })
 │   │
 │   ├─ ZkActor verifies each proof via: bb verify -k vk -p proof
@@ -437,10 +435,9 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 │          kind: DecryptionProofs,
 │          party_proofs: [C4a + C4b proofs per party]
 │        }
-│        → ShareVerificationActor performs same 3-phase verification:
+│        → ShareVerificationActor performs same 2-phase verification:
 │          Phase 1: ECDSA signature recovery + consistency check
-│          Phase 2: Commitment consistency check via per-E3 checker
-│          Phase 3: ZK proof verification via bb binary
+│          Phase 2: ZK proof verification via bb binary
 │        → On failure: SignedProofFailed → accusation pipeline
 │        → On pass: ProofVerificationPassed (cached)
 │
@@ -648,20 +645,13 @@ ThresholdPlaintextAggregator receives DecryptionshareCreated events
 │
 ├─ C6 VERIFICATION (per-share, on aggregator):
 │   ShareVerificationActor receives C6 signed proofs
-│   ├─ 3-phase pipeline (same as C2/C3):
-│   │   Phase 1: ECDSA validation
-│   │   Phase 2: Commitment consistency check (pre-ZK gating)
-│   │   Phase 3: ZK verification (only for consistent parties)
+│   ├─ ECDSA recovery + ZK verification (same 2-phase as C2/C3)
 │   ├─ On failure: SignedProofFailed → accusation pipeline
 │   └─ On pass: ProofVerificationPassed (cached)
 │
 ├─ When M+1 shares collected (threshold met):
 │   │
-│   ├─ State → VerifyingC6 → (after ShareVerificationComplete) → Computing
-│   │   NOTE: Commitment consistency checking happens inside the verification
-│   │   pipeline (Phase 2 of ShareVerificationActor). Inconsistent parties are
-│   │   included in ShareVerificationComplete.dishonest_parties. The aggregator
-│   │   does NOT need a separate WaitingForCommitmentCheck state.
+│   ├─ State → Computing
 │   │
 │   ├─ COMPUTE REQUEST: CalculateThresholdDecryption
 │   │   │

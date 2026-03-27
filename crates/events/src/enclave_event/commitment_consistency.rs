@@ -58,3 +58,23 @@ pub struct CommitmentConsistencyCheckComplete {
     /// Parties whose commitments are inconsistent with previously cached proofs.
     pub inconsistent_parties: BTreeSet<u64>,
 }
+
+/// Emitted by [`CommitmentConsistencyChecker`] when a party's commitment
+/// values are inconsistent across circuit proofs.
+///
+/// Consumed by [`AccusationManager`] to initiate the off-chain accusation
+/// quorum protocol — the same flow as [`ProofVerificationFailed`] but for
+/// cross-circuit commitment mismatches rather than ZK proof failures.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CommitmentConsistencyViolation {
+    pub e3_id: E3id,
+    /// Party whose commitment is inconsistent.
+    pub accused_party_id: u64,
+    /// Recovered Ethereum address of the accused party.
+    pub accused_address: Address,
+    /// The proof type (source side) whose commitment value doesn't match.
+    pub proof_type: ProofType,
+    /// `keccak256(abi.encode(proof.data, public_signals))` of the accused party's
+    /// proof — matches the data_hash used by the accusation protocol.
+    pub data_hash: [u8; 32],
+}
