@@ -13,6 +13,8 @@
 //! evaluates these links as verified proofs arrive.
 
 pub mod c1_to_c5;
+pub mod c4a_to_c6;
+pub mod c4b_to_c6;
 
 use e3_events::ProofType;
 
@@ -58,5 +60,9 @@ pub trait CommitmentLink: Send + Sync {
 
 /// Returns the default set of commitment links to register.
 pub fn default_links() -> Vec<Box<dyn CommitmentLink>> {
-    vec![Box::new(c1_to_c5::C1ToC5PkCommitmentLink)]
+    vec![
+        Box::new(c1_to_c5::C1ToC5PkCommitmentLink),
+        Box::new(c4a_to_c6::C4aToC6SkCommitmentLink),
+        Box::new(c4b_to_c6::C4bToC6ESmCommitmentLink),
+    ]
 }

@@ -24,14 +24,14 @@
 
 use super::{CommitmentLink, FieldValue, LinkScope};
 use e3_events::{CircuitName, ProofType};
-use e3_zk_helpers::{CircuitOutputLayout, FIELD_BYTE_LEN};
+use e3_zk_helpers::FIELD_BYTE_LEN;
 
 /// C1 → C5 pk_commitment consistency link.
 pub struct C1ToC5PkCommitmentLink;
 
 impl CommitmentLink for C1ToC5PkCommitmentLink {
     fn name(&self) -> &'static str {
-        "C1→C5 pk_commitment"
+        "C1->C5 pk_commitment"
     }
 
     fn source_proof_type(&self) -> ProofType {
