@@ -6,7 +6,6 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 export default buildModule("Enclave", (m) => {
-  const params = m.getParameter("params");
   const owner = m.getParameter("owner");
   const maxDuration = m.getParameter("maxDuration");
   const registry = m.getParameter("registry");
@@ -30,7 +29,6 @@ export default buildModule("Enclave", (m) => {
     feeToken,
     maxDuration,
     timeoutConfig,
-    [params],
   ]);
 
   const enclave = m.contract("TransparentUpgradeableProxy", [

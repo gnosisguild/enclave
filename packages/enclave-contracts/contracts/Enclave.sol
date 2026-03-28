@@ -81,9 +81,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     mapping(bytes32 encryptionSchemeId => IPkVerifier pkVerifier)
         public pkVerifiers;
 
-    /// @notice Mapping storing valid E3 program ABI encoded parameter sets.
-    /// @dev Stores allowed encryption scheme parameters (e.g., BFV parameters).
-    mapping(bytes e3ProgramParams => bool allowed) public e3ProgramsParams;
+    /// @notice Mapping from ParamSet enum to ABI-encoded BFV parameters.
+    /// @dev Populated during initialize(). Ciphernodes decode the enum directly;
+    ///      the encoded bytes are stored for transparency / on-chain consumers.
+    mapping(ParamSet => bytes) public paramSetRegistry;
 
     /// @notice Mapping tracking fee payments for each E3.
     /// @dev Stores the amount paid for an E3, distributed to committee upon completion.
@@ -174,7 +175,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param _feeToken The address of the ERC20 token used for E3 fees.
     /// @param _maxDuration The maximum duration of a computation in seconds.
     /// @param config Initial timeout configuration for E3 lifecycle stages.
-    /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV).
     function initialize(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
@@ -182,8 +182,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         IE3RefundManager _e3RefundManager,
         IERC20 _feeToken,
         uint256 _maxDuration,
-        E3TimeoutConfig calldata config,
-        bytes[] memory _e3ProgramsParams
+        E3TimeoutConfig calldata config
     ) public initializer {
         __Ownable_init(msg.sender);
         setMaxDuration(_maxDuration);
@@ -192,7 +191,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         setE3RefundManager(_e3RefundManager);
         setFeeToken(_feeToken);
         _setTimeoutConfig(config);
-        setE3ProgramsParams(_e3ProgramsParams);
 
         // Set default pricing parameters
         _pricingConfig = PricingConfig({
@@ -284,7 +282,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.requestBlock = block.number;
         e3.inputWindow = requestParams.inputWindow;
         e3.e3Program = requestParams.e3Program;
-        e3.e3ProgramParams = requestParams.e3ProgramParams;
+        e3.paramSet = requestParams.paramSet;
         e3.customParams = requestParams.customParams;
         e3.proofAggregationEnabled = requestParams.proofAggregationEnabled;
         e3.committeePublicKey = hex"";
@@ -294,10 +292,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         feeToken.safeTransferFrom(msg.sender, address(this), e3Fee);
 
+        bytes memory e3ProgramParams = paramSetRegistry[requestParams.paramSet];
+        require(e3ProgramParams.length > 0, "BFV param set not registered");
+
         bytes32 encryptionSchemeId = requestParams.e3Program.validate(
             e3Id,
             seed,
-            requestParams.e3ProgramParams,
+            e3ProgramParams,
             requestParams.computeProviderParams,
             requestParams.customParams
         );
@@ -651,27 +652,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit EncryptionSchemeDisabled(encryptionSchemeId);
     }
 
-    /// @inheritdoc IEnclave
-    function setE3ProgramsParams(
-        bytes[] memory _e3ProgramsParams
+    /// @notice Registers ABI-encoded BFV parameters for a param set enum variant.
+    /// @param paramSet The ParamSet variant to register.
+    /// @param encodedParams ABI-encoded BFV parameters (degree, plaintext_modulus, moduli[]).
+    function setParamSet(
+        ParamSet paramSet,
+        bytes calldata encodedParams
     ) public onlyOwner {
-        uint256 length = _e3ProgramsParams.length;
-        for (uint256 i; i < length; ++i) {
-            e3ProgramsParams[_e3ProgramsParams[i]] = true;
-        }
-        emit AllowedE3ProgramsParamsSet(_e3ProgramsParams);
-    }
-
-    /// @notice Removes previously allowed E3 program parameter sets
-    /// @param _e3ProgramsParams Array of ABI encoded parameter sets to remove
-    function removeE3ProgramsParams(
-        bytes[] memory _e3ProgramsParams
-    ) public onlyOwner {
-        uint256 length = _e3ProgramsParams.length;
-        for (uint256 i; i < length; ++i) {
-            delete e3ProgramsParams[_e3ProgramsParams[i]];
-        }
-        emit E3ProgramsParamsRemoved(_e3ProgramsParams);
+        require(encodedParams.length > 0, "Empty params");
+        paramSetRegistry[paramSet] = encodedParams;
+        emit ParamSetRegistered(paramSet, encodedParams);
     }
 
     /// @notice Sets the E3 Refund Manager contract address

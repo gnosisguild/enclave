@@ -27,6 +27,15 @@ interface IEnclave {
         Large
     }
 
+    /// @notice BFV encryption parameter sets.
+    /// @dev Each variant maps to a threshold BFV preset. The DKG counterpart
+    ///      is derived automatically by the ciphernode software.
+    ///      New variants require a contract upgrade + ciphernode software update.
+    enum ParamSet {
+        Insecure512,
+        Secure8192
+    }
+
     /// @notice Lifecycle stages of an E3 computation
     enum E3Stage {
         None,
@@ -181,13 +190,10 @@ interface IEnclave {
     /// @param e3Program The address of the E3 Program.
     event E3ProgramDisabled(IE3Program e3Program);
 
-    /// @notice Emitted when the allowed E3 encryption scheme parameters are configured.
-    /// @param e3ProgramParams Array of encoded encryption scheme parameters (e.g, for BFV)
-    event AllowedE3ProgramsParamsSet(bytes[] e3ProgramParams);
-
-    /// @notice Emitted when E3 program parameter sets are removed.
-    /// @param e3ProgramParams Array of removed encryption scheme parameters.
-    event E3ProgramsParamsRemoved(bytes[] e3ProgramParams);
+    /// @notice Emitted when a BFV param set is registered or updated.
+    /// @param paramSet The ParamSet variant.
+    /// @param encodedParams ABI-encoded BFV parameters.
+    event ParamSetRegistered(ParamSet paramSet, bytes encodedParams);
 
     /// @notice Emitted when E3RefundManager contract is set.
     /// @param e3RefundManager The address of the E3RefundManager contract.
@@ -411,14 +417,14 @@ interface IEnclave {
     /// @param committeeSize The M/N threshold and honest parties for the committee.
     /// @param inputWindow When the program will start and stop accepting inputs.
     /// @param e3Program The address of the E3 Program.
-    /// @param e3ProgramParams The ABI encoded computation parameters.
+    /// @param paramSet The BFV encryption parameter set to use.
     /// @param computeProviderParams The ABI encoded compute provider parameters.
     /// @param customParams Arbitrary ABI-encoded application-defined parameters.
     struct E3RequestParams {
         CommitteeSize committeeSize;
         uint256[2] inputWindow;
         IE3Program e3Program;
-        bytes e3ProgramParams;
+        ParamSet paramSet;
         bytes computeProviderParams;
         bytes customParams;
         /// @notice When true, ciphernodes generate and fold wrapper proofs
@@ -527,15 +533,13 @@ interface IEnclave {
     /// @param encryptionSchemeId The unique identifier for the encryption scheme to disable.
     function disableEncryptionScheme(bytes32 encryptionSchemeId) external;
 
-    /// @notice Sets the allowed E3 program parameters.
-    /// @dev This function enables specific parameter sets for E3 programs (e.g., BFV encryption parameters).
-    /// @param _e3ProgramsParams Array of ABI encoded parameter sets to allow.
-    function setE3ProgramsParams(bytes[] memory _e3ProgramsParams) external;
-
-    /// @notice Removes previously allowed E3 program parameter sets.
-    /// @dev This function revokes specific parameter sets that should no longer be allowed.
-    /// @param _e3ProgramsParams Array of ABI encoded parameter sets to remove.
-    function removeE3ProgramsParams(bytes[] memory _e3ProgramsParams) external;
+    /// @notice Registers ABI-encoded BFV parameters for a param set enum variant.
+    /// @param paramSet The ParamSet variant to register.
+    /// @param encodedParams ABI-encoded BFV parameters.
+    function setParamSet(
+        ParamSet paramSet,
+        bytes calldata encodedParams
+    ) external;
 
     /// @notice Sets the full pricing configuration.
     /// @param config The new pricing configuration.

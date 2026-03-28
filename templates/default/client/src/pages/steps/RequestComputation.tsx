@@ -107,15 +107,13 @@ const RequestComputation: React.FC = () => {
       const publicClient = sdk.sdk.getPublicClient()
 
       const inputWindow = await calculateInputWindow(publicClient, 600) // 10 min
-      const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
-      const e3ProgramParams = encodeBfvParams(thresholdBfvParams)
       const computeProviderParams = encodeComputeProviderParams(DEFAULT_COMPUTE_PROVIDER_PARAMS)
 
       const requestParams = {
         committeeSize,
         inputWindow,
         e3Program: contracts.e3Program,
-        e3ProgramParams,
+        paramSet: 0, // ParamSet.Insecure512
         computeProviderParams,
         proofAggregationEnabled: false,
       }

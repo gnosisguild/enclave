@@ -568,11 +568,6 @@
           "internalType": "address[]",
           "name": "nodes",
           "type": "address[]"
-        },
-        {
-          "internalType": "uint256[]",
-          "name": "scores",
-          "type": "uint256[]"
         }
       ],
       "stateMutability": "view",
@@ -965,5 +960,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-67d7bf420ed8ac25001394841682e83cf4523ea2"
+  "buildInfoId": "solc-0_8_28-5001586370e544afe3682c8bcabe8ae3f3167a96"
 }
