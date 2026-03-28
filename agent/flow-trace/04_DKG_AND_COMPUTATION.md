@@ -453,7 +453,7 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 
 ---
 
-## Phase 2: Public Key Aggregation (Eligible Finalized Committee Members, with C5 Proof)
+  ## Phase 2: Public Key Aggregation (Eligible Finalized Committee Members, with C5 Proof)
 
 ```
   PublicKeyAggregator starts on each selected node and collects KeyshareCreated events
@@ -504,16 +504,16 @@ ThresholdKeyshare receives AllThresholdSharesCollected
   ├─ Checks finalized committee rank via Sortition
   ├─ Reads on-chain committee stage / pk hash to avoid duplicate submission
   ├─ Waits rank-based delay (rank 0 first, later ranks staggered)
-  └─ Calls contract.publishCommittee(e3_id, nodes, publicKey, pkHash)
+  └─ Calls contract.publishCommittee(e3_id, nodes, publicKey, proof, foldProof)
         │
         │  ┌─── ON-CHAIN (CiphernodeRegistryOwnable) ──────────┐
         │  │                                                     │
-        │  │  publishCommittee(e3Id, nodes, pk, pkHash) {        │
-        │  │    1. require(initialized && finalized)             │
+        │  │  publishCommittee(e3Id, nodes, pk, proof, foldProof) {
+        │  │    1. require(finalized)                            │
         │  │    2. require(publicKeyHashes[e3Id] == 0)           │
         │  │       → Can only publish once                       │
-    │  │    3. verify C5 proof / committee metadata          │
-    │  │    4. publicKeyHashes[e3Id] = pkHash                │
+    │  │    3. verify C5 proof via pkVerifier                │
+    │  │    4. publicKeyHashes[e3Id] = pkHash (from proof)   │
     │  │    5. enclave.onCommitteePublished(e3Id, pkHash)    │
         │  │       │                                             │
         │  │       │  ┌─ Enclave.sol ────────────────────────┐  │
@@ -634,7 +634,7 @@ EnclaveSolReader decodes CiphertextOutputPublished event
 
 ---
 
-    ## Phase 5: Plaintext Aggregation (Eligible Finalized Committee Members, with C6 Verification & C7 Proof)
+## Phase 5: Plaintext Aggregation (Eligible Finalized Committee Members, with C6 Verification & C7 Proof)
 
 ```
     ThresholdPlaintextAggregator runs on nodes inside the finalized fallback chain

@@ -145,7 +145,7 @@ get_primary_committee_node() {
 
   local best_addr
   best_addr=$(paste <(printf '%s\n' "${addrs[@]}") <(printf '%s\n' "${scores[@]}") \
-    | sort -t$'\t' -k2,2 -g | head -n1 | cut -f1)
+    | sort -t$'\t' -k2,2 -n | head -n1 | cut -f1)
 
   [[ -z "$best_addr" ]] && { echo "No committee nodes found for e3_id=$e3_id" >&2; return 1; }
   ciphernode_name_for_address "$best_addr"

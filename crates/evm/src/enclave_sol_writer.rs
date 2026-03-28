@@ -236,7 +236,6 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                         let decoded = format_evm_error(&err);
                         if decoded.contains("InvalidStage")
                             || decoded.contains("CommitteeDutiesCompleted")
-                            || decoded.contains("CiphertextOutputNotPublished")
                         {
                             info!(
                                 "Plaintext publication already resolved on-chain: {}",

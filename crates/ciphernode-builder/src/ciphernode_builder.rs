@@ -685,6 +685,7 @@ async fn setup_evm_system(
     pubkey_agg: bool,
 ) -> Result<EvmEventConfig> {
     let mut evm_config = EvmEventConfig::new();
+    let mut committee_finalizer_attached = false;
     for chain in chains.iter().filter(|chain| chain.enabled.unwrap_or(true)) {
         let provider = provider_cache.ensure_read_provider(chain).await?;
         let chain_id = provider.chain_id();
@@ -748,9 +749,10 @@ async fn setup_evm_system(
                         );
                         info!("CiphernodeRegistrySolWriter attached for publishing committees");
 
-                        if pubkey_agg {
+                        if pubkey_agg && !committee_finalizer_attached {
                             info!("Attaching CommitteeFinalizer for score sortition");
                             CommitteeFinalizer::attach(&bus, sortition.clone());
+                            committee_finalizer_attached = true;
                         }
                     }
                     Err(e) => error!(
