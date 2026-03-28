@@ -10,28 +10,34 @@ use e3_events::{
     E3Failed, E3Stage, E3StageChanged, EType, EffectsEnabled, EnclaveEvent, EnclaveEventData,
     EventType, Shutdown, TypedEvent,
 };
+use e3_sortition::{GetLocalNodeSortitionRank, Sortition};
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use std::collections::HashMap;
 use std::time::Duration;
 use tracing::{error, info};
 
+const FINALIZATION_BUFFER_SECONDS: u64 = 1;
+const FINALIZATION_INTERVAL_SECONDS: u64 = 1;
+
 /// CommitteeFinalizer is an actor that listens to CommitteeRequested events and dispatches
 /// CommitteeFinalizeRequested events after the submission deadline has passed.
 pub struct CommitteeFinalizer {
     bus: BusHandle,
+    sortition: Addr<Sortition>,
     pending_committees: HashMap<String, SpawnHandle>,
 }
 
 impl CommitteeFinalizer {
-    pub fn new(bus: &BusHandle) -> Self {
+    pub fn new(bus: &BusHandle, sortition: Addr<Sortition>) -> Self {
         Self {
             bus: bus.clone(),
+            sortition,
             pending_committees: HashMap::new(),
         }
     }
 
-    pub fn attach(bus: &BusHandle) -> Addr<Self> {
-        let addr = CommitteeFinalizer::new(bus).start();
+    pub fn attach(bus: &BusHandle, sortition: Addr<Sortition>) -> Addr<Self> {
+        let addr = CommitteeFinalizer::new(bus, sortition).start();
 
         // Subscribe to state-building / cleanup events immediately
         bus.subscribe_all(
@@ -99,8 +105,13 @@ impl Handler<TypedEvent<CommitteeRequested>> for CommitteeFinalizer {
         let ec = msg.get_ctx().clone();
         let e3_id = msg.e3_id.clone();
         let committee_deadline = msg.committee_deadline;
-
-        const FINALIZATION_BUFFER_SECONDS: u64 = 1;
+        let local_rank_request = GetLocalNodeSortitionRank {
+            e3_id: msg.e3_id.clone(),
+            seed: msg.seed,
+            size: msg.threshold[1],
+            chain_id: msg.chain_id,
+        };
+        let sortition = self.sortition.clone();
         let e3_id_for_log = e3_id.clone();
         let fut = async move {
             // TODO: we should have no dependencies on e3_evm here. Reason being that this is core
@@ -108,69 +119,98 @@ impl Handler<TypedEvent<CommitteeRequested>> for CommitteeFinalizer {
             // shell. This means we should not hold an address to a shell actor even and should use
             // the eventbus to communicate.
             // see https://github.com/gnosisguild/enclave/issues/989
-            match e3_evm::helpers::get_current_timestamp().await {
-                Ok(timestamp) => Some(timestamp),
+            let current_timestamp = match e3_evm::helpers::get_current_timestamp().await {
+                Ok(timestamp) => timestamp,
                 Err(e) => {
                     error!(
                         e3_id = %e3_id_for_log,
                         error = %e,
                         "Failed to get current timestamp from RPC"
                     );
-                    None
+                    return None;
                 }
-            }
+            };
+
+            let local_rank = match sortition.send(local_rank_request).await {
+                Ok(rank) => rank,
+                Err(e) => {
+                    error!(
+                        e3_id = %e3_id_for_log,
+                        error = %e,
+                        "Failed to get local sortition rank for committee finalization"
+                    );
+                    return None;
+                }
+            };
+
+            Some((current_timestamp, local_rank))
         };
 
         let e3_id_for_async = e3_id;
         ctx.spawn(
             fut.into_actor(self)
-                .then(move |current_timestamp, act, ctx| {
-                    if let Some(current_timestamp) = current_timestamp {
-                        let seconds_until_deadline = if committee_deadline > current_timestamp {
-                            (committee_deadline - current_timestamp) + FINALIZATION_BUFFER_SECONDS
-                        } else {
+                .then(move |result, act, ctx| {
+                    if let Some((current_timestamp, local_rank)) = result {
+                        if let Some(rank) = local_rank {
+                            let base_delay = if committee_deadline > current_timestamp {
+                                (committee_deadline - current_timestamp)
+                                    + FINALIZATION_BUFFER_SECONDS
+                            } else {
+                                info!(
+                                    e3_id = %e3_id_for_async,
+                                    committee_deadline = committee_deadline,
+                                    current_timestamp = current_timestamp,
+                                    "Submission deadline already passed, finalizing with fallback buffer"
+                                );
+                                FINALIZATION_BUFFER_SECONDS
+                            };
+                            let seconds_to_wait =
+                                base_delay + (rank * FINALIZATION_INTERVAL_SECONDS);
+
                             info!(
                                 e3_id = %e3_id_for_async,
                                 committee_deadline = committee_deadline,
                                 current_timestamp = current_timestamp,
-                                "Submission deadline already passed, finalizing with buffer"
+                                rank = rank,
+                                seconds_to_wait = seconds_to_wait,
+                                "Scheduling committee finalization"
                             );
-                            FINALIZATION_BUFFER_SECONDS
-                        };
 
-                        info!(
-                            e3_id = %e3_id_for_async,
-                            committee_deadline = committee_deadline,
-                            current_timestamp = current_timestamp,
-                            seconds_to_wait = seconds_until_deadline,
-                            "Scheduling committee finalization"
-                        );
+                            let bus = act.bus.clone();
+                            let e3_id_clone = e3_id_for_async.clone();
 
-                        let bus = act.bus.clone();
-                        let e3_id_clone = e3_id_for_async.clone();
+                            let handle = ctx.run_later(
+                                Duration::from_secs(seconds_to_wait),
+                                move |act, _ctx| {
+                                    info!(e3_id = %e3_id_clone, rank = rank, "Dispatching CommitteeFinalizeRequested event");
 
-                        let handle = ctx.run_later(
-                            Duration::from_secs(seconds_until_deadline),
-                            move |act, _ctx| {
-                                info!(e3_id = %e3_id_clone, "Dispatching CommitteeFinalizeRequested event");
+                                    trap(EType::Sortition, &act.bus.with_ec(&ec), || {
+                                        bus.publish(CommitteeFinalizeRequested {
+                                            e3_id: e3_id_clone.clone(),
+                                        },ec)?;
+                                        Ok(())
+                                    });
 
-                                trap(EType::Sortition, &act.bus.with_ec(&ec), || {
-                                    bus.publish(CommitteeFinalizeRequested {
-                                        e3_id: e3_id_clone.clone(),
-                                    },ec)?;
-                                    Ok(())
-                                });
+                                    act.pending_committees.remove(&e3_id_clone.to_string());
+                                },
+                            );
 
-                                act.pending_committees.remove(&e3_id_clone.to_string());
-                            },
-                        );
-
-                        act.pending_committees
-                            .insert(e3_id_for_async.to_string(), handle);
+                            if let Some(existing) = act
+                                .pending_committees
+                                .insert(e3_id_for_async.to_string(), handle)
+                            {
+                                ctx.cancel_future(existing);
+                            }
+                        } else {
+                            info!(
+                                e3_id = %e3_id_for_async,
+                                "Node is outside the local pre-finalization committee ranking, skipping finalize scheduling"
+                            );
+                        }
                     } else {
                         error!(
                             e3_id = %e3_id_for_async,
-                            "Skipping committee finalization due to timestamp fetch failure"
+                            "Skipping committee finalization due to timestamp or sortition lookup failure"
                         );
                     }
 

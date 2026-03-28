@@ -18,7 +18,9 @@ use e3_events::{
     ShareVerificationDispatched, SignedProofPayload, TypedEvent, VerificationKind, ZkResponse,
 };
 use e3_fhe_params::BfvPreset;
-use e3_sortition::{E3CommitteeContainsRequest, E3CommitteeContainsResponse, Sortition};
+use e3_sortition::{
+    E3CommitteeContainsRequest, E3CommitteeContainsResponse, GetFinalizedCommittee, Sortition,
+};
 use e3_trbfv::{
     calculate_threshold_decryption::CalculateThresholdDecryptionRequest, TrBFVConfig, TrBFVRequest,
     TrBFVResponse,
@@ -168,11 +170,21 @@ impl ThresholdPlaintextAggregatorState {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AggregationDuty {
+    PendingCommittee,
+    Eligible { rank: usize },
+    Inactive,
+}
+
 pub struct ThresholdPlaintextAggregator {
     bus: BusHandle,
     sortition: Addr<Sortition>,
     e3_id: E3id,
     params_preset: BfvPreset,
+    node_address: String,
+    duty: AggregationDuty,
+    pending_shares: Vec<TypedEvent<DecryptionshareCreated>>,
     state: Persistable<ThresholdPlaintextAggregatorState>,
     /// C6 cross-node proof fold state.
     c6_fold: ProofFoldState,
@@ -187,6 +199,7 @@ pub struct ThresholdPlaintextAggregatorParams {
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
     pub params_preset: BfvPreset,
+    pub node_address: String,
 }
 
 impl ThresholdPlaintextAggregator {
@@ -199,10 +212,62 @@ impl ThresholdPlaintextAggregator {
             sortition: params.sortition,
             e3_id: params.e3_id,
             params_preset: params.params_preset,
+            node_address: params.node_address,
+            duty: AggregationDuty::PendingCommittee,
+            pending_shares: Vec::new(),
             state,
             c6_fold: ProofFoldState::new(),
             c7_proofs_pending: None,
             last_ec: None,
+        }
+    }
+
+    fn resolve_aggregation_duty(&mut self, committee: e3_events::Committee) {
+        self.duty = match committee.aggregation_rank_for(&self.node_address, self.threshold_m()) {
+            Some(rank) => {
+                info!(
+                    e3_id = %self.e3_id,
+                    node = %self.node_address,
+                    rank = rank,
+                    "Node is in the finalized plaintext aggregation priority chain"
+                );
+                AggregationDuty::Eligible { rank }
+            }
+            None => {
+                info!(
+                    e3_id = %self.e3_id,
+                    node = %self.node_address,
+                    "Node is outside the finalized plaintext aggregation priority chain"
+                );
+                AggregationDuty::Inactive
+            }
+        };
+    }
+
+    fn threshold_m(&self) -> usize {
+        self.state
+            .get()
+            .and_then(|state| match state {
+                ThresholdPlaintextAggregatorState::Collecting(ref data) => {
+                    Some(data.threshold_m as usize)
+                }
+                ThresholdPlaintextAggregatorState::VerifyingC6(ref data) => {
+                    Some(data.threshold_m as usize)
+                }
+                ThresholdPlaintextAggregatorState::Computing(ref data) => {
+                    Some(data.threshold_m as usize)
+                }
+                ThresholdPlaintextAggregatorState::GeneratingC7Proof(ref data) => {
+                    Some(data.threshold_m as usize)
+                }
+                ThresholdPlaintextAggregatorState::Complete(_) => None,
+            })
+            .unwrap_or_default()
+    }
+
+    fn flush_pending_shares(&mut self, ctx: &mut Context<Self>) {
+        for event in std::mem::take(&mut self.pending_shares) {
+            ctx.notify(event);
         }
     }
 
@@ -599,6 +664,34 @@ impl Actor for ThresholdPlaintextAggregator {
     type Context = Context<Self>;
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+
+        let sortition = self.sortition.clone();
+        let e3_id = self.e3_id.clone();
+        ctx.spawn(
+            async move { sortition.send(GetFinalizedCommittee { e3_id }).await }
+                .into_actor(self)
+                .map(|result, act, ctx| match result {
+                    Ok(Some(committee)) => {
+                        act.resolve_aggregation_duty(committee);
+                        if matches!(act.duty, AggregationDuty::Eligible { .. }) {
+                            act.flush_pending_shares(ctx);
+                        } else {
+                            act.pending_shares.clear();
+                            ctx.stop();
+                        }
+                    }
+                    Ok(None) => {
+                        warn!(e3_id = %act.e3_id, "No finalized committee available for plaintext aggregation; stopping actor");
+                        act.pending_shares.clear();
+                        ctx.stop();
+                    }
+                    Err(err) => {
+                        warn!(e3_id = %act.e3_id, error = %err, "Failed to resolve finalized committee for plaintext aggregation; stopping actor");
+                        act.pending_shares.clear();
+                        ctx.stop();
+                    }
+                }),
+        );
     }
 }
 
@@ -640,6 +733,16 @@ impl Handler<TypedEvent<DecryptionshareCreated>> for ThresholdPlaintextAggregato
                     debug!(state=?self.state, "Aggregator has been closed for collecting so ignoring this event.");
                     return Ok(());
                 };
+
+                match self.duty {
+                    AggregationDuty::PendingCommittee => {
+                        self.pending_shares.push(msg);
+                        return Ok(());
+                    }
+                    AggregationDuty::Inactive => return Ok(()),
+                    AggregationDuty::Eligible { .. } => {}
+                }
+
                 let node = msg.node.clone();
                 let e3_id = msg.e3_id.clone();
                 let request = E3CommitteeContainsRequest::new(e3_id, node, msg, ctx.address());

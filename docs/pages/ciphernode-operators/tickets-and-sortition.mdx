@@ -134,7 +134,8 @@ After the window closes and ≥ `threshold_n` tickets are present:
 2. If enough operators submitted, the registry emits `CommitteeFinalized(e3Id, committee)`
 3. If the threshold isn't met, `CommitteeFormationFailed` is emitted and the E3 fails
 4. Selected nodes generate and publish key shares
-5. Aggregated public key is published via `publishCommittee`
+5. The finalized committee ordering determines the primary aggregation node, which publishes via
+   `publishCommittee` while later ranks act as fallbacks if needed
 
 ## Parameters
 

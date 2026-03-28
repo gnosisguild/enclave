@@ -204,6 +204,21 @@ impl<T: Send + Sync> Deref for E3CommitteeContainsResponse<T> {
     }
 }
 
+#[derive(Message, Clone, Debug, PartialEq, Eq)]
+#[rtype(result = "Option<u64>")]
+pub struct GetLocalNodeSortitionRank {
+    pub e3_id: E3id,
+    pub seed: Seed,
+    pub size: usize,
+    pub chain_id: u64,
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq)]
+#[rtype(result = "Option<Committee>")]
+pub struct GetFinalizedCommittee {
+    pub e3_id: E3id,
+}
+
 /// Sortition actor that manages the sortition algorithm and the node state.
 pub struct Sortition {
     /// Persistent map of `chain_id -> SortitionBackend`.
@@ -734,6 +749,25 @@ where
             msg.sender.try_send(response)?;
             Ok(())
         })
+    }
+}
+
+impl Handler<GetLocalNodeSortitionRank> for Sortition {
+    type Result = MessageResult<GetLocalNodeSortitionRank>;
+
+    fn handle(&mut self, msg: GetLocalNodeSortitionRank, _: &mut Self::Context) -> Self::Result {
+        MessageResult(
+            self.get_node_index(msg.e3_id, msg.seed, msg.size, msg.chain_id)
+                .map(|(party_index, _)| party_index),
+        )
+    }
+}
+
+impl Handler<GetFinalizedCommittee> for Sortition {
+    type Result = MessageResult<GetFinalizedCommittee>;
+
+    fn handle(&mut self, msg: GetFinalizedCommittee, _: &mut Self::Context) -> Self::Result {
+        MessageResult(self.get_committee(&msg.e3_id))
     }
 }
 

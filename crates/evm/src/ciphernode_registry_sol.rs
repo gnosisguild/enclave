@@ -24,8 +24,13 @@ use e3_events::{
     EffectsEnabled, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, OrderedSet, Proof,
     PublicKeyAggregated, Seed, Shutdown, TicketGenerated, TicketId,
 };
+use e3_sortition::{GetFinalizedCommittee, Sortition};
 use e3_utils::{ArcBytes, NotifySync, MAILBOX_LIMIT};
+use std::time::Duration;
+use tokio::time::sleep;
 use tracing::{error, info, trace};
+
+const COMMITTEE_SUBMISSION_INTERVAL_SECS: u64 = 2;
 
 sol!(
     #[sol(rpc)]
@@ -270,6 +275,7 @@ pub struct CiphernodeRegistrySolWriter<P> {
     provider: EthProvider<P>,
     contract_address: Address,
     bus: BusHandle,
+    sortition: Addr<Sortition>,
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter<P> {
@@ -277,11 +283,13 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
         bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: Address,
+        sortition: Addr<Sortition>,
     ) -> Result<Self> {
         Ok(Self {
             provider,
             contract_address,
             bus: bus.clone(),
+            sortition,
         })
     }
 
@@ -289,23 +297,26 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
         bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: Address,
-        is_aggregator: bool,
+        sortition: Addr<Sortition>,
     ) {
         let runner = run_once::<EffectsEnabled>({
             let bus = bus.clone();
             move |_| {
-                let addr =
-                    CiphernodeRegistrySolWriter::new(&bus, provider, contract_address)?.start();
+                let addr = CiphernodeRegistrySolWriter::new(
+                    &bus,
+                    provider,
+                    contract_address,
+                    sortition.clone(),
+                )?
+                .start();
 
-                if is_aggregator {
-                    bus.subscribe_all(
-                        &[
-                            EventType::PublicKeyAggregated,
-                            EventType::CommitteeFinalizeRequested,
-                        ],
-                        addr.clone().into(),
-                    )
-                }
+                bus.subscribe_all(
+                    &[
+                        EventType::PublicKeyAggregated,
+                        EventType::CommitteeFinalizeRequested,
+                    ],
+                    addr.clone().into(),
+                );
 
                 bus.subscribe_all(
                     &[
@@ -414,6 +425,19 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<CommitteeFinalizeRe
         let bus = self.bus.clone();
 
         Box::pin(async move {
+            match should_finalize_committee(provider.clone(), contract_address, e3_id.clone()).await
+            {
+                Ok(false) => {
+                    info!(e3_id = %e3_id, "Committee already finalized or no longer requested, skipping finalizeCommittee submission");
+                    return;
+                }
+                Err(err) => {
+                    bus.err(EType::Evm, err);
+                    return;
+                }
+                Ok(true) => {}
+            }
+
             info!("Finalizing committee for E3 {:?}", e3_id);
 
             let result = finalize_committee_on_registry(provider, contract_address, e3_id).await;
@@ -422,8 +446,16 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<CommitteeFinalizeRe
                     info!(tx=%receipt.transaction_hash, "Committee finalized on registry");
                 }
                 Err(err) => {
-                    error!("Failed to finalize committee: {}", format_evm_error(&err));
-                    bus.err(EType::Evm, err);
+                    let decoded = format_evm_error(&err);
+                    if decoded.contains("CommitteeAlreadyFinalized") {
+                        info!(
+                            "Committee finalization already landed on-chain: {}",
+                            decoded
+                        );
+                    } else {
+                        error!("Failed to finalize committee: {}", decoded);
+                        bus.err(EType::Evm, err);
+                    }
                 }
             }
         })
@@ -443,8 +475,61 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
         let contract_address = self.contract_address;
         let provider = self.provider.clone();
         let bus = self.bus.clone();
+        let sortition = self.sortition.clone();
 
         Box::pin(async move {
+            let my_address = provider.provider().default_signer_address().to_string();
+
+            // Only committee members should attempt publication
+            if !nodes.contains(&my_address) {
+                return;
+            }
+
+            let rank = match aggregation_rank_for_e3(
+                &sortition,
+                provider.clone(),
+                contract_address,
+                &e3_id,
+                &my_address,
+            )
+            .await
+            {
+                Ok(rank) => rank,
+                Err(err) => {
+                    bus.err(EType::Evm, err);
+                    return;
+                }
+            };
+
+            let Some(rank) = rank else {
+                info!(e3_id = %e3_id, node = %my_address, "Node is outside the finalized aggregation priority chain, skipping committee publication");
+                return;
+            };
+
+            if rank > 0 {
+                let delay = Duration::from_secs(rank as u64 * COMMITTEE_SUBMISSION_INTERVAL_SECS);
+                info!(e3_id = %e3_id, node = %my_address, rank = rank, ?delay, "Waiting before fallback committee publication attempt");
+                sleep(delay).await;
+            }
+
+            match should_submit_committee_public_key(
+                provider.clone(),
+                contract_address,
+                e3_id.clone(),
+            )
+            .await
+            {
+                Ok(false) => {
+                    info!(e3_id = %e3_id, node = %my_address, rank = rank, "Public key already published or committee not finalizable, skipping committee publication");
+                    return;
+                }
+                Err(err) => {
+                    bus.err(EType::Evm, err);
+                    return;
+                }
+                Ok(true) => {}
+            }
+
             let result = publish_committee_to_registry(
                 provider,
                 contract_address,
@@ -460,8 +545,13 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                     info!(tx=%receipt.transaction_hash, "Committee published to registry");
                 }
                 Err(err) => {
-                    error!("Failed to publish committee: {}", format_evm_error(&err));
-                    bus.err(EType::Evm, err);
+                    let decoded = format_evm_error(&err);
+                    if decoded.contains("CommitteeAlreadyPublished") {
+                        info!("Committee publication already landed on-chain: {}", decoded);
+                    } else {
+                        error!("Failed to publish committee: {}", decoded);
+                        bus.err(EType::Evm, err);
+                    }
                 }
             }
         })
@@ -542,6 +632,61 @@ pub async fn finalize_committee_on_registry<P: Provider + WalletProvider + Clone
     .await
 }
 
+async fn should_finalize_committee<P: Provider + WalletProvider + Clone + 'static>(
+    provider: EthProvider<P>,
+    contract_address: Address,
+    e3_id: E3id,
+) -> Result<bool> {
+    let e3_id_u256: U256 = e3_id.try_into()?;
+    let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
+    let stage = contract.getCommitteeStage(e3_id_u256).call().await?;
+    Ok(stage == 1u8)
+}
+
+async fn should_submit_committee_public_key<P: Provider + WalletProvider + Clone + 'static>(
+    provider: EthProvider<P>,
+    contract_address: Address,
+    e3_id: E3id,
+) -> Result<bool> {
+    let e3_id_u256: U256 = e3_id.try_into()?;
+    let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
+    let stage = contract.getCommitteeStage(e3_id_u256).call().await?;
+    if stage != 2u8 {
+        return Ok(false);
+    }
+
+    let public_key_hash = contract.publicKeyHashes(e3_id_u256).call().await?;
+    Ok(public_key_hash == B256::ZERO)
+}
+
+async fn committee_threshold_m<P: Provider + WalletProvider + Clone + 'static>(
+    provider: EthProvider<P>,
+    contract_address: Address,
+    e3_id: &E3id,
+) -> Result<usize> {
+    let e3_id_u256: U256 = e3_id.clone().try_into()?;
+    let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
+    let viability = contract.getCommitteeViability(e3_id_u256).call().await?;
+    Ok(viability.thresholdM as usize)
+}
+
+async fn aggregation_rank_for_e3<P: Provider + WalletProvider + Clone + 'static>(
+    sortition: &Addr<Sortition>,
+    provider: EthProvider<P>,
+    contract_address: Address,
+    e3_id: &E3id,
+    node_address: &str,
+) -> Result<Option<usize>> {
+    let committee = sortition
+        .send(GetFinalizedCommittee {
+            e3_id: e3_id.clone(),
+        })
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("No finalized committee available for {}", e3_id))?;
+    let threshold_m = committee_threshold_m(provider, contract_address, e3_id).await?;
+    Ok(committee.aggregation_rank_for(node_address, threshold_m))
+}
+
 pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone + 'static>(
     provider: EthProvider<P>,
     contract_address: Address,
@@ -605,10 +750,10 @@ impl CiphernodeRegistrySol {
         bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: Address,
-        is_aggregator: bool,
+        sortition: Addr<Sortition>,
     ) where
         P: Provider + WalletProvider + Clone + 'static,
     {
-        CiphernodeRegistrySolWriter::attach(bus, provider, contract_address, is_aggregator);
+        CiphernodeRegistrySolWriter::attach(bus, provider, contract_address, sortition);
     }
 }

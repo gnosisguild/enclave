@@ -102,7 +102,7 @@ sequenceDiagram
     Keyshare->>Keyshare: Persist secret key
     Keyshare->>EventBus: KeyshareCreated(e3Id, node, pubkey, chainId)
 
-    Note over EventBus,PublicKeyAggregator: Phase 7: Public Key Aggregation
+    Note over EventBus,PublicKeyAggregator: Phase 7: Public Key Aggregation on eligible committee ranks
 
     EventBus->>PublicKeyAggregator: KeyshareCreated
     PublicKeyAggregator->>Sortition: GetNodesForE3(e3Id, chainId)
@@ -114,7 +114,7 @@ sequenceDiagram
         PublicKeyAggregator->>PublicKeyAggregator: fhe.get_aggregate_public_key(keyshares)
         PublicKeyAggregator->>PublicKeyAggregator: Aggregate public key shares
         PublicKeyAggregator->>EventBus: PublicKeyAggregated(e3Id, pubkey, nodes, chainId)
-        PublicKeyAggregator->>CiphernodeRegistry: publishPublicKey(e3Id, pubkey, nodes)
+        PublicKeyAggregator->>CiphernodeRegistry: publishPublicKey(e3Id, pubkey, nodes) after rank-based delay
     end
 
     Note over Operator,PlaintextAggregator: Phase 8: Encryption & Computation

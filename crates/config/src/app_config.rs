@@ -22,26 +22,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::{collections::HashMap, env, path::PathBuf};
 
-/// Either "aggregator" or "ciphernode"
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-#[serde(tag = "type")]
-pub enum NodeRole {
-    /// Aggregator role
-    Aggregator {
-        pubkey_write_path: Option<PathBuf>,
-        plaintext_write_path: Option<PathBuf>,
-    },
-    /// Ciphernode role
-    Ciphernode,
-}
-
-impl Default for NodeRole {
-    fn default() -> Self {
-        NodeRole::Ciphernode
-    }
-}
-
 /// The structure within the app configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
@@ -65,9 +45,10 @@ pub struct NodeDefinition {
     pub data_dir: PathBuf,
     /// Override the base folder for enclave configuration defaults to `~/.config/enclave/{name}` on linux
     pub config_dir: PathBuf,
-    /// The node role eg. "ciphernode" or "aggregator"
-    #[serde(default)]
-    pub role: NodeRole,
+    /// Optional test-only path for writing the aggregated public key emitted by this node.
+    pub pubkey_write_path: Option<PathBuf>,
+    /// Optional test-only path for writing the decrypted plaintext emitted by this node.
+    pub plaintext_write_path: Option<PathBuf>,
     /// If a net key has not been set autogenerate one on start
     pub autonetkey: bool,
     /// If a password has not been set autogenerate one on start
@@ -88,7 +69,8 @@ impl Default for NodeDefinition {
             log_file: PathBuf::from("log"), // ~/.config/enclave/log
             config_dir: std::path::PathBuf::new(), // ~/.config/enclave
             data_dir: std::path::PathBuf::new(), // ~/.config/enclave
-            role: NodeRole::Ciphernode,
+            pubkey_write_path: None,
+            plaintext_write_path: None,
             autonetkey: false,
             autopassword: false,
             autowallet: false,
@@ -377,24 +359,20 @@ impl AppConfig {
         &self.nodes
     }
 
-    /// Get the node's role and enriched relevant provided configuration
-    pub fn role(&self) -> NodeRole {
-        match self.node_def().role.clone() {
-            NodeRole::Aggregator {
-                pubkey_write_path,
-                plaintext_write_path,
-            } => NodeRole::Aggregator {
-                // Normalize paths so that these paths are based on the config dir if they are
-                // relative
-                pubkey_write_path: pubkey_write_path
-                    .as_ref()
-                    .map(|p| self.paths.relative_to_config(p)),
-                plaintext_write_path: plaintext_write_path
-                    .as_ref()
-                    .map(|p| self.paths.relative_to_config(p)),
-            },
-            NodeRole::Ciphernode => NodeRole::Ciphernode,
-        }
+    /// Optional normalized path for writing this node's aggregated public key.
+    pub fn pubkey_write_path(&self) -> Option<PathBuf> {
+        self.node_def()
+            .pubkey_write_path
+            .as_ref()
+            .map(|p| self.paths.relative_to_config(p))
+    }
+
+    /// Optional normalized path for writing this node's aggregated plaintext output.
+    pub fn plaintext_write_path(&self) -> Option<PathBuf> {
+        self.node_def()
+            .plaintext_write_path
+            .as_ref()
+            .map(|p| self.paths.relative_to_config(p))
     }
 
     /// Get the value of autonetkey
@@ -599,10 +577,8 @@ nodes:
     peers:
       - "one"
       - "two"
-    role:
-      type: aggregator
-      pubkey_write_path: "./output/pubkey.bin"
-      plaintext_write_path: "./output/plaintext.txt"
+        pubkey_write_path: "./output/pubkey.bin"
+        plaintext_write_path: "./output/plaintext.txt"
 
 "#;
         {
@@ -661,13 +637,12 @@ nodes:
 
             // Write paths should be relative to config file if they are relative
             assert_eq!(
-                config.role(),
-                NodeRole::Aggregator {
-                    pubkey_write_path: Some(PathBuf::from("/default/config/output/pubkey.bin")),
-                    plaintext_write_path: Some(PathBuf::from(
-                        "/default/config/output/plaintext.txt"
-                    ))
-                }
+                config.pubkey_write_path(),
+                Some(PathBuf::from("/default/config/output/pubkey.bin"))
+            );
+            assert_eq!(
+                config.plaintext_write_path(),
+                Some(PathBuf::from("/default/config/output/plaintext.txt"))
             );
         };
         Ok(())
@@ -702,7 +677,8 @@ nodes:
                 expected_config_dir.join("enclave.config.yaml")
             );
 
-            assert_eq!(config.role(), NodeRole::Ciphernode);
+            assert!(config.pubkey_write_path().is_none());
+            assert!(config.plaintext_write_path().is_none());
 
             Ok(())
         });

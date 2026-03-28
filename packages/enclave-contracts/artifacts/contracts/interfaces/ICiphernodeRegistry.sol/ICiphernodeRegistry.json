@@ -619,6 +619,30 @@
           "internalType": "address[]",
           "name": "committeeNodes",
           "type": "address[]"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "committeeScores",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getCommitteeStage",
+      "outputs": [
+        {
+          "internalType": "enum ICiphernodeRegistry.CommitteeStage",
+          "name": "stage",
+          "type": "uint8"
         }
       ],
       "stateMutability": "view",
@@ -758,6 +782,25 @@
           "internalType": "bool",
           "name": "",
           "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "publicKeyHashes",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "publicKeyHash",
+          "type": "bytes32"
         }
       ],
       "stateMutability": "view",
@@ -960,5 +1003,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-d3db7173950582d145915864c28ba15e975a7c98"
+  "buildInfoId": "solc-0_8_28-a5c2ec0646a40f95c66bc21729b7a906479f7537"
 }

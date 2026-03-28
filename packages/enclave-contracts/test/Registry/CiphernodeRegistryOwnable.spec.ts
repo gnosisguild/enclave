@@ -408,7 +408,7 @@ describe("CiphernodeRegistryOwnable", function () {
   });
 
   describe("publishCommittee()", function () {
-    it("reverts if the caller is not the owner", async function () {
+    it("allows any caller to publish the committee with a valid proof", async function () {
       const {
         registry,
         enclave,
@@ -432,21 +432,21 @@ describe("CiphernodeRegistryOwnable", function () {
       await registry.connect(operator3).submitTicket(0, 1);
       await finalizeCommitteeAfterWindow(registry, 0);
 
-      await expect(
-        registry
-          .connect(notTheOwner)
-          .publishCommittee(
-            0,
-            [
-              await operator1.getAddress(),
-              await operator2.getAddress(),
-              await operator3.getAddress(),
-            ],
-            data,
-            c5Proof,
-            "0x",
-          ),
-      ).to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount");
+      await registry
+        .connect(notTheOwner)
+        .publishCommittee(
+          0,
+          [
+            await operator1.getAddress(),
+            await operator2.getAddress(),
+            await operator3.getAddress(),
+          ],
+          data,
+          c5Proof,
+          "0x",
+        );
+
+      expect(await registry.committeePublicKey(0)).to.equal(dataHash);
     });
     it("stores the public key of the committee", async function () {
       const {

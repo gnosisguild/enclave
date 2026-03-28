@@ -315,6 +315,39 @@ export const publishCommittee = task(
   }))
   .build();
 
+export const activeCommitteeNodes = task(
+  "committee:active-nodes",
+  "Get the active finalized committee nodes for an E3",
+)
+  .addOption({
+    name: "e3Id",
+    description: "Id of the E3 program",
+    defaultValue: 0,
+    type: ArgumentType.INT,
+  })
+  .setAction(async () => ({
+    default: async ({ e3Id }, hre) => {
+      const { deployAndSaveCiphernodeRegistryOwnable } = await import(
+        "../scripts/deployAndSave/ciphernodeRegistryOwnable"
+      );
+      const { deployAndSavePoseidonT3 } = await import(
+        "../scripts/deployAndSave/poseidonT3"
+      );
+
+      const poseidonT3 = await deployAndSavePoseidonT3({ hre });
+      const { ciphernodeRegistry } = await deployAndSaveCiphernodeRegistryOwnable(
+        {
+          hre,
+          poseidonT3Address: poseidonT3,
+        },
+      );
+
+      const nodes = await ciphernodeRegistry.getActiveCommitteeNodes(e3Id);
+      console.log(JSON.stringify(nodes.map((node) => node.toLowerCase())));
+    },
+  }))
+  .build();
+
 export const publishCiphertext = task(
   "e3:publishCiphertext",
   "Publish ciphertext output for an E3 program",

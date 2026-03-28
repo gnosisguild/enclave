@@ -70,6 +70,23 @@ impl Committee {
         &self.members
     }
 
+    /// Number of committee members eligible to act as aggregators for this E3.
+    ///
+    /// This is the committee's failure budget, derived from the existing M/N
+    /// threshold. Rank 0 is the primary aggregator, rank 1 the first fallback,
+    /// and so on up to `len - threshold_m - 1`.
+    pub fn aggregator_count(&self, threshold_m: usize) -> usize {
+        self.len().saturating_sub(threshold_m)
+    }
+
+    /// Resolve the current node's aggregation rank from the finalized committee
+    /// ordering. Returns `None` when the node is outside the fallback chain.
+    pub fn aggregation_rank_for(&self, addr: &str, threshold_m: usize) -> Option<usize> {
+        let party_id = self.party_id_for(addr)? as usize;
+        let aggregator_count = self.aggregator_count(threshold_m);
+        (party_id < aggregator_count).then_some(party_id)
+    }
+
     pub fn len(&self) -> usize {
         self.members.len()
     }

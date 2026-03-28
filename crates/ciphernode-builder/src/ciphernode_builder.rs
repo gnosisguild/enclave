@@ -455,6 +455,7 @@ impl CiphernodeBuilder {
             &self.chains,
             &mut provider_cache,
             &bus,
+            sortition.clone(),
             &self.contract_components,
             self.pubkey_agg,
         )
@@ -508,6 +509,7 @@ impl CiphernodeBuilder {
             e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(
                 &bus,
                 aggregator_preset,
+                &addr,
             ));
 
             if self.keyshare.is_none() {
@@ -529,6 +531,7 @@ impl CiphernodeBuilder {
                 &bus,
                 &sortition,
                 aggregator_preset,
+                &addr,
             ))
         }
 
@@ -677,6 +680,7 @@ async fn setup_evm_system(
     chains: &Vec<ChainConfig>,
     provider_cache: &mut ProviderCache<WriteEnabled>,
     bus: &BusHandle,
+    sortition: Addr<Sortition>,
     contract_components: &ContractComponents,
     pubkey_agg: bool,
 ) -> Result<EvmEventConfig> {
@@ -696,7 +700,12 @@ async fn setup_evm_system(
         if contract_components.enclave {
             let write_provider = provider_cache.ensure_write_provider(chain).await?;
             let contract = &chain.contracts.enclave;
-            EnclaveSolWriter::attach(&bus, write_provider.clone(), contract.address()?);
+            EnclaveSolWriter::attach(
+                &bus,
+                write_provider.clone(),
+                contract.address()?,
+                sortition.clone(),
+            );
             system.with_contract(contract.address()?, move |next| {
                 EnclaveSolReader::setup(&next).recipient()
             });
@@ -735,13 +744,13 @@ async fn setup_evm_system(
                             &bus,
                             write_provider.clone(),
                             contract.address()?,
-                            pubkey_agg,
+                            sortition.clone(),
                         );
                         info!("CiphernodeRegistrySolWriter attached for publishing committees");
 
                         if pubkey_agg {
                             info!("Attaching CommitteeFinalizer for score sortition");
-                            CommitteeFinalizer::attach(&bus);
+                            CommitteeFinalizer::attach(&bus, sortition.clone());
                         }
                     }
                     Err(e) => error!(

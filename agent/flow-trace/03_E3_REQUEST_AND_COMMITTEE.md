@@ -127,9 +127,9 @@ EnclaveSolReader decodes IEnclave::E3Requested log
 │   └─ Creates Fhe instance from BFV params
 │   └─ Stores as dependency in E3Context
 │
-├─ PublicKeyAggregatorExtension.on_event(): (aggregator only)
-│   └─ Spins up PublicKeyAggregator actor
-│   └─ State: Collecting (waiting for N keyshares)
+├─ PublicKeyAggregatorExtension.on_event():
+│   └─ Spins up PublicKeyAggregator actor on each selected node
+│   └─ State: Pending until CommitteeFinalized resolves finalized aggregation duty
 │
 └─ Sortition actor receives E3Requested:
     │
@@ -233,13 +233,16 @@ CiphernodeRegistrySolWriter receives TicketGenerated event
 
 ## Step 3: Committee Finalization
 
-### 3a. Deadline Timer (Rust-Side, Aggregator)
+### 3a. Deadline Timer (Rust-Side, Selected Ciphernodes)
 
 ```
-CommitteeFinalizer actor receives CommitteeRequested event
+CommitteeFinalizer actor receives CommitteeRequested event on each selected node
+│
+├─ Resolves this node's local score rank from sortition
+│   └─ If the node is outside the provisional top-N, no timer is scheduled
 │
 ├─ Calculates wait time:
-│   wait = committeeDeadline - currentTimestamp + buffer
+│   wait = committeeDeadline - currentTimestamp + buffer + local_rank_stagger
 │
 ├─ Schedules timer
 │

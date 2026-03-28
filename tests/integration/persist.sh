@@ -20,8 +20,6 @@ done
 pnpm evm:clean
 pnpm evm:deploy --network localhost
 
-# set wallet to ag specifically
-enclave_wallet_set ag "$PRIVATE_KEY_AG"
 enclave_wallet_set cn1 "$PRIVATE_KEY_CN1"
 enclave_wallet_set cn2 "$PRIVATE_KEY_CN2"
 enclave_wallet_set cn3 "$PRIVATE_KEY_CN3"
@@ -71,20 +69,26 @@ pnpm committee:new \
   --committee-size 0 \
   --proof-aggregation-enabled true
 
-waiton "$SCRIPT_DIR/output/pubkey.bin"
+# Wait for any node's pubkey to signal committee finalization + DKG completion
+waiton_any_pubkey
 
-# kill aggregator
-enclave_nodes_stop ag
+# Determine primary (rank=0) aggregator from on-chain committee ordering
+PRIMARY_NODE=$(get_primary_committee_node 0)
+echo "Primary committee node: $PRIMARY_NODE"
+PRIMARY_PUBKEY_PATH=$(ciphernode_pubkey_path "$PRIMARY_NODE")
+PRIMARY_PLAINTEXT_PATH=$(ciphernode_plaintext_path "$PRIMARY_NODE")
+
+# restart the current primary node to exercise persistence on a regular ciphernode
+enclave_nodes_stop "$PRIMARY_NODE"
 
 sleep 8
 
-# relaunch the aggregator
-enclave_nodes_start ag
+enclave_nodes_start "$PRIMARY_NODE"
 
 sleep 8
 
 heading "Mock encrypted plaintext"
-$SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
+$SCRIPT_DIR/lib/fake_encrypt.sh --input "$PRIMARY_PUBKEY_PATH" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
 
 heading "Mock publish input e3-id"
 pnpm e3-program:publishInput --network localhost  --e3-id 0 --data 0x12345678
@@ -96,9 +100,9 @@ waiton "$SCRIPT_DIR/output/output.bin"
 heading "Publish ciphertext to EVM"
 pnpm e3:publishCiphertext --e3-id 0 --network localhost --data-file "$SCRIPT_DIR/output/output.bin" --proof 0x12345678
 
-waiton "$SCRIPT_DIR/output/plaintext.txt"
+waiton "$PRIMARY_PLAINTEXT_PATH"
 
-ACTUAL=$(cut -d',' -f1,2 $SCRIPT_DIR/output/plaintext.txt)
+ACTUAL=$(cut -d',' -f1,2 "$PRIMARY_PLAINTEXT_PATH")
 
 # Assume plaintext is shorter
 

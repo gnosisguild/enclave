@@ -61,11 +61,3 @@ nodes:
     ctrl_port: 50505
     autonetkey: true
     autopassword: true
-  ag:
-    address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
-    quic_port: 9206
-    ctrl_port: 50506
-    autonetkey: true
-    autopassword: true
-    role:
-      type: "aggregator"

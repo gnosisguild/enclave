@@ -235,6 +235,13 @@ impl Handler<TypedEvent<CommitteeFinalized>> for CiphernodeSelector {
                     party_id = party_id,
                     "Node is in finalized committee, emitting CiphernodeSelected"
                 );
+                if party_id == 0 {
+                    info!(
+                        node = self.address,
+                        e3_id = %msg.e3_id,
+                        "[SORTITION] Node is the finalized committee primary (party_id=0)"
+                    );
+                }
 
                 bus.publish(
                     CiphernodeSelected {

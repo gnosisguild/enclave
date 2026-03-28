@@ -49,14 +49,14 @@ sequenceDiagram
     CS->>+S: has node?
     S--)-CS: yes
     CS--)E3: CiphernodeSelected
-    E3->>PKA: Create new PublicKeyAggreator for this e3_id
+    E3->>PKA: Create new PublicKeyAggregator for this e3_id on selected nodes
     E3->>KS: Create new Keyshare for this e3_id
     loop
         KS--)PKA: KeyshareCreated
         PKA->>+S: has node?
         S--)-PKA: yes
     end
-    PKA--)EVM: PublicKeyAggregated
+    PKA--)EVM: PublicKeyAggregated by the highest-priority eligible node
     PKA--)PKA: Stop
 ```
 
@@ -72,13 +72,13 @@ sequenceDiagram
     participant S as Sortition
 
     EVM--)E3: CiphertextOutputPublished
-    E3->>PTA: Create new PlaintextAggreator for this e3_id
+    E3->>PTA: Create new PlaintextAggregator for this e3_id on selected nodes
     loop
         KS--)PTA: DecryptionShareCreated
         PTA->>+S: has node?
         S--)-PTA: yes
     end
-    PTA--)EVM: PlaintextAggregated
+    PTA--)EVM: PlaintextAggregated by the highest-priority eligible node
     PTA--)+KS: PlaintextAggregated
     PTA--)PTA: Stop
     KS--)-KS: Stop

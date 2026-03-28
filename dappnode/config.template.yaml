@@ -4,8 +4,6 @@
 node:
   address: '${NODE_ADDRESS}'
   quic_port: ${QUIC_PORT}
-  role:
-    type: ${NODE_ROLE}
   autonetkey: true
   autopassword: true
   autowallet: true

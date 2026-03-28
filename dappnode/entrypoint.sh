@@ -27,7 +27,6 @@ fi
 # Set defaults
 export NETWORK="${NETWORK:-sepolia}"
 export QUIC_PORT="${QUIC_PORT:-37173}"
-export NODE_ROLE="${NODE_ROLE:-ciphernode}"
 export NODE_ADDRESS="${NODE_ADDRESS:-}"
 export LOG_LEVEL="${LOG_LEVEL:-info}"
 

@@ -188,8 +188,8 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         success = true;
     }
 
-    /// @notice Publishes a committee for an E3 computation
-    /// @dev Only callable by owner. Verification of C5 proof is done in Enclave.onCommitteePublished.
+    /// @notice Publishes a committee for an E3 computation.
+    /// @dev Permissionless: any caller may submit the first valid C5 proof.
     /// @param e3Id ID of the E3 computation
     /// @param nodes Array of ciphernode addresses selected for the committee
     /// @param publicKey Aggregated public key of the committee
@@ -201,7 +201,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         bytes calldata publicKey,
         bytes calldata proof,
         bytes calldata foldProof
-    ) external onlyOwner {
+    ) external {
         Committee storage c = committees[e3Id];
 
         require(
@@ -326,7 +326,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             CommitteeAlreadyFinalized()
         );
         require(
-            block.timestamp > c.committeeDeadline,
+            block.timestamp >= c.committeeDeadline,
             SubmissionWindowNotClosed()
         );
         bool thresholdMet = c.topNodes.length >= c.threshold[1];
@@ -459,10 +459,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @inheritdoc ICiphernodeRegistry
     function getCommitteeNodes(
         uint256 e3Id
-    ) public view returns (address[] memory nodes) {
+    ) public view returns (address[] memory nodes, uint256[] memory scores) {
         Committee storage c = committees[e3Id];
         require(c.publicKey != bytes32(0), CommitteeNotPublished());
         nodes = c.topNodes;
+        uint256 len = nodes.length;
+        scores = new uint256[](len);
+        for (uint256 i = 0; i < len; ++i) {
+            scores[i] = c.scoreOf[nodes[i]];
+        }
     }
 
     /// @notice Returns the current size of the ciphernode IMT
@@ -487,6 +492,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             CommitteeNotRequested()
         );
         return c.committeeDeadline;
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function getCommitteeStage(
+        uint256 e3Id
+    ) external view returns (ICiphernodeRegistry.CommitteeStage) {
+        return committees[e3Id].stage;
     }
 
     ////////////////////////////////////////////////////////////

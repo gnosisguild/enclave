@@ -27,13 +27,15 @@ use e3_sortition::Sortition;
 pub struct PublicKeyAggregatorExtension {
     bus: BusHandle,
     params_preset: BfvPreset,
+    node_address: String,
 }
 
 impl PublicKeyAggregatorExtension {
-    pub fn create(bus: &BusHandle, params_preset: BfvPreset) -> Box<Self> {
+    pub fn create(bus: &BusHandle, params_preset: BfvPreset, node_address: &str) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             params_preset,
+            node_address: node_address.to_owned(),
         })
     }
 }
@@ -77,6 +79,8 @@ impl E3Extension for PublicKeyAggregatorExtension {
             e3_id,
             sync_state,
             self.params_preset.clone(),
+            &self.node_address,
+            meta.threshold_m,
         );
 
         ctx.set_event_recipient("publickey", Some(value));
@@ -111,6 +115,10 @@ impl E3Extension for PublicKeyAggregatorExtension {
             ctx.e3_id.clone(),
             sync_state,
             self.params_preset.clone(),
+            &self.node_address,
+            ctx.get_dependency(META_KEY)
+                .ok_or_else(|| anyhow!(ERROR_PUBKEY_META_MISSING))?
+                .threshold_m,
         );
 
         // send to context
@@ -126,6 +134,8 @@ fn create_publickey_aggregator(
     e3_id: E3id,
     sync_state: Persistable<PublicKeyAggregatorState>,
     params_preset: BfvPreset,
+    node_address: &str,
+    threshold_m: usize,
 ) -> Recipient<EnclaveEvent> {
     KeyshareCreatedFilterBuffer::new(
         PublicKeyAggregator::new(
@@ -134,6 +144,8 @@ fn create_publickey_aggregator(
                 bus,
                 e3_id,
                 params_preset,
+                node_address: node_address.to_owned(),
+                threshold_m,
             },
             sync_state,
         )
@@ -148,6 +160,7 @@ pub struct ThresholdPlaintextAggregatorExtension {
     bus: BusHandle,
     sortition: Addr<Sortition>,
     params_preset: BfvPreset,
+    node_address: String,
 }
 
 impl ThresholdPlaintextAggregatorExtension {
@@ -155,11 +168,13 @@ impl ThresholdPlaintextAggregatorExtension {
         bus: &BusHandle,
         sortition: &Addr<Sortition>,
         params_preset: BfvPreset,
+        node_address: &str,
     ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
             params_preset,
+            node_address: node_address.to_owned(),
         })
     }
 }
@@ -201,6 +216,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                         sortition: self.sortition.clone(),
                         e3_id: e3_id.clone(),
                         params_preset: self.params_preset.clone(),
+                        node_address: self.node_address.clone(),
                     },
                     sync_state,
                 )
@@ -230,6 +246,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
                 params_preset: self.params_preset.clone(),
+                node_address: self.node_address.clone(),
             },
             sync_state,
         )

@@ -49,7 +49,6 @@ Once this package is published to the DAppStore:
    - `RPC_URL` – WebSocket RPC endpoint (e.g. `wss://ethereum-sepolia-rpc.publicnode.com`)
    - `NETWORK` – e.g. `sepolia`, `mainnet`, `localhost`
    - Contract addresses + deploy blocks
-   - Node role (`ciphernode` or `aggregator`)
    - Optional keys and peers
 
 4. Confirm and finish the installation.
@@ -126,10 +125,6 @@ All runtime configuration is done via environment variables. They are:
 - **`NETWORK`** Logical network name written into the Enclave config (e.g. `sepolia`, `mainnet`,
   `localhost`).
 
-- **`NODE_ROLE`**
-  - `ciphernode` – participate in threshold decryption.
-  - `aggregator` – coordinate operations, requires a wallet key.
-
 - **`ETH_ADDRESS`** Optional Ethereum address to bind the node to. Leave empty to let Enclave handle
   it.
 
@@ -163,8 +158,8 @@ block heights.
 - **`NETWORK_PRIVATE_KEY`** Optional libp2p network key. If set, `entrypoint.sh` calls:
   - `enclave net set-key --config /data/config.yaml --net-keypair "$NETWORK_PRIVATE_KEY"`
 
-- **`PRIVATE_KEY`** Optional Ethereum private key (hex). Only needed for aggregator mode. If set,
-  `entrypoint.sh` calls:
+- **`PRIVATE_KEY`** Optional Ethereum private key (hex). Provide it when the node must submit
+  on-chain transactions. If set, `entrypoint.sh` calls:
   - `enclave wallet set --config /data/config.yaml --private-key "$PRIVATE_KEY"`
 
 ### Peers
@@ -189,11 +184,12 @@ screen after installation, as per DAppNode’s env behavior.
 At container startup, `entrypoint.sh`:
 
 1. Validates `RPC_URL` is non-empty and starts with `ws://` or `wss://`.
-2. Applies sensible defaults for `NETWORK`, `QUIC_PORT`, `NODE_ROLE`, and `LOG_LEVEL`.
+2. Applies sensible defaults for `NETWORK`, `QUIC_PORT`, and `LOG_LEVEL`.
 3. Uses `envsubst` to render `config.template.yaml` into `/data/config.yaml`, substituting:
-   - node address, role, ports
-   - network name and RPC URL
-   - contract addresses and deploy blocks
+
+- node address and ports
+- network name and RPC URL
+- contract addresses and deploy blocks
 
 4. Optionally programs password, network key, and wallet key via the `enclave` CLI.
 5. Builds CLI args, including verbosity and `--peer` flags from `PEERS`.

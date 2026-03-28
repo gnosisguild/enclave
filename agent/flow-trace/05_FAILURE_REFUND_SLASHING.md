@@ -977,13 +977,13 @@ When CommitteeMemberExpelled event arrives from EVM:
 │   │       → May trigger share processing with reduced set
 │   └─ Does NOT hold committee state — fully delegated to Sortition
 │
-├─ PublicKeyAggregator (aggregator, receives raw event):
+├─ PublicKeyAggregator (eligible finalized fallback nodes, receives raw event):
 │   ├─ Only processes raw events (party_id: None)
 │   ├─ Ignores enriched events (party_id: Some) to avoid double-processing
 │   └─ Reduces threshold_n
 │   └─ May trigger aggregation if enough keyshares collected
 │
-├─ KeyshareCreatedFilterBuffer (aggregator):
+├─ KeyshareCreatedFilterBuffer (eligible finalized fallback nodes):
 │   ├─ Only processes raw events (party_id: None)
 │   └─ Removes expelled node from committee filter set
 │

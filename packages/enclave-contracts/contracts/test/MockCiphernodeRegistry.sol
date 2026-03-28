@@ -56,6 +56,13 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         }
     }
 
+    function publicKeyHashes(uint256 e3Id) external pure returns (bytes32) {
+        if (e3Id == type(uint256).max) {
+            return bytes32(0);
+        }
+        return keccak256(abi.encode(e3Id));
+    }
+
     function isCiphernodeEligible(address) external pure returns (bool) {
         return false;
     }
@@ -76,8 +83,12 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 
     function getCommitteeNodes(
         uint256 e3Id
-    ) external view returns (address[] memory) {
-        return _committeeNodes[e3Id];
+    ) external view returns (address[] memory nodes, uint256[] memory scores) {
+        nodes = _committeeNodes[e3Id];
+        scores = new uint256[](nodes.length);
+        for (uint256 i = 0; i < nodes.length; i++) {
+            scores[i] = uint256(keccak256(abi.encode(nodes[i])));
+        }
     }
 
     function root() external pure returns (uint256) {
@@ -108,6 +119,12 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     // solhint-disable-next-line no-empty-blocks
     function finalizeCommittee(uint256) external pure returns (bool) {
         return true;
+    }
+
+    function getCommitteeStage(
+        uint256
+    ) external pure returns (ICiphernodeRegistry.CommitteeStage) {
+        return ICiphernodeRegistry.CommitteeStage.Finalized;
     }
 
     function sortitionSubmissionWindow() external pure returns (uint256) {
@@ -161,9 +178,9 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     }
 
     function getActiveCommitteeNodes(
-        uint256
-    ) external pure returns (address[] memory) {
-        return new address[](0);
+        uint256 e3Id
+    ) external view returns (address[] memory nodes) {
+        nodes = _committeeNodes[e3Id];
     }
 
     function getCommitteeViability(
@@ -196,6 +213,10 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         revert CommitteeNotPublished();
     }
 
+    function publicKeyHashes(uint256) external pure returns (bytes32) {
+        return bytes32(0);
+    }
+
     function isCiphernodeEligible(address) external pure returns (bool) {
         return false;
     }
@@ -216,9 +237,9 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
 
     function getCommitteeNodes(
         uint256
-    ) external pure returns (address[] memory) {
-        address[] memory nodes = new address[](0);
-        return nodes;
+    ) external pure returns (address[] memory nodes, uint256[] memory scores) {
+        nodes = new address[](0);
+        scores = new uint256[](0);
     }
 
     function root() external pure returns (uint256) {
@@ -256,6 +277,12 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
     // solhint-disable-next-line no-empty-blocks
     function finalizeCommittee(uint256) external pure returns (bool) {
         return true;
+    }
+
+    function getCommitteeStage(
+        uint256
+    ) external pure returns (ICiphernodeRegistry.CommitteeStage) {
+        return ICiphernodeRegistry.CommitteeStage.Finalized;
     }
 
     function isOpen(uint256) external pure returns (bool) {

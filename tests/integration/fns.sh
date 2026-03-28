@@ -15,7 +15,6 @@ fi
 # Environment variables
 RPC_URL="ws://localhost:8545"
 
-PRIVATE_KEY_AG="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 PRIVATE_KEY_CN1="0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
 PRIVATE_KEY_CN2="0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"
 PRIVATE_KEY_CN3="0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6"
@@ -97,6 +96,85 @@ waiton-files() {
     fi
     sleep 1
   done
+}
+
+normalize_address() {
+  echo "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+ciphernode_name_for_address() {
+  case "$(normalize_address "$1")" in
+    "$(normalize_address "$CIPHERNODE_ADDRESS_1")") echo "cn1" ;;
+    "$(normalize_address "$CIPHERNODE_ADDRESS_2")") echo "cn2" ;;
+    "$(normalize_address "$CIPHERNODE_ADDRESS_3")") echo "cn3" ;;
+    "$(normalize_address "$CIPHERNODE_ADDRESS_4")") echo "cn4" ;;
+    "$(normalize_address "$CIPHERNODE_ADDRESS_5")") echo "cn5" ;;
+    *)
+      echo "Unknown ciphernode address: $1" >&2
+      return 1
+      ;;
+  esac
+}
+
+# One-shot lookup of the primary (rank=0) committee node.
+# Call AFTER committee is finalized (e.g. after any pubkey.bin appears).
+CIPHERNODE_REGISTRY=$(yq '.chains[0].contracts.ciphernode_registry.address' "$SCRIPT_DIR/enclave.config.yaml")
+
+get_primary_committee_node() {
+  local e3_id="${1:-0}"
+  local timeout="${2:-120}"
+  local start_time=$(date +%s)
+
+  # Retry until publishCommittee tx is mined on-chain
+  local raw
+  while true; do
+    raw=$(cast call "$CIPHERNODE_REGISTRY" \
+      "getCommitteeNodes(uint256)(address[],uint256[])" "$e3_id" \
+      --rpc-url "$RPC_URL" 2>/dev/null) && break
+
+    if [ $(($(date +%s) - start_time)) -ge "$timeout" ]; then
+      echo "Timeout after ${timeout}s waiting for committee to be published on-chain for e3_id=$e3_id" >&2
+      return 1
+    fi
+    sleep 1
+  done
+
+  local -a addrs scores
+  mapfile -t addrs  < <(awk 'NR==1' <<< "$raw" | tr -d '[] ' | tr ',' '\n')
+  mapfile -t scores < <(awk 'NR==2' <<< "$raw" | tr -d '[] ' | tr ',' '\n')
+
+  local best_addr
+  best_addr=$(paste <(printf '%s\n' "${addrs[@]}") <(printf '%s\n' "${scores[@]}") \
+    | sort -t$'\t' -k2,2 -g | head -n1 | cut -f1)
+
+  [[ -z "$best_addr" ]] && { echo "No committee nodes found for e3_id=$e3_id" >&2; return 1; }
+  ciphernode_name_for_address "$best_addr"
+}
+
+ciphernode_pubkey_path() {
+  echo "$SCRIPT_DIR/output/$1/pubkey.bin"
+}
+
+# Wait until ANY node's pubkey.bin appears (committee membership is non-deterministic)
+waiton_any_pubkey() {
+  local timeout="${1:-1300}"
+  local start_time=$(date +%s)
+  while true; do
+    for name in cn1 cn2 cn3 cn4 cn5; do
+      if [ -f "$(ciphernode_pubkey_path "$name")" ]; then
+        return 0
+      fi
+    done
+    if [ $(($(date +%s) - start_time)) -ge "$timeout" ]; then
+      echo "Timeout after ${timeout}s waiting for any pubkey.bin" >&2
+      return 1
+    fi
+    sleep 1
+  done
+}
+
+ciphernode_plaintext_path() {
+  echo "$SCRIPT_DIR/output/$1/plaintext.txt"
 }
 
 enclave_password_set() {

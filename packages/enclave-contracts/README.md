@@ -111,6 +111,9 @@ To publish the public key of a committee, run
 pnpm run hardhat --network [network] committee:publish --e3-id [e3-id] --nodes [node address],[node address] --public-key [publickey] --proof [hex-encoded pk proof]
 ```
 
+`publishCommittee` is permissionless. Any eligible caller with a valid C5 proof
+can submit the committee public key.
+
 To activate an E3, run
 
 ```sh

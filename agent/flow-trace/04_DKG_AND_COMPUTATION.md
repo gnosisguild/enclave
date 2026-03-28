@@ -448,21 +448,24 @@ ThresholdKeyshare receives AllThresholdSharesCollected
        pk_share,        // public key share
        signed_proof     // ZK proof of correct generation
      }
-     → Broadcast to aggregator via P2P
+    → Broadcast to finalized committee aggregation candidates via P2P
 ```
 
 ---
 
-## Phase 2: Public Key Aggregation (Aggregator Only, with C5 Proof)
+## Phase 2: Public Key Aggregation (Eligible Finalized Committee Members, with C5 Proof)
 
 ```
-PublicKeyAggregator (AGGREGATOR) collects KeyshareCreated events
+  PublicKeyAggregator starts on each selected node and collects KeyshareCreated events
 │
 ├─ KeyshareCreatedFilterBuffer gates events:
 │   └─ Only forwards KeyshareCreated from verified committee members
 │   └─ Buffers until CommitteeFinalized is known
 │
-├─ When threshold_n keyshares collected:
+  ├─ When CommitteeFinalized resolves this node into the finalized fallback chain:
+  │   └─ State becomes Eligible(rank)
+  │
+  ├─ When threshold_n keyshares collected on an eligible node:
 │   │
 │   ├─ 1. Aggregate public key shares:
 │   │     aggregate_pk = Fhe::get_aggregate_public_key(
@@ -497,22 +500,21 @@ PublicKeyAggregator (AGGREGATOR) collects KeyshareCreated events
 │         e3_id, aggregate_pk, pk_hash, node_list
 │       }
 │
-└─ CiphernodeRegistrySolWriter (AGGREGATOR) receives PublicKeyAggregated:
-    └─ Calls contract.publishCommittee(e3_id, nodes, publicKey, pkHash)
+└─ CiphernodeRegistrySolWriter on each eligible node receives PublicKeyAggregated:
+  ├─ Checks finalized committee rank via Sortition
+  ├─ Reads on-chain committee stage / pk hash to avoid duplicate submission
+  ├─ Waits rank-based delay (rank 0 first, later ranks staggered)
+  └─ Calls contract.publishCommittee(e3_id, nodes, publicKey, pkHash)
         │
         │  ┌─── ON-CHAIN (CiphernodeRegistryOwnable) ──────────┐
         │  │                                                     │
         │  │  publishCommittee(e3Id, nodes, pk, pkHash) {        │
-        │  │    ⚠️ **onlyOwner** — this is centralized!          │
-        │  │    (acknowledged in contract with a TODO/SECURITY   │
-        │  │     comment; the owner can publish any key)         │
-        │  │                                                     │
         │  │    1. require(initialized && finalized)             │
         │  │    2. require(publicKeyHashes[e3Id] == 0)           │
         │  │       → Can only publish once                       │
-        │  │    3. require(nodes.length == committee.length)     │
-        │  │    4. publicKeyHashes[e3Id] = pkHash                │
-        │  │    5. enclave.onCommitteePublished(e3Id, pkHash)    │
+    │  │    3. verify C5 proof / committee metadata          │
+    │  │    4. publicKeyHashes[e3Id] = pkHash                │
+    │  │    5. enclave.onCommitteePublished(e3Id, pkHash)    │
         │  │       │                                             │
         │  │       │  ┌─ Enclave.sol ────────────────────────┐  │
         │  │       │  │  onCommitteePublished(e3Id, pkHash) {│  │
@@ -625,17 +627,22 @@ EnclaveSolReader decodes CiphertextOutputPublished event
     │     signed_proof: SignedProofPayload(C6),
     │     node: address
     │   }
-    │   → Broadcast via P2P to aggregator
+    │   → Broadcast via P2P to finalized committee aggregation candidates
     │
     └─ State: Decrypting → Completed
 ```
 
 ---
 
-## Phase 5: Plaintext Aggregation (Aggregator Only, with C6 Verification & C7 Proof)
+    ## Phase 5: Plaintext Aggregation (Eligible Finalized Committee Members, with C6 Verification & C7 Proof)
 
 ```
-ThresholdPlaintextAggregator receives DecryptionshareCreated events
+    ThresholdPlaintextAggregator runs on nodes inside the finalized fallback chain
+    │
+    ├─ On startup / CommitteeFinalized:
+    │   └─ Resolves whether this node is eligible to aggregate plaintext for this e3_id
+    │
+    ThresholdPlaintextAggregator receives DecryptionshareCreated events
 │
 ├─ For each share:
 │   ├─ Verify sender is in committee:
@@ -643,7 +650,7 @@ ThresholdPlaintextAggregator receives DecryptionshareCreated events
 │   ├─ If verified: add_share(party_id, decryption_share)
 │   └─ If not: ignore
 │
-├─ C6 VERIFICATION (per-share, on aggregator):
+    ├─ C6 VERIFICATION (per-share, on eligible aggregation node):
 │   ShareVerificationActor receives C6 signed proofs
 │   ├─ ECDSA recovery + ZK verification (same 2-phase as C2/C3)
 │   ├─ On failure: SignedProofFailed → accusation pipeline
@@ -692,8 +699,11 @@ ThresholdPlaintextAggregator receives DecryptionshareCreated events
 │   │
 │   └─ Publish PlaintextAggregated { e3_id, decrypted_output }
 │
-└─ EnclaveSolWriter (AGGREGATOR) receives PlaintextAggregated:
-    └─ Calls contract.publishPlaintextOutput(e3Id, output, proof)
+└─ EnclaveSolWriter on each eligible node receives PlaintextAggregated:
+  ├─ Checks finalized committee rank via Sortition
+  ├─ Reads on-chain E3 stage before submitting
+  ├─ Waits rank-based delay (rank 0 first, later ranks staggered)
+  └─ Calls contract.publishPlaintextOutput(e3Id, output, proof)
         │
         │  ┌─── ON-CHAIN (Enclave.sol) ─────────────────────────┐
         │  │                                                     │

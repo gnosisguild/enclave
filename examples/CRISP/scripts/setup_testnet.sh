@@ -35,7 +35,6 @@ if [ ! -f .env ]; then
 fi
 source .env 
 
-enclave wallet set --name ag --private-key "$PRIVATE_KEY_AG"
 enclave wallet set --name cn1 --private-key "$PRIVATE_KEY_CN1"
 enclave wallet set --name cn2 --private-key "$PRIVATE_KEY_CN2"
 enclave wallet set --name cn3 --private-key "$PRIVATE_KEY_CN3"
@@ -55,7 +54,7 @@ CN5=$(yq -r '.nodes.cn5.address' ./enclave.config.yaml)
 
 echo "Minting tokens" 
 
-# The aggregator is supposed to be the contract owner for testing
+# The deployer key is still used for admin-only testnet setup calls
 export PRIVATE_KEY="$PRIVATE_KEY_AG"
 
 pnpm ciphernode:mint:tokens --ciphernode-address "$CN1" --network "sepolia"
@@ -79,7 +78,7 @@ pnpm ciphernode:add:self --network "sepolia"
 
 echo "CIPHERNODES HAVE BEEN ADDED."
 
-# Reset the private key to the aggregator for further operations (owner of contracts)
+# Reset the private key to the deployer/admin account for follow-up operations
 export PRIVATE_KEY="$PRIVATE_KEY_AG"
 
 # wait
