@@ -401,6 +401,20 @@ pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
     fs::write(format!("tests/{file_name}"), bytes).unwrap();
 }
 
+/// Compute placeholder scores for a committee.
+/// Uses ticket_id=0 for each address with the given e3_id and seed.
+fn compute_committee_scores(committee: &[String], e3_id: &E3id, seed: Seed) -> Vec<String> {
+    use e3_sortition::hash_to_score;
+    committee
+        .iter()
+        .map(|addr| {
+            let address: Address = addr.parse().unwrap();
+            let score = hash_to_score(address, 0, e3_id.clone(), seed);
+            U256::from_be_slice(&score.to_bytes_be()).to_string()
+        })
+        .collect()
+}
+
 /// Determines the committee for a given E3 request using deterministic sortition.
 ///
 /// This function runs the same sortition algorithm that the ciphernodes use internally,
@@ -415,7 +429,7 @@ pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
 /// * `collector_addr` - Address of the collector node (for validation)
 ///
 /// # Returns
-/// A tuple of (committee_addresses, buffer_addresses)
+/// A tuple of (committee_addresses, committee_scores, buffer_addresses)
 fn determine_committee(
     e3_id: &E3id,
     seed: Seed,
@@ -423,7 +437,7 @@ fn determine_committee(
     threshold_n: usize,
     registered_addrs: &[String],
     collector_addr: &str,
-) -> Result<(Vec<String>, Vec<String>)> {
+) -> Result<(Vec<String>, Vec<String>, Vec<String>)> {
     let buffer = calculate_buffer_size(threshold_m, threshold_n);
     let total_selection_size = threshold_n + buffer;
 
@@ -457,6 +471,12 @@ fn determine_committee(
         .map(|w| w.address.to_string())
         .collect();
 
+    let committee_scores: Vec<String> = winners
+        .iter()
+        .take(threshold_n)
+        .map(|w| U256::from_be_slice(&w.score.to_bytes_be()).to_string())
+        .collect();
+
     let buffer_nodes: Vec<String> = winners
         .iter()
         .skip(threshold_n)
@@ -476,7 +496,7 @@ fn determine_committee(
         }
     }
 
-    Ok((committee, buffer_nodes))
+    Ok((committee, committee_scores, buffer_nodes))
 }
 
 async fn setup_score_sortition_environment(
@@ -736,7 +756,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     sleep(Duration::from_millis(500)).await;
 
-    let (committee, buffer_nodes) = determine_committee(
+    let (committee, committee_scores, buffer_nodes) = determine_committee(
         &e3_id,
         seed,
         threshold_m,
@@ -756,6 +776,7 @@ async fn test_trbfv_actor() -> Result<()> {
     bus.publish_without_context(CommitteeFinalized {
         e3_id: e3_id.clone(),
         committee: committee.clone(),
+        scores: committee_scores,
         chain_id,
     })?;
 
@@ -1252,6 +1273,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         bus.publish_without_context(CommitteeFinalized {
             e3_id: e3_id.clone(),
             committee: eth_addrs.clone(),
+            scores: compute_committee_scores(&eth_addrs, &e3_id, seed.clone()),
             chain_id: 1,
         })?;
 
@@ -1499,6 +1521,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     bus.publish_without_context(CommitteeFinalized {
         e3_id: E3id::new("1234", 1),
         committee: eth_addrs.clone(),
+        scores: compute_committee_scores(&eth_addrs, &E3id::new("1234", 1), seed.clone()),
         chain_id: 1,
     })?;
 
@@ -1537,6 +1560,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     bus.publish_without_context(CommitteeFinalized {
         e3_id: E3id::new("1234", 2),
         committee: eth_addrs.clone(),
+        scores: compute_committee_scores(&eth_addrs, &E3id::new("1234", 2), seed.clone()),
         chain_id: 2,
     })?;
 
