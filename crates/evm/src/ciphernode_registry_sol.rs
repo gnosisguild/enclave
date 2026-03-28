@@ -117,7 +117,7 @@ struct CommitteeFinalizedWithChainId(pub ICiphernodeRegistry::CommitteeFinalized
 
 impl From<CommitteeFinalizedWithChainId> for CommitteeFinalized {
     fn from(value: CommitteeFinalizedWithChainId) -> Self {
-        e3_events::CommitteeFinalized {
+        let mut result = e3_events::CommitteeFinalized {
             e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
             committee: value
                 .0
@@ -125,8 +125,11 @@ impl From<CommitteeFinalizedWithChainId> for CommitteeFinalized {
                 .iter()
                 .map(|addr| addr.to_string())
                 .collect(),
+            scores: value.0.scores.iter().map(|s| s.to_string()).collect(),
             chain_id: value.1,
-        }
+        };
+        result.sort_by_score();
+        result
     }
 }
 

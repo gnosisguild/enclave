@@ -84,7 +84,12 @@ interface ICiphernodeRegistry {
     /// @notice This event MUST be emitted when a committee is finalized
     /// @param e3Id ID of the E3 computation
     /// @param committee Array of selected ciphernode addresses
-    event CommitteeFinalized(uint256 indexed e3Id, address[] committee);
+    /// @param scores Array of sortition scores corresponding to each committee member
+    event CommitteeFinalized(
+        uint256 indexed e3Id,
+        address[] committee,
+        uint256[] scores
+    );
 
     /// @notice This event MUST be emitted when committee formation fails (threshold not met)
     /// @param e3Id ID of the E3 computation

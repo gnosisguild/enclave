@@ -292,7 +292,7 @@ CiphernodeRegistrySolWriter receives CommitteeFinalizeRequested
     │  │       │  │  }                                       │  │
     │  │       │  └──────────────────────────────────────────┘  │
     │  │                                                         │
-    │  │    6. Emit CommitteeFinalized(e3Id, committee)          │
+    │  │    6. Emit CommitteeFinalized(e3Id, committee, scores) │
     │  │  }                                                      │
     │  └─────────────────────────────────────────────────────────┘
 ```
@@ -303,7 +303,7 @@ CiphernodeRegistrySolWriter receives CommitteeFinalizeRequested
 CiphernodeRegistrySolReader decodes CommitteeFinalized event
 │
 ├─ Publishes EnclaveEvent::CommitteeFinalized {
-│     e3_id, committee: [addr1, addr2, ..., addrN], chain_id
+│     e3_id, committee: [addr1, addr2, ..., addrN], scores: [s1, s2, ..., sN], chain_id
 │   }
 │
 ├─ Sortition actor:
