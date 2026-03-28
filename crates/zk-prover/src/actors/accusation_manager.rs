@@ -35,12 +35,12 @@ use alloy::signers::local::PrivateKeySigner;
 use alloy::signers::SignerSync;
 use alloy::sol_types::SolValue;
 use e3_events::{
-    AccusationOutcome, AccusationQuorumReached, AccusationVote, BusHandle, ComputeRequest,
-    ComputeRequestError, ComputeResponse, ComputeResponseKind, CorrelationId, E3id, EnclaveEvent,
-    EnclaveEventData, EventContext, EventPublisher, EventSubscriber, EventType,
-    PartyProofsToVerify, ProofFailureAccusation, ProofType, ProofVerificationFailed,
-    ProofVerificationPassed, Sequenced, SignedProofPayload, SlashExecuted, TypedEvent,
-    VerifyShareProofsRequest, ZkRequest, ZkResponse,
+    AccusationOutcome, AccusationQuorumReached, AccusationVote, BusHandle,
+    CommitmentConsistencyViolation, ComputeRequest, ComputeRequestError, ComputeResponse,
+    ComputeResponseKind, CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EventContext,
+    EventPublisher, EventSubscriber, EventType, PartyProofsToVerify, ProofFailureAccusation,
+    ProofType, ProofVerificationFailed, ProofVerificationPassed, Sequenced, SignedProofPayload,
+    SlashExecuted, TypedEvent, VerifyShareProofsRequest, ZkRequest, ZkResponse,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
@@ -174,6 +174,10 @@ impl AccusationManager {
         bus.subscribe(EventType::ComputeResponse, addr.clone().into());
         bus.subscribe(EventType::ComputeRequestError, addr.clone().into());
         bus.subscribe(EventType::SlashExecuted, addr.clone().into());
+        bus.subscribe(
+            EventType::CommitmentConsistencyViolation,
+            addr.clone().into(),
+        );
         addr
     }
 
@@ -309,8 +313,8 @@ impl AccusationManager {
 
     /// Called when the local node detects a proof failure.
     ///
-    /// Creates and broadcasts a `ProofFailureAccusation`, casts own vote,
-    /// and begins vote collection with a timeout.
+    /// Resolves the accused address, caches the failure, extracts C3a/C3b
+    /// forwarding payload, then delegates to [`initiate_accusation`].
     fn on_local_proof_failure(
         &mut self,
         event: ProofVerificationFailed,
@@ -335,25 +339,14 @@ impl AccusationManager {
             event.accused_address
         };
 
-        let key = (accused_address, event.proof_type);
-
         // Cache the failed verification result
         self.received_data.insert(
-            key,
+            (accused_address, event.proof_type),
             ReceivedProofData {
                 data_hash: event.data_hash,
                 verification_passed: false,
             },
         );
-
-        // Dedup: don't create multiple accusations for the same (accused, proof_type)
-        if !self.accused_proofs.insert(key) {
-            info!(
-                "Already accused {:?} for {:?} — skipping duplicate",
-                accused_address, event.proof_type
-            );
-            return;
-        }
 
         // For C3a/C3b, include the signed payload so other nodes can re-verify
         let forwarded_payload = match event.proof_type {
@@ -363,14 +356,83 @@ impl AccusationManager {
             _ => None,
         };
 
+        self.initiate_accusation(
+            accused_address,
+            event.accused_party_id,
+            event.proof_type,
+            event.data_hash,
+            forwarded_payload,
+            ec,
+            ctx,
+        );
+    }
+
+    /// Called when the `CommitmentConsistencyChecker` detects a cross-circuit
+    /// commitment mismatch for a party.
+    ///
+    /// Caches the failure and delegates to `initiate_accusation` — the same
+    /// quorum protocol as ZK proof failures.
+    fn on_consistency_violation(
+        &mut self,
+        data: CommitmentConsistencyViolation,
+        ec: &EventContext<Sequenced>,
+        ctx: &mut Context<Self>,
+    ) {
+        // Cache as a failed verification for voting on future accusations
+        self.received_data.insert(
+            (data.accused_address, data.proof_type),
+            ReceivedProofData {
+                data_hash: data.data_hash,
+                verification_passed: false,
+            },
+        );
+
+        self.initiate_accusation(
+            data.accused_address,
+            data.accused_party_id,
+            data.proof_type,
+            data.data_hash,
+            None, // No forwarding needed — violations are detected from public signals all nodes have
+            ec,
+            ctx,
+        );
+    }
+
+    /// Shared accusation creation and broadcast logic.
+    ///
+    /// Called by [`on_local_proof_failure`] (ZK verification failure) and
+    /// [`on_consistency_violation`] (commitment consistency mismatch).
+    /// Deduplicates, creates and signs a [`ProofFailureAccusation`], casts
+    /// the node's own vote, and begins vote collection with a timeout.
+    fn initiate_accusation(
+        &mut self,
+        accused_address: Address,
+        accused_party_id: u64,
+        proof_type: ProofType,
+        data_hash: [u8; 32],
+        forwarded_payload: Option<SignedProofPayload>,
+        ec: &EventContext<Sequenced>,
+        ctx: &mut Context<Self>,
+    ) {
+        let key = (accused_address, proof_type);
+
+        // Dedup: don't create multiple accusations for the same (accused, proof_type)
+        if !self.accused_proofs.insert(key) {
+            info!(
+                "Already accused {:?} for {:?} — skipping duplicate",
+                accused_address, proof_type
+            );
+            return;
+        }
+
         // Create the accusation
         let mut accusation = ProofFailureAccusation {
             e3_id: self.e3_id.clone(),
             accuser: self.my_address,
             accused: accused_address,
-            accused_party_id: event.accused_party_id,
-            proof_type: event.proof_type,
-            data_hash: event.data_hash,
+            accused_party_id,
+            proof_type,
+            data_hash,
             signed_payload: forwarded_payload,
             signature: Vec::new(),
         };
@@ -379,8 +441,8 @@ impl AccusationManager {
         let accusation_id = Self::accusation_id(&accusation);
 
         info!(
-            "Broadcasting accusation against {} for {:?} proof failure",
-            accused_address, event.proof_type
+            "Broadcasting accusation against {} for {:?} failure",
+            accused_address, proof_type
         );
 
         // Broadcast accusation via gossip
@@ -395,7 +457,7 @@ impl AccusationManager {
             accusation_id,
             voter: self.my_address,
             agrees: true,
-            data_hash: event.data_hash,
+            data_hash,
             signature: Vec::new(),
         };
         own_vote.signature = self.sign_vote_digest(&own_vote);
@@ -1115,6 +1177,9 @@ impl Handler<EnclaveEvent> for AccusationManager {
             EnclaveEventData::SlashExecuted(data) => {
                 self.on_slash_executed(data);
             }
+            EnclaveEventData::CommitmentConsistencyViolation(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             _ => (),
         }
     }
@@ -1196,5 +1261,18 @@ impl Handler<TypedEvent<ComputeRequestError>> for AccusationManager {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         self.handle_reverification_error(msg);
+    }
+}
+
+impl Handler<TypedEvent<CommitmentConsistencyViolation>> for AccusationManager {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CommitmentConsistencyViolation>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let (data, ec) = msg.into_components();
+        self.on_consistency_violation(data, &ec, ctx);
     }
 }
