@@ -143,7 +143,9 @@ impl NodeProofAggregator {
         state.last_ec = ec;
 
         let buffered = state.buffer.len();
-        let folded = state.total_expected - state.remaining - buffered;
+        let folded = state
+            .total_expected
+            .saturating_sub(state.remaining.saturating_add(buffered));
         info!(
             "NodeProofAggregator: buffered seq={} for E3 {} (buffered={}, folded={}, remaining={})",
             msg.seq, e3_id, buffered, folded, state.remaining
