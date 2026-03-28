@@ -795,8 +795,10 @@ async fn test_trbfv_actor() -> Result<()> {
     let shares_to_pubkey_agg_timer = Instant::now();
     const KS3: [&str; 3] = ["KeyshareCreated"; 3];
     const DKG3: [&str; 3] = ["DKGRecursiveAggregationComplete"; 3];
-    const C1_C5: [&str; 11] = [
+    const C1_C5: [&str; 13] = [
         "ShareVerificationDispatched",
+        "CommitmentConsistencyCheckRequested",
+        "CommitmentConsistencyCheckComplete",
         "ComputeRequest",
         "ComputeResponse",
         "ProofVerificationPassed",
@@ -907,6 +909,8 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 CiphertextOutputPublished (from shared bus)
     // - 3 DecryptionshareCreated (from simulate_libp2p, passes is_forwardable_event)
     // - 1 ShareVerificationDispatched (C6 verification dispatched by ThresholdPlaintextAggregator)
+    // - 1 CommitmentConsistencyCheckRequested (pre-ZK consistency check)
+    // - 1 CommitmentConsistencyCheckComplete (consistency check result)
     // - 1 ComputeRequest (C6 ZK verification)
     // - 1 ComputeResponse (C6 ZK verification result)
     // - 9 ProofVerificationPassed (3 parties × 3 C6 proofs per ciphertext)
@@ -931,7 +935,19 @@ async fn test_trbfv_actor() -> Result<()> {
     };
     // Sum matches the comment above through AggregationProofSigned, then fold, then PlaintextAggregated.
     // E3RequestComplete is not included (arrives after; not needed for take).
-    let expected_count = 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + c6_fold_events + 1;
+    let expected_count = 1 // CiphertextOutputPublished
+        + 3               // DecryptionshareCreated
+        + 1               // ShareVerificationDispatched
+        + 2               // CommitmentConsistencyCheck (Requested + Complete)
+        + 2               // C6 ZK verification (ComputeRequest + ComputeResponse)
+        + 9               // ProofVerificationPassed (3 parties × 3 proofs)
+        + 1               // ShareVerificationComplete
+        + 2               // TrBFV computation (ComputeRequest + ComputeResponse)
+        + 1               // AggregationProofPending
+        + 2               // C7 proof (ComputeRequest + ComputeResponse)
+        + 1               // AggregationProofSigned
+        + c6_fold_events  // C6 fold steps
+        + 1; // PlaintextAggregated
 
     let h = nodes
         .take_history_with_timeouts(

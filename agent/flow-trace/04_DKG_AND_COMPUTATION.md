@@ -308,16 +308,34 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │   └─ Emit SignedProofFailed { accused, proof_type }
 │   │   │      → Triggers accusation pipeline (see Part 5)
 │   │   │
-│   │   └─ If ECDSA passes: cache recovered address, proceed to ZK
+│   │   └─ If ECDSA passes: cache recovered address, proceed
 │   │
-│   └─ Store PendingVerification {
-│        ecdsa_dishonest, pre_dishonest, dispatched_party_ids, recovered_addresses
+│   └─ Store PendingConsistencyCheck {
+│        ecdsa_dishonest, pre_dishonest, dispatched_party_ids,
+│        recovered_addresses, party_proofs (for ZK dispatch)
 │      }
 │
-├─ PHASE 2: Heavy ZK Verification (dispatched to multithread):
+├─ PHASE 2: Commitment Consistency Check (dispatched to per-E3 checker):
+│   │
+│   ├─ Publishes CommitmentConsistencyCheckRequested {
+│   │     correlation_id, kind, party_proofs: [(party_id, address, proofs)]
+│   │   }
+│   │
+│   ├─ CommitmentConsistencyChecker (per-E3 actor) receives this:
+│   │   ├─ Caches each party's (address, proof_type) → {public_signals, data_hash}
+│   │   ├─ Evaluates all registered CommitmentLinks (e.g. C1→C5 pk_commitment)
+│   │   ├─ On mismatch: publishes CommitmentConsistencyViolation
+│   │   │   → AccusationManager initiates accusation quorum (see Part 5)
+│   │   └─ Responds with CommitmentConsistencyCheckComplete { inconsistent_parties }
+│   │
+│   └─ On CommitmentConsistencyCheckComplete:
+│       ├─ Merge inconsistent_parties into dishonest set
+│       └─ Proceed to Phase 3 with remaining honest parties
+│
+├─ PHASE 3: Heavy ZK Verification (dispatched to multithread):
 │   │
 │   ├─ Publishes ComputeRequest::zk(VerifyShareProofsRequest {
-│   │     party_proofs, // all ECDSA-passing parties' ZK proof data
+│   │     party_proofs, // consistency-passing parties' ZK proof data
 │   │   })
 │   │
 │   ├─ ZkActor verifies each proof via: bb verify -k vk -p proof
@@ -331,7 +349,7 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │       │
 │       └─ Publish ShareVerificationComplete {
 │            kind: ShareProofs,
-│            dishonest_parties: {pre_dishonest ∪ ecdsa_fails ∪ zk_fails}
+│            dishonest_parties: {pre_dishonest ∪ ecdsa_fails ∪ consistency_fails ∪ zk_fails}
 │          }
 │
 └─ ThresholdKeyshare receives ShareVerificationComplete:
