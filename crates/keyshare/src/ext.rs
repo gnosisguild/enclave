@@ -53,6 +53,11 @@ impl E3Extension for ThresholdKeyshareExtension {
             return;
         };
 
+        // Don't start twice — a hydrated instance already exists after restart
+        if ctx.get_event_recipient("threshold_keyshare").is_some() {
+            return;
+        }
+
         let e3_id = data.clone().e3_id;
         let party_id = data.clone().party_id;
         let Some(meta) = ctx.get_dependency(META_KEY) else {
