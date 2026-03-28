@@ -137,7 +137,7 @@ export class EnclaveSDK {
     committeeSize: number
     inputWindow: [bigint, bigint]
     e3Program: `0x${string}`
-    e3ProgramParams: `0x${string}`
+    paramSet: number
     computeProviderParams: `0x${string}`
     customParams?: `0x${string}`
     proofAggregationEnabled?: boolean

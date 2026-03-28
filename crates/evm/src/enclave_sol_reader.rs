@@ -12,7 +12,7 @@ use alloy::{sol, sol_types::SolEvent};
 use e3_events::E3id;
 use e3_events::EnclaveEventData;
 use e3_events::{E3Failed, E3Stage, E3StageChanged, FailureReason};
-use e3_fhe_params::decode_bfv_params_arc;
+use e3_fhe_params::{encode_bfv_params, BfvParamSet, BfvPreset};
 use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::ArcBytes;
 use e3_zk_helpers::CiphernodesCommitteeSize;
@@ -29,8 +29,6 @@ struct E3RequestedWithChainId(pub IEnclave::E3Requested, pub u64);
 
 impl E3RequestedWithChainId {
     fn try_into_e3_requested(self) -> anyhow::Result<e3_events::E3Requested> {
-        let params_bytes = self.0.e3.e3ProgramParams.to_vec();
-
         // Derive threshold values from committee size enum
         let committee_size = match self.0.e3.committeeSize {
             0 => CiphernodesCommitteeSize::Micro,
@@ -43,7 +41,16 @@ impl E3RequestedWithChainId {
         let threshold_m = committee.threshold;
         let threshold_n = committee.n;
 
-        let params_arc = decode_bfv_params_arc(&params_bytes).expect("Failed to decode BFV params");
+        // Map on-chain ParamSet enum to BfvPreset
+        let param_set_value: u8 = self.0.e3.paramSet.try_into().map_err(|_| {
+            anyhow::anyhow!("ParamSet enum value too large: {}", self.0.e3.paramSet)
+        })?;
+        let params_preset = BfvPreset::from_on_chain_param_set(param_set_value)
+            .ok_or_else(|| anyhow::anyhow!("Unknown ParamSet enum value: {}", param_set_value))?;
+
+        // Build BFV parameters from the preset
+        let params_arc = BfvParamSet::from(params_preset).build_arc();
+        let params_bytes = encode_bfv_params(&params_arc);
 
         // TODO: These should be delivered from the e3_program contract
         // For now, using defaults that match the test configuration:
@@ -52,12 +59,7 @@ impl E3RequestedWithChainId {
         let lambda = 2;
         let esi_per_ct = 3;
 
-        let error_size = match calculate_error_size(
-            params_arc.clone(),
-            threshold_n,
-            threshold_m,
-            lambda,
-        ) {
+        let error_size = match calculate_error_size(params_arc, threshold_n, threshold_m, lambda) {
             Ok(size) => {
                 let size_bytes = size.to_bytes_be();
                 info!(
@@ -79,6 +81,7 @@ impl E3RequestedWithChainId {
         };
 
         Ok(e3_events::E3Requested {
+            params_preset,
             params: ArcBytes::from_bytes(&params_bytes),
             threshold_m,
             threshold_n,

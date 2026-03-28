@@ -27,15 +27,11 @@ use e3_sortition::Sortition;
 
 pub struct PublicKeyAggregatorExtension {
     bus: BusHandle,
-    params_preset: BfvPreset,
 }
 
 impl PublicKeyAggregatorExtension {
-    pub fn create(bus: &BusHandle, params_preset: BfvPreset) -> Box<Self> {
-        Box::new(Self {
-            bus: bus.clone(),
-            params_preset,
-        })
+    pub fn create(bus: &BusHandle) -> Box<Self> {
+        Box::new(Self { bus: bus.clone() })
     }
 }
 
@@ -66,6 +62,7 @@ impl E3Extension for PublicKeyAggregatorExtension {
             threshold_n,
             threshold_m,
             seed,
+            params_preset,
             ..
         } = data.clone();
         let repo = ctx.repositories().publickey(&e3_id);
@@ -80,7 +77,7 @@ impl E3Extension for PublicKeyAggregatorExtension {
             self.bus.clone(),
             e3_id,
             sync_state,
-            self.params_preset.clone(),
+            params_preset,
         );
 
         ctx.set_event_recipient("publickey", Some(value));
@@ -109,12 +106,16 @@ impl E3Extension for PublicKeyAggregatorExtension {
 
             return Ok(());
         };
+        let params_preset = ctx
+            .get_dependency(META_KEY)
+            .map(|meta| meta.params_preset)
+            .unwrap_or_default();
         let value = create_publickey_aggregator(
             fhe.clone(),
             self.bus.clone(),
             ctx.e3_id.clone(),
             sync_state,
-            self.params_preset.clone(),
+            params_preset,
         );
 
         // send to context
@@ -151,19 +152,13 @@ fn create_publickey_aggregator(
 pub struct ThresholdPlaintextAggregatorExtension {
     bus: BusHandle,
     sortition: Addr<Sortition>,
-    params_preset: BfvPreset,
 }
 
 impl ThresholdPlaintextAggregatorExtension {
-    pub fn create(
-        bus: &BusHandle,
-        sortition: &Addr<Sortition>,
-        params_preset: BfvPreset,
-    ) -> Box<Self> {
+    pub fn create(bus: &BusHandle, sortition: &Addr<Sortition>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
-            params_preset,
         })
     }
 }
@@ -213,7 +208,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                             bus: self.bus.clone(),
                             sortition: self.sortition.clone(),
                             e3_id: e3_id.clone(),
-                            params_preset: self.params_preset.clone(),
+                            params_preset: meta.params_preset,
                         },
                         sync_state,
                     )
@@ -239,12 +234,16 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
             return Ok(());
         };
 
+        let params_preset = ctx
+            .get_dependency(META_KEY)
+            .map(|meta| meta.params_preset)
+            .unwrap_or_default();
         let value = ThresholdPlaintextAggregator::new(
             ThresholdPlaintextAggregatorParams {
                 bus: self.bus.clone(),
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
-                params_preset: self.params_preset.clone(),
+                params_preset,
             },
             sync_state,
         )

@@ -6,6 +6,7 @@
 
 use crate::{E3id, Seed};
 use actix::Message;
+use e3_fhe_params::BfvPreset;
 use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
@@ -19,6 +20,7 @@ pub struct CiphernodeSelected {
     pub seed: Seed,
     pub error_size: ArcBytes,
     pub esi_per_ct: usize,
+    pub params_preset: BfvPreset,
     pub params: ArcBytes,
     pub party_id: u64,
 }
@@ -29,6 +31,7 @@ impl Default for CiphernodeSelected {
             e3_id: E3id::new("0", 0),
             error_size: ArcBytes::from_bytes(&[]),
             esi_per_ct: 0,
+            params_preset: BfvPreset::InsecureThreshold512,
             params: ArcBytes::from_bytes(&[]),
             party_id: 0,
             seed: Seed([0u8; 32]),

@@ -21,7 +21,7 @@ import { IEnclave } from "./IEnclave.sol";
  * @param inputWindow When to start and stop accepting inputs from data providers
  * @param encryptionSchemeId Identifier for the encryption scheme used in this computation
  * @param e3Program Address of the E3 Program contract that validates and verifies the computation
- * @param e3ProgramParams ABI encoded computation parameters specific to the E3 program
+ * @param paramSet BFV encryption parameter set used for this computation
  * @param customParams Arbitrary ABI-encoded application-defined parameters.
  * @param decryptionVerifier Address of the output verifier contract for decryption verification
  * @param committeePublicKey Hash of the public key of the selected committee for this computation
@@ -36,7 +36,7 @@ struct E3 {
     uint256[2] inputWindow;
     bytes32 encryptionSchemeId;
     IE3Program e3Program;
-    bytes e3ProgramParams;
+    IEnclave.ParamSet paramSet;
     bytes customParams;
     IDecryptionVerifier decryptionVerifier;
     IPkVerifier pkVerifier;

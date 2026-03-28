@@ -6,6 +6,7 @@
 
 use crate::{E3id, Seed};
 use actix::Message;
+use e3_fhe_params::BfvPreset;
 use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
@@ -26,7 +27,11 @@ pub struct E3Requested {
     pub error_size: ArcBytes,
     /// The number of smudging noise per ciphertext.
     pub esi_per_ct: usize,
-    /// The FHE parameters
+    /// The threshold BFV preset selected on-chain. The DKG counterpart is
+    /// derived automatically via `BfvPreset::dkg_counterpart()`.
+    pub params_preset: BfvPreset,
+    /// ABI-encoded BFV parameters (derived from `params_preset`).
+    /// Kept for downstream code that needs the raw bytes (e.g. `TrBFVConfig`).
     pub params: ArcBytes,
     /// When true, ciphernodes generate wrapper/fold proofs for DKG proof
     /// aggregation (public verifiability). When false, wrapper/fold proofs
@@ -45,6 +50,7 @@ impl Default for E3Requested {
             e3_id: E3id::new("99", 0),
             error_size: ArcBytes::from_bytes(&[]),
             esi_per_ct: 0,
+            params_preset: BfvPreset::InsecureThreshold512,
             params: ArcBytes::from_bytes(&[]),
             seed: Seed([0u8; 32]),
             threshold_m: 0,
