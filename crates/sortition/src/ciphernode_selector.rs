@@ -12,13 +12,13 @@ use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::E3RequestComplete;
 use e3_events::TypedEvent;
 use e3_events::{
-    prelude::*, trap, BusHandle, CiphernodeSelected, CommitteeFinalized, E3Requested, E3id, EType,
+    prelude::*, trap, AggregatorSelected, BusHandle, CiphernodeSelected, E3Requested, E3id, EType,
     EnclaveEvent, EnclaveEventData, EventType, Shutdown, TicketGenerated, TicketId,
 };
 use e3_request::E3Meta;
 use e3_utils::NotifySync;
 use e3_utils::MAILBOX_LIMIT;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tracing::info;
 
 /// Build an `E3Meta` from an `E3Requested` event's fields.
@@ -40,6 +40,7 @@ pub struct CiphernodeSelector {
     bus: BusHandle,
     address: String,
     e3_cache: Persistable<HashMap<E3id, E3Meta>>,
+    selected_e3s: HashSet<E3id>,
 }
 
 impl Actor for CiphernodeSelector {
@@ -59,6 +60,7 @@ impl CiphernodeSelector {
             bus: bus.clone(),
             e3_cache,
             address: address.to_owned(),
+            selected_e3s: HashSet::new(),
         }
     }
 
@@ -72,7 +74,7 @@ impl CiphernodeSelector {
 
         bus.subscribe(EventType::E3Requested, addr.clone().recipient());
         bus.subscribe(EventType::E3RequestComplete, addr.clone().recipient());
-        bus.subscribe(EventType::CommitteeFinalized, addr.clone().recipient());
+        bus.subscribe(EventType::AggregatorSelected, addr.clone().recipient());
         bus.subscribe(EventType::Shutdown, addr.clone().recipient());
 
         info!("CiphernodeSelector listening!");
@@ -89,7 +91,7 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
             EnclaveEventData::E3RequestComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::CommitteeFinalized(data) => {
+            EnclaveEventData::AggregatorSelected(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
@@ -103,7 +105,7 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
 /// This handler populates `e3_cache` during sync replay, when `Sortition` gates its
 /// `E3Requested` subscription behind `EffectsEnabled` and therefore does NOT forward
 /// `WithSortitionTicket` messages to us. Without this handler the cache would be empty
-/// when `CommitteeFinalized` arrives during replay, causing a missing-meta error.
+/// when `AggregatorSelected` arrives during replay, causing a missing-meta error.
 ///
 /// During live operation both this handler AND the `WithSortitionTicket` handler fire for
 /// the same E3. `or_insert` ensures the first write wins; the `WithSortitionTicket`
@@ -180,18 +182,22 @@ impl Handler<TypedEvent<E3RequestComplete>> for CiphernodeSelector {
                 self.e3_cache.try_mutate(msg.get_ctx(), |mut cache| {
                     cache.remove(&msg.e3_id);
                     Ok(cache)
-                })
+                })?;
+
+                self.selected_e3s.remove(&msg.e3_id);
+
+                Ok(())
             },
         )
     }
 }
 
-impl Handler<TypedEvent<CommitteeFinalized>> for CiphernodeSelector {
+impl Handler<TypedEvent<AggregatorSelected>> for CiphernodeSelector {
     type Result = ();
 
     fn handle(
         &mut self,
-        msg: TypedEvent<CommitteeFinalized>,
+        msg: TypedEvent<AggregatorSelected>,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         trap(
@@ -199,14 +205,17 @@ impl Handler<TypedEvent<CommitteeFinalized>> for CiphernodeSelector {
             &self.bus.with_ec(msg.get_ctx()),
             move || {
                 let (msg, ec) = msg.into_components();
-                info!("CiphernodeSelector received CommitteeFinalized.");
+                info!("CiphernodeSelector received AggregatorSelected.");
                 let bus = self.bus.clone();
-                info!("Getting e3_cache...");
+
+                if self.selected_e3s.contains(&msg.e3_id) {
+                    return Ok(());
+                }
+
                 let Some(e3_cache) = self.e3_cache.get() else {
                     bail!("Could not get cache");
                 };
 
-                info!("Getting e3_meta...");
                 let Some(e3_meta) = e3_cache.get(&msg.e3_id) else {
                     bail!(
                         "Could not find E3Meta on CiphernodeSelector for {}",
@@ -230,16 +239,19 @@ impl Handler<TypedEvent<CommitteeFinalized>> for CiphernodeSelector {
                     return Ok(());
                 };
 
+                self.selected_e3s.insert(msg.e3_id.clone());
+
                 info!(
                     node = self.address,
                     party_id = party_id,
                     "Node is in finalized committee, emitting CiphernodeSelected"
                 );
-                if party_id == 0 {
+                if msg.node == self.address {
                     info!(
                         node = self.address,
                         e3_id = %msg.e3_id,
-                        "[SORTITION] Node is the finalized committee primary (party_id=0)"
+                        aggregator_party_id = msg.party_id,
+                        "[SORTITION] Node is the currently selected aggregator"
                     );
                 }
 

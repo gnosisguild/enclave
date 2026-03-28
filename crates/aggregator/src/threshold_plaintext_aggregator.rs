@@ -11,15 +11,16 @@ use actix::prelude::*;
 use anyhow::{anyhow, bail, ensure, Result};
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, trap, AggregationProofPending, AggregationProofSigned, BusHandle, ComputeRequest,
-    ComputeResponse, ComputeResponseKind, CorrelationId, DecryptedSharesAggregationProofRequest,
-    DecryptionshareCreated, Die, E3id, EType, EnclaveEvent, EnclaveEventData, EventContext,
-    PartyProofsToVerify, PlaintextAggregated, Proof, Seed, Sequenced, ShareVerificationComplete,
-    ShareVerificationDispatched, SignedProofPayload, TypedEvent, VerificationKind, ZkResponse,
+    prelude::*, trap, AggregationProofPending, AggregationProofSigned, BusHandle,
+    CommitteeMemberExpelled, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
+    DecryptedSharesAggregationProofRequest, DecryptionshareCreated, Die, E3id, EType, EnclaveEvent,
+    EnclaveEventData, EventContext, PartyProofsToVerify, PlaintextAggregated, Proof, Seed,
+    Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload,
+    TypedEvent, VerificationKind, ZkResponse,
 };
 use e3_fhe_params::BfvPreset;
 use e3_sortition::{
-    E3CommitteeContainsRequest, E3CommitteeContainsResponse, GetFinalizedCommittee, Sortition,
+    E3CommitteeContainsRequest, E3CommitteeContainsResponse, GetAggregatorSubmissionRank, Sortition,
 };
 use e3_trbfv::{
     calculate_threshold_decryption::CalculateThresholdDecryptionRequest, TrBFVConfig, TrBFVRequest,
@@ -173,7 +174,7 @@ impl ThresholdPlaintextAggregatorState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AggregationDuty {
     PendingCommittee,
-    Eligible { rank: usize },
+    CommitteeMember,
     Inactive,
 }
 
@@ -222,53 +223,75 @@ impl ThresholdPlaintextAggregator {
         }
     }
 
-    fn resolve_aggregation_duty(&mut self, committee: e3_events::Committee) {
-        self.duty = match committee.aggregation_rank_for(&self.node_address, self.threshold_m()) {
+    fn resolve_aggregation_duty(&mut self, submission_rank: Option<usize>) {
+        self.duty = match submission_rank {
             Some(rank) => {
                 info!(
                     e3_id = %self.e3_id,
                     node = %self.node_address,
                     rank = rank,
-                    "Node is in the finalized plaintext aggregation priority chain"
+                    "Node is in the active plaintext aggregation chain"
                 );
-                AggregationDuty::Eligible { rank }
+                AggregationDuty::CommitteeMember
             }
             None => {
                 info!(
                     e3_id = %self.e3_id,
                     node = %self.node_address,
-                    "Node is outside the finalized plaintext aggregation priority chain"
+                    "Node is outside the active plaintext aggregation chain"
                 );
                 AggregationDuty::Inactive
             }
         };
     }
 
-    fn threshold_m(&self) -> usize {
-        self.state
-            .get()
-            .and_then(|state| match state {
-                ThresholdPlaintextAggregatorState::Collecting(ref data) => {
-                    Some(data.threshold_m as usize)
-                }
-                ThresholdPlaintextAggregatorState::VerifyingC6(ref data) => {
-                    Some(data.threshold_m as usize)
-                }
-                ThresholdPlaintextAggregatorState::Computing(ref data) => {
-                    Some(data.threshold_m as usize)
-                }
-                ThresholdPlaintextAggregatorState::GeneratingC7Proof(ref data) => {
-                    Some(data.threshold_m as usize)
-                }
-                ThresholdPlaintextAggregatorState::Complete(_) => None,
-            })
-            .unwrap_or_default()
-    }
-
     fn flush_pending_shares(&mut self, ctx: &mut Context<Self>) {
         for event in std::mem::take(&mut self.pending_shares) {
             ctx.notify(event);
         }
+    }
+
+    fn handle_member_expelled(
+        &mut self,
+        party_id: u64,
+        node: &str,
+        ec: &EventContext<Sequenced>,
+    ) -> Result<()> {
+        self.state.try_mutate(ec, |state| {
+            Ok(match state {
+                ThresholdPlaintextAggregatorState::Collecting(mut data) => {
+                    data.shares.remove(&party_id);
+                    data.c6_proofs.remove(&party_id);
+                    data.c6_wrapped_proofs.remove(&party_id);
+                    ThresholdPlaintextAggregatorState::Collecting(data)
+                }
+                ThresholdPlaintextAggregatorState::VerifyingC6(mut data) => {
+                    data.shares.remove(&party_id);
+                    data.c6_proofs.remove(&party_id);
+                    data.c6_wrapped_proofs.remove(&party_id);
+                    ThresholdPlaintextAggregatorState::VerifyingC6(data)
+                }
+                ThresholdPlaintextAggregatorState::Computing(mut data) => {
+                    data.shares.retain(|(id, _)| *id != party_id);
+                    ThresholdPlaintextAggregatorState::Computing(data)
+                }
+                ThresholdPlaintextAggregatorState::GeneratingC7Proof(mut data) => {
+                    data.shares.retain(|(id, _)| *id != party_id);
+                    ThresholdPlaintextAggregatorState::GeneratingC7Proof(data)
+                }
+                ThresholdPlaintextAggregatorState::Complete(mut data) => {
+                    data.shares.retain(|(id, _)| *id != party_id);
+                    ThresholdPlaintextAggregatorState::Complete(data)
+                }
+            })
+        })?;
+
+        if node.eq_ignore_ascii_case(&self.node_address) {
+            self.duty = AggregationDuty::Inactive;
+            self.pending_shares.clear();
+        }
+
+        Ok(())
     }
 
     pub fn add_share(
@@ -667,26 +690,29 @@ impl Actor for ThresholdPlaintextAggregator {
 
         let sortition = self.sortition.clone();
         let e3_id = self.e3_id.clone();
+        let node_address = self.node_address.clone();
         ctx.spawn(
-            async move { sortition.send(GetFinalizedCommittee { e3_id }).await }
+            async move {
+                sortition
+                    .send(GetAggregatorSubmissionRank {
+                        e3_id,
+                        node: node_address,
+                    })
+                    .await
+            }
                 .into_actor(self)
                 .map(|result, act, ctx| match result {
-                    Ok(Some(committee)) => {
-                        act.resolve_aggregation_duty(committee);
-                        if matches!(act.duty, AggregationDuty::Eligible { .. }) {
+                    Ok(submission_rank) => {
+                        act.resolve_aggregation_duty(submission_rank);
+                        if matches!(act.duty, AggregationDuty::CommitteeMember) {
                             act.flush_pending_shares(ctx);
                         } else {
                             act.pending_shares.clear();
                             ctx.stop();
                         }
                     }
-                    Ok(None) => {
-                        warn!(e3_id = %act.e3_id, "No finalized committee available for plaintext aggregation; stopping actor");
-                        act.pending_shares.clear();
-                        ctx.stop();
-                    }
                     Err(err) => {
-                        warn!(e3_id = %act.e3_id, error = %err, "Failed to resolve finalized committee for plaintext aggregation; stopping actor");
+                        warn!(e3_id = %act.e3_id, error = %err, "Failed to resolve active plaintext aggregation rank; stopping actor");
                         act.pending_shares.clear();
                         ctx.stop();
                     }
@@ -711,6 +737,9 @@ impl Handler<EnclaveEvent> for ThresholdPlaintextAggregator {
             EnclaveEventData::AggregationProofSigned(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
+            EnclaveEventData::CommitteeMemberExpelled(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             _ => (),
         }
     }
@@ -724,7 +753,7 @@ impl Handler<TypedEvent<DecryptionshareCreated>> for ThresholdPlaintextAggregato
         ctx: &mut Self::Context,
     ) -> Self::Result {
         trap(
-            EType::PublickeyAggregation,
+            EType::PlaintextAggregation,
             &self.bus.with_ec(msg.get_ctx()),
             || {
                 let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting { .. })) =
@@ -740,7 +769,7 @@ impl Handler<TypedEvent<DecryptionshareCreated>> for ThresholdPlaintextAggregato
                         return Ok(());
                     }
                     AggregationDuty::Inactive => return Ok(()),
-                    AggregationDuty::Eligible { .. } => {}
+                    AggregationDuty::CommitteeMember => {}
                 }
 
                 let node = msg.node.clone();
@@ -763,7 +792,7 @@ impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         trap(
-            EType::PublickeyAggregation,
+            EType::PlaintextAggregation,
             &self.bus.with_ec(msg.get_ctx()),
             || {
                 let e3_id = &msg.e3_id;
@@ -849,6 +878,35 @@ impl Handler<TypedEvent<AggregationProofSigned>> for ThresholdPlaintextAggregato
             &self.bus.with_ec(msg.get_ctx()),
             || self.handle_aggregation_proof_signed(msg),
         )
+    }
+}
+
+impl Handler<TypedEvent<CommitteeMemberExpelled>> for ThresholdPlaintextAggregator {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CommitteeMemberExpelled>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
+        let Some(party_id) = msg.party_id else {
+            return;
+        };
+
+        if msg.e3_id != self.e3_id {
+            return;
+        }
+
+        trap(EType::PlaintextAggregation, &self.bus.with_ec(&ec), || {
+            self.handle_member_expelled(party_id, &msg.node.to_string(), &ec)?;
+
+            if matches!(self.duty, AggregationDuty::Inactive) {
+                ctx.stop();
+            }
+
+            Ok(())
+        })
     }
 }
 

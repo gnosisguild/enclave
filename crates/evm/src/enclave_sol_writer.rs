@@ -17,7 +17,7 @@ use alloy::{
     primitives::{Bytes, U256},
     rpc::types::TransactionReceipt,
 };
-use anyhow::{bail, Result};
+use anyhow::Result;
 use e3_events::BusHandle;
 use e3_events::EnclaveEventData;
 use e3_events::EventType;
@@ -26,10 +26,9 @@ use e3_events::{prelude::*, EffectsEnabled};
 use e3_events::{run_once, EnclaveEvent};
 use e3_events::{E3Stage, E3StageChanged};
 use e3_events::{E3id, EType, PlaintextAggregated, Proof};
-use e3_sortition::{GetFinalizedCommittee, Sortition};
+use e3_sortition::{GetAggregatorSubmissionRank, Sortition};
 use e3_utils::NotifySync;
 use e3_utils::MAILBOX_LIMIT;
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::info;
@@ -173,14 +172,8 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                 }
 
                 let my_address = provider.provider().default_signer_address().to_string();
-                let rank = match plaintext_aggregation_rank_for_e3(
-                    &sortition,
-                    provider.clone(),
-                    contract_address,
-                    &e3_id,
-                    &my_address,
-                )
-                .await
+                let rank = match aggregator_submission_rank_for_e3(&sortition, &e3_id, &my_address)
+                    .await
                 {
                     Ok(rank) => rank,
                     Err(err) => {
@@ -190,7 +183,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                 };
 
                 let Some(rank) = rank else {
-                    info!(e3_id = %e3_id, node = %my_address, "Node is outside the finalized plaintext aggregation priority chain, skipping plaintext submission");
+                    info!(e3_id = %e3_id, node = %my_address, "Node is outside the active committee aggregation chain, skipping plaintext submission");
                     return;
                 };
 
@@ -349,39 +342,17 @@ async fn should_submit_plaintext_output<P: Provider + WalletProvider + Clone>(
     Ok(stage == 4u8)
 }
 
-async fn plaintext_threshold_m<P: Provider + WalletProvider + Clone>(
-    provider: EthProvider<P>,
-    contract_address: Address,
-    e3_id: &E3id,
-) -> Result<usize> {
-    let e3_id_u256: U256 = e3_id.clone().try_into()?;
-    let contract = IEnclave::new(contract_address, provider.provider());
-    let e3 = contract.getE3(e3_id_u256).call().await?;
-    let committee = match e3.committeeSize {
-        0 => CiphernodesCommitteeSize::Micro,
-        1 => CiphernodesCommitteeSize::Small,
-        2 => CiphernodesCommitteeSize::Medium,
-        3 => CiphernodesCommitteeSize::Large,
-        _ => bail!("Unknown committee size in E3"),
-    };
-    Ok(committee.values().threshold)
-}
-
-async fn plaintext_aggregation_rank_for_e3<P: Provider + WalletProvider + Clone>(
+async fn aggregator_submission_rank_for_e3(
     sortition: &Addr<Sortition>,
-    provider: EthProvider<P>,
-    contract_address: Address,
     e3_id: &E3id,
     node_address: &str,
 ) -> Result<Option<usize>> {
-    let committee = sortition
-        .send(GetFinalizedCommittee {
+    Ok(sortition
+        .send(GetAggregatorSubmissionRank {
             e3_id: e3_id.clone(),
+            node: node_address.to_owned(),
         })
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("No finalized committee available for {}", e3_id))?;
-    let threshold_m = plaintext_threshold_m(provider, contract_address, e3_id).await?;
-    Ok(committee.aggregation_rank_for(node_address, threshold_m))
+        .await?)
 }
 
 async fn process_e3_failure<P: Provider + WalletProvider + Clone>(

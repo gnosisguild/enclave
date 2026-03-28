@@ -13,9 +13,9 @@ use e3_events::{
     DKGRecursiveAggregationComplete, Die, E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData,
     EventContext, FailureReason, KeyshareCreated, OrderedSet, PartyProofsToVerify,
     PkAggregationProofPending, PkAggregationProofRequest, PkAggregationProofSigned, Proof,
-    ProofType, ProofVerificationPassed, PublicKeyAggregated, Seed, Sequenced,
-    ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed, SignedProofPayload,
-    TypedEvent, VerificationKind, ZkResponse,
+    ProofType, PublicKeyAggregated, Seed, Sequenced, ShareVerificationComplete,
+    ShareVerificationDispatched, SignedProofFailed, SignedProofPayload, TypedEvent,
+    VerificationKind, ZkResponse,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -87,7 +87,7 @@ impl PublicKeyAggregatorState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AggregationDuty {
     PendingCommittee,
-    Eligible { rank: usize },
+    CommitteeMember { party_id: u64 },
     Inactive,
 }
 
@@ -98,7 +98,6 @@ pub struct PublicKeyAggregator {
     state: Persistable<PublicKeyAggregatorState>,
     params_preset: BfvPreset,
     node_address: String,
-    threshold_m: usize,
     duty: AggregationDuty,
     /// DKG recursive aggregation events received before entering GeneratingC5Proof.
     early_dkg_proofs: Vec<TypedEvent<DKGRecursiveAggregationComplete>>,
@@ -110,7 +109,6 @@ pub struct PublicKeyAggregatorParams {
     pub e3_id: E3id,
     pub params_preset: BfvPreset,
     pub node_address: String,
-    pub threshold_m: usize,
 }
 
 /// Aggregate PublicKey for a committee of nodes. This actor listens for KeyshareCreated events
@@ -128,7 +126,6 @@ impl PublicKeyAggregator {
             state,
             params_preset: params.params_preset,
             node_address: params.node_address,
-            threshold_m: params.threshold_m,
             duty: AggregationDuty::PendingCommittee,
             early_dkg_proofs: Vec::new(),
         }
@@ -140,28 +137,28 @@ impl PublicKeyAggregator {
         }
 
         let committee = e3_events::Committee::new(msg.committee);
-        self.duty = match committee.aggregation_rank_for(&self.node_address, self.threshold_m) {
-            Some(rank) => {
+        self.duty = match committee.party_id_for(&self.node_address) {
+            Some(party_id) => {
                 info!(
                     e3_id = %self.e3_id,
                     node = %self.node_address,
-                    rank = rank,
-                    "Node is in the finalized public-key aggregation priority chain"
+                    party_id = party_id,
+                    "Node is in the finalized public-key aggregation chain"
                 );
-                if rank == 0 {
+                if party_id == 0 {
                     info!(
                         e3_id = %self.e3_id,
                         node = %self.node_address,
                         "[AGGREGATOR] Node is the current primary public-key aggregator"
                     );
                 }
-                AggregationDuty::Eligible { rank }
+                AggregationDuty::CommitteeMember { party_id }
             }
             None => {
                 info!(
                     e3_id = %self.e3_id,
                     node = %self.node_address,
-                    "Node is outside the finalized public-key aggregation priority chain"
+                    "Node is outside the finalized public-key aggregation chain"
                 );
                 AggregationDuty::Inactive
             }
@@ -687,7 +684,7 @@ impl PublicKeyAggregator {
 
     /// Publish `PublicKeyAggregated` when both C5 and cross-node fold are complete.
     fn try_publish_complete(&mut self) -> Result<()> {
-        if !matches!(self.duty, AggregationDuty::Eligible { .. }) {
+        if !matches!(self.duty, AggregationDuty::CommitteeMember { .. }) {
             return Ok(());
         }
 
@@ -940,6 +937,10 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
                     node_addr, data.e3_id
                 );
                 trap(EType::PublickeyAggregation, &self.bus.with_ec(&ec), || {
+                    if node_addr.eq_ignore_ascii_case(&self.node_address) {
+                        self.duty = AggregationDuty::Inactive;
+                    }
+
                     let was_collecting = matches!(
                         self.state.get(),
                         Some(PublicKeyAggregatorState::Collecting { .. })
@@ -988,7 +989,7 @@ impl Handler<TypedEvent<KeyshareCreated>> for PublicKeyAggregator {
     ) -> Self::Result {
         let (event, ec) = event.into_components();
         trap(EType::PublickeyAggregation, &self.bus.with_ec(&ec), || {
-            if !matches!(self.duty, AggregationDuty::Eligible { .. }) {
+            if !matches!(self.duty, AggregationDuty::CommitteeMember { .. }) {
                 return Ok(());
             }
 

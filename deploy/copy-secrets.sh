@@ -39,10 +39,10 @@ for target in "${TARGETS[@]}"; do
         echo "Skipping ${target}.secrets.json - file already exists"
     else
         cp "$SOURCE" "${target}.secrets.json"
-        set_network_private_key "${target}" "${NET_KEYS[${i:-0}]}"
-        ((i++))
+        set_network_private_key "${target}" "${NET_KEYS[$i]}"
         echo "Created ${target}.secrets.json"
     fi
+    ((i++))
 done
 
 echo "Copy operation completed!"

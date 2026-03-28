@@ -6,7 +6,7 @@
 | --- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | [01_REGISTRATION.md](01_REGISTRATION.md)                               | `setup`, `register`, `activate`, `status` CLI commands. On-chain registration into BondingRegistry → CiphernodeRegistry IMT. Rust-side event detection.                                                                                                                                                                                                               |
 | 2   | [02_TOKENS_AND_ACTIVATION.md](02_TOKENS_AND_ACTIVATION.md)             | ENCL license bonding, USDC→ETK ticket purchasing, unbonding, burning, exit queue, claiming. Activation thresholds and the `_updateOperatorStatus` formula.                                                                                                                                                                                                            |
-| 3   | [03_E3_REQUEST_AND_COMMITTEE.md](03_E3_REQUEST_AND_COMMITTEE.md)       | E3 request on-chain flow, fee payment, committee request, IMT snapshot. Rust-side sortition (score-based), on-chain ticket submission, committee finalization, `CiphernodeSelected` event.                                                                                                                                                                            |
+| 3   | [03_E3_REQUEST_AND_COMMITTEE.md](03_E3_REQUEST_AND_COMMITTEE.md)       | E3 request on-chain flow, fee payment, committee request, IMT snapshot. Rust-side sortition (score-based), buffered ticket submission candidates, on-chain committee finalization, `AggregatorSelected`, and `CiphernodeSelected`.                                                                                                                                     |
 | 4   | [04_DKG_AND_COMPUTATION.md](04_DKG_AND_COMPUTATION.md)                 | Full DKG with ZK proof pipeline: BFV keygen → C0 proof → encryption key exchange → TrBFV share generation → C1/C2/C3 proofs → share verification → Shamir secret sharing → encrypted share broadcast → C4 proofs → decryption key reconstruction. C5 proof for PK aggregation. Ciphertext output → C6 proof for decryption shares → C7 proof for plaintext → rewards. |
 | 5   | [05_FAILURE_REFUND_SLASHING.md](05_FAILURE_REFUND_SLASHING.md)         | Timeout-based failure detection, `markE3Failed`, `processE3Failure`. Refund calculation (work-value allocation). Off-chain AccusationManager quorum protocol (proof failure → accusation → voting → quorum). Lane A (attestation-based, atomic) and Lane B (evidence-based, with appeals) slashing. Ticket/license slashing. Slashed funds escrow and routing.        |
 | 6   | [06_DEACTIVATION_AND_COMPLETION.md](06_DEACTIVATION_AND_COMPLETION.md) | Voluntary deactivation (ticket/license withdrawal), full deregistration (IMT removal), E3 happy-path completion, node shutdown, sync/restart, exit queue timing, ban/unban.                                                                                                                                                                                           |
@@ -36,10 +36,12 @@
 6. E3 REQUEST   Requester calls Enclave.request(params)
                   → Fee paid, committee requested, IMT root snapshot
 
-7. SORTITION    Ciphernodes compute scores, submit tickets on-chain
-                  → Top N lowest scores selected
+7. SORTITION    Ciphernodes compute scores, derive a buffered local candidate list,
+                  and submit tickets on-chain
+                  → Finalized committee is later sorted by score
 
 8. FINALIZE     finalizeCommittee() → committee locked in
+                  → Sortition emits AggregatorSelected for the first active member
 
 9. DKG          Selected nodes perform distributed key generation:
                   a. BFV keygen → C0 proof (proves keypair valid)
@@ -51,8 +53,8 @@
                   g. Exchange DecryptionKeyShared → verify C4 proofs
                   h. Publish KeyshareCreated → finalized committee aggregation candidates
 
-10. PK AGG      Primary finalized committee member aggregates pk_shares
-                  → fallbacks are derived from later committee ranks
+10. PK AGG      Current aggregator aggregates pk_shares
+                  → all finalized committee members are ordered fallbacks
                   → C5 proof (proves aggregation correct)
                   → publishCommittee() on-chain → KeyPublished stage
 
@@ -63,8 +65,8 @@
                   → C6 proof per share (proves share correctly derived)
                   → Broadcast to finalized committee aggregation candidates
 
-13. AGGREGATE   Primary finalized committee member combines M+1 shares → plaintext
-                  → fallbacks submit later if higher-priority ranks miss their slot
+13. AGGREGATE   Current aggregator combines M+1 shares → plaintext
+                  → active committee fallbacks submit later if higher-priority ranks miss their slot
                   → C7 proof (proves reconstruction correct)
 
 14. COMPLETE    publishPlaintextOutput() → rewards distributed
@@ -178,6 +180,7 @@ _Found during source-code cross-referencing of these trace documents._
 | 8   | `CommitteePublished` event emits `(e3Id, nodes, publicKey, proof)` — full PK bytes and C5 proof, not just pkHash.                                                                                                                                              | CiphernodeRegistryOwnable.sol     | 04_DKG          |
 | 9   | `_validateNodeEligibility` calls `bondingRegistry.getTicketBalanceAtBlock()` (not `ticketToken.getPastVotes()` directly).                                                                                                                                      | CiphernodeRegistryOwnable.sol:668 | 03_E3_REQUEST   |
 | 10  | Lane A slashing uses **attestation-based** verification (committee quorum votes), not direct ZK proof re-verification on-chain. `proposeSlash()` decodes voter addresses, agrees, data hashes, and ECDSA signatures — not ZK proofs.                           | SlashingManager.sol               | 05_FAILURE      |
+| 11  | Aggregator failover is derived from the **ordered finalized committee**, not from `threshold_m`. All finalized committee members are ordered fallback candidates; `Sortition` emits `AggregatorSelected` for the first active member and advances it on expulsion. | Sortition + Aggregator writers    | 03_E3_REQUEST + 04_DKG |
 
 ### Protocol Design Concerns
 

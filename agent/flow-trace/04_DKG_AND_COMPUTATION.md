@@ -453,19 +453,20 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 
 ---
 
-  ## Phase 2: Public Key Aggregation (Eligible Finalized Committee Members, with C5 Proof)
+## Phase 2: Public Key Aggregation (Finalized Committee Members, with C5 Proof)
 
-```
-  PublicKeyAggregator starts on each selected node and collects KeyshareCreated events
+```text
+PublicKeyAggregator starts on each node and collects KeyshareCreated events
 │
 ├─ KeyshareCreatedFilterBuffer gates events:
 │   └─ Only forwards KeyshareCreated from verified committee members
 │   └─ Buffers until CommitteeFinalized is known
 │
-  ├─ When CommitteeFinalized resolves this node into the finalized fallback chain:
-  │   └─ State becomes Eligible(rank)
+  ├─ When CommitteeFinalized shows this node is in the finalized committee:
+  │   └─ State becomes active for aggregation on this node
+  │   └─ Every finalized committee member is an ordered fallback candidate
   │
-  ├─ When threshold_n keyshares collected on an eligible node:
+  ├─ When threshold_n keyshares collected on a finalized-committee node:
 │   │
 │   ├─ 1. Aggregate public key shares:
 │   │     aggregate_pk = Fhe::get_aggregate_public_key(
@@ -500,10 +501,12 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 │         e3_id, aggregate_pk, pk_hash, node_list
 │       }
 │
-└─ CiphernodeRegistrySolWriter on each eligible node receives PublicKeyAggregated:
-  ├─ Checks finalized committee rank via Sortition
+└─ CiphernodeRegistrySolWriter on each finalized-committee node receives PublicKeyAggregated:
+  ├─ Queries Sortition for this node's ACTIVE submission rank
+  │   → rank 0 = current aggregator from AggregatorSelected
+  │   → later active committee members are staggered fallbacks
   ├─ Reads on-chain committee stage / pk hash to avoid duplicate submission
-  ├─ Waits rank-based delay (rank 0 first, later ranks staggered)
+  ├─ Waits rank-based delay (rank 0 first, later active ranks staggered)
   └─ Calls contract.publishCommittee(e3_id, nodes, publicKey, proof, foldProof)
         │
         │  ┌─── ON-CHAIN (CiphernodeRegistryOwnable) ──────────┐
@@ -634,23 +637,24 @@ EnclaveSolReader decodes CiphertextOutputPublished event
 
 ---
 
-## Phase 5: Plaintext Aggregation (Eligible Finalized Committee Members, with C6 Verification & C7 Proof)
+## Phase 5: Plaintext Aggregation (Finalized Committee Members, with C6 Verification & C7 Proof)
 
-```
-    ThresholdPlaintextAggregator runs on nodes inside the finalized fallback chain
+```text
+    ThresholdPlaintextAggregator runs on finalized committee nodes that are still active
     │
-    ├─ On startup / CommitteeFinalized:
-    │   └─ Resolves whether this node is eligible to aggregate plaintext for this e3_id
+    ├─ On startup:
+    │   └─ Queries Sortition for this node's active aggregation rank for this e3_id
+    │   └─ Stops immediately if the node is no longer an active committee member
     │
     ThresholdPlaintextAggregator receives DecryptionshareCreated events
 │
 ├─ For each share:
-│   ├─ Verify sender is in committee:
+│   ├─ Verify sender is in the ACTIVE committee:
 │   │   └─ Query Sortition via E3CommitteeContainsRequest
 │   ├─ If verified: add_share(party_id, decryption_share)
 │   └─ If not: ignore
 │
-    ├─ C6 VERIFICATION (per-share, on eligible aggregation node):
+    ├─ C6 VERIFICATION (per-share, on active aggregation node):
 │   ShareVerificationActor receives C6 signed proofs
 │   ├─ ECDSA recovery + ZK verification (same 2-phase as C2/C3)
 │   ├─ On failure: SignedProofFailed → accusation pipeline
@@ -699,15 +703,15 @@ EnclaveSolReader decodes CiphertextOutputPublished event
 │   │
 │   └─ Publish PlaintextAggregated { e3_id, decrypted_output }
 │
-└─ EnclaveSolWriter on each eligible node receives PlaintextAggregated:
-  ├─ Checks finalized committee rank via Sortition
+└─ EnclaveSolWriter on each active committee node receives PlaintextAggregated:
+  ├─ Queries Sortition for this node's ACTIVE submission rank
   ├─ Reads on-chain E3 stage before submitting
-  ├─ Waits rank-based delay (rank 0 first, later ranks staggered)
-  └─ Calls contract.publishPlaintextOutput(e3Id, output, proof)
+  ├─ Waits rank-based delay (current aggregator first, later active ranks staggered)
+  └─ Calls contract.publishPlaintextOutput(e3Id, output, proof, foldProof)
         │
         │  ┌─── ON-CHAIN (Enclave.sol) ─────────────────────────┐
         │  │                                                     │
-        │  │  publishPlaintextOutput(e3Id, output, proof) {      │
+        │  │  publishPlaintextOutput(e3Id, output, proof, foldProof) {
         │  │    1. require(stage == CiphertextReady)             │
         │  │    2. require(now <= decryptionDeadline)            │
         │  │    3. e3.plaintextOutput = output                   │

@@ -80,7 +80,6 @@ impl E3Extension for PublicKeyAggregatorExtension {
             sync_state,
             self.params_preset.clone(),
             &self.node_address,
-            meta.threshold_m,
         );
 
         ctx.set_event_recipient("publickey", Some(value));
@@ -116,9 +115,6 @@ impl E3Extension for PublicKeyAggregatorExtension {
             sync_state,
             self.params_preset.clone(),
             &self.node_address,
-            ctx.get_dependency(META_KEY)
-                .ok_or_else(|| anyhow!(ERROR_PUBKEY_META_MISSING))?
-                .threshold_m,
         );
 
         // send to context
@@ -135,7 +131,6 @@ fn create_publickey_aggregator(
     sync_state: Persistable<PublicKeyAggregatorState>,
     params_preset: BfvPreset,
     node_address: &str,
-    threshold_m: usize,
 ) -> Recipient<EnclaveEvent> {
     KeyshareCreatedFilterBuffer::new(
         PublicKeyAggregator::new(
@@ -145,7 +140,6 @@ fn create_publickey_aggregator(
                 e3_id,
                 params_preset,
                 node_address: node_address.to_owned(),
-                threshold_m,
             },
             sync_state,
         )

@@ -12,16 +12,16 @@ use alloy::primitives::U256;
 use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
-    prelude::*, trap, CiphernodeAdded, CiphernodeRemoved, Committee, CommitteeFinalized,
-    CommitteeMemberExpelled, CommitteePublished, ConfigurationUpdated, E3Failed, E3Requested,
-    E3Stage, E3StageChanged, EType, EnclaveEvent, EventContext, EventType,
+    prelude::*, trap, AggregatorSelected, CiphernodeAdded, CiphernodeRemoved, Committee,
+    CommitteeFinalized, CommitteeMemberExpelled, CommitteePublished, ConfigurationUpdated,
+    E3Failed, E3Requested, E3Stage, E3StageChanged, EType, EnclaveEvent, EventContext, EventType,
     OperatorActivationChanged, PlaintextOutputPublished, Seed, Sequenced, TicketBalanceUpdated,
     TypedEvent,
 };
 use e3_events::{BusHandle, E3id, EnclaveEventData};
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::ops::Deref;
 use tracing::{info, instrument, warn};
 
@@ -209,7 +209,7 @@ impl<T: Send + Sync> Deref for E3CommitteeContainsResponse<T> {
 pub struct GetLocalNodeSortitionRank {
     pub e3_id: E3id,
     pub seed: Seed,
-    pub size: usize,
+    pub threshold: [usize; 2],
     pub chain_id: u64,
 }
 
@@ -217,6 +217,64 @@ pub struct GetLocalNodeSortitionRank {
 #[rtype(result = "Option<Committee>")]
 pub struct GetFinalizedCommittee {
     pub e3_id: E3id,
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq)]
+#[rtype(result = "Option<usize>")]
+pub struct GetAggregatorSubmissionRank {
+    pub e3_id: E3id,
+    pub node: String,
+}
+
+fn active_party_id(
+    committee: &Committee,
+    expelled: Option<&BTreeSet<u64>>,
+    node: &str,
+) -> Option<u64> {
+    let party_id = committee.party_id_for(node)?;
+    (!expelled.is_some_and(|members| members.contains(&party_id))).then_some(party_id)
+}
+
+fn committee_contains_active(
+    committee: &Committee,
+    expelled: Option<&BTreeSet<u64>>,
+    node: &str,
+) -> bool {
+    active_party_id(committee, expelled, node).is_some()
+}
+
+fn current_aggregator(
+    committee: &Committee,
+    expelled: Option<&BTreeSet<u64>>,
+) -> Option<(u64, String)> {
+    committee
+        .members()
+        .iter()
+        .enumerate()
+        .find(|(index, _)| !expelled.is_some_and(|members| members.contains(&(*index as u64))))
+        .map(|(index, node)| (index as u64, node.clone()))
+}
+
+fn active_submission_rank_for(
+    committee: &Committee,
+    expelled: Option<&BTreeSet<u64>>,
+    node: &str,
+) -> Option<usize> {
+    let target_party_id = active_party_id(committee, expelled, node)?;
+
+    committee
+        .members()
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| !expelled.is_some_and(|members| members.contains(&(*index as u64))))
+        .position(|(index, _)| index as u64 == target_party_id)
+}
+
+fn local_sortition_selection_size(threshold: [usize; 2]) -> usize {
+    let threshold_m = threshold[0];
+    let threshold_n = threshold[1];
+    let buffer = ticket_sortition::calculate_buffer_size(threshold_m, threshold_n);
+    threshold_n + buffer
 }
 
 /// Sortition actor that manages the sortition algorithm and the node state.
@@ -229,6 +287,8 @@ pub struct Sortition {
     bus: BusHandle,
     /// Persistent map of finalized committees per E3
     finalized_committees: Persistable<HashMap<e3_events::E3id, Committee>>,
+    /// In-memory expelled party ids for finalized committees.
+    expelled_members: HashMap<e3_events::E3id, BTreeSet<u64>>,
     /// Address for the CiphernodeSelector
     ciphernode_selector: Addr<CiphernodeSelector>,
     /// Address for the current node
@@ -246,6 +306,8 @@ pub struct SortitionParams {
     pub node_state: Persistable<HashMap<u64, NodeStateStore>>,
     /// Persistent map of finalized committees per E3
     pub finalized_committees: Persistable<HashMap<e3_events::E3id, Committee>>,
+    /// In-memory expelled party ids for finalized committees.
+    expelled_members: HashMap<e3_events::E3id, BTreeSet<u64>>,
     /// Address for the CiphernodeSelector
     pub ciphernode_selector: Addr<CiphernodeSelector>,
     /// Address for the current node
@@ -259,6 +321,7 @@ impl Sortition {
             node_state: params.node_state,
             bus: params.bus,
             finalized_committees: params.finalized_committees,
+            expelled_members: params.expelled_members,
             ciphernode_selector: params.ciphernode_selector,
             address: params.address,
         }
@@ -288,6 +351,7 @@ impl Sortition {
             backends,
             node_state,
             finalized_committees,
+            expelled_members: HashMap::new(),
             ciphernode_selector,
             address: address.to_owned(),
         })
@@ -368,7 +432,7 @@ impl Sortition {
             .and_then(|committees| committees.get(e3_id).cloned())
     }
 
-    fn committee_contains(&mut self, e3_id: E3id, node: String) -> bool {
+    fn committee_contains(&self, e3_id: E3id, node: String) -> bool {
         let Some(committee) = self.get_committee(&e3_id) else {
             // Non blocking error
             self.bus.err(
@@ -378,7 +442,33 @@ impl Sortition {
             return false;
         };
 
-        committee.contains(&node)
+        committee_contains_active(&committee, self.expelled_members.get(&e3_id), &node)
+    }
+
+    fn aggregator_submission_rank(&self, e3_id: &E3id, node: &str) -> Option<usize> {
+        let committee = self.get_committee(e3_id)?;
+        active_submission_rank_for(&committee, self.expelled_members.get(e3_id), node)
+    }
+
+    fn publish_aggregator_selected(
+        &self,
+        e3_id: &E3id,
+        chain_id: u64,
+        party_id: u64,
+        node: String,
+        committee: Vec<String>,
+        ec: EventContext<Sequenced>,
+    ) -> Result<()> {
+        self.bus.publish(
+            AggregatorSelected {
+                e3_id: e3_id.clone(),
+                party_id,
+                node,
+                committee,
+                chain_id,
+            },
+            ec,
+        )
     }
     /// Helper method to decrement active jobs for an E3's committee
     fn decrement_jobs_for_e3(
@@ -425,7 +515,11 @@ impl Sortition {
             }
 
             Ok(state_map)
-        })
+        })?;
+
+        self.expelled_members.remove(e3_id);
+
+        Ok(())
     }
 }
 
@@ -485,15 +579,14 @@ impl Handler<TypedEvent<E3Requested>> for Sortition {
         let e3_id = msg.e3_id.clone();
         let chain_id = msg.e3_id.chain_id();
         let seed = msg.seed;
-        let threshold_m = msg.threshold_m;
-        let threshold_n = msg.threshold_n;
-        let buffer = ticket_sortition::calculate_buffer_size(threshold_m, threshold_n);
-        let total_selection_size = threshold_n + buffer;
+        let total_selection_size =
+            local_sortition_selection_size([msg.threshold_m, msg.threshold_n]);
+        let buffer = total_selection_size.saturating_sub(msg.threshold_n);
 
         info!(
             e3_id = %e3_id,
-            threshold_m = threshold_m,
-            threshold_n = threshold_n,
+            threshold_m = msg.threshold_m,
+            threshold_n = msg.threshold_n,
             buffer = buffer,
             total_selection_size = total_selection_size,
             "Performing Sortition with buffer"
@@ -756,8 +849,9 @@ impl Handler<GetLocalNodeSortitionRank> for Sortition {
     type Result = MessageResult<GetLocalNodeSortitionRank>;
 
     fn handle(&mut self, msg: GetLocalNodeSortitionRank, _: &mut Self::Context) -> Self::Result {
+        let size = local_sortition_selection_size(msg.threshold);
         MessageResult(
-            self.get_node_index(msg.e3_id, msg.seed, msg.size, msg.chain_id)
+            self.get_node_index(msg.e3_id, msg.seed, size, msg.chain_id)
                 .map(|(party_index, _)| party_index),
         )
     }
@@ -768,6 +862,14 @@ impl Handler<GetFinalizedCommittee> for Sortition {
 
     fn handle(&mut self, msg: GetFinalizedCommittee, _: &mut Self::Context) -> Self::Result {
         MessageResult(self.get_committee(&msg.e3_id))
+    }
+}
+
+impl Handler<GetAggregatorSubmissionRank> for Sortition {
+    type Result = MessageResult<GetAggregatorSubmissionRank>;
+
+    fn handle(&mut self, msg: GetAggregatorSubmissionRank, _: &mut Self::Context) -> Self::Result {
+        MessageResult(self.aggregator_submission_rank(&msg.e3_id, &msg.node))
     }
 }
 
@@ -832,16 +934,34 @@ impl Handler<TypedEvent<CommitteeFinalized>> for Sortition {
     ) -> Self::Result {
         let (msg, ec) = msg.into_components();
         trap(EType::Sortition, &self.bus.with_ec(&ec), || {
+            let committee = Committee::new(msg.committee.clone());
+
             info!(
                 e3_id = %msg.e3_id,
                 committee_size = msg.committee.len(),
                 "Storing finalized committee"
             );
 
-            self.finalized_committees.try_mutate(&ec, |mut committees| {
-                committees.insert(msg.e3_id.clone(), Committee::new(msg.committee.clone()));
-                Ok(committees)
-            })
+            self.finalized_committees
+                .try_mutate(&ec, |mut committees| {
+                    committees.insert(msg.e3_id.clone(), committee.clone());
+                    Ok(committees)
+                })?;
+
+            self.expelled_members.remove(&msg.e3_id);
+
+            if let Some((party_id, node)) = current_aggregator(&committee, None) {
+                self.publish_aggregator_selected(
+                    &msg.e3_id,
+                    msg.chain_id,
+                    party_id,
+                    node,
+                    msg.committee,
+                    ec,
+                )?;
+            }
+
+            Ok(())
         })
     }
 }
@@ -882,6 +1002,20 @@ impl Handler<TypedEvent<CommitteeMemberExpelled>> for Sortition {
                 return Ok(());
             };
 
+            let previous_aggregator =
+                current_aggregator(&committee, self.expelled_members.get(&data.e3_id));
+
+            self.expelled_members
+                .entry(data.e3_id.clone())
+                .or_default()
+                .insert(party_id);
+
+            let next_aggregator =
+                current_aggregator(&committee, self.expelled_members.get(&data.e3_id));
+            let ordered_committee = committee.members().to_vec();
+            let chain_id = data.e3_id.chain_id();
+            let e3_id = data.e3_id.clone();
+
             info!(
                 "Sortition: resolved expelled node {} to party_id={} for e3_id={}, re-publishing enriched event",
                 node_addr, party_id, data.e3_id
@@ -893,10 +1027,96 @@ impl Handler<TypedEvent<CommitteeMemberExpelled>> for Sortition {
                     party_id: Some(party_id),
                     ..data
                 },
-                ec,
+                ec.clone(),
             )?;
+
+            if next_aggregator != previous_aggregator {
+                if let Some((party_id, node)) = next_aggregator {
+                    self.publish_aggregator_selected(
+                        &e3_id,
+                        chain_id,
+                        party_id,
+                        node,
+                        ordered_committee,
+                        ec,
+                    )?;
+                }
+            }
 
             Ok(())
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{active_submission_rank_for, current_aggregator};
+    use e3_events::Committee;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn active_submission_rank_tracks_ordered_failover_chain() {
+        let committee = Committee::new(vec![
+            "0x0000000000000000000000000000000000000001".to_string(),
+            "0x0000000000000000000000000000000000000002".to_string(),
+            "0x0000000000000000000000000000000000000003".to_string(),
+            "0x0000000000000000000000000000000000000004".to_string(),
+        ]);
+        let mut expelled = BTreeSet::new();
+
+        assert_eq!(
+            current_aggregator(&committee, Some(&expelled)).map(|(id, _)| id),
+            Some(0)
+        );
+        assert_eq!(
+            active_submission_rank_for(
+                &committee,
+                Some(&expelled),
+                "0x0000000000000000000000000000000000000001",
+            ),
+            Some(0)
+        );
+        assert_eq!(
+            active_submission_rank_for(
+                &committee,
+                Some(&expelled),
+                "0x0000000000000000000000000000000000000004",
+            ),
+            Some(3)
+        );
+
+        expelled.insert(0);
+
+        assert_eq!(
+            current_aggregator(&committee, Some(&expelled)).map(|(id, _)| id),
+            Some(1)
+        );
+        assert_eq!(
+            active_submission_rank_for(
+                &committee,
+                Some(&expelled),
+                "0x0000000000000000000000000000000000000002",
+            ),
+            Some(0)
+        );
+        assert_eq!(
+            active_submission_rank_for(
+                &committee,
+                Some(&expelled),
+                "0x0000000000000000000000000000000000000004",
+            ),
+            Some(2)
+        );
+
+        expelled.insert(2);
+
+        assert_eq!(
+            active_submission_rank_for(
+                &committee,
+                Some(&expelled),
+                "0x0000000000000000000000000000000000000004",
+            ),
+            Some(1)
+        );
     }
 }

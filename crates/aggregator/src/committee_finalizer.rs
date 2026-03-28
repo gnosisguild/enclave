@@ -108,7 +108,7 @@ impl Handler<TypedEvent<CommitteeRequested>> for CommitteeFinalizer {
         let local_rank_request = GetLocalNodeSortitionRank {
             e3_id: msg.e3_id.clone(),
             seed: msg.seed,
-            size: msg.threshold[1],
+            threshold: msg.threshold,
             chain_id: msg.chain_id,
         };
         let sortition = self.sortition.clone();

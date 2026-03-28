@@ -128,12 +128,15 @@ EnclaveSolReader decodes IEnclave::E3Requested log
 │   └─ Stores as dependency in E3Context
 │
 ├─ PublicKeyAggregatorExtension.on_event():
-│   └─ Spins up PublicKeyAggregator actor on each selected node
-│   └─ State: Pending until CommitteeFinalized resolves finalized aggregation duty
+│   └─ Spins up PublicKeyAggregator actor
+│   └─ State: Pending until CommitteeFinalized resolves whether this node is in the finalized committee
 │
 └─ Sortition actor receives E3Requested:
     │
     ├─ Calculates buffer = calculate_buffer_size(M, N)
+    │   → Produces a LOCAL selected list of N + buffer candidates
+    │   → This same ordered candidate list drives both ticket submission and
+    │     fallback `finalizeCommittee()` scheduling
     │
     ├─ ScoreBackend.get_committee():
     │   │
@@ -150,12 +153,12 @@ EnclaveSolReader decodes IEnclave::E3Requested log
     │   │
     │   ├─ Sort ALL nodes by their best score (ascending)
     │   │
-    │   └─ Select top N nodes (lowest scores win)
-    │       → Returns committee list with party indices
+    │   └─ Select top N + buffer nodes (lowest scores win)
+    │       → Returns the ordered local candidate list used before finalization
     │
     └─ Sends WithSortitionTicket<E3Requested> to CiphernodeSelector
         │
-        ├─ If THIS node is in the selected committee:
+        ├─ If THIS node is in the selected candidate list:
         │   ticket_id = Some(TicketId::Score(best_ticket_number))
         │   party_index = Some(index_in_committee)
         │
@@ -235,11 +238,11 @@ CiphernodeRegistrySolWriter receives TicketGenerated event
 
 ### 3a. Deadline Timer (Rust-Side, Selected Ciphernodes)
 
-```
+```text
 CommitteeFinalizer actor receives CommitteeRequested event on each selected node
 │
-├─ Resolves this node's local score rank from sortition
-│   └─ If the node is outside the provisional top-N, no timer is scheduled
+├─ Resolves this node's local score rank from the same buffered sortition list
+│   └─ If the node is outside the local selected candidate list, no timer is scheduled
 │
 ├─ Calculates wait time:
 │   wait = committeeDeadline - currentTimestamp + buffer + local_rank_stagger
@@ -312,9 +315,16 @@ CiphernodeRegistrySolReader decodes CommitteeFinalized event
 ├─ Sortition actor:
 │   └─ Stores finalized committee as a `Committee` struct in persistent map
 │       → Provides O(1) address→party_id lookup for later expulsion handling
+│   └─ Emits AggregatorSelected {
+│         e3_id, party_id, node, committee
+│       }
+│       → Initial selection is the first member in the score-sorted finalized committee
+│       → If that member is later expelled, Sortition emits another AggregatorSelected
+│         for the next active committee member in order
 │
 ├─ CiphernodeSelector:
-│   ├─ Checks if this node's address is in the committee list
+│   ├─ Receives the FIRST AggregatorSelected for this E3
+│   ├─ Checks if this node's address is in the finalized committee list
 │   ├─ If YES:
 │   │   party_id = index of this node in committee array
 │   │   Publishes CiphernodeSelected {
@@ -322,6 +332,8 @@ CiphernodeRegistrySolReader decodes CommitteeFinalized event
 │   │     seed, party_id, ...all E3 metadata
 │   │   }
 │   └─ If NO: does nothing for this E3
+│       → Later AggregatorSelected failover events do NOT re-emit CiphernodeSelected
+│         because committee membership did not change
 │
 └─ KeyshareCreatedFilterBuffer:
     └─ Stores committee set

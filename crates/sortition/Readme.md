@@ -114,7 +114,7 @@ sequenceDiagram
         PublicKeyAggregator->>PublicKeyAggregator: fhe.get_aggregate_public_key(keyshares)
         PublicKeyAggregator->>PublicKeyAggregator: Aggregate public key shares
         PublicKeyAggregator->>EventBus: PublicKeyAggregated(e3Id, pubkey, nodes, chainId)
-        PublicKeyAggregator->>CiphernodeRegistry: publishPublicKey(e3Id, pubkey, nodes) after rank-based delay
+        PublicKeyAggregator->>CiphernodeRegistry: publishCommittee(e3Id, pubkey, nodes) after rank-based delay
     end
 
     Note over Operator,PlaintextAggregator: Phase 8: Encryption & Computation

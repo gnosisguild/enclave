@@ -24,7 +24,7 @@ use e3_events::{
     EffectsEnabled, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, OrderedSet, Proof,
     PublicKeyAggregated, Seed, Shutdown, TicketGenerated, TicketId,
 };
-use e3_sortition::{GetFinalizedCommittee, Sortition};
+use e3_sortition::{GetAggregatorSubmissionRank, Sortition};
 use e3_utils::{ArcBytes, NotifySync, MAILBOX_LIMIT};
 use std::time::Duration;
 use tokio::time::sleep;
@@ -485,24 +485,17 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                 return;
             }
 
-            let rank = match aggregation_rank_for_e3(
-                &sortition,
-                provider.clone(),
-                contract_address,
-                &e3_id,
-                &my_address,
-            )
-            .await
-            {
-                Ok(rank) => rank,
-                Err(err) => {
-                    bus.err(EType::Evm, err);
-                    return;
-                }
-            };
+            let rank =
+                match aggregator_submission_rank_for_e3(&sortition, &e3_id, &my_address).await {
+                    Ok(rank) => rank,
+                    Err(err) => {
+                        bus.err(EType::Evm, err);
+                        return;
+                    }
+                };
 
             let Some(rank) = rank else {
-                info!(e3_id = %e3_id, node = %my_address, "Node is outside the finalized aggregation priority chain, skipping committee publication");
+                info!(e3_id = %e3_id, node = %my_address, "Node is outside the active committee aggregation chain, skipping committee publication");
                 return;
             };
 
@@ -659,32 +652,17 @@ async fn should_submit_committee_public_key<P: Provider + WalletProvider + Clone
     Ok(public_key_hash == B256::ZERO)
 }
 
-async fn committee_threshold_m<P: Provider + WalletProvider + Clone + 'static>(
-    provider: EthProvider<P>,
-    contract_address: Address,
-    e3_id: &E3id,
-) -> Result<usize> {
-    let e3_id_u256: U256 = e3_id.clone().try_into()?;
-    let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    let viability = contract.getCommitteeViability(e3_id_u256).call().await?;
-    Ok(viability.thresholdM as usize)
-}
-
-async fn aggregation_rank_for_e3<P: Provider + WalletProvider + Clone + 'static>(
+async fn aggregator_submission_rank_for_e3(
     sortition: &Addr<Sortition>,
-    provider: EthProvider<P>,
-    contract_address: Address,
     e3_id: &E3id,
     node_address: &str,
 ) -> Result<Option<usize>> {
-    let committee = sortition
-        .send(GetFinalizedCommittee {
+    Ok(sortition
+        .send(GetAggregatorSubmissionRank {
             e3_id: e3_id.clone(),
+            node: node_address.to_owned(),
         })
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("No finalized committee available for {}", e3_id))?;
-    let threshold_m = committee_threshold_m(provider, contract_address, e3_id).await?;
-    Ok(committee.aggregation_rank_for(node_address, threshold_m))
+        .await?)
 }
 
 pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone + 'static>(

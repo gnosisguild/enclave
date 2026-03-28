@@ -123,7 +123,8 @@ CIPHERNODE_REGISTRY=$(yq '.chains[0].contracts.ciphernode_registry.address' "$SC
 get_primary_committee_node() {
   local e3_id="${1:-0}"
   local timeout="${2:-120}"
-  local start_time=$(date +%s)
+  local start_time
+  start_time=$(date +%s)
 
   # Retry until publishCommittee tx is mined on-chain
   local raw
@@ -158,7 +159,8 @@ ciphernode_pubkey_path() {
 # Wait until ANY node's pubkey.bin appears (committee membership is non-deterministic)
 waiton_any_pubkey() {
   local timeout="${1:-1300}"
-  local start_time=$(date +%s)
+  local start_time
+  start_time=$(date +%s)
   while true; do
     for name in cn1 cn2 cn3 cn4 cn5; do
       if [ -f "$(ciphernode_pubkey_path "$name")" ]; then
