@@ -110,6 +110,10 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         return true;
     }
 
+    function sortitionSubmissionWindow() external pure returns (uint256) {
+        return 0;
+    }
+
     // solhint-disable-next-line no-empty-blocks
     function setSortitionSubmissionWindow(uint256) external pure {}
 
@@ -172,8 +176,6 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 }
 
 contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
-    error CommitteeNotPublished();
-
     function requestCommittee(
         uint256,
         uint256,
@@ -240,6 +242,10 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
 
     // solhint-disable-next-line no-empty-blocks
     function setBondingRegistry(IBondingRegistry) external pure {}
+
+    function sortitionSubmissionWindow() external pure returns (uint256) {
+        return 0;
+    }
 
     // solhint-disable-next-line no-empty-blocks
     function setSortitionSubmissionWindow(uint256) external pure {}

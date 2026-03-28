@@ -168,6 +168,97 @@ interface ICiphernodeRegistry {
     /// @param sortitionSubmissionWindow The submission window for the E3 sortition in seconds.
     event SortitionSubmissionWindowSet(uint256 sortitionSubmissionWindow);
 
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                        Errors                          //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice Committee has already been requested for this E3
+    error CommitteeAlreadyRequested();
+
+    /// @notice Committee has already been published for this E3
+    error CommitteeAlreadyPublished();
+
+    /// @notice Committee has not been published yet for this E3
+    error CommitteeNotPublished();
+
+    /// @notice Committee has not been requested yet for this E3
+    error CommitteeNotRequested();
+
+    /// @notice Committee Not Initialized or Finalized
+    error CommitteeNotInitializedOrFinalized();
+
+    /// @notice Submission Window has been closed for this E3
+    error SubmissionWindowClosed();
+
+    /// @notice Committee deadline has been reached for this E3
+    error CommitteeDeadlineReached();
+
+    /// @notice Committee has already been finalized for this E3
+    error CommitteeAlreadyFinalized();
+
+    /// @notice Committee has not been finalized yet for this E3
+    error CommitteeNotFinalized();
+
+    /// @notice Node has already submitted a ticket for this E3
+    error NodeAlreadySubmitted();
+
+    /// @notice Node has not submitted a ticket for this E3
+    error NodeNotSubmitted();
+
+    /// @notice Node is not eligible for this E3
+    error NodeNotEligible();
+
+    /// @notice Ciphernode is not enabled in the registry
+    /// @param node Address of the ciphernode
+    error CiphernodeNotEnabled(address node);
+
+    /// @notice Caller is not the Enclave contract
+    error OnlyEnclave();
+
+    /// @notice Caller is not the bonding registry
+    error OnlyBondingRegistry();
+
+    /// @notice Caller is neither owner nor bonding registry
+    error NotOwnerOrBondingRegistry();
+
+    /// @notice Node is not bonded
+    /// @param node Address of the node
+    error NodeNotBonded(address node);
+
+    /// @notice Address cannot be zero
+    error ZeroAddress();
+
+    /// @notice Bonding registry has not been set
+    error BondingRegistryNotSet();
+
+    /// @notice Invalid ticket number
+    error InvalidTicketNumber();
+
+    /// @notice Submission window not closed yet
+    error SubmissionWindowNotClosed();
+
+    /// @notice Threshold not met for this E3
+    error ThresholdNotMet();
+
+    /// @notice Caller is not authorized
+    error Unauthorized();
+
+    /// @notice Caller is not the slashing manager
+    error NotSlashingManager();
+
+    /// @notice Not enough registered ciphernodes to meet threshold
+    /// @param requested The requested committee size (N)
+    /// @param available The number of registered ciphernodes
+    error InsufficientCiphernodes(uint256 requested, uint256 available);
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                  Function Signatures                   //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
     /// @notice Check if a ciphernode is eligible for committee selection
     /// @dev A ciphernode is eligible if it is enabled in the registry and meets bonding requirements
     /// @param ciphernode Address of the ciphernode to check
@@ -257,6 +348,10 @@ interface ICiphernodeRegistry {
     /// @dev Only callable by owner
     /// @param _bondingRegistry Address of the bonding registry contract
     function setBondingRegistry(IBondingRegistry _bondingRegistry) external;
+
+    /// @notice Returns the current sortition submission window.
+    /// @return The sortition submission window in seconds.
+    function sortitionSubmissionWindow() external view returns (uint256);
 
     /// @notice This function should be called to set the submission window for the E3 sortition.
     /// @param _sortitionSubmissionWindow The submission window for the E3 sortition in seconds.
