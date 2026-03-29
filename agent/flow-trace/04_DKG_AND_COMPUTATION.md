@@ -41,6 +41,8 @@ CiphernodeSelected event arrives at ThresholdKeyshare
 │   ├─ 5. Create child actors:
 │   │     ├─ EncryptionKeyCollector (waits for all N parties' keys)
 │   │     └─ ThresholdShareCollector (waits for all N parties' shares)
+│   │     → These collectors start immediately so early peer keys/shares can
+│   │       be buffered while this node is still finishing earlier DKG phases
 │   │
 │   └─ Each collector has a timeout (60s for keys, 120s for shares)
 ```
@@ -455,7 +457,7 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 
 ---
 
-## Phase 2: Public Key Aggregation (Committee-Buffered, Active Aggregator Submits)
+  ## Phase 2: Public Key Aggregation (Committee-Buffered, Active Aggregator Submits)
 
 ```
   All committee members receive KeyshareCreated events
@@ -636,7 +638,7 @@ EnclaveSolReader decodes CiphertextOutputPublished event
 
 ---
 
-## Phase 5: Plaintext Aggregation (Committee-Buffered, Active Aggregator Submits)
+  ## Phase 5: Plaintext Aggregation (Committee-Buffered, Active Aggregator Submits)
 
 ```
   All committee members receive DecryptionshareCreated events

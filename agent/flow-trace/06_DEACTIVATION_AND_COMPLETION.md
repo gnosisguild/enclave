@@ -209,12 +209,16 @@ enclave start → running node
 On restart:
 ├─ Sync module replays:
 │   1. Load snapshot metadata and hydrate persisted per-E3 state
+│      → Extensions must preserve hydrated recipients; replayed committee events
+│        must not replace a restored per-E3 actor with a fresh instance
 │   2. CiphernodeSelector emits persisted AggregatorChanged state before replay
 │   3. Replay EventStore events since last snapshot (effects still disabled)
 │   4. Fetch historical EVM events from last known block
-│   5. Sort & publish merged events by HLC timestamp
-│   6. Enable effects (writers may submit only after this point)
-│   7. SyncEnded → live operations begin
+│   5. Historical libp2p sync retries failed aggregate fetches after reconnects
+│      and also on bounded retry intervals even without a new connection event
+│   6. Sort & publish merged events by HLC timestamp
+│   7. Enable effects (writers may submit only after this point)
+│   8. SyncEnded → live operations begin
 └─ Node resumes from where it left off
 ```
 

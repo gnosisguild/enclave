@@ -579,7 +579,9 @@ impl ThresholdKeyshare {
         let state = self.state.try_get()?;
         if !matches!(
             state.state,
-            KeyshareState::GeneratingThresholdShare(_) | KeyshareState::AggregatingDecryptionKey(_)
+            KeyshareState::CollectingEncryptionKeys(_)
+                | KeyshareState::GeneratingThresholdShare(_)
+                | KeyshareState::AggregatingDecryptionKey(_)
         ) {
             trace!(
                 e3_id = %state.e3_id,
@@ -622,7 +624,10 @@ impl ThresholdKeyshare {
         self_addr: Addr<Self>,
     ) -> Result<()> {
         let state = self.state.try_get()?;
-        if !matches!(state.state, KeyshareState::CollectingEncryptionKeys(_)) {
+        if !matches!(
+            state.state,
+            KeyshareState::Init | KeyshareState::CollectingEncryptionKeys(_)
+        ) {
             trace!(
                 e3_id = %state.e3_id,
                 state = state.variant_name(),

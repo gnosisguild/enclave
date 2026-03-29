@@ -30,13 +30,16 @@ use crate::{
 /// failed before publishing `NetReady` anyway.
 const NET_READY_CONNECT_TIMEOUT: Duration = Duration::from_secs(60);
 
-/// Maximum time to wait for the `AllPeersDialed` event before giving up.
-const ALL_PEERS_DIALED_TIMEOUT: Duration = Duration::from_secs(120);
+/// Direct-request retry settings for a single historical sync fetch attempt.
+const SYNC_FETCH_MAX_RETRIES: u32 = 3;
+const SYNC_FETCH_RETRY_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Maximum time to wait for a peer to reconnect after sync fetch fails.
-/// On restart, peers may briefly connect then disconnect (the remote side still
-/// holds the old connection). Kademlia rediscovery can take up to ~120s.
-const SYNC_RECONNECT_TIMEOUT: Duration = Duration::from_secs(120);
+/// If a historical sync fetch fails, wait this long for a fresh connection
+/// before retrying anyway against currently connected peers.
+const SYNC_RECOVERY_RETRY_INTERVAL: Duration = Duration::from_secs(15);
+
+/// Number of recovery rounds to try for failed aggregates after the initial fetch pass.
+const SYNC_RECOVERY_MAX_ATTEMPTS: usize = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncResponseValue {
@@ -345,6 +348,27 @@ struct AllPeersDialed {
 #[rtype(result = "()")]
 struct PeerConnected;
 
+async fn fetch_historical_events_for_aggregate(
+    net_cmds: &mpsc::Sender<NetCommand>,
+    net_events: &Arc<broadcast::Receiver<NetEvent>>,
+    aggregate_id: AggregateId,
+    since: u128,
+) -> Result<Vec<EnclaveEvent<Unsequenced>>> {
+    let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone())
+        .max_retries(SYNC_FETCH_MAX_RETRIES)
+        .retry_timeout(SYNC_FETCH_RETRY_TIMEOUT)
+        .build();
+
+    fetch_all_batched_events::<EnclaveEvent<Unsequenced>>(
+        requester,
+        PeerTarget::Random,
+        aggregate_id,
+        since,
+        100,
+    )
+    .await
+}
+
 async fn handle_sync_request_event(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
@@ -398,18 +422,8 @@ async fn handle_sync_request_event(
             "Requesting batched events for aggregate_id={} since={}",
             aggregate_id, since
         );
-        let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone())
-            .max_retries(3)
-            .retry_timeout(Duration::from_secs(5))
-            .build();
-        match fetch_all_batched_events::<EnclaveEvent<Unsequenced>>(
-            requester,
-            PeerTarget::Random,
-            *aggregate_id,
-            *since,
-            100,
-        )
-        .await
+        match fetch_historical_events_for_aggregate(&net_cmds, &net_events, *aggregate_id, *since)
+            .await
         {
             Ok(events) => {
                 info!(
@@ -435,79 +449,92 @@ async fn handle_sync_request_event(
         }
     }
 
-    // If any aggregate failed (likely "no connected peers"), wait for a peer
-    // to reconnect and retry. This handles the restart scenario where peers
-    // briefly connect then immediately disconnect (the remote side still holds
-    // the old connection and rejects the new one). Reconnection via Kademlia
-    // can take up to ~120s.
+    // If any aggregate failed, retry a few recovery rounds. Prefer a fresh
+    // ConnectionEstablished signal when one arrives, but do not depend on it:
+    // a connected peer may simply be slow or temporarily stalled.
     if !failed_aggregates.is_empty() {
         info!(
-            "Sync fetch failed for {} aggregates — waiting for peer reconnection...",
+            "Sync fetch failed for {} aggregates — starting recovery retries...",
             failed_aggregates.len()
         );
-        match await_event(
-            &net_events,
-            |e| {
-                if matches!(e, NetEvent::ConnectionEstablished { .. }) {
-                    Some(())
-                } else {
-                    None
-                }
-            },
-            SYNC_RECONNECT_TIMEOUT,
-        )
-        .await
-        {
-            Ok(()) => {
-                info!("Peer reconnected, retrying failed aggregates");
-                let mut still_failed = Vec::new();
-                for aggregate_id in failed_aggregates {
-                    let since = event.since.get(&aggregate_id).copied().unwrap_or(0);
-                    let requester =
-                        DirectRequester::builder(net_cmds.clone(), net_events.clone()).build();
-                    match fetch_all_batched_events::<EnclaveEvent<Unsequenced>>(
-                        requester,
-                        PeerTarget::Random,
-                        aggregate_id,
-                        since,
-                        100,
-                    )
-                    .await
-                    {
-                        Ok(events) => {
-                            info!(
-                                "Retry succeeded: {} events for aggregate_id={}",
-                                events.len(),
-                                aggregate_id
-                            );
-                            for enclave_event in events {
-                                let ts = enclave_event.ts();
-                                if ts > latest_timestamp {
-                                    latest_timestamp = ts;
-                                }
-                                all_events.push(enclave_event);
-                            }
-                        }
-                        Err(e) => {
-                            warn!("Retry also failed for aggregate_id={}: {e}", aggregate_id);
-                            still_failed.push(aggregate_id);
-                        }
+        let mut recovery_attempt = 0;
+
+        while !failed_aggregates.is_empty() && recovery_attempt < SYNC_RECOVERY_MAX_ATTEMPTS {
+            recovery_attempt += 1;
+
+            match await_event(
+                &net_events,
+                |e| {
+                    if matches!(e, NetEvent::ConnectionEstablished { .. }) {
+                        Some(())
+                    } else {
+                        None
                     }
+                },
+                SYNC_RECOVERY_RETRY_INTERVAL,
+            )
+            .await
+            {
+                Ok(()) => {
+                    info!(
+                        attempt = recovery_attempt,
+                        "Peer reconnected, retrying failed aggregates"
+                    );
                 }
-                if !still_failed.is_empty() {
-                    bail!(
-                        "failed to fetch historical net events for aggregates: {:?}",
-                        still_failed
+                Err(_) => {
+                    info!(
+                        attempt = recovery_attempt,
+                        retry_after = ?SYNC_RECOVERY_RETRY_INTERVAL,
+                        "No new peer connection observed; retrying failed aggregates against current peers"
                     );
                 }
             }
-            Err(_) => {
-                bail!(
-                    "failed to fetch historical net events for aggregates: {:?} (no peers reconnected within {:?})",
-                    failed_aggregates,
-                    SYNC_RECONNECT_TIMEOUT
-                );
+
+            let mut still_failed = Vec::new();
+            for aggregate_id in failed_aggregates {
+                let since = event.since.get(&aggregate_id).copied().unwrap_or(0);
+                match fetch_historical_events_for_aggregate(
+                    &net_cmds,
+                    &net_events,
+                    aggregate_id,
+                    since,
+                )
+                .await
+                {
+                    Ok(events) => {
+                        info!(
+                            attempt = recovery_attempt,
+                            "Retry succeeded: {} events for aggregate_id={}",
+                            events.len(),
+                            aggregate_id
+                        );
+                        for enclave_event in events {
+                            let ts = enclave_event.ts();
+                            if ts > latest_timestamp {
+                                latest_timestamp = ts;
+                            }
+                            all_events.push(enclave_event);
+                        }
+                    }
+                    Err(e) => {
+                        warn!(
+                            attempt = recovery_attempt,
+                            "Retry failed for aggregate_id={}: {e}", aggregate_id
+                        );
+                        still_failed.push(aggregate_id);
+                    }
+                }
             }
+
+            failed_aggregates = still_failed;
+        }
+
+        if !failed_aggregates.is_empty() {
+            bail!(
+                "failed to fetch historical net events for aggregates: {:?} after {} recovery attempts",
+                failed_aggregates,
+                SYNC_RECOVERY_MAX_ATTEMPTS
+            );
         }
     }
 

@@ -628,6 +628,7 @@ async fn should_finalize_committee<P: Provider + WalletProvider + Clone + 'stati
                 message.contains("CommitteeAlreadyFinalized")
                     || message.contains("CommitteeNotRequested")
                     || message.contains("SubmissionWindowNotClosed")
+                    || message.contains("ThresholdNotMet")
             }) {
                 return Ok(false);
             }
