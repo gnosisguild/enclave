@@ -14,10 +14,19 @@ use e3_sortition::{GetLocalNodeSortitionRank, Sortition};
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use std::collections::HashMap;
 use std::time::Duration;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 const FINALIZATION_BUFFER_SECONDS: u64 = 1;
 const FINALIZATION_INTERVAL_SECONDS: u64 = 1;
+const FINALIZATION_SCHEDULE_RETRY_SECONDS: u64 = 1;
+const MAX_FINALIZATION_SCHEDULE_ATTEMPTS: u8 = 3;
+
+#[derive(Message, Clone, Debug, PartialEq, Eq)]
+#[rtype(result = "()")]
+struct RetryCommitteeScheduling {
+    event: TypedEvent<CommitteeRequested>,
+    attempt: u8,
+}
 
 /// CommitteeFinalizer is an actor that listens to CommitteeRequested events and dispatches
 /// CommitteeFinalizeRequested events after the submission deadline has passed.
@@ -66,6 +75,149 @@ impl CommitteeFinalizer {
 
         addr
     }
+
+    fn schedule_committee_finalization(
+        &mut self,
+        msg: TypedEvent<CommitteeRequested>,
+        attempt: u8,
+        ctx: &mut Context<Self>,
+    ) {
+        let ec = msg.get_ctx().clone();
+        let e3_id = msg.e3_id.clone();
+        let committee_deadline = msg.committee_deadline;
+        let local_rank_request = GetLocalNodeSortitionRank {
+            e3_id: msg.e3_id.clone(),
+            seed: msg.seed,
+            threshold: msg.threshold,
+            chain_id: msg.chain_id,
+        };
+        let sortition = self.sortition.clone();
+        let e3_id_for_log = e3_id.clone();
+        let msg_for_retry = msg.clone();
+        let fut = async move {
+            let current_timestamp = match e3_evm::helpers::get_current_timestamp().await {
+                Ok(timestamp) => timestamp,
+                Err(e) => {
+                    error!(
+                        e3_id = %e3_id_for_log,
+                        error = %e,
+                        attempt = attempt,
+                        "Failed to get current timestamp from RPC"
+                    );
+                    return None;
+                }
+            };
+
+            let local_rank = match sortition.send(local_rank_request).await {
+                Ok(rank) => rank,
+                Err(e) => {
+                    error!(
+                        e3_id = %e3_id_for_log,
+                        error = %e,
+                        attempt = attempt,
+                        "Failed to get local sortition rank for committee finalization"
+                    );
+                    return None;
+                }
+            };
+
+            Some((current_timestamp, local_rank))
+        };
+
+        ctx.spawn(
+            fut.into_actor(self)
+                .then(move |result, act, ctx| {
+                    if let Some((current_timestamp, Some(rank))) = result {
+                        let base_delay = if committee_deadline > current_timestamp {
+                            (committee_deadline - current_timestamp) + FINALIZATION_BUFFER_SECONDS
+                        } else {
+                            info!(
+                                e3_id = %e3_id,
+                                committee_deadline = committee_deadline,
+                                current_timestamp = current_timestamp,
+                                "Submission deadline already passed, finalizing with fallback buffer"
+                            );
+                            FINALIZATION_BUFFER_SECONDS
+                        };
+                        let seconds_to_wait =
+                            base_delay + (rank * FINALIZATION_INTERVAL_SECONDS);
+
+                        info!(
+                            e3_id = %e3_id,
+                            committee_deadline = committee_deadline,
+                            current_timestamp = current_timestamp,
+                            rank = rank,
+                            seconds_to_wait = seconds_to_wait,
+                            "Scheduling committee finalization"
+                        );
+
+                        let bus = act.bus.clone();
+                        let e3_id_clone = e3_id.clone();
+
+                        let handle = ctx.run_later(
+                            Duration::from_secs(seconds_to_wait),
+                            move |act, _ctx| {
+                                info!(e3_id = %e3_id_clone, rank = rank, "Dispatching CommitteeFinalizeRequested event");
+
+                                trap(EType::Sortition, &act.bus.with_ec(&ec), || {
+                                    bus.publish(
+                                        CommitteeFinalizeRequested {
+                                            e3_id: e3_id_clone.clone(),
+                                        },
+                                        ec,
+                                    )?;
+                                    Ok(())
+                                });
+
+                                act.pending_committees.remove(&e3_id_clone.to_string());
+                            },
+                        );
+
+                        if let Some(existing) =
+                            act.pending_committees.insert(e3_id.to_string(), handle)
+                        {
+                            ctx.cancel_future(existing);
+                        }
+                    } else if attempt < MAX_FINALIZATION_SCHEDULE_ATTEMPTS {
+                        let next_attempt = attempt + 1;
+                        let retry_event = msg_for_retry.clone();
+                        let retry_e3_id = e3_id.clone();
+
+                        info!(
+                            e3_id = %retry_e3_id,
+                            attempt = next_attempt,
+                            retry_after_secs = FINALIZATION_SCHEDULE_RETRY_SECONDS,
+                            "Could not resolve local finalization schedule yet, retrying"
+                        );
+
+                        let handle = ctx.run_later(
+                            Duration::from_secs(FINALIZATION_SCHEDULE_RETRY_SECONDS),
+                            move |act, ctx| {
+                                act.pending_committees.remove(&retry_e3_id.to_string());
+                                ctx.notify(RetryCommitteeScheduling {
+                                    event: retry_event.clone(),
+                                    attempt: next_attempt,
+                                });
+                            },
+                        );
+
+                        if let Some(existing) =
+                            act.pending_committees.insert(e3_id.to_string(), handle)
+                        {
+                            ctx.cancel_future(existing);
+                        }
+                    } else {
+                        warn!(
+                            e3_id = %e3_id,
+                            attempts = attempt,
+                            "Unable to resolve local committee finalization rank after retries; skipping local scheduling"
+                        );
+                    }
+
+                    async {}.into_actor(act)
+                }),
+        );
+    }
 }
 
 impl Actor for CommitteeFinalizer {
@@ -102,121 +254,15 @@ impl Handler<TypedEvent<CommitteeRequested>> for CommitteeFinalizer {
         msg: TypedEvent<CommitteeRequested>,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let ec = msg.get_ctx().clone();
-        let e3_id = msg.e3_id.clone();
-        let committee_deadline = msg.committee_deadline;
-        let local_rank_request = GetLocalNodeSortitionRank {
-            e3_id: msg.e3_id.clone(),
-            seed: msg.seed,
-            threshold: msg.threshold,
-            chain_id: msg.chain_id,
-        };
-        let sortition = self.sortition.clone();
-        let e3_id_for_log = e3_id.clone();
-        let fut = async move {
-            // TODO: we should have no dependencies on e3_evm here. Reason being that this is core
-            // functionality and evm is shell. Shell can depend on core but core MUST not depend on
-            // shell. This means we should not hold an address to a shell actor even and should use
-            // the eventbus to communicate.
-            // see https://github.com/gnosisguild/enclave/issues/989
-            let current_timestamp = match e3_evm::helpers::get_current_timestamp().await {
-                Ok(timestamp) => timestamp,
-                Err(e) => {
-                    error!(
-                        e3_id = %e3_id_for_log,
-                        error = %e,
-                        "Failed to get current timestamp from RPC"
-                    );
-                    return None;
-                }
-            };
+        self.schedule_committee_finalization(msg, 0, ctx);
+    }
+}
 
-            let local_rank = match sortition.send(local_rank_request).await {
-                Ok(rank) => rank,
-                Err(e) => {
-                    error!(
-                        e3_id = %e3_id_for_log,
-                        error = %e,
-                        "Failed to get local sortition rank for committee finalization"
-                    );
-                    return None;
-                }
-            };
+impl Handler<RetryCommitteeScheduling> for CommitteeFinalizer {
+    type Result = ();
 
-            Some((current_timestamp, local_rank))
-        };
-
-        let e3_id_for_async = e3_id;
-        ctx.spawn(
-            fut.into_actor(self)
-                .then(move |result, act, ctx| {
-                    if let Some((current_timestamp, local_rank)) = result {
-                        if let Some(rank) = local_rank {
-                            let base_delay = if committee_deadline > current_timestamp {
-                                (committee_deadline - current_timestamp)
-                                    + FINALIZATION_BUFFER_SECONDS
-                            } else {
-                                info!(
-                                    e3_id = %e3_id_for_async,
-                                    committee_deadline = committee_deadline,
-                                    current_timestamp = current_timestamp,
-                                    "Submission deadline already passed, finalizing with fallback buffer"
-                                );
-                                FINALIZATION_BUFFER_SECONDS
-                            };
-                            let seconds_to_wait =
-                                base_delay + (rank * FINALIZATION_INTERVAL_SECONDS);
-
-                            info!(
-                                e3_id = %e3_id_for_async,
-                                committee_deadline = committee_deadline,
-                                current_timestamp = current_timestamp,
-                                rank = rank,
-                                seconds_to_wait = seconds_to_wait,
-                                "Scheduling committee finalization"
-                            );
-
-                            let bus = act.bus.clone();
-                            let e3_id_clone = e3_id_for_async.clone();
-
-                            let handle = ctx.run_later(
-                                Duration::from_secs(seconds_to_wait),
-                                move |act, _ctx| {
-                                    info!(e3_id = %e3_id_clone, rank = rank, "Dispatching CommitteeFinalizeRequested event");
-
-                                    trap(EType::Sortition, &act.bus.with_ec(&ec), || {
-                                        bus.publish(CommitteeFinalizeRequested {
-                                            e3_id: e3_id_clone.clone(),
-                                        },ec)?;
-                                        Ok(())
-                                    });
-
-                                    act.pending_committees.remove(&e3_id_clone.to_string());
-                                },
-                            );
-
-                            if let Some(existing) = act
-                                .pending_committees
-                                .insert(e3_id_for_async.to_string(), handle)
-                            {
-                                ctx.cancel_future(existing);
-                            }
-                        } else {
-                            info!(
-                                e3_id = %e3_id_for_async,
-                                "Node is outside the local pre-finalization committee ranking, skipping finalize scheduling"
-                            );
-                        }
-                    } else {
-                        error!(
-                            e3_id = %e3_id_for_async,
-                            "Skipping committee finalization due to timestamp or sortition lookup failure"
-                        );
-                    }
-
-                    async {}.into_actor(act)
-                }),
-        );
+    fn handle(&mut self, msg: RetryCommitteeScheduling, ctx: &mut Self::Context) -> Self::Result {
+        self.schedule_committee_finalization(msg.event, msg.attempt, ctx);
     }
 }
 

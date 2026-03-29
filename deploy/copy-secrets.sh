@@ -24,7 +24,16 @@ NETWORK_KEY_CN1="0x11a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f
 NETWORK_KEY_CN2="0x21a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 NETWORK_KEY_CN3="0x31a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 NETWORK_KEY_CN4="0x41a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
-NET_KEYS=($NETWORK_KEY_CN1 $NETWORK_KEY_CN2 $NETWORK_KEY_CN3 $NETWORK_KEY_CN4)
+
+get_network_private_key() {
+    case "$1" in
+        cn1) printf '%s\n' "$NETWORK_KEY_CN1" ;;
+        cn2) printf '%s\n' "$NETWORK_KEY_CN2" ;;
+        cn3) printf '%s\n' "$NETWORK_KEY_CN3" ;;
+        cn4) printf '%s\n' "$NETWORK_KEY_CN4" ;;
+        *) printf '%s\n' "" ;;
+    esac
+}
 
 # Check if source file exists
 if [ ! -f "$SOURCE" ]; then
@@ -32,17 +41,21 @@ if [ ! -f "$SOURCE" ]; then
     exit 1
 fi
 
-i=0
 # Copy file to each target, skipping if exists
 for target in "${TARGETS[@]}"; do
+    key="$(get_network_private_key "$target")"
+    if [ -z "$key" ]; then
+        echo "Error: No network private key configured for $target"
+        exit 1
+    fi
+
     if [ -f "${target}.secrets.json" ]; then
         echo "Skipping ${target}.secrets.json - file already exists"
     else
         cp "$SOURCE" "${target}.secrets.json"
-        set_network_private_key "${target}" "${NET_KEYS[$i]}"
+        set_network_private_key "${target}" "$key"
         echo "Created ${target}.secrets.json"
     fi
-    ((i++))
 done
 
 echo "Copy operation completed!"

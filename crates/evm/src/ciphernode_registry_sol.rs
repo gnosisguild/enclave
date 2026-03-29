@@ -425,17 +425,21 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<CommitteeFinalizeRe
         let bus = self.bus.clone();
 
         Box::pin(async move {
-            match should_finalize_committee(provider.clone(), contract_address, e3_id.clone()).await
+            match should_skip_finalize_committee_submission(
+                provider.clone(),
+                contract_address,
+                e3_id.clone(),
+            )
+            .await
             {
-                Ok(false) => {
-                    info!(e3_id = %e3_id, "Committee already finalized or no longer requested, skipping finalizeCommittee submission");
+                Ok(true) => {
+                    info!(e3_id = %e3_id, "Committee is already terminal on-chain, skipping finalizeCommittee submission");
                     return;
                 }
                 Err(err) => {
-                    bus.err(EType::Evm, err);
-                    return;
+                    info!(e3_id = %e3_id, error = %err, "Committee finalize preflight unavailable, proceeding to tx path");
                 }
-                Ok(true) => {}
+                Ok(false) => {}
             }
 
             info!("Finalizing committee for E3 {:?}", e3_id);
@@ -505,22 +509,21 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                 sleep(delay).await;
             }
 
-            match should_submit_committee_public_key(
+            match should_skip_committee_public_key_submission(
                 provider.clone(),
                 contract_address,
                 e3_id.clone(),
             )
             .await
             {
-                Ok(false) => {
-                    info!(e3_id = %e3_id, node = %my_address, rank = rank, "Public key already published or committee not finalizable, skipping committee publication");
+                Ok(true) => {
+                    info!(e3_id = %e3_id, node = %my_address, rank = rank, "Committee public key is already published on-chain, skipping committee publication");
                     return;
                 }
                 Err(err) => {
-                    bus.err(EType::Evm, err);
-                    return;
+                    info!(e3_id = %e3_id, node = %my_address, rank = rank, error = %err, "Committee publication preflight unavailable, proceeding to tx path");
                 }
-                Ok(true) => {}
+                Ok(false) => {}
             }
 
             let result = publish_committee_to_registry(
@@ -625,7 +628,9 @@ pub async fn finalize_committee_on_registry<P: Provider + WalletProvider + Clone
     .await
 }
 
-async fn should_finalize_committee<P: Provider + WalletProvider + Clone + 'static>(
+async fn should_skip_finalize_committee_submission<
+    P: Provider + WalletProvider + Clone + 'static,
+>(
     provider: EthProvider<P>,
     contract_address: Address,
     e3_id: E3id,
@@ -633,23 +638,20 @@ async fn should_finalize_committee<P: Provider + WalletProvider + Clone + 'stati
     let e3_id_u256: U256 = e3_id.try_into()?;
     let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
     let stage = contract.getCommitteeStage(e3_id_u256).call().await?;
-    Ok(stage == 1u8)
+    Ok(matches!(stage, 2u8 | 3u8))
 }
 
-async fn should_submit_committee_public_key<P: Provider + WalletProvider + Clone + 'static>(
+async fn should_skip_committee_public_key_submission<
+    P: Provider + WalletProvider + Clone + 'static,
+>(
     provider: EthProvider<P>,
     contract_address: Address,
     e3_id: E3id,
 ) -> Result<bool> {
     let e3_id_u256: U256 = e3_id.try_into()?;
     let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    let stage = contract.getCommitteeStage(e3_id_u256).call().await?;
-    if stage != 2u8 {
-        return Ok(false);
-    }
-
     let public_key_hash = contract.publicKeyHashes(e3_id_u256).call().await?;
-    Ok(public_key_hash == B256::ZERO)
+    Ok(public_key_hash != B256::ZERO)
 }
 
 async fn aggregator_submission_rank_for_e3(

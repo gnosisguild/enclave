@@ -16,6 +16,21 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     /// @notice Configurable threshold M per E3 for testing
     mapping(uint256 e3Id => uint32 threshold) private _thresholdM;
 
+    /// @notice Configurable lifecycle stage per E3 for testing
+    mapping(uint256 e3Id => CommitteeStage stage) private _committeeStage;
+
+    /// @notice Tracks whether a stage was explicitly configured for an E3
+    mapping(uint256 e3Id => bool configured) private _stageConfigured;
+
+    /// @notice Configurable committee deadline per E3 for testing
+    mapping(uint256 e3Id => uint256 deadline) private _committeeDeadline;
+
+    /// @notice Configurable public key hash per E3 for testing
+    mapping(uint256 e3Id => bytes32 hash) private _publicKeyHash;
+
+    /// @notice Tracks whether a public key hash was explicitly configured for an E3
+    mapping(uint256 e3Id => bool configured) private _publicKeyHashConfigured;
+
     /// @notice Set committee members for an E3 (test helper)
     function setCommitteeNodes(
         uint256 e3Id,
@@ -32,35 +47,61 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         _thresholdM[e3Id] = m;
     }
 
+    /// @notice Set the committee stage for an E3 (test helper)
+    function setCommitteeStage(uint256 e3Id, CommitteeStage stage) external {
+        _committeeStage[e3Id] = stage;
+        _stageConfigured[e3Id] = true;
+    }
+
+    /// @notice Set the committee deadline for an E3 (test helper)
+    function setCommitteeDeadline(uint256 e3Id, uint256 deadline) external {
+        _committeeDeadline[e3Id] = deadline;
+    }
+
+    /// @notice Set the published public key hash for an E3 (test helper)
+    function setPublicKeyHash(uint256 e3Id, bytes32 publicKeyHash) external {
+        _publicKeyHash[e3Id] = publicKeyHash;
+        _publicKeyHashConfigured[e3Id] = true;
+    }
+
     function requestCommittee(
+        uint256 e3Id,
         uint256,
-        uint256,
-        uint32[2] calldata
-    ) external pure returns (bool success) {
+        uint32[2] calldata threshold
+    ) external returns (bool success) {
+        _committeeStage[e3Id] = CommitteeStage.Requested;
+        _stageConfigured[e3Id] = true;
+        _committeeDeadline[e3Id] = block.timestamp + 10;
+        _thresholdM[e3Id] = threshold[0];
+        _publicKeyHash[e3Id] = bytes32(0);
+        _publicKeyHashConfigured[e3Id] = true;
         success = true;
     }
 
-    function getCommitteeDeadline(uint256) external view returns (uint256) {
-        return block.timestamp + 10;
+    function getCommitteeDeadline(
+        uint256 e3Id
+    ) external view returns (uint256) {
+        uint256 deadline = _committeeDeadline[e3Id];
+        return deadline == 0 ? block.timestamp + 10 : deadline;
     }
 
     function isEnabled(address) external pure returns (bool) {
         return true;
     }
 
-    function committeePublicKey(uint256 e3Id) external pure returns (bytes32) {
-        if (e3Id == type(uint256).max) {
-            return bytes32(0);
-        } else {
-            return keccak256(abi.encode(e3Id));
+    function committeePublicKey(uint256 e3Id) external view returns (bytes32) {
+        bytes32 publicKeyHash = _publicKeyHashConfigured[e3Id]
+            ? _publicKeyHash[e3Id]
+            : bytes32(0);
+        if (publicKeyHash == bytes32(0)) {
+            revert CommitteeNotPublished();
         }
+        return publicKeyHash;
     }
 
-    function publicKeyHashes(uint256 e3Id) external pure returns (bytes32) {
-        if (e3Id == type(uint256).max) {
-            return bytes32(0);
-        }
-        return keccak256(abi.encode(e3Id));
+    function publicKeyHashes(uint256 e3Id) external view returns (bytes32) {
+        return
+            _publicKeyHashConfigured[e3Id] ? _publicKeyHash[e3Id] : bytes32(0);
     }
 
     function isCiphernodeEligible(address) external pure returns (bool) {
@@ -74,12 +115,17 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function removeCiphernode(address) external pure {}
 
     function publishCommittee(
-        uint256,
+        uint256 e3Id,
         address[] calldata,
-        bytes calldata,
+        bytes calldata publicKey,
         bytes calldata,
         bytes calldata
-    ) external pure {} // solhint-disable-line no-empty-blocks
+    ) external {
+        _committeeStage[e3Id] = CommitteeStage.Finalized;
+        _stageConfigured[e3Id] = true;
+        _publicKeyHash[e3Id] = keccak256(publicKey);
+        _publicKeyHashConfigured[e3Id] = true;
+    }
 
     function getCommitteeNodes(
         uint256 e3Id
@@ -117,14 +163,19 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function submitTicket(uint256, uint256) external pure {}
 
     // solhint-disable-next-line no-empty-blocks
-    function finalizeCommittee(uint256) external pure returns (bool) {
+    function finalizeCommittee(uint256 e3Id) external returns (bool) {
+        _committeeStage[e3Id] = CommitteeStage.Finalized;
+        _stageConfigured[e3Id] = true;
         return true;
     }
 
     function getCommitteeStage(
-        uint256
-    ) external pure returns (ICiphernodeRegistry.CommitteeStage) {
-        return ICiphernodeRegistry.CommitteeStage.Finalized;
+        uint256 e3Id
+    ) external view returns (ICiphernodeRegistry.CommitteeStage) {
+        return
+            _stageConfigured[e3Id]
+                ? _committeeStage[e3Id]
+                : ICiphernodeRegistry.CommitteeStage.None;
     }
 
     function sortitionSubmissionWindow() external pure returns (uint256) {

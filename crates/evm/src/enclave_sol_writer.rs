@@ -194,22 +194,21 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                     sleep(delay).await;
                 }
 
-                match should_submit_plaintext_output(
+                match should_skip_plaintext_output_submission(
                     provider.clone(),
                     contract_address,
                     e3_id.clone(),
                 )
                 .await
                 {
-                    Ok(false) => {
-                        info!(e3_id = %e3_id, node = %my_address, rank = rank, "Plaintext already published or E3 no longer in CiphertextReady, skipping plaintext submission");
+                    Ok(true) => {
+                        info!(e3_id = %e3_id, node = %my_address, rank = rank, "Plaintext submission is already terminal on-chain, skipping plaintext submission");
                         return;
                     }
                     Err(err) => {
-                        bus.err(EType::Evm, err);
-                        return;
+                        info!(e3_id = %e3_id, node = %my_address, rank = rank, error = %err, "Plaintext submission preflight unavailable, proceeding to tx path");
                     }
-                    Ok(true) => {}
+                    Ok(false) => {}
                 }
 
                 let result = publish_plaintext_output(
@@ -311,7 +310,7 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
 
     send_tx_with_retry(
         "publishPlaintextOutput",
-        &["CiphertextOutputNotPublished"],
+        &["CiphertextOutputNotPublished", "InvalidStage"],
         || {
             info!("publishPlaintextOutput() e3_id={:?}", e3_id);
             let decrypted_output = Bytes::from(decrypted_output.clone());
@@ -331,7 +330,7 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     .await
 }
 
-async fn should_submit_plaintext_output<P: Provider + WalletProvider + Clone>(
+async fn should_skip_plaintext_output_submission<P: Provider + WalletProvider + Clone>(
     provider: EthProvider<P>,
     contract_address: Address,
     e3_id: E3id,
@@ -339,7 +338,7 @@ async fn should_submit_plaintext_output<P: Provider + WalletProvider + Clone>(
     let e3_id_u256: U256 = e3_id.try_into()?;
     let contract = IEnclave::new(contract_address, provider.provider());
     let stage = contract.getE3Stage(e3_id_u256).call().await?;
-    Ok(stage == 4u8)
+    Ok(matches!(stage, 5u8 | 6u8))
 }
 
 async fn aggregator_submission_rank_for_e3(

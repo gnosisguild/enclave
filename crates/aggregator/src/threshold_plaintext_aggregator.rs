@@ -254,6 +254,7 @@ impl ThresholdPlaintextAggregator {
     fn handle_member_expelled(
         &mut self,
         party_id: u64,
+        active_count_after: u64,
         node: &str,
         ec: &EventContext<Sequenced>,
     ) -> Result<()> {
@@ -263,20 +264,44 @@ impl ThresholdPlaintextAggregator {
                     data.shares.remove(&party_id);
                     data.c6_proofs.remove(&party_id);
                     data.c6_wrapped_proofs.remove(&party_id);
-                    ThresholdPlaintextAggregatorState::Collecting(data)
+                    data.threshold_n = active_count_after;
+
+                    if active_count_after > 0 && (data.shares.len() as u64) >= active_count_after {
+                        info!(
+                            e3_id = %self.e3_id,
+                            party_id = party_id,
+                            active_count_after = active_count_after,
+                            "Collected all remaining active plaintext shares after expulsion, transitioning to VerifyingC6"
+                        );
+
+                        ThresholdPlaintextAggregatorState::VerifyingC6(VerifyingC6 {
+                            threshold_m: data.threshold_m,
+                            threshold_n: active_count_after,
+                            shares: data.shares,
+                            c6_proofs: data.c6_proofs,
+                            c6_wrapped_proofs: data.c6_wrapped_proofs,
+                            ciphertext_output: data.ciphertext_output,
+                            params: data.params,
+                        })
+                    } else {
+                        ThresholdPlaintextAggregatorState::Collecting(data)
+                    }
                 }
                 ThresholdPlaintextAggregatorState::VerifyingC6(mut data) => {
                     data.shares.remove(&party_id);
                     data.c6_proofs.remove(&party_id);
                     data.c6_wrapped_proofs.remove(&party_id);
+                    data.threshold_n = active_count_after;
                     ThresholdPlaintextAggregatorState::VerifyingC6(data)
                 }
                 ThresholdPlaintextAggregatorState::Computing(mut data) => {
                     data.shares.retain(|(id, _)| *id != party_id);
+                    data.threshold_n = active_count_after;
                     ThresholdPlaintextAggregatorState::Computing(data)
                 }
                 ThresholdPlaintextAggregatorState::GeneratingC7Proof(mut data) => {
                     data.shares.retain(|(id, _)| *id != party_id);
+                    data.threshold_n = active_count_after;
                     ThresholdPlaintextAggregatorState::GeneratingC7Proof(data)
                 }
                 ThresholdPlaintextAggregatorState::Complete(mut data) => {
@@ -899,7 +924,12 @@ impl Handler<TypedEvent<CommitteeMemberExpelled>> for ThresholdPlaintextAggregat
         }
 
         trap(EType::PlaintextAggregation, &self.bus.with_ec(&ec), || {
-            self.handle_member_expelled(party_id, &msg.node.to_string(), &ec)?;
+            self.handle_member_expelled(
+                party_id,
+                msg.active_count_after,
+                &msg.node.to_string(),
+                &ec,
+            )?;
 
             if matches!(self.duty, AggregationDuty::Inactive) {
                 ctx.stop();
