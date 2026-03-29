@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    error_decoder::format_evm_error,
+    error_decoder::{decode_error_from_str, format_evm_error},
     events::{EnclaveEvmEvent, EvmEventProcessor},
     evm_parser::EvmParser,
     helpers::{encode_zk_proof, get_current_timestamp, send_tx_with_retry, EthProvider},
@@ -630,11 +630,22 @@ async fn should_publish_committee<P: Provider + WalletProvider + Clone + 'static
 ) -> Result<bool> {
     let e3_id_u256: U256 = e3_id.try_into()?;
     let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    Ok(contract
-        .committeePublicKey(e3_id_u256)
-        .call()
-        .await
-        .is_err())
+    match contract.committeePublicKey(e3_id_u256).call().await {
+        Ok(_) => Ok(false),
+        Err(err) => {
+            let err = anyhow::Error::from(err);
+            let decoded = decode_error_from_str(&format!("{err:?}"));
+
+            if decoded
+                .as_deref()
+                .is_some_and(|message| message.contains("CommitteeNotPublished"))
+            {
+                return Ok(true);
+            }
+
+            Err(err)
+        }
+    }
 }
 
 pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone + 'static>(

@@ -72,7 +72,15 @@ pnpm committee:new \
 wait_for_committee_pubkey 0 "$SCRIPT_DIR/output/pubkey.bin"
 
 ACTIVE_AGG_ADDRESS=$(wait_for_active_aggregator_address 0)
-ACTIVE_AGG=$(node_name_for_address "$ACTIVE_AGG_ADDRESS")
+if ! ACTIVE_AGG=$(node_name_for_address "$ACTIVE_AGG_ADDRESS"); then
+  echo "Failed to resolve active aggregator node name for address: $ACTIVE_AGG_ADDRESS" >&2
+  exit 1
+fi
+
+if [[ -z "$ACTIVE_AGG" ]]; then
+  echo "Resolved empty active aggregator node name for address: $ACTIVE_AGG_ADDRESS" >&2
+  exit 1
+fi
 
 # kill active aggregator
 enclave_nodes_stop "$ACTIVE_AGG"

@@ -189,7 +189,8 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     /// @notice Publishes a committee for an E3 computation
-    /// @dev Permissionless once the committee is finalized. Verification of C5 proof is done in Enclave.onCommitteePublished.
+    /// @dev Permissionless once the committee is finalized. Verification of C5 proof is
+    /// done in Enclave.onCommitteePublished.
     /// @param e3Id ID of the E3 computation
     /// @param nodes Array of ciphernode addresses selected for the committee
     /// @param publicKey Aggregated public key of the committee

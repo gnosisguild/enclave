@@ -9,11 +9,11 @@ import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import path from "path";
 
-import { readDeploymentArgs } from "../scripts/utils";
 import {
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
   Enclave__factory as EnclaveFactory,
 } from "../types";
+import { readDeploymentArgs } from "../scripts/utils";
 
 function ensureParentDir(filePath: string): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -435,6 +435,12 @@ export const getActiveAggregator = task(
       const { registry } = await getRegistryConnection(hre);
       const [activeNodes, activeScores] =
         await registry.getActiveCommitteeNodes(e3Id);
+
+      if (activeNodes.length !== activeScores.length) {
+        throw new Error(
+          `Mismatched active committee data for e3Id=${e3Id}: nodes=${activeNodes.length}, scores=${activeScores.length}`,
+        );
+      }
 
       if (activeNodes.length === 0) {
         throw new Error(`No active committee nodes found for e3Id=${e3Id}`);
