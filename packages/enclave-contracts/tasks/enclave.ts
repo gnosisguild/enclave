@@ -12,7 +12,7 @@ import path from "path";
 import {
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
   Enclave__factory as EnclaveFactory,
-} from "../types";
+} from "../types/index.js";
 import { readDeploymentArgs } from "../scripts/utils";
 
 function ensureParentDir(filePath: string): void {
