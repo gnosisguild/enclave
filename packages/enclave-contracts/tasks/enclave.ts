@@ -7,8 +7,67 @@ import { BigNumberish, ZeroAddress, zeroPadValue } from "ethers";
 import fs from "fs";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
+import path from "path";
 
 import { readDeploymentArgs } from "../scripts/utils";
+import {
+  CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
+  Enclave__factory as EnclaveFactory,
+} from "../types";
+
+function ensureParentDir(filePath: string): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+}
+
+function decodePlaintextBytesToCsv(bytes: Uint8Array): string {
+  if (bytes.length % 8 !== 0) {
+    throw new Error("Plaintext output length must be a multiple of 8 bytes");
+  }
+
+  const values: string[] = [];
+  for (let index = 0; index < bytes.length; index += 8) {
+    let value = 0n;
+    for (let offset = 0; offset < 8; offset++) {
+      value |= BigInt(bytes[index + offset]!) << BigInt(offset * 8);
+    }
+    values.push(value.toString());
+  }
+
+  return values.join(",");
+}
+
+async function getRegistryConnection(hre: any) {
+  const { ethers } = await hre.network.connect();
+  const [signer] = await ethers.getSigners();
+  const chain = hre.globalOptions.network;
+  const deployment = readDeploymentArgs("CiphernodeRegistryOwnable", chain);
+
+  if (!deployment?.address) {
+    throw new Error("CiphernodeRegistryOwnable deployment not found");
+  }
+
+  return {
+    ethers,
+    deployment,
+    registry: CiphernodeRegistryFactory.connect(deployment.address, signer),
+  };
+}
+
+async function getEnclaveConnection(hre: any) {
+  const { ethers } = await hre.network.connect();
+  const [signer] = await ethers.getSigners();
+  const chain = hre.globalOptions.network;
+  const deployment = readDeploymentArgs("Enclave", chain);
+
+  if (!deployment?.address) {
+    throw new Error("Enclave deployment not found");
+  }
+
+  return {
+    ethers,
+    enclave: EnclaveFactory.connect(deployment.address, signer),
+  };
+}
 
 export const requestCommittee = task(
   "committee:new",
@@ -315,6 +374,89 @@ export const publishCommittee = task(
   }))
   .build();
 
+export const getCommitteePublicKey = task(
+  "committee:getPublicKey",
+  "Read the latest published committee public key for an E3",
+)
+  .addOption({
+    name: "e3Id",
+    description: "Id of the E3 program",
+    defaultValue: 0,
+    type: ArgumentType.INT,
+  })
+  .addOption({
+    name: "outFile",
+    description: "file to write the raw committee public key bytes to",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .setAction(async () => ({
+    default: async ({ e3Id, outFile }, hre) => {
+      const { ethers, deployment, registry } = await getRegistryConnection(hre);
+      const filter = registry.filters.CommitteePublished(e3Id);
+      const logs = await registry.queryFilter(
+        filter,
+        deployment.blockNumber ?? 0,
+        "latest",
+      );
+      const event = logs.at(-1) as any;
+
+      if (!event) {
+        throw new Error(`CommitteePublished event not found for e3Id=${e3Id}`);
+      }
+
+      const publicKey = (event.args.publicKey ?? event.args[2]) as string;
+      if (!publicKey || publicKey === "0x") {
+        throw new Error(`Committee public key is empty for e3Id=${e3Id}`);
+      }
+
+      if (outFile) {
+        ensureParentDir(outFile);
+        fs.writeFileSync(outFile, Buffer.from(ethers.getBytes(publicKey)));
+      }
+
+      console.log(publicKey);
+    },
+  }))
+  .build();
+
+export const getActiveAggregator = task(
+  "committee:getActiveAggregator",
+  "Read the active aggregator address for an E3",
+)
+  .addOption({
+    name: "e3Id",
+    description: "Id of the E3 program",
+    defaultValue: 0,
+    type: ArgumentType.INT,
+  })
+  .setAction(async () => ({
+    default: async ({ e3Id }, hre) => {
+      const { registry } = await getRegistryConnection(hre);
+      const [activeNodes, activeScores] =
+        await registry.getActiveCommitteeNodes(e3Id);
+
+      if (activeNodes.length === 0) {
+        throw new Error(`No active committee nodes found for e3Id=${e3Id}`);
+      }
+
+      const [activeAggregator] = activeNodes
+        .map((node, index) => ({
+          node,
+          score: activeScores[index],
+          index,
+        }))
+        .sort((left, right) => {
+          if (left.score < right.score) return -1;
+          if (left.score > right.score) return 1;
+          return left.index - right.index;
+        });
+
+      console.log(activeAggregator.node);
+    },
+  }))
+  .build();
+
 export const publishCiphertext = task(
   "e3:publishCiphertext",
   "Publish ciphertext output for an E3 program",
@@ -477,6 +619,45 @@ export const publishPlaintext = task(
       await tx.wait();
 
       console.log(`Plaintext published`);
+    },
+  }))
+  .build();
+
+export const getPlaintextOutput = task(
+  "e3:getPlaintext",
+  "Read the published plaintext output for an E3",
+)
+  .addOption({
+    name: "e3Id",
+    description: "Id of the E3 program",
+    defaultValue: 0,
+    type: ArgumentType.INT,
+  })
+  .addOption({
+    name: "outFile",
+    description: "file to write the decoded plaintext CSV output to",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .setAction(async () => ({
+    default: async ({ e3Id, outFile }, hre) => {
+      const { ethers, enclave } = await getEnclaveConnection(hre);
+      const e3 = await enclave.getE3(e3Id);
+
+      if (!e3.plaintextOutput || e3.plaintextOutput === "0x") {
+        throw new Error(`Plaintext output not published for e3Id=${e3Id}`);
+      }
+
+      const decoded = decodePlaintextBytesToCsv(
+        ethers.getBytes(e3.plaintextOutput),
+      );
+
+      if (outFile) {
+        ensureParentDir(outFile);
+        fs.writeFileSync(outFile, decoded);
+      }
+
+      console.log(decoded);
     },
   }))
   .build();

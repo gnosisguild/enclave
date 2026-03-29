@@ -149,7 +149,7 @@ publishPlaintextOutput() succeeds
 ├─ ON-CHAIN:
 │   ├─ stage = Complete
 │   ├─ _distributeRewards(e3Id)
-│   │   ├─ activeNodes = ciphernodeRegistry.getActiveCommitteeNodes(e3Id)
+│   │   ├─ (activeNodes, _) = ciphernodeRegistry.getActiveCommitteeNodes(e3Id)
 │   │   ├─ perNode = payment / activeNodes.length
 │   │   ├─ dust → last member
 │   │   ├─ if activeNodes.length == 0: refund payment to requester
@@ -177,13 +177,15 @@ publishPlaintextOutput() succeeds
     │   → Node becomes available for future E3s
     │   → Removes e3_id from node_state.e3_committees map
     │
-    ├─ CiphernodeSelector: removes e3_id from e3_cache
+    ├─ CiphernodeSelector: removes e3_id from e3_cache, committee, expelled set,
+    │  and persisted aggregator designation for the E3
     │
     ├─ Per-E3 actors receive Die / shutdown on completion:
     │   ├─ ThresholdKeyshare: state = Completed, actor stops
     │   ├─ PublicKeyAggregator: actor stops
     │   ├─ ThresholdPlaintextAggregator: actor stops
-    │   └─ KeyshareCreatedFilterBuffer: no new E3 events after context teardown
+    │   ├─ KeyshareCreatedFilterBuffer: no new E3 events after context teardown
+    │   └─ DecryptionshareCreatedBuffer: no new E3 events after context teardown
     │
     └─ E3Router: removes E3Context for this e3_id
         → All per-E3 state fully cleaned up
@@ -206,12 +208,13 @@ enclave start → running node
 
 On restart:
 ├─ Sync module replays:
-│   1. Load snapshot metadata
-│   2. Replay EventStore events since last snapshot
-│   3. Fetch historical EVM events from last known block
-│   4. Sort & publish merged events by HLC timestamp
-│   5. Enable effects (writers activated)
-│   6. SyncEnded → live operations begin
+│   1. Load snapshot metadata and hydrate persisted per-E3 state
+│   2. CiphernodeSelector emits persisted AggregatorChanged state before replay
+│   3. Replay EventStore events since last snapshot (effects still disabled)
+│   4. Fetch historical EVM events from last known block
+│   5. Sort & publish merged events by HLC timestamp
+│   6. Enable effects (writers may submit only after this point)
+│   7. SyncEnded → live operations begin
 └─ Node resumes from where it left off
 ```
 

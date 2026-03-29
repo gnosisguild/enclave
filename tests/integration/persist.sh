@@ -20,8 +20,6 @@ done
 pnpm evm:clean
 pnpm evm:deploy --network localhost
 
-# set wallet to ag specifically
-enclave_wallet_set ag "$PRIVATE_KEY_AG"
 enclave_wallet_set cn1 "$PRIVATE_KEY_CN1"
 enclave_wallet_set cn2 "$PRIVATE_KEY_CN2"
 enclave_wallet_set cn3 "$PRIVATE_KEY_CN3"
@@ -71,15 +69,18 @@ pnpm committee:new \
   --committee-size 0 \
   --proof-aggregation-enabled true
 
-waiton "$SCRIPT_DIR/output/pubkey.bin"
+wait_for_committee_pubkey 0 "$SCRIPT_DIR/output/pubkey.bin"
 
-# kill aggregator
-enclave_nodes_stop ag
+ACTIVE_AGG_ADDRESS=$(wait_for_active_aggregator_address 0)
+ACTIVE_AGG=$(node_name_for_address "$ACTIVE_AGG_ADDRESS")
+
+# kill active aggregator
+enclave_nodes_stop "$ACTIVE_AGG"
 
 sleep 8
 
-# relaunch the aggregator
-enclave_nodes_start ag
+# relaunch the active aggregator
+enclave_nodes_start "$ACTIVE_AGG"
 
 sleep 8
 
@@ -96,7 +97,7 @@ waiton "$SCRIPT_DIR/output/output.bin"
 heading "Publish ciphertext to EVM"
 pnpm e3:publishCiphertext --e3-id 0 --network localhost --data-file "$SCRIPT_DIR/output/output.bin" --proof 0x12345678
 
-waiton "$SCRIPT_DIR/output/plaintext.txt"
+wait_for_plaintext_output 0 "$SCRIPT_DIR/output/plaintext.txt"
 
 ACTUAL=$(cut -d',' -f1,2 $SCRIPT_DIR/output/plaintext.txt)
 

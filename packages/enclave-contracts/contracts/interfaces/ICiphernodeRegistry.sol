@@ -422,9 +422,10 @@ interface ICiphernodeRegistry {
     /// @notice Get active (non-expelled) committee nodes for an E3
     /// @param e3Id ID of the E3 computation
     /// @return nodes Array of active committee member addresses
+    /// @return scores Array of active committee member ticket scores aligned with `nodes`
     function getActiveCommitteeNodes(
         uint256 e3Id
-    ) external view returns (address[] memory nodes);
+    ) external view returns (address[] memory nodes, uint256[] memory scores);
 
     /// @notice Consolidated committee viability check — avoids two separate view calls.
     /// @param e3Id ID of the E3 computation

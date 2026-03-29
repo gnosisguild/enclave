@@ -9,26 +9,19 @@ use actix::Message;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum TicketId {
-    Score(u64),
-}
-
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct TicketGenerated {
+pub struct AggregatorChanged {
     pub e3_id: E3id,
-    pub ticket_id: TicketId,
-    pub node: String,
-    pub party_index: Option<u64>,
+    pub is_aggregator: bool,
 }
 
-impl Display for TicketGenerated {
+impl Display for AggregatorChanged {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "e3_id: {}, ticket_id: {:?}, node: {}, party_index: {:?}",
-            self.e3_id, self.ticket_id, self.node, self.party_index
+            "AggregatorChanged {{ e3_id: {}, is_aggregator: {} }}",
+            self.e3_id, self.is_aggregator
         )
     }
 }

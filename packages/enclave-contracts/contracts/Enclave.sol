@@ -437,7 +437,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ///      Any division dust is sent to the last member rather than being lost.
     /// @param e3Id The ID of the E3 for which to distribute rewards.
     function _distributeRewards(uint256 e3Id) internal {
-        address[] memory activeNodes = ciphernodeRegistry
+        (address[] memory activeNodes, ) = ciphernodeRegistry
             .getActiveCommitteeNodes(e3Id);
         uint256 activeLength = activeNodes.length;
 
@@ -535,8 +535,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         // Use active committee nodes (already filtered by expulsion)
         try ciphernodeRegistry.getActiveCommitteeNodes(e3Id) returns (
-            address[] memory nodes
+            address[] memory nodes,
+            uint256[] memory scores
         ) {
+            scores;
             return nodes;
         } catch {
             return new address[](0); // Committee not published (DKG failed)

@@ -19,15 +19,17 @@ use alloy::{
 };
 use anyhow::Result;
 use e3_events::BusHandle;
+use e3_events::E3RequestComplete;
+use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
 use e3_events::EventType;
 use e3_events::Shutdown;
-use e3_events::{prelude::*, EffectsEnabled};
-use e3_events::{run_once, EnclaveEvent};
+use e3_events::{prelude::*, AggregatorChanged, EffectsEnabled};
 use e3_events::{E3Stage, E3StageChanged};
 use e3_events::{E3id, EType, PlaintextAggregated, Proof};
 use e3_utils::NotifySync;
 use e3_utils::MAILBOX_LIMIT;
+use std::collections::HashMap;
 use tracing::info;
 
 sol!(
@@ -41,6 +43,8 @@ pub struct EnclaveSolWriter<P> {
     provider: EthProvider<P>,
     contract_address: Address,
     bus: BusHandle,
+    effects_enabled: bool,
+    active_aggregators: HashMap<E3id, bool>,
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
@@ -53,27 +57,30 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
             provider,
             contract_address,
             bus: bus.clone(),
+            effects_enabled: false,
+            active_aggregators: HashMap::new(),
         })
     }
 
     pub fn attach(bus: &BusHandle, provider: EthProvider<P>, contract_address: Address) {
-        let addr = run_once::<EffectsEnabled>({
-            let bus = bus.clone();
-            move |_| {
-                let addr = EnclaveSolWriter::new(&bus, provider, contract_address)?.start();
-                bus.subscribe_all(
-                    &[
-                        EventType::PlaintextAggregated,
-                        EventType::E3StageChanged,
-                        EventType::Shutdown,
-                    ],
-                    addr.clone().into(),
-                );
-                Ok(())
-            }
-        });
+        let addr = EnclaveSolWriter::new(bus, provider, contract_address)
+            .expect("failed to create EnclaveSolWriter")
+            .start();
+        bus.subscribe_all(
+            &[
+                EventType::EffectsEnabled,
+                EventType::AggregatorChanged,
+                EventType::PlaintextAggregated,
+                EventType::E3StageChanged,
+                EventType::E3RequestComplete,
+                EventType::Shutdown,
+            ],
+            addr.into(),
+        );
+    }
 
-        bus.subscribe(EventType::EffectsEnabled, addr.recipient());
+    fn is_active_aggregator_for(&self, e3_id: &E3id) -> bool {
+        self.active_aggregators.get(e3_id).copied().unwrap_or(false)
     }
 }
 
@@ -89,6 +96,8 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for E
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
+            EnclaveEventData::EffectsEnabled(data) => self.notify_sync(ctx, data),
+            EnclaveEventData::AggregatorChanged(data) => self.notify_sync(ctx, data),
             EnclaveEventData::PlaintextAggregated(data) => {
                 // Only publish if the src and destination chains match
                 if self.provider.chain_id() == data.e3_id.chain_id() {
@@ -104,9 +113,40 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for E
                     ctx.notify(data);
                 }
             }
+            EnclaveEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
             EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
+    }
+}
+
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<EffectsEnabled>
+    for EnclaveSolWriter<P>
+{
+    type Result = ();
+
+    fn handle(&mut self, _: EffectsEnabled, _: &mut Self::Context) -> Self::Result {
+        self.effects_enabled = true;
+    }
+}
+
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<AggregatorChanged>
+    for EnclaveSolWriter<P>
+{
+    type Result = ();
+
+    fn handle(&mut self, msg: AggregatorChanged, _: &mut Self::Context) -> Self::Result {
+        self.active_aggregators.insert(msg.e3_id, msg.is_aggregator);
+    }
+}
+
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<E3RequestComplete>
+    for EnclaveSolWriter<P>
+{
+    type Result = ();
+
+    fn handle(&mut self, msg: E3RequestComplete, _: &mut Self::Context) -> Self::Result {
+        self.active_aggregators.remove(&msg.e3_id);
     }
 }
 
@@ -116,6 +156,10 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, msg: PlaintextAggregated, _: &mut Self::Context) -> Self::Result {
+        if !self.effects_enabled || !self.is_active_aggregator_for(&msg.e3_id) {
+            return Box::pin(async {});
+        }
+
         Box::pin({
             let e3_id = msg.e3_id.clone();
             let decrypted_output = msg.decrypted_output.clone();
@@ -154,6 +198,26 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                     );
                     return;
                 }
+                match should_publish_plaintext(provider.clone(), contract_address, e3_id.clone())
+                    .await
+                {
+                    Ok(false) => {
+                        info!(e3_id = %e3_id, "Skipping publishPlaintextOutput; plaintext already published");
+                        return;
+                    }
+                    Err(err) => {
+                        bus.err(
+                            EType::Evm,
+                            anyhow::anyhow!(
+                                "Error preflighting plaintext publication: {}",
+                                format_evm_error(&err)
+                            ),
+                        );
+                        return;
+                    }
+                    Ok(true) => {}
+                }
+
                 let result = publish_plaintext_output(
                     provider,
                     contract_address,
@@ -196,6 +260,10 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<E3StageChanged>
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, msg: E3StageChanged, _: &mut Self::Context) -> Self::Result {
+        if !self.effects_enabled || !self.is_active_aggregator_for(&msg.e3_id) {
+            return Box::pin(async {});
+        }
+
         Box::pin({
             let contract_address = self.contract_address;
             let provider = self.provider.clone();
@@ -264,6 +332,17 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         },
     )
     .await
+}
+
+async fn should_publish_plaintext<P: Provider + WalletProvider + Clone>(
+    provider: EthProvider<P>,
+    contract_address: Address,
+    e3_id: E3id,
+) -> Result<bool> {
+    let e3_id: U256 = e3_id.try_into()?;
+    let contract = IEnclave::new(contract_address, provider.provider());
+    let e3 = contract.getE3(e3_id).call().await?;
+    Ok(e3.plaintextOutput.is_empty())
 }
 
 async fn process_e3_failure<P: Provider + WalletProvider + Clone>(

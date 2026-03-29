@@ -6,20 +6,34 @@
 
 use actix::prelude::*;
 use e3_events::{
-    prelude::*, run_once, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested,
-    E3Failed, E3Stage, E3StageChanged, EType, EffectsEnabled, EnclaveEvent, EnclaveEventData,
-    EventType, Shutdown, TypedEvent,
+    prelude::*, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, E3Failed,
+    E3RequestComplete, E3Stage, E3StageChanged, EType, EffectsEnabled, EnclaveEvent,
+    EnclaveEventData, EventType, Shutdown, TicketGenerated, TypedEvent,
 };
+use e3_events::{E3id, EventContext, Sequenced};
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use std::collections::HashMap;
 use std::time::Duration;
 use tracing::{error, info};
+
+const FINALIZATION_BUFFER_SECONDS: u64 = 1;
+const FINALIZE_INTERVAL_SECONDS: u64 = 5;
+
+#[derive(Clone)]
+struct PendingCommitteeRequest {
+    e3_id: E3id,
+    committee_deadline: u64,
+    ec: EventContext<Sequenced>,
+}
 
 /// CommitteeFinalizer is an actor that listens to CommitteeRequested events and dispatches
 /// CommitteeFinalizeRequested events after the submission deadline has passed.
 pub struct CommitteeFinalizer {
     bus: BusHandle,
     pending_committees: HashMap<String, SpawnHandle>,
+    pending_requests: HashMap<String, PendingCommitteeRequest>,
+    party_indexes: HashMap<String, u64>,
+    effects_enabled: bool,
 }
 
 impl CommitteeFinalizer {
@@ -27,6 +41,9 @@ impl CommitteeFinalizer {
         Self {
             bus: bus.clone(),
             pending_committees: HashMap::new(),
+            pending_requests: HashMap::new(),
+            party_indexes: HashMap::new(),
+            effects_enabled: false,
         }
     }
 
@@ -39,26 +56,111 @@ impl CommitteeFinalizer {
                 EventType::Shutdown,
                 EventType::E3Failed,
                 EventType::E3StageChanged,
+                EventType::E3RequestComplete,
+                EventType::TicketGenerated,
+                EventType::CommitteeRequested,
+                EventType::EffectsEnabled,
             ],
             addr.clone().recipient(),
         );
 
-        // Gate CommitteeRequested behind EffectsEnabled — finalization should not
-        // be scheduled during historical event replay.
-        bus.subscribe(
-            EventType::EffectsEnabled,
-            run_once::<EffectsEnabled>({
-                let bus = bus.clone();
-                let addr = addr.clone();
-                move |_| {
-                    bus.subscribe(EventType::CommitteeRequested, addr.into());
-                    Ok(())
-                }
-            })
-            .recipient(),
-        );
-
         addr
+    }
+
+    fn schedule_committee(
+        &mut self,
+        e3_id: String,
+        request: PendingCommitteeRequest,
+        party_index: u64,
+        ctx: &mut Context<Self>,
+    ) {
+        if self.pending_committees.contains_key(&e3_id) {
+            return;
+        }
+
+        let committee_deadline = request.committee_deadline;
+        let request_e3_id = request.e3_id.clone();
+        let ec = request.ec.clone();
+        let e3_id_for_async = e3_id.clone();
+
+        let fut = async move {
+            match e3_evm::helpers::get_current_timestamp().await {
+                Ok(timestamp) => Some(timestamp),
+                Err(e) => {
+                    error!(
+                        e3_id = %e3_id_for_async,
+                        error = %e,
+                        "Failed to get current timestamp from RPC"
+                    );
+                    None
+                }
+            }
+        };
+
+        ctx.spawn(
+            fut.into_actor(self)
+                .then(move |current_timestamp, act, ctx| {
+                    if let Some(current_timestamp) = current_timestamp {
+                        let seconds_until_deadline = if committee_deadline > current_timestamp {
+                            committee_deadline - current_timestamp
+                        } else {
+                            0
+                        } + FINALIZATION_BUFFER_SECONDS
+                            + (party_index * FINALIZE_INTERVAL_SECONDS);
+
+                        info!(
+                            e3_id = %e3_id,
+                            party_index,
+                            committee_deadline,
+                            current_timestamp,
+                            seconds_to_wait = seconds_until_deadline,
+                            "Scheduling committee finalization"
+                        );
+
+                        let bus = act.bus.clone();
+                        let e3_id_clone = e3_id.clone();
+                        let ec_clone = ec.clone();
+
+                        let handle = ctx.run_later(
+                            Duration::from_secs(seconds_until_deadline),
+                            move |act, _ctx| {
+                                info!(e3_id = %e3_id_clone, party_index, "Dispatching CommitteeFinalizeRequested event");
+
+                                trap(EType::Sortition, &act.bus.with_ec(&ec_clone), || {
+                                    bus.publish(
+                                        CommitteeFinalizeRequested {
+                                            e3_id: request_e3_id.clone(),
+                                        },
+                                        ec_clone.clone(),
+                                    )?;
+                                    Ok(())
+                                });
+
+                                act.pending_committees.remove(&e3_id_clone);
+                            },
+                        );
+
+                        act.pending_committees.insert(e3_id.clone(), handle);
+                    }
+
+                    async {}.into_actor(act)
+                }),
+        );
+    }
+
+    fn schedule_if_ready(&mut self, e3_id: &str, ctx: &mut Context<Self>) {
+        if !self.effects_enabled {
+            return;
+        }
+
+        let Some(request) = self.pending_requests.get(e3_id).cloned() else {
+            return;
+        };
+        let Some(party_index) = self.party_indexes.get(e3_id).copied() else {
+            return;
+        };
+
+        self.schedule_committee(e3_id.to_owned(), request, party_index, ctx);
     }
 }
 
@@ -77,8 +179,13 @@ impl Handler<EnclaveEvent> for CommitteeFinalizer {
             EnclaveEventData::CommitteeRequested(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
+            EnclaveEventData::EffectsEnabled(data) => self.notify_sync(ctx, data),
+            EnclaveEventData::TicketGenerated(data) => self.notify_sync(ctx, data),
             EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
             EnclaveEventData::E3Failed(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
+            EnclaveEventData::E3RequestComplete(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             EnclaveEventData::E3StageChanged(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
@@ -96,87 +203,42 @@ impl Handler<TypedEvent<CommitteeRequested>> for CommitteeFinalizer {
         msg: TypedEvent<CommitteeRequested>,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let ec = msg.get_ctx().clone();
-        let e3_id = msg.e3_id.clone();
-        let committee_deadline = msg.committee_deadline;
+        let e3_id = msg.e3_id.to_string();
+        self.pending_requests.insert(
+            e3_id.clone(),
+            PendingCommitteeRequest {
+                e3_id: msg.e3_id.clone(),
+                committee_deadline: msg.committee_deadline,
+                ec: msg.get_ctx().clone(),
+            },
+        );
+        self.schedule_if_ready(&e3_id, ctx);
+    }
+}
 
-        const FINALIZATION_BUFFER_SECONDS: u64 = 1;
-        let e3_id_for_log = e3_id.clone();
-        let fut = async move {
-            // TODO: we should have no dependencies on e3_evm here. Reason being that this is core
-            // functionality and evm is shell. Shell can depend on core but core MUST not depend on
-            // shell. This means we should not hold an address to a shell actor even and should use
-            // the eventbus to communicate.
-            // see https://github.com/gnosisguild/enclave/issues/989
-            match e3_evm::helpers::get_current_timestamp().await {
-                Ok(timestamp) => Some(timestamp),
-                Err(e) => {
-                    error!(
-                        e3_id = %e3_id_for_log,
-                        error = %e,
-                        "Failed to get current timestamp from RPC"
-                    );
-                    None
-                }
-            }
+impl Handler<TicketGenerated> for CommitteeFinalizer {
+    type Result = ();
+
+    fn handle(&mut self, msg: TicketGenerated, ctx: &mut Self::Context) -> Self::Result {
+        let Some(party_index) = msg.party_index else {
+            return;
         };
 
-        let e3_id_for_async = e3_id;
-        ctx.spawn(
-            fut.into_actor(self)
-                .then(move |current_timestamp, act, ctx| {
-                    if let Some(current_timestamp) = current_timestamp {
-                        let seconds_until_deadline = if committee_deadline > current_timestamp {
-                            (committee_deadline - current_timestamp) + FINALIZATION_BUFFER_SECONDS
-                        } else {
-                            info!(
-                                e3_id = %e3_id_for_async,
-                                committee_deadline = committee_deadline,
-                                current_timestamp = current_timestamp,
-                                "Submission deadline already passed, finalizing with buffer"
-                            );
-                            FINALIZATION_BUFFER_SECONDS
-                        };
+        let e3_id = msg.e3_id.to_string();
+        self.party_indexes.insert(e3_id.clone(), party_index);
+        self.schedule_if_ready(&e3_id, ctx);
+    }
+}
 
-                        info!(
-                            e3_id = %e3_id_for_async,
-                            committee_deadline = committee_deadline,
-                            current_timestamp = current_timestamp,
-                            seconds_to_wait = seconds_until_deadline,
-                            "Scheduling committee finalization"
-                        );
+impl Handler<EffectsEnabled> for CommitteeFinalizer {
+    type Result = ();
 
-                        let bus = act.bus.clone();
-                        let e3_id_clone = e3_id_for_async.clone();
-
-                        let handle = ctx.run_later(
-                            Duration::from_secs(seconds_until_deadline),
-                            move |act, _ctx| {
-                                info!(e3_id = %e3_id_clone, "Dispatching CommitteeFinalizeRequested event");
-
-                                trap(EType::Sortition, &act.bus.with_ec(&ec), || {
-                                    bus.publish(CommitteeFinalizeRequested {
-                                        e3_id: e3_id_clone.clone(),
-                                    },ec)?;
-                                    Ok(())
-                                });
-
-                                act.pending_committees.remove(&e3_id_clone.to_string());
-                            },
-                        );
-
-                        act.pending_committees
-                            .insert(e3_id_for_async.to_string(), handle);
-                    } else {
-                        error!(
-                            e3_id = %e3_id_for_async,
-                            "Skipping committee finalization due to timestamp fetch failure"
-                        );
-                    }
-
-                    async {}.into_actor(act)
-                }),
-        );
+    fn handle(&mut self, _msg: EffectsEnabled, ctx: &mut Self::Context) -> Self::Result {
+        self.effects_enabled = true;
+        let e3_ids: Vec<String> = self.pending_requests.keys().cloned().collect();
+        for e3_id in e3_ids {
+            self.schedule_if_ready(&e3_id, ctx);
+        }
     }
 }
 
@@ -204,6 +266,8 @@ impl Handler<TypedEvent<E3Failed>> for CommitteeFinalizer {
             );
             ctx.cancel_future(handle);
         }
+        self.pending_requests.remove(&e3_id_str);
+        self.party_indexes.remove(&e3_id_str);
     }
 }
 
@@ -221,8 +285,27 @@ impl Handler<TypedEvent<E3StageChanged>> for CommitteeFinalizer {
                     );
                     ctx.cancel_future(handle);
                 }
+                self.pending_requests.remove(&e3_id_str);
+                self.party_indexes.remove(&e3_id_str);
             }
             _ => {}
         }
+    }
+}
+
+impl Handler<TypedEvent<E3RequestComplete>> for CommitteeFinalizer {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<E3RequestComplete>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let e3_id_str = msg.e3_id.to_string();
+        if let Some(handle) = self.pending_committees.remove(&e3_id_str) {
+            ctx.cancel_future(handle);
+        }
+        self.pending_requests.remove(&e3_id_str);
+        self.party_indexes.remove(&e3_id_str);
     }
 }

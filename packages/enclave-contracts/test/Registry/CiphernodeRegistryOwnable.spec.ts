@@ -408,7 +408,7 @@ describe("CiphernodeRegistryOwnable", function () {
   });
 
   describe("publishCommittee()", function () {
-    it("reverts if the caller is not the owner", async function () {
+    it("allows any caller to publish a finalized committee", async function () {
       const {
         registry,
         enclave,
@@ -446,7 +446,18 @@ describe("CiphernodeRegistryOwnable", function () {
             c5Proof,
             "0x",
           ),
-      ).to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount");
+      )
+        .to.emit(registry, "CommitteePublished")
+        .withArgs(
+          0,
+          [
+            await operator1.getAddress(),
+            await operator2.getAddress(),
+            await operator3.getAddress(),
+          ],
+          data,
+          c5Proof,
+        );
     });
     it("stores the public key of the committee", async function () {
       const {
@@ -532,6 +543,44 @@ describe("CiphernodeRegistryOwnable", function () {
           data,
           c5Proof,
         );
+    });
+  });
+
+  describe("getActiveCommitteeNodes()", function () {
+    it("returns active committee nodes with their scores", async function () {
+      const {
+        registry,
+        enclave,
+        usdcToken,
+        mockE3Program,
+        mockDecryptionVerifier,
+        operator1,
+        operator2,
+        operator3,
+      } = await loadFixture(setup);
+      await makeRequest(
+        enclave,
+        usdcToken,
+        mockE3Program,
+        mockDecryptionVerifier,
+      );
+
+      await registry.connect(operator1).submitTicket(0, 1);
+      await registry.connect(operator2).submitTicket(0, 1);
+      await registry.connect(operator3).submitTicket(0, 1);
+      await finalizeCommitteeAfterWindow(registry, 0);
+
+      const finalizedEvents = await registry.queryFilter(
+        registry.filters.CommitteeFinalized(0),
+      );
+      expect(finalizedEvents.length).to.equal(1);
+
+      const finalizedEvent = finalizedEvents[0];
+      const [activeNodes, activeScores] =
+        await registry.getActiveCommitteeNodes(0);
+
+      expect(activeNodes).to.deep.equal(finalizedEvent.args.committee);
+      expect(activeScores).to.deep.equal(finalizedEvent.args.scores);
     });
   });
 

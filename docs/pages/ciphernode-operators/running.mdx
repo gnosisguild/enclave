@@ -21,7 +21,6 @@ DappNode provides a user-friendly interface for running a ciphernode with minima
    - `RPC_URL` - WebSocket RPC endpoint (e.g., `wss://ethereum-sepolia-rpc.publicnode.com`)
    - `NETWORK` - Network name (e.g., `sepolia`, `mainnet`)
    - Contract addresses and deploy blocks
-   - Node role (`ciphernode` or `aggregator`)
    - Optional: encryption password, network key, private key
 
 4. Confirm and complete the installation
@@ -33,12 +32,11 @@ DappNode provides a user-friendly interface for running a ciphernode with minima
 | --------------------- | -------------------------------------------- | -------- |
 | `RPC_URL`             | WebSocket RPC endpoint                       | Yes      |
 | `NETWORK`             | Network name (sepolia, mainnet, etc.)        | No       |
-| `NODE_ROLE`           | `ciphernode` or `aggregator`                 | No       |
 | `NODE_ADDRESS`        | Your Ethereum address                        | No       |
 | `QUIC_PORT`           | UDP port for P2P networking (default: 37173) | No       |
 | `ENCRYPTION_PASSWORD` | Password to encrypt local data               | No       |
 | `NETWORK_PRIVATE_KEY` | libp2p network key (ed25519)                 | No       |
-| `PRIVATE_KEY`         | Ethereum private key (for aggregator)        | No       |
+| `PRIVATE_KEY`         | Ethereum private key for node transactions   | No       |
 | `PEERS`               | Comma-separated peer multiaddresses          | No       |
 
 ---

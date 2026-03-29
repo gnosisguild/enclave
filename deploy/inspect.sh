@@ -42,7 +42,7 @@ get_logs_by_version enclave_cn3
 
 echo ""
 echo "================================="
-echo "           AGG "
+echo "           CN4 "
 echo "================================="
 
-get_logs_by_version enclave_aggregator
+get_logs_by_version enclave_cn4

@@ -24,7 +24,7 @@ CRISP/
 ├── crates/                  # Rust libraries used by the server
 ├── circuits/                # Noir zero-knowledge circuits
 ├── scripts/                 # Development scripts for running, testing, and deployment
-├── enclave.config.yaml      # Ciphernodes + aggregator config
+├── enclave.config.yaml      # Local ciphernode network config
 └── docker-compose.yaml      # Optional multi-node deployment
 ```
 

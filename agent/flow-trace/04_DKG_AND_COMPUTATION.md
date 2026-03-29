@@ -4,8 +4,10 @@
 
 After committee finalization, the selected ciphernodes perform Distributed Key Generation (DKG)
 using threshold BFV (TrBFV) cryptography. This produces a collective public key without any single
-party knowing the full secret key. Later, the committee produces decryption shares that the
-aggregator combines.
+party knowing the full secret key. Later, the committee produces decryption shares; all committee
+members buffer them, and the active aggregator combines them. The runtime first normalizes the
+finalized committee into ascending ticket-score order, and the active aggregator is then the lowest
+non-expelled `party_id` in that normalized order.
 
 ---
 
@@ -448,21 +450,24 @@ ThresholdKeyshare receives AllThresholdSharesCollected
        pk_share,        // public key share
        signed_proof     // ZK proof of correct generation
      }
-     → Broadcast to aggregator via P2P
+    → Broadcast to committee members via P2P
 ```
 
 ---
 
-## Phase 2: Public Key Aggregation (Aggregator Only, with C5 Proof)
+## Phase 2: Public Key Aggregation (Committee-Buffered, Active Aggregator Submits)
 
 ```
-PublicKeyAggregator (AGGREGATOR) collects KeyshareCreated events
+  All committee members receive KeyshareCreated events
 │
 ├─ KeyshareCreatedFilterBuffer gates events:
-│   └─ Only forwards KeyshareCreated from verified committee members
-│   └─ Buffers until CommitteeFinalized is known
+  │   └─ Only accepts KeyshareCreated from verified committee members
+  │   └─ Buffers until BOTH CommitteeFinalized and AggregatorChanged(is_aggregator=true)
+  │   └─ On expulsion-driven handoff, the next active aggregator flushes its existing buffer
 │
-├─ When threshold_n keyshares collected:
+  ├─ Only the active aggregator's buffer flushes into PublicKeyAggregator
+  │
+  ├─ When threshold_n keyshares collected:
 │   │
 │   ├─ 1. Aggregate public key shares:
 │   │     aggregate_pk = Fhe::get_aggregate_public_key(
@@ -497,16 +502,15 @@ PublicKeyAggregator (AGGREGATOR) collects KeyshareCreated events
 │         e3_id, aggregate_pk, pk_hash, node_list
 │       }
 │
-└─ CiphernodeRegistrySolWriter (AGGREGATOR) receives PublicKeyAggregated:
-    └─ Calls contract.publishCommittee(e3_id, nodes, publicKey, pkHash)
+└─ CiphernodeRegistrySolWriter receives PublicKeyAggregated:
+  ├─ Requires EffectsEnabled
+  ├─ Requires active_aggregators[e3_id] == true
+  ├─ Reads chain state to confirm committee public key is still unset
+  └─ Calls contract.publishCommittee(e3_id, nodes, publicKey, pkHash)
         │
         │  ┌─── ON-CHAIN (CiphernodeRegistryOwnable) ──────────┐
         │  │                                                     │
         │  │  publishCommittee(e3Id, nodes, pk, pkHash) {        │
-        │  │    ⚠️ **onlyOwner** — this is centralized!          │
-        │  │    (acknowledged in contract with a TODO/SECURITY   │
-        │  │     comment; the owner can publish any key)         │
-        │  │                                                     │
         │  │    1. require(initialized && finalized)             │
         │  │    2. require(publicKeyHashes[e3Id] == 0)           │
         │  │       → Can only publish once                       │
@@ -625,25 +629,29 @@ EnclaveSolReader decodes CiphertextOutputPublished event
     │     signed_proof: SignedProofPayload(C6),
     │     node: address
     │   }
-    │   → Broadcast via P2P to aggregator
+    │   → Broadcast via P2P to committee members for buffering
     │
     └─ State: Decrypting → Completed
 ```
 
 ---
 
-## Phase 5: Plaintext Aggregation (Aggregator Only, with C6 Verification & C7 Proof)
+## Phase 5: Plaintext Aggregation (Committee-Buffered, Active Aggregator Submits)
 
 ```
-ThresholdPlaintextAggregator receives DecryptionshareCreated events
+  All committee members receive DecryptionshareCreated events
 │
-├─ For each share:
-│   ├─ Verify sender is in committee:
-│   │   └─ Query Sortition via E3CommitteeContainsRequest
-│   ├─ If verified: add_share(party_id, decryption_share)
-│   └─ If not: ignore
+  ├─ DecryptionshareCreatedBuffer gates events:
+  │   ├─ Tracks expelled parties
+  │   ├─ Buffers until AggregatorChanged(is_aggregator=true)
+  │   └─ Flushes verified shares to ThresholdPlaintextAggregator when this node is active
+  │
+  ├─ ThresholdPlaintextAggregator receives flushed shares
+  │   ├─ Verifies sender is in committee
+  │   ├─ Adds the share if verified
+  │   └─ Ignores non-members or expelled parties
 │
-├─ C6 VERIFICATION (per-share, on aggregator):
+  ├─ C6 VERIFICATION (per-share, on active aggregator):
 │   ShareVerificationActor receives C6 signed proofs
 │   ├─ ECDSA recovery + ZK verification (same 2-phase as C2/C3)
 │   ├─ On failure: SignedProofFailed → accusation pipeline
@@ -692,8 +700,11 @@ ThresholdPlaintextAggregator receives DecryptionshareCreated events
 │   │
 │   └─ Publish PlaintextAggregated { e3_id, decrypted_output }
 │
-└─ EnclaveSolWriter (AGGREGATOR) receives PlaintextAggregated:
-    └─ Calls contract.publishPlaintextOutput(e3Id, output, proof)
+└─ EnclaveSolWriter receives PlaintextAggregated:
+  ├─ Requires EffectsEnabled
+  ├─ Requires active_aggregators[e3_id] == true
+  ├─ Reads chain state to confirm plaintextOutput is still empty
+  └─ Calls contract.publishPlaintextOutput(e3Id, output, proof)
         │
         │  ┌─── ON-CHAIN (Enclave.sol) ─────────────────────────┐
         │  │                                                     │
@@ -860,7 +871,7 @@ Each party now has dk_i (decryption key portion)
 No party knows the full secret key
 Any M+1 parties can collaboratively decrypt
 
-AGGREGATOR collects PK_share₁ + PK_share₂ + PK_share₃
+ACTIVE AGGREGATOR collects PK_share₁ + PK_share₂ + PK_share₃
   → Produces aggregate_PK (public, published on-chain)
   → Anyone can encrypt, only committee can decrypt
 ```

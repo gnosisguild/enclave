@@ -11,11 +11,12 @@ use actix::prelude::*;
 use anyhow::{anyhow, bail, ensure, Result};
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, trap, AggregationProofPending, AggregationProofSigned, BusHandle, ComputeRequest,
-    ComputeResponse, ComputeResponseKind, CorrelationId, DecryptedSharesAggregationProofRequest,
-    DecryptionshareCreated, Die, E3id, EType, EnclaveEvent, EnclaveEventData, EventContext,
-    PartyProofsToVerify, PlaintextAggregated, Proof, Seed, Sequenced, ShareVerificationComplete,
-    ShareVerificationDispatched, SignedProofPayload, TypedEvent, VerificationKind, ZkResponse,
+    prelude::*, trap, AggregationProofPending, AggregationProofSigned, BusHandle,
+    CommitteeMemberExpelled, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
+    DecryptedSharesAggregationProofRequest, DecryptionshareCreated, Die, E3id, EType, EnclaveEvent,
+    EnclaveEventData, EventContext, PartyProofsToVerify, PlaintextAggregated, Proof, Seed,
+    Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload,
+    TypedEvent, VerificationKind, ZkResponse,
 };
 use e3_fhe_params::BfvPreset;
 use e3_sortition::{E3CommitteeContainsRequest, E3CommitteeContainsResponse, Sortition};
@@ -259,6 +260,71 @@ impl ThresholdPlaintextAggregator {
                     params,
                 },
             ))
+        })
+    }
+
+    pub fn handle_member_expelled(
+        &mut self,
+        party_id: u64,
+        ec: &EventContext<Sequenced>,
+    ) -> Result<()> {
+        self.state.try_mutate(ec, |state| {
+            let ThresholdPlaintextAggregatorState::Collecting(current) = state else {
+                return Ok(state);
+            };
+
+            let mut shares = current.shares;
+            let mut c6_proofs = current.c6_proofs;
+            let mut c6_wrapped_proofs = current.c6_wrapped_proofs;
+            let mut threshold_n = current.threshold_n;
+
+            shares.remove(&party_id);
+            c6_proofs.remove(&party_id);
+            c6_wrapped_proofs.remove(&party_id);
+
+            if threshold_n > 0 {
+                threshold_n -= 1;
+            }
+
+            if threshold_n < current.threshold_m {
+                warn!(
+                    "ThresholdPlaintextAggregator: threshold_n ({}) < threshold_m ({}) after expulsion",
+                    threshold_n, current.threshold_m
+                );
+                return Ok(ThresholdPlaintextAggregatorState::Collecting(Collecting {
+                    threshold_m: current.threshold_m,
+                    threshold_n,
+                    shares,
+                    c6_proofs,
+                    c6_wrapped_proofs,
+                    seed: current.seed,
+                    ciphertext_output: current.ciphertext_output,
+                    params: current.params,
+                }));
+            }
+
+            if (shares.len() as u64) < threshold_n || threshold_n == 0 {
+                return Ok(ThresholdPlaintextAggregatorState::Collecting(Collecting {
+                    threshold_m: current.threshold_m,
+                    threshold_n,
+                    shares,
+                    c6_proofs,
+                    c6_wrapped_proofs,
+                    seed: current.seed,
+                    ciphertext_output: current.ciphertext_output,
+                    params: current.params,
+                }));
+            }
+
+            Ok(ThresholdPlaintextAggregatorState::VerifyingC6(VerifyingC6 {
+                threshold_m: current.threshold_m,
+                threshold_n,
+                shares,
+                c6_proofs,
+                c6_wrapped_proofs,
+                ciphertext_output: current.ciphertext_output,
+                params: current.params,
+            }))
         })
     }
 
@@ -612,6 +678,9 @@ impl Handler<EnclaveEvent> for ThresholdPlaintextAggregator {
             EnclaveEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
+            EnclaveEventData::CommitteeMemberExpelled(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             EnclaveEventData::ShareVerificationComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
@@ -715,6 +784,37 @@ impl Handler<TypedEvent<ComputeResponse>> for ThresholdPlaintextAggregator {
             EType::PlaintextAggregation,
             &self.bus.with_ec(msg.get_ctx()),
             || self.handle_compute_response(msg),
+        )
+    }
+}
+
+impl Handler<TypedEvent<CommitteeMemberExpelled>> for ThresholdPlaintextAggregator {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CommitteeMemberExpelled>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(
+            EType::PlaintextAggregation,
+            &self.bus.with_ec(msg.get_ctx()),
+            || {
+                let (msg, ec) = msg.into_components();
+                let Some(party_id) = msg.party_id else {
+                    return Ok(());
+                };
+
+                self.handle_member_expelled(party_id, &ec)?;
+
+                if let Some(ThresholdPlaintextAggregatorState::VerifyingC6(ref state)) =
+                    self.state.get()
+                {
+                    self.dispatch_c6_verification(state.c6_proofs.clone(), ec)?;
+                }
+
+                Ok(())
+            },
         )
     }
 }

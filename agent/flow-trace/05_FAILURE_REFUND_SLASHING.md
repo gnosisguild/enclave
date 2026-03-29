@@ -85,8 +85,8 @@ Anyone calls: Enclave.processE3Failure(e3Id)
 ├─ 2. e3Payments[e3Id] = 0  (prevent double-processing)
 │
 ├─ 3. Get honest nodes:
-│     honestNodes = ciphernodeRegistry.getActiveCommitteeNodes(e3Id)
-│     → Returns committee members NOT expelled by slashing
+│     (honestNodes, _) = ciphernodeRegistry.getActiveCommitteeNodes(e3Id)
+│     → Returns committee members NOT expelled by slashing plus their ticket scores
 │
 ├─ 4. Transfer payment to E3RefundManager:
 │     paymentToken = _e3FeeTokens[e3Id]  (per-E3 token, not current global)
