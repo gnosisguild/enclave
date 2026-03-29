@@ -433,7 +433,7 @@ export const getActiveAggregator = task(
   .setAction(async () => ({
     default: async ({ e3Id }, hre) => {
       const { registry } = await getRegistryConnection(hre);
-      const [activeNodes, activeScores] =
+      const [activeNodes, activeScores]: [string[], bigint[]] =
         await registry.getActiveCommitteeNodes(e3Id);
 
       if (activeNodes.length !== activeScores.length) {
