@@ -85,12 +85,12 @@ fi
 # kill active aggregator
 enclave_nodes_stop "$ACTIVE_AGG"
 
-sleep 8
+sleep 15
 
 # relaunch the active aggregator
 enclave_nodes_start "$ACTIVE_AGG"
 
-sleep 8
+sleep 5
 
 heading "Mock encrypted plaintext"
 $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"

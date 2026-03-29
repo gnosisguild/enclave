@@ -8,7 +8,7 @@ use crate::{
     error_decoder::{decode_error_from_str, format_evm_error},
     events::{EnclaveEvmEvent, EvmEventProcessor},
     evm_parser::EvmParser,
-    helpers::{encode_zk_proof, get_current_timestamp, send_tx_with_retry, EthProvider},
+    helpers::{encode_zk_proof, send_tx_with_retry, EthProvider},
 };
 use actix::prelude::*;
 use alloy::{
@@ -614,13 +614,27 @@ async fn should_finalize_committee<P: Provider + WalletProvider + Clone + 'stati
 ) -> Result<bool> {
     let e3_id_u256: U256 = e3_id.try_into()?;
     let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    let active_committee = contract.getActiveCommitteeNodes(e3_id_u256).call().await?;
-    if !active_committee.nodes.is_empty() {
+    if contract.isOpen(e3_id_u256).call().await? {
         return Ok(false);
     }
 
-    let deadline = contract.getCommitteeDeadline(e3_id_u256).call().await?;
-    Ok(get_current_timestamp().await? > deadline.to())
+    match contract.finalizeCommittee(e3_id_u256).call().await {
+        Ok(_) => Ok(true),
+        Err(err) => {
+            let err = anyhow::Error::from(err);
+            let decoded = decode_error_from_str(&format!("{err:?}"));
+
+            if decoded.as_deref().is_some_and(|message| {
+                message.contains("CommitteeAlreadyFinalized")
+                    || message.contains("CommitteeNotRequested")
+                    || message.contains("SubmissionWindowNotClosed")
+            }) {
+                return Ok(false);
+            }
+
+            Err(err)
+        }
+    }
 }
 
 async fn should_publish_committee<P: Provider + WalletProvider + Clone + 'static>(
