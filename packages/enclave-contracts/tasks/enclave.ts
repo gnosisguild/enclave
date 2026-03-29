@@ -9,10 +9,6 @@ import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import path from "path";
 
-import {
-  CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
-  Enclave__factory as EnclaveFactory,
-} from "../types/index.js";
 import { readDeploymentArgs } from "../scripts/utils";
 
 function ensureParentDir(filePath: string): void {
@@ -49,7 +45,11 @@ async function getRegistryConnection(hre: any) {
   return {
     ethers,
     deployment,
-    registry: CiphernodeRegistryFactory.connect(deployment.address, signer),
+    registry: await ethers.getContractAt(
+      "CiphernodeRegistryOwnable",
+      deployment.address,
+      signer,
+    ),
   };
 }
 
@@ -65,7 +65,7 @@ async function getEnclaveConnection(hre: any) {
 
   return {
     ethers,
-    enclave: EnclaveFactory.connect(deployment.address, signer),
+    enclave: await ethers.getContractAt("Enclave", deployment.address, signer),
   };
 }
 
