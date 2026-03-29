@@ -110,42 +110,6 @@ impl CircuitOutputLayout {
     }
 }
 
-// ── Public input layout (fields at the HEAD of public_signals) ──────────────
-
-/// Describes the public input fields of a circuit.
-/// Inputs sit at the **start** of `public_signals`, before any return values.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum CircuitInputLayout {
-    /// Fixed number of named `Field`-sized inputs, known at compile time.
-    Fixed { fields: &'static [OutputField] },
-    /// No known public input layout.
-    None,
-}
-
-impl CircuitInputLayout {
-    /// Extract a named public input field from raw `public_signals` bytes.
-    /// Inputs sit at the **start** of `public_signals`.
-    pub fn extract_field<'a>(&self, public_signals: &'a [u8], name: &str) -> Option<&'a [u8]> {
-        let fields = match self {
-            CircuitInputLayout::Fixed { fields } => fields,
-            _ => return None,
-        };
-        let idx = fields.iter().position(|f| f.name == name)?;
-        let offset = idx * FIELD_BYTE_LEN;
-        let end = offset + FIELD_BYTE_LEN;
-        if public_signals.len() < end {
-            return None;
-        }
-        Some(&public_signals[offset..end])
-    }
-}
-
-/// C3 — Share encryption public inputs.
-pub const SHARE_ENCRYPTION_INPUTS: &[OutputField] = &[
-    f("expected_pk_commitment"),
-    f("expected_message_commitment"),
-];
-
 /// C6 — Threshold share decryption public inputs.
 pub const THRESHOLD_SHARE_DECRYPTION_INPUTS: &[OutputField] =
     &[f("expected_sk_commitment"), f("expected_e_sm_commitment")];
@@ -177,6 +141,61 @@ pub const PK_AGGREGATION_OUTPUTS: &[OutputField] = &[f("commitment")];
 
 /// C6 — Threshold share decryption (prefix commitment to `d`, per CRT limb).
 pub const THRESHOLD_SHARE_DECRYPTION_OUTPUTS: &[OutputField] = &[f("d_commitment")];
+
+// ── Per-circuit input field constants ───────────────────────────────────────
+
+/// C3 — Share encryption public inputs (at HEAD of `public_signals`).
+pub const SHARE_ENCRYPTION_INPUTS: &[OutputField] = &[
+    f("expected_pk_commitment"),
+    f("expected_message_commitment"),
+];
+
+/// Describes the public input layout of a circuit.
+///
+/// Unlike [`CircuitOutputLayout`] which indexes from the TAIL of
+/// `public_signals`, input fields sit at the HEAD.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CircuitInputLayout {
+    /// Fixed number of `Field`-sized inputs, names known at compile time.
+    Fixed { fields: &'static [OutputField] },
+    /// The circuit has no named public inputs (or they are not tracked).
+    None,
+}
+
+impl CircuitInputLayout {
+    /// Number of fixed input fields, or `None` for void layouts.
+    pub fn field_count(&self) -> Option<usize> {
+        match self {
+            CircuitInputLayout::Fixed { fields } => Some(fields.len()),
+            CircuitInputLayout::None => Some(0),
+        }
+    }
+
+    /// Look up a field index by name.
+    pub fn field_index(&self, name: &str) -> Option<usize> {
+        match self {
+            CircuitInputLayout::Fixed { fields } => fields.iter().position(|f| f.name == name),
+            _ => None,
+        }
+    }
+
+    /// Extract a named input field from raw `public_signals` bytes.
+    ///
+    /// Input fields sit at the **beginning** of `public_signals`.
+    /// This method indexes from the head (offset = idx * FIELD_BYTE_LEN).
+    pub fn extract_field<'a>(&self, public_signals: &'a [u8], name: &str) -> Option<&'a [u8]> {
+        let fields = match self {
+            CircuitInputLayout::Fixed { fields } => fields,
+            _ => return None,
+        };
+        let idx = fields.iter().position(|f| f.name == name)?;
+        let offset = idx * FIELD_BYTE_LEN;
+        if public_signals.len() < offset + FIELD_BYTE_LEN {
+            return None;
+        }
+        Some(&public_signals[offset..offset + FIELD_BYTE_LEN])
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -332,6 +351,31 @@ mod tests {
         );
     }
 
+    // ── CircuitInputLayout tests ────────────────────────────────────────
+
+    #[test]
+    fn extract_input_field_from_head() {
+        let layout = CircuitInputLayout::Fixed {
+            fields: SHARE_ENCRYPTION_INPUTS,
+        };
+        let mut signals = vec![0u8; 128];
+        signals[0..32].copy_from_slice(&[0xAA; 32]);
+        signals[32..64].copy_from_slice(&[0xBB; 32]);
+
+        assert_eq!(
+            layout
+                .extract_field(&signals, "expected_pk_commitment")
+                .unwrap(),
+            &[0xAA; 32]
+        );
+        assert_eq!(
+            layout
+                .extract_field(&signals, "expected_message_commitment")
+                .unwrap(),
+            &[0xBB; 32]
+        );
+    }
+
     #[test]
     fn extract_c6_public_inputs_via_input_layout() {
         let layout = CircuitInputLayout::Fixed {
@@ -364,6 +408,45 @@ mod tests {
         assert!(layout
             .extract_field(&[0u8; 32], "expected_e_sm_commitment")
             .is_none());
+    }
+
+    #[test]
+    fn input_layout_nonexistent_field_returns_none() {
+        let layout = CircuitInputLayout::Fixed {
+            fields: SHARE_ENCRYPTION_INPUTS,
+        };
+        let signals = vec![0u8; 64];
+        assert!(layout.extract_field(&signals, "nonexistent").is_none());
+    }
+
+    #[test]
+    fn input_layout_none_returns_none() {
+        let layout = CircuitInputLayout::None;
+        let signals = vec![0u8; 64];
+        assert!(layout.extract_field(&signals, "anything").is_none());
+    }
+
+    #[test]
+    fn input_signals_too_short_returns_none() {
+        let layout = CircuitInputLayout::Fixed {
+            fields: SHARE_ENCRYPTION_INPUTS,
+        };
+        let signals = vec![0u8; 32];
+        assert!(layout
+            .extract_field(&signals, "expected_message_commitment")
+            .is_none());
+    }
+
+    #[test]
+    fn input_field_count() {
+        assert_eq!(
+            CircuitInputLayout::Fixed {
+                fields: SHARE_ENCRYPTION_INPUTS
+            }
+            .field_count(),
+            Some(2)
+        );
+        assert_eq!(CircuitInputLayout::None.field_count(), Some(0));
     }
 
     /// C7 (`DecryptedSharesAggregation`) has no `-> pub` return values; metadata uses `None`.
