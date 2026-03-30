@@ -1,10 +1,9 @@
-# `share_decryption` — C6
+# `sk_share_computation_base` — C2 (inner)
 
-Threshold **decryption share** for the homomorphic result ciphertext, using aggregated `sk` / `e_sm`
-commitments from C4.
+Base proof for the **secret key contribution** Shamir share array `y`, bound to C1’s `sk` commitment.
 
 |           |                                                                                                     |
 | --------- | --------------------------------------------------------------------------------------------------- |
-| **Core**  | [`lib/src/core/threshold/share_decryption.nr`](../../../lib/src/core/threshold/share_decryption.nr) |
+| **Core**  | [`lib/src/core/dkg/share_computation/base.nr`](../../../lib/src/core/dkg/share_computation/base.nr) |
 | **Index** | [Circuit package index](../../../README.md#circuit-package-index)                                   |
 | **Docs**  | [Noir Circuits](../../../../docs/pages/noir-circuits.mdx)                                           |

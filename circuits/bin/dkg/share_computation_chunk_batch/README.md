@@ -1,9 +1,10 @@
-# `pk` — C0
+# `share_computation_chunk_batch` — C2 (inner)
 
-BFV **individual** public key commitment: binds the ciphernode’s share-encryption key used in C3.
+Verifies the **base** proof plus a batch of **chunk** proofs and enforces consistency of the `y`
+slice across them.
 
 |           |                                                                   |
 | --------- | ----------------------------------------------------------------- |
-| **Core**  | [`lib/src/core/dkg/pk.nr`](../../../lib/src/core/dkg/pk.nr)       |
+| **Core**  | (invokes base + chunk layouts; configs in `lib`)                  |
 | **Index** | [Circuit package index](../../../README.md#circuit-package-index) |
 | **Docs**  | [Noir Circuits](../../../../docs/pages/noir-circuits.mdx)         |

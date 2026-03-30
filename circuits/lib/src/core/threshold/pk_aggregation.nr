@@ -8,7 +8,7 @@ use crate::math::commitments::{compute_pk_aggregation_commitment, compute_thresh
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
-/// Cryptographic parameters for Threshold public key aggregation circuit.
+/// Parameters for threshold public key aggregation (C5).
 pub struct Configs<let L: u32> {
     /// CRT moduli for each basis: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
@@ -20,35 +20,42 @@ impl<let L: u32> Configs<L> {
     }
 }
 
-/// Public Key Aggregation (Circuit 5).
+/// Threshold public key aggregation (C5).
 ///
-/// Verifies that for each CRT basis l and each coefficient i:
-/// - pk0_agg[l][i] = sum_h(pk0[h][l][i]) mod q_l (witnesses use centered coefficients; aggregation
-///   uses a half-q shift so [`ModU128::reduce_mod`] sees small non-negative integers)
-/// - pk1_agg[l][i] = pk1[0][l][i] (all parties share pk1 = a, aggregated pk1 = a)
+/// **Role:** Sum honest parties' threshold PK limbs into `pk0_agg`, check `pk1_agg` matches CRS `a`,
+/// and commit the aggregated key for P3.
+///
+/// **Consumes:** `commit(pk_trbfv[h])` from C1 per honest party `h`.
+///
+/// **Produces:** `commit(pk_agg)` for user-data encryption (P3).
+///
+/// **Verifies:** For each limb and coefficient, `pk0_agg` matches the mod-`q_l` sum of party `pk0`
+/// (centered coefficients, `ModU128::reduce_mod` with half-`q` shift); `pk1_agg` equals shared CRS `a`.
 pub struct PkAggregation<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> {
     /// Circuit parameters including CRT moduli
     configs: Configs<L>,
 
-    /// Expected commitments to threshold public key (from C1)
-    /// We need one commitment from each honest party (H).
-    /// (public witness)
+    /// Expected commitments to each honest party's threshold public key share.
+    /// commit(pk_trbfv[h]) produced by C1 for each h in H.
+    /// (public witnesses)
     expected_threshold_pk_commitments: [Field; H],
 
-    /// Individual public keys from H honest parties
-    /// pk0[party_idx][basis_idx] - first component of public key for each party and CRT basis
+    /// Individual threshold public key first components from H honest parties.
+    /// pk0[party_idx][basis_idx] for each party and CRT basis.
     /// (committed witnesses)
     pk0: [[Polynomial<N>; L]; H],
-    /// pk1[party_idx][basis_idx] - second component of public key for each party and CRT basis
+    /// Individual threshold public key second components from H honest parties.
+    /// pk1[party_idx][basis_idx] for each party and CRT basis.
     /// (committed witnesses)
     pk1: [[Polynomial<N>; L]; H],
 
-    /// Claimed aggregated public key
-    /// pk0_agg[basis_idx] - first component of aggregated public key for each CRT basis
-    /// (committed witnesses)
+    /// Claimed aggregated public key first component for each CRT basis.
+    /// Must equal sum(pk0[h][l]) mod q_l for each basis l.
+    /// (committed witness)
     pk0_agg: [Polynomial<N>; L],
-    /// pk1_agg[basis_idx] - second component of aggregated public key for each CRT basis
-    /// (committed witnesses)
+    /// Claimed aggregated public key second component for each CRT basis.
+    /// Must equal sum(pk1[h][l]) mod q_l for each basis l.
+    /// (committed witness)
     pk1_agg: [Polynomial<N>; L],
 }
 
@@ -64,7 +71,11 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> PkAggregation<N, H, L,
         PkAggregation { configs, expected_threshold_pk_commitments, pk0, pk1, pk0_agg, pk1_agg }
     }
 
-    /// Verifies that pk hashes to each expected_threshold_pk_commitment
+    /// Verifies that each honest party's public key hashes to its expected commitment from C1.
+    ///
+    /// Ensures that only correctly generated public key shares, as verified during
+    /// key generation in C1, are included in the aggregation. Any substitution of
+    /// a different key will cause this assertion to fail.
     fn verify_pk_commitments(self) {
         for i in 0..H {
             assert(
@@ -75,7 +86,14 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> PkAggregation<N, H, L,
         }
     }
 
-    fn verify_pk0_for_basis(
+    /// Verifies aggregation correctness for one component (pk0 or pk1) at a given CRT basis.
+    ///
+    /// For each coefficient position i, checks:
+    ///   pk_agg[basis_idx][i] = sum(pk[h][basis_idx][i]) mod q_l  for h in 0..H
+    ///
+    /// The modular reduction ensures the aggregated coefficients stay within
+    /// the valid range for the CRT modulus q_l.
+    fn verify_pk_for_basis(
         self,
         pk: [[Polynomial<N>; L]; H],
         pk_agg: [Polynomial<N>; L],
@@ -114,19 +132,18 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> PkAggregation<N, H, L,
         }
     }
 
-    /// Main verification function
-    /// Returns commitment to aggregated threshold public key
+    /// Returns `commit(pk_agg)` for P3 (`user_data_encryption_ct0` / `ct1`).
     pub fn execute(self) -> Field {
-        // 0. Verify pk commitments
+        // Step 1: Bind each party PK to its C1 commitment.
         self.verify_pk_commitments();
 
-        // 1. Verify pk0 aggregation (sum) and pk1 (all equal to a, pk1_agg = a)
+        // Step 2: Check `pk0_agg` sums party limbs and `pk1_agg` matches CRS `a` (per CRT basis).
         for basis_idx in 0..L {
-            self.verify_pk0_for_basis(self.pk0, self.pk0_agg, basis_idx);
+            self.verify_pk_for_basis(self.pk0, self.pk0_agg, basis_idx);
             self.verify_pk1(basis_idx);
         }
 
-        // 2. Commit to aggregated threshold public key
+        // Step 3: Commit to the aggregated threshold public key.
         compute_pk_aggregation_commitment::<N, L, BIT_PK>(self.pk0_agg, self.pk1_agg)
     }
 }

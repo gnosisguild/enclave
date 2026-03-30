@@ -1181,7 +1181,6 @@ pub global THRESHOLD_SHARE_DECRYPTION_CONFIGS: ShareDecryptionConfigs<L> = Share
 decrypted_shares_aggregation (CIRCUIT 7)
 -------------------------------------
 ************************************/
-
 pub global DECRYPTED_SHARES_AGGREGATION_BIT_NOISE: u32 = 65;
 pub global DECRYPTED_SHARES_AGGREGATION_BIT_D: u32 = 35;
 

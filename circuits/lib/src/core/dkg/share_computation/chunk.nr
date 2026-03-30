@@ -4,13 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-// Chunk circuit for C2. Verifies range checks and parity check for a chunk of
-// CHUNK_SIZE coefficients. y_chunk is public so the wrapper can enforce consistency
-// with the base circuit without hashing overhead in either circuit.
+//! C2 chunk circuit - range + parity on a slice of the public share array `y`.
 
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
+/// Parameters for share computation chunk (C2).
 pub struct Configs<let L: u32> {
     pub qis: [Field; L],
 }
@@ -21,6 +20,13 @@ impl<let L: u32> Configs<L> {
     }
 }
 
+/// Share computation chunk (C2).
+///
+/// **Role:** For a slice of coefficients, range-check Shamir shares and Reed-Solomon parity (`H`).
+///
+/// **Consumes:** Public `y_chunk` aligned with the C2 base `y` array.
+///
+/// **Produces:** None (assert-only); wrappers glue chunks to the base proof.
 pub struct ShareComputationChunk<let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SHARE: u32, let CHUNK_SIZE: u32> {
     configs: Configs<L>,
     /// Slice of y for this chunk, public so wrapper can enforce
@@ -72,7 +78,9 @@ impl<let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SHARE: u32, let CHUNK_S
     }
 
     pub fn execute(self) {
+        // Step 1: Range-check non-secret share columns.
         self.check_range_bounds();
+        // Step 2: Reed-Solomon parity on this chunk.
         self.verify_parity_check();
     }
 }

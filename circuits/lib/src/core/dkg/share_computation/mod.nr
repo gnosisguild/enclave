@@ -4,5 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! Share computation (C2): `base` and `chunk` cores; recursive wrappers and batching live under
+//! `circuits/bin/dkg/`.
+
 pub mod base;
 pub mod chunk;
