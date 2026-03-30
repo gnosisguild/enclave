@@ -84,6 +84,9 @@
 10.   PROOF FAIL  A committee member submits an invalid proof (C0-C7)
                     → ProofVerificationActor / ShareVerificationActor detects
                     → SignedProofFailed triggers AccusationManager
+                  OR: Commitment consistency mismatch detected (cross-circuit)
+                    → CommitmentConsistencyChecker publishes CommitmentConsistencyViolation
+                    → Also triggers AccusationManager
 
 11.   ACCUSATION  AccusationManager creates ProofFailureAccusation
                     → Signed and broadcast via P2P gossip

@@ -400,6 +400,20 @@ pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
     fs::write(format!("tests/{file_name}"), bytes).unwrap();
 }
 
+/// Compute placeholder scores for a committee.
+/// Uses ticket_id=0 for each address with the given e3_id and seed.
+fn compute_committee_scores(committee: &[String], e3_id: &E3id, seed: Seed) -> Vec<String> {
+    use e3_sortition::hash_to_score;
+    committee
+        .iter()
+        .map(|addr| {
+            let address: Address = addr.parse().unwrap();
+            let score = hash_to_score(address, 0, e3_id.clone(), seed);
+            U256::from_be_slice(&score.to_bytes_be()).to_string()
+        })
+        .collect()
+}
+
 /// Determines the committee for a given E3 request using deterministic sortition.
 ///
 /// This function runs the same sortition algorithm that the ciphernodes use internally,
@@ -414,7 +428,7 @@ pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
 /// * `collector_addr` - Address of the collector node (for validation)
 ///
 /// # Returns
-/// A tuple of (committee_addresses, buffer_addresses)
+/// A tuple of (committee_addresses, committee_scores, buffer_addresses)
 fn determine_committee(
     e3_id: &E3id,
     seed: Seed,
@@ -422,7 +436,7 @@ fn determine_committee(
     threshold_n: usize,
     registered_addrs: &[String],
     collector_addr: &str,
-) -> Result<(Vec<String>, Vec<String>)> {
+) -> Result<(Vec<String>, Vec<String>, Vec<String>)> {
     let buffer = calculate_buffer_size(threshold_m, threshold_n);
     let total_selection_size = threshold_n + buffer;
 
@@ -456,6 +470,12 @@ fn determine_committee(
         .map(|w| w.address.to_string())
         .collect();
 
+    let committee_scores: Vec<String> = winners
+        .iter()
+        .take(threshold_n)
+        .map(|w| U256::from_be_slice(&w.score.to_bytes_be()).to_string())
+        .collect();
+
     let buffer_nodes: Vec<String> = winners
         .iter()
         .skip(threshold_n)
@@ -475,7 +495,7 @@ fn determine_committee(
         }
     }
 
-    Ok((committee, buffer_nodes))
+    Ok((committee, committee_scores, buffer_nodes))
 }
 
 async fn setup_score_sortition_environment(
@@ -735,7 +755,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     sleep(Duration::from_millis(500)).await;
 
-    let (committee, buffer_nodes) = determine_committee(
+    let (committee, committee_scores, buffer_nodes) = determine_committee(
         &e3_id,
         seed,
         threshold_m,
@@ -755,6 +775,7 @@ async fn test_trbfv_actor() -> Result<()> {
     bus.publish_without_context(CommitteeFinalized {
         e3_id: e3_id.clone(),
         committee: committee.clone(),
+        scores: committee_scores,
         chain_id,
     })?;
 
@@ -773,8 +794,10 @@ async fn test_trbfv_actor() -> Result<()> {
     let shares_to_pubkey_agg_timer = Instant::now();
     const KS3: [&str; 3] = ["KeyshareCreated"; 3];
     const DKG3: [&str; 3] = ["DKGRecursiveAggregationComplete"; 3];
-    const C1_C5: [&str; 11] = [
+    const C1_C5: [&str; 13] = [
         "ShareVerificationDispatched",
+        "CommitmentConsistencyCheckRequested",
+        "CommitmentConsistencyCheckComplete",
         "ComputeRequest",
         "ComputeResponse",
         "ProofVerificationPassed",
@@ -885,6 +908,8 @@ async fn test_trbfv_actor() -> Result<()> {
     // - 1 CiphertextOutputPublished (from shared bus)
     // - 3 DecryptionshareCreated (from simulate_libp2p, passes is_forwardable_event)
     // - 1 ShareVerificationDispatched (C6 verification dispatched by ThresholdPlaintextAggregator)
+    // - 1 CommitmentConsistencyCheckRequested (pre-ZK consistency check)
+    // - 1 CommitmentConsistencyCheckComplete (consistency check result)
     // - 1 ComputeRequest (C6 ZK verification)
     // - 1 ComputeResponse (C6 ZK verification result)
     // - 9 ProofVerificationPassed (3 parties × 3 C6 proofs per ciphertext)
@@ -909,7 +934,19 @@ async fn test_trbfv_actor() -> Result<()> {
     };
     // Sum matches the comment above through AggregationProofSigned, then fold, then PlaintextAggregated.
     // E3RequestComplete is not included (arrives after; not needed for take).
-    let expected_count = 1 + 3 + 1 + 2 + 9 + 1 + 2 + 1 + 2 + 1 + c6_fold_events + 1;
+    let expected_count = 1 // CiphertextOutputPublished
+        + 3               // DecryptionshareCreated
+        + 1               // ShareVerificationDispatched
+        + 2               // CommitmentConsistencyCheck (Requested + Complete)
+        + 2               // C6 ZK verification (ComputeRequest + ComputeResponse)
+        + 9               // ProofVerificationPassed (3 parties × 3 proofs)
+        + 1               // ShareVerificationComplete
+        + 2               // TrBFV computation (ComputeRequest + ComputeResponse)
+        + 1               // AggregationProofPending
+        + 2               // C7 proof (ComputeRequest + ComputeResponse)
+        + 1               // AggregationProofSigned
+        + c6_fold_events  // C6 fold steps
+        + 1; // PlaintextAggregated
 
     let h = nodes
         .take_history_with_timeouts(
@@ -1235,6 +1272,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         bus.publish_without_context(CommitteeFinalized {
             e3_id: e3_id.clone(),
             committee: eth_addrs.clone(),
+            scores: compute_committee_scores(&eth_addrs, &e3_id, seed.clone()),
             chain_id: 1,
         })?;
 
@@ -1482,6 +1520,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     bus.publish_without_context(CommitteeFinalized {
         e3_id: E3id::new("1234", 1),
         committee: eth_addrs.clone(),
+        scores: compute_committee_scores(&eth_addrs, &E3id::new("1234", 1), seed.clone()),
         chain_id: 1,
     })?;
 
@@ -1520,6 +1559,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     bus.publish_without_context(CommitteeFinalized {
         e3_id: E3id::new("1234", 2),
         committee: eth_addrs.clone(),
+        scores: compute_committee_scores(&eth_addrs, &E3id::new("1234", 2), seed.clone()),
         chain_id: 2,
     })?;
 

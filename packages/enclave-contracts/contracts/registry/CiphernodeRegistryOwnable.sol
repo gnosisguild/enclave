@@ -348,8 +348,14 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         c.stage = ICiphernodeRegistry.CommitteeStage.Finalized;
         c.activeCount = c.topNodes.length;
 
+        uint256 len = c.topNodes.length;
+        uint256[] memory scores = new uint256[](len);
+        for (uint256 i = 0; i < len; ++i) {
+            scores[i] = c.scoreOf[c.topNodes[i]];
+        }
+
         enclave.onCommitteeFinalized(e3Id);
-        emit CommitteeFinalized(e3Id, c.topNodes);
+        emit CommitteeFinalized(e3Id, c.topNodes, scores);
         return true;
     }
 

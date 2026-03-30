@@ -99,7 +99,8 @@ export interface CommitteePublishedData {
 
 export interface CommitteeFinalizedData {
   e3Id: bigint
-  nodes: string[]
+  committee: string[]
+  scores: bigint[]
 }
 
 export interface EnclaveEventData {

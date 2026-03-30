@@ -244,45 +244,55 @@ LIFECYCLE:
 #### Step 1: Local Proof Failure Detection
 
 ```
-ProofVerificationFailed event arrives at AccusationManager
+ProofVerificationFailed OR CommitmentConsistencyViolation event arrives
 │
-├─ 1. Resolve accused address:
-│     If accused_address == 0x0:
-│       Look up from committee list by party_id
+├─ For ProofVerificationFailed:
+│   ├─ 1. Resolve accused address:
+│   │     If accused_address == 0x0:
+│   │       Look up from committee list by party_id
+│   │
+│   ├─ 2. Cache verification result:
+│   │     received_data[(accused, proof_type)] = { data_hash, passed: false }
+│   │
+│   ├─ 3. For C3a/C3b proofs: attach signed_payload for re-verification
+│   │     → Other nodes need the original proof to independently verify
+│   │
+│   └─ 4. Delegate to initiate_accusation()
 │
-├─ 2. Cache verification result:
-│     received_data[(accused, proof_type)] = { data_hash, passed: false }
+├─ For CommitmentConsistencyViolation:
+│   ├─ 1. Cache verification result:
+│   │     received_data[(accused, proof_type)] = { data_hash, passed: false }
+│   │
+│   └─ 2. Delegate to initiate_accusation() (no forwarded payload)
 │
-├─ 3. Dedup check:
-│     If (accused, proof_type) already in accused_proofs set:
-│       → Return (already accused, skip)
-│     Else: insert into accused_proofs
-│
-├─ 4. For C3a/C3b proofs: attach signed_payload for re-verification
-│     → Other nodes need the original proof to independently verify
-│     → Non-C3 proofs don't need forwarding (nodes have the data locally)
-│
-├─ 5. Create and SIGN accusation:
-│     ProofFailureAccusation {
-│       e3_id, accuser: my_address, accused, accused_party_id,
-│       proof_type, data_hash, signed_payload (C3 only),
-│       signature: ecSign(accusation_digest)
-│     }
-│
-├─ 6. Broadcast accusation via P2P gossip
-│
-├─ 7. Cast OWN VOTE (agrees = true):
-│     AccusationVote {
-│       e3_id, accusation_id, voter: my_address,
-│       agrees: true, data_hash,
-│       signature: ecSign(vote_digest)
-│     }
-│     → Broadcast via P2P gossip
-│
-├─ 8. Start vote timeout (300 seconds):
-│     → If quorum not reached by timeout, resolve as Inconclusive
-│
-└─ 9. Check for immediate quorum (if threshold_m == 1)
+└─ initiate_accusation() — shared logic:
+    │
+    ├─ 3. Dedup check:
+    │     If (accused, proof_type) already in accused_proofs set:
+    │       → Return (already accused, skip)
+    │     Else: insert into accused_proofs
+    │
+    ├─ 4. Create and SIGN accusation:
+    │     ProofFailureAccusation {
+    │       e3_id, accuser: my_address, accused, accused_party_id,
+    │       proof_type, data_hash, signed_payload (C3 only),
+    │       signature: ecSign(accusation_digest)
+    │     }
+    │
+    ├─ 5. Broadcast accusation via P2P gossip
+    │
+    ├─ 6. Cast OWN VOTE (agrees = true):
+    │     AccusationVote {
+    │       e3_id, accusation_id, voter: my_address,
+    │       agrees: true, data_hash,
+    │       signature: ecSign(vote_digest)
+    │     }
+    │     → Broadcast via P2P gossip
+    │
+    ├─ 7. Start vote timeout (300 seconds):
+    │     → If quorum not reached by timeout, resolve as Inconclusive
+    │
+    └─ 8. Check for immediate quorum (if threshold_m == 1)
 ```
 
 #### Step 2: Incoming Accusation Handling
