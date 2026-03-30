@@ -80,6 +80,21 @@ impl CommitmentConsistencyChecker {
         }
     }
 
+    /// Insert a proof into the cache, deduplicating by `data_hash` to avoid
+    /// double-counting when the same proof arrives via both the pre-ZK batch
+    /// and the post-ZK `ProofVerificationPassed` path.
+    fn insert_verified(
+        &mut self,
+        address: Address,
+        proof_type: ProofType,
+        data: VerifiedProofData,
+    ) {
+        let entries = self.verified.entry((address, proof_type)).or_default();
+        if !entries.iter().any(|e| e.data_hash == data.data_hash) {
+            entries.push(data);
+        }
+    }
+
     pub fn setup(bus: &BusHandle, e3_id: E3id, links: Vec<Box<dyn CommitmentLink>>) -> Addr<Self> {
         let actor = Self::new(bus, e3_id, links);
         let addr = actor.start();
@@ -314,15 +329,16 @@ impl Handler<TypedEvent<ProofVerificationPassed>> for CommitmentConsistencyCheck
         let proof_type = data.proof_type;
         let address = data.address;
 
-        self.verified
-            .entry((address, proof_type))
-            .or_default()
-            .push(VerifiedProofData {
+        self.insert_verified(
+            address,
+            proof_type,
+            VerifiedProofData {
                 party_id: data.party_id,
                 address,
                 public_signals: data.public_signals,
                 data_hash: data.data_hash,
-            });
+            },
+        );
 
         self.check_links(proof_type, &ec);
     }
@@ -343,15 +359,16 @@ impl Handler<TypedEvent<CommitmentConsistencyCheckRequested>> for CommitmentCons
         // Cache each party's proof data for link evaluation.
         for party in &data.party_proofs {
             for (proof_type, public_signals, data_hash) in &party.proofs {
-                self.verified
-                    .entry((party.address, *proof_type))
-                    .or_default()
-                    .push(VerifiedProofData {
+                self.insert_verified(
+                    party.address,
+                    *proof_type,
+                    VerifiedProofData {
                         party_id: party.party_id,
                         address: party.address,
                         public_signals: public_signals.clone(),
                         data_hash: *data_hash,
-                    });
+                    },
+                );
             }
         }
 
