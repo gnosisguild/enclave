@@ -3,8 +3,9 @@
 use derivative::Derivative;
 use e3_utils::utility_types::ArcBytes;
 use e3_zk_helpers::{
-    CircuitOutputLayout, DKG_SHARE_DECRYPTION_OUTPUTS, PK_AGGREGATION_OUTPUTS, PK_BFV_OUTPUTS,
-    PK_GENERATION_OUTPUTS, SHARE_COMPUTATION_CHUNK_BATCH_OUTPUTS, SHARE_COMPUTATION_OUTPUTS,
+    CircuitInputLayout, CircuitOutputLayout, DKG_SHARE_DECRYPTION_OUTPUTS, PK_AGGREGATION_OUTPUTS,
+    PK_BFV_OUTPUTS, PK_GENERATION_OUTPUTS, SHARE_COMPUTATION_CHUNK_BATCH_OUTPUTS,
+    SHARE_COMPUTATION_OUTPUTS, SHARE_ENCRYPTION_INPUTS, THRESHOLD_SHARE_DECRYPTION_INPUTS,
     THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
 };
 use serde::{Deserialize, Serialize};
@@ -44,6 +45,17 @@ impl Proof {
     /// circuit's [`CircuitOutputLayout`].
     pub fn extract_output(&self, field_name: &str) -> Option<ArcBytes> {
         let layout = self.circuit.output_layout();
+        layout
+            .extract_field(&self.public_signals, field_name)
+            .map(ArcBytes::from_bytes)
+    }
+
+    /// Extract a named public input field from this proof's public signals.
+    ///
+    /// Public inputs sit at the **start** of `public_signals`, before any
+    /// return values.
+    pub fn extract_input(&self, field_name: &str) -> Option<ArcBytes> {
+        let layout = self.circuit.input_layout();
         layout
             .extract_field(&self.public_signals, field_name)
             .map(ArcBytes::from_bytes)
@@ -200,6 +212,19 @@ impl CircuitName {
             }
             CircuitName::DecryptedSharesAggregation => CircuitOutputLayout::None,
             CircuitName::Fold => CircuitOutputLayout::None,
+        }
+    }
+
+    /// Public input layout for C3 and C6 circuits (fields at the start of public_signals).
+    pub fn input_layout(&self) -> CircuitInputLayout {
+        match self {
+            CircuitName::ShareEncryption => CircuitInputLayout::Fixed {
+                fields: SHARE_ENCRYPTION_INPUTS,
+            },
+            CircuitName::ThresholdShareDecryption => CircuitInputLayout::Fixed {
+                fields: THRESHOLD_SHARE_DECRYPTION_INPUTS,
+            },
+            _ => CircuitInputLayout::None,
         }
     }
 }

@@ -142,9 +142,13 @@ impl NodeProofAggregator {
         state.buffer.insert(msg.seq, msg.wrapped_proof);
         state.last_ec = ec;
 
+        let buffered = state.buffer.len();
+        let folded = state
+            .total_expected
+            .saturating_sub(state.remaining.saturating_add(buffered));
         info!(
-            "NodeProofAggregator: buffered seq={} for E3 {} (remaining={})",
-            msg.seq, e3_id, state.remaining
+            "NodeProofAggregator: buffered seq={} for E3 {} (buffered={}, folded={}, remaining={})",
+            msg.seq, e3_id, buffered, folded, state.remaining
         );
 
         self.try_advance(&e3_id);
