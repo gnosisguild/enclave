@@ -93,6 +93,7 @@ where
     F: Fn(String) -> Fut,
     Fut: Future<Output = Result<String>>,
 {
+    // We do manual http parsing as actix-web requires running on a separate thread and is too heavy
     let (reader, mut writer) = stream.into_split();
     let mut buf_reader = BufReader::new(reader);
 
