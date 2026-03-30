@@ -684,6 +684,8 @@ async fn test_trbfv_actor() -> Result<()> {
     let (zk_backend, _zk_temp) = setup_test_zk_backend().await;
 
     let nodes = CiphernodeSystemBuilder::new()
+        // All nodes run the same binary under the aggregator-committee model.
+        // Node 0 stays an observer only because it is excluded from sortition registration.
         // Adding 20 total nodes: 3 for committee + 3 buffer = 6 selected, 14 unselected
         .add_group(1, || async {
             let addr = rand_eth_addr(&rng);
@@ -709,13 +711,16 @@ async fn test_trbfv_actor() -> Result<()> {
             let addr = rand_eth_addr(&rng);
             println!("Building normal {}", &addr);
             CiphernodeBuilder::new(rng.clone(), cipher.clone())
+                .testmode_with_history()
                 .with_shared_taskpool(&task_pool)
                 .with_multithread_concurrent_jobs(concurrent_jobs)
                 .with_shared_multithread_report(&multithread_report)
                 .with_trbfv()
                 .with_zkproof(zk_backend.clone())
                 .testmode_with_signer(PrivateKeySigner::random())
+                .with_pubkey_aggregation()
                 .with_sortition_score()
+                .with_threshold_plaintext_aggregation()
                 .testmode_with_forked_bus(bus.event_bus())
                 .testmode_ignore_address_check()
                 .with_logging()
