@@ -260,25 +260,29 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<E3StageChanged>
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, msg: E3StageChanged, _: &mut Self::Context) -> Self::Result {
-        if !self.effects_enabled || !self.is_active_aggregator_for(&msg.e3_id) {
+        if !self.effects_enabled {
             return Box::pin(async {});
         }
 
         Box::pin({
+            let e3_id = msg.e3_id.clone();
             let contract_address = self.contract_address;
             let provider = self.provider.clone();
             async move {
-                let result =
-                    process_e3_failure(provider, contract_address, msg.e3_id.clone()).await;
+                let result = process_e3_failure(provider, contract_address, e3_id.clone()).await;
                 match result {
                     Ok(receipt) => {
-                        info!(tx=%receipt.transaction_hash, "Called processE3Failure for E3 {}", msg.e3_id);
+                        info!(
+                            tx=%receipt.transaction_hash,
+                            e3_id = %e3_id,
+                            "Called processE3Failure"
+                        );
                     }
                     Err(err) => {
-                        // Non-fatal: may revert if already processed or no payment
                         info!(
-                            "processE3Failure for E3 {} did not succeed (may already be processed): {:?}",
-                            msg.e3_id, err
+                            e3_id = %e3_id,
+                            "processE3Failure did not succeed (may already be processed): {}",
+                            format_evm_error(&err)
                         );
                     }
                 }
@@ -352,22 +356,16 @@ async fn process_e3_failure<P: Provider + WalletProvider + Clone>(
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = e3_id.try_into()?;
 
-    send_tx_with_retry("processE3Failure", &[], || {
-        info!("processE3Failure() e3_id={:?}", e3_id);
-        let provider = provider.clone();
+    info!("processE3Failure() e3_id={:?}", e3_id);
 
-        async move {
-            let from_address = provider.provider().default_signer_address();
-            let current_nonce = provider
-                .provider()
-                .get_transaction_count(from_address)
-                .pending()
-                .await?;
-            let contract = IEnclave::new(contract_address, provider.provider());
-            let builder = contract.processE3Failure(e3_id).nonce(current_nonce);
-            let receipt = builder.send().await?.get_receipt().await?;
-            Ok(receipt)
-        }
-    })
-    .await
+    let from_address = provider.provider().default_signer_address();
+    let current_nonce = provider
+        .provider()
+        .get_transaction_count(from_address)
+        .pending()
+        .await?;
+    let contract = IEnclave::new(contract_address, provider.provider());
+    let builder = contract.processE3Failure(e3_id).nonce(current_nonce);
+    let receipt = builder.send().await?.get_receipt().await?;
+    Ok(receipt)
 }

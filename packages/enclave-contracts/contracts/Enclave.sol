@@ -536,9 +536,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // Use active committee nodes (already filtered by expulsion)
         try ciphernodeRegistry.getActiveCommitteeNodes(e3Id) returns (
             address[] memory nodes,
-            uint256[] memory scores
+            uint256[] memory
         ) {
-            scores;
             return nodes;
         } catch {
             return new address[](0); // Committee not published (DKG failed)

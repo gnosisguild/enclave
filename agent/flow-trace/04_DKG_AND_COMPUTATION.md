@@ -457,7 +457,7 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 
 ---
 
-  ## Phase 2: Public Key Aggregation (Committee-Buffered, Active Aggregator Submits)
+## Phase 2: Public Key Aggregation (Committee-Buffered, Active Aggregator Submits)
 
 ```
   All committee members receive KeyshareCreated events
@@ -638,7 +638,7 @@ EnclaveSolReader decodes CiphertextOutputPublished event
 
 ---
 
-  ## Phase 5: Plaintext Aggregation (Committee-Buffered, Active Aggregator Submits)
+## Phase 5: Plaintext Aggregation (Committee-Buffered, Active Aggregator Submits)
 
 ```
   All committee members receive DecryptionshareCreated events

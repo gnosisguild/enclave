@@ -456,6 +456,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<CommitteeFinalizeRe
                         "Failed to preflight finalizeCommittee: {}",
                         format_evm_error(&err)
                     );
+                    return;
                 }
                 Ok(true) => {}
             }
@@ -506,6 +507,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                         "Failed to preflight publishCommittee: {}",
                         format_evm_error(&err)
                     );
+                    return;
                 }
                 Ok(true) => {}
             }

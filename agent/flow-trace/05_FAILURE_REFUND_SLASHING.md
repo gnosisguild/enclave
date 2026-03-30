@@ -75,6 +75,11 @@ Specific triggers:
 
 ### Step 1: Process Failure
 
+Runtime note: `processE3Failure()` is a permissionless cleanup path. The Rust `EnclaveSolWriter` may
+auto-submit it from any effects-enabled node on the same chain, and it must not depend on
+active-aggregator designation because failures can happen before committee finalization or while the
+current aggregator is offline.
+
 ```
 Anyone calls: Enclave.processE3Failure(e3Id)
 │
