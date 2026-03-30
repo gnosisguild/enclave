@@ -343,7 +343,9 @@ mod tests {
         signals[64..96].copy_from_slice(&[0x77; 32]);
 
         assert_eq!(
-            layout.extract_field(&signals, "expected_sk_commitment").unwrap(),
+            layout
+                .extract_field(&signals, "expected_sk_commitment")
+                .unwrap(),
             &[0x11; 32]
         );
         assert_eq!(
