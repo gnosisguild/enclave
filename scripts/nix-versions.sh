@@ -23,7 +23,7 @@ for p in amd64-linux; do
   hex=$(jq -r ".bb_checksums[\"${p}\"]" "$VERSIONS_JSON")
   sri=$(nix hash convert --to sri --hash-algo sha256 "$hex")
   check "bb-${p}" \
-    "https://github.com/gnosisguild/aztec-packages/releases/download/v${BB_VER}/barretenberg-${p}.tar.gz" \
+    "https://github.com/AztecProtocol/aztec-packages/releases/download/v${BB_VER}/barretenberg-${p}.tar.gz" \
     "$sri"
 done
 exit $FAIL
