@@ -30,7 +30,7 @@ members = [
   "crates/request",
   "crates/safe",
   "crates/sdk",
-  "crates/socket-server",
+  "crates/daemon-server",
   "crates/sortition",
   "crates/support-scripts",
   "crates/sync",
@@ -100,7 +100,7 @@ e3-logger = { version = "0.1.15", path = "./crates/logger" }
 e3-net = { version = "0.1.15", path = "./crates/net" }
 e3-compute-provider = { version = "0.1.15", path = "./crates/compute-provider" }
 e3-sortition = { version = "0.1.15", path = "./crates/sortition" }
-e3-socket-server = { version = "0.1.15", path = "./crates/socket-server" }
+e3-daemon-server = { version = "0.1.15", path = "./crates/daemon-server" }
 e3-program-server = { version = "0.1.15", path = "./crates/program-server" }
 e3-polynomial = { version = "0.1.15", path = "./crates/polynomial" }
 e3-support-scripts = { version = "0.1.15", path = "./crates/support-scripts" }

@@ -15,7 +15,7 @@ use e3_ciphernode_builder::CiphernodeHandle;
 use e3_config::{AppConfig, NodeRole};
 use e3_console::Console;
 use e3_events::{prelude::*, Shutdown};
-use e3_socket_server::start_rest_server;
+use e3_socket_server::start_daemon_server;
 use e3_utils::{colorize, Color};
 use tokio::signal::unix::{signal, SignalKind};
 use tracing::{error, info, instrument};
@@ -55,7 +55,7 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
 /// Launch a socket server to read RemoteCli commands
 pub fn launch_socket_server(ctrl_port: u16) {
     // Setup socket server for daemon
-    tokio::task::spawn_local(start_rest_server(ctrl_port, |body| async move {
+    tokio::task::spawn_local(start_daemon_server(ctrl_port, |body| async move {
         let (out, mut rx) = Console::channel();
         info!("CMD: {}", &colorize(&body, Color::Blue));
         let remote_cli: RemoteCli = serde_json::from_str(&body)?;

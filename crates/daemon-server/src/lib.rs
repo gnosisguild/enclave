@@ -56,7 +56,7 @@ pub async fn run_on_daemon<T: Serialize>(
     Ok(())
 }
 
-pub async fn start_rest_server<F, Fut>(tcp_port: u16, handler: F)
+pub async fn start_daemon_server<F, Fut>(tcp_port: u16, handler: F)
 where
     F: Fn(String) -> Fut + 'static,
     Fut: Future<Output = Result<String>> + 'static,

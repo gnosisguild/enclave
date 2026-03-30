@@ -3131,12 +3131,12 @@ dependencies = [
  "e3-config",
  "e3-console",
  "e3-crypto",
+ "e3-daemon-server",
  "e3-entrypoint",
  "e3-events",
  "e3-evm",
  "e3-fhe-params",
  "e3-init",
- "e3-socket-server",
  "e3-support-scripts",
  "e3-trbfv",
  "e3-utils",
@@ -3226,6 +3226,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-daemon-server"
+version = "0.1.15"
+dependencies = [
+ "anyhow",
+ "e3-config",
+ "e3-console",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "e3-data"
 version = "0.1.15"
 dependencies = [
@@ -3260,6 +3274,7 @@ dependencies = [
  "e3-ciphernode-builder",
  "e3-config",
  "e3-crypto",
+ "e3-daemon-server",
  "e3-data",
  "e3-events",
  "e3-evm",
@@ -3268,7 +3283,6 @@ dependencies = [
  "e3-logger",
  "e3-net",
  "e3-request",
- "e3-socket-server",
  "e3-sortition",
  "e3-test-helpers",
  "e3-zk-prover",
@@ -3649,20 +3663,6 @@ dependencies = [
  "e3-evm-helpers",
  "e3-fhe-params",
  "e3-indexer",
-]
-
-[[package]]
-name = "e3-socket-server"
-version = "0.1.15"
-dependencies = [
- "anyhow",
- "e3-config",
- "e3-console",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
 ]
 
 [[package]]

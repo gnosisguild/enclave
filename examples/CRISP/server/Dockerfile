@@ -85,7 +85,7 @@ COPY crates/program-server/Cargo.toml crates/program-server/Cargo.toml
 COPY crates/request/Cargo.toml crates/request/Cargo.toml
 COPY crates/sdk/Cargo.toml crates/sdk/Cargo.toml
 COPY crates/sortition/Cargo.toml crates/sortition/Cargo.toml
-COPY crates/socket-server/Cargo.toml crates/socket-server/Cargo.toml
+COPY crates/daemon-server/Cargo.toml crates/daemon-server/Cargo.toml
 COPY crates/support-scripts/Cargo.toml crates/support-scripts/Cargo.toml
 COPY crates/sync/Cargo.toml crates/sync/Cargo.toml
 COPY crates/test-helpers/Cargo.toml crates/test-helpers/Cargo.toml
