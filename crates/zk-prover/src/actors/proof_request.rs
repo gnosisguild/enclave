@@ -8,7 +8,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use actix::{Actor, Addr, Context, Handler};
+use alloy::primitives::{keccak256, Bytes};
 use alloy::signers::local::PrivateKeySigner;
+use alloy::sol_types::SolValue;
 use e3_events::{
     AggregationProofPending, AggregationProofSigned, BusHandle, ComputeRequest,
     ComputeRequestError, ComputeRequestErrorKind, ComputeResponse, ComputeResponseKind,
@@ -17,9 +19,10 @@ use e3_events::{
     EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated, EncryptionKeyPending,
     EventContext, EventPublisher, EventSubscriber, EventType, FailureReason,
     PkAggregationProofPending, PkAggregationProofRequest, PkAggregationProofSigned,
-    PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload, ProofType, Sequenced,
-    ShareDecryptionProofPending, SignedProofFailed, SignedProofPayload, ThresholdShare,
-    ThresholdShareCreated, ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
+    PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload, ProofType,
+    ProofVerificationPassed, Sequenced, ShareDecryptionProofPending, SignedProofFailed,
+    SignedProofPayload, ThresholdShare, ThresholdShareCreated, ThresholdSharePending, TypedEvent,
+    ZkRequest, ZkResponse,
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
@@ -1368,6 +1371,7 @@ impl ProofRequestActor {
             }
         }
 
+        let local_party_id = key.party_id;
         if let Err(err) = self.bus.publish(
             EncryptionKeyCreated {
                 e3_id: e3_id.clone(),
@@ -1377,6 +1381,33 @@ impl ProofRequestActor {
             ec.clone(),
         ) {
             error!("Failed to publish EncryptionKeyCreated: {err}");
+        }
+
+        // Publish the local node's own C0 as ProofVerificationPassed so the
+        // CommitmentConsistencyChecker caches it. Without this, C3 proofs from
+        // other parties that encrypt under this node's pk would fail the C3→C0
+        // consistency check (the local C0 target wouldn't exist in the cache).
+        {
+            let msg = (
+                Bytes::copy_from_slice(&proof.data),
+                Bytes::copy_from_slice(&proof.public_signals),
+            )
+                .abi_encode();
+            let data_hash: [u8; 32] = keccak256(&msg).into();
+
+            if let Err(err) = self.bus.publish(
+                ProofVerificationPassed {
+                    e3_id: e3_id.clone(),
+                    party_id: local_party_id,
+                    address: self.signer.address(),
+                    proof_type: ProofType::C0PkBfv,
+                    data_hash,
+                    public_signals: proof.public_signals.clone(),
+                },
+                ec.clone(),
+            ) {
+                error!("Failed to publish local C0 ProofVerificationPassed: {err}");
+            }
         }
 
         // Emit DKGInnerProofReady for C0, or buffer if meta not yet available
