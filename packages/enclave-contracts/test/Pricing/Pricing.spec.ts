@@ -347,7 +347,7 @@ describe("E3 Pricing", function () {
   };
 
   // Helper to make a request
-  const makeRequest = async (
+  const _makeRequest = async (
     enclave: Enclave,
     usdcToken: MockUSDC,
     requestParams: Parameters<Enclave["request"]>[0],
@@ -788,10 +788,10 @@ describe("E3 Pricing", function () {
         enclave,
         usdcToken,
         request,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-        operator3,
+        // ciphernodeRegistryContract,
+        // operator1,
+        // operator2,
+        // operator3,
         owner,
       } = await loadFixture(setup);
 
