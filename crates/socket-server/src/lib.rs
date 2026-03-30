@@ -18,35 +18,48 @@ const TCP_ADDRESS: &str = "127.0.0.1"; // using localhost specifically so that i
                                        // externally. We might change this if we need to control
                                        // externally and add authentication or TLS
 
-pub async fn connect_socket(maybe_config: Option<&AppConfig>) -> Option<TcpStream> {
-    let config = maybe_config?;
-    let addr = format!("{}:{}", TCP_ADDRESS, config.ctrl_port());
-    TcpStream::connect(addr).await.ok()
+pub struct ServerInfo {
+    pub port: u16,
 }
 
-pub async fn run_on_socket<T: Serialize>(
+pub async fn connect_daemon(maybe_config: Option<&AppConfig>) -> Option<ServerInfo> {
+    let config = maybe_config?;
+    let port = config.ctrl_port();
+    let url = format!("http://{}:{}", TCP_ADDRESS, port);
+    reqwest::Client::new()
+        .head(&url)
+        .timeout(std::time::Duration::from_secs(1))
+        .send()
+        .await
+        .ok()?;
+    Some(ServerInfo { port })
+}
+
+pub async fn run_on_daemon<T: Serialize>(
     out: Console,
-    stream: TcpStream,
+    server: ServerInfo,
     cli: T,
 ) -> anyhow::Result<()> {
-    let (reader, mut writer) = stream.into_split();
-    let payload = serde_json::to_string(&cli)?;
-    writer.write_all(payload.as_bytes()).await?;
-    writer.write_all(b"\n").await?;
-    writer.shutdown().await?;
+    let url = format!("http://{}:{}", TCP_ADDRESS, server.port);
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(&url)
+        .json(&cli)
+        .send()
+        .await?
+        .error_for_status()?;
 
-    let mut lines = BufReader::new(reader).lines();
-    while let Some(line) = lines.next_line().await? {
+    let text = resp.text().await?;
+    for line in text.lines() {
         log!(out, "{}", line);
     }
-
     Ok(())
 }
 
-pub async fn start_socket_server<F, Fut>(tcp_port: u16, handler: F)
+pub async fn start_rest_server<F, Fut>(tcp_port: u16, handler: F)
 where
-    F: Fn(TcpStream) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = Result<()>> + 'static,
+    F: Fn(String) -> Fut + 'static,
+    Fut: Future<Output = Result<String>> + 'static,
 {
     let addr = format!("{}:{}", TCP_ADDRESS, tcp_port);
     let listener = match tokio::net::TcpListener::bind(addr).await {
@@ -56,15 +69,13 @@ where
             return;
         }
     };
-
     let handler = Arc::new(handler);
     loop {
         match listener.accept().await {
             Ok((stream, _)) => {
                 let handler = Arc::clone(&handler);
-
                 tokio::task::spawn_local(async move {
-                    if let Err(e) = handler(stream).await {
+                    if let Err(e) = handle_http(stream, &handler.as_ref()).await {
                         error!("Connection error: {e}");
                     }
                 });
@@ -75,4 +86,46 @@ where
             }
         }
     }
+}
+
+async fn handle_http<F, Fut>(stream: TcpStream, handler: &F) -> Result<()>
+where
+    F: Fn(String) -> Fut,
+    Fut: Future<Output = Result<String>>,
+{
+    let (reader, mut writer) = stream.into_split();
+    let mut buf_reader = BufReader::new(reader);
+
+    // Read headers until blank line
+    let mut content_length: usize = 0;
+    loop {
+        let mut line = String::new();
+        buf_reader.read_line(&mut line).await?;
+        if line.trim().is_empty() {
+            break;
+        }
+        if let Some(val) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+            content_length = val.trim().parse().unwrap_or(0);
+        }
+    }
+
+    // Read body
+    let mut body = vec![0u8; content_length];
+    tokio::io::AsyncReadExt::read_exact(&mut buf_reader, &mut body).await?;
+    let body = String::from_utf8(body)?;
+
+    // Run the existing logic
+    let (status, response_body) = match handler(body).await {
+        Ok(output) => ("200 OK", output),
+        Err(e) => ("500 Internal Server Error", e.to_string()),
+    };
+
+    let response = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        response_body.len(),
+        response_body
+    );
+    writer.write_all(response.as_bytes()).await?;
+    writer.shutdown().await?;
+    Ok(())
 }

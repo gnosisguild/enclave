@@ -8,7 +8,7 @@ use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, RemoteCli};
 use e3_console::Console;
-use e3_socket_server::{connect_socket, run_on_socket};
+use e3_socket_server::{connect_daemon, run_on_daemon};
 use e3_utils::{colorize, Color};
 use tracing::info;
 
@@ -70,13 +70,13 @@ pub async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let config_result = cli.load_config();
-    let maybe_stream = connect_socket(config_result.as_ref().ok()).await;
+    let maybe_server = connect_daemon(config_result.as_ref().ok()).await;
     let maybe_remote_command = TryInto::<RemoteCli>::try_into(cli.clone()).ok();
 
     // If the socket exists and the command can be parsed as remote
-    if let Err(err) = if let (Some(stream), Some(command)) = (maybe_stream, maybe_remote_command) {
+    if let Err(err) = if let (Some(server), Some(command)) = (maybe_server, maybe_remote_command) {
         // Run the command over the socket
-        run_on_socket(out, stream, command).await
+        run_on_daemon(out, server, command).await
     } else {
         // Run the command locally
         cli.execute(out, config_result).await

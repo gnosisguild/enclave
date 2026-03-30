@@ -3658,6 +3658,7 @@ dependencies = [
  "anyhow",
  "e3-config",
  "e3-console",
+ "reqwest",
  "serde",
  "serde_json",
  "tokio",
