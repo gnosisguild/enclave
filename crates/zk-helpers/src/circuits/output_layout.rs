@@ -314,4 +314,72 @@ mod tests {
         assert_eq!(CircuitOutputLayout::None.field_count(), Some(0));
         assert_eq!(CircuitOutputLayout::Dynamic.field_count(), None);
     }
+
+    #[test]
+    fn extract_c6_d_commitment_after_pub_inputs() {
+        let layout = CircuitOutputLayout::Fixed {
+            fields: THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
+        };
+        // C6: 2 public inputs + 1 output = 96 bytes
+        let mut signals = vec![0u8; 96];
+        signals[0..32].copy_from_slice(&[0x11; 32]);
+        signals[32..64].copy_from_slice(&[0x22; 32]);
+        signals[64..96].copy_from_slice(&[0x77; 32]);
+
+        assert_eq!(
+            layout.extract_field(&signals, "d_commitment").unwrap(),
+            &[0x77; 32]
+        );
+    }
+
+    #[test]
+    fn extract_c6_public_inputs_via_input_layout() {
+        let layout = CircuitInputLayout::Fixed {
+            fields: THRESHOLD_SHARE_DECRYPTION_INPUTS,
+        };
+        let mut signals = vec![0u8; 96];
+        signals[0..32].copy_from_slice(&[0x11; 32]);
+        signals[32..64].copy_from_slice(&[0x22; 32]);
+        signals[64..96].copy_from_slice(&[0x77; 32]);
+
+        assert_eq!(
+            layout
+                .extract_field(&signals, "expected_sk_commitment")
+                .unwrap(),
+            &[0x11; 32]
+        );
+        assert_eq!(
+            layout
+                .extract_field(&signals, "expected_e_sm_commitment")
+                .unwrap(),
+            &[0x22; 32]
+        );
+    }
+
+    #[test]
+    fn extract_c6_input_signals_too_short_returns_none() {
+        let layout = CircuitInputLayout::Fixed {
+            fields: THRESHOLD_SHARE_DECRYPTION_INPUTS,
+        };
+        assert!(layout
+            .extract_field(&[0u8; 32], "expected_e_sm_commitment")
+            .is_none());
+    }
+
+    /// C7 (`DecryptedSharesAggregation`) has no `-> pub` return values; metadata uses `None`.
+    #[test]
+    fn c7_void_output_extract_field_returns_none() {
+        let layout = CircuitOutputLayout::None;
+        let signals = vec![0u8; 256];
+        assert!(layout.extract_field(&signals, "d_commitment").is_none());
+    }
+
+    /// C7: `extract_all` yields no named outputs when the layout is void.
+    #[test]
+    fn c7_void_output_extract_all_returns_empty() {
+        let layout = CircuitOutputLayout::None;
+        let signals = vec![0u8; 256];
+        let all = layout.extract_all(&signals).unwrap();
+        assert!(all.is_empty());
+    }
 }

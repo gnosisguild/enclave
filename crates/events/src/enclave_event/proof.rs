@@ -281,6 +281,46 @@ mod tests {
     }
 
     #[test]
+    fn extract_c6_d_commitment_after_pub_inputs() {
+        // C6: 2 public inputs + 1 output (`d_commitment` at tail).
+        let mut signals = vec![0u8; 96];
+        signals[0..32].copy_from_slice(&[0x11; 32]); // expected_sk_commitment
+        signals[32..64].copy_from_slice(&[0x22; 32]); // expected_e_sm_commitment
+        signals[64..96].copy_from_slice(&[0x77; 32]); // d_commitment
+
+        let proof = make_proof(CircuitName::ThresholdShareDecryption, &signals);
+        assert_eq!(&*proof.extract_output("d_commitment").unwrap(), &[0x77; 32]);
+    }
+
+    #[test]
+    fn extract_c6_public_inputs() {
+        let mut signals = vec![0u8; 96];
+        signals[0..32].copy_from_slice(&[0x11; 32]);
+        signals[32..64].copy_from_slice(&[0x22; 32]);
+        signals[64..96].copy_from_slice(&[0x77; 32]);
+
+        let proof = make_proof(CircuitName::ThresholdShareDecryption, &signals);
+        assert_eq!(
+            &*proof.extract_input("expected_sk_commitment").unwrap(),
+            &[0x11; 32]
+        );
+        assert_eq!(
+            &*proof.extract_input("expected_e_sm_commitment").unwrap(),
+            &[0x22; 32]
+        );
+    }
+
+    #[test]
+    fn extract_c7_has_no_named_public_outputs() {
+        // C7 (`DecryptedSharesAggregation`) has only public inputs in Noir; `output_layout` is
+        // `None`, so `extract_output` cannot resolve a return field.
+        let signals = vec![0xAB; 32 * 8];
+        let proof = make_proof(CircuitName::DecryptedSharesAggregation, &signals);
+        assert!(proof.extract_output("d_commitment").is_none());
+        assert!(proof.extract_output("commitment").is_none());
+    }
+
+    #[test]
     fn extract_nonexistent_field() {
         let proof = make_proof(CircuitName::PkBfv, &[0u8; 32]);
         assert!(proof.extract_output("nonexistent").is_none());
