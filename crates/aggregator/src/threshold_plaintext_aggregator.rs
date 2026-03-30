@@ -11,12 +11,7 @@ use actix::prelude::*;
 use anyhow::{anyhow, bail, ensure, Result};
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, trap, AggregationProofPending, AggregationProofSigned, BusHandle,
-    CommitteeMemberExpelled, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
-    DecryptedSharesAggregationProofRequest, DecryptionshareCreated, Die, E3id, EType, EnclaveEvent,
-    EnclaveEventData, EventContext, PartyProofsToVerify, PlaintextAggregated, Proof, Seed,
-    Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload,
-    TypedEvent, VerificationKind, ZkResponse,
+    AggregationProofPending, AggregationProofSigned, BusHandle, CircuitName, CommitteeMemberExpelled, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId, DecryptedSharesAggregationProofRequest, DecryptionshareCreated, Die, E3id, EType, EnclaveEvent, EnclaveEventData, EventContext, PartyProofsToVerify, PlaintextAggregated, Proof, ProofType, Seed, Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed, SignedProofPayload, TypedEvent, VerificationKind, ZkResponse, prelude::*, trap
 };
 use e3_fhe_params::BfvPreset;
 use e3_sortition::{E3CommitteeContainsRequest, E3CommitteeContainsResponse, Sortition};
@@ -27,7 +22,7 @@ use e3_trbfv::{
 use e3_utils::NotifySync;
 use e3_utils::{utility_types::ArcBytes, MAILBOX_LIMIT};
 use e3_zk_helpers::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Collecting {
@@ -376,7 +371,7 @@ impl ThresholdPlaintextAggregator {
             .ok_or(anyhow!("Could not get state"))?
             .try_into()?;
 
-        let dishonest_parties = &msg.dishonest_parties;
+        let mut dishonest_parties = msg.dishonest_parties.clone();
         if !dishonest_parties.is_empty() {
             warn!(
                 "C6 verification: {} dishonest parties filtered: {:?}",
@@ -386,7 +381,7 @@ impl ThresholdPlaintextAggregator {
         }
 
         // Filter shares to only honest parties
-        let honest_shares: Vec<(u64, Vec<ArcBytes>)> = state
+        let mut honest_shares: Vec<(u64, Vec<ArcBytes>)> = state
             .shares
             .iter()
             .filter(|(id, _)| !dishonest_parties.contains(id))
@@ -400,9 +395,62 @@ impl ThresholdPlaintextAggregator {
             state.threshold_m + 1
         );
 
+        // Verify each honest party's raw decryption share matches the
+        // d_commitment attested by their verified C6 proof. Catches the attack
+        // where a node sends a valid C6 proof for share d_A but broadcasts
+        // different bytes d_B.
+        let share_mismatch_parties =
+            self.verify_shares_match_c6_commitments(&honest_shares, &state.c6_proofs);
+        if !share_mismatch_parties.is_empty() {
+            warn!(
+                "C6 share-commitment mismatch for {} parties: {:?} — excluding from aggregation",
+                share_mismatch_parties.len(),
+                share_mismatch_parties,
+            );
+
+            // Emit SignedProofFailed for each mismatched party so the
+            // AccusationManager can initiate the slashing quorum protocol.
+            for party_id in &share_mismatch_parties {
+                if let Some(proofs) = state.c6_proofs.get(party_id) {
+                    if let Some(signed) = proofs.first() {
+                        let Ok(faulting_node) = signed.recover_address() else {
+                            warn!(
+                                "Could not recover address for party {} C6 proof — skipping accusation",
+                                party_id
+                            );
+                            continue;
+                        };
+                        if let Err(err) = self.bus.publish(
+                            SignedProofFailed {
+                                e3_id: self.e3_id.clone(),
+                                faulting_node,
+                                proof_type: ProofType::C6ThresholdShareDecryption,
+                                signed_payload: signed.clone(),
+                            },
+                            ec.clone(),
+                        ) {
+                            error!(
+                                "Failed to publish SignedProofFailed for party {}: {err}",
+                                party_id
+                            );
+                        }
+                    }
+                }
+            }
+
+            dishonest_parties.extend(&share_mismatch_parties);
+            honest_shares.retain(|(id, _)| !share_mismatch_parties.contains(id));
+            ensure!(
+                honest_shares.len() > state.threshold_m as usize,
+                "Not enough honest shares after d_commitment check: {} honest, {} required",
+                honest_shares.len(),
+                state.threshold_m + 1
+            );
+        }
+
         info!(
             "C6 verification passed: {} honest parties, transitioning to Computing",
-            honest_shares.len()
+            honest_shares.len(),
         );
 
         // Collect honest C6 wrapped proofs sorted by party_id for cross-node folding.
@@ -460,6 +508,97 @@ impl ThresholdPlaintextAggregator {
         self.try_publish_complete()?;
 
         Ok(())
+    }
+
+    /// Verify that each honest party's raw decryption share bytes match the
+    /// `d_commitment` output in their verified C6 proof. Returns party IDs
+    /// that failed the check.
+    fn verify_shares_match_c6_commitments(
+        &self,
+        honest_shares: &[(u64, Vec<ArcBytes>)],
+        c6_proofs: &HashMap<u64, Vec<SignedProofPayload>>,
+    ) -> BTreeSet<u64> {
+        let mut mismatched = BTreeSet::new();
+
+        // Build BFV params and compute d_bit
+        let Ok((threshold_params, _)) = e3_fhe_params::build_pair_for_preset(self.params_preset)
+        else {
+            warn!("Could not build BFV params for d_commitment check — skipping");
+            return mismatched;
+        };
+
+        let d_bit = {
+            let Ok(ctx) = threshold_params.ctx_at_level(0) else {
+                warn!("Could not get ctx_at_level(0) for d_commitment check — skipping");
+                return mismatched;
+            };
+            let mut max_bit = 0u32;
+            for qi in ctx.moduli_operators() {
+                let qi_bound = (num_bigint::BigInt::from(qi.modulus()) - 1) / 2;
+                max_bit = max_bit.max(e3_zk_helpers::utils::calculate_bit_width(qi_bound));
+            }
+            max_bit
+        };
+
+        let max_k =
+            e3_zk_helpers::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
+        let c6_output_layout = CircuitName::ThresholdShareDecryption.output_layout();
+
+        for (party_id, shares) in honest_shares {
+            // Extract d_commitment from C6 proof
+            let Some(proofs) = c6_proofs.get(party_id) else {
+                continue;
+            };
+            let Some(first_proof) = proofs.first() else {
+                continue;
+            };
+            let Some(c6_d_bytes) = c6_output_layout
+                .extract_field(&first_proof.payload.proof.public_signals, "d_commitment")
+            else {
+                warn!(
+                    "Could not extract d_commitment from C6 proof for party {} — skipping check",
+                    party_id
+                );
+                continue;
+            };
+
+            // Compute d_commitment from raw share bytes (first ciphertext index)
+            let Some(share_bytes) = shares.first() else {
+                continue;
+            };
+            let Ok(mut poly) =
+                e3_trbfv::helpers::try_poly_from_bytes(share_bytes, &threshold_params)
+            else {
+                warn!(
+                    "Could not deserialize share for party {} — marking as mismatched",
+                    party_id
+                );
+                mismatched.insert(*party_id);
+                continue;
+            };
+            poly.change_representation(fhe_math::rq::Representation::PowerBasis);
+            let crt = e3_polynomial::CrtPolynomial::from_fhe_polynomial(&poly);
+            let computed =
+                e3_zk_helpers::circuits::commitments::compute_threshold_decryption_share_commitment(
+                    &crt, d_bit, max_k,
+                );
+
+            // Convert BigInt to LE bytes for comparison
+            let computed_bytes = computed.to_bytes_le().1;
+            let mut computed_padded = [0u8; 32];
+            let len = computed_bytes.len().min(32);
+            computed_padded[..len].copy_from_slice(&computed_bytes[..len]);
+
+            if computed_padded != c6_d_bytes {
+                warn!(
+                    "d_commitment mismatch for party {}: raw share commitment differs from C6 proof output",
+                    party_id
+                );
+                mismatched.insert(*party_id);
+            }
+        }
+
+        mismatched
     }
 
     /// Publish AggregationProofPending for C7 proof generation through ProofRequestActor.
