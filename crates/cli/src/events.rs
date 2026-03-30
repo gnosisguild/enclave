@@ -680,11 +680,11 @@ async fn query_events_fake(aggregate: u64, since: u64, limit: u64) -> Result<()>
             es_poly_sum: vec![ArcBytes::from_bytes(&[0x55; 32])],
             signed_sk_decryption_proof: dummy_signed_proof_payload(
                 E3id::new("test23", 1),
-                ProofType::C4DkgShareDecryption,
+                ProofType::C2aSkShareComputation,
             ),
             signed_e_sm_decryption_proofs: vec![dummy_signed_proof_payload(
                 E3id::new("test23", 1),
-                ProofType::C4DkgShareDecryption,
+                ProofType::C2aSkShareComputation,
             )],
             external: false,
         }),
