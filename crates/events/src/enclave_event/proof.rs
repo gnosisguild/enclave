@@ -215,7 +215,7 @@ impl CircuitName {
         }
     }
 
-    /// Public input layout for this circuit (fields at the start of public_signals).
+    /// Public input layout for C3 and C6 circuits (fields at the start of public_signals).
     pub fn input_layout(&self) -> CircuitInputLayout {
         match self {
             CircuitName::ShareEncryption => CircuitInputLayout::Fixed {

@@ -43,12 +43,12 @@ pub enum ProofType {
     C4aSkShareDecryption = 6,
     /// C4b — Smudging noise share decryption proof (Proof 4b).
     C4bESmShareDecryption = 7,
-    /// C6 — Threshold share decryption proof (Proof 6).
-    C6ThresholdShareDecryption = 8,
-    /// C7 — Decrypted shares aggregation proof (Proof 7).
-    C7DecryptedSharesAggregation = 9,
     /// C5 — Public key aggregation proof (Proof 5).
-    C5PkAggregation = 10,
+    C5PkAggregation = 8,
+    /// C6 — Threshold share decryption proof (Proof 6).
+    C6ThresholdShareDecryption = 9,
+    /// C7 — Decrypted shares aggregation proof (Proof 7).
+    C7DecryptedSharesAggregation = 10,
 }
 
 impl ProofType {
