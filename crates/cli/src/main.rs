@@ -8,7 +8,7 @@ use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, RemoteCli};
 use e3_console::Console;
-use e3_socket_server::{connect_daemon, run_on_daemon};
+use e3_daemon_server::{connect_daemon, run_on_daemon};
 use e3_utils::{colorize, Color};
 use tracing::info;
 
