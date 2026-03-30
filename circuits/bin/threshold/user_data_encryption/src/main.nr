@@ -8,12 +8,12 @@ use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_hon
 use lib::math::commitments::{compute_commitment, DS_CIPHERTEXT, DS_PK_AGGREGATION};
 
 fn main(
-    // User Data Encryption ct0 Section.
+    // P3: ct0 inner proof.
     ct0_verification_key: UltraHonkVerificationKey,
     ct0_proof: UltraHonkProof,
     ct0_public_inputs: [Field; 4], // pk0_commitment, ct0_commitment, k1_commitment, u_commitment
     ct0_key_hash: pub Field,
-    // User Data Encryption ct1 Section.
+    // P3: ct1 inner proof.
     ct1_verification_key: UltraHonkVerificationKey,
     ct1_proof: UltraHonkProof,
     ct1_public_inputs: [Field; 3], // pk1_commitment, ct1_commitment, u_commitment
@@ -41,7 +41,7 @@ fn main(
     ct_inputs.push(ct1_public_inputs[1]);
     let ct_commitment = compute_commitment(ct_inputs, DS_CIPHERTEXT);
 
-    // Computes the public key aggregation commitment.
+    // Threshold PK aggregation commitment (pk0 and pk1 limbs).
     let mut pk_inputs = Vec::new();
     pk_inputs.push(ct0_public_inputs[0]);
     pk_inputs.push(ct1_public_inputs[0]);

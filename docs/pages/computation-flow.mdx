@@ -118,6 +118,9 @@ event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput, byte
 
 Upon successful decryption, rewards are distributed to the active committee members.
 
+**See also:** [Cryptography](/cryptography) (threshold BFV, phases P1–P4, circuit IDs) and
+[Noir Circuits](/noir-circuits) (build, lint, `enclave noir`, Rust prover integration).
+
 ### Failure Handling
 
 If any phase exceeds its deadline or a fault is detected, the E3 transitions to the `Failed` stage.

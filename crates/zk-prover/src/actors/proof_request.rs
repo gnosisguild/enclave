@@ -712,7 +712,7 @@ impl ProofRequestActor {
         // Sign C4a (SK decryption proof)
         let Some(signed_sk) = self.sign_proof(
             e3_id,
-            ProofType::C4DkgShareDecryption,
+            ProofType::C4aSkShareDecryption,
             pending.sk_proof.expect("checked in is_complete"),
         ) else {
             error!("Failed to sign C4a SK proof — DecryptionKeyShared will not be published");
@@ -727,7 +727,7 @@ impl ProofRequestActor {
                 .get(&idx)
                 .expect("checked in is_complete")
                 .clone();
-            let Some(signed) = self.sign_proof(e3_id, ProofType::C4DkgShareDecryption, proof)
+            let Some(signed) = self.sign_proof(e3_id, ProofType::C4bESmShareDecryption, proof)
             else {
                 error!(
                     "Failed to sign C4b ESM proof [{}] — DecryptionKeyShared will not be published",

@@ -25,8 +25,6 @@ import {
   Enclave__factory as EnclaveFactory,
   MockUSDC__factory as MockUSDCFactory,
 } from "../../types";
-import type { Enclave } from "../../types/contracts/Enclave";
-import type { MockUSDC } from "../../types/contracts/test/MockStableToken.sol/MockUSDC";
 import { encodePkProof } from "../fixtures";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
@@ -344,20 +342,6 @@ describe("E3 Pricing", function () {
       request,
       mocks: { decryptionVerifier, e3Program, mockComputeProvider, pkVerifier },
     };
-  };
-
-  // Helper to make a request
-  const makeRequest = async (
-    enclave: Enclave,
-    usdcToken: MockUSDC,
-    requestParams: Parameters<Enclave["request"]>[0],
-    signer?: Signer,
-  ) => {
-    const fee = await enclave.getE3Quote(requestParams);
-    const tokenContract = signer ? usdcToken.connect(signer) : usdcToken;
-    const enclaveContract = signer ? enclave.connect(signer) : enclave;
-    await tokenContract.approve(await enclave.getAddress(), fee);
-    return enclaveContract.request(requestParams);
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -784,16 +768,7 @@ describe("E3 Pricing", function () {
 
   describe("End-to-end request with parametric pricing", function () {
     it("charges the computed fee and completes successfully", async function () {
-      const {
-        enclave,
-        usdcToken,
-        request,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-        operator3,
-        owner,
-      } = await loadFixture(setup);
+      const { enclave, usdcToken, request, owner } = await loadFixture(setup);
 
       const fee = await enclave.getE3Quote(request);
       const ownerAddr = await owner.getAddress();

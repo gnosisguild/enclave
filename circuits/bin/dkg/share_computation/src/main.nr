@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-// Level 2: final_wrapper
+// Level 2: final C2 wrapper (after chunk_batch); folds batches and checks VK genealogy.
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
 use lib::configs::default::dkg::{
     SHARE_COMPUTATION_EXPECTED_VK_HASH_ESM, SHARE_COMPUTATION_EXPECTED_VK_HASH_SK,
