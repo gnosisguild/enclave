@@ -48,7 +48,7 @@ impl CommitmentLink for C4aToC6SkCommitmentLink {
         target_public_signals: &[u8],
     ) -> bool {
         if source_values.is_empty() {
-            return true;
+            return false;
         }
         let layout = CircuitName::ThresholdShareDecryption.input_layout();
         layout
@@ -108,6 +108,7 @@ mod tests {
     fn short_signals() {
         let link = C4aToC6SkCommitmentLink;
         assert!(link.extract_source_values(&[0u8; 10]).is_empty());
-        assert!(link.check_consistency(&[], &[0u8; 64]));
+        // Empty source values means malformed proof — should be inconsistent
+        assert!(!link.check_consistency(&[], &[0u8; 64]));
     }
 }

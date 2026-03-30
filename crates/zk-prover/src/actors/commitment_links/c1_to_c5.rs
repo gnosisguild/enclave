@@ -62,7 +62,7 @@ impl CommitmentLink for C1ToC5PkCommitmentLink {
         target_public_signals: &[u8],
     ) -> bool {
         if source_values.is_empty() {
-            return true;
+            return false;
         }
 
         // C5 public_signals layout: [pub inputs: pk_commitments[0..H]] [output: commitment]
@@ -148,11 +148,11 @@ mod tests {
     }
 
     #[test]
-    fn short_source_signals_treated_as_consistent() {
+    fn short_source_signals_treated_as_inconsistent() {
         let link = C1ToC5PkCommitmentLink;
-        // Too short for C1 — extract returns empty, so vacuously consistent
+        // Too short for C1 — extract returns empty, malformed source is a fault
         assert!(link.extract_source_values(&[0u8; 60]).is_empty());
-        assert!(link.check_consistency(&[], &[0u8; 31]));
+        assert!(!link.check_consistency(&[], &[0u8; 31]));
     }
 
     #[test]
