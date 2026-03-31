@@ -5,7 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::configs::default::{N_PARTIES, T};
-pub use crate::configs::insecure::threshold::{L as L_THRESHOLD, QIS as QIS_THRESHOLD};
+pub use crate::configs::insecure::threshold::{
+    L as L_THRESHOLD, QIS as QIS_THRESHOLD,
+    THRESHOLD_SHARE_DECRYPTION_BIT_SK as SHARE_DECRYPTION_BIT_AGG,
+};
 use crate::core::dkg::share_computation::chunk::Configs as ShareComputationChunkConfigs;
 use crate::core::dkg::share_encryption::Configs as ShareEncryptionConfigs;
 
@@ -131,3 +134,4 @@ share_decryption_e_sm (CIRCUIT 4b - BFV DECRYPTION E_SM)
 ************************************/
 
 pub global SHARE_DECRYPTION_BIT_MSG: u32 = 36;
+// SHARE_DECRYPTION_BIT_AGG: see `pub use` of `THRESHOLD_SHARE_DECRYPTION_BIT_SK` (C6 `BIT_SK`).

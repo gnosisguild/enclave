@@ -9,13 +9,23 @@
 //! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
 //! and (for input) honest ciphertexts and secret key. Input values are normalized for the ZKP
 //! field so the Noir circuit's range checks and commitment checks succeed.
+//!
+//! Bit widths:
+//! - **`msg_bit`** — [`crate::compute_msg_bit`] on the **DKG** BFV params: coefficients in
+//!   `[0, t)` so the bound is `t − 1`. Matches C2 share-encryption
+//!   `compute_share_encryption_commitment_from_message` on per-share plaintexts. Emitted as
+//!   `SHARE_DECRYPTION_BIT_MSG` in codegen.
+//! - **`agg_bit`** — [`crate::compute_modulus_bit`] on the **threshold** BFV params: same as C6
+//!   aggregate hashing. Emitted as `SHARE_DECRYPTION_BIT_AGG`; the Noir C4 circuit uses it for
+//!   `compute_aggregated_shares_commitment` on the sum (per-share verification still uses `BIT_MSG`).
 
 use crate::circuits::commitments::compute_share_encryption_commitment_from_message;
 use crate::dkg::share_decryption::ShareDecryptionCircuit;
 use crate::dkg::share_decryption::ShareDecryptionCircuitData;
 use crate::CircuitsErrors;
-use crate::{bigint_2d_to_json_values, calculate_bit_width, poly_coefficients_to_toml_json};
+use crate::{bigint_2d_to_json_values, poly_coefficients_to_toml_json};
 use crate::{CircuitComputation, Computation};
+use crate::{compute_modulus_bit, compute_msg_bit};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::Polynomial;
@@ -68,11 +78,15 @@ pub struct Configs {
     pub bounds: Bounds,
 }
 
-/// Bit widths used by the Noir prover (e.g. for packing message coefficients).
+/// Bit widths used by the Noir prover and witness recomputation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Bits {
-    /// Bit width for plaintext/message coefficients (in [0, t)).
+    /// Per-share message coefficients in `[0, t)`; matches C2 share encryption
+    /// (`compute_msg_bit` on DKG params).
     pub msg_bit: u32,
+    /// CRT aggregate polynomials (same ring semantics as C6 `sk` / `e_sm`);
+    /// matches [`crate::compute_modulus_bit`] on threshold params.
+    pub agg_bit: u32,
 }
 
 /// Coefficient bounds for the share-decryption circuit (currently empty; bounds are derived from plaintext modulus).
@@ -123,11 +137,12 @@ impl Computation for Bits {
     type Error = crate::utils::ZkHelpersUtilsError;
 
     fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
-        let (_, dkg_params) = build_pair_for_preset(preset)
+        let (threshold_params, dkg_params) = build_pair_for_preset(preset)
             .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
         Ok(Bits {
-            msg_bit: calculate_bit_width(BigInt::from(dkg_params.plaintext())),
+            msg_bit: compute_msg_bit(&dkg_params),
+            agg_bit: compute_modulus_bit(&threshold_params),
         })
     }
 }
@@ -155,7 +170,7 @@ impl Computation for Inputs {
         let mut expected_commitments: Vec<Vec<BigInt>> = Vec::new();
         let mut decrypted_shares: Vec<Vec<Vec<BigInt>>> = Vec::new();
 
-        let msg_bit = calculate_bit_width(BigInt::from(dkg_params.plaintext()));
+        let msg_bit = compute_msg_bit(&dkg_params);
 
         // Decrypt each ciphertext and compute its commitment
         for party_cts in data.honest_ciphertexts.iter() {
@@ -240,8 +255,9 @@ mod tests {
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
         let (_, dkg_params) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
-        let expected_msg_bit = calculate_bit_width(BigInt::from(dkg_params.plaintext()));
-        assert_eq!(bits.msg_bit, expected_msg_bit);
+        let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
+        assert_eq!(bits.msg_bit, compute_msg_bit(&dkg_params));
+        assert_eq!(bits.agg_bit, compute_modulus_bit(&threshold_params));
     }
 
     #[test]
@@ -299,7 +315,7 @@ mod tests {
 
         let (threshold_params, dkg_params) = build_pair_for_preset(preset).unwrap();
         let threshold_l = threshold_params.moduli().len();
-        let msg_bit = calculate_bit_width(BigInt::from(dkg_params.plaintext()));
+        let msg_bit = compute_msg_bit(&dkg_params);
 
         let inputs = Inputs::compute(preset, &sample).unwrap();
         assert_eq!(
