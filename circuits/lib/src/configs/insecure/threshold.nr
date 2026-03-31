@@ -1088,7 +1088,7 @@ pk_aggregation (CIRCUIT 5)
 -------------------------------------
 ************************************/
 
-pub global PK_AGGREGATION_BIT_PK: u32 = 36;
+pub global PK_AGGREGATION_BIT_PK: u32 = 35;
 
 pub global PK_AGGREGATION_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS);
 
@@ -1098,8 +1098,8 @@ user_data_encryption (USED FOR DATA ENCRYPTION)
 -------------------------------------
 ************************************/
 
-pub global USER_DATA_ENCRYPTION_BIT_PK: u32 = 36;
-pub global USER_DATA_ENCRYPTION_BIT_CT: u32 = 36;
+pub global USER_DATA_ENCRYPTION_BIT_PK: u32 = 35;
+pub global USER_DATA_ENCRYPTION_BIT_CT: u32 = 35;
 pub global USER_DATA_ENCRYPTION_BIT_U: u32 = 1;
 pub global USER_DATA_ENCRYPTION_BIT_E0: u32 = 5;
 pub global USER_DATA_ENCRYPTION_BIT_E1: u32 = 5;
