@@ -201,11 +201,9 @@ gracefull_shutdown() {
 }
 
 daemon_query_events() {
-  local node_name="${1:-ag}"
+  local ctrl_port="${1:50505}"
   local output_file="${2:-$SCRIPT_DIR/output/events.txt}"
-  local ctrl_port
 
-  ctrl_port=$($ENCLAVE_BIN config get --field "nodes.${node_name}.ctrl_port" --config "$SCRIPT_DIR/enclave.config.yaml")
 
   local json_payload='{"command":{"EventsQuery":{"since":0,"limit":100}}}'
 
