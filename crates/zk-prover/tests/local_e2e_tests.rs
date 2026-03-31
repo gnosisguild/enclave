@@ -20,7 +20,6 @@ use std::sync::Arc;
 
 use ark_bn254::Fr;
 use ark_ff::{BigInteger, PrimeField, Zero};
-use fhe::trbfv::TRBFV;
 use common::{
     extract_field, extract_field_from_end, find_bb, setup_compiled_circuit, setup_test_prover,
 };
@@ -39,13 +38,13 @@ use e3_zk_helpers::circuits::{
     CircuitComputation,
 };
 use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_decryption::{
-    ShareDecryptionCircuit as DkgShareDecryptionCircuit,
-    ShareDecryptionCircuitData as DkgShareDecryptionCircuitData,
-};
 use e3_zk_helpers::dkg::share_computation::{
     Configs, ShareComputationBaseCircuit, ShareComputationChunkCircuit,
     ShareComputationChunkCircuitData, ShareComputationCircuit, ShareComputationCircuitData,
+};
+use e3_zk_helpers::dkg::share_decryption::{
+    ShareDecryptionCircuit as DkgShareDecryptionCircuit,
+    ShareDecryptionCircuitData as DkgShareDecryptionCircuitData,
 };
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitData};
@@ -69,10 +68,13 @@ use e3_zk_prover::{
     generate_chunk_batch_proof, generate_share_computation_final_proof, CircuitVariant, Provable,
     ZkBackend, ZkProver,
 };
+use fhe::trbfv::TRBFV;
 
 /// Sum per-modulus decrypted shares across honest parties (matches C4 `compute_aggregated_shares`).
 /// Coefficients are summed in the BN254 field, not reduced mod each CRT modulus (see `share_decryption.nr`).
-fn aggregate_dkg_decrypted_shares_to_crt(decrypted_shares: &[Vec<Vec<num_bigint::BigInt>>]) -> CrtPolynomial {
+fn aggregate_dkg_decrypted_shares_to_crt(
+    decrypted_shares: &[Vec<Vec<num_bigint::BigInt>>],
+) -> CrtPolynomial {
     let h = decrypted_shares.len();
     let l = decrypted_shares[0].len();
     let n = decrypted_shares[0][0].len();
@@ -883,21 +885,19 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
     let dkg_out = DkgShareDecryptionCircuit::compute(preset, &dkg_sample).unwrap();
     let agg_sk = aggregate_dkg_decrypted_shares_to_crt(&dkg_out.inputs.decrypted_shares);
 
-    let sk_poly = agg_sk.to_fhe_polynomial(&ctx, moduli).expect("agg_sk -> Poly");
+    let sk_poly = agg_sk
+        .to_fhe_polynomial(&ctx, moduli)
+        .expect("agg_sk -> Poly");
     let es_poly = c6_sample
         .e
         .to_fhe_polynomial(&ctx, moduli)
         .expect("e -> Poly");
 
-    let trbfv = TRBFV::new(committee.n, committee.threshold, threshold_params.clone())
-        .expect("TRBFV::new");
+    let trbfv =
+        TRBFV::new(committee.n, committee.threshold, threshold_params.clone()).expect("TRBFV::new");
 
     let d_share_rns = trbfv
-        .decryption_share(
-            Arc::new(c6_sample.ciphertext.clone()),
-            sk_poly,
-            es_poly,
-        )
+        .decryption_share(Arc::new(c6_sample.ciphertext.clone()), sk_poly, es_poly)
         .expect("decryption_share");
 
     c6_sample.s = agg_sk.clone();
@@ -936,13 +936,10 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
         .extract_field(&c6_proof.public_signals, "expected_sk_commitment")
         .expect("C6 expected_sk_commitment");
 
-    let c4_big =
-        num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, c4_commitment);
-    let c6_big =
-        num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, c6_expected_sk);
+    let c4_big = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, c4_commitment);
+    let c6_big = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, c6_expected_sk);
 
-    let expected_c4_hash =
-        compute_aggregated_shares_commitment(&agg_sk, dkg_out.bits.agg_bit);
+    let expected_c4_hash = compute_aggregated_shares_commitment(&agg_sk, dkg_out.bits.agg_bit);
     assert_eq!(
         c4_big, expected_c4_hash,
         "C4 commitment must match hash(agg_sk) with DKG agg_bit (BIT_AGG)"
@@ -950,8 +947,7 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
 
     let c6_out = ThresholdShareDecryptionCircuit::compute(preset, &c6_sample).unwrap();
     assert_eq!(
-        c6_big,
-        c6_out.inputs.expected_sk_commitment,
+        c6_big, c6_out.inputs.expected_sk_commitment,
         "C6 expected_sk_commitment must match witness after wiring agg_sk"
     );
 
