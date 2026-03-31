@@ -139,5 +139,5 @@ share_decryption_e_sm (CIRCUIT 4b - BFV DECRYPTION E_SM)
 -------------------------------------
 ************************************/
 
-pub global SHARE_DECRYPTION_BIT_MSG: u32 = 55;
+pub global SHARE_DECRYPTION_BIT_MSG: u32 = 54;
 // SHARE_DECRYPTION_BIT_AGG: see `pub use` of `THRESHOLD_SHARE_DECRYPTION_BIT_SK` (C6 `BIT_SK`).
