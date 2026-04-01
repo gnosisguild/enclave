@@ -485,7 +485,6 @@ impl ThresholdPlaintextAggregator {
         Ok(())
     }
 
-    /// Verify that each honest party's decryption share bytes deserialize to
     /// Verify that each honest party's raw decryption share bytes match the
     /// `d_commitment` output in their verified C6 proof. Returns party IDs
     /// that failed the check.
@@ -522,22 +521,38 @@ impl ThresholdPlaintextAggregator {
 
         for (party_id, shares) in honest_shares {
             let Some(proofs) = c6_proofs.get(party_id) else {
+                warn!(
+                    "No C6 proofs for party {} — marking as mismatched",
+                    party_id
+                );
+                mismatched.insert(*party_id);
                 continue;
             };
             let Some(first_proof) = proofs.first() else {
+                warn!(
+                    "Empty C6 proof list for party {} — marking as mismatched",
+                    party_id
+                );
+                mismatched.insert(*party_id);
                 continue;
             };
             let Some(c6_d_bytes) = c6_output_layout
                 .extract_field(&first_proof.payload.proof.public_signals, "d_commitment")
             else {
                 warn!(
-                    "Could not extract d_commitment from C6 proof for party {} — skipping",
+                    "Could not extract d_commitment from C6 proof for party {} — marking as mismatched",
                     party_id
                 );
+                mismatched.insert(*party_id);
                 continue;
             };
 
             let Some(share_bytes) = shares.first() else {
+                warn!(
+                    "No share bytes for party {} — marking as mismatched",
+                    party_id
+                );
+                mismatched.insert(*party_id);
                 continue;
             };
             let Ok(poly) = e3_trbfv::helpers::try_poly_from_bytes(share_bytes, &threshold_params)
@@ -556,9 +571,10 @@ impl ThresholdPlaintextAggregator {
             crt.reverse();
             if let Err(e) = crt.center(&moduli) {
                 warn!(
-                    "Could not center d_share for party {} — skipping: {e}",
+                    "Could not center d_share for party {} — marking as mismatched: {e}",
                     party_id
                 );
+                mismatched.insert(*party_id);
                 continue;
             }
 
