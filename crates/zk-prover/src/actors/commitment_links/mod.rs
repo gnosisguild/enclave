@@ -70,13 +70,20 @@ pub trait CommitmentLink: Send + Sync {
 }
 
 /// Returns the default set of commitment links to register.
+///
+/// C4→C6 links are disabled: the C4 Noir circuit and C6 Rust code compute
+/// `compute_aggregated_shares_commitment` from incompatible representations
+/// of the same aggregated polynomial (unreduced/uncentered/non-reversed vs
+/// reduced/centered/reversed, plus different BIT parameters). See test
+/// `c4_c6_commitment_mismatch_due_to_modular_reduction` in `c4a_to_c6.rs`.
+/// Re-enable after aligning the commitment computation (circuit change needed).
 pub fn default_links() -> Vec<Box<dyn CommitmentLink>> {
     vec![
         Box::new(c0_to_c3::C3aToC0PkCommitmentLink),
         Box::new(c0_to_c3::C3bToC0PkCommitmentLink),
         Box::new(c1_to_c5::C1ToC5PkCommitmentLink),
-        Box::new(c4a_to_c6::C4aToC6SkCommitmentLink),
-        Box::new(c4b_to_c6::C4bToC6ESmCommitmentLink),
         Box::new(c6_to_c7::C6ToC7DCommitmentLink),
+        // Box::new(c4a_to_c6::C4aToC6SkCommitmentLink),
+        // Box::new(c4b_to_c6::C4bToC6ESmCommitmentLink),
     ]
 }
