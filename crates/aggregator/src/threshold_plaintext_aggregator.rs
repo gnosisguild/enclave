@@ -410,6 +410,10 @@ impl ThresholdPlaintextAggregator {
 
             // Emit SignedProofFailed for each mismatched party so the
             // AccusationManager can initiate the slashing quorum protocol.
+            // NOTE: These proofs have already passed ECDSA validation in
+            // ShareVerificationActor, so recover_address() returns the
+            // authenticated signer. We still verify_address() as defense
+            // in depth before attributing a fault.
             for party_id in &share_mismatch_parties {
                 if let Some(proofs) = state.c6_proofs.get(party_id) {
                     if let Some(signed) = proofs.first() {
@@ -420,6 +424,19 @@ impl ThresholdPlaintextAggregator {
                             );
                             continue;
                         };
+                        // Defense in depth: only publish accusation if the
+                        // recovered address matches the wrapper signature.
+                        match signed.verify_address(&faulting_node) {
+                            Ok(true) => {}
+                            _ => {
+                                warn!(
+                                    "Wrapper signature verification failed for party {} — \
+                                     excluding share locally but not publishing accusation",
+                                    party_id
+                                );
+                                continue;
+                            }
+                        }
                         if let Err(err) = self.bus.publish(
                             SignedProofFailed {
                                 e3_id: self.e3_id.clone(),
@@ -577,7 +594,22 @@ impl ThresholdPlaintextAggregator {
                 continue;
             };
             poly.change_representation(fhe_math::rq::Representation::PowerBasis);
-            let crt = e3_polynomial::CrtPolynomial::from_fhe_polynomial(&poly);
+            let mut crt = e3_polynomial::CrtPolynomial::from_fhe_polynomial(&poly);
+
+            // Apply the same transformations C6's Inputs::compute applies before
+            // hashing: reverse coefficient order + center each limb mod qi.
+            // Without this, the commitment is over a different polynomial
+            // representation and always mismatches the C6 proof output.
+            let moduli: Vec<u64> = threshold_params.moduli().to_vec();
+            crt.reverse();
+            if let Err(e) = crt.center(&moduli) {
+                warn!(
+                    "Could not center d_share for party {} — skipping check: {e}",
+                    party_id
+                );
+                continue;
+            }
+
             let computed =
                 e3_zk_helpers::circuits::commitments::compute_threshold_decryption_share_commitment(
                     &crt, d_bit, max_k,
