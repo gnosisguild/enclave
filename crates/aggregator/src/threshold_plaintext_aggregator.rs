@@ -11,7 +11,12 @@ use actix::prelude::*;
 use anyhow::{anyhow, bail, ensure, Result};
 use e3_data::Persistable;
 use e3_events::{
-    AggregationProofPending, AggregationProofSigned, BusHandle, CircuitName, CommitteeMemberExpelled, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId, DecryptedSharesAggregationProofRequest, DecryptionshareCreated, Die, E3id, EType, EnclaveEvent, EnclaveEventData, EventContext, PartyProofsToVerify, PlaintextAggregated, Proof, ProofType, Seed, Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed, SignedProofPayload, TypedEvent, VerificationKind, ZkResponse, prelude::*, trap
+    prelude::*, trap, AggregationProofPending, AggregationProofSigned, BusHandle, CircuitName,
+    CommitteeMemberExpelled, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
+    DecryptedSharesAggregationProofRequest, DecryptionshareCreated, Die, E3id, EType, EnclaveEvent,
+    EnclaveEventData, EventContext, PartyProofsToVerify, PlaintextAggregated, Proof, ProofType,
+    Seed, Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed,
+    SignedProofPayload, TypedEvent, VerificationKind, ZkResponse,
 };
 use e3_fhe_params::BfvPreset;
 use e3_sortition::{E3CommitteeContainsRequest, E3CommitteeContainsResponse, Sortition};
@@ -408,53 +413,6 @@ impl ThresholdPlaintextAggregator {
                 share_mismatch_parties,
             );
 
-            // Emit SignedProofFailed for each mismatched party so the
-            // AccusationManager can initiate the slashing quorum protocol.
-            // NOTE: These proofs have already passed ECDSA validation in
-            // ShareVerificationActor, so recover_address() returns the
-            // authenticated signer. We still verify_address() as defense
-            // in depth before attributing a fault.
-            for party_id in &share_mismatch_parties {
-                if let Some(proofs) = state.c6_proofs.get(party_id) {
-                    if let Some(signed) = proofs.first() {
-                        let Ok(faulting_node) = signed.recover_address() else {
-                            warn!(
-                                "Could not recover address for party {} C6 proof — skipping accusation",
-                                party_id
-                            );
-                            continue;
-                        };
-                        // Defense in depth: only publish accusation if the
-                        // recovered address matches the wrapper signature.
-                        match signed.verify_address(&faulting_node) {
-                            Ok(true) => {}
-                            _ => {
-                                warn!(
-                                    "Wrapper signature verification failed for party {} — \
-                                     excluding share locally but not publishing accusation",
-                                    party_id
-                                );
-                                continue;
-                            }
-                        }
-                        if let Err(err) = self.bus.publish(
-                            SignedProofFailed {
-                                e3_id: self.e3_id.clone(),
-                                faulting_node,
-                                proof_type: ProofType::C6ThresholdShareDecryption,
-                                signed_payload: signed.clone(),
-                            },
-                            ec.clone(),
-                        ) {
-                            error!(
-                                "Failed to publish SignedProofFailed for party {}: {err}",
-                                party_id
-                            );
-                        }
-                    }
-                }
-            }
-
             dishonest_parties.extend(&share_mismatch_parties);
             honest_shares.retain(|(id, _)| !share_mismatch_parties.contains(id));
             ensure!(
@@ -527,6 +485,7 @@ impl ThresholdPlaintextAggregator {
         Ok(())
     }
 
+    /// Verify that each honest party's decryption share bytes deserialize to
     /// Verify that each honest party's raw decryption share bytes match the
     /// `d_commitment` output in their verified C6 proof. Returns party IDs
     /// that failed the check.
@@ -537,7 +496,6 @@ impl ThresholdPlaintextAggregator {
     ) -> BTreeSet<u64> {
         let mut mismatched = BTreeSet::new();
 
-        // Build BFV params and compute d_bit
         let Ok((threshold_params, _)) = e3_fhe_params::build_pair_for_preset(self.params_preset)
         else {
             warn!("Could not build BFV params for d_commitment check — skipping");
@@ -560,9 +518,9 @@ impl ThresholdPlaintextAggregator {
         let max_k =
             e3_zk_helpers::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
         let c6_output_layout = CircuitName::ThresholdShareDecryption.output_layout();
+        let moduli: Vec<u64> = threshold_params.moduli().to_vec();
 
         for (party_id, shares) in honest_shares {
-            // Extract d_commitment from C6 proof
             let Some(proofs) = c6_proofs.get(party_id) else {
                 continue;
             };
@@ -573,18 +531,16 @@ impl ThresholdPlaintextAggregator {
                 .extract_field(&first_proof.payload.proof.public_signals, "d_commitment")
             else {
                 warn!(
-                    "Could not extract d_commitment from C6 proof for party {} — skipping check",
+                    "Could not extract d_commitment from C6 proof for party {} — skipping",
                     party_id
                 );
                 continue;
             };
 
-            // Compute d_commitment from raw share bytes (first ciphertext index)
             let Some(share_bytes) = shares.first() else {
                 continue;
             };
-            let Ok(mut poly) =
-                e3_trbfv::helpers::try_poly_from_bytes(share_bytes, &threshold_params)
+            let Ok(poly) = e3_trbfv::helpers::try_poly_from_bytes(share_bytes, &threshold_params)
             else {
                 warn!(
                     "Could not deserialize share for party {} — marking as mismatched",
@@ -593,18 +549,14 @@ impl ThresholdPlaintextAggregator {
                 mismatched.insert(*party_id);
                 continue;
             };
-            poly.change_representation(fhe_math::rq::Representation::PowerBasis);
             let mut crt = e3_polynomial::CrtPolynomial::from_fhe_polynomial(&poly);
 
-            // Apply the same transformations C6's Inputs::compute applies before
-            // hashing: reverse coefficient order + center each limb mod qi.
-            // Without this, the commitment is over a different polynomial
-            // representation and always mismatches the C6 proof output.
-            let moduli: Vec<u64> = threshold_params.moduli().to_vec();
+            // Apply the same transformations C6's Inputs::compute applies:
+            // reverse coefficient order + center each limb mod qi.
             crt.reverse();
             if let Err(e) = crt.center(&moduli) {
                 warn!(
-                    "Could not center d_share for party {} — skipping check: {e}",
+                    "Could not center d_share for party {} — skipping: {e}",
                     party_id
                 );
                 continue;
@@ -615,11 +567,12 @@ impl ThresholdPlaintextAggregator {
                     &crt, d_bit, max_k,
                 );
 
-            // Convert BigInt to LE bytes for comparison
-            let computed_bytes = computed.to_bytes_le().1;
+            // Convert to big-endian 32-byte padded format matching
+            // Barretenberg's public_signals encoding.
+            let (_, be_bytes) = computed.to_bytes_be();
             let mut computed_padded = [0u8; 32];
-            let len = computed_bytes.len().min(32);
-            computed_padded[..len].copy_from_slice(&computed_bytes[..len]);
+            let start = 32usize.saturating_sub(be_bytes.len());
+            computed_padded[start..].copy_from_slice(&be_bytes[..be_bytes.len().min(32)]);
 
             if computed_padded != c6_d_bytes {
                 warn!(

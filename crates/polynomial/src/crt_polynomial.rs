@@ -75,18 +75,19 @@ impl CrtPolynomial {
         Self::from_bigint_vectors(limbs)
     }
 
-    /// Builds a `CrtPolynomial` from an fhe-math `Poly` in PowerBasis representation.
+    /// Builds a `CrtPolynomial` from an fhe-math `Poly` in any representation.
     ///
     /// Used to prepare inputs for ZK circuits by converting FHE BFV ciphertext polynomials
-    /// into CRT limb format. If `p` is in NTT form, it is converted to PowerBasis first.
+    /// into CRT limb format. If `p` is not in PowerBasis form (e.g. NTT or NttShoup),
+    /// it is converted first.
     ///
     /// # Arguments
     ///
-    /// * `p` - An fhe-math polynomial (PowerBasis or Ntt).
+    /// * `p` - An fhe-math polynomial (any representation).
     pub fn from_fhe_polynomial(p: &Poly) -> Self {
         let mut p = p.clone();
 
-        if *p.representation() == Representation::Ntt {
+        if *p.representation() != Representation::PowerBasis {
             p.change_representation(Representation::PowerBasis);
         }
 
