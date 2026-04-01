@@ -3914,6 +3914,7 @@ dependencies = [
  "nargo",
  "noirc_abi",
  "num-bigint",
+ "num-traits",
  "paste",
  "reqwest",
  "serde",
