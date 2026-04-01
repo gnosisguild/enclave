@@ -189,7 +189,8 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     /// @notice Publishes a committee for an E3 computation
-    /// @dev Only callable by owner. Verification of C5 proof is done in Enclave.onCommitteePublished.
+    /// @dev Permissionless once the committee is finalized. Verification of C5 proof is
+    /// done in Enclave.onCommitteePublished.
     /// @param e3Id ID of the E3 computation
     /// @param nodes Array of ciphernode addresses selected for the committee
     /// @param publicKey Aggregated public key of the committee
@@ -201,7 +202,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         bytes calldata publicKey,
         bytes calldata proof,
         bytes calldata foldProof
-    ) external onlyOwner {
+    ) external {
         Committee storage c = committees[e3Id];
 
         require(
@@ -552,23 +553,24 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @inheritdoc ICiphernodeRegistry
     function getActiveCommitteeNodes(
         uint256 e3Id
-    ) external view returns (address[] memory) {
+    ) external view returns (address[] memory nodes, uint256[] memory scores) {
         Committee storage c = committees[e3Id];
         uint256 total = c.topNodes.length;
         uint256 actCount = c.activeCount;
 
-        address[] memory activeNodes = new address[](actCount);
+        nodes = new address[](actCount);
+        scores = new uint256[](actCount);
         uint256 idx = 0;
         for (uint256 i = 0; i < total; ++i) {
+            address node = c.topNodes[i];
             if (
-                c.memberStatus[c.topNodes[i]] ==
-                ICiphernodeRegistry.MemberStatus.Active
+                c.memberStatus[node] == ICiphernodeRegistry.MemberStatus.Active
             ) {
-                activeNodes[idx] = c.topNodes[i];
+                nodes[idx] = node;
+                scores[idx] = c.scoreOf[node];
                 idx++;
             }
         }
-        return activeNodes;
     }
 
     /// @inheritdoc ICiphernodeRegistry

@@ -6,7 +6,7 @@
 
 use actix::prelude::*;
 
-use e3_events::{prelude::*, Die, EnclaveEvent, EnclaveEventData};
+use e3_events::{prelude::*, AggregatorChanged, Die, EnclaveEvent, EnclaveEventData};
 use e3_utils::MAILBOX_LIMIT;
 use std::collections::HashSet;
 use tracing::info;
@@ -18,9 +18,8 @@ pub struct KeyshareCreatedFilterBuffer {
     dest: Addr<PublicKeyAggregator>,
     committee: Option<HashSet<String>>,
     buffer: Vec<EnclaveEvent>,
-    /// Nodes expelled before CommitteeFinalized arrived.
-    /// Tracked separately so they are filtered during `process_buffered_events()`.
-    expelled_before_finalization: HashSet<String>,
+    expelled_nodes: HashSet<String>,
+    is_aggregator: bool,
 }
 
 impl KeyshareCreatedFilterBuffer {
@@ -29,19 +28,32 @@ impl KeyshareCreatedFilterBuffer {
             dest,
             committee: None,
             buffer: Vec::new(),
-            expelled_before_finalization: HashSet::new(),
+            expelled_nodes: HashSet::new(),
+            is_aggregator: false,
         }
     }
 
     fn process_buffered_events(&mut self) {
+        if !self.is_aggregator {
+            return;
+        }
+
         if let Some(ref committee) = self.committee {
             for event in self.buffer.drain(..) {
-                if let EnclaveEventData::KeyshareCreated(data) = event.get_data() {
-                    if committee.contains(&data.node)
-                        && !self.expelled_before_finalization.contains(&data.node)
+                match event.get_data() {
+                    EnclaveEventData::KeyshareCreated(data)
+                        if committee.contains(&data.node)
+                            && !self.expelled_nodes.contains(&data.node) =>
                     {
                         self.dest.do_send(event);
                     }
+                    EnclaveEventData::CommitteeMemberExpelled(data) if data.party_id.is_none() => {
+                        self.dest.do_send(event);
+                    }
+                    EnclaveEventData::E3RequestComplete(_) | EnclaveEventData::Shutdown(_) => {
+                        self.dest.do_send(event);
+                    }
+                    _ => {}
                 }
             }
         }
@@ -61,49 +73,67 @@ impl Handler<EnclaveEvent> for KeyshareCreatedFilterBuffer {
     fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
         match msg.get_data() {
             EnclaveEventData::KeyshareCreated(data) => match &self.committee {
-                Some(committee) if committee.contains(&data.node) => {
-                    // if the committee is ready then process
+                Some(committee)
+                    if self.is_aggregator
+                        && committee.contains(&data.node)
+                        && !self.expelled_nodes.contains(&data.node) =>
+                {
                     self.dest.do_send(msg);
                 }
                 None => {
-                    // if not buffer
+                    self.buffer.push(msg);
+                }
+                Some(committee)
+                    if committee.contains(&data.node)
+                        && !self.expelled_nodes.contains(&data.node) =>
+                {
                     self.buffer.push(msg);
                 }
                 _ => {}
             },
             EnclaveEventData::CommitteeFinalized(data) => {
-                self.dest.do_send(msg.clone());
                 self.committee = Some(data.committee.iter().cloned().collect());
                 self.process_buffered_events();
             }
             EnclaveEventData::CommitteeMemberExpelled(data) => {
-                // Only process raw events from chain (party_id not yet resolved).
                 if data.party_id.is_some() {
                     return;
                 }
 
                 let node_addr = data.node.to_string();
+                self.expelled_nodes.insert(node_addr.clone());
+                self.buffer.retain(|event| {
+                    !matches!(
+                        event.get_data(),
+                        EnclaveEventData::KeyshareCreated(share) if share.node == node_addr
+                    )
+                });
 
-                // Remove expelled node so we don't forward late KeyshareCreated events from them
                 if let Some(ref mut committee) = self.committee {
                     info!(
                         "KeyshareCreatedFilterBuffer: removing expelled node {} from committee filter (e3_id={})",
                         node_addr, data.e3_id
                     );
                     committee.remove(&node_addr);
-                } else {
-                    // Committee not yet finalized — track for filtering during process_buffered_events
-                    info!(
-                        "KeyshareCreatedFilterBuffer: tracking expelled node {} before finalization (e3_id={})",
-                        node_addr, data.e3_id
-                    );
-                    self.expelled_before_finalization.insert(node_addr);
                 }
-                // Forward to PublicKeyAggregator for threshold_n adjustment
+
+                if self.is_aggregator {
+                    self.dest.do_send(msg);
+                } else {
+                    self.buffer.push(msg);
+                }
+            }
+            EnclaveEventData::AggregatorChanged(AggregatorChanged { is_aggregator, .. }) => {
+                self.is_aggregator = *is_aggregator;
+                self.process_buffered_events();
+            }
+            EnclaveEventData::E3RequestComplete(_) | EnclaveEventData::Shutdown(_) => {
                 self.dest.do_send(msg);
             }
             _ => {
-                self.dest.do_send(msg);
+                if self.is_aggregator {
+                    self.dest.do_send(msg);
+                }
             }
         }
     }

@@ -51,8 +51,8 @@ image is ready; skip this by exporting `SKIP_PROGRAM_COMPILE=1`.
   flags.
 - `server/.env`: holds the operator wallet key (never commit this file), RPC endpoints, and cron API
   tokens.
-- `enclave.config.yaml`: describes your Ciphernodes and aggregator profile. The default file mirrors
-  the template you saw earlier in this repo.
+- `enclave.config.yaml`: describes your local ciphernode network. The default file mirrors the
+  template you saw earlier in this repo.
 
 ## Integrating the SDK
 
@@ -82,10 +82,10 @@ contracts.
 
 ## Customizing Ciphernodes
 
-`enclave.config.yaml` includes multiple node profiles (`cn1`, `cn2`, `cn3`, `ag`). Update the
-addresses, peers, and QUIC ports to match your deployment. For production, replace
-`autonetkey/autopassword` with explicit secrets and run `enclave nodes up --detach` from a systemd
-service or container entrypoint.
+`enclave.config.yaml` includes multiple node profiles (`cn1` through `cn5`). Update the addresses,
+peers, and QUIC ports to match your deployment. For production, replace `autonetkey/autopassword`
+with explicit secrets and run `enclave nodes up --detach` from a systemd service or container
+entrypoint.
 
 ## Common tweaks
 

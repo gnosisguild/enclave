@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 mod committee_finalizer;
+mod decryptionshare_created_buffer;
 pub mod ext;
 mod keyshare_created_filter_buffer;
 mod proof_fold;

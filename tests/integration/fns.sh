@@ -15,7 +15,6 @@ fi
 # Environment variables
 RPC_URL="ws://localhost:8545"
 
-PRIVATE_KEY_AG="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 PRIVATE_KEY_CN1="0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
 PRIVATE_KEY_CN2="0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"
 PRIVATE_KEY_CN3="0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6"
@@ -98,6 +97,83 @@ waiton-files() {
     sleep 1
   done
 }
+
+  wait_for_committee_pubkey() {
+    local e3_id="$1"
+    local out_file="$2"
+    local timeout="${3:-1300}"
+    local start_time=$(date +%s)
+
+    while true; do
+      if pnpm committee:get-public-key --network localhost --e3-id "$e3_id" --out-file "$out_file" >/dev/null 2>&1; then
+        return 0
+      fi
+
+      if [ $(($(date +%s) - start_time)) -ge "$timeout" ]; then
+        echo "Timeout after ${timeout}s waiting for committee public key for e3=${e3_id}" >&2
+        return 1
+      fi
+
+      sleep 1
+    done
+  }
+
+  wait_for_plaintext_output() {
+    local e3_id="$1"
+    local out_file="$2"
+    local timeout="${3:-1300}"
+    local start_time=$(date +%s)
+
+    while true; do
+      if pnpm e3:get-plaintext --network localhost --e3-id "$e3_id" --out-file "$out_file" >/dev/null 2>&1; then
+        return 0
+      fi
+
+      if [ $(($(date +%s) - start_time)) -ge "$timeout" ]; then
+        echo "Timeout after ${timeout}s waiting for plaintext output for e3=${e3_id}" >&2
+        return 1
+      fi
+
+      sleep 1
+    done
+  }
+
+  wait_for_active_aggregator_address() {
+    local e3_id="$1"
+    local timeout="${2:-1300}"
+    local start_time=$(date +%s)
+
+    while true; do
+      local output=""
+      if output=$(pnpm committee:get-active-aggregator --network localhost --e3-id "$e3_id" 2>/dev/null); then
+        echo "$output" | tail -n 1
+        return 0
+      fi
+
+      if [ $(($(date +%s) - start_time)) -ge "$timeout" ]; then
+        echo "Timeout after ${timeout}s waiting for active aggregator for e3=${e3_id}" >&2
+        return 1
+      fi
+
+      sleep 1
+    done
+  }
+
+  node_name_for_address() {
+    local address="${1,,}"
+
+    case "$address" in
+      "${CIPHERNODE_ADDRESS_1,,}") echo "cn1" ;;
+      "${CIPHERNODE_ADDRESS_2,,}") echo "cn2" ;;
+      "${CIPHERNODE_ADDRESS_3,,}") echo "cn3" ;;
+      "${CIPHERNODE_ADDRESS_4,,}") echo "cn4" ;;
+      "${CIPHERNODE_ADDRESS_5,,}") echo "cn5" ;;
+      *)
+        echo "Unknown ciphernode address: $1" >&2
+        return 1
+        ;;
+    esac
+  }
 
 enclave_password_set() {
   local name="$1"

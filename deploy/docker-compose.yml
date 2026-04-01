@@ -9,7 +9,6 @@ services:
         target: secrets.json
     env_file: .env
     environment:
-      AGGREGATOR: 'false'
       ADDRESS: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
       QUIC_PORT: 9091
     deploy:
@@ -28,7 +27,6 @@ services:
         target: secrets.json
     env_file: .env
     environment:
-      AGGREGATOR: 'false'
       ADDRESS: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'
       QUIC_PORT: 9092
     deploy:
@@ -47,7 +45,6 @@ services:
         target: secrets.json
     env_file: .env
     environment:
-      AGGREGATOR: 'false'
       ADDRESS: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
       QUIC_PORT: 9093
     deploy:
@@ -56,19 +53,18 @@ services:
     networks:
       - global-network
 
-  aggregator:
+  cn4:
     image: { { IMAGE } }
     depends_on:
       - cn1
     volumes:
-      - ./agg.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
-      - agg-data:/home/ciphernode/.local/share/enclave
+      - ./cn4.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - cn4-data:/home/ciphernode/.local/share/enclave
     secrets:
-      - source: secrets_agg
+      - source: secrets_cn4
         target: secrets.json
     env_file: .env
     environment:
-      AGGREGATOR: 'true'
       ADDRESS: '0x8626a6940E2eb28930eFb4CeF49B2d1F2C9C1199'
       QUIC_PORT: 9094
     deploy:
@@ -84,14 +80,14 @@ secrets:
     file: cn2.secrets.json
   secrets_cn3:
     file: cn3.secrets.json
-  secrets_agg:
-    file: agg.secrets.json
+  secrets_cn4:
+    file: cn4.secrets.json
 
 volumes:
   cn1-data:
   cn2-data:
   cn3-data:
-  agg-data:
+  cn4-data:
 
 networks:
   global-network:

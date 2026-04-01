@@ -4,7 +4,6 @@ set -e
 # Paths to config and secrets
 CONFIG_FILE="$CONFIG_DIR/config.yaml"
 SECRETS_FILE="/run/secrets/secrets.json"
-AGGREGATOR="$AGGREGATOR"
 
 # Ensure required files exist
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -27,7 +26,7 @@ if [ -z "$PRIVATE_KEY" ] || [ -z "$PASSWORD" ] || [ -z "$NETWORK_PRIVATE_KEY" ];
     exit 1
 fi
 
-# Set password and private key
+# Set password
 echo "Setting password"
 enclave password set --config "$CONFIG_FILE" --password "$PASSWORD"
 
@@ -35,15 +34,10 @@ enclave password set --config "$CONFIG_FILE" --password "$PASSWORD"
 echo "Setting network private key"
 enclave net set-key --config "$CONFIG_FILE" --net-keypair "$NETWORK_PRIVATE_KEY"
 
-if [ "$AGGREGATOR" = "true" ]; then
-    echo "Setting private key"
-    enclave wallet set --config "$CONFIG_FILE" --private-key "$PRIVATE_KEY"
+echo "Setting wallet key"
+enclave wallet set --config "$CONFIG_FILE" --private-key "$PRIVATE_KEY"
 
-    echo "Starting aggregator"
-    exec enclave start -v --config "$CONFIG_FILE"
-else
-    echo "Starting Ciphernode"
-    exec enclave start -v --config "$CONFIG_FILE"
-fi
+echo "Starting ciphernode"
+exec enclave start -v --config "$CONFIG_FILE"
 
 

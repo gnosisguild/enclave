@@ -52,6 +52,7 @@ impl Committee {
             .enumerate()
             .map(|(i, addr)| (addr.to_lowercase(), i as u64))
             .collect();
+
         Self { members, index }
     }
 
@@ -76,5 +77,33 @@ impl Committee {
 
     pub fn is_empty(&self) -> bool {
         self.members.is_empty()
+    }
+
+    pub fn is_active_aggregator(&self, my_addr: &str, expelled: &[u64]) -> bool {
+        (0..self.members.len() as u64)
+            .find(|party_id| !expelled.contains(party_id))
+            .and_then(|party_id| self.members.get(party_id as usize))
+            .map(|addr| addr.eq_ignore_ascii_case(my_addr))
+            .unwrap_or(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Committee;
+
+    #[test]
+    fn picks_lowest_non_expelled_party_in_sorted_committee_as_aggregator() {
+        // Committee order is already score-sorted before it is stored.
+        let committee = Committee::new(vec![
+            "0xbbb".to_string(),
+            "0xccc".to_string(),
+            "0xaaa".to_string(),
+        ]);
+
+        assert!(committee.is_active_aggregator("0xBbB", &[]));
+        assert!(committee.is_active_aggregator("0xccc", &[0]));
+        assert!(committee.is_active_aggregator("0xaaa", &[0, 1]));
+        assert!(!committee.is_active_aggregator("0xaaa", &[0, 1, 2]));
     }
 }

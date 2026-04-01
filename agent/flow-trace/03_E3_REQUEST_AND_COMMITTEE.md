@@ -127,9 +127,9 @@ EnclaveSolReader decodes IEnclave::E3Requested log
 │   └─ Creates Fhe instance from BFV params
 │   └─ Stores as dependency in E3Context
 │
-├─ PublicKeyAggregatorExtension.on_event(): (aggregator only)
-│   └─ Spins up PublicKeyAggregator actor
-│   └─ State: Collecting (waiting for N keyshares)
+├─ PublicKeyAggregatorExtension.on_event():
+│   └─ Spins up the per-E3 public-key aggregation pipeline
+│   └─ KeyshareCreatedFilterBuffer buffers until this node becomes the active aggregator
 │
 └─ Sortition actor receives E3Requested:
     │
@@ -171,7 +171,8 @@ CiphernodeSelector receives WithSortitionTicket<E3Requested>
 │   ├─ Caches E3Meta { e3_id, threshold_m, threshold_n, seed, ... }
 │   ├─ Publishes TicketGenerated {
 │   │     e3_id,
-│   │     ticket_id: TicketId::Score(ticket_number)
+│   │     ticket_id: TicketId::Score(ticket_number),
+│   │     party_index: index_in_local_score_ranking
 │   │   }
 │   └─ This event triggers on-chain ticket submission
 │
@@ -233,20 +234,26 @@ CiphernodeRegistrySolWriter receives TicketGenerated event
 
 ## Step 3: Committee Finalization
 
-### 3a. Deadline Timer (Rust-Side, Aggregator)
+### 3a. Deadline Timer (Rust-Side, Committee Members)
 
 ```
 CommitteeFinalizer actor receives CommitteeRequested event
 │
-├─ Calculates wait time:
-│   wait = committeeDeadline - currentTimestamp + buffer
+├─ Stores the request during replay and waits until ALL of:
+│   ├─ local TicketGenerated.party_index is known
+│   └─ EffectsEnabled has fired
 │
-├─ Schedules timer
+├─ Calculates wait time:
+│   wait = max(committeeDeadline - currentTimestamp, 0)
+│          + 1 second
+│          + party_index * 5 seconds
+│
+├─ Schedules a staggered timer
 │
 ├─ When timer fires:
 │   └─ Publishes CommitteeFinalizeRequested { e3_id }
 │
-└─ On E3Failed / E3StageChanged(Complete|Failed):
+└─ On E3Failed / E3RequestComplete / E3StageChanged(Complete|Failed):
     └─ Cancels pending timer for this e3_id (if any)
         → Prevents stale finalization attempt after E3 is already terminal
 ```
@@ -292,7 +299,7 @@ CiphernodeRegistrySolWriter receives CommitteeFinalizeRequested
     │  │       │  │  }                                       │  │
     │  │       │  └──────────────────────────────────────────┘  │
     │  │                                                         │
-    │  │    6. Emit CommitteeFinalized(e3Id, committee, scores) │
+    │  │    6. Emit CommitteeFinalized(e3Id, committee)         │
     │  │  }                                                      │
     │  └─────────────────────────────────────────────────────────┘
 ```
@@ -309,6 +316,7 @@ CiphernodeRegistrySolReader decodes CommitteeFinalized event
 ├─ Sortition actor:
 │   └─ Stores finalized committee as a `Committee` struct in persistent map
 │       → Provides O(1) address→party_id lookup for later expulsion handling
+│       → `CommitteeFinalized` is normalized into ascending ticket-score order before storage
 │
 ├─ CiphernodeSelector:
 │   ├─ Checks if this node's address is in the committee list
@@ -318,12 +326,17 @@ CiphernodeRegistrySolReader decodes CommitteeFinalized event
 │   │     e3_id, threshold_m, threshold_n,
 │   │     seed, party_id, ...all E3 metadata
 │   │   }
+│   │   Publishes AggregatorChanged {
+│   │     e3_id,
+│   │     is_aggregator = (my node has the lowest non-expelled party_id in the
+│   │                      score-sorted finalized committee)
+│   │   }
 │   └─ If NO: does nothing for this E3
 │
 └─ KeyshareCreatedFilterBuffer:
     └─ Stores committee set
-    └─ Flushes any buffered KeyshareCreated events
-    └─ Only forwards events from verified committee members
+    └─ Keeps buffering until AggregatorChanged(is_aggregator=true)
+    └─ Then flushes buffered KeyshareCreated events from verified committee members
 ```
 
 ---
@@ -358,8 +371,17 @@ If any deadline is missed → anyone can call markE3Failed()
 2. **Snapshot-based eligibility**: Ticket balances are checked at `requestBlock - 1`, preventing
    front-running manipulation.
 
-3. **Permissionless finalization**: Anyone can call `finalizeCommittee()` after the deadline — no
+3. **Runtime committee order**: the Rust runtime normalizes `CommitteeFinalized` into ascending
+   ticket-score order before `Sortition` and `CiphernodeSelector` derive `party_id`. That makes
+   `party_id` in the runtime equivalent to score order, even though the raw on-chain `topNodes`
+   array is not itself score-sorted.
+
+4. **Active aggregator selection**: `CiphernodeSelector` derives `AggregatorChanged` from the
+   finalized committee plus enriched `CommitteeMemberExpelled` events. The active aggregator is the
+   lowest non-expelled `party_id` in the score-sorted runtime committee.
+
+5. **Permissionless finalization**: Anyone can call `finalizeCommittee()` after the deadline — no
    single point of failure.
 
-4. **IMT root snapshot**: The Merkle tree root is captured at request time. Nodes that join/leave
+6. **IMT root snapshot**: The Merkle tree root is captured at request time. Nodes that join/leave
    after the request don't affect this E3's committee.

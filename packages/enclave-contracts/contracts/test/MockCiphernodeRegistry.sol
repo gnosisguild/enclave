@@ -162,8 +162,9 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 
     function getActiveCommitteeNodes(
         uint256
-    ) external pure returns (address[] memory) {
-        return new address[](0);
+    ) external pure returns (address[] memory nodes, uint256[] memory scores) {
+        nodes = new address[](0);
+        scores = new uint256[](0);
     }
 
     function getCommitteeViability(
@@ -284,8 +285,9 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
 
     function getActiveCommitteeNodes(
         uint256
-    ) external pure returns (address[] memory) {
-        return new address[](0);
+    ) external pure returns (address[] memory nodes, uint256[] memory scores) {
+        nodes = new address[](0);
+        scores = new uint256[](0);
     }
 
     function getCommitteeViability(

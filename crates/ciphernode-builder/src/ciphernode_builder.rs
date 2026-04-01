@@ -32,8 +32,9 @@ use e3_net::{
 };
 use e3_request::E3Router;
 use e3_sortition::{
-    CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
-    NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
+    CiphernodeSelector, CiphernodeSelectorFactory, EmitPersistedAggregatorState,
+    FinalizedCommitteesRepositoryFactory, NodeStateRepositoryFactory, Sortition, SortitionBackend,
+    SortitionRepositoryFactory,
 };
 use e3_sync::sync;
 use e3_utils::SharedRng;
@@ -443,7 +444,7 @@ impl CiphernodeBuilder {
             repositories.node_state(),
             repositories.finalized_committees(),
             default_backend,
-            ciphernode_selector,
+            ciphernode_selector.clone(),
             &addr,
         )
         .await?;
@@ -548,6 +549,7 @@ impl CiphernodeBuilder {
         info!("E3Router building...");
 
         e3_builder.build().await?;
+        ciphernode_selector.do_send(EmitPersistedAggregatorState);
 
         let topic = "enclave-gossip";
         let (peer_id, interface, channel_bridge) = if let Some(net_config) = self.net_config {
@@ -735,7 +737,6 @@ async fn setup_evm_system(
                             &bus,
                             write_provider.clone(),
                             contract.address()?,
-                            pubkey_agg,
                         );
                         info!("CiphernodeRegistrySolWriter attached for publishing committees");
 

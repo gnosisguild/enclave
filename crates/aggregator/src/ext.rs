@@ -6,6 +6,7 @@
 
 use std::sync::Arc;
 
+use crate::decryptionshare_created_buffer::DecryptionshareCreatedBuffer;
 use crate::keyshare_created_filter_buffer::KeyshareCreatedFilterBuffer;
 use crate::{
     PublicKeyAggregator, PublicKeyAggregatorParams, PublicKeyAggregatorState,
@@ -16,7 +17,7 @@ use actix::{Actor, Addr, Recipient};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_data::{AutoPersist, Persistable, RepositoriesFactory};
-use e3_events::{prelude::*, E3id};
+use e3_events::{prelude::*, CiphernodeSelected, E3id};
 use e3_events::{BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use e3_fhe::ext::FHE_KEY;
 use e3_fhe::Fhe;
@@ -44,10 +45,14 @@ const ERROR_PUBKEY_META_MISSING:&str = "Could not create PublicKeyAggregator bec
 #[async_trait]
 impl E3Extension for PublicKeyAggregatorExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
-        // Saving the publickey aggregator with deps on E3Requested
-        let EnclaveEventData::E3Requested(data) = evt.get_data() else {
+        // Create the public-key aggregation pipeline only for finalized committee members.
+        let EnclaveEventData::CiphernodeSelected(data) = evt.get_data() else {
             return;
         };
+
+        if ctx.get_event_recipient("publickey").is_some() {
+            return;
+        }
 
         let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
             self.bus.err(
@@ -56,19 +61,18 @@ impl E3Extension for PublicKeyAggregatorExtension {
             );
             return;
         };
-        let Some(ref meta) = ctx.get_dependency(META_KEY) else {
-            self.bus.err(
-                EType::PublickeyAggregation,
-                anyhow!(ERROR_PUBKEY_META_MISSING),
-            );
-            return;
-        };
-        let e3_id = data.e3_id.clone();
+        let CiphernodeSelected {
+            e3_id,
+            threshold_n,
+            threshold_m,
+            seed,
+            ..
+        } = data.clone();
         let repo = ctx.repositories().publickey(&e3_id);
         let sync_state = repo.send(Some(PublicKeyAggregatorState::init(
-            meta.threshold_n,
-            meta.threshold_m,
-            meta.seed,
+            threshold_n,
+            threshold_m,
+            seed,
         )));
 
         let value = create_publickey_aggregator(
@@ -169,7 +173,15 @@ const ERROR_TRBFV_PLAINTEXT_META_MISSING:&str = "Could not create ThresholdPlain
 #[async_trait]
 impl E3Extension for ThresholdPlaintextAggregatorExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
-        // Save plaintext aggregator
+        if ctx.get_event_recipient("threshold_keyshare").is_none() {
+            return;
+        }
+
+        if ctx.get_event_recipient("plaintext").is_some() {
+            return;
+        }
+
+        // Save plaintext aggregator for finalized committee members.
         let EnclaveEventData::CiphertextOutputPublished(data) = evt.get_data() else {
             return;
         };
@@ -195,14 +207,17 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
         ctx.set_event_recipient(
             "plaintext",
             Some(
-                ThresholdPlaintextAggregator::new(
-                    ThresholdPlaintextAggregatorParams {
-                        bus: self.bus.clone(),
-                        sortition: self.sortition.clone(),
-                        e3_id: e3_id.clone(),
-                        params_preset: self.params_preset.clone(),
-                    },
-                    sync_state,
+                DecryptionshareCreatedBuffer::new(
+                    ThresholdPlaintextAggregator::new(
+                        ThresholdPlaintextAggregatorParams {
+                            bus: self.bus.clone(),
+                            sortition: self.sortition.clone(),
+                            e3_id: e3_id.clone(),
+                            params_preset: self.params_preset.clone(),
+                        },
+                        sync_state,
+                    )
+                    .start(),
                 )
                 .start()
                 .into(),
@@ -233,11 +248,13 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
             },
             sync_state,
         )
-        .start()
-        .into();
+        .start();
 
         // send to context
-        ctx.set_event_recipient("plaintext", Some(value));
+        ctx.set_event_recipient(
+            "plaintext",
+            Some(DecryptionshareCreatedBuffer::new(value).start().into()),
+        );
 
         Ok(())
     }

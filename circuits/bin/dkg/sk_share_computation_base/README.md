@@ -1,6 +1,7 @@
 # `sk_share_computation_base` — C2 (inner)
 
-Base proof for the **secret key contribution** Shamir share array `y`, bound to C1’s `sk` commitment.
+Base proof for the **secret key contribution** Shamir share array `y`, bound to C1’s `sk`
+commitment.
 
 |           |                                                                                                     |
 | --------- | --------------------------------------------------------------------------------------------------- |

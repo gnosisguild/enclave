@@ -35,7 +35,13 @@ if [ ! -f .env ]; then
 fi
 source .env 
 
-enclave wallet set --name ag --private-key "$PRIVATE_KEY_AG"
+PRIVATE_KEY_ADMIN="${PRIVATE_KEY_ADMIN:-${PRIVATE_KEY_AG:-}}"
+
+if [ -z "$PRIVATE_KEY_ADMIN" ]; then
+  echo "Error: PRIVATE_KEY_ADMIN (or legacy PRIVATE_KEY_AG) must be set in .env"
+  exit 1
+fi
+
 enclave wallet set --name cn1 --private-key "$PRIVATE_KEY_CN1"
 enclave wallet set --name cn2 --private-key "$PRIVATE_KEY_CN2"
 enclave wallet set --name cn3 --private-key "$PRIVATE_KEY_CN3"
@@ -55,8 +61,8 @@ CN5=$(yq -r '.nodes.cn5.address' ./enclave.config.yaml)
 
 echo "Minting tokens" 
 
-# The aggregator is supposed to be the contract owner for testing
-export PRIVATE_KEY="$PRIVATE_KEY_AG"
+# The admin/deployer account performs owner-only setup tasks during testnet bootstrap
+export PRIVATE_KEY="$PRIVATE_KEY_ADMIN"
 
 pnpm ciphernode:mint:tokens --ciphernode-address "$CN1" --network "sepolia"
 pnpm ciphernode:mint:tokens --ciphernode-address "$CN2" --network "sepolia"
@@ -79,8 +85,8 @@ pnpm ciphernode:add:self --network "sepolia"
 
 echo "CIPHERNODES HAVE BEEN ADDED."
 
-# Reset the private key to the aggregator for further operations (owner of contracts)
-export PRIVATE_KEY="$PRIVATE_KEY_AG"
+# Reset the private key to the admin account for any subsequent contract operations
+export PRIVATE_KEY="$PRIVATE_KEY_ADMIN"
 
 # wait
 
