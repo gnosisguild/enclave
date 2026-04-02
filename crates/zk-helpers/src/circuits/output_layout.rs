@@ -30,7 +30,7 @@ pub struct OutputField {
 /// which is the same order as the Noir `-> pub (A, B, C)` tuple.
 ///
 /// Circuits whose output count depends on runtime parameters (e.g.
-/// `SkShareComputationBase` whose return is `[[Field; L]; N]`)
+/// `SkShareComputation` / `ESmShareComputation` whose return is `[[Field; L]; N]`)
 /// use [`CircuitOutputLayout::Dynamic`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CircuitOutputLayout {
@@ -127,10 +127,7 @@ pub const PK_BFV_OUTPUTS: &[OutputField] = &[f("pk_commitment")];
 pub const PK_GENERATION_OUTPUTS: &[OutputField] =
     &[f("sk_commitment"), f("pk_commitment"), f("e_sm_commitment")];
 
-/// C2d — Share computation chunk batch.
-pub const SHARE_COMPUTATION_CHUNK_BATCH_OUTPUTS: &[OutputField] = &[f("commitment")];
-
-/// C2 — Share computation (final wrapper).
+/// C2 — Share computation (aggregation wrapper).
 pub const SHARE_COMPUTATION_OUTPUTS: &[OutputField] = &[f("key_hash"), f("commitment")];
 
 /// C4 — DKG share decryption.

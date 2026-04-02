@@ -41,6 +41,12 @@ use std::path::PathBuf;
 
 /// Find the bb binary on the system.
 pub async fn find_bb() -> Option<PathBuf> {
+    if let Ok(p) = std::env::var("E3_CUSTOM_BB") {
+        let path = PathBuf::from(p.trim());
+        if path.is_file() {
+            return Some(path);
+        }
+    }
     // Check PATH first via `which`
     if let Ok(output) = tokio::process::Command::new("which")
         .arg("bb")

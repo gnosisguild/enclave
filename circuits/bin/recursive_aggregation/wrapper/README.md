@@ -10,16 +10,16 @@ Each subdirectory under `wrapper/dkg/` and `wrapper/threshold/` sets `N_PROOFS` 
 `N_PUBLIC_INPUTS` in its `src/main.nr`. Values below match the sources as of this tree; symbols come
 from `lib::configs::default` (`L`, `N`, `H`, `T`, `L_THRESHOLD`, `MAX_MSG_NON_ZERO_COEFFS`, etc.).
 
-| Wrapper path                             | `N_PROOFS` | `N_PUBLIC_INPUTS` (per proof)                                                                 |
-| ---------------------------------------- | ---------- | --------------------------------------------------------------------------------------------- |
-| `dkg/pk`                                 | 1          | `1`                                                                                           |
-| `dkg/share_computation`                  | 1          | `3` (batch key hash + inner proof’s public outputs; final C2 proof wrapped **one at a time**) |
-| `dkg/share_encryption`                   | 1          | `(2 × L × N) + 2`                                                                             |
-| `dkg/share_decryption`                   | 1          | `(H × L_THRESHOLD) + 1`                                                                       |
-| `threshold/pk_generation`                | 1          | `3` (`sk_commitment`, `pk_commitment`, `e_sm_commitment`)                                     |
-| `threshold/pk_aggregation`               | 1          | `H + 1`                                                                                       |
-| `threshold/share_decryption`             | 1          | `2 + 2 × L × N + 1`                                                                           |
-| `threshold/decrypted_shares_aggregation` | 1          | `(T + 1) + MAX_MSG_NON_ZERO_COEFFS + (T + 1)`                                                 |
+| Wrapper path                             | `N_PROOFS` | `N_PUBLIC_INPUTS` (per proof)                                                               |
+| ---------------------------------------- | ---------- | ------------------------------------------------------------------------------------------- |
+| `dkg/pk`                                 | 1          | `1`                                                                                         |
+| `dkg/share_computation`                  | 1          | `3` (key-hash chain fields + inner proof’s public outputs; **one** inner C2 proof per wrap) |
+| `dkg/share_encryption`                   | 1          | `(2 × L × N) + 2`                                                                           |
+| `dkg/share_decryption`                   | 1          | `(H × L_THRESHOLD) + 1`                                                                     |
+| `threshold/pk_generation`                | 1          | `3` (`sk_commitment`, `pk_commitment`, `e_sm_commitment`)                                   |
+| `threshold/pk_aggregation`               | 1          | `H + 1`                                                                                     |
+| `threshold/share_decryption`             | 1          | `2 + 2 × L × N + 1`                                                                         |
+| `threshold/decrypted_shares_aggregation` | 1          | `(T + 1) + MAX_MSG_NON_ZERO_COEFFS + (T + 1)`                                               |
 
 ### P3 user encryption (different path)
 

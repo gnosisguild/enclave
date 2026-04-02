@@ -42,18 +42,6 @@ pub fn prove_recursive_circuit(
     prover.generate_proof_with_variant(circuit_name, &witness, e3_id, CircuitVariant::Recursive)
 }
 
-/// Like [`prove_recursive_circuit`] but produces a non-ZK proof (UltraHonkProof, 457 fields).
-/// Use for intermediate proofs consumed by circuits that verify with `verify_honk_proof_non_zk`.
-pub fn prove_recursive_circuit_non_zk(
-    prover: &ZkProver,
-    circuit_name: CircuitName,
-    input: &impl serde::Serialize,
-    e3_id: &str,
-) -> Result<Proof, ZkError> {
-    let witness = generate_recursive_witness(prover, circuit_name, input)?;
-    prover.generate_recursive_non_zk_proof(circuit_name, &witness, e3_id)
-}
-
 /// Shared helper: load compiled circuit from Recursive dir, serialize input, generate witness.
 fn generate_recursive_witness(
     prover: &ZkProver,

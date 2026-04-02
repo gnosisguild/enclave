@@ -262,6 +262,16 @@ ProofRequestActor receives ThresholdSharePending
    → Ensures no incomplete data is gossiped
 ```
 
+**C2 inner vs wrapper:** For each C2a/C2b request, the prover builds a **recursive** proof for
+`sk_share_computation` / `e_sm_share_computation`. That **inner** `Proof` is what
+`PendingThresholdProofs` stores and what gets ECDSA-signed for gossip
+(`ProofType::C2aSkShareComputation` / `C2bESmShareComputation`). When node proof aggregation is
+enabled, the prover also returns a **wrapper** proof (`CircuitName::ShareComputation`); the actor
+publishes `DKGInnerProofReady` with that wrapper for folding, but does not replace the signed inner
+payload. Verifiers treat C2a/C2b as allowing both inner and wrapper circuit names
+(`ProofType::circuit_names()`); multithread ZK verify uses standard `bb verify` for inner circuits
+and the wrapper VK path when the bundle’s circuit is `ShareComputation`.
+
 ### Step 6: Collect All Threshold Shares (with C2/C3 Verification)
 
 ```
@@ -342,7 +352,8 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │     party_proofs, // consistency-passing parties' ZK proof data
 │   │   })
 │   │
-│   ├─ ZkActor verifies each proof via: bb verify -k vk -p proof
+│   ├─ Multithread ZK verify: inner circuits → `bb verify` with recursive VK;
+│   │   `ShareComputation` (wrapper) → wrapper VK / `verify_wrapper_proof` path
 │   │   → Returns per-party pass/fail results
 │   │
 │   └─ On ComputeResponse:
@@ -812,7 +823,7 @@ Slash Reasons by Proof Type:
 │  ├─ Subscribes to *Pending events (proof requests)                 │
 │  ├─ Dispatches ComputeRequest::zk to ZkActor                      │
 │  ├─ Collects responses, signs proofs (ECDSA EIP-191)               │
-│  ├─ Manages pending proof state (C1-C3 batch, C4 batch)           │
+│  ├─ Manages pending proof state (C1–C3 and C4 proof bundles per E3) │
 │  └─ Publishes *Created / *Signed events when all proofs complete   │
 │                                                                     │
 │  ProofVerificationActor (C0 Verification)                          │
