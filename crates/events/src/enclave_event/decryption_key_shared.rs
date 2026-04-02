@@ -22,11 +22,6 @@ pub struct DecryptionKeyShared {
     pub party_id: u64,
     /// The sender's node address.
     pub node: String,
-    /// Lagrange-interpolated aggregated SK polynomial (serialized).
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub sk_poly_sum: ArcBytes,
-    /// Lagrange-interpolated aggregated E_SM polynomials (serialized), one per smudging noise.
-    pub es_poly_sum: Vec<ArcBytes>,
     /// ECDSA-signed C4a proof (SecretKey decryption) for verification and fault attribution.
     pub signed_sk_decryption_proof: SignedProofPayload,
     /// ECDSA-signed C4b proofs (SmudgingNoise decryption), one per smudging noise index.
