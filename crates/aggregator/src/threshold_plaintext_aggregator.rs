@@ -26,7 +26,10 @@ use e3_trbfv::{
 };
 use e3_utils::NotifySync;
 use e3_utils::{utility_types::ArcBytes, MAILBOX_LIMIT};
+use e3_zk_helpers::circuits::commitments::compute_threshold_decryption_share_commitment;
 use e3_zk_helpers::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
+use e3_zk_helpers::threshold::share_decryption::{Bits as C6Bits, Bounds as C6Bounds};
+use e3_zk_helpers::Computation;
 use tracing::{debug, error, info, trace, warn};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -501,21 +504,19 @@ impl ThresholdPlaintextAggregator {
             return mismatched;
         };
 
-        let d_bit = {
-            let Ok(ctx) = threshold_params.ctx_at_level(0) else {
-                warn!("Could not get ctx_at_level(0) for d_commitment check — skipping");
-                return mismatched;
-            };
-            let mut max_bit = 0u32;
-            for qi in ctx.moduli_operators() {
-                let qi_bound = (num_bigint::BigInt::from(qi.modulus()) - 1) / 2;
-                max_bit = max_bit.max(e3_zk_helpers::utils::calculate_bit_width(qi_bound));
-            }
-            max_bit
+        // Reuse the same Bounds/Bits computation that C6 codegen uses,
+        // so d_bit stays in sync if the formula ever changes.
+        let Ok(bounds) = C6Bounds::compute(self.params_preset, &()) else {
+            warn!("Could not compute bounds for d_commitment check — skipping");
+            return mismatched;
         };
+        let Ok(bits) = C6Bits::compute(self.params_preset, &bounds) else {
+            warn!("Could not compute bits for d_commitment check — skipping");
+            return mismatched;
+        };
+        let d_bit = bits.d_bit;
 
-        let max_k =
-            e3_zk_helpers::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
+        let max_k = MAX_MSG_NON_ZERO_COEFFS;
         let c6_output_layout = CircuitName::ThresholdShareDecryption.output_layout();
         let moduli: Vec<u64> = threshold_params.moduli().to_vec();
 
@@ -578,10 +579,7 @@ impl ThresholdPlaintextAggregator {
                 continue;
             }
 
-            let computed =
-                e3_zk_helpers::circuits::commitments::compute_threshold_decryption_share_commitment(
-                    &crt, d_bit, max_k,
-                );
+            let computed = compute_threshold_decryption_share_commitment(&crt, d_bit, max_k);
 
             // Convert to big-endian 32-byte padded format matching
             // Barretenberg's public_signals encoding.
