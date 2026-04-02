@@ -7,10 +7,13 @@
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
 use enclave_lib::math::commitments::compute_vk_hash;
 
-/// Binds the four inner `vk_hash` witnesses;
-// update when ct0 / ct1 / user_data_encryption / crisp change (`pnpm compute:vk-hash`).
-pub global CRISP_FOLD_EXPECTED_KEY_HASH: Field =
+/// Binds the four inner `vk_hash` witnesses. Regenerate with `pnpm compute:vk-hash` in
+/// `examples/CRISP` after changing ct0 / ct1 / user_data_encryption / crisp (or the lib preset).
+/// Insecure: `lib::configs::default` uses `insecure::*`; secure: uses `secure::*`.
+pub global CRISP_FOLD_EXPECTED_KEY_HASH_INSECURE: Field =
     0x2e53e3285d47eebd65eb932cf6a57ecaa5e43f90b1673165715c92b78e493a9c;
+pub global CRISP_FOLD_EXPECTED_KEY_HASH_SECURE: Field =
+    0x15c663ca84d55d8c794cda86add7073873eec66cbf798e94998f0056b125ba69;
 
 fn main(
     // User Data Encryption Section.
@@ -65,8 +68,11 @@ fn main(
     vk_hashes.push(user_data_encryption_public_inputs[0]); // ct0_key_hash
     vk_hashes.push(user_data_encryption_public_inputs[1]); // ct1_key_hash
 
-    // Verify that the computed key hash matches the expected key hash.
-    assert(compute_vk_hash(vk_hashes) == CRISP_FOLD_EXPECTED_KEY_HASH);
+    let chain_key_hash = compute_vk_hash(vk_hashes);
+    assert(
+        (chain_key_hash == CRISP_FOLD_EXPECTED_KEY_HASH_INSECURE)
+            | (chain_key_hash == CRISP_FOLD_EXPECTED_KEY_HASH_SECURE),
+    );
 
     user_data_encryption_public_inputs[2]
 }
