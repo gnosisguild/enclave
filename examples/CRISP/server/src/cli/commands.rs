@@ -139,7 +139,8 @@ pub async fn initialize_crisp_round(
             return Err(anyhow::anyhow!("Invalid committee size: {}", invalid).into());
         }
     };
-    let e3_params = Bytes::from(encode_bfv_params(&generate_bfv_parameters()));
+    // param_set 0 = InsecureThreshold512 (must match on-chain paramSetRegistry)
+    let param_set: u8 = 0;
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.to_string(),
         parallel: CONFIG.e3_compute_provider_parallel,
@@ -168,7 +169,7 @@ pub async fn initialize_crisp_round(
             committee_size.clone(),
             input_window,
             e3_program,
-            e3_params.clone(),
+            param_set,
             compute_provider_params_bytes.clone(),
             proof_aggregation_enabled,
         )
@@ -214,7 +215,7 @@ pub async fn initialize_crisp_round(
             committee_size,
             input_window,
             e3_program,
-            e3_params,
+            param_set,
             compute_provider_params_bytes,
             custom_params_bytes,
             proof_aggregation_enabled,

@@ -81,10 +81,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     mapping(bytes32 encryptionSchemeId => IPkVerifier pkVerifier)
         public pkVerifiers;
 
-    /// @notice Mapping from ParamSet enum to ABI-encoded BFV parameters.
-    /// @dev Populated during initialize(). Ciphernodes decode the enum directly;
-    ///      the encoded bytes are stored for transparency / on-chain consumers.
-    mapping(ParamSet => bytes) public paramSetRegistry;
+    /// @notice Mapping from param set index to ABI-encoded BFV parameters.
+    /// @dev Ciphernodes map the uint8 index to their local BfvPreset.
+    ///      New param sets can be added without a contract upgrade.
+    mapping(uint8 => bytes) public paramSetRegistry;
 
     /// @notice Mapping tracking fee payments for each E3.
     /// @dev Stores the amount paid for an E3, distributed to committee upon completion.
@@ -652,11 +652,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit EncryptionSchemeDisabled(encryptionSchemeId);
     }
 
-    /// @notice Registers ABI-encoded BFV parameters for a param set enum variant.
-    /// @param paramSet The ParamSet variant to register.
+    /// @notice Registers ABI-encoded BFV parameters for a param set index.
+    /// @param paramSet The param set index (0 = Insecure512, 1 = Secure8192, ...).
     /// @param encodedParams ABI-encoded BFV parameters (degree, plaintext_modulus, moduli[]).
     function setParamSet(
-        ParamSet paramSet,
+        uint8 paramSet,
         bytes calldata encodedParams
     ) public onlyOwner {
         require(encodedParams.length > 0, "Empty params");
