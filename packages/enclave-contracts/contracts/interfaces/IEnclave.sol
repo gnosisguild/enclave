@@ -29,13 +29,6 @@ interface IEnclave {
 
     /// @notice BFV encryption parameter sets.
     /// @dev Each variant maps to a threshold BFV preset. The DKG counterpart
-    ///      is derived automatically by the ciphernode software.
-    ///      New variants require a contract upgrade + ciphernode software update.
-    enum ParamSet {
-        Insecure512,
-        Secure8192
-    }
-
     /// @notice Lifecycle stages of an E3 computation
     enum E3Stage {
         None,
@@ -191,9 +184,9 @@ interface IEnclave {
     event E3ProgramDisabled(IE3Program e3Program);
 
     /// @notice Emitted when a BFV param set is registered or updated.
-    /// @param paramSet The ParamSet variant.
+    /// @param paramSet The param set index.
     /// @param encodedParams ABI-encoded BFV parameters.
-    event ParamSetRegistered(ParamSet paramSet, bytes encodedParams);
+    event ParamSetRegistered(uint8 paramSet, bytes encodedParams);
 
     /// @notice Emitted when E3RefundManager contract is set.
     /// @param e3RefundManager The address of the E3RefundManager contract.
@@ -424,7 +417,7 @@ interface IEnclave {
         CommitteeSize committeeSize;
         uint256[2] inputWindow;
         IE3Program e3Program;
-        ParamSet paramSet;
+        uint8 paramSet;
         bytes computeProviderParams;
         bytes customParams;
         /// @notice When true, ciphernodes generate and fold wrapper proofs
@@ -534,12 +527,9 @@ interface IEnclave {
     function disableEncryptionScheme(bytes32 encryptionSchemeId) external;
 
     /// @notice Registers ABI-encoded BFV parameters for a param set enum variant.
-    /// @param paramSet The ParamSet variant to register.
+    /// @param paramSet The param set index to register.
     /// @param encodedParams ABI-encoded BFV parameters.
-    function setParamSet(
-        ParamSet paramSet,
-        bytes calldata encodedParams
-    ) external;
+    function setParamSet(uint8 paramSet, bytes calldata encodedParams) external;
 
     /// @notice Sets the full pricing configuration.
     /// @param config The new pricing configuration.

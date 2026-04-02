@@ -36,7 +36,7 @@ struct E3 {
     uint256[2] inputWindow;
     bytes32 encryptionSchemeId;
     IE3Program e3Program;
-    IEnclave.ParamSet paramSet;
+    uint8 paramSet;
     bytes customParams;
     IDecryptionVerifier decryptionVerifier;
     IPkVerifier pkVerifier;

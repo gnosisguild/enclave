@@ -55,7 +55,7 @@ sol! {
         uint256[2] inputWindow;
         bytes32 encryptionSchemeId;
         address e3Program;
-        bytes e3ProgramParams;
+        uint8 paramSet;
         bytes customParams;
         address decryptionVerifier;
         address pkVerifier;
@@ -71,7 +71,7 @@ sol! {
         CommitteeSize committeeSize;
         uint256[2] inputWindow;
         address e3Program;
-        bytes e3ProgramParams;
+        uint8 paramSet;
         bytes computeProviderParams;
         bytes customParams;
         bool proofAggregationEnabled;
@@ -156,10 +156,10 @@ pub trait EnclaveRead {
     /// Get the fee quote for an E3 request
     async fn get_e3_quote(
         &self,
-        commitee_size: CommitteeSize,
+        committee_size: CommitteeSize,
         input_window: [U256; 2],
         e3_program: Address,
-        e3_params: Bytes,
+        param_set: u8,
         compute_provider_params: Bytes,
         proof_aggregation_enabled: bool,
     ) -> Result<U256>;
@@ -184,7 +184,7 @@ pub trait EnclaveWrite {
         committee_size: CommitteeSize,
         input_window: [U256; 2],
         e3_program: Address,
-        e3_params: Bytes,
+        param_set: u8,
         compute_provider_params: Bytes,
         custom_params: Bytes,
         proof_aggregation_enabled: bool,
@@ -372,7 +372,7 @@ where
         committee_size: CommitteeSize,
         input_window: [U256; 2],
         e3_program: Address,
-        e3_params: Bytes,
+        param_set: u8,
         compute_provider_params: Bytes,
         proof_aggregation_enabled: bool,
     ) -> Result<U256> {
@@ -380,7 +380,7 @@ where
             committeeSize: committee_size,
             inputWindow: input_window,
             e3Program: e3_program,
-            e3ProgramParams: e3_params,
+            paramSet: param_set,
             computeProviderParams: compute_provider_params,
             customParams: Bytes::new(),
             proofAggregationEnabled: proof_aggregation_enabled,
@@ -430,7 +430,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         committee_size: CommitteeSize,
         input_window: [U256; 2],
         e3_program: Address,
-        e3_params: Bytes,
+        param_set: u8,
         compute_provider_params: Bytes,
         custom_params: Bytes,
         proof_aggregation_enabled: bool,
@@ -448,7 +448,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
             committeeSize: committee_size,
             inputWindow: input_window,
             e3Program: e3_program,
-            e3ProgramParams: e3_params.clone(),
+            paramSet: param_set,
             computeProviderParams: compute_provider_params.clone(),
             customParams: custom_params.clone(),
             proofAggregationEnabled: proof_aggregation_enabled,

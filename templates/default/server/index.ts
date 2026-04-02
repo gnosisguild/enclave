@@ -71,8 +71,10 @@ async function runProgram(e3Id: bigint): Promise<void> {
     const sdk = await createPrivateSDK()
     const e3Details = await sdk.getE3(e3Id)
     const paramSetId = e3Details.paramSet
-    const e3ProgramParams = (await sdk.sdk.getPublicClient().readContract({
-      address: sdk.sdk.getContractAddresses().enclave,
+    const publicClient = sdk.getPublicClient()
+    const { ENCLAVE_CONTRACT } = getCheckedEnvVars()
+    const e3ProgramParams = (await publicClient.readContract({
+      address: ENCLAVE_CONTRACT as `0x${string}`,
       abi: [
         {
           name: 'paramSetRegistry',
