@@ -24,8 +24,7 @@ use e3_fhe_params::{BfvPreset, ParameterType};
 use e3_zk_helpers::ciphernodes_committee::CiphernodesCommitteeSize;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
 use e3_zk_helpers::circuits::dkg::share_computation::circuit::{
-    ShareComputationBaseCircuit, ShareComputationChunkCircuit, ShareComputationChunkCircuitData,
-    ShareComputationCircuitData,
+    ShareComputationCircuit, ShareComputationCircuitData,
 };
 use e3_zk_helpers::codegen::{write_artifacts, write_toml, CircuitCodegen};
 use e3_zk_helpers::computation::DkgInputType;
@@ -204,8 +203,7 @@ fn main() -> Result<()> {
     // Register all circuits in the registry (metadata only).
     let mut registry = CircuitRegistry::new();
     registry.register(Arc::new(PkCircuit));
-    registry.register(Arc::new(ShareComputationBaseCircuit));
-    registry.register(Arc::new(ShareComputationChunkCircuit));
+    registry.register(Arc::new(ShareComputationCircuit));
     registry.register(Arc::new(UserDataEncryptionCircuit));
     registry.register(Arc::new(PkGenerationCircuit));
     registry.register(Arc::new(ShareEncryptionCircuit));
@@ -265,14 +263,13 @@ fn main() -> Result<()> {
 
     // Some circuits reuse one helper entrypoint for multiple witness families, so `--inputs`
     // selects whether we derive secret-key or smudging-noise sample data.
-    let requires_inputs_arg = circuit_name == ShareComputationChunkCircuit::NAME
+    let requires_inputs_arg = circuit_name == ShareComputationCircuit::NAME
         || circuit_meta.name() == ShareEncryptionCircuit::NAME
         || circuit_meta.name() == DkgShareDecryptionCircuit::NAME;
 
-    let show_input_type = requires_inputs_arg || circuit_name == ShareComputationBaseCircuit::NAME;
+    let show_input_type = requires_inputs_arg || circuit_name == ShareComputationCircuit::NAME;
 
-    let dkg_input_type = if circuit_name == ShareComputationBaseCircuit::NAME || requires_inputs_arg
-    {
+    let dkg_input_type = if circuit_name == ShareComputationCircuit::NAME || requires_inputs_arg {
         let inputs_str = if !args.toml {
             args.inputs.as_deref().unwrap_or("secret-key")
         } else {
@@ -315,25 +312,14 @@ fn main() -> Result<()> {
                 let circuit = PkCircuit;
                 circuit.codegen(preset, &sample)?
             }
-            name if name == <ShareComputationBaseCircuit as Circuit>::NAME => {
+            name if name == <ShareComputationCircuit as Circuit>::NAME => {
                 let sample = ShareComputationCircuitData::generate_sample(
                     preset,
                     committee,
                     dkg_input_type,
                 )?;
 
-                let circuit = ShareComputationBaseCircuit;
-                circuit.codegen(preset, &sample)?
-            }
-            name if name == <ShareComputationChunkCircuit as Circuit>::NAME => {
-                let sample = ShareComputationChunkCircuitData::generate_sample(
-                    preset,
-                    committee,
-                    dkg_input_type,
-                    args.chunk_idx,
-                )?;
-
-                let circuit = ShareComputationChunkCircuit;
+                let circuit = ShareComputationCircuit;
                 circuit.codegen(preset, &sample)?
             }
             name if name == <ShareEncryptionCircuit as Circuit>::NAME => {

@@ -9,7 +9,7 @@ pub use crate::configs::secure::threshold::{
     L as L_THRESHOLD, QIS as QIS_THRESHOLD,
     THRESHOLD_SHARE_DECRYPTION_BIT_SK as SHARE_DECRYPTION_BIT_AGG,
 };
-use crate::core::dkg::share_computation::chunk::Configs as ShareComputationChunkConfigs;
+use crate::core::dkg::share_computation::Configs as ShareComputationConfigs;
 use crate::core::dkg::share_encryption::Configs as ShareEncryptionConfigs;
 
 // Global configs for DKG secure preset
@@ -46,6 +46,9 @@ share_computation_sk (CIRCUIT 2a)
 pub global SHARE_COMPUTATION_BIT_SHARE: u32 = 53;
 pub global SHARE_COMPUTATION_SK_BIT_SECRET: u32 = 1;
 
+pub global SHARE_COMPUTATION_SK_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
+    ShareComputationConfigs::new(QIS_THRESHOLD);
+
 /************************************
 -------------------------------------
 share_computation_e_sm (CIRCUIT 2b)
@@ -54,36 +57,8 @@ share_computation_e_sm (CIRCUIT 2b)
 
 pub global SHARE_COMPUTATION_E_SM_BIT_SECRET: u32 = 192;
 
-/************************************
--------------------------------------
-share_computation_chunk (CIRCUIT 2c)
--------------------------------------
-************************************/
-
-pub global SHARE_COMPUTATION_CHUNK_SIZE: u32 = 512;
-pub global SHARE_COMPUTATION_N_CHUNKS: u32 = N / SHARE_COMPUTATION_CHUNK_SIZE;
-
-pub global SHARE_COMPUTATION_CHUNKS_PER_BATCH: u32 = 4;
-pub global SHARE_COMPUTATION_N_BATCHES: u32 =
-    SHARE_COMPUTATION_N_CHUNKS / SHARE_COMPUTATION_CHUNKS_PER_BATCH;
-
-pub global SHARE_COMPUTATION_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
-    ShareComputationChunkConfigs::new(QIS_THRESHOLD);
-
-/************************************
--------------------------------------
-share_computation final (C2) - combined VK hash (noir-recursive-no-zk)
-Regenerate for secure preset after compiling lib with configs::secure::dkg as default.
--------------------------------------
-************************************/
-
-// Placeholder: set lib default to secure::dkg, run pnpm build:circuits (or bb write_vk per crate into
-// circuits/bin/dkg/target as *.vk_recursive_hash), then compute-vk-hash (base,chunk,batch) per SK/ESM.
-// TODO: update with actual hashes once we use secure parameters.
-pub global SHARE_COMPUTATION_EXPECTED_VK_HASH_SK: Field =
-    0x0000000000000000000000000000000000000000000000000000000000000001;
-pub global SHARE_COMPUTATION_EXPECTED_VK_HASH_ESM: Field =
-    0x0000000000000000000000000000000000000000000000000000000000000001;
+pub global SHARE_COMPUTATION_E_SM_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
+    ShareComputationConfigs::new(QIS_THRESHOLD);
 
 /************************************
 -------------------------------------
