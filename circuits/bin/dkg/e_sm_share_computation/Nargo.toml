@@ -1,5 +1,5 @@
 [package]
-name = "share_computation_chunk_batch"
+name = "e_sm_share_computation"
 type = "bin"
 authors = [""]
 

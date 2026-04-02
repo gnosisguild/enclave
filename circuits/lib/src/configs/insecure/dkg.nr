@@ -9,7 +9,7 @@ pub use crate::configs::insecure::threshold::{
     L as L_THRESHOLD, QIS as QIS_THRESHOLD,
     THRESHOLD_SHARE_DECRYPTION_BIT_SK as SHARE_DECRYPTION_BIT_AGG,
 };
-use crate::core::dkg::share_computation::chunk::Configs as ShareComputationChunkConfigs;
+use crate::core::dkg::share_computation::Configs as ShareComputationConfigs;
 use crate::core::dkg::share_encryption::Configs as ShareEncryptionConfigs;
 
 // Global configs for DKG insecure preset
@@ -43,6 +43,9 @@ share_computation_sk (CIRCUIT 2a)
 pub global SHARE_COMPUTATION_BIT_SHARE: u32 = 36;
 pub global SHARE_COMPUTATION_SK_BIT_SECRET: u32 = 1;
 
+pub global SHARE_COMPUTATION_SK_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
+    ShareComputationConfigs::new(QIS_THRESHOLD);
+
 /************************************
 -------------------------------------
 share_computation_e_sm (CIRCUIT 2b)
@@ -51,33 +54,8 @@ share_computation_e_sm (CIRCUIT 2b)
 
 pub global SHARE_COMPUTATION_E_SM_BIT_SECRET: u32 = 24;
 
-/************************************
--------------------------------------
-share_computation_chunk (CIRCUIT 2c)
--------------------------------------
-************************************/
-
-pub global SHARE_COMPUTATION_CHUNK_SIZE: u32 = 512;
-pub global SHARE_COMPUTATION_N_CHUNKS: u32 = N / SHARE_COMPUTATION_CHUNK_SIZE;
-
-pub global SHARE_COMPUTATION_CHUNKS_PER_BATCH: u32 = 1;
-pub global SHARE_COMPUTATION_N_BATCHES: u32 =
-    SHARE_COMPUTATION_N_CHUNKS / SHARE_COMPUTATION_CHUNKS_PER_BATCH;
-
-pub global SHARE_COMPUTATION_CHUNK_CONFIGS: ShareComputationChunkConfigs<L_THRESHOLD> =
-    ShareComputationChunkConfigs::new(QIS_THRESHOLD);
-
-/************************************
--------------------------------------
-share_computation final (C2) - combined VK hash (noir-recursive-no-zk)
-Regenerate: zk_cli share_computation codegen with ENCLAVE_CIRCUITS_ROOT + bin/dkg/target/\*.vk_recursive_hash.
--------------------------------------
-************************************/
-
-pub global SHARE_COMPUTATION_EXPECTED_VK_HASH_SK: Field =
-    0x166f69fac410d14aef0357cc8544aaa9e4466d50e2629c14c3e666b3a08fb25f;
-pub global SHARE_COMPUTATION_EXPECTED_VK_HASH_ESM: Field =
-    0x12d9d8102a32f8750061596b14144ac6209e039421e684e595082c92e31ceb71;
+pub global SHARE_COMPUTATION_E_SM_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
+    ShareComputationConfigs::new(QIS_THRESHOLD);
 
 /************************************
 -------------------------------------
