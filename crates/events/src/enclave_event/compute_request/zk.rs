@@ -20,7 +20,7 @@ pub enum ZkRequest {
     PkBfv(PkBfvProofRequest),
     /// Generate proof for PK generation (C1).
     PkGeneration(PkGenerationProofRequest),
-    /// Generate proof for share and esm computation (C2a and C2b).
+    /// Generate proof for share and ESM computation (C2a and C2b).
     ShareComputation(ShareComputationProofRequest),
     /// Generate proof for share encryption (C3a/C3b).
     ShareEncryption(ShareEncryptionProofRequest),
@@ -67,7 +67,7 @@ pub struct PkAggregationProofRequest {
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct ShareComputationProofRequest {
-    /// Raw secret polynomial bytes (sk or e_sm — witness, encrypted at rest).
+    /// Raw secret polynomial bytes (sk or ESM — witness, encrypted at rest).
     pub secret_raw: SensitiveBytes,
     /// Bincode-serialized SharedSecret containing Shamir shares (witness, encrypted at rest).
     pub secret_sss_raw: SensitiveBytes,
@@ -198,7 +198,7 @@ pub enum ZkResponse {
     PkBfv(PkBfvProofResponse),
     /// Proof for PK generation (C1).
     PkGeneration(PkGenerationProofResponse),
-    /// Proof for share and esm computation (C2a and C2b).
+    /// Proof for share and ESM computation (C2a and C2b).
     ShareComputation(ShareComputationProofResponse),
     /// Proof for share encryption (C3a/C3b).
     ShareEncryption(ShareEncryptionProofResponse),

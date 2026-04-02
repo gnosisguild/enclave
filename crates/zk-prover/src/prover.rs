@@ -9,6 +9,7 @@ use crate::error::ZkError;
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use e3_utils::utility_types::ArcBytes;
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command as StdCommand;
 use tracing::{debug, info, warn};
@@ -188,7 +189,7 @@ impl ZkProver {
         let job_dir = self.work_dir.join(e3_id);
         let witness_path = job_dir.join("witness.gz");
         let output_dir = job_dir.join("out");
-        fs::create_dir_all(&job_dir)?;
+        fs::create_dir_all(&output_dir)?;
 
         fs::write(&witness_path, witness_data)?;
 
@@ -230,8 +231,47 @@ impl ZkProver {
             )));
         }
 
-        let proof_data = fs::read(output_dir.join("proof"))?;
-        let public_signals = fs::read(output_dir.join("public_inputs"))?;
+        let proof_path = output_dir.join("proof");
+        let public_path = output_dir.join("public_inputs");
+        let proof_data = fs::read(&proof_path).map_err(|e| {
+            // #region agent log
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("/Users/giacomo/Documents/projects/enclave/enclave/.cursor/debug-2b3a7d.log")
+            {
+                let _ = writeln!(
+                    f,
+                    r#"{{"sessionId":"2b3a7d","hypothesisId":"H6","location":"prover.rs:read_proof","message":"bb out/proof read failed","data":{{"e3_id":"{}","circuit":"{}","proof_path":"{}","public_path":"{}","err":"{}"}}}}"#,
+                    e3_id,
+                    circuit.as_str(),
+                    proof_path.display(),
+                    public_path.display(),
+                    e
+                );
+            }
+            // #endregion
+            e
+        })?;
+        let public_signals = fs::read(&public_path).map_err(|e| {
+            // #region agent log
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("/Users/giacomo/Documents/projects/enclave/enclave/.cursor/debug-2b3a7d.log")
+            {
+                let _ = writeln!(
+                    f,
+                    r#"{{"sessionId":"2b3a7d","hypothesisId":"H6","location":"prover.rs:read_public","message":"bb out/public_inputs read failed","data":{{"e3_id":"{}","circuit":"{}","public_path":"{}","err":"{}"}}}}"#,
+                    e3_id,
+                    circuit.as_str(),
+                    public_path.display(),
+                    e
+                );
+            }
+            // #endregion
+            e
+        })?;
 
         info!(
             "generated proof ({} bytes) for {} / {}",

@@ -155,47 +155,20 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             ".vk_noir_hash",
         )
         .await;
-        // C2a base (sk_share_computation_base)
+        // C2a (sk_share_computation)
         copy_circuit(
             &dkg_target,
-            &rv.join("dkg/sk_share_computation_base"),
-            "sk_share_computation_base",
+            &rv.join("dkg/sk_share_computation"),
+            "sk_share_computation",
             ".vk_noir",
             ".vk_noir_hash",
         )
         .await;
-        // C2b base (e_sm_share_computation_base)
+        // C2b (e_sm_share_computation)
         copy_circuit(
             &dkg_target,
-            &rv.join("dkg/e_sm_share_computation_base"),
-            "e_sm_share_computation_base",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C2 chunk (share_computation_chunk)
-        copy_circuit(
-            &dkg_target,
-            &rv.join("dkg/share_computation_chunk"),
-            "share_computation_chunk",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C2 chunk_batch (share_computation_chunk_batch)
-        copy_circuit(
-            &dkg_target,
-            &rv.join("dkg/share_computation_chunk_batch"),
-            "share_computation_chunk_batch",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C2 final (share_computation)
-        copy_circuit(
-            &dkg_target,
-            &rv.join("dkg/share_computation"),
-            "share_computation",
+            &rv.join("dkg/e_sm_share_computation"),
+            "e_sm_share_computation",
             ".vk_noir",
             ".vk_noir_hash",
         )
@@ -285,31 +258,6 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         )
         .await;
 
-        // share_computation aliases (sk_share_computation, e_sm_share_computation)
-        for alias in ["sk_share_computation", "e_sm_share_computation"] {
-            let alias_dir = dkg_wrapper_base.join(alias);
-            tokio::fs::create_dir_all(&alias_dir).await.unwrap();
-            let sc_dir = dkg_wrapper_base.join("share_computation");
-            tokio::fs::copy(
-                sc_dir.join("share_computation.json"),
-                alias_dir.join(format!("{alias}.json")),
-            )
-            .await
-            .unwrap();
-            tokio::fs::copy(
-                sc_dir.join("share_computation.vk"),
-                alias_dir.join(format!("{alias}.vk")),
-            )
-            .await
-            .unwrap();
-            tokio::fs::copy(
-                sc_dir.join("share_computation.vk_hash"),
-                alias_dir.join(format!("{alias}.vk_hash")),
-            )
-            .await
-            .unwrap();
-        }
-
         // Threshold wrapper circuits
         let threshold_wrapper_base = dv.join("recursive_aggregation/wrapper/threshold");
         copy_circuit(
@@ -398,6 +346,20 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             .expect("Failed to download and install ZK backend");
         (backend, temp)
     }
+}
+
+/// Barretenberg writes under `work_dir.join(job_id)` (`witness.gz`, `out/proof`, …). Several
+/// ciphernodes built with `zk_backend.clone()` therefore share one directory; for the same E3,
+/// `job_id` matches across nodes (e.g. `1:0_c2a`), so parallel provers race and reads can fail
+/// with `No such file or directory`. Use a per-node subtree while keeping shared `circuits_dir`.
+fn zk_backend_isolated_work_dir(base: &ZkBackend, node_id: &str) -> ZkBackend {
+    let safe: String = node_id
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect();
+    let mut b = base.clone();
+    b.work_dir = base.work_dir.join(safe);
+    b
 }
 
 pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
@@ -839,7 +801,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_multithread_concurrent_jobs(concurrent_jobs)
                 .with_shared_multithread_report(&multithread_report)
                 .with_trbfv()
-                .with_zkproof(zk_backend.clone())
+                .with_zkproof(zk_backend_isolated_work_dir(&zk_backend, &addr))
                 .testmode_with_signer(PrivateKeySigner::random())
                 .with_pubkey_aggregation()
                 .with_sortition_score()
@@ -859,7 +821,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_multithread_concurrent_jobs(concurrent_jobs)
                 .with_shared_multithread_report(&multithread_report)
                 .with_trbfv()
-                .with_zkproof(zk_backend.clone())
+                .with_zkproof(zk_backend_isolated_work_dir(&zk_backend, &addr))
                 .testmode_with_signer(PrivateKeySigner::random())
                 .with_pubkey_aggregation()
                 .with_sortition_score()
@@ -1476,11 +1438,11 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         addr: &str,
         store: Option<actix::Addr<InMemStore>>,
         cipher: &Arc<Cipher>,
-        zk_backend: ZkBackend,
+        zk_backend: &ZkBackend,
     ) -> Result<e3_ciphernode_builder::CiphernodeHandle> {
         let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
             .with_trbfv()
-            .with_zkproof(zk_backend)
+            .with_zkproof(zk_backend_isolated_work_dir(zk_backend, addr))
             .testmode_with_signer(PrivateKeySigner::random())
             .testmode_with_forked_bus(bus.event_bus())
             .testmode_with_history()
@@ -1506,15 +1468,14 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         rng: &e3_utils::SharedRng,
         count: u32,
         cipher: &Arc<Cipher>,
-        zk_backend: ZkBackend,
+        zk_backend: &ZkBackend,
     ) -> Result<Vec<e3_ciphernode_builder::CiphernodeHandle>> {
         let eth_addrs = create_random_eth_addrs(count);
         let mut result = vec![];
         for addr in &eth_addrs {
             println!("Setting up eth addr: {}", addr);
             let tuple =
-                setup_local_ciphernode(&bus, &rng, true, addr, None, cipher, zk_backend.clone())
-                    .await?;
+                setup_local_ciphernode(&bus, &rng, true, addr, None, cipher, zk_backend).await?;
             result.push(tuple);
         }
         simulate_libp2p_net(&result).await;
@@ -1527,8 +1488,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     let (rng, cn1_address, cn1_data, cn2_address, cn2_data, cipher, history, params, crpoly) = {
         let (bus, rng, seed, params, crpoly, _, _) = get_common_setup(None)?;
         let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
-        let ciphernodes =
-            create_local_ciphernodes(&bus, &rng, 2, &cipher, zk_backend.clone()).await?;
+        let ciphernodes = create_local_ciphernodes(&bus, &rng, 2, &cipher, &zk_backend).await?;
         let eth_addrs = ciphernodes.iter().map(|n| n.address()).collect::<Vec<_>>();
 
         setup_score_sortition_environment(&bus, &eth_addrs, 1).await?;
@@ -1599,7 +1559,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         &cn1_address,
         Some(InMemStore::from_dump(cn1_data, true)?.start()),
         &cipher,
-        zk_backend.clone(),
+        &zk_backend,
     )
     .await?;
     let cn2 = setup_local_ciphernode(
@@ -1609,7 +1569,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         &cn2_address,
         Some(InMemStore::from_dump(cn2_data, true)?.start()),
         &cipher,
-        zk_backend.clone(),
+        &zk_backend,
     )
     .await?;
     let history_collector = cn1.history().unwrap();
@@ -1696,11 +1656,11 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         addr: &str,
         store: Option<actix::Addr<e3_data::InMemStore>>,
         cipher: &Arc<Cipher>,
-        zk_backend: ZkBackend,
+        zk_backend: &ZkBackend,
     ) -> Result<e3_ciphernode_builder::CiphernodeHandle> {
         let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
             .with_trbfv()
-            .with_zkproof(zk_backend)
+            .with_zkproof(zk_backend_isolated_work_dir(zk_backend, addr))
             .testmode_with_signer(PrivateKeySigner::random())
             .testmode_with_forked_bus(bus.event_bus())
             .testmode_with_history()
@@ -1726,15 +1686,14 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         rng: &e3_utils::SharedRng,
         count: u32,
         cipher: &Arc<Cipher>,
-        zk_backend: ZkBackend,
+        zk_backend: &ZkBackend,
     ) -> Result<Vec<e3_ciphernode_builder::CiphernodeHandle>> {
         let eth_addrs = create_random_eth_addrs(count);
         let mut result = vec![];
         for addr in &eth_addrs {
             println!("Setting up eth addr: {}", addr);
             let tuple =
-                setup_local_ciphernode(&bus, &rng, true, addr, None, cipher, zk_backend.clone())
-                    .await?;
+                setup_local_ciphernode(&bus, &rng, true, addr, None, cipher, zk_backend).await?;
             result.push(tuple);
         }
         simulate_libp2p_net(&result).await;
@@ -1779,7 +1738,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     let (zk_backend, _zk_temp) = setup_test_zk_backend().await;
 
     // Setup actual ciphernodes and dispatch add events
-    let ciphernodes = create_local_ciphernodes(&bus, &rng, 3, &cipher, zk_backend.clone()).await?;
+    let ciphernodes = create_local_ciphernodes(&bus, &rng, 3, &cipher, &zk_backend).await?;
     let eth_addrs = ciphernodes.iter().map(|tup| tup.address()).collect();
 
     setup_score_sortition_environment(&bus, &eth_addrs, 1).await?;

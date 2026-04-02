@@ -1808,7 +1808,7 @@ impl ThresholdKeyshare {
             params_preset: threshold_preset,
         };
 
-        let esm_requests: Vec<DkgShareDecryptionProofRequest> = esi_ciphertexts_raw
+        let e_sm_requests: Vec<DkgShareDecryptionProofRequest> = esi_ciphertexts_raw
             .into_iter()
             .map(|esi_cts| DkgShareDecryptionProofRequest {
                 sk_bfv: current.sk_bfv.clone(),
@@ -1825,7 +1825,7 @@ impl ThresholdKeyshare {
             s.honest_parties = Some(honest_party_ids);
             Ok(s)
         })?;
-        self.pending_share_decryption_data = Some((sk_request, esm_requests));
+        self.pending_share_decryption_data = Some((sk_request, e_sm_requests));
 
         Ok(())
     }
@@ -1846,7 +1846,7 @@ impl ThresholdKeyshare {
         let (sk_poly_sum, es_poly_sum) = (output.sk_poly_sum, output.es_poly_sum);
 
         // Extract C4 data from the actor (stored by proceed_with_decryption_key_calculation)
-        let (sk_request, esm_requests) = self
+        let (sk_request, e_sm_requests) = self
             .pending_share_decryption_data
             .take()
             .ok_or_else(|| anyhow!("No pending share decryption data — CalculateDecryptionKey responded before proof requests were built"))?;
@@ -1899,7 +1899,7 @@ impl ThresholdKeyshare {
             "Publishing DecryptionShareProofsPending for E3 {} party {} (1 SK + {} ESM requests)",
             e3_id,
             party_id,
-            esm_requests.len()
+            e_sm_requests.len()
         );
 
         self.bus.publish(
@@ -1910,7 +1910,7 @@ impl ThresholdKeyshare {
                 sk_poly_sum: ArcBytes::from_bytes(&sk_poly_sum_bytes),
                 es_poly_sum: es_poly_sum_bytes,
                 sk_request,
-                esm_requests,
+                e_sm_requests,
             },
             ec.clone(),
         )?;
@@ -1980,17 +1980,17 @@ impl ThresholdKeyshare {
 
         // Validate ESM proof count — each party must provide exactly
         // one C4b proof per smudging noise index.
-        let expected_esm = ready.es_poly_sum.len();
+        let expected_e_sm = ready.es_poly_sum.len();
         let mut c4_count_dishonest: HashSet<u64> = HashSet::new();
         let party_proofs: Vec<PartyShareDecryptionProofsToVerify> = collected_shares
             .iter()
             .filter_map(|(&party_id, share)| {
-                if share.signed_e_sm_decryption_proofs.len() != expected_esm {
+                if share.signed_e_sm_decryption_proofs.len() != expected_e_sm {
                     warn!(
                         "Party {} has wrong ESM proof count ({} vs expected {}) for E3 {} — treating as dishonest",
                         party_id,
                         share.signed_e_sm_decryption_proofs.len(),
-                        expected_esm,
+                        expected_e_sm,
                         e3_id
                     );
                     c4_count_dishonest.insert(party_id);

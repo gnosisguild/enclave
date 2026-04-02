@@ -7,10 +7,7 @@
 use std::collections::BTreeMap;
 
 use crate::error::ZkError;
-use crate::prover::ZkProver;
-use crate::witness::{CompiledCircuit, WitnessGenerator};
 use acir::FieldElement;
-use e3_events::{CircuitName, CircuitVariant, Proof};
 use noirc_abi::{input_parser::InputValue, InputMap};
 
 const FIELD_SIZE: usize = 32;
@@ -27,51 +24,6 @@ pub fn bytes_to_field_strings(bytes: &[u8]) -> Result<Vec<String>, ZkError> {
         .chunks(FIELD_SIZE)
         .map(|chunk| format!("0x{}", hex::encode(chunk)))
         .collect())
-}
-
-/// Proves a circuit given a serializable input struct (ZK blinding enabled).
-///
-/// Handles the common pattern: serialize → load compiled circuit → generate witness → prove.
-pub fn prove_recursive_circuit(
-    prover: &ZkProver,
-    circuit_name: CircuitName,
-    input: &impl serde::Serialize,
-    e3_id: &str,
-) -> Result<Proof, ZkError> {
-    let witness = generate_recursive_witness(prover, circuit_name, input)?;
-    prover.generate_proof_with_variant(circuit_name, &witness, e3_id, CircuitVariant::Recursive)
-}
-
-/// Like [`prove_recursive_circuit`] but produces a non-ZK proof (UltraHonkProof, 457 fields).
-/// Use for intermediate proofs consumed by circuits that verify with `verify_honk_proof_non_zk`.
-pub fn prove_recursive_circuit_non_zk(
-    prover: &ZkProver,
-    circuit_name: CircuitName,
-    input: &impl serde::Serialize,
-    e3_id: &str,
-) -> Result<Proof, ZkError> {
-    let witness = generate_recursive_witness(prover, circuit_name, input)?;
-    prover.generate_recursive_non_zk_proof(circuit_name, &witness, e3_id)
-}
-
-/// Shared helper: load compiled circuit from Recursive dir, serialize input, generate witness.
-fn generate_recursive_witness(
-    prover: &ZkProver,
-    circuit_name: CircuitName,
-    input: &impl serde::Serialize,
-) -> Result<Vec<u8>, ZkError> {
-    let recursive_dir = prover.circuits_dir(CircuitVariant::Recursive);
-    let circuit_path = recursive_dir
-        .join(circuit_name.dir_path())
-        .join(format!("{}.json", circuit_name.as_str()));
-    let compiled = CompiledCircuit::from_file(&circuit_path)?;
-
-    let json =
-        serde_json::to_value(input).map_err(|e| ZkError::SerializationError(e.to_string()))?;
-    let input_map = inputs_json_to_input_map(&json)?;
-
-    let witness_gen = WitnessGenerator::new();
-    Ok(witness_gen.generate_witness(&compiled, input_map)?)
 }
 
 /// Converts inputs JSON (from `Inputs::to_json()`) to `InputMap` for Noir ABI.

@@ -138,7 +138,7 @@ ThresholdKeyshare receives AllEncryptionKeysCollected
 │   │  │     → Splits sk into N shares, any M+1 can reconstruct │
 │   │  │     → One share per committee member                    │
 │   │  │                                                         │
-│   │  │  3. Generate smudging noise (e_sm_raw):                │
+│   │  │  3. Generate smudging noise (ESM):                      │
 │   │  │     → Statistical security parameter                    │
 │   │  │     → Prevents information leakage during decryption    │
 │   │  │                                                         │
@@ -222,7 +222,7 @@ ProofRequestActor receives ThresholdSharePending
 ├─ 2. Dispatches ALL proof requests in parallel:
 │     ├─ C1:  ComputeRequest::zk(ZkRequest::PkGeneration {...})
 │     ├─ C2a: ComputeRequest::zk(ZkRequest::ShareComputation { kind: SK })
-│     ├─ C2b: ComputeRequest::zk(ZkRequest::ShareComputation { kind: ESM })
+│     ├─ C2b: ComputeRequest::zk(ZkRequest::ShareComputation { dkg_input_type: SmudgingNoise })
 │     ├─ C3a[i]: ComputeRequest::zk(ZkRequest::ShareEncryption { recipient, row })
 │     │   → One per recipient party × modulus row
 │     └─ C3b[i]: ComputeRequest::zk(ZkRequest::ShareEncryption { esi_idx, recipient, row })
@@ -251,10 +251,10 @@ ProofRequestActor receives ThresholdSharePending
 │          e3_id, party_id,
 │          threshold_share,               // pk_share + encrypted shares
 │          signed_pk_generation_proof,     // C1
-│          signed_sk_computation_proof,    // C2a
-│          signed_esm_computation_proof,   // C2b
-│          signed_sk_encryption_proofs,    // C3a[] indexed by (recipient, row)
-│          signed_esm_encryption_proofs    // C3b[] indexed by (esi, recipient, row)
+│          signed_c2a_proof,             // C2a (sk share computation)
+│          signed_c2b_proof,               // C2b (ESM share computation)
+│          signed_c3a_proofs,              // C3a[] indexed by (recipient, row)
+│          signed_c3b_proofs               // C3b[] indexed by (esi, recipient, row)
 │        }
 │        → Broadcast to all nodes via libp2p gossip
 │
@@ -398,7 +398,7 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 ├─ 3. PUBLISH C4 PROOF REQUESTS:
 │     DecryptionShareProofsPending {
 │       sk_request:   DkgShareDecryptionProofRequest (C4a),
-│       esm_requests: Vec<DkgShareDecryptionProofRequest> (C4b, one per ESI),
+│       e_sm_requests: Vec<DkgShareDecryptionProofRequest> (C4b, one per ESI),
 │       sk_poly_sum, es_poly_sum  // decrypted aggregates for proof inputs
 │     }
 │     → ProofRequestActor picks this up
@@ -410,7 +410,7 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 │     │  │
 │     │  ├─ Dispatches proof requests:
 │     │  │   C4a: ComputeRequest::zk(ZkRequest::DkgShareDecryption { kind: SK })
-│     │  │   C4b[i]: ComputeRequest::zk(ZkRequest::DkgShareDecryption { kind: ESM, esi_idx })
+│     │  │   C4b[i]: ComputeRequest::zk(ZkRequest::DkgShareDecryption { dkg_input_type: SmudgingNoise, esi_idx })
 │     │  │   → Proves share decryption was performed correctly
 │     │  │   → Proves the reconstructed key portion is valid
 │     │  │
@@ -422,7 +422,7 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 │     │           e3_id, party_id,
 │     │           sk_poly_sum, es_poly_sum,        // protocol data
 │     │           signed_sk_decryption_proof,       // C4a
-│     │           signed_esm_decryption_proofs[]    // C4b per ESI
+│     │           signed_e_sm_decryption_proofs[]   // C4b per ESI
 │     │         }
 │     │         → Broadcast to all committee nodes via P2P gossip
 │     │         → This is Protocol Exchange #3 (decryption key sharing)

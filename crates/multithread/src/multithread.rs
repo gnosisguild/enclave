@@ -61,19 +61,14 @@ use e3_zk_helpers::circuits::threshold::pk_generation::circuit::{
     PkGenerationCircuit, PkGenerationCircuitData,
 };
 use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_computation::{
-    ChunkInputs, Configs, Inputs, ShareComputationBaseCircuit, ShareComputationCircuitData,
-};
+use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComputationCircuitData};
 use e3_zk_helpers::dkg::share_decryption::{ShareDecryptionCircuit, ShareDecryptionCircuitData};
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
-use e3_zk_helpers::Computation;
 use e3_zk_prover::{
-    generate_chunk_batch_proof, generate_chunk_proof, generate_fold_proof,
-    generate_share_computation_final_proof, generate_wrapper_proof, CircuitVariant, Provable,
-    ZkBackend, ZkProver,
+    generate_fold_proof, generate_wrapper_proof, CircuitVariant, Provable, ZkBackend, ZkProver,
 };
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
@@ -82,7 +77,7 @@ use ndarray::Array2;
 use num_bigint::BigInt;
 use rand::rngs::OsRng;
 use rand::Rng;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 /// Multithread actor
 pub struct Multithread {
@@ -752,13 +747,13 @@ fn handle_share_computation_proof(
         .map(|arr| arr.mapv(|v| BigInt::from(v)))
         .collect();
 
-    // 5. Compute parity matrix
+    // 4. Compute parity matrix
     let committee = req.committee_size.values();
     let parity_matrix =
         compute_parity_matrix(threshold_params.moduli(), committee.n, committee.threshold)
             .map_err(|e| make_zk_error(&request, format!("compute_parity_matrix: {}", e)))?;
 
-    // 6. Build circuit data
+    // 5. Build circuit data
     let circuit_data = ShareComputationCircuitData {
         dkg_input_type: req.dkg_input_type,
         secret,
@@ -770,15 +765,10 @@ fn handle_share_computation_proof(
 
     let e3_id_str = request.e3_id.to_string();
 
-    // 7. Prove base circuit (C2a or C2b base)
-    let base_circuit = ShareComputationBaseCircuit;
+    // 7. Prove base circuit (C2a or C2b)
+    let base_circuit = ShareComputationCircuit;
     let base_proof = base_circuit
-        .prove(
-            prover,
-            &req.params_preset,
-            &circuit_data,
-            &format!("{e3_id_str}_base"),
-        )
+        .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
         .map_err(|e| {
             ComputeRequestError::new(
                 ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
@@ -786,83 +776,18 @@ fn handle_share_computation_proof(
             )
         })?;
 
-    // 8. Determine number of chunks and prove each chunk circuit
-    let configs = Configs::compute(req.params_preset.clone(), &circuit_data)
-        .map_err(|e| make_zk_error(&request, format!("Configs::compute: {}", e)))?;
-
-    let base_inputs = Inputs::compute(req.params_preset.clone(), &circuit_data)
-        .map_err(|e| make_zk_error(&request, format!("Inputs::compute: {}", e)))?;
-
-    let mut chunk_proofs = Vec::with_capacity(configs.n_chunks);
-    for chunk_idx in 0..configs.n_chunks {
-        let chunk_inputs = ChunkInputs::from_inputs(&base_inputs, &configs, chunk_idx)
-            .map_err(|e| make_zk_error(&request, format!("ChunkInputs::from_inputs: {}", e)))?;
-        let chunk_proof = generate_chunk_proof(
-            prover,
-            &chunk_inputs,
-            &format!("{e3_id_str}_chunk_{chunk_idx}"),
-        )
-        .map_err(|e| {
-            ComputeRequestError::new(
-                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
-                request.clone(),
-            )
-        })?;
-        chunk_proofs.push(chunk_proof);
-    }
-
-    // 9. Level 1: group chunks into batches and prove each batch
-    let mut batch_proofs = Vec::with_capacity(configs.n_batches);
-    for batch_idx in 0..configs.n_batches {
-        let start = batch_idx * configs.chunks_per_batch;
-        let end = usize::min(start + configs.chunks_per_batch, chunk_proofs.len());
-        let batch_chunks = chunk_proofs.get(start..end).ok_or_else(|| {
-            ComputeRequestError::new(
-                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(format!(
-                    "chunk_proofs slice out of bounds: batch_idx={batch_idx}, start={start}, end={end}, len={}",
-                    chunk_proofs.len()
-                ))),
-                request.clone(),
-            )
-        })?;
-        let batch_proof = generate_chunk_batch_proof(
-            prover,
-            &base_proof,
-            batch_chunks,
-            batch_idx as u32,
-            &format!("{e3_id_str}_batch_{batch_idx}"),
-        )
-        .map_err(|e| {
-            ComputeRequestError::new(
-                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
-                request.clone(),
-            )
-        })?;
-        batch_proofs.push(batch_proof);
-    }
-
-    // 10. Level 2: aggregate batch proofs into final C2 proof
-    let proof =
-        generate_share_computation_final_proof(prover, &batch_proofs, &format!("{e3_id_str}_c2"))
-            .map_err(|e| {
-            ComputeRequestError::new(
-                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
-                request.clone(),
-            )
-        })?;
-
-    // 11. Wrap the final C2 proof for fold aggregation
-    let wrapped_proof = generate_wrapper_proof(prover, &proof, &e3_id_str).map_err(|e| {
+    // 8. Wrap the C2a/C2b proof for fold aggregation
+    let wrapped_proof = generate_wrapper_proof(prover, &base_proof, &e3_id_str).map_err(|e| {
         ComputeRequestError::new(
             ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
             request.clone(),
         )
     })?;
 
-    // 12. Return final C2 proof
+    // 9. Return the C2a/C2b proof
     Ok(ComputeResponse::zk(
         ZkResponse::ShareComputation(ShareComputationProofResponse {
-            proof,
+            proof: base_proof,
             wrapped_proof,
             dkg_input_type: req.dkg_input_type,
         }),
@@ -892,7 +817,7 @@ fn handle_pk_generation_proof(
     let e_sm_bytes = req
         .e_sm
         .access_raw(cipher)
-        .map_err(|e| make_zk_error(&request, format!("e_sm decrypt: {}", e)))?;
+        .map_err(|e| make_zk_error(&request, format!("ESM decrypt: {}", e)))?;
 
     // 3. Deserialize raw polynomial bytes → Poly
     let pk0_share_poly = try_poly_from_bytes(&req.pk0_share, &params)
@@ -905,7 +830,7 @@ fn handle_pk_generation_proof(
         .map_err(|e| make_zk_error(&request, format!("eek: {}", e)))?;
 
     let e_sm_poly = try_poly_from_bytes(&e_sm_bytes, &params)
-        .map_err(|e| make_zk_error(&request, format!("e_sm: {}", e)))?;
+        .map_err(|e| make_zk_error(&request, format!("ESM: {}", e)))?;
 
     // 3. Convert Poly → CrtPolynomial
     let pk0_share = CrtPolynomial::from_fhe_polynomial(&pk0_share_poly);
@@ -1272,7 +1197,7 @@ fn handle_verify_share_decryption_proofs(
         .map(|party| {
             let sender = party.sender_party_id;
 
-            // Guard: an empty esm_decryption_proofs vec would make this loop
+            // Guard: an empty ESM decryption-proofs vec would make this loop
             // vacuously true.  Defence-in-depth: reject any party with zero ESM proofs.
             if party.signed_e_sm_decryption_proofs.is_empty() {
                 return PartyVerificationResult {
@@ -1283,7 +1208,7 @@ fn handle_verify_share_decryption_proofs(
                 };
             }
 
-            // Flatten all signed proofs (SK + ESMs) and verify uniformly.
+            // Flatten all signed proofs (SK + ESM) and verify uniformly.
             let all_signed: Vec<&e3_events::SignedProofPayload> =
                 std::iter::once(&party.signed_sk_decryption_proof)
                     .chain(party.signed_e_sm_decryption_proofs.iter())

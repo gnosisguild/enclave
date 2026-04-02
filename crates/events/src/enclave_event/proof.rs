@@ -112,9 +112,9 @@ pub enum CircuitName {
     /// TrBFV public key share proof (C1).
     PkGeneration,
     /// Sk share computation base proof (C2a base).
-    SkShareComputationBase,
+    SkShareComputation,
     /// E_SM share computation base proof (C2b base).
-    ESmShareComputationBase,
+    ESmShareComputation,
     /// Share computation chunk proof (C2c, proven N times).
     ShareComputationChunk,
     /// Share computation chunk batch proof (C2d — binds base + CHUNKS_PER_BATCH chunks).
@@ -140,8 +140,10 @@ impl CircuitName {
         match self {
             CircuitName::PkBfv => "pk",
             CircuitName::PkGeneration => "pk_generation",
-            CircuitName::SkShareComputationBase => "sk_share_computation_base",
-            CircuitName::ESmShareComputationBase => "e_sm_share_computation_base",
+            // C2 rollback: the split base/chunk/batch packages were removed; the
+            // inner share-computation proofs live under these package names.
+            CircuitName::SkShareComputation => "sk_share_computation",
+            CircuitName::ESmShareComputation => "e_sm_share_computation",
             CircuitName::ShareComputationChunk => "share_computation_chunk",
             CircuitName::ShareComputationChunkBatch => "share_computation_chunk_batch",
             CircuitName::ShareComputation => "share_computation",
@@ -157,8 +159,8 @@ impl CircuitName {
     pub fn group(&self) -> &'static str {
         match self {
             CircuitName::PkBfv => "dkg",
-            CircuitName::SkShareComputationBase => "dkg",
-            CircuitName::ESmShareComputationBase => "dkg",
+            CircuitName::SkShareComputation => "dkg",
+            CircuitName::ESmShareComputation => "dkg",
             CircuitName::ShareComputationChunk => "dkg",
             CircuitName::ShareComputationChunkBatch => "dkg",
             CircuitName::ShareComputation => "dkg",
@@ -181,6 +183,17 @@ impl CircuitName {
         format!("recursive_aggregation/wrapper/{}", self.dir_path())
     }
 
+    /// C2a/C2b inner proofs use `sk_share_computation` / `e_sm_share_computation` artifacts; both are
+    /// wrapped by the single `share_computation` wrapper under `recursive_aggregation/wrapper/dkg/`.
+    pub fn wrapper_artifact_circuit(self) -> Self {
+        match self {
+            CircuitName::SkShareComputation | CircuitName::ESmShareComputation => {
+                CircuitName::ShareComputation
+            }
+            _ => self,
+        }
+    }
+
     /// Public input layout for this circuit.
     ///
     /// Public output (return value) layout for this circuit.
@@ -192,7 +205,7 @@ impl CircuitName {
             CircuitName::PkGeneration => CircuitOutputLayout::Fixed {
                 fields: PK_GENERATION_OUTPUTS,
             },
-            CircuitName::SkShareComputationBase | CircuitName::ESmShareComputationBase => {
+            CircuitName::SkShareComputation | CircuitName::ESmShareComputation => {
                 CircuitOutputLayout::Dynamic
             }
             CircuitName::ShareComputationChunkBatch => CircuitOutputLayout::Fixed {

@@ -168,15 +168,15 @@ struct PendingDecryptionProofs {
     es_poly_sum: Vec<ArcBytes>,
     ec: EventContext<Sequenced>,
     sk_proof: Option<Proof>,
-    esm_proofs: HashMap<usize, Proof>,
-    expected_esm_count: usize,
+    e_sm_proofs: HashMap<usize, Proof>,
+    expected_e_sm_count: usize,
 }
 
 impl PendingDecryptionProofs {
     fn is_complete(&self) -> bool {
         self.sk_proof.is_some()
-            && self.esm_proofs.len() == self.expected_esm_count
-            && (0..self.expected_esm_count).all(|i| self.esm_proofs.contains_key(&i))
+            && self.e_sm_proofs.len() == self.expected_e_sm_count
+            && (0..self.expected_e_sm_count).all(|i| self.e_sm_proofs.contains_key(&i))
     }
 }
 
@@ -557,7 +557,7 @@ impl ProofRequestActor {
     ) {
         let (msg, ec) = msg.into_components();
         let e3_id = msg.e3_id.clone();
-        let esm_count = msg.esm_requests.len();
+        let e_sm_count = msg.e_sm_requests.len();
 
         if self.pending_decryption.contains_key(&e3_id) {
             warn!(
@@ -576,8 +576,8 @@ impl ProofRequestActor {
                 es_poly_sum: msg.es_poly_sum,
                 ec: ec.clone(),
                 sk_proof: None,
-                esm_proofs: HashMap::new(),
-                expected_esm_count: esm_count,
+                e_sm_proofs: HashMap::new(),
+                expected_e_sm_count: e_sm_count,
             },
         );
 
@@ -612,10 +612,10 @@ impl ProofRequestActor {
         }
 
         // C4b: SmudgingNoise decryption proofs
-        for (esi_idx, esm_req) in msg.esm_requests.into_iter().enumerate() {
-            let esm_corr = CorrelationId::new();
+        for (esi_idx, e_sm_req) in msg.e_sm_requests.into_iter().enumerate() {
+            let e_sm_corr = CorrelationId::new();
             self.decryption_correlation.insert(
-                esm_corr,
+                e_sm_corr,
                 (
                     e3_id.clone(),
                     DecryptionProofKind::SmudgingNoise { esi_idx },
@@ -628,8 +628,8 @@ impl ProofRequestActor {
             );
             if let Err(err) = self.bus.publish(
                 ComputeRequest::zk(
-                    ZkRequest::DkgShareDecryption(esm_req),
-                    esm_corr,
+                    ZkRequest::DkgShareDecryption(e_sm_req),
+                    e_sm_corr,
                     e3_id.clone(),
                 ),
                 ec.clone(),
@@ -673,7 +673,7 @@ impl ProofRequestActor {
                     "Received C4b ESM decryption proof [{}] for E3 {}",
                     esi_idx, e3_id
                 );
-                pending.esm_proofs.insert(esi_idx, proof);
+                pending.e_sm_proofs.insert(esi_idx, proof);
             }
         }
 
@@ -723,10 +723,10 @@ impl ProofRequestActor {
         };
 
         // Sign C4b (ESM decryption proofs) in esi_idx order
-        let mut signed_esms = Vec::with_capacity(pending.expected_esm_count);
-        for idx in 0..pending.expected_esm_count {
+        let mut signed_e_sm_decryption_proofs = Vec::with_capacity(pending.expected_e_sm_count);
+        for idx in 0..pending.expected_e_sm_count {
             let proof = pending
-                .esm_proofs
+                .e_sm_proofs
                 .get(&idx)
                 .expect("checked in is_complete")
                 .clone();
@@ -738,7 +738,7 @@ impl ProofRequestActor {
                 );
                 return;
             };
-            signed_esms.push(signed);
+            signed_e_sm_decryption_proofs.push(signed);
         }
 
         info!(
@@ -756,7 +756,7 @@ impl ProofRequestActor {
                 sk_poly_sum: pending.sk_poly_sum,
                 es_poly_sum: pending.es_poly_sum,
                 signed_sk_decryption_proof: signed_sk,
-                signed_e_sm_decryption_proofs: signed_esms,
+                signed_e_sm_decryption_proofs: signed_e_sm_decryption_proofs,
                 external: false,
             },
             pending.ec,

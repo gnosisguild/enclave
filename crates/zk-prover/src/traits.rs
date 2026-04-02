@@ -85,6 +85,7 @@ pub trait Provable: Send + Sync {
             .circuits_dir(variant)
             .join(resolved_name.dir_path())
             .join(format!("{}.json", resolved_name.as_str()));
+        println!("circuit_path: {}", circuit_path.display());
 
         let circuit = CompiledCircuit::from_file(&circuit_path)?;
 

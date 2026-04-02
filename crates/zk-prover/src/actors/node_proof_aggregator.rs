@@ -105,7 +105,7 @@ impl NodeProofAggregator {
         let sk_enc_count = msg.sk_share_encryption_requests.len();
         let e_sm_enc_count = msg.e_sm_share_encryption_requests.len();
         // Must mirror the formula in ProofRequestActor::handle_threshold_share_pending:
-        //   C0 + C1 + C2a + C2b + C3a×sk_enc + C3b×e_sm_enc + C4a + C4b
+        //   C0 + C1 + C2a + C2b + C3a×sk_enc + C3b×ESM_enc + C4a + C4b
         let total_expected = 4 + sk_enc_count + e_sm_enc_count + 2;
 
         self.states.entry(e3_id.clone()).or_insert_with(|| {
