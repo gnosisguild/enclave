@@ -12,11 +12,13 @@
 //!
 //! **Share-computation (C2) configs.nr:** set `ENCLAVE_CIRCUITS_ROOT` to the repo `circuits`
 //! directory (or run from the Enclave repo so it is auto-discovered). After `pnpm build:circuits`,
-//! `circuits/bin/dkg/target/` contains `sk_share_computation_base.vk_recursive_hash`,
-//! `e_sm_share_computation_base.vk_recursive_hash`, `share_computation_chunk.vk_recursive_hash`,
-//! and `share_computation_chunk_batch.vk_recursive_hash` (from `scripts/build-circuits.ts`). If
-//! `ENCLAVE_CIRCUITS_ROOT` is set and those files are missing, codegen fails; if unset and artifacts
-//! are absent, the C2 literals are omitted from the generated fragment.
+//! `circuits/bin/dkg/target/` contains `sk_share_computation.vk_recursive_hash` and
+//! `e_sm_share_computation.vk_recursive_hash` for the inner recursive circuits; the aggregation
+//! wrapper emits `share_computation.vk_recursive_hash` under
+//! `circuits/bin/recursive_aggregation/wrapper/dkg/share_computation/target/` (from
+//! `scripts/build-circuits.ts`). If `ENCLAVE_CIRCUITS_ROOT` is set and those files are missing,
+//! codegen fails; if unset and artifacts are absent, the C2 literals are omitted from the generated
+//! fragment.
 
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser};
@@ -171,7 +173,7 @@ struct Cli {
     /// List all available circuits and exit.
     #[arg(long)]
     list_circuits: bool,
-    /// Circuit name to generate artifacts for (e.g. pk, share-computation-base).
+    /// Circuit name to generate artifacts for (e.g. `pk`, `share-computation`).
     #[arg(long, required_unless_present = "list_circuits")]
     circuit: Option<String>,
     /// Preset: "insecure"|"secure" or λ (2|80). Drives both threshold and DKG params.
@@ -183,9 +185,6 @@ struct Cli {
     /// Committee size: "micro" or "small".
     #[arg(long, default_value = "micro")]
     committee: String,
-    /// For `share-computation-chunk`: which `y` slice to export as `y_chunk`.
-    #[arg(long, default_value_t = 0)]
-    chunk_idx: usize,
     /// Output directory for generated artifacts.
     #[arg(long, default_value = "output")]
     output: PathBuf,

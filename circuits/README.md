@@ -43,19 +43,22 @@ how phases, commitments, and circuit IDs line up end to end, read
 [Cryptography](https://docs.theinterfold.com/cryptography) (source:
 [`docs/pages/cryptography.mdx`](../docs/pages/cryptography.mdx)).
 
-**C2** is implemented as a **pipeline** of proofs: `sk_share_computation` (**C2a**) and
-`e_sm_share_computation` (**C2b**) are the inner share-computation checks, and the recursive
-aggregation wrapper `recursive_aggregation/wrapper/dkg/share_computation` folds their batch proofs.
+**C2** uses **inner** recursive proofs plus an optional **wrapper**: `sk_share_computation`
+(**C2a**) and `e_sm_share_computation` (**C2b**) prove the Shamir-share computation; the wrapper
+`recursive_aggregation/wrapper/dkg/share_computation` (`CircuitName::ShareComputation`) re-verifies
+a single inner C2 proof at a time and compresses public inputs for folding / aggregation. Gossip and
+threshold signing use the **inner** proof; the wrapper is produced separately when node proof
+aggregation is enabled.
 
 ### DKG (`bin/dkg/`)
 
-| Path                     | ID  | `CircuitName`             | Role                                          |
-| ------------------------ | --- | ------------------------- | --------------------------------------------- |
-| `pk`                     | C0  | `PkBfv`                   | Commit to individual BFV public key           |
-| `sk_share_computation`   | C2a | `SkShareComputationBase`  | Secret-key track Shamir shares (`y`)          |
-| `e_sm_share_computation` | C2b | `ESmShareComputationBase` | Smudging-noise track Shamir shares (`y`)      |
-| `share_encryption`       | C3  | `ShareEncryption`         | BFV encryption of shares under recipient keys |
-| `share_decryption`       | C4  | `DkgShareDecryption`      | Decrypt shares; aggregate; commitments for P4 |
+| Path                     | ID  | `CircuitName`         | Role                                          |
+| ------------------------ | --- | --------------------- | --------------------------------------------- |
+| `pk`                     | C0  | `PkBfv`               | Commit to individual BFV public key           |
+| `sk_share_computation`   | C2a | `SkShareComputation`  | Secret-key track Shamir shares (`y`)          |
+| `e_sm_share_computation` | C2b | `ESmShareComputation` | Smudging-noise track Shamir shares (`y`)      |
+| `share_encryption`       | C3  | `ShareEncryption`     | BFV encryption of shares under recipient keys |
+| `share_decryption`       | C4  | `DkgShareDecryption`  | Decrypt shares; aggregate; commitments for P4 |
 
 ### Threshold (`bin/threshold/`)
 
@@ -71,12 +74,12 @@ aggregation wrapper `recursive_aggregation/wrapper/dkg/share_computation` folds 
 
 ### Recursive aggregation (`bin/recursive_aggregation/`)
 
-| Path                            | `CircuitName`      | Role                                                                   |
-| ------------------------------- | ------------------ | ---------------------------------------------------------------------- |
-| `fold`                          | `Fold`             | Fold two wrapper outputs                                               |
-| `wrapper/dkg/share_computation` | `ShareComputation` | C2 wrapper: folds inner C2a/C2b batch proofs (and checks VK genealogy) |
-| `wrapper/dkg/*`                 | —                  | Verifies inner DKG proofs; compresses public inputs                    |
-| `wrapper/threshold/*`           | —                  | Verifies inner threshold proofs; compresses public inputs              |
+| Path                            | `CircuitName`      | Role                                                                               |
+| ------------------------------- | ------------------ | ---------------------------------------------------------------------------------- |
+| `fold`                          | `Fold`             | Fold two wrapper outputs                                                           |
+| `wrapper/dkg/share_computation` | `ShareComputation` | C2 wrapper: one inner C2a or C2b proof per wrap; VK genealogy + compressed outputs |
+| `wrapper/dkg/*`                 | —                  | Verifies inner DKG proofs; compresses public inputs                                |
+| `wrapper/threshold/*`           | —                  | Verifies inner threshold proofs; compresses public inputs                          |
 
 Wrapper parameters are documented in
 [`wrapper/README.md`](bin/recursive_aggregation/wrapper/README.md).
