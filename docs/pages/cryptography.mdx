@@ -194,6 +194,69 @@ without ever dumping raw polynomials into calldata. Domain labels (`DS_*` in
 [`commitments.nr`](https://github.com/gnosisguild/enclave/blob/main/circuits/lib/src/math/commitments.nr))
 keep different commitment kinds from being confused with one another.
 
+### Proof aggregation
+
+> **Note:** this section describes a proposed design that has not been implemented yet. It is
+> included here as the target architecture for proof aggregation and on-chain verification.
+
+Individual circuit proofs cover each step in isolation, but the protocol must land them on-chain as
+a compact, verifiable package. A naive fold of all proofs into one recursive aggregate produces an
+opaque commitment that the contract cannot interpret without the original public inputs, and if
+cross-circuit consistency (e.g. that
+[**C2**](https://github.com/gnosisguild/enclave/tree/main/circuits/bin/dkg/share_computation)'s
+expected commitments match
+[**C1**](https://github.com/gnosisguild/enclave/tree/main/circuits/bin/threshold/pk_generation)'s
+outputs) is only checked off-chain, end-to-end correctness still depends on trusting the committee
+network rather than on verifiable mathematics.
+
+The aggregation design addresses both problems. Only **two recursive proofs** are posted on-chain
+per E3 session:
+
+1. **DKG recursive proof**: the aggregator recursively verifies every node's C0-C4 fold chain
+   together with **C5**, which aggregates the public key.
+2. **Decryption recursive proof**: the aggregator recursively verifies **C6** proofs from at least
+   **T+1** parties together with **C7**, which reconstructs the plaintext.
+
+Nodes do not post proofs on-chain. Each node folds its own C0-C4 chain, **signs** the fold output,
+and relays it to the aggregator via P2P gossip. The recursive proof verifies each signature inside
+ZK, so the aggregator cannot substitute or fabricate any node's contribution without the proof
+failing. During registration the contract stores the submitting address for each `party_id`;
+verification recovers the signer via `ecrecover` and checks it matches, binding each fold output to
+its creator.
+
+#### Surfaced anchor values
+
+Instead of collapsing everything into an opaque hash, each recursive proof surfaces the values the
+contract needs as **explicit public outputs**:
+
+| Recursive proof | Surfaced outputs                                                              | Contract action                     |
+| --------------- | ----------------------------------------------------------------------------- | ----------------------------------- |
+| DKG             | `sk_agg_commits[]`, `esm_agg_commits[]`, `party_ids[]`, `aggregated_pk_commit` | Stores at DKG completion            |
+| Decryption      | `expected_sk_commits[]`, `expected_esm_commits[]`                             | Checks against stored DKG values    |
+
+The decryption recursive proof is cryptographically bound to the DKG recursive proof through these
+surfaced values. The decryption proof's **C6** inputs depend on the secret-key and smudging-noise
+shares that each node aggregated during DKG (in **C4**), so the proof necessarily surfaces
+`expected_sk_commits[]` and `expected_esm_commits[]` as public outputs. The contract then checks
+that these match the `sk_agg_commits[]` and `esm_agg_commits[]` stored when the DKG proof was
+verified. If any value differs, the decryption proof is rejected. This binding means the two
+recursive proofs form a single verifiable chain: the DKG proof establishes the anchor commitments,
+and the decryption proof proves it operated on exactly those commitments.
+
+No explicit session identifier is needed. The surfaced commitments are session-specific by
+construction, derived from the secrets and parameters of this E3.
+
+#### Cross-circuit consistency inside ZK
+
+Instead of a single generic fold, each consecutive circuit pair in the chain gets a **specialised
+fold** that receives the linking fields as public inputs and asserts the required equalities inside
+the proof. For example, a fold spanning C1 to C2 asserts `C1.sk_commitment ==
+C2.expected_sk_commitment` and `C1.e_sm_commitment == C2.expected_e_sm_commitment`. For this to
+work, inner circuits expose the fields needed for linking (`pk_commitment` from C0,
+`sk_commitment` and `e_sm_commitment` from C1 and C4, `d_commitment` from C6) as direct public
+outputs rather than burying them inside opaque wrapper hashes. This turns cross-circuit consistency
+from an off-chain obligation into a cryptographic guarantee.
+
 ## Key terminology
 
 The same **BFV** ring arithmetic appears twice in the system: once for **individual** keys that
