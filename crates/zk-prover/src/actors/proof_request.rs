@@ -164,8 +164,6 @@ enum DecryptionProofKind {
 struct PendingDecryptionProofs {
     party_id: u64,
     node: String,
-    sk_poly_sum: ArcBytes,
-    es_poly_sum: Vec<ArcBytes>,
     ec: EventContext<Sequenced>,
     sk_proof: Option<Proof>,
     esm_proofs: HashMap<usize, Proof>,
@@ -572,8 +570,6 @@ impl ProofRequestActor {
             PendingDecryptionProofs {
                 party_id: msg.party_id,
                 node: msg.node,
-                sk_poly_sum: msg.sk_poly_sum,
-                es_poly_sum: msg.es_poly_sum,
                 ec: ec.clone(),
                 sk_proof: None,
                 esm_proofs: HashMap::new(),
@@ -753,8 +749,6 @@ impl ProofRequestActor {
                 e3_id: e3_id.clone(),
                 party_id: pending.party_id,
                 node: pending.node,
-                sk_poly_sum: pending.sk_poly_sum,
-                es_poly_sum: pending.es_poly_sum,
                 signed_sk_decryption_proof: signed_sk,
                 signed_e_sm_decryption_proofs: signed_esms,
                 external: false,

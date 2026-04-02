@@ -1884,17 +1884,6 @@ impl ThresholdKeyshare {
         let party_id = state.party_id;
         let node = state.address.clone();
 
-        let ready: ReadyForDecryption = state.clone().try_into()?;
-        let sk_poly_sum_bytes = ready.sk_poly_sum.access(&self.cipher)?;
-        let es_poly_sum_bytes: Vec<ArcBytes> = ready
-            .es_poly_sum
-            .iter()
-            .map(|s| {
-                let bytes = s.access(&self.cipher)?;
-                Ok(ArcBytes::from_bytes(&bytes))
-            })
-            .collect::<Result<_>>()?;
-
         info!(
             "Publishing DecryptionShareProofsPending for E3 {} party {} (1 SK + {} ESM requests)",
             e3_id,
@@ -1907,8 +1896,6 @@ impl ThresholdKeyshare {
                 e3_id: e3_id.clone(),
                 party_id,
                 node,
-                sk_poly_sum: ArcBytes::from_bytes(&sk_poly_sum_bytes),
-                es_poly_sum: es_poly_sum_bytes,
                 sk_request,
                 esm_requests,
             },
