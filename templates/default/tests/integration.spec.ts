@@ -191,9 +191,6 @@ describe('Integration', () => {
     const committeeSize = CommitteeSize.Micro
     const duration = 500
     const inputWindow = await calculateInputWindow(publicClient, duration)
-    const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
-    const e3ProgramParams = encodeBfvParams(thresholdBfvParams)
-
     const computeProviderParams = encodeComputeProviderParams(
       DEFAULT_COMPUTE_PROVIDER_PARAMS,
       true, // Mock the compute provider parameters, return 32 bytes of 0x00
@@ -207,7 +204,7 @@ describe('Integration', () => {
       committeeSize,
       inputWindow,
       e3Program: contracts.e3Program,
-      e3ProgramParams,
+      paramSet: 0, // ParamSet.Insecure512
       computeProviderParams,
       proofAggregationEnabled: false,
     }

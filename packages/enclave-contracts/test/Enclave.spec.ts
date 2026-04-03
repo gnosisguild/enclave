@@ -188,7 +188,6 @@ describe("Enclave", function () {
     const { enclave: _enclave } = await ignition.deploy(EnclaveModule, {
       parameters: {
         Enclave: {
-          params: encodedE3ProgramParams,
           owner: ownerAddress,
           maxDuration: THIRTY_DAYS_IN_SECONDS,
           registry: ciphernodeRegistryAddress,
@@ -243,7 +242,7 @@ describe("Enclave", function () {
       await ignition.deploy(MockE3ProgramModule);
 
     await enclave.enableE3Program(await e3Program.getAddress());
-    await enclave.setE3ProgramsParams([encodedE3ProgramParams]);
+    await enclave.setParamSet(0, encodedE3ProgramParams);
     await enclave.setDecryptionVerifier(
       encryptionSchemeId,
       await decryptionVerifier.getAddress(),
@@ -285,7 +284,7 @@ describe("Enclave", function () {
       committeeSize: 0, // Micro
       inputWindow: [now + 10, now + inputWindowDuration] as [number, number],
       e3Program: await e3Program.getAddress(),
-      e3ProgramParams: encodedE3ProgramParams,
+      paramSet: 0,
       computeProviderParams: abiCoder.encode(
         ["address"],
         [await decryptionVerifier.getAddress()],
@@ -406,48 +405,35 @@ describe("Enclave", function () {
     });
   });
 
-  describe("setE3ProgramsParams()", function () {
-    const encodedE3ProgramsParams = [encodedE3ProgramParams];
-
+  describe("setParamSet()", function () {
     it("reverts if not called by owner", async function () {
       const { enclave, notTheOwner } = await loadFixture(setup);
 
       await expect(
-        enclave
-          .connect(notTheOwner)
-          .setE3ProgramsParams(encodedE3ProgramsParams),
+        enclave.connect(notTheOwner).setParamSet(0, encodedE3ProgramParams),
       )
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
 
-    it("sets E3 program parameters correctly", async function () {
+    it("registers param set and emits event", async function () {
       const { enclave } = await loadFixture(setup);
 
-      await enclave.setE3ProgramsParams(encodedE3ProgramsParams);
-      expect(await enclave.e3ProgramsParams(encodedE3ProgramsParams[0]!)).to.be
-        .true;
-    });
+      await expect(enclave.setParamSet(1, encodedE3ProgramParams))
+        .to.emit(enclave, "ParamSetRegistered")
+        .withArgs(1, encodedE3ProgramParams);
 
-    it("emits AllowedE3ProgramsParamsSet event", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      await expect(enclave.setE3ProgramsParams(encodedE3ProgramsParams))
-        .to.emit(enclave, "AllowedE3ProgramsParamsSet")
-        .withArgs(encodedE3ProgramsParams);
-    });
-
-    it("handles multiple parameters", async function () {
-      const { enclave } = await loadFixture(setup);
-      encodedE3ProgramsParams.push(
-        "0x0000000000000000000000000000000000000000000000000000000000000001",
+      expect(await enclave.paramSetRegistry(1)).to.equal(
+        encodedE3ProgramParams,
       );
+    });
 
-      await enclave.setE3ProgramsParams(encodedE3ProgramsParams);
+    it("reverts with empty params", async function () {
+      const { enclave } = await loadFixture(setup);
 
-      for (const param of encodedE3ProgramsParams) {
-        expect(await enclave.e3ProgramsParams(param)).to.be.true;
-      }
+      await expect(enclave.setParamSet(0, "0x")).to.be.revertedWith(
+        "Empty params",
+      );
     });
   });
 
@@ -467,7 +453,7 @@ describe("Enclave", function () {
         committeeSize: request.committeeSize,
         inputWindow: request.inputWindow,
         e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
+        paramSet: request.paramSet,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
         proofAggregationEnabled: false,
@@ -479,7 +465,7 @@ describe("Enclave", function () {
       expect(e3.inputWindow[0]).to.equal(request.inputWindow[0]);
       expect(e3.inputWindow[1]).to.equal(request.inputWindow[1]);
       expect(e3.e3Program).to.equal(request.e3Program);
-      expect(e3.e3ProgramParams).to.equal(request.e3ProgramParams);
+      expect(e3.paramSet).to.equal(request.paramSet);
       expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.computeProviderParams)[0],
       );
@@ -671,7 +657,7 @@ describe("Enclave", function () {
           committeeSize: request.committeeSize,
           inputWindow: request.inputWindow,
           e3Program: request.e3Program,
-          e3ProgramParams: request.e3ProgramParams,
+          paramSet: request.paramSet,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
           proofAggregationEnabled: false,
@@ -686,7 +672,7 @@ describe("Enclave", function () {
           committeeSize: 3,
           inputWindow: request.inputWindow,
           e3Program: request.e3Program,
-          e3ProgramParams: request.e3ProgramParams,
+          paramSet: request.paramSet,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
           proofAggregationEnabled: false,
@@ -706,7 +692,7 @@ describe("Enclave", function () {
             request.inputWindow[1] + time.duration.days(31),
           ],
           e3Program: request.e3Program,
-          e3ProgramParams: request.e3ProgramParams,
+          paramSet: request.paramSet,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
           proofAggregationEnabled: false,
@@ -721,7 +707,7 @@ describe("Enclave", function () {
           committeeSize: request.committeeSize,
           inputWindow: request.inputWindow,
           e3Program: ethers.ZeroAddress,
-          e3ProgramParams: request.e3ProgramParams,
+          paramSet: request.paramSet,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
           proofAggregationEnabled: false,
@@ -738,7 +724,7 @@ describe("Enclave", function () {
           committeeSize: request.committeeSize,
           inputWindow: request.inputWindow,
           e3Program: request.e3Program,
-          e3ProgramParams: request.e3ProgramParams,
+          paramSet: request.paramSet,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
           proofAggregationEnabled: false,
@@ -754,7 +740,7 @@ describe("Enclave", function () {
         committeeSize: request.committeeSize,
         inputWindow: request.inputWindow,
         e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
+        paramSet: request.paramSet,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
         proofAggregationEnabled: false,
@@ -781,7 +767,7 @@ describe("Enclave", function () {
         committeeSize: request.committeeSize,
         inputWindow: request.inputWindow,
         e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
+        paramSet: request.paramSet,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
         proofAggregationEnabled: false,
@@ -819,7 +805,7 @@ describe("Enclave", function () {
         committeeSize: request.committeeSize,
         inputWindow: request.inputWindow,
         e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
+        paramSet: request.paramSet,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
         proofAggregationEnabled: false,
@@ -894,7 +880,7 @@ describe("Enclave", function () {
         committeeSize: request.committeeSize,
         inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
         e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
+        paramSet: request.paramSet,
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
         proofAggregationEnabled: false,

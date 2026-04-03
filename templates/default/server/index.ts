@@ -18,7 +18,7 @@ import { MyProgram__factory } from '../types/factories/contracts'
 interface E3Session {
   e3Id: bigint
   expiration: bigint
-  e3ProgramParams?: string
+  paramSet?: number
   inputs: Array<{ data: string; index: bigint }>
   isProcessing: boolean
   isCompleted: boolean
@@ -67,18 +67,31 @@ async function runProgram(e3Id: bigint): Promise<void> {
       return
     }
 
-    let e3ProgramParams = session.e3ProgramParams
-    if (!e3ProgramParams) {
-      const sdk = await createPrivateSDK()
-      const e3Details = await sdk.getE3(e3Id)
-      e3ProgramParams = e3Details.e3ProgramParams
-      session.e3ProgramParams = e3ProgramParams
-    }
+    // Look up the encoded params from the on-chain paramSetRegistry
+    const sdk = await createPrivateSDK()
+    const e3Details = await sdk.getE3(e3Id)
+    const paramSetId = e3Details.paramSet
+    const publicClient = sdk.getPublicClient()
+    const { ENCLAVE_CONTRACT } = getCheckedEnvVars()
+    const e3ProgramParams = (await publicClient.readContract({
+      address: ENCLAVE_CONTRACT as `0x${string}`,
+      abi: [
+        {
+          name: 'paramSetRegistry',
+          type: 'function',
+          stateMutability: 'view',
+          inputs: [{ name: '', type: 'uint8' }],
+          outputs: [{ name: '', type: 'bytes' }],
+        },
+      ],
+      functionName: 'paramSetRegistry',
+      args: [paramSetId],
+    })) as string
 
     const ciphertextInputs: Array<[string, number]> = session.inputs.map((input) => [input.data, Number(input.index)])
 
     console.log(`🔄 Calling FHE runner for E3 ${e3Id}...`)
-    await callFheRunner(e3Id, e3ProgramParams!, ciphertextInputs)
+    await callFheRunner(e3Id, e3ProgramParams, ciphertextInputs)
 
     console.log(`✅ E3 ${e3Id} sent to FHE runner - awaiting callback`)
   } catch (error) {
@@ -140,7 +153,7 @@ async function handleCommitteePublishedEvent(event: any) {
   if (!e3Sessions.has(e3Id.toString())) {
     e3Sessions.set(e3Id.toString(), {
       e3Id,
-      e3ProgramParams: e3.e3ProgramParams,
+      paramSet: e3.paramSet,
       expiration,
       inputs: [],
       isProcessing: false,

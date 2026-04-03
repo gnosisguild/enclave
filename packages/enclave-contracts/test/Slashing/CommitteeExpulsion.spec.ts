@@ -194,7 +194,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     const { enclave: _enclave } = await ignition.deploy(EnclaveModule, {
       parameters: {
         Enclave: {
-          params: encodedE3ProgramParams,
           owner: ownerAddress,
           maxDuration: THIRTY_DAYS,
           registry: registryAddress,
@@ -232,6 +231,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     await registry.setSlashingManager(await slashingManager.getAddress());
 
     await enclave.enableE3Program(await e3Program.getAddress());
+    await enclave.setParamSet(0, encodedE3ProgramParams);
     await enclave.setDecryptionVerifier(
       encryptionSchemeId,
       await decryptionVerifier.getAddress(),
@@ -315,7 +315,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         committeeSize,
         inputWindow: [startTime + 100, startTime + ONE_DAY] as [number, number],
         e3Program: await e3Program.getAddress(),
-        e3ProgramParams: encodedE3ProgramParams,
+        paramSet: 0,
         computeProviderParams: abiCoder.encode(
           ["address"],
           [await decryptionVerifier.getAddress()],

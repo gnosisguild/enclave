@@ -23,21 +23,14 @@ pub struct ThresholdKeyshareExtension {
     bus: BusHandle,
     cipher: Arc<Cipher>,
     address: String,
-    share_enc_preset: BfvPreset,
 }
 
 impl ThresholdKeyshareExtension {
-    pub fn create(
-        bus: &BusHandle,
-        cipher: &Arc<Cipher>,
-        address: &str,
-        share_enc_preset: BfvPreset,
-    ) -> Box<Self> {
+    pub fn create(bus: &BusHandle, cipher: &Arc<Cipher>, address: &str) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             cipher: cipher.to_owned(),
             address: address.to_owned(),
-            share_enc_preset,
         })
     }
 }
@@ -84,7 +77,10 @@ impl E3Extension for ThresholdKeyshareExtension {
                     bus: self.bus.clone(),
                     cipher: self.cipher.clone(),
                     state: container,
-                    share_enc_preset: self.share_enc_preset,
+                    share_enc_preset: meta
+                        .params_preset
+                        .dkg_counterpart()
+                        .unwrap_or(meta.params_preset),
                 })
                 .start()
                 .into(),
@@ -109,12 +105,18 @@ impl E3Extension for ThresholdKeyshareExtension {
             return Ok(());
         };
 
+        // Derive DKG preset from persisted E3Meta
+        let share_enc_preset = ctx
+            .get_dependency(META_KEY)
+            .and_then(|meta| meta.params_preset.dkg_counterpart())
+            .unwrap_or(BfvPreset::InsecureThreshold512);
+
         // Construct from snapshot
         let value = ThresholdKeyshare::new(ThresholdKeyshareParams {
             bus: self.bus.clone(),
             cipher: self.cipher.clone(),
             state,
-            share_enc_preset: self.share_enc_preset,
+            share_enc_preset,
         })
         .start()
         .into();

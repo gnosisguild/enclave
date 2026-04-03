@@ -9,6 +9,7 @@ repository = "https://github.com/gnosisguild/enclave/crates/request"
 [dependencies]
 actix = { workspace = true }
 e3-events = { workspace = true }
+e3-fhe-params = { workspace = true }
 e3-data = { workspace = true}
 e3-utils = { workspace = true}
 anyhow = { workspace = true }

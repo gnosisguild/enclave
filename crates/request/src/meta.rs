@@ -9,6 +9,7 @@ use anyhow::*;
 use async_trait::async_trait;
 use e3_data::RepositoriesFactory;
 use e3_events::{E3Requested, EnclaveEvent, EnclaveEventData, Event, Seed};
+use e3_fhe_params::BfvPreset;
 use e3_utils::utility_types::ArcBytes;
 
 pub const META_KEY: TypedKey<E3Meta> = TypedKey::new("meta");
@@ -18,6 +19,7 @@ pub struct E3Meta {
     pub threshold_m: usize,
     pub threshold_n: usize,
     pub seed: Seed,
+    pub params_preset: BfvPreset,
     pub params: ArcBytes,
     pub esi_per_ct: usize,
     pub error_size: ArcBytes,
@@ -43,6 +45,7 @@ impl E3Extension for E3MetaExtension {
             threshold_n,
             seed,
             e3_id,
+            params_preset,
             params,
             esi_per_ct,
             error_size,
@@ -55,6 +58,7 @@ impl E3Extension for E3MetaExtension {
             threshold_m,
             threshold_n,
             seed,
+            params_preset,
             params,
             esi_per_ct,
             error_size,

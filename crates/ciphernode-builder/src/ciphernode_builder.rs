@@ -23,7 +23,6 @@ use e3_evm::{
     SlashingManagerSolWriter,
 };
 use e3_fhe::ext::FheExtension;
-use e3_fhe_params::{BfvPreset, DEFAULT_BFV_PRESET};
 use e3_keyshare::ext::ThresholdKeyshareExtension;
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
 use e3_net::{
@@ -466,11 +465,6 @@ impl CiphernodeBuilder {
 
         if let Some(KeyshareKind::Threshold) = self.keyshare {
             let _ = self.ensure_multithread(&bus);
-            // TODO: Make BfvPreset configurable via builder method (e.g., with_share_enc_preset())
-            // Currently hardcoded to InsecureDkg512 for DKG operations.
-            // Production deployments should use BfvPreset::SecureDkg8192.
-            let share_enc_preset = BfvPreset::InsecureDkg512;
-
             let backend = self
                 .zk_backend
                 .as_ref()
@@ -486,7 +480,6 @@ impl CiphernodeBuilder {
                 &bus,
                 &self.cipher,
                 &addr,
-                share_enc_preset,
             ));
 
             info!("Setting up ZK actors");
@@ -502,14 +495,7 @@ impl CiphernodeBuilder {
             info!("Setting up PublicKeyAggregationExtension");
             // Ensure multithread worker is available for C1 verification and C5 proof generation
             let _ = self.ensure_multithread(&bus);
-            // TODO: Make BfvPreset configurable via builder method.
-            // Currently hardcoded to InsecureThreshold512 for C5 proof generation.
-            // Production deployments should use the appropriate threshold preset.
-            let aggregator_preset = DEFAULT_BFV_PRESET;
-            e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(
-                &bus,
-                aggregator_preset,
-            ));
+            e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(&bus));
 
             if self.keyshare.is_none() {
                 let backend = self
@@ -525,11 +511,8 @@ impl CiphernodeBuilder {
         if self.threshold_plaintext_agg {
             info!("Setting up ThresholdPlaintextAggregatorExtension");
             let _ = self.ensure_multithread(&bus);
-            let aggregator_preset = DEFAULT_BFV_PRESET;
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
-                &bus,
-                &sortition,
-                aggregator_preset,
+                &bus, &sortition,
             ))
         }
 

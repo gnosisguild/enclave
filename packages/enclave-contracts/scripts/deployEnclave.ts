@@ -146,7 +146,6 @@ export const deployEnclave = async (
 
   console.log("Deploying Enclave...");
   const { enclave } = await deployAndSaveEnclave({
-    params: [encoded],
     owner: ownerAddress,
     maxDuration: THIRTY_DAYS_IN_SECONDS.toString(),
     registry: ciphernodeRegistryAddress,
@@ -230,6 +229,11 @@ export const deployEnclave = async (
   await enclave.setCommitteeThresholds(1, [2, 5]);
   // Medium and Large can be set later as needed
   console.log("Committee thresholds set (Micro=[1,3], Small=[2,5])");
+
+  // Register BFV param sets
+  console.log("Registering BFV param sets...");
+  await enclave.setParamSet(0, encoded); // ParamSet.Insecure512
+  console.log("ParamSet.Insecure512 registered");
 
   const encryptionSchemeId = ethers.keccak256(ethers.toUtf8Bytes("fhe.rs:BFV"));
 

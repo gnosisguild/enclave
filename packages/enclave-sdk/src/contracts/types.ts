@@ -17,6 +17,11 @@ export enum CommitteeSize {
   Large = 3,
 }
 
+export enum ParamSet {
+  Insecure512 = 0,
+  Secure8192 = 1,
+}
+
 export interface E3 {
   seed: bigint
   committeeSize: number
@@ -24,7 +29,7 @@ export interface E3 {
   inputWindow: readonly [bigint, bigint]
   encryptionSchemeId: string
   e3Program: string
-  e3ProgramParams: string
+  paramSet: number
   decryptionVerifier: string
   committeePublicKey: string
   ciphertextOutput: string
@@ -39,7 +44,7 @@ export interface E3RequestParams extends RequestParams {
   committeeSize: number
   inputWindow: readonly [bigint, bigint]
   e3Program: `0x${string}`
-  e3ProgramParams: `0x${string}`
+  paramSet: number
   computeProviderParams: `0x${string}`
   customParams?: `0x${string}`
   /** When true, ciphernodes generate wrapper/fold proofs for DKG proof aggregation.

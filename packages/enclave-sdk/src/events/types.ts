@@ -16,7 +16,7 @@ export enum EnclaveEventType {
   ENCRYPTION_SCHEME_DISABLED = 'EncryptionSchemeDisabled',
   CIPHERNODE_REGISTRY_SET = 'CiphernodeRegistrySet',
   MAX_DURATION_SET = 'MaxDurationSet',
-  ALLOWED_E3_PROGRAMS_PARAMS_SET = 'AllowedE3ProgramsParamsSet',
+  PARAM_SET_REGISTERED = 'ParamSetRegistered',
   OWNERSHIP_TRANSFERRED = 'OwnershipTransferred',
   INITIALIZED = 'Initialized',
 }
@@ -41,7 +41,7 @@ export interface E3RequestedData {
     inputWindow: readonly [bigint, bigint]
     encryptionSchemeId: string
     e3Program: string
-    e3ProgramParams: string
+    paramSet: number
     decryptionVerifier: string
     committeePublicKey: string
     ciphertextOutput: string
@@ -113,7 +113,7 @@ export interface EnclaveEventData {
   [EnclaveEventType.ENCRYPTION_SCHEME_DISABLED]: { encryptionSchemeId: string }
   [EnclaveEventType.CIPHERNODE_REGISTRY_SET]: { ciphernodeRegistry: string }
   [EnclaveEventType.MAX_DURATION_SET]: { maxDuration: bigint }
-  [EnclaveEventType.ALLOWED_E3_PROGRAMS_PARAMS_SET]: { e3ProgramParams: string[] }
+  [EnclaveEventType.PARAM_SET_REGISTERED]: { paramSet: number; encodedParams: string }
   [EnclaveEventType.OWNERSHIP_TRANSFERRED]: { previousOwner: string; newOwner: string }
   [EnclaveEventType.INITIALIZED]: { version: bigint }
 }
