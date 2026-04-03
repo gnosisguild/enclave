@@ -1443,7 +1443,7 @@ fn handle_decrypted_shares_aggregation_proof(
         proofs.push(proof);
     }
 
-    // 4. Return response
+    // 5. Return response
     Ok(ComputeResponse::zk(
         ZkResponse::DecryptedSharesAggregation(DecryptedSharesAggregationProofResponse { proofs }),
         request.correlation_id,
