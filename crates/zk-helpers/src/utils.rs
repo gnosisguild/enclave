@@ -15,11 +15,13 @@
 
 use ark_bn254::Fr as Field;
 use ark_bn254::Fr as FieldElement;
+use ark_ff::BigInteger;
 use ark_ff::PrimeField;
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_safe::SafeSponge;
 use fhe::bfv::BfvParameters;
 use num_bigint::BigInt;
+use num_bigint::Sign;
 use num_traits::{ToPrimitive, Zero};
 use std::fmt::Display;
 use std::str::FromStr;
@@ -207,12 +209,18 @@ pub fn get_zkp_modulus() -> BigInt {
     .expect("Invalid ZKP modulus")
 }
 
-/// Converts a BigInt to a JSON value: number when it fits in i64 (preserves sign), else string.
+/// Converts a BigInt to a JSON value for Noir witness ABI: canonical field element in `[0, p)`,
+/// as a JSON number when it fits in `i64`, else decimal string. Never emits negative numbers
+/// (noirc rejects signed integers for `Field` inputs).
 pub fn bigint_to_json_value(n: &BigInt) -> serde_json::Value {
-    n.to_i64()
+    let field_val = bigint_to_field(n);
+    let bytes = field_val.into_bigint().to_bytes_le();
+    let canonical = BigInt::from_bytes_le(Sign::Plus, &bytes);
+    canonical
+        .to_i64()
         .map(serde_json::Number::from)
         .map(serde_json::Value::Number)
-        .unwrap_or_else(|| serde_json::Value::String(n.to_string()))
+        .unwrap_or_else(|| serde_json::Value::String(canonical.to_string()))
 }
 
 /// Poly-with-coefficients shape for TOML JSON: `{"coefficients": [number|string, ...]}`.
@@ -296,6 +304,18 @@ mod tests {
         let value = BigInt::from(-1);
         let expected = bigint_to_field(&(modulus - BigInt::from(1)));
         assert_eq!(bigint_to_field(&value), expected);
+    }
+
+    #[test]
+    fn bigint_to_json_value_never_emits_negative_for_field_witness() {
+        let neg = BigInt::from(-13449214110323435_i64);
+        let v = bigint_to_json_value(&neg);
+        let as_text = match v {
+            serde_json::Value::Number(n) => n.to_string(),
+            serde_json::Value::String(s) => s,
+            _ => panic!("expected number or string"),
+        };
+        assert!(!as_text.starts_with('-'));
     }
 
     #[test]
