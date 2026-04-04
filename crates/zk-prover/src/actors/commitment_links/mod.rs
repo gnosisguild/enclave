@@ -13,6 +13,7 @@
 //! evaluates these links as verified proofs arrive.
 
 pub mod c0_to_c3;
+pub mod c1_to_c2;
 pub mod c1_to_c5;
 pub mod c2_to_c3;
 pub mod c2_to_c4;
@@ -94,12 +95,10 @@ pub trait CommitmentLink: Send + Sync {
 
 /// Returns the default set of commitment links to register.
 ///
-/// C4→C6 links are disabled: the C4 Noir circuit and C6 Rust code compute
-/// `compute_aggregated_shares_commitment` from incompatible representations
-/// of the same aggregated polynomial (unreduced/uncentered/non-reversed vs
-/// reduced/centered/reversed, plus different BIT parameters). See test
-/// `c4_c6_commitment_mismatch_due_to_modular_reduction` in `c4a_to_c6.rs`.
-/// Re-enable after aligning the commitment computation (circuit change needed).
+/// C4→C6 links verify that C4's aggregated share commitment matches C6's
+/// `expected_sk_commitment` / `expected_e_sm_commitment`. The C4 circuit
+/// normalizes its aggregated polynomial (reverse + center per CRT modulus)
+/// before hashing, matching the representation C6's Rust witness computes.
 ///
 /// C3→C4 links are replaced by C2→C4: C2 directly outputs share commitments
 /// that C4 consumes as `expected_commitments`. Since C2→C3 already ensures
@@ -110,13 +109,15 @@ pub fn default_links() -> Vec<Box<dyn CommitmentLink>> {
     vec![
         Box::new(c0_to_c3::C3aToC0PkCommitmentLink),
         Box::new(c0_to_c3::C3bToC0PkCommitmentLink),
+        Box::new(c1_to_c2::C1ToC2aSkCommitmentLink),
+        Box::new(c1_to_c2::C1ToC2bESmCommitmentLink),
         Box::new(c1_to_c5::C1ToC5PkCommitmentLink),
         Box::new(c2_to_c3::C3aToC2aShareEncryptionLink),
         Box::new(c2_to_c3::C3bToC2bShareEncryptionLink),
         Box::new(c2_to_c4::C2aToC4aShareCommitmentLink { l }),
         Box::new(c2_to_c4::C2bToC4bShareCommitmentLink { l }),
         Box::new(c6_to_c7::C6ToC7DCommitmentLink),
-        // Box::new(c4a_to_c6::C4aToC6SkCommitmentLink),
-        // Box::new(c4b_to_c6::C4bToC6ESmCommitmentLink),
+        Box::new(c4a_to_c6::C4aToC6SkCommitmentLink),
+        Box::new(c4b_to_c6::C4bToC6ESmCommitmentLink),
     ]
 }
