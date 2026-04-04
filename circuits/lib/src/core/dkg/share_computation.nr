@@ -194,7 +194,11 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
                 // Reverse: position i gets the coefficient from N-1-i.
                 let c = self.e_sm_secret[j].coefficients[N - 1 - i];
                 // Center: shift [0, q) to [-(q-1)/2, (q-1)/2].
-                let centered = if (c as u128) > (half as u128) { c - q } else { c };
+                let centered = if (c as u128) > (half as u128) {
+                    c - q
+                } else {
+                    c
+                };
                 coeffs[i] = centered;
             }
             normalized[j] = Polynomial::new(coeffs);
