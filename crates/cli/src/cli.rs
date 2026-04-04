@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::ciphernode::{self, ChainArgs, CiphernodeCommands};
+use crate::config::{self, ConfigCommands};
 use crate::events::{self, EventsCommands};
 use crate::helpers::telemetry::{setup_simple_tracing, setup_tracing};
 use crate::net::{self, NetCommands};
@@ -184,6 +185,7 @@ impl Cli {
             Commands::Net { command } => net::execute(&out, command, &config).await?,
             Commands::Events { command } => events::execute(out, command, &config).await?,
             Commands::Rev => rev::execute(out).await?,
+            Commands::Config { command } => config::execute(out, command, &config).await?,
         }
 
         close_all_connections();
@@ -304,6 +306,12 @@ pub enum Commands {
     Events {
         #[command(subcommand)]
         command: EventsCommands,
+    },
+
+    /// Get config values
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommands,
     },
 }
 
