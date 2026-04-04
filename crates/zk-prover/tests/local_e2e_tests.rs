@@ -25,7 +25,7 @@ use common::{
 };
 use e3_events::CircuitName;
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
-use e3_polynomial::CrtPolynomial;
+use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
 use e3_zk_helpers::circuits::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;
@@ -86,6 +86,33 @@ fn aggregate_dkg_decrypted_shares_to_crt(
         limb_vecs.push(coeffs);
     }
     CrtPolynomial::from_bigint_vectors(limb_vecs)
+}
+
+/// Normalize an aggregated DKG CrtPolynomial to match C4's output representation.
+///
+/// C4 normalizes aggregated shares (which sum to `[0, H*q_l)`) before hashing:
+///   1. Reduce each coefficient mod q_l → `[0, q_l)`
+///   2. Reverse each limb (high-degree first)
+///   3. Center each limb → `[-(q_l-1)/2, (q_l-1)/2]`
+///
+/// This is the same normalization C6 applies to `s` (already `[0, q_l)`) before
+/// calling `compute_aggregated_shares_commitment`, so after this C4 and C6 hash
+/// the same representation.
+fn normalize_crt_for_commitment(crt: &CrtPolynomial, moduli: &[u64]) -> CrtPolynomial {
+    let normalized: Vec<Polynomial> = crt
+        .limbs
+        .iter()
+        .zip(moduli.iter())
+        .map(|(limb, &qi)| {
+            let q = num_bigint::BigInt::from(qi);
+            let mut l = limb.clone();
+            l.reduce(&q);
+            l.reverse();
+            l.center(&q);
+            l
+        })
+        .collect();
+    CrtPolynomial::new(normalized)
 }
 
 fn bigint_to_field_bytes32(b: &num_bigint::BigInt) -> [u8; 32] {
@@ -745,14 +772,19 @@ async fn test_c4_sk_commitment_is_c6_expected_sk_input_e2e() {
         .extract_field(&c6_proof.public_signals, "expected_sk_commitment")
         .expect("C6 proof must expose expected_sk_commitment at public inputs");
 
+    let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
     let dkg_out = DkgShareDecryptionCircuit::compute(preset, &dkg_sample).unwrap();
     let aggregated = aggregate_dkg_decrypted_shares_to_crt(&dkg_out.inputs.decrypted_shares);
-    let expected_c4 = compute_aggregated_shares_commitment(&aggregated, dkg_out.bits.agg_bit);
+    // C4 normalizes (reduce + reverse + center) before hashing; apply the same here.
+    let aggregated_normalized =
+        normalize_crt_for_commitment(&aggregated, threshold_params.moduli());
+    let expected_c4 =
+        compute_aggregated_shares_commitment(&aggregated_normalized, dkg_out.bits.agg_bit);
     let c4_from_proof =
         num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, c4_commitment_bytes);
     assert_eq!(
         c4_from_proof, expected_c4,
-        "C4 commitment output must match compute_aggregated_shares_commitment on aggregated DKG shares"
+        "C4 commitment output must match compute_aggregated_shares_commitment on normalized aggregated DKG shares"
     );
 
     let c6_out = ThresholdShareDecryptionCircuit::compute(preset, &c6_sample).unwrap();
@@ -843,10 +875,13 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
     let c4_big = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, c4_commitment);
     let c6_big = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, c6_expected_sk);
 
-    let expected_c4_hash = compute_aggregated_shares_commitment(&agg_sk, dkg_out.bits.agg_bit);
+    // C4 normalizes (reduce + reverse + center) before hashing; apply the same here.
+    let agg_sk_normalized = normalize_crt_for_commitment(&agg_sk, threshold_params.moduli());
+    let expected_c4_hash =
+        compute_aggregated_shares_commitment(&agg_sk_normalized, dkg_out.bits.agg_bit);
     assert_eq!(
         c4_big, expected_c4_hash,
-        "C4 commitment must match hash(agg_sk) with DKG agg_bit (BIT_AGG)"
+        "C4 commitment must match hash(normalized agg_sk) with DKG agg_bit (BIT_AGG)"
     );
 
     let c6_out = ThresholdShareDecryptionCircuit::compute(preset, &c6_sample).unwrap();
