@@ -201,9 +201,12 @@ gracefull_shutdown() {
 }
 
 daemon_query_events() {
-  local ctrl_port="${1:50505}"
+  local name="$1"
   local output_file="${2:-$SCRIPT_DIR/output/events.txt}"
 
+  local ctrl_port=$($ENCLAVE_BIN config get ctrl_port \
+    --name $name \
+    --config "$SCRIPT_DIR/enclave.config.yaml")
 
   local json_payload='{"command":{"EventsQuery":{"since":0,"limit":100}}}'
 
@@ -211,7 +214,7 @@ daemon_query_events() {
     -H "Content-Type: application/json" \
     -d "$json_payload" > "$output_file"
 
-  echo "Events written to: $output_file"
+  echo "Events from $name written to: $output_file"
 }
 
 # Run this at the start of every test to ensure we start with a clean slate

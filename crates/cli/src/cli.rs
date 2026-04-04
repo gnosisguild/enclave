@@ -343,6 +343,9 @@ pub enum RemoteCommand {
         vite: bool,
         chain: String,
     },
+    ConfigGet {
+        param: Option<String>,
+    },
 }
 
 impl TryFrom<Commands> for RemoteCommand {
@@ -367,6 +370,9 @@ impl TryFrom<Commands> for RemoteCommand {
             Commands::Wallet {
                 command: WalletCommands::Get,
             } => Ok(RemoteCommand::WalletGet),
+            Commands::Config {
+                command: ConfigCommands::Get { param },
+            } => Ok(RemoteCommand::ConfigGet { param }),
             _ => bail!("Command not allowed while node is running."),
         }
     }
@@ -420,6 +426,9 @@ impl TryFrom<RemoteCommand> for Commands {
             },
             RemoteCommand::EventsQuery { agg, since, limit } => Commands::Events {
                 command: EventsCommands::Query { agg, since, limit },
+            },
+            RemoteCommand::ConfigGet { param } => Commands::Config {
+                command: ConfigCommands::Get { param },
             },
         };
         // We might have to hold this stuff on RemoteCommand

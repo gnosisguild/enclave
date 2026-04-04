@@ -79,7 +79,7 @@ pnpm committee:new \
 waiton "$SCRIPT_DIR/output/pubkey.bin" 2000
 
 heading "Query events via daemon REST API"
-daemon_query_events 50506 "$SCRIPT_DIR/output/events.txt"
+daemon_query_events ag "$SCRIPT_DIR/output/events.txt"
 
 heading "Mock encrypted plaintext"
 $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
