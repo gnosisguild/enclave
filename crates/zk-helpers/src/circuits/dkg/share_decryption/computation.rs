@@ -331,8 +331,12 @@ mod tests {
             for mod_idx in 0..threshold_l {
                 let decrypted_pt = sample.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
                 let share_coeffs = decrypted_pt.value.deref().to_vec();
+                // Reverse to match Inputs::compute, which reverses before committing to align
+                // with C2's commit_to_party_shares (highest-degree-first convention).
+                let mut reversed = share_coeffs.clone();
+                reversed.reverse();
                 let direct_commitment = compute_share_encryption_commitment_from_message(
-                    &Polynomial::from_u64_vector(share_coeffs),
+                    &Polynomial::from_u64_vector(reversed),
                     msg_bit,
                 );
                 assert_eq!(
