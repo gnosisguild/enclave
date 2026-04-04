@@ -40,9 +40,6 @@ pub async fn execute(out: Console, command: ConfigCommands, config: &AppConfig) 
                 log!(out, "{}", addr);
             }
         }
-        Some("role") => {
-            log!(out, "{:?}", config.role());
-        }
         Some("autonetkey") => {
             log!(out, "{}", config.autonetkey());
         }
@@ -97,7 +94,6 @@ pub async fn execute(out: Console, command: ConfigCommands, config: &AppConfig) 
             log!(out, "quic_port: {}", config.quic_port());
             log!(out, "ctrl_port: {}", config.ctrl_port());
             log!(out, "address: {:?}", config.address());
-            log!(out, "role: {:?}", config.role());
             log!(out, "autonetkey: {}", config.autonetkey());
             log!(out, "autopassword: {}", config.autopassword());
             log!(out, "autowallet: {}", config.autowallet());
