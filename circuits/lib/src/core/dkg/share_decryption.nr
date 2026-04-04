@@ -52,9 +52,16 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32, let BIT_AGG: u32> Sha
     fn verify_commitments(self) {
         for party_idx in 0..H {
             for mod_idx in 0..L {
+                // Reverse the share polynomial to match the commitment format used by C2's
+                // commit_to_party_shares, which stores coefficients highest-degree-first.
+                let share = self.decrypted_shares[party_idx][mod_idx];
+                let mut reversed_coeffs: [Field; N] = [0; N];
+                for i in 0..N {
+                    reversed_coeffs[N - 1 - i] = share.coefficients[i];
+                }
                 assert(
                     compute_share_encryption_commitment_from_message::<N, BIT_MSG>(
-                        self.decrypted_shares[party_idx][mod_idx],
+                        Polynomial::new(reversed_coeffs),
                     )
                         == self.expected_commitments[party_idx][mod_idx],
                     "Commitment mismatch",

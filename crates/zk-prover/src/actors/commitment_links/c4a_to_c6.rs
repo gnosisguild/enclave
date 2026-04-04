@@ -42,11 +42,7 @@ impl CommitmentLink for C4aToC6SkCommitmentLink {
         vec![value]
     }
 
-    fn check_consistency(
-        &self,
-        source_values: &[FieldValue],
-        target_public_signals: &[u8],
-    ) -> bool {
+    fn check_signals(&self, source_values: &[FieldValue], target_public_signals: &[u8]) -> bool {
         if source_values.is_empty() {
             return false;
         }
@@ -88,7 +84,7 @@ mod tests {
         c6_signals.extend_from_slice(&sk_commitment);
         c6_signals.extend_from_slice(&make_field(99));
 
-        assert!(link.check_consistency(&source_values, &c6_signals));
+        assert!(link.check_signals(&source_values, &c6_signals));
     }
 
     #[test]
@@ -101,7 +97,7 @@ mod tests {
         c6_signals.extend_from_slice(&make_field(99));
         c6_signals.extend_from_slice(&make_field(99));
 
-        assert!(!link.check_consistency(&source_values, &c6_signals));
+        assert!(!link.check_signals(&source_values, &c6_signals));
     }
 
     #[test]
@@ -109,6 +105,6 @@ mod tests {
         let link = C4aToC6SkCommitmentLink;
         assert!(link.extract_source_values(&[0u8; 10]).is_empty());
         // Empty source values means malformed proof — should be inconsistent
-        assert!(!link.check_consistency(&[], &[0u8; 64]));
+        assert!(!link.check_signals(&[], &[0u8; 64]));
     }
 }

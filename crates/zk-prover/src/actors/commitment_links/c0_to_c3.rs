@@ -49,11 +49,7 @@ impl CommitmentLink for C3aToC0PkCommitmentLink {
         extract_expected_pk_commitment(public_signals)
     }
 
-    fn check_consistency(
-        &self,
-        source_values: &[FieldValue],
-        target_public_signals: &[u8],
-    ) -> bool {
+    fn check_signals(&self, source_values: &[FieldValue], target_public_signals: &[u8]) -> bool {
         check_pk_exists_in_c0(source_values, target_public_signals)
     }
 }
@@ -82,11 +78,7 @@ impl CommitmentLink for C3bToC0PkCommitmentLink {
         extract_expected_pk_commitment(public_signals)
     }
 
-    fn check_consistency(
-        &self,
-        source_values: &[FieldValue],
-        target_public_signals: &[u8],
-    ) -> bool {
+    fn check_signals(&self, source_values: &[FieldValue], target_public_signals: &[u8]) -> bool {
         check_pk_exists_in_c0(source_values, target_public_signals)
     }
 }
@@ -154,7 +146,7 @@ mod tests {
         let pk = make_field(42);
         let source_values = vec![pk];
         let target = c0_signals(pk);
-        assert!(link.check_consistency(&source_values, &target));
+        assert!(link.check_signals(&source_values, &target));
     }
 
     #[test]
@@ -162,7 +154,7 @@ mod tests {
         let link = C3aToC0PkCommitmentLink;
         let source_values = vec![make_field(42)];
         let target = c0_signals(make_field(99));
-        assert!(!link.check_consistency(&source_values, &target));
+        assert!(!link.check_signals(&source_values, &target));
     }
 
     #[test]
@@ -171,7 +163,7 @@ mod tests {
         let pk = make_field(7);
         let source_values = vec![pk];
         let target = c0_signals(pk);
-        assert!(link.check_consistency(&source_values, &target));
+        assert!(link.check_signals(&source_values, &target));
     }
 
     #[test]
@@ -179,19 +171,19 @@ mod tests {
         let link = C3bToC0PkCommitmentLink;
         let source_values = vec![make_field(7)];
         let target = c0_signals(make_field(8));
-        assert!(!link.check_consistency(&source_values, &target));
+        assert!(!link.check_signals(&source_values, &target));
     }
 
     #[test]
     fn empty_source_is_inconsistent() {
         let link = C3aToC0PkCommitmentLink;
-        assert!(!link.check_consistency(&[], &c0_signals(make_field(1))));
+        assert!(!link.check_signals(&[], &c0_signals(make_field(1))));
     }
 
     #[test]
     fn short_target_signals_is_inconsistent() {
         let link = C3aToC0PkCommitmentLink;
-        assert!(!link.check_consistency(&[make_field(1)], &[0u8; 16]));
+        assert!(!link.check_signals(&[make_field(1)], &[0u8; 16]));
     }
 
     #[test]
