@@ -151,21 +151,21 @@
   },
   "localhost": {
     "PoseidonT3": {
-      "blockNumber": 4,
+      "blockNumber": 6,
       "address": "0x3333333C0A88F9BE4fd23ed0536F9B6c427e3B93"
     },
     "MockUSDC": {
       "constructorArgs": {
         "initialSupply": "1000000"
       },
-      "blockNumber": 5,
+      "blockNumber": 7,
       "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
     },
     "EnclaveToken": {
       "constructorArgs": {
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
       },
-      "blockNumber": 6,
+      "blockNumber": 8,
       "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
     },
     "EnclaveTicketToken": {
@@ -174,14 +174,14 @@
         "registry": "0x0000000000000000000000000000000000000001",
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
       },
-      "blockNumber": 8,
+      "blockNumber": 10,
       "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
     },
     "SlashingManager": {
       "constructorArgs": {
         "admin": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
       },
-      "blockNumber": 9,
+      "blockNumber": 11,
       "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
     },
     "CiphernodeRegistryOwnable": {
@@ -196,7 +196,7 @@
         "proxyAdminAddress": "0x9bd03768a7DCc129555dE410FF8E85528A4F88b5",
         "implementationAddress": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
       },
-      "blockNumber": 10,
+      "blockNumber": 12,
       "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
     },
     "BondingRegistry": {
@@ -218,7 +218,7 @@
         "proxyAdminAddress": "0x8aCd85898458400f7Db866d53FCFF6f0D49741FF",
         "implementationAddress": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
       },
-      "blockNumber": 11,
+      "blockNumber": 13,
       "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
     },
     "Enclave": {
@@ -241,7 +241,7 @@
         "proxyAdminAddress": "0x8dAF17A20c9DBA35f005b6324F493785D239719d",
         "implementationAddress": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
       },
-      "blockNumber": 14,
+      "blockNumber": 16,
       "address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
     },
     "E3RefundManager": {
@@ -257,24 +257,24 @@
         "proxyAdminAddress": "0x32467b43BFa67273FC7dDda0999Ee9A12F2AaA08",
         "implementationAddress": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0"
       },
-      "blockNumber": 16,
+      "blockNumber": 18,
       "address": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82"
     },
     "MockComputeProvider": {
-      "blockNumber": 18,
-      "address": "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E"
-    },
-    "MockDecryptionVerifier": {
-      "blockNumber": 19,
+      "blockNumber": 20,
       "address": "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690"
     },
-    "MockPkVerifier": {
-      "blockNumber": 20,
+    "MockDecryptionVerifier": {
+      "blockNumber": 21,
       "address": "0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB"
     },
-    "MockE3Program": {
-      "blockNumber": 21,
+    "MockPkVerifier": {
+      "blockNumber": 22,
       "address": "0x9E545E3C0baAB3E08CdfD552C960A1050f373042"
+    },
+    "MockE3Program": {
+      "blockNumber": 23,
+      "address": "0xa82fF9aFd8f496c3d6ac40E2a0F282E47488CFc9"
     }
   }
 }

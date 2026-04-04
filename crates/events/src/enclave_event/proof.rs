@@ -53,7 +53,8 @@ impl Proof {
     /// Extract a named public input field from this proof's public signals.
     ///
     /// Public inputs sit at the **start** of `public_signals`, before any
-    /// return values.
+    /// return values.  The field name must match one declared in the circuit's
+    /// [`CircuitInputLayout`].
     pub fn extract_input(&self, field_name: &str) -> Option<ArcBytes> {
         let layout = self.circuit.input_layout();
         layout
@@ -180,6 +181,8 @@ impl CircuitName {
         format!("recursive_aggregation/wrapper/{}", self.dir_path())
     }
 
+    /// Public input layout for this circuit.
+    ///
     /// Public output (return value) layout for this circuit.
     pub fn output_layout(&self) -> CircuitOutputLayout {
         match self {
@@ -343,5 +346,44 @@ mod tests {
     fn extract_empty_signals() {
         let proof = make_proof(CircuitName::PkGeneration, &[]);
         assert!(proof.extract_output("pk_commitment").is_none());
+    }
+
+    #[test]
+    fn input_layout_share_encryption() {
+        let layout = CircuitName::ShareEncryption.input_layout();
+        assert_eq!(layout.field_count(), Some(2));
+    }
+
+    #[test]
+    fn input_layout_other_circuits_none() {
+        assert_eq!(CircuitName::PkBfv.input_layout().field_count(), Some(0));
+        assert_eq!(
+            CircuitName::PkGeneration.input_layout().field_count(),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn extract_input_from_share_encryption() {
+        // C3: 2 pub inputs at HEAD + rest of signals
+        let mut signals = vec![0u8; 96];
+        signals[0..32].copy_from_slice(&[0xAA; 32]); // expected_pk_commitment
+        signals[32..64].copy_from_slice(&[0xBB; 32]); // expected_message_commitment
+
+        let proof = make_proof(CircuitName::ShareEncryption, &signals);
+        assert_eq!(
+            &*proof.extract_input("expected_pk_commitment").unwrap(),
+            &[0xAA; 32]
+        );
+        assert_eq!(
+            &*proof.extract_input("expected_message_commitment").unwrap(),
+            &[0xBB; 32]
+        );
+    }
+
+    #[test]
+    fn extract_input_from_non_input_circuit() {
+        let proof = make_proof(CircuitName::PkBfv, &[0u8; 32]);
+        assert!(proof.extract_input("anything").is_none());
     }
 }

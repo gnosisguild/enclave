@@ -16,17 +16,24 @@
 
 mod common;
 
+use std::sync::Arc;
+
 use ark_bn254::Fr;
-use ark_ff::{PrimeField, Zero};
+use ark_ff::{BigInteger, PrimeField, Zero};
 use common::{
     extract_field, extract_field_from_end, find_bb, setup_compiled_circuit, setup_test_prover,
 };
+use e3_events::CircuitName;
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
+use e3_polynomial::CrtPolynomial;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
 use e3_zk_helpers::circuits::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;
 use e3_zk_helpers::circuits::{
-    commitments::{compute_dkg_pk_commitment, compute_threshold_decryption_share_commitment},
+    commitments::{
+        compute_aggregated_shares_commitment, compute_dkg_pk_commitment,
+        compute_threshold_decryption_share_commitment,
+    },
     threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS,
     CircuitComputation,
 };
@@ -34,6 +41,10 @@ use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_computation::{
     Configs, ShareComputationBaseCircuit, ShareComputationChunkCircuit,
     ShareComputationChunkCircuitData, ShareComputationCircuit, ShareComputationCircuitData,
+};
+use e3_zk_helpers::dkg::share_decryption::{
+    ShareDecryptionCircuit as DkgShareDecryptionCircuit,
+    ShareDecryptionCircuitData as DkgShareDecryptionCircuitData,
 };
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitData};
@@ -57,6 +68,44 @@ use e3_zk_prover::{
     generate_chunk_batch_proof, generate_share_computation_final_proof, CircuitVariant, Provable,
     ZkBackend, ZkProver,
 };
+use fhe::trbfv::TRBFV;
+
+/// Sum per-modulus decrypted shares across honest parties (matches C4 `compute_aggregated_shares`).
+/// Coefficients are summed in the BN254 field, not reduced mod each CRT modulus (see `share_decryption.nr`).
+fn aggregate_dkg_decrypted_shares_to_crt(
+    decrypted_shares: &[Vec<Vec<num_bigint::BigInt>>],
+) -> CrtPolynomial {
+    let h = decrypted_shares.len();
+    let l = decrypted_shares[0].len();
+    let n = decrypted_shares[0][0].len();
+    let mut limb_vecs: Vec<Vec<num_bigint::BigInt>> = Vec::with_capacity(l);
+    for mod_idx in 0..l {
+        let mut coeffs = vec![num_bigint::BigInt::from(0u64); n];
+        for coeff_idx in 0..n {
+            let mut sum = Fr::zero();
+            for party in 0..h {
+                let bytes = bigint_to_field_bytes32(&decrypted_shares[party][mod_idx][coeff_idx]);
+                sum += Fr::from_be_bytes_mod_order(&bytes);
+            }
+            coeffs[coeff_idx] = fr_to_bigint(sum);
+        }
+        limb_vecs.push(coeffs);
+    }
+    CrtPolynomial::from_bigint_vectors(limb_vecs)
+}
+
+fn bigint_to_field_bytes32(b: &num_bigint::BigInt) -> [u8; 32] {
+    let (_, bytes) = b.to_bytes_be();
+    let mut out = [0u8; 32];
+    let take = bytes.len().min(32);
+    out[32 - take..].copy_from_slice(&bytes[bytes.len() - take..]);
+    out
+}
+
+fn fr_to_bigint(f: Fr) -> num_bigint::BigInt {
+    let le = f.into_bigint().to_bytes_le();
+    num_bigint::BigInt::from_bytes_le(num_bigint::Sign::Plus, &le)
+}
 
 /// Convert raw public signals bytes (32-byte big-endian chunks) to ark_bn254::Fr field elements.
 fn public_signals_to_fields(signals: &[u8]) -> Vec<Fr> {
@@ -281,6 +330,35 @@ async fn setup_share_decryption_test() -> Option<(
         preset,
         "1",
     ))
+}
+
+/// Loads C4 (dkg/share_decryption) and C6 (threshold/share_decryption) artifacts for link tests.
+async fn setup_c4_c6_e2e_test() -> Option<(
+    ZkBackend,
+    tempfile::TempDir,
+    ZkProver,
+    DkgShareDecryptionCircuitData,
+    ThresholdShareDecryptionCircuitData,
+    BfvPreset,
+)> {
+    let committee = CiphernodesCommitteeSize::Micro.values();
+    let preset = BfvPreset::InsecureThreshold512;
+    let bb = find_bb().await?;
+    let (backend, temp) = setup_test_prover(&bb).await;
+
+    setup_compiled_circuit(&backend, "dkg", "share_decryption").await;
+    setup_compiled_circuit(&backend, "threshold", "share_decryption").await;
+
+    let dkg_sample = DkgShareDecryptionCircuitData::generate_sample(
+        preset,
+        committee.clone(),
+        DkgInputType::SecretKey,
+    )
+    .ok()?;
+    let c6_sample = ThresholdShareDecryptionCircuitData::generate_sample(preset, committee).ok()?;
+    let prover = ZkProver::new(&backend);
+
+    Some((backend, temp, prover, dkg_sample, c6_sample, preset))
 }
 
 async fn setup_pk_aggregation_test() -> Option<(
@@ -716,6 +794,171 @@ async fn test_threshold_share_decryption_commitment_consistency() {
     );
 
     prover.cleanup(e3_id).unwrap();
+}
+
+/// C4a publishes `commitment` (aggregated sk); C6 consumes `expected_sk_commitment` as its first
+/// public input — see `commitment_links/c4a_to_c6.rs`. This test checks both proofs expose those
+/// values consistently with witness recomputation (same hash as the cross-circuit link).
+#[tokio::test]
+async fn test_c4_sk_commitment_is_c6_expected_sk_input_e2e() {
+    let Some((_backend, _temp, prover, dkg_sample, c6_sample, preset)) =
+        setup_c4_c6_e2e_test().await
+    else {
+        println!("skipping: bb not found");
+        return;
+    };
+
+    let e3_id_c4 = "c4-e2e";
+    let e3_id_c6 = "c6-e2e";
+
+    let c4_proof = DkgShareDecryptionCircuit
+        .prove_with_variant(
+            &prover,
+            &preset,
+            &dkg_sample,
+            e3_id_c4,
+            CircuitVariant::Recursive,
+        )
+        .expect("C4 proof generation should succeed");
+
+    let c6_proof = ThresholdShareDecryptionCircuit
+        .prove_with_variant(
+            &prover,
+            &preset,
+            &c6_sample,
+            e3_id_c6,
+            CircuitVariant::Recursive,
+        )
+        .expect("C6 proof generation should succeed");
+
+    let c4_commitment_bytes = CircuitName::DkgShareDecryption
+        .output_layout()
+        .extract_field(&c4_proof.public_signals, "commitment")
+        .expect("C4 proof must expose commitment output");
+
+    let c6_expected_sk_bytes = CircuitName::ThresholdShareDecryption
+        .input_layout()
+        .extract_field(&c6_proof.public_signals, "expected_sk_commitment")
+        .expect("C6 proof must expose expected_sk_commitment at public inputs");
+
+    let dkg_out = DkgShareDecryptionCircuit::compute(preset, &dkg_sample).unwrap();
+    let aggregated = aggregate_dkg_decrypted_shares_to_crt(&dkg_out.inputs.decrypted_shares);
+    let expected_c4 = compute_aggregated_shares_commitment(&aggregated, dkg_out.bits.agg_bit);
+    let c4_from_proof =
+        num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, c4_commitment_bytes);
+    assert_eq!(
+        c4_from_proof, expected_c4,
+        "C4 commitment output must match compute_aggregated_shares_commitment on aggregated DKG shares"
+    );
+
+    let c6_out = ThresholdShareDecryptionCircuit::compute(preset, &c6_sample).unwrap();
+    let expected_c6_sk = c6_out.inputs.expected_sk_commitment.clone();
+    let c6_expected_sk_from_proof =
+        num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, c6_expected_sk_bytes);
+    assert_eq!(
+        c6_expected_sk_from_proof, expected_c6_sk,
+        "C6 expected_sk_commitment public input must match witness computation"
+    );
+
+    prover.cleanup(e3_id_c4).unwrap();
+    prover.cleanup(e3_id_c6).unwrap();
+}
+
+/// Wires the same aggregated SK (`agg_sk`) into C6: DKG aggregate → `s` + TRBFV `decryption_share` for new `d_share`.
+///
+/// C4 hashes the aggregate with `SHARE_DECRYPTION_BIT_AGG` (Rust `dkg_out.bits.agg_bit`); C6 uses the same width for `sk`.
+/// Per-share C4 checks still use `SHARE_DECRYPTION_BIT_MSG` (`msg_bit`) vs C2.
+#[tokio::test]
+async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
+    let Some((_backend, _temp, prover, dkg_sample, mut c6_sample, preset)) =
+        setup_c4_c6_e2e_test().await
+    else {
+        println!("skipping: bb not found");
+        return;
+    };
+
+    let committee = CiphernodesCommitteeSize::Micro.values();
+    let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
+    let ctx = threshold_params.ctx_at_level(0).unwrap();
+    let moduli = threshold_params.moduli();
+
+    let dkg_out = DkgShareDecryptionCircuit::compute(preset, &dkg_sample).unwrap();
+    let agg_sk = aggregate_dkg_decrypted_shares_to_crt(&dkg_out.inputs.decrypted_shares);
+
+    let sk_poly = agg_sk
+        .to_fhe_polynomial(&ctx, moduli)
+        .expect("agg_sk -> Poly");
+    let es_poly = c6_sample
+        .e
+        .to_fhe_polynomial(&ctx, moduli)
+        .expect("e -> Poly");
+
+    let trbfv =
+        TRBFV::new(committee.n, committee.threshold, threshold_params.clone()).expect("TRBFV::new");
+
+    let d_share_rns = trbfv
+        .decryption_share(Arc::new(c6_sample.ciphertext.clone()), sk_poly, es_poly)
+        .expect("decryption_share");
+
+    c6_sample.s = agg_sk.clone();
+    c6_sample.d_share = CrtPolynomial::from_fhe_polynomial(&d_share_rns);
+
+    let e3_id_c4 = "c4-align";
+    let e3_id_c6 = "c6-align";
+
+    let c4_proof = DkgShareDecryptionCircuit
+        .prove_with_variant(
+            &prover,
+            &preset,
+            &dkg_sample,
+            e3_id_c4,
+            CircuitVariant::Recursive,
+        )
+        .expect("C4 proof generation should succeed");
+
+    let c6_proof = ThresholdShareDecryptionCircuit
+        .prove_with_variant(
+            &prover,
+            &preset,
+            &c6_sample,
+            e3_id_c6,
+            CircuitVariant::Recursive,
+        )
+        .expect("C6 proof generation should succeed");
+
+    let c4_commitment = CircuitName::DkgShareDecryption
+        .output_layout()
+        .extract_field(&c4_proof.public_signals, "commitment")
+        .expect("C4 commitment");
+
+    let c6_expected_sk = CircuitName::ThresholdShareDecryption
+        .input_layout()
+        .extract_field(&c6_proof.public_signals, "expected_sk_commitment")
+        .expect("C6 expected_sk_commitment");
+
+    let c4_big = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, c4_commitment);
+    let c6_big = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, c6_expected_sk);
+
+    let expected_c4_hash = compute_aggregated_shares_commitment(&agg_sk, dkg_out.bits.agg_bit);
+    assert_eq!(
+        c4_big, expected_c4_hash,
+        "C4 commitment must match hash(agg_sk) with DKG agg_bit (BIT_AGG)"
+    );
+
+    let c6_out = ThresholdShareDecryptionCircuit::compute(preset, &c6_sample).unwrap();
+    assert_eq!(
+        c6_big, c6_out.inputs.expected_sk_commitment,
+        "C6 expected_sk_commitment must match witness after wiring agg_sk"
+    );
+
+    assert_eq!(
+        dkg_out.bits.agg_bit,
+        c6_out.bits.sk_bit,
+        "DKG bits.agg_bit (compute_modulus_bit on threshold) must match C6 bits.sk_bit for aggregate hashing"
+    );
+
+    prover.cleanup(e3_id_c4).unwrap();
+    prover.cleanup(e3_id_c6).unwrap();
 }
 
 #[tokio::test]

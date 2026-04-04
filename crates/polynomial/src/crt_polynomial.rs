@@ -6,10 +6,15 @@
 
 //! CRT (Chinese Remainder Theorem) polynomial representation.
 
+use std::sync::Arc;
+
 use crate::polynomial::Polynomial;
 use crate::utils::reduce;
-use fhe_math::rq::{Poly, Representation};
+use fhe_math::rq::traits::TryConvertFrom;
+use fhe_math::rq::{Context, Poly, Representation};
+use ndarray::Array2;
 use num_bigint::BigInt;
+use num_traits::{ToPrimitive, Zero};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -70,18 +75,19 @@ impl CrtPolynomial {
         Self::from_bigint_vectors(limbs)
     }
 
-    /// Builds a `CrtPolynomial` from an fhe-math `Poly` in PowerBasis representation.
+    /// Builds a `CrtPolynomial` from an fhe-math `Poly` in any representation.
     ///
     /// Used to prepare inputs for ZK circuits by converting FHE BFV ciphertext polynomials
-    /// into CRT limb format. If `p` is in NTT form, it is converted to PowerBasis first.
+    /// into CRT limb format. If `p` is not in PowerBasis form (e.g. NTT or NttShoup),
+    /// it is converted first.
     ///
     /// # Arguments
     ///
-    /// * `p` - An fhe-math polynomial (PowerBasis or Ntt).
+    /// * `p` - An fhe-math polynomial (any representation).
     pub fn from_fhe_polynomial(p: &Poly) -> Self {
         let mut p = p.clone();
 
-        if *p.representation() == Representation::Ntt {
+        if *p.representation() != Representation::PowerBasis {
             p.change_representation(Representation::PowerBasis);
         }
 
@@ -92,6 +98,57 @@ impl CrtPolynomial {
             .collect();
 
         Self { limbs }
+    }
+
+    /// Builds an fhe-math `Poly` in PowerBasis representation (inverse of [`Self::from_fhe_polynomial`]).
+    ///
+    /// Coefficients are reduced to `[0, q_i)` per limb using `moduli[i]` before packing the RNS buffer.
+    /// `ctx` must match the TRBFV/BFV context: `ctx.q.len()` equals limb count, and each limb has
+    /// `ctx.degree` coefficients.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`fhe_math::Error`] if limb counts or coefficient lengths disagree with `ctx`, ndarray
+    /// layout fails, a coefficient does not fit `u64`, or `Poly::try_convert_from` fails.
+    pub fn to_fhe_polynomial(
+        &self,
+        ctx: &Arc<Context>,
+        moduli: &[u64],
+    ) -> Result<Poly, fhe_math::Error> {
+        let degree = ctx.degree;
+        let l = ctx.q.len();
+        if self.limbs.len() != l {
+            return Err(fhe_math::Error::Default(format!(
+                "CrtPolynomial::to_fhe_polynomial: {} limbs != ctx.q.len() {}",
+                self.limbs.len(),
+                l
+            )));
+        }
+        if moduli.len() != l {
+            return Err(fhe_math::Error::Default(format!(
+                "CrtPolynomial::to_fhe_polynomial: {} moduli != ctx.q.len() {}",
+                moduli.len(),
+                l
+            )));
+        }
+        let mut data = Vec::with_capacity(l * degree);
+        for i in 0..l {
+            let coeffs = self.limb(i).coefficients();
+            if coeffs.len() != degree {
+                return Err(fhe_math::Error::Default(format!(
+                    "CrtPolynomial::to_fhe_polynomial: limb {i} len {} != ctx.degree {degree}",
+                    coeffs.len()
+                )));
+            }
+            for j in 0..degree {
+                let u = bigint_to_u64_mod(&coeffs[j], moduli[i])?;
+                data.push(u);
+            }
+        }
+        let arr = Array2::from_shape_vec((l, degree), data).map_err(|e| {
+            fhe_math::Error::Default(format!("CrtPolynomial::to_fhe_polynomial: ndarray {e}"))
+        })?;
+        Poly::try_convert_from(arr, ctx, false, Representation::PowerBasis)
     }
 
     /// Reverses the coefficient order of every limb in-place.
@@ -204,4 +261,17 @@ impl CrtPolynomial {
     pub fn limb(&self, i: usize) -> &Polynomial {
         &self.limbs[i]
     }
+}
+
+fn bigint_to_u64_mod(c: &BigInt, m: u64) -> Result<u64, fhe_math::Error> {
+    let bm = BigInt::from(m);
+    let mut r = c % &bm;
+    if r < BigInt::zero() {
+        r += bm;
+    }
+    r.to_u64().ok_or_else(|| {
+        fhe_math::Error::Default(format!(
+            "CrtPolynomial::to_fhe_polynomial: coefficient does not fit u64 after mod {m}: {r}"
+        ))
+    })
 }

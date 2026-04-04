@@ -39,7 +39,8 @@
 7. SORTITION    Ciphernodes compute scores, submit tickets on-chain
                   → Top N lowest scores selected
 
-8. FINALIZE     finalizeCommittee() → committee locked in
+8. FINALIZE     Committee members schedule staggered finalizeCommittee() calls
+                  → first successful call locks committee in canonical on-chain order
 
 9. DKG          Selected nodes perform distributed key generation:
                   a. BFV keygen → C0 proof (proves keypair valid)
@@ -49,23 +50,26 @@
                   e. Collect shares → verify C2/C3 proofs (2-phase)
                   f. Decrypt shares → calc decryption key → C4a/C4b proofs
                   g. Exchange DecryptionKeyShared → verify C4 proofs
-                  h. Publish KeyshareCreated → aggregator
+                  h. Publish KeyshareCreated → all committee members buffer it
 
-10. PK AGG      Aggregator aggregates pk_shares → aggregate PK
-                  → C5 proof (proves aggregation correct)
-                  → publishCommittee() on-chain → KeyPublished stage
+10. PK AGG      All committee members buffer keyshares
+                  → Rust normalizes finalized committee into ascending ticket-score order
+                  → active aggregator = lowest non-expelled party_id in that normalized order
+                  → active aggregator aggregates pk_shares → C5 proof
+                  → permissionless publishCommittee() on-chain → KeyPublished stage
 
 11. COMPUTE     Data encrypted with aggregate PK, computation runs
                   → Ciphertext output published on-chain
 
 12. DECRYPT     Committee members produce decryption shares
                   → C6 proof per share (proves share correctly derived)
-                  → Broadcast to aggregator
+                  → broadcast to all committee members for buffering
 
-13. AGGREGATE   Aggregator combines M+1 shares → plaintext
+13. AGGREGATE   Active aggregator combines M+1 shares → plaintext
                   → C7 proof (proves reconstruction correct)
 
-14. COMPLETE    publishPlaintextOutput() → rewards distributed
+14. COMPLETE    Active aggregator permissionlessly calls publishPlaintextOutput()
+                  → rewards distributed
                   → Each active committee member gets fee / N
                   → Any escrowed slashed funds split:
                     nodes (successSlashedNodeBps) + treasury
@@ -172,7 +176,7 @@ _Found during source-code cross-referencing of these trace documents._
 | 4   | `activate()` calls `register()` → `registerOperator()` which has `require(!registered, AlreadyRegistered())`. So activate **reverts** for already-registered operators. It only works for re-registration after deregistration.                                | BondingRegistry.sol:308           | 01_REGISTRATION |
 | 5   | `E3Requested` event is `(uint256 e3Id, E3 e3, IE3Program indexed e3Program)` — seed and params are inside the E3 struct, not separate parameters.                                                                                                              | IEnclave.sol:82                   | 03_E3_REQUEST   |
 | 6   | `finalizeCommittee()` checks `>=` deadline, not `>`.                                                                                                                                                                                                           | CiphernodeRegistryOwnable.sol     | 03_E3_REQUEST   |
-| 7   | `publishCommittee()` is `onlyOwner` restricted — centralized trust assumption acknowledged in contract TODOs.                                                                                                                                                  | CiphernodeRegistryOwnable.sol     | 04_DKG          |
+| 7   | `publishCommittee()` is now permissionless. The effective access control is the C5 proof verification plus the single-publish guard `publicKeyHashes[e3Id] == 0`; the old `onlyOwner` note is obsolete.                                                        | CiphernodeRegistryOwnable.sol     | 04_DKG          |
 | 8   | `CommitteePublished` event emits `(e3Id, nodes, publicKey, proof)` — full PK bytes and C5 proof, not just pkHash.                                                                                                                                              | CiphernodeRegistryOwnable.sol     | 04_DKG          |
 | 9   | `_validateNodeEligibility` calls `bondingRegistry.getTicketBalanceAtBlock()` (not `ticketToken.getPastVotes()` directly).                                                                                                                                      | CiphernodeRegistryOwnable.sol:668 | 03_E3_REQUEST   |
 | 10  | Lane A slashing uses **attestation-based** verification (committee quorum votes), not direct ZK proof re-verification on-chain. `proposeSlash()` decodes voter addresses, agrees, data hashes, and ECDSA signatures — not ZK proofs.                           | SlashingManager.sol               | 05_FAILURE      |
@@ -182,7 +186,7 @@ _Found during source-code cross-referencing of these trace documents._
 | #   | Concern                                  | Severity | Detail                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | --- | ---------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | **Deregister-before-slash race**         | Accepted | SlashingManager Lane B (evidence+appeal) has a window during which the operator can deregister and claim their exit. If they do, the slash executes against 0 funds. The contract comments acknowledge this as an accepted tradeoff for the appeal window design.                                                                                                                                                                                                                                                                                                                           |
-| 2   | **`publishCommittee()` is centralized**  | High     | Only the contract owner can publish the committee public key. A malicious or compromised owner could publish a fake key. The contract has `// TODO` and `// SECURITY` comments acknowledging this.                                                                                                                                                                                                                                                                                                                                                                                          |
+| 2   | **Committee publication decentralized**  | Resolved | `publishCommittee()` is permissionless. Off-chain role selection chooses the active aggregator, while on-chain C5 proof verification and the single-publish guard prevent invalid or duplicate committee publication.                                                                                                                                                                                                                                                                                                                                                                       |
 | 3   | **`gracePeriod` is dead code**           | Medium   | `gracePeriod` is stored and validated during config updates but never actually used in any timeout check. Either the deadlines already bake in sufficient buffer, or this is a missing feature.                                                                                                                                                                                                                                                                                                                                                                                             |
 | 4   | **`activate` CLI command is misleading** | Low      | Named "activate" but actually calls "register" — will fail for already-registered operators. There's no standalone way to trigger re-evaluation of active status; instead, `_updateOperatorStatus()` runs automatically inside `addTicketBalance()`, `bondLicense()`, etc.                                                                                                                                                                                                                                                                                                                  |
 | 5   | **Active-job load balancing bug fixed**  | Info     | The Rust `NodeStateStore.available_tickets()` subtracts `active_jobs` from total tickets, reducing the chance of busy nodes being selected for new E3s. Previously, the `Sortition` actor's `Handler<EnclaveEvent>` was missing match arms for `E3Failed` and `E3StageChanged`, causing these events to fall to the default `_ => ()` — the typed handlers for decrementing jobs were dead code. This has been fixed: E3Failed and E3StageChanged are now routed to their handlers, and `finalized_committees` is cleaned up in `decrement_jobs_for_e3` to prevent unbounded memory growth. |

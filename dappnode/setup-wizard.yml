@@ -53,22 +53,6 @@ fields:
     required: false
     pattern: '^(0x[a-fA-F0-9]{64})?$'
 
-  # Node settings
-  - id: NODE_ROLE
-    target:
-      type: environment
-      name: NODE_ROLE
-      service: ciphernode
-    title: 'Node Role'
-    default: 'ciphernode'
-    description: |
-      - **ciphernode**: Participate in threshold decryption 
-      - **aggregator**: Coordinate operations
-    enum:
-      - ciphernode
-      - aggregator
-    required: false
-
   # Contracts
   - id: ENCLAVE_CONTRACT
     target:

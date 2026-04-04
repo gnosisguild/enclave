@@ -577,6 +577,21 @@ impl ThresholdKeyshare {
         self_addr: Addr<Self>,
     ) -> Result<()> {
         let state = self.state.try_get()?;
+        if !matches!(
+            state.state,
+            KeyshareState::CollectingEncryptionKeys(_)
+                | KeyshareState::GeneratingThresholdShare(_)
+                | KeyshareState::AggregatingDecryptionKey(_)
+        ) {
+            trace!(
+                e3_id = %state.e3_id,
+                state = state.variant_name(),
+                sender_party_id = msg.share.party_id,
+                "Ignoring ThresholdShareCreated outside share collection"
+            );
+            return Ok(());
+        }
+
         let my_party_id = state.party_id;
 
         // Filter: only process shares intended for this party
@@ -609,6 +624,19 @@ impl ThresholdKeyshare {
         self_addr: Addr<Self>,
     ) -> Result<()> {
         let state = self.state.try_get()?;
+        if !matches!(
+            state.state,
+            KeyshareState::Init | KeyshareState::CollectingEncryptionKeys(_)
+        ) {
+            trace!(
+                e3_id = %state.e3_id,
+                state = state.variant_name(),
+                sender_party_id = msg.key.party_id,
+                "Ignoring EncryptionKeyCreated outside key collection"
+            );
+            return Ok(());
+        }
+
         // Reject keys from expelled parties
         if state.expelled_parties.contains(&msg.key.party_id) {
             info!(
@@ -741,6 +769,16 @@ impl ThresholdKeyshare {
         address: Addr<Self>,
     ) -> Result<()> {
         let (msg, ec) = msg.into_components();
+        let state = self.state.try_get()?;
+        if !matches!(state.state, KeyshareState::Init) {
+            info!(
+                e3_id = %state.e3_id,
+                state = state.variant_name(),
+                "Ignoring replayed CiphernodeSelected; keyshare already initialized"
+            );
+            return Ok(());
+        }
+
         info!("CiphernodeSelected received.");
         // Ensure the collectors are created
         let _ = self.ensure_collector(address.clone());
@@ -755,7 +793,6 @@ impl ThresholdKeyshare {
         let sk_bfv_encrypted = SensitiveBytes::new(sk_bytes, &self.cipher)?;
         let pk_bfv_bytes = ArcBytes::from_bytes(&pk_bfv.to_bytes());
 
-        let state = self.state.try_get()?;
         let e3_id = state.e3_id.clone();
 
         self.state.try_mutate(&ec, |s| {
@@ -1847,17 +1884,6 @@ impl ThresholdKeyshare {
         let party_id = state.party_id;
         let node = state.address.clone();
 
-        let ready: ReadyForDecryption = state.clone().try_into()?;
-        let sk_poly_sum_bytes = ready.sk_poly_sum.access(&self.cipher)?;
-        let es_poly_sum_bytes: Vec<ArcBytes> = ready
-            .es_poly_sum
-            .iter()
-            .map(|s| {
-                let bytes = s.access(&self.cipher)?;
-                Ok(ArcBytes::from_bytes(&bytes))
-            })
-            .collect::<Result<_>>()?;
-
         info!(
             "Publishing DecryptionShareProofsPending for E3 {} party {} (1 SK + {} ESM requests)",
             e3_id,
@@ -1870,8 +1896,6 @@ impl ThresholdKeyshare {
                 e3_id: e3_id.clone(),
                 party_id,
                 node,
-                sk_poly_sum: ArcBytes::from_bytes(&sk_poly_sum_bytes),
-                es_poly_sum: es_poly_sum_bytes,
                 sk_request,
                 esm_requests,
             },

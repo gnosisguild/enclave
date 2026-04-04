@@ -19,7 +19,10 @@ use crate::math::polynomial::Polynomial;
 /// **Produces:**
 /// - C4a: `commit(agg_sk)` -> C6 (threshold share decryption).
 /// - C4b: `commit(agg_e_sm)` -> C6 (threshold share decryption).
-pub struct ShareDecryption<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32> {
+///
+/// `BIT_MSG` hashes per-share plaintexts (aligned with C2). `BIT_AGG` hashes the CRT aggregate
+/// (`compute_aggregated_shares_commitment`) and must match threshold C6 `BIT_SK` / `BIT_E_SM`.
+pub struct ShareDecryption<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32, let BIT_AGG: u32> {
     /// Expected commitments to the share polynomials, produced in C2a (for C4a) or C2b (for C4b)
     /// via commit_to_party_shares. Organised as [party_idx][mod_idx], covering all H honest
     /// parties and L CRT moduli.
@@ -32,7 +35,7 @@ pub struct ShareDecryption<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32>
     decrypted_shares: [[Polynomial<N>; L]; H],
 }
 
-impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32> ShareDecryption<N, L, H, BIT_MSG> {
+impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32, let BIT_AGG: u32> ShareDecryption<N, L, H, BIT_MSG, BIT_AGG> {
     pub fn new(
         expected_commitments: [[Field; L]; H],
         decrypted_shares: [[Polynomial<N>; L]; H],
@@ -104,6 +107,6 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32> ShareDecryption<N, L,
         let aggregated = self.compute_aggregated_shares();
 
         // Step 3: Publish commitment to the aggregate (C6 input).
-        compute_aggregated_shares_commitment::<N, L, BIT_MSG>(aggregated)
+        compute_aggregated_shares_commitment::<N, L, BIT_AGG>(aggregated)
     }
 }

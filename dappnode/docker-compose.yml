@@ -16,7 +16,6 @@ services:
       RPC_URL: ''
       # Network & node config
       NETWORK: 'sepolia'
-      NODE_ROLE: 'ciphernode'
       NODE_ADDRESS: ''
       QUIC_PORT: '37173'
       PEERS: ''

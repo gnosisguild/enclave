@@ -106,7 +106,7 @@ To deploy with swarm we need to set up the secrets file for our cluster.
 
 ## What it does
 
-- Copies `example.secrets.json` to create `cn1/2/3` and `agg.secrets.json` files
+- Copies `example.secrets.json` to create `cn1/2/3/4.secrets.json` files
 - Skips existing files
 - Warns with yellow arrows (==>) if any files are identical to the example
 
@@ -134,7 +134,7 @@ This will deploy the following services:
 ```
 ❯ docker service ls
 ID             NAME                 MODE         REPLICAS   IMAGE                  PORTS
-tr44go8vevh1   enclave_aggregator   replicated   1/1        ghcr.io/gnosisguild/ciphernode:latest
+tr44go8vevh1   enclave_cn4          replicated   1/1        ghcr.io/gnosisguild/ciphernode:latest
 kdqktv85xcuv   enclave_cn1          replicated   1/1        ghcr.io/gnosisguild/ciphernode:latest
 nguul381w6mu   enclave_cn2          replicated   1/1        ghcr.io/gnosisguild/ciphernode:latest
 zgmwmv7cd63j   enclave_cn3          replicated   1/1        ghcr.io/gnosisguild/ciphernode:latest

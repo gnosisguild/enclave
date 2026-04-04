@@ -8,6 +8,7 @@ mod accusation_quorum_reached;
 mod accusation_vote;
 mod aggregation_proof_pending;
 mod aggregation_proof_signed;
+mod aggregator_changed;
 mod ciphernode_added;
 mod ciphernode_removed;
 mod ciphernode_selected;
@@ -73,6 +74,7 @@ pub use accusation_quorum_reached::*;
 pub use accusation_vote::*;
 pub use aggregation_proof_pending::*;
 pub use aggregation_proof_signed::*;
+pub use aggregator_changed::*;
 pub use ciphernode_added::*;
 pub use ciphernode_removed::*;
 pub use ciphernode_selected::*;
@@ -234,6 +236,7 @@ macro_rules! impl_event_types {
 pub enum EnclaveEventData {
     AccusationQuorumReached(AccusationQuorumReached),
     AccusationVote(AccusationVote),
+    AggregatorChanged(AggregatorChanged),
     ProofFailureAccusation(ProofFailureAccusation),
     ProofVerificationFailed(ProofVerificationFailed),
     ProofVerificationPassed(ProofVerificationPassed),
@@ -533,6 +536,7 @@ impl EnclaveEventData {
         match self {
             EnclaveEventData::AccusationQuorumReached(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::AccusationVote(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::AggregatorChanged(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ProofFailureAccusation(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ProofVerificationFailed(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ProofVerificationPassed(ref data) => Some(data.e3_id.clone()),
@@ -610,6 +614,7 @@ impl<S: SeqState> WithAggregateId for EnclaveEvent<S> {
 impl_event_types!(
     AccusationQuorumReached,
     AccusationVote,
+    AggregatorChanged,
     ProofFailureAccusation,
     ProofVerificationFailed,
     ProofVerificationPassed,

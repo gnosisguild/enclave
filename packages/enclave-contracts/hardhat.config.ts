@@ -21,6 +21,9 @@ import {
 } from "./tasks/ciphernode";
 import {
   enableE3,
+  getActiveAggregator,
+  getCommitteePublicKey,
+  getPlaintextOutput,
   publishCiphertext,
   publishCommittee,
   publishPlaintext,
@@ -92,9 +95,12 @@ const config: HardhatUserConfig = {
     ciphernodeMintTokens,
     ciphernodeRemove,
     requestCommittee,
+    getCommitteePublicKey,
+    getActiveAggregator,
     publishPlaintext,
     publishCiphertext,
     publishCommittee,
+    getPlaintextOutput,
     publishInput,
     enableE3,
     cleanDeploymentsTask,

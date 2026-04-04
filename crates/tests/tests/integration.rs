@@ -13,10 +13,11 @@ use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
 use e3_config::BBPath;
 use e3_crypto::Cipher;
 use e3_events::{
-    prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated,
-    E3Requested, E3id, EffectsEnabled, EnclaveEvent, EnclaveEventData, EventType, GetEvents,
-    HistoryCollector, OperatorActivationChanged, OrderedSet, PkAggregationProofPending,
-    PkAggregationProofRequest, PlaintextAggregated, Seed, TakeEvents, TicketBalanceUpdated,
+    prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized, ComputeRequestKind,
+    ComputeResponseKind, ConfigurationUpdated, E3Requested, E3id, EffectsEnabled, EnclaveEvent,
+    EnclaveEventData, EventType, GetEvents, HistoryCollector, OperatorActivationChanged,
+    OrderedSet, PkAggregationProofPending, PkAggregationProofRequest, PlaintextAggregated,
+    ProofType, Seed, TakeEvents, TicketBalanceUpdated, VerificationKind, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_fhe_params::{build_pair_for_preset, create_deterministic_crp_from_default_seed};
@@ -26,11 +27,14 @@ use e3_net::events::{GossipData, NetEvent};
 use e3_net::NetEventTranslator;
 use e3_polynomial::CrtPolynomial;
 use e3_sortition::{calculate_buffer_size, RegisteredNode, ScoreSortition, Ticket};
-use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
+use e3_test_helpers::ciphernode_system::{
+    CiphernodeHistory, CiphernodeSystem, CiphernodeSystemBuilder,
+};
 use e3_test_helpers::{
     create_seed_from_u64, create_shared_rng_from_u64, find_bb, with_tracing, AddToCommittee,
 };
 use e3_trbfv::helpers::calculate_error_size;
+use e3_trbfv::{TrBFVRequest, TrBFVResponse};
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::{colorize, rand_eth_addr, Color};
 use e3_zk_helpers::{compute_modulus_bit, compute_threshold_pk_commitment};
@@ -498,6 +502,176 @@ fn determine_committee(
     Ok((committee, committee_scores, buffer_nodes))
 }
 
+fn find_node_index_by_address(nodes: &CiphernodeSystem, address: &str) -> Result<usize> {
+    for (index, node) in nodes.iter().enumerate() {
+        if node.address().eq_ignore_ascii_case(address) {
+            return Ok(index);
+        }
+    }
+
+    bail!("Could not find node index for address {address}");
+}
+
+async fn expect_node_events_with_timeouts(
+    nodes: &CiphernodeSystem,
+    index: usize,
+    expected: &[&str],
+    total_to: Duration,
+    per_evt_to: Duration,
+) -> Result<CiphernodeHistory> {
+    let h = nodes
+        .take_history_with_timeouts(index, expected.len(), Some(total_to), Some(per_evt_to))
+        .await
+        .map_err(|e| anyhow::anyhow!("FAILURE on node {index}: {expected:?} : {e}"))?;
+
+    println!(
+        "node {index} >> {:?} == {:?}",
+        h.event_types(),
+        expected.to_vec()
+    );
+    h.expect(expected.to_vec());
+    Ok(h)
+}
+
+fn project_history<F>(history: &[EnclaveEvent], mut projector: F) -> Vec<&'static str>
+where
+    F: FnMut(&EnclaveEventData) -> Option<&'static str>,
+{
+    history
+        .iter()
+        .filter_map(|event| projector(event.get_data()))
+        .collect()
+}
+
+fn count_projected_events(projected: &[&str], event_type: &str) -> usize {
+    projected.iter().filter(|seen| **seen == event_type).count()
+}
+
+fn publickey_aggregator_marker(data: &EnclaveEventData, e3_id: &E3id) -> Option<&'static str> {
+    match data {
+        EnclaveEventData::CommitteeFinalized(data) if data.e3_id == *e3_id => {
+            Some("CommitteeFinalized")
+        }
+        EnclaveEventData::CiphernodeSelected(data) if data.e3_id == *e3_id => {
+            Some("CiphernodeSelected")
+        }
+        EnclaveEventData::AggregatorChanged(data) if data.e3_id == *e3_id && data.is_aggregator => {
+            Some("AggregatorChanged")
+        }
+        EnclaveEventData::KeyshareCreated(data) if data.e3_id == *e3_id => Some("KeyshareCreated"),
+        EnclaveEventData::ShareVerificationDispatched(data)
+            if data.e3_id == *e3_id && data.kind == VerificationKind::PkGenerationProofs =>
+        {
+            Some("ShareVerificationDispatched")
+        }
+        EnclaveEventData::CommitmentConsistencyCheckRequested(data)
+            if data.e3_id == *e3_id && data.kind == VerificationKind::PkGenerationProofs =>
+        {
+            Some("CommitmentConsistencyCheckRequested")
+        }
+        EnclaveEventData::CommitmentConsistencyCheckComplete(data)
+            if data.e3_id == *e3_id && data.kind == VerificationKind::PkGenerationProofs =>
+        {
+            Some("CommitmentConsistencyCheckComplete")
+        }
+        EnclaveEventData::ProofVerificationPassed(data)
+            if data.e3_id == *e3_id && data.proof_type == ProofType::C1PkGeneration =>
+        {
+            Some("ProofVerificationPassed")
+        }
+        EnclaveEventData::ShareVerificationComplete(data)
+            if data.e3_id == *e3_id && data.kind == VerificationKind::PkGenerationProofs =>
+        {
+            Some("ShareVerificationComplete")
+        }
+        EnclaveEventData::PkAggregationProofPending(data) if data.e3_id == *e3_id => {
+            Some("PkAggregationProofPending")
+        }
+        EnclaveEventData::PkAggregationProofSigned(data) if data.e3_id == *e3_id => {
+            Some("PkAggregationProofSigned")
+        }
+        EnclaveEventData::DKGRecursiveAggregationComplete(data) if data.e3_id == *e3_id => {
+            Some("DKGRecursiveAggregationComplete")
+        }
+        EnclaveEventData::PublicKeyAggregated(data) if data.e3_id == *e3_id => {
+            Some("PublicKeyAggregated")
+        }
+        _ => None,
+    }
+}
+
+fn plaintext_aggregator_marker(data: &EnclaveEventData, e3_id: &E3id) -> Option<&'static str> {
+    match data {
+        EnclaveEventData::CiphertextOutputPublished(data) if data.e3_id == *e3_id => {
+            Some("CiphertextOutputPublished")
+        }
+        EnclaveEventData::DecryptionshareCreated(data) if data.e3_id == *e3_id => {
+            Some("DecryptionshareCreated")
+        }
+        EnclaveEventData::ShareVerificationDispatched(data)
+            if data.e3_id == *e3_id && data.kind == VerificationKind::ThresholdDecryptionProofs =>
+        {
+            Some("ShareVerificationDispatched")
+        }
+        EnclaveEventData::CommitmentConsistencyCheckRequested(data)
+            if data.e3_id == *e3_id && data.kind == VerificationKind::ThresholdDecryptionProofs =>
+        {
+            Some("CommitmentConsistencyCheckRequested")
+        }
+        EnclaveEventData::CommitmentConsistencyCheckComplete(data)
+            if data.e3_id == *e3_id && data.kind == VerificationKind::ThresholdDecryptionProofs =>
+        {
+            Some("CommitmentConsistencyCheckComplete")
+        }
+        EnclaveEventData::ComputeRequest(data)
+            if data.e3_id == *e3_id
+                && matches!(
+                    &data.request,
+                    ComputeRequestKind::Zk(ZkRequest::VerifyShareProofs(_))
+                        | ComputeRequestKind::TrBFV(TrBFVRequest::CalculateThresholdDecryption(_))
+                        | ComputeRequestKind::Zk(ZkRequest::DecryptedSharesAggregation(_))
+                        | ComputeRequestKind::Zk(ZkRequest::FoldProofs { .. })
+                ) =>
+        {
+            Some("ComputeRequest")
+        }
+        EnclaveEventData::ComputeResponse(data)
+            if data.e3_id == *e3_id
+                && matches!(
+                    &data.response,
+                    ComputeResponseKind::Zk(ZkResponse::VerifyShareProofs(_))
+                        | ComputeResponseKind::TrBFV(TrBFVResponse::CalculateThresholdDecryption(
+                            _
+                        ))
+                        | ComputeResponseKind::Zk(ZkResponse::DecryptedSharesAggregation(_))
+                        | ComputeResponseKind::Zk(ZkResponse::FoldProofs(_))
+                ) =>
+        {
+            Some("ComputeResponse")
+        }
+        EnclaveEventData::ProofVerificationPassed(data)
+            if data.e3_id == *e3_id && data.proof_type == ProofType::C6ThresholdShareDecryption =>
+        {
+            Some("ProofVerificationPassed")
+        }
+        EnclaveEventData::ShareVerificationComplete(data)
+            if data.e3_id == *e3_id && data.kind == VerificationKind::ThresholdDecryptionProofs =>
+        {
+            Some("ShareVerificationComplete")
+        }
+        EnclaveEventData::AggregationProofPending(data) if data.e3_id == *e3_id => {
+            Some("AggregationProofPending")
+        }
+        EnclaveEventData::AggregationProofSigned(data) if data.e3_id == *e3_id => {
+            Some("AggregationProofSigned")
+        }
+        EnclaveEventData::PlaintextAggregated(data) if data.e3_id == *e3_id => {
+            Some("PlaintextAggregated")
+        }
+        _ => None,
+    }
+}
+
 async fn setup_score_sortition_environment(
     bus: &BusHandle,
     eth_addrs: &Vec<String>,
@@ -652,6 +826,8 @@ async fn test_trbfv_actor() -> Result<()> {
     let (zk_backend, _zk_temp) = setup_test_zk_backend().await?;
 
     let nodes = CiphernodeSystemBuilder::new()
+        // All nodes run the same binary under the aggregator-committee model.
+        // Node 0 stays an observer only because it is excluded from sortition registration.
         // Adding 20 total nodes: 3 for committee + 3 buffer = 6 selected, 14 unselected
         .add_group(1, || async {
             let addr = rand_eth_addr(&rng);
@@ -677,13 +853,16 @@ async fn test_trbfv_actor() -> Result<()> {
             let addr = rand_eth_addr(&rng);
             println!("Building normal {}", &addr);
             CiphernodeBuilder::new(rng.clone(), cipher.clone())
+                .testmode_with_history()
                 .with_shared_taskpool(&task_pool)
                 .with_multithread_concurrent_jobs(concurrent_jobs)
                 .with_shared_multithread_report(&multithread_report)
                 .with_trbfv()
                 .with_zkproof(zk_backend.clone())
                 .testmode_with_signer(PrivateKeySigner::random())
+                .with_pubkey_aggregation()
                 .with_sortition_score()
+                .with_threshold_plaintext_aggregation()
                 .testmode_with_forked_bus(bus.event_bus())
                 .testmode_ignore_address_check()
                 .with_logging()
@@ -770,6 +949,17 @@ async fn test_trbfv_actor() -> Result<()> {
         buffer_nodes.len()
     ));
 
+    let active_aggregator_addr = committee
+        .first()
+        .cloned()
+        .expect("committee should have an active aggregator");
+    let active_aggregator_index = find_node_index_by_address(&nodes, &active_aggregator_addr)?;
+
+    println!(
+        "Resolved active aggregator: node index {} ({})",
+        active_aggregator_index, active_aggregator_addr
+    );
+
     nodes.expect_events(&["E3Requested"]).await?;
 
     bus.publish_without_context(CommitteeFinalized {
@@ -788,54 +978,70 @@ async fn test_trbfv_actor() -> Result<()> {
         committee_finalized_timer.elapsed(),
     ));
 
-    // Collector (node 0): prefix order differs by `proof_aggregation_enabled` (see flow-trace DKG).
-    // Then C1/C5 verification, then if aggregation: DKGRecursive ×3 + cross-node fold ZK, then
-    // PublicKeyAggregated.
+    // Node 0 is a non-committee observer. It only sees bus-global events and the forwardable
+    // gossip events from the active aggregator flow.
     let shares_to_pubkey_agg_timer = Instant::now();
     const KS3: [&str; 3] = ["KeyshareCreated"; 3];
     const DKG3: [&str; 3] = ["DKGRecursiveAggregationComplete"; 3];
-    const C1_C5: [&str; 13] = [
+    const ACTIVE_AGGREGATOR_C1_C5: [&str; 9] = [
         "ShareVerificationDispatched",
         "CommitmentConsistencyCheckRequested",
         "CommitmentConsistencyCheckComplete",
-        "ComputeRequest",
-        "ComputeResponse",
         "ProofVerificationPassed",
         "ProofVerificationPassed",
         "ProofVerificationPassed",
         "ShareVerificationComplete",
         "PkAggregationProofPending",
-        "ComputeRequest",
-        "ComputeResponse",
         "PkAggregationProofSigned",
     ];
-    const DKG_FOLD: [&str; 4] = [
-        "ComputeRequest",
-        "ComputeResponse",
-        "ComputeRequest",
-        "ComputeResponse",
-    ];
 
-    let mut expected_events: Vec<&'static str> = Vec::new();
+    let mut expected_events: Vec<&'static str> = vec!["AggregatorChanged"];
     if proof_aggregation_enabled {
         expected_events.extend_from_slice(&KS3);
+        expected_events.extend_from_slice(&DKG3);
     } else {
         expected_events.extend_from_slice(&DKG3);
         expected_events.extend_from_slice(&KS3);
     }
-    expected_events.extend_from_slice(&C1_C5);
-    if proof_aggregation_enabled {
-        expected_events.extend_from_slice(&DKG3);
-        expected_events.extend_from_slice(&DKG_FOLD);
-    }
     expected_events.push("PublicKeyAggregated");
-    let h = nodes
-        .expect_events_with_timeouts(
-            &expected_events,
-            Duration::from_secs(5000),
-            Duration::from_secs(5000),
-        )
-        .await?;
+    let h = expect_node_events_with_timeouts(
+        &nodes,
+        0,
+        &expected_events,
+        Duration::from_secs(5000),
+        Duration::from_secs(5000),
+    )
+    .await?;
+
+    let active_aggregator_history = nodes.get_history(active_aggregator_index).await?;
+    let active_aggregator_pubkey_history_len = active_aggregator_history.len();
+    let mut expected_active_aggregator_pubkey_events = vec![
+        "CommitteeFinalized",
+        "CiphernodeSelected",
+        "AggregatorChanged",
+    ];
+    if proof_aggregation_enabled {
+        expected_active_aggregator_pubkey_events.extend_from_slice(&KS3);
+    } else {
+        expected_active_aggregator_pubkey_events.extend_from_slice(&DKG3);
+        expected_active_aggregator_pubkey_events.extend_from_slice(&KS3);
+    }
+    expected_active_aggregator_pubkey_events.extend_from_slice(&ACTIVE_AGGREGATOR_C1_C5);
+    if proof_aggregation_enabled {
+        expected_active_aggregator_pubkey_events.extend_from_slice(&DKG3);
+    }
+    expected_active_aggregator_pubkey_events.push("PublicKeyAggregated");
+
+    // The active aggregator is also a selected committee member, so its node history contains
+    // local ThresholdKeyshare DKG work in addition to the public-key aggregation stage. Project
+    // only the deterministic pubkey-aggregation signals instead of comparing the whole raw node bus.
+    let active_aggregator_pubkey_events = project_history(&active_aggregator_history, |data| {
+        publickey_aggregator_marker(data, &e3_id)
+    });
+    assert_eq!(
+        active_aggregator_pubkey_events, expected_active_aggregator_pubkey_events,
+        "Unexpected active aggregator public-key flow"
+    );
 
     report.push((
         "ThresholdShares -> PublicKeyAggregated",
@@ -848,13 +1054,14 @@ async fn test_trbfv_actor() -> Result<()> {
     ));
     let app_gen_timer = Instant::now();
 
-    // Verify we got the expected events (last should be PublicKeyAggregated)
-    // First we get the public key
+    // First we get the public key from the collector-visible gossip event.
     println!("Getting public key");
-    let Some(EnclaveEventData::PublicKeyAggregated(pubkey_event)) = h.last().map(|e| e.get_data())
-    else {
+    let Some(pubkey_event) = h.iter().rev().find_map(|event| match event.get_data() {
+        EnclaveEventData::PublicKeyAggregated(data) => Some(data.clone()),
+        _ => None,
+    }) else {
         panic!(
-            "Was expecting last event to be PublicKeyAggregated, got: {:?}",
+            "Was expecting collector history to contain PublicKeyAggregated, got: {:?}",
             h.event_types()
         );
     };
@@ -903,59 +1110,129 @@ async fn test_trbfv_actor() -> Result<()> {
 
     println!("CiphertextOutputPublished event has been dispatched!");
 
-    // Lets grab decryption share events
-    // The collector sees:
-    // - 1 CiphertextOutputPublished (from shared bus)
-    // - 3 DecryptionshareCreated (from simulate_libp2p, passes is_forwardable_event)
-    // - 1 ShareVerificationDispatched (C6 verification dispatched by ThresholdPlaintextAggregator)
-    // - 1 CommitmentConsistencyCheckRequested (pre-ZK consistency check)
-    // - 1 CommitmentConsistencyCheckComplete (consistency check result)
-    // - 1 ComputeRequest (C6 ZK verification)
-    // - 1 ComputeResponse (C6 ZK verification result)
-    // - 9 ProofVerificationPassed (3 parties × 3 C6 proofs per ciphertext)
-    // - 1 ShareVerificationComplete (C6 verification done)
-    // - 1 ComputeRequest (TrBFV CalculateThresholdDecryption)
-    // - 1 ComputeResponse (TrBFV CalculateThresholdDecryption)
-    // - 1 AggregationProofPending (C7 proof requested by ThresholdPlaintextAggregator)
-    // - 1 ComputeRequest (C7 proof generation)
-    // - 1 ComputeResponse (C7 proof result)
-    // - 1 AggregationProofSigned (C7 proof signed by ProofRequestActor)
-    // - If proof aggregation: ComputeRequest + ComputeResponse per C6 fold step (9 proofs -> 8 steps)
-    // - 1 PlaintextAggregated (with C7 + C6 proofs)
-    // - 1 E3RequestComplete (published after PlaintextAggregated by request router)
-    // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
-    // stay on their local buses.
+    // The collector only sees the shared ciphertext event, gossiped decryption shares, and the
+    // final gossiped plaintext output.
+    const DS3: [&str; 3] = ["DecryptionshareCreated"; 3];
+    let mut expected_events: Vec<&'static str> = vec!["CiphertextOutputPublished"];
+    expected_events.extend_from_slice(&DS3);
+    expected_events.push("PlaintextAggregated");
+
+    let h = expect_node_events_with_timeouts(
+        &nodes,
+        0,
+        &expected_events,
+        Duration::from_secs(1000),
+        Duration::from_secs(1000),
+    )
+    .await?;
+
+    let active_aggregator_history = nodes.get_history(active_aggregator_index).await?;
+    const C6_VERIFY_PREFIX: [&str; 19] = [
+        "CiphertextOutputPublished",
+        "DecryptionshareCreated",
+        "DecryptionshareCreated",
+        "DecryptionshareCreated",
+        "ShareVerificationDispatched",
+        "CommitmentConsistencyCheckRequested",
+        "CommitmentConsistencyCheckComplete",
+        "ComputeRequest",
+        "ComputeResponse",
+        "ProofVerificationPassed",
+        "ProofVerificationPassed",
+        "ProofVerificationPassed",
+        "ProofVerificationPassed",
+        "ProofVerificationPassed",
+        "ProofVerificationPassed",
+        "ProofVerificationPassed",
+        "ProofVerificationPassed",
+        "ProofVerificationPassed",
+        "ShareVerificationComplete",
+    ];
+    let active_aggregator_plaintext_events = project_history(
+        &active_aggregator_history[active_aggregator_pubkey_history_len..],
+        |data| plaintext_aggregator_marker(data, &e3_id),
+    );
+    assert_eq!(
+        &active_aggregator_plaintext_events[..C6_VERIFY_PREFIX.len()],
+        C6_VERIFY_PREFIX,
+        "Unexpected active aggregator C6 verification prefix"
+    );
+
+    let completion_events = &active_aggregator_plaintext_events[C6_VERIFY_PREFIX.len()..];
     let c6_proof_count = threshold_n as usize * num_votes_per_voter;
-    let c6_fold_steps = c6_proof_count.saturating_sub(1);
-    let c6_fold_events = if proof_aggregation_enabled {
-        2 * c6_fold_steps
+    let c6_fold_steps = if proof_aggregation_enabled {
+        c6_proof_count.saturating_sub(1)
     } else {
         0
     };
-    // Sum matches the comment above through AggregationProofSigned, then fold, then PlaintextAggregated.
-    // E3RequestComplete is not included (arrives after; not needed for take).
-    let expected_count = 1 // CiphertextOutputPublished
-        + 3               // DecryptionshareCreated
-        + 1               // ShareVerificationDispatched
-        + 2               // CommitmentConsistencyCheck (Requested + Complete)
-        + 2               // C6 ZK verification (ComputeRequest + ComputeResponse)
-        + 9               // ProofVerificationPassed (3 parties × 3 proofs)
-        + 1               // ShareVerificationComplete
-        + 2               // TrBFV computation (ComputeRequest + ComputeResponse)
-        + 1               // AggregationProofPending
-        + 2               // C7 proof (ComputeRequest + ComputeResponse)
-        + 1               // AggregationProofSigned
-        + c6_fold_events  // C6 fold steps
-        + 1; // PlaintextAggregated
 
-    let h = nodes
-        .take_history_with_timeouts(
-            0,
-            expected_count,
-            Some(Duration::from_secs(1000)),
-            Some(Duration::from_secs(1000)),
-        )
-        .await?;
+    if proof_aggregation_enabled {
+        let aggregation_pending_index = completion_events
+            .iter()
+            .position(|event| *event == "AggregationProofPending")
+            .expect("AggregationProofPending should be present");
+        let aggregation_signed_index = completion_events
+            .iter()
+            .position(|event| *event == "AggregationProofSigned")
+            .expect("AggregationProofSigned should be present");
+        let plaintext_aggregated_index = completion_events
+            .iter()
+            .position(|event| *event == "PlaintextAggregated")
+            .expect("PlaintextAggregated should be present");
+
+        assert_eq!(
+            completion_events.len(),
+            7 + (2 * c6_fold_steps),
+            "Unexpected active aggregator C6/C7 completion event count"
+        );
+        assert_eq!(
+            &completion_events[..2],
+            ["ComputeRequest", "ComputeRequest"]
+        );
+        assert_eq!(
+            count_projected_events(completion_events, "ComputeRequest"),
+            2 + c6_fold_steps
+        );
+        assert_eq!(
+            count_projected_events(completion_events, "ComputeResponse"),
+            2 + c6_fold_steps
+        );
+        assert_eq!(
+            count_projected_events(completion_events, "AggregationProofPending"),
+            1
+        );
+        assert_eq!(
+            count_projected_events(completion_events, "AggregationProofSigned"),
+            1
+        );
+        assert_eq!(
+            count_projected_events(completion_events, "PlaintextAggregated"),
+            1
+        );
+        assert!(
+            aggregation_pending_index < aggregation_signed_index,
+            "AggregationProofPending must precede AggregationProofSigned"
+        );
+        assert_eq!(
+            plaintext_aggregated_index,
+            completion_events.len() - 1,
+            "PlaintextAggregated must be the last active aggregator completion event"
+        );
+    } else {
+        assert_eq!(
+            completion_events,
+            [
+                "ComputeRequest",
+                "ComputeResponse",
+                "AggregationProofPending",
+                "ComputeRequest",
+                "ComputeResponse",
+                "AggregationProofSigned",
+                "PlaintextAggregated",
+            ],
+            "Unexpected active aggregator plaintext completion flow"
+        );
+    }
 
     report.push((
         "Ciphertext published -> PlaintextAggregated",

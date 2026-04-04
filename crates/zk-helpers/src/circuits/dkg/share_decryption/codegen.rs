@@ -61,11 +61,14 @@ share_decryption_e_sm (CIRCUIT 4b - BFV DECRYPTION E_SM)
 ************************************/
 
 pub global {}_BIT_MSG: u32 = {};
+pub global {}_BIT_AGG: u32 = {};
 "#,
         preset.dkg_counterpart().unwrap().metadata().degree,
         preset.dkg_counterpart().unwrap().metadata().num_moduli,
         prefix,
         configs.bits.msg_bit,
+        prefix,
+        configs.bits.agg_bit,
     )
 }
 
@@ -117,5 +120,8 @@ mod tests {
         assert!(artifacts
             .configs
             .contains(format!("{}_BIT_MSG: u32 = {}", prefix, configs.bits.msg_bit).as_str()));
+        assert!(artifacts
+            .configs
+            .contains(format!("{}_BIT_AGG: u32 = {}", prefix, configs.bits.agg_bit).as_str()));
     }
 }

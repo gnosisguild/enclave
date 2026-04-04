@@ -647,9 +647,18 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       ]);
 
       // Before expulsion: all 3 should be in active nodes
-      const nodesBefore = await registry.getActiveCommitteeNodes(0);
+      const [nodesBefore, scoresBefore] =
+        await registry.getActiveCommitteeNodes(0);
       expect(nodesBefore.length).to.equal(3);
+      expect(scoresBefore.length).to.equal(3);
       expect(nodesBefore).to.include(await operator1.getAddress());
+
+      const scoreByNode = new Map(
+        nodesBefore.map((node, index) => [
+          node.toLowerCase(),
+          scoresBefore[index],
+        ]),
+      );
 
       // Expel operator1
       const proof = await signAndEncodeAttestation(
@@ -664,11 +673,18 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       );
 
       // After expulsion: only 2 should be active
-      const nodesAfter = await registry.getActiveCommitteeNodes(0);
+      const [nodesAfter, scoresAfter] =
+        await registry.getActiveCommitteeNodes(0);
       expect(nodesAfter.length).to.equal(2);
+      expect(scoresAfter.length).to.equal(2);
       expect(nodesAfter).to.not.include(await operator1.getAddress());
       expect(nodesAfter).to.include(await operator2.getAddress());
       expect(nodesAfter).to.include(await operator3.getAddress());
+      scoresAfter.forEach((score, index) => {
+        expect(score).to.equal(
+          scoreByNode.get(nodesAfter[index].toLowerCase()),
+        );
+      });
     });
   });
 

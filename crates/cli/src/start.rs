@@ -12,7 +12,7 @@ use crate::{
 };
 use anyhow::Result;
 use e3_ciphernode_builder::CiphernodeHandle;
-use e3_config::{AppConfig, NodeRole};
+use e3_config::AppConfig;
 use e3_console::Console;
 use e3_daemon_server::start_daemon_server;
 use e3_events::{prelude::*, Shutdown};
@@ -78,23 +78,7 @@ pub async fn build_ciphernode(
     // add cli peers to the config
     config.add_peers(peers);
 
-    let node = match config.role() {
-        // Launch in aggregator configuration
-        NodeRole::Aggregator {
-            pubkey_write_path,
-            plaintext_write_path,
-        } => {
-            e3_entrypoint::start::aggregator_start::execute(
-                &config,
-                pubkey_write_path,
-                plaintext_write_path,
-            )
-            .await?
-        }
-
-        // Launch in ciphernode configuration
-        NodeRole::Ciphernode => e3_entrypoint::start::start::execute(&config).await?,
-    };
+    let node = e3_entrypoint::start::start::execute(&config).await?;
 
     Ok(node)
 }

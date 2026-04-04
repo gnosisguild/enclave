@@ -363,6 +363,86 @@ mod tests {
         assert_eq!(bits.d_bit, expected_bit);
     }
 
+    /// Verifies that `CrtPolynomial::reverse()` + `center()` matches
+    /// `Inputs::compute` for d_commitment, and that the Poly bytes round-trip
+    /// is lossless.
+    #[test]
+    fn test_d_commitment_matches_inputs_compute() {
+        use crate::circuits::commitments::compute_threshold_decryption_share_commitment;
+        use crate::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
+        use crate::threshold::share_decryption::ShareDecryptionCircuitData;
+        use crate::CiphernodesCommitteeSize;
+        use fhe_math::rq::{Poly, Representation};
+        use fhe_traits::{DeserializeWithContext, Serialize as FheSer};
+        use num_traits::ToPrimitive;
+
+        let preset = DEFAULT_BFV_PRESET;
+        let committee = CiphernodesCommitteeSize::Small.values();
+        let sample = ShareDecryptionCircuitData::generate_sample(preset, committee).unwrap();
+        let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
+        let bounds = Bounds::compute(preset, &()).unwrap();
+        let bits = Bits::compute(preset, &bounds).unwrap();
+        let moduli: Vec<u64> = threshold_params.moduli().to_vec();
+
+        // Ground truth: Inputs::compute (what the Noir prover receives)
+        let inputs = Inputs::compute(preset, &sample).unwrap();
+        let truth = compute_threshold_decryption_share_commitment(
+            &inputs.d,
+            bits.d_bit,
+            MAX_MSG_NON_ZERO_COEFFS,
+        );
+
+        // Aggregator path: CrtPolynomial::reverse() + center()
+        let mut crt = sample.d_share.clone();
+        crt.reverse();
+        crt.center(&moduli).unwrap();
+        let from_api = compute_threshold_decryption_share_commitment(
+            &crt,
+            bits.d_bit,
+            MAX_MSG_NON_ZERO_COEFFS,
+        );
+        assert_eq!(
+            truth, from_api,
+            "CrtPolynomial API must match Inputs::compute"
+        );
+
+        // Bytes round-trip: Poly → to_bytes → from_bytes → from_fhe_polynomial
+        let raw: Vec<Vec<u64>> = sample
+            .d_share
+            .limbs
+            .iter()
+            .map(|l| {
+                l.coefficients()
+                    .iter()
+                    .map(|c| c.to_u64().unwrap())
+                    .collect()
+            })
+            .collect();
+        let n = raw[0].len();
+        let mut arr = ndarray::Array2::<u64>::zeros((raw.len(), n));
+        for (i, limb) in raw.iter().enumerate() {
+            for (j, &v) in limb.iter().enumerate() {
+                arr[[i, j]] = v;
+            }
+        }
+        let ctx = threshold_params.ctx_at_level(0).unwrap();
+        let mut poly = Poly::zero(&ctx, Representation::PowerBasis);
+        poly.set_coefficients(arr);
+        let poly_rt = Poly::from_bytes(&poly.to_bytes(), &ctx).unwrap();
+        let mut crt_rt = CrtPolynomial::from_fhe_polynomial(&poly_rt);
+        crt_rt.reverse();
+        crt_rt.center(&moduli).unwrap();
+        let from_bytes = compute_threshold_decryption_share_commitment(
+            &crt_rt,
+            bits.d_bit,
+            MAX_MSG_NON_ZERO_COEFFS,
+        );
+        assert_eq!(
+            truth, from_bytes,
+            "Bytes round-trip must match Inputs::compute"
+        );
+    }
+
     #[test]
     fn test_constants_json_roundtrip() {
         let constants = Configs::compute(DEFAULT_BFV_PRESET, &()).unwrap();

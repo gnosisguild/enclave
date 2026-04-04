@@ -52,7 +52,7 @@ not a single crate.
 | ------------------------------- | -------- | ---------------------------- | --------------------------------------------- |
 | `pk`                            | C0       | `PkBfv`                      | Commit to individual BFV public key           |
 | `sk_share_computation_base`     | C2 inner | `SkShareComputationBase`     | Shamir shares (`y`) for secret contribution   |
-| `e_sm_share_computation_base`   | C2 inner | `ESmShareComputationBase`    | Shamir shares (`y`) for smudging noise          |
+| `e_sm_share_computation_base`   | C2 inner | `ESmShareComputationBase`    | Shamir shares (`y`) for smudging noise        |
 | `share_computation_chunk`       | C2 inner | `ShareComputationChunk`      | Reed–Solomon parity on a coefficient slice    |
 | `share_computation_chunk_batch` | C2 inner | `ShareComputationChunkBatch` | Binds base proof to a batch of chunk proofs   |
 | `share_computation`             | **C2**   | `ShareComputation`           | Final C2 step; aggregates inner proofs        |
@@ -106,9 +106,9 @@ produces. Install options and CLI flags are on the
 
 ## Related documentation
 
-| Topic                                                                  | Location                                                                                                 |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Cryptographic model (PV-TBFV, phases P1–P4, circuit identifiers C0–C7) | [Cryptography](https://docs.theinterfold.com/cryptography) · [source](../docs/pages/cryptography.mdx)    |
-| Toolchain, repository layout, `enclave noir`, compilation              | [Noir Circuits](https://docs.theinterfold.com/noir-circuits) · [source](../docs/pages/noir-circuits.mdx) |
+| Topic                                                                  | Location                                                                                                                            |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Cryptographic model (PV-TBFV, phases P1–P4, circuit identifiers C0–C7) | [Cryptography](https://docs.theinterfold.com/cryptography) · [source](../docs/pages/cryptography.mdx)                               |
+| Toolchain, repository layout, `enclave noir`, compilation              | [Noir Circuits](https://docs.theinterfold.com/noir-circuits) · [source](../docs/pages/noir-circuits.mdx)                            |
 | Rust types (`ProofType`, `CircuitName`)                                | [`signed_proof.rs`](../crates/events/src/enclave_event/signed_proof.rs) · [`proof.rs`](../crates/events/src/enclave_event/proof.rs) |
-| Protocol execution (actors, events, proof ordering)                    | [`agent/flow-trace/04_DKG_AND_COMPUTATION.md`](../agent/flow-trace/04_DKG_AND_COMPUTATION.md)            |
+| Protocol execution (actors, events, proof ordering)                    | [`agent/flow-trace/04_DKG_AND_COMPUTATION.md`](../agent/flow-trace/04_DKG_AND_COMPUTATION.md)                                       |

@@ -66,7 +66,8 @@ pub struct CommitmentConsistencyChecker {
     e3_id: E3id,
     links: Vec<Box<dyn CommitmentLink>>,
     /// Verified proof outputs: `(address, proof_type) → data`.
-    verified: HashMap<(Address, ProofType), VerifiedProofData>,
+    /// Multiple proofs per key are supported (e.g. N-1 C3a proofs per sender).
+    verified: HashMap<(Address, ProofType), Vec<VerifiedProofData>>,
 }
 
 impl CommitmentConsistencyChecker {
@@ -76,6 +77,21 @@ impl CommitmentConsistencyChecker {
             e3_id,
             links,
             verified: HashMap::new(),
+        }
+    }
+
+    /// Insert a proof into the cache, deduplicating by `data_hash` to avoid
+    /// double-counting when the same proof arrives via both the pre-ZK batch
+    /// and the post-ZK `ProofVerificationPassed` path.
+    fn insert_verified(
+        &mut self,
+        address: Address,
+        proof_type: ProofType,
+        data: VerifiedProofData,
+    ) {
+        let entries = self.verified.entry((address, proof_type)).or_default();
+        if !entries.iter().any(|e| e.data_hash == data.data_hash) {
+            entries.push(data);
         }
     }
 
@@ -97,50 +113,118 @@ impl CommitmentConsistencyChecker {
         let tgt_type = link.target_proof_type();
 
         match link.scope() {
-            LinkScope::SameParty => self
-                .verified
-                .keys()
-                .filter(|(_, pt)| *pt == src_type)
-                .filter_map(|(addr, _)| {
-                    let src = self.verified.get(&(*addr, src_type))?;
-                    let tgt = self.verified.get(&(*addr, tgt_type))?;
-                    let vals = link.extract_source_values(&src.public_signals);
-                    (!link.check_consistency(&vals, &tgt.public_signals)).then(|| Mismatch {
-                        party_id: src.party_id,
-                        address: *addr,
-                        proof_type: src_type,
-                        data_hash: src.data_hash,
-                    })
-                })
-                .collect(),
+            // Same address: each source entry must be consistent with each
+            // target entry from the same address.
+            LinkScope::SameParty => {
+                let mut mismatches = Vec::new();
+                for ((addr, pt), srcs) in &self.verified {
+                    if *pt != src_type {
+                        continue;
+                    }
+                    let Some(tgts) = self.verified.get(&(*addr, tgt_type)) else {
+                        continue;
+                    };
+                    for src in srcs {
+                        let vals = link.extract_source_values(&src.public_signals);
+                        for tgt in tgts {
+                            if !link.check_consistency(&vals, &tgt.public_signals) {
+                                mismatches.push(Mismatch {
+                                    party_id: src.party_id,
+                                    address: *addr,
+                                    proof_type: src_type,
+                                    data_hash: src.data_hash,
+                                });
+                                break; // one mismatch per source entry is enough
+                            }
+                        }
+                    }
+                }
+                mismatches
+            }
 
+            // Cross-party: each source's extracted value must appear in at
+            // least one target's public signals. Fault the source if no match.
+            // If no targets are cached yet, skip — the check will run again
+            // when a target arrives.
             LinkScope::CrossParty => {
-                let targets: Vec<_> = self
+                let all_targets: Vec<&VerifiedProofData> = self
                     .verified
                     .iter()
                     .filter(|((_, pt), _)| *pt == tgt_type)
-                    .map(|(_, v)| v)
+                    .flat_map(|(_, entries)| entries)
                     .collect();
 
-                self.verified
-                    .iter()
-                    .filter(|((_, pt), _)| *pt == src_type)
-                    .filter_map(|(_, src)| {
+                if all_targets.is_empty() {
+                    return Vec::new();
+                }
+
+                let mut mismatches = Vec::new();
+                for ((_, pt), srcs) in &self.verified {
+                    if *pt != src_type {
+                        continue;
+                    }
+                    for src in srcs {
                         let vals = link.extract_source_values(&src.public_signals);
                         if vals.is_empty() {
-                            return None;
+                            continue;
                         }
-                        targets
+                        // Source must match AT LEAST ONE target.
+                        let found = all_targets
                             .iter()
-                            .any(|tgt| !link.check_consistency(&vals, &tgt.public_signals))
-                            .then(|| Mismatch {
+                            .any(|tgt| link.check_consistency(&vals, &tgt.public_signals));
+                        if !found {
+                            mismatches.push(Mismatch {
                                 party_id: src.party_id,
                                 address: src.address,
                                 proof_type: src_type,
                                 data_hash: src.data_hash,
-                            })
-                    })
-                    .collect()
+                            });
+                        }
+                    }
+                }
+                mismatches
+            }
+
+            // Each source claims a value that must exist among any target's
+            // outputs. Fault the source (e.g. C3) when no target (e.g. C0)
+            // matches. If no targets are cached yet, skip — the check will
+            // run when a target arrives via post-ZK ProofVerificationPassed.
+            LinkScope::SourceMustExistInTargets => {
+                let all_targets: Vec<&VerifiedProofData> = self
+                    .verified
+                    .iter()
+                    .filter(|((_, pt), _)| *pt == tgt_type)
+                    .flat_map(|(_, entries)| entries)
+                    .collect();
+
+                if all_targets.is_empty() {
+                    return Vec::new();
+                }
+
+                let mut mismatches = Vec::new();
+                for ((_, pt), srcs) in &self.verified {
+                    if *pt != src_type {
+                        continue;
+                    }
+                    for src in srcs {
+                        let vals = link.extract_source_values(&src.public_signals);
+                        if vals.is_empty() {
+                            continue;
+                        }
+                        let found = all_targets
+                            .iter()
+                            .any(|tgt| link.check_consistency(&vals, &tgt.public_signals));
+                        if !found {
+                            mismatches.push(Mismatch {
+                                party_id: src.party_id,
+                                address: src.address,
+                                proof_type: src_type,
+                                data_hash: src.data_hash,
+                            });
+                        }
+                    }
+                }
+                mismatches
             }
         }
     }
@@ -245,8 +329,9 @@ impl Handler<TypedEvent<ProofVerificationPassed>> for CommitmentConsistencyCheck
         let proof_type = data.proof_type;
         let address = data.address;
 
-        self.verified.insert(
-            (address, proof_type),
+        self.insert_verified(
+            address,
+            proof_type,
             VerifiedProofData {
                 party_id: data.party_id,
                 address,
@@ -274,8 +359,9 @@ impl Handler<TypedEvent<CommitmentConsistencyCheckRequested>> for CommitmentCons
         // Cache each party's proof data for link evaluation.
         for party in &data.party_proofs {
             for (proof_type, public_signals, data_hash) in &party.proofs {
-                self.verified.insert(
-                    (party.address, *proof_type),
+                self.insert_verified(
+                    party.address,
+                    *proof_type,
                     VerifiedProofData {
                         party_id: party.party_id,
                         address: party.address,
@@ -307,8 +393,10 @@ impl Handler<TypedEvent<CommitmentConsistencyCheckRequested>> for CommitmentCons
         // Remove cached entries for inconsistent parties so they don't
         // participate in future post-ZK `find_mismatches` evaluations.
         if !inconsistent_parties.is_empty() {
-            self.verified
-                .retain(|_, v| !inconsistent_parties.contains(&v.party_id));
+            self.verified.retain(|_, entries| {
+                entries.retain(|v| !inconsistent_parties.contains(&v.party_id));
+                !entries.is_empty()
+            });
         }
 
         // Respond to ShareVerificationActor.
