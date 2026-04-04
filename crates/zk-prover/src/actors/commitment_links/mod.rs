@@ -14,11 +14,14 @@
 
 pub mod c0_to_c3;
 pub mod c1_to_c5;
+pub mod c2_to_c3;
+pub mod c2_to_c4;
 pub mod c4a_to_c6;
 pub mod c4b_to_c6;
 pub mod c6_to_c7;
 
 use e3_events::ProofType;
+use e3_fhe_params::DEFAULT_BFV_PRESET;
 
 /// A 32-byte BN254 field element extracted from public signals.
 pub type FieldValue = [u8; 32];
@@ -64,9 +67,29 @@ pub trait CommitmentLink: Send + Sync {
     fn extract_source_values(&self, public_signals: &[u8]) -> Vec<FieldValue>;
 
     /// Return `true` when `source_values` are consistent with
+    /// `target_public_signals`, without party context.
+    ///
+    /// Most links implement this. Links that need positional party information
+    /// should override [`check_consistency`] instead and leave this unimplemented.
+    fn check_signals(&self, _source_values: &[FieldValue], _target_public_signals: &[u8]) -> bool {
+        unimplemented!("override check_signals or check_consistency")
+    }
+
+    /// Return `true` when `source_values` are consistent with
     /// `target_public_signals`.
-    fn check_consistency(&self, source_values: &[FieldValue], target_public_signals: &[u8])
-        -> bool;
+    ///
+    /// `src_party_id` and `tgt_party_id` are 0-based committee indices.
+    /// Defaults to ignoring party IDs and delegating to [`check_signals`].
+    /// Override this only when positional party information is required.
+    fn check_consistency(
+        &self,
+        source_values: &[FieldValue],
+        target_public_signals: &[u8],
+        _src_party_id: u64,
+        _tgt_party_id: u64,
+    ) -> bool {
+        self.check_signals(source_values, target_public_signals)
+    }
 }
 
 /// Returns the default set of commitment links to register.
@@ -77,11 +100,21 @@ pub trait CommitmentLink: Send + Sync {
 /// reduced/centered/reversed, plus different BIT parameters). See test
 /// `c4_c6_commitment_mismatch_due_to_modular_reduction` in `c4a_to_c6.rs`.
 /// Re-enable after aligning the commitment computation (circuit change needed).
+///
+/// C3→C4 links are replaced by C2→C4: C2 directly outputs share commitments
+/// that C4 consumes as `expected_commitments`. Since C2→C3 already ensures
+/// C3 encrypts the correct share, C2→C4 closes the remaining gap (preventing
+/// a party from using different commitments in C4 than they computed in C2).
 pub fn default_links() -> Vec<Box<dyn CommitmentLink>> {
+    let l = DEFAULT_BFV_PRESET.metadata().num_moduli;
     vec![
         Box::new(c0_to_c3::C3aToC0PkCommitmentLink),
         Box::new(c0_to_c3::C3bToC0PkCommitmentLink),
         Box::new(c1_to_c5::C1ToC5PkCommitmentLink),
+        Box::new(c2_to_c3::C3aToC2aShareEncryptionLink),
+        Box::new(c2_to_c3::C3bToC2bShareEncryptionLink),
+        Box::new(c2_to_c4::C2aToC4aShareCommitmentLink { l }),
+        Box::new(c2_to_c4::C2bToC4bShareCommitmentLink { l }),
         Box::new(c6_to_c7::C6ToC7DCommitmentLink),
         // Box::new(c4a_to_c6::C4aToC6SkCommitmentLink),
         // Box::new(c4b_to_c6::C4bToC6ESmCommitmentLink),

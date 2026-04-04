@@ -6,7 +6,7 @@
 
 use crate::math::commitments::{
     compute_share_computation_e_sm_commitment, compute_share_computation_sk_commitment,
-    compute_share_encryption_commitment_from_shares,
+    compute_share_encryption_commitment_from_message,
 };
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
@@ -105,7 +105,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
         verify_parity_check::<N, L, N_PARTIES, T>(self.configs.qis, self.h, self.y);
 
         // Step 5: Commit to shares for each party and modulus
-        commit_to_party_shares::<N, L, N_PARTIES>(self.y)
+        commit_to_party_shares::<N, L, N_PARTIES, BIT_SHARE>(self.y)
     }
 
     /// Verifies that secret hashes to expected_secret_commitment
@@ -166,7 +166,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
         verify_parity_check::<N, L, N_PARTIES, T>(self.configs.qis, self.h, self.y);
 
         // Step 5: Commit to shares for each party and modulus
-        commit_to_party_shares::<N, L, N_PARTIES>(self.y)
+        commit_to_party_shares::<N, L, N_PARTIES, BIT_SHARE>(self.y)
     }
 
     /// Verifies that secret hashes to expected_secret_commitment
@@ -273,20 +273,28 @@ pub fn verify_parity_check<let N: u32, let L: u32, let N_PARTIES: u32, let T: u3
     }
 }
 
-/// Commits to shares for each party and modulus
-/// Returns [[Field; L]; N_PARTIES] where commitments[party_idx][mod_idx]
-pub fn commit_to_party_shares<let N: u32, let L: u32, let N_PARTIES: u32>(
+/// Commits to shares for each party and modulus.
+///
+/// Returns `[[Field; L]; N_PARTIES]` where `commitments[party_idx][mod_idx]`
+/// equals `compute_share_encryption_commitment_from_message(share_polynomial)`.
+pub fn commit_to_party_shares<let N: u32, let L: u32, let N_PARTIES: u32, let BIT_SHARE: u32>(
     y: [[[Field; N_PARTIES + 1]; L]; N],
 ) -> [[Field; L]; N_PARTIES] {
     let mut commitments: [[Field; L]; N_PARTIES] = [[0; L]; N_PARTIES];
 
     for party_idx in 0..N_PARTIES {
         for mod_idx in 0..L {
-            commitments[party_idx][mod_idx] = compute_share_encryption_commitment_from_shares::<N, L, N_PARTIES>(
-                y,
-                party_idx,
-                mod_idx,
-            );
+            // Build the share polynomial for this (party, modulus) pair.
+            // Coefficients are stored in reversed order to match C3 / C4 `message` witness,
+            // which is constructed as `pt.value.reversed()` before committing.
+            let mut share_coeffs: [Field; N] = [0; N];
+            for coeff_idx in 0..N {
+                share_coeffs[N - 1 - coeff_idx] = y[coeff_idx][mod_idx][party_idx + 1];
+            }
+
+            let share_poly = Polynomial::new(share_coeffs);
+            commitments[party_idx][mod_idx] =
+                compute_share_encryption_commitment_from_message::<N, BIT_SHARE>(share_poly);
         }
     }
 

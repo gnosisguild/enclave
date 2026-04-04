@@ -127,7 +127,7 @@ impl CommitmentConsistencyChecker {
                     for src in srcs {
                         let vals = link.extract_source_values(&src.public_signals);
                         for tgt in tgts {
-                            if !link.check_consistency(&vals, &tgt.public_signals) {
+                            if !link.check_consistency(&vals, &tgt.public_signals, src.party_id, tgt.party_id) {
                                 mismatches.push(Mismatch {
                                     party_id: src.party_id,
                                     address: *addr,
@@ -171,7 +171,7 @@ impl CommitmentConsistencyChecker {
                         // Source must match AT LEAST ONE target.
                         let found = all_targets
                             .iter()
-                            .any(|tgt| link.check_consistency(&vals, &tgt.public_signals));
+                            .any(|tgt| link.check_consistency(&vals, &tgt.public_signals, src.party_id, tgt.party_id));
                         if !found {
                             mismatches.push(Mismatch {
                                 party_id: src.party_id,
@@ -213,7 +213,7 @@ impl CommitmentConsistencyChecker {
                         }
                         let found = all_targets
                             .iter()
-                            .any(|tgt| link.check_consistency(&vals, &tgt.public_signals));
+                            .any(|tgt| link.check_consistency(&vals, &tgt.public_signals, src.party_id, tgt.party_id));
                         if !found {
                             mismatches.push(Mismatch {
                                 party_id: src.party_id,

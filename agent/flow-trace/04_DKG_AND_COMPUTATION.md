@@ -337,7 +337,14 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │
 │   ├─ CommitmentConsistencyChecker (per-E3 actor) receives this:
 │   │   ├─ Caches each party's (address, proof_type) → {public_signals, data_hash}
-│   │   ├─ Evaluates all registered CommitmentLinks (e.g. C1→C5 pk_commitment)
+│   │   ├─ Evaluates all registered CommitmentLinks:
+│   │   │     C0→C3  (SourceMustExistInTargets): C3's expected_pk_commitment ∈ any C0 pk_commitment
+│   │   │     C1→C5  (CrossParty):               C1's pk_commitment ∈ C5 expected pk inputs
+│   │   │     C2→C3  (SameParty):                C3's expected_message_commitment ∈ C2's share commitments
+│   │   │     C2→C4  (SourceMustExistInTargets): C2's L share commitments for recipient R exactly
+│   │   │                                         match C4_R's expected_commitments row for sender X
+│   │   │     C6→C7  (SameParty):                C6's d_commitment matches C7's expected_d_commitment
+│   │   │
 │   │   ├─ On mismatch: publishes CommitmentConsistencyViolation
 │   │   │   → AccusationManager initiates accusation quorum (see Part 5)
 │   │   └─ Responds with CommitmentConsistencyCheckComplete { inconsistent_parties }
