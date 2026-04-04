@@ -214,7 +214,9 @@ daemon_query_events() {
     -H "Content-Type: application/json" \
     -d "$json_payload" > "$output_file"
 
-  echo "Events from $name written to: $output_file"
+  echo "Events from $name written:"
+  cat $output_file
+  echo "End"
 }
 
 # Run this at the start of every test to ensure we start with a clean slate
