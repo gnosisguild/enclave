@@ -317,10 +317,15 @@ pub enum Commands {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RemoteCli {
+    #[serde(default)]
     name: Option<String>,
+    #[serde(default)]
     otel: Option<String>,
+    #[serde(default)]
     quiet: bool,
+    #[serde(default)]
     config: Option<String>,
+    #[serde(default)]
     verbose: u8,
     command: RemoteCommand,
 }
