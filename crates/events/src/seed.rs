@@ -38,8 +38,9 @@ impl AsBytesSerde for Seed {
 
     fn try_from_bytes(bytes: Vec<u8>) -> Result<Self, String> {
         Ok(Seed(
-            bytes.try_into().map_err(|_| "EventId requires 32 bytes")?,
+            bytes.try_into().map_err(|_| "Seed requires 32 bytes")?,
         ))
+    }
     }
 }
 
