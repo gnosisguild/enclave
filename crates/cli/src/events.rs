@@ -12,6 +12,7 @@ use e3_console::{log, Console};
 use e3_entrypoint::helpers::datastore::get_eventstore_reader;
 use e3_events::CorrelationId;
 use e3_events::EnclaveEvent;
+use e3_events::EventContextSeq;
 use e3_events::EventStoreQueryResponse;
 use e3_events::{AggregateId, EventStoreQueryBy, SeqAgg};
 use e3_utils::actix::channel as actix_toolbox;
@@ -45,6 +46,12 @@ pub async fn execute(out: Console, command: EventsCommands, config: &AppConfig) 
     Ok(())
 }
 
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub enum BatchCursor {
+    Done,
+    Next(u64),
+}
+
 async fn query_events(
     out: Console,
     config: &AppConfig,
@@ -53,8 +60,9 @@ async fn query_events(
     limit: Option<u64>,
 ) -> Result<()> {
     let eventstore = get_eventstore_reader(config)?;
-    let events = fetch_events(eventstore, aggregate, since, limit).await?;
-    print_events(out, events)?;
+    let (events, next) = fetch_events(eventstore, aggregate, since, limit).await?;
+    print_events(out.clone(), events)?;
+    log!(out, "{}", serde_json::to_string(&next)?);
     Ok(())
 }
 
@@ -63,7 +71,7 @@ async fn fetch_events(
     aggregate: Option<usize>,
     since: Option<u64>,
     limit: Option<u64>,
-) -> Result<Vec<EnclaveEvent>> {
+) -> Result<(Vec<EnclaveEvent>, BatchCursor)> {
     let aggregate = aggregate.unwrap_or(0);
     let since = since.unwrap_or(0);
     let limit = limit.unwrap_or(10);
@@ -78,8 +86,14 @@ async fn fetch_events(
 
     eventstore.seq().do_send(msg);
     let events = rx.await?.into_events();
+    let next = if events.len() == limit as usize {
+        let last_event_seq = events.last().map(|e| e.seq()).unwrap_or(0);
+        BatchCursor::Next(last_event_seq)
+    } else {
+        BatchCursor::Done
+    };
 
-    Ok(events)
+    Ok((events, next))
 }
 
 fn print_events(out: Console, events: Vec<EnclaveEvent>) -> Result<()> {

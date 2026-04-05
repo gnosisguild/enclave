@@ -284,8 +284,7 @@ daemon_query_events() {
     --name $name \
     --config "$SCRIPT_DIR/enclave.config.yaml")
 
-  local json_payload='{"command":{"EventsQuery":{"since":0,"limit":100}}}'
-
+  local json_payload='{"command":{"EventsQuery":{"since":0,"limit":10}}}'
   curl -sf -X POST "http://127.0.0.1:${ctrl_port}" \
     -H "Content-Type: application/json" \
     -d "$json_payload" > "$output_file"
@@ -293,6 +292,16 @@ daemon_query_events() {
   echo "Events from $name written:"
   cat $output_file
   echo "End"
+}
+
+check_last_line() {
+  local file="$1"
+  local expected="$2"
+  if [[ "$(tail -1 "$file")" == "$expected" ]]; then
+    return 0
+  else
+    return 1
+  fi
 }
 
 # Run this at the start of every test to ensure we start with a clean slate

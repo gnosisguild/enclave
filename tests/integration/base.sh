@@ -79,6 +79,8 @@ wait_for_committee_pubkey 0 "$SCRIPT_DIR/output/pubkey.bin"
 heading "Query events via daemon REST API"
 daemon_query_events cn1 "$SCRIPT_DIR/output/events.txt"
 
+check_last_line "$SCRIPT_DIR/output/events.txt" '{"Next":10}'
+
 heading "Mock encrypted plaintext"
 $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
 
