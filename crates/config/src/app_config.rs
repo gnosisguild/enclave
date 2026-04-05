@@ -179,7 +179,7 @@ impl BBPath {
         }
     }
 
-    /// Check the environment variable and if found use that otherwisse use the given path
+    /// Check the environment variable and if found use that otherwise use the given path
     pub fn check(default_path: PathBuf) -> Result<Self> {
         let bb_path = if let Some(bb_path) = env::var("E3_CUSTOM_BB").ok() {
             BBPath::Custom(bb_path.try_into()?)
