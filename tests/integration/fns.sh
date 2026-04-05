@@ -289,9 +289,6 @@ daemon_query_events() {
     -H "Content-Type: application/json" \
     -d "$json_payload" > "$output_file"
 
-  echo "Events from $name written:"
-  cat $output_file
-  echo "End"
 }
 
 check_last_line() {
