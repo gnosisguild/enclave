@@ -7,6 +7,7 @@
 use crate::E3id;
 use actix::Message;
 use alloy::primitives::Address;
+use e3_utils::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
@@ -27,7 +28,7 @@ pub struct AccusationVote {
     /// keccak256 hash of the data as this node received it — for equivocation detection.
     pub data_hash: [u8; 32],
     /// ECDSA signature of the voter over the vote fields.
-    pub signature: Vec<u8>,
+    pub signature: ArcBytes,
 }
 
 impl Display for AccusationVote {

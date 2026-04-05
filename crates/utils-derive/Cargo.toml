@@ -1,0 +1,16 @@
+[package]
+name = "e3-utils-derive"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+hex.workspace = true
+syn.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true

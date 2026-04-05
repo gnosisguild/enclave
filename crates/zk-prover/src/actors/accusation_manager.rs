@@ -42,7 +42,7 @@ use e3_events::{
     ProofType, ProofVerificationFailed, ProofVerificationPassed, Sequenced, SignedProofPayload,
     SlashExecuted, TypedEvent, VerifyShareProofsRequest, ZkRequest, ZkResponse,
 };
-use e3_utils::NotifySync;
+use e3_utils::{ArcBytes, NotifySync};
 use tracing::{error, info, warn};
 
 /// How long to wait for votes before declaring the accusation inconclusive.
@@ -248,7 +248,9 @@ impl AccusationManager {
 
     fn verify_accusation_signature(&self, accusation: &ProofFailureAccusation) -> bool {
         let digest = Self::accusation_digest(accusation);
-        let sig = match alloy::primitives::Signature::try_from(accusation.signature.as_slice()) {
+        let sig = match alloy::primitives::Signature::try_from(
+            accusation.signature.extract_bytes().as_ref(),
+        ) {
             Ok(s) => s,
             Err(_) => return false,
         };
@@ -299,10 +301,11 @@ impl AccusationManager {
 
     fn verify_vote_signature(&self, vote: &AccusationVote) -> bool {
         let digest = Self::vote_digest(vote);
-        let sig = match alloy::primitives::Signature::try_from(vote.signature.as_slice()) {
-            Ok(s) => s,
-            Err(_) => return false,
-        };
+        let sig =
+            match alloy::primitives::Signature::try_from(vote.signature.extract_bytes().as_ref()) {
+                Ok(s) => s,
+                Err(_) => return false,
+            };
         match sig.recover_address_from_msg(&digest) {
             Ok(addr) => addr == vote.voter,
             Err(_) => false,
@@ -434,9 +437,9 @@ impl AccusationManager {
             proof_type,
             data_hash,
             signed_payload: forwarded_payload,
-            signature: Vec::new(),
+            signature: ArcBytes::default(),
         };
-        accusation.signature = self.sign_accusation_digest(&accusation);
+        accusation.signature = ArcBytes::from_bytes(&self.sign_accusation_digest(&accusation));
 
         let accusation_id = Self::accusation_id(&accusation);
 
@@ -458,9 +461,9 @@ impl AccusationManager {
             voter: self.my_address,
             agrees: true,
             data_hash,
-            signature: Vec::new(),
+            signature: ArcBytes::default(),
         };
-        own_vote.signature = self.sign_vote_digest(&own_vote);
+        own_vote.signature = ArcBytes::from_bytes(&self.sign_vote_digest(&own_vote));
 
         if let Err(err) = self.bus.publish(own_vote.clone(), ec.clone()) {
             error!("Failed to broadcast own AccusationVote: {err}");
@@ -663,9 +666,9 @@ impl AccusationManager {
             voter: self.my_address,
             agrees,
             data_hash: our_data_hash,
-            signature: Vec::new(),
+            signature: ArcBytes::default(),
         };
-        vote.signature = self.sign_vote_digest(&vote);
+        vote.signature = ArcBytes::from_bytes(&self.sign_vote_digest(&vote));
 
         info!(
             "Voting {} on accusation against {} for {:?}",
@@ -1101,9 +1104,9 @@ impl AccusationManager {
             voter: self.my_address,
             agrees,
             data_hash: reverif.data_hash,
-            signature: Vec::new(),
+            signature: ArcBytes::default(),
         };
-        vote.signature = self.sign_vote_digest(&vote);
+        vote.signature = ArcBytes::from_bytes(&self.sign_vote_digest(&vote));
 
         info!(
             "C3a/C3b re-verification complete — voting {} on accusation against {:?}",

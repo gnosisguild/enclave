@@ -276,6 +276,25 @@ gracefull_shutdown() {
   kill_em_all
 }
 
+daemon_query_events() {
+  local name="$1"
+  local output_file="${2:-$SCRIPT_DIR/output/events.txt}"
+
+  local ctrl_port=$($ENCLAVE_BIN config get ctrl_port \
+    --name $name \
+    --config "$SCRIPT_DIR/enclave.config.yaml")
+
+  local json_payload='{"command":{"EventsQuery":{"since":0,"limit":100}}}'
+
+  curl -sf -X POST "http://127.0.0.1:${ctrl_port}" \
+    -H "Content-Type: application/json" \
+    -d "$json_payload" > "$output_file"
+
+  echo "Events from $name written:"
+  cat $output_file
+  echo "End"
+}
+
 # Run this at the start of every test to ensure we start with a clean slate
 kill_em_all
 

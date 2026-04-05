@@ -5,6 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::ciphernode::{self, ChainArgs, CiphernodeCommands};
+use crate::config::{self, ConfigCommands};
+use crate::events::{self, EventsCommands};
 use crate::helpers::telemetry::{setup_simple_tracing, setup_tracing};
 use crate::net::{self, NetCommands};
 use crate::nodes::{self, NodeCommands};
@@ -181,7 +183,9 @@ impl Cli {
             Commands::Ciphernode { command } => ciphernode::execute(out, command, &config).await?,
             Commands::Noir { command } => noir::execute(out, command, &config).await?,
             Commands::Net { command } => net::execute(&out, command, &config).await?,
+            Commands::Events { command } => events::execute(out, command, &config).await?,
             Commands::Rev => rev::execute(out).await?,
+            Commands::Config { command } => config::execute(out, command, &config).await?,
         }
 
         close_all_connections();
@@ -297,14 +301,31 @@ pub enum Commands {
         #[command(subcommand)]
         command: NetCommands,
     },
+
+    /// Query events
+    Events {
+        #[command(subcommand)]
+        command: EventsCommands,
+    },
+
+    /// Get config values
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommands,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RemoteCli {
+    #[serde(default)]
     name: Option<String>,
+    #[serde(default)]
     otel: Option<String>,
+    #[serde(default)]
     quiet: bool,
+    #[serde(default)]
     config: Option<String>,
+    #[serde(default)]
     verbose: u8,
     command: RemoteCommand,
 }
@@ -312,11 +333,24 @@ pub struct RemoteCli {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum RemoteCommand {
     NetGetPeerId,
-    CiphernodeStatus { chain: ChainArgs },
+    CiphernodeStatus {
+        chain: ChainArgs,
+    },
     NoirStatus,
     WalletGet,
+    EventsQuery {
+        agg: Option<usize>,
+        since: Option<u64>,
+        limit: Option<u64>,
+    },
     Rev,
-    PrintEnv { vite: bool, chain: String },
+    PrintEnv {
+        vite: bool,
+        chain: String,
+    },
+    ConfigGet {
+        param: Option<String>,
+    },
 }
 
 impl TryFrom<Commands> for RemoteCommand {
@@ -335,9 +369,15 @@ impl TryFrom<Commands> for RemoteCommand {
                 command: CiphernodeCommands::Status { chain },
             } => Ok(RemoteCommand::CiphernodeStatus { chain }),
             Commands::PrintEnv { chain, vite } => Ok(RemoteCommand::PrintEnv { vite, chain }),
+            Commands::Events {
+                command: EventsCommands::Query { agg, since, limit },
+            } => Ok(RemoteCommand::EventsQuery { agg, since, limit }),
             Commands::Wallet {
                 command: WalletCommands::Get,
             } => Ok(RemoteCommand::WalletGet),
+            Commands::Config {
+                command: ConfigCommands::Get { param },
+            } => Ok(RemoteCommand::ConfigGet { param }),
             _ => bail!("Command not allowed while node is running."),
         }
     }
@@ -388,6 +428,12 @@ impl TryFrom<RemoteCommand> for Commands {
             },
             RemoteCommand::NetGetPeerId => Commands::Net {
                 command: NetCommands::GetPeerId,
+            },
+            RemoteCommand::EventsQuery { agg, since, limit } => Commands::Events {
+                command: EventsCommands::Query { agg, since, limit },
+            },
+            RemoteCommand::ConfigGet { param } => Commands::Config {
+                command: ConfigCommands::Get { param },
             },
         };
         // We might have to hold this stuff on RemoteCommand

@@ -75,12 +75,14 @@ pub trait QueryKind {
 }
 
 /// Query by aggregated sequence
+#[derive(Debug)]
 pub struct SeqAgg;
 impl QueryKind for SeqAgg {
     type Shape = HashMap<AggregateId, u64>;
 }
 
 /// Query by aggregated timestamp
+#[derive(Debug)]
 pub struct TsAgg;
 impl QueryKind for TsAgg {
     type Shape = HashMap<AggregateId, u128>;
