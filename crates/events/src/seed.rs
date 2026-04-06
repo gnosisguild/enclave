@@ -41,7 +41,6 @@ impl AsBytesSerde for Seed {
             bytes.try_into().map_err(|_| "Seed requires 32 bytes")?,
         ))
     }
-    }
 }
 
 impl Display for Seed {
