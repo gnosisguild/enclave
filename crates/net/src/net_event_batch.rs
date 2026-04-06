@@ -228,7 +228,11 @@ mod tests {
 
         handle.await.unwrap();
 
-        let unique: Vec<_> = events.iter().collect::<std::collections::HashSet<_>>().into_iter().collect();
+        let unique: Vec<_> = events
+            .iter()
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
         assert_eq!(
             events.len(),
             unique.len(),
@@ -236,7 +240,10 @@ mod tests {
             events.len(),
             unique.len()
         );
-        assert_eq!(events, vec![b"event1".to_vec(), b"event2".to_vec(), b"event3".to_vec()]);
+        assert_eq!(
+            events,
+            vec![b"event1".to_vec(), b"event2".to_vec(), b"event3".to_vec()]
+        );
     }
 
     #[tokio::test]
