@@ -10,7 +10,7 @@ use e3_ciphernode_builder::global_eventstore_cache::EventStoreReader;
 use e3_config::AppConfig;
 use e3_console::{log, Console};
 use e3_entrypoint::helpers::datastore::get_eventstore_reader;
-use e3_events::{compute_seq_cursor, CorrelationId, EnclaveEvent, SeqCursor, SeqAgg};
+use e3_events::{compute_seq_cursor, CorrelationId, EnclaveEvent, SeqAgg, SeqCursor};
 use e3_events::{AggregateId, EventStoreQueryBy, EventStoreQueryResponse};
 use e3_utils::actix::channel as actix_toolbox;
 use std::collections::HashMap;
