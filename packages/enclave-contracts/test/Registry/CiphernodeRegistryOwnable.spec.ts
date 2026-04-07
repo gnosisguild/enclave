@@ -141,7 +141,6 @@ describe("CiphernodeRegistryOwnable", function () {
     const { enclave: _enclave } = await ignition.deploy(EnclaveModule, {
       parameters: {
         Enclave: {
-          params: encodedE3ProgramParams,
           owner: ownerAddress,
           maxDuration: 60 * 60 * 24 * 30, // 30 days
           registry: registryAddress,
@@ -194,7 +193,7 @@ describe("CiphernodeRegistryOwnable", function () {
     const { mockPkVerifier } = await ignition.deploy(MockPkVerifierModule);
 
     await enclave.enableE3Program(await mockE3Program.getAddress());
-    await enclave.setE3ProgramsParams([encodedE3ProgramParams]);
+    await enclave.setParamSet(0, encodedE3ProgramParams);
     await enclave.setDecryptionVerifier(
       encryptionSchemeId,
       await mockDecryptionVerifier.getAddress(),
@@ -266,7 +265,7 @@ describe("CiphernodeRegistryOwnable", function () {
       committeeSize: 0,
       inputWindow: [currentTime + 100, currentTime + 300] as [number, number],
       e3Program: await mockE3Program.getAddress(),
-      e3ProgramParams: encodedE3ProgramParams,
+      paramSet: 0,
       computeProviderParams: abiCoder.encode(
         ["address"],
         [await mockDecryptionVerifier.getAddress()],

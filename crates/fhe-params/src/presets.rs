@@ -58,6 +58,18 @@ pub enum BfvPreset {
     SecureDkg8192,
 }
 
+impl BfvPreset {
+    /// Convert an on-chain `ParamSet` enum value (uint8) to the corresponding
+    /// threshold `BfvPreset`. Returns `None` for unknown values.
+    pub fn from_on_chain_param_set(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(BfvPreset::InsecureThreshold512),
+            1 => Some(BfvPreset::SecureThreshold8192),
+            _ => None,
+        }
+    }
+}
+
 /// Default BFV preset used across the workspace.
 ///
 /// This is the canonical preset for production (secure threshold 8192).

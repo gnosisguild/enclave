@@ -223,7 +223,8 @@ pub async fn initialize_crisp_round(
         U256::from(window_start),
         U256::from(window_start + CONFIG.e3_duration),
     ];
-    let e3_params = Bytes::from(params);
+    // param_set 0 = InsecureThreshold512 (must match on-chain paramSetRegistry)
+    let param_set: u8 = 0;
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.clone(),
         parallel: CONFIG.e3_compute_provider_parallel,
@@ -238,7 +239,7 @@ pub async fn initialize_crisp_round(
             committee_size,
             input_window,
             e3_program,
-            e3_params,
+            param_set,
             compute_provider_params,
             custom_params_bytes,
             proof_aggregation_enabled,

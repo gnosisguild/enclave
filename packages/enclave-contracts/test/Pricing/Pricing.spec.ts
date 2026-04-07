@@ -222,7 +222,6 @@ describe("E3 Pricing", function () {
     const { enclave: _enclave } = await ignition.deploy(EnclaveModule, {
       parameters: {
         Enclave: {
-          params: encodedE3ProgramParams,
           owner: ownerAddress,
           maxDuration: THIRTY_DAYS_IN_SECONDS,
           registry: ciphernodeRegistryAddress,
@@ -273,7 +272,7 @@ describe("E3 Pricing", function () {
       await ignition.deploy(MockPkVerifierModule);
 
     await enclave.enableE3Program(await e3Program.getAddress());
-    await enclave.setE3ProgramsParams([encodedE3ProgramParams]);
+    await enclave.setParamSet(0, encodedE3ProgramParams);
     await enclave.setDecryptionVerifier(
       encryptionSchemeId,
       await decryptionVerifier.getAddress(),
@@ -312,7 +311,7 @@ describe("E3 Pricing", function () {
       committeeSize: 0, // Micro
       inputWindow: [now + 10, now + inputWindowDuration] as [number, number],
       e3Program: await e3Program.getAddress(),
-      e3ProgramParams: encodedE3ProgramParams,
+      paramSet: 0,
       computeProviderParams: abiCoder.encode(
         ["address"],
         [await decryptionVerifier.getAddress()],
@@ -595,7 +594,7 @@ describe("E3 Pricing", function () {
           number,
         ],
         e3Program: await e3Program.getAddress(),
-        e3ProgramParams: encodedE3ProgramParams,
+        paramSet: 0,
         computeProviderParams: abiCoder.encode(
           ["address"],
           [await decryptionVerifier.getAddress()],
@@ -678,7 +677,7 @@ describe("E3 Pricing", function () {
           number,
         ],
         e3Program: await e3Program.getAddress(),
-        e3ProgramParams: encodedE3ProgramParams,
+        paramSet: 0,
         computeProviderParams: abiCoder.encode(
           ["address"],
           [await decryptionVerifier.getAddress()],

@@ -887,6 +887,7 @@ async fn test_trbfv_actor() -> Result<()> {
         seed: seed.clone(),
         error_size,
         esi_per_ct: esi_per_ct as usize,
+        params_preset: DEFAULT_BFV_PRESET,
         params,
         proof_aggregation_enabled,
     };

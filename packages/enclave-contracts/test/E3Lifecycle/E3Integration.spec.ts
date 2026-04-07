@@ -178,7 +178,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     const { enclave: _enclave } = await ignition.deploy(EnclaveModule, {
       parameters: {
         Enclave: {
-          params: encodedE3ProgramParams,
           owner: ownerAddress,
           maxDuration: THIRTY_DAYS,
           registry: ciphernodeRegistryAddress,
@@ -247,6 +246,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     await enclave.setE3RefundManager(e3RefundManagerAddress);
     await enclave.setSlashingManager(await slashingManager.getAddress());
     await enclave.enableE3Program(await e3Program.getAddress());
+    await enclave.setParamSet(0, encodedE3ProgramParams);
     await enclave.setDecryptionVerifier(
       encryptionSchemeId,
       await decryptionVerifier.getAddress(),
@@ -305,7 +305,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         committeeSize,
         inputWindow: [startTime + 100, startTime + ONE_DAY] as [number, number],
         e3Program: await e3Program.getAddress(),
-        e3ProgramParams: encodedE3ProgramParams,
+        paramSet: 0,
         computeProviderParams: abiCoder.encode(
           ["address"],
           [await decryptionVerifier.getAddress()],
@@ -521,7 +521,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const newEnclaveContract = await ignition.deploy(EnclaveModule, {
         parameters: {
           Enclave: {
-            params: encodedE3ProgramParams,
             owner: await owner.getAddress(),
             maxDuration: THIRTY_DAYS,
             registry: await enclave.ciphernodeRegistry(),
@@ -1268,7 +1267,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
           committeeSize: 0,
           inputWindow: [startTime, startTime + ONE_DAY] as [number, number],
           e3Program: await e3Program.getAddress(),
-          e3ProgramParams: encodedE3ProgramParams,
+          paramSet: 0,
           computeProviderParams: abiCoder.encode(
             ["address"],
             [await decryptionVerifier.getAddress()],
@@ -1351,7 +1350,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
           committeeSize: 0,
           inputWindow: [startTime, startTime + ONE_DAY] as [number, number],
           e3Program: await e3Program.getAddress(),
-          e3ProgramParams: encodedE3ProgramParams,
+          paramSet: 0,
           computeProviderParams: abiCoder.encode(
             ["address"],
             [await decryptionVerifier.getAddress()],
