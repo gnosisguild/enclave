@@ -343,7 +343,7 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │     C2→C3  (SameParty):                C3's expected_message_commitment ∈ C2's share commitments
 │   │   │     C2→C4  (SourceMustExistInTargets): C2's L share commitments for recipient R exactly
 │   │   │                                         match C4_R's expected_commitments row for sender X
-│   │   │     C6→C7  (SameParty):                C6's d_commitment matches C7's expected_d_commitment
+│   │   │     C6→C7  (CrossParty):                C6's d_commitment matches C7's expected_d_commitment
 │   │   │
 │   │   ├─ On mismatch: publishes CommitmentConsistencyViolation
 │   │   │   → AccusationManager initiates accusation quorum (see Part 5)
