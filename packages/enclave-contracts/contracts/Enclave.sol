@@ -1019,6 +1019,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function getE3Quote(
         E3RequestParams calldata requestParams
     ) public view returns (uint256 fee) {
+        require(
+            paramSetRegistry[requestParams.paramSet].length > 0,
+            "BFV param set not registered"
+        );
         uint32[2] memory threshold = committeeThresholds[
             requestParams.committeeSize
         ];
