@@ -1,9 +1,9 @@
 # Enclave ZK Circuit Benchmarks
 
-**Generated:** 2026-02-17 15:08:16 UTC
+**Generated:** 2026-04-07 13:56:44 UTC
 
-**Git Branch:** `configs/fixqmt`  
-**Git Commit:** `689e56cb90251b34e67af87cb7abfed03bedcd1c`
+**Git Branch:** `main`  
+**Git Commit:** `bae26bfb4e0d6673bff4783c4942384dfbef5a08`
 
 ---
 
@@ -15,43 +15,45 @@
 
 | Circuit                | Compile | Execute | Prove  | Verify |
 | ---------------------- | ------- | ------- | ------ | ------ |
-| e_sm_share_computation | 3.29 s  | 0.54 s  | 1.63 s | 0.03 s |
-| pk                     | 0.33 s  | 0.26 s  | 0.12 s | 0.02 s |
-| share_decryption       | 0.71 s  | 0.29 s  | 0.23 s | 0.02 s |
-| share_encryption       | 1.99 s  | 0.43 s  | 0.62 s | 0.03 s |
-| sk_share_computation   | 3.18 s  | 0.51 s  | 1.62 s | 0.02 s |
+| e_sm_share_computation | 0.34 s  | 0.49 s  | 0.89 s | 0.02 s |
+| pk                     | 0.30 s  | 0.31 s  | 0.12 s | 0.02 s |
+| share_decryption       | 0.32 s  | 0.39 s  | 0.51 s | 0.02 s |
+| share_encryption       | 0.33 s  | 0.48 s  | 0.60 s | 0.03 s |
+| sk_share_computation   | 0.33 s  | 0.45 s  | 0.81 s | 0.02 s |
 
 #### Size & Circuit Metrics
 
 | Circuit                | Opcodes | Gates   | Circuit Size | Witness   | VK Size | Proof Size |
 | ---------------------- | ------- | ------- | ------------ | --------- | ------- | ---------- |
-| e_sm_share_computation | 90956   | 328.74K | 1.39 MB      | 477.88 KB | 3.59 KB | 15.88 KB   |
-| pk                     | 344     | 6.85K   | 87.84 KB     | 29.08 KB  | 3.59 KB | 15.88 KB   |
-| share_decryption       | 3093    | 28.72K  | 158.27 KB    | 148.90 KB | 3.59 KB | 15.88 KB   |
-| share_encryption       | 47758   | 127.69K | 798.14 KB    | 512.29 KB | 3.59 KB | 15.88 KB   |
-| sk_share_computation   | 90827   | 326.14K | 1.38 MB      | 463.75 KB | 3.59 KB | 15.88 KB   |
+| e_sm_share_computation | 75649   | 198.35K | 1.16 MB      | 222.06 KB | 3.59 KB | 15.88 KB   |
+| pk                     | 344     | 6.85K   | 90.54 KB     | 29.07 KB  | 3.59 KB | 15.88 KB   |
+| share_decryption       | 28577   | 92.52K  | 538.83 KB    | 151.95 KB | 3.59 KB | 15.88 KB   |
+| share_encryption       | 47758   | 127.05K | 802.98 KB    | 512.11 KB | 3.59 KB | 15.88 KB   |
+| sk_share_computation   | 56018   | 142.62K | 936.72 KB    | 165.20 KB | 3.59 KB | 15.88 KB   |
 
 ### Threshold
 
 #### Timing Metrics
 
-| Circuit                          | Compile | Execute | Prove  | Verify |
-| -------------------------------- | ------- | ------- | ------ | ------ |
-| decrypted_shares_aggregation_mod | 0.54 s  | 0.32 s  | 0.47 s | 0.03 s |
-| pk_aggregation                   | 1.45 s  | 0.43 s  | 0.88 s | 0.02 s |
-| pk_generation                    | 1.24 s  | 0.37 s  | 0.50 s | 0.03 s |
-| share_decryption                 | 1.18 s  | 0.37 s  | 0.52 s | 0.03 s |
-| user_data_encryption             | 2.01 s  | 0.47 s  | 0.61 s | 0.02 s |
+| Circuit                      | Compile | Execute | Prove  | Verify |
+| ---------------------------- | ------- | ------- | ------ | ------ |
+| decrypted_shares_aggregation | 0.33 s  | 0.58 s  | 0.51 s | 0.02 s |
+| pk_aggregation               | 0.34 s  | 0.45 s  | 0.83 s | 0.02 s |
+| pk_generation                | 0.32 s  | 0.40 s  | 0.35 s | 0.02 s |
+| share_decryption             | 0.32 s  | 0.43 s  | 0.52 s | 0.03 s |
+| user_data_encryption_ct0     | 0.32 s  | 0.41 s  | 0.33 s | 0.03 s |
+| user_data_encryption_ct1     | 0.32 s  | 0.39 s  | 0.32 s | 0.03 s |
 
 #### Size & Circuit Metrics
 
-| Circuit                          | Opcodes | Gates   | Circuit Size | Witness   | VK Size | Proof Size |
-| -------------------------------- | ------- | ------- | ------------ | --------- | ------- | ---------- |
-| decrypted_shares_aggregation_mod | 31544   | 80.74K  | 509.84 KB    | 77.50 KB  | 3.59 KB | 15.88 KB   |
-| pk_aggregation                   | 47817   | 169.89K | 884.11 KB    | 360.70 KB | 3.59 KB | 15.88 KB   |
-| pk_generation                    | 30019   | 65.61K  | 542.16 KB    | 446.98 KB | 3.59 KB | 15.88 KB   |
-| share_decryption                 | 22378   | 74.21K  | 460.26 KB    | 494.32 KB | 3.59 KB | 15.88 KB   |
-| user_data_encryption             | 56601   | 106.72K | 847.53 KB    | 691.33 KB | 3.59 KB | 15.88 KB   |
+| Circuit                      | Opcodes | Gates   | Circuit Size | Witness   | VK Size | Proof Size |
+| ---------------------------- | ------- | ------- | ------------ | --------- | ------- | ---------- |
+| decrypted_shares_aggregation | 41673   | 104.27K | 1.12 MB      | 111.14 KB | 3.59 KB | 15.88 KB   |
+| pk_aggregation               | 48950   | 151.72K | 837.49 KB    | 259.79 KB | 3.59 KB | 15.88 KB   |
+| pk_generation                | 27737   | 57.82K  | 501.25 KB    | 348.73 KB | 3.59 KB | 15.88 KB   |
+| share_decryption             | 22486   | 75.12K  | 466.54 KB    | 498.22 KB | 3.59 KB | 15.88 KB   |
+| user_data_encryption_ct0     | 27573   | 53.73K  | 500.84 KB    | 358.40 KB | 3.59 KB | 15.88 KB   |
+| user_data_encryption_ct1     | 21399   | 46.27K  | 421.51 KB    | 325.19 KB | 3.59 KB | 15.88 KB   |
 
 ### Config
 
@@ -73,15 +75,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 3.29 s    |
-| **Execution**        | 0.54 s    |
-| **VK Generation**    | 0.64 s    |
-| **Proof Generation** | 1.63 s    |
-| **Verification**     | 0.03 s    |
-| **ACIR Opcodes**     | "90956"   |
-| **Total Gates**      | "328743"  |
-| **Circuit Size**     | 1.39 MB   |
-| **Witness Size**     | 477.88 KB |
+| **Compilation**      | 0.34 s    |
+| **Execution**        | 0.49 s    |
+| **VK Generation**    | 0.38 s    |
+| **Proof Generation** | 0.89 s    |
+| **Verification**     | 0.02 s    |
+| **ACIR Opcodes**     | "75649"   |
+| **Total Gates**      | "198355"  |
+| **Circuit Size**     | 1.16 MB   |
+| **Witness Size**     | 222.06 KB |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -89,15 +91,15 @@
 
 | Metric               | Value    |
 | -------------------- | -------- |
-| **Compilation**      | 0.33 s   |
-| **Execution**        | 0.26 s   |
+| **Compilation**      | 0.30 s   |
+| **Execution**        | 0.31 s   |
 | **VK Generation**    | 0.05 s   |
 | **Proof Generation** | 0.12 s   |
 | **Verification**     | 0.02 s   |
 | **ACIR Opcodes**     | "344"    |
-| **Total Gates**      | "6846"   |
-| **Circuit Size**     | 87.84 KB |
-| **Witness Size**     | 29.08 KB |
+| **Total Gates**      | "6847"   |
+| **Circuit Size**     | 90.54 KB |
+| **Witness Size**     | 29.07 KB |
 | **VK Size**          | 3.59 KB  |
 | **Proof Size**       | 15.88 KB |
 
@@ -105,15 +107,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 0.71 s    |
-| **Execution**        | 0.29 s    |
-| **VK Generation**    | 0.09 s    |
-| **Proof Generation** | 0.23 s    |
+| **Compilation**      | 0.32 s    |
+| **Execution**        | 0.39 s    |
+| **VK Generation**    | 0.20 s    |
+| **Proof Generation** | 0.51 s    |
 | **Verification**     | 0.02 s    |
-| **ACIR Opcodes**     | "3093"    |
-| **Total Gates**      | "28720"   |
-| **Circuit Size**     | 158.27 KB |
-| **Witness Size**     | 148.90 KB |
+| **ACIR Opcodes**     | "28577"   |
+| **Total Gates**      | "92515"   |
+| **Circuit Size**     | 538.83 KB |
+| **Witness Size**     | 151.95 KB |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -121,15 +123,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 1.99 s    |
-| **Execution**        | 0.43 s    |
-| **VK Generation**    | 0.26 s    |
-| **Proof Generation** | 0.62 s    |
+| **Compilation**      | 0.33 s    |
+| **Execution**        | 0.48 s    |
+| **VK Generation**    | 0.25 s    |
+| **Proof Generation** | 0.60 s    |
 | **Verification**     | 0.03 s    |
 | **ACIR Opcodes**     | "47758"   |
-| **Total Gates**      | "127691"  |
-| **Circuit Size**     | 798.14 KB |
-| **Witness Size**     | 512.29 KB |
+| **Total Gates**      | "127047"  |
+| **Circuit Size**     | 802.98 KB |
+| **Witness Size**     | 512.11 KB |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -137,33 +139,33 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 3.18 s    |
-| **Execution**        | 0.51 s    |
-| **VK Generation**    | 0.60 s    |
-| **Proof Generation** | 1.62 s    |
+| **Compilation**      | 0.33 s    |
+| **Execution**        | 0.45 s    |
+| **VK Generation**    | 0.28 s    |
+| **Proof Generation** | 0.81 s    |
 | **Verification**     | 0.02 s    |
-| **ACIR Opcodes**     | "90827"   |
-| **Total Gates**      | "326138"  |
-| **Circuit Size**     | 1.38 MB   |
-| **Witness Size**     | 463.75 KB |
+| **ACIR Opcodes**     | "56018"   |
+| **Total Gates**      | "142625"  |
+| **Circuit Size**     | 936.72 KB |
+| **Witness Size**     | 165.20 KB |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
 ### Threshold
 
-#### decrypted_shares_aggregation_mod
+#### decrypted_shares_aggregation
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 0.54 s    |
-| **Execution**        | 0.32 s    |
-| **VK Generation**    | 0.19 s    |
-| **Proof Generation** | 0.47 s    |
-| **Verification**     | 0.03 s    |
-| **ACIR Opcodes**     | "31544"   |
-| **Total Gates**      | "80740"   |
-| **Circuit Size**     | 509.84 KB |
-| **Witness Size**     | 77.50 KB  |
+| **Compilation**      | 0.33 s    |
+| **Execution**        | 0.58 s    |
+| **VK Generation**    | 0.23 s    |
+| **Proof Generation** | 0.51 s    |
+| **Verification**     | 0.02 s    |
+| **ACIR Opcodes**     | "41673"   |
+| **Total Gates**      | "104273"  |
+| **Circuit Size**     | 1.12 MB   |
+| **Witness Size**     | 111.14 KB |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -171,15 +173,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 1.45 s    |
-| **Execution**        | 0.43 s    |
-| **VK Generation**    | 0.35 s    |
-| **Proof Generation** | 0.88 s    |
+| **Compilation**      | 0.34 s    |
+| **Execution**        | 0.45 s    |
+| **VK Generation**    | 0.30 s    |
+| **Proof Generation** | 0.83 s    |
 | **Verification**     | 0.02 s    |
-| **ACIR Opcodes**     | "47817"   |
-| **Total Gates**      | "169890"  |
-| **Circuit Size**     | 884.11 KB |
-| **Witness Size**     | 360.70 KB |
+| **ACIR Opcodes**     | "48950"   |
+| **Total Gates**      | "151717"  |
+| **Circuit Size**     | 837.49 KB |
+| **Witness Size**     | 259.79 KB |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -187,15 +189,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 1.24 s    |
-| **Execution**        | 0.37 s    |
-| **VK Generation**    | 0.17 s    |
-| **Proof Generation** | 0.50 s    |
-| **Verification**     | 0.03 s    |
-| **ACIR Opcodes**     | "30019"   |
-| **Total Gates**      | "65606"   |
-| **Circuit Size**     | 542.16 KB |
-| **Witness Size**     | 446.98 KB |
+| **Compilation**      | 0.32 s    |
+| **Execution**        | 0.40 s    |
+| **VK Generation**    | 0.14 s    |
+| **Proof Generation** | 0.35 s    |
+| **Verification**     | 0.02 s    |
+| **ACIR Opcodes**     | "27737"   |
+| **Total Gates**      | "57818"   |
+| **Circuit Size**     | 501.25 KB |
+| **Witness Size**     | 348.73 KB |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -203,31 +205,47 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 1.18 s    |
-| **Execution**        | 0.37 s    |
+| **Compilation**      | 0.32 s    |
+| **Execution**        | 0.43 s    |
 | **VK Generation**    | 0.17 s    |
 | **Proof Generation** | 0.52 s    |
 | **Verification**     | 0.03 s    |
-| **ACIR Opcodes**     | "22378"   |
-| **Total Gates**      | "74214"   |
-| **Circuit Size**     | 460.26 KB |
-| **Witness Size**     | 494.32 KB |
+| **ACIR Opcodes**     | "22486"   |
+| **Total Gates**      | "75125"   |
+| **Circuit Size**     | 466.54 KB |
+| **Witness Size**     | 498.22 KB |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
-#### user_data_encryption
+#### user_data_encryption_ct0
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 2.01 s    |
-| **Execution**        | 0.47 s    |
-| **VK Generation**    | 0.24 s    |
-| **Proof Generation** | 0.61 s    |
-| **Verification**     | 0.02 s    |
-| **ACIR Opcodes**     | "56601"   |
-| **Total Gates**      | "106725"  |
-| **Circuit Size**     | 847.53 KB |
-| **Witness Size**     | 691.33 KB |
+| **Compilation**      | 0.32 s    |
+| **Execution**        | 0.41 s    |
+| **VK Generation**    | 0.13 s    |
+| **Proof Generation** | 0.33 s    |
+| **Verification**     | 0.03 s    |
+| **ACIR Opcodes**     | "27573"   |
+| **Total Gates**      | "53732"   |
+| **Circuit Size**     | 500.84 KB |
+| **Witness Size**     | 358.40 KB |
+| **VK Size**          | 3.59 KB   |
+| **Proof Size**       | 15.88 KB  |
+
+#### user_data_encryption_ct1
+
+| Metric               | Value     |
+| -------------------- | --------- |
+| **Compilation**      | 0.32 s    |
+| **Execution**        | 0.39 s    |
+| **VK Generation**    | 0.12 s    |
+| **Proof Generation** | 0.32 s    |
+| **Verification**     | 0.03 s    |
+| **ACIR Opcodes**     | "21399"   |
+| **Total Gates**      | "46270"   |
+| **Circuit Size**     | 421.51 KB |
+| **Witness Size**     | 325.19 KB |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -245,7 +263,7 @@
 
 ### Software
 
-- **Nargo Version:** nargo version = 1.0.0-beta.15 noirc version =
-  1.0.0-beta.15+83245db91dcf63420ef4bcbbd85b98f397fee663 (git version hash:
-  83245db91dcf63420ef4bcbbd85b98f397fee663, is dirty: false)
-- **Barretenberg Version:** 3.0.0-nightly.20251104
+- **Nargo Version:** nargo version = 1.0.0-beta.16 noirc version =
+  1.0.0-beta.16+2d46fca7203545cbbfb31a0d0328de6c10a8db95 (git version hash:
+  2d46fca7203545cbbfb31a0d0328de6c10a8db95, is dirty: false)
+- **Barretenberg Version:** 3.0.0-nightly.20260102
