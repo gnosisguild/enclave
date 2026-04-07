@@ -127,9 +127,6 @@ pub const PK_BFV_OUTPUTS: &[OutputField] = &[f("pk_commitment")];
 pub const PK_GENERATION_OUTPUTS: &[OutputField] =
     &[f("sk_commitment"), f("pk_commitment"), f("e_sm_commitment")];
 
-/// C2 — Share computation (aggregation wrapper).
-pub const SHARE_COMPUTATION_OUTPUTS: &[OutputField] = &[f("key_hash"), f("commitment")];
-
 /// C4 — DKG share decryption.
 pub const DKG_SHARE_DECRYPTION_OUTPUTS: &[OutputField] = &[f("commitment")];
 
@@ -245,26 +242,6 @@ mod tests {
         signals[96..128].copy_from_slice(&[0xFF; 32]); // 1 output at the end
         let commitment = layout.extract_field(&signals, "commitment").unwrap();
         assert_eq!(commitment, &[0xFF; 32]);
-    }
-
-    #[test]
-    fn extract_c2_two_outputs() {
-        let layout = CircuitOutputLayout::Fixed {
-            fields: SHARE_COMPUTATION_OUTPUTS,
-        };
-        // C2 has 1 pub input (key_hash) + 2 outputs = 96 bytes
-        let mut signals = vec![0x00; 96];
-        signals[32..64].copy_from_slice(&[0xAA; 32]); // key_hash output
-        signals[64..96].copy_from_slice(&[0xBB; 32]); // commitment output
-
-        assert_eq!(
-            layout.extract_field(&signals, "key_hash").unwrap(),
-            &[0xAA; 32]
-        );
-        assert_eq!(
-            layout.extract_field(&signals, "commitment").unwrap(),
-            &[0xBB; 32]
-        );
     }
 
     #[test]

@@ -4,7 +4,7 @@ use derivative::Derivative;
 use e3_utils::utility_types::ArcBytes;
 use e3_zk_helpers::{
     CircuitInputLayout, CircuitOutputLayout, DKG_SHARE_DECRYPTION_OUTPUTS, PK_AGGREGATION_OUTPUTS,
-    PK_BFV_OUTPUTS, PK_GENERATION_OUTPUTS, SHARE_COMPUTATION_OUTPUTS, SHARE_ENCRYPTION_INPUTS,
+    PK_BFV_OUTPUTS, PK_GENERATION_OUTPUTS, SHARE_ENCRYPTION_INPUTS,
     THRESHOLD_SHARE_DECRYPTION_INPUTS, THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
 };
 use serde::{Deserialize, Serialize};
@@ -199,9 +199,7 @@ impl CircuitName {
             CircuitName::SkShareComputation | CircuitName::ESmShareComputation => {
                 CircuitOutputLayout::Dynamic
             }
-            CircuitName::ShareComputation => CircuitOutputLayout::Fixed {
-                fields: SHARE_COMPUTATION_OUTPUTS,
-            },
+            CircuitName::ShareComputation => CircuitOutputLayout::None,
             CircuitName::DkgShareDecryption => CircuitOutputLayout::Fixed {
                 fields: DKG_SHARE_DECRYPTION_OUTPUTS,
             },
