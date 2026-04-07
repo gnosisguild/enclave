@@ -330,7 +330,10 @@ mod tests {
         for (party_idx, party_cts) in sample.honest_ciphertexts.iter().enumerate() {
             for mod_idx in 0..threshold_l {
                 let decrypted_pt = sample.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
-                let share_coeffs = decrypted_pt.value.deref().to_vec();
+                let mut share_coeffs = decrypted_pt.value.deref().to_vec();
+                // Reverse to match Inputs::compute, which reverses before committing
+                // (matching C3's message witness construction).
+                share_coeffs.reverse();
                 let direct_commitment = compute_share_encryption_commitment_from_message(
                     &Polynomial::from_u64_vector(share_coeffs),
                     msg_bit,
