@@ -12,6 +12,8 @@ contract FakeEnclave {
   event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput, bytes proof);
   event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey, bytes proof);
 
+  mapping(uint8 => bytes) public paramSetRegistry;
+
   // Emit InputPublished event with passed test data
   function emitInputPublished(uint256 e3Id, bytes memory data, uint256 inputHash, uint256 index) public {
     emit InputPublished(e3Id, data, inputHash, index);
