@@ -150,7 +150,7 @@ impl Computation for Bounds {
     type Data = ShareComputationCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let defaults = preset
@@ -159,9 +159,12 @@ impl Computation for Bounds {
         let num_ciphertexts = defaults.z;
         let lambda = defaults.lambda;
 
+        // Use search_defaults.n (same as C1/PkGeneration) so the smudging bound and
+        // resulting bit width match C1's PK_GENERATION_BIT_E_SM. This ensures
+        // C1.e_sm_commitment == C2b.expected_secret_commitment for the same e_sm.
         let e_sm_config = SmudgingBoundCalculatorConfig::new(
             threshold_params,
-            data.n_parties as usize,
+            defaults.n as usize,
             num_ciphertexts as usize,
             lambda as usize,
         );
@@ -219,12 +222,35 @@ impl Computation for Inputs {
 
         let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
+        // Reverse+center before committing to match C1 (PkGeneration)'s convention:
+        // C1 applies reverse then center to sk/e_sm before computing the commitment.
+        // For SK the values are already centered ({-1,0,1}) so centering is a no-op.
+        // For e_sm values are in [0,q) here, so we must center to [-(q-1)/2, (q-1)/2].
         let expected_secret_commitment = match data.dkg_input_type {
             DkgInputType::SecretKey => {
-                compute_share_computation_sk_commitment(secret_crt.limb(0), bits.bit_sk_secret)
+                let mut reversed = secret_crt.limb(0).clone();
+                reversed.reverse();
+                compute_share_computation_sk_commitment(&reversed, bits.bit_sk_secret)
             }
             DkgInputType::SmudgingNoise => {
-                compute_share_computation_e_sm_commitment(&secret_crt, bits.bit_e_sm_secret)
+                let centered_reversed_crt = e3_polynomial::CrtPolynomial::new(
+                    secret_crt
+                        .limbs
+                        .iter()
+                        .zip(moduli.iter())
+                        .map(|(l, &qi)| {
+                            let q = num_bigint::BigInt::from(qi);
+                            let mut r = l.clone();
+                            r.reverse();
+                            r.center(&q);
+                            r
+                        })
+                        .collect(),
+                );
+                compute_share_computation_e_sm_commitment(
+                    &centered_reversed_crt,
+                    bits.bit_e_sm_secret,
+                )
             }
         };
 

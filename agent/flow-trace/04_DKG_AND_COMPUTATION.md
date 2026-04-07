@@ -338,12 +338,16 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   ├─ CommitmentConsistencyChecker (per-E3 actor) receives this:
 │   │   ├─ Caches each party's (address, proof_type) → {public_signals, data_hash}
 │   │   ├─ Evaluates all registered CommitmentLinks:
-│   │   │     C0→C3  (SourceMustExistInTargets): C3's expected_pk_commitment ∈ any C0 pk_commitment
-│   │   │     C1→C5  (CrossParty):               C1's pk_commitment ∈ C5 expected pk inputs
-│   │   │     C2→C3  (SameParty):                C3's expected_message_commitment ∈ C2's share commitments
-│   │   │     C2→C4  (SourceMustExistInTargets): C2's L share commitments for recipient R exactly
-│   │   │                                         match C4_R's expected_commitments row for sender X
-│   │   │     C6→C7  (CrossParty):                C6's d_commitment matches C7's expected_d_commitment
+│   │   │     C0→C3   (SourceMustExistInTargets): C3's expected_pk_commitment ∈ any C0 pk_commitment
+│   │   │     C1→C2a  (SameParty):                C1's sk_commitment == C2a's expected_secret_commitment
+│   │   │     C1→C2b  (SameParty):                C1's e_sm_commitment == C2b's expected_secret_commitment
+│   │   │     C1→C5   (CrossParty):               C1's pk_commitment ∈ C5 expected pk inputs
+│   │   │     C2→C3   (SameParty):                C3's expected_message_commitment ∈ C2's share commitments
+│   │   │     C2→C4   (SourceMustExistInTargets): C2's L share commitments for recipient R exactly
+│   │   │                                          match C4_R's expected_commitments row for sender X
+│   │   │     C4a→C6  (SameParty):                C4a's commitment == C6's expected_sk_commitment
+│   │   │     C4b→C6  (SameParty):                C4b's commitment == C6's expected_e_sm_commitment
+│   │   │     C6→C7   (CrossParty):               C6's d_commitment matches C7's expected_d_commitment
 │   │   │
 │   │   ├─ On mismatch: publishes CommitmentConsistencyViolation
 │   │   │   → AccusationManager initiates accusation quorum (see Part 5)
@@ -458,8 +462,9 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 │          party_proofs: [C4a + C4b proofs per party]
 │        }
 │        → ShareVerificationActor performs same 2-phase verification:
-│          Phase 1: ECDSA signature recovery + consistency check
-│          Phase 2: ZK proof verification via bb binary
+│          Phase 1: ECDSA signature recovery
+│          Phase 2: Commitment consistency check (C2→C4, C4a→C6, C4b→C6)
+│          Phase 3: ZK proof verification via bb binary
 │        → On failure: SignedProofFailed → accusation pipeline
 │        → On pass: ProofVerificationPassed (cached)
 │
@@ -773,7 +778,9 @@ EnclaveSolReader decodes CiphertextOutputPublished event
 │      │                            │                   │ correctly                    │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
 │ C1   │ TrBFV PK Generation        │ DKG: Share Gen    │ Threshold pk_share derived   │
-│      │                            │                   │ correctly from sk            │
+│      │                            │                   │ correctly from sk; outputs   │
+│      │                            │                   │ sk_commitment, pk_commitment,│
+│      │                            │                   │ e_sm_commitment              │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
 │ C2a  │ SK Share Computation       │ DKG: Share Gen    │ Shamir shares of sk computed │
 │      │                            │                   │ correctly                    │
@@ -787,11 +794,16 @@ EnclaveSolReader decodes CiphertextOutputPublished event
 │ C3b  │ ESM Share Encryption       │ DKG: Share Gen    │ esi_sss encrypted correctly  │
 │      │                            │                   │ under recipient's BFV key   │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
-│ C4a  │ SK Decryption Share (T2)   │ DKG: Key Calc     │ SK share decryption done     │
-│      │                            │                   │ correctly                    │
+│ C4a  │ SK Decryption Share (T2)   │ DKG: Key Calc     │ Verifies H decrypted shares  │
+│      │                            │                   │ match C2a commitments; sums  │
+│      │                            │                   │ and normalises (reduce mod   │
+│      │                            │                   │ q, reverse, center) before   │
+│      │                            │                   │ hashing; output commitment   │
+│      │                            │                   │ consumed by C6               │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
-│ C4b  │ ESM Decryption Share (T2)  │ DKG: Key Calc     │ ESM share decryption done    │
-│      │                            │                   │ correctly                    │
+│ C4b  │ ESM Decryption Share (T2)  │ DKG: Key Calc     │ Same as C4a for e_sm branch; │
+│      │                            │                   │ output commitment consumed   │
+│      │                            │                   │ by C6                        │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
 │ C5   │ PK Aggregation             │ Aggregation       │ Aggregate PK correctly       │
 │      │                            │                   │ computed from all pk_shares  │

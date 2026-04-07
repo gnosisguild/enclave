@@ -108,10 +108,19 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
         commit_to_party_shares::<N, L, N_PARTIES, BIT_SHARE>(self.y)
     }
 
-    /// Verifies that secret hashes to expected_secret_commitment
+    /// Verifies that secret hashes to expected_secret_commitment.
+    ///
+    /// Reverses `sk_secret` coefficients before hashing to match C1 (PkGeneration)'s
+    /// convention, which passes sk in highest-degree-first order. This ensures
+    /// `C1.sk_commitment == C2a.expected_secret_commitment` for the same sk.
     fn verify_secret_commitment(self) {
+        let mut reversed_coeffs: [Field; N] = [0; N];
+        for i in 0..N {
+            reversed_coeffs[i] = self.sk_secret.coefficients[N - 1 - i];
+        }
+        let reversed_sk = Polynomial::new(reversed_coeffs);
         assert(
-            compute_share_computation_sk_commitment::<N, BIT_SECRET>(self.sk_secret)
+            compute_share_computation_sk_commitment::<N, BIT_SECRET>(reversed_sk)
                 == self.expected_secret_commitment,
             "SK commitment mismatch",
         );
@@ -169,12 +178,33 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
         commit_to_party_shares::<N, L, N_PARTIES, BIT_SHARE>(self.y)
     }
 
-    /// Verifies that secret hashes to expected_secret_commitment
-    /// The commitment is computed over all L RNS polynomials (matching
-    /// multiple_polynomial_payload's behavior which hashes all L modulus polynomials)
+    /// Verifies that secret hashes to expected_secret_commitment.
+    ///
+    /// Reverses and centers each `e_sm_secret` limb before hashing to match C1 (PkGeneration)'s
+    /// convention: C1 passes e_sm reversed+centered (highest-degree-first, coefficients in
+    /// `[-(q-1)/2, (q-1)/2]`). `e_sm_secret` here is in `[0, q)`, so we apply the same
+    /// reverse+center transform before hashing.
     fn verify_secret_commitment(self) {
+        let mut normalized: [Polynomial<N>; L] = [Polynomial::new([0; N]); L];
+        for j in 0..L {
+            let q = self.configs.qis[j];
+            let half = (q - 1) / 2;
+            let mut coeffs: [Field; N] = [0; N];
+            for i in 0..N {
+                // Reverse: position i gets the coefficient from N-1-i.
+                let c = self.e_sm_secret[j].coefficients[N - 1 - i];
+                // Center: shift [0, q) to [-(q-1)/2, (q-1)/2].
+                let centered = if (c as u128) > (half as u128) {
+                    c - q
+                } else {
+                    c
+                };
+                coeffs[i] = centered;
+            }
+            normalized[j] = Polynomial::new(coeffs);
+        }
         assert(
-            compute_share_computation_e_sm_commitment::<N, L, BIT_SECRET>(self.e_sm_secret)
+            compute_share_computation_e_sm_commitment::<N, L, BIT_SECRET>(normalized)
                 == self.expected_secret_commitment,
             "ESM commitment mismatch",
         );
