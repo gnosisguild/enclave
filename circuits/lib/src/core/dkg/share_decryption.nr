@@ -7,6 +7,7 @@
 use crate::math::commitments::{
     compute_aggregated_shares_commitment, compute_share_encryption_commitment_from_message,
 };
+use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
 /// DKG share decryption and aggregation (C4a / C4b).
@@ -120,8 +121,7 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32, let BIT_AGG: u32> Sha
         let aggregated = self.compute_aggregated_shares();
 
         // Step 3: Normalize to match C6's representation: reduce mod q, reverse, center.
-        // H is passed so iterative reduction can bring coefficients from [0, H*q) into [0, q).
-        let normalized = normalize_aggregated::<N, L, H>(aggregated, moduli);
+        let normalized = normalize_aggregated::<N, L>(aggregated, moduli);
 
         // Step 4: Publish commitment to the aggregate (C6 input).
         compute_aggregated_shares_commitment::<N, L, BIT_AGG>(normalized)
@@ -130,20 +130,14 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32, let BIT_AGG: u32> Sha
 
 /// Normalize aggregated share polynomials to match C6's Rust witness representation.
 ///
-/// C6 applies two transformations before hashing:
-///   1. Reduce: sk coefficients from the FHE library are already in `[0, q_l)`.
+/// C6 applies three transformations before hashing:
+///   1. Reduce: coefficients to `[0, q_l)` (FHE `sk` is already reduced; C4 sums lie in `[0, H*q_l)`).
 ///   2. Reverse: coefficients are reordered highest-degree-first.
 ///   3. Center: each coefficient `c` is mapped to `c - q` when `c > (q-1)/2`,
 ///              so values lie in `[-(q-1)/2, (q-1)/2]` instead of `[0, q)`.
 ///
-/// C4's aggregated coefficients are the sum of H party shares. Each share is in
-/// `[0, q_l)` (verified by C2 range checks), so the sum lies in `[0, H*q_l)`.
-/// Before centering we must reduce the sum into `[0, q_l)` by subtracting `q_l`
-/// up to `H-1` times one subtraction per extra copy of `q_l` that may be present.
-///
-/// `H` is a compile-time parameter bounding the number of iterations.
-/// Comparison uses `u128` to safely handle moduli up to 62 bits.
-fn normalize_aggregated<let N: u32, let L: u32, let H: u32>(
+/// Reduction uses [`ModU128::reduce_mod`] (unconstrained quotient/remainder + in-circuit checks).
+fn normalize_aggregated<let N: u32, let L: u32>(
     aggregated: [Polynomial<N>; L],
     moduli: [Field; L],
 ) -> [Polynomial<N>; L] {
@@ -158,13 +152,7 @@ fn normalize_aggregated<let N: u32, let L: u32, let H: u32>(
         for i in 0..N {
             // Reverse: position i gets the coefficient from N-1-i.
             let c = poly.coefficients[N - 1 - i];
-            // Reduce mod q: sum is in [0, H*q), subtract q up to H-1 times.
-            let mut reduced = c;
-            for _ in 0..H - 1 {
-                if (reduced as u128) >= (q as u128) {
-                    reduced = reduced - q;
-                }
-            }
+            let reduced = ModU128::new(q).reduce_mod(c);
             // Center: shift to [-(q-1)/2, (q-1)/2].
             let centered = if (reduced as u128) > (half as u128) {
                 reduced - q
