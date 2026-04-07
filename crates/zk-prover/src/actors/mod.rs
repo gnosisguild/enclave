@@ -46,7 +46,6 @@ pub mod zk_actor;
 
 pub use accusation_manager::AccusationManager;
 pub use accusation_manager_ext::AccusationManagerExtension;
-pub use commitment_consistency_checker::CommitmentConsistencyChecker;
 pub use commitment_consistency_checker_ext::CommitmentConsistencyCheckerExtension;
 pub use node_proof_aggregator::NodeProofAggregator;
 pub use proof_request::ProofRequestActor;

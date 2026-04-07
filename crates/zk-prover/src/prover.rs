@@ -68,28 +68,6 @@ impl ZkProver {
         self.generate_proof_impl(circuit, witness_data, e3_id, &circuit.dir_path(), variant)
     }
 
-    /// Generate a non-ZK proof using circuit artifacts from the Recursive directory.
-    /// Useful for intermediate proofs that don't need ZK blinding but whose artifacts
-    /// only exist in the recursive dir (e.g., chunk_batch proofs).
-    pub fn generate_recursive_non_zk_proof(
-        &self,
-        circuit: CircuitName,
-        witness_data: &[u8],
-        e3_id: &str,
-    ) -> Result<Proof, ZkError> {
-        // Intentionally crossing variant and directory:
-        // - CircuitVariant::Default → "noir-recursive-no-zk" verifier target (non-ZK proof, 457 fields)
-        // - circuits_dir(Recursive) → read artifacts from recursive/ (where chunk_batch lives)
-        self.generate_proof_impl_with_dir(
-            circuit,
-            witness_data,
-            e3_id,
-            &circuit.dir_path(),
-            CircuitVariant::Default,
-            self.circuits_dir(CircuitVariant::Recursive),
-        )
-    }
-
     /// Wrapper proof (Default variant, wrapper dir).
     pub fn generate_wrapper_proof(
         &self,
@@ -230,8 +208,18 @@ impl ZkProver {
             )));
         }
 
-        let proof_data = fs::read(output_dir.join("proof"))?;
-        let public_signals = fs::read(output_dir.join("public_inputs"))?;
+        let proof_path = output_dir.join("proof");
+        let public_inputs_path = output_dir.join("public_inputs");
+        let proof_data = fs::read(&proof_path).map_err(|e| {
+            ZkError::OutputReadError(format!(
+                "bb output {}: {} (if bb exited 0, check bb version / prover flags)",
+                proof_path.display(),
+                e
+            ))
+        })?;
+        let public_signals = fs::read(&public_inputs_path).map_err(|e| {
+            ZkError::OutputReadError(format!("bb output {}: {}", public_inputs_path.display(), e))
+        })?;
 
         info!(
             "generated proof ({} bytes) for {} / {}",

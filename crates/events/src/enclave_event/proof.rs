@@ -4,9 +4,8 @@ use derivative::Derivative;
 use e3_utils::utility_types::ArcBytes;
 use e3_zk_helpers::{
     CircuitInputLayout, CircuitOutputLayout, DKG_SHARE_DECRYPTION_OUTPUTS, PK_AGGREGATION_OUTPUTS,
-    PK_BFV_OUTPUTS, PK_GENERATION_OUTPUTS, SHARE_COMPUTATION_CHUNK_BATCH_OUTPUTS,
-    SHARE_COMPUTATION_OUTPUTS, SHARE_ENCRYPTION_INPUTS, THRESHOLD_SHARE_DECRYPTION_INPUTS,
-    THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
+    PK_BFV_OUTPUTS, PK_GENERATION_OUTPUTS, SHARE_ENCRYPTION_INPUTS,
+    THRESHOLD_SHARE_DECRYPTION_INPUTS, THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -111,15 +110,11 @@ pub enum CircuitName {
     PkBfv,
     /// TrBFV public key share proof (C1).
     PkGeneration,
-    /// Sk share computation base proof (C2a base).
-    SkShareComputationBase,
-    /// E_SM share computation base proof (C2b base).
-    ESmShareComputationBase,
-    /// Share computation chunk proof (C2c, proven N times).
-    ShareComputationChunk,
-    /// Share computation chunk batch proof (C2d — binds base + CHUNKS_PER_BATCH chunks).
-    ShareComputationChunkBatch,
-    /// Share computation final wrapper proof (C2 — binds N_BATCHES batch proofs).
+    /// Sk share computation inner proof (C2a, recursive).
+    SkShareComputation,
+    /// E_SM share computation inner proof (C2b, recursive).
+    ESmShareComputation,
+    /// Share computation wrapper proof (verifies one inner C2 proof; fold input).
     ShareComputation,
     /// Share encryption proof (C3).
     ShareEncryption,
@@ -140,10 +135,8 @@ impl CircuitName {
         match self {
             CircuitName::PkBfv => "pk",
             CircuitName::PkGeneration => "pk_generation",
-            CircuitName::SkShareComputationBase => "sk_share_computation_base",
-            CircuitName::ESmShareComputationBase => "e_sm_share_computation_base",
-            CircuitName::ShareComputationChunk => "share_computation_chunk",
-            CircuitName::ShareComputationChunkBatch => "share_computation_chunk_batch",
+            CircuitName::SkShareComputation => "sk_share_computation",
+            CircuitName::ESmShareComputation => "e_sm_share_computation",
             CircuitName::ShareComputation => "share_computation",
             CircuitName::ShareEncryption => "share_encryption",
             CircuitName::DkgShareDecryption => "share_decryption",
@@ -157,10 +150,8 @@ impl CircuitName {
     pub fn group(&self) -> &'static str {
         match self {
             CircuitName::PkBfv => "dkg",
-            CircuitName::SkShareComputationBase => "dkg",
-            CircuitName::ESmShareComputationBase => "dkg",
-            CircuitName::ShareComputationChunk => "dkg",
-            CircuitName::ShareComputationChunkBatch => "dkg",
+            CircuitName::SkShareComputation => "dkg",
+            CircuitName::ESmShareComputation => "dkg",
             CircuitName::ShareComputation => "dkg",
             CircuitName::ShareEncryption => "dkg",
             CircuitName::DkgShareDecryption => "dkg",
@@ -181,6 +172,19 @@ impl CircuitName {
         format!("recursive_aggregation/wrapper/{}", self.dir_path())
     }
 
+    /// Compiled wrapper bundle to use when wrapping an inner proof.
+    ///
+    /// C2a/C2b inner circuits (`sk_share_computation`, `e_sm_share_computation`) share one wrapper
+    /// Noir program (`share_computation` under `recursive_aggregation/wrapper/dkg/`).
+    pub fn wrapper_artifact_circuit(&self) -> CircuitName {
+        match self {
+            CircuitName::SkShareComputation | CircuitName::ESmShareComputation => {
+                CircuitName::ShareComputation
+            }
+            _ => *self,
+        }
+    }
+
     /// Public input layout for this circuit.
     ///
     /// Public output (return value) layout for this circuit.
@@ -192,15 +196,10 @@ impl CircuitName {
             CircuitName::PkGeneration => CircuitOutputLayout::Fixed {
                 fields: PK_GENERATION_OUTPUTS,
             },
-            CircuitName::SkShareComputationBase | CircuitName::ESmShareComputationBase => {
+            CircuitName::SkShareComputation | CircuitName::ESmShareComputation => {
                 CircuitOutputLayout::Dynamic
             }
-            CircuitName::ShareComputationChunkBatch => CircuitOutputLayout::Fixed {
-                fields: SHARE_COMPUTATION_CHUNK_BATCH_OUTPUTS,
-            },
-            CircuitName::ShareComputation => CircuitOutputLayout::Fixed {
-                fields: SHARE_COMPUTATION_OUTPUTS,
-            },
+            CircuitName::ShareComputation => CircuitOutputLayout::None,
             CircuitName::DkgShareDecryption => CircuitOutputLayout::Fixed {
                 fields: DKG_SHARE_DECRYPTION_OUTPUTS,
             },
@@ -210,9 +209,7 @@ impl CircuitName {
             CircuitName::ThresholdShareDecryption => CircuitOutputLayout::Fixed {
                 fields: THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
             },
-            CircuitName::ShareComputationChunk | CircuitName::ShareEncryption => {
-                CircuitOutputLayout::None
-            }
+            CircuitName::ShareEncryption => CircuitOutputLayout::None,
             CircuitName::DecryptedSharesAggregation => CircuitOutputLayout::None,
             CircuitName::Fold => CircuitOutputLayout::None,
         }

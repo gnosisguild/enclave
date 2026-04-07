@@ -68,11 +68,7 @@ impl CommitmentLink for C6ToC7DCommitmentLink {
         vec![value]
     }
 
-    fn check_consistency(
-        &self,
-        source_values: &[FieldValue],
-        target_public_signals: &[u8],
-    ) -> bool {
+    fn check_signals(&self, source_values: &[FieldValue], target_public_signals: &[u8]) -> bool {
         if source_values.is_empty() {
             return false;
         }
@@ -160,7 +156,7 @@ mod tests {
         let party = [make_field(1), make_field(2), make_field(3)];
         let c7_signals = c7_public_signals(&d_comm, &party);
 
-        assert!(link.check_consistency(&source_values, &c7_signals));
+        assert!(link.check_signals(&source_values, &c7_signals));
     }
 
     #[test]
@@ -173,7 +169,7 @@ mod tests {
         let party = [make_field(1), make_field(2), make_field(3)];
         let c7_signals = c7_public_signals(&d_comm, &party);
 
-        assert!(!link.check_consistency(&source_values, &c7_signals));
+        assert!(!link.check_signals(&source_values, &c7_signals));
     }
 
     #[test]
@@ -189,19 +185,19 @@ mod tests {
         let msg_off = 6 * FIELD_BYTE_LEN;
         c7_signals[msg_off..msg_off + FIELD_BYTE_LEN].copy_from_slice(&d);
 
-        assert!(!link.check_consistency(&source_values, &c7_signals));
+        assert!(!link.check_signals(&source_values, &c7_signals));
     }
 
     #[test]
     fn short_source_signals_treated_as_inconsistent() {
         let link = C6ToC7DCommitmentLink;
         assert!(link.extract_source_values(&[0u8; 16]).is_empty());
-        assert!(!link.check_consistency(&[], &[0u8; 32]));
+        assert!(!link.check_signals(&[], &[0u8; 32]));
     }
 
     #[test]
     fn short_target_signals_treated_as_inconsistent() {
         let link = C6ToC7DCommitmentLink;
-        assert!(!link.check_consistency(&[make_field(1)], &[0u8; 16]));
+        assert!(!link.check_signals(&[make_field(1)], &[0u8; 16]));
     }
 }
