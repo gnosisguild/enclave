@@ -229,10 +229,10 @@ its creator.
 Instead of collapsing everything into an opaque hash, each recursive proof surfaces the values the
 contract needs as **explicit public outputs**:
 
-| Recursive proof | Surfaced outputs                                                              | Contract action                     |
-| --------------- | ----------------------------------------------------------------------------- | ----------------------------------- |
-| DKG             | `sk_agg_commits[]`, `esm_agg_commits[]`, `party_ids[]`, `aggregated_pk_commit` | Stores at DKG completion            |
-| Decryption      | `expected_sk_commits[]`, `expected_esm_commits[]`                             | Checks against stored DKG values    |
+| Recursive proof | Surfaced outputs                                                               | Contract action                  |
+| --------------- | ------------------------------------------------------------------------------ | -------------------------------- |
+| DKG             | `sk_agg_commits[]`, `esm_agg_commits[]`, `party_ids[]`, `aggregated_pk_commit` | Stores at DKG completion         |
+| Decryption      | `expected_sk_commits[]`, `expected_esm_commits[]`                              | Checks against stored DKG values |
 
 The decryption recursive proof is cryptographically bound to the DKG recursive proof through these
 surfaced values. The decryption proof's **C6** inputs depend on the secret-key and smudging-noise
@@ -250,12 +250,13 @@ construction, derived from the secrets and parameters of this E3.
 
 Instead of a single generic fold, each consecutive circuit pair in the chain gets a **specialised
 fold** that receives the linking fields as public inputs and asserts the required equalities inside
-the proof. For example, a fold spanning C1 to C2 asserts `C1.sk_commitment ==
-C2.expected_sk_commitment` and `C1.e_sm_commitment == C2.expected_e_sm_commitment`. For this to
-work, inner circuits expose the fields needed for linking (`pk_commitment` from C0,
-`sk_commitment` and `e_sm_commitment` from C1 and C4, `d_commitment` from C6) as direct public
-outputs rather than burying them inside opaque wrapper hashes. This turns cross-circuit consistency
-from an off-chain obligation into a cryptographic guarantee.
+the proof. For example, a fold spanning C1 to C2 asserts
+`C1.sk_commitment == C2.expected_sk_commitment` and
+`C1.e_sm_commitment == C2.expected_e_sm_commitment`. For this to work, inner circuits expose the
+fields needed for linking (`pk_commitment` from C0, `sk_commitment` and `e_sm_commitment` from C1
+and C4, `d_commitment` from C6) as direct public outputs rather than burying them inside opaque
+wrapper hashes. This turns cross-circuit consistency from an off-chain obligation into a
+cryptographic guarantee.
 
 ## Key terminology
 

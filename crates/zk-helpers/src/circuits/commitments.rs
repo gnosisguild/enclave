@@ -334,7 +334,6 @@ pub fn compute_share_encryption_commitment_from_message(
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
-
 /// Compute threshold public key aggregation commitment.
 ///
 /// This matches the Noir `compute_pk_aggregation_commitment` function exactly.
@@ -619,7 +618,6 @@ mod tests {
         let actual = compute_ciphertext_commitment(&ct0, &ct1, bit_ct);
         assert_eq!(actual, expected);
     }
-
 
     #[test]
     fn compute_threshold_pk_challenge_returns_single_bigint() {

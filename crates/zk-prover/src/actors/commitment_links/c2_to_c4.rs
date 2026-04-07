@@ -294,9 +294,12 @@ mod tests {
 
         // C2 from sender X=1: 3 parties × 2 moduli
         let c2 = c2_signals(&[
-            make_field(10), make_field(11), // party 0
-            make_field(20), make_field(21), // party 1 (slot for tgt_party=1)
-            make_field(30), make_field(31), // party 2
+            make_field(10),
+            make_field(11), // party 0
+            make_field(20),
+            make_field(21), // party 1 (slot for tgt_party=1)
+            make_field(30),
+            make_field(31), // party 2
         ]);
         let source_values = link.extract_source_values(&c2);
 
@@ -319,9 +322,12 @@ mod tests {
         let link = C2aToC4aShareCommitmentLink { l };
 
         let c2 = c2_signals(&[
-            make_field(10), make_field(11),
-            make_field(20), make_field(21), // party 1 slot
-            make_field(30), make_field(31),
+            make_field(10),
+            make_field(11),
+            make_field(20),
+            make_field(21), // party 1 slot
+            make_field(30),
+            make_field(31),
         ]);
         let source_values = link.extract_source_values(&c2);
 
@@ -343,8 +349,10 @@ mod tests {
         let link = C2aToC4aShareCommitmentLink { l };
 
         let c2 = c2_signals(&[
-            make_field(10), make_field(11), // party 0
-            make_field(20), make_field(21), // party 1
+            make_field(10),
+            make_field(11), // party 0
+            make_field(20),
+            make_field(21), // party 1
         ]);
         let source_values = link.extract_source_values(&c2);
 
