@@ -60,9 +60,9 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32, let BIT_AGG: u32> Sha
                     reversed_coeffs[N - 1 - i] = share.coefficients[i];
                 }
                 assert(
-                    compute_share_encryption_commitment_from_message::<N, BIT_MSG>(
-                        Polynomial::new(reversed_coeffs),
-                    )
+                    compute_share_encryption_commitment_from_message::<N, BIT_MSG>(Polynomial::new(
+                        reversed_coeffs,
+                    ))
                         == self.expected_commitments[party_idx][mod_idx],
                     "Commitment mismatch",
                 );
