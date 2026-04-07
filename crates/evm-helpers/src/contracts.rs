@@ -129,6 +129,7 @@ sol! {
         function publishCiphertextOutput(uint256 e3Id, bytes calldata ciphertextOutput, bytes calldata proof) external returns (bool success);
         function publishPlaintextOutput(uint256 e3Id, bytes calldata data, bytes calldata proof, bytes calldata foldProof) external returns (bool success);
         function getE3(uint256 e3Id) external view returns (E3 memory e3);
+        function paramSetRegistry(uint8 paramSet) external view returns (bytes memory encodedParams);
         function getE3Quote(E3RequestParams memory request) external view returns (uint256 fee);
         function getE3Stage(uint256 e3Id) external view returns (E3Stage stage);
         function getFailureReason(uint256 e3Id) external view returns (FailureReason reason);
@@ -173,6 +174,9 @@ pub trait EnclaveRead {
     async fn get_deadlines(&self, e3_id: U256) -> Result<E3Deadlines>;
 
     async fn get_timeout_config(&self) -> Result<E3TimeoutConfig>;
+
+    /// Look up the ABI-encoded BFV parameters for a param set index
+    async fn get_param_set_registry(&self, param_set: u8) -> Result<Bytes>;
 }
 
 /// Trait for write operations on the Enclave contract
@@ -419,6 +423,12 @@ where
         let contract = Enclave::new(self.contract_address, &self.provider);
         let config = contract.getTimeoutConfig().call().await?;
         Ok(config)
+    }
+
+    async fn get_param_set_registry(&self, param_set: u8) -> Result<Bytes> {
+        let contract = Enclave::new(self.contract_address, &self.provider);
+        let params = contract.paramSetRegistry(param_set).call().await?;
+        Ok(params)
     }
 }
 

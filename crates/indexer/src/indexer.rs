@@ -344,6 +344,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
             );
 
             let e3 = contract.get_e3(e.e3Id).await?;
+            let e3_params = contract.get_param_set_registry(e3.paramSet).await?;
             let seed = e3.seed.to_be_bytes();
             let request_block = u64_try_from(e3.requestBlock)?;
             let input_window = [
@@ -357,7 +358,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
                 ciphertext_output: vec![],
                 committee_public_key: e.publicKey.to_vec(),
                 custom_params: e3.customParams.to_vec(),
-                e3_params: vec![e3.paramSet],
+                e3_params: e3_params.to_vec(),
                 enclave_address,
                 encryption_scheme_id: e3.encryptionSchemeId.to_vec(),
                 id: e3_id,
