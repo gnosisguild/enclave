@@ -42,7 +42,7 @@ contract FakeEnclave {
       encryptionSchemeId: bytes32(keccak256("AES-256-GCM")),
       e3Program: 0x7F3E4df648B8Cb96C1D343be976b91B97CaD5c21,
       decryptionVerifier: 0x4B0D8c2E5f7a6c832f8b16d3aB0e7F5d9E9B24b1,
-      e3ProgramParams: abi.encode(42, "testParams"),
+      paramSet: 0,
       customParams: abi.encode("custom_params"),
       committeePublicKey: bytes32(keccak256("committee_public_key")),
       ciphertextOutput: bytes32(keccak256("encrypted_data")),
@@ -58,7 +58,7 @@ struct E3 {
   uint256[2] inputWindow;
   bytes32 encryptionSchemeId;
   address e3Program;
-  bytes e3ProgramParams;
+  uint8 paramSet;
   bytes customParams;
   address decryptionVerifier;
   bytes32 committeePublicKey;

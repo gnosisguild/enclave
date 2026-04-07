@@ -43,7 +43,7 @@ sol! {
         uint256[2] inputWindow;
         bytes32 encryptionSchemeId;
         IE3Program e3Program;
-        bytes e3ProgramParams;
+        uint8 paramSet;
         bytes customParams;
         IDecryptionVerifier decryptionVerifier;
         IPkVerifier pkVerifier;
