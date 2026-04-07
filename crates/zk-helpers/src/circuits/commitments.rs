@@ -587,7 +587,6 @@ pub fn compute_threshold_share_decryption_challenge(payload: Vec<Field>) -> BigI
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::bigint_to_field;
     use e3_polynomial::CrtPolynomial;
 
     fn field_to_bigint(value: Field) -> BigInt {
