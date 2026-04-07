@@ -78,7 +78,7 @@ integers. With k bits of precision:
 
 Torus element t ≈ round(t × 2^k) stored as a signed integer
 
-Example (k = 8 bits): t = 0.25 → 0.25 × 256 = 64 → stored as 64 t = 0.75 → 0.75 ×
+Example (k = 8 bits): t = 0.25 → 0.25 × 256 = 64 → stored as 64; t = 0.75 → 0.75 × 256 = 192 → stored as 192
 
 ---
 

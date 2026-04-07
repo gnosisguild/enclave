@@ -28,7 +28,9 @@ interface IEnclave {
     }
 
     /// @notice BFV encryption parameter sets.
-    /// @dev Each variant maps to a threshold BFV preset. The DKG counterpart
+    /// @dev Each variant maps to a threshold BFV preset. The DKG counterpart is
+    /// derived automatically via `BfvPreset::dkg_counterpart()` on the node side.
+
     /// @notice Lifecycle stages of an E3 computation
     enum E3Stage {
         None,

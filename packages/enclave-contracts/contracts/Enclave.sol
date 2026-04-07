@@ -660,6 +660,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes calldata encodedParams
     ) public onlyOwner {
         require(encodedParams.length > 0, "Empty params");
+        require(paramSetRegistry[paramSet].length == 0, "ParamSet already registered");
         paramSetRegistry[paramSet] = encodedParams;
         emit ParamSetRegistered(paramSet, encodedParams);
     }

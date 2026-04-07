@@ -106,16 +106,20 @@ impl E3Extension for PublicKeyAggregatorExtension {
 
             return Ok(());
         };
-        let params_preset = ctx
-            .get_dependency(META_KEY)
-            .map(|meta| meta.params_preset)
-            .unwrap_or_default();
+        let Some(meta) = ctx.get_dependency(META_KEY) else {
+            self.bus.err(
+                EType::PublickeyAggregation,
+                anyhow!(ERROR_PUBKEY_META_MISSING),
+            );
+
+            return Ok(());
+        };
         let value = create_publickey_aggregator(
             fhe.clone(),
             self.bus.clone(),
             ctx.e3_id.clone(),
             sync_state,
-            params_preset,
+            meta.params_preset,
         );
 
         // send to context
@@ -234,16 +238,20 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
             return Ok(());
         };
 
-        let params_preset = ctx
-            .get_dependency(META_KEY)
-            .map(|meta| meta.params_preset)
-            .unwrap_or_default();
+        let Some(meta) = ctx.get_dependency(META_KEY) else {
+            self.bus.err(
+                EType::PlaintextAggregation,
+                anyhow!(ERROR_TRBFV_PLAINTEXT_META_MISSING),
+            );
+
+            return Ok(());
+        };
         let value = ThresholdPlaintextAggregator::new(
             ThresholdPlaintextAggregatorParams {
                 bus: self.bus.clone(),
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
-                params_preset,
+                params_preset: meta.params_preset,
             },
             sync_state,
         )

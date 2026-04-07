@@ -14,7 +14,6 @@ use async_trait::async_trait;
 use e3_crypto::Cipher;
 use e3_data::{AutoPersist, RepositoriesFactory};
 use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
-use e3_fhe_params::BfvPreset;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 
 use crate::KeyshareState;
@@ -106,10 +105,13 @@ impl E3Extension for ThresholdKeyshareExtension {
         };
 
         // Derive DKG preset from persisted E3Meta
-        let share_enc_preset = ctx
-            .get_dependency(META_KEY)
-            .and_then(|meta| meta.params_preset.dkg_counterpart())
-            .unwrap_or(BfvPreset::InsecureThreshold512);
+        let Some(meta) = ctx.get_dependency(META_KEY) else {
+            return Err(anyhow!(ERROR_KEYSHARE_META_MISSING));
+        };
+        let share_enc_preset = meta
+            .params_preset
+            .dkg_counterpart()
+            .unwrap_or(meta.params_preset);
 
         // Construct from snapshot
         let value = ThresholdKeyshare::new(ThresholdKeyshareParams {
