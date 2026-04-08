@@ -10,12 +10,7 @@ import CardContent from '../components/CardContent'
 import Spinner from '../components/Spinner'
 import ErrorDisplay from '../components/ErrorDisplay'
 import { useWizard, WizardStep } from '../../context/WizardContext'
-import {
-  encodeComputeProviderParams,
-  DEFAULT_COMPUTE_PROVIDER_PARAMS,
-  DEFAULT_E3_CONFIG,
-  calculateInputWindow,
-} from '@enclave-e3/sdk'
+import { encodeComputeProviderParams, DEFAULT_COMPUTE_PROVIDER_PARAMS, DEFAULT_E3_CONFIG, calculateInputWindow } from '@enclave-e3/sdk'
 import { getContractAddresses } from '@/utils/env-config'
 
 /**

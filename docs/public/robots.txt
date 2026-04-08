@@ -1,5 +1,32 @@
-User-agent: *
-Content-Signal: search=yes,ai-train=no
+# Allow search engine crawlers
+User-agent: Googlebot
 Allow: /
 
-Sitemap: https://docs.theinterfold.com/sitemap.xml
+User-agent: Bingbot
+Allow: /
+
+# Block AI training crawlers
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+# Allow everything else (other search engines)
+User-agent: *
+Allow: /

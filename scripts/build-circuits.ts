@@ -699,8 +699,7 @@ async function main() {
         process.exit(1)
       }
       options.preset = val as CircuitPreset | 'all'
-    }
-    else if (['hash', 'build'].includes(arg)) command = arg
+    } else if (['hash', 'build'].includes(arg)) command = arg
   }
 
   const builder = new NoirCircuitBuilder(undefined, options)
