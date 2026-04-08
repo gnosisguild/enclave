@@ -204,7 +204,7 @@ impl ThresholdPlaintextAggregator {
             e3_id: params.e3_id,
             params_preset: params.params_preset,
             state,
-            c6_fold: ProofFoldState::new().with_params_preset(params.params_preset),
+            c6_fold: ProofFoldState::new(params.params_preset),
             c7_proofs_pending: None,
             last_ec: None,
         }

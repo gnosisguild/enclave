@@ -35,7 +35,7 @@ pub struct ProofFoldState {
 }
 
 impl ProofFoldState {
-    pub fn new() -> Self {
+    pub fn new(params_preset: BfvPreset) -> Self {
         ProofFoldState {
             correlation: None,
             accumulated: None,
@@ -43,19 +43,8 @@ impl ProofFoldState {
             total_steps: None,
             result: None,
             fold_input_was_empty: false,
-            params_preset: BfvPreset::default(),
+            params_preset,
         }
-    }
-
-    /// Set the BFV preset for this fold state.
-    pub fn with_params_preset(mut self, preset: BfvPreset) -> Self {
-        self.params_preset = preset;
-        self
-    }
-
-    /// Update the BFV preset for this fold state.
-    pub fn set_params_preset(&mut self, preset: BfvPreset) {
-        self.params_preset = preset;
     }
 
     /// Returns `true` if a fold step was dispatched but the in-flight proof was consumed
