@@ -301,7 +301,7 @@ jobs:
   build_ciphernode_image:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.docker_ciphernode == 'true'
-    timeout-minutes: 30
+    timeout-minutes: 60
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v6

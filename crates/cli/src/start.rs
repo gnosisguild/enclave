@@ -14,10 +14,9 @@ use anyhow::Result;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_config::AppConfig;
 use e3_console::Console;
+use e3_daemon_server::start_daemon_server;
 use e3_events::{prelude::*, Shutdown};
-use e3_socket_server::start_socket_server;
 use e3_utils::{colorize, Color};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::signal::unix::{signal, SignalKind};
 use tracing::{error, info, instrument};
 
@@ -56,24 +55,19 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
 /// Launch a socket server to read RemoteCli commands
 pub fn launch_socket_server(ctrl_port: u16) {
     // Setup socket server for daemon
-    tokio::task::spawn_local(start_socket_server(ctrl_port, |stream| async move {
-        let (reader, mut writer) = stream.into_split();
-        let mut lines = BufReader::new(reader).lines();
+    tokio::task::spawn_local(start_daemon_server(ctrl_port, |body| async move {
+        let (out, mut rx) = Console::channel();
+        info!("CMD: {}", &colorize(&body, Color::Blue));
+        let remote_cli: RemoteCli = serde_json::from_str(&body)?;
+        let cli: Cli = remote_cli.try_into()?;
+        let config_result = cli.load_config();
+        cli.execute(out, config_result).await?;
 
-        if let Some(line) = lines.next_line().await? {
-            let (out, mut rx) = Console::channel();
-            info!("CMD: {}", &colorize(&line, Color::Blue));
-            let remote_cli: RemoteCli = serde_json::from_str(&line)?;
-            let cli: Cli = remote_cli.try_into()?;
-            let config_result = cli.load_config();
-            cli.execute(out, config_result).await?;
-            while let Some(msg) = rx.recv().await {
-                writer.write_all(format!("{msg}\n").as_bytes()).await?;
-            }
+        let mut output = String::new();
+        while let Some(msg) = rx.recv().await {
+            output.push_str(&format!("{msg}\n"));
         }
-
-        writer.shutdown().await?;
-        Ok(())
+        Ok(output)
     }));
 }
 

@@ -407,17 +407,20 @@ impl CiphernodeBuilder {
                     .with_event_bus(local_bus)
                     .with_aggregate_config(aggregate_config.clone())
                     .with_global_shared_store(self.global_shared_store)
+                    .with_global_shared_eventstore(self.global_shared_eventstore)
             } else {
                 if let Some(ref store) = self.in_mem_store {
                     EventSystem::in_mem_from_store(store)
                         .with_event_bus(local_bus)
                         .with_aggregate_config(aggregate_config.clone())
                         .with_global_shared_store(self.global_shared_store)
+                        .with_global_shared_eventstore(self.global_shared_eventstore)
                 } else {
                     EventSystem::in_mem()
                         .with_event_bus(local_bus)
                         .with_aggregate_config(aggregate_config.clone())
                         .with_global_shared_store(self.global_shared_store)
+                        .with_global_shared_eventstore(self.global_shared_eventstore)
                 }
             };
         let store = event_system.store()?;

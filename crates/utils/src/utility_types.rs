@@ -11,14 +11,14 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use e3_utils_derive::BytesSerde;
 use rand_chacha::ChaCha20Rng;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::formatters::hexf;
+use crate::{formatters::hexf, AsBytesSerde};
 
 pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
 
-#[derive(Clone, Default, PartialEq, Eq, Hash)]
+#[derive(BytesSerde, Clone, Default, PartialEq, Eq, Hash)]
 pub struct ArcBytes(Arc<Vec<u8>>);
 
 impl ArcBytes {
@@ -49,22 +49,12 @@ impl fmt::Debug for ArcBytes {
     }
 }
 
-impl Serialize for ArcBytes {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.0.serialize(serializer)
+impl AsBytesSerde for ArcBytes {
+    fn as_bytes(&self) -> &[u8] {
+        &self.0.as_ref()
     }
-}
-
-impl<'de> Deserialize<'de> for ArcBytes {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let vec: Vec<u8> = Vec::deserialize(deserializer)?;
-        Ok(ArcBytes(Arc::new(vec)))
+    fn try_from_bytes(bytes: Vec<u8>) -> Result<Self, String> {
+        Ok(ArcBytes(Arc::new(bytes)))
     }
 }
 
