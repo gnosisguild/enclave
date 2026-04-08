@@ -334,46 +334,6 @@ pub fn compute_share_encryption_commitment_from_message(
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
-/// Compute share encryption commitment from shares.
-///
-/// This matches the Noir `compute_share_encryption_commitment_from_shares` function exactly.
-/// Used in C2 (verify shares circuit).
-///
-/// # Arguments
-/// * `y` - 3D array of share values: `y[coeff_idx][mod_idx][party_idx]`
-/// * `party_idx` - Index of the party (0-based)
-/// * `mod_idx` - Index of the modulus
-///
-/// # Returns
-/// A `BigInt` representing the commitment hash value
-pub fn compute_share_encryption_commitment_from_shares(
-    y: &[Vec<Vec<BigInt>>],
-    party_idx: usize,
-    mod_idx: usize,
-) -> BigInt {
-    let mut payload = Vec::new();
-
-    // Add shares y[coeff_idx][mod_idx][party_idx + 1] for each coefficient
-    for coeff_y in y {
-        let share_value = coeff_y.get(mod_idx).expect("Modulus index out of bounds");
-        let share_value = share_value
-            .get(party_idx + 1)
-            .expect("Party index out of bounds");
-        payload.push(crate::utils::bigint_to_field(share_value));
-    }
-
-    // Include party_idx and mod_idx in the hash
-    payload.push(Field::from(party_idx as u64));
-    payload.push(Field::from(mod_idx as u64));
-
-    let input_size = payload.len() as u32;
-    let io_pattern = [0x80000000 | input_size, 1];
-
-    let commitment_field = compute_commitments(payload, DS_SHARE_ENCRYPTION, io_pattern)[0];
-    let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
-    BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
-}
-
 /// Compute threshold public key aggregation commitment.
 ///
 /// This matches the Noir `compute_pk_aggregation_commitment` function exactly.
@@ -627,7 +587,6 @@ pub fn compute_threshold_share_decryption_challenge(payload: Vec<Field>) -> BigI
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::bigint_to_field;
     use e3_polynomial::CrtPolynomial;
 
     fn field_to_bigint(value: Field) -> BigInt {
@@ -656,42 +615,6 @@ mod tests {
         let expected = field_to_bigint(compute_commitments(inputs, DS_CIPHERTEXT, io)[0]);
 
         let actual = compute_ciphertext_commitment(&ct0, &ct1, bit_ct);
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn compute_share_encryption_commitment_from_shares_matches_manual_payload() {
-        let y = vec![
-            vec![
-                vec![BigInt::from(0), BigInt::from(11), BigInt::from(12)],
-                vec![BigInt::from(0), BigInt::from(21), BigInt::from(22)],
-            ],
-            vec![
-                vec![BigInt::from(0), BigInt::from(13), BigInt::from(14)],
-                vec![BigInt::from(0), BigInt::from(23), BigInt::from(24)],
-            ],
-            vec![
-                vec![BigInt::from(0), BigInt::from(15), BigInt::from(16)],
-                vec![BigInt::from(0), BigInt::from(25), BigInt::from(26)],
-            ],
-        ];
-        let party_idx = 0;
-        let mod_idx = 1;
-
-        let mut payload = Vec::new();
-        for coeff_y in &y {
-            let share_value = &coeff_y[mod_idx][party_idx + 1];
-            payload.push(bigint_to_field(share_value));
-        }
-        payload.push(Field::from(party_idx as u64));
-        payload.push(Field::from(mod_idx as u64));
-
-        let input_size = payload.len() as u32;
-        let io_pattern = [0x80000000 | input_size, 1];
-        let expected =
-            field_to_bigint(compute_commitments(payload, DS_SHARE_ENCRYPTION, io_pattern)[0]);
-
-        let actual = compute_share_encryption_commitment_from_shares(&y, party_idx, mod_idx);
         assert_eq!(actual, expected);
     }
 

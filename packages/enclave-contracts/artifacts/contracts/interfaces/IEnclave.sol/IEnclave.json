@@ -430,19 +430,6 @@
       "inputs": [
         {
           "indexed": false,
-          "internalType": "bytes[]",
-          "name": "e3ProgramParams",
-          "type": "bytes[]"
-        }
-      ],
-      "name": "AllowedE3ProgramsParamsSet",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
           "internalType": "address",
           "name": "bondingRegistry",
           "type": "address"
@@ -608,19 +595,6 @@
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
-          "internalType": "bytes[]",
-          "name": "e3ProgramParams",
-          "type": "bytes[]"
-        }
-      ],
-      "name": "E3ProgramsParamsRemoved",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
           "indexed": true,
           "internalType": "address",
           "name": "e3RefundManager",
@@ -672,9 +646,9 @@
               "type": "address"
             },
             {
-              "internalType": "bytes",
-              "name": "e3ProgramParams",
-              "type": "bytes"
+              "internalType": "uint8",
+              "name": "paramSet",
+              "type": "uint8"
             },
             {
               "internalType": "bytes",
@@ -838,6 +812,25 @@
         }
       ],
       "name": "MaxDurationSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "paramSet",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "encodedParams",
+          "type": "bytes"
+        }
+      ],
+      "name": "ParamSetRegistered",
       "type": "event"
     },
     {
@@ -1247,9 +1240,9 @@
               "type": "address"
             },
             {
-              "internalType": "bytes",
-              "name": "e3ProgramParams",
-              "type": "bytes"
+              "internalType": "uint8",
+              "name": "paramSet",
+              "type": "uint8"
             },
             {
               "internalType": "bytes",
@@ -1320,9 +1313,9 @@
               "type": "address"
             },
             {
-              "internalType": "bytes",
-              "name": "e3ProgramParams",
-              "type": "bytes"
+              "internalType": "uint8",
+              "name": "paramSet",
+              "type": "uint8"
             },
             {
               "internalType": "bytes",
@@ -1699,19 +1692,6 @@
     {
       "inputs": [
         {
-          "internalType": "bytes[]",
-          "name": "_e3ProgramsParams",
-          "type": "bytes[]"
-        }
-      ],
-      "name": "removeE3ProgramsParams",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
           "components": [
             {
               "internalType": "enum IEnclave.CommitteeSize",
@@ -1729,9 +1709,9 @@
               "type": "address"
             },
             {
-              "internalType": "bytes",
-              "name": "e3ProgramParams",
-              "type": "bytes"
+              "internalType": "uint8",
+              "name": "paramSet",
+              "type": "uint8"
             },
             {
               "internalType": "bytes",
@@ -1794,9 +1774,9 @@
               "type": "address"
             },
             {
-              "internalType": "bytes",
-              "name": "e3ProgramParams",
-              "type": "bytes"
+              "internalType": "uint8",
+              "name": "paramSet",
+              "type": "uint8"
             },
             {
               "internalType": "bytes",
@@ -1912,19 +1892,6 @@
     {
       "inputs": [
         {
-          "internalType": "bytes[]",
-          "name": "_e3ProgramsParams",
-          "type": "bytes[]"
-        }
-      ],
-      "name": "setE3ProgramsParams",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
           "internalType": "contract IERC20",
           "name": "_feeToken",
           "type": "address"
@@ -1944,6 +1911,24 @@
         }
       ],
       "name": "setMaxDuration",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "paramSet",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes",
+          "name": "encodedParams",
+          "type": "bytes"
+        }
+      ],
+      "name": "setParamSet",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -2093,5 +2078,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-67d7bf420ed8ac25001394841682e83cf4523ea2"
+  "buildInfoId": "solc-0_8_28-a5591f76a7a8353e3d0dd83e83c16479678f73a9"
 }

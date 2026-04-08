@@ -192,10 +192,8 @@ export const requestCommittee = task(
         hre.globalOptions.network,
       );
 
-      let e3ProgramParams = e3Params;
-      if (e3ProgramParams === ZeroAddress) {
-        e3ProgramParams = zeroPadValue(e3ProgramParams, 32);
-      }
+      // paramSet: 0 = Insecure512, 1 = Secure8192
+      const paramSet = 0;
 
       let computeProviderParams = computeParams;
       const mockDecryptionVerifierArgs = readDeploymentArgs(
@@ -227,7 +225,7 @@ export const requestCommittee = task(
         ],
         e3Program:
           e3Address === ZeroAddress ? mockE3ProgramArgs!.address : e3Address,
-        e3ProgramParams,
+        paramSet,
         computeProviderParams,
         customParams,
         proofAggregationEnabled,

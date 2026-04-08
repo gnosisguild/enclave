@@ -7,11 +7,7 @@ import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
 import { Enclave, Enclave__factory as EnclaveFactory } from "../../types";
 import { getProxyAdmin, verifyProxyAdminOwner } from "../proxy";
-import {
-  areArraysEqual,
-  readDeploymentArgs,
-  storeDeploymentArgs,
-} from "../utils";
+import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 
 /**
  * Timeout configuration for E3 stages
@@ -27,7 +23,6 @@ export interface E3TimeoutConfig {
  * The arguments for the deployAndSaveEnclave function
  */
 export interface EnclaveArgs {
-  params?: string[];
   owner?: string;
   maxDuration?: string;
   registry?: string;
@@ -44,7 +39,6 @@ export interface EnclaveArgs {
  * @returns The deployed Enclave contract
  */
 export const deployAndSaveEnclave = async ({
-  params,
   owner,
   maxDuration,
   registry,
@@ -62,7 +56,6 @@ export const deployAndSaveEnclave = async ({
   const preDeployedArgs = readDeploymentArgs("Enclave", chain);
 
   if (
-    !params ||
     !owner ||
     !maxDuration ||
     !registry ||
@@ -76,10 +69,7 @@ export const deployAndSaveEnclave = async ({
       preDeployedArgs?.constructorArgs?.bondingRegistry === bondingRegistry &&
       preDeployedArgs?.constructorArgs?.e3RefundManager === e3RefundManager &&
       preDeployedArgs?.constructorArgs?.feeToken === feeToken &&
-      areArraysEqual(
-        preDeployedArgs?.constructorArgs?.params as string[],
-        params,
-      ))
+      true)
   ) {
     if (!preDeployedArgs?.address) {
       throw new Error("Enclave address not found, it must be deployed first");
@@ -106,7 +96,6 @@ export const deployAndSaveEnclave = async ({
     feeToken,
     maxDuration,
     timeoutConfig,
-    params,
   ]);
 
   const ProxyCF = await ethers.getContractFactory(
@@ -128,7 +117,6 @@ export const deployAndSaveEnclave = async ({
         feeToken,
         maxDuration,
         timeoutConfig: JSON.stringify(timeoutConfig),
-        params,
       },
       proxyRecords: {
         initData,

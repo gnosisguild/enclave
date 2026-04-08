@@ -62,12 +62,16 @@ pub fn generate_wrapper_proof(
     proof: &Proof,
     e3_id: &str,
 ) -> Result<Proof, ZkError> {
+    let inner_circuit = proof.circuit;
+    let wrapper_circuit = inner_circuit.wrapper_artifact_circuit();
+
     let proof_fields = vec![bytes_to_field_strings(&proof.data)?];
     let public_inputs = vec![bytes_to_field_strings(&proof.public_signals)?];
-    let circuit = proof.circuit;
 
-    let vk_artifacts =
-        vk::load_vk_artifacts(&prover.circuits_dir(CircuitVariant::Recursive), circuit)?;
+    let vk_artifacts = vk::load_vk_artifacts(
+        &prover.circuits_dir(CircuitVariant::Recursive),
+        inner_circuit,
+    )?;
 
     let full_input = WrapperInput {
         verification_key: vk_artifacts.verification_key,
@@ -76,11 +80,11 @@ pub fn generate_wrapper_proof(
         key_hash: vk_artifacts.key_hash,
     };
 
-    let dir_path = circuit.wrapper_dir_path();
+    let dir_path = wrapper_circuit.wrapper_dir_path();
     let circuit_path = prover
         .circuits_dir(CircuitVariant::Default)
         .join(&dir_path)
-        .join(format!("{}.json", circuit.as_str()));
+        .join(format!("{}.json", wrapper_circuit.as_str()));
     let compiled = CompiledCircuit::from_file(&circuit_path)?;
 
     let json = full_input.to_json()?;
@@ -89,7 +93,7 @@ pub fn generate_wrapper_proof(
     let witness_gen = WitnessGenerator::new();
     let witness = witness_gen.generate_witness(&compiled, input_map)?;
 
-    prover.generate_wrapper_proof(circuit, &witness, e3_id)
+    prover.generate_wrapper_proof(wrapper_circuit, &witness, e3_id)
 }
 
 /// Full input for the fold circuit (recursive_aggregation/fold).

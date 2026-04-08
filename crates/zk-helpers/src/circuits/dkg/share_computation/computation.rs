@@ -15,22 +15,18 @@ use crate::circuits::commitments::{
     compute_share_computation_e_sm_commitment, compute_share_computation_sk_commitment,
 };
 use crate::computation::DkgInputType;
-use crate::dkg::share_computation::{
-    ShareComputationChunkCircuitData, ShareComputationCircuit, ShareComputationCircuitData,
-};
+use crate::dkg::share_computation::ShareComputationCircuit;
+use crate::dkg::share_computation::ShareComputationCircuitData;
 use crate::CircuitsErrors;
 use crate::{calculate_bit_width, crt_polynomial_to_toml_json, poly_coefficients_to_toml_json};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
-use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::{reduce, CrtPolynomial};
 use fhe::bfv::SecretKey;
 use fhe::trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig};
 use num_bigint::{BigInt, BigUint};
 use serde::{Deserialize, Serialize};
-// todo: understand where to put this!
-const SHARE_COMPUTATION_CHUNK_SIZE: usize = 512;
 
 /// Output of [`CircuitComputation::compute`] for [`ShareComputationCircuit`]: bounds, bit widths, and input.
 #[derive(Debug)]
@@ -65,10 +61,6 @@ pub struct Configs {
     pub n: usize,
     pub l: usize,
     pub moduli: Vec<u64>,
-    pub chunk_size: usize,
-    pub n_chunks: usize,
-    pub chunks_per_batch: usize,
-    pub n_batches: usize,
     pub bits: Bits,
     pub bounds: Bounds,
 }
@@ -88,8 +80,7 @@ pub struct Bounds {
     pub e_sm_bound: BigUint,
 }
 
-/// Input for the share-computation base circuit: secret in CRT form, full public `y`,
-/// and the expected secret commitment.
+/// Input for the share-computation circuit: secret in CRT form, y (secret + shares per coeff/modulus), and commitment.
 ///
 /// All coefficients are reduced to the ZKP field modulus for serialization. Before that,
 /// secret_crt and y are normalized so that per modulus j: secret and shares are in [0, q_j),
@@ -106,16 +97,6 @@ pub struct Inputs {
     pub dkg_input_type: DkgInputType,
 }
 
-/// Input for a single share-computation chunk circuit.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChunkInputs {
-    /// Chunk index used by the helper to select the correct slice from `y`.
-    /// It is not serialized because the current chunk Noir circuit only takes `y_chunk`.
-    pub chunk_idx: usize,
-    /// y_chunk[coeff_idx][mod_idx][party_idx]
-    pub y_chunk: Vec<Vec<Vec<BigInt>>>,
-}
-
 impl Computation for Configs {
     type Preset = BfvPreset;
     type Data = ShareComputationCircuitData;
@@ -130,45 +111,14 @@ impl Computation for Configs {
         let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
 
-        let degree = threshold_params.degree();
-        let chunk_size = compute_chunk_size();
-        let n_chunks = compute_n_chunks(degree, chunk_size);
-        let chunks_per_batch = compute_chunks_per_batch(degree);
-        let n_batches = compute_n_batches(n_chunks, chunks_per_batch);
-
         Ok(Configs {
-            n: degree,
+            n: threshold_params.degree(),
             l,
             moduli,
-            chunk_size,
-            n_chunks,
-            chunks_per_batch,
-            n_batches,
             bits,
             bounds,
         })
     }
-}
-
-fn compute_chunk_size() -> usize {
-    SHARE_COMPUTATION_CHUNK_SIZE
-}
-
-fn compute_n_chunks(degree: usize, chunk_size: usize) -> usize {
-    degree.div_ceil(chunk_size)
-}
-
-fn compute_chunks_per_batch(degree: usize) -> usize {
-    // Matches Noir configs: insecure (N<=512) uses 1, secure (N=8192) uses 4
-    if degree == BfvParamSet::from(BfvPreset::InsecureThreshold512).degree {
-        1
-    } else {
-        4
-    }
-}
-
-fn compute_n_batches(n_chunks: usize, chunks_per_batch: usize) -> usize {
-    n_chunks.div_ceil(chunks_per_batch)
 }
 
 impl Computation for Bits {
@@ -200,7 +150,7 @@ impl Computation for Bounds {
     type Data = ShareComputationCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let defaults = preset
@@ -209,9 +159,12 @@ impl Computation for Bounds {
         let num_ciphertexts = defaults.z;
         let lambda = defaults.lambda;
 
+        // Use search_defaults.n (same as C1/PkGeneration) so the smudging bound and
+        // resulting bit width match C1's PK_GENERATION_BIT_E_SM. This ensures
+        // C1.e_sm_commitment == C2b.expected_secret_commitment for the same e_sm.
         let e_sm_config = SmudgingBoundCalculatorConfig::new(
             threshold_params,
-            data.n_parties as usize,
+            defaults.n as usize,
             num_ciphertexts as usize,
             lambda as usize,
         );
@@ -269,12 +222,35 @@ impl Computation for Inputs {
 
         let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
+        // Reverse+center before committing to match C1 (PkGeneration)'s convention:
+        // C1 applies reverse then center to sk/e_sm before computing the commitment.
+        // For SK the values are already centered ({-1,0,1}) so centering is a no-op.
+        // For e_sm values are in [0,q) here, so we must center to [-(q-1)/2, (q-1)/2].
         let expected_secret_commitment = match data.dkg_input_type {
             DkgInputType::SecretKey => {
-                compute_share_computation_sk_commitment(secret_crt.limb(0), bits.bit_sk_secret)
+                let mut reversed = secret_crt.limb(0).clone();
+                reversed.reverse();
+                compute_share_computation_sk_commitment(&reversed, bits.bit_sk_secret)
             }
             DkgInputType::SmudgingNoise => {
-                compute_share_computation_e_sm_commitment(&secret_crt, bits.bit_e_sm_secret)
+                let centered_reversed_crt = e3_polynomial::CrtPolynomial::new(
+                    secret_crt
+                        .limbs
+                        .iter()
+                        .zip(moduli.iter())
+                        .map(|(l, &qi)| {
+                            let q = num_bigint::BigInt::from(qi);
+                            let mut r = l.clone();
+                            r.reverse();
+                            r.center(&q);
+                            r
+                        })
+                        .collect(),
+                );
+                compute_share_computation_e_sm_commitment(
+                    &centered_reversed_crt,
+                    bits.bit_e_sm_secret,
+                )
             }
         };
 
@@ -310,79 +286,6 @@ impl Computation for Inputs {
         json.as_object_mut().unwrap().insert(key.to_string(), value);
 
         Ok(json)
-    }
-}
-
-impl Inputs {
-    pub fn split_into_chunks(&self, chunk_size: usize) -> Result<Vec<ChunkInputs>, CircuitsErrors> {
-        if chunk_size == 0 {
-            return Err(CircuitsErrors::Sample(
-                "share computation chunk size must be > 0".to_string(),
-            ));
-        }
-
-        let degree = self.y.len();
-        let n_chunks = compute_n_chunks(degree, chunk_size);
-        let mut chunks = Vec::with_capacity(n_chunks);
-
-        for chunk_idx in 0..n_chunks {
-            let start = chunk_idx * chunk_size;
-            let end = usize::min(start + chunk_size, degree);
-            let y_chunk = self.y[start..end].to_vec();
-
-            chunks.push(ChunkInputs { chunk_idx, y_chunk });
-        }
-
-        Ok(chunks)
-    }
-}
-
-impl ChunkInputs {
-    /// Select chunk inputs from pre-computed base inputs and configs.
-    /// Avoids redundant recomputation when generating multiple chunk proofs.
-    pub fn from_inputs(
-        inputs: &Inputs,
-        configs: &Configs,
-        chunk_idx: usize,
-    ) -> Result<Self, CircuitsErrors> {
-        let chunks = inputs.split_into_chunks(configs.chunk_size)?;
-        chunks
-            .into_iter()
-            .find(|chunk| chunk.chunk_idx == chunk_idx)
-            .ok_or_else(|| {
-                CircuitsErrors::Sample(format!(
-                    "chunk index {} out of range for {} chunks",
-                    chunk_idx, configs.n_chunks
-                ))
-            })
-    }
-}
-
-impl Computation for ChunkInputs {
-    type Preset = BfvPreset;
-    type Data = ShareComputationChunkCircuitData;
-    type Error = CircuitsErrors;
-
-    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
-        let base_inputs = Inputs::compute(preset, &data.share_data)?;
-        let configs = Configs::compute(preset, &data.share_data)?;
-        let chunks = base_inputs.split_into_chunks(configs.chunk_size)?;
-
-        chunks
-            .into_iter()
-            .find(|chunk| chunk.chunk_idx == data.chunk_idx)
-            .ok_or_else(|| {
-                CircuitsErrors::Sample(format!(
-                    "chunk index {} out of range for {} chunks",
-                    data.chunk_idx, configs.n_chunks
-                ))
-            })
-    }
-
-    fn to_json(&self) -> serde_json::Result<serde_json::Value> {
-        Ok(serde_json::json!({
-            "y_chunk": bigint_3d_to_json_values(&self.y_chunk),
-        }))
     }
 }
 
@@ -454,57 +357,7 @@ mod tests {
         assert_eq!(decoded.n, constants.n);
         assert_eq!(decoded.l, constants.l);
         assert_eq!(decoded.moduli, constants.moduli);
-        assert_eq!(decoded.chunk_size, constants.chunk_size);
-        assert_eq!(decoded.n_chunks, constants.n_chunks);
         assert_eq!(decoded.bits, constants.bits);
         assert_eq!(decoded.bounds, constants.bounds);
-    }
-
-    #[test]
-    fn test_split_inputs_produces_expected_chunk_count() {
-        let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareComputationCircuitData::generate_sample(
-            BfvPreset::InsecureThreshold512,
-            committee,
-            DkgInputType::SecretKey,
-        )
-        .unwrap();
-
-        let base = Inputs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
-        let configs = Configs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
-        let chunks = base.split_into_chunks(configs.chunk_size).unwrap();
-
-        assert_eq!(chunks.len(), configs.n_chunks);
-        assert_eq!(base.y.len(), configs.n);
-    }
-
-    #[test]
-    fn test_chunk_input_matches_base_slice() {
-        let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareComputationCircuitData::generate_sample(
-            BfvPreset::SecureThreshold8192,
-            committee,
-            DkgInputType::SecretKey,
-        )
-        .unwrap();
-
-        let configs = Configs::compute(BfvPreset::SecureThreshold8192, &sample).unwrap();
-        assert!(configs.n_chunks > 1);
-
-        let base_inputs = Inputs::compute(BfvPreset::SecureThreshold8192, &sample).unwrap();
-        let chunk = ChunkInputs::compute(
-            BfvPreset::SecureThreshold8192,
-            &ShareComputationChunkCircuitData {
-                share_data: sample,
-                chunk_idx: 1,
-            },
-        )
-        .unwrap();
-
-        let expected_start = configs.chunk_size;
-        let expected_end = expected_start + configs.chunk_size;
-        let expected_slice = base_inputs.y[expected_start..expected_end].to_vec();
-
-        assert_eq!(chunk.y_chunk, expected_slice);
     }
 }

@@ -39,7 +39,7 @@ use e3_utils::utility_types::ArcBytes;
 use e3_utils::{colorize, rand_eth_addr, Color};
 use e3_zk_helpers::{compute_modulus_bit, compute_threshold_pk_commitment};
 use e3_zk_prover::test_utils::get_tempdir;
-use e3_zk_prover::{ProofRequestActor, ZkBackend};
+use e3_zk_prover::{ProofRequestActor, VersionInfo, ZkBackend};
 use fhe::bfv::PublicKey;
 use fhe::bfv::SecretKey;
 use fhe::mbfv::{AggregateIter, PublicKeyShare};
@@ -155,47 +155,20 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
             ".vk_noir_hash",
         )
         .await;
-        // C2a base (sk_share_computation_base)
+        // C2a (sk_share_computation)
         copy_circuit(
             &dkg_target,
-            &rv.join("dkg/sk_share_computation_base"),
-            "sk_share_computation_base",
+            &rv.join("dkg/sk_share_computation"),
+            "sk_share_computation",
             ".vk_noir",
             ".vk_noir_hash",
         )
         .await;
-        // C2b base (e_sm_share_computation_base)
+        // C2b (e_sm_share_computation)
         copy_circuit(
             &dkg_target,
-            &rv.join("dkg/e_sm_share_computation_base"),
-            "e_sm_share_computation_base",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C2 chunk (share_computation_chunk)
-        copy_circuit(
-            &dkg_target,
-            &rv.join("dkg/share_computation_chunk"),
-            "share_computation_chunk",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C2 chunk_batch (share_computation_chunk_batch)
-        copy_circuit(
-            &dkg_target,
-            &rv.join("dkg/share_computation_chunk_batch"),
-            "share_computation_chunk_batch",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C2 final (share_computation)
-        copy_circuit(
-            &dkg_target,
-            &rv.join("dkg/share_computation"),
-            "share_computation",
+            &rv.join("dkg/e_sm_share_computation"),
+            "e_sm_share_computation",
             ".vk_noir",
             ".vk_noir_hash",
         )
@@ -285,31 +258,6 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
         )
         .await;
 
-        // share_computation aliases (sk_share_computation, e_sm_share_computation)
-        for alias in ["sk_share_computation", "e_sm_share_computation"] {
-            let alias_dir = dkg_wrapper_base.join(alias);
-            tokio::fs::create_dir_all(&alias_dir).await.unwrap();
-            let sc_dir = dkg_wrapper_base.join("share_computation");
-            tokio::fs::copy(
-                sc_dir.join("share_computation.json"),
-                alias_dir.join(format!("{alias}.json")),
-            )
-            .await
-            .unwrap();
-            tokio::fs::copy(
-                sc_dir.join("share_computation.vk"),
-                alias_dir.join(format!("{alias}.vk")),
-            )
-            .await
-            .unwrap();
-            tokio::fs::copy(
-                sc_dir.join("share_computation.vk_hash"),
-                alias_dir.join(format!("{alias}.vk_hash")),
-            )
-            .await
-            .unwrap();
-        }
-
         // Threshold wrapper circuits
         let threshold_wrapper_base = dv.join("recursive_aggregation/wrapper/threshold");
         copy_circuit(
@@ -386,7 +334,20 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
             ".vk_hash",
         )
         .await;
-        let backend = ZkBackend::new(BBPath::check(bb_binary)?, circuits_dir, work_dir);
+
+        let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
+
+        // `CiphernodeBuilder` calls `ensure_installed()`, which deletes `circuits_dir` and downloads
+        // the release tarball whenever `version.json` does not record the pinned bb/circuits
+        // versions. That would wipe the fixture tree we just copied from `circuits/bin/`.
+        let mut version_info = VersionInfo::default();
+        version_info.bb_version = Some(backend.config.required_bb_version.clone());
+        version_info.circuits_version = Some(backend.config.required_circuits_version.clone());
+        version_info
+            .save(&backend.version_file())
+            .await
+            .expect("write noir/version.json for integration ZK fixtures");
+
         Ok((backend, temp))
     } else {
         println!("bb binary not found locally, downloading via ensure_installed()...");
@@ -926,6 +887,7 @@ async fn test_trbfv_actor() -> Result<()> {
         seed: seed.clone(),
         error_size,
         esi_per_ct: esi_per_ct as usize,
+        params_preset: DEFAULT_BFV_PRESET,
         params,
         proof_aggregation_enabled,
     };

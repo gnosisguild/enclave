@@ -56,11 +56,7 @@ impl CommitmentLink for C1ToC5PkCommitmentLink {
         vec![value]
     }
 
-    fn check_consistency(
-        &self,
-        source_values: &[FieldValue],
-        target_public_signals: &[u8],
-    ) -> bool {
+    fn check_signals(&self, source_values: &[FieldValue], target_public_signals: &[u8]) -> bool {
         if source_values.is_empty() {
             return false;
         }
@@ -129,7 +125,7 @@ mod tests {
         c5_signals.extend_from_slice(&pk);
         c5_signals.extend_from_slice(&make_field(99));
 
-        assert!(link.check_consistency(&source_values, &c5_signals));
+        assert!(link.check_signals(&source_values, &c5_signals));
     }
 
     #[test]
@@ -144,7 +140,7 @@ mod tests {
         c5_signals.extend_from_slice(&make_field(20));
         c5_signals.extend_from_slice(&make_field(99));
 
-        assert!(!link.check_consistency(&source_values, &c5_signals));
+        assert!(!link.check_signals(&source_values, &c5_signals));
     }
 
     #[test]
@@ -152,15 +148,15 @@ mod tests {
         let link = C1ToC5PkCommitmentLink;
         // Too short for C1 — extract returns empty, malformed source is a fault
         assert!(link.extract_source_values(&[0u8; 60]).is_empty());
-        assert!(!link.check_consistency(&[], &[0u8; 31]));
+        assert!(!link.check_signals(&[], &[0u8; 31]));
     }
 
     #[test]
     fn short_target_signals_treated_as_inconsistent() {
         let link = C1ToC5PkCommitmentLink;
         // Source has valid data but target C5 is truncated — non-consistent
-        assert!(!link.check_consistency(&[make_field(1)], &[0u8; 31]));
+        assert!(!link.check_signals(&[make_field(1)], &[0u8; 31]));
         // Only one field (< 2 required) — non-consistent
-        assert!(!link.check_consistency(&[make_field(1)], &make_field(1)));
+        assert!(!link.check_signals(&[make_field(1)], &make_field(1)));
     }
 }

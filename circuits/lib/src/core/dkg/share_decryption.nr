@@ -7,6 +7,7 @@
 use crate::math::commitments::{
     compute_aggregated_shares_commitment, compute_share_encryption_commitment_from_message,
 };
+use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
 /// DKG share decryption and aggregation (C4a / C4b).
@@ -52,10 +53,17 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32, let BIT_AGG: u32> Sha
     fn verify_commitments(self) {
         for party_idx in 0..H {
             for mod_idx in 0..L {
+                // Reverse the share polynomial to match the commitment format used by C2's
+                // commit_to_party_shares, which stores coefficients highest-degree-first.
+                let share = self.decrypted_shares[party_idx][mod_idx];
+                let mut reversed_coeffs: [Field; N] = [0; N];
+                for i in 0..N {
+                    reversed_coeffs[N - 1 - i] = share.coefficients[i];
+                }
                 assert(
-                    compute_share_encryption_commitment_from_message::<N, BIT_MSG>(
-                        self.decrypted_shares[party_idx][mod_idx],
-                    )
+                    compute_share_encryption_commitment_from_message::<N, BIT_MSG>(Polynomial::new(
+                        reversed_coeffs,
+                    ))
                         == self.expected_commitments[party_idx][mod_idx],
                     "Commitment mismatch",
                 );
@@ -66,12 +74,12 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32, let BIT_AGG: u32> Sha
     /// Aggregates all verified shares by summing coefficient-wise across honest parties.
     ///
     /// For each CRT modulus and each coefficient position, computes:
-    ///   aggregated[mod_idx][coeff] = sum(decrypted_shares[party_idx][mod_idx][coeff]) mod q_l
+    ///   aggregated[mod_idx][coeff] = sum(decrypted_shares[party_idx][mod_idx][coeff])
     ///                                  for party_idx in 0..H
     ///
-    /// Note: explicit modular reduction is omitted here because shares are verified to be in
-    /// [0, q_l) by C2 range checks, and the sum fits in the circuit field. The modular
-    /// reduction is enforced implicitly via the quotient polynomials in the downstream C6 circuit.
+    /// No modular reduction is applied here each share coefficient is in [0, q_l) by C2 range
+    /// checks, so the sum lies in [0, H*q_l) and fits in the circuit field. Reduction to [0, q_l)
+    /// is performed by normalize_aggregated before committing.
     ///
     /// This reflects the threshold key construction: sk = sum(sk_i) for i in H.
     /// Each ciphernode now holds a share of this sum, used during threshold decryption in P4.
@@ -99,14 +107,62 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32, let BIT_AGG: u32> Sha
     /// Returns a commitment to the aggregated shares:
     /// - C4a: commit(agg_sk), consumed by C6 in P4
     /// - C4b: commit(agg_e_sm), consumed by C6 in P4
-    pub fn execute(self) -> Field {
+    ///
+    /// `moduli` must be the threshold CRT moduli `[q_0, ..., q_{L-1}]`.
+    /// They are used to reduce, reverse, and center the aggregated polynomials so that
+    /// `compute_aggregated_shares_commitment` produces the same hash as C6's
+    /// Rust witness (which operates on sk coefficients already reduced to `[0, q_l)`
+    /// and then applies `.reverse()` and `.center(&qi)` before hashing).
+    pub fn execute(self, moduli: [Field; L]) -> Field {
         // Step 1: Verify decrypted shares match expected C2 commitments.
         self.verify_commitments();
 
         // Step 2: Sum shares coefficient-wise per CRT limb.
         let aggregated = self.compute_aggregated_shares();
 
-        // Step 3: Publish commitment to the aggregate (C6 input).
-        compute_aggregated_shares_commitment::<N, L, BIT_AGG>(aggregated)
+        // Step 3: Normalize to match C6's representation: reduce mod q, reverse, center.
+        let normalized = normalize_aggregated::<N, L>(aggregated, moduli);
+
+        // Step 4: Publish commitment to the aggregate (C6 input).
+        compute_aggregated_shares_commitment::<N, L, BIT_AGG>(normalized)
     }
+}
+
+/// Normalize aggregated share polynomials to match C6's Rust witness representation.
+///
+/// C6 applies three transformations before hashing:
+///   1. Reduce: coefficients to `[0, q_l)` (FHE `sk` is already reduced; C4 sums lie in `[0, H*q_l)`).
+///   2. Reverse: coefficients are reordered highest-degree-first.
+///   3. Center: each coefficient `c` is mapped to `c - q` when `c > (q-1)/2`,
+///              so values lie in `[-(q-1)/2, (q-1)/2]` instead of `[0, q)`.
+///
+/// Reduction uses [`ModU128::reduce_mod`] (unconstrained quotient/remainder + in-circuit checks).
+fn normalize_aggregated<let N: u32, let L: u32>(
+    aggregated: [Polynomial<N>; L],
+    moduli: [Field; L],
+) -> [Polynomial<N>; L] {
+    let mut normalized: [Polynomial<N>; L] = [Polynomial::new([0; N]); L];
+
+    for mod_idx in 0..L {
+        let poly = aggregated[mod_idx];
+        let q = moduli[mod_idx];
+        let half = (q - 1) / 2;
+
+        let mut coeffs: [Field; N] = [0; N];
+        for i in 0..N {
+            // Reverse: position i gets the coefficient from N-1-i.
+            let c = poly.coefficients[N - 1 - i];
+            let reduced = ModU128::new(q).reduce_mod(c);
+            // Center: shift to [-(q-1)/2, (q-1)/2].
+            let centered = if (reduced as u128) > (half as u128) {
+                reduced - q
+            } else {
+                reduced
+            };
+            coeffs[i] = centered;
+        }
+        normalized[mod_idx] = Polynomial::new(coeffs);
+    }
+
+    normalized
 }

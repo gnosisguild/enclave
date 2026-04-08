@@ -32,7 +32,9 @@ impl CompiledCircuit {
     }
 
     pub fn from_file(path: &std::path::Path) -> Result<Self, ZkError> {
-        let contents = std::fs::read_to_string(path)?;
+        let contents = std::fs::read_to_string(path).map_err(|e| {
+            ZkError::CircuitNotFound(format!("circuit JSON at {}: {}", path.display(), e))
+        })?;
         Self::from_json(&contents)
     }
 }
