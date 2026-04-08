@@ -692,7 +692,14 @@ async function main() {
     else if (arg === '--group') options.groups = args[++i]?.split(',') as CircuitGroup[]
     else if (arg === '--circuit') (options.circuits ??= []).push(args[++i])
     else if (arg === '-o' || arg === '--output') options.outputDir = resolve(args[++i])
-    else if (arg === '--preset') options.preset = args[++i] as CircuitPreset | 'all'
+    else if (arg === '--preset') {
+      const val = args[++i]
+      if (val !== 'all' && !ALL_PRESETS.includes(val as CircuitPreset)) {
+        console.error(`Unknown preset: ${val}. Valid values: ${ALL_PRESETS.join(', ')}, all`)
+        process.exit(1)
+      }
+      options.preset = val as CircuitPreset | 'all'
+    }
     else if (['hash', 'build'].includes(arg)) command = arg
   }
 

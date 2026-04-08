@@ -145,12 +145,15 @@ impl ProofVerificationActor {
             },
         );
 
-        let artifacts_dir = self
-            .presets
-            .get(&msg.e3_id)
-            .copied()
-            .unwrap_or_default()
-            .artifacts_dir();
+        let Some(preset) = self.presets.get(&msg.e3_id).copied() else {
+            error!(
+                "No BfvPreset known for e3_id={} — cannot determine circuit artifacts directory. \
+                 This can happen if CiphernodeSelected was missed (e.g. after restart). Rejecting key from party {}.",
+                msg.e3_id, msg.key.party_id
+            );
+            return;
+        };
+        let artifacts_dir = preset.artifacts_dir();
 
         let request = TypedEvent::new(
             ZkVerificationRequest {

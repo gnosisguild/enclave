@@ -252,13 +252,6 @@ describe("CiphernodeRegistryOwnable", function () {
     signer?: Signer,
   ) {
     const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-    const polynomial_degree = ethers.toBigInt(2048);
-    const plaintext_modulus = ethers.toBigInt(1032193);
-    const moduli = [ethers.toBigInt("18014398492704769")];
-    const encodedE3ProgramParams = abiCoder.encode(
-      ["uint256", "uint256", "uint256[]"],
-      [polynomial_degree, plaintext_modulus, moduli],
-    );
 
     const currentTime = await networkHelpers.time.latest();
     const requestParams = {
