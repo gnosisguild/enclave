@@ -160,7 +160,7 @@ impl<I: SequenceIndex, L: EventLog> Handler<EventStoreQueryBy<Seq>> for EventSto
 
 #[cfg(test)]
 mod tests {
-    use crate::{EventConstructorWithTimestamp, EventSource, TestEvent};
+    use crate::{EventConstructorWithTimestamp, EventContextSeq, EventSource, TestEvent};
 
     use super::*;
     use anyhow::Result;
@@ -501,5 +501,134 @@ mod tests {
         let events = store.query_by_ts(100, None, Some(2)).unwrap();
 
         assert_eq!(events.len(), 2);
+    }
+
+    // ===========================================================================
+    // Pagination / Cursor boundary tests
+    // ===========================================================================
+
+    #[test]
+    fn ts_query_is_inclusive_at_boundary() {
+        let store = populated_store(&[
+            make_local_event(100),
+            make_local_event(200),
+            make_local_event(300),
+        ]);
+
+        let page1 = store.query_by_ts(100, None, Some(2)).unwrap();
+        assert_eq!(page1.len(), 2);
+        assert_eq!(page1[0].get_ctx().ts(), 100);
+        assert_eq!(page1[1].get_ctx().ts(), 200);
+
+        let page2 = store.query_by_ts(200, None, Some(2)).unwrap();
+        assert_eq!(page2.len(), 2);
+        assert_eq!(page2[0].get_ctx().ts(), 200);
+        assert_eq!(page2[1].get_ctx().ts(), 300);
+    }
+
+    #[test]
+    fn ts_query_cursor_off_by_one_causes_duplicates() {
+        let store = populated_store(&[
+            make_local_event(100),
+            make_local_event(200),
+            make_local_event(300),
+        ]);
+
+        let page1 = store.query_by_ts(100, None, Some(2)).unwrap();
+        assert_eq!(page1.len(), 2);
+
+        let cursor_ts = page1.last().unwrap().get_ctx().ts();
+        assert_eq!(cursor_ts, 200);
+
+        let page2 = store.query_by_ts(cursor_ts, None, None).unwrap();
+        assert_eq!(page2.len(), 2);
+
+        let total: Vec<_> = page1.iter().chain(page2.iter()).collect();
+        let ts_values: Vec<_> = total.iter().map(|e| e.get_ctx().ts()).collect();
+        let has_duplicates = ts_values.len()
+            != ts_values
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len();
+
+        assert!(
+            has_duplicates,
+            "BUG: ts=200 appears in both pages (inclusive query with cursor=last_ts)"
+        );
+    }
+
+    #[test]
+    fn ts_query_pagination_without_duplicates() {
+        let store = populated_store(&[
+            make_local_event(100),
+            make_local_event(200),
+            make_local_event(300),
+            make_local_event(400),
+        ]);
+
+        let page1 = store.query_by_ts(100, None, Some(2)).unwrap();
+        assert_eq!(page1.len(), 2);
+
+        let cursor_ts = page1.last().unwrap().get_ctx().ts() + 1;
+        let page2 = store.query_by_ts(cursor_ts, None, Some(2)).unwrap();
+
+        let all_ts: Vec<_> = page1
+            .iter()
+            .chain(page2.iter())
+            .map(|e| e.get_ctx().ts())
+            .collect();
+
+        assert_eq!(all_ts.len(), 4);
+        assert_eq!(all_ts, vec![100, 200, 300, 400]);
+    }
+
+    #[test]
+    fn seq_query_is_inclusive_at_boundary() {
+        let store = populated_store(&[
+            make_local_event(100),
+            make_local_event(200),
+            make_local_event(300),
+        ]);
+
+        let page1 = store.query_by_seq(0, None, Some(2));
+        assert_eq!(page1.len(), 2);
+        assert_eq!(page1[0].seq(), 0);
+        assert_eq!(page1[1].seq(), 1);
+
+        let page2 = store.query_by_seq(1, None, Some(2));
+        assert_eq!(page2.len(), 2);
+        assert_eq!(page2[0].seq(), 1);
+        assert_eq!(page2[1].seq(), 2);
+    }
+
+    #[test]
+    fn seq_query_cursor_off_by_one_causes_duplicates() {
+        let store = populated_store(&[
+            make_local_event(100),
+            make_local_event(200),
+            make_local_event(300),
+        ]);
+
+        let page1 = store.query_by_seq(0, None, Some(2));
+        assert_eq!(page1.len(), 2);
+
+        let cursor_seq = page1.last().unwrap().seq();
+        assert_eq!(cursor_seq, 1);
+
+        let page2 = store.query_by_seq(cursor_seq, None, None);
+        assert_eq!(page2.len(), 2);
+
+        let total: Vec<_> = page1.iter().chain(page2.iter()).collect();
+        let seq_values: Vec<_> = total.iter().map(|e| e.seq()).collect();
+        let has_duplicates = seq_values.len()
+            != seq_values
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len();
+
+        assert!(
+            has_duplicates,
+            "BUG: seq=1 appears in both pages (inclusive query with cursor=last_seq)"
+        );
     }
 }

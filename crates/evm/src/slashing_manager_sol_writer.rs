@@ -206,7 +206,7 @@ fn encode_attestation_evidence(data: &AccusationQuorumReached) -> Vec<u8> {
     let data_hashes: Vec<[u8; 32]> = votes.iter().map(|v| v.data_hash).collect();
     let signatures: Vec<Bytes> = votes
         .iter()
-        .map(|v| Bytes::from(v.signature.clone()))
+        .map(|v| Bytes::from(v.signature.extract_bytes()))
         .collect();
 
     (proof_type, voters, agrees, data_hashes, signatures).abi_encode()

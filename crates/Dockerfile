@@ -75,13 +75,14 @@ COPY crates/request/Cargo.toml ./request/Cargo.toml
 COPY crates/safe/Cargo.toml ./safe/Cargo.toml
 COPY crates/sdk/Cargo.toml ./sdk/Cargo.toml
 COPY crates/sortition/Cargo.toml ./sortition/Cargo.toml
-COPY crates/socket-server/Cargo.toml ./socket-server/Cargo.toml
+COPY crates/daemon-server/Cargo.toml ./daemon-server/Cargo.toml
 COPY crates/support-scripts/Cargo.toml ./support-scripts/Cargo.toml
 COPY crates/sync/Cargo.toml ./sync/Cargo.toml
 COPY crates/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml ./tests/Cargo.toml
 COPY crates/trbfv/Cargo.toml ./trbfv/Cargo.toml
 COPY crates/utils/Cargo.toml ./utils/Cargo.toml
+COPY crates/utils-derive/Cargo.toml ./utils-derive/Cargo.toml
 COPY crates/wasm/Cargo.toml ./wasm/Cargo.toml
 COPY crates/zk-helpers/Cargo.toml ./zk-helpers/Cargo.toml
 
@@ -92,6 +93,9 @@ RUN for d in ./*/ ; do \
           if [ "$d" = "./cli/" ] || [ "$d" = "./enclaveup/" ]; then \
             mkdir -p "$d/src" && \
             echo "fn main() {}" > "$d/src/main.rs"; \
+          elif [ "$d" = "./utils-derive/" ]; then \
+            mkdir -p "$d/src" && \
+            echo "" > "$d/src/lib.rs"; \
           else \
             mkdir -p "$d/src" && \
             echo "pub fn main() {}" > "$d/src/lib.rs"; \

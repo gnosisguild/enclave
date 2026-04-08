@@ -7,6 +7,7 @@
 mod bus_handle;
 mod committee;
 mod correlation_id;
+mod cursor;
 mod data_events;
 mod e3id;
 mod enclave_event;
@@ -32,6 +33,7 @@ mod traits;
 pub use bus_handle::*;
 pub use committee::*;
 pub use correlation_id::*;
+pub use cursor::*;
 pub use data_events::*;
 pub use e3id::*;
 pub use enclave_event::*;

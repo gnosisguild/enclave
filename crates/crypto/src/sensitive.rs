@@ -35,6 +35,13 @@ impl SensitiveBytes {
             .collect::<Result<_>>()
     }
 
+    /// Helper method mainly for testing
+    pub fn from_encrypted(encrypted: &[u8]) -> Self {
+        SensitiveBytes {
+            encrypted: ArcBytes::from_bytes(encrypted),
+        }
+    }
+
     /// Access the decrypted data, wrapped in a ZeroizeOnDrop container
     // TODO: rename try_access
     pub fn access(&self, cipher: &Cipher) -> Result<Zeroizing<Vec<u8>>> {

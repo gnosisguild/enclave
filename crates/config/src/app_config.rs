@@ -178,6 +178,16 @@ impl BBPath {
             BBPath::Default(p) => p.clone(),
         }
     }
+
+    /// Check the environment variable and if found use that otherwise use the given path
+    pub fn check(default_path: PathBuf) -> Result<Self> {
+        let bb_path = if let Some(bb_path) = env::var("E3_CUSTOM_BB").ok() {
+            BBPath::Custom(bb_path.try_into()?)
+        } else {
+            BBPath::Default(default_path)
+        };
+        Ok(bb_path)
+    }
 }
 
 impl AppConfig {

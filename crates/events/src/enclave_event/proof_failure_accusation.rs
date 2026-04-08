@@ -7,6 +7,7 @@
 use crate::{E3id, ProofType, SignedProofPayload};
 use actix::Message;
 use alloy::primitives::Address;
+use e3_utils::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
@@ -36,7 +37,7 @@ pub struct ProofFailureAccusation {
     /// `None` for proofs that all nodes already received.
     pub signed_payload: Option<SignedProofPayload>,
     /// ECDSA signature of the accuser over the accusation fields.
-    pub signature: Vec<u8>,
+    pub signature: ArcBytes,
 }
 
 impl Display for ProofFailureAccusation {
