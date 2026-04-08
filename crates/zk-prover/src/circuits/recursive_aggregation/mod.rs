@@ -61,6 +61,7 @@ pub fn generate_wrapper_proof(
     prover: &ZkProver,
     proof: &Proof,
     e3_id: &str,
+    artifacts_dir: &str,
 ) -> Result<Proof, ZkError> {
     let inner_circuit = proof.circuit;
     let wrapper_circuit = inner_circuit.wrapper_artifact_circuit();
@@ -69,7 +70,7 @@ pub fn generate_wrapper_proof(
     let public_inputs = vec![bytes_to_field_strings(&proof.public_signals)?];
 
     let vk_artifacts = vk::load_vk_artifacts(
-        &prover.circuits_dir(CircuitVariant::Recursive),
+        &prover.circuits_dir(CircuitVariant::Recursive, artifacts_dir),
         inner_circuit,
     )?;
 
@@ -82,7 +83,7 @@ pub fn generate_wrapper_proof(
 
     let dir_path = wrapper_circuit.wrapper_dir_path();
     let circuit_path = prover
-        .circuits_dir(CircuitVariant::Default)
+        .circuits_dir(CircuitVariant::Default, artifacts_dir)
         .join(&dir_path)
         .join(format!("{}.json", wrapper_circuit.as_str()));
     let compiled = CompiledCircuit::from_file(&circuit_path)?;
@@ -93,7 +94,7 @@ pub fn generate_wrapper_proof(
     let witness_gen = WitnessGenerator::new();
     let witness = witness_gen.generate_witness(&compiled, input_map)?;
 
-    prover.generate_wrapper_proof(wrapper_circuit, &witness, e3_id)
+    prover.generate_wrapper_proof(wrapper_circuit, &witness, e3_id, artifacts_dir)
 }
 
 /// Full input for the fold circuit (recursive_aggregation/fold).
@@ -143,13 +144,14 @@ pub fn generate_fold_proof(
     proof2: &Proof,
     e3_id: &str,
     target_evm: bool,
+    artifacts_dir: &str,
 ) -> Result<Proof, ZkError> {
     let vk1 = vk::load_vk_for_fold_input(
-        &prover.circuits_dir(CircuitVariant::Default),
+        &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
         proof1.circuit,
     )?;
     let vk2 = vk::load_vk_for_fold_input(
-        &prover.circuits_dir(CircuitVariant::Default),
+        &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
         proof2.circuit,
     )?;
 
@@ -188,7 +190,7 @@ pub fn generate_fold_proof(
     };
     let dir_path = CircuitName::Fold.dir_path();
     let circuit_path = prover
-        .circuits_dir(variant)
+        .circuits_dir(variant, artifacts_dir)
         .join(&dir_path)
         .join(format!("{}.json", CircuitName::Fold.as_str()));
     let compiled = CompiledCircuit::from_file(&circuit_path)?;
@@ -200,9 +202,9 @@ pub fn generate_fold_proof(
     let witness = witness_gen.generate_witness(&compiled, input_map)?;
 
     if target_evm {
-        prover.generate_final_fold_proof(&witness, e3_id)
+        prover.generate_final_fold_proof(&witness, e3_id, artifacts_dir)
     } else {
-        prover.generate_fold_proof(&witness, e3_id)
+        prover.generate_fold_proof(&witness, e3_id, artifacts_dir)
     }
 }
 
@@ -294,6 +296,7 @@ mod tests {
         }
 
         let preset = BfvPreset::InsecureThreshold512;
+        let artifacts_dir = preset.artifacts_dir();
         let sample =
             PkCircuitData::generate_sample(preset).expect("sample data generation should succeed");
 
@@ -301,12 +304,18 @@ mod tests {
 
         // First generate the inner proof with prove() (Recursive Variant)
         let inner_proof = PkCircuit
-            .prove(&prover, &preset, &sample, &format!("{e3_id}_inner_0"))
+            .prove(
+                &prover,
+                &preset,
+                &sample,
+                &format!("{e3_id}_inner_0"),
+                &artifacts_dir,
+            )
             .expect("inner prove() should succeed");
 
         let start = std::time::Instant::now();
-        let wrapper_proof =
-            generate_wrapper_proof(&prover, &inner_proof, e3_id).expect("wrapper (1 proof)");
+        let wrapper_proof = generate_wrapper_proof(&prover, &inner_proof, e3_id, &artifacts_dir)
+            .expect("wrapper (1 proof)");
         let elapsed = start.elapsed();
         eprintln!("1-proof wrapper generation: {:?}", elapsed);
 
@@ -314,7 +323,7 @@ mod tests {
         assert!(!wrapper_proof.public_signals.is_empty());
 
         let verified = prover
-            .verify_wrapper_proof(&wrapper_proof, e3_id, 0)
+            .verify_wrapper_proof(&wrapper_proof, e3_id, 0, &artifacts_dir)
             .expect("verification should not error");
         assert!(verified, "wrapper proof should verify successfully");
 
@@ -361,6 +370,7 @@ mod tests {
         }
 
         let preset = BfvPreset::InsecureThreshold512;
+        let artifacts_dir = preset.artifacts_dir();
         let committee = CiphernodesCommitteeSize::Micro.values();
         let sample_a = ShareDecryptionCircuitData::generate_sample(
             preset,
@@ -376,19 +386,38 @@ mod tests {
 
         // First generate the inner proofs with prove() (Recursive Variant)
         let inner_proof_a = ShareDecryptionCircuit
-            .prove(&prover, &preset, &sample_a, &format!("{e3_id}_inner_0"))
+            .prove(
+                &prover,
+                &preset,
+                &sample_a,
+                &format!("{e3_id}_inner_0"),
+                &artifacts_dir,
+            )
             .expect("inner prove() A should succeed");
         let inner_proof_b = ShareDecryptionCircuit
-            .prove(&prover, &preset, &sample_b, &format!("{e3_id}_inner_1"))
+            .prove(
+                &prover,
+                &preset,
+                &sample_b,
+                &format!("{e3_id}_inner_1"),
+                &artifacts_dir,
+            )
             .expect("inner prove() B should succeed");
 
         let start = std::time::Instant::now();
-        let wrapper_a =
-            generate_wrapper_proof(&prover, &inner_proof_a, e3_id).expect("wrapper (proof A)");
-        let wrapper_b =
-            generate_wrapper_proof(&prover, &inner_proof_b, e3_id).expect("wrapper (proof B)");
-        let fold_proof = generate_fold_proof(&prover, &wrapper_a, &wrapper_b, e3_id, false)
-            .expect("fold 2 wrappers");
+        let wrapper_a = generate_wrapper_proof(&prover, &inner_proof_a, e3_id, &artifacts_dir)
+            .expect("wrapper (proof A)");
+        let wrapper_b = generate_wrapper_proof(&prover, &inner_proof_b, e3_id, &artifacts_dir)
+            .expect("wrapper (proof B)");
+        let fold_proof = generate_fold_proof(
+            &prover,
+            &wrapper_a,
+            &wrapper_b,
+            e3_id,
+            false,
+            &artifacts_dir,
+        )
+        .expect("fold 2 wrappers");
         let elapsed = start.elapsed();
         eprintln!("2-proof (wrapper each + fold) generation: {:?}", elapsed);
 
@@ -396,7 +425,7 @@ mod tests {
         assert!(!fold_proof.public_signals.is_empty());
 
         let verified = prover
-            .verify_fold_proof(&fold_proof, e3_id, 0)
+            .verify_fold_proof(&fold_proof, e3_id, 0, &artifacts_dir)
             .expect("verification should not error");
         assert!(verified, "fold of 2 wrappers should verify successfully");
 
@@ -463,6 +492,7 @@ mod tests {
         }
 
         let preset = BfvPreset::InsecureThreshold512;
+        let artifacts_dir = preset.artifacts_dir();
         let committee = CiphernodesCommitteeSize::Micro.values();
         let sd = preset.search_defaults().expect("search_defaults");
 
@@ -490,11 +520,18 @@ mod tests {
 
         // Generate inner proofs first with prove() (Recursive Variant)
         let pk_inner_proof = PkCircuit
-            .prove(&prover, &preset, &pk_sample, &format!("{e3_id}_pk_inner_0"))
+            .prove(
+                &prover,
+                &preset,
+                &pk_sample,
+                &format!("{e3_id}_pk_inner_0"),
+                &artifacts_dir,
+            )
             .expect("pk inner prove() should succeed");
 
         let pk_wrapper_proof =
-            generate_wrapper_proof(&prover, &pk_inner_proof, e3_id).expect("pk wrapper");
+            generate_wrapper_proof(&prover, &pk_inner_proof, e3_id, &artifacts_dir)
+                .expect("pk wrapper");
 
         let enc_inner_secret = ShareEncryptionCircuit
             .prove(
@@ -502,6 +539,7 @@ mod tests {
                 &preset,
                 &share_enc_sample_secret,
                 &format!("{e3_id}_enc_inner_0"),
+                &artifacts_dir,
             )
             .expect("share_encryption inner prove() (secret) should succeed");
         let enc_inner_noise = ShareEncryptionCircuit
@@ -510,19 +548,23 @@ mod tests {
                 &preset,
                 &share_enc_sample_noise,
                 &format!("{e3_id}_enc_inner_1"),
+                &artifacts_dir,
             )
             .expect("share_encryption inner prove() (noise) should succeed");
 
-        let share_enc_wrapper_1 = generate_wrapper_proof(&prover, &enc_inner_secret, e3_id)
-            .expect("share_encryption wrapper (secret)");
-        let share_enc_wrapper_2 = generate_wrapper_proof(&prover, &enc_inner_noise, e3_id)
-            .expect("share_encryption wrapper (noise)");
+        let share_enc_wrapper_1 =
+            generate_wrapper_proof(&prover, &enc_inner_secret, e3_id, &artifacts_dir)
+                .expect("share_encryption wrapper (secret)");
+        let share_enc_wrapper_2 =
+            generate_wrapper_proof(&prover, &enc_inner_noise, e3_id, &artifacts_dir)
+                .expect("share_encryption wrapper (noise)");
         let share_enc_fold_proof = generate_fold_proof(
             &prover,
             &share_enc_wrapper_1,
             &share_enc_wrapper_2,
             e3_id,
             false,
+            &artifacts_dir,
         )
         .expect("fold share_enc wrappers");
         let fold_proof = generate_fold_proof(
@@ -531,6 +573,7 @@ mod tests {
             &pk_wrapper_proof,
             e3_id,
             false,
+            &artifacts_dir,
         )
         .expect("fold");
 
@@ -539,7 +582,7 @@ mod tests {
         assert_eq!(fold_proof.circuit, e3_events::CircuitName::Fold);
 
         let verified = prover
-            .verify_fold_proof(&fold_proof, e3_id, 0)
+            .verify_fold_proof(&fold_proof, e3_id, 0, &artifacts_dir)
             .expect("verification should not error");
         assert!(verified, "fold proof should verify successfully");
 

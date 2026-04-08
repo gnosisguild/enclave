@@ -377,6 +377,18 @@ impl BfvPreset {
         }
     }
 
+    /// Returns the security tier for this preset.
+    pub fn security_tier(&self) -> SecurityTier {
+        self.metadata().security
+    }
+
+    /// Returns the directory name for circuit artifacts (e.g. `"insecure-512"`, `"secure-8192"`).
+    /// Threshold and DKG presets at the same degree share the same compiled circuits.
+    pub fn artifacts_dir(&self) -> String {
+        let meta = self.metadata();
+        format!("{}-{}", meta.security.as_config_str(), meta.degree)
+    }
+
     pub fn search_defaults(&self) -> Option<PresetSearchDefaults> {
         match self {
             BfvPreset::InsecureThreshold512 => Some(PresetSearchDefaults {
@@ -536,5 +548,19 @@ mod tests {
         // DKG presets don't have search defaults
         assert!(BfvPreset::InsecureDkg512.search_defaults().is_none());
         assert!(BfvPreset::SecureDkg8192.search_defaults().is_none());
+    }
+
+    #[test]
+    fn test_artifacts_dir() {
+        assert_eq!(
+            BfvPreset::InsecureThreshold512.artifacts_dir(),
+            "insecure-512"
+        );
+        assert_eq!(BfvPreset::InsecureDkg512.artifacts_dir(), "insecure-512");
+        assert_eq!(
+            BfvPreset::SecureThreshold8192.artifacts_dir(),
+            "secure-8192"
+        );
+        assert_eq!(BfvPreset::SecureDkg8192.artifacts_dir(), "secure-8192");
     }
 }

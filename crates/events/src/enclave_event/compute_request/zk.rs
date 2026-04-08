@@ -42,6 +42,7 @@ pub enum ZkRequest {
         proof1: Proof,
         proof2: Proof,
         target_evm: bool,
+        params_preset: BfvPreset,
     },
 }
 
@@ -346,6 +347,8 @@ impl PkGenerationProofResponse {
 pub struct VerifyShareProofsRequest {
     /// Proofs grouped by sender party_id.
     pub party_proofs: Vec<PartyProofsToVerify>,
+    /// BFV preset for parameter resolution (determines circuit artifact directory).
+    pub params_preset: BfvPreset,
 }
 
 /// All signed proofs from a single sender to verify.
@@ -386,6 +389,8 @@ pub struct PartyVerificationResult {
 pub struct VerifyShareDecryptionProofsRequest {
     /// C4 proofs grouped by sender party_id.
     pub party_proofs: Vec<PartyShareDecryptionProofsToVerify>,
+    /// BFV preset for parameter resolution (determines circuit artifact directory).
+    pub params_preset: BfvPreset,
 }
 
 /// C4 proofs from a single sender to verify.

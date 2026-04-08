@@ -265,10 +265,12 @@ impl ProofRequestActor {
     }
 
     /// Returns true if proof aggregation (wrapping/folding) is enabled for this E3.
+    /// Defaults to `false` when metadata is missing (e.g. after restart) to avoid
+    /// requiring wrapped proofs that were never generated.
     fn is_proof_aggregation_enabled(&self, e3_id: &E3id) -> bool {
         self.node_agg_meta
             .get(e3_id)
-            .map_or(true, |m| m.proof_aggregation_enabled)
+            .map_or(false, |m| m.proof_aggregation_enabled)
     }
 
     fn handle_encryption_key_pending(&mut self, msg: TypedEvent<EncryptionKeyPending>) {

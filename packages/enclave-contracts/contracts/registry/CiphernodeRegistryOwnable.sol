@@ -220,7 +220,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         bytes32 publicKeyHash = publicInputs[publicInputs.length - 1];
 
         E3 memory e3 = enclave.getE3(e3Id);
-        e3.pkVerifier.verify(proof, foldProof);
+        if (e3.proofAggregationEnabled) {
+            e3.pkVerifier.verify(proof, foldProof);
+        }
 
         c.publicKey = publicKeyHash;
         publicKeyHashes[e3Id] = publicKeyHash;

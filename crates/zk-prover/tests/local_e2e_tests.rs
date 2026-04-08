@@ -468,8 +468,9 @@ macro_rules! e2e_proof_tests {
                         return;
                     };
 
+                    let artifacts_dir = preset.artifacts_dir();
                     let proof = circuit
-                        .prove_with_variant(&prover, &preset, &sample, e3_id, $variant)
+                        .prove_with_variant(&prover, &preset, &sample, e3_id, $variant, &artifacts_dir)
                         .expect("proof generation should succeed");
 
                     assert!(!proof.data.is_empty(), "proof data should not be empty");
@@ -477,7 +478,7 @@ macro_rules! e2e_proof_tests {
 
                     let party_id = 1;
                     let verification_result =
-                        circuit.verify_with_variant(&prover, &proof, e3_id, party_id, $variant);
+                        circuit.verify_with_variant(&prover, &proof, e3_id, party_id, $variant, &artifacts_dir);
                     assert!(
                         verification_result.as_ref().is_ok_and(|&v| v),
                         "Proof verification failed: {:?}",
@@ -512,8 +513,9 @@ async fn test_pk_generation_commitment_consistency() {
         return;
     };
 
+    let artifacts_dir = preset.artifacts_dir();
     let proof = circuit
-        .prove(&prover, &preset, &sample, e3_id)
+        .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("proof generation should succeed");
 
     let computation_output = PkGenerationCircuit::compute(preset, &sample).unwrap();
@@ -559,8 +561,9 @@ async fn test_pk_bfv_commitment_consistency() {
         return;
     };
 
+    let artifacts_dir = preset.artifacts_dir();
     let proof = circuit
-        .prove(&prover, &preset, &sample, e3_id)
+        .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("proof generation should succeed");
 
     // Verify the commitment from the proof is a valid field element
@@ -597,8 +600,9 @@ async fn test_share_computation_sk_commitment_consistency() {
         return;
     };
 
+    let artifacts_dir = preset.artifacts_dir();
     let proof = circuit
-        .prove(&prover, &preset, &sample, e3_id)
+        .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("inner sk_share_computation proof should succeed");
 
     assert_eq!(
@@ -629,8 +633,9 @@ async fn test_share_computation_e_sm_commitment_consistency() {
         return;
     };
 
+    let artifacts_dir = preset.artifacts_dir();
     let proof = circuit
-        .prove(&prover, &preset, &sample, e3_id)
+        .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("inner e_sm_share_computation proof should succeed");
 
     assert_eq!(
@@ -663,8 +668,16 @@ async fn test_pk_aggregation_commitment_consistency() {
 
     // C5 uses Evm variant in production; Recursive fails because commitment hashes (256-bit)
     // exceed the noir-recursive verifier's limb bound.
+    let artifacts_dir = preset.artifacts_dir();
     let proof = circuit
-        .prove_with_variant(&prover, &preset, &sample, e3_id, CircuitVariant::Evm)
+        .prove_with_variant(
+            &prover,
+            &preset,
+            &sample,
+            e3_id,
+            CircuitVariant::Evm,
+            &artifacts_dir,
+        )
         .expect("proof generation should succeed");
 
     let computation_output = PkAggregationCircuit::compute(preset, &sample).unwrap();
@@ -706,8 +719,16 @@ async fn test_threshold_share_decryption_commitment_consistency() {
         return;
     };
 
+    let artifacts_dir = preset.artifacts_dir();
     let proof = circuit
-        .prove_with_variant(&prover, &preset, &sample, e3_id, CircuitVariant::Recursive)
+        .prove_with_variant(
+            &prover,
+            &preset,
+            &sample,
+            e3_id,
+            CircuitVariant::Recursive,
+            &artifacts_dir,
+        )
         .expect("proof generation should succeed");
 
     let computation_output = ThresholdShareDecryptionCircuit::compute(preset, &sample).unwrap();
@@ -741,6 +762,7 @@ async fn test_c4_sk_commitment_is_c6_expected_sk_input_e2e() {
 
     let e3_id_c4 = "c4-e2e";
     let e3_id_c6 = "c6-e2e";
+    let artifacts_dir = preset.artifacts_dir();
 
     let c4_proof = DkgShareDecryptionCircuit
         .prove_with_variant(
@@ -749,6 +771,7 @@ async fn test_c4_sk_commitment_is_c6_expected_sk_input_e2e() {
             &dkg_sample,
             e3_id_c4,
             CircuitVariant::Recursive,
+            &artifacts_dir,
         )
         .expect("C4 proof generation should succeed");
 
@@ -759,6 +782,7 @@ async fn test_c4_sk_commitment_is_c6_expected_sk_input_e2e() {
             &c6_sample,
             e3_id_c6,
             CircuitVariant::Recursive,
+            &artifacts_dir,
         )
         .expect("C6 proof generation should succeed");
 
@@ -841,6 +865,7 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
 
     let e3_id_c4 = "c4-align";
     let e3_id_c6 = "c6-align";
+    let artifacts_dir = preset.artifacts_dir();
 
     let c4_proof = DkgShareDecryptionCircuit
         .prove_with_variant(
@@ -849,6 +874,7 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
             &dkg_sample,
             e3_id_c4,
             CircuitVariant::Recursive,
+            &artifacts_dir,
         )
         .expect("C4 proof generation should succeed");
 
@@ -859,6 +885,7 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
             &c6_sample,
             e3_id_c6,
             CircuitVariant::Recursive,
+            &artifacts_dir,
         )
         .expect("C6 proof generation should succeed");
 
@@ -909,8 +936,16 @@ async fn test_decrypted_shares_aggregation_commitment_consistency() {
         return;
     };
 
+    let artifacts_dir = preset.artifacts_dir();
     let proof = circuit
-        .prove_with_variant(&prover, &preset, &sample, e3_id, CircuitVariant::Recursive)
+        .prove_with_variant(
+            &prover,
+            &preset,
+            &sample,
+            e3_id,
+            CircuitVariant::Recursive,
+            &artifacts_dir,
+        )
         .expect("proof generation should succeed");
 
     let computation_output = DecryptedSharesAggregationCircuit::compute(preset, &sample).unwrap();

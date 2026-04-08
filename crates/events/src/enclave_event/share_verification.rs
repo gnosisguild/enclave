@@ -42,6 +42,8 @@ pub struct ShareVerificationDispatched {
     /// Parties already identified as dishonest before verification
     /// (e.g., missing/incomplete proofs). Merged into the final result.
     pub pre_dishonest: BTreeSet<u64>,
+    /// BFV preset for circuit artifact resolution.
+    pub params_preset: e3_fhe_params::BfvPreset,
 }
 
 /// ShareVerificationActor → ThresholdKeyshare: verification results.

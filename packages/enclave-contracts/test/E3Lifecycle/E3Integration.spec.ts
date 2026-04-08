@@ -314,7 +314,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
           ["address"],
           ["0x1234567890123456789012345678901234567890"],
         ),
-        proofAggregationEnabled: true,
+        proofAggregationEnabled: false,
       };
 
       const fee = await enclave.getE3Quote(requestParams);

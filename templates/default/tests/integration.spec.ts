@@ -8,7 +8,6 @@ import {
   EnclaveSDK,
   calculateInputWindow,
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
-  encodeBfvParams,
   encodeComputeProviderParams,
   decodePlaintextOutput,
   CommitteeSize,

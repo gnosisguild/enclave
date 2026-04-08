@@ -293,7 +293,7 @@ describe("Enclave", function () {
         ["address"],
         ["0x1234567890123456789012345678901234567890"],
       ),
-      proofAggregationEnabled: true,
+      proofAggregationEnabled: false,
     };
 
     // ── Return ────────────────────────────────────────────────────────────────
@@ -1095,6 +1095,7 @@ describe("Enclave", function () {
       await makeRequest(enclave, usdcToken, {
         ...request,
         inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
+        proofAggregationEnabled: true,
       });
 
       await setupAndPublishCommittee(

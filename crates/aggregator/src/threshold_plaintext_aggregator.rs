@@ -204,7 +204,7 @@ impl ThresholdPlaintextAggregator {
             e3_id: params.e3_id,
             params_preset: params.params_preset,
             state,
-            c6_fold: ProofFoldState::new(),
+            c6_fold: ProofFoldState::new(params.params_preset),
             c7_proofs_pending: None,
             last_ec: None,
         }
@@ -352,6 +352,7 @@ impl ThresholdPlaintextAggregator {
                 share_proofs: party_proofs,
                 decryption_proofs: vec![],
                 pre_dishonest: BTreeSet::new(),
+                params_preset: self.params_preset,
             },
             ec,
         )?;

@@ -4,8 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 //
-// Unico punto in cui si cambia il param-set: re-esporta insecure o production
-// (in futuro altri param-set). I circuiti usano tutti lib::configs::default::*.
+// Only place where we change param-set: re-export insecure or production.
+// (in future any other param-set). All circuits use lib::configs::default::*.
 
 pub use super::committee::micro::{H, N_PARTIES, T};
 pub use super::insecure::dkg;
