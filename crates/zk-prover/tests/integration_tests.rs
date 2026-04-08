@@ -118,7 +118,7 @@ async fn test_full_flow_download_circuits_prove_and_verify() {
 
     let e3_id = "integration-test-full-flow";
     let proof = PkCircuit
-        .prove(&prover, &preset, &sample, e3_id)
+        .prove(&prover, &preset, &sample, e3_id, &preset.artifacts_dir())
         .expect("proof generation should succeed");
 
     assert!(!proof.data.is_empty(), "proof data should not be empty");
@@ -129,7 +129,7 @@ async fn test_full_flow_download_circuits_prove_and_verify() {
 
     let party_id = 0;
     let verified = PkCircuit
-        .verify(&prover, &proof, e3_id, party_id)
+        .verify(&prover, &proof, e3_id, party_id, &preset.artifacts_dir())
         .expect("verification call should not error");
 
     assert!(verified, "proof should verify successfully");
