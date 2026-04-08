@@ -79,27 +79,38 @@ async fn test_full_flow_download_circuits_prove_and_verify() {
     let result = backend.download_circuits().await;
     assert!(result.is_ok(), "download_circuits failed: {:?}", result);
 
-    assert!(backend
-        .circuits_dir
-        .join("default")
-        .join("dkg")
-        .join("pk")
-        .join("pk.json")
-        .exists());
-    assert!(backend
-        .circuits_dir
-        .join("default")
-        .join("dkg")
-        .join("pk")
-        .join("pk.vk")
-        .exists());
-    assert!(backend
-        .circuits_dir
-        .join("evm")
-        .join("dkg")
-        .join("pk")
-        .join("pk.vk")
-        .exists());
+    // Circuit artifacts are nested under the preset directory (e.g. insecure-512/)
+    let preset_dir = backend.circuits_dir.join("insecure-512");
+    assert!(
+        preset_dir
+            .join("default")
+            .join("dkg")
+            .join("pk")
+            .join("pk.json")
+            .exists(),
+        "expected circuit at {}/default/dkg/pk/pk.json",
+        preset_dir.display()
+    );
+    assert!(
+        preset_dir
+            .join("default")
+            .join("dkg")
+            .join("pk")
+            .join("pk.vk")
+            .exists(),
+        "expected VK at {}/default/dkg/pk/pk.vk",
+        preset_dir.display()
+    );
+    assert!(
+        preset_dir
+            .join("evm")
+            .join("dkg")
+            .join("pk")
+            .join("pk.vk")
+            .exists(),
+        "expected evm VK at {}/evm/dkg/pk/pk.vk",
+        preset_dir.display()
+    );
 
     let result = backend.ensure_installed().await;
     assert!(result.is_ok(), "ensure_installed failed: {:?}", result);

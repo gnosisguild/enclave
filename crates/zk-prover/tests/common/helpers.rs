@@ -41,12 +41,11 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
         vk_evm_path.display()
     );
 
+    // Tests use insecure params — fixtures go under insecure-512/
+    let preset_dir = backend.circuits_dir.join("insecure-512");
+
     // Set up the evm variant directory (keccak VK + hash)
-    let evm_dir = backend
-        .circuits_dir
-        .join("evm")
-        .join(group)
-        .join(circuit_name);
+    let evm_dir = preset_dir.join("evm").join(group).join(circuit_name);
     fs::create_dir_all(&evm_dir).await.unwrap();
     fs::copy(&json_path, evm_dir.join(format!("{circuit_name}.json")))
         .await
@@ -64,11 +63,7 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
     }
 
     // Set up the default variant directory (noir-recursive-no-zk VK for wrapper/fold proofs)
-    let default_dir = backend
-        .circuits_dir
-        .join("default")
-        .join(group)
-        .join(circuit_name);
+    let default_dir = preset_dir.join("default").join(group).join(circuit_name);
     fs::create_dir_all(&default_dir).await.unwrap();
     fs::copy(&json_path, default_dir.join(format!("{circuit_name}.json")))
         .await
@@ -95,11 +90,7 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
     }
 
     // Set up the recursive variant directory (noir-recursive VK for inner/base proofs)
-    let recursive_dir = backend
-        .circuits_dir
-        .join("recursive")
-        .join(group)
-        .join(circuit_name);
+    let recursive_dir = preset_dir.join("recursive").join(group).join(circuit_name);
     fs::create_dir_all(&recursive_dir).await.unwrap();
     fs::copy(
         &json_path,
