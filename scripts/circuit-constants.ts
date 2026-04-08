@@ -34,3 +34,25 @@ export const CIRCUIT_VARIANTS = {
 export type CircuitVariant = (typeof CIRCUIT_VARIANTS)[keyof typeof CIRCUIT_VARIANTS]
 
 export const ALL_VARIANTS: CircuitVariant[] = [CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_VARIANTS.RECURSIVE, CIRCUIT_VARIANTS.EVM]
+
+/**
+ * Circuit parameter presets identify which BFV parameter set the circuits were compiled for.
+ * Named as `{security_tier}-{degree}`. Threshold and DKG presets at the same degree share
+ * the same compiled circuit artifacts.
+ */
+export const CIRCUIT_PRESETS = {
+  INSECURE_512: 'insecure-512',
+  SECURE_8192: 'secure-8192',
+} as const
+
+export type CircuitPreset = (typeof CIRCUIT_PRESETS)[keyof typeof CIRCUIT_PRESETS]
+
+export const ALL_PRESETS: CircuitPreset[] = [CIRCUIT_PRESETS.INSECURE_512, CIRCUIT_PRESETS.SECURE_8192]
+
+/**
+ * Maps each preset to the Noir config module it re-exports from `circuits/lib/src/configs/default/mod.nr`.
+ */
+export const PRESET_NOIR_CONFIG: Record<CircuitPreset, 'insecure' | 'secure'> = {
+  [CIRCUIT_PRESETS.INSECURE_512]: 'insecure',
+  [CIRCUIT_PRESETS.SECURE_8192]: 'secure',
+}

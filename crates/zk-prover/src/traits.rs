@@ -58,12 +58,20 @@ pub trait Provable: Send + Sync {
         params: &Self::Params,
         input: &Self::Input,
         e3_id: &str,
+        artifacts_dir: &str,
     ) -> Result<Proof, ZkError>
     where
         Self::Inputs: Computation<Preset = Self::Params, Data = Self::Input> + serde::Serialize,
         <Self::Inputs as Computation>::Error: Display,
     {
-        self.prove_with_variant(prover, params, input, e3_id, CircuitVariant::Recursive)
+        self.prove_with_variant(
+            prover,
+            params,
+            input,
+            e3_id,
+            CircuitVariant::Recursive,
+            artifacts_dir,
+        )
     }
 
     fn prove_with_variant(
@@ -73,6 +81,7 @@ pub trait Provable: Send + Sync {
         input: &Self::Input,
         e3_id: &str,
         variant: CircuitVariant,
+        artifacts_dir: &str,
     ) -> Result<Proof, ZkError>
     where
         Self::Inputs: Computation<Preset = Self::Params, Data = Self::Input> + serde::Serialize,
@@ -82,7 +91,7 @@ pub trait Provable: Send + Sync {
 
         let resolved_name = self.resolve_circuit_name(params, input);
         let circuit_path = prover
-            .circuits_dir(variant)
+            .circuits_dir(variant, artifacts_dir)
             .join(resolved_name.dir_path())
             .join(format!("{}.json", resolved_name.as_str()));
 
@@ -91,7 +100,7 @@ pub trait Provable: Send + Sync {
         let witness_gen = WitnessGenerator::new();
         let witness = witness_gen.generate_witness(&circuit, inputs)?;
 
-        prover.generate_proof_with_variant(resolved_name, &witness, e3_id, variant)
+        prover.generate_proof_with_variant(resolved_name, &witness, e3_id, variant, artifacts_dir)
     }
 
     fn verify(
@@ -100,8 +109,16 @@ pub trait Provable: Send + Sync {
         proof: &Proof,
         e3_id: &str,
         party_id: u64,
+        artifacts_dir: &str,
     ) -> Result<bool, ZkError> {
-        self.verify_with_variant(prover, proof, e3_id, party_id, CircuitVariant::Recursive)
+        self.verify_with_variant(
+            prover,
+            proof,
+            e3_id,
+            party_id,
+            CircuitVariant::Recursive,
+            artifacts_dir,
+        )
     }
 
     fn verify_with_variant(
@@ -111,6 +128,7 @@ pub trait Provable: Send + Sync {
         e3_id: &str,
         party_id: u64,
         variant: CircuitVariant,
+        artifacts_dir: &str,
     ) -> Result<bool, ZkError> {
         if !self.valid_circuits().contains(&proof.circuit) {
             return Err(ZkError::VerifyFailed(format!(
@@ -124,6 +142,6 @@ pub trait Provable: Send + Sync {
             "Verifying proof for circuit {} with e3_id {} and party_id {}",
             proof.circuit, e3_id, party_id
         );
-        prover.verify_proof_with_variant(proof, e3_id, party_id, variant)
+        prover.verify_proof_with_variant(proof, e3_id, party_id, variant, artifacts_dir)
     }
 }

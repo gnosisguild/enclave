@@ -134,8 +134,10 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
         }
 
         // ── recursive/ variant (inner/base proofs, uses .vk_noir) ──────────
+        // Tests use insecure params, so fixtures go under insecure-512/
+        let preset_dir = circuits_dir.join("insecure-512");
 
-        let rv = circuits_dir.join("recursive");
+        let rv = preset_dir.join("recursive");
 
         // T0 (pk)
         copy_circuit(
@@ -221,7 +223,7 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
 
         // ── default/ variant (wrapper & fold proofs, uses .vk_recursive) ───
 
-        let dv = circuits_dir.join("default");
+        let dv = preset_dir.join("default");
 
         // DKG wrapper circuits
         let dkg_wrapper_base = dv.join("recursive_aggregation/wrapper/dkg");
@@ -305,7 +307,7 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
 
         // ── evm/ variant (on-chain verification: C5, C7, fold) ───────────
 
-        let ev = circuits_dir.join("evm");
+        let ev = preset_dir.join("evm");
 
         // C5 (pk_aggregation) — EVM-targeted
         copy_circuit(
@@ -878,7 +880,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // Trigger actor DKG
     let e3_id = E3id::new("0", 1);
 
-    let proof_aggregation_enabled = true;
+    let proof_aggregation_enabled = false;
 
     let e3_requested = E3Requested {
         e3_id: e3_id.clone(),

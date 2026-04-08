@@ -89,6 +89,7 @@ impl E3Extension for AccusationManagerExtension {
             self.signer.clone(),
             committee_addresses,
             threshold_m,
+            meta.params_preset,
         );
 
         ctx.set_event_recipient("accusation_manager", Some(addr.into()));

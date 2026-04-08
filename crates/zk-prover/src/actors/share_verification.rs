@@ -90,6 +90,8 @@ struct PendingVerification {
     party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>>,
     /// Cached (proof_type, public_signals) per party — for commitment consistency checking.
     party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
+    /// BFV preset for circuit artifact resolution.
+    params_preset: e3_fhe_params::BfvPreset,
 }
 
 /// Pending consistency check — stored between ECDSA pass and ZK dispatch.
@@ -124,6 +126,8 @@ struct PendingConsistencyCheck {
     /// Original ECDSA-passed decryption proofs for ZK dispatch.
     /// Populated for DecryptionProofs.
     ecdsa_passed_decryption_proofs: Vec<PartyShareDecryptionProofsToVerify>,
+    /// BFV preset for circuit artifact resolution.
+    params_preset: e3_fhe_params::BfvPreset,
 }
 
 /// Filter out inconsistent parties and collect dispatched party IDs.
@@ -194,6 +198,7 @@ impl ShareVerificationActor {
             e3_id, msg.kind
         );
 
+        let params_preset = msg.params_preset;
         match msg.kind {
             VerificationKind::ShareProofs
             | VerificationKind::ThresholdDecryptionProofs
@@ -205,6 +210,7 @@ impl ShareVerificationActor {
                     msg.share_proofs,
                     msg.pre_dishonest,
                     ec,
+                    params_preset,
                     |pending, passed| {
                         pending.ecdsa_passed_share_proofs = passed;
                     },
@@ -217,6 +223,7 @@ impl ShareVerificationActor {
                     msg.decryption_proofs,
                     msg.pre_dishonest,
                     ec,
+                    params_preset,
                     |pending, passed| {
                         pending.ecdsa_passed_decryption_proofs = passed;
                     },
@@ -237,6 +244,7 @@ impl ShareVerificationActor {
         party_proofs: Vec<P>,
         pre_dishonest: BTreeSet<u64>,
         ec: EventContext<Sequenced>,
+        params_preset: e3_fhe_params::BfvPreset,
         store_passed_proofs: impl FnOnce(&mut PendingConsistencyCheck, Vec<P>),
     ) {
         let e3_id_str = e3_id.to_string();
@@ -355,6 +363,7 @@ impl ShareVerificationActor {
             party_public_signals,
             ecdsa_passed_share_proofs: Vec::new(),
             ecdsa_passed_decryption_proofs: Vec::new(),
+            params_preset,
         };
         store_passed_proofs(&mut pending, ecdsa_passed_parties);
         self.pending_consistency.insert(correlation_id, pending);
@@ -446,6 +455,7 @@ impl ShareVerificationActor {
                 let req = ComputeRequest::zk(
                     ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
                         party_proofs: passed,
+                        params_preset: pending.params_preset,
                     }),
                     zk_correlation_id,
                     pending.e3_id.clone(),
@@ -469,6 +479,7 @@ impl ShareVerificationActor {
                 let req = ComputeRequest::zk(
                     ZkRequest::VerifyShareDecryptionProofs(VerifyShareDecryptionProofsRequest {
                         party_proofs: passed,
+                        params_preset: pending.params_preset,
                     }),
                     zk_correlation_id,
                     pending.e3_id.clone(),
@@ -510,6 +521,7 @@ impl ShareVerificationActor {
                 party_addresses,
                 party_proof_hashes,
                 party_public_signals,
+                params_preset: pending.params_preset,
             },
         );
 

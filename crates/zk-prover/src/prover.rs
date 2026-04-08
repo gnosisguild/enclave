@@ -28,8 +28,8 @@ impl ZkProver {
         }
     }
 
-    pub fn circuits_dir(&self, variant: CircuitVariant) -> PathBuf {
-        self.circuits_dir.join(variant.as_str())
+    pub fn circuits_dir(&self, variant: CircuitVariant, artifacts_dir: &str) -> PathBuf {
+        self.circuits_dir.join(artifacts_dir).join(variant.as_str())
     }
 
     pub fn work_dir(&self) -> &PathBuf {
@@ -45,8 +45,15 @@ impl ZkProver {
         circuit: CircuitName,
         witness_data: &[u8],
         e3_id: &str,
+        artifacts_dir: &str,
     ) -> Result<Proof, ZkError> {
-        self.generate_proof_with_variant(circuit, witness_data, e3_id, CircuitVariant::Recursive)
+        self.generate_proof_with_variant(
+            circuit,
+            witness_data,
+            e3_id,
+            CircuitVariant::Recursive,
+            artifacts_dir,
+        )
     }
 
     pub fn generate_evm_proof(
@@ -54,8 +61,15 @@ impl ZkProver {
         circuit: CircuitName,
         witness_data: &[u8],
         e3_id: &str,
+        artifacts_dir: &str,
     ) -> Result<Proof, ZkError> {
-        self.generate_proof_with_variant(circuit, witness_data, e3_id, CircuitVariant::Evm)
+        self.generate_proof_with_variant(
+            circuit,
+            witness_data,
+            e3_id,
+            CircuitVariant::Evm,
+            artifacts_dir,
+        )
     }
 
     pub fn generate_proof_with_variant(
@@ -64,8 +78,16 @@ impl ZkProver {
         witness_data: &[u8],
         e3_id: &str,
         variant: CircuitVariant,
+        artifacts_dir: &str,
     ) -> Result<Proof, ZkError> {
-        self.generate_proof_impl(circuit, witness_data, e3_id, &circuit.dir_path(), variant)
+        self.generate_proof_impl(
+            circuit,
+            witness_data,
+            e3_id,
+            &circuit.dir_path(),
+            variant,
+            artifacts_dir,
+        )
     }
 
     /// Wrapper proof (Default variant, wrapper dir).
@@ -74,6 +96,7 @@ impl ZkProver {
         circuit: CircuitName,
         witness_data: &[u8],
         e3_id: &str,
+        artifacts_dir: &str,
     ) -> Result<Proof, ZkError> {
         self.generate_proof_impl(
             circuit,
@@ -81,11 +104,17 @@ impl ZkProver {
             e3_id,
             &circuit.wrapper_dir_path(),
             CircuitVariant::Default,
+            artifacts_dir,
         )
     }
 
     /// Fold proof (Default variant).
-    pub fn generate_fold_proof(&self, witness_data: &[u8], e3_id: &str) -> Result<Proof, ZkError> {
+    pub fn generate_fold_proof(
+        &self,
+        witness_data: &[u8],
+        e3_id: &str,
+        artifacts_dir: &str,
+    ) -> Result<Proof, ZkError> {
         let dir = CircuitName::Fold.dir_path();
         self.generate_proof_impl(
             CircuitName::Fold,
@@ -93,6 +122,7 @@ impl ZkProver {
             e3_id,
             &dir,
             CircuitVariant::Default,
+            artifacts_dir,
         )
     }
 
@@ -101,6 +131,7 @@ impl ZkProver {
         &self,
         witness_data: &[u8],
         e3_id: &str,
+        artifacts_dir: &str,
     ) -> Result<Proof, ZkError> {
         let dir = CircuitName::Fold.dir_path();
         self.generate_proof_impl(
@@ -109,6 +140,7 @@ impl ZkProver {
             e3_id,
             &dir,
             CircuitVariant::Evm,
+            artifacts_dir,
         )
     }
 
@@ -119,6 +151,7 @@ impl ZkProver {
         e3_id: &str,
         dir_path: &str,
         variant: CircuitVariant,
+        artifacts_dir: &str,
     ) -> Result<Proof, ZkError> {
         self.generate_proof_impl_with_dir(
             circuit,
@@ -126,7 +159,7 @@ impl ZkProver {
             e3_id,
             dir_path,
             variant,
-            self.circuits_dir(variant),
+            self.circuits_dir(variant, artifacts_dir),
         )
     }
 
@@ -236,8 +269,20 @@ impl ZkProver {
     }
 
     /// Verifies a proof (Recursive variant, matching `prove()`).
-    pub fn verify_proof(&self, proof: &Proof, e3_id: &str, party_id: u64) -> Result<bool, ZkError> {
-        self.verify_proof_with_variant(proof, e3_id, party_id, CircuitVariant::Recursive)
+    pub fn verify_proof(
+        &self,
+        proof: &Proof,
+        e3_id: &str,
+        party_id: u64,
+        artifacts_dir: &str,
+    ) -> Result<bool, ZkError> {
+        self.verify_proof_with_variant(
+            proof,
+            e3_id,
+            party_id,
+            CircuitVariant::Recursive,
+            artifacts_dir,
+        )
     }
 
     pub fn verify_proof_with_variant(
@@ -246,6 +291,7 @@ impl ZkProver {
         e3_id: &str,
         party_id: u64,
         variant: CircuitVariant,
+        artifacts_dir: &str,
     ) -> Result<bool, ZkError> {
         self.verify_proof_impl(
             proof.circuit,
@@ -255,6 +301,7 @@ impl ZkProver {
             e3_id,
             party_id,
             variant,
+            artifacts_dir,
         )
     }
 
@@ -263,8 +310,9 @@ impl ZkProver {
         proof: &Proof,
         e3_id: &str,
         party_id: u64,
+        artifacts_dir: &str,
     ) -> Result<bool, ZkError> {
-        self.verify_proof_with_variant(proof, e3_id, party_id, CircuitVariant::Evm)
+        self.verify_proof_with_variant(proof, e3_id, party_id, CircuitVariant::Evm, artifacts_dir)
     }
 
     /// Verifies a wrapper proof (Default Variant, wrapper dir).
@@ -273,6 +321,7 @@ impl ZkProver {
         proof: &Proof,
         e3_id: &str,
         party_id: u64,
+        artifacts_dir: &str,
     ) -> Result<bool, ZkError> {
         self.verify_proof_impl(
             proof.circuit,
@@ -282,6 +331,7 @@ impl ZkProver {
             e3_id,
             party_id,
             CircuitVariant::Default,
+            artifacts_dir,
         )
     }
 
@@ -291,6 +341,7 @@ impl ZkProver {
         proof: &Proof,
         e3_id: &str,
         party_id: u64,
+        artifacts_dir: &str,
     ) -> Result<bool, ZkError> {
         use e3_events::CircuitName;
         if proof.circuit != CircuitName::Fold {
@@ -307,6 +358,7 @@ impl ZkProver {
             e3_id,
             party_id,
             CircuitVariant::Default,
+            artifacts_dir,
         )
     }
 
@@ -319,6 +371,7 @@ impl ZkProver {
         e3_id: &str,
         party_id: u64,
         variant: CircuitVariant,
+        artifacts_dir: &str,
     ) -> Result<bool, ZkError> {
         if !self.bb_binary.exists() {
             return Err(ZkError::BbNotInstalled);
@@ -326,7 +379,7 @@ impl ZkProver {
 
         let verifier_target = variant.verifier_target();
         let vk_path = self
-            .circuits_dir(variant)
+            .circuits_dir(variant, artifacts_dir)
             .join(&dir_path)
             .join(format!("{}.vk", circuit.as_str()));
         if !vk_path.exists() {
@@ -416,7 +469,7 @@ mod tests {
         let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
         let prover = ZkProver::new(&backend);
 
-        let result = prover.generate_proof(CircuitName::PkBfv, b"witness", "e3-1");
+        let result = prover.generate_proof(CircuitName::PkBfv, b"witness", "e3-1", "insecure-512");
         assert!(matches!(result, Err(ZkError::BbNotInstalled)));
     }
 }

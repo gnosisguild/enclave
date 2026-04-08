@@ -134,7 +134,7 @@ export const requestCommittee = task(
         inputWindowStart,
         inputWindowEnd,
         e3Address,
-        e3Params,
+        e3Params: _e3Params,
         computeParams,
         customParams,
         proofAggregationEnabled,

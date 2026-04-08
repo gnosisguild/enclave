@@ -412,12 +412,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3s[e3Id].plaintextOutput = plaintextOutput;
         _e3Stages[e3Id] = E3Stage.Complete;
 
-        (success) = e3.decryptionVerifier.verify(
-            keccak256(plaintextOutput),
-            proof,
-            foldProof
-        );
-        require(success, InvalidOutput(plaintextOutput));
+        if (e3.proofAggregationEnabled) {
+            (success) = e3.decryptionVerifier.verify(
+                keccak256(plaintextOutput),
+                proof,
+                foldProof
+            );
+            require(success, InvalidOutput(plaintextOutput));
+        } else {
+            success = true;
+        }
 
         _distributeRewards(e3Id);
 
@@ -660,7 +664,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes calldata encodedParams
     ) public onlyOwner {
         require(encodedParams.length > 0, "Empty params");
-        require(paramSetRegistry[paramSet].length == 0, "ParamSet already registered");
+        require(
+            paramSetRegistry[paramSet].length == 0,
+            "ParamSet already registered"
+        );
         paramSetRegistry[paramSet] = encodedParams;
         emit ParamSetRegistered(paramSet, encodedParams);
     }
