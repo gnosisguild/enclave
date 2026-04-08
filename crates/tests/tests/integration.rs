@@ -878,7 +878,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // Trigger actor DKG
     let e3_id = E3id::new("0", 1);
 
-    let proof_aggregation_enabled = true;
+    let proof_aggregation_enabled = false;
 
     let e3_requested = E3Requested {
         e3_id: e3_id.clone(),

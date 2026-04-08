@@ -223,6 +223,7 @@ impl PublicKeyAggregator {
                 share_proofs: party_proofs,
                 decryption_proofs: vec![],
                 pre_dishonest: no_proof_parties.into_iter().collect(),
+                params_preset: self.params_preset,
             },
             ec,
         )?;
@@ -416,7 +417,7 @@ impl PublicKeyAggregator {
                 dkg_node_proofs: HashMap::new(),
                 honest_party_ids: honest_party_ids.clone(),
                 dishonest_parties: dishonest_parties.clone(),
-                cross_node_fold: ProofFoldState::new(),
+                cross_node_fold: ProofFoldState::new().with_params_preset(self.params_preset),
                 c5_proof_pending: None,
                 last_ec: Some(ec.clone()),
             })
@@ -611,7 +612,7 @@ impl PublicKeyAggregator {
             };
             if cross_node_fold.needs_restart() {
                 warn!("cross-node fold stuck mid-step on restart — resetting and re-folding from persisted proofs");
-                cross_node_fold = ProofFoldState::new();
+                cross_node_fold = ProofFoldState::new().with_params_preset(self.params_preset);
             }
             cross_node_fold.start(
                 proofs,

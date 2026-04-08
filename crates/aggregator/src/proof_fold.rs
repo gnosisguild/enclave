@@ -9,6 +9,7 @@ use e3_events::{
     prelude::*, BusHandle, ComputeRequest, CorrelationId, E3id, EventContext, Proof, Sequenced,
     ZkRequest,
 };
+use e3_fhe_params::BfvPreset;
 use tracing::{error, info};
 
 /// Manages the state of a sequential `FoldProofs` operation.
@@ -29,6 +30,8 @@ pub struct ProofFoldState {
     pub result: Option<Proof>,
     /// `start` was called with zero proofs — folding is complete with no aggregate.
     pub fold_input_was_empty: bool,
+    /// BFV preset for circuit artifact resolution.
+    params_preset: BfvPreset,
 }
 
 impl ProofFoldState {
@@ -40,7 +43,19 @@ impl ProofFoldState {
             total_steps: None,
             result: None,
             fold_input_was_empty: false,
+            params_preset: BfvPreset::default(),
         }
+    }
+
+    /// Set the BFV preset for this fold state.
+    pub fn with_params_preset(mut self, preset: BfvPreset) -> Self {
+        self.params_preset = preset;
+        self
+    }
+
+    /// Update the BFV preset for this fold state.
+    pub fn set_params_preset(&mut self, preset: BfvPreset) {
+        self.params_preset = preset;
     }
 
     /// Returns `true` if a fold step was dispatched but the in-flight proof was consumed
@@ -196,6 +211,7 @@ impl ProofFoldState {
                     proof1: acc,
                     proof2: next,
                     target_evm,
+                    params_preset: self.params_preset,
                 },
                 corr,
                 e3_id.clone(),

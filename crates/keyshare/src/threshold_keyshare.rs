@@ -1421,6 +1421,7 @@ impl ThresholdKeyshare {
                 share_proofs: party_proofs_to_verify,
                 decryption_proofs: Vec::new(),
                 pre_dishonest,
+                params_preset: self.share_enc_preset,
             },
             ec,
         )?;
@@ -2048,6 +2049,7 @@ impl ThresholdKeyshare {
                 share_proofs: Vec::new(),
                 decryption_proofs: party_proofs,
                 pre_dishonest,
+                params_preset: self.share_enc_preset,
             },
             ec,
         )?;

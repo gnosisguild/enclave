@@ -15,11 +15,12 @@ use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, Recipient};
 use alloy::primitives::{keccak256, Address, Bytes};
 use alloy::sol_types::SolValue;
 use e3_events::{
-    BusHandle, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated,
-    EncryptionKeyReceived, EventContext, EventPublisher, EventSubscriber, EventType, Proof,
-    ProofType, ProofVerificationFailed, ProofVerificationPassed, Sequenced, SignedProofFailed,
-    SignedProofPayload, TypedEvent,
+    BusHandle, CiphernodeSelected, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
+    EncryptionKeyCreated, EncryptionKeyReceived, EventContext, EventPublisher, EventSubscriber,
+    EventType, Proof, ProofType, ProofVerificationFailed, ProofVerificationPassed, Sequenced,
+    SignedProofFailed, SignedProofPayload, TypedEvent,
 };
+use e3_fhe_params::BfvPreset;
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
 
@@ -30,6 +31,7 @@ pub struct ZkVerificationRequest {
     pub e3_id: E3id,
     pub key: Arc<EncryptionKey>,
     pub sender: Recipient<TypedEvent<ZkVerificationResponse>>,
+    pub artifacts_dir: String,
 }
 
 #[derive(Debug, Clone, Message)]
@@ -51,6 +53,8 @@ pub struct ProofVerificationActor {
     bus: BusHandle,
     verifier: Recipient<TypedEvent<ZkVerificationRequest>>,
     pending: HashMap<(E3id, u64), PendingVerification>,
+    /// Tracks `BfvPreset` per E3 so we can derive `artifacts_dir` for proof verification.
+    presets: HashMap<E3id, BfvPreset>,
 }
 
 impl ProofVerificationActor {
@@ -59,6 +63,7 @@ impl ProofVerificationActor {
             bus: bus.clone(),
             verifier,
             pending: HashMap::new(),
+            presets: HashMap::new(),
         }
     }
 
@@ -67,6 +72,7 @@ impl ProofVerificationActor {
         verifier: Recipient<TypedEvent<ZkVerificationRequest>>,
     ) -> Addr<Self> {
         let addr = Self::new(bus, verifier).start();
+        bus.subscribe(EventType::CiphernodeSelected, addr.clone().into());
         bus.subscribe(EventType::EncryptionKeyReceived, addr.clone().into());
         addr
     }
@@ -139,12 +145,20 @@ impl ProofVerificationActor {
             },
         );
 
+        let artifacts_dir = self
+            .presets
+            .get(&msg.e3_id)
+            .copied()
+            .unwrap_or_default()
+            .artifacts_dir();
+
         let request = TypedEvent::new(
             ZkVerificationRequest {
                 proof: proof.clone(),
                 e3_id: msg.e3_id,
                 key: msg.key,
                 sender: ctx.address().recipient(),
+                artifacts_dir,
             },
             ec,
         );
@@ -181,6 +195,9 @@ impl Handler<EnclaveEvent> for ProofVerificationActor {
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
+            EnclaveEventData::CiphernodeSelected(data) => {
+                self.presets.insert(data.e3_id.clone(), data.params_preset);
+            }
             EnclaveEventData::EncryptionKeyReceived(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }

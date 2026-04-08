@@ -132,6 +132,9 @@ pub struct AccusationManager {
 
     /// Vote timeout duration.
     vote_timeout: Duration,
+
+    /// BFV preset for circuit artifact resolution.
+    params_preset: e3_fhe_params::BfvPreset,
 }
 
 impl AccusationManager {
@@ -141,6 +144,7 @@ impl AccusationManager {
         signer: PrivateKeySigner,
         committee: Vec<Address>,
         threshold_m: usize,
+        params_preset: e3_fhe_params::BfvPreset,
     ) -> Self {
         let my_address = signer.address();
         Self {
@@ -156,6 +160,7 @@ impl AccusationManager {
             buffered_votes: HashMap::new(),
             pending_reverifications: HashMap::new(),
             vote_timeout: DEFAULT_VOTE_TIMEOUT,
+            params_preset,
         }
     }
 
@@ -165,8 +170,9 @@ impl AccusationManager {
         signer: PrivateKeySigner,
         committee: Vec<Address>,
         threshold_m: usize,
+        params_preset: e3_fhe_params::BfvPreset,
     ) -> Addr<Self> {
-        let addr = Self::new(bus, e3_id, signer, committee, threshold_m).start();
+        let addr = Self::new(bus, e3_id, signer, committee, threshold_m, params_preset).start();
         bus.subscribe(EventType::ProofVerificationFailed, addr.clone().into());
         bus.subscribe(EventType::ProofVerificationPassed, addr.clone().into());
         bus.subscribe(EventType::ProofFailureAccusation, addr.clone().into());
@@ -635,6 +641,7 @@ impl AccusationManager {
             let request = ComputeRequest::zk(
                 ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
                     party_proofs: vec![party_proof],
+                    params_preset: self.params_preset,
                 }),
                 correlation_id,
                 self.e3_id.clone(),

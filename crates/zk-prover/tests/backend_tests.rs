@@ -95,6 +95,11 @@ fn test_prover_requires_bb() {
     let backend = test_backend(temp.path(), ZkConfig::default());
     let prover = ZkProver::new(&backend);
 
-    let result = prover.generate_proof(e3_events::CircuitName::PkBfv, b"witness", "e3-1");
+    let result = prover.generate_proof(
+        e3_events::CircuitName::PkBfv,
+        b"witness",
+        "e3-1",
+        "insecure-512",
+    );
     assert!(matches!(result, Err(e3_zk_prover::ZkError::BbNotInstalled)));
 }

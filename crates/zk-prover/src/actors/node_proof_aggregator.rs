@@ -47,6 +47,8 @@ struct RollingAggregationState {
     fold_correlation: Option<CorrelationId>,
     /// EventContext for publishing.
     last_ec: EventContext<Sequenced>,
+    /// BFV preset for circuit artifact resolution.
+    params_preset: e3_fhe_params::BfvPreset,
 }
 
 /// Actor that incrementally folds DKG inner proofs into a single node-level proof.
@@ -108,6 +110,7 @@ impl NodeProofAggregator {
         //   C0 + C1 + C2a + C2b + C3a×sk_enc + C3b×e_sm_enc + C4a + C4b
         let total_expected = 4 + sk_enc_count + e_sm_enc_count + 2;
 
+        let params_preset = msg.proof_request.params_preset;
         self.states.entry(e3_id.clone()).or_insert_with(|| {
             info!(
                 "NodeProofAggregator: initializing state for E3 {} party {} (total_expected={}, ~{} fold steps)",
@@ -123,6 +126,7 @@ impl NodeProofAggregator {
                 remaining: total_expected,
                 fold_correlation: None,
                 last_ec: ec,
+                params_preset,
             }
         });
     }
@@ -211,6 +215,7 @@ impl NodeProofAggregator {
                             proof1: acc,
                             proof2: next_proof,
                             target_evm: false,
+                            params_preset: state.params_preset,
                         },
                         corr,
                         e3_id_clone,
