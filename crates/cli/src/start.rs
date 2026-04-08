@@ -29,6 +29,16 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
     owo();
     launch_socket_server(config.ctrl_port());
 
+    if let Some(dashboard_port) = config.dashboard_port() {
+        let ctrl_port = config.ctrl_port();
+        let node_name = config.name();
+        let config_path = config.config_yaml().to_str().map(|s| s.to_string());
+        tokio::task::spawn_local(async move {
+            e3_dashboard::start_dashboard(dashboard_port, ctrl_port, node_name, config_path).await;
+        });
+        info!("Dashboard available at http://0.0.0.0:{}", dashboard_port);
+    }
+
     let node = tokio::select! {
         // build the ciphernode and if it completes first return the result
         result = build_ciphernode(&mut config, peers) => result,
