@@ -322,10 +322,7 @@ mod tests {
             &*proof.extract_input("expected_e_sm_commitment").unwrap(),
             &[0x22; 32]
         );
-        assert_eq!(
-            &*proof.extract_input("ct_commitment").unwrap(),
-            &[0x33; 32]
-        );
+        assert_eq!(&*proof.extract_input("ct_commitment").unwrap(), &[0x33; 32]);
     }
 
     #[test]

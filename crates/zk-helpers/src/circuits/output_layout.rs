@@ -390,9 +390,7 @@ mod tests {
         let layout = CircuitInputLayout::Fixed {
             fields: THRESHOLD_SHARE_DECRYPTION_INPUTS,
         };
-        assert!(layout
-            .extract_field(&[0u8; 64], "ct_commitment")
-            .is_none());
+        assert!(layout.extract_field(&[0u8; 64], "ct_commitment").is_none());
     }
 
     #[test]

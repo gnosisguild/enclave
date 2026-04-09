@@ -121,8 +121,7 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
     }
 
     fn verify_ct_commitment(self) {
-        let computed =
-            compute_ciphertext_commitment::<N, L, BIT_CT>(self.ct0, self.ct1);
+        let computed = compute_ciphertext_commitment::<N, L, BIT_CT>(self.ct0, self.ct1);
         assert(computed == self.ct_commitment, "Ciphertext commitment mismatch");
     }
 

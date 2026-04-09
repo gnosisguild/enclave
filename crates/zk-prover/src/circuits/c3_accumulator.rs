@@ -140,14 +140,16 @@ pub fn generate_c3_fold_merge_proof(
     e3_id: &str,
     artifacts_dir: &str,
 ) -> Result<Proof, ZkError> {
-    if n_slot_proof1.circuit != CircuitName::C3Fold && n_slot_proof1.circuit != CircuitName::C3FoldMerge
+    if n_slot_proof1.circuit != CircuitName::C3Fold
+        && n_slot_proof1.circuit != CircuitName::C3FoldMerge
     {
         return Err(ZkError::InvalidInput(format!(
             "merge left input must be C3Fold or C3FoldMerge, got {}",
             n_slot_proof1.circuit
         )));
     }
-    if n_slot_proof2.circuit != CircuitName::C3Fold && n_slot_proof2.circuit != CircuitName::C3FoldMerge
+    if n_slot_proof2.circuit != CircuitName::C3Fold
+        && n_slot_proof2.circuit != CircuitName::C3FoldMerge
     {
         return Err(ZkError::InvalidInput(format!(
             "merge right input must be C3Fold or C3FoldMerge, got {}",
