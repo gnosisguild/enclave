@@ -14,7 +14,8 @@ use crate::witness::{CompiledCircuit, WitnessGenerator};
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use serde::Serialize;
 
-fn share_encryption_two_pub_inputs(proof: &Proof) -> Result<[String; 2], ZkError> {
+/// Inner C3 public transcript: `expected_pk`, `expected_message`, then `ct_commitment` (return).
+fn share_encryption_inner_public_inputs(proof: &Proof) -> Result<[String; 3], ZkError> {
     if proof.circuit != CircuitName::ShareEncryption {
         return Err(ZkError::InvalidInput(format!(
             "expected ShareEncryption inner proof, got {}",
@@ -29,14 +30,18 @@ fn share_encryption_two_pub_inputs(proof: &Proof) -> Result<[String; 2], ZkError
         .ok_or_else(|| {
             ZkError::InvalidInput("C3 proof missing expected_message_commitment".into())
         })?;
+    let ct = proof
+        .extract_output("ct_commitment")
+        .ok_or_else(|| ZkError::InvalidInput("C3 proof missing ct_commitment output".into()))?;
     let p0 = bytes_to_field_strings(pk.as_ref())?;
     let p1 = bytes_to_field_strings(msg.as_ref())?;
-    if p0.len() != 1 || p1.len() != 1 {
+    let p2 = bytes_to_field_strings(ct.as_ref())?;
+    if p0.len() != 1 || p1.len() != 1 || p2.len() != 1 {
         return Err(ZkError::InvalidInput(
-            "C3 public inputs must be two 32-byte fields".into(),
+            "C3 public signals must be three 32-byte fields (2 inputs + 1 output)".into(),
         ));
     }
-    Ok([p0[0].clone(), p1[0].clone()])
+    Ok([p0[0].clone(), p1[0].clone(), p2[0].clone()])
 }
 
 /// Witness input for [`CircuitName::C3Fold`] (`circuits/bin/recursive_aggregation/c3_fold`).
@@ -44,11 +49,11 @@ fn share_encryption_two_pub_inputs(proof: &Proof) -> Result<[String; 2], ZkError
 struct C3FoldInput {
     vk: Vec<String>,
     proof1: Vec<String>,
-    c3_public_inputs1: [String; 2],
+    c3_public_inputs1: [String; 3],
     key_hash: String,
     slot_index1: u32,
     proof2: Vec<String>,
-    c3_public_inputs2: [String; 2],
+    c3_public_inputs2: [String; 3],
     slot_index2: u32,
     skip_second_proof: bool,
 }
@@ -91,8 +96,8 @@ pub fn generate_c3_fold_proof(
         &prover.circuits_dir(CircuitVariant::Recursive, artifacts_dir),
         CircuitName::ShareEncryption,
     )?;
-    let c3_public_inputs1 = share_encryption_two_pub_inputs(proof1)?;
-    let c3_public_inputs2 = share_encryption_two_pub_inputs(proof2)?;
+    let c3_public_inputs1 = share_encryption_inner_public_inputs(proof1)?;
+    let c3_public_inputs2 = share_encryption_inner_public_inputs(proof2)?;
 
     let full_input = C3FoldInput {
         vk: vk.verification_key,

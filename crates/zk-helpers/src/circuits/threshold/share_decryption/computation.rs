@@ -11,7 +11,9 @@
 //! [`Computation`] and are used by codegen.
 
 use crate::calculate_bit_width;
-use crate::circuits::commitments::compute_aggregated_shares_commitment;
+use crate::circuits::commitments::{
+    compute_aggregated_shares_commitment, compute_ciphertext_commitment,
+};
 use crate::compute_modulus_bit;
 use crate::crt_polynomial_to_toml_json;
 use crate::decompose_residue;
@@ -95,6 +97,7 @@ pub struct Inputs {
     pub d: CrtPolynomial,
     pub expected_sk_commitment: BigInt,
     pub expected_e_sm_commitment: BigInt,
+    pub ct_commitment: BigInt,
 }
 
 impl Computation for Configs {
@@ -306,6 +309,10 @@ impl Computation for Inputs {
         let expected_sk_commitment = compute_aggregated_shares_commitment(&sk, modulus_bit);
         let expected_e_sm_commitment = compute_aggregated_shares_commitment(&e_sm, modulus_bit);
 
+        let bounds = Bounds::compute(preset, &())?;
+        let bits = Bits::compute(preset, &bounds)?;
+        let ct_commitment = compute_ciphertext_commitment(&ct0, &ct1, bits.ct_bit);
+
         Ok(Inputs {
             ct0,
             ct1,
@@ -316,6 +323,7 @@ impl Computation for Inputs {
             d,
             expected_sk_commitment,
             expected_e_sm_commitment,
+            ct_commitment,
         })
     }
 
@@ -329,6 +337,7 @@ impl Computation for Inputs {
         let d = crt_polynomial_to_toml_json(&self.d);
         let expected_sk_commitment = self.expected_sk_commitment.to_string();
         let expected_e_sm_commitment = self.expected_e_sm_commitment.to_string();
+        let ct_commitment = self.ct_commitment.to_string();
 
         let json = serde_json::json!({
             "ct0": ct0,
@@ -340,6 +349,7 @@ impl Computation for Inputs {
             "d": d,
             "expected_sk_commitment": expected_sk_commitment,
             "expected_e_sm_commitment": expected_e_sm_commitment,
+            "ct_commitment": ct_commitment,
         });
 
         Ok(json)

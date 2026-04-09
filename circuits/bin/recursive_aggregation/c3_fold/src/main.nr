@@ -16,11 +16,11 @@ use lib::configs::default::N_PARTIES;
 fn main(
     vk: UltraHonkVerificationKey,
     proof1: UltraHonkZKProof,
-    c3_public_inputs1: [Field; 2],
+    c3_public_inputs1: [Field; 3],
     key_hash: pub Field,
     slot_index1: pub u32,
     proof2: UltraHonkZKProof,
-    c3_public_inputs2: [Field; 2],
+    c3_public_inputs2: [Field; 3],
     slot_index2: pub u32,
     skip_second_proof: pub bool,
 ) -> pub ([Field; N_PARTIES], [Field; N_PARTIES]) {

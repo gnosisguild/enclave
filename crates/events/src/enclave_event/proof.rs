@@ -4,7 +4,7 @@ use derivative::Derivative;
 use e3_utils::utility_types::ArcBytes;
 use e3_zk_helpers::{
     CircuitInputLayout, CircuitOutputLayout, DKG_SHARE_DECRYPTION_OUTPUTS, PK_AGGREGATION_OUTPUTS,
-    PK_BFV_OUTPUTS, PK_GENERATION_OUTPUTS, SHARE_ENCRYPTION_INPUTS,
+    PK_BFV_OUTPUTS, PK_GENERATION_OUTPUTS, SHARE_ENCRYPTION_INPUTS, SHARE_ENCRYPTION_OUTPUTS,
     THRESHOLD_SHARE_DECRYPTION_INPUTS, THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
 };
 use serde::{Deserialize, Serialize};
@@ -217,7 +217,9 @@ impl CircuitName {
             CircuitName::ThresholdShareDecryption => CircuitOutputLayout::Fixed {
                 fields: THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
             },
-            CircuitName::ShareEncryption => CircuitOutputLayout::None,
+            CircuitName::ShareEncryption => CircuitOutputLayout::Fixed {
+                fields: SHARE_ENCRYPTION_OUTPUTS,
+            },
             CircuitName::DecryptedSharesAggregation => CircuitOutputLayout::None,
             CircuitName::Fold | CircuitName::C3Fold | CircuitName::C3FoldMerge => {
                 CircuitOutputLayout::None
@@ -292,11 +294,12 @@ mod tests {
 
     #[test]
     fn extract_c6_d_commitment_after_pub_inputs() {
-        // C6: 2 public inputs + 1 output (`d_commitment` at tail).
-        let mut signals = vec![0u8; 96];
+        // C6: 3 public inputs + 1 output (`d_commitment` at tail).
+        let mut signals = vec![0u8; 128];
         signals[0..32].copy_from_slice(&[0x11; 32]); // expected_sk_commitment
         signals[32..64].copy_from_slice(&[0x22; 32]); // expected_e_sm_commitment
-        signals[64..96].copy_from_slice(&[0x77; 32]); // d_commitment
+        signals[64..96].copy_from_slice(&[0x33; 32]); // ct_commitment
+        signals[96..128].copy_from_slice(&[0x77; 32]); // d_commitment
 
         let proof = make_proof(CircuitName::ThresholdShareDecryption, &signals);
         assert_eq!(&*proof.extract_output("d_commitment").unwrap(), &[0x77; 32]);
@@ -304,10 +307,11 @@ mod tests {
 
     #[test]
     fn extract_c6_public_inputs() {
-        let mut signals = vec![0u8; 96];
+        let mut signals = vec![0u8; 128];
         signals[0..32].copy_from_slice(&[0x11; 32]);
         signals[32..64].copy_from_slice(&[0x22; 32]);
-        signals[64..96].copy_from_slice(&[0x77; 32]);
+        signals[64..96].copy_from_slice(&[0x33; 32]);
+        signals[96..128].copy_from_slice(&[0x77; 32]);
 
         let proof = make_proof(CircuitName::ThresholdShareDecryption, &signals);
         assert_eq!(
@@ -317,6 +321,10 @@ mod tests {
         assert_eq!(
             &*proof.extract_input("expected_e_sm_commitment").unwrap(),
             &[0x22; 32]
+        );
+        assert_eq!(
+            &*proof.extract_input("ct_commitment").unwrap(),
+            &[0x33; 32]
         );
     }
 
@@ -337,9 +345,16 @@ mod tests {
     }
 
     #[test]
-    fn extract_from_void_circuit() {
-        let proof = make_proof(CircuitName::ShareEncryption, &[0u8; 64]);
-        assert!(proof.extract_output("commitment").is_none());
+    fn extract_ct_commitment_from_share_encryption() {
+        let mut signals = vec![0u8; 96];
+        signals[0..32].copy_from_slice(&[0xAA; 32]);
+        signals[32..64].copy_from_slice(&[0xBB; 32]);
+        signals[64..96].copy_from_slice(&[0xCC; 32]);
+        let proof = make_proof(CircuitName::ShareEncryption, &signals);
+        assert_eq!(
+            &*proof.extract_output("ct_commitment").unwrap(),
+            &[0xCC; 32]
+        );
     }
 
     #[test]
@@ -372,10 +387,11 @@ mod tests {
 
     #[test]
     fn extract_input_from_share_encryption() {
-        // C3: 2 pub inputs at HEAD + rest of signals
+        // C3: 2 pub inputs at HEAD + ct_commitment return at tail
         let mut signals = vec![0u8; 96];
         signals[0..32].copy_from_slice(&[0xAA; 32]); // expected_pk_commitment
         signals[32..64].copy_from_slice(&[0xBB; 32]); // expected_message_commitment
+        signals[64..96].copy_from_slice(&[0xCC; 32]); // ct_commitment
 
         let proof = make_proof(CircuitName::ShareEncryption, &signals);
         assert_eq!(
@@ -385,6 +401,10 @@ mod tests {
         assert_eq!(
             &*proof.extract_input("expected_message_commitment").unwrap(),
             &[0xBB; 32]
+        );
+        assert_eq!(
+            &*proof.extract_output("ct_commitment").unwrap(),
+            &[0xCC; 32]
         );
     }
 

@@ -111,8 +111,14 @@ impl CircuitOutputLayout {
 }
 
 /// C6 — Threshold share decryption public inputs.
-pub const THRESHOLD_SHARE_DECRYPTION_INPUTS: &[OutputField] =
-    &[f("expected_sk_commitment"), f("expected_e_sm_commitment")];
+pub const THRESHOLD_SHARE_DECRYPTION_INPUTS: &[OutputField] = &[
+    f("expected_sk_commitment"),
+    f("expected_e_sm_commitment"),
+    f("ct_commitment"),
+];
+
+/// C3 — Share encryption public return (`-> pub Field`).
+pub const SHARE_ENCRYPTION_OUTPUTS: &[OutputField] = &[f("ct_commitment")];
 
 // ── Per-circuit output field constants ──────────────────────────────────────
 
@@ -313,11 +319,12 @@ mod tests {
         let layout = CircuitOutputLayout::Fixed {
             fields: THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
         };
-        // C6: 2 public inputs + 1 output = 96 bytes
-        let mut signals = vec![0u8; 96];
+        // C6: 3 public inputs + 1 output = 128 bytes
+        let mut signals = vec![0u8; 128];
         signals[0..32].copy_from_slice(&[0x11; 32]);
         signals[32..64].copy_from_slice(&[0x22; 32]);
-        signals[64..96].copy_from_slice(&[0x77; 32]);
+        signals[64..96].copy_from_slice(&[0x33; 32]);
+        signals[96..128].copy_from_slice(&[0x77; 32]);
 
         assert_eq!(
             layout.extract_field(&signals, "d_commitment").unwrap(),
@@ -358,7 +365,7 @@ mod tests {
         let mut signals = vec![0u8; 96];
         signals[0..32].copy_from_slice(&[0x11; 32]);
         signals[32..64].copy_from_slice(&[0x22; 32]);
-        signals[64..96].copy_from_slice(&[0x77; 32]);
+        signals[64..96].copy_from_slice(&[0x33; 32]);
 
         assert_eq!(
             layout
@@ -372,6 +379,10 @@ mod tests {
                 .unwrap(),
             &[0x22; 32]
         );
+        assert_eq!(
+            layout.extract_field(&signals, "ct_commitment").unwrap(),
+            &[0x33; 32]
+        );
     }
 
     #[test]
@@ -380,7 +391,7 @@ mod tests {
             fields: THRESHOLD_SHARE_DECRYPTION_INPUTS,
         };
         assert!(layout
-            .extract_field(&[0u8; 32], "expected_e_sm_commitment")
+            .extract_field(&[0u8; 64], "ct_commitment")
             .is_none());
     }
 

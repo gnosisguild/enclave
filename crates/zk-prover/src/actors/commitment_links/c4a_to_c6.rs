@@ -79,10 +79,11 @@ mod tests {
         let sk_commitment = make_field(42);
         let source_values = vec![sk_commitment];
 
-        // C6 inputs: [expected_sk_commitment=42, expected_e_sm_commitment=99]
+        // C6 inputs: [sk, e_sm, ct_commitment] + optional tail (e.g. d_commitment)
         let mut c6_signals = Vec::new();
         c6_signals.extend_from_slice(&sk_commitment);
         c6_signals.extend_from_slice(&make_field(99));
+        c6_signals.extend_from_slice(&make_field(1));
 
         assert!(link.check_signals(&source_values, &c6_signals));
     }
@@ -92,10 +93,10 @@ mod tests {
         let link = C4aToC6SkCommitmentLink;
         let source_values = vec![make_field(42)];
 
-        // C6 inputs: [expected_sk_commitment=99, expected_e_sm_commitment=99]
         let mut c6_signals = Vec::new();
         c6_signals.extend_from_slice(&make_field(99));
         c6_signals.extend_from_slice(&make_field(99));
+        c6_signals.extend_from_slice(&make_field(1));
 
         assert!(!link.check_signals(&source_values, &c6_signals));
     }
@@ -105,6 +106,6 @@ mod tests {
         let link = C4aToC6SkCommitmentLink;
         assert!(link.extract_source_values(&[0u8; 10]).is_empty());
         // Empty source values means malformed proof — should be inconsistent
-        assert!(!link.check_signals(&[], &[0u8; 64]));
+        assert!(!link.check_signals(&[], &[0u8; 96]));
     }
 }
