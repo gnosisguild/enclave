@@ -21,6 +21,7 @@ pub use actors::{
 };
 
 pub use backend::{SetupStatus, ZkBackend};
+pub use circuits::c3_accumulator::{generate_c3_fold_merge_proof, generate_c3_fold_proof};
 pub use circuits::recursive_aggregation::{generate_fold_proof, generate_wrapper_proof};
 pub use config::{verify_checksum, BbTarget, CircuitInfo, VersionInfo, ZkConfig};
 pub use e3_events::CircuitVariant;

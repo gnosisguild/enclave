@@ -128,6 +128,10 @@ pub enum CircuitName {
     DecryptedSharesAggregation,
     /// Recursive aggregation fold circuit (independent; lives at recursive_aggregation/fold).
     Fold,
+    /// C3 base fold: two inner C3 ZK proofs (or one plus padding) → N-slot pk/msg arrays.
+    C3Fold,
+    /// C3 merge fold: two N-slot non-ZK proofs → merged N-slot arrays.
+    C3FoldMerge,
 }
 
 impl CircuitName {
@@ -144,6 +148,8 @@ impl CircuitName {
             CircuitName::ThresholdShareDecryption => "share_decryption",
             CircuitName::DecryptedSharesAggregation => "decrypted_shares_aggregation",
             CircuitName::Fold => "fold",
+            CircuitName::C3Fold => "c3_fold",
+            CircuitName::C3FoldMerge => "c3_fold_merge",
         }
     }
 
@@ -159,7 +165,9 @@ impl CircuitName {
             CircuitName::ThresholdShareDecryption => "threshold",
             CircuitName::PkAggregation => "threshold",
             CircuitName::DecryptedSharesAggregation => "threshold",
-            CircuitName::Fold => "recursive_aggregation",
+            CircuitName::Fold | CircuitName::C3Fold | CircuitName::C3FoldMerge => {
+                "recursive_aggregation"
+            }
         }
     }
 
@@ -211,7 +219,9 @@ impl CircuitName {
             },
             CircuitName::ShareEncryption => CircuitOutputLayout::None,
             CircuitName::DecryptedSharesAggregation => CircuitOutputLayout::None,
-            CircuitName::Fold => CircuitOutputLayout::None,
+            CircuitName::Fold | CircuitName::C3Fold | CircuitName::C3FoldMerge => {
+                CircuitOutputLayout::None
+            }
         }
     }
 

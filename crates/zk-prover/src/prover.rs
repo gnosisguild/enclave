@@ -126,6 +126,24 @@ impl ZkProver {
         )
     }
 
+    /// Proof for a `recursive_aggregation/*` bin circuit (Default / `noir-recursive-no-zk`).
+    pub fn generate_recursive_aggregation_bin_proof(
+        &self,
+        circuit: CircuitName,
+        witness_data: &[u8],
+        e3_id: &str,
+        artifacts_dir: &str,
+    ) -> Result<Proof, ZkError> {
+        self.generate_proof_impl(
+            circuit,
+            witness_data,
+            e3_id,
+            &circuit.dir_path(),
+            CircuitVariant::Default,
+            artifacts_dir,
+        )
+    }
+
     /// Final fold proof for on-chain verification (Evm variant).
     pub fn generate_final_fold_proof(
         &self,
