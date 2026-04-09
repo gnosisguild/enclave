@@ -11,6 +11,7 @@ import {
   encodeComputeProviderParams,
   decodePlaintextOutput,
   CommitteeSize,
+  ThresholdBfvParamsPresetNames,
 } from '@enclave-e3/sdk'
 import { EnclaveEventType, RegistryEventType } from '@enclave-e3/sdk/events'
 import type { AllEventTypes, EnclaveEvent } from '@enclave-e3/sdk/events'
@@ -170,7 +171,7 @@ describe('Integration', () => {
     },
     rpcUrl: 'ws://localhost:8545',
     chain: anvil,
-    thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
+    thresholdBfvParamsPresetName: ThresholdBfvParamsPresetNames[1],
     privateKey: testPrivateKey,
   })
 
@@ -188,7 +189,7 @@ describe('Integration', () => {
     const { waitForEvent } = await setupEventListeners(sdk, store)
 
     const committeeSize = CommitteeSize.Micro
-    const duration = 450
+    const duration = 1000
     const inputWindow = await calculateInputWindow(publicClient, duration)
     const computeProviderParams = encodeComputeProviderParams(
       DEFAULT_COMPUTE_PROVIDER_PARAMS,
@@ -203,7 +204,7 @@ describe('Integration', () => {
       committeeSize,
       inputWindow,
       e3Program: contracts.e3Program,
-      paramSet: 0, // ParamSet.Insecure512
+      paramSet: 1, // ParamSet.Secure8192
       computeProviderParams,
       proofAggregationEnabled: false,
     }

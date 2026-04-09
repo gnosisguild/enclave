@@ -3,6 +3,10 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
+import {
+  ThresholdBfvParamsPresetNames,
+  getThresholdBfvParamsSet,
+} from "@enclave-e3/sdk";
 import hre from "hardhat";
 
 import { autoCleanForLocalhost } from "./cleanIgnitionState";
@@ -52,18 +56,39 @@ export const deployEnclave = async (
 
   const ownerAddress = await owner.getAddress();
 
-  const polynomial_degree = ethers.toBigInt(512);
-  const plaintext_modulus = ethers.toBigInt(100);
-  const moduli = [
-    ethers.toBigInt("0xffffee001"),
-    ethers.toBigInt("0xffffc4001"),
-  ];
-  const error1_variance = "3";
-  const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
+  const paramsInsecure = await getThresholdBfvParamsSet(
+    ThresholdBfvParamsPresetNames[0],
+  );
+  const paramsSecure = await getThresholdBfvParamsSet(
+    ThresholdBfvParamsPresetNames[1],
+  );
+
+  const encodedInsecure = ethers.AbiCoder.defaultAbiCoder().encode(
     [
       "tuple(uint256 degree, uint256 plaintext_modulus, uint256[] moduli, string error1_variance)",
     ],
-    [[polynomial_degree, plaintext_modulus, moduli, error1_variance]],
+    [
+      [
+        paramsInsecure.degree,
+        paramsInsecure.plaintextModulus,
+        paramsInsecure.moduli,
+        paramsInsecure.error1Variance,
+      ],
+    ],
+  );
+
+  const encodedSecure = ethers.AbiCoder.defaultAbiCoder().encode(
+    [
+      "tuple(uint256 degree, uint256 plaintext_modulus, uint256[] moduli, string error1_variance)",
+    ],
+    [
+      [
+        paramsSecure.degree,
+        paramsSecure.plaintextModulus,
+        paramsSecure.moduli,
+        paramsSecure.error1Variance,
+      ],
+    ],
   );
 
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
@@ -232,8 +257,10 @@ export const deployEnclave = async (
 
   // Register BFV param sets
   console.log("Registering BFV param sets...");
-  await enclave.setParamSet(0, encoded); // ParamSet.Insecure512
+  await enclave.setParamSet(0, encodedInsecure); // ParamSet.Insecure512
+  await enclave.setParamSet(1, encodedSecure); // ParamSet.Secure8192
   console.log("ParamSet.Insecure512 registered");
+  console.log("ParamSet.Secure8192 registered");
 
   const encryptionSchemeId = ethers.keccak256(ethers.toUtf8Bytes("fhe.rs:BFV"));
 
