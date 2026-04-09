@@ -3,11 +3,44 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import {
-  ThresholdBfvParamsPresetNames,
-  getThresholdBfvParamsSet,
-} from "@enclave-e3/sdk";
+import { ethers as ethersLib } from "ethers";
 import hre from "hardhat";
+
+// BFV parameter presets — hardcoded from crates/fhe-params/src/constants.rs
+// to avoid a cyclic dependency on @enclave-e3/sdk.
+const BFV_PARAMS = {
+  insecure512: {
+    degree: 512n,
+    plaintextModulus: 100n,
+    moduli: [0xffffee001n, 0xffffc4001n],
+    error1Variance: "3",
+  },
+  secure8192: {
+    degree: 8192n,
+    plaintextModulus: 100n,
+    moduli: [
+      0x0008000000820001n,
+      0x0010000000060001n,
+      0x00100000003e0001n,
+      0x00100000006e0001n,
+    ],
+    error1Variance:
+      "523091811282223396986315785267318739368948664428268466733056000",
+  },
+} as const;
+
+function encodeBfvParams(params: {
+  degree: bigint;
+  plaintextModulus: bigint;
+  moduli: readonly bigint[];
+  error1Variance: string;
+}): string {
+  const abiCoder = ethersLib.AbiCoder.defaultAbiCoder();
+  return abiCoder.encode(
+    ["tuple(uint256 degree, uint256 plaintext_modulus, uint256[] moduli, string error1_variance)"],
+    [[params.degree, params.plaintextModulus, [...params.moduli], params.error1Variance]],
+  );
+}
 
 import { autoCleanForLocalhost } from "./cleanIgnitionState";
 import { deployAndSaveBfvDecryptionVerifier } from "./deployAndSave/bfvDecryptionVerifier";
@@ -56,40 +89,8 @@ export const deployEnclave = async (
 
   const ownerAddress = await owner.getAddress();
 
-  const paramsInsecure = await getThresholdBfvParamsSet(
-    ThresholdBfvParamsPresetNames[0],
-  );
-  const paramsSecure = await getThresholdBfvParamsSet(
-    ThresholdBfvParamsPresetNames[1],
-  );
-
-  const encodedInsecure = ethers.AbiCoder.defaultAbiCoder().encode(
-    [
-      "tuple(uint256 degree, uint256 plaintext_modulus, uint256[] moduli, string error1_variance)",
-    ],
-    [
-      [
-        paramsInsecure.degree,
-        paramsInsecure.plaintextModulus,
-        paramsInsecure.moduli,
-        paramsInsecure.error1Variance,
-      ],
-    ],
-  );
-
-  const encodedSecure = ethers.AbiCoder.defaultAbiCoder().encode(
-    [
-      "tuple(uint256 degree, uint256 plaintext_modulus, uint256[] moduli, string error1_variance)",
-    ],
-    [
-      [
-        paramsSecure.degree,
-        paramsSecure.plaintextModulus,
-        paramsSecure.moduli,
-        paramsSecure.error1Variance,
-      ],
-    ],
-  );
+  const encodedInsecure = encodeBfvParams(BFV_PARAMS.insecure512);
+  const encodedSecure = encodeBfvParams(BFV_PARAMS.secure8192);
 
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
   const SORTITION_SUBMISSION_WINDOW = 10;
