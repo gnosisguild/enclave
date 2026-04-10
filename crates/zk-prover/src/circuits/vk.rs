@@ -73,9 +73,7 @@ pub fn load_vk_for_fold_input(
     circuit: CircuitName,
 ) -> Result<VkArtifacts, ZkError> {
     match circuit {
-        CircuitName::Fold | CircuitName::C3Fold | CircuitName::C3FoldMerge => {
-            load_vk_artifacts(circuits_dir, circuit)
-        }
+        CircuitName::Fold | CircuitName::C3Fold => load_vk_artifacts(circuits_dir, circuit),
         _ => load_wrapper_vk_artifacts(circuits_dir, circuit),
     }
 }

@@ -4,7 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! C3 binary-fold tree: `c3_fold` (ZK inner → N-slot) and `c3_fold_merge` (non-ZK merge).
+//! Sequential C3 fold: each step verifies one inner `ShareEncryption` proof and optionally the
+//! previous `c3_fold` non-ZK proof (`is_first_step` skips the latter).
 
 use super::utils::{bytes_to_field_strings, inputs_json_to_input_map};
 use crate::circuits::vk;
@@ -12,9 +13,22 @@ use crate::error::ZkError;
 use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
 use e3_events::{CircuitName, CircuitVariant, Proof};
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use serde::Serialize;
 
-/// Inner C3 public transcript: `expected_pk`, `expected_message`, then `ct_commitment` (return).
+/// Field count for `UltraHonkProof` (non-ZK) in `c3_fold` — from `nargo compile` ABI (`acc_proof`).
+const C3_FOLD_ACC_NONZK_PROOF_FIELDS: usize = 457;
+
+fn c3_fold_public_input_field_count(n_parties: usize) -> usize {
+    4 + 3 * n_parties
+}
+
+fn zero_field_hex_strings(field_count: usize) -> Result<Vec<String>, ZkError> {
+    let bytes = vec![0u8; field_count * 32];
+    bytes_to_field_strings(&bytes)
+}
+
+/// Inner C3 public transcript: two inputs + `ct_commitment` output.
 fn share_encryption_inner_public_inputs(proof: &Proof) -> Result<[String; 3], ZkError> {
     if proof.circuit != CircuitName::ShareEncryption {
         return Err(ZkError::InvalidInput(format!(
@@ -44,71 +58,121 @@ fn share_encryption_inner_public_inputs(proof: &Proof) -> Result<[String; 3], Zk
     Ok([p0[0].clone(), p1[0].clone(), p2[0].clone()])
 }
 
-/// Witness input for [`CircuitName::C3Fold`] (`circuits/bin/recursive_aggregation/c3_fold`).
 #[derive(Serialize)]
-struct C3FoldInput {
-    vk: Vec<String>,
-    proof1: Vec<String>,
-    c3_public_inputs1: [String; 3],
-    key_hash: String,
-    slot_index1: u32,
-    proof2: Vec<String>,
-    c3_public_inputs2: [String; 3],
-    slot_index2: u32,
-    skip_second_proof: bool,
+struct C3FoldStepInput {
+    inner_vk: Vec<String>,
+    inner_proof: Vec<String>,
+    c3_public_inputs: [String; 3],
+    acc_vk: Vec<String>,
+    acc_proof: Vec<String>,
+    acc_public_inputs: Vec<String>,
+    inner_key_hash: String,
+    acc_key_hash: String,
+    is_first_step: bool,
+    slot_index: u32,
 }
 
-/// Witness input for [`CircuitName::C3FoldMerge`] (`circuits/bin/recursive_aggregation/c3_fold_merge`).
-#[derive(Serialize)]
-struct C3FoldMergeInput {
-    vk1: Vec<String>,
-    proof1: Vec<String>,
-    pk_commits1: Vec<String>,
-    msg_commits1: Vec<String>,
-    key_hash1: String,
-    vk2: Vec<String>,
-    proof2: Vec<String>,
-    pk_commits2: Vec<String>,
-    msg_commits2: Vec<String>,
-    key_hash2: String,
-}
-
-fn field_strings_from_c3_fold_public_signals(signals: &[u8]) -> Result<Vec<String>, ZkError> {
-    let v = bytes_to_field_strings(signals)?;
+fn parse_c3_fold_public_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
+    if proof.circuit != CircuitName::C3Fold {
+        return Err(ZkError::InvalidInput(format!(
+            "expected C3Fold proof, got {}",
+            proof.circuit
+        )));
+    }
+    let v = bytes_to_field_strings(proof.public_signals.as_ref())?;
+    if v.len() < 4 || (v.len() - 4) % 3 != 0 {
+        return Err(ZkError::InvalidInput(format!(
+            "unexpected c3_fold public signal field count: {}",
+            v.len()
+        )));
+    }
     Ok(v)
 }
 
-/// Generates a `c3_fold` proof from one or two inner C3 (`ShareEncryption`, recursive) proofs.
-///
-/// When `skip_second_proof` is true (odd leaf in a pair), only `proof1` is verified on-chain;
-/// `proof2` is still passed to the witness (use a duplicate of `proof1` to satisfy fixed-size ABI).
-pub fn generate_c3_fold_proof(
+fn n_parties_from_c3_fold_proof(p: &Proof) -> Result<usize, ZkError> {
+    let n = (parse_c3_fold_public_field_strings(p)?.len() - 4) / 3;
+    if n == 0 {
+        return Err(ZkError::InvalidInput(
+            "c3_fold proof implies zero parties".into(),
+        ));
+    }
+    Ok(n)
+}
+
+/// Default `N_PARTIES` matching [`circuits/lib`](../circuits/lib) micro preset when no prior fold exists.
+fn default_n_parties() -> usize {
+    CiphernodesCommitteeSize::Micro.values().n
+}
+
+/// One sequential `c3_fold` step.
+pub fn generate_c3_fold_step(
     prover: &ZkProver,
-    proof1: &Proof,
-    slot_index1: u32,
-    proof2: &Proof,
-    slot_index2: u32,
-    skip_second_proof: bool,
+    inner: &Proof,
+    prior_fold: Option<&Proof>,
+    slot_index: u32,
+    is_first_step: bool,
     e3_id: &str,
     artifacts_dir: &str,
 ) -> Result<Proof, ZkError> {
-    let vk = vk::load_vk_artifacts(
+    if is_first_step && prior_fold.is_some() {
+        return Err(ZkError::InvalidInput(
+            "c3_fold first step must not pass a prior_fold proof".into(),
+        ));
+    }
+    if !is_first_step && prior_fold.is_none() {
+        return Err(ZkError::InvalidInput(
+            "c3_fold continuation step requires prior_fold".into(),
+        ));
+    }
+
+    let inner_vk = vk::load_vk_artifacts(
         &prover.circuits_dir(CircuitVariant::Recursive, artifacts_dir),
         CircuitName::ShareEncryption,
     )?;
-    let c3_public_inputs1 = share_encryption_inner_public_inputs(proof1)?;
-    let c3_public_inputs2 = share_encryption_inner_public_inputs(proof2)?;
+    let fold_vk = vk::load_vk_artifacts(
+        &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
+        CircuitName::C3Fold,
+    )?;
 
-    let full_input = C3FoldInput {
-        vk: vk.verification_key,
-        proof1: bytes_to_field_strings(&proof1.data)?,
-        c3_public_inputs1,
-        key_hash: vk.key_hash,
-        slot_index1,
-        proof2: bytes_to_field_strings(&proof2.data)?,
-        c3_public_inputs2,
-        slot_index2,
-        skip_second_proof,
+    let c3_public_inputs = share_encryption_inner_public_inputs(inner)?;
+
+    let n_parties = if is_first_step {
+        default_n_parties()
+    } else {
+        n_parties_from_c3_fold_proof(prior_fold.expect("checked above"))?
+    };
+
+    let expected_acc_pub = c3_fold_public_input_field_count(n_parties);
+
+    let (acc_proof, acc_public_inputs) = if is_first_step {
+        let acc_pi = zero_field_hex_strings(expected_acc_pub)?;
+        let acc_pf = zero_field_hex_strings(C3_FOLD_ACC_NONZK_PROOF_FIELDS)?;
+        (acc_pf, acc_pi)
+    } else {
+        let p = prior_fold.expect("prior_fold required when is_first_step is false");
+        let acc_pi = parse_c3_fold_public_field_strings(p)?;
+        if acc_pi.len() != expected_acc_pub {
+            return Err(ZkError::InvalidInput(format!(
+                "prior c3_fold public field count {} != expected {} for N={}",
+                acc_pi.len(),
+                expected_acc_pub,
+                n_parties
+            )));
+        }
+        (bytes_to_field_strings(&p.data)?, acc_pi)
+    };
+
+    let full_input = C3FoldStepInput {
+        inner_vk: inner_vk.verification_key,
+        inner_proof: bytes_to_field_strings(&inner.data)?,
+        c3_public_inputs,
+        acc_vk: fold_vk.verification_key,
+        acc_proof,
+        acc_public_inputs,
+        inner_key_hash: inner_vk.key_hash,
+        acc_key_hash: fold_vk.key_hash,
+        is_first_step,
+        slot_index,
     };
 
     let circuit_path = prover
@@ -132,87 +196,38 @@ pub fn generate_c3_fold_proof(
     )
 }
 
-/// Merges two N-slot `c3_fold` / `c3_fold_merge` proofs using [`CircuitName::C3FoldMerge`].
-pub fn generate_c3_fold_merge_proof(
+/// Folds `inner_proofs` in order, one inner C3 proof per step. `slot_indices[i]` is the party slot
+/// for `inner_proofs[i]`.
+pub fn generate_sequential_c3_fold(
     prover: &ZkProver,
-    n_slot_proof1: &Proof,
-    n_slot_proof2: &Proof,
+    inner_proofs: &[Proof],
+    slot_indices: &[u32],
     e3_id: &str,
     artifacts_dir: &str,
 ) -> Result<Proof, ZkError> {
-    if n_slot_proof1.circuit != CircuitName::C3Fold
-        && n_slot_proof1.circuit != CircuitName::C3FoldMerge
-    {
-        return Err(ZkError::InvalidInput(format!(
-            "merge left input must be C3Fold or C3FoldMerge, got {}",
-            n_slot_proof1.circuit
-        )));
+    if inner_proofs.is_empty() {
+        return Err(ZkError::InvalidInput(
+            "generate_sequential_c3_fold: need at least one inner proof".into(),
+        ));
     }
-    if n_slot_proof2.circuit != CircuitName::C3Fold
-        && n_slot_proof2.circuit != CircuitName::C3FoldMerge
-    {
-        return Err(ZkError::InvalidInput(format!(
-            "merge right input must be C3Fold or C3FoldMerge, got {}",
-            n_slot_proof2.circuit
-        )));
+    if inner_proofs.len() != slot_indices.len() {
+        return Err(ZkError::InvalidInput(
+            "inner_proofs and slot_indices length mismatch".into(),
+        ));
     }
-
-    let vk1 = vk::load_vk_for_fold_input(
-        &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
-        n_slot_proof1.circuit,
-    )?;
-    let vk2 = vk::load_vk_for_fold_input(
-        &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
-        n_slot_proof2.circuit,
-    )?;
-
-    let f1 = field_strings_from_c3_fold_public_signals(n_slot_proof1.public_signals.as_ref())?;
-    let f2 = field_strings_from_c3_fold_public_signals(n_slot_proof2.public_signals.as_ref())?;
-
-    if f1.len() != f2.len() || f1.len() % 2 != 0 {
-        return Err(ZkError::InvalidInput(format!(
-            "C3 N-slot public signals must be two equal-length halves (pk || msg), got {} and {}",
-            f1.len(),
-            f2.len()
-        )));
+    let mut acc: Option<Proof> = None;
+    for (i, inner) in inner_proofs.iter().enumerate() {
+        let is_first = i == 0;
+        let out = generate_c3_fold_step(
+            prover,
+            inner,
+            acc.as_ref(),
+            slot_indices[i],
+            is_first,
+            e3_id,
+            artifacts_dir,
+        )?;
+        acc = Some(out);
     }
-    let n = f1.len() / 2;
-
-    let pk_commits1 = f1[..n].to_vec();
-    let msg_commits1 = f1[n..].to_vec();
-    let pk_commits2 = f2[..n].to_vec();
-    let msg_commits2 = f2[n..].to_vec();
-
-    let full_input = C3FoldMergeInput {
-        vk1: vk1.verification_key,
-        proof1: bytes_to_field_strings(&n_slot_proof1.data)?,
-        pk_commits1,
-        msg_commits1,
-        key_hash1: vk1.key_hash,
-        vk2: vk2.verification_key,
-        proof2: bytes_to_field_strings(&n_slot_proof2.data)?,
-        pk_commits2,
-        msg_commits2,
-        key_hash2: vk2.key_hash,
-    };
-
-    let circuit_path = prover
-        .circuits_dir(CircuitVariant::Default, artifacts_dir)
-        .join(CircuitName::C3FoldMerge.dir_path())
-        .join(format!("{}.json", CircuitName::C3FoldMerge.as_str()));
-    let compiled = CompiledCircuit::from_file(&circuit_path)?;
-
-    let json = serde_json::to_value(&full_input)
-        .map_err(|e| ZkError::SerializationError(e.to_string()))?;
-    let input_map = inputs_json_to_input_map(&json)?;
-
-    let witness_gen = WitnessGenerator::new();
-    let witness = witness_gen.generate_witness(&compiled, input_map)?;
-
-    prover.generate_recursive_aggregation_bin_proof(
-        CircuitName::C3FoldMerge,
-        &witness,
-        e3_id,
-        artifacts_dir,
-    )
+    Ok(acc.expect("non-empty loop"))
 }
