@@ -290,7 +290,7 @@ function handleGetSessions(req: Request, res: Response) {
 }
 
 const app = express()
-app.use(express.json())
+app.use(express.json({ limit: '50mb' }))
 
 app.post('/', handleWebhookRequest)
 app.get('/sessions', handleGetSessions)

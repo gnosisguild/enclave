@@ -117,6 +117,7 @@ impl E3ProgramServer {
         let server = HttpServer::new(move || {
             App::new()
                 .app_data(web::Data::new(config.clone()))
+                .app_data(web::JsonConfig::default().limit(10 * 1024 * 1024)) // 10MB for prod params
                 .wrap(Logger::default())
                 .route("/run_compute", web::post().to(handle_compute))
                 .route("/health", web::get().to(handle_health_check))
