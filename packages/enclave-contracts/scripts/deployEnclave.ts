@@ -6,6 +6,21 @@
 import { ethers as ethersLib } from "ethers";
 import hre from "hardhat";
 
+import { autoCleanForLocalhost } from "./cleanIgnitionState";
+import { deployAndSaveBfvDecryptionVerifier } from "./deployAndSave/bfvDecryptionVerifier";
+import { deployAndSaveBfvPkVerifier } from "./deployAndSave/bfvPkVerifier";
+import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
+import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
+import { deployAndSaveE3RefundManager } from "./deployAndSave/e3RefundManager";
+import { deployAndSaveEnclave } from "./deployAndSave/enclave";
+import { deployAndSaveEnclaveTicketToken } from "./deployAndSave/enclaveTicketToken";
+import { deployAndSaveEnclaveToken } from "./deployAndSave/enclaveToken";
+import { deployAndSaveMockStableToken } from "./deployAndSave/mockStableToken";
+import { deployAndSavePoseidonT3 } from "./deployAndSave/poseidonT3";
+import { deployAndSaveSlashingManager } from "./deployAndSave/slashingManager";
+import { deployAndSaveAllVerifiers } from "./deployAndSave/verifiers";
+import { deployMocks } from "./deployMocks";
+
 // BFV parameter presets — hardcoded from crates/fhe-params/src/constants.rs
 // to avoid a cyclic dependency on @enclave-e3/sdk.
 const BFV_PARAMS = {
@@ -37,25 +52,19 @@ function encodeBfvParams(params: {
 }): string {
   const abiCoder = ethersLib.AbiCoder.defaultAbiCoder();
   return abiCoder.encode(
-    ["tuple(uint256 degree, uint256 plaintext_modulus, uint256[] moduli, string error1_variance)"],
-    [[params.degree, params.plaintextModulus, [...params.moduli], params.error1Variance]],
+    [
+      "tuple(uint256 degree, uint256 plaintext_modulus, uint256[] moduli, string error1_variance)",
+    ],
+    [
+      [
+        params.degree,
+        params.plaintextModulus,
+        [...params.moduli],
+        params.error1Variance,
+      ],
+    ],
   );
 }
-
-import { autoCleanForLocalhost } from "./cleanIgnitionState";
-import { deployAndSaveBfvDecryptionVerifier } from "./deployAndSave/bfvDecryptionVerifier";
-import { deployAndSaveBfvPkVerifier } from "./deployAndSave/bfvPkVerifier";
-import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
-import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
-import { deployAndSaveE3RefundManager } from "./deployAndSave/e3RefundManager";
-import { deployAndSaveEnclave } from "./deployAndSave/enclave";
-import { deployAndSaveEnclaveTicketToken } from "./deployAndSave/enclaveTicketToken";
-import { deployAndSaveEnclaveToken } from "./deployAndSave/enclaveToken";
-import { deployAndSaveMockStableToken } from "./deployAndSave/mockStableToken";
-import { deployAndSavePoseidonT3 } from "./deployAndSave/poseidonT3";
-import { deployAndSaveSlashingManager } from "./deployAndSave/slashingManager";
-import { deployAndSaveAllVerifiers } from "./deployAndSave/verifiers";
-import { deployMocks } from "./deployMocks";
 
 /**
  * Default timeout configuration (in seconds)

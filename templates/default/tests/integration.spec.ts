@@ -171,7 +171,7 @@ describe('Integration', () => {
     },
     rpcUrl: 'ws://localhost:8545',
     chain: anvil,
-    thresholdBfvParamsPresetName: ThresholdBfvParamsPresetNames[1],
+    thresholdBfvParamsPresetName: ThresholdBfvParamsPresetNames[0],
     privateKey: testPrivateKey,
   })
 
@@ -204,7 +204,7 @@ describe('Integration', () => {
       committeeSize,
       inputWindow,
       e3Program: contracts.e3Program,
-      paramSet: 1, // ParamSet.Secure8192
+      paramSet: 0, // ParamSet.InsecureThreshold512
       computeProviderParams,
       proofAggregationEnabled: false,
     }

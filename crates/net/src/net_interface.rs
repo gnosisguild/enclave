@@ -56,6 +56,7 @@ use tracing::{debug, error, info, trace, warn};
 
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/enclave/kad/1.0.0");
 const MAX_KADEMLIA_PAYLOAD_MB: usize = 100;
+const MAX_KADEMLIA_RECORD_MB: usize = 25; // Largest record: ~21MB ThresholdShare with prod params
 const DHT_MAX_RECORDS: usize = 4096;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 10240; // 10MB — prod params C6 proofs are ~4.6MB
 const MAX_CONSECUTIVE_DIAL_FAILURES: u32 = 40;
@@ -308,7 +309,7 @@ fn create_behaviour(
         .set_query_timeout(Duration::from_secs(30));
     let store_config = MemoryStoreConfig {
         max_records: DHT_MAX_RECORDS,
-        max_value_bytes: MAX_KADEMLIA_PAYLOAD_MB * 1024 * 1024,
+        max_value_bytes: MAX_KADEMLIA_RECORD_MB * 1024 * 1024,
         max_providers_per_key: usize::MAX,
         max_provided_keys: DHT_MAX_RECORDS,
     };

@@ -433,7 +433,7 @@ function renderEvents() {
     if (e3Filter && !String(e3id).toLowerCase().includes(e3Filter)) continue;
     if (sourceFilter && ctx.source !== sourceFilter) continue;
     if (severityFilter === 'error' && !ERROR_TYPES.some(function(t) { return type === t; })) continue;
-    if (severityFilter === 'warning' && !WARNING_TYPES.some(function(t) { return type === t; }) && !ERROR_TYPES.some(function(t) { return type === t; })) continue;
+    if (severityFilter === 'warning' && !WARNING_TYPES.some(function(t) { return type === t; })) continue;
     if (severityFilter === 'state' && !STATE_TYPES.some(function(t) { return type === t; })) continue;
     var seq = ctx.seq !== undefined ? ctx.seq : '-';
     var src = ctx.source || '-';
@@ -466,10 +466,10 @@ function extractE3Id(evt) {
   if (!evt.payload) return '-';
   var data = Object.values(evt.payload)[0];
   if (!data || typeof data !== 'object') return '-';
-  var eid = data.e3_id || data.e3Id;
-  if (!eid) return '-';
+  var eid = data.e3_id !== undefined ? data.e3_id : data.e3Id;
+  if (eid == null) return '-';
   if (typeof eid === 'object' && eid.id !== undefined) {
-    return eid.chain_id ? eid.chain_id + ':' + eid.id : eid.id;
+    return eid.chain_id !== undefined ? eid.chain_id + ':' + eid.id : String(eid.id);
   }
   return String(eid);
 }
