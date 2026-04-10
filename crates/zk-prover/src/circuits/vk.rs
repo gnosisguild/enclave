@@ -67,14 +67,13 @@ pub fn load_vk_artifacts(
     load_vk_from_dir(&circuit_dir, circuit.as_str())
 }
 
-/// VK path by circuit type: Fold uses dir_path, wrappers use wrapper_dir_path.
+/// VK path by circuit type: recursive aggregation bins use `dir_path`, wrappers use `wrapper_dir_path`.
 pub fn load_vk_for_fold_input(
     circuits_dir: &Path,
     circuit: CircuitName,
 ) -> Result<VkArtifacts, ZkError> {
-    if circuit == CircuitName::Fold {
-        load_vk_artifacts(circuits_dir, circuit)
-    } else {
-        load_wrapper_vk_artifacts(circuits_dir, circuit)
+    match circuit {
+        CircuitName::Fold | CircuitName::C3Fold => load_vk_artifacts(circuits_dir, circuit),
+        _ => load_wrapper_vk_artifacts(circuits_dir, circuit),
     }
 }

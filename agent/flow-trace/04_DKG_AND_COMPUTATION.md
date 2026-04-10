@@ -348,6 +348,7 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │     C4a→C6  (SameParty):                C4a's commitment == C6's expected_sk_commitment
 │   │   │     C4b→C6  (SameParty):                C4b's commitment == C6's expected_e_sm_commitment
 │   │   │     C6→C7   (CrossParty):               C6's d_commitment matches C7's expected_d_commitment
+│   │   │     (on-chain / E3 state)              C3 `ct_commitment` output and C6 `ct_commitment` input bind to the same ciphertext as user_data_encryption (not a CommitmentLink row)
 │   │   │
 │   │   ├─ On mismatch: publishes CommitmentConsistencyViolation
 │   │   │   → AccusationManager initiates accusation quorum (see Part 5)

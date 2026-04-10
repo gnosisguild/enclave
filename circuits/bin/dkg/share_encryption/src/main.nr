@@ -18,8 +18,8 @@ fn main(
     expected_message_commitment: pub Field,
     pk0is: [Polynomial<N>; L],
     pk1is: [Polynomial<N>; L],
-    ct0is: pub [Polynomial<N>; L],
-    ct1is: pub [Polynomial<N>; L],
+    ct0is: [Polynomial<N>; L],
+    ct1is: [Polynomial<N>; L],
     u: Polynomial<N>,
     e0: Polynomial<N>,
     e0is: [Polynomial<N>; L],
@@ -30,7 +30,7 @@ fn main(
     r2is: [Polynomial<N - 1>; L],
     p1is: [Polynomial<(2 * N) - 1>; L],
     p2is: [Polynomial<N - 1>; L],
-) {
+) -> pub Field {
     let share_encryption: ShareEncryption<N, L, SHARE_ENCRYPTION_BIT_PK, SHARE_ENCRYPTION_BIT_CT, SHARE_ENCRYPTION_BIT_U, SHARE_ENCRYPTION_BIT_E0, SHARE_ENCRYPTION_BIT_E1, SHARE_ENCRYPTION_BIT_MSG, SHARE_ENCRYPTION_BIT_R1, SHARE_ENCRYPTION_BIT_R2, SHARE_ENCRYPTION_BIT_P1, SHARE_ENCRYPTION_BIT_P2> = ShareEncryption::new(
         SHARE_ENCRYPTION_CONFIGS,
         expected_pk_commitment,
@@ -50,5 +50,5 @@ fn main(
         p1is,
         p2is,
     );
-    share_encryption.execute();
+    share_encryption.execute()
 }

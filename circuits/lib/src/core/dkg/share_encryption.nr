@@ -4,10 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::math::commitments::compute_dkg_pk_commitment;
 use crate::math::commitments::{
-    compute_share_encryption_challenge, compute_share_encryption_commitment_from_message,
+    compute_ciphertext_commitment, compute_share_encryption_challenge,
+    compute_share_encryption_commitment_from_message,
 };
+use crate::math::commitments::compute_dkg_pk_commitment;
 use crate::math::helpers::flatten;
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
@@ -87,7 +88,7 @@ impl<let L: u32> Configs<L> {
 ///
 /// **Consumes:** `expected_pk_commitment` (C0); `expected_message_commitment` (C2 sk or C2 e_sm).
 ///
-/// **Produces:** Ciphertexts `ct0`, `ct1` for C4 (no new standalone commitment artifact).
+/// **Produces:** Public `ct_commitment` (hash of ct0/ct1 limbs) for cross-phase binding; witness ct0/ct1 feed C4 off-transcript.
 pub struct ShareEncryption<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     /// Circuit parameters
     configs: Configs<L>,
@@ -284,8 +285,8 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         }
     }
 
-    /// Executes the share encryption circuit.
-    pub fn execute(self) {
+    /// Executes the share encryption circuit and returns the ciphertext commitment (C3 public output).
+    pub fn execute(self) -> Field {
         // Step 1: Verify public key commitment matches expected
         self.verify_pk_commitment();
 
@@ -305,7 +306,9 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let gammas = self.generate_challenge(k1);
 
         // Step 7: Verify encryption constraints
-        self.verify_evaluations(gammas, k1)
+        self.verify_evaluations(gammas, k1);
+
+        compute_ciphertext_commitment::<N, L, BIT_CT>(self.ct0is, self.ct1is)
     }
 
     /// Performs range checks on all secret witness polynomial coefficients.

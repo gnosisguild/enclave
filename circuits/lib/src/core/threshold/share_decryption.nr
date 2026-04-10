@@ -5,8 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::math::commitments::{
-    compute_aggregated_shares_commitment, compute_threshold_decryption_share_commitment,
-    compute_threshold_share_decryption_challenge,
+    compute_aggregated_shares_commitment, compute_ciphertext_commitment,
+    compute_threshold_decryption_share_commitment, compute_threshold_share_decryption_challenge,
 };
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
@@ -32,7 +32,8 @@ impl<let L: u32> Configs<L> {
 /// **Role:** Prove one party's partial decryption share `d` is consistent with the ciphertext and
 /// with aggregate `sk` / `e_sm` commitments from C4.
 ///
-/// **Consumes:** `expected_sk_commitment`, `expected_e_sm_commitment` (C4); ciphertext limbs `ct0`, `ct1`.
+/// **Consumes:** `expected_sk_commitment`, `expected_e_sm_commitment` (C4), `ct_commitment` (cross-phase /
+/// user data encryption); ciphertext limbs `ct0`, `ct1` as witness.
 ///
 /// **Produces:** Truncated-`d` commitment for C7 (`decrypted_shares_aggregation`).
 pub struct ShareDecryption<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> {
@@ -47,7 +48,10 @@ pub struct ShareDecryption<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: 
     /// (public witness)
     expected_e_sm_commitment: Field,
 
-    /// Ciphertext components (public witnesses)
+    /// Expected commitment to the full ciphertext (ct0 limbs + ct1 limbs), aligned with C3 / user_data_encryption.
+    ct_commitment: Field,
+
+    /// Ciphertext components (witness-only)
     /// ct0 components for each CRT basis (degree N-1 polynomials with N coefficients)
     ct0: [Polynomial<N>; L],
     /// ct1 components for each CRT basis (degree N-1 polynomials with N coefficients)
@@ -73,6 +77,7 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         configs: Configs<L>,
         expected_sk_commitment: Field,
         expected_e_sm_commitment: Field,
+        ct_commitment: Field,
         ct0: [Polynomial<N>; L],
         ct1: [Polynomial<N>; L],
         sk: [Polynomial<N>; L],
@@ -86,6 +91,7 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
             configs,
             expected_sk_commitment,
             expected_e_sm_commitment,
+            ct_commitment,
             ct0,
             ct1,
             sk,
@@ -112,6 +118,11 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
                 == self.expected_e_sm_commitment,
             "E commitment mismatch",
         );
+    }
+
+    fn verify_ct_commitment(self) {
+        let computed = compute_ciphertext_commitment::<N, L, BIT_CT>(self.ct0, self.ct1);
+        assert(computed == self.ct_commitment, "Ciphertext commitment mismatch");
     }
 
     /// Truncates each CRT limb of `d` to `MAX_MSG_NON_ZERO_COEFFS` coefficients.
@@ -159,7 +170,7 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         inputs.push(self.expected_sk_commitment);
         inputs.push(self.expected_e_sm_commitment);
 
-        // Flatten ciphertext components (public inputs)
+        // Flatten ciphertext components (witness)
         inputs = flatten::<_, _, BIT_CT>(inputs, self.ct0);
         inputs = flatten::<_, _, BIT_CT>(inputs, self.ct1);
 
@@ -181,7 +192,10 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         // Step 2: Verify e_sm commitment matches expected
         self.verify_agg_e_sm_commitment();
 
-        // Step 3: Range-check quotient polynomials (r1, r2).
+        // Step 3: Bind witness ciphertext to the public ct_commitment
+        self.verify_ct_commitment();
+
+        // Step 4: Range-check quotient polynomials (r1, r2).
         // sk and e_sm are enforced only via `verify_agg_*_commitment` against C4 outputs; C4
         // aggregated per-party shares that passed verification against C2 (see `dkg/share_decryption`).
         self.check_range_bounds();
@@ -191,10 +205,10 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
             d_truncated,
         );
 
-        // Step 4: Generate Fiat-Shamir challenge from the transcript
+        // Step 5: Generate Fiat-Shamir challenge from the transcript
         let gamma = self.generate_challenge();
 
-        // Step 5: Verify decryption share computation for each CRT basis
+        // Step 6: Verify decryption share computation for each CRT basis
         for i in 0..L {
             self.verify_decryption_share_computation(i, gamma);
         }
