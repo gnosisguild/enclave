@@ -19,7 +19,7 @@ use e3_trbfv::PartyId;
 use e3_utils::MAILBOX_LIMIT;
 use tracing::{info, warn};
 
-const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(60);
+const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(600);
 
 use crate::ThresholdKeyshare;
 

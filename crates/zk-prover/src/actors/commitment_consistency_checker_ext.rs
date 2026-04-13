@@ -16,8 +16,8 @@ use super::commitment_links;
 use anyhow::Result;
 use async_trait::async_trait;
 use e3_events::{BusHandle, EnclaveEvent, EnclaveEventData, Event};
-use e3_request::{E3Context, E3ContextSnapshot, E3Extension};
-use tracing::info;
+use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
+use tracing::{error, info};
 
 pub struct CommitmentConsistencyCheckerExtension {
     bus: BusHandle,
@@ -46,9 +46,14 @@ impl E3Extension for CommitmentConsistencyCheckerExtension {
 
         let e3_id = data.e3_id.clone();
 
+        let Some(meta) = ctx.get_dependency(META_KEY) else {
+            error!("E3Meta not available — cannot start CommitmentConsistencyChecker");
+            return;
+        };
+
         info!("Starting CommitmentConsistencyChecker for E3 {}", e3_id);
 
-        let links = commitment_links::default_links();
+        let links = commitment_links::default_links(meta.params_preset);
         let addr = CommitmentConsistencyChecker::setup(&self.bus, e3_id, links);
 
         ctx.set_event_recipient("commitment_consistency_checker", Some(addr.into()));
