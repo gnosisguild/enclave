@@ -22,7 +22,7 @@ pub mod c4b_to_c6;
 pub mod c6_to_c7;
 
 use e3_events::ProofType;
-use e3_fhe_params::DEFAULT_BFV_PRESET;
+use e3_fhe_params::BfvPreset;
 
 /// A 32-byte BN254 field element extracted from public signals.
 pub type FieldValue = [u8; 32];
@@ -104,8 +104,8 @@ pub trait CommitmentLink: Send + Sync {
 /// that C4 consumes as `expected_commitments`. Since C2→C3 already ensures
 /// C3 encrypts the correct share, C2→C4 closes the remaining gap (preventing
 /// a party from using different commitments in C4 than they computed in C2).
-pub fn default_links() -> Vec<Box<dyn CommitmentLink>> {
-    let l = DEFAULT_BFV_PRESET.metadata().num_moduli;
+pub fn default_links(preset: BfvPreset) -> Vec<Box<dyn CommitmentLink>> {
+    let l = preset.metadata().num_moduli;
     vec![
         Box::new(c0_to_c3::C3aToC0PkCommitmentLink),
         Box::new(c0_to_c3::C3bToC0PkCommitmentLink),
@@ -114,10 +114,8 @@ pub fn default_links() -> Vec<Box<dyn CommitmentLink>> {
         Box::new(c1_to_c5::C1ToC5PkCommitmentLink),
         Box::new(c2_to_c3::C3aToC2aShareEncryptionLink),
         Box::new(c2_to_c3::C3bToC2bShareEncryptionLink),
-        // TODO: C2->C4 share commitment checks produce false positives with secure (N=8192)
-        // params. Disabled until the root cause is investigated.
-        // Box::new(c2_to_c4::C2aToC4aShareCommitmentLink { l }),
-        // Box::new(c2_to_c4::C2bToC4bShareCommitmentLink { l }),
+        Box::new(c2_to_c4::C2aToC4aShareCommitmentLink { l }),
+        Box::new(c2_to_c4::C2bToC4bShareCommitmentLink { l }),
         Box::new(c6_to_c7::C6ToC7DCommitmentLink),
         Box::new(c4a_to_c6::C4aToC6SkCommitmentLink),
         Box::new(c4b_to_c6::C4bToC6ESmCommitmentLink),
