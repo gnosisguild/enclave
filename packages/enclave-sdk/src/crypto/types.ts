@@ -30,3 +30,8 @@ export interface EncryptedValueAndPublicInputs {
   encryptedData: Uint8Array
   circuitInputs: CircuitInputs
 }
+
+export interface BfvParamSet {
+  name: ThresholdBfvParamsPresetName
+  params: BfvParams
+}

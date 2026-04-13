@@ -22,7 +22,7 @@ pub mod c4b_to_c6;
 pub mod c6_to_c7;
 
 use e3_events::ProofType;
-use e3_fhe_params::DEFAULT_BFV_PRESET;
+use e3_fhe_params::BfvPreset;
 
 /// A 32-byte BN254 field element extracted from public signals.
 pub type FieldValue = [u8; 32];
@@ -104,8 +104,8 @@ pub trait CommitmentLink: Send + Sync {
 /// that C4 consumes as `expected_commitments`. Since C2→C3 already ensures
 /// C3 encrypts the correct share, C2→C4 closes the remaining gap (preventing
 /// a party from using different commitments in C4 than they computed in C2).
-pub fn default_links() -> Vec<Box<dyn CommitmentLink>> {
-    let l = DEFAULT_BFV_PRESET.metadata().num_moduli;
+pub fn default_links(preset: BfvPreset) -> Vec<Box<dyn CommitmentLink>> {
+    let l = preset.metadata().num_moduli;
     vec![
         Box::new(c0_to_c3::C3aToC0PkCommitmentLink),
         Box::new(c0_to_c3::C3bToC0PkCommitmentLink),

@@ -118,7 +118,17 @@ input[type="text"] {
   font-size: 13px;
   outline: none;
 }
-input[type="text"]:focus { border-color: var(--accent); }
+input[type="text"]:focus, select:focus { border-color: var(--accent); }
+select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
 button {
   background: var(--accent);
   color: #fff;
@@ -170,6 +180,9 @@ pre {
 .badge-green { background: rgba(74,222,128,0.15); color: var(--green); }
 .badge-red { background: rgba(248,113,113,0.15); color: var(--red); }
 .badge-yellow { background: rgba(251,191,36,0.15); color: var(--yellow); }
+tr.evt-error td { border-left: 3px solid var(--red); }
+tr.evt-warn td { border-left: 3px solid var(--yellow); }
+tr.evt-state td { border-left: 3px solid var(--green); }
 </style>
 </head>
 <body>
@@ -206,6 +219,26 @@ pre {
   <div class="panel" id="panel-events">
     <div class="controls">
       <input type="text" id="evt-filter" placeholder="Filter by type...">
+      <input type="text" id="evt-e3-filter" placeholder="Filter by E3 ID...">
+      <select id="evt-source-filter">
+        <option value="">All sources</option>
+        <option value="Local">Local</option>
+        <option value="Net">Net</option>
+        <option value="Evm">Evm</option>
+      </select>
+      <select id="evt-severity-filter">
+        <option value="">All events</option>
+        <option value="error">Errors only</option>
+        <option value="warning">Warnings</option>
+        <option value="state">State changes</option>
+      </select>
+      <select id="evt-sort">
+        <option value="seq-desc">Newest first</option>
+        <option value="seq-asc">Oldest first</option>
+        <option value="type-asc">Type A-Z</option>
+        <option value="type-desc">Type Z-A</option>
+        <option value="source-asc">Source A-Z</option>
+      </select>
       <button id="evt-refresh" onclick="loadEvents()">Refresh</button>
       <label><input type="checkbox" id="evt-auto"> Auto-refresh</label>
     </div>
@@ -322,7 +355,7 @@ async function loadOverview() {
 async function loadEvents(since, append) {
   try {
     const s = since !== undefined ? since : 0;
-    const text = await api('/api/events?since=' + s + '&limit=50');
+    const text = await api('/api/events?since=' + s + '&limit=500');
     // Split on newlines first; if a line fails to parse, try splitting on }{ boundaries
     const lines = text.trim().split('\n').filter(function(l) { return l.trim().length > 0; });
     if (!append) allEvents = [];
@@ -366,21 +399,49 @@ function loadMoreEvents() {
   if (eventCursor !== null) loadEvents(eventCursor, true);
 }
 
+var ERROR_TYPES = ['EnclaveError','E3Failed','ProofVerificationFailed','SignedProofFailed','ThresholdShareCollectionFailed','EncryptionKeyCollectionFailed'];
+var WARNING_TYPES = ['AccusationVote','ProofFailureAccusation','CommitmentMismatch'];
+var STATE_TYPES = ['E3Requested','CiphernodeSelected','CommitteePublished','CommitteeFinalized','CiphertextOutputPublished','PlaintextOutputPublished','PlaintextAggregated','E3StageChanged'];
+
 function renderEvents() {
-  const filter = document.getElementById('evt-filter').value.toLowerCase();
-  const tbody = document.getElementById('evt-body');
-  const rows = [];
-  for (const evt of allEvents) {
-    const ctx = evt.ctx || {};
-    const type = extractType(evt);
+  var filter = document.getElementById('evt-filter').value.toLowerCase();
+  var e3Filter = document.getElementById('evt-e3-filter').value.toLowerCase();
+  var sourceFilter = document.getElementById('evt-source-filter').value;
+  var severityFilter = document.getElementById('evt-severity-filter').value;
+  var sortKey = document.getElementById('evt-sort').value;
+  var sorted = allEvents.slice();
+  sorted.sort(function(a, b) {
+    var seqA = (a.ctx || {}).seq || 0;
+    var seqB = (b.ctx || {}).seq || 0;
+    if (sortKey === 'seq-asc') return seqA - seqB;
+    if (sortKey === 'seq-desc') return seqB - seqA;
+    var typeA = extractType(a);
+    var typeB = extractType(b);
+    if (sortKey === 'type-asc') return typeA.localeCompare(typeB);
+    if (sortKey === 'type-desc') return typeB.localeCompare(typeA);
+    if (sortKey === 'source-asc') return ((a.ctx || {}).source || '').localeCompare((b.ctx || {}).source || '');
+    return seqB - seqA;
+  });
+  var tbody = document.getElementById('evt-body');
+  var rows = [];
+  for (var i = 0; i < sorted.length; i++) {
+    var evt = sorted[i];
+    var ctx = evt.ctx || {};
+    var type = extractType(evt);
     if (filter && !type.toLowerCase().includes(filter)) continue;
-    const seq = ctx.seq !== undefined ? ctx.seq : '-';
-    const e3id = extractE3Id(evt);
-    const src = ctx.source || '-';
+    var e3id = extractE3Id(evt);
+    if (e3Filter && !String(e3id).toLowerCase().includes(e3Filter)) continue;
+    if (sourceFilter && ctx.source !== sourceFilter) continue;
+    if (severityFilter === 'error' && !ERROR_TYPES.some(function(t) { return type === t; })) continue;
+    if (severityFilter === 'warning' && !WARNING_TYPES.some(function(t) { return type === t; })) continue;
+    if (severityFilter === 'state' && !STATE_TYPES.some(function(t) { return type === t; })) continue;
+    var seq = ctx.seq !== undefined ? ctx.seq : '-';
+    var src = ctx.source || '-';
     const id = 'evt-' + rows.length;
     var ts = hlcToTime(ctx.ts);
+    var rowClass = ERROR_TYPES.indexOf(type) >= 0 ? 'evt-error' : WARNING_TYPES.indexOf(type) >= 0 ? 'evt-warn' : STATE_TYPES.indexOf(type) >= 0 ? 'evt-state' : '';
     rows.push(
-      '<tr onclick="toggleDetail(\'' + id + '\')" style="cursor:pointer">' +
+      '<tr class="' + rowClass + '" onclick="toggleDetail(\'' + id + '\')" style="cursor:pointer">' +
       '<td>' + esc(String(seq)) + '</td>' +
       '<td>' + esc(ts) + '</td>' +
       '<td>' + esc(type) + '</td>' +
@@ -391,6 +452,7 @@ function renderEvents() {
     );
   }
   tbody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="5" class="loading">No events</td></tr>';
+  document.getElementById('evt-refresh').textContent = 'Refresh (' + allEvents.length + ' total, ' + rows.length + ' shown)';
 }
 
 function extractType(evt) {
@@ -402,9 +464,14 @@ function extractType(evt) {
 
 function extractE3Id(evt) {
   if (!evt.payload) return '-';
-  const data = Object.values(evt.payload)[0];
+  var data = Object.values(evt.payload)[0];
   if (!data || typeof data !== 'object') return '-';
-  return data.e3_id || data.e3Id || '-';
+  var eid = data.e3_id !== undefined ? data.e3_id : data.e3Id;
+  if (eid == null) return '-';
+  if (typeof eid === 'object' && eid.id !== undefined) {
+    return eid.chain_id !== undefined ? eid.chain_id + ':' + eid.id : String(eid.id);
+  }
+  return String(eid);
 }
 
 function toggleDetail(id) {
@@ -413,6 +480,10 @@ function toggleDetail(id) {
 }
 
 document.getElementById('evt-filter').addEventListener('input', renderEvents);
+document.getElementById('evt-e3-filter').addEventListener('input', renderEvents);
+document.getElementById('evt-source-filter').addEventListener('change', renderEvents);
+document.getElementById('evt-severity-filter').addEventListener('change', renderEvents);
+document.getElementById('evt-sort').addEventListener('change', renderEvents);
 
 // Auto-refresh for events
 document.getElementById('evt-auto').addEventListener('change', function() {
