@@ -1,7 +1,0 @@
-[workspace]
-members = [
-    "pk_generation",
-    "pk_aggregation",
-    "share_decryption",
-    "decrypted_shares_aggregation"
-]

@@ -1,0 +1,61 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
+//! Phase 7 decryption aggregator (on-chain target): one non-ZK `c6_fold` proof (folded C6 column) plus C7 ZK.
+
+use bb_proof_verification::{
+    UltraHonkProof, UltraHonkVerificationKey, UltraHonkZKProof, verify_honk_proof,
+    verify_honk_proof_non_zk,
+};
+use lib::configs::default::MAX_MSG_NON_ZERO_COEFFS;
+use lib::configs::default::T;
+use lib::math::commitments::compute_vk_hash;
+
+/// Must match `c6_fold::C6_FOLD_PUBLIC_LEN`: pub params + flattened `(out_sk, out_esm, out_ct, out_d)`.
+pub global C6_FOLD_PUBLIC_LEN: u32 = 4 + (4 * (T + 1));
+
+pub global C7_PUBLIC_LEN: u32 = (2 * (T + 1)) + MAX_MSG_NON_ZERO_COEFFS;
+
+fn main(
+    c6_fold_vk: UltraHonkVerificationKey,
+    c6_fold_proof: UltraHonkProof,
+    c6_fold_public: [Field; C6_FOLD_PUBLIC_LEN],
+    c7_vk: UltraHonkVerificationKey,
+    c7_proof: UltraHonkZKProof,
+    c7_public: [Field; C7_PUBLIC_LEN],
+    c6_fold_key_hash: pub Field,
+    c7_key_hash: pub Field,
+) -> pub (Field, [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; MAX_MSG_NON_ZERO_COEFFS]) {
+    verify_honk_proof_non_zk(c6_fold_vk, c6_fold_proof, c6_fold_public, c6_fold_key_hash);
+    verify_honk_proof(c7_vk, c7_proof, c7_public, c7_key_hash);
+
+    // Cross-circuit C6 to C7: each folded `d_commitment` column entry must match `c7_public[i]`
+    // (leading `T + 1` words of `c7_public`).
+    for i in 0..(T + 1) {
+        assert(c6_fold_public[4 + 3 * (T + 1) + i] == c7_public[i]);
+    }
+
+    let mut vk_hashes = Vec::new();
+    vk_hashes.push(c6_fold_key_hash);
+    vk_hashes.push(c7_key_hash);
+    let key_hash = compute_vk_hash(vk_hashes);
+
+    let mut party_ids: [Field; T + 1] = [0; T + 1];
+    let mut expected_sk: [Field; T + 1] = [0; T + 1];
+    let mut expected_esm: [Field; T + 1] = [0; T + 1];
+    for i in 0..(T + 1) {
+        party_ids[i] = c7_public[(T + 1) + i];
+        expected_sk[i] = c6_fold_public[4 + i];
+        expected_esm[i] = c6_fold_public[4 + (T + 1) + i];
+    }
+
+    let mut message: [Field; MAX_MSG_NON_ZERO_COEFFS] = [0; MAX_MSG_NON_ZERO_COEFFS];
+    for k in 0..MAX_MSG_NON_ZERO_COEFFS {
+        message[k] = c7_public[(2 * (T + 1)) + k];
+    }
+
+    (key_hash, party_ids, expected_sk, expected_esm, message)
+}

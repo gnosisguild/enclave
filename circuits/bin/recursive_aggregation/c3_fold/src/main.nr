@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Sequential C3 fold: one inner `ShareEncryption` ZK proof per step, optionally chained with the
+//! Sequential C3 fold: one inner ZK `ShareEncryption` proof per step, optionally chained with the
 //! previous `c3_fold` non-ZK proof. First step (`is_first_step`) verifies only the inner proof.
 
 use bb_proof_verification::{
