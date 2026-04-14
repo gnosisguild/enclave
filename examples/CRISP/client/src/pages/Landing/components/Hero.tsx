@@ -50,7 +50,7 @@ const HeroSection: React.FC = () => {
             <div className='text-slate-400'>This is a simple demonstration of CRISP technology.</div>
             <Link
               target='_blank'
-              to='https://docs.enclave.gg'
+              to='https://docs.theinterfold.com'
               className='inline-flex cursor-pointer items-center space-x-1 text-lime-600 duration-300 ease-in-out hover:underline hover:opacity-70'
             >
               <div>Learn more.</div>

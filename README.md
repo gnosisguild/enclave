@@ -79,10 +79,15 @@ The monorepo provides several test scripts for different components:
 - **`pnpm sdk:test`** - Runs tests for the TypeScript SDK in `packages/enclave-sdk`.
 
 - **`pnpm noir:test`** - Runs tests for Noir circuits in the `circuits/` directory using
-  `nargo test`.
+  `nargo test`. Requires the
+  [Noir toolchain](https://noir-lang.org/docs/getting_started/installation) (`nargo`) and
+  [Barretenberg](https://github.com/AztecProtocol/aztec-packages/tree/master/barretenberg) (`bb`) to
+  be installed and on your `PATH`.
 
 - **`pnpm test:integration`** - Runs integration tests from `tests/integration/`. These tests may
   require prebuilt binaries and can be run with `--no-prebuild` if binaries are already available.
+  When running with secure (production) BFV parameters, pre-built circuit artifacts for the
+  `secure-8192` preset must be present in the `circuits/` artifacts directory.
 
 #### Running Individual Test Suites
 

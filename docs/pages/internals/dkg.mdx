@@ -1,0 +1,244 @@
+---
+title: 'DKG & Threshold Cryptography'
+description:
+  'How ciphernodes collectively generate a threshold public key without any party learning the full
+  secret — BFV keypairs, Shamir sharing, TrBFV, and the DKG state machine'
+---
+
+# DKG & Threshold Cryptography — Technical Deep Dive
+
+After [sortition](./sortition) selects a committee, the selected ciphernodes run a Distributed Key
+Generation (DKG) protocol to produce a **collective public key** that users encrypt to. No single
+party ever holds the full secret key — instead, each node holds a Shamir share, and any
+`threshold_m` of `N` committee members can collaboratively decrypt.
+
+The scheme is built on **Threshold Ring-BFV** (TrBFV), which extends the standard BFV
+fully-homomorphic encryption scheme to a threshold setting.
+
+---
+
+## Two Key Hierarchies
+
+A common source of confusion: there are **two separate keypairs** in the protocol.
+
+| Key type           | Scheme       | Purpose                                                              | Lifetime           |
+| ------------------ | ------------ | -------------------------------------------------------------------- | ------------------ |
+| **Individual key** | Standard BFV | Encrypt Shamir shares in transit during DKG                          | One DKG session    |
+| **Threshold key**  | TrBFV        | The collective key users encrypt to; used for homomorphic operations | One E3 computation |
+
+The individual BFV key is proved correct in **C0**. The threshold key contributions are proved in
+**C1**. They live in different polynomial rings (the individual key uses a smaller "DKG" parameter
+set optimized for encryption).
+
+---
+
+## DKG State Machine
+
+Each ciphernode runs a `ThresholdKeyshare` actor that progresses through a strict state machine:
+
+```
+Init
+  │  CiphernodeSelected arrives
+  ▼
+CollectingEncryptionKeys     ← Generate BFV keypair; prove with C0; wait for all N peers
+  │  All N keys collected
+  ▼
+GeneratingThresholdShare     ← Generate TrBFV contribution (C1); Shamir-split sk and e_sm;
+  │                            encrypt shares (C3); prove share computation (C2)
+  │  All N shares collected
+  ▼
+AggregatingDecryptionKey     ← Decrypt received shares; prove decryption (C4);
+  │                            aggregate into local sk/e_sm shares
+  │  C4 proofs verified
+  ▼
+ReadyForDecryption           ← Waiting for ciphertext output from the FHE evaluation
+  │  CiphertextOutputPublished arrives
+  ▼
+Decrypting                   ← Compute partial decryption share (C6)
+  │
+  ▼
+GeneratingDecryptionProof    ← [Aggregator only] Collect shares; Lagrange interpolation (C7)
+  │
+  ▼
+Completed
+```
+
+Each transition requires both a cryptographic operation and successful ZK proof
+generation/verification. If any step times out, the node can be expelled from the committee.
+
+---
+
+## Phase 1: Individual Key Exchange (C0)
+
+```
+CiphernodeSelected event arrives at ThresholdKeyshare
+  │
+  ├─ BFV::keygen(dkg_params) → (sk_bfv, pk_bfv)
+  │   This is the INDIVIDUAL node encryption key (NOT the threshold key)
+  │
+  ├─ Encrypt sk_bfv at rest with local password (AES-GCM via Cipher)
+  │
+  ├─ Publish EncryptionKeyPending { e3_id, party_id, pk_bfv }
+  │   → ZK proof actor picks this up and generates C0
+  │
+  └─ Create collectors:
+      ├─ EncryptionKeyCollector (waits for N parties, 60s timeout)
+      └─ ThresholdShareCollector (waits for N parties, 120s timeout)
+          → Start immediately so early-arriving peer data is buffered
+```
+
+**C0** proves the BFV keypair was generated correctly — specifically that `pk = (-a·sk + e, a)` for
+a validly sampled secret `sk` and error `e`. Receiving nodes verify C0 before trusting the public
+key.
+
+---
+
+## Phase 2: Threshold Share Generation (C1, C2, C3)
+
+Once all N individual public keys are collected, each node generates its threshold contribution:
+
+### Step 1 — TrBFV Key Share (C1)
+
+```
+GenPkShareAndSkSss request:
+  ├─ TRBFV::gen_pk_share(sk, crp, params) → PublicKeyShare
+  │   pk0_share = -crp·sk + eek + r2·(γ^N+1) + r1·q
+  │
+  ├─ ShareManager::create_shares(sk, M, N) → N Shamir shares of the secret key
+  │
+  └─ Sample smudging noise e_sm with λ-bit statistical security
+      ShareManager::create_shares(e_sm, M, N) → N Shamir shares of e_sm
+```
+
+**C1** proves the public key share was correctly derived from the secret key, and that the smudging
+noise has the correct distribution. The Common Random Polynomial (CRP) is a fixed deterministic
+value derived from a default seed per BFV preset — all nodes using the same preset produce the same
+CRP.
+
+### Step 2 — Share Computation Proof (C2a / C2b)
+
+C2 runs separately for the secret key shares (C2a) and smudging noise shares (C2b). Each C2 circuit:
+
+1. **Verifies Shamir structure** via a parity check: `H · y^T ≡ 0 (mod q_j)` for each CRT modulus,
+   where `H` is a Reed–Solomon parity matrix. This proves the shares lie on a polynomial of degree ≤
+   M without revealing the polynomial
+2. **Outputs per-party commitments**: `hash(share_polynomial)` for each recipient party and each CRT
+   modulus — producing an `N × L` grid of commitment values
+
+These commitments are the bridge to C4 (the recipient verifies they received the same shares that
+were committed to).
+
+### Step 3 — Share Encryption (C3a / C3b)
+
+Each share is BFV-encrypted under the recipient's individual public key (from C0). C3 proves:
+
+```
+ct0 = pk0·u + e0 + message + r1·q + r2·(γ^N+1)
+ct1 = pk1·u + e1 + p1·q + p2·(γ^N+1)
+```
+
+This generates `(N-1) × L` proofs per variant (one for each recipient × CRT modulus). In a 3-node
+committee with L=4 CRT moduli, that's 8 C3a proofs and 8 C3b proofs per node.
+
+### Proof Publication
+
+All proofs for a node are generated in parallel on a multithread pool. Only when **all** proofs
+complete does the node broadcast its `ThresholdShareCreated` message containing:
+
+- The public key share (from C1)
+- Encrypted Shamir shares (from C3)
+- All signed proofs (C1, C2a, C2b, C3a[], C3b[])
+
+This atomic publication prevents partial data from reaching peers.
+
+---
+
+## Phase 3: Share Decryption and Aggregation (C4)
+
+Each node decrypts the encrypted shares it received from all other honest parties using its
+individual BFV secret key. C4 then:
+
+1. **Verifies commitment consistency**: Each decrypted share is hashed and compared against the
+   commitment the sender published in C2. If they don't match, the sender was dishonest
+2. **Aggregates**: Sums all decrypted shares coefficient-wise per CRT modulus:
+   `agg_sk[ℓ][i] = Σ_h share_h[ℓ][i]`
+3. **Normalizes**: Reduces mod `q_ℓ`, reverses coefficient order, and centers to match C6's
+   representation
+4. **Outputs**: A single commitment to the aggregated share polynomial, consumed by C6
+
+After C4, each node holds:
+
+- Its share of the threshold secret key (`agg_sk`)
+- Its share of the smudging noise (`agg_e_sm`)
+
+These are the only long-lived secrets from the DKG.
+
+---
+
+## Phase 4: Public Key Aggregation (C5)
+
+The aggregator (party_id=0) collects all N public key shares from C1 and sums them:
+
+```
+pk = Σ pk_share_i
+```
+
+C5 proves this addition was done correctly. The result is the **threshold public key** that users
+encrypt their data to. It is published on-chain via `publishCommittee`.
+
+---
+
+## Threshold Decryption (C6, C7)
+
+Multiple users submit BFV-encrypted inputs during the E3 input window. A compute provider then
+evaluates the E3 program homomorphically over those ciphertexts (e.g. adding them for a tally, or
+multiplying for other computations) and publishes the resulting ciphertext output on-chain. At that
+point, each committee member computes a partial decryption share of the evaluated result:
+
+### C6 — Partial Decryption
+
+```
+d[ℓ](γ) = ct0[ℓ](γ) + ct1[ℓ](γ)·sk[ℓ](γ) + e_sm[ℓ](γ) + r2[ℓ](γ)·(γ^N+1) + r1[ℓ](γ)·q_ℓ
+```
+
+The smudging noise `e_sm` is added to prevent leaking information about the node's secret key share
+through the partial decryption. C6 proves this computation was done correctly with the same `sk` and
+`e_sm` committed in C4a/C4b.
+
+### C7 — Lagrange Reconstruction
+
+The aggregator collects ≥ `threshold_m` partial shares and reconstructs the plaintext:
+
+1. **Lagrange interpolation** at zero: `u[ℓ] = Σ_i d_i[ℓ] · L_i(0) (mod q_ℓ)` where
+   `L_i(0) = ∏_{j≠i} (-x_j) / (x_i - x_j)`
+2. **CRT reconstruction**: Stitch `u[0..L-1]` into a single value via the Chinese Remainder Theorem
+3. **Decoding**: Map from the ciphertext ring back to the plaintext space
+
+C7 proves all three steps were done correctly. The final plaintext is published on-chain.
+
+---
+
+## BFV Parameter Presets
+
+All polynomial degrees, CRT moduli, noise bounds, and security levels are determined by the BFV
+preset:
+
+| Parameter                | Insecure (N=512) | Secure (N=8192) |
+| ------------------------ | ---------------- | --------------- |
+| Polynomial degree (N)    | 512              | 8192            |
+| Threshold CRT moduli (L) | 2                | 4               |
+| DKG CRT moduli           | 1                | 2               |
+| Plaintext modulus (t)    | Small            | Large           |
+| Security                 | None             | Full (λ=80)     |
+
+The preset is selected per-E3 via the on-chain `paramSet` index. Circuit artifacts are compiled
+separately for each preset, so both the prover and verifier must use matching parameters.
+
+---
+
+## Related
+
+- [ZK Proof Pipeline](./zk-proofs) — how each circuit is proved, verified, and aggregated
+- [Commitment Consistency](./commitment-consistency) — how cross-circuit commitments are enforced
+- [Sortition](./sortition) — how the committee is selected before DKG begins
+- [Cryptography](/cryptography) — mathematical foundations (user-facing overview)

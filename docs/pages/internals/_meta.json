@@ -1,0 +1,14 @@
+{
+  "sortition": {
+    "title": "Sortition"
+  },
+  "dkg": {
+    "title": "DKG & Threshold Cryptography"
+  },
+  "zk-proofs": {
+    "title": "ZK Proof Pipeline"
+  },
+  "commitment-consistency": {
+    "title": "Commitment Consistency"
+  }
+}

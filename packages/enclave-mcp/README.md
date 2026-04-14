@@ -1,7 +1,8 @@
 # @enclave-e3/mcp
 
-MCP server for [Enclave](https://enclave.gg) documentation. Allows AI assistants to answer questions
-about Enclave by fetching content directly from [docs.enclave.gg](https://docs.enclave.gg).
+MCP server for [The Interfold](https://theinterfold.com) documentation. Allows AI assistants to
+answer questions about The Interfold by fetching content directly from
+[docs.theinterfold.com](https://docs.theinterfold.com).
 
 ## Requirements
 
@@ -86,10 +87,10 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
 
 Once configured, ask your AI assistant questions like:
 
-- _"What is an E3 in Enclave?"_
+- _"What is an E3?"_
 - _"How do I run a ciphernode?"_
-- _"Explain the Enclave architecture"_
-- _"Search the enclave docs for threshold encryption"_
+- _"Explain the Interfold architecture"_
+- _"Search the docs for threshold encryption"_
 
 ## License
 

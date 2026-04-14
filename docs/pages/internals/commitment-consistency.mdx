@@ -1,0 +1,209 @@
+---
+title: 'Commitment Consistency'
+description:
+  'How the Interfold protocol detects dishonest ciphernodes by cross-checking commitment values
+  across ZK circuit proofs — link types, scoping rules, and the C2→C4 check'
+---
+
+# Commitment Consistency — Technical Deep Dive
+
+The [ZK proof pipeline](./zk-proofs) ensures each individual circuit execution is correct. But a
+dishonest node could still cheat by using **different inputs** across circuits — for example,
+committing to one set of shares in C2 but using different shares in C4. Each proof would verify in
+isolation, but the overall protocol output would be wrong.
+
+The **commitment consistency checker** closes this gap by cross-referencing public signals across
+circuit proofs. If a commitment value produced by one circuit doesn't match the expected value in
+another, the offending party is flagged and excluded.
+
+---
+
+## Architecture
+
+The checker is a per-E3 actor (`CommitmentConsistencyChecker`) that:
+
+1. **Caches** verified proof outputs keyed by `(Address, ProofType)`
+2. **Evaluates** a set of registered **commitment links** on every new proof arrival
+3. **Emits** `CommitmentConsistencyViolation` events for the accusation pipeline on mismatch
+
+It operates in two modes:
+
+### Pre-ZK Gating (fast path)
+
+Before expensive ZK verification, the `ShareVerificationActor` sends all received proofs to the
+checker in a batch via `CommitmentConsistencyCheckRequested`. The checker evaluates all links and
+returns a set of `inconsistent_parties` that are **excluded from ZK verification entirely**.
+
+This is a significant optimization — a dishonest party caught by commitment checks never wastes
+resources on ZK verification.
+
+### Post-ZK Cross-Check (defense in depth)
+
+After ZK verification passes, the checker receives `ProofVerificationPassed` events and re-evaluates
+links. This catches cases where a proof from one phase arrives after the initial batch, or where a
+cross-party link couldn't be evaluated earlier because the counterparty's proof hadn't arrived yet.
+
+---
+
+## Link Types
+
+Each commitment link defines a relationship between a **source** circuit (which produces a
+commitment value) and a **target** circuit (which must consume or agree with that value).
+
+```rust
+trait CommitmentLink {
+    fn source_proof_type(&self) -> ProofType;
+    fn target_proof_type(&self) -> ProofType;
+    fn scope(&self) -> LinkScope;
+    fn extract_source_values(&self, public_signals: &[u8]) -> Vec<FieldValue>;
+    fn check_consistency(
+        &self,
+        source_values: &[FieldValue],
+        target_public_signals: &[u8],
+        src_party_id: u64,
+        tgt_party_id: u64,
+    ) -> bool;
+}
+```
+
+### Scoping Rules
+
+The **scope** determines how source and target proofs are matched and where blame is attributed:
+
+| Scope                        | Matching rule                                                       | Blame  | Example                                                         |
+| ---------------------------- | ------------------------------------------------------------------- | ------ | --------------------------------------------------------------- |
+| **SameParty**                | Source and target must come from the same Ethereum address          | Source | C1→C2: same node's sk commitment must match                     |
+| **CrossParty**               | Each source must match at least one target from any party           | Source | C1→C5: per-node pk must appear in aggregator's C5               |
+| **SourceMustExistInTargets** | Each source claims a value that must exist in some target's signals | Source | C2→C4: sender's share commitments must appear in recipient's C4 |
+
+Blame always falls on the **source** party. If C2's commitments don't match C4's expectations, the
+C2 sender is accused — not the C4 recipient.
+
+---
+
+## Registered Links
+
+The protocol registers 12 commitment links at startup. The `l` parameter (number of CRT moduli) is
+derived from the E3's BFV preset:
+
+### DKG Phase Links
+
+| Link          | Scope                    | What it checks                                                         |
+| ------------- | ------------------------ | ---------------------------------------------------------------------- |
+| **C1 → C2a**  | SameParty                | C1's `sk_commitment` matches C2a's `expected_secret_commitment`        |
+| **C1 → C2b**  | SameParty                | C1's `e_sm_commitment` matches C2b's `expected_secret_commitment`      |
+| **C1 → C5**   | CrossParty               | C1's `pk_commitment` appears in C5's expected pk inputs                |
+| **C3a → C0**  | SourceMustExistInTargets | C3a's `expected_pk_commitment` must exist in some C0's `pk_commitment` |
+| **C3b → C0**  | SourceMustExistInTargets | Same for C3b                                                           |
+| **C3a → C2a** | SameParty                | C3a's `expected_message_commitment` matches C2a's share commitments    |
+| **C3b → C2b** | SameParty                | Same for the smudging noise branch                                     |
+| **C2a → C4a** | SourceMustExistInTargets | C2a's L share commitments for recipient R match C4a's row for sender X |
+| **C2b → C4b** | SourceMustExistInTargets | Same for smudging noise                                                |
+
+### Threshold Decryption Links
+
+| Link         | Scope      | What it checks                                                             |
+| ------------ | ---------- | -------------------------------------------------------------------------- |
+| **C4a → C6** | SameParty  | C4a's aggregated `sk_commitment` matches C6's `expected_sk_commitment`     |
+| **C4b → C6** | SameParty  | C4b's aggregated `e_sm_commitment` matches C6's `expected_e_sm_commitment` |
+| **C6 → C7**  | CrossParty | C6's `d_commitment` matches C7's `expected_d_commitment`                   |
+
+---
+
+## The C2→C4 Link (Most Complex)
+
+This link is the most technically interesting because it bridges two **different parties**: the
+sender (who computed shares in C2) and the recipient/aggregator (who decrypted shares in C4).
+
+### Public Signal Layouts
+
+**C2 inner circuit** (row-major: party first, modulus second):
+
+```
+[expected_secret_commitment (32 B)]  ← skipped
+[party_0_mod_0] [party_0_mod_1] ... [party_0_mod_{L-1}]
+[party_1_mod_0] ...
+[party_{N-1}_mod_{L-1}]
+```
+
+**C4 public signals** (H honest parties, L moduli):
+
+```
+[expected_commitments[0][0]] ... [expected_commitments[0][L-1]]
+[expected_commitments[1][0]] ...
+[expected_commitments[H-1][L-1]]
+[aggregated_commitment (32 B)]  ← tail, excluded from check
+```
+
+### Check Logic
+
+Given C2 sender `X` (party_id) and C4 recipient `R` (party_id):
+
+1. **From C2_X**: Extract L commitments at slot R → `source_values[R*L .. (R+1)*L]` — these are the
+   L commitments that sender X computed for recipient R
+2. **From C4_R**: Extract row at position X → `target_signals[X*L*32 .. (X+1)*L*32]` — these are the
+   L commitments that recipient R expects from sender X
+3. **Compare**: All L values must match exactly
+
+If any modulus commitment differs, sender X is accused.
+
+### The L Parameter
+
+The block size `L` (number of CRT moduli) varies by BFV preset:
+
+| Preset                   | L   |
+| ------------------------ | --- |
+| `INSECURE_THRESHOLD_512` | 2   |
+| `SECURE_THRESHOLD_8192`  | 4   |
+
+The `L` used in the check **must match the actual preset** for the E3 — otherwise every index
+calculation is wrong and the check produces false positives. This is why the checker reads `L` from
+`E3Meta.params_preset` at E3 startup rather than using a hardcoded default.
+
+---
+
+## Deduplication
+
+The same proof can arrive via two paths:
+
+1. **Pre-ZK batch**: `CommitmentConsistencyCheckRequested` from `ShareVerificationActor`
+2. **Post-ZK event**: `ProofVerificationPassed` after ZK verification
+
+The checker deduplicates by `data_hash` — a hash of the proof's public signals. If a proof with the
+same hash is already cached, it's silently ignored. This prevents double-counting or re-triggering
+link evaluations.
+
+---
+
+## Accusation Flow
+
+When a commitment inconsistency is detected:
+
+```
+CommitmentConsistencyChecker detects mismatch
+  │
+  ├─ Emits CommitmentConsistencyViolation {
+  │     accused_party_id,
+  │     accused_address,
+  │     proof_type,       // which proof was inconsistent
+  │     data_hash,        // identifies the specific proof
+  │   }
+  │
+  ▼
+AccusationManager receives violation
+  │
+  ├─ Initiates off-chain accusation quorum protocol
+  ├─ Other committee members independently verify
+  └─ If quorum reached → on-chain slashing via SlashingManager
+```
+
+Pre-ZK inconsistent parties are also excluded from the `CommitmentConsistencyCheckComplete`
+response, preventing them from consuming ZK verification resources.
+
+---
+
+## Related
+
+- [ZK Proof Pipeline](./zk-proofs) — the circuits whose commitments are being cross-checked
+- [DKG & Threshold Cryptography](./dkg) — the protocol that generates the proofs
+- [Sortition](./sortition) — committee selection before any of this begins
