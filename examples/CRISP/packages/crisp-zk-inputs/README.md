@@ -51,7 +51,7 @@ await init()
 const inputs = generateVoteInputs(/* ... */)
 ```
 
-Call `init()` once before any other imports from `@crisp-e3/zk-inputs`. In browser environments
+Call `init()` once before using any other imports from `@crisp-e3/zk-inputs`. In browser environments
 `init()` fetches the WASM binary; in Node.js it is a no-op.
 
 ## Building
