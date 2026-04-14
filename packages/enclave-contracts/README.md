@@ -11,8 +11,6 @@
 | `EnclaveTicketToken.sol`        | USDC-backed tickets used by ciphernodes for sortition entry                                      |
 | `SlashingManager.sol`           | Fault attribution and slashing for dishonest ciphernodes (accusation → quorum → slash)           |
 | `E3RefundManager.sol`           | Issues refunds to requesters when an E3 fails                                                    |
-| `BfvDecryptionVerifier.sol`     | On-chain ZK verifier for threshold decryption proofs (C6/C7)                                     |
-| `BfvPkVerifier.sol`             | On-chain ZK verifier for public key generation proofs (C0/C1)                                    |
 
 ### Key Interfaces
 

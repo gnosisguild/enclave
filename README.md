@@ -86,8 +86,8 @@ The monorepo provides several test scripts for different components:
 
 - **`pnpm test:integration`** - Runs integration tests from `tests/integration/`. These tests may
   require prebuilt binaries and can be run with `--no-prebuild` if binaries are already available.
-  When running with secure (production) BFV parameters, pre-built circuit artifacts for the
-  `secure-8192` preset must be present in the `circuits/` artifacts directory.
+  Pre-built circuit artifacts for the configured BFV preset must be present in the `circuits/`
+  artifacts directory.
 
 #### Running Individual Test Suites
 

@@ -6,15 +6,24 @@ witness data needed for Noir-based vote-validity proofs without duplicating the 
 
 ## What it generates
 
-The WASM module exposes functions for computing ZK circuit inputs for CRISP's two Noir circuits:
+The WASM module wraps a `ZKInputsGenerator` class that performs BFV encryption and produces the
+witness data needed for CRISP's Noir circuits. Two main proof types are supported:
 
-- **Vote proof inputs** — proves a vote was cast by an eligible participant with a valid Merkle
-  membership witness.
-- **Masked vote proof inputs** — same as above but with an additional blinding factor for additional
-  privacy.
+- **Vote proof** (`generateInputs`) — encrypts a vote under the committee's threshold BFV public key
+  and produces a witness proving the vote is correctly encrypted and that the voter is eligible
+  (e.g. holds the required token balance, verified via a Merkle membership proof).
 
-These inputs are then passed to `@noir-lang/noir_js` and `@aztec/bb.js` to generate the actual
-proofs.
+- **Vote update / mask proof** (`generateInputsForUpdate`) — same structure, but used for revotes or
+  masker contributions under the
+  [vote masking](https://blog.theinterfold.com/vote-masking-receipt-freeness-secret-ballots/) scheme
+  that provides receipt-freeness. Unlike the first-vote path, this preserves the real
+  `prev_ct_commitment` (rather than zeroing it) to chain updates together.
+
+The generator also exposes `encryptVote` / `decryptVote` for standalone BFV operations and
+`generateKeys` for key generation.
+
+These witness objects are then passed to `@noir-lang/noir_js` and `@aztec/bb.js` to generate the
+actual ZK proofs.
 
 ## Usage
 
