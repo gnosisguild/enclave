@@ -1195,8 +1195,7 @@ fn handle_dkg_share_decryption_proof(
     ))
 }
 
-/// ZK-verify a share proof: inner recursive circuits use `verify_proof`; the C2 wrapper
-/// (`ShareComputation`) uses the wrapper VK path and Default bb target.
+/// ZK-verify a share proof (inner recursive circuits; former wrapper proofs use the same path).
 fn zk_verify_share_proof_bundle(
     prover: &ZkProver,
     proof: &Proof,
@@ -1204,11 +1203,7 @@ fn zk_verify_share_proof_bundle(
     party_id: u64,
     artifacts_dir: &str,
 ) -> Result<bool, ZkError> {
-    if proof.circuit == CircuitName::ShareComputation {
-        prover.verify_wrapper_proof(proof, e3_id_str, party_id, artifacts_dir)
-    } else {
-        prover.verify_proof(proof, e3_id_str, party_id, artifacts_dir)
-    }
+    prover.verify_proof(proof, e3_id_str, party_id, artifacts_dir)
 }
 
 fn handle_verify_share_proofs(

@@ -16,7 +16,9 @@ use lib::math::commitments::compute_vk_hash;
 
 pub global C2_PUBLIC_LEN: u32 = 1 + (N_PARTIES * L_THRESHOLD);
 pub global C2AB_FOLD_PUBLIC_LEN: u32 = 3 + (2 * C2_PUBLIC_LEN);
-pub global C3AB_FOLD_PUBLIC_LEN: u32 = 2 + 1 + (6 * N_PARTIES);
+/// One slot per (party, threshold-modulus) pair - must match `c3ab_fold::C3AB_FOLD_PUBLIC_LEN`.
+pub global C3_SLOTS: u32 = N_PARTIES * L_THRESHOLD;
+pub global C3AB_FOLD_PUBLIC_LEN: u32 = 2 + 1 + (6 * C3_SLOTS);
 pub global C4_PUBLIC_LEN: u32 = (H * L_THRESHOLD) + 1;
 pub global C4AB_FOLD_PUBLIC_LEN: u32 = 3 + (2 * C4_PUBLIC_LEN);
 
@@ -69,22 +71,38 @@ fn main(
     assert(c1_public[0] == c2ab_public[3]);
     assert(c1_public[2] == c2ab_public[10]);
 
-    // Same-party C3a and C3b: after the `c3ab` key-hash prefix, `pk_a[j]` and `pk_b[j]` must match
-    // for every party column (recipient public key consistent across both folded C3 chains).
+    // Same-party C3a and C3b: pk_a[j*L+l] and pk_b[j*L+l] must match for every (party, modulus)
+    // slot - recipient public key must be consistent across both folded C3 chains.
     for j in 0..N_PARTIES {
-        assert(c3ab_public[3 + j] == c3ab_public[12 + j]);
+        for l in 0..L_THRESHOLD {
+            assert(
+                c3ab_public[3 + j * L_THRESHOLD + l]
+                    == c3ab_public[3 + 3 * C3_SLOTS + j * L_THRESHOLD + l],
+            );
+        }
     }
 
-    // Same-party C2 to C3: first coefficient of party j's C2a/C2b share row must equal that party's
-    // message-commitment column in `c3ab` for the C3a and C3b halves (`msg_a[j]`, `msg_b[j]`).
+    // C2 to C3: all (party, modulus) slots must be bound - msg_a[j*L+l] == c2a_shares[j][l]
+    // and msg_b[j*L+l] == c2b_shares[j][l].
+    // c3ab layout: [0..1] key hashes, [2] combined hash, [3..3+C3_SLOTS-1] pk_a,
+    //              [3+C3_SLOTS..3+2*C3_SLOTS-1] msg_a, ..., [3+4*C3_SLOTS..] msg_b.
+    // c2ab layout: [0..2] key hashes, [3] c2a_expected, [4..4+N_PARTIES*L-1] c2a_shares,
+    //              [4+N_PARTIES*L] c2b_expected, [5+N_PARTIES*L..] c2b_shares.
     for j in 0..N_PARTIES {
-        assert(c2ab_public[4 + j * L_THRESHOLD] == c3ab_public[6 + j]);
-        assert(c2ab_public[11 + j * L_THRESHOLD] == c3ab_public[15 + j]);
+        for l in 0..L_THRESHOLD {
+            let slot = j * L_THRESHOLD + l;
+            assert(c2ab_public[4 + slot] == c3ab_public[3 + C3_SLOTS + slot]);
+            assert(
+                c2ab_public[5 + N_PARTIES * L_THRESHOLD + slot]
+                    == c3ab_public[3 + 4 * C3_SLOTS + slot],
+            );
+        }
     }
 
     let mut c3_pk: [Field; N_PARTIES] = [0; N_PARTIES];
     for j in 0..N_PARTIES {
-        c3_pk[j] = c3ab_public[3 + j];
+        // pk is per-party (same DKG key across all moduli of the same recipient): use slot j*L+0.
+        c3_pk[j] = c3ab_public[3 + j * L_THRESHOLD];
     }
 
     let mut c2a: [[Field; L_THRESHOLD]; N_PARTIES] = [[0; L_THRESHOLD]; N_PARTIES];

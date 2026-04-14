@@ -57,20 +57,8 @@ impl ProofType {
         match self {
             ProofType::C0PkBfv => vec![CircuitName::PkBfv],
             ProofType::C1PkGeneration => vec![CircuitName::PkGeneration],
-            // C2 proofs are signed as inner recursive circuits; the ShareComputation entry allows
-            // verifying a wrapped proof if we ever publish that instead.
-            ProofType::C2aSkShareComputation => {
-                vec![
-                    CircuitName::SkShareComputation,
-                    CircuitName::ShareComputation,
-                ]
-            }
-            ProofType::C2bESmShareComputation => {
-                vec![
-                    CircuitName::ESmShareComputation,
-                    CircuitName::ShareComputation,
-                ]
-            }
+            ProofType::C2aSkShareComputation => vec![CircuitName::SkShareComputation],
+            ProofType::C2bESmShareComputation => vec![CircuitName::ESmShareComputation],
             ProofType::C3aSkShareEncryption => vec![CircuitName::ShareEncryption],
             ProofType::C3bESmShareEncryption => vec![CircuitName::ShareEncryption],
             ProofType::C4aSkShareDecryption | ProofType::C4bESmShareDecryption => {
@@ -417,17 +405,11 @@ mod tests {
         );
         assert_eq!(
             ProofType::C2aSkShareComputation.circuit_names(),
-            vec![
-                CircuitName::SkShareComputation,
-                CircuitName::ShareComputation
-            ]
+            vec![CircuitName::SkShareComputation]
         );
         assert_eq!(
             ProofType::C2bESmShareComputation.circuit_names(),
-            vec![
-                CircuitName::ESmShareComputation,
-                CircuitName::ShareComputation
-            ]
+            vec![CircuitName::ESmShareComputation]
         );
         assert_eq!(
             ProofType::C6ThresholdShareDecryption.circuit_names(),

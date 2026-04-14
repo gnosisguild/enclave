@@ -13,14 +13,14 @@ use crate::error::ZkError;
 use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
 use e3_events::{CircuitName, CircuitVariant, Proof};
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use serde::Serialize;
 
 /// Field count for `UltraHonkProof` (non-ZK) in `c3_fold` — from `nargo compile` ABI (`acc_proof`).
 const C3_FOLD_ACC_NONZK_PROOF_FIELDS: usize = 457;
 
-fn c3_fold_public_input_field_count(n_parties: usize) -> usize {
-    4 + 3 * n_parties
+/// `total_slots` = N_PARTIES * L_THRESHOLD (one slot per party-modulus pair).
+fn c3_fold_public_input_field_count(total_slots: usize) -> usize {
+    4 + 3 * total_slots
 }
 
 fn zero_field_hex_strings(field_count: usize) -> Result<Vec<String>, ZkError> {
@@ -89,28 +89,28 @@ fn parse_c3_fold_public_field_strings(proof: &Proof) -> Result<Vec<String>, ZkEr
     Ok(v)
 }
 
-fn n_parties_from_c3_fold_proof(p: &Proof) -> Result<usize, ZkError> {
+fn total_slots_from_c3_fold_proof(p: &Proof) -> Result<usize, ZkError> {
     let n = (parse_c3_fold_public_field_strings(p)?.len() - 4) / 3;
     if n == 0 {
         return Err(ZkError::InvalidInput(
-            "c3_fold proof implies zero parties".into(),
+            "c3_fold proof implies zero slots".into(),
         ));
     }
     Ok(n)
 }
 
-/// Default `N_PARTIES` matching [`circuits/lib`](../circuits/lib) micro preset when no prior fold exists.
-fn default_n_parties() -> usize {
-    CiphernodesCommitteeSize::Micro.values().n
-}
-
 /// One sequential `c3_fold` step.
+///
+/// `total_slots` is `N_PARTIES * L_THRESHOLD` — one slot per (party, threshold-modulus) pair.
+/// On the first step this sets the accumulator size; on subsequent steps it is cross-checked
+/// against the slot count already encoded in `prior_fold`.
 pub fn generate_c3_fold_step(
     prover: &ZkProver,
     inner: &Proof,
     prior_fold: Option<&Proof>,
     slot_index: u32,
     is_first_step: bool,
+    total_slots: usize,
     e3_id: &str,
     artifacts_dir: &str,
 ) -> Result<Proof, ZkError> {
@@ -136,13 +136,7 @@ pub fn generate_c3_fold_step(
 
     let c3_public_inputs = share_encryption_inner_public_inputs(inner)?;
 
-    let n_parties = if is_first_step {
-        default_n_parties()
-    } else {
-        n_parties_from_c3_fold_proof(prior_fold.expect("checked above"))?
-    };
-
-    let expected_acc_pub = c3_fold_public_input_field_count(n_parties);
+    let expected_acc_pub = c3_fold_public_input_field_count(total_slots);
 
     let (acc_proof, acc_public_inputs) = if is_first_step {
         let acc_pi = zero_field_hex_strings(expected_acc_pub)?;
@@ -150,13 +144,20 @@ pub fn generate_c3_fold_step(
         (acc_pf, acc_pi)
     } else {
         let p = prior_fold.expect("prior_fold required when is_first_step is false");
+        let prior_slots = total_slots_from_c3_fold_proof(p)?;
+        if prior_slots != total_slots {
+            return Err(ZkError::InvalidInput(format!(
+                "prior c3_fold slot count {} != expected {}",
+                prior_slots, total_slots
+            )));
+        }
         let acc_pi = parse_c3_fold_public_field_strings(p)?;
         if acc_pi.len() != expected_acc_pub {
             return Err(ZkError::InvalidInput(format!(
-                "prior c3_fold public field count {} != expected {} for N={}",
+                "prior c3_fold public field count {} != expected {} for total_slots={}",
                 acc_pi.len(),
                 expected_acc_pub,
-                n_parties
+                total_slots
             )));
         }
         (bytes_to_field_strings(&p.data)?, acc_pi)
@@ -196,12 +197,15 @@ pub fn generate_c3_fold_step(
     )
 }
 
-/// Folds `inner_proofs` in order, one inner C3 proof per step. `slot_indices[i]` is the party slot
-/// for `inner_proofs[i]`.
+/// Folds `inner_proofs` in order, one inner C3 proof per step.
+///
+/// `slot_indices[i]` is the `(party * L_THRESHOLD + modulus)` slot for `inner_proofs[i]`.
+/// `total_slots` must equal `N_PARTIES * L_THRESHOLD` and determines the accumulator size.
 pub fn generate_sequential_c3_fold(
     prover: &ZkProver,
     inner_proofs: &[Proof],
     slot_indices: &[u32],
+    total_slots: usize,
     e3_id: &str,
     artifacts_dir: &str,
 ) -> Result<Proof, ZkError> {
@@ -224,6 +228,7 @@ pub fn generate_sequential_c3_fold(
             acc.as_ref(),
             slot_indices[i],
             is_first,
+            total_slots,
             e3_id,
             artifacts_dir,
         )?;

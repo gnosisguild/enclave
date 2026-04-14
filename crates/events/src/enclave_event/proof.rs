@@ -114,8 +114,6 @@ pub enum CircuitName {
     SkShareComputation,
     /// E_SM share computation inner proof (C2b, recursive).
     ESmShareComputation,
-    /// Share computation wrapper proof (verifies one inner C2 proof; fold input).
-    ShareComputation,
     /// Share encryption proof (C3).
     ShareEncryption,
     /// DKG share decryption proof (C4).
@@ -126,10 +124,24 @@ pub enum CircuitName {
     ThresholdShareDecryption,
     /// Decrypted shares aggregation proof (C7).
     DecryptedSharesAggregation,
-    /// Recursive aggregation fold circuit (independent; lives at recursive_aggregation/fold).
-    Fold,
     /// Sequential C3 fold: inner ZK + optional prior `c3_fold` non-ZK proof.
     C3Fold,
+    /// Sequential C6 fold: inner ZK + optional prior `c6_fold` non-ZK proof (phase-7 aggregator).
+    C6Fold,
+    /// Ad-hoc recursive aggregation: C2a + C2b.
+    C2abFold,
+    /// Ad-hoc: final sk `c3_fold` + final e_sm `c3_fold`.
+    C3abFold,
+    /// Ad-hoc: C4a + C4b.
+    C4abFold,
+    /// Per-node DKG fold (C0..C4 links).
+    NodeFold,
+    /// Sequential fold of `H` `node_fold` proofs (non-ZK) before `dkg_aggregator`.
+    NodesFold,
+    /// DKG aggregator (folded `node_fold` via `nodes_fold` + C5).
+    DkgAggregator,
+    /// Phase-7 decryption aggregator (folded C6 via `c6_fold` + C7).
+    DecryptionAggregator,
 }
 
 impl CircuitName {
@@ -139,14 +151,20 @@ impl CircuitName {
             CircuitName::PkGeneration => "pk_generation",
             CircuitName::SkShareComputation => "sk_share_computation",
             CircuitName::ESmShareComputation => "e_sm_share_computation",
-            CircuitName::ShareComputation => "share_computation",
             CircuitName::ShareEncryption => "share_encryption",
             CircuitName::DkgShareDecryption => "share_decryption",
             CircuitName::PkAggregation => "pk_aggregation",
             CircuitName::ThresholdShareDecryption => "share_decryption",
             CircuitName::DecryptedSharesAggregation => "decrypted_shares_aggregation",
-            CircuitName::Fold => "fold",
             CircuitName::C3Fold => "c3_fold",
+            CircuitName::C6Fold => "c6_fold",
+            CircuitName::C2abFold => "c2ab_fold",
+            CircuitName::C3abFold => "c3ab_fold",
+            CircuitName::C4abFold => "c4ab_fold",
+            CircuitName::NodeFold => "node_fold",
+            CircuitName::NodesFold => "nodes_fold",
+            CircuitName::DkgAggregator => "dkg_aggregator",
+            CircuitName::DecryptionAggregator => "decryption_aggregator",
         }
     }
 
@@ -155,37 +173,26 @@ impl CircuitName {
             CircuitName::PkBfv => "dkg",
             CircuitName::SkShareComputation => "dkg",
             CircuitName::ESmShareComputation => "dkg",
-            CircuitName::ShareComputation => "dkg",
             CircuitName::ShareEncryption => "dkg",
             CircuitName::DkgShareDecryption => "dkg",
             CircuitName::PkGeneration => "threshold",
             CircuitName::ThresholdShareDecryption => "threshold",
             CircuitName::PkAggregation => "threshold",
             CircuitName::DecryptedSharesAggregation => "threshold",
-            CircuitName::Fold | CircuitName::C3Fold => "recursive_aggregation",
+            CircuitName::C3Fold
+            | CircuitName::C6Fold
+            | CircuitName::C2abFold
+            | CircuitName::C3abFold
+            | CircuitName::C4abFold
+            | CircuitName::NodeFold
+            | CircuitName::NodesFold
+            | CircuitName::DkgAggregator
+            | CircuitName::DecryptionAggregator => "recursive_aggregation",
         }
     }
 
     pub fn dir_path(&self) -> String {
         format!("{}/{}", self.group(), self.as_str())
-    }
-
-    /// Wrapper circuit path: `recursive_aggregation/wrapper/{group}/{name}`.
-    pub fn wrapper_dir_path(&self) -> String {
-        format!("recursive_aggregation/wrapper/{}", self.dir_path())
-    }
-
-    /// Compiled wrapper bundle to use when wrapping an inner proof.
-    ///
-    /// C2a/C2b inner circuits (`sk_share_computation`, `e_sm_share_computation`) share one wrapper
-    /// Noir program (`share_computation` under `recursive_aggregation/wrapper/dkg/`).
-    pub fn wrapper_artifact_circuit(&self) -> CircuitName {
-        match self {
-            CircuitName::SkShareComputation | CircuitName::ESmShareComputation => {
-                CircuitName::ShareComputation
-            }
-            _ => *self,
-        }
     }
 
     /// Public input layout for this circuit.
@@ -202,7 +209,6 @@ impl CircuitName {
             CircuitName::SkShareComputation | CircuitName::ESmShareComputation => {
                 CircuitOutputLayout::Dynamic
             }
-            CircuitName::ShareComputation => CircuitOutputLayout::None,
             CircuitName::DkgShareDecryption => CircuitOutputLayout::Fixed {
                 fields: DKG_SHARE_DECRYPTION_OUTPUTS,
             },
@@ -216,7 +222,15 @@ impl CircuitName {
                 fields: SHARE_ENCRYPTION_OUTPUTS,
             },
             CircuitName::DecryptedSharesAggregation => CircuitOutputLayout::None,
-            CircuitName::Fold | CircuitName::C3Fold => CircuitOutputLayout::None,
+            CircuitName::C3Fold
+            | CircuitName::C6Fold
+            | CircuitName::C2abFold
+            | CircuitName::C3abFold
+            | CircuitName::C4abFold
+            | CircuitName::NodeFold
+            | CircuitName::NodesFold
+            | CircuitName::DkgAggregator
+            | CircuitName::DecryptionAggregator => CircuitOutputLayout::None,
         }
     }
 

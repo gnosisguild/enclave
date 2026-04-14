@@ -90,42 +90,6 @@ impl ZkProver {
         )
     }
 
-    /// Wrapper proof (Default variant, wrapper dir).
-    pub fn generate_wrapper_proof(
-        &self,
-        circuit: CircuitName,
-        witness_data: &[u8],
-        e3_id: &str,
-        artifacts_dir: &str,
-    ) -> Result<Proof, ZkError> {
-        self.generate_proof_impl(
-            circuit,
-            witness_data,
-            e3_id,
-            &circuit.wrapper_dir_path(),
-            CircuitVariant::Default,
-            artifacts_dir,
-        )
-    }
-
-    /// Fold proof (Default variant).
-    pub fn generate_fold_proof(
-        &self,
-        witness_data: &[u8],
-        e3_id: &str,
-        artifacts_dir: &str,
-    ) -> Result<Proof, ZkError> {
-        let dir = CircuitName::Fold.dir_path();
-        self.generate_proof_impl(
-            CircuitName::Fold,
-            witness_data,
-            e3_id,
-            &dir,
-            CircuitVariant::Default,
-            artifacts_dir,
-        )
-    }
-
     /// Proof for a `recursive_aggregation/*` bin circuit (Default / `noir-recursive-no-zk`).
     pub fn generate_recursive_aggregation_bin_proof(
         &self,
@@ -140,24 +104,6 @@ impl ZkProver {
             e3_id,
             &circuit.dir_path(),
             CircuitVariant::Default,
-            artifacts_dir,
-        )
-    }
-
-    /// Final fold proof for on-chain verification (Evm variant).
-    pub fn generate_final_fold_proof(
-        &self,
-        witness_data: &[u8],
-        e3_id: &str,
-        artifacts_dir: &str,
-    ) -> Result<Proof, ZkError> {
-        let dir = CircuitName::Fold.dir_path();
-        self.generate_proof_impl(
-            CircuitName::Fold,
-            witness_data,
-            e3_id,
-            &dir,
-            CircuitVariant::Evm,
             artifacts_dir,
         )
     }
@@ -333,7 +279,7 @@ impl ZkProver {
         self.verify_proof_with_variant(proof, e3_id, party_id, CircuitVariant::Evm, artifacts_dir)
     }
 
-    /// Verifies a wrapper proof (Default Variant, wrapper dir).
+    /// Verifies a former "wrapper" proof (same layout as [`Self::verify_proof`]).
     pub fn verify_wrapper_proof(
         &self,
         proof: &Proof,
@@ -341,19 +287,10 @@ impl ZkProver {
         party_id: u64,
         artifacts_dir: &str,
     ) -> Result<bool, ZkError> {
-        self.verify_proof_impl(
-            proof.circuit,
-            &proof.data,
-            &proof.public_signals,
-            proof.circuit.wrapper_dir_path(),
-            e3_id,
-            party_id,
-            CircuitVariant::Default,
-            artifacts_dir,
-        )
+        self.verify_proof(proof, e3_id, party_id, artifacts_dir)
     }
 
-    /// Verifies a fold proof (Default variant).
+    /// Verifies a recursive-aggregation bin proof (Default variant).
     pub fn verify_fold_proof(
         &self,
         proof: &Proof,
@@ -361,18 +298,8 @@ impl ZkProver {
         party_id: u64,
         artifacts_dir: &str,
     ) -> Result<bool, ZkError> {
-        use e3_events::CircuitName;
-        if proof.circuit != CircuitName::Fold {
-            return Err(ZkError::InvalidInput(format!(
-                "expected Fold proof, got {}",
-                proof.circuit
-            )));
-        }
-        self.verify_proof_impl(
-            proof.circuit,
-            &proof.data,
-            &proof.public_signals,
-            proof.circuit.dir_path(),
+        self.verify_proof_with_variant(
+            proof,
             e3_id,
             party_id,
             CircuitVariant::Default,

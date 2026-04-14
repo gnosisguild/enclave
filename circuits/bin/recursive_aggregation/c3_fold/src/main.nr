@@ -11,10 +11,14 @@ use bb_proof_verification::{
     UltraHonkProof, UltraHonkVerificationKey, UltraHonkZKProof, verify_honk_proof,
     verify_honk_proof_non_zk,
 };
+use lib::configs::default::dkg::L_THRESHOLD;
 use lib::configs::default::N_PARTIES;
 
-/// Total public fields for a `c3_fold` proof: 4 pub parameters + 3*N party slots (pk, msg, ct).
-pub global C3_FOLD_PUBLIC_LEN: u32 = 4 + (3 * N_PARTIES);
+/// Total slots: one per (party, threshold-modulus) pair.
+pub global C3_SLOTS: u32 = N_PARTIES * L_THRESHOLD;
+
+/// Total public fields for a `c3_fold` proof: 4 pub parameters + 3*C3_SLOTS (pk, msg, ct).
+pub global C3_FOLD_PUBLIC_LEN: u32 = 4 + (3 * C3_SLOTS);
 
 fn main(
     inner_vk: UltraHonkVerificationKey,
@@ -27,8 +31,8 @@ fn main(
     acc_key_hash: pub Field,
     is_first_step: pub bool,
     slot_index: pub u32,
-) -> pub ([Field; N_PARTIES], [Field; N_PARTIES], [Field; N_PARTIES]) {
-    assert(slot_index < N_PARTIES);
+) -> pub ([Field; C3_SLOTS], [Field; C3_SLOTS], [Field; C3_SLOTS]) {
+    assert(slot_index < C3_SLOTS);
 
     verify_honk_proof(inner_vk, inner_proof, c3_public_inputs, inner_key_hash);
 
@@ -40,11 +44,11 @@ fn main(
     let msg_new = c3_public_inputs[1];
     let ct_new = c3_public_inputs[2];
 
-    let mut out_pk: [Field; N_PARTIES] = [0; N_PARTIES];
-    let mut out_msg: [Field; N_PARTIES] = [0; N_PARTIES];
-    let mut out_ct: [Field; N_PARTIES] = [0; N_PARTIES];
+    let mut out_pk: [Field; C3_SLOTS] = [0; C3_SLOTS];
+    let mut out_msg: [Field; C3_SLOTS] = [0; C3_SLOTS];
+    let mut out_ct: [Field; C3_SLOTS] = [0; C3_SLOTS];
 
-    for i in 0..N_PARTIES {
+    for i in 0..C3_SLOTS {
         let idx = i as u32;
         if is_first_step {
             if idx == slot_index {
@@ -58,8 +62,8 @@ fn main(
             }
         } else {
             let prior_pk = acc_public_inputs[4 + i];
-            let prior_msg = acc_public_inputs[4 + N_PARTIES + i];
-            let prior_ct = acc_public_inputs[4 + N_PARTIES + N_PARTIES + i];
+            let prior_msg = acc_public_inputs[4 + C3_SLOTS + i];
+            let prior_ct = acc_public_inputs[4 + C3_SLOTS + C3_SLOTS + i];
 
             if idx == slot_index {
                 assert(prior_pk == 0);

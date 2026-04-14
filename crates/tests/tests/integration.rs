@@ -85,19 +85,17 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
             .join("bin");
         let dkg_target = circuits_build_root.join("dkg").join("target");
         let threshold_target = circuits_build_root.join("threshold").join("target");
-        let wrapper_dkg_target = circuits_build_root
+        let c3_fold_target = circuits_build_root
             .join("recursive_aggregation")
-            .join("wrapper")
-            .join("dkg")
+            .join("c3_fold")
             .join("target");
-        let wrapper_threshold_target = circuits_build_root
+        let c6_fold_target = circuits_build_root
             .join("recursive_aggregation")
-            .join("wrapper")
-            .join("threshold")
+            .join("c6_fold")
             .join("target");
-        let fold_target = circuits_build_root
+        let nodes_fold_target = circuits_build_root
             .join("recursive_aggregation")
-            .join("fold")
+            .join("nodes_fold")
             .join("target");
 
         // Helper: copy {name}.json + VK artifacts into a destination directory.
@@ -221,91 +219,36 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
         )
         .await;
 
-        // ── default/ variant (wrapper & fold proofs, uses .vk_recursive) ───
+        // ── default/ variant (recursive aggregation bins, uses .vk_recursive) ───
 
         let dv = preset_dir.join("default");
 
-        // DKG wrapper circuits
-        let dkg_wrapper_base = dv.join("recursive_aggregation/wrapper/dkg");
         copy_circuit(
-            &wrapper_dkg_target,
-            &dkg_wrapper_base.join("pk"),
-            "pk",
+            &c3_fold_target,
+            &dv.join("recursive_aggregation/c3_fold"),
+            "c3_fold",
             ".vk_recursive",
             ".vk_recursive_hash",
         )
         .await;
         copy_circuit(
-            &wrapper_dkg_target,
-            &dkg_wrapper_base.join("share_computation"),
-            "share_computation",
+            &c6_fold_target,
+            &dv.join("recursive_aggregation/c6_fold"),
+            "c6_fold",
             ".vk_recursive",
             ".vk_recursive_hash",
         )
         .await;
         copy_circuit(
-            &wrapper_dkg_target,
-            &dkg_wrapper_base.join("share_encryption"),
-            "share_encryption",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &wrapper_dkg_target,
-            &dkg_wrapper_base.join("share_decryption"),
-            "share_decryption",
+            &nodes_fold_target,
+            &dv.join("recursive_aggregation/nodes_fold"),
+            "nodes_fold",
             ".vk_recursive",
             ".vk_recursive_hash",
         )
         .await;
 
-        // Threshold wrapper circuits
-        let threshold_wrapper_base = dv.join("recursive_aggregation/wrapper/threshold");
-        copy_circuit(
-            &wrapper_threshold_target,
-            &threshold_wrapper_base.join("pk_generation"),
-            "pk_generation",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &wrapper_threshold_target,
-            &threshold_wrapper_base.join("pk_aggregation"),
-            "pk_aggregation",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &wrapper_threshold_target,
-            &threshold_wrapper_base.join("share_decryption"),
-            "share_decryption",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &wrapper_threshold_target,
-            &threshold_wrapper_base.join("decrypted_shares_aggregation"),
-            "decrypted_shares_aggregation",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-
-        // Fold circuit (default variant)
-        copy_circuit(
-            &fold_target,
-            &dv.join("recursive_aggregation/fold"),
-            "fold",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-
-        // ── evm/ variant (on-chain verification: C5, C7, fold) ───────────
+        // ── evm/ variant (on-chain verification: C5, C7) ───────────
 
         let ev = preset_dir.join("evm");
 
@@ -323,15 +266,6 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
             &threshold_target,
             &ev.join("threshold/decrypted_shares_aggregation"),
             "decrypted_shares_aggregation",
-            ".vk",
-            ".vk_hash",
-        )
-        .await;
-        // Fold circuit — final EVM fold
-        copy_circuit(
-            &fold_target,
-            &ev.join("recursive_aggregation/fold"),
-            "fold",
             ".vk",
             ".vk_hash",
         )
