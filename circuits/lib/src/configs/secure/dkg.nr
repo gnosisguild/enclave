@@ -15,16 +15,15 @@ use crate::core::dkg::share_encryption::Configs as ShareEncryptionConfigs;
 // Global configs for DKG secure preset
 pub global N: u32 = 8192;
 pub global L: u32 = 2;
-pub global QIS: [Field; L] = [72057594082099201, 72057594062438401];
-pub global PLAINTEXT_MODULUS: Field = 18014398509481984;
-pub global Q_MOD_T: Field = 1082658244788225;
-pub global Q_MOD_T_CENTERED: Field = 1082658244788225;
+pub global QIS: [Field; L] = [2305843009242923009, 2305843009240301569];
+pub global PLAINTEXT_MODULUS: Field = 1152921504606846976;
+pub global Q_MOD_T: Field = 777715553927169;
+pub global Q_MOD_T_CENTERED: Field = 777715553927169;
 
 pub global PARITY_MATRIX: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L_THRESHOLD] = [
-    [[1, 2251799822204927, 1, 0], [2, 2251799822204926, 0, 1]],
-    [[1, 4503599627763711, 1, 0], [2, 4503599627763710, 0, 1]],
-    [[1, 4503599631433727, 1, 0], [2, 4503599631433726, 0, 1]],
-    [[1, 4503599634579455, 1, 0], [2, 4503599634579454, 0, 1]],
+    [[1, 288230376173076479, 1, 0], [2, 288230376173076478, 0, 1]],
+    [[1, 288230376167047167, 1, 0], [2, 288230376167047166, 0, 1]],
+    [[1, 288230376161279999, 1, 0], [2, 288230376161279998, 0, 1]],
 ];
 
 /************************************
@@ -35,7 +34,7 @@ pk (CIRCUIT 0)
 
 // pk - bit parameters
 
-pub global PK_BIT_PK: u32 = 56;
+pub global PK_BIT_PK: u32 = 61;
 
 /************************************
 -------------------------------------
@@ -43,9 +42,11 @@ share_computation_sk (CIRCUIT 2a)
 -------------------------------------
 ************************************/
 
-pub global SHARE_COMPUTATION_BIT_SHARE: u32 = 53;
+// share_computation_sk - bit parameters
+pub global SHARE_COMPUTATION_BIT_SHARE: u32 = 59;
 pub global SHARE_COMPUTATION_SK_BIT_SECRET: u32 = 1;
 
+// share_computation_sk - configs
 pub global SHARE_COMPUTATION_SK_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
     ShareComputationConfigs::new(QIS_THRESHOLD);
 
@@ -55,8 +56,10 @@ share_computation_e_sm (CIRCUIT 2b)
 -------------------------------------
 ************************************/
 
-pub global SHARE_COMPUTATION_E_SM_BIT_SECRET: u32 = 192;
+// share_computation_e_sm - bit parameters
+pub global SHARE_COMPUTATION_E_SM_BIT_SECRET: u32 = 152;
 
+// verify_shares - configs
 pub global SHARE_COMPUTATION_E_SM_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
     ShareComputationConfigs::new(QIS_THRESHOLD);
 
@@ -67,28 +70,28 @@ share_encryption_e_sm (CIRCUIT 3b)
 -------------------------------------
 ************************************/
 
-pub global SHARE_ENCRYPTION_BIT_PK: u32 = 56;
-pub global SHARE_ENCRYPTION_BIT_CT: u32 = 56;
+pub global SHARE_ENCRYPTION_BIT_PK: u32 = 61;
+pub global SHARE_ENCRYPTION_BIT_CT: u32 = 61;
 pub global SHARE_ENCRYPTION_BIT_U: u32 = 1;
 pub global SHARE_ENCRYPTION_BIT_E0: u32 = 5;
 pub global SHARE_ENCRYPTION_BIT_E1: u32 = 5;
-pub global SHARE_ENCRYPTION_BIT_MSG: u32 = 54;
-pub global SHARE_ENCRYPTION_BIT_R1: u32 = 53;
-pub global SHARE_ENCRYPTION_BIT_R2: u32 = 56;
+pub global SHARE_ENCRYPTION_BIT_MSG: u32 = 60;
+pub global SHARE_ENCRYPTION_BIT_R1: u32 = 59;
+pub global SHARE_ENCRYPTION_BIT_R2: u32 = 61;
 pub global SHARE_ENCRYPTION_BIT_P1: u32 = 13;
-pub global SHARE_ENCRYPTION_BIT_P2: u32 = 56;
+pub global SHARE_ENCRYPTION_BIT_P2: u32 = 61;
 
-pub global SHARE_ENCRYPTION_K0IS: [Field; L] = [70854796903366627, 47439047573780733];
-pub global SHARE_ENCRYPTION_PK_BOUNDS: [Field; L] = [36028797041049600, 36028797031219200];
+pub global SHARE_ENCRYPTION_K0IS: [Field; L] = [1591479343852802974, 636423477871775445];
+pub global SHARE_ENCRYPTION_PK_BOUNDS: [Field; L] = [1152921504621461504, 1152921504620150784];
 pub global SHARE_ENCRYPTION_E0_BOUND: Field = 20;
 pub global SHARE_ENCRYPTION_E1_BOUND: Field = 20;
 pub global SHARE_ENCRYPTION_U_BOUND: Field = 1;
-pub global SHARE_ENCRYPTION_R1_LOW_BOUNDS: [Field; L] = [8856849607495681, 5929880944709633];
-pub global SHARE_ENCRYPTION_R1_UP_BOUNDS: [Field; L] = [8856849607495680, 5929880944709632];
-pub global SHARE_ENCRYPTION_R2_BOUNDS: [Field; L] = [36028797041049600, 36028797031219200];
+pub global SHARE_ENCRYPTION_R1_LOW_BOUNDS: [Field; L] = [397869835958161409, 159105869466112001];
+pub global SHARE_ENCRYPTION_R1_UP_BOUNDS: [Field; L] = [397869835958161408, 159105869466112001];
+pub global SHARE_ENCRYPTION_R2_BOUNDS: [Field; L] = [1152921504621461504, 1152921504620150784];
 pub global SHARE_ENCRYPTION_P1_BOUNDS: [Field; L] = [4096, 4096];
-pub global SHARE_ENCRYPTION_P2_BOUNDS: [Field; L] = [36028797041049600, 36028797031219200];
-pub global SHARE_ENCRYPTION_MSG_BOUND: Field = 18014398509481983;
+pub global SHARE_ENCRYPTION_P2_BOUNDS: [Field; L] = [1152921504621461504, 1152921504620150784];
+pub global SHARE_ENCRYPTION_MSG_BOUND: Field = 1152921504606846975;
 
 pub global SHARE_ENCRYPTION_CONFIGS: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
     PLAINTEXT_MODULUS,
@@ -114,5 +117,5 @@ share_decryption_e_sm (CIRCUIT 4b - BFV DECRYPTION E_SM)
 -------------------------------------
 ************************************/
 
-pub global SHARE_DECRYPTION_BIT_MSG: u32 = 54;
+pub global SHARE_DECRYPTION_BIT_MSG: u32 = 60;
 // SHARE_DECRYPTION_BIT_AGG: see `pub use` of `THRESHOLD_SHARE_DECRYPTION_BIT_SK` (C6 `BIT_SK`).
