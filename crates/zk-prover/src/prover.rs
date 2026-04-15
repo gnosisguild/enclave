@@ -279,17 +279,6 @@ impl ZkProver {
         self.verify_proof_with_variant(proof, e3_id, party_id, CircuitVariant::Evm, artifacts_dir)
     }
 
-    /// Verifies a former "wrapper" proof (same layout as [`Self::verify_proof`]).
-    pub fn verify_wrapper_proof(
-        &self,
-        proof: &Proof,
-        e3_id: &str,
-        party_id: u64,
-        artifacts_dir: &str,
-    ) -> Result<bool, ZkError> {
-        self.verify_proof(proof, e3_id, party_id, artifacts_dir)
-    }
-
     /// Verifies a recursive-aggregation bin proof (Default variant).
     pub fn verify_fold_proof(
         &self,

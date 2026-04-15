@@ -20,13 +20,6 @@ import {
   type CircuitPreset,
 } from './circuit-constants'
 
-/** share_computation wrapper is shared by sk_share_computation and e_sm_share_computation. */
-const SHARE_COMP_WRAPPER = {
-  path: ['recursive_aggregation', 'wrapper', 'dkg'] as const,
-  aliases: ['sk_share_computation', 'e_sm_share_computation'] as const,
-  variants: [CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_VARIANTS.RECURSIVE] as const,
-}
-
 interface CircuitInfo {
   name: string
   group: CircuitGroup
@@ -362,8 +355,8 @@ class NoirCircuitBuilder {
     return result
   }
 
-  private isWrapper(circuit: CircuitInfo): boolean {
-    return circuit.name.startsWith('wrapper/')
+  private isFoldOrAggregation(circuit: CircuitInfo): boolean {
+    return circuit.group === CIRCUIT_GROUPS.AGGREGATION
   }
 
   private generateVk(
@@ -387,7 +380,7 @@ class NoirCircuitBuilder {
       vkNoir: null as string | null,
       vkNoirHash: null as string | null,
     }
-    const isWrapper = this.isWrapper(circuit)
+    const isFoldOrAggregation = this.isFoldOrAggregation(circuit)
 
     const runWriteVk = (verifierTarget: string, vkOut: string, vkHashOut: string): boolean => {
       try {
@@ -420,36 +413,27 @@ class NoirCircuitBuilder {
     const vkNoirFile = join(targetDir, `${packageName}.vk_noir`)
     const vkNoirHashFile = join(targetDir, `${packageName}.vk_noir_hash`)
 
-    if (!isWrapper) {
-      // evm VK: for on-chain Solidity verification
+    if (isFoldOrAggregation) {
+      // Aggregation fold circuits: only Default variant (noir-recursive-no-zk)
+      if (!runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
+        throw new Error(`VK generation failed for ${packageName} (noir-recursive-no-zk)`)
+      }
+      result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
+      result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
+    } else {
+      // Base DKG/threshold circuits: evm + noir-recursive-no-zk + noir-recursive
       if (!runWriteVk('evm', vkFile, vkHashFile)) {
         throw new Error(`VK generation failed for ${packageName} (evm)`)
       }
       result.vk = existsSync(vkFile) ? vkFile : null
       result.vkHash = existsSync(vkHashFile) ? vkHashFile : null
 
-      // noir-recursive-no-zk VK: for wrapper/fold output verification (Default variant)
       if (!runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
         throw new Error(`VK generation failed for ${packageName} (noir-recursive-no-zk)`)
       }
       result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
       result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
 
-      // noir-recursive VK: for inner/base proofs embedded in wrapper inputs (Recursive variant)
-      if (!runWriteVk('noir-recursive', vkNoirFile, vkNoirHashFile)) {
-        throw new Error(`VK generation failed for ${packageName} (noir-recursive)`)
-      }
-      result.vkNoir = existsSync(vkNoirFile) ? vkNoirFile : null
-      result.vkNoirHash = existsSync(vkNoirHashFile) ? vkNoirHashFile : null
-    } else {
-      // Wrapper circuits: noir-recursive-no-zk (Default variant)
-      if (!runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
-        throw new Error(`VK generation failed for ${packageName} (noir-recursive-no-zk)`)
-      }
-      result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
-      result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
-
-      // noir-recursive VK: needed if wrapper/fold proofs are embedded in further recursive aggregation
       if (!runWriteVk('noir-recursive', vkNoirFile, vkNoirHashFile)) {
         throw new Error(`VK generation failed for ${packageName} (noir-recursive)`)
       }
@@ -550,27 +534,6 @@ class NoirCircuitBuilder {
       }
     }
 
-    // share_computation wrapper aliases
-    const wrapperPath = SHARE_COMP_WRAPPER.path.join('/')
-    const presets = Array.from(new Set(compiled.map((c) => c.preset)))
-    for (const preset of presets) {
-      for (const variant of SHARE_COMP_WRAPPER.variants) {
-        const shareCompPrefix = `${preset}/${variant}/${wrapperPath}/share_computation`
-        const basePrefix = `${preset}/${variant}/${wrapperPath}`
-        for (const alias of SHARE_COMP_WRAPPER.aliases) {
-          for (const suffix of ['.json', '.vk', '.vk_hash']) {
-            const srcKey = `${shareCompPrefix}/share_computation${suffix}`
-            const srcHash = checksums[srcKey]
-            if (srcHash) {
-              const aliasKey = `${basePrefix}/${alias}/${alias}${suffix}`
-              checksums[aliasKey] = srcHash
-              lines.push(`${srcHash}  ${aliasKey}`)
-            }
-          }
-        }
-      }
-    }
-
     const outputDir = this.options.outputDir!
     writeFileSync(join(outputDir, 'SHA256SUMS'), lines.join('\n') + '\n')
     writeFileSync(
@@ -613,23 +576,6 @@ class NoirCircuitBuilder {
         copyFileSync(c.artifacts.vkNoir, join(recursiveDir, `${packageName}.vk`))
         if (c.artifacts.vkNoirHash) {
           copyFileSync(c.artifacts.vkNoirHash, join(recursiveDir, `${packageName}.vk_hash`))
-        }
-      }
-    }
-
-    // Share_computation wrapper aliases (source includes circuit group per SHARE_COMP_WRAPPER.path)
-    for (const variant of SHARE_COMP_WRAPPER.variants) {
-      const shareCompSrc = join(outputDir, variant, ...SHARE_COMP_WRAPPER.path, 'share_computation')
-      const hasJson = existsSync(join(shareCompSrc, 'share_computation.json'))
-      const hasVk = existsSync(join(shareCompSrc, 'share_computation.vk'))
-      const hasVkHash = existsSync(join(shareCompSrc, 'share_computation.vk_hash'))
-      if (hasJson || hasVk || hasVkHash) {
-        for (const alias of SHARE_COMP_WRAPPER.aliases) {
-          const destDir = join(outputDir, variant, ...SHARE_COMP_WRAPPER.path, alias)
-          mkdirSync(destDir, { recursive: true })
-          if (hasJson) copyFileSync(join(shareCompSrc, 'share_computation.json'), join(destDir, `${alias}.json`))
-          if (hasVk) copyFileSync(join(shareCompSrc, 'share_computation.vk'), join(destDir, `${alias}.vk`))
-          if (hasVkHash) copyFileSync(join(shareCompSrc, 'share_computation.vk_hash'), join(destDir, `${alias}.vk_hash`))
         }
       }
     }

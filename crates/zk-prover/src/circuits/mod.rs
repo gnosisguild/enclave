@@ -6,7 +6,6 @@
 
 pub mod c3_accumulator;
 pub(crate) mod dkg;
-pub mod recursive_aggregation;
 mod threshold;
 pub(crate) mod utils;
 pub(crate) mod vk;

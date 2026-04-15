@@ -126,6 +126,8 @@ pub enum CircuitName {
     DecryptedSharesAggregation,
     /// Sequential C3 fold: inner ZK + optional prior `c3_fold` non-ZK proof.
     C3Fold,
+    /// Bootstrap circuit for [`CircuitName::C3Fold`] genesis accumulator proof (same ABI, no acc verify).
+    C3FoldKernel,
     /// Sequential C6 fold: inner ZK + optional prior `c6_fold` non-ZK proof (phase-7 aggregator).
     C6Fold,
     /// Ad-hoc recursive aggregation: C2a + C2b.
@@ -157,6 +159,7 @@ impl CircuitName {
             CircuitName::ThresholdShareDecryption => "share_decryption",
             CircuitName::DecryptedSharesAggregation => "decrypted_shares_aggregation",
             CircuitName::C3Fold => "c3_fold",
+            CircuitName::C3FoldKernel => "c3_fold_kernel",
             CircuitName::C6Fold => "c6_fold",
             CircuitName::C2abFold => "c2ab_fold",
             CircuitName::C3abFold => "c3ab_fold",
@@ -180,6 +183,7 @@ impl CircuitName {
             CircuitName::PkAggregation => "threshold",
             CircuitName::DecryptedSharesAggregation => "threshold",
             CircuitName::C3Fold
+            | CircuitName::C3FoldKernel
             | CircuitName::C6Fold
             | CircuitName::C2abFold
             | CircuitName::C3abFold
@@ -223,6 +227,7 @@ impl CircuitName {
             },
             CircuitName::DecryptedSharesAggregation => CircuitOutputLayout::None,
             CircuitName::C3Fold
+            | CircuitName::C3FoldKernel
             | CircuitName::C6Fold
             | CircuitName::C2abFold
             | CircuitName::C3abFold

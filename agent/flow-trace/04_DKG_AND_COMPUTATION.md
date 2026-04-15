@@ -270,8 +270,9 @@ stores and what gets ECDSA-signed for gossip (`ProofType::C2aSkShareComputation`
 `circuits/bin/recursive_aggregation/` (e.g. `c2ab_fold`, `c3ab_fold`, `c6_fold`, `node_fold`,
 `nodes_fold`, `dkg_aggregator`, `decryption_aggregator` — `nodes_fold` chains `H` `node_fold` proofs
 for `dkg_aggregator`; `decryption_aggregator` folds C6 via non-ZK `c6_fold` then checks C7 with ZK).
-Until the Rust prover wires those end-to-end, `generate_wrapper_proof` returns the inner proof
-unchanged (see `crates/zk-prover`).
+The per-circuit `wrapper/` Noir step was removed; multithread still sets `wrapped_proof` in
+responses to `proof.clone()` of the inner recursive proof so aggregators keep the same response
+shape.
 
 ### Step 6: Collect All Threshold Shares (with C2/C3 Verification)
 
@@ -366,7 +367,7 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   })
 │   │
 │   ├─ Multithread ZK verify: `bb verify` on inner recursive circuits (same path as
-│   │   `ZkProver::verify_proof`; `verify_wrapper_proof` is an alias)
+│   │   `ZkProver::verify_proof`)
 │   │   → Returns per-party pass/fail results
 │   │
 │   └─ On ComputeResponse:

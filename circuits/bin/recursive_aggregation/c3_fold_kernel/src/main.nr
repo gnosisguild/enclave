@@ -4,21 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Sequential C3 fold: one inner ZK `ShareEncryption` proof per step, chained with the previous
-//! accumulator (`c3_fold` non-ZK proof, or a fixed genesis proof from `c3_fold_kernel` on the first
-//! step; see `crates/zk-prover` and `c3_fold_kernel`).
+//! Same IO as [`c3_fold`](../c3_fold/src/main.nr) but **only** verifies the inner `ShareEncryption`
+//! proof. Used to mint a fixed genesis `UltraHonkProof` that bootstraps the real `c3_fold` circuit,
+//! which always runs `verify_honk_proof_non_zk` on the accumulator (see `c3_fold`).
 
 use bb_proof_verification::{
     UltraHonkProof, UltraHonkVerificationKey, UltraHonkZKProof, verify_honk_proof,
-    verify_honk_proof_non_zk,
 };
 use lib::configs::default::dkg::L_THRESHOLD;
 use lib::configs::default::N_PARTIES;
 
-/// Total slots: one per (party, threshold-modulus) pair.
 pub global C3_SLOTS: u32 = N_PARTIES * L_THRESHOLD;
 
-/// Total public fields for a `c3_fold` proof: 4 pub parameters + 3*C3_SLOTS (pk, msg, ct).
 pub global C3_FOLD_PUBLIC_LEN: u32 = 4 + (3 * C3_SLOTS);
 
 fn main(
@@ -37,7 +34,7 @@ fn main(
 
     verify_honk_proof(inner_vk, inner_proof, c3_public_inputs, inner_key_hash);
 
-    verify_honk_proof_non_zk(acc_vk, acc_proof, acc_public_inputs, acc_key_hash);
+    let _ = (acc_vk, acc_proof, acc_key_hash);
 
     let pk_new = c3_public_inputs[0];
     let msg_new = c3_public_inputs[1];
