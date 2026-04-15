@@ -93,6 +93,10 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
             .join("recursive_aggregation")
             .join("c6_fold")
             .join("target");
+        let c6_fold_kernel_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("c6_fold_kernel")
+            .join("target");
         let nodes_fold_target = circuits_build_root
             .join("recursive_aggregation")
             .join("nodes_fold")
@@ -235,6 +239,14 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
             &c6_fold_target,
             &dv.join("recursive_aggregation/c6_fold"),
             "c6_fold",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &c6_fold_kernel_target,
+            &dv.join("recursive_aggregation/c6_fold_kernel"),
+            "c6_fold_kernel",
             ".vk_recursive",
             ".vk_recursive_hash",
         )

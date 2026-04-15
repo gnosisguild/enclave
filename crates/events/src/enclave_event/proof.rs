@@ -128,8 +128,10 @@ pub enum CircuitName {
     C3Fold,
     /// Bootstrap circuit for [`CircuitName::C3Fold`] genesis accumulator proof (same ABI, no acc verify).
     C3FoldKernel,
-    /// Sequential C6 fold: inner ZK + optional prior `c6_fold` non-ZK proof (phase-7 aggregator).
+    /// Sequential C6 fold: inner ZK + prior `c6_fold` non-ZK proof (phase-7 aggregator).
     C6Fold,
+    /// Bootstrap circuit for [`CircuitName::C6Fold`] genesis accumulator proof (same ABI, no acc verify).
+    C6FoldKernel,
     /// Ad-hoc recursive aggregation: C2a + C2b.
     C2abFold,
     /// Ad-hoc: final sk `c3_fold` + final e_sm `c3_fold`.
@@ -161,6 +163,7 @@ impl CircuitName {
             CircuitName::C3Fold => "c3_fold",
             CircuitName::C3FoldKernel => "c3_fold_kernel",
             CircuitName::C6Fold => "c6_fold",
+            CircuitName::C6FoldKernel => "c6_fold_kernel",
             CircuitName::C2abFold => "c2ab_fold",
             CircuitName::C3abFold => "c3ab_fold",
             CircuitName::C4abFold => "c4ab_fold",
@@ -185,6 +188,7 @@ impl CircuitName {
             CircuitName::C3Fold
             | CircuitName::C3FoldKernel
             | CircuitName::C6Fold
+            | CircuitName::C6FoldKernel
             | CircuitName::C2abFold
             | CircuitName::C3abFold
             | CircuitName::C4abFold
@@ -229,6 +233,7 @@ impl CircuitName {
             CircuitName::C3Fold
             | CircuitName::C3FoldKernel
             | CircuitName::C6Fold
+            | CircuitName::C6FoldKernel
             | CircuitName::C2abFold
             | CircuitName::C3abFold
             | CircuitName::C4abFold

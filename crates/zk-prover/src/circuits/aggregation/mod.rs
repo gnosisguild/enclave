@@ -4,8 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod aggregation;
-pub(crate) mod dkg;
-mod threshold;
-pub(crate) mod utils;
-pub(crate) mod vk;
+//! Recursive proof aggregation (Noir fold / `recursive_aggregation` binaries).
+
+pub mod c3_accumulator;
+pub mod c6_accumulator;

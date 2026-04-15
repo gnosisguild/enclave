@@ -4,20 +4,20 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Sequential C6 fold: one inner ZK `ThresholdShareDecryption` proof per step, chained with the
-//! previous accumulator (`c6_fold` non-ZK proof, or a fixed genesis proof from `c6_fold_kernel` on
-//! the first step; see `crates/zk-prover` and `c6_fold_kernel`).
+//! Same IO as [`c6_fold`](../c6_fold/src/main.nr) but **only** verifies the inner
+//! `ThresholdShareDecryption` proof. Used to mint a fixed genesis `UltraHonkProof` that bootstraps
+//! the real `c6_fold` circuit, which always runs `verify_honk_proof_non_zk` on the accumulator (see
+//! `c6_fold`).
 
 use bb_proof_verification::{
     UltraHonkProof, UltraHonkVerificationKey, UltraHonkZKProof, verify_honk_proof,
-    verify_honk_proof_non_zk,
 };
 use lib::configs::default::T;
 
 /// One C6 public row: `expected_sk`, `expected_e_sm`, `ct_commitment`, `d_commitment` (see C6 leaf).
 pub global C6_PUBLIC_LEN: u32 = 4;
 
-/// Same shape as `c3_fold`: 4 pub parameters + 4 columns of `T + 1` party slots each.
+/// Same shape as `c6_fold`: 4 pub parameters + 4 columns of `T + 1` party slots each.
 pub global C6_FOLD_PUBLIC_LEN: u32 = 4 + (4 * (T + 1));
 
 fn main(
@@ -36,7 +36,7 @@ fn main(
 
     verify_honk_proof(inner_vk, inner_proof, c6_public_inputs, inner_key_hash);
 
-    verify_honk_proof_non_zk(acc_vk, acc_proof, acc_public_inputs, acc_key_hash);
+    let _ = (acc_vk, acc_proof, acc_key_hash);
 
     let sk_new = c6_public_inputs[0];
     let esm_new = c6_public_inputs[1];
