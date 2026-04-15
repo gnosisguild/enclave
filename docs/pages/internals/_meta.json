@@ -3,10 +3,7 @@
     "title": "Sortition"
   },
   "dkg": {
-    "title": "DKG & Threshold Cryptography"
-  },
-  "zk-proofs": {
-    "title": "ZK Proof Pipeline"
+    "title": "PVDKG & ZK Proofs"
   },
   "commitment-consistency": {
     "title": "Commitment Consistency"

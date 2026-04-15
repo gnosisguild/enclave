@@ -2,15 +2,15 @@
 title: 'Commitment Consistency'
 description:
   'How the Interfold protocol detects dishonest ciphernodes by cross-checking commitment values
-  across ZK circuit proofs — link types, scoping rules, and the C2→C4 check'
+  across ZK circuit proofs.'
 ---
 
-# Commitment Consistency — Technical Deep Dive
+# Commitment Consistency
 
-The [ZK proof pipeline](./zk-proofs) ensures each individual circuit execution is correct. But a
-dishonest node could still cheat by using **different inputs** across circuits — for example,
-committing to one set of shares in C2 but using different shares in C4. Each proof would verify in
-isolation, but the overall protocol output would be wrong.
+The [ZK proof pipeline](./dkg) ensures each individual circuit execution is correct. But a dishonest
+node could still cheat by using **different inputs** across circuits — for example, committing to
+one set of shares in C2 but using different shares in C4. Each proof would verify in isolation, but
+the overall protocol output would be wrong.
 
 The **commitment consistency checker** closes this gap by cross-referencing public signals across
 circuit proofs. If a commitment value produced by one circuit doesn't match the expected value in
@@ -28,7 +28,7 @@ The checker is a per-E3 actor (`CommitmentConsistencyChecker`) that:
 
 It operates in two modes:
 
-### Pre-ZK Gating (fast path)
+**Pre-ZK Gating (fast path)**
 
 Before expensive ZK verification, the `ShareVerificationActor` sends all received proofs to the
 checker in a batch via `CommitmentConsistencyCheckRequested`. The checker evaluates all links and
@@ -37,7 +37,7 @@ returns a set of `inconsistent_parties` that are **excluded from ZK verification
 This is a significant optimization — a dishonest party caught by commitment checks never wastes
 resources on ZK verification.
 
-### Post-ZK Cross-Check (defense in depth)
+**Post-ZK Cross-Check (defense in depth)**
 
 After ZK verification passes, the checker receives `ProofVerificationPassed` events and re-evaluates
 links. This catches cases where a proof from one phase arrives after the initial batch, or where a
@@ -147,21 +147,6 @@ Given C2 sender `X` (party_id) and C4 recipient `R` (party_id):
 
 If any modulus commitment differs, sender X is accused.
 
-### The L Parameter
-
-The block size `L` (number of CRT moduli) varies by BFV preset:
-
-| Preset                   | L   |
-| ------------------------ | --- |
-| `INSECURE_THRESHOLD_512` | 2   |
-| `SECURE_THRESHOLD_8192`  | 4   |
-
-The `L` used in the check **must match the actual preset** for the E3 — otherwise every index
-calculation is wrong and the check produces false positives. This is why the checker reads `L` from
-`E3Meta.params_preset` at E3 startup rather than using a hardcoded default.
-
----
-
 ## Deduplication
 
 The same proof can arrive via two paths:
@@ -204,6 +189,6 @@ response, preventing them from consuming ZK verification resources.
 
 ## Related
 
-- [ZK Proof Pipeline](./zk-proofs) — the circuits whose commitments are being cross-checked
+- [ZK Proof Pipeline](./dkg) — the circuits whose commitments are being cross-checked
 - [DKG & Threshold Cryptography](./dkg) — the protocol that generates the proofs
 - [Sortition](./sortition) — committee selection before any of this begins
