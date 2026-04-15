@@ -4,22 +4,21 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Tests for `circuits/bin/recursive_aggregation/*` fold binaries under [`CircuitVariant::Default`]
-//! (`noir-recursive-no-zk` VK only — see `scripts/build-circuits.ts` for aggregation circuits).
+//! Fold **accumulators** integration tests: sequential [`generate_sequential_c3_fold`] /
+//! [`generate_sequential_c6_fold`] (prove + [`ZkProver::verify_fold_proof`]), ABI/slot inference from
+//! compiled `c3_fold` / `c6_fold` JSON, and artifact staging under [`CircuitVariant::Default`]
+//! (`noir-recursive-no-zk` VKs — see `scripts/build-circuits.ts`).
 //!
-//! - [`recursive_aggregation_default_artifacts_staged`] checks that staged paths match what
-//!   [`ZkProver::generate_recursive_aggregation_bin_proof`] / [`e3_zk_prover::ZkProver::verify_fold_proof`]
-//!   expect (no `bb prove`).
-//! - [`c3_fold_sequential_proves_and_verifies`] runs `bb prove` for two inner `ShareEncryption`
-//!   proofs, then [`generate_sequential_c3_fold`] (`c3_fold_kernel` genesis + two `c3_fold` steps)
-//!   (requires `pnpm build:circuits` for `share_encryption`, `c3_fold`, and `c3_fold_kernel`).
-//! - [`c6_fold_sequential_proves_and_verifies`] runs `bb prove` for two inner `ThresholdShareDecryption`
-//!   proofs, then [`generate_sequential_c6_fold`] (`c6_fold_kernel` genesis + two `c6_fold` steps)
-//!   (requires `pnpm build:circuits` for threshold `share_decryption`, `c6_fold`, and `c6_fold_kernel`).
-//! - [`node_fold_pipeline_compiled_json_load`] and [`node_fold_pipeline_recursive_aggregation_artifacts_staged`]
-//!   cover the per-node DKG fold stack: [`CircuitName::C2abFold`], [`CircuitName::C3abFold`],
-//!   [`CircuitName::C4abFold`], and [`CircuitName::NodeFold`] (composed in `node_fold`). A full `bb prove`
-//!   for `node_fold` is not run here — it needs one correlated witness across C0–C4 and the ab folds.
+//! Loads compiled JSON for the node-fold **pipeline** ([`CircuitName::C2abFold`] … [`CircuitName::NodeFold`])
+//! and stages those artifacts; it does **not** run a full correlated `node_fold` proof — use
+//! `node_fold_correlated_e2e_tests.rs` for that.
+//!
+//! - [`recursive_aggregation_default_artifacts_staged`]: staged `c3_fold` paths (no `bb prove`).
+//! - [`recursive_aggregation_c6_fold_kernel_artifacts_staged`]: staged `c6_fold_kernel` paths.
+//! - [`c3_fold_sequential_proves_and_verifies`]: two inner `ShareEncryption` proofs → [`generate_sequential_c3_fold`].
+//! - [`c6_fold_sequential_proves_and_verifies`]: two inner `ThresholdShareDecryption` proofs → [`generate_sequential_c6_fold`].
+//! - [`node_fold_pipeline_compiled_json_load`] / [`node_fold_pipeline_recursive_aggregation_artifacts_staged`]:
+//!   pipeline circuits load + staged artifacts for C2ab/C3ab/C4ab/NodeFold.
 
 mod common;
 
