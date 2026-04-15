@@ -16,6 +16,10 @@
 //! - [`c6_fold_sequential_proves_and_verifies`] runs `bb prove` for two inner `ThresholdShareDecryption`
 //!   proofs, then [`generate_sequential_c6_fold`] (`c6_fold_kernel` genesis + two `c6_fold` steps)
 //!   (requires `pnpm build:circuits` for threshold `share_decryption`, `c6_fold`, and `c6_fold_kernel`).
+//! - [`node_fold_pipeline_compiled_json_load`] and [`node_fold_pipeline_recursive_aggregation_artifacts_staged`]
+//!   cover the per-node DKG fold stack: [`CircuitName::C2abFold`], [`CircuitName::C3abFold`],
+//!   [`CircuitName::C4abFold`], and [`CircuitName::NodeFold`] (composed in `node_fold`). A full `bb prove`
+//!   for `node_fold` is not run here — it needs one correlated witness across C0–C4 and the ab folds.
 
 mod common;
 
@@ -46,6 +50,22 @@ fn c6_fold_json_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../circuits/bin/recursive_aggregation/c6_fold/target/c6_fold.json")
 }
+
+fn recursive_aggregation_compiled_json_path(circuit: CircuitName) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../circuits/bin")
+        .join(circuit.dir_path())
+        .join("target")
+        .join(format!("{}.json", circuit.as_str()))
+}
+
+/// `c2ab_fold` → `c3ab_fold` → `c4ab_fold` → inputs to `node_fold` (see `node_fold/src/main.nr`).
+const NODE_FOLD_PIPELINE: &[CircuitName] = &[
+    CircuitName::C2abFold,
+    CircuitName::C3abFold,
+    CircuitName::C4abFold,
+    CircuitName::NodeFold,
+];
 
 /// Reads `C3_SLOTS` from the compiled `c3_fold` ABI (`acc_public_inputs` length is `4 + 3 * C3_SLOTS`).
 fn c3_fold_total_slots_from_compiled_json() -> usize {
@@ -137,6 +157,29 @@ fn c6_fold_compiled_abi_has_consistent_slot_count() {
         CompiledCircuit::from_file(&c6_fold_json_path()).expect("load compiled c6_fold circuit");
 }
 
+#[test]
+fn node_fold_pipeline_compiled_json_load() {
+    let mut missing = Vec::new();
+    for &c in NODE_FOLD_PIPELINE {
+        let p = recursive_aggregation_compiled_json_path(c);
+        if !p.exists() {
+            missing.push(p);
+        }
+    }
+    if !missing.is_empty() {
+        println!(
+            "skipping: missing compiled JSON(s) (run `pnpm build:circuits --group recursive_aggregation`): {:?}",
+            missing
+        );
+        return;
+    }
+    for &c in NODE_FOLD_PIPELINE {
+        let path = recursive_aggregation_compiled_json_path(c);
+        let _ = CompiledCircuit::from_file(&path)
+            .unwrap_or_else(|e| panic!("load compiled {}: {}", c.as_str(), e));
+    }
+}
+
 #[tokio::test]
 async fn recursive_aggregation_default_artifacts_staged() {
     let Some(bb) = find_bb().await else {
@@ -203,6 +246,45 @@ async fn recursive_aggregation_c6_fold_kernel_artifacts_staged() {
         "expected staged {}.vk (noir-recursive-no-zk) under default/ variant",
         pkg
     );
+
+    drop(temp);
+}
+
+#[tokio::test]
+async fn node_fold_pipeline_recursive_aggregation_artifacts_staged() {
+    let Some(bb) = find_bb().await else {
+        println!("skipping: bb not found");
+        return;
+    };
+    let gate = recursive_aggregation_compiled_json_path(CircuitName::NodeFold);
+    if !gate.exists() {
+        println!(
+            "skipping: {} not found (run `pnpm build:circuits --group recursive_aggregation`)",
+            gate.display()
+        );
+        return;
+    }
+
+    let (backend, temp) = setup_test_prover(&bb).await;
+    for &c in NODE_FOLD_PIPELINE {
+        setup_recursive_aggregation_fold_circuit(&backend, c).await;
+    }
+
+    let preset_base = backend.circuits_dir.join("insecure-512").join("default");
+    for &c in NODE_FOLD_PIPELINE {
+        let base = preset_base.join(c.dir_path());
+        let pkg = c.as_str();
+        assert!(
+            base.join(format!("{pkg}.json")).exists(),
+            "expected staged {}.json under default/ variant",
+            pkg
+        );
+        assert!(
+            base.join(format!("{pkg}.vk")).exists(),
+            "expected staged {}.vk (noir-recursive-no-zk) under default/ variant",
+            pkg
+        );
+    }
 
     drop(temp);
 }
