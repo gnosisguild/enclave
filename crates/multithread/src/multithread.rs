@@ -25,13 +25,14 @@ use e3_events::EffectsEnabled;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
     ComputeResponse, DecryptedSharesAggregationProofRequest,
-    DecryptedSharesAggregationProofResponse, DkgAggregationRequest, DkgAggregationResponse,
-    DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, DecryptionAggregationRequest,
-    DecryptionAggregationResponse, EnclaveEvent, EnclaveEventData, EventPublisher, EventSubscriber,
-    EventType, NodeDkgFoldRequest, NodeDkgFoldResponse, PartyVerificationResult,
-    PkAggregationProofRequest, PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse,
-    PkGenerationProofRequest, PkGenerationProofResponse, Proof, ShareComputationProofRequest,
-    ShareComputationProofResponse, ShareEncryptionProofRequest, ShareEncryptionProofResponse,
+    DecryptedSharesAggregationProofResponse, DecryptionAggregationRequest,
+    DecryptionAggregationResponse, DkgAggregationRequest, DkgAggregationResponse,
+    DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, EnclaveEvent,
+    EnclaveEventData, EventPublisher, EventSubscriber, EventType, NodeDkgFoldRequest,
+    NodeDkgFoldResponse, PartyVerificationResult, PkAggregationProofRequest,
+    PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest,
+    PkGenerationProofResponse, Proof, ShareComputationProofRequest, ShareComputationProofResponse,
+    ShareEncryptionProofRequest, ShareEncryptionProofResponse,
     ThresholdShareDecryptionProofRequest, ThresholdShareDecryptionProofResponse, TypedEvent,
     VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
     VerifyShareProofsRequest, VerifyShareProofsResponse, ZkError as ZkEventError, ZkRequest,
@@ -69,9 +70,9 @@ use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
 use e3_zk_prover::{
-    prove_decryption_aggregation_jobs, prove_dkg_aggregation, prove_node_dkg_fold,
-    CircuitVariant, DecryptionAggregationJob, DkgAggregationInput, NodeDkgFoldInput, Provable,
-    ZkBackend, ZkError, ZkProver,
+    prove_decryption_aggregation_jobs, prove_dkg_aggregation, prove_node_dkg_fold, CircuitVariant,
+    DecryptionAggregationJob, DkgAggregationInput, NodeDkgFoldInput, Provable, ZkBackend, ZkError,
+    ZkProver,
 };
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;

@@ -671,7 +671,9 @@ impl ThresholdPlaintextAggregator {
             return Ok(());
         };
         if honest_c6.is_empty() || honest_c6.iter().any(|(_, w)| w.is_empty()) {
-            info!("ThresholdPlaintextAggregator: no C6 inner proofs — skipping DecryptionAggregation");
+            info!(
+                "ThresholdPlaintextAggregator: no C6 inner proofs — skipping DecryptionAggregation"
+            );
             self.decryption_aggregator_proofs = Some(Vec::new());
             return Ok(());
         }
@@ -934,12 +936,7 @@ impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
                     ec,
                 ) = msg.into_inner().into_components();
 
-                self.add_share(
-                    party_id,
-                    decryption_share,
-                    signed_decryption_proofs,
-                    &ec,
-                )?;
+                self.add_share(party_id, decryption_share, signed_decryption_proofs, &ec)?;
 
                 // If we transitioned to VerifyingC6, dispatch C6 verification
                 // using the proofs persisted in state

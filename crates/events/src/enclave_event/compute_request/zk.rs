@@ -362,7 +362,10 @@ impl DkgShareDecryptionProofResponse {
 
 impl ShareComputationProofResponse {
     pub fn new(proof: Proof, dkg_input_type: DkgInputType) -> Self {
-        Self { proof, dkg_input_type }
+        Self {
+            proof,
+            dkg_input_type,
+        }
     }
 }
 
