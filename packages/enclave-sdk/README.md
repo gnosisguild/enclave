@@ -50,7 +50,8 @@ const sdk = new EnclaveSDK({
     feeToken: '0x...', // Your ERC-20 fee token address
   },
   chain: sepolia,
-  thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
+  // Use 'SECURE_THRESHOLD_8192' for production; 'INSECURE_THRESHOLD_512' for local dev only
+  thresholdBfvParamsPresetName: 'SECURE_THRESHOLD_8192',
 })
 
 // Listen to events with the unified event system
@@ -90,7 +91,8 @@ const sdk = EnclaveSDK.create({
   },
   chain: sepolia,
   privateKey: '0x...', // optional — omit for read-only
-  thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
+  // Use 'SECURE_THRESHOLD_8192' for production; 'INSECURE_THRESHOLD_512' for local dev only
+  thresholdBfvParamsPresetName: 'SECURE_THRESHOLD_8192',
 })
 ```
 
@@ -208,7 +210,8 @@ function MyComponent() {
       feeToken: '0x...',
     },
     autoConnect: true,
-    thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
+    // Use 'SECURE_THRESHOLD_8192' for production; 'INSECURE_THRESHOLD_512' for local dev only
+    thresholdBfvParamsPresetName: 'SECURE_THRESHOLD_8192',
   })
 
   useEffect(() => {
@@ -270,7 +273,8 @@ import {
   getThresholdBfvParamsSet,
 } from '@enclave-e3/sdk'
 
-const presetName = 'INSECURE_THRESHOLD_512'
+// Use 'SECURE_THRESHOLD_8192' for production; 'INSECURE_THRESHOLD_512' for local dev only
+const presetName = 'SECURE_THRESHOLD_8192'
 
 const publicKey = await generatePublicKey(presetName)
 const encrypted = await encryptNumber(42n, publicKey, presetName)
@@ -400,8 +404,16 @@ interface SDKConfig {
 }
 ```
 
-`thresholdBfvParamsPresetName` must be one of: `'INSECURE_THRESHOLD_512'` or
-`'SECURE_THRESHOLD_8192'`.
+`thresholdBfvParamsPresetName` selects the BFV parameter set used for encryption. It must match the
+on-chain `paramSet` index registered in the Enclave contract:
+
+| Preset name                | On-chain `paramSet` index | Use case                                                                                                    |
+| -------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `'INSECURE_THRESHOLD_512'` | `0`                       | Local development and testing only — small polynomial degree (N=512), fast but not cryptographically secure |
+| `'SECURE_THRESHOLD_8192'`  | `1`                       | Production — full security parameters (N=8192, L=4 CRT moduli)                                              |
+
+Always use `'SECURE_THRESHOLD_8192'` in production. The insecure preset exists solely to speed up
+local dev cycles.
 
 ## Error Handling
 

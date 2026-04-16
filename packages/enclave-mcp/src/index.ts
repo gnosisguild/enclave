@@ -11,7 +11,7 @@ import pkg from '../package.json' with { type: 'json' }
 
 const { version } = pkg
 
-const BASE_URL = 'https://docs.enclave.gg'
+const BASE_URL = 'https://docs.theinterfold.com'
 const FETCH_TIMEOUT_MS = 10_000
 
 interface DocPage {

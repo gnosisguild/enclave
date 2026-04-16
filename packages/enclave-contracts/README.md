@@ -1,5 +1,28 @@
 # Enclave Smart Contracts
 
+## Contract Overview
+
+| Contract                        | Description                                                                                      |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `Enclave.sol`                   | Main protocol coordinator — handles E3 requests, param sets, fee routing, and output publication |
+| `CiphernodeRegistryOwnable.sol` | Ciphernode registration and committee selection                                                  |
+| `BondingRegistry.sol`           | ENCL token bonding for ciphernodes; tracks bond amounts and manages bond lifecycle               |
+| `EnclaveToken.sol`              | ENCL governance/utility token                                                                    |
+| `EnclaveTicketToken.sol`        | USDC-backed tickets used by ciphernodes for sortition entry                                      |
+| `SlashingManager.sol`           | Fault attribution and slashing for dishonest ciphernodes (accusation → quorum → slash)           |
+| `E3RefundManager.sol`           | Issues refunds to requesters when an E3 fails                                                    |
+
+### Key Interfaces
+
+| Interface          | Description                                                                   |
+| ------------------ | ----------------------------------------------------------------------------- |
+| `IE3Program`       | Implement this to write a custom E3 program (defines `validate` and `verify`) |
+| `IEnclave`         | External interface to the main Enclave contract                               |
+| `IBondingRegistry` | Interface for bonding queries and management                                  |
+| `ISlashingManager` | Interface for accusation and slashing                                         |
+| `IE3RefundManager` | Interface for the refund manager                                              |
+| `IComputeProvider` | Interface for compute provider integration                                    |
+
 ## Importing the contracts, interfaces or types
 
 To install, run
