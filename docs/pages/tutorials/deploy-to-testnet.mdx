@@ -1,0 +1,205 @@
+---
+title: 'Deploy to Sepolia'
+description:
+  'Move your E3 program from local development to the Sepolia testnet — contracts, server
+  configuration, and BFV parameter switching'
+---
+
+# Deploy Your E3 to Sepolia
+
+This tutorial takes you from a working local E3 (from [Quick Start](/quick-start) or CRISP) to a
+live deployment on Sepolia testnet.
+
+> **What you'll build:** Your E3 program contract deployed to Sepolia, a coordination server pointed
+> at a Sepolia RPC, and a verified end-to-end E3 round against the live testnet ciphernode
+> committee.
+>
+> **Time:** ~30–45 minutes (most of it waiting for block confirmations and the committee to form)
+>
+> **Prerequisites:** A working local E3, Sepolia ETH for gas, a WebSocket RPC endpoint (e.g.
+> Alchemy, Infura), and your deployer private key funded.
+
+---
+
+## 1. Get Testnet Tokens
+
+You'll need:
+
+- **Sepolia ETH** — for gas. Any public Sepolia faucet works, e.g.
+  [sepoliafaucet.com](https://sepoliafaucet.com),
+  [Google Cloud faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia), or
+  [PoW faucet](https://sepolia-faucet.pk910.de).
+- **Test ENCL** — for ciphernode bonding (only if you're running your own nodes). The mock ENCL
+  token is deployed at `0x24b28471AE7BdF1fdBcfDd183c73D13ff0689B99`. Reach out on the
+  [community Telegram](https://t.me/encaborations) for test ENCL.
+- **Test USDC** — for E3 fees and tickets. Mock USDC at
+  `0x01AbD7D8e6547c943c2fE082C3Ce194fDCe57396`. Same channel for tokens.
+
+> The full list of deployed Sepolia addresses lives in
+> [Ciphernode Operators → Sepolia Contract Addresses](/ciphernode-operators#sepolia-contract-addresses)
+> and in `deployed_contracts.json` inside the repo.
+
+---
+
+## 2. Configure Environment
+
+Create or update your `.env` file with Sepolia settings:
+
+```bash
+# Sepolia RPC (WebSocket required for event listening)
+WS_RPC_URL=wss://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
+HTTP_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
+
+# Deployer private key (has Sepolia ETH)
+PRIVATE_KEY=0x...
+
+# Chain
+CHAIN_ID=11155111
+
+# Deployed Interfold contract addresses (Sepolia)
+ENCLAVE_ADDRESS=0x450015E41E1F6b6AfaEbf598E32a8d02a368c0A0
+CIPHERNODE_REGISTRY_ADDRESS=0xc8D2880c59D5e807eFFDee3451fb0Aa97f6aefDA
+FEE_TOKEN_ADDRESS=0x01AbD7D8e6547c943c2fE082C3Ce194fDCe57396
+```
+
+---
+
+## 3. Deploy Your E3 Program Contract
+
+If you're deploying your own E3 program contract (not using an already-deployed one):
+
+```bash
+# From your project root
+pnpm deploy:contracts --network sepolia
+```
+
+This uses Hardhat to deploy your contracts to Sepolia. Make sure `hardhat.config.ts` has the Sepolia
+network configured:
+
+```typescript
+// hardhat.config.ts
+networks: {
+  sepolia: {
+    url: process.env.HTTP_RPC_URL,
+    accounts: [process.env.PRIVATE_KEY],
+  },
+}
+```
+
+Note the deployed contract address — you'll need it for the E3 request and the server config.
+
+### Verify on Etherscan
+
+Publishing source makes your contract inspectable and lets users interact with it from Etherscan's
+UI. Set an Etherscan API key and run:
+
+```bash
+# .env
+ETHERSCAN_API_KEY=your_key
+
+# Verify
+pnpm hardhat verify --network sepolia <YOUR_PROGRAM_ADDRESS> <constructor-arg-1> <constructor-arg-2>
+```
+
+Constructor args are whatever you passed to your program's constructor — typically the Enclave
+contract address and any verifier addresses.
+
+### Save the address
+
+Persist the deployed address in `.env` so your server and frontend pick it up automatically:
+
+```bash
+# Append the fresh address — don't forget this step
+echo "E3_PROGRAM_ADDRESS=<deployed_address>" >> .env
+```
+
+---
+
+## 4. Switch to Secure BFV Parameters
+
+On testnet, you should use the production BFV parameters. Update your SDK initialisation:
+
+```typescript
+const sdk = new EnclaveSDK({
+  // ... other config
+  thresholdBfvParamsPresetName: 'SECURE_THRESHOLD_8192',
+})
+```
+
+The SDK will automatically use the secure parameters when requesting E3s:
+
+```typescript
+const hash = await sdk.requestE3({
+  threshold: [2, 3],
+  inputWindow: [startTime, endTime],
+  e3Program: YOUR_PROGRAM_ADDRESS,
+  e3ProgramParams: '0x...',
+  computeProviderParams: '0x...',
+})
+```
+
+Secure parameters use larger polynomial rings (N=8192 vs N=512) which makes proof generation slower
+but provides real cryptographic security. Expect proof generation to take longer than in local dev.
+
+---
+
+## 5. Configure the Server
+
+Update your coordination server to point to Sepolia:
+
+```bash
+# .env for the server
+WS_RPC_URL=wss://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
+HTTP_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
+ENCLAVE_ADDRESS=0x450015E41E1F6b6AfaEbf598E32a8d02a368c0A0
+E3_PROGRAM_ADDRESS=<your deployed program address>
+CHAIN_ID=11155111
+```
+
+Start the server:
+
+```bash
+pnpm dev:server
+```
+
+The server will connect to Sepolia via WebSocket and begin listening for E3 events.
+
+---
+
+## 6. Test End-to-End
+
+1. **Request an E3** — via the SDK or your frontend
+2. **Wait for committee formation** — the Sepolia ciphernode committee will perform sortition and
+   DKG (this takes longer than local dev due to real block times)
+3. **Submit encrypted inputs** — your frontend encrypts under the threshold public key and submits
+4. **Wait for computation** — the compute provider runs the FHE program
+5. **Check the result** — the committee decrypts and publishes the plaintext
+
+Monitor progress by watching for events:
+
+```typescript
+sdk.onEnclaveEvent(EnclaveEventType.E3_REQUESTED, (e) => console.log('E3 requested'))
+sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, (e) => console.log('Committee ready'))
+sdk.onEnclaveEvent(EnclaveEventType.CIPHERTEXT_OUTPUT_PUBLISHED, (e) => console.log('Output ready'))
+sdk.onEnclaveEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED, (e) =>
+  console.log('Result:', e.data),
+)
+```
+
+---
+
+## Troubleshooting
+
+| Issue                       | Possible cause                              | Fix                                                                        |
+| --------------------------- | ------------------------------------------- | -------------------------------------------------------------------------- |
+| E3 request reverts          | Insufficient fee token approval             | Call `sdk.approveFeeToken()` first                                         |
+| Committee never forms       | Not enough active ciphernodes on Sepolia    | Check the registry for active operators                                    |
+| Proof generation fails      | Missing circuit artifacts for secure preset | Ensure `secure-8192` artifacts are built                                   |
+| Decryption produces garbage | BFV preset mismatch                         | Verify both SDK and E3 request use `SECURE_THRESHOLD_8192` / `paramSet: 1` |
+
+---
+
+## Next Steps
+
+- [Manage Tickets](./manage-tickets) — if you're also running a ciphernode on Sepolia
+- [Troubleshoot Your Node](./operator-troubleshooting) — debugging ciphernode issues on testnet
