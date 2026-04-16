@@ -4,20 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Incremental node-level proof aggregation for DKG.
-//!
-//! `NodeProofAggregator` subscribes to `ThresholdSharePending` to learn how
-//! many proofs to expect per E3, then folds each `DKGInnerProofReady` wrapped
-//! proof into a running aggregate in strict `seq` order, using a reorder
-//! buffer for out-of-order arrivals.
-//!
-//! When all expected proofs have been folded, it publishes
-//! `DKGRecursiveAggregationComplete`.
-//!
-//! Ordering guarantee: `ThresholdSharePending` is always published to the bus
-//! before any `DKGInnerProofReady` for the same E3 (ProofRequestActor holds
-//! back C0's event until after `ThresholdSharePending` is processed).
-//! Arriving out of that order is treated as a programming error and logged.
+//! Node-level DKG proof aggregation: buffer all inner proofs (C0–C4), then run one
+//! [`ZkRequest::NodeDkgFold`] when [`ThresholdSharePending`] says the full set is ready.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -25,37 +13,42 @@ use actix::{Actor, Addr, Context, Handler};
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind,
     CorrelationId, DKGInnerProofReady, DKGRecursiveAggregationComplete, E3id, EnclaveEvent,
-    EnclaveEventData, EventContext, EventPublisher, EventSubscriber, EventType, Proof, Sequenced,
-    ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
+    EnclaveEventData, EventContext, EventPublisher, EventSubscriber, EventType, NodeDkgFoldRequest,
+    Proof, Sequenced, ShareEncryptionProofRequest, ThresholdSharePending, TypedEvent, ZkRequest,
+    ZkResponse,
 };
+use e3_fhe_params::build_pair_for_preset;
 use tracing::{error, info, warn};
 
-/// Per-E3 rolling aggregation state for one node's proofs.
-struct RollingAggregationState {
+/// Metadata from [`ThresholdSharePending`] for slot indices and sizing.
+struct NodeDkgFoldMeta {
     party_id: u64,
-    /// Total proofs expected (for progress logging).
     total_expected: usize,
-    /// Proofs buffered out-of-order, keyed by seq index.
-    buffer: BTreeMap<usize, Proof>,
-    /// The running accumulated (folded) proof.
-    accumulated: Option<Proof>,
-    /// Next seq index expected for folding.
-    next_to_aggregate: usize,
-    /// Number of proofs remaining to process (decrements on first store + each fold completion).
-    remaining: usize,
-    /// Correlation ID for the in-flight fold, if any.
-    fold_correlation: Option<CorrelationId>,
-    /// EventContext for publishing.
-    last_ec: EventContext<Sequenced>,
-    /// BFV preset for circuit artifact resolution.
+    sk_enc_count: usize,
+    e_sm_enc_count: usize,
+    sk_share_encryption_requests: Vec<ShareEncryptionProofRequest>,
+    e_sm_share_encryption_requests: Vec<ShareEncryptionProofRequest>,
+    committee_n: usize,
+    n_moduli: usize,
     params_preset: e3_fhe_params::BfvPreset,
 }
 
-/// Actor that incrementally folds DKG inner proofs into a single node-level proof.
+/// Per-E3 collection state: buffer proofs by `seq` until the monolithic fold can run.
+struct DkgProofCollectionState {
+    meta: NodeDkgFoldMeta,
+    buffer: BTreeMap<usize, Proof>,
+    fold_correlation: Option<CorrelationId>,
+    last_ec: EventContext<Sequenced>,
+}
+
+fn c3_slot_for_request(req: &ShareEncryptionProofRequest, n_moduli: usize) -> u32 {
+    (req.recipient_party_id as u32) * (n_moduli as u32) + (req.row_index as u32)
+}
+
+/// Actor that collects DKG inner proofs and dispatches a single [`ZkRequest::NodeDkgFold`].
 pub struct NodeProofAggregator {
     bus: BusHandle,
-    states: HashMap<E3id, RollingAggregationState>,
-    /// Reverse map: fold correlation_id -> e3_id.
+    states: HashMap<E3id, DkgProofCollectionState>,
     fold_correlation: HashMap<CorrelationId, E3id>,
 }
 
@@ -81,8 +74,6 @@ impl NodeProofAggregator {
         let (msg, ec) = msg.into_components();
         let e3_id = msg.e3_id.clone();
 
-        // When proof aggregation is disabled, skip wrapping/folding entirely
-        // and immediately signal completion with no aggregated proof.
         if !msg.proof_aggregation_enabled {
             info!(
                 "NodeProofAggregator: proof aggregation disabled for E3 {} — skipping",
@@ -106,29 +97,48 @@ impl NodeProofAggregator {
 
         let sk_enc_count = msg.sk_share_encryption_requests.len();
         let e_sm_enc_count = msg.e_sm_share_encryption_requests.len();
-        // Must mirror the formula in ProofRequestActor::handle_threshold_share_pending:
-        //   C0 + C1 + C2a + C2b + C3a×sk_enc + C3b×e_sm_enc + C4a + C4b
         let total_expected = 4 + sk_enc_count + e_sm_enc_count + 2;
 
-        let params_preset = msg.proof_request.params_preset;
-        self.states.entry(e3_id.clone()).or_insert_with(|| {
-            info!(
-                "NodeProofAggregator: initializing state for E3 {} party {} (total_expected={}, ~{} fold steps)",
-                e3_id, msg.full_share.party_id, total_expected,
-                total_expected.saturating_sub(1),
-            );
-            RollingAggregationState {
-                party_id: msg.full_share.party_id,
-                total_expected,
+        let (committee_n, n_moduli) = match build_pair_for_preset(msg.proof_request.params_preset) {
+            Ok((threshold_params, _)) => {
+                let n = msg.proof_request.committee_size.values().n as usize;
+                (n, threshold_params.moduli().len())
+            }
+            Err(e) => {
+                error!(
+                    "NodeProofAggregator: build_pair_for_preset failed for E3 {}: {e}",
+                    e3_id
+                );
+                return;
+            }
+        };
+
+        let meta = NodeDkgFoldMeta {
+            party_id: msg.full_share.party_id,
+            total_expected,
+            sk_enc_count,
+            e_sm_enc_count,
+            sk_share_encryption_requests: msg.sk_share_encryption_requests.clone(),
+            e_sm_share_encryption_requests: msg.e_sm_share_encryption_requests.clone(),
+            committee_n,
+            n_moduli,
+            params_preset: msg.proof_request.params_preset,
+        };
+
+        info!(
+            "NodeProofAggregator: E3 {} party {} — expecting {} inner proofs (C0..C4) for NodeDkgFold",
+            e3_id, meta.party_id, total_expected,
+        );
+
+        self.states.insert(
+            e3_id.clone(),
+            DkgProofCollectionState {
+                meta,
                 buffer: BTreeMap::new(),
-                accumulated: None,
-                next_to_aggregate: 0,
-                remaining: total_expected,
                 fold_correlation: None,
                 last_ec: ec,
-                params_preset,
-            }
-        });
+            },
+        );
     }
 
     fn handle_inner_proof_ready(&mut self, msg: TypedEvent<DKGInnerProofReady>) {
@@ -143,159 +153,143 @@ impl NodeProofAggregator {
             return;
         };
 
-        state.buffer.insert(msg.seq, msg.wrapped_proof);
+        if state.fold_correlation.is_some() {
+            warn!(
+                "NodeProofAggregator: seq={} arrived while NodeDkgFold in flight — dropped",
+                msg.seq
+            );
+            return;
+        }
+
+        state.buffer.insert(msg.seq, msg.proof);
         state.last_ec = ec;
 
-        let buffered = state.buffer.len();
-        let folded = state
-            .total_expected
-            .saturating_sub(state.remaining.saturating_add(buffered));
         info!(
-            "NodeProofAggregator: buffered seq={} for E3 {} (buffered={}, folded={}, remaining={})",
-            msg.seq, e3_id, buffered, folded, state.remaining
+            "NodeProofAggregator: buffered seq={} for E3 {} (have {}/{})",
+            msg.seq,
+            e3_id,
+            state.buffer.len(),
+            state.meta.total_expected
         );
 
-        self.try_advance(&e3_id);
+        self.try_dispatch_node_dkg_fold(&e3_id);
     }
 
-    fn try_advance(&mut self, e3_id: &E3id) {
-        loop {
-            let state = match self.states.get_mut(e3_id) {
-                Some(s) => s,
-                None => return,
-            };
+    fn try_dispatch_node_dkg_fold(&mut self, e3_id: &E3id) {
+        let state = match self.states.get_mut(e3_id) {
+            Some(s) => s,
+            None => return,
+        };
+        let n = state.meta.total_expected;
+        if state.buffer.len() != n || !(0..n).all(|i| state.buffer.contains_key(&i)) {
+            return;
+        }
 
-            if state.fold_correlation.is_some() || state.remaining == 0 {
-                return;
-            }
+        let meta = &state.meta;
+        let c3_total_slots = meta.committee_n * meta.n_moduli;
+        let slots_a: Vec<u32> = meta
+            .sk_share_encryption_requests
+            .iter()
+            .map(|r| c3_slot_for_request(r, meta.n_moduli))
+            .collect();
+        let slots_b: Vec<u32> = meta
+            .e_sm_share_encryption_requests
+            .iter()
+            .map(|r| c3_slot_for_request(r, meta.n_moduli))
+            .collect();
 
-            let next_proof = match state.buffer.remove(&state.next_to_aggregate) {
-                Some(p) => p,
-                None => return, // not yet available
-            };
+        let sk = meta.sk_enc_count;
+        let esm = meta.e_sm_enc_count;
+        let buf = &state.buffer;
+        let get = |seq: usize| {
+            buf.get(&seq)
+                .cloned()
+                .expect("buffer contains all seq indices")
+        };
 
-            if state.accumulated.is_none() {
-                // First proof: store as accumulated
-                info!(
-                    "NodeProofAggregator: storing first proof (seq={}) for E3 {}",
-                    state.next_to_aggregate, e3_id
-                );
-                state.accumulated = Some(next_proof);
-                state.remaining -= 1;
-                state.next_to_aggregate += 1;
+        let c0_proof = get(0);
+        let c1_proof = get(1);
+        let c2a_proof = get(2);
+        let c2b_proof = get(3);
+        let mut c3a_inner_proofs = Vec::with_capacity(sk);
+        for s in 0..sk {
+            c3a_inner_proofs.push(get(4 + s));
+        }
+        let mut c3b_inner_proofs = Vec::with_capacity(esm);
+        for s in 0..esm {
+            c3b_inner_proofs.push(get(4 + sk + s));
+        }
+        let c4a_seq = 4 + sk + esm;
+        let c4a_proof = get(c4a_seq);
+        let c4b_proof = get(c4a_seq + 1);
 
-                if state.remaining == 0 {
-                    // Only one proof total — done immediately
-                    self.publish_complete(e3_id);
-                    return;
-                }
-            } else {
-                // Fold accumulated + next_proof
-                let acc = state.accumulated.take().expect("checked above");
-                let acc_restore = acc.clone();
-                let next_proof_restore = next_proof.clone();
-                let seq = state.next_to_aggregate;
-                let corr = CorrelationId::new();
-                let ec = state.last_ec.clone();
-                let e3_id_clone = e3_id.clone();
+        let corr = CorrelationId::new();
+        let ec = state.last_ec.clone();
+        let party_id = meta.party_id;
+        let preset = meta.params_preset;
 
-                let folds_completed = state.total_expected - state.remaining - 1;
-                let total_folds = state.total_expected.saturating_sub(1);
-                info!(
-                    "NodeProofAggregator: dispatching fold step {}/{} (seq={}) for E3 {}",
-                    folds_completed + 1,
-                    total_folds,
-                    seq,
-                    e3_id
-                );
+        let req = NodeDkgFoldRequest {
+            c0_proof,
+            c1_proof,
+            c2a_proof,
+            c2b_proof,
+            c3a_inner_proofs,
+            c3b_inner_proofs,
+            c4a_proof,
+            c4b_proof,
+            c3_slot_indices_a: slots_a,
+            c3_slot_indices_b: slots_b,
+            c3_total_slots,
+            party_id,
+            params_preset: preset,
+        };
 
-                match self.bus.publish(
-                    ComputeRequest::zk(
-                        ZkRequest::FoldProofs {
-                            proof1: acc,
-                            proof2: next_proof,
-                            target_evm: false,
-                            params_preset: state.params_preset,
-                        },
-                        corr,
-                        e3_id_clone,
-                    ),
-                    ec,
-                ) {
-                    Ok(()) => {
-                        state.fold_correlation = Some(corr);
-                        state.next_to_aggregate += 1;
-                        self.fold_correlation.insert(corr, e3_id.clone());
-                    }
-                    Err(err) => {
-                        error!(
-                            "NodeProofAggregator: failed to publish fold request for E3 {}: {err}",
-                            e3_id
-                        );
-                        state.accumulated = Some(acc_restore);
-                        state.buffer.insert(seq, next_proof_restore);
-                    }
-                }
+        state.fold_correlation = Some(corr);
+        self.fold_correlation.insert(corr, e3_id.clone());
 
-                return; // wait for fold response
-            }
+        info!(
+            "NodeProofAggregator: dispatching NodeDkgFold for E3 {} party {}",
+            e3_id, party_id
+        );
+
+        if let Err(err) = self.bus.publish(
+            ComputeRequest::zk(ZkRequest::NodeDkgFold(req), corr, e3_id.clone()),
+            ec,
+        ) {
+            error!(
+                "NodeProofAggregator: failed to publish NodeDkgFold for E3 {}: {err}",
+                e3_id
+            );
+            let _ = self.states.get_mut(e3_id).map(|s| {
+                s.fold_correlation = None;
+            });
+            self.fold_correlation.remove(&corr);
         }
     }
 
-    fn handle_fold_response(&mut self, correlation_id: &CorrelationId, proof: Proof) {
+    fn handle_node_dkg_response(&mut self, correlation_id: &CorrelationId, proof: Proof) {
         let Some(e3_id) = self.fold_correlation.remove(correlation_id) else {
             return;
         };
 
-        let Some(state) = self.states.get_mut(&e3_id) else {
+        let Some(state) = self.states.remove(&e3_id) else {
             error!(
-                "NodeProofAggregator: received fold response for unknown E3 {}",
-                e3_id
-            );
-            return;
-        };
-
-        state.remaining -= 1;
-        let folds_completed = state.total_expected - state.remaining - 1;
-        let total_folds = state.total_expected.saturating_sub(1);
-        info!(
-            "NodeProofAggregator: fold step {}/{} complete for E3 {} ({} proofs remaining)",
-            folds_completed, total_folds, e3_id, state.remaining
-        );
-
-        state.accumulated = Some(proof);
-        state.fold_correlation = None;
-
-        if state.remaining == 0 {
-            self.publish_complete(&e3_id);
-        } else {
-            self.try_advance(&e3_id);
-        }
-    }
-
-    fn publish_complete(&mut self, e3_id: &E3id) {
-        let Some(state) = self.states.remove(e3_id) else {
-            return;
-        };
-
-        let Some(aggregated_proof) = state.accumulated else {
-            error!(
-                "NodeProofAggregator: no accumulated proof for E3 {} at completion",
+                "NodeProofAggregator: NodeDkgFold response for unknown E3 {}",
                 e3_id
             );
             return;
         };
 
         info!(
-            "NodeProofAggregator: all proofs folded for E3 {} party {} — publishing DKGRecursiveAggregationComplete",
-            e3_id, state.party_id
+            "NodeProofAggregator: NodeDkgFold complete for E3 {} party {} — publishing DKGRecursiveAggregationComplete",
+            e3_id, state.meta.party_id
         );
 
         if let Err(err) = self.bus.publish(
             DKGRecursiveAggregationComplete {
                 e3_id: e3_id.clone(),
-                party_id: state.party_id,
-                aggregated_proof: Some(aggregated_proof),
+                party_id: state.meta.party_id,
+                aggregated_proof: Some(proof),
             },
             state.last_ec,
         ) {
@@ -385,8 +379,8 @@ impl Handler<TypedEvent<ComputeRequestError>> for NodeProofAggregator {
 impl NodeProofAggregator {
     fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) {
         let (msg, _ec) = msg.into_components();
-        if let ComputeResponseKind::Zk(ZkResponse::FoldProofs(resp)) = msg.response {
-            self.handle_fold_response(&msg.correlation_id, resp.proof);
+        if let ComputeResponseKind::Zk(ZkResponse::NodeDkgFold(resp)) = msg.response {
+            self.handle_node_dkg_response(&msg.correlation_id, resp.proof);
         }
     }
 
@@ -394,13 +388,13 @@ impl NodeProofAggregator {
         let (msg, _ec) = msg.into_components();
         if let Some(e3_id) = self.fold_correlation.remove(msg.correlation_id()) {
             error!(
-                "NodeProofAggregator: fold request failed for E3 {}: {:?} — aggregation aborted",
+                "NodeProofAggregator: NodeDkgFold failed for E3 {}: {:?} — aggregation aborted",
                 e3_id,
                 msg.get_err()
             );
             self.states.remove(&e3_id);
             warn!(
-                "NodeProofAggregator: E3 {} aggregation state discarded due to fold error",
+                "NodeProofAggregator: E3 {} aggregation state discarded due to error",
                 e3_id
             );
         }

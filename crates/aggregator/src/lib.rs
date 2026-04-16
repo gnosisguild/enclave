@@ -8,7 +8,6 @@ mod committee_finalizer;
 mod decryptionshare_created_buffer;
 pub mod ext;
 mod keyshare_created_filter_buffer;
-mod proof_fold;
 mod publickey_aggregator;
 mod repo;
 mod threshold_plaintext_aggregator;

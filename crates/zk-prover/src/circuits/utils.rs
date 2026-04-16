@@ -15,6 +15,33 @@ use noirc_abi::{input_parser::InputValue, InputMap};
 
 const FIELD_SIZE: usize = 32;
 
+/// Matches `bb_proof_verification::RECURSIVE_ZK_PROOF_LENGTH` (`UltraHonkZKProof`).
+pub const ULTRA_HONK_ZK_PROOF_FIELD_COUNT: usize = 508;
+
+/// Converts raw ZK proof bytes to field strings for `UltraHonkZKProof` witness input.
+///
+/// Barretenberg often emits fewer than [`ULTRA_HONK_ZK_PROOF_FIELD_COUNT`] 32-byte limbs; the Noir
+/// type is a fixed-width array, so shorter proofs are zero-padded at the end.
+pub fn zk_proof_bytes_to_field_strings(bytes: &[u8]) -> Result<Vec<String>, ZkError> {
+    let need = ULTRA_HONK_ZK_PROOF_FIELD_COUNT * FIELD_SIZE;
+    if bytes.len() > need {
+        return Err(ZkError::InvalidInput(format!(
+            "zk proof bytes length {} exceeds fixed width {}",
+            bytes.len(),
+            need
+        )));
+    }
+    if bytes.len() % FIELD_SIZE != 0 {
+        return Err(ZkError::InvalidInput(format!(
+            "zk proof bytes length must be multiple of {FIELD_SIZE}, got {}",
+            bytes.len()
+        )));
+    }
+    let mut buf = bytes.to_vec();
+    buf.resize(need, 0);
+    bytes_to_field_strings(&buf)
+}
+
 /// Converts raw proof/public-signal bytes (32-byte big-endian chunks) to hex-encoded field strings.
 pub fn bytes_to_field_strings(bytes: &[u8]) -> Result<Vec<String>, ZkError> {
     if bytes.len() % FIELD_SIZE != 0 {

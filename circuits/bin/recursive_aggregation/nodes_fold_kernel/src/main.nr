@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Sequential fold of `H` per-node `node_fold` proofs (non-ZK), one honest slot per step, chained with
-//! the previous `nodes_fold` non-ZK proof, or a fixed genesis proof from `nodes_fold_kernel` on the
-//! first step (see `crates/zk-prover` and `nodes_fold_kernel`).
+//! Same IO as [`nodes_fold`](../nodes_fold/src/main.nr) but **only** verifies the inner `node_fold`
+//! proof. Used to mint a fixed genesis `UltraHonkProof` that bootstraps the real `nodes_fold`
+//! circuit, which always runs `verify_honk_proof_non_zk` on the accumulator (see `nodes_fold`).
 
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
 use lib::configs::default::dkg::L_THRESHOLD;
@@ -23,7 +23,7 @@ pub global C4AB_FOLD_PUBLIC_LEN: u32 = 3 + (2 * C4_PUBLIC_LEN);
 /// Must match `node_fold::NODE_FOLD_PUBLIC_LEN`.
 pub global NODE_FOLD_PUBLIC_LEN: u32 = 11 + N_PARTIES + (2 * (N_PARTIES + H) * L_THRESHOLD);
 
-/// Same shape as `c6_fold`: 4 pub parameters + `H` full `node_fold` public rows (flattened).
+/// Same shape as `nodes_fold`: 4 pub parameters + `H` full `node_fold` public rows (flattened).
 pub global NODES_FOLD_PUBLIC_LEN: u32 = 4 + (H * NODE_FOLD_PUBLIC_LEN);
 
 fn main(
@@ -47,7 +47,7 @@ fn main(
         inner_key_hash,
     );
 
-    verify_honk_proof_non_zk(acc_vk, acc_proof, acc_public_inputs, acc_key_hash);
+    let _ = (acc_vk, acc_proof, acc_key_hash);
 
     let mut out: [[Field; NODE_FOLD_PUBLIC_LEN]; H] = [[0; NODE_FOLD_PUBLIC_LEN]; H];
 

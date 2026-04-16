@@ -23,6 +23,11 @@ pub use actors::{
 pub use backend::{SetupStatus, ZkBackend};
 pub use circuits::aggregation::c3_accumulator::generate_sequential_c3_fold;
 pub use circuits::aggregation::c6_accumulator::generate_sequential_c6_fold;
+pub use circuits::aggregation::node_dkg_fold::{
+    prove_decryption_aggregation_jobs, prove_dkg_aggregation, prove_node_dkg_fold,
+    DecryptionAggregationJob, DkgAggregationInput, NodeDkgFoldInput,
+};
+pub use circuits::aggregation::nodes_fold_accumulator::generate_sequential_nodes_fold;
 pub use config::{verify_checksum, BbTarget, CircuitInfo, VersionInfo, ZkConfig};
 pub use e3_events::CircuitVariant;
 pub use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;

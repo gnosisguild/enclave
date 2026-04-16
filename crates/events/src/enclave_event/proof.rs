@@ -142,6 +142,8 @@ pub enum CircuitName {
     NodeFold,
     /// Sequential fold of `H` `node_fold` proofs (non-ZK) before `dkg_aggregator`.
     NodesFold,
+    /// Bootstrap circuit for [`CircuitName::NodesFold`] genesis accumulator proof (same ABI, no acc verify).
+    NodesFoldKernel,
     /// DKG aggregator (folded `node_fold` via `nodes_fold` + C5).
     DkgAggregator,
     /// Phase-7 decryption aggregator (folded C6 via `c6_fold` + C7).
@@ -169,6 +171,7 @@ impl CircuitName {
             CircuitName::C4abFold => "c4ab_fold",
             CircuitName::NodeFold => "node_fold",
             CircuitName::NodesFold => "nodes_fold",
+            CircuitName::NodesFoldKernel => "nodes_fold_kernel",
             CircuitName::DkgAggregator => "dkg_aggregator",
             CircuitName::DecryptionAggregator => "decryption_aggregator",
         }
@@ -194,6 +197,7 @@ impl CircuitName {
             | CircuitName::C4abFold
             | CircuitName::NodeFold
             | CircuitName::NodesFold
+            | CircuitName::NodesFoldKernel
             | CircuitName::DkgAggregator
             | CircuitName::DecryptionAggregator => "recursive_aggregation",
         }
@@ -239,6 +243,7 @@ impl CircuitName {
             | CircuitName::C4abFold
             | CircuitName::NodeFold
             | CircuitName::NodesFold
+            | CircuitName::NodesFoldKernel
             | CircuitName::DkgAggregator
             | CircuitName::DecryptionAggregator => CircuitOutputLayout::None,
         }

@@ -21,6 +21,7 @@ DIRS=(
   "bin/recursive_aggregation/c4ab_fold"
   "bin/recursive_aggregation/node_fold"
   "bin/recursive_aggregation/nodes_fold"
+  "bin/recursive_aggregation/nodes_fold_kernel"
   "bin/recursive_aggregation/dkg_aggregator"
   "bin/recursive_aggregation/decryption_aggregator"
   "bin/dkg"

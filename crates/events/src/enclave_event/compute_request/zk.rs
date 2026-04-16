@@ -36,14 +36,55 @@ pub enum ZkRequest {
     ThresholdShareDecryption(ThresholdShareDecryptionProofRequest),
     /// Generate proof for decrypted shares aggregation (C7).
     DecryptedSharesAggregation(DecryptedSharesAggregationProofRequest),
-    /// Fold two proofs into one (incremental recursive aggregation).
-    /// When `target_evm` is true, the output proof is generated for on-chain EVM verification.
-    FoldProofs {
-        proof1: Proof,
-        proof2: Proof,
-        target_evm: bool,
-        params_preset: BfvPreset,
-    },
+    /// Per-node DKG recursive fold (C2abFold → … → NodeFold).
+    NodeDkgFold(NodeDkgFoldRequest),
+    /// Cross-node DKG aggregator (NodesFold + C5 + DkgAggregator).
+    DkgAggregation(DkgAggregationRequest),
+    /// Phase-7 decryption aggregator (C6Fold + C7 + DecryptionAggregator).
+    DecryptionAggregation(DecryptionAggregationRequest),
+}
+
+/// Inputs for a single ciphertext index inside [`ZkRequest::DecryptionAggregation`].
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DecryptionAggregationJobRequest {
+    pub c6_inner_proofs: Vec<Proof>,
+    pub c6_slot_indices: Vec<u32>,
+    pub c7_proof: Proof,
+}
+
+/// Full per-node DKG fold (all inner recursive proofs for one party).
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct NodeDkgFoldRequest {
+    pub c0_proof: Proof,
+    pub c1_proof: Proof,
+    pub c2a_proof: Proof,
+    pub c2b_proof: Proof,
+    pub c3a_inner_proofs: Vec<Proof>,
+    pub c3b_inner_proofs: Vec<Proof>,
+    pub c4a_proof: Proof,
+    pub c4b_proof: Proof,
+    pub c3_slot_indices_a: Vec<u32>,
+    pub c3_slot_indices_b: Vec<u32>,
+    pub c3_total_slots: usize,
+    pub party_id: u64,
+    pub params_preset: BfvPreset,
+}
+
+/// Cross-node DKG aggregation (NodesFold + C5 + DkgAggregator).
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DkgAggregationRequest {
+    pub node_fold_proofs: Vec<Proof>,
+    pub c5_proof: Proof,
+    pub party_ids: Vec<u64>,
+    pub params_preset: BfvPreset,
+}
+
+/// Decryption aggregation: sequential C6 fold + DecryptionAggregator per job.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DecryptionAggregationRequest {
+    pub c6_total_slots: usize,
+    pub jobs: Vec<DecryptionAggregationJobRequest>,
+    pub params_preset: BfvPreset,
 }
 
 /// Request to generate a proof for public key aggregation (C5).
@@ -215,8 +256,30 @@ pub enum ZkResponse {
     ThresholdShareDecryption(ThresholdShareDecryptionProofResponse),
     /// Proof for decrypted shares aggregation (C7).
     DecryptedSharesAggregation(DecryptedSharesAggregationProofResponse),
-    /// Folded proof (output of two-proof fold).
-    FoldProofs(FoldProofsResponse),
+    /// Output of [`ZkRequest::NodeDkgFold`].
+    NodeDkgFold(NodeDkgFoldResponse),
+    /// Output of [`ZkRequest::DkgAggregation`].
+    DkgAggregation(DkgAggregationResponse),
+    /// Output of [`ZkRequest::DecryptionAggregation`].
+    DecryptionAggregation(DecryptionAggregationResponse),
+}
+
+/// Response from [`ZkRequest::NodeDkgFold`].
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct NodeDkgFoldResponse {
+    pub proof: Proof,
+}
+
+/// Response from [`ZkRequest::DkgAggregation`].
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DkgAggregationResponse {
+    pub proof: Proof,
+}
+
+/// Response from [`ZkRequest::DecryptionAggregation`].
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DecryptionAggregationResponse {
+    pub proofs: Vec<Proof>,
 }
 
 /// Response containing a generated proof for public key aggregation (C5).
@@ -242,29 +305,19 @@ pub struct ThresholdShareDecryptionProofRequest {
     pub d_share_bytes: Vec<ArcBytes>,
     /// BFV preset for parameter resolution.
     pub params_preset: BfvPreset,
-    /// When false, skip wrapper proofs for recursive C6 folding (mirrors DKG `proof_aggregation_enabled`).
-    #[serde(default = "default_proof_aggregation_enabled")]
-    pub proof_aggregation_enabled: bool,
-}
-
-fn default_proof_aggregation_enabled() -> bool {
-    true
 }
 
 /// Response containing generated proofs for threshold share decryption (C6).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ThresholdShareDecryptionProofResponse {
-    /// One raw C6 proof per ciphertext index.
+    /// One C6 proof per ciphertext index.
     pub proofs: Vec<Proof>,
-    /// Wrapper proof for each C6 proof (same order as `proofs`), ready for recursive folding.
-    pub wrapped_proofs: Vec<Proof>,
 }
 
 /// Response containing a generated share computation proof.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ShareComputationProofResponse {
     pub proof: Proof,
-    pub wrapped_proof: Proof,
     pub dkg_input_type: DkgInputType,
 }
 
@@ -272,7 +325,6 @@ pub struct ShareComputationProofResponse {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ShareEncryptionProofResponse {
     pub proof: Proof,
-    pub wrapped_proof: Proof,
     pub dkg_input_type: DkgInputType,
     pub recipient_party_id: usize,
     pub row_index: usize,
@@ -284,59 +336,45 @@ pub struct ShareEncryptionProofResponse {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PkBfvProofResponse {
     pub proof: Proof,
-    pub wrapped_proof: Proof,
 }
 
 /// Response containing a generated PK generation proof.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PkGenerationProofResponse {
     pub proof: Proof,
-    pub wrapped_proof: Proof,
 }
 
 /// Response containing a generated DKG share decryption proof.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DkgShareDecryptionProofResponse {
     pub proof: Proof,
-    pub wrapped_proof: Proof,
     pub dkg_input_type: DkgInputType,
 }
 
 impl DkgShareDecryptionProofResponse {
-    pub fn new(proof: Proof, wrapped_proof: Proof, dkg_input_type: DkgInputType) -> Self {
+    pub fn new(proof: Proof, dkg_input_type: DkgInputType) -> Self {
         Self {
             proof,
-            wrapped_proof,
             dkg_input_type,
         }
     }
 }
 
 impl ShareComputationProofResponse {
-    pub fn new(proof: Proof, wrapped_proof: Proof, dkg_input_type: DkgInputType) -> Self {
-        Self {
-            proof,
-            wrapped_proof,
-            dkg_input_type,
-        }
+    pub fn new(proof: Proof, dkg_input_type: DkgInputType) -> Self {
+        Self { proof, dkg_input_type }
     }
 }
 
 impl PkBfvProofResponse {
-    pub fn new(proof: Proof, wrapped_proof: Proof) -> Self {
-        Self {
-            proof,
-            wrapped_proof,
-        }
+    pub fn new(proof: Proof) -> Self {
+        Self { proof }
     }
 }
 
 impl PkGenerationProofResponse {
-    pub fn new(proof: Proof, wrapped_proof: Proof) -> Self {
-        Self {
-            proof,
-            wrapped_proof,
-        }
+    pub fn new(proof: Proof) -> Self {
+        Self { proof }
     }
 }
 
@@ -434,12 +472,6 @@ pub struct DecryptedSharesAggregationProofRequest {
 pub struct DecryptedSharesAggregationProofResponse {
     /// One C7 proof per ciphertext index.
     pub proofs: Vec<Proof>,
-}
-
-/// Response containing the folded proof.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct FoldProofsResponse {
-    pub proof: Proof,
 }
 
 /// ZK-specific error variants.

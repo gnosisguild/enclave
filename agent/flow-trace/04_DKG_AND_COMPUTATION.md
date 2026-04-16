@@ -274,6 +274,14 @@ The per-circuit `wrapper/` Noir step was removed; multithread still sets `wrappe
 responses to `proof.clone()` of the inner recursive proof so aggregators keep the same response
 shape.
 
+**Ciphernode / aggregator integration:** `ZkRequest::FoldProofs` was removed. The multithread actor
+implements `ZkRequest::NodeDkgFold` (full per-node pipeline to a `NodeFold` proof),
+`ZkRequest::DkgAggregation` (`NodesFold` + C5 + `DkgAggregator`), and
+`ZkRequest::DecryptionAggregation` (per-ciphertext `C6Fold` + C7 + `DecryptionAggregator`).
+`NodeProofAggregator` buffers all `DKGInnerProofReady` proofs then issues one `NodeDkgFold` request;
+`PublicKeyAggregator` and `ThresholdPlaintextAggregator` dispatch the aggregator requests instead of
+pairwise folding.
+
 ### Step 6: Collect All Threshold Shares (with C2/C3 Verification)
 
 ```

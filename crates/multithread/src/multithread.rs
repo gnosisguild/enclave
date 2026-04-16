@@ -25,12 +25,13 @@ use e3_events::EffectsEnabled;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
     ComputeResponse, DecryptedSharesAggregationProofRequest,
-    DecryptedSharesAggregationProofResponse, DkgShareDecryptionProofRequest,
-    DkgShareDecryptionProofResponse, EnclaveEvent, EnclaveEventData, EventPublisher,
-    EventSubscriber, EventType, PartyVerificationResult, PkAggregationProofRequest,
-    PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest,
-    PkGenerationProofResponse, Proof, ShareComputationProofRequest, ShareComputationProofResponse,
-    ShareEncryptionProofRequest, ShareEncryptionProofResponse,
+    DecryptedSharesAggregationProofResponse, DkgAggregationRequest, DkgAggregationResponse,
+    DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, DecryptionAggregationRequest,
+    DecryptionAggregationResponse, EnclaveEvent, EnclaveEventData, EventPublisher, EventSubscriber,
+    EventType, NodeDkgFoldRequest, NodeDkgFoldResponse, PartyVerificationResult,
+    PkAggregationProofRequest, PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse,
+    PkGenerationProofRequest, PkGenerationProofResponse, Proof, ShareComputationProofRequest,
+    ShareComputationProofResponse, ShareEncryptionProofRequest, ShareEncryptionProofResponse,
     ThresholdShareDecryptionProofRequest, ThresholdShareDecryptionProofResponse, TypedEvent,
     VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
     VerifyShareProofsRequest, VerifyShareProofsResponse, ZkError as ZkEventError, ZkRequest,
@@ -67,7 +68,11 @@ use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncrypti
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
-use e3_zk_prover::{CircuitVariant, Provable, ZkBackend, ZkError, ZkProver};
+use e3_zk_prover::{
+    prove_decryption_aggregation_jobs, prove_dkg_aggregation, prove_node_dkg_fold,
+    CircuitVariant, DecryptionAggregationJob, DkgAggregationInput, NodeDkgFoldInput, Provable,
+    ZkBackend, ZkError, ZkProver,
+};
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
 use fhe_traits::{DeserializeParametrized, FheEncoder};
@@ -416,7 +421,6 @@ fn handle_threshold_share_decryption_proof(
         ));
     }
     let mut proofs = Vec::with_capacity(num_indices);
-    let mut wrapped_proofs = Vec::with_capacity(num_indices);
     let bb_work_base = zk_bb_work_id(&request);
     let artifacts_dir = req.params_preset.artifacts_dir();
 
@@ -474,18 +478,11 @@ fn handle_threshold_share_decryption_proof(
                 )
             })?;
 
-        if req.proof_aggregation_enabled {
-            let wrapped = proof.clone();
-            wrapped_proofs.push(wrapped);
-        }
         proofs.push(proof);
     }
 
     Ok(ComputeResponse::zk(
-        ZkResponse::ThresholdShareDecryption(ThresholdShareDecryptionProofResponse {
-            proofs,
-            wrapped_proofs,
-        }),
+        ZkResponse::ThresholdShareDecryption(ThresholdShareDecryptionProofResponse { proofs }),
         request.correlation_id,
         request.e3_id,
     ))
@@ -677,16 +674,111 @@ fn handle_zk_request(
                 handle_decrypted_shares_aggregation_proof(&prover, req, request.clone())
             })
         }
-        ZkRequest::FoldProofs { .. } => timefunc("zk_fold_proofs", id, || {
-            Err(ComputeRequestError::new(
-                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(
-                    "two-proof fold removed; use ad-hoc dkg_aggregator / decryption_aggregator"
-                        .to_string(),
-                )),
-                request.clone(),
-            ))
+        ZkRequest::NodeDkgFold(req) => timefunc("zk_node_dkg_fold", id, || {
+            handle_node_dkg_fold_proof(&prover, req, request.clone())
+        }),
+        ZkRequest::DkgAggregation(req) => timefunc("zk_dkg_aggregation", id, || {
+            handle_dkg_aggregation_proof(&prover, req, request.clone())
+        }),
+        ZkRequest::DecryptionAggregation(req) => timefunc("zk_decryption_aggregation", id, || {
+            handle_decryption_aggregation_proof(&prover, req, request.clone())
         }),
     }
+}
+
+fn handle_node_dkg_fold_proof(
+    prover: &ZkProver,
+    req: NodeDkgFoldRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    let artifacts_dir = req.params_preset.artifacts_dir();
+    let job_id = zk_bb_work_id(&request);
+    let input = NodeDkgFoldInput {
+        c0_proof: &req.c0_proof,
+        c1_proof: &req.c1_proof,
+        c2a_proof: &req.c2a_proof,
+        c2b_proof: &req.c2b_proof,
+        c3a_inner_proofs: &req.c3a_inner_proofs,
+        c3b_inner_proofs: &req.c3b_inner_proofs,
+        c3_slot_indices_a: &req.c3_slot_indices_a,
+        c3_slot_indices_b: &req.c3_slot_indices_b,
+        c3_total_slots: req.c3_total_slots,
+        c4a_proof: &req.c4a_proof,
+        c4b_proof: &req.c4b_proof,
+        party_id: req.party_id,
+    };
+    let proof = prove_node_dkg_fold(prover, &input, &job_id, &artifacts_dir).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
+    Ok(ComputeResponse::zk(
+        ZkResponse::NodeDkgFold(NodeDkgFoldResponse { proof }),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
+fn handle_dkg_aggregation_proof(
+    prover: &ZkProver,
+    req: DkgAggregationRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    let artifacts_dir = req.params_preset.artifacts_dir();
+    let job_id = zk_bb_work_id(&request);
+    let input = DkgAggregationInput {
+        node_fold_proofs: &req.node_fold_proofs,
+        c5_proof: &req.c5_proof,
+        party_ids: &req.party_ids,
+    };
+    let proof = prove_dkg_aggregation(prover, &input, &job_id, &artifacts_dir).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
+    Ok(ComputeResponse::zk(
+        ZkResponse::DkgAggregation(DkgAggregationResponse { proof }),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
+fn handle_decryption_aggregation_proof(
+    prover: &ZkProver,
+    req: DecryptionAggregationRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    let artifacts_dir = req.params_preset.artifacts_dir();
+    let job_id = zk_bb_work_id(&request);
+    let jobs: Vec<DecryptionAggregationJob> = req
+        .jobs
+        .iter()
+        .map(|j| DecryptionAggregationJob {
+            c6_inner_proofs: &j.c6_inner_proofs,
+            c6_slot_indices: &j.c6_slot_indices,
+            c7_proof: &j.c7_proof,
+        })
+        .collect();
+    let proofs = prove_decryption_aggregation_jobs(
+        prover,
+        req.c6_total_slots,
+        &jobs,
+        &job_id,
+        &artifacts_dir,
+    )
+    .map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
+    Ok(ComputeResponse::zk(
+        ZkResponse::DecryptionAggregation(DecryptionAggregationResponse { proofs }),
+        request.correlation_id,
+        request.e3_id,
+    ))
 }
 
 /// Helper to reduce boilerplate for ZK errors
@@ -790,14 +882,9 @@ fn handle_share_computation_proof(
             )
         })?;
 
-    // 8. Former wrapper step removed; `wrapped_proof` is the inner recursive proof for aggregation.
-    let wrapped_proof = proof.clone();
-
-    // 9. Return inner + wrapped C2 proofs
     Ok(ComputeResponse::zk(
         ZkResponse::ShareComputation(ShareComputationProofResponse {
             proof,
-            wrapped_proof,
             dkg_input_type: req.dkg_input_type,
         }),
         request.correlation_id,
@@ -877,11 +964,8 @@ fn handle_pk_generation_proof(
             )
         })?;
 
-    let wrapped_proof = proof.clone();
-
-    // 6. Return response
     Ok(ComputeResponse::zk(
-        ZkResponse::PkGeneration(PkGenerationProofResponse::new(proof, wrapped_proof)),
+        ZkResponse::PkGeneration(PkGenerationProofResponse::new(proof)),
         request.correlation_id,
         request.e3_id,
     ))
@@ -930,10 +1014,8 @@ fn handle_pk_bfv_proof(
             )
         })?;
 
-    let wrapped_proof = proof.clone();
-
     Ok(ComputeResponse::zk(
-        ZkResponse::PkBfv(PkBfvProofResponse::new(proof, wrapped_proof)),
+        ZkResponse::PkBfv(PkBfvProofResponse::new(proof)),
         request.correlation_id,
         request.e3_id,
     ))
@@ -1019,12 +1101,9 @@ fn handle_share_encryption_proof(
             )
         })?;
 
-    let wrapped_proof = proof.clone();
-
     Ok(ComputeResponse::zk(
         ZkResponse::ShareEncryption(ShareEncryptionProofResponse {
             proof,
-            wrapped_proof,
             dkg_input_type: req.dkg_input_type,
             recipient_party_id: req.recipient_party_id,
             row_index: req.row_index,
@@ -1114,13 +1193,9 @@ fn handle_dkg_share_decryption_proof(
             )
         })?;
 
-    let wrapped_proof = proof.clone();
-
-    // 6. Return response
     Ok(ComputeResponse::zk(
         ZkResponse::DkgShareDecryption(DkgShareDecryptionProofResponse {
             proof,
-            wrapped_proof,
             dkg_input_type: req.dkg_input_type,
         }),
         request.correlation_id,

@@ -4,17 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::proof_fold::ProofFoldState;
 use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, BusHandle, ComputeResponse, ComputeResponseKind, DKGRecursiveAggregationComplete,
-    Die, E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EventContext, FailureReason,
-    KeyshareCreated, OrderedSet, PartyProofsToVerify, PkAggregationProofPending,
-    PkAggregationProofRequest, PkAggregationProofSigned, Proof, ProofType, ProofVerificationPassed,
-    PublicKeyAggregated, Seed, Sequenced, ShareVerificationComplete, ShareVerificationDispatched,
-    SignedProofFailed, SignedProofPayload, TypedEvent, VerificationKind, ZkResponse,
+    prelude::*, BusHandle, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
+    DKGRecursiveAggregationComplete, Die, DkgAggregationRequest, E3Failed, E3Stage, E3id,
+    EnclaveEvent, EnclaveEventData, EventContext, FailureReason, KeyshareCreated, OrderedSet,
+    PartyProofsToVerify, PkAggregationProofPending, PkAggregationProofRequest,
+    PkAggregationProofSigned, Proof, ProofType, PublicKeyAggregated, Seed, Sequenced,
+    ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed, SignedProofPayload,
+    TypedEvent, VerificationKind, ZkRequest, ZkResponse,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -58,7 +58,10 @@ pub enum PublicKeyAggregatorState {
         dkg_node_proofs: HashMap<u64, Option<Proof>>,
         honest_party_ids: BTreeSet<u64>,
         dishonest_parties: BTreeSet<u64>,
-        cross_node_fold: ProofFoldState,
+        /// In-flight [`ZkRequest::DkgAggregation`], if any.
+        dkg_aggregation_correlation: Option<CorrelationId>,
+        /// Result from [`ZkResponse::DkgAggregation`] (replaces pairwise `FoldProofs`).
+        dkg_aggregated_proof: Option<Proof>,
         c5_proof_pending: Option<Proof>,
         last_ec: Option<EventContext<Sequenced>>,
     },
@@ -417,7 +420,8 @@ impl PublicKeyAggregator {
                 dkg_node_proofs: HashMap::new(),
                 honest_party_ids: honest_party_ids.clone(),
                 dishonest_parties: dishonest_parties.clone(),
-                cross_node_fold: ProofFoldState::new(self.params_preset),
+                dkg_aggregation_correlation: None,
+                dkg_aggregated_proof: None,
                 c5_proof_pending: None,
                 last_ec: Some(ec.clone()),
             })
@@ -429,7 +433,7 @@ impl PublicKeyAggregator {
             self.handle_dkg_recursive_aggregation_complete(event)?;
         }
 
-        self.try_start_cross_node_fold(&ec)?;
+        self.try_dispatch_dkg_aggregation(&ec)?;
 
         Ok(())
     }
@@ -464,7 +468,8 @@ impl PublicKeyAggregator {
                 dkg_node_proofs,
                 honest_party_ids,
                 dishonest_parties,
-                cross_node_fold,
+                dkg_aggregation_correlation,
+                dkg_aggregated_proof,
                 ..
             } = state
             else {
@@ -477,7 +482,8 @@ impl PublicKeyAggregator {
                 dkg_node_proofs,
                 honest_party_ids,
                 dishonest_parties,
-                cross_node_fold,
+                dkg_aggregation_correlation,
+                dkg_aggregated_proof,
                 c5_proof_pending: Some(c5_proof),
                 last_ec: Some(ec.clone()),
             })
@@ -531,7 +537,8 @@ impl PublicKeyAggregator {
                 mut dkg_node_proofs,
                 honest_party_ids,
                 dishonest_parties,
-                cross_node_fold,
+                dkg_aggregation_correlation,
+                dkg_aggregated_proof,
                 c5_proof_pending,
                 last_ec: _,
             } = state
@@ -546,54 +553,75 @@ impl PublicKeyAggregator {
                 dkg_node_proofs,
                 honest_party_ids,
                 dishonest_parties,
-                cross_node_fold,
+                dkg_aggregation_correlation,
+                dkg_aggregated_proof,
                 c5_proof_pending,
                 last_ec: Some(ec.clone()),
             })
         })?;
 
-        self.try_start_cross_node_fold(&ec)
+        self.try_dispatch_dkg_aggregation(&ec)
     }
 
-    /// Start cross-node fold once we have DKG proofs from all verified honest parties.
-    fn try_start_cross_node_fold(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
+    /// Dispatch [`ZkRequest::DkgAggregation`] once C5 and all honest NodeFold proofs are ready.
+    fn try_dispatch_dkg_aggregation(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
         let state = self.state.get();
         let Some(PublicKeyAggregatorState::GeneratingC5Proof {
             dkg_node_proofs,
             honest_party_ids,
-            cross_node_fold,
+            c5_proof_pending,
+            dkg_aggregation_correlation,
+            dkg_aggregated_proof,
             ..
         }) = state.as_ref()
         else {
             return Ok(());
         };
-        let all_honest_proofs_present = honest_party_ids
-            .iter()
-            .all(|id| dkg_node_proofs.contains_key(id));
-        if !all_honest_proofs_present
-            || (!cross_node_fold.is_idle() && !cross_node_fold.needs_restart())
-        {
+
+        let Some(c5_proof) = c5_proof_pending.as_ref() else {
+            return Ok(());
+        };
+
+        if dkg_aggregation_correlation.is_some() || dkg_aggregated_proof.is_some() {
             return Ok(());
         }
 
-        // Collect non-None proofs from honest parties for cross-node folding.
-        // Folding is skipped only when all honest-party proofs are None (every node
-        // reported aggregation disabled). A mixed Some/None scenario should not occur
-        // in practice because proof_aggregation_enabled is an E3-level flag shared by all nodes.
+        let all_honest_proofs_present = honest_party_ids
+            .iter()
+            .all(|id| dkg_node_proofs.contains_key(id));
+        if !all_honest_proofs_present {
+            return Ok(());
+        }
+
         let mut pairs: Vec<_> = dkg_node_proofs
             .iter()
             .filter(|(pid, _)| honest_party_ids.contains(pid))
             .filter_map(|(pid, p)| p.as_ref().map(|proof| (*pid, proof.clone())))
             .collect();
         pairs.sort_by_key(|(pid, _)| *pid);
-        let proofs: Vec<Proof> = pairs.into_iter().map(|(_, p)| p).collect();
+        let party_ids: Vec<u64> = pairs.iter().map(|(pid, _)| *pid).collect();
+        let node_fold_proofs: Vec<Proof> = pairs.into_iter().map(|(_, p)| p).collect();
 
-        // If no proofs to fold (aggregation was disabled), try publishing immediately
-        if proofs.is_empty() {
-            info!("PublicKeyAggregator: proof aggregation disabled — skipping cross-node fold");
+        if node_fold_proofs.is_empty() {
+            info!("PublicKeyAggregator: proof aggregation disabled — skipping DkgAggregation");
             self.try_publish_complete()?;
             return Ok(());
         }
+
+        let corr = CorrelationId::new();
+        self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::DkgAggregation(DkgAggregationRequest {
+                    node_fold_proofs,
+                    c5_proof: c5_proof.clone(),
+                    party_ids,
+                    params_preset: self.params_preset,
+                }),
+                corr,
+                self.e3_id.clone(),
+            ),
+            ec.clone(),
+        )?;
 
         self.state.try_mutate(ec, |state| {
             let PublicKeyAggregatorState::GeneratingC5Proof {
@@ -603,24 +631,14 @@ impl PublicKeyAggregator {
                 dkg_node_proofs,
                 honest_party_ids,
                 dishonest_parties,
-                mut cross_node_fold,
+                dkg_aggregation_correlation: _,
+                dkg_aggregated_proof,
                 c5_proof_pending,
                 last_ec,
             } = state
             else {
                 return Ok(state);
             };
-            if cross_node_fold.needs_restart() {
-                warn!("cross-node fold stuck mid-step on restart — resetting and re-folding from persisted proofs");
-                cross_node_fold = ProofFoldState::new(self.params_preset);
-            }
-            cross_node_fold.start(
-                proofs,
-                "PublicKeyAggregator cross-node DKG fold",
-                &self.bus,
-                &self.e3_id,
-                ec,
-            )?;
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
                 keyshare_bytes,
@@ -628,21 +646,33 @@ impl PublicKeyAggregator {
                 dkg_node_proofs,
                 honest_party_ids,
                 dishonest_parties,
-                cross_node_fold,
+                dkg_aggregation_correlation: Some(corr),
+                dkg_aggregated_proof,
                 c5_proof_pending,
                 last_ec,
             })
         })?;
-        self.try_publish_complete()
+        Ok(())
     }
 
-    /// Publish `PublicKeyAggregated` when both C5 and cross-node fold are complete.
+    /// Publish `PublicKeyAggregated` when both C5 and DkgAggregator proof are ready (or aggregation skipped).
     fn try_publish_complete(&mut self) -> Result<()> {
+        if let Some(ec) = self.state.get().and_then(|s| {
+            if let PublicKeyAggregatorState::GeneratingC5Proof { last_ec, .. } = &s {
+                last_ec.clone()
+            } else {
+                None
+            }
+        }) {
+            self.try_dispatch_dkg_aggregation(&ec)?;
+        }
+
         let PublicKeyAggregatorState::GeneratingC5Proof {
             public_key,
             nodes,
             c5_proof_pending,
-            cross_node_fold,
+            dkg_aggregated_proof,
+            dkg_aggregation_correlation: _,
             last_ec,
             ..
         } = self
@@ -657,10 +687,6 @@ impl PublicKeyAggregator {
             return Ok(());
         };
 
-        // Cross-node fold result is optional — None when proof aggregation is disabled
-        let dkg_aggregated_proof = cross_node_fold.result.clone();
-
-        // If aggregation is enabled but fold hasn't completed yet, wait
         let all_proofs_are_none = self
             .state
             .get()
@@ -681,8 +707,7 @@ impl PublicKeyAggregator {
             })
             .unwrap_or(false);
 
-        if dkg_aggregated_proof.is_none() && !all_proofs_are_none {
-            // Aggregation is enabled but fold not done yet — wait
+        if !all_proofs_are_none && dkg_aggregated_proof.is_none() {
             return Ok(());
         }
 
@@ -704,11 +729,10 @@ impl PublicKeyAggregator {
             e3_id: self.e3_id.clone(),
             nodes: nodes.clone(),
             pk_aggregation_proof: Some(c5_proof.clone()),
-            dkg_aggregated_proof,
+            dkg_aggregated_proof: dkg_aggregated_proof.clone(),
         };
         self.bus.publish(event, ec.clone())?;
 
-        // Transition to Complete
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::Complete {
                 public_key,
@@ -722,18 +746,19 @@ impl PublicKeyAggregator {
 
     fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
         let (msg, _ec) = msg.into_components();
-        if let ComputeResponseKind::Zk(ZkResponse::FoldProofs(resp)) = msg.response {
+        if let ComputeResponseKind::Zk(ZkResponse::DkgAggregation(resp)) = msg.response {
             if msg.e3_id != self.e3_id {
                 return Ok(());
             }
             let state = self.state.get();
             let Some(PublicKeyAggregatorState::GeneratingC5Proof { last_ec, .. }) = state.as_ref()
             else {
-                // Late response after transitioning out of GeneratingC5Proof — ignore.
                 return Ok(());
             };
-            let Some(ec) = last_ec.clone() else {
-                return Err(anyhow::anyhow!("No EventContext for fold response"));
+            let Some(_ec) = last_ec.clone() else {
+                return Err(anyhow::anyhow!(
+                    "No EventContext for DkgAggregation response"
+                ));
             };
             self.state.try_mutate_without_context(|state| {
                 let PublicKeyAggregatorState::GeneratingC5Proof {
@@ -743,21 +768,28 @@ impl PublicKeyAggregator {
                     dkg_node_proofs,
                     honest_party_ids,
                     dishonest_parties,
-                    mut cross_node_fold,
+                    dkg_aggregation_correlation,
+                    dkg_aggregated_proof,
                     c5_proof_pending,
                     last_ec,
                 } = state
                 else {
                     return Ok(state);
                 };
-                cross_node_fold.handle_response(
-                    &msg.correlation_id,
-                    resp.proof.clone(),
-                    "PublicKeyAggregator cross-node DKG fold",
-                    &self.bus,
-                    &self.e3_id,
-                    &ec,
-                )?;
+                if dkg_aggregation_correlation.as_ref() != Some(&msg.correlation_id) {
+                    return Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                        public_key,
+                        keyshare_bytes,
+                        nodes,
+                        dkg_node_proofs,
+                        honest_party_ids,
+                        dishonest_parties,
+                        dkg_aggregation_correlation,
+                        dkg_aggregated_proof,
+                        c5_proof_pending,
+                        last_ec,
+                    });
+                }
                 Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                     public_key,
                     keyshare_bytes,
@@ -765,7 +797,8 @@ impl PublicKeyAggregator {
                     dkg_node_proofs,
                     honest_party_ids,
                     dishonest_parties,
-                    cross_node_fold,
+                    dkg_aggregation_correlation: None,
+                    dkg_aggregated_proof: Some(resp.proof.clone()),
                     c5_proof_pending,
                     last_ec,
                 })

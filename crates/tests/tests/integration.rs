@@ -89,6 +89,10 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
             .join("recursive_aggregation")
             .join("c3_fold")
             .join("target");
+        let c3_fold_kernel_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("c3_fold_kernel")
+            .join("target");
         let c6_fold_target = circuits_build_root
             .join("recursive_aggregation")
             .join("c6_fold")
@@ -116,6 +120,18 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
         let nodes_fold_target = circuits_build_root
             .join("recursive_aggregation")
             .join("nodes_fold")
+            .join("target");
+        let nodes_fold_kernel_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("nodes_fold_kernel")
+            .join("target");
+        let dkg_aggregator_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("dkg_aggregator")
+            .join("target");
+        let decryption_aggregator_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("decryption_aggregator")
             .join("target");
 
         // Helper: copy {name}.json + VK artifacts into a destination directory.
@@ -252,6 +268,14 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
         )
         .await;
         copy_circuit(
+            &c3_fold_kernel_target,
+            &dv.join("recursive_aggregation/c3_fold_kernel"),
+            "c3_fold_kernel",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
             &c6_fold_target,
             &dv.join("recursive_aggregation/c6_fold"),
             "c6_fold",
@@ -303,6 +327,30 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
             &nodes_fold_target,
             &dv.join("recursive_aggregation/nodes_fold"),
             "nodes_fold",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &nodes_fold_kernel_target,
+            &dv.join("recursive_aggregation/nodes_fold_kernel"),
+            "nodes_fold_kernel",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &dkg_aggregator_target,
+            &dv.join("recursive_aggregation/dkg_aggregator"),
+            "dkg_aggregator",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &decryption_aggregator_target,
+            &dv.join("recursive_aggregation/decryption_aggregator"),
+            "decryption_aggregator",
             ".vk_recursive",
             ".vk_recursive_hash",
         )
@@ -587,7 +635,9 @@ fn plaintext_aggregator_marker(data: &EnclaveEventData, e3_id: &E3id) -> Option<
                     ComputeRequestKind::Zk(ZkRequest::VerifyShareProofs(_))
                         | ComputeRequestKind::TrBFV(TrBFVRequest::CalculateThresholdDecryption(_))
                         | ComputeRequestKind::Zk(ZkRequest::DecryptedSharesAggregation(_))
-                        | ComputeRequestKind::Zk(ZkRequest::FoldProofs { .. })
+                        | ComputeRequestKind::Zk(ZkRequest::NodeDkgFold { .. })
+                        | ComputeRequestKind::Zk(ZkRequest::DkgAggregation { .. })
+                        | ComputeRequestKind::Zk(ZkRequest::DecryptionAggregation { .. })
                 ) =>
         {
             Some("ComputeRequest")
@@ -601,7 +651,9 @@ fn plaintext_aggregator_marker(data: &EnclaveEventData, e3_id: &E3id) -> Option<
                             _
                         ))
                         | ComputeResponseKind::Zk(ZkResponse::DecryptedSharesAggregation(_))
-                        | ComputeResponseKind::Zk(ZkResponse::FoldProofs(_))
+                        | ComputeResponseKind::Zk(ZkResponse::NodeDkgFold(_))
+                        | ComputeResponseKind::Zk(ZkResponse::DkgAggregation(_))
+                        | ComputeResponseKind::Zk(ZkResponse::DecryptionAggregation(_))
                 ) =>
         {
             Some("ComputeResponse")
@@ -874,7 +926,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // Trigger actor DKG
     let e3_id = E3id::new("0", 1);
 
-    let proof_aggregation_enabled = false;
+    let proof_aggregation_enabled = true;
 
     let e3_requested = E3Requested {
         e3_id: e3_id.clone(),
@@ -1117,80 +1169,60 @@ async fn test_trbfv_actor() -> Result<()> {
     );
 
     let completion_events = &active_aggregator_plaintext_events[C6_VERIFY_PREFIX.len()..];
-    let c6_proof_count = threshold_n as usize * num_votes_per_voter;
-    let c6_fold_steps = if proof_aggregation_enabled {
-        c6_proof_count.saturating_sub(1)
-    } else {
-        0
-    };
 
+    let mut expected_plaintext_completion = vec![
+        "ComputeRequest",
+        "ComputeResponse",
+        "AggregationProofPending",
+        "ComputeRequest",
+        "ComputeResponse",
+        "AggregationProofSigned",
+    ];
     if proof_aggregation_enabled {
-        let aggregation_pending_index = completion_events
-            .iter()
-            .position(|event| *event == "AggregationProofPending")
-            .expect("AggregationProofPending should be present");
-        let aggregation_signed_index = completion_events
-            .iter()
-            .position(|event| *event == "AggregationProofSigned")
-            .expect("AggregationProofSigned should be present");
-        let plaintext_aggregated_index = completion_events
-            .iter()
-            .position(|event| *event == "PlaintextAggregated")
-            .expect("PlaintextAggregated should be present");
-
-        assert_eq!(
-            completion_events.len(),
-            7 + (2 * c6_fold_steps),
-            "Unexpected active aggregator C6/C7 completion event count"
-        );
-        assert_eq!(
-            &completion_events[..2],
-            ["ComputeRequest", "ComputeRequest"]
-        );
-        assert_eq!(
-            count_projected_events(completion_events, "ComputeRequest"),
-            2 + c6_fold_steps
-        );
-        assert_eq!(
-            count_projected_events(completion_events, "ComputeResponse"),
-            2 + c6_fold_steps
-        );
-        assert_eq!(
-            count_projected_events(completion_events, "AggregationProofPending"),
-            1
-        );
-        assert_eq!(
-            count_projected_events(completion_events, "AggregationProofSigned"),
-            1
-        );
-        assert_eq!(
-            count_projected_events(completion_events, "PlaintextAggregated"),
-            1
-        );
-        assert!(
-            aggregation_pending_index < aggregation_signed_index,
-            "AggregationProofPending must precede AggregationProofSigned"
-        );
-        assert_eq!(
-            plaintext_aggregated_index,
-            completion_events.len() - 1,
-            "PlaintextAggregated must be the last active aggregator completion event"
-        );
-    } else {
-        assert_eq!(
-            completion_events,
-            [
-                "ComputeRequest",
-                "ComputeResponse",
-                "AggregationProofPending",
-                "ComputeRequest",
-                "ComputeResponse",
-                "AggregationProofSigned",
-                "PlaintextAggregated",
-            ],
-            "Unexpected active aggregator plaintext completion flow"
-        );
+        // `DecryptionAggregation`: one compute pair (C6 fold + C7 checked inside the worker).
+        expected_plaintext_completion.push("ComputeRequest");
+        expected_plaintext_completion.push("ComputeResponse");
     }
+    expected_plaintext_completion.push("PlaintextAggregated");
+
+    assert_eq!(
+        completion_events,
+        expected_plaintext_completion.as_slice(),
+        "Unexpected active aggregator plaintext completion flow"
+    );
+    assert_eq!(
+        count_projected_events(completion_events, "AggregationProofPending"),
+        1
+    );
+    assert_eq!(
+        count_projected_events(completion_events, "AggregationProofSigned"),
+        1
+    );
+    assert_eq!(
+        count_projected_events(completion_events, "PlaintextAggregated"),
+        1
+    );
+    let aggregation_pending_index = completion_events
+        .iter()
+        .position(|event| *event == "AggregationProofPending")
+        .expect("AggregationProofPending should be present");
+    let aggregation_signed_index = completion_events
+        .iter()
+        .position(|event| *event == "AggregationProofSigned")
+        .expect("AggregationProofSigned should be present");
+    let plaintext_aggregated_index = completion_events
+        .iter()
+        .position(|event| *event == "PlaintextAggregated")
+        .expect("PlaintextAggregated should be present");
+    assert!(
+        aggregation_pending_index < aggregation_signed_index,
+        "AggregationProofPending must precede AggregationProofSigned"
+    );
+    assert_eq!(
+        plaintext_aggregated_index,
+        completion_events.len() - 1,
+        "PlaintextAggregated must be the last active aggregator completion event"
+    );
 
     report.push((
         "Ciphertext published -> PlaintextAggregated",
