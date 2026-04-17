@@ -74,8 +74,7 @@ Look for `"SubmissionWindowClosed"` errors or missing `TicketSubmitted` events.
 **RPC latency.** The sortition submission window is short (10 seconds on Sepolia). If your RPC
 endpoint is slow, the transaction may not be mined in time.
 
-**Fix:** Use a faster RPC endpoint, preferably WebSocket. Avoid free-tier endpoints that throttle
-under load.
+**Fix:** Use a faster RPC endpoint. Avoid free-tier endpoints that throttle under load.
 
 **Nonce conflicts.** If your node is submitting other transactions simultaneously, nonce conflicts
 can delay the ticket submission.
@@ -182,8 +181,8 @@ tail -f "$(enclave config print log_file)"
 A mainnet-grade ciphernode should have:
 
 - **CPU:** 4+ modern cores. DKG and ZK proving are CPU-heavy.
-- **Memory:** 8 GB minimum, 16 GB recommended. Proof generation during DKG peaks well above idle.
-- **Disk:** 20 GB for the node data directory, more if you retain historical events. Use SSD —
+- **Memory:** 16 GB minimum, 32 GB recommended. Proof generation during DKG peaks well above idle.
+- **Disk:** 30 GB for the node data directory, more if you retain historical events. Use SSD —
   spinning disks will miss submission windows under load.
 - **Network:** Stable residential or cloud link. UDP must be unfiltered for QUIC (see below).
 
@@ -227,5 +226,5 @@ details.
 
 - Check the [Tickets & Sortition](/ciphernode-operators/tickets-and-sortition) reference for
   parameter details
-- Join the community [Telegram group](https://t.me/encaborations) for help
+- Join the community [Telegram group](https://t.me/enclave_e3) for help
 - If you suspect a bug, open an issue on [GitHub](https://github.com/gnosisguild/enclave/issues)

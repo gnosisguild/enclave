@@ -156,9 +156,6 @@ function publishInput(uint256 e3Id, bytes memory data) external {
 }
 ```
 
-> Only the Enclave contract ever calls `publishInput` — the Enclave coordinator enforces that at the
-> protocol level, so your program doesn't need an explicit `msg.sender` check here.
-
 Every E3 program should verify that the submitted ciphertext is correctly encrypted under the
 committee's threshold public key. Beyond that baseline, your `publishInput` can add
 application-specific checks — CRISP adds eligibility (Merkle membership), vote validity (balance
@@ -194,7 +191,8 @@ ever seeing the plaintext. The `+=` operator performs homomorphic addition — w
 committee later decrypts the sum, the result is the sum of all the original votes.
 
 The RISC Zero guest generates a ZK proof that this computation was performed correctly. In
-development, set `RISC0_DEV_MODE=1` to skip real proof generation.
+development, set `RISC0_DEV_MODE=1` to skip real proof generation, and ensure that the contracts
+were deployed using full mock mode, otherwise a real proof will be needed.
 
 ---
 
