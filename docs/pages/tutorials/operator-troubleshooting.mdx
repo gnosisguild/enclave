@@ -162,14 +162,14 @@ enclave start -vv
 To find the current log file path:
 
 ```bash
-enclave config print log_file
+enclave config get log_file
 ```
 
 The default lives under your platform's state directory (e.g. `~/.local/state/enclave/` on Linux,
 `~/Library/Application Support/enclave/` on macOS). Tail it while reproducing an issue:
 
 ```bash
-tail -f "$(enclave config print log_file)"
+tail -f "$(enclave config get log_file)"
 ```
 
 ---

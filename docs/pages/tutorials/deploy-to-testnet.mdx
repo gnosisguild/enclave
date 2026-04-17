@@ -128,15 +128,15 @@ The SDK will automatically use the secure parameters when requesting E3s:
 
 ```typescript
 const hash = await sdk.requestE3({
-  threshold: [2, 3],
+  committeeSize: CommitteeSize.Micro,
   inputWindow: [startTime, endTime],
   e3Program: YOUR_PROGRAM_ADDRESS,
-  e3ProgramParams: '0x...',
   computeProviderParams: '0x...',
+  paramSet: 0, // Insecure,
 })
 ```
 
-Secure parameters use larger polynomial rings (N=8192 vs N=512) which makes proof generation slower
+Secure parameters use polynomials of larger degrees (N=8192 vs N=512) which makes proof generation slower
 but provides real cryptographic security. Expect proof generation to take longer than in local dev.
 
 ---
