@@ -1,0 +1,144 @@
+---
+title: 'Manage Tickets & Optimise Selection'
+description:
+  'How to buy, burn, and manage your ciphernode tickets for optimal committee selection probability'
+---
+
+# Manage Tickets & Optimise Selection
+
+Tickets determine how often your ciphernode is selected for E3 committees. This tutorial covers the
+practical aspects of managing your ticket balance.
+
+> **What you'll learn:** How ticket balances map to selection probability, how to buy and burn
+> tickets from the CLI, the snapshot rule that decides which tickets count for a given E3 request,
+> and a simple strategy for keeping your node eligible.
+>
+> **Prerequisites:** A registered ciphernode with a license bond (see
+> [Registration](/ciphernode-operators/registration)).
+
+---
+
+## How Tickets Affect Selection
+
+Each ticket gives you one entry in the sortition lottery. For each E3 request, your node computes a
+score for every ticket it holds:
+
+```text
+score = keccak256(your_address, ticket_number, e3Id, seed)
+```
+
+Only your **best** (lowest) score is submitted. More tickets means more draws from the lottery,
+which means a better best score on average.
+
+**Selection probability scales linearly.** If the network has 1000 total tickets and you hold 100,
+you'll be selected roughly 10% of the time (assuming no buffer effects).
+
+---
+
+## Buying Tickets
+
+Deposit stablecoins (USDC or the configured fee token) to mint ticket tokens (ETK):
+
+```bash
+enclave ciphernode tickets buy --amount 100
+```
+
+This:
+
+1. Approves the ticket contract to spend your stablecoins (if needed)
+2. Deposits the stablecoins
+3. Mints equivalent ETK to your balance
+
+Your available ticket count is:
+
+```text
+availableTickets = floor(etkBalance / ticketPrice)
+```
+
+Check `ticketPrice` with `enclave ciphernode status` — it's set by governance and may change.
+
+---
+
+## Burning Tickets
+
+Withdraw the underlying stablecoins by burning tickets:
+
+```bash
+enclave ciphernode tickets burn --amount 50
+```
+
+Burning takes effect **immediately**. If it drops you below `minTicketBalance`, your node becomes
+inactive and won't be selected for any further committees until you top up.
+
+---
+
+## The Snapshot Rule
+
+Balances are snapshotted at **`requestBlock - 1`** — the block immediately before each E3 request is
+included. This means:
+
+- Tickets added **before** the request block count for that round
+- Tickets added **in the same block or later** do not count — they apply to future rounds
+- You cannot front-run a request by depositing tickets at the last moment
+
+**Practical tip:** Add tickets well ahead of anticipated demand. Don't wait for a specific E3
+request.
+
+---
+
+## Minimum Balance
+
+Your node must hold at least `minTicketBalance` tickets to be active. If your balance drops below
+this (e.g. after burning or after a slashing penalty), your node transitions to **Inactive** and
+stops being eligible for selection.
+
+Check the current minimum:
+
+```bash
+enclave ciphernode status
+```
+
+---
+
+## Strategy Tips
+
+### Keep a buffer
+
+Maintain a balance above the minimum — slashing deductions or governance changes to `ticketPrice`
+could temporarily drop you below the threshold. A buffer of 2-3x the minimum is reasonable.
+
+### Add tickets before demand spikes
+
+If you know a high-value E3 is coming (or you see increased request frequency), add tickets one or
+two requests ahead so they're captured in the snapshot.
+
+### Monitor the economics
+
+| Parameter             | What it means                 | How to check                |
+| --------------------- | ----------------------------- | --------------------------- |
+| `ticketPrice`         | Stablecoins per ticket        | `enclave ciphernode status` |
+| `minTicketBalance`    | Minimum to stay active        | `enclave ciphernode status` |
+| `availableTickets`    | Your current ticket count     | `enclave ciphernode status` |
+| Total network tickets | Sum of all operators' tickets | On-chain query (registry)   |
+
+## What Happens When You're Selected
+
+When the sortition algorithm picks your node:
+
+1. Your node auto-submits its winning ticket on-chain
+2. After enough tickets are submitted, the committee is finalised
+3. Your node participates in DKG → computation → decryption
+4. On successful completion, you earn rewards
+
+If you miss the submission window (10s on Sepolia), your ticket isn't counted and another node takes
+the slot. See [Troubleshooting](./operator-troubleshooting) for common causes.
+
+---
+
+## Related
+
+- [Tickets & Sortition](/ciphernode-operators/tickets-and-sortition) — full reference on the ticket
+  system
+- [Sortition Internals](/internals/sortition) — technical deep dive on the scoring algorithm
+- [Exits & Slashing](/ciphernode-operators/exits-and-slashing) — what happens if something goes
+  wrong

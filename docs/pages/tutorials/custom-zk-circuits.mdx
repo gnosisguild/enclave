@@ -1,0 +1,229 @@
+---
+title: 'Custom Noir Circuits for Input Validation'
+description:
+  'How CRISP uses Noir zero-knowledge circuits to prove vote validity on-chain — circuit structure,
+  proof composition, and on-chain verification'
+---
+
+# Custom Noir Circuits for Input Validation
+
+Every E3 program must validate that user inputs are correctly encrypted under the committee's
+threshold public key — this is the baseline. On top of that, programs can add application-specific
+checks. CRISP, for example, also proves that each vote is valid (within the voter's balance), that
+the voter is eligible (Merkle membership), and for mask votes that the ciphertext is an encryption
+of zero correctly added to the previous slot ciphertext. All without revealing the vote itself.
+
+This tutorial walks through how CRISP's Noir circuits work, as a template for building your own
+input validation circuits.
+
+> **What you'll learn:** How CRISP composes several Noir circuits into a single on-chain-verifiable
+> proof, which library modules are reusable, and how to wire a custom circuit into `publishInput`.
+>
+> **Prerequisites:** Basic familiarity with [Noir](https://noir-lang.org/docs) and the
+> [E3 program structure](./write-e3-program).
+
+---
+
+## What the Circuits Prove
+
+CRISP's circuit system handles two distinct cases:
+
+**Actual vote:**
+
+1. **Voter eligibility** — the voter's address is in a Merkle tree of eligible participants
+2. **Valid encryption** — the ciphertext is a well-formed BFV encryption
+3. **Correct signature** — the submission was signed by the voter (ECDSA recovery)
+4. **Within balance** — the vote amount does not exceed the voter's token balance
+
+**Mask vote** (for
+[receipt-freeness](https://blog.theinterfold.com/vote-masking-receipt-freeness-secret-ballots/)):
+
+1. **Encryption of zero** — the ciphertext encrypts a zero-value vote
+2. **Correct ciphertext addition** — the sum of the previous slot ciphertext and the zero ciphertext
+   is computed correctly (`sum = prev + 0`)
+
+---
+
+## Circuit Structure
+
+CRISP's circuits live in `examples/CRISP/circuits/` and are organized into a main circuit plus
+reusable library modules:
+
+```text
+circuits/
+├── bin/crisp/src/main.nr       # Main circuit — orchestrates all checks
+└── lib/src/
+    ├── merkle_tree.nr          # Poseidon-based Merkle membership proof (depth 20)
+    ├── ecdsa.nr                # secp256k1 signature validation + Ethereum address derivation
+    ├── ciphertext_addition.nr  # Homomorphic addition verification (Schwartz-Zippel)
+    ├── utils.nr                # Vote validation (binary coefficients, balance checks)
+    └── constants.nr            # FHE parameters (N, L, Q, bit-widths)
+```
+
+### The Main Circuit
+
+The main circuit (`bin/crisp/src/main.nr`) takes all inputs and orchestrates the verification:
+
+```noir
+fn main(
+    // Ciphertext components
+    prev_ct0is: [Polynomial<N>; L],    // Previous ciphertext (for updates)
+    prev_ct1is: [Polynomial<N>; L],
+    prev_ct_commitment: pub Field,
+    sum_ct0is: [Polynomial<N>; L],     // Sum after addition
+    sum_ct1is: [Polynomial<N>; L],
+    ct0is: [Polynomial<N>; L],         // New vote ciphertext
+    ct1is: [Polynomial<N>; L],
+
+    // ECDSA signature
+    public_key_x: [u8; 32],
+    public_key_y: [u8; 32],
+    signature: [u8; 64],
+    hashed_message: [u8; 32],
+
+    // Merkle proof of eligibility
+    merkle_root: pub Field,
+    merkle_proof_indices: [u1; 20],
+    merkle_proof_siblings: [Field; 20],
+
+    // Vote metadata
+    slot_address: pub Field,
+    balance: Field,
+    is_first_vote: pub bool,
+    is_mask_vote: bool,
+    num_options: pub u32,
+) -> pub (Field, Field, Field)  // (final_ct_commitment, ct_commitment, k1_commitment)
+```
+
+The circuit supports two modes controlled by `is_mask_vote`:
+
+- **Actual vote**: Verifies the signature matches the slot address, checks that the vote amount
+  doesn't exceed the voter's balance, and validates Merkle membership
+- **Mask vote**: Verifies a zero-value vote. Anyone can submit mask votes to any slot, which
+  provides
+  [receipt-freeness](https://blog.theinterfold.com/vote-masking-receipt-freeness-secret-ballots/) —
+  voters cannot prove which ciphertext is theirs
+
+### Library Modules
+
+**`merkle_tree.nr`** — Poseidon-based Merkle membership proof with a 20-level tree. Proves that a
+leaf (voter address) exists at a specific index without revealing other leaves.
+
+**`ecdsa.nr`** — secp256k1 ECDSA signature verification and Ethereum address derivation. Recovers
+the signer address from the signature and verifies it matches the expected voter.
+
+**`ciphertext_addition.nr`** — Used in mask vote mode to prove that `sum = prev + new` for BFV
+ciphertexts (where `new` is an encryption of zero). Uses the Schwartz-Zippel lemma with a
+Fiat-Shamir challenge point to verify the polynomial identity at a single random point, avoiding the
+cost of checking every coefficient.
+
+**`utils.nr`** — Vote validation helpers. Checks that vote coefficients are binary (0 or 1) and that
+the total doesn't exceed the voter's balance.
+
+---
+
+## Proof Composition
+
+A single vote submission requires proving multiple things, which means multiple circuit executions
+composed together. CRISP uses recursive proof folding to produce a single EVM-verifiable proof:
+
+```text
+ct0 circuit  ─→  user_data_encryption  ─┐
+ct1 circuit  ─→  user_data_encryption  ─┤
+                                        ├─→  crisp circuit  ─→  fold  ─→  Single proof
+merkle witness (verified inside crisp) ─┤
+ecdsa witness (verified inside crisp) ──┘
+```
+
+The `ct0` and `ct1` circuits verify encryption of each ciphertext component. The main `crisp`
+circuit takes those results plus the Merkle membership witness and ECDSA signature as private
+inputs, verifying eligibility and signature correctness internally. The `fold` circuit recursively
+aggregates everything into a single proof that can be verified on-chain.
+
+The TypeScript SDK orchestrates this in `packages/crisp-sdk/src/vote.ts`:
+
+```typescript
+// 1. Generate circuit inputs (BFV encryption + Merkle proof + signature)
+const { circuitInputs, encryptedVote } = await generateCircuitInputs(proofInputs)
+
+// 2. Execute circuits sequentially, each building on the last
+const ct0Result = await executeCircuit(ct0Circuit, ct0Inputs)
+const ct1Result = await executeCircuit(ct1Circuit, ct1Inputs)
+const crispResult = await executeCircuit(crispCircuit, crispInputs)
+const foldResult = await executeCircuit(foldCircuit, foldInputs)
+
+// 3. Generate the final Honk proof
+const proof = await honkBackend.generateProof(foldResult.witness)
+
+// 4. Encode for Solidity
+const solidityProof = encodeSolidityProof(proof, encryptedVote)
+```
+
+The Barretenberg WASM API (`@aztec/bb.js`) handles the UltraHonk proof generation. The SDK caches
+the API instance and SRS (Structured Reference String) to avoid re-initialisation on every proof.
+
+---
+
+## On-chain Verification
+
+The final proof is verified on-chain in `CRISPProgram.publishInput()` using an auto-generated Honk
+verifier contract (`CRISPVerifier.sol`). This verifier is generated by Barretenberg and contains the
+verification key baked in.
+
+```solidity
+// In publishInput():
+honkVerifier.verify(proof, publicInputs);
+```
+
+The public inputs include:
+
+- `prev_ct_commitment` — commitment to the previous ciphertext in the slot
+- `merkle_root` — the eligibility Merkle root
+- `slot_address` — which vote slot is being written to
+- `is_first_vote` — whether this is the first vote in the slot
+- `num_options` — number of voting options
+
+---
+
+## Generating Circuit Inputs from WASM
+
+Circuit inputs require BFV encryption internals (polynomial coefficients, RNS representations) that
+are implemented in Rust. To reuse the same code in the browser, CRISP compiles it to WASM via
+`@crisp-e3/zk-inputs`:
+
+```typescript
+import init from '@crisp-e3/zk-inputs/init'
+import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
+
+await init()
+const generator = ZKInputsGenerator.withDefaults()
+const { encryptedVote, inputs } = generator.generateInputs(
+  previousCiphertext,
+  publicKey,
+  voteCoefficients,
+)
+```
+
+The WASM module handles BFV encryption and produces the exact polynomial decompositions the Noir
+circuits expect. See the
+[crisp-zk-inputs README](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP/packages/crisp-zk-inputs)
+for the full API.
+
+---
+
+## Building Your Own Circuits
+
+If your E3 program needs custom input validation:
+
+1. **Define what to prove** — eligibility? correct format? value bounds?
+2. **Write Noir circuits** — use CRISP's library modules as building blocks (Merkle proofs, ECDSA,
+   ciphertext operations are all reusable)
+3. **Generate a verifier** — compile your circuit with `nargo` and generate the Solidity verifier
+   with `bb`
+4. **Call it from `publishInput`** — deploy the verifier and call it in your E3 program contract
+5. **Build a TypeScript SDK** — wrap circuit input generation in a package your frontend can use
+
+For simpler cases (e.g. just checking a value is in range), you may not need custom circuits at all,
+you can reuse the user-data-encryption circuit and the standard Interfold SDK.
+
+See [Noir Circuits](/noir-circuits) for toolchain setup and compilation instructions.

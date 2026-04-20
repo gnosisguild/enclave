@@ -44,6 +44,13 @@
   "hello-world-tutorial": {
     "title": "Hello World"
   },
+  "-- Tutorials": {
+    "type": "separator",
+    "title": "Tutorials"
+  },
+  "tutorials": {
+    "title": "Tutorials"
+  },
   "-- Tooling": {
     "type": "separator",
     "title": "Tooling"
