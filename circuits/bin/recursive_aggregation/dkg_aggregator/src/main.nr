@@ -46,7 +46,8 @@ fn main(
         assert(nodes_fold_public[4 + i * NODE_FOLD_PUBLIC_LEN] == party_ids[i]);
     }
 
-    // Cross-node C2 share grid (see `node_fold` public layout).
+    // Cross-node C0 to C3: each row's c3_pk[j] (recipient pk used in party i's C3 encryption for
+    // recipient j) must equal party j's own c0_pk.
     for i in 0..H {
         for j in 0..H {
             assert(
