@@ -1,0 +1,11 @@
+{
+  "sortition": {
+    "title": "Sortition"
+  },
+  "dkg": {
+    "title": "PVDKG & ZK Proofs"
+  },
+  "commitment-consistency": {
+    "title": "Commitment Consistency"
+  }
+}

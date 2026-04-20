@@ -57,7 +57,8 @@ const sdk = new EnclaveSDK({
     feeToken: import.meta.env.VITE_FEE_TOKEN_ADDRESS,
   },
   chain: sepolia,
-  thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
+  // Use 'SECURE_THRESHOLD_8192' for production. 'INSECURE_THRESHOLD_512' is for local dev only.
+  thresholdBfvParamsPresetName: 'SECURE_THRESHOLD_8192',
 })
 ```
 
@@ -76,18 +77,29 @@ const sdk = EnclaveSDK.create({
   },
   chain: sepolia,
   privateKey: '0x...', // optional — omit for read-only
-  thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
+  // Use 'SECURE_THRESHOLD_8192' for production. 'INSECURE_THRESHOLD_512' is for local dev only.
+  thresholdBfvParamsPresetName: 'SECURE_THRESHOLD_8192',
 })
 ```
 
 ### BFV Parameter Presets
 
-The SDK supports two BFV parameter presets:
+The `thresholdBfvParamsPresetName` field selects the BFV encryption parameters used by the client.
+It must match the `paramSet` index registered in the on-chain `Enclave` contract:
 
-| Preset Name              | Degree | Security | Use Case                     |
-| ------------------------ | ------ | -------- | ---------------------------- |
-| `INSECURE_THRESHOLD_512` | 512    | Insecure | Development and testing only |
-| `SECURE_THRESHOLD_8192`  | 8192   | Secure   | Production deployments       |
+| Preset Name              | On-chain `paramSet` | Degree | CRT moduli (L) | Security | Use case                           |
+| ------------------------ | ------------------- | ------ | -------------- | -------- | ---------------------------------- |
+| `INSECURE_THRESHOLD_512` | `0`                 | 512    | 2              | ❌ None  | Local development and testing only |
+| `SECURE_THRESHOLD_8192`  | `1`                 | 8192   | 4              | ✅ Full  | Production deployments             |
+
+**Always use `SECURE_THRESHOLD_8192` in production.** The insecure preset uses a small polynomial
+ring (N=512) with no cryptographic security guarantees — it exists solely to speed up local dev
+cycles. The secure preset (N=8192) meets standard FHE security targets and is required for mainnet
+and testnet deployments.
+
+The `paramSet` index in the E3 request must match the preset used by the ciphernode network. If you
+request an E3 with `paramSet: 1` but initialise the SDK with `INSECURE_THRESHOLD_512`, the
+ciphertext will be encrypted under the wrong parameters and decryption will fail.
 
 ### Requesting computations
 
@@ -145,7 +157,8 @@ export function Dashboard() {
       ciphernodeRegistry: import.meta.env.VITE_REGISTRY_ADDRESS,
       feeToken: import.meta.env.VITE_FEE_TOKEN_ADDRESS,
     },
-    thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
+    // Use 'SECURE_THRESHOLD_8192' for production. 'INSECURE_THRESHOLD_512' is for local dev only.
+    thresholdBfvParamsPresetName: 'SECURE_THRESHOLD_8192',
   })
 
   useEffect(() => {
@@ -186,8 +199,8 @@ const { encryptedData, circuitInputs } = await sdk.encryptNumberAndGenInputs(42n
 // Standalone import (pass preset name explicitly)
 import { generatePublicKey, encryptNumber } from '@enclave-e3/sdk'
 
-const pk = await generatePublicKey('INSECURE_THRESHOLD_512')
-const ct = await encryptNumber(42n, pk, 'INSECURE_THRESHOLD_512')
+const pk = await generatePublicKey('SECURE_THRESHOLD_8192')
+const ct = await encryptNumber(42n, pk, 'SECURE_THRESHOLD_8192')
 ```
 
 ### Full encryption method reference

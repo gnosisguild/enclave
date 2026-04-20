@@ -157,11 +157,11 @@ sequenceDiagram
 
 ## Publicly verifiable threshold BFV (PV-TBFV)
 
-**PV-TBFV** means **publicly verifiable threshold Ring-BFV**: every sensitive step you would worry
-about in a centralised system—generating key material, moving it under encryption, aggregating
-public keys, taking user ciphertexts, emitting decryption shares—is backed by a statement that
-verifiers can check **without** seeing the private witnesses. The DKG slice of that story is what we
-call **PVDKG**; in the repository it lands in **C0** through **C4** (with
+**PV-TBFV** means **publicly verifiable threshold BFV**: every sensitive step you would worry about
+in a centralised system—generating key material, moving it under encryption, aggregating public
+keys, taking user ciphertexts, emitting decryption shares—is backed by a statement that verifiers
+can check **without** seeing the private witnesses. The DKG slice of that story is what we call
+**PVDKG**; in the repository it lands in **C0** through **C4** (with
 [**C1**](https://github.com/gnosisguild/enclave/tree/main/circuits/bin/threshold/pk_generation)
 living under
 [`circuits/bin/threshold`](https://github.com/gnosisguild/enclave/tree/main/circuits/bin/threshold)

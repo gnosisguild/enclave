@@ -1,29 +1,64 @@
-# Wasm bundle for crisp-zk-inputs
+# @crisp-e3/zk-inputs
 
-Here we export wasm functionality for consumption in TypeScript to enable us to share code between
-Rust and TypeScript.
+WASM bindings for generating CRISP ZK proof inputs, compiled from Rust and shared between the
+server-side Node.js environment and the browser. This package lets the CRISP SDK produce the circuit
+witness data needed for Noir-based vote-validity proofs without duplicating the logic in TypeScript.
+
+## What it generates
+
+The WASM module wraps a `ZKInputsGenerator` class that performs BFV encryption and produces the
+witness data needed for CRISP's Noir circuits. Two main proof types are supported:
+
+- **Vote proof** (`generateInputs`) — encrypts a vote under the committee's threshold BFV public key
+  and produces a witness proving the vote is correctly encrypted and that the voter is eligible
+  (e.g. holds the required token balance, verified via a Merkle membership proof).
+
+- **Vote update / mask proof** (`generateInputsForUpdate`) — same structure, but used for revotes or
+  masker contributions under the
+  [vote masking](https://blog.theinterfold.com/vote-masking-receipt-freeness-secret-ballots/) scheme
+  that provides receipt-freeness. Unlike the first-vote path, this preserves the real
+  `prev_ct_commitment` (rather than zeroing it) to chain updates together.
+
+The generator also exposes `encryptVote` / `decryptVote` for standalone BFV operations and
+`generateKeys` for key generation.
+
+These witness objects are then passed to `@noir-lang/noir_js` and `@aztec/bb.js` to generate the
+actual ZK proofs.
 
 ## Usage
 
-This package exposes an `init` subpackage default function which should be used to universally load
-the wasm module instead of exporting the default loader.
+This package requires a universal init pattern because:
 
-This is because in modern node there is no need for preloading however in the browser we still need
-to load the wasm bundle.
+- In **Node.js** (>=18) WASM can be loaded synchronously — no preloading needed.
+- In the **browser** the WASM binary must be fetched and instantiated asynchronously.
 
-### ❌ DONT USE THE DEFAULT INIT
+The `init` subpackage handles both environments transparently.
+
+### ❌ Don't use the default export
 
 ```ts
-// Bad! Because this uses the raw loader which doesn't exist in node contexts
-import init, { bfvEncryptNumber } from '@crisp-e3/zk-inputs'
+// Bad — the raw default loader doesn't work in Node.js contexts
+import init, { generateVoteInputs } from '@crisp-e3/zk-inputs'
 ```
 
-### ✅ DO USE THE EXPORTED SUBMODULE
+### ✅ Use the universal subpackage loader
 
 ```ts
-// Good! Use the universal loader
 import init from '@crisp-e3/zk-inputs/init'
+import { generateVoteInputs } from '@crisp-e3/zk-inputs'
 
 await init()
-// other package imports here
+const inputs = generateVoteInputs(/* ... */)
+```
+
+Call `init()` once before using any other imports from `@crisp-e3/zk-inputs`. In browser
+environments `init()` fetches the WASM binary; in Node.js it is a no-op.
+
+## Building
+
+The WASM bundle is compiled from the Rust source in `crates/crisp-zk-inputs` using `wasm-pack`:
+
+```bash
+# From the CRISP root
+pnpm build:wasm
 ```

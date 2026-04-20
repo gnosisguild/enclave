@@ -1,9 +1,9 @@
 # Enclave ZK Circuit Benchmarks
 
-**Generated:** 2026-04-07 14:49:11 UTC
+**Generated:** 2026-04-15 11:38:26 UTC
 
-**Git Branch:** `main`  
-**Git Commit:** `bae26bfb4e0d6673bff4783c4942384dfbef5a08`
+**Git Branch:** `up/params`  
+**Git Commit:** `6359bfdf5bc7a5c8ea59a494a78b00341c318cb1`
 
 ---
 
@@ -15,21 +15,21 @@
 
 | Circuit                | Compile  | Execute | Prove   | Verify |
 | ---------------------- | -------- | ------- | ------- | ------ |
-| e_sm_share_computation | 430.82 s | 7.67 s  | 22.45 s | 0.03 s |
-| pk                     | 12.68 s  | 0.54 s  | 1.05 s  | 0.03 s |
-| share_decryption       | 164.72 s | 3.66 s  | 10.81 s | 0.02 s |
-| share_encryption       | 538.42 s | 5.06 s  | 11.41 s | 0.09 s |
-| sk_share_computation   | 176.93 s | 5.53 s  | 20.02 s | 0.03 s |
+| e_sm_share_computation | 288.92 s | 5.88 s  | 20.08 s | 0.03 s |
+| pk                     | 22.05 s  | 0.62 s  | 1.60 s  | 0.03 s |
+| share_decryption       | 126.46 s | 2.96 s  | 9.76 s  | 0.02 s |
+| share_encryption       | 778.88 s | 5.14 s  | 11.65 s | 0.09 s |
+| sk_share_computation   | 135.62 s | 4.70 s  | 13.34 s | 0.03 s |
 
 #### Size & Circuit Metrics
 
-| Circuit                | Opcodes | Gates   | Circuit Size | Witness   | VK Size | Proof Size |
-| ---------------------- | ------- | ------- | ------------ | --------- | ------- | ---------- |
-| e_sm_share_computation | 2468542 | 7.39M   | 31.59 MB     | 10.11 MB  | 3.59 KB | 15.88 KB   |
-| pk                     | 10925   | 215.80K | 445.36 KB    | 952.11 KB | 3.59 KB | 15.88 KB   |
-| share_decryption       | 928446  | 3.13M   | 12.72 MB     | 5.89 MB   | 3.59 KB | 15.88 KB   |
-| share_encryption       | 1151876 | 3.19M   | 14.37 MB     | 14.19 MB  | 3.59 KB | 15.88 KB   |
-| sk_share_computation   | 1802613 | 4.90M   | 23.37 MB     | 6.12 MB   | 3.59 KB | 15.88 KB   |
+| Circuit                | Opcodes | Gates   | Circuit Size | Witness  | VK Size | Proof Size |
+| ---------------------- | ------- | ------- | ------------ | -------- | ------- | ---------- |
+| e_sm_share_computation | 1859606 | 5.74M   | 23.81 MB     | 8.12 MB  | 3.59 KB | 15.88 KB   |
+| pk                     | 14568   | 287.76K | 501.04 KB    | 1.12 MB  | 3.59 KB | 15.88 KB   |
+| share_decryption       | 707266  | 2.56M   | 9.72 MB      | 4.98 MB  | 3.59 KB | 15.88 KB   |
+| share_encryption       | 1167356 | 3.52M   | 14.61 MB     | 15.09 MB | 3.59 KB | 15.88 KB   |
+| sk_share_computation   | 1360248 | 3.88M   | 17.62 MB     | 5.05 MB  | 3.59 KB | 15.88 KB   |
 
 ### Threshold
 
@@ -37,23 +37,23 @@
 
 | Circuit                      | Compile  | Execute | Prove   | Verify |
 | ---------------------------- | -------- | ------- | ------- | ------ |
-| decrypted_shares_aggregation | 1.50 s   | 0.70 s  | 0.81 s  | 0.02 s |
-| pk_aggregation               | 126.53 s | 6.07 s  | 20.04 s | 0.02 s |
-| pk_generation                | 379.45 s | 4.07 s  | 10.93 s | 0.02 s |
-| share_decryption             | 478.26 s | 4.89 s  | 11.28 s | 0.16 s |
-| user_data_encryption_ct0     | 118.00 s | 4.30 s  | 6.61 s  | 0.02 s |
-| user_data_encryption_ct1     | 90.37 s  | 3.54 s  | 6.04 s  | 0.03 s |
+| decrypted_shares_aggregation | 1.35 s   | 0.66 s  | 0.54 s  | 0.02 s |
+| pk_aggregation               | 106.23 s | 4.76 s  | 18.09 s | 0.02 s |
+| pk_generation                | 264.52 s | 3.27 s  | 9.66 s  | 0.02 s |
+| share_decryption             | 375.76 s | 3.90 s  | 10.14 s | 0.12 s |
+| user_data_encryption_ct0     | 100.06 s | 3.36 s  | 6.39 s  | 0.03 s |
+| user_data_encryption_ct1     | 73.23 s  | 2.78 s  | 5.46 s  | 0.02 s |
 
 #### Size & Circuit Metrics
 
 | Circuit                      | Opcodes | Gates   | Circuit Size | Witness   | VK Size | Proof Size |
 | ---------------------------- | ------- | ------- | ------------ | --------- | ------- | ---------- |
-| decrypted_shares_aggregation | 59327   | 149.69K | 1.36 MB      | 201.40 KB | 3.59 KB | 15.88 KB   |
-| pk_aggregation               | 1594721 | 5.28M   | 21.95 MB     | 10.22 MB  | 3.59 KB | 15.88 KB   |
-| pk_generation                | 854628  | 3.09M   | 11.22 MB     | 12.89 MB  | 3.59 KB | 15.88 KB   |
-| share_decryption             | 750193  | 3.02M   | 10.43 MB     | 18.04 MB  | 3.59 KB | 15.88 KB   |
-| user_data_encryption_ct0     | 783630  | 1.91M   | 10.13 MB     | 12.55 MB  | 3.59 KB | 15.88 KB   |
-| user_data_encryption_ct1     | 647104  | 1.61M   | 8.36 MB      | 10.42 MB  | 3.59 KB | 15.88 KB   |
+| decrypted_shares_aggregation | 50592   | 128.31K | 1.25 MB      | 174.93 KB | 3.59 KB | 15.88 KB   |
+| pk_aggregation               | 1217897 | 4.40M   | 16.86 MB     | 8.83 MB   | 3.59 KB | 15.88 KB   |
+| pk_generation                | 669868  | 2.43M   | 8.87 MB      | 10.35 MB  | 3.59 KB | 15.88 KB   |
+| share_decryption             | 579100  | 2.63M   | 8.10 MB      | 14.57 MB  | 3.59 KB | 15.88 KB   |
+| user_data_encryption_ct0     | 626751  | 1.68M   | 8.12 MB      | 10.02 MB  | 3.59 KB | 15.88 KB   |
+| user_data_encryption_ct1     | 506035  | 1.40M   | 6.59 MB      | 8.44 MB   | 3.59 KB | 15.88 KB   |
 
 ### Config
 
@@ -61,7 +61,7 @@
 
 | Circuit                 | Compile | Execute | Prove  | Verify |
 | ----------------------- | ------- | ------- | ------ | ------ |
-| validate_secure_configs | 0.31 s  | 0.31 s  | 0.00 s | 0.00 s |
+| validate_secure_configs | 0.30 s  | 0.29 s  | 0.00 s | 0.00 s |
 
 #### Size & Circuit Metrics
 
@@ -77,15 +77,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 430.82 s  |
-| **Execution**        | 7.67 s    |
-| **VK Generation**    | 10.77 s   |
-| **Proof Generation** | 22.45 s   |
+| **Compilation**      | 288.92 s  |
+| **Execution**        | 5.88 s    |
+| **VK Generation**    | 8.38 s    |
+| **Proof Generation** | 20.08 s   |
 | **Verification**     | 0.03 s    |
-| **ACIR Opcodes**     | "2468542" |
-| **Total Gates**      | "7387206" |
-| **Circuit Size**     | 31.59 MB  |
-| **Witness Size**     | 10.11 MB  |
+| **ACIR Opcodes**     | "1859606" |
+| **Total Gates**      | "5739750" |
+| **Circuit Size**     | 23.81 MB  |
+| **Witness Size**     | 8.12 MB   |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -93,15 +93,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 12.68 s   |
-| **Execution**        | 0.54 s    |
-| **VK Generation**    | 0.39 s    |
-| **Proof Generation** | 1.05 s    |
+| **Compilation**      | 22.05 s   |
+| **Execution**        | 0.62 s    |
+| **VK Generation**    | 0.48 s    |
+| **Proof Generation** | 1.60 s    |
 | **Verification**     | 0.03 s    |
-| **ACIR Opcodes**     | "10925"   |
-| **Total Gates**      | "215804"  |
-| **Circuit Size**     | 445.36 KB |
-| **Witness Size**     | 952.11 KB |
+| **ACIR Opcodes**     | "14568"   |
+| **Total Gates**      | "287764"  |
+| **Circuit Size**     | 501.04 KB |
+| **Witness Size**     | 1.12 MB   |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -109,15 +109,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 164.72 s  |
-| **Execution**        | 3.66 s    |
-| **VK Generation**    | 4.53 s    |
-| **Proof Generation** | 10.81 s   |
+| **Compilation**      | 126.46 s  |
+| **Execution**        | 2.96 s    |
+| **VK Generation**    | 3.93 s    |
+| **Proof Generation** | 9.76 s    |
 | **Verification**     | 0.02 s    |
-| **ACIR Opcodes**     | "928446"  |
-| **Total Gates**      | "3127021" |
-| **Circuit Size**     | 12.72 MB  |
-| **Witness Size**     | 5.89 MB   |
+| **ACIR Opcodes**     | "707266"  |
+| **Total Gates**      | "2564001" |
+| **Circuit Size**     | 9.72 MB   |
+| **Witness Size**     | 4.98 MB   |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -125,15 +125,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 538.42 s  |
-| **Execution**        | 5.06 s    |
-| **VK Generation**    | 4.67 s    |
-| **Proof Generation** | 11.41 s   |
+| **Compilation**      | 778.88 s  |
+| **Execution**        | 5.14 s    |
+| **VK Generation**    | 4.89 s    |
+| **Proof Generation** | 11.65 s   |
 | **Verification**     | 0.09 s    |
-| **ACIR Opcodes**     | "1151876" |
-| **Total Gates**      | "3194472" |
-| **Circuit Size**     | 14.37 MB  |
-| **Witness Size**     | 14.19 MB  |
+| **ACIR Opcodes**     | "1167356" |
+| **Total Gates**      | "3520046" |
+| **Circuit Size**     | 14.61 MB  |
+| **Witness Size**     | 15.09 MB  |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -141,15 +141,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 176.93 s  |
-| **Execution**        | 5.53 s    |
-| **VK Generation**    | 7.86 s    |
-| **Proof Generation** | 20.02 s   |
+| **Compilation**      | 135.62 s  |
+| **Execution**        | 4.70 s    |
+| **VK Generation**    | 6.34 s    |
+| **Proof Generation** | 13.34 s   |
 | **Verification**     | 0.03 s    |
-| **ACIR Opcodes**     | "1802613" |
-| **Total Gates**      | "4903487" |
-| **Circuit Size**     | 23.37 MB  |
-| **Witness Size**     | 6.12 MB   |
+| **ACIR Opcodes**     | "1360248" |
+| **Total Gates**      | "3879330" |
+| **Circuit Size**     | 17.62 MB  |
+| **Witness Size**     | 5.05 MB   |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -159,15 +159,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 1.50 s    |
-| **Execution**        | 0.70 s    |
-| **VK Generation**    | 0.32 s    |
-| **Proof Generation** | 0.81 s    |
+| **Compilation**      | 1.35 s    |
+| **Execution**        | 0.66 s    |
+| **VK Generation**    | 0.25 s    |
+| **Proof Generation** | 0.54 s    |
 | **Verification**     | 0.02 s    |
-| **ACIR Opcodes**     | "59327"   |
-| **Total Gates**      | "149687"  |
-| **Circuit Size**     | 1.36 MB   |
-| **Witness Size**     | 201.40 KB |
+| **ACIR Opcodes**     | "50592"   |
+| **Total Gates**      | "128310"  |
+| **Circuit Size**     | 1.25 MB   |
+| **Witness Size**     | 174.93 KB |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -175,15 +175,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 126.53 s  |
-| **Execution**        | 6.07 s    |
-| **VK Generation**    | 8.17 s    |
-| **Proof Generation** | 20.04 s   |
+| **Compilation**      | 106.23 s  |
+| **Execution**        | 4.76 s    |
+| **VK Generation**    | 6.46 s    |
+| **Proof Generation** | 18.09 s   |
 | **Verification**     | 0.02 s    |
-| **ACIR Opcodes**     | "1594721" |
-| **Total Gates**      | "5284183" |
-| **Circuit Size**     | 21.95 MB  |
-| **Witness Size**     | 10.22 MB  |
+| **ACIR Opcodes**     | "1217897" |
+| **Total Gates**      | "4395328" |
+| **Circuit Size**     | 16.86 MB  |
+| **Witness Size**     | 8.83 MB   |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -191,15 +191,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 379.45 s  |
-| **Execution**        | 4.07 s    |
-| **VK Generation**    | 4.17 s    |
-| **Proof Generation** | 10.93 s   |
+| **Compilation**      | 264.52 s  |
+| **Execution**        | 3.27 s    |
+| **VK Generation**    | 3.50 s    |
+| **Proof Generation** | 9.66 s    |
 | **Verification**     | 0.02 s    |
-| **ACIR Opcodes**     | "854628"  |
-| **Total Gates**      | "3088306" |
-| **Circuit Size**     | 11.22 MB  |
-| **Witness Size**     | 12.89 MB  |
+| **ACIR Opcodes**     | "669868"  |
+| **Total Gates**      | "2432074" |
+| **Circuit Size**     | 8.87 MB   |
+| **Witness Size**     | 10.35 MB  |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -207,15 +207,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 478.26 s  |
-| **Execution**        | 4.89 s    |
-| **VK Generation**    | 4.24 s    |
-| **Proof Generation** | 11.28 s   |
-| **Verification**     | 0.16 s    |
-| **ACIR Opcodes**     | "750193"  |
-| **Total Gates**      | "3022296" |
-| **Circuit Size**     | 10.43 MB  |
-| **Witness Size**     | 18.04 MB  |
+| **Compilation**      | 375.76 s  |
+| **Execution**        | 3.90 s    |
+| **VK Generation**    | 3.60 s    |
+| **Proof Generation** | 10.14 s   |
+| **Verification**     | 0.12 s    |
+| **ACIR Opcodes**     | "579100"  |
+| **Total Gates**      | "2628314" |
+| **Circuit Size**     | 8.10 MB   |
+| **Witness Size**     | 14.57 MB  |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -223,15 +223,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 118.00 s  |
-| **Execution**        | 4.30 s    |
-| **VK Generation**    | 2.84 s    |
-| **Proof Generation** | 6.61 s    |
-| **Verification**     | 0.02 s    |
-| **ACIR Opcodes**     | "783630"  |
-| **Total Gates**      | "1911547" |
-| **Circuit Size**     | 10.13 MB  |
-| **Witness Size**     | 12.55 MB  |
+| **Compilation**      | 100.06 s  |
+| **Execution**        | 3.36 s    |
+| **VK Generation**    | 2.53 s    |
+| **Proof Generation** | 6.39 s    |
+| **Verification**     | 0.03 s    |
+| **ACIR Opcodes**     | "626751"  |
+| **Total Gates**      | "1678200" |
+| **Circuit Size**     | 8.12 MB   |
+| **Witness Size**     | 10.02 MB  |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -239,15 +239,15 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 90.37 s   |
-| **Execution**        | 3.54 s    |
-| **VK Generation**    | 2.43 s    |
-| **Proof Generation** | 6.04 s    |
-| **Verification**     | 0.03 s    |
-| **ACIR Opcodes**     | "647104"  |
-| **Total Gates**      | "1607045" |
-| **Circuit Size**     | 8.36 MB   |
-| **Witness Size**     | 10.42 MB  |
+| **Compilation**      | 73.23 s   |
+| **Execution**        | 2.78 s    |
+| **VK Generation**    | 2.02 s    |
+| **Proof Generation** | 5.46 s    |
+| **Verification**     | 0.02 s    |
+| **ACIR Opcodes**     | "506035"  |
+| **Total Gates**      | "1398659" |
+| **Circuit Size**     | 6.59 MB   |
+| **Witness Size**     | 8.44 MB   |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
 
@@ -257,8 +257,8 @@
 
 | Metric               | Value    |
 | -------------------- | -------- |
-| **Compilation**      | 0.31 s   |
-| **Execution**        | 0.31 s   |
+| **Compilation**      | 0.30 s   |
+| **Execution**        | 0.29 s   |
 | **VK Generation**    | 0.00 s   |
 | **Proof Generation** | 0.00 s   |
 | **Verification**     | 0.00 s   |

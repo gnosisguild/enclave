@@ -44,6 +44,13 @@
   "hello-world-tutorial": {
     "title": "Hello World"
   },
+  "-- Tutorials": {
+    "type": "separator",
+    "title": "Tutorials"
+  },
+  "tutorials": {
+    "title": "Tutorials"
+  },
   "-- Tooling": {
     "type": "separator",
     "title": "Tooling"
@@ -95,6 +102,13 @@
   },
   "CRISP": {
     "title": "CRISP"
+  },
+  "-- Internals": {
+    "type": "separator",
+    "title": "Internals"
+  },
+  "internals": {
+    "title": "Technical Deep Dives"
   },
   "-- Reference": {
     "type": "separator",
