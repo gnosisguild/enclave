@@ -8,9 +8,9 @@ use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, BusHandle, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
-    DKGRecursiveAggregationComplete, Die, DkgAggregationRequest, E3Failed, E3Stage, E3id,
-    EnclaveEvent, EnclaveEventData, EventContext, FailureReason, KeyshareCreated, OrderedSet,
+    prelude::*, BusHandle, CircuitName, ComputeRequest, ComputeResponse, ComputeResponseKind,
+    CorrelationId, DKGRecursiveAggregationComplete, Die, DkgAggregationRequest, E3Failed, E3Stage,
+    E3id, EnclaveEvent, EnclaveEventData, EventContext, FailureReason, KeyshareCreated, OrderedSet,
     PartyProofsToVerify, PkAggregationProofPending, PkAggregationProofRequest,
     PkAggregationProofSigned, Proof, ProofType, PublicKeyAggregated, Seed, Sequenced,
     ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed, SignedProofPayload,
@@ -24,6 +24,23 @@ use e3_utils::{ArcBytes, MAILBOX_LIMIT};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use tracing::{error, info, warn};
+
+/// Extract the Safe-based aggregated PK commitment from the signed C5 proof.
+/// This is the last public signal of `CircuitName::PkAggregation`.
+fn extract_pk_commitment(c5_proof: &Proof) -> Result<[u8; 32]> {
+    let layout = CircuitName::PkAggregation.output_layout();
+    let bytes = layout
+        .extract_field(&c5_proof.public_signals, "commitment")
+        .ok_or_else(|| anyhow::anyhow!("C5 proof is missing `commitment` public signal"))?;
+    let mut out = [0u8; 32];
+    if bytes.len() != 32 {
+        return Err(anyhow::anyhow!(
+            "C5 `commitment` public signal must be 32 bytes"
+        ));
+    }
+    out.copy_from_slice(bytes);
+    Ok(out)
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublicKeyAggregatorState {
@@ -655,7 +672,7 @@ impl PublicKeyAggregator {
         Ok(())
     }
 
-    /// Publish `PublicKeyAggregated` when both C5 and DkgAggregator proof are ready (or aggregation skipped).
+    /// Publish `PublicKeyAggregated` when C5 (non-ZK recursive) and, if applicable, the EVM DkgAggregator proof are ready (or aggregation skipped).
     fn try_publish_complete(&mut self) -> Result<()> {
         if let Some(ec) = self.state.get().and_then(|s| {
             if let PublicKeyAggregatorState::GeneratingC5Proof { last_ec, .. } = &s {
@@ -716,7 +733,7 @@ impl PublicKeyAggregator {
             .ok_or_else(|| anyhow::anyhow!("No EventContext for publish"))?;
 
         info!(
-            "C5 proof ready — publishing PublicKeyAggregated (dkg_aggregated_proof={})",
+            "Publishing PublicKeyAggregated (dkg_evm_proof={})",
             if dkg_aggregated_proof.is_some() {
                 "present"
             } else {
@@ -724,12 +741,14 @@ impl PublicKeyAggregator {
             }
         );
 
+        let pk_commitment = extract_pk_commitment(c5_proof)?;
+
         let event = PublicKeyAggregated {
             pubkey: public_key.clone(),
             e3_id: self.e3_id.clone(),
             nodes: nodes.clone(),
-            pk_aggregation_proof: Some(c5_proof.clone()),
-            dkg_aggregated_proof: dkg_aggregated_proof.clone(),
+            pk_commitment,
+            dkg_aggregator_proof: dkg_aggregated_proof.clone(),
         };
         self.bus.publish(event, ec.clone())?;
 

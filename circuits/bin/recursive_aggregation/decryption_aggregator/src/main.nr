@@ -4,12 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Phase 7 decryption aggregator (on-chain target): one non-ZK `c6_fold` proof (folded C6 column) plus C7 ZK.
+//! Decryption aggregator: non-ZK `c6_fold` (folded C6 column) + non-ZK `decrypted_shares_aggregation`
+//! (C7, both `noir-recursive-no-zk`). The final `bb prove -t evm` proof of this circuit is what the
+//! contract verifies on-chain.
 
-use bb_proof_verification::{
-    UltraHonkProof, UltraHonkVerificationKey, UltraHonkZKProof, verify_honk_proof,
-    verify_honk_proof_non_zk,
-};
+use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
 use lib::configs::default::MAX_MSG_NON_ZERO_COEFFS;
 use lib::configs::default::T;
 use lib::math::commitments::compute_vk_hash;
@@ -24,13 +23,13 @@ fn main(
     c6_fold_proof: UltraHonkProof,
     c6_fold_public: [Field; C6_FOLD_PUBLIC_LEN],
     c7_vk: UltraHonkVerificationKey,
-    c7_proof: UltraHonkZKProof,
+    c7_proof: UltraHonkProof,
     c7_public: [Field; C7_PUBLIC_LEN],
     c6_fold_key_hash: pub Field,
     c7_key_hash: pub Field,
 ) -> pub (Field, [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; MAX_MSG_NON_ZERO_COEFFS]) {
     verify_honk_proof_non_zk(c6_fold_vk, c6_fold_proof, c6_fold_public, c6_fold_key_hash);
-    verify_honk_proof(c7_vk, c7_proof, c7_public, c7_key_hash);
+    verify_honk_proof_non_zk(c7_vk, c7_proof, c7_public, c7_key_hash);
 
     // Cross-circuit C6 to C7: each folded `d_commitment` column entry must match `c7_public[i]`
     // (leading `T + 1` words of `c7_public`).

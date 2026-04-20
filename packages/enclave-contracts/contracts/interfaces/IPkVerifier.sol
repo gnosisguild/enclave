@@ -7,17 +7,20 @@ pragma solidity >=0.8.27;
 
 /**
  * @title IPkVerifier
- * @notice Interface for C5 (pk_aggregation) proof verification
- * @dev Verifies that the aggregated committee public key was correctly reconstructed from party shares
+ * @notice Interface for the DkgAggregator (EVM) proof verifier.
+ * @dev The DkgAggregator circuit internally verifies the node-fold and C5
+ *      (pk_aggregation) sub-proofs; this on-chain verifier only needs to
+ *      verify the final EVM proof and enforce that its last public input
+ *      matches the committee's aggregated public-key commitment.
  */
 interface IPkVerifier {
-    /// @notice Verify a C5 (pk_aggregation) proof and return the aggregate commitment.
-    /// @param proof ABI-encoded (bytes rawProof, bytes32[] publicInputs).
-    /// @param foldProof ABI-encoded fold proof (bytes, bytes32[]) or empty to skip.
-    /// @return pkCommitment The aggregate public key commitment (last public input).
-    /// @dev Reverts if the proof is invalid.
+    /// @notice Verify a DkgAggregator EVM proof and bind it to `pkCommitment`.
+    /// @param pkCommitment Safe-based aggregated PK commitment the proof must attest to
+    ///        (equals `publicInputs[publicInputs.length - 1]`).
+    /// @param proof ABI-encoded `(bytes rawProof, bytes32[] publicInputs)`.
+    /// @return success True if the proof is valid and its last public input equals `pkCommitment`.
     function verify(
-        bytes memory proof,
-        bytes memory foldProof
-    ) external view returns (bytes32 pkCommitment);
+        bytes32 pkCommitment,
+        bytes calldata proof
+    ) external view returns (bool success);
 }

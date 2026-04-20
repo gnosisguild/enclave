@@ -5,10 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-export default buildModule("RecursiveAggregationFoldVerifier", (m) => {
-  const recursiveAggregationFoldVerifier = m.contract(
-    "RecursiveAggregationFoldVerifier",
-  );
+export default buildModule("DkgAggregatorVerifier", (m) => {
+  const dkgAggregatorVerifier = m.contract("DkgAggregatorVerifier");
 
-  return { recursiveAggregationFoldVerifier };
+  return { dkgAggregatorVerifier };
 }) as any;

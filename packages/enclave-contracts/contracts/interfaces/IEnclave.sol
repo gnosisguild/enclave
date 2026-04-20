@@ -462,13 +462,13 @@ interface IEnclave {
     /// @dev This function MUST emit the PlaintextOutputPublished event.
     /// @param e3Id ID of the E3.
     /// @param plaintextOutput ABI encoded plaintext output.
-    /// @param proof ABI encoded data to verify the plaintextOutput (C7).
-    /// @param foldProof Optional fold proof ABI-encoded (bytes, bytes32[]); empty to skip.
+    /// @param proof DecryptionAggregator (EVM) proof ABI-encoded
+    ///        `(bytes rawProof, bytes32[] publicInputs)`, or empty bytes when proof
+    ///        aggregation is disabled for the E3.
     function publishPlaintextOutput(
         uint256 e3Id,
         bytes calldata plaintextOutput,
-        bytes calldata proof,
-        bytes calldata foldProof
+        bytes calldata proof
     ) external returns (bool success);
 
     ////////////////////////////////////////////////////////////

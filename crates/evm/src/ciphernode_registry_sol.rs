@@ -490,7 +490,8 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
         let e3_id = msg.e3_id.clone();
         let pubkey = msg.pubkey.clone();
         let nodes = msg.nodes.clone();
-        let pk_aggregation_proof = msg.pk_aggregation_proof.clone();
+        let pk_commitment = msg.pk_commitment;
+        let dkg_aggregator_proof = msg.dkg_aggregator_proof.clone();
         let contract_address = self.contract_address;
         let provider = self.provider.clone();
         let bus = self.bus.clone();
@@ -518,8 +519,8 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                 e3_id,
                 nodes,
                 pubkey,
-                pk_aggregation_proof.as_ref(),
-                msg.dkg_aggregated_proof.as_ref(),
+                pk_commitment,
+                dkg_aggregator_proof.as_ref(),
             )
             .await;
             match result {
@@ -671,16 +672,16 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
     e3_id: E3id,
     nodes: OrderedSet<String>,
     public_key: ArcBytes,
-    pk_aggregation_proof: Option<&Proof>,
-    dkg_aggregated_proof: Option<&Proof>,
+    pk_commitment: [u8; 32],
+    dkg_aggregator_proof: Option<&Proof>,
 ) -> Result<TransactionReceipt> {
     let e3_id_u256: U256 = e3_id.try_into()?;
     let public_key_bytes = Bytes::from(public_key.extract_bytes());
+    let pk_commitment_b256 = B256::from(pk_commitment);
 
-    let proof: Bytes = encode_zk_proof(
-        pk_aggregation_proof.ok_or_else(|| anyhow::anyhow!("pk_aggregation_proof required"))?,
-    )?;
-    let fold_proof: Bytes = match dkg_aggregated_proof {
+    // `proof` is empty when `proofAggregationEnabled = false`; the contract
+    // trusts `pk_commitment` directly in that case.
+    let proof: Bytes = match dkg_aggregator_proof {
         Some(p) => encode_zk_proof(p)?,
         None => Bytes::new(),
     };
@@ -695,7 +696,6 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
         let provider = provider.clone();
         let nodes_vec = nodes_vec.clone();
         let public_key_bytes = public_key_bytes.clone();
-        let fold_proof = fold_proof.clone();
         let proof = proof.clone();
         async move {
             info!("Calling: contract.publishCommittee(..)");
@@ -707,7 +707,13 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
                 .await?;
             let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
             let builder = contract
-                .publishCommittee(e3_id_u256, nodes_vec, public_key_bytes, proof, fold_proof)
+                .publishCommittee(
+                    e3_id_u256,
+                    nodes_vec,
+                    public_key_bytes,
+                    pk_commitment_b256,
+                    proof,
+                )
                 .nonce(current_nonce);
             let receipt = builder.send().await?.get_receipt().await?;
             Ok(receipt)

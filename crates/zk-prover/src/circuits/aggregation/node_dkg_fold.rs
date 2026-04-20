@@ -10,9 +10,7 @@
 use crate::circuits::aggregation::c3_accumulator::generate_sequential_c3_fold;
 use crate::circuits::aggregation::c6_accumulator::generate_sequential_c6_fold;
 use crate::circuits::aggregation::nodes_fold_accumulator::generate_sequential_nodes_fold;
-use crate::circuits::utils::{
-    bytes_to_field_strings, inputs_json_to_input_map, zk_proof_bytes_to_field_strings,
-};
+use crate::circuits::utils::{bytes_to_field_strings, inputs_json_to_input_map};
 use crate::circuits::vk;
 use crate::error::ZkError;
 use crate::prover::ZkProver;
@@ -23,10 +21,6 @@ use serde_json::json;
 
 fn proof_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
     bytes_to_field_strings(proof.data.as_ref())
-}
-
-fn zk_proof_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
-    zk_proof_bytes_to_field_strings(proof.data.as_ref())
 }
 
 fn proof_public_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
@@ -299,7 +293,8 @@ struct DkgAggregatorWitness {
     party_ids: Vec<String>,
 }
 
-/// [`CircuitName::DkgAggregator`] over sequential [`CircuitName::NodesFold`] + C5.
+/// [`CircuitName::DkgAggregator`] over sequential [`CircuitName::NodesFold`] + C5, proved with
+/// [`CircuitVariant::Evm`] for on-chain verification.
 pub fn prove_dkg_aggregation(
     prover: &ZkProver,
     input: &DkgAggregationInput,
@@ -332,7 +327,7 @@ pub fn prove_dkg_aggregation(
         CircuitName::NodesFold,
     )?;
     let c5_vk = vk::load_vk_artifacts(
-        &prover.circuits_dir(CircuitVariant::Recursive, artifacts_dir),
+        &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
         CircuitName::PkAggregation,
     )?;
 
@@ -348,7 +343,7 @@ pub fn prove_dkg_aggregation(
         nodes_fold_proof: proof_field_strings(&nodes_fold_proof)?,
         nodes_fold_public: proof_public_field_strings(&nodes_fold_proof)?,
         c5_vk: c5_vk.verification_key.clone(),
-        c5_proof: zk_proof_field_strings(input.c5_proof)?,
+        c5_proof: proof_field_strings(input.c5_proof)?,
         c5_public: proof_public_field_strings(input.c5_proof)?,
         nodes_fold_key_hash: nodes_fold_vk.key_hash.clone(),
         c5_key_hash: c5_vk.key_hash.clone(),
@@ -365,10 +360,11 @@ pub fn prove_dkg_aggregation(
             .join(format!("{}.json", CircuitName::DkgAggregator.as_str())),
     )?;
     let w = WitnessGenerator::new().generate_witness(&compiled, input_map)?;
-    prover.generate_recursive_aggregation_bin_proof(
+    prover.generate_proof_with_variant(
         CircuitName::DkgAggregator,
         &w,
         e3_id,
+        CircuitVariant::Evm,
         artifacts_dir,
     )
 }
@@ -392,7 +388,8 @@ struct DecryptionAggregatorWitness {
     c7_key_hash: String,
 }
 
-/// Prove [`CircuitName::DecryptionAggregator`] for each job (C6 fold + C7).
+/// Prove [`CircuitName::DecryptionAggregator`] for each job (C6 fold + C7), with
+/// [`CircuitVariant::Evm`] for on-chain verification.
 pub fn prove_decryption_aggregation_jobs(
     prover: &ZkProver,
     c6_total_slots: usize,
@@ -415,7 +412,7 @@ pub fn prove_decryption_aggregation_jobs(
             CircuitName::C6Fold,
         )?;
         let c7_vk = vk::load_vk_artifacts(
-            &prover.circuits_dir(CircuitVariant::Recursive, artifacts_dir),
+            &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
             CircuitName::DecryptedSharesAggregation,
         )?;
 
@@ -424,7 +421,7 @@ pub fn prove_decryption_aggregation_jobs(
             c6_fold_proof: proof_field_strings(&c6_fold)?,
             c6_fold_public: proof_public_field_strings(&c6_fold)?,
             c7_vk: c7_vk.verification_key.clone(),
-            c7_proof: zk_proof_field_strings(job.c7_proof)?,
+            c7_proof: proof_field_strings(job.c7_proof)?,
             c7_public: proof_public_field_strings(job.c7_proof)?,
             c6_fold_key_hash: c6_fold_vk.key_hash.clone(),
             c7_key_hash: c7_vk.key_hash.clone(),
@@ -443,10 +440,11 @@ pub fn prove_decryption_aggregation_jobs(
                 )),
         )?;
         let w = WitnessGenerator::new().generate_witness(&compiled, input_map)?;
-        let proof = prover.generate_recursive_aggregation_bin_proof(
+        let proof = prover.generate_proof_with_variant(
             CircuitName::DecryptionAggregator,
             &w,
             &format!("{e3_id}-decagg-{i}"),
+            CircuitVariant::Evm,
             artifacts_dir,
         )?;
         out.push(proof);

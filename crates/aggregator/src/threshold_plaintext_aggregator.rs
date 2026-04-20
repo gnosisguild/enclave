@@ -801,7 +801,7 @@ impl ThresholdPlaintextAggregator {
             .clone()
             .ok_or_else(|| anyhow!("No EventContext for publish"))?;
 
-        info!("Both C7 and C6 fold proof ready — publishing PlaintextAggregated");
+        info!("C7 + decryption_aggregator proofs ready — publishing PlaintextAggregated");
 
         let len = MAX_MSG_NON_ZERO_COEFFS * 8;
         let decrypted_output: Vec<ArcBytes> = state
@@ -818,18 +818,19 @@ impl ThresholdPlaintextAggregator {
             })
             .collect();
 
-        let dec = self.decryption_aggregator_proofs.as_ref();
+        let decryption_aggregator_proofs = self
+            .decryption_aggregator_proofs
+            .clone()
+            .unwrap_or_default();
+        // Keep c7_proofs for invariant check; they are subsumed by the decryption_aggregator proof.
+        let _ = c7_proofs;
         let event = PlaintextAggregated {
             decrypted_output,
             e3_id: self.e3_id.clone(),
-            aggregation_proofs: c7_proofs,
-            c6_aggregated_proof: dec.and_then(|v| v.first().cloned()),
+            decryption_aggregator_proofs,
         };
 
-        info!(
-            "Dispatching plaintext event with C7 and C6 proofs {:?}",
-            event
-        );
+        info!("Dispatching plaintext event {:?}", event);
         self.bus.publish(event, ec.clone())?;
 
         self.state.try_mutate(&ec, |_| {

@@ -4,13 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! DKG aggregator (on-chain target): one non-ZK `nodes_fold` proof (folded `H` `node_fold` rows), then
-//! C5 with ZK `verify_honk_proof` (base `pk_aggregation` remains ZK in the leaf pipeline).
+//! DKG aggregator: non-ZK `nodes_fold` and non-ZK `pk_aggregation` (both `noir-recursive-no-zk`).
+//! The final `bb prove -t evm` proof of this circuit is what the contract verifies on-chain.
 
-use bb_proof_verification::{
-    UltraHonkProof, UltraHonkVerificationKey, UltraHonkZKProof, verify_honk_proof,
-    verify_honk_proof_non_zk,
-};
+use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
 use lib::configs::default::dkg::L_THRESHOLD;
 use lib::configs::default::{H, N_PARTIES};
 use lib::math::commitments::compute_vk_hash;
@@ -26,7 +23,7 @@ fn main(
     nodes_fold_proof: UltraHonkProof,
     nodes_fold_public: [Field; NODES_FOLD_PUBLIC_LEN],
     c5_vk: UltraHonkVerificationKey,
-    c5_proof: UltraHonkZKProof,
+    c5_proof: UltraHonkProof,
     c5_public: [Field; H + 1],
     nodes_fold_key_hash: pub Field,
     c5_key_hash: pub Field,
@@ -38,7 +35,7 @@ fn main(
         nodes_fold_public,
         nodes_fold_key_hash,
     );
-    verify_honk_proof(c5_vk, c5_proof, c5_public, c5_key_hash);
+    verify_honk_proof_non_zk(c5_vk, c5_proof, c5_public, c5_key_hash);
 
     // Bind each folded `node_fold` row to the aggregator-supplied honest-set ordering: slot 0 per row
     // is the party id (matches `party_ids[i]`).

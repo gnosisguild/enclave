@@ -259,6 +259,17 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
 
         let dv = preset_dir.join("default");
 
+        // C5 (pk_aggregation) — proven with noir-recursive-no-zk and folded into
+        // DkgAggregator, so it must be staged under default/ too.
+        copy_circuit(
+            &threshold_target,
+            &dv.join("threshold/pk_aggregation"),
+            "pk_aggregation",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+
         copy_circuit(
             &c3_fold_target,
             &dv.join("recursive_aggregation/c3_fold"),
@@ -356,15 +367,15 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
         )
         .await;
 
-        // ── evm/ variant (on-chain verification: C5, C7) ───────────
+        // ── evm/ variant (on-chain verification: DKG aggregator, C7) ───────────
 
         let ev = preset_dir.join("evm");
 
-        // C5 (pk_aggregation) — EVM-targeted
+        // DKG aggregator — EVM-targeted (folds + C5 verified inside)
         copy_circuit(
-            &threshold_target,
-            &ev.join("threshold/pk_aggregation"),
-            "pk_aggregation",
+            &dkg_aggregator_target,
+            &ev.join("recursive_aggregation/dkg_aggregator"),
+            "dkg_aggregator",
             ".vk",
             ".vk_hash",
         )
@@ -1229,17 +1240,20 @@ async fn test_trbfv_actor() -> Result<()> {
         publishing_ct_timer.elapsed(),
     ));
 
-    let (plaintext, aggregation_proofs) = h
+    let (plaintext, decryption_aggregator_proofs) = h
         .iter()
         .rev()
         .find_map(|e| {
             if let EnclaveEventData::PlaintextAggregated(PlaintextAggregated {
                 decrypted_output,
-                aggregation_proofs,
+                decryption_aggregator_proofs,
                 ..
             }) = e.get_data()
             {
-                Some((decrypted_output.clone(), aggregation_proofs.clone()))
+                Some((
+                    decrypted_output.clone(),
+                    decryption_aggregator_proofs.clone(),
+                ))
             } else {
                 None
             }
@@ -1252,8 +1266,8 @@ async fn test_trbfv_actor() -> Result<()> {
         })?;
 
     assert!(
-        !aggregation_proofs.is_empty(),
-        "C7 proofs should be present in PlaintextAggregated"
+        !decryption_aggregator_proofs.is_empty(),
+        "DecryptionAggregator proofs should be present in PlaintextAggregated"
     );
 
     let results = plaintext
@@ -1344,15 +1358,13 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     let evt_1 = PlaintextAggregated {
         e3_id: E3id::new("1235", 1),
         decrypted_output: vec![ArcBytes::from_bytes(&[1, 2, 3, 4])],
-        aggregation_proofs: vec![],
-        c6_aggregated_proof: None,
+        decryption_aggregator_proofs: vec![],
     };
 
     let evt_2 = PlaintextAggregated {
         e3_id: E3id::new("1236", 1),
         decrypted_output: vec![ArcBytes::from_bytes(&[1, 2, 3, 4])],
-        aggregation_proofs: vec![],
-        c6_aggregated_proof: None,
+        decryption_aggregator_proofs: vec![],
     };
 
     let local_evt_3 = CiphernodeSelected {
@@ -1801,14 +1813,18 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         .send(TakeEvents::<e3_events::EnclaveEvent>::new(28))
         .await?;
 
+    let actual_pk_commitment_1 = match history.events.last().cloned().unwrap().into_data() {
+        e3_events::EnclaveEventData::PublicKeyAggregated(ev) => ev.pk_commitment,
+        other => panic!("expected PublicKeyAggregated, got {other:?}"),
+    };
     assert_eq!(
         history.events.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
             pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
             e3_id: E3id::new("1234", 1),
             nodes: OrderedSet::from(eth_addrs.clone()),
-            pk_aggregation_proof: None,
-            dkg_aggregated_proof: None,
+            pk_commitment: actual_pk_commitment_1,
+            dkg_aggregator_proof: None,
         }
         .into()
     );
@@ -1838,14 +1854,18 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         .send(TakeEvents::<e3_events::EnclaveEvent>::new(8))
         .await?;
 
+    let actual_pk_commitment_2 = match history.events.last().cloned().unwrap().into_data() {
+        e3_events::EnclaveEventData::PublicKeyAggregated(ev) => ev.pk_commitment,
+        other => panic!("expected PublicKeyAggregated, got {other:?}"),
+    };
     assert_eq!(
         history.events.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
             pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
             e3_id: E3id::new("1234", 2),
             nodes: OrderedSet::from(eth_addrs.clone()),
-            pk_aggregation_proof: None,
-            dkg_aggregated_proof: None,
+            pk_commitment: actual_pk_commitment_2,
+            dkg_aggregator_proof: None,
         }
         .into()
     );

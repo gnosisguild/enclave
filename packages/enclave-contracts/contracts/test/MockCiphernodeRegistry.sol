@@ -70,7 +70,7 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         uint256,
         address[] calldata,
         bytes calldata,
-        bytes calldata,
+        bytes32,
         bytes calldata
     ) external pure {} // solhint-disable-line no-empty-blocks
 
@@ -211,7 +211,7 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         uint256,
         address[] calldata,
         bytes calldata,
-        bytes calldata,
+        bytes32,
         bytes calldata
     ) external pure {} // solhint-disable-line no-empty-blocks
 

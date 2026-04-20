@@ -25,7 +25,6 @@ import {
   Enclave__factory as EnclaveFactory,
   MockUSDC__factory as MockUSDCFactory,
 } from "../../types";
-import { encodePkProof } from "../fixtures";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time, mine } = networkHelpers;
@@ -141,8 +140,8 @@ describe("E3 Pricing", function () {
     }
     await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
     await registry.finalizeCommittee(e3Id);
-    const proof = encodePkProof(ethers.keccak256(publicKey));
-    await registry.publishCommittee(e3Id, nodes, publicKey, proof, "0x");
+    const pkCommitment = ethers.keccak256(publicKey);
+    await registry.publishCommittee(e3Id, nodes, publicKey, pkCommitment, "0x");
   };
 
   const setup = async () => {
@@ -636,7 +635,7 @@ describe("E3 Pricing", function () {
       const op3Before = await usdcToken.balanceOf(nodes[2]);
 
       // Publish plaintext (triggers _distributeRewards)
-      await enclave.publishPlaintextOutput(e3Id, data, proof, proof);
+      await enclave.publishPlaintextOutput(e3Id, data, proof);
 
       const op1After = await usdcToken.balanceOf(nodes[0]);
       const op2After = await usdcToken.balanceOf(nodes[1]);
@@ -718,7 +717,7 @@ describe("E3 Pricing", function () {
       const op2Before = await usdcToken.balanceOf(nodes[1]);
       const op3Before = await usdcToken.balanceOf(nodes[2]);
 
-      await enclave.publishPlaintextOutput(e3Id, data, proof, proof);
+      await enclave.publishPlaintextOutput(e3Id, data, proof);
 
       const treasuryAfter = await usdcToken.balanceOf(treasuryAddr);
       const op1After = await usdcToken.balanceOf(nodes[0]);

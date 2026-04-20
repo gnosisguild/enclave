@@ -123,11 +123,11 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
     }
 }
 
-/// Stages a `recursive_aggregation/*` fold binary for [`CircuitVariant::Default`] (`noir-recursive-no-zk` only).
+/// Stages a `recursive_aggregation/*` fold binary for [`CircuitVariant::Default`] (`noir-recursive-no-zk`).
 ///
-/// `pnpm build:circuits` writes `{package}.vk_recursive` (+ `_hash`) under `circuits/bin/recursive_aggregation/<name>/target/`
-/// for aggregation circuits; this copies them into `insecure-512/default/recursive_aggregation/<name>/` as `.vk` / `.vk_hash`.
-/// Unlike [`setup_compiled_circuit`], no EVM VK is required.
+/// `pnpm build:circuits` writes `{package}.vk_recursive` (+ `_hash`) under `circuits/bin/recursive_aggregation/<name>/target/`.
+/// [`CircuitName::DkgAggregator`] also gets `{package}.vk` / `.vk_hash` (`bb write_vk -t evm`); when present, they are
+/// copied into `insecure-512/evm/...` for [`CircuitVariant::Evm`] proving.
 pub async fn setup_recursive_aggregation_fold_circuit(backend: &ZkBackend, circuit: CircuitName) {
     let pkg = circuit.as_str();
     let target_dir = circuits_build_root()
@@ -138,6 +138,8 @@ pub async fn setup_recursive_aggregation_fold_circuit(backend: &ZkBackend, circu
     let json_path = target_dir.join(format!("{pkg}.json"));
     let vk_recursive_path = target_dir.join(format!("{pkg}.vk_recursive"));
     let vk_recursive_hash_path = target_dir.join(format!("{pkg}.vk_recursive_hash"));
+    let vk_evm_path = target_dir.join(format!("{pkg}.vk"));
+    let vk_evm_hash_path = target_dir.join(format!("{pkg}.vk_hash"));
 
     assert!(
         json_path.exists(),
@@ -166,6 +168,22 @@ pub async fn setup_recursive_aggregation_fold_circuit(backend: &ZkBackend, circu
         )
         .await
         .unwrap();
+    }
+
+    if vk_evm_path.exists() {
+        let evm_dir = preset_dir.join("evm").join(circuit.group()).join(pkg);
+        fs::create_dir_all(&evm_dir).await.unwrap();
+        fs::copy(&json_path, evm_dir.join(format!("{pkg}.json")))
+            .await
+            .unwrap();
+        fs::copy(&vk_evm_path, evm_dir.join(format!("{pkg}.vk")))
+            .await
+            .unwrap();
+        if vk_evm_hash_path.exists() {
+            fs::copy(&vk_evm_hash_path, evm_dir.join(format!("{pkg}.vk_hash")))
+                .await
+                .unwrap();
+        }
     }
 }
 

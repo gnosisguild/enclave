@@ -10,53 +10,37 @@ import { ICircuitVerifier } from "../../interfaces/ICircuitVerifier.sol";
 
 /**
  * @title BfvPkVerifier
- * @notice Verifies C5 (pk_aggregation) proofs on-chain. Delegates to the Honk
- *         ThresholdPkAggregationVerifier and returns the aggregate commitment from public inputs.
- *         Optional `foldProof` is ABI-encoded (bytes, bytes32[]) for RecursiveAggregationFoldVerifier
- *         (DKG cross-node fold); pass empty bytes to skip.
- * @dev Use with encryptionSchemeId keccak256("fhe.rs:BFV"). Commitment count is enforced by the VK.
+ * @notice Verifies the DkgAggregator (EVM) proof produced by the recursive
+ *         aggregation pipeline (node folds + C5/pk_aggregation verified
+ *         internally). Binds the proof to a caller-supplied `pkCommitment`.
+ * @dev Used when the Enclave is configured with encryptionSchemeId
+ *      keccak256("fhe.rs:BFV"). The aggregator circuit's last public input is
+ *      the Safe-based aggregated PK commitment.
  */
 contract BfvPkVerifier is IPkVerifier {
+    /// @notice Underlying Honk verifier for the DkgAggregator circuit.
     ICircuitVerifier public immutable circuitVerifier;
-    ICircuitVerifier public immutable foldVerifier;
 
-    constructor(address _circuitVerifier, address _foldVerifier) {
+    constructor(address _circuitVerifier) {
         circuitVerifier = ICircuitVerifier(_circuitVerifier);
-        foldVerifier = ICircuitVerifier(_foldVerifier);
     }
 
     /// @inheritdoc IPkVerifier
     function verify(
-        bytes memory proof,
-        bytes memory foldProof
-    ) external view override returns (bytes32 pkCommitment) {
+        bytes32 pkCommitment,
+        bytes calldata proof
+    ) external view override returns (bool) {
         (bytes memory rawProof, bytes32[] memory publicInputs) = abi.decode(
             proof,
             (bytes, bytes32[])
         );
 
-        require(publicInputs.length > 0, "BfvPkVerifier: no public inputs");
-        require(
-            circuitVerifier.verify(rawProof, publicInputs),
-            "BfvPkVerifier: invalid proof"
-        );
-
-        _verifyFold(foldProof);
-
-        return publicInputs[publicInputs.length - 1];
-    }
-
-    function _verifyFold(bytes memory foldProof) internal view {
-        if (foldProof.length == 0) {
-            return;
+        if (publicInputs.length == 0) {
+            return false;
         }
-
-        (bytes memory foldRawProof, bytes32[] memory foldPublicInputs) = abi
-            .decode(foldProof, (bytes, bytes32[]));
-
-        require(
-            foldVerifier.verify(foldRawProof, foldPublicInputs),
-            "BfvPkVerifier: invalid fold proof"
-        );
+        if (publicInputs[publicInputs.length - 1] != pkCommitment) {
+            return false;
+        }
+        return circuitVerifier.verify(rawProof, publicInputs);
     }
 }

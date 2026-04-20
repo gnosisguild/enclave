@@ -77,9 +77,8 @@ const DEFAULT_TIMEOUT_CONFIG = {
 };
 
 /** Circuit names required for BFV ZK verification in this script */
-const THRESHOLD_DECRYPTED_SHARES_AGGREGATION_VERIFIER =
-  "ThresholdDecryptedSharesAggregationVerifier";
-const THRESHOLD_PK_AGGREGATION_VERIFIER = "ThresholdPkAggregationVerifier";
+const DKG_AGGREGATOR_VERIFIER = "DkgAggregatorVerifier";
+const DECRYPTION_AGGREGATOR_VERIFIER = "DecryptionAggregatorVerifier";
 
 /**
  * Deploys the Enclave contracts
@@ -346,8 +345,8 @@ export const deployEnclave = async (
     console.log("Deploying circuit verifiers...");
     verifierDeployments = await deployAndSaveAllVerifiers(hre);
     const requiredVerifierNames = [
-      THRESHOLD_DECRYPTED_SHARES_AGGREGATION_VERIFIER,
-      THRESHOLD_PK_AGGREGATION_VERIFIER,
+      DKG_AGGREGATOR_VERIFIER,
+      DECRYPTION_AGGREGATOR_VERIFIER,
     ] as const;
     for (const name of requiredVerifierNames) {
       const addr = verifierDeployments[name];

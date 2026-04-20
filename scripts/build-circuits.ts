@@ -359,6 +359,13 @@ class NoirCircuitBuilder {
     return circuit.group === CIRCUIT_GROUPS.AGGREGATION
   }
 
+  /** Aggregation circuits that are also published on-chain as EVM verifiable proofs. */
+  private isAggregationWithEvmOnChain(circuit: CircuitInfo): boolean {
+    if (circuit.group !== CIRCUIT_GROUPS.AGGREGATION) return false
+    const name = basename(circuit.path)
+    return name === 'dkg_aggregator' || name === 'decryption_aggregator'
+  }
+
   private generateVk(
     circuit: CircuitInfo,
     jsonFile: string,
@@ -414,12 +421,21 @@ class NoirCircuitBuilder {
     const vkNoirHashFile = join(targetDir, `${packageName}.vk_noir_hash`)
 
     if (isFoldOrAggregation) {
-      // Aggregation fold circuits: only Default variant (noir-recursive-no-zk)
+      // Aggregation fold circuits: Default variant (noir-recursive-no-zk) for witness generation.
       if (!runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
         throw new Error(`VK generation failed for ${packageName} (noir-recursive-no-zk)`)
       }
       result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
       result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
+
+      // DKG / decryption aggregators are additionally proven with `-t evm` for on-chain verification.
+      if (this.isAggregationWithEvmOnChain(circuit)) {
+        if (!runWriteVk('evm', vkFile, vkHashFile)) {
+          throw new Error(`VK generation failed for ${packageName} (evm)`)
+        }
+        result.vk = existsSync(vkFile) ? vkFile : null
+        result.vkHash = existsSync(vkHashFile) ? vkHashFile : null
+      }
     } else {
       // Base DKG/threshold circuits: evm + noir-recursive-no-zk + noir-recursive
       if (!runWriteVk('evm', vkFile, vkHashFile)) {

@@ -76,7 +76,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     mapping(bytes32 encryptionSchemeId => IDecryptionVerifier decryptionVerifier)
         public decryptionVerifiers;
 
-    /// @notice Mapping of encryption schemes to their C5 (pk_aggregation) proof verifiers.
+    /// @notice Mapping of encryption schemes to their DkgAggregator (EVM) proof verifiers.
     /// @dev Required per scheme; gates E3 requests like decryptionVerifier.
     mapping(bytes32 encryptionSchemeId => IPkVerifier pkVerifier)
         public pkVerifiers;
@@ -388,8 +388,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function publishPlaintextOutput(
         uint256 e3Id,
         bytes calldata plaintextOutput,
-        bytes calldata proof,
-        bytes calldata foldProof
+        bytes calldata proof
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
@@ -413,10 +412,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         _e3Stages[e3Id] = E3Stage.Complete;
 
         if (e3.proofAggregationEnabled) {
-            (success) = e3.decryptionVerifier.verify(
+            require(proof.length > 0, "proof required");
+            success = e3.decryptionVerifier.verify(
                 keccak256(plaintextOutput),
-                proof,
-                foldProof
+                proof
             );
             require(success, InvalidOutput(plaintextOutput));
         } else {

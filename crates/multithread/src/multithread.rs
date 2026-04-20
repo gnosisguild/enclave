@@ -359,7 +359,8 @@ fn handle_pk_aggregation_proof(
     // dispatching this request (pre-aggregation check). By the time we reach
     // the prover, all keyshares are guaranteed to match their C1 proofs.
 
-    // 7. Generate proof via Provable trait (C5 is always EVM-targeted for on-chain verification)
+    // 7. C5 uses noir-recursive-no-zk (non-ZK recursive); it is verified inside `DkgAggregator` via
+    // `verify_honk_proof_non_zk`. The EVM-facing proof for on-chain is `CircuitName::DkgAggregator`.
     let circuit = PkAggregationCircuit;
     let bb_work_id = zk_bb_work_id(&request);
     let artifacts_dir = req.params_preset.artifacts_dir();
@@ -369,7 +370,7 @@ fn handle_pk_aggregation_proof(
             &req.params_preset,
             &circuit_data,
             &bb_work_id,
-            CircuitVariant::Evm,
+            CircuitVariant::Default,
             &artifacts_dir,
         )
         .map_err(|e| {
@@ -1445,7 +1446,9 @@ fn handle_decrypted_shares_aggregation_proof(
             threshold: req.threshold_m as usize,
         };
 
-        // e. Build circuit data and generate proof (C7 is always EVM-targeted for on-chain verification)
+        // e. C7 uses noir-recursive-no-zk (non-ZK recursive); it is verified inside
+        // `DecryptionAggregator` via `verify_honk_proof_non_zk`. The EVM-facing proof for on-chain
+        // is `CircuitName::DecryptionAggregator`.
         let circuit_data = DecryptedSharesAggregationCircuitData {
             committee,
             d_share_polys,
@@ -1462,7 +1465,7 @@ fn handle_decrypted_shares_aggregation_proof(
                 &req.params_preset,
                 &circuit_data,
                 &idx_work_id,
-                CircuitVariant::Evm,
+                CircuitVariant::Default,
                 &artifacts_dir,
             )
             .map_err(|e| {

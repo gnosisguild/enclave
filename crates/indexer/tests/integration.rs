@@ -100,7 +100,7 @@ async fn test_indexer() -> Result<()> {
     let sk = SecretKey::random(&params, &mut rng);
     let pk = PublicKey::new(&sk, &mut rng);
 
-    _ = compute_pk_commitment(
+    let pk_commitment = compute_pk_commitment(
         pk.to_bytes(),
         params.degree(),
         params.plaintext(),
@@ -116,6 +116,7 @@ async fn test_indexer() -> Result<()> {
         .emitCommitteePublished(
             Uint::from(E3_ID),
             Bytes::from(pk.to_bytes()),
+            pk_commitment.into(),
             Bytes::default(),
         )
         .send()

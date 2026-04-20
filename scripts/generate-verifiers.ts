@@ -192,7 +192,7 @@ class VerifierGenerator {
     }
 
     // 4. Post-process: rename contract, add license header, copy to output
-    const contractName = this.toContractName(group, name)
+    const contractName = this.toContractName(name)
     const outputFileName = `${contractName}.sol`
     const outputPath = join(this.verifierDir, outputFileName)
 
@@ -292,18 +292,16 @@ class VerifierGenerator {
   }
 
   /**
-   * Convert group/name to a PascalCase Solidity contract name.
-   * e.g. (threshold, pk_aggregation) → ThresholdPkAggregationVerifier
-   *      (threshold, pk_generation) → ThresholdPkGenerationVerifier
-   *      (recursive_aggregation, fold) → RecursiveAggregationFoldVerifier
+   * Convert circuit folder name to a PascalCase Solidity contract name.
+   * e.g. dkg_aggregator → DkgAggregatorVerifier, decryption_aggregator → DecryptionAggregatorVerifier
    */
-  private toContractName(group: CircuitGroup, name: string): string {
+  private toContractName(name: string): string {
     const pascal = (s: string) =>
       s
         .split(/[_-]+/)
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
         .join('')
-    return `${pascal(group)}${pascal(name)}Verifier`
+    return `${pascal(name)}Verifier`
   }
 
   /**
@@ -399,8 +397,8 @@ Options:
   -h, --help             Show this help message
 
 Examples:
-  pnpm generate:verifiers --circuits pk,pk_aggregation,decrypted_shares_aggregation,fold
-  pnpm generate:verifiers --circuits pk --clean
+  pnpm generate:verifiers --circuits dkg_aggregator,decryption_aggregator
+  pnpm generate:verifiers --circuits dkg_aggregator --clean
 `)
 }
 

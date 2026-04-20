@@ -21,23 +21,12 @@ export const deployAndSaveBfvDecryptionVerifier = async (
   const chain = hre.globalOptions.network ?? "localhost";
 
   const circuitVerifierArgs = readDeploymentArgs(
-    "ThresholdDecryptedSharesAggregationVerifier",
+    "DecryptionAggregatorVerifier",
     chain,
   );
   if (!circuitVerifierArgs?.address) {
     throw new Error(
-      "ThresholdDecryptedSharesAggregationVerifier must be deployed first. " +
-        "Run deployAndSaveAllVerifiers or deploy verifiers.",
-    );
-  }
-
-  const foldVerifierArgs = readDeploymentArgs(
-    "RecursiveAggregationFoldVerifier",
-    chain,
-  );
-  if (!foldVerifierArgs?.address) {
-    throw new Error(
-      "RecursiveAggregationFoldVerifier must be deployed first. " +
+      "DecryptionAggregatorVerifier must be deployed first. " +
         "Run deployAndSaveAllVerifiers or deploy verifiers.",
     );
   }
@@ -59,7 +48,6 @@ export const deployAndSaveBfvDecryptionVerifier = async (
   );
   const bfvDecryptionVerifier = await bfvDecryptionVerifierFactory.deploy(
     circuitVerifierArgs.address,
-    foldVerifierArgs.address,
   );
 
   await bfvDecryptionVerifier.waitForDeployment();
