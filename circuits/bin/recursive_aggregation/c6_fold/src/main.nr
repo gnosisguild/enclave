@@ -20,6 +20,8 @@ pub global C6_PUBLIC_LEN: u32 = 4;
 /// Same shape as `c3_fold`: 4 pub parameters + 4 columns of `T + 1` party slots each.
 pub global C6_FOLD_PUBLIC_LEN: u32 = 4 + (4 * (T + 1));
 
+pub global C6_FOLD_PREFIX_LEN: u32 = C6_FOLD_PUBLIC_LEN - (4 * (T + 1));
+
 fn main(
     inner_vk: UltraHonkVerificationKey,
     inner_proof: UltraHonkZKProof,
@@ -63,10 +65,10 @@ fn main(
                 out_d[i] = 0;
             }
         } else {
-            let prior_sk = acc_public_inputs[4 + i];
-            let prior_esm = acc_public_inputs[4 + (T + 1) + i];
-            let prior_ct = acc_public_inputs[4 + 2 * (T + 1) + i];
-            let prior_d = acc_public_inputs[4 + 3 * (T + 1) + i];
+            let prior_sk = acc_public_inputs[C6_FOLD_PREFIX_LEN + i];
+            let prior_esm = acc_public_inputs[C6_FOLD_PREFIX_LEN + (T + 1) + i];
+            let prior_ct = acc_public_inputs[C6_FOLD_PREFIX_LEN + (2 * (T + 1)) + i];
+            let prior_d = acc_public_inputs[C6_FOLD_PREFIX_LEN + (3 * (T + 1)) + i];
 
             if idx == slot_index {
                 assert(prior_sk == 0);

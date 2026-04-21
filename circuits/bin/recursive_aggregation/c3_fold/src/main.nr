@@ -21,6 +21,8 @@ pub global C3_SLOTS: u32 = N_PARTIES * L_THRESHOLD;
 /// Total public fields for a `c3_fold` proof: 4 pub parameters + 3*C3_SLOTS (pk, msg, ct).
 pub global C3_FOLD_PUBLIC_LEN: u32 = 4 + (3 * C3_SLOTS);
 
+pub global C3_FOLD_PREFIX_LEN: u32 = C3_FOLD_PUBLIC_LEN - (3 * C3_SLOTS);
+
 fn main(
     inner_vk: UltraHonkVerificationKey,
     inner_proof: UltraHonkZKProof,
@@ -60,9 +62,9 @@ fn main(
                 out_ct[i] = 0;
             }
         } else {
-            let prior_pk = acc_public_inputs[4 + i];
-            let prior_msg = acc_public_inputs[4 + C3_SLOTS + i];
-            let prior_ct = acc_public_inputs[4 + C3_SLOTS + C3_SLOTS + i];
+            let prior_pk = acc_public_inputs[C3_FOLD_PREFIX_LEN + i];
+            let prior_msg = acc_public_inputs[C3_FOLD_PREFIX_LEN + C3_SLOTS + i];
+            let prior_ct = acc_public_inputs[C3_FOLD_PREFIX_LEN + C3_SLOTS + C3_SLOTS + i];
 
             if idx == slot_index {
                 assert(prior_pk == 0);

@@ -16,6 +16,8 @@ use lib::math::commitments::compute_vk_hash;
 /// Must match `c6_fold::C6_FOLD_PUBLIC_LEN`: pub params + flattened `(out_sk, out_esm, out_ct, out_d)`.
 pub global C6_FOLD_PUBLIC_LEN: u32 = 4 + (4 * (T + 1));
 
+pub global C6_FOLD_PREFIX_LEN: u32 = C6_FOLD_PUBLIC_LEN - (4 * (T + 1));
+
 pub global C7_PUBLIC_LEN: u32 = (2 * (T + 1)) + MAX_MSG_NON_ZERO_COEFFS;
 
 fn main(
@@ -34,7 +36,7 @@ fn main(
     // Cross-circuit C6 to C7: each folded `d_commitment` column entry must match `c7_public[i]`
     // (leading `T + 1` words of `c7_public`).
     for i in 0..(T + 1) {
-        assert(c6_fold_public[4 + 3 * (T + 1) + i] == c7_public[i]);
+        assert(c6_fold_public[C6_FOLD_PREFIX_LEN + (3 * (T + 1)) + i] == c7_public[i]);
     }
 
     let mut vk_hashes = Vec::new();
@@ -47,8 +49,8 @@ fn main(
     let mut expected_esm: [Field; T + 1] = [0; T + 1];
     for i in 0..(T + 1) {
         party_ids[i] = c7_public[(T + 1) + i];
-        expected_sk[i] = c6_fold_public[4 + i];
-        expected_esm[i] = c6_fold_public[4 + (T + 1) + i];
+        expected_sk[i] = c6_fold_public[C6_FOLD_PREFIX_LEN + i];
+        expected_esm[i] = c6_fold_public[C6_FOLD_PREFIX_LEN + (T + 1) + i];
     }
 
     let mut message: [Field; MAX_MSG_NON_ZERO_COEFFS] = [0; MAX_MSG_NON_ZERO_COEFFS];

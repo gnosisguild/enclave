@@ -17,6 +17,8 @@ pub global C3_SLOTS: u32 = N_PARTIES * L_THRESHOLD;
 /// Must match `c3_fold`: `4 + 3*C3_SLOTS` public fields per final proof.
 pub global C3_FOLD_PUBLIC_LEN: u32 = 4 + (3 * C3_SLOTS);
 
+pub global C3_FOLD_PREFIX_LEN: u32 = C3_FOLD_PUBLIC_LEN - (3 * C3_SLOTS);
+
 /// Total public fields for `c3ab_fold` (two key hashes + flattened return tuple).
 pub global C3AB_FOLD_PUBLIC_LEN: u32 = 2 + 1 + (6 * C3_SLOTS);
 
@@ -46,12 +48,12 @@ fn main(
     let mut ct_b: [Field; C3_SLOTS] = [0; C3_SLOTS];
 
     for j in 0..C3_SLOTS {
-        pk_a[j] = c3a_public[4 + j];
-        msg_a[j] = c3a_public[4 + C3_SLOTS + j];
-        ct_a[j] = c3a_public[4 + C3_SLOTS + C3_SLOTS + j];
-        pk_b[j] = c3b_public[4 + j];
-        msg_b[j] = c3b_public[4 + C3_SLOTS + j];
-        ct_b[j] = c3b_public[4 + C3_SLOTS + C3_SLOTS + j];
+        pk_a[j] = c3a_public[C3_FOLD_PREFIX_LEN + j];
+        msg_a[j] = c3a_public[C3_FOLD_PREFIX_LEN + C3_SLOTS + j];
+        ct_a[j] = c3a_public[C3_FOLD_PREFIX_LEN + C3_SLOTS + C3_SLOTS + j];
+        pk_b[j] = c3b_public[C3_FOLD_PREFIX_LEN + j];
+        msg_b[j] = c3b_public[C3_FOLD_PREFIX_LEN + C3_SLOTS + j];
+        ct_b[j] = c3b_public[C3_FOLD_PREFIX_LEN + C3_SLOTS + C3_SLOTS + j];
     }
 
     (key_hash, pk_a, msg_a, ct_a, pk_b, msg_b, ct_b)

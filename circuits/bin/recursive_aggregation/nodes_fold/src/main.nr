@@ -26,6 +26,8 @@ pub global NODE_FOLD_PUBLIC_LEN: u32 = 11 + N_PARTIES + (2 * (N_PARTIES + H) * L
 /// Same shape as `c6_fold`: 4 pub parameters + `H` full `node_fold` public rows (flattened).
 pub global NODES_FOLD_PUBLIC_LEN: u32 = 4 + (H * NODE_FOLD_PUBLIC_LEN);
 
+pub global NODES_FOLD_PARAM_PUBLIC_LEN: u32 = NODES_FOLD_PUBLIC_LEN - (H * NODE_FOLD_PUBLIC_LEN);
+
 fn main(
     inner_vk: UltraHonkVerificationKey,
     inner_proof: UltraHonkProof,
@@ -59,12 +61,16 @@ fn main(
             }
         } else if idx == slot_index {
             for k in 0..NODE_FOLD_PUBLIC_LEN {
-                assert(acc_public_inputs[4 + i * NODE_FOLD_PUBLIC_LEN + k] == 0);
+                assert(
+                    acc_public_inputs[NODES_FOLD_PARAM_PUBLIC_LEN + i * NODE_FOLD_PUBLIC_LEN + k]
+                        == 0,
+                );
             }
             out[i] = node_fold_public_inputs;
         } else {
             for k in 0..NODE_FOLD_PUBLIC_LEN {
-                out[i][k] = acc_public_inputs[4 + i * NODE_FOLD_PUBLIC_LEN + k];
+                out[i][k] =
+                    acc_public_inputs[NODES_FOLD_PARAM_PUBLIC_LEN + i * NODE_FOLD_PUBLIC_LEN + k];
             }
         }
     }
