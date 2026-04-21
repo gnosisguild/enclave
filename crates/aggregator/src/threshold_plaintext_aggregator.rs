@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use actix::prelude::*;
 use anyhow::{anyhow, bail, ensure, Result};
@@ -36,9 +36,9 @@ use tracing::{debug, info, trace, warn};
 pub struct Collecting {
     threshold_m: u64,
     threshold_n: u64,
-    shares: HashMap<u64, Vec<ArcBytes>>,
+    shares: BTreeMap<u64, Vec<ArcBytes>>,
     /// Signed raw C6 proofs for ShareVerification.
-    c6_proofs: HashMap<u64, Vec<SignedProofPayload>>,
+    c6_proofs: BTreeMap<u64, Vec<SignedProofPayload>>,
     seed: Seed,
     ciphertext_output: Vec<ArcBytes>,
     params: ArcBytes,
@@ -48,8 +48,8 @@ pub struct Collecting {
 pub struct VerifyingC6 {
     threshold_m: u64,
     threshold_n: u64,
-    shares: HashMap<u64, Vec<ArcBytes>>,
-    c6_proofs: HashMap<u64, Vec<SignedProofPayload>>,
+    shares: BTreeMap<u64, Vec<ArcBytes>>,
+    c6_proofs: BTreeMap<u64, Vec<SignedProofPayload>>,
     ciphertext_output: Vec<ArcBytes>,
     params: ArcBytes,
 }
@@ -157,8 +157,8 @@ impl ThresholdPlaintextAggregatorState {
         ThresholdPlaintextAggregatorState::Collecting(Collecting {
             threshold_m,
             threshold_n,
-            shares: HashMap::new(),
-            c6_proofs: HashMap::new(),
+            shares: BTreeMap::new(),
+            c6_proofs: BTreeMap::new(),
             seed,
             ciphertext_output,
             params,
@@ -327,7 +327,7 @@ impl ThresholdPlaintextAggregator {
     /// Dispatch C6 proof verification through ShareVerificationActor.
     pub fn dispatch_c6_verification(
         &mut self,
-        c6_proofs: HashMap<u64, Vec<SignedProofPayload>>,
+        c6_proofs: BTreeMap<u64, Vec<SignedProofPayload>>,
         ec: EventContext<Sequenced>,
     ) -> Result<()> {
         let party_proofs: Vec<PartyProofsToVerify> = c6_proofs
@@ -425,8 +425,10 @@ impl ThresholdPlaintextAggregator {
             honest_shares.len(),
         );
 
-        // Collect honest C6 inner proofs (from signed payloads) sorted by party_id for DecryptionAggregation.
-        let mut honest_c6: Vec<(u64, Vec<Proof>)> = state
+        // Collect honest C6 inner proofs (from signed payloads) for DecryptionAggregation.
+        // BTreeMap iteration yields ascending party_id, matching the slot layout
+        // used by honest_shares above and enforced by decryption_aggregator.nr.
+        let honest_c6: Vec<(u64, Vec<Proof>)> = state
             .c6_proofs
             .iter()
             .filter(|(id, _)| !dishonest_parties.contains(id))
@@ -437,7 +439,6 @@ impl ThresholdPlaintextAggregator {
                 )
             })
             .collect();
-        honest_c6.sort_by_key(|(id, _)| *id);
 
         // Publish ComputeRequest before transitioning state so a publish
         // failure leaves us in VerifyingC6 (retryable) rather than
@@ -483,7 +484,7 @@ impl ThresholdPlaintextAggregator {
     fn verify_shares_match_c6_commitments(
         &self,
         honest_shares: &[(u64, Vec<ArcBytes>)],
-        c6_proofs: &HashMap<u64, Vec<SignedProofPayload>>,
+        c6_proofs: &BTreeMap<u64, Vec<SignedProofPayload>>,
     ) -> BTreeSet<u64> {
         let mut mismatched = BTreeSet::new();
 
