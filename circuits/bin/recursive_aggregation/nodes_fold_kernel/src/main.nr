@@ -47,25 +47,16 @@ fn main(
         inner_key_hash,
     );
 
-    let _ = (acc_vk, acc_proof, acc_key_hash);
+    let _ = (acc_vk, acc_proof, acc_key_hash, acc_public_inputs);
+
+    assert(is_first_step);
 
     let mut out: [[Field; NODE_FOLD_PUBLIC_LEN]; H] = [[0; NODE_FOLD_PUBLIC_LEN]; H];
 
     for i in 0..H {
         let idx = i as u32;
-        if is_first_step {
-            if idx == slot_index {
-                out[i] = node_fold_public_inputs;
-            }
-        } else if idx == slot_index {
-            for k in 0..NODE_FOLD_PUBLIC_LEN {
-                assert(acc_public_inputs[4 + i * NODE_FOLD_PUBLIC_LEN + k] == 0);
-            }
+        if idx == slot_index {
             out[i] = node_fold_public_inputs;
-        } else {
-            for k in 0..NODE_FOLD_PUBLIC_LEN {
-                out[i][k] = acc_public_inputs[4 + i * NODE_FOLD_PUBLIC_LEN + k];
-            }
         }
     }
 

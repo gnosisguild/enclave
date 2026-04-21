@@ -34,7 +34,9 @@ fn main(
 
     verify_honk_proof(inner_vk, inner_proof, c3_public_inputs, inner_key_hash);
 
-    let _ = (acc_vk, acc_proof, acc_key_hash);
+    let _ = (acc_vk, acc_proof, acc_key_hash, acc_public_inputs);
+
+    assert(is_first_step);
 
     let pk_new = c3_public_inputs[0];
     let msg_new = c3_public_inputs[1];
@@ -46,33 +48,14 @@ fn main(
 
     for i in 0..C3_SLOTS {
         let idx = i as u32;
-        if is_first_step {
-            if idx == slot_index {
-                out_pk[i] = pk_new;
-                out_msg[i] = msg_new;
-                out_ct[i] = ct_new;
-            } else {
-                out_pk[i] = 0;
-                out_msg[i] = 0;
-                out_ct[i] = 0;
-            }
+        if idx == slot_index {
+            out_pk[i] = pk_new;
+            out_msg[i] = msg_new;
+            out_ct[i] = ct_new;
         } else {
-            let prior_pk = acc_public_inputs[4 + i];
-            let prior_msg = acc_public_inputs[4 + C3_SLOTS + i];
-            let prior_ct = acc_public_inputs[4 + C3_SLOTS + C3_SLOTS + i];
-
-            if idx == slot_index {
-                assert(prior_pk == 0);
-                assert(prior_msg == 0);
-                assert(prior_ct == 0);
-                out_pk[i] = pk_new;
-                out_msg[i] = msg_new;
-                out_ct[i] = ct_new;
-            } else {
-                out_pk[i] = prior_pk;
-                out_msg[i] = prior_msg;
-                out_ct[i] = prior_ct;
-            }
+            out_pk[i] = 0;
+            out_msg[i] = 0;
+            out_ct[i] = 0;
         }
     }
 

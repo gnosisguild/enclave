@@ -36,7 +36,9 @@ fn main(
 
     verify_honk_proof(inner_vk, inner_proof, c6_public_inputs, inner_key_hash);
 
-    let _ = (acc_vk, acc_proof, acc_key_hash);
+    let _ = (acc_vk, acc_proof, acc_key_hash, acc_public_inputs);
+
+    assert(is_first_step);
 
     let sk_new = c6_public_inputs[0];
     let esm_new = c6_public_inputs[1];
@@ -50,39 +52,16 @@ fn main(
 
     for i in 0..(T + 1) {
         let idx = i as u32;
-        if is_first_step {
-            if idx == slot_index {
-                out_sk[i] = sk_new;
-                out_esm[i] = esm_new;
-                out_ct[i] = ct_new;
-                out_d[i] = d_new;
-            } else {
-                out_sk[i] = 0;
-                out_esm[i] = 0;
-                out_ct[i] = 0;
-                out_d[i] = 0;
-            }
+        if idx == slot_index {
+            out_sk[i] = sk_new;
+            out_esm[i] = esm_new;
+            out_ct[i] = ct_new;
+            out_d[i] = d_new;
         } else {
-            let prior_sk = acc_public_inputs[4 + i];
-            let prior_esm = acc_public_inputs[4 + (T + 1) + i];
-            let prior_ct = acc_public_inputs[4 + 2 * (T + 1) + i];
-            let prior_d = acc_public_inputs[4 + 3 * (T + 1) + i];
-
-            if idx == slot_index {
-                assert(prior_sk == 0);
-                assert(prior_esm == 0);
-                assert(prior_ct == 0);
-                assert(prior_d == 0);
-                out_sk[i] = sk_new;
-                out_esm[i] = esm_new;
-                out_ct[i] = ct_new;
-                out_d[i] = d_new;
-            } else {
-                out_sk[i] = prior_sk;
-                out_esm[i] = prior_esm;
-                out_ct[i] = prior_ct;
-                out_d[i] = prior_d;
-            }
+            out_sk[i] = 0;
+            out_esm[i] = 0;
+            out_ct[i] = 0;
+            out_d[i] = 0;
         }
     }
 
