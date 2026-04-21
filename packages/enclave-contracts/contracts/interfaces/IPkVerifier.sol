@@ -15,7 +15,7 @@ pragma solidity >=0.8.27;
  */
 interface IPkVerifier {
     /// @notice Verify a DkgAggregator EVM proof and bind it to `pkCommitment`.
-    /// @param pkCommitment Safe-based aggregated PK commitment the proof must attest to
+    /// @param pkCommitment Hash-based aggregated PK commitment the proof must attest to
     ///        (equals `publicInputs[publicInputs.length - 1]`).
     /// @param proof ABI-encoded `(bytes rawProof, bytes32[] publicInputs)`.
     /// @return success True if the proof is valid and its last public input equals `pkCommitment`.

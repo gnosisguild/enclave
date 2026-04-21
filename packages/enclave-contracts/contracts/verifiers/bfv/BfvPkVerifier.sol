@@ -15,7 +15,7 @@ import { ICircuitVerifier } from "../../interfaces/ICircuitVerifier.sol";
  *         internally). Binds the proof to a caller-supplied `pkCommitment`.
  * @dev Used when the Enclave is configured with encryptionSchemeId
  *      keccak256("fhe.rs:BFV"). The aggregator circuit's last public input is
- *      the Safe-based aggregated PK commitment.
+ *      the hash-based aggregated PK commitment.
  */
 contract BfvPkVerifier is IPkVerifier {
     /// @notice Underlying Honk verifier for the DkgAggregator circuit.

@@ -19,9 +19,8 @@ pub struct PublicKeyAggregated {
     pub pubkey: ArcBytes, // TODO: ArcBytes ?
     pub e3_id: E3id,
     pub nodes: OrderedSet<String>,
-    /// Safe-based aggregated PK commitment (last public signal of the C5 proof).
-    /// Always present; forwarded to `publishCommittee(... pkCommitment ...)`.
-    #[serde(default)]
+    /// Hash-based aggregated PK commitment (last public signal of the C5 proof).
+    /// Passed as `pkCommitment` to `publishCommittee`.
     pub pk_commitment: [u8; 32],
     /// EVM DKG recursive proof (`CircuitName::DkgAggregator`) carrying node folds + C5
     /// for on-chain verification. `None` when proof aggregation is disabled.

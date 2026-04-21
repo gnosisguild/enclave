@@ -317,7 +317,7 @@ export const publishCommittee = task(
   .addOption({
     name: "pkCommitment",
     description:
-      "Safe-based aggregated PK commitment (bytes32 hex); required even when proof aggregation is disabled",
+      "Hash-based aggregated PK commitment (bytes32 hex); required even when proof aggregation is disabled",
     defaultValue: "",
     type: ArgumentType.STRING,
   })

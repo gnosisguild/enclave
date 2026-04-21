@@ -25,7 +25,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
-/// Extract the Safe-based aggregated PK commitment from the signed C5 proof.
+/// Extract the hash-based aggregated PK commitment from the signed C5 proof.
 /// This is the last public signal of `CircuitName::PkAggregation`.
 fn extract_pk_commitment(c5_proof: &Proof) -> Result<[u8; 32]> {
     let layout = CircuitName::PkAggregation.output_layout();
