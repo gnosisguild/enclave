@@ -329,7 +329,10 @@ impl PublicKeyAggregator {
                     .extract_output("pk_commitment")
                     .map_or(false, |extracted| extracted[..] == computed[..]),
                 Err(e) => {
-                    warn!("Failed to compute pk_commitment for party {}: {}", party_id, e);
+                    warn!(
+                        "Failed to compute pk_commitment for party {}: {}",
+                        party_id, e
+                    );
                     false
                 }
             };
