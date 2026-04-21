@@ -118,6 +118,12 @@ event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput, byte
 
 Upon successful decryption, rewards are distributed to the active committee members.
 
+> **If an E3 fails** at any of the five phases above (timeout, invalid shares, compute provider
+> error, etc.), the requester is entitled to a partial refund proportional to the work that was
+> _not_ completed, and honest CNs are paid for the work they _did_ complete. See the
+> [Requestor Guide](/requestor-guide) for the complete failure → refund map, the list of all 13
+> `FailureReason` codes, and the `markE3Failed` / `claimRequesterRefund` flow.
+
 **See also:** [Cryptography](/cryptography) (threshold BFV, phases P1–P4, circuit IDs) and
 [Noir Circuits](/noir-circuits) (build, lint, `enclave noir`, Rust prover integration).
 

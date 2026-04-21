@@ -35,7 +35,9 @@ Interfold.
 - **Proof hooks**: When using RISC Zero or other verifiable CPs, keep witness blobs small and
   reserve `computeProviderParams` for runtime toggles (precision, chunk size, etc.).
 - **Failover**: Decide how your app reacts if `CiphertextOutputPublished` never arrives—e.g., allow
-  a guardian actor to cancel the round and refund deposits.
+  a guardian actor to cancel the round and refund deposits. See the
+  [Requestor Guide](/requestor-guide) for the full failure → refund map and the `markE3Failed` /
+  `claimRequesterRefund` flow.
 
 ## Key Material & Ciphernodes
 
