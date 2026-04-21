@@ -32,6 +32,7 @@ fn zero_field_hex_strings(field_count: usize) -> Result<Vec<String>, ZkError> {
 fn generate_c6_fold_kernel_genesis_proof(
     prover: &ZkProver,
     inner: &Proof,
+    slot_index: u32,
     total_slots: usize,
     artifacts_dir: &str,
     job_id: &str,
@@ -59,7 +60,7 @@ fn generate_c6_fold_kernel_genesis_proof(
         inner_key_hash: inner_vk.key_hash,
         acc_key_hash: kernel_vk.key_hash,
         is_first_step: true,
-        slot_index: 0,
+        slot_index,
     };
 
     let circuit_path = prover
@@ -177,6 +178,7 @@ fn generate_c6_fold_step(
         let kernel_proof = generate_c6_fold_kernel_genesis_proof(
             prover,
             inner,
+            slot_index,
             total_slots,
             artifacts_dir,
             &kernel_job_id,
