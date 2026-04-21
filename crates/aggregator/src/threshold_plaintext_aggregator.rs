@@ -677,6 +677,13 @@ impl ThresholdPlaintextAggregator {
             self.decryption_aggregator_proofs = Some(Vec::new());
             return Ok(());
         }
+        let state: GeneratingC7Proof = self
+            .state
+            .get()
+            .ok_or(anyhow!("Could not get state"))?
+            .try_into()?;
+        // C6Fold witness width is `T + 1` (same `T` as `threshold_m`), not the honest party count.
+        let c6_total_slots = state.threshold_m as usize + 1;
         let num_ct = c7_proofs.len();
         let n_parties = honest_c6.len();
         let mut jobs = Vec::with_capacity(num_ct);
@@ -699,7 +706,7 @@ impl ThresholdPlaintextAggregator {
         self.bus.publish(
             ComputeRequest::zk(
                 ZkRequest::DecryptionAggregation(DecryptionAggregationRequest {
-                    c6_total_slots: n_parties,
+                    c6_total_slots,
                     jobs,
                     params_preset: self.params_preset,
                 }),
