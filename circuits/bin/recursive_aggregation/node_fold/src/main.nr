@@ -68,6 +68,7 @@ fn main(
     vk_hashes.push(c4ab_key_hash);
     let key_hash = compute_vk_hash(vk_hashes);
 
+    // C0: `commit(pk_dkg)` (DKG key for C3). C1[1]: `commit(pk_trbfv)` (threshold key); not equal to C0.
     let c0_pk = c0_public[0];
     let c1_pk = c1_public[1];
 
