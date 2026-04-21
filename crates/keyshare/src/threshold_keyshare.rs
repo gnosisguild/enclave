@@ -2061,6 +2061,7 @@ impl ThresholdKeyshare {
         let state = self.state.try_get()?;
         let e3_id = state.get_e3_id();
         let address = state.get_address().to_owned();
+        let party_id = state.get_party_id();
         let current: ReadyForDecryption = state.clone().try_into()?;
 
         info!("Publishing Exchange #4 (KeyshareCreated) for E3 {}", e3_id);
@@ -2070,6 +2071,7 @@ impl ThresholdKeyshare {
                 pubkey: current.pk_share,
                 e3_id: e3_id.clone(),
                 node: address,
+                party_id,
                 signed_pk_generation_proof: current.signed_pk_generation_proof,
             },
             ec,

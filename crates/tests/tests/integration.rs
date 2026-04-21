@@ -366,6 +366,16 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
             ".vk_recursive_hash",
         )
         .await;
+        // C7 (decrypted_shares_aggregation) — proven with noir-recursive-no-zk and
+        // folded into DecryptionAggregator, so it must also be staged under default/.
+        copy_circuit(
+            &threshold_target,
+            &dv.join("threshold/decrypted_shares_aggregation"),
+            "decrypted_shares_aggregation",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
 
         // ── evm/ variant (on-chain verification: DKG aggregator, C7) ───────────
 
@@ -1025,14 +1035,40 @@ async fn test_trbfv_actor() -> Result<()> {
         expected_events.extend_from_slice(&KS3);
     }
     expected_events.push("PublicKeyAggregated");
-    let h = expect_node_events_with_timeouts(
-        &nodes,
-        0,
-        &expected_events,
-        Duration::from_secs(5000),
-        Duration::from_secs(5000),
-    )
-    .await?;
+    // KeyshareCreated and DKGRecursiveAggregationComplete are gossiped independently
+    // by different committee members, so at a non-committee observer they can interleave
+    // in any order. Assert the multiset matches and the boundary events are in place,
+    // rather than a strict sequence.
+    let h = nodes
+        .take_history_with_timeouts(
+            0,
+            expected_events.len(),
+            Some(Duration::from_secs(5000)),
+            Some(Duration::from_secs(5000)),
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("FAILURE on node 0: {expected_events:?} : {e}"))?;
+    let actual_types = h.event_types();
+    println!("node 0 >> {:?} =~ {:?}", actual_types, expected_events);
+    let mut actual_sorted = actual_types.clone();
+    let mut expected_sorted: Vec<String> =
+        expected_events.iter().map(|s| (*s).to_string()).collect();
+    actual_sorted.sort();
+    expected_sorted.sort();
+    assert_eq!(
+        actual_sorted, expected_sorted,
+        "node 0 event multiset mismatch"
+    );
+    assert_eq!(
+        actual_types.first().map(String::as_str),
+        Some("AggregatorChanged"),
+        "node 0: first event must be AggregatorChanged"
+    );
+    assert_eq!(
+        actual_types.last().map(String::as_str),
+        Some("PublicKeyAggregated"),
+        "node 0: last event must be PublicKeyAggregated"
+    );
 
     let active_aggregator_history = nodes.get_history(active_aggregator_index).await?;
     let active_aggregator_pubkey_history_len = active_aggregator_history.len();
@@ -1056,12 +1092,31 @@ async fn test_trbfv_actor() -> Result<()> {
     // The active aggregator is also a selected committee member, so its node history contains
     // local ThresholdKeyshare DKG work in addition to the public-key aggregation stage. Project
     // only the deterministic pubkey-aggregation signals instead of comparing the whole raw node bus.
+    //
+    // KeyshareCreated and DKGRecursiveAggregationComplete events are produced independently
+    // by each committee member and gossiped in parallel with the active aggregator's own
+    // C1→C5 verification flow, so their positions relative to the C1→C5 sub-sequence are
+    // non-deterministic. Compare as a multiset plus boundary events rather than strict order.
     let active_aggregator_pubkey_events = project_history(&active_aggregator_history, |data| {
         publickey_aggregator_marker(data, &e3_id)
     });
+    let mut actual_sorted = active_aggregator_pubkey_events.clone();
+    let mut expected_sorted = expected_active_aggregator_pubkey_events.clone();
+    actual_sorted.sort();
+    expected_sorted.sort();
     assert_eq!(
-        active_aggregator_pubkey_events, expected_active_aggregator_pubkey_events,
-        "Unexpected active aggregator public-key flow"
+        actual_sorted, expected_sorted,
+        "Active aggregator public-key flow: event multiset mismatch"
+    );
+    assert_eq!(
+        active_aggregator_pubkey_events.first().copied(),
+        Some("CommitteeFinalized"),
+        "Active aggregator: first event must be CommitteeFinalized"
+    );
+    assert_eq!(
+        active_aggregator_pubkey_events.last().copied(),
+        Some("PublicKeyAggregated"),
+        "Active aggregator: last event must be PublicKeyAggregated"
     );
 
     report.push((

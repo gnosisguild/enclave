@@ -48,23 +48,25 @@ pub enum PublicKeyAggregatorState {
         threshold_n: usize,
         threshold_m: usize,
         keyshares: OrderedSet<ArcBytes>,
-        /// C1 proofs collected from KeyshareCreated events, indexed by insertion order.
+        /// C1 proofs collected from KeyshareCreated events, indexed by insertion order
+        /// (matches `submission_order`).
         c1_proofs: Vec<Option<SignedProofPayload>>,
         seed: Seed,
         nodes: OrderedSet<String>,
-        /// Insertion-ordered (node, keyshare) pairs.
-        /// Index matches `c1_proofs`, giving the party ID for verification.
+        /// Insertion-ordered (real sortition `party_id`, node, keyshare) triples.
+        /// Index matches `c1_proofs`. The real `party_id` comes from `KeyshareCreated`
+        /// and must be used for all downstream circuit slot indexing — arrival order
+        /// is non-deterministic and does not match sortition's committee position.
         #[serde(default)]
-        submission_order: Vec<(String, ArcBytes)>,
+        submission_order: Vec<(u64, String, ArcBytes)>,
     },
     VerifyingC1 {
-        /// Insertion-ordered (node, keyshare) pairs from Collecting.
-        /// Index matches `c1_proofs`, giving the party ID used in verification.
-        submission_order: Vec<(String, ArcBytes)>,
+        /// Insertion-ordered (party_id, node, keyshare) triples from Collecting.
+        submission_order: Vec<(u64, String, ArcBytes)>,
         threshold_m: usize,
         /// C1 proofs in the same insertion order as `submission_order`.
         c1_proofs: Vec<Option<SignedProofPayload>>,
-        /// Party indices that submitted no C1 proof — treated as dishonest.
+        /// Real party_ids that submitted no C1 proof — treated as dishonest.
         no_proof_parties: Vec<u64>,
     },
     GeneratingC5Proof {
@@ -142,6 +144,7 @@ impl PublicKeyAggregator {
         &mut self,
         keyshare: ArcBytes,
         node: String,
+        party_id: u64,
         c1_proof: Option<SignedProofPayload>,
         ec: &EventContext<Sequenced>,
     ) -> Result<()> {
@@ -162,7 +165,13 @@ impl PublicKeyAggregator {
             keyshares.insert(keyshare.clone());
             c1_proofs.push(c1_proof);
             nodes.insert(node.clone());
-            submission_order.push((node, keyshare));
+            info!(
+                "add_keyshare: node={} party_id={} (arrival slot={})",
+                node,
+                party_id,
+                submission_order.len()
+            );
+            submission_order.push((party_id, node, keyshare));
             let n = *threshold_n;
             let m = *threshold_m;
             info!(
@@ -186,26 +195,27 @@ impl PublicKeyAggregator {
 
     fn dispatch_c1_verification(
         &mut self,
+        submission_order: &[(u64, String, ArcBytes)],
         c1_proofs: &[Option<SignedProofPayload>],
         ec: EventContext<Sequenced>,
     ) -> Result<()> {
         let mut party_proofs = Vec::new();
         let mut no_proof_parties = Vec::new();
 
-        for (idx, proof_opt) in c1_proofs.iter().enumerate() {
+        for ((party_id, _, _), proof_opt) in submission_order.iter().zip(c1_proofs.iter()) {
             match proof_opt {
                 Some(proof) => {
                     party_proofs.push(PartyProofsToVerify {
-                        sender_party_id: idx as u64,
+                        sender_party_id: *party_id,
                         signed_proofs: vec![proof.clone()],
                     });
                 }
                 None => {
                     warn!(
                         "Party {} submitted keyshare without C1 proof — treating as dishonest",
-                        idx
+                        party_id
                     );
-                    no_proof_parties.push(idx as u64);
+                    no_proof_parties.push(*party_id);
                 }
             }
         }
@@ -280,29 +290,31 @@ impl PublicKeyAggregator {
         };
 
         let mut dishonest_parties = msg.dishonest_parties.clone();
-        let total_parties = submission_order.len();
 
-        // Filter out parties that failed C1 ZK verification.
-        let mut honest_entries: Vec<(usize, (String, ArcBytes))> = submission_order
-            .into_iter()
-            .enumerate()
-            .filter(|(idx, _)| !dishonest_parties.contains(&(*idx as u64)))
-            .collect();
+        // Filter out parties that failed C1 ZK verification. Keyed by the real
+        // sortition party_id carried in `submission_order`, not arrival index.
+        let mut honest_entries: Vec<(u64, String, ArcBytes, Option<SignedProofPayload>)> =
+            submission_order
+                .into_iter()
+                .zip(c1_proofs.into_iter())
+                .filter(|((pid, _, _), _)| !dishonest_parties.contains(pid))
+                .map(|((pid, node, ks), c1)| (pid, node, ks, c1))
+                .collect();
 
         // Cross-check: verify each party's keyshare matches their C1 pk_commitment.
         // Parties that fail are marked dishonest and reported via SignedProofFailed.
         let mut commitment_dishonest = Vec::new();
-        for (party_idx, (_node, ks)) in &honest_entries {
-            let signed_proof = match c1_proofs.get(*party_idx).and_then(|opt| opt.as_ref()) {
+        for (party_id, _node, ks, c1) in &honest_entries {
+            let signed_proof = match c1.as_ref() {
                 Some(proof) => proof,
                 None => {
                     // No C1 proof for this party — should already be in dishonest_parties.
                     // If not, treat as dishonest now (defensive).
                     warn!(
                         "Party {} has no C1 proof but was not marked dishonest",
-                        party_idx
+                        party_id
                     );
-                    dishonest_parties.insert(*party_idx as u64);
+                    dishonest_parties.insert(*party_id);
                     continue;
                 }
             };
@@ -317,21 +329,18 @@ impl PublicKeyAggregator {
                     .extract_output("pk_commitment")
                     .map_or(false, |extracted| extracted[..] == computed[..]),
                 Err(e) => {
-                    warn!(
-                        "Failed to compute pk_commitment for party {}: {}",
-                        party_idx, e
-                    );
+                    warn!("Failed to compute pk_commitment for party {}: {}", party_id, e);
                     false
                 }
             };
             if !ok {
-                commitment_dishonest.push((*party_idx as u64, signed_proof.clone()));
+                commitment_dishonest.push((*party_id, signed_proof.clone()));
             }
         }
 
         // Emit SignedProofFailed for each commitment-mismatched party
-        for (party_idx, signed_proof) in &commitment_dishonest {
-            dishonest_parties.insert(*party_idx);
+        for (party_id, signed_proof) in &commitment_dishonest {
+            dishonest_parties.insert(*party_id);
             match signed_proof.recover_address() {
                 Ok(faulting_node) => {
                     if let Err(e) = self.bus.publish(
@@ -348,7 +357,7 @@ impl PublicKeyAggregator {
                 }
                 Err(e) => warn!(
                     "Could not recover address from C1 proof for party {}: {e}",
-                    party_idx
+                    party_id
                 ),
             }
         }
@@ -359,12 +368,18 @@ impl PublicKeyAggregator {
                 commitment_dishonest.len()
             );
             // Re-filter honest_entries after commitment check
-            honest_entries.retain(|(idx, _)| !dishonest_parties.contains(&(*idx as u64)));
+            honest_entries.retain(|(pid, _, _, _)| !dishonest_parties.contains(pid));
         }
+
+        // Sort by real party_id ascending so honest_keyshares / honest_nodes /
+        // honest_party_ids all share the same ordering used by NodeFold rows
+        // (publickey_aggregator sorts dkg_node_proofs by pid before dispatch)
+        // and by the circuit's slot indexing in `dkg_aggregator.nr`.
+        honest_entries.sort_by_key(|(pid, _, _, _)| *pid);
 
         let (honest_keyshares, honest_nodes): (Vec<ArcBytes>, Vec<String>) = honest_entries
             .iter()
-            .map(|(_, (node, ks))| (ks.clone(), node.clone()))
+            .map(|(_, node, ks, _)| (ks.clone(), node.clone()))
             .unzip();
 
         if !dishonest_parties.is_empty() {
@@ -374,9 +389,8 @@ impl PublicKeyAggregator {
             );
         }
 
-        let honest_party_ids: BTreeSet<u64> = (0..total_parties as u64)
-            .filter(|id| !dishonest_parties.contains(id))
-            .collect();
+        let honest_party_ids: BTreeSet<u64> =
+            honest_entries.iter().map(|(pid, _, _, _)| *pid).collect();
 
         // Need at least threshold + 1 honest parties for aggregation
         if honest_keyshares.len() <= threshold_m {
@@ -408,7 +422,12 @@ impl PublicKeyAggregator {
 
         let committee_h = honest_keyshares.len();
         let honest_nodes_set = OrderedSet::from(honest_nodes.clone());
-        let keyshare_bytes: Vec<_> = honest_keyshares_set.iter().cloned().collect();
+        // Feed keyshares to C5 in ascending party_id order so that
+        // `c5_public[i]` (pk_commitment of the i-th input keyshare) matches
+        // party_ids[i] and the row-i node_fold pk bound by dkg_aggregator.nr.
+        // `honest_keyshares` preserves the submission-index (== party_id) order
+        // from `honest_entries`; do NOT sort by byte content.
+        let keyshare_bytes: Vec<ArcBytes> = honest_keyshares.clone();
 
         let pubkey = ArcBytes::from_bytes(&pubkey);
         info!("Publishing PkAggregationProofPending for C5 proof generation...");
@@ -618,6 +637,18 @@ impl PublicKeyAggregator {
         pairs.sort_by_key(|(pid, _)| *pid);
         let party_ids: Vec<u64> = pairs.iter().map(|(pid, _)| *pid).collect();
         let node_fold_proofs: Vec<Proof> = pairs.into_iter().map(|(_, p)| p).collect();
+        info!(
+            "ORDER-DEBUG dispatch DkgAggregation: honest_party_ids(submission-idx)={:?} \
+             dkg_node_proofs_keys(real party_id from DKGRecursiveAggregationComplete)={:?} \
+             party_ids_passed_to_circuit={:?}",
+            honest_party_ids.iter().collect::<Vec<_>>(),
+            {
+                let mut k: Vec<u64> = dkg_node_proofs.keys().copied().collect();
+                k.sort();
+                k
+            },
+            party_ids
+        );
 
         if node_fold_proofs.is_empty() {
             info!("PublicKeyAggregator: proof aggregation disabled — skipping DkgAggregation");
@@ -850,8 +881,8 @@ impl PublicKeyAggregator {
 
             // Find the expelled node's index in submission_order and remove from
             // all parallel collections so they stay aligned.
-            if let Some(idx) = submission_order.iter().position(|(n, _)| n == &node_str) {
-                let (_, expelled_keyshare) = submission_order.remove(idx);
+            if let Some(idx) = submission_order.iter().position(|(_, n, _)| n == &node_str) {
+                let (_, _, expelled_keyshare) = submission_order.remove(idx);
                 keyshares.remove(&expelled_keyshare);
                 c1_proofs.remove(idx);
             }
@@ -947,10 +978,17 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
                     // using the c1_proofs now stored in the VerifyingC1 state (already
                     // cleaned of the expelled node's entry).
                     if was_collecting {
-                        if let Some(PublicKeyAggregatorState::VerifyingC1 { c1_proofs, .. }) =
-                            self.state.get()
+                        if let Some(PublicKeyAggregatorState::VerifyingC1 {
+                            submission_order,
+                            c1_proofs,
+                            ..
+                        }) = self.state.get()
                         {
-                            self.dispatch_c1_verification(&c1_proofs, ec.clone())?;
+                            self.dispatch_c1_verification(
+                                &submission_order,
+                                &c1_proofs,
+                                ec.clone(),
+                            )?;
                         }
                     }
                     Ok(())
@@ -974,6 +1012,7 @@ impl Handler<TypedEvent<KeyshareCreated>> for PublicKeyAggregator {
             let e3_id = event.e3_id.clone();
             let pubkey = event.pubkey.clone();
             let node = event.node.clone();
+            let party_id = event.party_id;
             let c1_proof = event.signed_pk_generation_proof.clone();
 
             if e3_id != self.e3_id {
@@ -981,13 +1020,17 @@ impl Handler<TypedEvent<KeyshareCreated>> for PublicKeyAggregator {
                 return Ok(());
             }
 
-            self.add_keyshare(pubkey, node, c1_proof, &ec)?;
+            self.add_keyshare(pubkey, node, party_id, c1_proof, &ec)?;
 
             // If we just transitioned to VerifyingC1, dispatch verification
             // using c1_proofs stored in the new state.
-            if let Some(PublicKeyAggregatorState::VerifyingC1 { c1_proofs, .. }) = self.state.get()
+            if let Some(PublicKeyAggregatorState::VerifyingC1 {
+                submission_order,
+                c1_proofs,
+                ..
+            }) = self.state.get()
             {
-                self.dispatch_c1_verification(&c1_proofs, ec)?;
+                self.dispatch_c1_verification(&submission_order, &c1_proofs, ec)?;
             }
 
             Ok(())
