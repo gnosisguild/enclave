@@ -732,7 +732,7 @@ async fn test_threshold_share_decryption_commitment_consistency() {
     let computation_output = ThresholdShareDecryptionCircuit::compute(preset, &sample).unwrap();
 
     let expected_d_commitment = compute_threshold_decryption_share_commitment(
-        &computation_output.inputs.d,
+        &computation_output.inputs.d_native_trunc,
         computation_output.bits.d_bit,
         MAX_MSG_NON_ZERO_COEFFS,
     );
@@ -740,7 +740,7 @@ async fn test_threshold_share_decryption_commitment_consistency() {
     let d_commitment_from_proof = extract_field_from_end(&proof.public_signals, 0);
     assert_eq!(
         d_commitment_from_proof, expected_d_commitment,
-        "C6 d_commitment must match compute_threshold_decryption_share_commitment on witness d"
+        "C6 d_commitment must match hash of d_native_trunc (C7-aligned), not centered witness d"
     );
 
     prover.cleanup(e3_id).unwrap();

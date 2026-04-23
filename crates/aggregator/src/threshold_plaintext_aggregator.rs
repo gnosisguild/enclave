@@ -508,7 +508,6 @@ impl ThresholdPlaintextAggregator {
 
         let max_k = MAX_MSG_NON_ZERO_COEFFS;
         let c6_output_layout = CircuitName::ThresholdShareDecryption.output_layout();
-        let moduli: Vec<u64> = threshold_params.moduli().to_vec();
 
         for (party_id, shares) in honest_shares {
             let Some(proofs) = c6_proofs.get(party_id) else {
@@ -555,20 +554,10 @@ impl ThresholdPlaintextAggregator {
                 mismatched.insert(*party_id);
                 continue;
             };
-            let mut crt = e3_polynomial::CrtPolynomial::from_fhe_polynomial(&poly);
+            let crt = e3_polynomial::CrtPolynomial::from_fhe_polynomial(&poly);
 
-            // Apply the same transformations C6's Inputs::compute applies:
-            // reverse coefficient order + center each limb mod qi.
-            crt.reverse();
-            if let Err(e) = crt.center(&moduli) {
-                warn!(
-                    "Could not center d_share for party {} — marking as mismatched: {e}",
-                    party_id
-                );
-                mismatched.insert(*party_id);
-                continue;
-            }
-
+            // C6 public `d_commitment` hashes native truncated limbs (same layout as C7), not
+            // reversed+centered witness `d`.
             let computed = compute_threshold_decryption_share_commitment(&crt, d_bit, max_k);
 
             // Convert to big-endian 32-byte padded format matching
@@ -683,15 +672,22 @@ impl ThresholdPlaintextAggregator {
             .get()
             .ok_or(anyhow!("Could not get state"))?
             .try_into()?;
-        // C6Fold witness width is `T + 1` (same `T` as `threshold_m`), not the honest party count.
+        // C6Fold witness width is `T + 1` (same `T` as `threshold_m`). C7 is only proven for the
+        // first `T + 1` parties after sorting by party id (`handle_decrypted_shares_aggregation_proof`
+        // truncates); fold slot indices must stay in `0..T+1` and use that same party subset.
         let c6_total_slots = state.threshold_m as usize + 1;
+        ensure!(
+            honest_c6.len() >= c6_total_slots,
+            "DecryptionAggregation needs at least {} honest C6 parties, have {}",
+            c6_total_slots,
+            honest_c6.len()
+        );
         let num_ct = c7_proofs.len();
-        let n_parties = honest_c6.len();
         let mut jobs = Vec::with_capacity(num_ct);
         for ct_idx in 0..num_ct {
-            let mut c6_inner_proofs = Vec::with_capacity(n_parties);
-            let c6_slot_indices: Vec<u32> = (0..n_parties as u32).collect();
-            for (_, wps) in honest_c6 {
+            let mut c6_inner_proofs = Vec::with_capacity(c6_total_slots);
+            let c6_slot_indices: Vec<u32> = (0..c6_total_slots as u32).collect();
+            for (_, wps) in honest_c6.iter().take(c6_total_slots) {
                 let Some(p) = wps.get(ct_idx) else {
                     bail!("C6 inner proof missing for party at ct index {}", ct_idx);
                 };

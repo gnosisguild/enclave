@@ -25,6 +25,7 @@ fn main(
     r1: [Polynomial<(2 * N) - 1>; L],
     r2: [Polynomial<N - 1>; L],
     d: [Polynomial<N>; L],
+    d_native_trunc: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
 ) -> pub Field {
     let share_decryption: ShareDecryption<N, MAX_MSG_NON_ZERO_COEFFS, L, THRESHOLD_SHARE_DECRYPTION_BIT_CT, THRESHOLD_SHARE_DECRYPTION_BIT_SK, THRESHOLD_SHARE_DECRYPTION_BIT_E_SM, THRESHOLD_SHARE_DECRYPTION_BIT_R1, THRESHOLD_SHARE_DECRYPTION_BIT_R2, THRESHOLD_SHARE_DECRYPTION_BIT_D> = ShareDecryption::new(
         THRESHOLD_SHARE_DECRYPTION_CONFIGS,
@@ -38,6 +39,7 @@ fn main(
         r1,
         r2,
         d,
+        d_native_trunc,
     );
     share_decryption.execute()
 }

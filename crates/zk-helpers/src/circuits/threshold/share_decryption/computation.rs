@@ -17,6 +17,7 @@ use crate::circuits::commitments::{
 use crate::compute_modulus_bit;
 use crate::crt_polynomial_to_toml_json;
 use crate::decompose_residue;
+use crate::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuit;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuitData;
 use crate::CircuitsErrors;
@@ -28,10 +29,37 @@ use e3_polynomial::Polynomial;
 use itertools::izip;
 use num_bigint::BigInt;
 use num_bigint::BigUint;
-use num_traits::ToPrimitive;
+use num_traits::{ToPrimitive, Zero};
 use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
+
+/// Low-degree native \([0, q)\) CRT limbs for `d_commitment`, matching C7's `from_fhe` truncation.
+/// In each limb, `d` is reversed+centered (witness layout); native coeff `j` is `uncenter(d[N-1-j])`.
+fn d_native_trunc_from_centered_d(
+    d: &CrtPolynomial,
+    moduli: &[u64],
+    degree: usize,
+    max_k: usize,
+) -> CrtPolynomial {
+    let mut limbs = Vec::with_capacity(d.limbs.len());
+    for (limb_idx, limb) in d.limbs.iter().enumerate() {
+        let q = BigInt::from(moduli[limb_idx]);
+        let coeffs = limb.coefficients();
+        let mut asc = Vec::with_capacity(max_k);
+        for j in 0..max_k {
+            let w = &coeffs[degree - 1 - j];
+            let u = if w < &BigInt::zero() {
+                w + &q
+            } else {
+                w.clone()
+            };
+            asc.push(u);
+        }
+        limbs.push(Polynomial::new(asc));
+    }
+    CrtPolynomial::new(limbs)
+}
 
 /// Output of [`CircuitComputation::compute`] for [`ShareDecryptionCircuit`]: bounds, bit widths, and inputs.
 #[derive(Debug)]
@@ -95,6 +123,8 @@ pub struct Inputs {
     pub r1: CrtPolynomial,
     pub r2: CrtPolynomial,
     pub d: CrtPolynomial,
+    /// Native truncated `d` per limb (C7-compatible); hashed for public `d_commitment`.
+    pub d_native_trunc: CrtPolynomial,
     pub expected_sk_commitment: BigInt,
     pub expected_e_sm_commitment: BigInt,
     pub ct_commitment: BigInt,
@@ -313,6 +343,14 @@ impl Computation for Inputs {
         let bits = Bits::compute(preset, &bounds)?;
         let ct_commitment = compute_ciphertext_commitment(&ct0, &ct1, bits.ct_bit);
 
+        let moduli_u64: Vec<u64> = threshold_params.moduli().to_vec();
+        let d_native_trunc = d_native_trunc_from_centered_d(
+            &d,
+            &moduli_u64,
+            n as usize,
+            MAX_MSG_NON_ZERO_COEFFS,
+        );
+
         Ok(Inputs {
             ct0,
             ct1,
@@ -321,6 +359,7 @@ impl Computation for Inputs {
             r1,
             r2,
             d,
+            d_native_trunc,
             expected_sk_commitment,
             expected_e_sm_commitment,
             ct_commitment,
@@ -335,6 +374,7 @@ impl Computation for Inputs {
         let r1 = crt_polynomial_to_toml_json(&self.r1);
         let r2 = crt_polynomial_to_toml_json(&self.r2);
         let d = crt_polynomial_to_toml_json(&self.d);
+        let d_native_trunc = crt_polynomial_to_toml_json(&self.d_native_trunc);
         let expected_sk_commitment = self.expected_sk_commitment.to_string();
         let expected_e_sm_commitment = self.expected_e_sm_commitment.to_string();
         let ct_commitment = self.ct_commitment.to_string();
@@ -347,6 +387,7 @@ impl Computation for Inputs {
             "r1": r1,
             "r2": r2,
             "d": d,
+            "d_native_trunc": d_native_trunc,
             "expected_sk_commitment": expected_sk_commitment,
             "expected_e_sm_commitment": expected_e_sm_commitment,
             "ct_commitment": ct_commitment,
@@ -373,13 +414,10 @@ mod tests {
         assert_eq!(bits.d_bit, expected_bit);
     }
 
-    /// Verifies that `CrtPolynomial::reverse()` + `center()` matches
-    /// `Inputs::compute` for d_commitment, and that the Poly bytes round-trip
-    /// is lossless.
+    /// `d_commitment` matches C7: hash of native truncated `from_fhe` limbs, via `d_native_trunc`.
     #[test]
     fn test_d_commitment_matches_inputs_compute() {
         use crate::circuits::commitments::compute_threshold_decryption_share_commitment;
-        use crate::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
         use crate::threshold::share_decryption::ShareDecryptionCircuitData;
         use crate::CiphernodesCommitteeSize;
         use fhe_math::rq::{Poly, Representation};
@@ -392,29 +430,19 @@ mod tests {
         let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
         let bounds = Bounds::compute(preset, &()).unwrap();
         let bits = Bits::compute(preset, &bounds).unwrap();
-        let moduli: Vec<u64> = threshold_params.moduli().to_vec();
 
-        // Ground truth: Inputs::compute (what the Noir prover receives)
         let inputs = Inputs::compute(preset, &sample).unwrap();
-        let truth = compute_threshold_decryption_share_commitment(
-            &inputs.d,
+        let from_d_native = compute_threshold_decryption_share_commitment(
+            &inputs.d_native_trunc,
             bits.d_bit,
             MAX_MSG_NON_ZERO_COEFFS,
         );
-
-        // Aggregator path: CrtPolynomial::reverse() + center()
-        let mut crt = sample.d_share.clone();
-        crt.reverse();
-        crt.center(&moduli).unwrap();
-        let from_api = compute_threshold_decryption_share_commitment(
-            &crt,
+        let from_raw_share = compute_threshold_decryption_share_commitment(
+            &sample.d_share,
             bits.d_bit,
             MAX_MSG_NON_ZERO_COEFFS,
         );
-        assert_eq!(
-            truth, from_api,
-            "CrtPolynomial API must match Inputs::compute"
-        );
+        assert_eq!(from_d_native, from_raw_share);
 
         // Bytes round-trip: Poly → to_bytes → from_bytes → from_fhe_polynomial
         let raw: Vec<Vec<u64>> = sample
@@ -439,18 +467,13 @@ mod tests {
         let mut poly = Poly::zero(&ctx, Representation::PowerBasis);
         poly.set_coefficients(arr);
         let poly_rt = Poly::from_bytes(&poly.to_bytes(), &ctx).unwrap();
-        let mut crt_rt = CrtPolynomial::from_fhe_polynomial(&poly_rt);
-        crt_rt.reverse();
-        crt_rt.center(&moduli).unwrap();
+        let crt_rt = CrtPolynomial::from_fhe_polynomial(&poly_rt);
         let from_bytes = compute_threshold_decryption_share_commitment(
             &crt_rt,
             bits.d_bit,
             MAX_MSG_NON_ZERO_COEFFS,
         );
-        assert_eq!(
-            truth, from_bytes,
-            "Bytes round-trip must match Inputs::compute"
-        );
+        assert_eq!(from_d_native, from_bytes);
     }
 
     #[test]

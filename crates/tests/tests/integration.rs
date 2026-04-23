@@ -390,6 +390,15 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
             ".vk_hash",
         )
         .await;
+        // Decryption aggregator — EVM-targeted (C6 fold + C7 verified inside)
+        copy_circuit(
+            &decryption_aggregator_target,
+            &ev.join("recursive_aggregation/decryption_aggregator"),
+            "decryption_aggregator",
+            ".vk",
+            ".vk_hash",
+        )
+        .await;
         // C7 (decrypted_shares_aggregation) — EVM-targeted
         copy_circuit(
             &threshold_target,
