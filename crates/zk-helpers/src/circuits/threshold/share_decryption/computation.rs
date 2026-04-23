@@ -14,10 +14,10 @@ use crate::calculate_bit_width;
 use crate::circuits::commitments::{
     compute_aggregated_shares_commitment, compute_ciphertext_commitment,
 };
+use crate::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
 use crate::compute_modulus_bit;
 use crate::crt_polynomial_to_toml_json;
 use crate::decompose_residue;
-use crate::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuit;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuitData;
 use crate::CircuitsErrors;
@@ -344,12 +344,8 @@ impl Computation for Inputs {
         let ct_commitment = compute_ciphertext_commitment(&ct0, &ct1, bits.ct_bit);
 
         let moduli_u64: Vec<u64> = threshold_params.moduli().to_vec();
-        let d_native_trunc = d_native_trunc_from_centered_d(
-            &d,
-            &moduli_u64,
-            n as usize,
-            MAX_MSG_NON_ZERO_COEFFS,
-        );
+        let d_native_trunc =
+            d_native_trunc_from_centered_d(&d, &moduli_u64, n as usize, MAX_MSG_NON_ZERO_COEFFS);
 
         Ok(Inputs {
             ct0,
