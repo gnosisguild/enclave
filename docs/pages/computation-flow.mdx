@@ -118,12 +118,6 @@ event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput, byte
 
 Upon successful decryption, rewards are distributed to the active committee members.
 
-> **If an E3 fails** at any of the five phases above (timeout, invalid shares, compute provider
-> error, etc.), the requester is entitled to a partial refund proportional to the work that was
-> _not_ completed, and honest CNs are paid for the work they _did_ complete. See the
-> [Requestor Guide](/requestor-guide) for the complete failure → refund map, the list of all 13
-> `FailureReason` codes, and the `markE3Failed` / `claimRequesterRefund` flow.
-
 **See also:** [Cryptography](/cryptography) (threshold BFV, phases P1–P4, circuit IDs) and
 [Noir Circuits](/noir-circuits) (build, lint, `enclave noir`, Rust prover integration).
 
@@ -133,10 +127,18 @@ If any phase exceeds its deadline or a fault is detected, the E3 transitions to 
 Anyone can call `markE3Failed(e3Id)` to check timeout conditions, or the `SlashingManager` /
 `CiphernodeRegistry` can trigger failure directly.
 
-Once failed, the `E3RefundManager` calculates a proportional refund based on how much work was
-completed:
+Once failed, `processE3Failure(e3Id)` transfers the escrowed payment to `E3RefundManager`, which
+determines how funds are split among the requester, honest committee members, and the protocol
+treasury using its configurable `WorkValueAllocation` (basis-point weights per stage) plus any
+slashed funds — not a simple proportion of work remaining. The failure cause is recorded as one of
+the 13 `FailureReason` entries (`None` plus 12 concrete states such as `DKGTimeout`,
+`ComputeProviderFailed`, `DecryptionInvalidShares`, etc.; `_MAX_FAILURE_REASON` is a separate
+sentinel used for bounds-checking in `IEnclave`):
 
-- The requester can claim a partial refund via `claimRequesterRefund(e3Id)`
+- The requester can claim their share via `claimRequesterRefund(e3Id)`
 - Honest committee members (non-expelled nodes) can claim compensation via
   `claimHonestNodeReward(e3Id)`
 - A protocol fee is retained for operational costs
+
+For the complete `FailureReason` → allocation map, see the `markE3Failed` / `claimRequesterRefund`
+flow in `IE3RefundManager` and `IEnclave`.
