@@ -41,10 +41,9 @@ circuits/
 ```
 
 Binary packages map to **C0–C7** and operational phases as on the [Cryptography](./cryptography)
-page (**Phases & Circuits** section). Large statements (especially **C2**) use **inner** proofs
-that are then combined inside `recursive_aggregation/` (AB combiners → per-step folds →
-`node_fold` per party → `nodes_fold` across parties → `dkg_aggregator` /
-`decryption_aggregator`).
+page (**Phases & Circuits** section). Large statements (especially **C2**) use **inner** proofs that
+are then combined inside `recursive_aggregation/` (AB combiners → per-step folds → `node_fold` per
+party → `nodes_fold` across parties → `dkg_aggregator` / `decryption_aggregator`).
 
 ## Using `circuits/lib` from another Noir project
 

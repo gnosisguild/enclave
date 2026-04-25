@@ -329,10 +329,7 @@ export const publishCommittee = task(
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async (
-      { e3Id, nodes, publicKey, pkCommitment, proof },
-      hre,
-    ) => {
+    default: async ({ e3Id, nodes, publicKey, pkCommitment, proof }, hre) => {
       const { deployAndSaveCiphernodeRegistryOwnable } = await import(
         "../scripts/deployAndSave/ciphernodeRegistryOwnable"
       );
@@ -572,10 +569,7 @@ export const publishPlaintext = task(
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async (
-      { e3Id, data, dataFile, proof, proofFile },
-      hre,
-    ) => {
+    default: async ({ e3Id, data, dataFile, proof, proofFile }, hre) => {
       const { deployAndSaveEnclave } = await import(
         "../scripts/deployAndSave/enclave"
       );

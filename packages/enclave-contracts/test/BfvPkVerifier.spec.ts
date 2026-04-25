@@ -57,10 +57,7 @@ describe("BfvPkVerifier", function () {
       const pkCommitment = ethers.keccak256("0x1234");
       const proof = encodeProof("0x01", []);
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        proof,
-      );
+      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
       expect(result).to.equal(false);
     });
 
@@ -74,10 +71,7 @@ describe("BfvPkVerifier", function () {
       const wrong = ethers.keccak256("0x1234");
       const proof = encodeProof("0x01", [wrong]);
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        proof,
-      );
+      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
       expect(result).to.equal(false);
     });
 
@@ -90,10 +84,7 @@ describe("BfvPkVerifier", function () {
       const pkCommitment = ethers.keccak256("0xabcd");
       const proof = encodeProof("0x01", [pkCommitment]);
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        proof,
-      );
+      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
       expect(result).to.equal(false);
     });
   });
@@ -112,10 +103,7 @@ describe("BfvPkVerifier", function () {
         pkCommitment,
       ]);
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        proof,
-      );
+      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
       expect(result).to.equal(true);
     });
 
@@ -128,10 +116,7 @@ describe("BfvPkVerifier", function () {
       const pkCommitment = ethers.id("committee-pk");
       const proof = encodeProof("0x", [pkCommitment]);
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        proof,
-      );
+      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
       expect(result).to.equal(true);
     });
   });
