@@ -632,6 +632,26 @@ impl PublicKeyAggregator {
             return Ok(());
         }
 
+        // `proof_aggregation_enabled` is an E3-level flag shared by all nodes, so honest-party
+        // proofs should be uniformly Some (aggregation on) or uniformly None (aggregation off).
+        // A mixed bag would silently truncate the dispatched request below; reject it explicitly.
+        let some_count = honest_party_ids
+            .iter()
+            .filter(|id| {
+                dkg_node_proofs
+                    .get(id)
+                    .map(Option::is_some)
+                    .unwrap_or(false)
+            })
+            .count();
+        if some_count != 0 && some_count != honest_party_ids.len() {
+            anyhow::bail!(
+                "PublicKeyAggregator: mixed Some/None DKG node proofs across honest parties \
+                 ({some_count} of {} present); refusing to dispatch a truncated DkgAggregation",
+                honest_party_ids.len()
+            );
+        }
+
         let mut pairs: Vec<_> = dkg_node_proofs
             .iter()
             .filter(|(pid, _)| honest_party_ids.contains(pid))

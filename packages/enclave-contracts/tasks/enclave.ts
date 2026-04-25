@@ -3,7 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { BigNumberish, ZeroAddress, zeroPadValue } from "ethers";
+import { BigNumberish, ZeroAddress, ZeroHash, isHexString, zeroPadValue } from "ethers";
 import fs from "fs";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
@@ -356,6 +356,20 @@ export const publishCommittee = task(
 
       if (!pkCommitment) {
         throw new Error("pkCommitment is required");
+      }
+      // pkCommitment is stored and emitted unconditionally by the registry, so off-chain
+      // consumers can read an unusable key if the values are inconsistent. Validate format
+      // and require both publicKey and pkCommitment to be present and non-zero.
+      if (!isHexString(pkCommitment, 32)) {
+        throw new Error(
+          `pkCommitment must be a 32-byte hex string (got ${pkCommitment})`,
+        );
+      }
+      if (pkCommitment === ZeroHash) {
+        throw new Error("pkCommitment must not be the zero hash");
+      }
+      if (!isHexString(publicKey) || publicKey === "0x") {
+        throw new Error("publicKey is required and must be a non-empty hex string");
       }
 
       const tx = await ciphernodeRegistry.publishCommittee(
