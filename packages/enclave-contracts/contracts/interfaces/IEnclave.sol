@@ -290,6 +290,9 @@ interface IEnclave {
     /// @param output The invalid output data.
     error InvalidOutput(bytes output);
 
+    /// @notice Thrown when proof aggregation is enabled but no proof was supplied.
+    error ProofRequired();
+
     /// @notice Thrown when the committee size has not been configured with thresholds.
     /// @param committeeSize The unconfigured committee size.
     error CommitteeSizeNotConfigured(CommitteeSize committeeSize);

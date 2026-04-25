@@ -9,6 +9,7 @@
 
 use crate::circuits::aggregation::c3_accumulator::generate_sequential_c3_fold;
 use crate::circuits::aggregation::c6_accumulator::generate_sequential_c6_fold;
+use crate::circuits::aggregation::helpers::u64_to_field_hex;
 use crate::circuits::aggregation::nodes_fold_accumulator::generate_sequential_nodes_fold;
 use crate::circuits::utils::{bytes_to_field_strings, inputs_json_to_input_map};
 use crate::circuits::vk;
@@ -17,7 +18,6 @@ use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use serde::Serialize;
-use serde_json::json;
 
 fn proof_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
     bytes_to_field_strings(proof.data.as_ref())
@@ -25,12 +25,6 @@ fn proof_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
 
 fn proof_public_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
     bytes_to_field_strings(proof.public_signals.as_ref())
-}
-
-fn u64_to_field_hex(x: u64) -> String {
-    let mut b = [0u8; 32];
-    b[24..32].copy_from_slice(&x.to_be_bytes());
-    format!("0x{}", hex::encode(b))
 }
 
 #[derive(Serialize)]
@@ -67,6 +61,31 @@ struct C4abFoldWitness {
     c4b_public: Vec<String>,
     c4a_key_hash: String,
     c4b_key_hash: String,
+}
+
+#[derive(Serialize)]
+struct NodeFoldWitness {
+    c0_vk: Vec<String>,
+    c0_proof: Vec<String>,
+    c0_public: Vec<String>,
+    c1_vk: Vec<String>,
+    c1_proof: Vec<String>,
+    c1_public: Vec<String>,
+    c2ab_vk: Vec<String>,
+    c2ab_proof: Vec<String>,
+    c2ab_public: Vec<String>,
+    c3ab_vk: Vec<String>,
+    c3ab_proof: Vec<String>,
+    c3ab_public: Vec<String>,
+    c4ab_vk: Vec<String>,
+    c4ab_proof: Vec<String>,
+    c4ab_public: Vec<String>,
+    party_id: String,
+    c0_key_hash: String,
+    c1_key_hash: String,
+    c2ab_key_hash: String,
+    c3ab_key_hash: String,
+    c4ab_key_hash: String,
 }
 
 /// Inputs for [`prove_node_dkg_fold`]: recursive inner proofs and C3 slot metadata.
@@ -232,31 +251,33 @@ pub fn prove_node_dkg_fold(
         CircuitName::C4abFold,
     )?;
 
-    let nf = json!({
-        "c0_vk": c0_vk.verification_key,
-        "c0_proof": proof_field_strings(input.c0_proof)?,
-        "c0_public": proof_public_field_strings(input.c0_proof)?,
-        "c1_vk": c1_vk.verification_key,
-        "c1_proof": proof_field_strings(input.c1_proof)?,
-        "c1_public": proof_public_field_strings(input.c1_proof)?,
-        "c2ab_vk": c2ab_fold_vk.verification_key,
-        "c2ab_proof": proof_field_strings(&c2ab_proof)?,
-        "c2ab_public": proof_public_field_strings(&c2ab_proof)?,
-        "c3ab_vk": c3ab_fold_vk.verification_key,
-        "c3ab_proof": proof_field_strings(&c3ab_proof)?,
-        "c3ab_public": proof_public_field_strings(&c3ab_proof)?,
-        "c4ab_vk": c4ab_fold_vk.verification_key,
-        "c4ab_proof": proof_field_strings(&c4ab_proof)?,
-        "c4ab_public": proof_public_field_strings(&c4ab_proof)?,
-        "_party_id": u64_to_field_hex(input.party_id),
-        "c0_key_hash": c0_vk.key_hash,
-        "c1_key_hash": c1_vk.key_hash,
-        "c2ab_key_hash": c2ab_fold_vk.key_hash,
-        "c3ab_key_hash": c3ab_fold_vk.key_hash,
-        "c4ab_key_hash": c4ab_fold_vk.key_hash,
-    });
+    let nf = NodeFoldWitness {
+        c0_vk: c0_vk.verification_key,
+        c0_proof: proof_field_strings(input.c0_proof)?,
+        c0_public: proof_public_field_strings(input.c0_proof)?,
+        c1_vk: c1_vk.verification_key,
+        c1_proof: proof_field_strings(input.c1_proof)?,
+        c1_public: proof_public_field_strings(input.c1_proof)?,
+        c2ab_vk: c2ab_fold_vk.verification_key,
+        c2ab_proof: proof_field_strings(&c2ab_proof)?,
+        c2ab_public: proof_public_field_strings(&c2ab_proof)?,
+        c3ab_vk: c3ab_fold_vk.verification_key,
+        c3ab_proof: proof_field_strings(&c3ab_proof)?,
+        c3ab_public: proof_public_field_strings(&c3ab_proof)?,
+        c4ab_vk: c4ab_fold_vk.verification_key,
+        c4ab_proof: proof_field_strings(&c4ab_proof)?,
+        c4ab_public: proof_public_field_strings(&c4ab_proof)?,
+        party_id: u64_to_field_hex(input.party_id),
+        c0_key_hash: c0_vk.key_hash,
+        c1_key_hash: c1_vk.key_hash,
+        c2ab_key_hash: c2ab_fold_vk.key_hash,
+        c3ab_key_hash: c3ab_fold_vk.key_hash,
+        c4ab_key_hash: c4ab_fold_vk.key_hash,
+    };
 
-    let nf_map = inputs_json_to_input_map(&nf)?;
+    let nf_json =
+        serde_json::to_value(&nf).map_err(|e| ZkError::SerializationError(e.to_string()))?;
+    let nf_map = inputs_json_to_input_map(&nf_json)?;
     let nf_compiled = CompiledCircuit::from_file(
         &prover
             .circuits_dir(CircuitVariant::Default, artifacts_dir)
@@ -397,6 +418,25 @@ pub fn prove_decryption_aggregation_jobs(
     e3_id: &str,
     artifacts_dir: &str,
 ) -> Result<Vec<Proof>, ZkError> {
+    // VKs and the compiled circuit are job-independent: load once, reuse per ciphertext.
+    let c6_fold_vk = vk::load_vk_artifacts(
+        &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
+        CircuitName::C6Fold,
+    )?;
+    let c7_vk = vk::load_vk_artifacts(
+        &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
+        CircuitName::DecryptedSharesAggregation,
+    )?;
+    let compiled = CompiledCircuit::from_file(
+        &prover
+            .circuits_dir(CircuitVariant::Default, artifacts_dir)
+            .join(CircuitName::DecryptionAggregator.dir_path())
+            .join(format!(
+                "{}.json",
+                CircuitName::DecryptionAggregator.as_str()
+            )),
+    )?;
+
     let mut out = Vec::with_capacity(jobs.len());
     for (i, job) in jobs.iter().enumerate() {
         let c6_fold = generate_sequential_c6_fold(
@@ -406,14 +446,6 @@ pub fn prove_decryption_aggregation_jobs(
             c6_total_slots,
             &format!("{e3_id}-c6fold-{i}"),
             artifacts_dir,
-        )?;
-        let c6_fold_vk = vk::load_vk_artifacts(
-            &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
-            CircuitName::C6Fold,
-        )?;
-        let c7_vk = vk::load_vk_artifacts(
-            &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
-            CircuitName::DecryptedSharesAggregation,
         )?;
 
         let witness = DecryptionAggregatorWitness {
@@ -430,15 +462,6 @@ pub fn prove_decryption_aggregation_jobs(
         let json = serde_json::to_value(&witness)
             .map_err(|e| ZkError::SerializationError(e.to_string()))?;
         let input_map = inputs_json_to_input_map(&json)?;
-        let compiled = CompiledCircuit::from_file(
-            &prover
-                .circuits_dir(CircuitVariant::Default, artifacts_dir)
-                .join(CircuitName::DecryptionAggregator.dir_path())
-                .join(format!(
-                    "{}.json",
-                    CircuitName::DecryptionAggregator.as_str()
-                )),
-        )?;
         let w = WitnessGenerator::new().generate_witness(&compiled, input_map)?;
         let proof = prover.generate_proof_with_variant(
             CircuitName::DecryptionAggregator,

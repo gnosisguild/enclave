@@ -105,7 +105,7 @@ mod tests {
     fn short_signals() {
         let link = C4aToC6SkCommitmentLink;
         assert!(link.extract_source_values(&[0u8; 10]).is_empty());
-        // Empty source values means malformed proof — should be inconsistent
-        assert!(!link.check_signals(&[], &[0u8; 96]));
+        // 3 * FIELD_BYTE_LEN = C6 input layout (sk, e_sm, ct_commitment).
+        assert!(!link.check_signals(&[], &[0u8; 3 * FIELD_BYTE_LEN]));
     }
 }

@@ -47,6 +47,7 @@ fn main(
         inner_key_hash,
     );
 
+    // Signature parity with `nodes_fold`: see `c3_fold_kernel`.
     let _ = (acc_vk, acc_proof, acc_key_hash, acc_public_inputs);
 
     assert(is_first_step);

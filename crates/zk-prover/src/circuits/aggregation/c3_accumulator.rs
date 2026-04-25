@@ -11,6 +11,10 @@
 //! Ciphernodes integrate via [`generate_sequential_c3_fold`] only: they supply the full list of C3
 //! inner proofs and slot indices; per-step folding is not exposed outside this crate.
 
+use crate::circuits::aggregation::helpers::{
+    ACC_NONZK_PROOF_FIELDS, extract_single_field, parse_acc_public_field_strings, sequential_fold,
+    zero_field_hex_strings,
+};
 use crate::circuits::utils::{bytes_to_field_strings, inputs_json_to_input_map};
 use crate::circuits::vk;
 use crate::error::ZkError;
@@ -19,18 +23,14 @@ use crate::witness::{CompiledCircuit, WitnessGenerator};
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use serde::Serialize;
 
-/// Field count for `UltraHonkProof` (non-ZK) in `c3_fold` — from `nargo compile` ABI (`acc_proof`).
-const C3_FOLD_ACC_NONZK_PROOF_FIELDS: usize = 457;
-
 /// `total_slots` = N_PARTIES * L_THRESHOLD (one slot per party-modulus pair).
 fn c3_fold_public_input_field_count(total_slots: usize) -> usize {
     4 + 3 * total_slots
 }
 
-fn zero_field_hex_strings(field_count: usize) -> Result<Vec<String>, ZkError> {
-    let bytes = vec![0u8; field_count * 32];
-    bytes_to_field_strings(&bytes)
-}
+/// Public-signal layout of `c3_fold`: 4-field prefix, then 3-field-wide per-slot tail.
+const C3_FOLD_PREFIX_LEN: usize = 4;
+const C3_FOLD_SLOT_WIDTH: usize = 3;
 
 /// Proves [`CircuitName::C3FoldKernel`] for the same `inner` / `total_slots` as the fold step.
 ///
@@ -54,7 +54,7 @@ fn generate_c3_fold_kernel_genesis_proof(
     let c3_public_inputs = share_encryption_inner_public_inputs(inner)?;
     let expected_acc_pub = c3_fold_public_input_field_count(total_slots);
     let acc_pi = zero_field_hex_strings(expected_acc_pub)?;
-    let acc_pf = zero_field_hex_strings(C3_FOLD_ACC_NONZK_PROOF_FIELDS)?;
+    let acc_pf = zero_field_hex_strings(ACC_NONZK_PROOF_FIELDS)?;
 
     let full_input = C3FoldStepInput {
         inner_vk: inner_vk.verification_key,
@@ -91,26 +91,6 @@ fn generate_c3_fold_kernel_genesis_proof(
     Ok(proof)
 }
 
-/// Extracts a single 32-byte field from a named proof signal, returning its hex string.
-fn extract_single_field(proof: &Proof, kind: &str, name: &str) -> Result<String, ZkError> {
-    let bytes = match kind {
-        "input" => proof
-            .extract_input(name)
-            .ok_or_else(|| ZkError::InvalidInput(format!("C3 proof missing {name}")))?,
-        "output" => proof
-            .extract_output(name)
-            .ok_or_else(|| ZkError::InvalidInput(format!("C3 proof missing {name}")))?,
-        _ => unreachable!(),
-    };
-    let fields = bytes_to_field_strings(bytes.as_ref())?;
-    if fields.len() != 1 {
-        return Err(ZkError::InvalidInput(
-            "C3 public signals must be three 32-byte fields (2 inputs + 1 output)".into(),
-        ));
-    }
-    Ok(fields.into_iter().next().unwrap())
-}
-
 /// Inner C3 public transcript: two inputs + `ct_commitment` output.
 fn share_encryption_inner_public_inputs(proof: &Proof) -> Result<[String; 3], ZkError> {
     if proof.circuit != CircuitName::ShareEncryption {
@@ -119,10 +99,11 @@ fn share_encryption_inner_public_inputs(proof: &Proof) -> Result<[String; 3], Zk
             proof.circuit
         )));
     }
+    let ctx = "C3 inner ShareEncryption proof";
     Ok([
-        extract_single_field(proof, "input", "expected_pk_commitment")?,
-        extract_single_field(proof, "input", "expected_message_commitment")?,
-        extract_single_field(proof, "output", "ct_commitment")?,
+        extract_single_field(proof, "input", "expected_pk_commitment", ctx)?,
+        extract_single_field(proof, "input", "expected_message_commitment", ctx)?,
+        extract_single_field(proof, "output", "ct_commitment", ctx)?,
     ])
 }
 
@@ -141,20 +122,12 @@ struct C3FoldStepInput {
 }
 
 fn parse_c3_fold_public_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
-    if proof.circuit != CircuitName::C3Fold {
-        return Err(ZkError::InvalidInput(format!(
-            "expected C3Fold proof, got {}",
-            proof.circuit
-        )));
-    }
-    let v = bytes_to_field_strings(proof.public_signals.as_ref())?;
-    if v.len() < 4 || (v.len() - 4) % 3 != 0 {
-        return Err(ZkError::InvalidInput(format!(
-            "unexpected c3_fold public signal field count: {}",
-            v.len()
-        )));
-    }
-    Ok(v)
+    parse_acc_public_field_strings(
+        proof,
+        CircuitName::C3Fold,
+        C3_FOLD_PREFIX_LEN,
+        C3_FOLD_SLOT_WIDTH,
+    )
 }
 
 /// One sequential `c3_fold` step.
@@ -292,28 +265,20 @@ pub fn generate_sequential_c3_fold(
     e3_id: &str,
     artifacts_dir: &str,
 ) -> Result<Proof, ZkError> {
-    if inner_proofs.is_empty() {
-        return Err(ZkError::InvalidInput(
-            "generate_sequential_c3_fold: need at least one inner proof".into(),
-        ));
-    }
-    if inner_proofs.len() != slot_indices.len() {
-        return Err(ZkError::InvalidInput(
-            "inner_proofs and slot_indices length mismatch".into(),
-        ));
-    }
-    let mut acc: Option<Proof> = None;
-    for (i, inner) in inner_proofs.iter().enumerate() {
-        let out = generate_c3_fold_step(
-            prover,
-            inner,
-            acc.as_ref(),
-            slot_indices[i],
-            total_slots,
-            e3_id,
-            artifacts_dir,
-        )?;
-        acc = Some(out);
-    }
-    Ok(acc.expect("non-empty loop"))
+    sequential_fold(
+        "generate_sequential_c3_fold",
+        inner_proofs,
+        slot_indices,
+        |inner, prior, slot| {
+            generate_c3_fold_step(
+                prover,
+                inner,
+                prior,
+                slot,
+                total_slots,
+                e3_id,
+                artifacts_dir,
+            )
+        },
+    )
 }

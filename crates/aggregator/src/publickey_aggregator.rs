@@ -654,8 +654,10 @@ impl PublicKeyAggregator {
         );
 
         if node_fold_proofs.is_empty() {
+            // Proof aggregation disabled. Do NOT call `try_publish_complete` here — it
+            // is the most common entry into this method, so re-entering it would create
+            // unbounded mutual recursion (stack overflow in deployed nodes).
             info!("PublicKeyAggregator: proof aggregation disabled — skipping DkgAggregation");
-            self.try_publish_complete()?;
             return Ok(());
         }
 

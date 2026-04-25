@@ -573,7 +573,7 @@ class NoirCircuitBuilder {
         if (c.artifacts.vkHash) copyFileSync(c.artifacts.vkHash, join(evmDir, basename(c.artifacts.vkHash)))
       }
 
-      // Copy to default/ variant: .json + noir-recursive-no-zk .vk (wrapper/fold proofs)
+      // Copy to default/ variant: .json + noir-recursive-no-zk .vk (aggregation fold proofs)
       const defaultDir = join(outputDir, CIRCUIT_VARIANTS.DEFAULT, c.group, c.name)
       mkdirSync(defaultDir, { recursive: true })
       if (c.artifacts.json) copyFileSync(c.artifacts.json, join(defaultDir, basename(c.artifacts.json)))

@@ -9,6 +9,10 @@
 //! [`CircuitName::NodesFoldKernel`] at runtime to obtain a valid genesis `UltraHonkProof` (see
 //! `circuits/bin/recursive_aggregation/nodes_fold_kernel`).
 
+use crate::circuits::aggregation::helpers::{
+    ACC_NONZK_PROOF_FIELDS, parse_acc_public_field_strings, sequential_fold,
+    zero_field_hex_strings,
+};
 use crate::circuits::utils::{bytes_to_field_strings, inputs_json_to_input_map};
 use crate::circuits::vk;
 use crate::error::ZkError;
@@ -17,12 +21,8 @@ use crate::witness::{CompiledCircuit, WitnessGenerator};
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use serde::Serialize;
 
-const NODES_FOLD_ACC_NONZK_PROOF_FIELDS: usize = 457;
-
-fn zero_field_hex_strings(field_count: usize) -> Result<Vec<String>, ZkError> {
-    let bytes = vec![0u8; field_count * 32];
-    bytes_to_field_strings(&bytes)
-}
+/// Public-signal layout of `nodes_fold`: 4-field prefix, then `node_fold_fields`-wide tail.
+const NODES_FOLD_PREFIX_LEN: usize = 4;
 
 fn node_fold_statement_field_count(proof: &Proof) -> Result<usize, ZkError> {
     if proof.circuit != CircuitName::NodeFold {
@@ -85,7 +85,7 @@ fn generate_nodes_fold_kernel_genesis_proof(
     }
     let expected_acc_pub = nodes_fold_acc_public_len(nf_fields, total_slots);
     let acc_pi = zero_field_hex_strings(expected_acc_pub)?;
-    let acc_pf = zero_field_hex_strings(NODES_FOLD_ACC_NONZK_PROOF_FIELDS)?;
+    let acc_pf = zero_field_hex_strings(ACC_NONZK_PROOF_FIELDS)?;
 
     let full_input = NodesFoldStepInput {
         inner_vk: inner_vk.verification_key,
@@ -123,20 +123,9 @@ fn generate_nodes_fold_kernel_genesis_proof(
 }
 
 fn parse_nodes_fold_public_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
-    if proof.circuit != CircuitName::NodesFold {
-        return Err(ZkError::InvalidInput(format!(
-            "expected NodesFold proof, got {}",
-            proof.circuit
-        )));
-    }
-    let v = bytes_to_field_strings(proof.public_signals.as_ref())?;
-    if v.len() < 4 {
-        return Err(ZkError::InvalidInput(format!(
-            "unexpected nodes_fold public signal field count: {}",
-            v.len()
-        )));
-    }
-    Ok(v)
+    // `slot_width` of 1 here only enforces the 4-field prefix; per-step length is then
+    // cross-checked against `expected_acc_pub` derived from the actual `node_fold_fields`.
+    parse_acc_public_field_strings(proof, CircuitName::NodesFold, NODES_FOLD_PREFIX_LEN, 1)
 }
 
 fn generate_nodes_fold_step(
@@ -260,28 +249,20 @@ pub fn generate_sequential_nodes_fold(
     e3_id: &str,
     artifacts_dir: &str,
 ) -> Result<Proof, ZkError> {
-    if inner_proofs.is_empty() {
-        return Err(ZkError::InvalidInput(
-            "generate_sequential_nodes_fold: need at least one inner proof".into(),
-        ));
-    }
-    if inner_proofs.len() != slot_indices.len() {
-        return Err(ZkError::InvalidInput(
-            "inner_proofs and slot_indices length mismatch".into(),
-        ));
-    }
-    let mut acc: Option<Proof> = None;
-    for (i, inner) in inner_proofs.iter().enumerate() {
-        let out = generate_nodes_fold_step(
-            prover,
-            inner,
-            acc.as_ref(),
-            slot_indices[i],
-            total_slots,
-            e3_id,
-            artifacts_dir,
-        )?;
-        acc = Some(out);
-    }
-    Ok(acc.expect("non-empty loop"))
+    sequential_fold(
+        "generate_sequential_nodes_fold",
+        inner_proofs,
+        slot_indices,
+        |inner, prior, slot| {
+            generate_nodes_fold_step(
+                prover,
+                inner,
+                prior,
+                slot,
+                total_slots,
+                e3_id,
+                artifacts_dir,
+            )
+        },
+    )
 }

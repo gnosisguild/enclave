@@ -104,6 +104,6 @@ mod tests {
         let link = C4bToC6ESmCommitmentLink;
         assert!(link.extract_source_values(&[0u8; 10]).is_empty());
         // Empty source values means malformed proof — should be inconsistent
-        assert!(!link.check_signals(&[], &[0u8; 96]));
+        assert!(!link.check_signals(&[], &[0u8; 3 * FIELD_BYTE_LEN]));
     }
 }

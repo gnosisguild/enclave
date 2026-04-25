@@ -8,6 +8,10 @@
 //! accumulator (`c6_fold` non-ZK proof). The first step proves [`CircuitName::C6FoldKernel`] at
 //! runtime to obtain a valid genesis `UltraHonkProof` (see `circuits/bin/recursive_aggregation/c6_fold_kernel`).
 
+use crate::circuits::aggregation::helpers::{
+    ACC_NONZK_PROOF_FIELDS, extract_single_field, parse_acc_public_field_strings, sequential_fold,
+    zero_field_hex_strings,
+};
 use crate::circuits::utils::{bytes_to_field_strings, inputs_json_to_input_map};
 use crate::circuits::vk;
 use crate::error::ZkError;
@@ -16,18 +20,14 @@ use crate::witness::{CompiledCircuit, WitnessGenerator};
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use serde::Serialize;
 
-/// Field count for `UltraHonkProof` (non-ZK) in `c6_fold` — from `nargo compile` ABI (`acc_proof`).
-const C6_FOLD_ACC_NONZK_PROOF_FIELDS: usize = 457;
-
 /// `total_slots` = `T + 1` (one slot per party index in the C6 leaf layout).
 fn c6_fold_public_input_field_count(total_slots: usize) -> usize {
     4 + 4 * total_slots
 }
 
-fn zero_field_hex_strings(field_count: usize) -> Result<Vec<String>, ZkError> {
-    let bytes = vec![0u8; field_count * 32];
-    bytes_to_field_strings(&bytes)
-}
+/// Public-signal layout of `c6_fold`: 4-field prefix, then 4-field-wide per-slot tail.
+const C6_FOLD_PREFIX_LEN: usize = 4;
+const C6_FOLD_SLOT_WIDTH: usize = 4;
 
 fn generate_c6_fold_kernel_genesis_proof(
     prover: &ZkProver,
@@ -48,7 +48,7 @@ fn generate_c6_fold_kernel_genesis_proof(
     let c6_public_inputs = threshold_share_decryption_inner_public_inputs(inner)?;
     let expected_acc_pub = c6_fold_public_input_field_count(total_slots);
     let acc_pi = zero_field_hex_strings(expected_acc_pub)?;
-    let acc_pf = zero_field_hex_strings(C6_FOLD_ACC_NONZK_PROOF_FIELDS)?;
+    let acc_pf = zero_field_hex_strings(ACC_NONZK_PROOF_FIELDS)?;
 
     let full_input = C6FoldStepInput {
         inner_vk: inner_vk.verification_key,
@@ -85,25 +85,6 @@ fn generate_c6_fold_kernel_genesis_proof(
     Ok(proof)
 }
 
-fn extract_single_field(proof: &Proof, kind: &str, name: &str) -> Result<String, ZkError> {
-    let bytes = match kind {
-        "input" => proof
-            .extract_input(name)
-            .ok_or_else(|| ZkError::InvalidInput(format!("C6 inner proof missing {name}")))?,
-        "output" => proof
-            .extract_output(name)
-            .ok_or_else(|| ZkError::InvalidInput(format!("C6 inner proof missing {name}")))?,
-        _ => unreachable!(),
-    };
-    let fields = bytes_to_field_strings(bytes.as_ref())?;
-    if fields.len() != 1 {
-        return Err(ZkError::InvalidInput(
-            "C6 public signals must be four 32-byte fields (3 inputs + 1 output)".into(),
-        ));
-    }
-    Ok(fields.into_iter().next().unwrap())
-}
-
 fn threshold_share_decryption_inner_public_inputs(proof: &Proof) -> Result<[String; 4], ZkError> {
     if proof.circuit != CircuitName::ThresholdShareDecryption {
         return Err(ZkError::InvalidInput(format!(
@@ -111,11 +92,12 @@ fn threshold_share_decryption_inner_public_inputs(proof: &Proof) -> Result<[Stri
             proof.circuit
         )));
     }
+    let ctx = "C6 inner ThresholdShareDecryption proof";
     Ok([
-        extract_single_field(proof, "input", "expected_sk_commitment")?,
-        extract_single_field(proof, "input", "expected_e_sm_commitment")?,
-        extract_single_field(proof, "input", "ct_commitment")?,
-        extract_single_field(proof, "output", "d_commitment")?,
+        extract_single_field(proof, "input", "expected_sk_commitment", ctx)?,
+        extract_single_field(proof, "input", "expected_e_sm_commitment", ctx)?,
+        extract_single_field(proof, "input", "ct_commitment", ctx)?,
+        extract_single_field(proof, "output", "d_commitment", ctx)?,
     ])
 }
 
@@ -134,20 +116,12 @@ struct C6FoldStepInput {
 }
 
 fn parse_c6_fold_public_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
-    if proof.circuit != CircuitName::C6Fold {
-        return Err(ZkError::InvalidInput(format!(
-            "expected C6Fold proof, got {}",
-            proof.circuit
-        )));
-    }
-    let v = bytes_to_field_strings(proof.public_signals.as_ref())?;
-    if v.len() < 4 || (v.len() - 4) % 4 != 0 {
-        return Err(ZkError::InvalidInput(format!(
-            "unexpected c6_fold public signal field count: {}",
-            v.len()
-        )));
-    }
-    Ok(v)
+    parse_acc_public_field_strings(
+        proof,
+        CircuitName::C6Fold,
+        C6_FOLD_PREFIX_LEN,
+        C6_FOLD_SLOT_WIDTH,
+    )
 }
 
 fn generate_c6_fold_step(
@@ -277,28 +251,20 @@ pub fn generate_sequential_c6_fold(
     e3_id: &str,
     artifacts_dir: &str,
 ) -> Result<Proof, ZkError> {
-    if inner_proofs.is_empty() {
-        return Err(ZkError::InvalidInput(
-            "generate_sequential_c6_fold: need at least one inner proof".into(),
-        ));
-    }
-    if inner_proofs.len() != slot_indices.len() {
-        return Err(ZkError::InvalidInput(
-            "inner_proofs and slot_indices length mismatch".into(),
-        ));
-    }
-    let mut acc: Option<Proof> = None;
-    for (i, inner) in inner_proofs.iter().enumerate() {
-        let out = generate_c6_fold_step(
-            prover,
-            inner,
-            acc.as_ref(),
-            slot_indices[i],
-            total_slots,
-            e3_id,
-            artifacts_dir,
-        )?;
-        acc = Some(out);
-    }
-    Ok(acc.expect("non-empty loop"))
+    sequential_fold(
+        "generate_sequential_c6_fold",
+        inner_proofs,
+        slot_indices,
+        |inner, prior, slot| {
+            generate_c6_fold_step(
+                prover,
+                inner,
+                prior,
+                slot,
+                total_slots,
+                e3_id,
+                artifacts_dir,
+            )
+        },
+    )
 }

@@ -412,7 +412,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         _e3Stages[e3Id] = E3Stage.Complete;
 
         if (e3.proofAggregationEnabled) {
-            require(proof.length > 0, "proof required");
+            require(proof.length > 0, ProofRequired());
             success = e3.decryptionVerifier.verify(
                 keccak256(plaintextOutput),
                 proof

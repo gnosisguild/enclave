@@ -103,6 +103,21 @@ class VerifierGenerator {
     }
     mkdirSync(this.verifierDir, { recursive: true })
 
+    // Pre-flight: two circuits with the same leaf name would silently overwrite each other's .sol.
+    const seen = new Map<string, string>()
+    for (const circuit of circuits) {
+      const contractFile = `${this.toContractName(circuit.name)}.sol`
+      const prior = seen.get(contractFile)
+      if (prior) {
+        throw new Error(
+          `Duplicate Solidity verifier filename ${contractFile} for circuits ` +
+            `${prior} and ${circuit.group}/${circuit.name}; rename one of the circuits or ` +
+            `extend toContractName to include the group prefix.`,
+        )
+      }
+      seen.set(contractFile, `${circuit.group}/${circuit.name}`)
+    }
+
     const generated: string[] = []
     const errors: string[] = []
 

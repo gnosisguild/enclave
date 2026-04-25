@@ -28,6 +28,24 @@ pub global C4AB_FOLD_PUBLIC_LEN: u32 = 3 + (2 * C4_PUBLIC_LEN);
 pub global C2AB_PREFIX_LEN: u32 = C2AB_FOLD_PUBLIC_LEN - (2 * C2_PUBLIC_LEN);
 pub global C4AB_PREFIX_LEN: u32 = C4AB_FOLD_PUBLIC_LEN - (2 * C4_PUBLIC_LEN);
 
+/// Inner C2 / C4 column offsets inside `c2ab_public` / `c4ab_public`
+/// (parallel to `NF_*` in `dkg_aggregator`; keep in sync).
+pub global C2A_INNER_START: u32 = C2AB_PREFIX_LEN;
+pub global C2B_INNER_START: u32 = C2AB_PREFIX_LEN + C2_PUBLIC_LEN;
+pub global C2A_SHARES_START: u32 = C2A_INNER_START + 1;
+pub global C2B_SHARES_START: u32 = C2B_INNER_START + 1;
+
+pub global C4A_INNER_START: u32 = C4AB_PREFIX_LEN;
+pub global C4B_INNER_START: u32 = C4AB_PREFIX_LEN + C4_PUBLIC_LEN;
+pub global SK_AGG_INDEX: u32 = C4A_INNER_START + (H * L_THRESHOLD);
+pub global ESM_AGG_INDEX: u32 = C4B_INNER_START + (H * L_THRESHOLD);
+
+/// `c3ab_fold` flattened tail: pk_a, msg_a, ct_a, pk_b, msg_b, ct_b - each `C3_SLOTS` long.
+pub global C3AB_PK_A_START: u32 = C3AB_PREFIX_LEN;
+pub global C3AB_MSG_A_START: u32 = C3AB_PREFIX_LEN + C3_SLOTS;
+pub global C3AB_PK_B_START: u32 = C3AB_PREFIX_LEN + (3 * C3_SLOTS);
+pub global C3AB_MSG_B_START: u32 = C3AB_PREFIX_LEN + (4 * C3_SLOTS);
+
 /// Total public parameters + outputs for `node_fold`.
 pub global NODE_FOLD_PUBLIC_LEN: u32 = 11 + N_PARTIES + (2 * (N_PARTIES + H) * L_THRESHOLD);
 
@@ -47,7 +65,8 @@ fn main(
     c4ab_vk: UltraHonkVerificationKey,
     c4ab_proof: UltraHonkProof,
     c4ab_public: [Field; C4AB_FOLD_PUBLIC_LEN],
-    _party_id: pub Field,
+    // Bound to sortition slot via `NF_PARTY_ID_IDX` in `dkg_aggregator`; do not rename.
+    party_id: pub Field,
     c0_key_hash: pub Field,
     c1_key_hash: pub Field,
     c2ab_key_hash: pub Field,
@@ -72,33 +91,18 @@ fn main(
     let c0_pk = c0_public[0];
     let c1_pk = c1_public[1];
 
-    let c2a_inner_start: u32 = C2AB_PREFIX_LEN;
-    let c2b_inner_start: u32 = C2AB_PREFIX_LEN + C2_PUBLIC_LEN;
-    let c2a_shares_start: u32 = c2a_inner_start + 1;
-    let c2b_shares_start: u32 = c2b_inner_start + 1;
-
-    let c4a_inner_start: u32 = C4AB_PREFIX_LEN;
-    let c4b_inner_start: u32 = C4AB_PREFIX_LEN + C4_PUBLIC_LEN;
-    let sk_agg_index: u32 = c4a_inner_start + (H * L_THRESHOLD);
-    let esm_agg_index: u32 = c4b_inner_start + (H * L_THRESHOLD);
-
     // Same-party C1 to C2: `c2ab_public` lays out two full C2 public vectors after a 3-field
     // prefix (`C2AB_FOLD_PUBLIC_LEN` = 3 + 2 * `C2_PUBLIC_LEN`). For each inner C2 block, index 0
     // is `expected_secret_commitment`; these equal C1's sk- and e_sm-side public inputs [0] and [2].
-    assert(c1_public[0] == c2ab_public[c2a_inner_start]);
-    assert(c1_public[2] == c2ab_public[c2b_inner_start]);
+    assert(c1_public[0] == c2ab_public[C2A_INNER_START]);
+    assert(c1_public[2] == c2ab_public[C2B_INNER_START]);
 
     // Same-party C3a and C3b: pk_a[j*L+l] and pk_b[j*L+l] must match for every (party, modulus)
     // slot - recipient public key must be consistent across both folded C3 chains.
-    let c3ab_pk_a_start: u32 = C3AB_PREFIX_LEN;
-    let c3ab_pk_b_start: u32 = C3AB_PREFIX_LEN + (3 * C3_SLOTS);
-    let c3ab_msg_a_start: u32 = C3AB_PREFIX_LEN + C3_SLOTS;
-    let c3ab_msg_b_start: u32 = C3AB_PREFIX_LEN + (4 * C3_SLOTS);
-
     for j in 0..N_PARTIES {
         for l in 0..L_THRESHOLD {
             let slot = j * L_THRESHOLD + l;
-            assert(c3ab_public[c3ab_pk_a_start + slot] == c3ab_public[c3ab_pk_b_start + slot]);
+            assert(c3ab_public[C3AB_PK_A_START + slot] == c3ab_public[C3AB_PK_B_START + slot]);
         }
     }
 
@@ -109,23 +113,23 @@ fn main(
     for j in 0..N_PARTIES {
         for l in 0..L_THRESHOLD {
             let slot = j * L_THRESHOLD + l;
-            assert(c2ab_public[c2a_shares_start + slot] == c3ab_public[c3ab_msg_a_start + slot]);
-            assert(c2ab_public[c2b_shares_start + slot] == c3ab_public[c3ab_msg_b_start + slot]);
+            assert(c2ab_public[C2A_SHARES_START + slot] == c3ab_public[C3AB_MSG_A_START + slot]);
+            assert(c2ab_public[C2B_SHARES_START + slot] == c3ab_public[C3AB_MSG_B_START + slot]);
         }
     }
 
     let mut c3_pk: [Field; N_PARTIES] = [0; N_PARTIES];
     for j in 0..N_PARTIES {
         // pk is per-party (same DKG key across all moduli of the same recipient): use slot j*L+0.
-        c3_pk[j] = c3ab_public[c3ab_pk_a_start + j * L_THRESHOLD];
+        c3_pk[j] = c3ab_public[C3AB_PK_A_START + j * L_THRESHOLD];
     }
 
     let mut c2a: [[Field; L_THRESHOLD]; N_PARTIES] = [[0; L_THRESHOLD]; N_PARTIES];
     let mut c2b: [[Field; L_THRESHOLD]; N_PARTIES] = [[0; L_THRESHOLD]; N_PARTIES];
     for j in 0..N_PARTIES {
         for l in 0..L_THRESHOLD {
-            c2a[j][l] = c2ab_public[c2a_shares_start + j * L_THRESHOLD + l];
-            c2b[j][l] = c2ab_public[c2b_shares_start + j * L_THRESHOLD + l];
+            c2a[j][l] = c2ab_public[C2A_SHARES_START + j * L_THRESHOLD + l];
+            c2b[j][l] = c2ab_public[C2B_SHARES_START + j * L_THRESHOLD + l];
         }
     }
 
@@ -133,12 +137,12 @@ fn main(
     let mut c4b_exp: [[Field; L_THRESHOLD]; H] = [[0; L_THRESHOLD]; H];
     for h in 0..H {
         for l in 0..L_THRESHOLD {
-            c4a_exp[h][l] = c4ab_public[c4a_inner_start + h * L_THRESHOLD + l];
-            c4b_exp[h][l] = c4ab_public[c4b_inner_start + h * L_THRESHOLD + l];
+            c4a_exp[h][l] = c4ab_public[C4A_INNER_START + h * L_THRESHOLD + l];
+            c4b_exp[h][l] = c4ab_public[C4B_INNER_START + h * L_THRESHOLD + l];
         }
     }
-    let sk_agg = c4ab_public[sk_agg_index];
-    let esm_agg = c4ab_public[esm_agg_index];
+    let sk_agg = c4ab_public[SK_AGG_INDEX];
+    let esm_agg = c4ab_public[ESM_AGG_INDEX];
 
     (key_hash, c0_pk, c1_pk, c3_pk, c2a, c2b, c4a_exp, c4b_exp, sk_agg, esm_agg)
 }

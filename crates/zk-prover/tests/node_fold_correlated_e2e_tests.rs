@@ -530,7 +530,7 @@ async fn node_fold_correlated_proves_and_verifies() {
         "c4ab_vk": c4ab_fold_vk.verification_key,
         "c4ab_proof": fold_witness_field_strings(&c4ab_proof.data).expect("c4ab"),
         "c4ab_public": proof_public_fields(&c4ab_proof),
-        "_party_id": field_str_zero(),
+        "party_id": field_str_zero(),
         "c0_key_hash": c0_vk.key_hash,
         "c1_key_hash": c1_vk.key_hash,
         "c2ab_key_hash": c2ab_fold_vk.key_hash,

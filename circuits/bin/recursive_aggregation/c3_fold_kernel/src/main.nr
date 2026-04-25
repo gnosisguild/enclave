@@ -34,6 +34,7 @@ fn main(
 
     verify_honk_proof(inner_vk, inner_proof, c3_public_inputs, inner_key_hash);
 
+    // Signature parity with `c3_fold`: kernel mints the genesis accumulator, so acc_* is unused.
     let _ = (acc_vk, acc_proof, acc_key_hash, acc_public_inputs);
 
     assert(is_first_step);

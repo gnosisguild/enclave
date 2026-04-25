@@ -19,9 +19,8 @@ pub struct KeyshareCreated {
     pub pubkey: ArcBytes,
     pub e3_id: E3id,
     pub node: String,
-    /// Real sortition-assigned party id. Aggregator uses this (not arrival order)
-    /// to align C5, NodeFold, and circuit slot indices.
-    #[serde(default)]
+    /// Real sortition-assigned party id. Required (no `serde(default)`): a missing value
+    /// would silently default to 0 and mis-route shares.
     pub party_id: u64,
     #[serde(default)]
     pub signed_pk_generation_proof: Option<SignedProofPayload>,

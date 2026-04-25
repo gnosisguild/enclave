@@ -36,6 +36,7 @@ fn main(
 
     verify_honk_proof(inner_vk, inner_proof, c6_public_inputs, inner_key_hash);
 
+    // Signature parity with `c6_fold`: see `c3_fold_kernel`.
     let _ = (acc_vk, acc_proof, acc_key_hash, acc_public_inputs);
 
     assert(is_first_step);
