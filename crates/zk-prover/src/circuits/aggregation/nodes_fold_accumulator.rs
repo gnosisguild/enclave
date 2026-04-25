@@ -10,8 +10,7 @@
 //! `circuits/bin/recursive_aggregation/nodes_fold_kernel`).
 
 use crate::circuits::aggregation::helpers::{
-    ACC_NONZK_PROOF_FIELDS, parse_acc_public_field_strings, sequential_fold,
-    zero_field_hex_strings,
+    parse_acc_public_field_strings, sequential_fold, zero_field_hex_strings, ACC_NONZK_PROOF_FIELDS,
 };
 use crate::circuits::utils::{bytes_to_field_strings, inputs_json_to_input_map};
 use crate::circuits::vk;
