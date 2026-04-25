@@ -251,6 +251,29 @@ pub fn generate_sequential_c6_fold(
     e3_id: &str,
     artifacts_dir: &str,
 ) -> Result<Proof, ZkError> {
+    // Defense in depth: every C6 slot must be filled exactly once and indices must be in range.
+    // Without this a partial fold or duplicate slot could reach the decryption aggregator.
+    if inner_proofs.len() != total_slots {
+        return Err(ZkError::InvalidInput(format!(
+            "generate_sequential_c6_fold: expected {total_slots} inner proofs, got {}",
+            inner_proofs.len()
+        )));
+    }
+    let mut seen = vec![false; total_slots];
+    for &s in slot_indices {
+        let idx = s as usize;
+        if idx >= total_slots {
+            return Err(ZkError::InvalidInput(format!(
+                "generate_sequential_c6_fold: slot index {s} out of range (total_slots={total_slots})"
+            )));
+        }
+        if seen[idx] {
+            return Err(ZkError::InvalidInput(format!(
+                "generate_sequential_c6_fold: duplicate slot index {s}"
+            )));
+        }
+        seen[idx] = true;
+    }
     sequential_fold(
         "generate_sequential_c6_fold",
         inner_proofs,

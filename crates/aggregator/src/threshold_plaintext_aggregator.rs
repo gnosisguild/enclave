@@ -660,13 +660,13 @@ impl ThresholdPlaintextAggregator {
         let Some(honest_c6) = self.honest_c6_proofs_for_agg.as_ref() else {
             return Ok(());
         };
-        if honest_c6.is_empty() || honest_c6.iter().any(|(_, w)| w.is_empty()) {
-            info!(
-                "ThresholdPlaintextAggregator: no C6 inner proofs — skipping DecryptionAggregation"
-            );
-            self.decryption_aggregator_proofs = Some(Vec::new());
-            return Ok(());
-        }
+        // With proof aggregation enabled we must have a complete C6 set; otherwise we'd publish
+        // `decryption_aggregator_proofs = Vec::new()`, which downstream consumers interpret as
+        // "aggregation disabled". Fail loudly instead so the missing shares are surfaced.
+        ensure!(
+            !honest_c6.is_empty() && honest_c6.iter().all(|(_, w)| !w.is_empty()),
+            "DecryptionAggregation: honest C6 inner proofs missing while proof aggregation is enabled"
+        );
         let state: GeneratingC7Proof = self
             .state
             .get()
@@ -767,6 +767,15 @@ impl ThresholdPlaintextAggregator {
             ComputeResponseKind::Zk(ZkResponse::DecryptionAggregation(resp)) => {
                 if self.decryption_aggregation_correlation.as_ref() == Some(&correlation_id) {
                     self.decryption_aggregation_correlation = None;
+                    // Worker must return one DecryptionAggregator proof per pending C7 ciphertext.
+                    if let Some(c7_proofs) = self.c7_proofs_pending.as_ref() {
+                        ensure!(
+                            resp.proofs.len() == c7_proofs.len(),
+                            "DecryptionAggregation response proof count {} != expected {}",
+                            resp.proofs.len(),
+                            c7_proofs.len()
+                        );
+                    }
                     self.decryption_aggregator_proofs = Some(resp.proofs);
                     self.try_publish_complete()?;
                 }
