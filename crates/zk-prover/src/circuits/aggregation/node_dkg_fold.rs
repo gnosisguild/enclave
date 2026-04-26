@@ -27,6 +27,40 @@ fn proof_public_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
     bytes_to_field_strings(proof.public_signals.as_ref())
 }
 
+/// Load `<artifacts_dir>/<variant>/<circuit>/<circuit>.json` as a [`CompiledCircuit`]. Centralised
+/// so the layout is in one place across all aggregation builders below.
+fn load_compiled_circuit(
+    prover: &ZkProver,
+    circuit: CircuitName,
+    variant: CircuitVariant,
+    artifacts_dir: &str,
+) -> Result<CompiledCircuit, ZkError> {
+    let path = prover
+        .circuits_dir(variant, artifacts_dir)
+        .join(circuit.dir_path())
+        .join(format!("{}.json", circuit.as_str()));
+    CompiledCircuit::from_file(&path)
+}
+
+/// Build a witness from a `Serialize` Noir input struct and prove `circuit` via the recursive-bin
+/// path. Collapses the repeated `serde_json::to_value → inputs_json_to_input_map → CompiledCircuit::from_file
+/// → WitnessGenerator → generate_recursive_aggregation_bin_proof` boilerplate used by every fold
+/// builder (c2ab / c3ab / c4ab / node_fold) in this module.
+fn build_and_prove_recursive_bin<W: Serialize>(
+    prover: &ZkProver,
+    circuit: CircuitName,
+    witness_input: &W,
+    job_label: &str,
+    artifacts_dir: &str,
+) -> Result<Proof, ZkError> {
+    let json = serde_json::to_value(witness_input)
+        .map_err(|e| ZkError::SerializationError(e.to_string()))?;
+    let input_map = inputs_json_to_input_map(&json)?;
+    let compiled = load_compiled_circuit(prover, circuit, CircuitVariant::Default, artifacts_dir)?;
+    let witness = WitnessGenerator::new().generate_witness(&compiled, input_map)?;
+    prover.generate_recursive_aggregation_bin_proof(circuit, &witness, job_label, artifacts_dir)
+}
+
 #[derive(Serialize)]
 struct C2abFoldWitness {
     c2a_vk: Vec<String>,
@@ -130,19 +164,10 @@ pub fn prove_node_dkg_fold(
         c2a_key_hash: c2a_vk.key_hash.clone(),
         c2b_key_hash: c2b_vk.key_hash.clone(),
     };
-    let c2ab_json =
-        serde_json::to_value(&c2ab).map_err(|e| ZkError::SerializationError(e.to_string()))?;
-    let c2ab_map = inputs_json_to_input_map(&c2ab_json)?;
-    let c2ab_compiled = CompiledCircuit::from_file(
-        &prover
-            .circuits_dir(CircuitVariant::Default, artifacts_dir)
-            .join(CircuitName::C2abFold.dir_path())
-            .join(format!("{}.json", CircuitName::C2abFold.as_str())),
-    )?;
-    let c2ab_witness = WitnessGenerator::new().generate_witness(&c2ab_compiled, c2ab_map)?;
-    let c2ab_proof = prover.generate_recursive_aggregation_bin_proof(
+    let c2ab_proof = build_and_prove_recursive_bin(
+        prover,
         CircuitName::C2abFold,
-        &c2ab_witness,
+        &c2ab,
         &format!("{e3_id}-c2ab"),
         artifacts_dir,
     )?;
@@ -178,54 +203,34 @@ pub fn prove_node_dkg_fold(
         c3a_key_hash: c3_fold_vk.key_hash.clone(),
         c3b_key_hash: c3_fold_vk.key_hash.clone(),
     };
-    let c3ab_json =
-        serde_json::to_value(&c3ab).map_err(|e| ZkError::SerializationError(e.to_string()))?;
-    let c3ab_map = inputs_json_to_input_map(&c3ab_json)?;
-    let c3ab_compiled = CompiledCircuit::from_file(
-        &prover
-            .circuits_dir(CircuitVariant::Default, artifacts_dir)
-            .join(CircuitName::C3abFold.dir_path())
-            .join(format!("{}.json", CircuitName::C3abFold.as_str())),
-    )?;
-    let c3ab_witness = WitnessGenerator::new().generate_witness(&c3ab_compiled, c3ab_map)?;
-    let c3ab_proof = prover.generate_recursive_aggregation_bin_proof(
+    let c3ab_proof = build_and_prove_recursive_bin(
+        prover,
         CircuitName::C3abFold,
-        &c3ab_witness,
+        &c3ab,
         &format!("{e3_id}-c3ab"),
         artifacts_dir,
     )?;
 
-    let c4a_vk = vk::load_vk_artifacts(
-        &prover.circuits_dir(CircuitVariant::Recursive, artifacts_dir),
-        CircuitName::DkgShareDecryption,
-    )?;
-    let c4b_vk = vk::load_vk_artifacts(
+    // C4a and C4b are both proofs of the same `DkgShareDecryption` circuit, so they share the
+    // same VK. Load it once and clone into both witness slots.
+    let c4_vk = vk::load_vk_artifacts(
         &prover.circuits_dir(CircuitVariant::Recursive, artifacts_dir),
         CircuitName::DkgShareDecryption,
     )?;
     let c4ab = C4abFoldWitness {
-        c4a_vk: c4a_vk.verification_key.clone(),
+        c4a_vk: c4_vk.verification_key.clone(),
         c4a_proof: proof_field_strings(input.c4a_proof)?,
         c4a_public: proof_public_field_strings(input.c4a_proof)?,
-        c4b_vk: c4b_vk.verification_key.clone(),
+        c4b_vk: c4_vk.verification_key.clone(),
         c4b_proof: proof_field_strings(input.c4b_proof)?,
         c4b_public: proof_public_field_strings(input.c4b_proof)?,
-        c4a_key_hash: c4a_vk.key_hash.clone(),
-        c4b_key_hash: c4b_vk.key_hash.clone(),
+        c4a_key_hash: c4_vk.key_hash.clone(),
+        c4b_key_hash: c4_vk.key_hash.clone(),
     };
-    let c4ab_json =
-        serde_json::to_value(&c4ab).map_err(|e| ZkError::SerializationError(e.to_string()))?;
-    let c4ab_map = inputs_json_to_input_map(&c4ab_json)?;
-    let c4ab_compiled = CompiledCircuit::from_file(
-        &prover
-            .circuits_dir(CircuitVariant::Default, artifacts_dir)
-            .join(CircuitName::C4abFold.dir_path())
-            .join(format!("{}.json", CircuitName::C4abFold.as_str())),
-    )?;
-    let c4ab_witness = WitnessGenerator::new().generate_witness(&c4ab_compiled, c4ab_map)?;
-    let c4ab_proof = prover.generate_recursive_aggregation_bin_proof(
+    let c4ab_proof = build_and_prove_recursive_bin(
+        prover,
         CircuitName::C4abFold,
-        &c4ab_witness,
+        &c4ab,
         &format!("{e3_id}-c4ab"),
         artifacts_dir,
     )?;
@@ -275,19 +280,10 @@ pub fn prove_node_dkg_fold(
         c4ab_key_hash: c4ab_fold_vk.key_hash,
     };
 
-    let nf_json =
-        serde_json::to_value(&nf).map_err(|e| ZkError::SerializationError(e.to_string()))?;
-    let nf_map = inputs_json_to_input_map(&nf_json)?;
-    let nf_compiled = CompiledCircuit::from_file(
-        &prover
-            .circuits_dir(CircuitVariant::Default, artifacts_dir)
-            .join(CircuitName::NodeFold.dir_path())
-            .join(format!("{}.json", CircuitName::NodeFold.as_str())),
-    )?;
-    let nf_witness = WitnessGenerator::new().generate_witness(&nf_compiled, nf_map)?;
-    prover.generate_recursive_aggregation_bin_proof(
+    build_and_prove_recursive_bin(
+        prover,
         CircuitName::NodeFold,
-        &nf_witness,
+        &nf,
         &format!("{e3_id}-nodefold"),
         artifacts_dir,
     )
@@ -374,11 +370,11 @@ pub fn prove_dkg_aggregation(
     let json =
         serde_json::to_value(&witness).map_err(|e| ZkError::SerializationError(e.to_string()))?;
     let input_map = inputs_json_to_input_map(&json)?;
-    let compiled = CompiledCircuit::from_file(
-        &prover
-            .circuits_dir(CircuitVariant::Default, artifacts_dir)
-            .join(CircuitName::DkgAggregator.dir_path())
-            .join(format!("{}.json", CircuitName::DkgAggregator.as_str())),
+    let compiled = load_compiled_circuit(
+        prover,
+        CircuitName::DkgAggregator,
+        CircuitVariant::Default,
+        artifacts_dir,
     )?;
     let w = WitnessGenerator::new().generate_witness(&compiled, input_map)?;
     prover.generate_proof_with_variant(
@@ -427,14 +423,11 @@ pub fn prove_decryption_aggregation_jobs(
         &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
         CircuitName::DecryptedSharesAggregation,
     )?;
-    let compiled = CompiledCircuit::from_file(
-        &prover
-            .circuits_dir(CircuitVariant::Default, artifacts_dir)
-            .join(CircuitName::DecryptionAggregator.dir_path())
-            .join(format!(
-                "{}.json",
-                CircuitName::DecryptionAggregator.as_str()
-            )),
+    let compiled = load_compiled_circuit(
+        prover,
+        CircuitName::DecryptionAggregator,
+        CircuitVariant::Default,
+        artifacts_dir,
     )?;
 
     let mut out = Vec::with_capacity(jobs.len());

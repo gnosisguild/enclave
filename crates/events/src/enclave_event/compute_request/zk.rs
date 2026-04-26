@@ -153,6 +153,17 @@ pub struct ShareEncryptionProofRequest {
     pub esi_index: usize,
 }
 
+impl ShareEncryptionProofRequest {
+    /// Slot index used by the C3 fold accumulator: `recipient_party_id * n_moduli + row_index`.
+    ///
+    /// This is a protocol invariant shared between the proof-request producer and the C3 fold
+    /// driver; it is defined here (next to the request type) so all callers reference one
+    /// formula.
+    pub fn c3_slot_index(&self, n_moduli: usize) -> u32 {
+        (self.recipient_party_id as u32) * (n_moduli as u32) + (self.row_index as u32)
+    }
+}
+
 /// Request to generate a proof for DKG share decryption (C4a or C4b).
 ///
 /// Proves that a node correctly decrypted H honest parties' BFV-encrypted

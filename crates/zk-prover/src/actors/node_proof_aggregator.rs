@@ -41,10 +41,6 @@ struct DkgProofCollectionState {
     last_ec: EventContext<Sequenced>,
 }
 
-fn c3_slot_for_request(req: &ShareEncryptionProofRequest, n_moduli: usize) -> u32 {
-    (req.recipient_party_id as u32) * (n_moduli as u32) + (req.row_index as u32)
-}
-
 /// Actor that collects DKG inner proofs and dispatches a single [`ZkRequest::NodeDkgFold`].
 pub struct NodeProofAggregator {
     bus: BusHandle,
@@ -190,12 +186,12 @@ impl NodeProofAggregator {
         let slots_a: Vec<u32> = meta
             .sk_share_encryption_requests
             .iter()
-            .map(|r| c3_slot_for_request(r, meta.n_moduli))
+            .map(|r| r.c3_slot_index(meta.n_moduli))
             .collect();
         let slots_b: Vec<u32> = meta
             .e_sm_share_encryption_requests
             .iter()
-            .map(|r| c3_slot_for_request(r, meta.n_moduli))
+            .map(|r| r.c3_slot_index(meta.n_moduli))
             .collect();
 
         let sk = meta.sk_enc_count;

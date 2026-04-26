@@ -9,8 +9,8 @@
 //! runtime to obtain a valid genesis `UltraHonkProof` (see `circuits/bin/recursive_aggregation/c6_fold_kernel`).
 
 use crate::circuits::aggregation::helpers::{
-    extract_single_field, parse_acc_public_field_strings, sequential_fold, zero_field_hex_strings,
-    ACC_NONZK_PROOF_FIELDS,
+    extract_single_field, field_keys, parse_acc_public_field_strings, sequential_fold,
+    zero_field_hex_strings, ACC_NONZK_PROOF_FIELDS,
 };
 use crate::circuits::utils::{bytes_to_field_strings, inputs_json_to_input_map};
 use crate::circuits::vk;
@@ -94,10 +94,10 @@ fn threshold_share_decryption_inner_public_inputs(proof: &Proof) -> Result<[Stri
     }
     let ctx = "C6 inner ThresholdShareDecryption proof";
     Ok([
-        extract_single_field(proof, "input", "expected_sk_commitment", ctx)?,
-        extract_single_field(proof, "input", "expected_e_sm_commitment", ctx)?,
-        extract_single_field(proof, "input", "ct_commitment", ctx)?,
-        extract_single_field(proof, "output", "d_commitment", ctx)?,
+        extract_single_field(proof, "input", field_keys::EXPECTED_SK_COMMITMENT, ctx)?,
+        extract_single_field(proof, "input", field_keys::EXPECTED_E_SM_COMMITMENT, ctx)?,
+        extract_single_field(proof, "input", field_keys::CT_COMMITMENT, ctx)?,
+        extract_single_field(proof, "output", field_keys::D_COMMITMENT, ctx)?,
     ])
 }
 

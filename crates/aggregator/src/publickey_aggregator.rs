@@ -25,12 +25,16 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
+/// Public-signal key for the aggregated PK commitment in `CircuitName::PkAggregation` (C5).
+/// Must stay in lock-step with the Noir circuit's output ABI declaration.
+const C5_PK_COMMITMENT_FIELD: &str = "commitment";
+
 /// Extract the hash-based aggregated PK commitment from the signed C5 proof.
 /// This is the last public signal of `CircuitName::PkAggregation`.
 fn extract_pk_commitment(c5_proof: &Proof) -> Result<[u8; 32]> {
     let layout = CircuitName::PkAggregation.output_layout();
     let bytes = layout
-        .extract_field(&c5_proof.public_signals, "commitment")
+        .extract_field(&c5_proof.public_signals, C5_PK_COMMITMENT_FIELD)
         .ok_or_else(|| anyhow::anyhow!("C5 proof is missing `commitment` public signal"))?;
     let mut out = [0u8; 32];
     if bytes.len() != 32 {

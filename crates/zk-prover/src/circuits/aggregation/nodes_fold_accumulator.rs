@@ -10,7 +10,8 @@
 //! `circuits/bin/recursive_aggregation/nodes_fold_kernel`).
 
 use crate::circuits::aggregation::helpers::{
-    parse_acc_public_field_strings, sequential_fold, zero_field_hex_strings, ACC_NONZK_PROOF_FIELDS,
+    parse_acc_public_field_strings_flat, sequential_fold, zero_field_hex_strings,
+    ACC_NONZK_PROOF_FIELDS,
 };
 use crate::circuits::utils::{bytes_to_field_strings, inputs_json_to_input_map};
 use crate::circuits::vk;
@@ -122,9 +123,10 @@ fn generate_nodes_fold_kernel_genesis_proof(
 }
 
 fn parse_nodes_fold_public_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
-    // `slot_width` of 1 here only enforces the 4-field prefix; per-step length is then
-    // cross-checked against `expected_acc_pub` derived from the actual `node_fold_fields`.
-    parse_acc_public_field_strings(proof, CircuitName::NodesFold, NODES_FOLD_PREFIX_LEN, 1)
+    // `nodes_fold` per-slot width is the inner `node_fold` statement length, which is only known at
+    // runtime; use the prefix-only parser and let the caller verify the total length against
+    // `nodes_fold_acc_public_len(node_fold_fields, total_slots)`.
+    parse_acc_public_field_strings_flat(proof, CircuitName::NodesFold, NODES_FOLD_PREFIX_LEN)
 }
 
 fn generate_nodes_fold_step(

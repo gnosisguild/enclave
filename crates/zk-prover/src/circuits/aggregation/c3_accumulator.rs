@@ -12,8 +12,8 @@
 //! inner proofs and slot indices; per-step folding is not exposed outside this crate.
 
 use crate::circuits::aggregation::helpers::{
-    extract_single_field, parse_acc_public_field_strings, sequential_fold, zero_field_hex_strings,
-    ACC_NONZK_PROOF_FIELDS,
+    extract_single_field, field_keys, parse_acc_public_field_strings, sequential_fold,
+    zero_field_hex_strings, ACC_NONZK_PROOF_FIELDS,
 };
 use crate::circuits::utils::{bytes_to_field_strings, inputs_json_to_input_map};
 use crate::circuits::vk;
@@ -101,9 +101,9 @@ fn share_encryption_inner_public_inputs(proof: &Proof) -> Result<[String; 3], Zk
     }
     let ctx = "C3 inner ShareEncryption proof";
     Ok([
-        extract_single_field(proof, "input", "expected_pk_commitment", ctx)?,
-        extract_single_field(proof, "input", "expected_message_commitment", ctx)?,
-        extract_single_field(proof, "output", "ct_commitment", ctx)?,
+        extract_single_field(proof, "input", field_keys::EXPECTED_PK_COMMITMENT, ctx)?,
+        extract_single_field(proof, "input", field_keys::EXPECTED_MESSAGE_COMMITMENT, ctx)?,
+        extract_single_field(proof, "output", field_keys::CT_COMMITMENT, ctx)?,
     ])
 }
 
@@ -265,6 +265,32 @@ pub fn generate_sequential_c3_fold(
     e3_id: &str,
     artifacts_dir: &str,
 ) -> Result<Proof, ZkError> {
+    // Defense in depth: every slot index must be in range and used at most once. C3 chains are
+    // allowed to be partial (one C3 per (recipient, modulus) actually computed by this party),
+    // unlike C6 which must cover all `T + 1` slots, so length equality is intentionally not
+    // enforced here.
+    if inner_proofs.len() != slot_indices.len() {
+        return Err(ZkError::InvalidInput(format!(
+            "generate_sequential_c3_fold: inner_proofs and slot_indices length mismatch ({} vs {})",
+            inner_proofs.len(),
+            slot_indices.len()
+        )));
+    }
+    let mut seen = vec![false; total_slots];
+    for &s in slot_indices {
+        let idx = s as usize;
+        if idx >= total_slots {
+            return Err(ZkError::InvalidInput(format!(
+                "generate_sequential_c3_fold: slot index {s} out of range (total_slots={total_slots})"
+            )));
+        }
+        if seen[idx] {
+            return Err(ZkError::InvalidInput(format!(
+                "generate_sequential_c3_fold: duplicate slot index {s}"
+            )));
+        }
+        seen[idx] = true;
+    }
     sequential_fold(
         "generate_sequential_c3_fold",
         inner_proofs,
