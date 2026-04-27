@@ -24,7 +24,7 @@ sol! {
 
     #[derive(Debug)]
     interface IPkVerifier {
-        function verify(bytes memory proof) external view returns (bytes32 pkCommitment);
+        function verify(bytes32 pkCommitment, bytes memory proof) external view returns (bool);
     }
 
     #[derive(Debug)]
@@ -61,7 +61,7 @@ sol! {
     event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput, bytes proof);
 
     #[derive(Debug)]
-    event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey, bytes proof);
+    event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey, bytes32 pkCommitment, bytes proof);
 
     #[derive(Debug)]
     enum E3Stage {

@@ -1166,6 +1166,7 @@ pub global THRESHOLD_SHARE_DECRYPTION_BIT_E_SM: u32 = 35;
 pub global THRESHOLD_SHARE_DECRYPTION_BIT_R1: u32 = 43;
 pub global THRESHOLD_SHARE_DECRYPTION_BIT_R2: u32 = 35;
 pub global THRESHOLD_SHARE_DECRYPTION_BIT_D: u32 = 35;
+pub global THRESHOLD_SHARE_DECRYPTION_BIT_D_NATIVE: u32 = 36;
 
 pub global THRESHOLD_SHARE_DECRYPTION_R1_BOUNDS: [Field; L] = [8796083584898, 8796061564802];
 pub global THRESHOLD_SHARE_DECRYPTION_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
@@ -1182,7 +1183,7 @@ decrypted_shares_aggregation (CIRCUIT 7)
 -------------------------------------
 ************************************/
 pub global DECRYPTED_SHARES_AGGREGATION_BIT_NOISE: u32 = 65;
-pub global DECRYPTED_SHARES_AGGREGATION_BIT_D: u32 = 35;
+pub global DECRYPTED_SHARES_AGGREGATION_BIT_D_NATIVE: u32 = 36;
 
 pub global DECRYPTED_SHARES_AGGREGATION_CONFIGS: DecryptedSharesAggregationConfigs<L> =
     DecryptedSharesAggregationConfigs::new(QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);

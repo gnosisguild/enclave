@@ -213,13 +213,24 @@ echo "║       Generating Report...                     ║"
 echo "╚════════════════════════════════════════════════╝"
 echo ""
 
+# Try to retrieve verifier gas from the existing CRISP verify test path.
+GAS_JSON_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/crisp_verify_gas.json"
+# Remove any previous gas artifact so failures cannot leak stale values.
+rm -f "${GAS_JSON_FILE}"
+if "${SCRIPT_DIR}/extract_crisp_verify_gas.sh" --output "${GAS_JSON_FILE}"; then
+    echo "✓ CRISP verify gas extracted: ${GAS_JSON_FILE}"
+else
+    echo "⚠️  Could not extract CRISP verify gas; report will show N/A for verify gas"
+fi
+
 # Generate markdown report
 REPORT_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/report.md"
 "${SCRIPT_DIR}/generate_report.sh" \
     --input-dir "${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw" \
     --output "${REPORT_FILE}" \
     --git-commit "$GIT_COMMIT" \
-    --git-branch "$GIT_BRANCH"
+    --git-branch "$GIT_BRANCH" \
+    --gas-json "${GAS_JSON_FILE}"
 
 echo "✓ Report generated: ${REPORT_FILE}"
 echo ""

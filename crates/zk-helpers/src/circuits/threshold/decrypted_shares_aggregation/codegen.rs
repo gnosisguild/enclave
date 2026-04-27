@@ -72,7 +72,7 @@ decrypted_shares_aggregation (CIRCUIT 7)
 ************************************/
 
 pub global {}_BIT_NOISE: u32 = {};
-pub global {}_BIT_D: u32 = {};
+pub global {}_BIT_D_NATIVE: u32 = {};
 
 pub global {}_CONFIGS: DecryptedSharesAggregationConfigs<L> =
     DecryptedSharesAggregationConfigs::new(QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);
@@ -86,7 +86,7 @@ pub global {}_CONFIGS: DecryptedSharesAggregationConfigs<L> =
         prefix,
         configs.bits.noise_bit,
         prefix,
-        configs.bits.d_bit,
+        configs.bits.d_native_bit,
         prefix,
     )
 }
@@ -109,9 +109,10 @@ mod tests {
             "{}_BIT_NOISE: u32 = {}",
             prefix, configs.bits.noise_bit
         )));
-        assert!(
-            codegen_configs.contains(&format!("{}_BIT_D: u32 = {}", prefix, configs.bits.d_bit))
-        );
+        assert!(codegen_configs.contains(&format!(
+            "{}_BIT_D_NATIVE: u32 = {}",
+            prefix, configs.bits.d_native_bit
+        )));
         assert!(codegen_configs.contains(&format!("{}_CONFIGS:", prefix)));
         assert!(codegen_configs.contains(
             "DecryptedSharesAggregationConfigs::new(QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T)"
@@ -134,7 +135,7 @@ mod tests {
             .contains("DECRYPTED_SHARES_AGGREGATION_BIT_NOISE"));
         assert!(artifacts
             .configs
-            .contains("DECRYPTED_SHARES_AGGREGATION_BIT_D"));
+            .contains("DECRYPTED_SHARES_AGGREGATION_BIT_D_NATIVE"));
         assert!(artifacts
             .configs
             .contains("DECRYPTED_SHARES_AGGREGATION_CONFIGS"));

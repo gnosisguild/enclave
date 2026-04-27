@@ -18,7 +18,7 @@ use alloy::primitives::{Address, Bytes, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::SolValue;
 use crisp::config::CONFIG;
-use e3_fhe_params::{build_bfv_params_from_set_arc, encode_bfv_params};
+use e3_fhe_params::build_bfv_params_from_set_arc;
 use e3_sdk::evm_helpers::contracts::{CommitteeSize, EnclaveContract, EnclaveRead, EnclaveWrite};
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{
@@ -202,7 +202,7 @@ pub async fn initialize_crisp_round(
 
     // Recompute the current timestamp to ensure it's as up-to-date as possible before sending the transaction,
     // since there are multiple steps (fee quote, token approval) that could take time.
-    let mut current_timestamp = get_current_timestamp().await?;
+    let current_timestamp = get_current_timestamp().await?;
     // Buffer so tx can mine before window opens; end = start + duration so voting window equals e3_duration
     let window_start = current_timestamp + 20;
     let input_window: [U256; 2] = [
@@ -312,7 +312,6 @@ pub async fn decrypt_and_publish_result(
             U256::from(input_crisp_id),
             Bytes::from(votes.to_be_bytes()),
             proof,
-            Bytes::new(),
         )
         .await?;
     info!("Vote broadcast. TxHash: {:?}", res.transaction_hash);

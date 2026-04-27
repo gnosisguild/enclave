@@ -179,6 +179,17 @@ pub fn compute_max_modulus(moduli: &[u64]) -> u64 {
     moduli.iter().copied().max().unwrap()
 }
 
+/// Bit width to pack/hash native CRT coefficients in \([0, q)\) (per-limb), for commitment I/O.
+///
+/// Uses `max_l bits(q_l - 1)`, strictly wider than centered bounds `(q_l-1)/2` when needed.
+pub fn compute_native_crt_coeff_bit(moduli: &[u64]) -> u32 {
+    moduli
+        .iter()
+        .map(|&q| calculate_bit_width(BigInt::from(q) - 1))
+        .max()
+        .unwrap_or(1)
+}
+
 /// Computes the bit width of the message.
 ///
 /// # Arguments

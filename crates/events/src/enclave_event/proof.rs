@@ -4,7 +4,7 @@ use derivative::Derivative;
 use e3_utils::utility_types::ArcBytes;
 use e3_zk_helpers::{
     CircuitInputLayout, CircuitOutputLayout, DKG_SHARE_DECRYPTION_OUTPUTS, PK_AGGREGATION_OUTPUTS,
-    PK_BFV_OUTPUTS, PK_GENERATION_OUTPUTS, SHARE_ENCRYPTION_INPUTS,
+    PK_BFV_OUTPUTS, PK_GENERATION_OUTPUTS, SHARE_ENCRYPTION_INPUTS, SHARE_ENCRYPTION_OUTPUTS,
     THRESHOLD_SHARE_DECRYPTION_INPUTS, THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
 };
 use serde::{Deserialize, Serialize};
@@ -114,8 +114,6 @@ pub enum CircuitName {
     SkShareComputation,
     /// E_SM share computation inner proof (C2b, recursive).
     ESmShareComputation,
-    /// Share computation wrapper proof (verifies one inner C2 proof; fold input).
-    ShareComputation,
     /// Share encryption proof (C3).
     ShareEncryption,
     /// DKG share decryption proof (C4).
@@ -126,8 +124,30 @@ pub enum CircuitName {
     ThresholdShareDecryption,
     /// Decrypted shares aggregation proof (C7).
     DecryptedSharesAggregation,
-    /// Recursive aggregation fold circuit (independent; lives at recursive_aggregation/fold).
-    Fold,
+    /// Sequential C3 fold: inner ZK + optional prior `c3_fold` non-ZK proof.
+    C3Fold,
+    /// Bootstrap circuit for [`CircuitName::C3Fold`] genesis accumulator proof (same ABI, no acc verify).
+    C3FoldKernel,
+    /// Sequential C6 fold: inner ZK + prior `c6_fold` non-ZK proof (phase-7 aggregator).
+    C6Fold,
+    /// Bootstrap circuit for [`CircuitName::C6Fold`] genesis accumulator proof (same ABI, no acc verify).
+    C6FoldKernel,
+    /// Ad-hoc recursive aggregation: C2a + C2b.
+    C2abFold,
+    /// Ad-hoc: final sk `c3_fold` + final e_sm `c3_fold`.
+    C3abFold,
+    /// Ad-hoc: C4a + C4b.
+    C4abFold,
+    /// Per-node DKG fold (C0..C4 links).
+    NodeFold,
+    /// Sequential fold of `H` `node_fold` proofs (non-ZK) before `dkg_aggregator`.
+    NodesFold,
+    /// Bootstrap circuit for [`CircuitName::NodesFold`] genesis accumulator proof (same ABI, no acc verify).
+    NodesFoldKernel,
+    /// DKG aggregator (folded `node_fold` via `nodes_fold` + C5).
+    DkgAggregator,
+    /// Phase-7 decryption aggregator (folded C6 via `c6_fold` + C7).
+    DecryptionAggregator,
 }
 
 impl CircuitName {
@@ -137,13 +157,23 @@ impl CircuitName {
             CircuitName::PkGeneration => "pk_generation",
             CircuitName::SkShareComputation => "sk_share_computation",
             CircuitName::ESmShareComputation => "e_sm_share_computation",
-            CircuitName::ShareComputation => "share_computation",
             CircuitName::ShareEncryption => "share_encryption",
             CircuitName::DkgShareDecryption => "share_decryption",
             CircuitName::PkAggregation => "pk_aggregation",
             CircuitName::ThresholdShareDecryption => "share_decryption",
             CircuitName::DecryptedSharesAggregation => "decrypted_shares_aggregation",
-            CircuitName::Fold => "fold",
+            CircuitName::C3Fold => "c3_fold",
+            CircuitName::C3FoldKernel => "c3_fold_kernel",
+            CircuitName::C6Fold => "c6_fold",
+            CircuitName::C6FoldKernel => "c6_fold_kernel",
+            CircuitName::C2abFold => "c2ab_fold",
+            CircuitName::C3abFold => "c3ab_fold",
+            CircuitName::C4abFold => "c4ab_fold",
+            CircuitName::NodeFold => "node_fold",
+            CircuitName::NodesFold => "nodes_fold",
+            CircuitName::NodesFoldKernel => "nodes_fold_kernel",
+            CircuitName::DkgAggregator => "dkg_aggregator",
+            CircuitName::DecryptionAggregator => "decryption_aggregator",
         }
     }
 
@@ -152,37 +182,29 @@ impl CircuitName {
             CircuitName::PkBfv => "dkg",
             CircuitName::SkShareComputation => "dkg",
             CircuitName::ESmShareComputation => "dkg",
-            CircuitName::ShareComputation => "dkg",
             CircuitName::ShareEncryption => "dkg",
             CircuitName::DkgShareDecryption => "dkg",
             CircuitName::PkGeneration => "threshold",
             CircuitName::ThresholdShareDecryption => "threshold",
             CircuitName::PkAggregation => "threshold",
             CircuitName::DecryptedSharesAggregation => "threshold",
-            CircuitName::Fold => "recursive_aggregation",
+            CircuitName::C3Fold
+            | CircuitName::C3FoldKernel
+            | CircuitName::C6Fold
+            | CircuitName::C6FoldKernel
+            | CircuitName::C2abFold
+            | CircuitName::C3abFold
+            | CircuitName::C4abFold
+            | CircuitName::NodeFold
+            | CircuitName::NodesFold
+            | CircuitName::NodesFoldKernel
+            | CircuitName::DkgAggregator
+            | CircuitName::DecryptionAggregator => "recursive_aggregation",
         }
     }
 
     pub fn dir_path(&self) -> String {
         format!("{}/{}", self.group(), self.as_str())
-    }
-
-    /// Wrapper circuit path: `recursive_aggregation/wrapper/{group}/{name}`.
-    pub fn wrapper_dir_path(&self) -> String {
-        format!("recursive_aggregation/wrapper/{}", self.dir_path())
-    }
-
-    /// Compiled wrapper bundle to use when wrapping an inner proof.
-    ///
-    /// C2a/C2b inner circuits (`sk_share_computation`, `e_sm_share_computation`) share one wrapper
-    /// Noir program (`share_computation` under `recursive_aggregation/wrapper/dkg/`).
-    pub fn wrapper_artifact_circuit(&self) -> CircuitName {
-        match self {
-            CircuitName::SkShareComputation | CircuitName::ESmShareComputation => {
-                CircuitName::ShareComputation
-            }
-            _ => *self,
-        }
     }
 
     /// Public input layout for this circuit.
@@ -199,7 +221,6 @@ impl CircuitName {
             CircuitName::SkShareComputation | CircuitName::ESmShareComputation => {
                 CircuitOutputLayout::Dynamic
             }
-            CircuitName::ShareComputation => CircuitOutputLayout::None,
             CircuitName::DkgShareDecryption => CircuitOutputLayout::Fixed {
                 fields: DKG_SHARE_DECRYPTION_OUTPUTS,
             },
@@ -209,9 +230,22 @@ impl CircuitName {
             CircuitName::ThresholdShareDecryption => CircuitOutputLayout::Fixed {
                 fields: THRESHOLD_SHARE_DECRYPTION_OUTPUTS,
             },
-            CircuitName::ShareEncryption => CircuitOutputLayout::None,
+            CircuitName::ShareEncryption => CircuitOutputLayout::Fixed {
+                fields: SHARE_ENCRYPTION_OUTPUTS,
+            },
             CircuitName::DecryptedSharesAggregation => CircuitOutputLayout::None,
-            CircuitName::Fold => CircuitOutputLayout::None,
+            CircuitName::C3Fold
+            | CircuitName::C3FoldKernel
+            | CircuitName::C6Fold
+            | CircuitName::C6FoldKernel
+            | CircuitName::C2abFold
+            | CircuitName::C3abFold
+            | CircuitName::C4abFold
+            | CircuitName::NodeFold
+            | CircuitName::NodesFold
+            | CircuitName::NodesFoldKernel
+            | CircuitName::DkgAggregator
+            | CircuitName::DecryptionAggregator => CircuitOutputLayout::None,
         }
     }
 
@@ -282,11 +316,12 @@ mod tests {
 
     #[test]
     fn extract_c6_d_commitment_after_pub_inputs() {
-        // C6: 2 public inputs + 1 output (`d_commitment` at tail).
-        let mut signals = vec![0u8; 96];
+        // C6: 3 public inputs + 1 output (`d_commitment` at tail).
+        let mut signals = vec![0u8; 128];
         signals[0..32].copy_from_slice(&[0x11; 32]); // expected_sk_commitment
         signals[32..64].copy_from_slice(&[0x22; 32]); // expected_e_sm_commitment
-        signals[64..96].copy_from_slice(&[0x77; 32]); // d_commitment
+        signals[64..96].copy_from_slice(&[0x33; 32]); // ct_commitment
+        signals[96..128].copy_from_slice(&[0x77; 32]); // d_commitment
 
         let proof = make_proof(CircuitName::ThresholdShareDecryption, &signals);
         assert_eq!(&*proof.extract_output("d_commitment").unwrap(), &[0x77; 32]);
@@ -294,10 +329,11 @@ mod tests {
 
     #[test]
     fn extract_c6_public_inputs() {
-        let mut signals = vec![0u8; 96];
+        let mut signals = vec![0u8; 128];
         signals[0..32].copy_from_slice(&[0x11; 32]);
         signals[32..64].copy_from_slice(&[0x22; 32]);
-        signals[64..96].copy_from_slice(&[0x77; 32]);
+        signals[64..96].copy_from_slice(&[0x33; 32]);
+        signals[96..128].copy_from_slice(&[0x77; 32]);
 
         let proof = make_proof(CircuitName::ThresholdShareDecryption, &signals);
         assert_eq!(
@@ -308,6 +344,7 @@ mod tests {
             &*proof.extract_input("expected_e_sm_commitment").unwrap(),
             &[0x22; 32]
         );
+        assert_eq!(&*proof.extract_input("ct_commitment").unwrap(), &[0x33; 32]);
     }
 
     #[test]
@@ -327,9 +364,16 @@ mod tests {
     }
 
     #[test]
-    fn extract_from_void_circuit() {
-        let proof = make_proof(CircuitName::ShareEncryption, &[0u8; 64]);
-        assert!(proof.extract_output("commitment").is_none());
+    fn extract_ct_commitment_from_share_encryption() {
+        let mut signals = vec![0u8; 96];
+        signals[0..32].copy_from_slice(&[0xAA; 32]);
+        signals[32..64].copy_from_slice(&[0xBB; 32]);
+        signals[64..96].copy_from_slice(&[0xCC; 32]);
+        let proof = make_proof(CircuitName::ShareEncryption, &signals);
+        assert_eq!(
+            &*proof.extract_output("ct_commitment").unwrap(),
+            &[0xCC; 32]
+        );
     }
 
     #[test]
@@ -362,10 +406,11 @@ mod tests {
 
     #[test]
     fn extract_input_from_share_encryption() {
-        // C3: 2 pub inputs at HEAD + rest of signals
+        // C3: 2 pub inputs at HEAD + ct_commitment return at tail
         let mut signals = vec![0u8; 96];
         signals[0..32].copy_from_slice(&[0xAA; 32]); // expected_pk_commitment
         signals[32..64].copy_from_slice(&[0xBB; 32]); // expected_message_commitment
+        signals[64..96].copy_from_slice(&[0xCC; 32]); // ct_commitment
 
         let proof = make_proof(CircuitName::ShareEncryption, &signals);
         assert_eq!(
@@ -375,6 +420,10 @@ mod tests {
         assert_eq!(
             &*proof.extract_input("expected_message_commitment").unwrap(),
             &[0xBB; 32]
+        );
+        assert_eq!(
+            &*proof.extract_output("ct_commitment").unwrap(),
+            &[0xCC; 32]
         );
     }
 

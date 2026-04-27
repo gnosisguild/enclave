@@ -5,20 +5,15 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-import recursiveAggregationFoldVerifierModule from "./recursiveAggregationFoldVerifier";
-import thresholdDecryptedSharesAggregationVerifierModule from "./thresholdDecryptedSharesAggregationVerifier";
+import decryptionAggregatorVerifierModule from "./decryptionAggregatorVerifier";
 
 export default buildModule("BfvDecryptionVerifier", (m) => {
-  const { thresholdDecryptedSharesAggregationVerifier } = m.useModule(
-    thresholdDecryptedSharesAggregationVerifierModule,
-  );
-  const { recursiveAggregationFoldVerifier } = m.useModule(
-    recursiveAggregationFoldVerifierModule,
+  const { decryptionAggregatorVerifier } = m.useModule(
+    decryptionAggregatorVerifierModule,
   );
 
   const bfvDecryptionVerifier = m.contract("BfvDecryptionVerifier", [
-    thresholdDecryptedSharesAggregationVerifier,
-    recursiveAggregationFoldVerifier,
+    decryptionAggregatorVerifier,
   ]);
 
   return { bfvDecryptionVerifier };

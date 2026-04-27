@@ -31,7 +31,7 @@ import {
   MockUSDC__factory as MockUSDCFactory,
   SlashingManager__factory as SlashingManagerFactory,
 } from "../../types";
-import { encodePkProof, signAndEncodeAttestation } from "../fixtures";
+import { signAndEncodeAttestation } from "../fixtures";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time } = networkHelpers;
@@ -444,9 +444,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
-      const pkProof = encodePkProof(ethers.keccak256(publicKey));
+      const pkCommitment = ethers.keccak256(publicKey);
 
-      await registry.publishCommittee(0, nodes, publicKey, pkProof, "0x");
+      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
 
       // Verify stage transitioned to KeyPublished (after publishCommittee which calls onKeyPublished)
       stage = await enclave.getE3Stage(0);
@@ -489,10 +489,10 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
-      const pkProof = encodePkProof(ethers.keccak256(publicKey));
+      const pkCommitment = ethers.keccak256(publicKey);
 
       await expect(
-        registry.publishCommittee(0, nodes, publicKey, pkProof, "0x"),
+        registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x"),
       )
         .to.emit(enclave, "CommitteeFormed")
         .withArgs(0);
@@ -755,8 +755,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
-      const pkProof = encodePkProof(ethers.keccak256(publicKey));
-      await registry.publishCommittee(0, nodes, publicKey, pkProof, "0x");
+      const pkCommitment = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
 
       // 2. Wait past compute deadline → mark as failed
       const e3 = await enclave.getE3(0);
@@ -859,8 +859,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
-      const pkProof = encodePkProof(ethers.keccak256(publicKey));
-      await registry.publishCommittee(0, nodes, publicKey, pkProof, "0x");
+      const pkCommitment = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
 
       // 2. Fail via compute timeout
       const e3 = await enclave.getE3(0);
@@ -1111,8 +1111,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
-      const pkProof = encodePkProof(ethers.keccak256(publicKey));
-      await registry.publishCommittee(0, nodes, publicKey, pkProof, "0x");
+      const pkCommitment = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
 
       stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(3); // KeyPublished
@@ -1190,8 +1190,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
-      const pkProof = encodePkProof(ethers.keccak256(publicKey));
-      await registry.publishCommittee(0, nodes, publicKey, pkProof, "0x");
+      const pkCommitment = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
 
       stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(3); // KeyPublished
@@ -1433,8 +1433,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
-      const pkProof = encodePkProof(ethers.keccak256(publicKey));
-      await registry.publishCommittee(0, nodes, publicKey, pkProof, "0x");
+      const pkCommitment = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
 
       expect(await enclave.getE3Stage(0)).to.equal(3); // KeyPublished
 
@@ -1487,12 +1487,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       );
 
       const plaintextOutput = "0x" + "cd".repeat(100);
-      await enclave.publishPlaintextOutput(
-        0,
-        plaintextOutput,
-        proofBytes,
-        "0x",
-      );
+      await enclave.publishPlaintextOutput(0, plaintextOutput, proofBytes);
       expect(await enclave.getE3Stage(0)).to.equal(5); // Complete
 
       // 4. Verify escrowed slashed funds were distributed
@@ -1569,8 +1564,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
-      const pkProof = encodePkProof(ethers.keccak256(publicKey));
-      await registry.publishCommittee(0, nodes, publicKey, pkProof, "0x");
+      const pkCommitment = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
 
       expect(await enclave.getE3Stage(0)).to.equal(3); // KeyPublished
 
@@ -1585,7 +1580,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       // 4. Publish plaintext output
       const plaintextOutput = "0x" + "cd".repeat(100);
-      await enclave.publishPlaintextOutput(0, plaintextOutput, proof, "0x");
+      await enclave.publishPlaintextOutput(0, plaintextOutput, proof);
       expect(await enclave.getE3Stage(0)).to.equal(5); // Complete
 
       // Cannot mark completed E3 as failed
@@ -1628,8 +1623,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         await operator3.getAddress(),
       ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
-      const pkProof = encodePkProof(ethers.keccak256(publicKey));
-      await registry.publishCommittee(0, nodes, publicKey, pkProof, "0x");
+      const pkCommitment = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
 
       // Publish outputs
       const e3 = await enclave.getE3(0);
@@ -1640,7 +1635,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await enclave.publishCiphertextOutput(0, ciphertextOutput, proof);
 
       const plaintextOutput = "0x" + "cd".repeat(100);
-      await enclave.publishPlaintextOutput(0, plaintextOutput, proof, "0x");
+      await enclave.publishPlaintextOutput(0, plaintextOutput, proof);
 
       // Verify E3 is complete
       expect(await enclave.getE3Stage(0)).to.equal(5); // Complete

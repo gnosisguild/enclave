@@ -11,7 +11,24 @@ fi
 cd circuits
 
 # Directories to check
-DIRS=("lib" "bin/config" "bin/recursive_aggregation/fold" "bin/recursive_aggregation/wrapper/dkg" "bin/recursive_aggregation/wrapper/threshold" "bin/dkg" "bin/threshold")
+DIRS=(
+  "lib"
+  "bin/config"
+  "bin/recursive_aggregation/c2ab_fold"
+  "bin/recursive_aggregation/c3_fold"
+  "bin/recursive_aggregation/c3_fold_kernel"
+  "bin/recursive_aggregation/c6_fold"
+  "bin/recursive_aggregation/c6_fold_kernel"
+  "bin/recursive_aggregation/c3ab_fold"
+  "bin/recursive_aggregation/c4ab_fold"
+  "bin/recursive_aggregation/node_fold"
+  "bin/recursive_aggregation/nodes_fold"
+  "bin/recursive_aggregation/nodes_fold_kernel"
+  "bin/recursive_aggregation/dkg_aggregator"
+  "bin/recursive_aggregation/decryption_aggregator"
+  "bin/dkg"
+  "bin/threshold"
+)
 
 for dir in "${DIRS[@]}"; do
     if [ ! -d "$dir" ]; then

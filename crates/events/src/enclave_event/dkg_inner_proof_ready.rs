@@ -12,10 +12,9 @@
 use crate::{E3id, Proof};
 use serde::{Deserialize, Serialize};
 
-/// A single wrapped inner proof ready for incremental aggregation.
+/// A single inner DKG proof ready for incremental aggregation (`NodeFold` input chain).
 ///
-/// Emitted for every inner circuit (C0-C4) as soon as its wrapped proof
-/// is available. `seq` gives the deterministic ordering.
+/// Emitted for every inner circuit (C0–C4) when available. `seq` gives the deterministic ordering.
 ///
 /// The total count of expected proofs is communicated separately via
 /// [`ThresholdSharePending`], which is always published before the first
@@ -24,8 +23,7 @@ use serde::{Deserialize, Serialize};
 pub struct DKGInnerProofReady {
     pub e3_id: E3id,
     pub party_id: u64,
-    /// Already-wrapped proof (single-element RecursiveAggregation output).
-    pub wrapped_proof: Proof,
+    pub proof: Proof,
     /// Deterministic sequence index for ordered folding.
     pub seq: usize,
 }

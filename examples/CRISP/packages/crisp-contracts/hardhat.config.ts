@@ -144,9 +144,8 @@ const config: HardhatUserConfig = {
       '@enclave-e3/contracts/contracts/test/MockStableToken.sol',
       '@enclave-e3/contracts/contracts/verifiers/bfv/BfvDecryptionVerifier.sol',
       '@enclave-e3/contracts/contracts/verifiers/bfv/BfvPkVerifier.sol',
-      '@enclave-e3/contracts/contracts/verifiers/bfv/honk/RecursiveAggregationFoldVerifier.sol',
-      '@enclave-e3/contracts/contracts/verifiers/bfv/honk/ThresholdDecryptedSharesAggregationVerifier.sol',
-      '@enclave-e3/contracts/contracts/verifiers/bfv/honk/ThresholdPkAggregationVerifier.sol',
+      '@enclave-e3/contracts/contracts/verifiers/bfv/honk/DkgAggregatorVerifier.sol',
+      '@enclave-e3/contracts/contracts/verifiers/bfv/honk/DecryptionAggregatorVerifier.sol',
     ],
     settings: {
       optimizer: {

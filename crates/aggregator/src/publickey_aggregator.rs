@@ -4,17 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::proof_fold::ProofFoldState;
 use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, BusHandle, ComputeResponse, ComputeResponseKind, DKGRecursiveAggregationComplete,
-    Die, E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EventContext, FailureReason,
-    KeyshareCreated, OrderedSet, PartyProofsToVerify, PkAggregationProofPending,
-    PkAggregationProofRequest, PkAggregationProofSigned, Proof, ProofType, ProofVerificationPassed,
-    PublicKeyAggregated, Seed, Sequenced, ShareVerificationComplete, ShareVerificationDispatched,
-    SignedProofFailed, SignedProofPayload, TypedEvent, VerificationKind, ZkResponse,
+    prelude::*, BusHandle, CircuitName, ComputeRequest, ComputeResponse, ComputeResponseKind,
+    CorrelationId, DKGRecursiveAggregationComplete, Die, DkgAggregationRequest, E3Failed, E3Stage,
+    E3id, EnclaveEvent, EnclaveEventData, EventContext, FailureReason, KeyshareCreated, OrderedSet,
+    PartyProofsToVerify, PkAggregationProofPending, PkAggregationProofRequest,
+    PkAggregationProofSigned, Proof, ProofType, PublicKeyAggregated, Seed, Sequenced,
+    ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed, SignedProofPayload,
+    TypedEvent, VerificationKind, ZkRequest, ZkResponse,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -25,29 +25,52 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
+/// Public-signal key for the aggregated PK commitment in `CircuitName::PkAggregation` (C5).
+/// Must stay in lock-step with the Noir circuit's output ABI declaration.
+const C5_PK_COMMITMENT_FIELD: &str = "commitment";
+
+/// Extract the hash-based aggregated PK commitment from the signed C5 proof.
+/// This is the last public signal of `CircuitName::PkAggregation`.
+fn extract_pk_commitment(c5_proof: &Proof) -> Result<[u8; 32]> {
+    let layout = CircuitName::PkAggregation.output_layout();
+    let bytes = layout
+        .extract_field(&c5_proof.public_signals, C5_PK_COMMITMENT_FIELD)
+        .ok_or_else(|| anyhow::anyhow!("C5 proof is missing `commitment` public signal"))?;
+    let mut out = [0u8; 32];
+    if bytes.len() != 32 {
+        return Err(anyhow::anyhow!(
+            "C5 `commitment` public signal must be 32 bytes"
+        ));
+    }
+    out.copy_from_slice(bytes);
+    Ok(out)
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublicKeyAggregatorState {
     Collecting {
         threshold_n: usize,
         threshold_m: usize,
         keyshares: OrderedSet<ArcBytes>,
-        /// C1 proofs collected from KeyshareCreated events, indexed by insertion order.
+        /// C1 proofs collected from KeyshareCreated events, indexed by insertion order
+        /// (matches `submission_order`).
         c1_proofs: Vec<Option<SignedProofPayload>>,
         seed: Seed,
         nodes: OrderedSet<String>,
-        /// Insertion-ordered (node, keyshare) pairs.
-        /// Index matches `c1_proofs`, giving the party ID for verification.
+        /// Insertion-ordered (real sortition `party_id`, node, keyshare) triples.
+        /// Index matches `c1_proofs`. The real `party_id` comes from `KeyshareCreated`
+        /// and must be used for all downstream circuit slot indexing — arrival order
+        /// is non-deterministic and does not match sortition's committee position.
         #[serde(default)]
-        submission_order: Vec<(String, ArcBytes)>,
+        submission_order: Vec<(u64, String, ArcBytes)>,
     },
     VerifyingC1 {
-        /// Insertion-ordered (node, keyshare) pairs from Collecting.
-        /// Index matches `c1_proofs`, giving the party ID used in verification.
-        submission_order: Vec<(String, ArcBytes)>,
+        /// Insertion-ordered (party_id, node, keyshare) triples from Collecting.
+        submission_order: Vec<(u64, String, ArcBytes)>,
         threshold_m: usize,
         /// C1 proofs in the same insertion order as `submission_order`.
         c1_proofs: Vec<Option<SignedProofPayload>>,
-        /// Party indices that submitted no C1 proof — treated as dishonest.
+        /// Real party_ids that submitted no C1 proof — treated as dishonest.
         no_proof_parties: Vec<u64>,
     },
     GeneratingC5Proof {
@@ -58,7 +81,10 @@ pub enum PublicKeyAggregatorState {
         dkg_node_proofs: HashMap<u64, Option<Proof>>,
         honest_party_ids: BTreeSet<u64>,
         dishonest_parties: BTreeSet<u64>,
-        cross_node_fold: ProofFoldState,
+        /// In-flight [`ZkRequest::DkgAggregation`], if any.
+        dkg_aggregation_correlation: Option<CorrelationId>,
+        /// Result from [`ZkResponse::DkgAggregation`] (replaces pairwise `FoldProofs`).
+        dkg_aggregated_proof: Option<Proof>,
         c5_proof_pending: Option<Proof>,
         last_ec: Option<EventContext<Sequenced>>,
     },
@@ -122,6 +148,7 @@ impl PublicKeyAggregator {
         &mut self,
         keyshare: ArcBytes,
         node: String,
+        party_id: u64,
         c1_proof: Option<SignedProofPayload>,
         ec: &EventContext<Sequenced>,
     ) -> Result<()> {
@@ -142,7 +169,13 @@ impl PublicKeyAggregator {
             keyshares.insert(keyshare.clone());
             c1_proofs.push(c1_proof);
             nodes.insert(node.clone());
-            submission_order.push((node, keyshare));
+            info!(
+                "add_keyshare: node={} party_id={} (arrival slot={})",
+                node,
+                party_id,
+                submission_order.len()
+            );
+            submission_order.push((party_id, node, keyshare));
             let n = *threshold_n;
             let m = *threshold_m;
             info!(
@@ -166,26 +199,27 @@ impl PublicKeyAggregator {
 
     fn dispatch_c1_verification(
         &mut self,
+        submission_order: &[(u64, String, ArcBytes)],
         c1_proofs: &[Option<SignedProofPayload>],
         ec: EventContext<Sequenced>,
     ) -> Result<()> {
         let mut party_proofs = Vec::new();
         let mut no_proof_parties = Vec::new();
 
-        for (idx, proof_opt) in c1_proofs.iter().enumerate() {
+        for ((party_id, _, _), proof_opt) in submission_order.iter().zip(c1_proofs.iter()) {
             match proof_opt {
                 Some(proof) => {
                     party_proofs.push(PartyProofsToVerify {
-                        sender_party_id: idx as u64,
+                        sender_party_id: *party_id,
                         signed_proofs: vec![proof.clone()],
                     });
                 }
                 None => {
                     warn!(
                         "Party {} submitted keyshare without C1 proof — treating as dishonest",
-                        idx
+                        party_id
                     );
-                    no_proof_parties.push(idx as u64);
+                    no_proof_parties.push(*party_id);
                 }
             }
         }
@@ -260,29 +294,31 @@ impl PublicKeyAggregator {
         };
 
         let mut dishonest_parties = msg.dishonest_parties.clone();
-        let total_parties = submission_order.len();
 
-        // Filter out parties that failed C1 ZK verification.
-        let mut honest_entries: Vec<(usize, (String, ArcBytes))> = submission_order
-            .into_iter()
-            .enumerate()
-            .filter(|(idx, _)| !dishonest_parties.contains(&(*idx as u64)))
-            .collect();
+        // Filter out parties that failed C1 ZK verification. Keyed by the real
+        // sortition party_id carried in `submission_order`, not arrival index.
+        let mut honest_entries: Vec<(u64, String, ArcBytes, Option<SignedProofPayload>)> =
+            submission_order
+                .into_iter()
+                .zip(c1_proofs.into_iter())
+                .filter(|((pid, _, _), _)| !dishonest_parties.contains(pid))
+                .map(|((pid, node, ks), c1)| (pid, node, ks, c1))
+                .collect();
 
         // Cross-check: verify each party's keyshare matches their C1 pk_commitment.
         // Parties that fail are marked dishonest and reported via SignedProofFailed.
         let mut commitment_dishonest = Vec::new();
-        for (party_idx, (_node, ks)) in &honest_entries {
-            let signed_proof = match c1_proofs.get(*party_idx).and_then(|opt| opt.as_ref()) {
+        for (party_id, _node, ks, c1) in &honest_entries {
+            let signed_proof = match c1.as_ref() {
                 Some(proof) => proof,
                 None => {
                     // No C1 proof for this party — should already be in dishonest_parties.
                     // If not, treat as dishonest now (defensive).
                     warn!(
                         "Party {} has no C1 proof but was not marked dishonest",
-                        party_idx
+                        party_id
                     );
-                    dishonest_parties.insert(*party_idx as u64);
+                    dishonest_parties.insert(*party_id);
                     continue;
                 }
             };
@@ -299,19 +335,19 @@ impl PublicKeyAggregator {
                 Err(e) => {
                     warn!(
                         "Failed to compute pk_commitment for party {}: {}",
-                        party_idx, e
+                        party_id, e
                     );
                     false
                 }
             };
             if !ok {
-                commitment_dishonest.push((*party_idx as u64, signed_proof.clone()));
+                commitment_dishonest.push((*party_id, signed_proof.clone()));
             }
         }
 
         // Emit SignedProofFailed for each commitment-mismatched party
-        for (party_idx, signed_proof) in &commitment_dishonest {
-            dishonest_parties.insert(*party_idx);
+        for (party_id, signed_proof) in &commitment_dishonest {
+            dishonest_parties.insert(*party_id);
             match signed_proof.recover_address() {
                 Ok(faulting_node) => {
                     if let Err(e) = self.bus.publish(
@@ -328,7 +364,7 @@ impl PublicKeyAggregator {
                 }
                 Err(e) => warn!(
                     "Could not recover address from C1 proof for party {}: {e}",
-                    party_idx
+                    party_id
                 ),
             }
         }
@@ -339,12 +375,18 @@ impl PublicKeyAggregator {
                 commitment_dishonest.len()
             );
             // Re-filter honest_entries after commitment check
-            honest_entries.retain(|(idx, _)| !dishonest_parties.contains(&(*idx as u64)));
+            honest_entries.retain(|(pid, _, _, _)| !dishonest_parties.contains(pid));
         }
+
+        // Sort by real party_id ascending so honest_keyshares / honest_nodes /
+        // honest_party_ids all share the same ordering used by NodeFold rows
+        // (publickey_aggregator sorts dkg_node_proofs by pid before dispatch)
+        // and by the circuit's slot indexing in `dkg_aggregator.nr`.
+        honest_entries.sort_by_key(|(pid, _, _, _)| *pid);
 
         let (honest_keyshares, honest_nodes): (Vec<ArcBytes>, Vec<String>) = honest_entries
             .iter()
-            .map(|(_, (node, ks))| (ks.clone(), node.clone()))
+            .map(|(_, node, ks, _)| (ks.clone(), node.clone()))
             .unzip();
 
         if !dishonest_parties.is_empty() {
@@ -354,9 +396,8 @@ impl PublicKeyAggregator {
             );
         }
 
-        let honest_party_ids: BTreeSet<u64> = (0..total_parties as u64)
-            .filter(|id| !dishonest_parties.contains(id))
-            .collect();
+        let honest_party_ids: BTreeSet<u64> =
+            honest_entries.iter().map(|(pid, _, _, _)| *pid).collect();
 
         // Need at least threshold + 1 honest parties for aggregation
         if honest_keyshares.len() <= threshold_m {
@@ -388,7 +429,12 @@ impl PublicKeyAggregator {
 
         let committee_h = honest_keyshares.len();
         let honest_nodes_set = OrderedSet::from(honest_nodes.clone());
-        let keyshare_bytes: Vec<_> = honest_keyshares_set.iter().cloned().collect();
+        // Feed keyshares to C5 in ascending party_id order so that
+        // `c5_public[i]` (pk_commitment of the i-th input keyshare) matches
+        // party_ids[i] and the row-i node_fold pk bound by dkg_aggregator.nr.
+        // `honest_keyshares` preserves the submission-index (== party_id) order
+        // from `honest_entries`; do NOT sort by byte content.
+        let keyshare_bytes: Vec<ArcBytes> = honest_keyshares.clone();
 
         let pubkey = ArcBytes::from_bytes(&pubkey);
         info!("Publishing PkAggregationProofPending for C5 proof generation...");
@@ -417,7 +463,8 @@ impl PublicKeyAggregator {
                 dkg_node_proofs: HashMap::new(),
                 honest_party_ids: honest_party_ids.clone(),
                 dishonest_parties: dishonest_parties.clone(),
-                cross_node_fold: ProofFoldState::new(self.params_preset),
+                dkg_aggregation_correlation: None,
+                dkg_aggregated_proof: None,
                 c5_proof_pending: None,
                 last_ec: Some(ec.clone()),
             })
@@ -429,7 +476,7 @@ impl PublicKeyAggregator {
             self.handle_dkg_recursive_aggregation_complete(event)?;
         }
 
-        self.try_start_cross_node_fold(&ec)?;
+        self.try_dispatch_dkg_aggregation(&ec)?;
 
         Ok(())
     }
@@ -464,7 +511,8 @@ impl PublicKeyAggregator {
                 dkg_node_proofs,
                 honest_party_ids,
                 dishonest_parties,
-                cross_node_fold,
+                dkg_aggregation_correlation,
+                dkg_aggregated_proof,
                 ..
             } = state
             else {
@@ -477,7 +525,8 @@ impl PublicKeyAggregator {
                 dkg_node_proofs,
                 honest_party_ids,
                 dishonest_parties,
-                cross_node_fold,
+                dkg_aggregation_correlation,
+                dkg_aggregated_proof,
                 c5_proof_pending: Some(c5_proof),
                 last_ec: Some(ec.clone()),
             })
@@ -531,7 +580,8 @@ impl PublicKeyAggregator {
                 mut dkg_node_proofs,
                 honest_party_ids,
                 dishonest_parties,
-                cross_node_fold,
+                dkg_aggregation_correlation,
+                dkg_aggregated_proof,
                 c5_proof_pending,
                 last_ec: _,
             } = state
@@ -546,54 +596,109 @@ impl PublicKeyAggregator {
                 dkg_node_proofs,
                 honest_party_ids,
                 dishonest_parties,
-                cross_node_fold,
+                dkg_aggregation_correlation,
+                dkg_aggregated_proof,
                 c5_proof_pending,
                 last_ec: Some(ec.clone()),
             })
         })?;
 
-        self.try_start_cross_node_fold(&ec)
+        self.try_dispatch_dkg_aggregation(&ec)
     }
 
-    /// Start cross-node fold once we have DKG proofs from all verified honest parties.
-    fn try_start_cross_node_fold(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
+    /// Dispatch [`ZkRequest::DkgAggregation`] once C5 and all honest NodeFold proofs are ready.
+    fn try_dispatch_dkg_aggregation(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
         let state = self.state.get();
         let Some(PublicKeyAggregatorState::GeneratingC5Proof {
             dkg_node_proofs,
             honest_party_ids,
-            cross_node_fold,
+            c5_proof_pending,
+            dkg_aggregation_correlation,
+            dkg_aggregated_proof,
             ..
         }) = state.as_ref()
         else {
             return Ok(());
         };
-        let all_honest_proofs_present = honest_party_ids
-            .iter()
-            .all(|id| dkg_node_proofs.contains_key(id));
-        if !all_honest_proofs_present
-            || (!cross_node_fold.is_idle() && !cross_node_fold.needs_restart())
-        {
+
+        let Some(c5_proof) = c5_proof_pending.as_ref() else {
+            return Ok(());
+        };
+
+        if dkg_aggregation_correlation.is_some() || dkg_aggregated_proof.is_some() {
             return Ok(());
         }
 
-        // Collect non-None proofs from honest parties for cross-node folding.
-        // Folding is skipped only when all honest-party proofs are None (every node
-        // reported aggregation disabled). A mixed Some/None scenario should not occur
-        // in practice because proof_aggregation_enabled is an E3-level flag shared by all nodes.
+        let all_honest_proofs_present = honest_party_ids
+            .iter()
+            .all(|id| dkg_node_proofs.contains_key(id));
+        if !all_honest_proofs_present {
+            return Ok(());
+        }
+
+        // `proof_aggregation_enabled` is an E3-level flag shared by all nodes, so honest-party
+        // proofs should be uniformly Some (aggregation on) or uniformly None (aggregation off).
+        // A mixed bag would silently truncate the dispatched request below; reject it explicitly.
+        let some_count = honest_party_ids
+            .iter()
+            .filter(|id| {
+                dkg_node_proofs
+                    .get(id)
+                    .map(Option::is_some)
+                    .unwrap_or(false)
+            })
+            .count();
+        if some_count != 0 && some_count != honest_party_ids.len() {
+            anyhow::bail!(
+                "PublicKeyAggregator: mixed Some/None DKG node proofs across honest parties \
+                 ({some_count} of {} present); refusing to dispatch a truncated DkgAggregation",
+                honest_party_ids.len()
+            );
+        }
+
         let mut pairs: Vec<_> = dkg_node_proofs
             .iter()
             .filter(|(pid, _)| honest_party_ids.contains(pid))
             .filter_map(|(pid, p)| p.as_ref().map(|proof| (*pid, proof.clone())))
             .collect();
         pairs.sort_by_key(|(pid, _)| *pid);
-        let proofs: Vec<Proof> = pairs.into_iter().map(|(_, p)| p).collect();
+        let party_ids: Vec<u64> = pairs.iter().map(|(pid, _)| *pid).collect();
+        let node_fold_proofs: Vec<Proof> = pairs.into_iter().map(|(_, p)| p).collect();
+        info!(
+            "ORDER-DEBUG dispatch DkgAggregation: honest_party_ids(submission-idx)={:?} \
+             dkg_node_proofs_keys(real party_id from DKGRecursiveAggregationComplete)={:?} \
+             party_ids_passed_to_circuit={:?}",
+            honest_party_ids.iter().collect::<Vec<_>>(),
+            {
+                let mut k: Vec<u64> = dkg_node_proofs.keys().copied().collect();
+                k.sort();
+                k
+            },
+            party_ids
+        );
 
-        // If no proofs to fold (aggregation was disabled), try publishing immediately
-        if proofs.is_empty() {
-            info!("PublicKeyAggregator: proof aggregation disabled — skipping cross-node fold");
-            self.try_publish_complete()?;
+        if node_fold_proofs.is_empty() {
+            // Proof aggregation disabled. Do NOT call `try_publish_complete` here — it
+            // is the most common entry into this method, so re-entering it would create
+            // unbounded mutual recursion (stack overflow in deployed nodes).
+            info!("PublicKeyAggregator: proof aggregation disabled — skipping DkgAggregation");
             return Ok(());
         }
+
+        let corr = CorrelationId::new();
+        self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::DkgAggregation(DkgAggregationRequest {
+                    node_fold_proofs,
+                    c5_proof: c5_proof.clone(),
+                    party_ids,
+                    params_preset: self.params_preset,
+                }),
+                corr,
+                self.e3_id.clone(),
+            ),
+            ec.clone(),
+        )?;
 
         self.state.try_mutate(ec, |state| {
             let PublicKeyAggregatorState::GeneratingC5Proof {
@@ -603,24 +708,14 @@ impl PublicKeyAggregator {
                 dkg_node_proofs,
                 honest_party_ids,
                 dishonest_parties,
-                mut cross_node_fold,
+                dkg_aggregation_correlation: _,
+                dkg_aggregated_proof,
                 c5_proof_pending,
                 last_ec,
             } = state
             else {
                 return Ok(state);
             };
-            if cross_node_fold.needs_restart() {
-                warn!("cross-node fold stuck mid-step on restart — resetting and re-folding from persisted proofs");
-                cross_node_fold = ProofFoldState::new(self.params_preset);
-            }
-            cross_node_fold.start(
-                proofs,
-                "PublicKeyAggregator cross-node DKG fold",
-                &self.bus,
-                &self.e3_id,
-                ec,
-            )?;
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
                 keyshare_bytes,
@@ -628,21 +723,33 @@ impl PublicKeyAggregator {
                 dkg_node_proofs,
                 honest_party_ids,
                 dishonest_parties,
-                cross_node_fold,
+                dkg_aggregation_correlation: Some(corr),
+                dkg_aggregated_proof,
                 c5_proof_pending,
                 last_ec,
             })
         })?;
-        self.try_publish_complete()
+        Ok(())
     }
 
-    /// Publish `PublicKeyAggregated` when both C5 and cross-node fold are complete.
+    /// Publish `PublicKeyAggregated` when C5 (non-ZK recursive) and, if applicable, the EVM DkgAggregator proof are ready (or aggregation skipped).
     fn try_publish_complete(&mut self) -> Result<()> {
+        if let Some(ec) = self.state.get().and_then(|s| {
+            if let PublicKeyAggregatorState::GeneratingC5Proof { last_ec, .. } = &s {
+                last_ec.clone()
+            } else {
+                None
+            }
+        }) {
+            self.try_dispatch_dkg_aggregation(&ec)?;
+        }
+
         let PublicKeyAggregatorState::GeneratingC5Proof {
             public_key,
             nodes,
             c5_proof_pending,
-            cross_node_fold,
+            dkg_aggregated_proof,
+            dkg_aggregation_correlation: _,
             last_ec,
             ..
         } = self
@@ -657,10 +764,6 @@ impl PublicKeyAggregator {
             return Ok(());
         };
 
-        // Cross-node fold result is optional — None when proof aggregation is disabled
-        let dkg_aggregated_proof = cross_node_fold.result.clone();
-
-        // If aggregation is enabled but fold hasn't completed yet, wait
         let all_proofs_are_none = self
             .state
             .get()
@@ -681,8 +784,7 @@ impl PublicKeyAggregator {
             })
             .unwrap_or(false);
 
-        if dkg_aggregated_proof.is_none() && !all_proofs_are_none {
-            // Aggregation is enabled but fold not done yet — wait
+        if !all_proofs_are_none && dkg_aggregated_proof.is_none() {
             return Ok(());
         }
 
@@ -691,7 +793,7 @@ impl PublicKeyAggregator {
             .ok_or_else(|| anyhow::anyhow!("No EventContext for publish"))?;
 
         info!(
-            "C5 proof ready — publishing PublicKeyAggregated (dkg_aggregated_proof={})",
+            "Publishing PublicKeyAggregated (dkg_evm_proof={})",
             if dkg_aggregated_proof.is_some() {
                 "present"
             } else {
@@ -699,16 +801,17 @@ impl PublicKeyAggregator {
             }
         );
 
+        let pk_commitment = extract_pk_commitment(c5_proof)?;
+
         let event = PublicKeyAggregated {
             pubkey: public_key.clone(),
             e3_id: self.e3_id.clone(),
             nodes: nodes.clone(),
-            pk_aggregation_proof: Some(c5_proof.clone()),
-            dkg_aggregated_proof,
+            pk_commitment,
+            dkg_aggregator_proof: dkg_aggregated_proof.clone(),
         };
         self.bus.publish(event, ec.clone())?;
 
-        // Transition to Complete
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::Complete {
                 public_key,
@@ -722,18 +825,19 @@ impl PublicKeyAggregator {
 
     fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
         let (msg, _ec) = msg.into_components();
-        if let ComputeResponseKind::Zk(ZkResponse::FoldProofs(resp)) = msg.response {
+        if let ComputeResponseKind::Zk(ZkResponse::DkgAggregation(resp)) = msg.response {
             if msg.e3_id != self.e3_id {
                 return Ok(());
             }
             let state = self.state.get();
             let Some(PublicKeyAggregatorState::GeneratingC5Proof { last_ec, .. }) = state.as_ref()
             else {
-                // Late response after transitioning out of GeneratingC5Proof — ignore.
                 return Ok(());
             };
-            let Some(ec) = last_ec.clone() else {
-                return Err(anyhow::anyhow!("No EventContext for fold response"));
+            let Some(_ec) = last_ec.clone() else {
+                return Err(anyhow::anyhow!(
+                    "No EventContext for DkgAggregation response"
+                ));
             };
             self.state.try_mutate_without_context(|state| {
                 let PublicKeyAggregatorState::GeneratingC5Proof {
@@ -743,21 +847,28 @@ impl PublicKeyAggregator {
                     dkg_node_proofs,
                     honest_party_ids,
                     dishonest_parties,
-                    mut cross_node_fold,
+                    dkg_aggregation_correlation,
+                    dkg_aggregated_proof,
                     c5_proof_pending,
                     last_ec,
                 } = state
                 else {
                     return Ok(state);
                 };
-                cross_node_fold.handle_response(
-                    &msg.correlation_id,
-                    resp.proof.clone(),
-                    "PublicKeyAggregator cross-node DKG fold",
-                    &self.bus,
-                    &self.e3_id,
-                    &ec,
-                )?;
+                if dkg_aggregation_correlation.as_ref() != Some(&msg.correlation_id) {
+                    return Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                        public_key,
+                        keyshare_bytes,
+                        nodes,
+                        dkg_node_proofs,
+                        honest_party_ids,
+                        dishonest_parties,
+                        dkg_aggregation_correlation,
+                        dkg_aggregated_proof,
+                        c5_proof_pending,
+                        last_ec,
+                    });
+                }
                 Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                     public_key,
                     keyshare_bytes,
@@ -765,7 +876,8 @@ impl PublicKeyAggregator {
                     dkg_node_proofs,
                     honest_party_ids,
                     dishonest_parties,
-                    cross_node_fold,
+                    dkg_aggregation_correlation: None,
+                    dkg_aggregated_proof: Some(resp.proof.clone()),
                     c5_proof_pending,
                     last_ec,
                 })
@@ -798,8 +910,8 @@ impl PublicKeyAggregator {
 
             // Find the expelled node's index in submission_order and remove from
             // all parallel collections so they stay aligned.
-            if let Some(idx) = submission_order.iter().position(|(n, _)| n == &node_str) {
-                let (_, expelled_keyshare) = submission_order.remove(idx);
+            if let Some(idx) = submission_order.iter().position(|(_, n, _)| n == &node_str) {
+                let (_, _, expelled_keyshare) = submission_order.remove(idx);
                 keyshares.remove(&expelled_keyshare);
                 c1_proofs.remove(idx);
             }
@@ -895,10 +1007,17 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
                     // using the c1_proofs now stored in the VerifyingC1 state (already
                     // cleaned of the expelled node's entry).
                     if was_collecting {
-                        if let Some(PublicKeyAggregatorState::VerifyingC1 { c1_proofs, .. }) =
-                            self.state.get()
+                        if let Some(PublicKeyAggregatorState::VerifyingC1 {
+                            submission_order,
+                            c1_proofs,
+                            ..
+                        }) = self.state.get()
                         {
-                            self.dispatch_c1_verification(&c1_proofs, ec.clone())?;
+                            self.dispatch_c1_verification(
+                                &submission_order,
+                                &c1_proofs,
+                                ec.clone(),
+                            )?;
                         }
                     }
                     Ok(())
@@ -922,6 +1041,7 @@ impl Handler<TypedEvent<KeyshareCreated>> for PublicKeyAggregator {
             let e3_id = event.e3_id.clone();
             let pubkey = event.pubkey.clone();
             let node = event.node.clone();
+            let party_id = event.party_id;
             let c1_proof = event.signed_pk_generation_proof.clone();
 
             if e3_id != self.e3_id {
@@ -929,13 +1049,17 @@ impl Handler<TypedEvent<KeyshareCreated>> for PublicKeyAggregator {
                 return Ok(());
             }
 
-            self.add_keyshare(pubkey, node, c1_proof, &ec)?;
+            self.add_keyshare(pubkey, node, party_id, c1_proof, &ec)?;
 
             // If we just transitioned to VerifyingC1, dispatch verification
             // using c1_proofs stored in the new state.
-            if let Some(PublicKeyAggregatorState::VerifyingC1 { c1_proofs, .. }) = self.state.get()
+            if let Some(PublicKeyAggregatorState::VerifyingC1 {
+                submission_order,
+                c1_proofs,
+                ..
+            }) = self.state.get()
             {
-                self.dispatch_c1_verification(&c1_proofs, ec)?;
+                self.dispatch_c1_verification(&submission_order, &c1_proofs, ec)?;
             }
 
             Ok(())
