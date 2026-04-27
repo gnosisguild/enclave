@@ -1152,6 +1152,7 @@ async fn test_trbfv_actor() -> Result<()> {
     };
 
     let pubkey_bytes = pubkey_event.pubkey.clone();
+    let dkg_aggregator_proof = pubkey_event.dkg_aggregator_proof.clone();
 
     let pubkey = PublicKey::from_bytes(&pubkey_bytes, &params_raw)?;
 
@@ -1333,6 +1334,47 @@ async fn test_trbfv_actor() -> Result<()> {
         !decryption_aggregator_proofs.is_empty(),
         "DecryptionAggregator proofs should be present in PlaintextAggregated"
     );
+
+    if let Ok(path) = std::env::var("BENCHMARK_FOLDED_OUTPUT") {
+        if let (Some(dkg_proof), Some(dec_proof)) = (
+            dkg_aggregator_proof.as_ref(),
+            decryption_aggregator_proofs.first(),
+        ) {
+            fn to_hex(bytes: &[u8]) -> String {
+                let mut out = String::from("0x");
+                for b in bytes {
+                    out.push_str(&format!("{:02x}", b));
+                }
+                out
+            }
+            let json = format!(
+                concat!(
+                    "{{\n",
+                    "  \"dkg_aggregator\": {{\n",
+                    "    \"proof_hex\": \"{}\",\n",
+                    "    \"public_inputs_hex\": \"{}\"\n",
+                    "  }},\n",
+                    "  \"decryption_aggregator\": {{\n",
+                    "    \"proof_hex\": \"{}\",\n",
+                    "    \"public_inputs_hex\": \"{}\"\n",
+                    "  }}\n",
+                    "}}\n"
+                ),
+                to_hex(&dkg_proof.data),
+                to_hex(&dkg_proof.public_signals),
+                to_hex(&dec_proof.data),
+                to_hex(&dec_proof.public_signals),
+            );
+            fs::write(&path, json)?;
+            println!("Wrote folded benchmark proofs to {path}");
+        } else {
+            println!(
+                "BENCHMARK_FOLDED_OUTPUT set but folded proofs unavailable (dkg={}, dec={})",
+                dkg_aggregator_proof.is_some(),
+                !decryption_aggregator_proofs.is_empty()
+            );
+        }
+    }
 
     let results = plaintext
         .into_iter()

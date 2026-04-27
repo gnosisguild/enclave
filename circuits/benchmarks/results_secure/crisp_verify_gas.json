@@ -1,0 +1,13 @@
+{
+  "verify_gas": {
+    "dkg": 3037824,
+    "user": 2972929,
+    "dec": 3549028
+  },
+  "source": "crisp_verify_test",
+  "test_exit_code": {
+    "crisp": 0,
+    "folded_export": 0,
+    "enclave_contracts": 0
+  }
+}
