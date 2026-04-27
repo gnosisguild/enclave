@@ -733,7 +733,7 @@ async fn test_threshold_share_decryption_commitment_consistency() {
 
     let expected_d_commitment = compute_threshold_decryption_share_commitment(
         &computation_output.inputs.d_native_trunc,
-        computation_output.bits.d_bit,
+        computation_output.bits.d_native_bit,
         MAX_MSG_NON_ZERO_COEFFS,
     );
 

@@ -495,7 +495,7 @@ impl ThresholdPlaintextAggregator {
         };
 
         // Reuse the same Bounds/Bits computation that C6 codegen uses,
-        // so d_bit stays in sync if the formula ever changes.
+        // so d_native_bit stays in sync if the formula ever changes.
         let Ok(bounds) = C6Bounds::compute(self.params_preset, &()) else {
             warn!("Could not compute bounds for d_commitment check — skipping");
             return mismatched;
@@ -504,7 +504,7 @@ impl ThresholdPlaintextAggregator {
             warn!("Could not compute bits for d_commitment check — skipping");
             return mismatched;
         };
-        let d_bit = bits.d_bit;
+        let d_native_bit = bits.d_native_bit;
 
         let max_k = MAX_MSG_NON_ZERO_COEFFS;
         let c6_output_layout = CircuitName::ThresholdShareDecryption.output_layout();
@@ -558,7 +558,7 @@ impl ThresholdPlaintextAggregator {
 
             // C6 public `d_commitment` hashes native truncated limbs (same layout as C7), not
             // reversed+centered witness `d`.
-            let computed = compute_threshold_decryption_share_commitment(&crt, d_bit, max_k);
+            let computed = compute_threshold_decryption_share_commitment(&crt, d_native_bit, max_k);
 
             // Convert to big-endian 32-byte padded format matching
             // Barretenberg's public_signals encoding.

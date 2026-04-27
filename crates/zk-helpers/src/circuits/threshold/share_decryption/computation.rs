@@ -16,6 +16,7 @@ use crate::circuits::commitments::{
 };
 use crate::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
 use crate::compute_modulus_bit;
+use crate::compute_native_crt_coeff_bit;
 use crate::crt_polynomial_to_toml_json;
 use crate::decompose_residue;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuit;
@@ -105,7 +106,10 @@ pub struct Bits {
     pub e_sm_bit: u32,
     pub r1_bit: u32,
     pub r2_bit: u32,
+    /// Centered `d` coefficient bound (payload flatten / Fiat–Shamir).
     pub d_bit: u32,
+    /// Native \([0, q)\) limb width for `d_native_trunc` / C7 share commitments.
+    pub d_native_bit: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -159,7 +163,7 @@ impl Computation for Bits {
     type Data = Bounds;
     type Error = CircuitsErrors;
 
-    fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         // For r1, use the maximum of all low and up bounds
         let mut r1_bit = 0;
         for bound in data.r1_bounds.iter() {
@@ -172,6 +176,10 @@ impl Computation for Bits {
             r2_bit = r2_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
         }
 
+        let (threshold_params, _) =
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
+        let d_native_bit = compute_native_crt_coeff_bit(threshold_params.moduli());
+
         Ok(Bits {
             ct_bit: r2_bit,
             sk_bit: r2_bit,
@@ -179,6 +187,7 @@ impl Computation for Bits {
             r1_bit,
             r2_bit,
             d_bit: r2_bit,
+            d_native_bit,
         })
     }
 }
@@ -410,6 +419,18 @@ mod tests {
         assert_eq!(bits.d_bit, expected_bit);
     }
 
+    #[test]
+    fn test_d_native_bit_matches_moduli_and_covers_centered_d_bit() {
+        let (threshold_params, _) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
+        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
+        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
+        assert_eq!(
+            bits.d_native_bit,
+            crate::compute_native_crt_coeff_bit(threshold_params.moduli())
+        );
+        assert!(bits.d_native_bit >= bits.d_bit);
+    }
+
     /// `d_commitment` matches C7: hash of native truncated `from_fhe` limbs, via `d_native_trunc`.
     #[test]
     fn test_d_commitment_matches_inputs_compute() {
@@ -430,12 +451,12 @@ mod tests {
         let inputs = Inputs::compute(preset, &sample).unwrap();
         let from_d_native = compute_threshold_decryption_share_commitment(
             &inputs.d_native_trunc,
-            bits.d_bit,
+            bits.d_native_bit,
             MAX_MSG_NON_ZERO_COEFFS,
         );
         let from_raw_share = compute_threshold_decryption_share_commitment(
             &sample.d_share,
-            bits.d_bit,
+            bits.d_native_bit,
             MAX_MSG_NON_ZERO_COEFFS,
         );
         assert_eq!(from_d_native, from_raw_share);
@@ -466,7 +487,7 @@ mod tests {
         let crt_rt = CrtPolynomial::from_fhe_polynomial(&poly_rt);
         let from_bytes = compute_threshold_decryption_share_commitment(
             &crt_rt,
-            bits.d_bit,
+            bits.d_native_bit,
             MAX_MSG_NON_ZERO_COEFFS,
         );
         assert_eq!(from_d_native, from_bytes);

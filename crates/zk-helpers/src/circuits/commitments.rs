@@ -457,14 +457,16 @@ fn truncate_crt_polynomial_to_max_coeffs(crt: &CrtPolynomial, max_len: usize) ->
 
 /// Commitment to a threshold decryption share: all CRT limbs, first `max_k` coefficients
 /// per limb (matches Noir `compute_threshold_decryption_share_commitment`).
+///
+/// `native_coeff_bit` must be the max bit width of coefficients in \([0, q_l)\) per CRT limb.
 pub fn compute_threshold_decryption_share_commitment(
     d_share: &CrtPolynomial,
-    bit_d: u32,
+    native_coeff_bit: u32,
     max_k: usize,
 ) -> BigInt {
     let truncated = truncate_crt_polynomial_to_max_coeffs(d_share, max_k);
     let mut payload = Vec::new();
-    payload = flatten(payload, &truncated.limbs, bit_d);
+    payload = flatten(payload, &truncated.limbs, native_coeff_bit);
 
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];

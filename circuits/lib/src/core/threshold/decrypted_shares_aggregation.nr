@@ -35,7 +35,7 @@ impl<let L: u32> Configs<L> {
 /// **Consumes:** C6 `d` commitments for each reconstructing party (same order as shares).
 ///
 /// **Verifies:** Share binding to C6; Lagrange combine per limb; CRT glue; decode mod `t`.
-pub struct DecryptedSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32, let BIT_D: u32> {
+pub struct DecryptedSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32, let BIT_D_NATIVE: u32> {
     /// Circuit parameters including crypto constants
     configs: Configs<L>,
 
@@ -59,7 +59,7 @@ pub struct DecryptedSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u
     crt_quotients: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
 }
 
-impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32, let BIT_D: u32> DecryptedSharesAggregation<MAX_MSG_NON_ZERO_COEFFS, L, T, BIT_NOISE, BIT_D> {
+impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u32, let BIT_D_NATIVE: u32> DecryptedSharesAggregation<MAX_MSG_NON_ZERO_COEFFS, L, T, BIT_NOISE, BIT_D_NATIVE> {
     pub fn new(
         configs: Configs<L>,
         expected_d_commitments: [Field; T + 1],
@@ -83,7 +83,7 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u3
     /// Run all checks (no return value; asserts hold or the proof fails).
     pub fn execute(self) {
         for party_idx in 0..(T + 1) {
-            let computed = compute_threshold_decryption_share_commitment::<MAX_MSG_NON_ZERO_COEFFS, L, BIT_D>(
+            let computed = compute_threshold_decryption_share_commitment::<MAX_MSG_NON_ZERO_COEFFS, L, BIT_D_NATIVE>(
                 self.decryption_shares[party_idx],
             );
             assert(computed == self.expected_d_commitments[party_idx], "d commitment mismatch");

@@ -209,10 +209,13 @@ pub fn compute_aggregated_shares_commitment<let N: u32, let L: u32, let BIT_MSG:
 
 /// Commitment to a threshold decryption share: all CRT limbs, first `K` coefficients per limb
 /// (same layout as `Polynomial<K>` in decrypted_shares_aggregation).
-pub fn compute_threshold_decryption_share_commitment<let K: u32, let L: u32, let BIT_D: u32>(
+///
+/// `NATIVE_BIT_WIDTH` must cover native coefficients in \([0, q_l)\) per limb (not centered `d` bounds).
+pub fn compute_threshold_decryption_share_commitment<let K: u32, let L: u32, let NATIVE_BIT_WIDTH: u32>(
     d_share_limbs: [Polynomial<K>; L],
 ) -> Field {
-    let mut payload = multiple_polynomial_payload::<K, L, BIT_D>(Vec::new(), d_share_limbs);
+    let mut payload =
+        multiple_polynomial_payload::<K, L, NATIVE_BIT_WIDTH>(Vec::new(), d_share_limbs);
     compute_commitment(payload, DS_THRESHOLD_DECRYPTION_SHARE)
 }
 
