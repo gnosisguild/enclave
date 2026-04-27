@@ -361,8 +361,8 @@ fn verify_pk_generation_bounds() {
         // r2_bounds[i] = (q_i - 1) / 2
         assert(PK_GENERATION_R2_BOUNDS[i] as u128 == qi_bound, "PK_GENERATION_R2_BOUNDS mismatch");
 
-        // r1_bounds[i] = ((n * eek_bound + 2) * qi_bound + eek_bound) / q_i
-        let expected_r1: u128 = ((n * eek + 2) * qi_bound + eek) / qi;
+        // r1_bounds[i] = ((n + 2) * qi_bound + eek_bound) / q_i
+        let expected_r1: u128 = ((n + 2) * qi_bound + eek) / qi;
         assert(
             PK_GENERATION_R1_BOUNDS[i] as u128 == expected_r1,
             "PK_GENERATION_R1_BOUNDS mismatch",
@@ -393,11 +393,11 @@ fn verify_e_sm_bound() {
     // b_c = N_CIPHERTEXTS * (b_fresh + Q_MOD_T)
     let b_c = num_ciphertexts * (b_fresh + THRESHOLD_Q_MOD_T);
 
-    // 2^80
-    let two_pow_80: Field = 0x100000000000000000000;
+    // 2^60
+    let two_pow_60: Field = 0x1000000000000000;
 
-    // e_sm_bound = 2^80 * b_c
-    let expected_e_sm_bound = two_pow_80 * b_c;
+    // e_sm_bound = 2^60 * b_c
+    let expected_e_sm_bound = two_pow_60 * b_c;
 
     assert(expected_e_sm_bound == PK_GENERATION_E_SM_BOUND, "PK_GENERATION_E_SM_BOUND mismatch");
 }
@@ -418,8 +418,8 @@ fn verify_share_decryption_bounds() {
             "SHARE_DECRYPTION_R2_BOUNDS mismatch",
         );
 
-        // r1_bounds[i] = (qi_bound * (qi_bound * n + 3) - qi_bound) / q_i
-        let expected_r1: u128 = (qi_bound * (qi_bound * n + 3) - qi_bound) / qi;
+        // r1_bounds[i] = (((q_j-1)/2)^2 * n + 4 * (q_j-1)/2) / q_j
+        let expected_r1: u128 = (qi_bound * qi_bound * n + 4 * qi_bound) / qi;
         assert(
             THRESHOLD_SHARE_DECRYPTION_R1_BOUNDS[i] as u128 == expected_r1,
             "SHARE_DECRYPTION_R1_BOUNDS mismatch",

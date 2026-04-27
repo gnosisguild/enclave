@@ -15,8 +15,8 @@ use crate::math::polynomial::Polynomial;
 /// Threshold BFV parameter set search defaults configurations.
 /// These are for the SecureThreshold8192 preset.
 /// The InsecureThreshold512 preset has been generated manually.
-pub global PARAMS_SEARCH_N: Field = 100;
-pub global PARAMS_SEARCH_Z: Field = 100;
+pub global PARAMS_SEARCH_N: Field = 7;
+pub global PARAMS_SEARCH_Z: Field = 1024;
 
 // Global configs for threshold secure preset
 pub global N: u32 = 8192;
