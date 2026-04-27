@@ -23,7 +23,7 @@ import {
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
   Enclave__factory as EnclaveFactory,
 } from "../../types";
-import { encodePkProof, setupOperatorForSortition } from "../fixtures";
+import { setupOperatorForSortition } from "../fixtures";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -33,7 +33,6 @@ const { loadFixture } = networkHelpers;
 
 const data = "0xda7a";
 const dataHash = ethers.id(data);
-const c5Proof = encodePkProof(dataHash);
 const SORTITION_SUBMISSION_WINDOW = 3;
 
 describe("CiphernodeRegistryOwnable", function () {
@@ -435,7 +434,7 @@ describe("CiphernodeRegistryOwnable", function () {
               await operator3.getAddress(),
             ],
             data,
-            c5Proof,
+            dataHash,
             "0x",
           ),
       )
@@ -448,7 +447,8 @@ describe("CiphernodeRegistryOwnable", function () {
             await operator3.getAddress(),
           ],
           data,
-          c5Proof,
+          dataHash,
+          "0x",
         );
     });
     it("stores the public key of the committee", async function () {
@@ -482,7 +482,7 @@ describe("CiphernodeRegistryOwnable", function () {
           await operator3.getAddress(),
         ],
         data,
-        c5Proof,
+        dataHash,
         "0x",
       );
       expect(await registry.committeePublicKey(0)).to.equal(dataHash);
@@ -520,7 +520,7 @@ describe("CiphernodeRegistryOwnable", function () {
             await operator3.getAddress(),
           ],
           data,
-          c5Proof,
+          dataHash,
           "0x",
         ),
       )
@@ -533,7 +533,8 @@ describe("CiphernodeRegistryOwnable", function () {
             await operator3.getAddress(),
           ],
           data,
-          c5Proof,
+          dataHash,
+          "0x",
         );
     });
   });
@@ -701,7 +702,7 @@ describe("CiphernodeRegistryOwnable", function () {
           await operator3.getAddress(),
         ],
         data,
-        c5Proof,
+        dataHash,
         "0x",
       );
       expect(await registry.committeePublicKey(e3Id)).to.equal(dataHash);

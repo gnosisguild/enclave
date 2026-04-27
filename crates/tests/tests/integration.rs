@@ -85,19 +85,53 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
             .join("bin");
         let dkg_target = circuits_build_root.join("dkg").join("target");
         let threshold_target = circuits_build_root.join("threshold").join("target");
-        let wrapper_dkg_target = circuits_build_root
+        let c3_fold_target = circuits_build_root
             .join("recursive_aggregation")
-            .join("wrapper")
-            .join("dkg")
+            .join("c3_fold")
             .join("target");
-        let wrapper_threshold_target = circuits_build_root
+        let c3_fold_kernel_target = circuits_build_root
             .join("recursive_aggregation")
-            .join("wrapper")
-            .join("threshold")
+            .join("c3_fold_kernel")
             .join("target");
-        let fold_target = circuits_build_root
+        let c6_fold_target = circuits_build_root
             .join("recursive_aggregation")
-            .join("fold")
+            .join("c6_fold")
+            .join("target");
+        let c6_fold_kernel_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("c6_fold_kernel")
+            .join("target");
+        let c2ab_fold_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("c2ab_fold")
+            .join("target");
+        let c3ab_fold_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("c3ab_fold")
+            .join("target");
+        let c4ab_fold_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("c4ab_fold")
+            .join("target");
+        let node_fold_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("node_fold")
+            .join("target");
+        let nodes_fold_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("nodes_fold")
+            .join("target");
+        let nodes_fold_kernel_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("nodes_fold_kernel")
+            .join("target");
+        let dkg_aggregator_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("dkg_aggregator")
+            .join("target");
+        let decryption_aggregator_target = circuits_build_root
+            .join("recursive_aggregation")
+            .join("decryption_aggregator")
             .join("target");
 
         // Helper: copy {name}.json + VK artifacts into a destination directory.
@@ -221,99 +255,146 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
         )
         .await;
 
-        // ── default/ variant (wrapper & fold proofs, uses .vk_recursive) ───
+        // ── default/ variant (recursive aggregation bins, uses .vk_recursive) ───
 
         let dv = preset_dir.join("default");
 
-        // DKG wrapper circuits
-        let dkg_wrapper_base = dv.join("recursive_aggregation/wrapper/dkg");
+        // C5 (pk_aggregation) — proven with noir-recursive-no-zk and folded into
+        // DkgAggregator, so it must be staged under default/ too.
         copy_circuit(
-            &wrapper_dkg_target,
-            &dkg_wrapper_base.join("pk"),
-            "pk",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &wrapper_dkg_target,
-            &dkg_wrapper_base.join("share_computation"),
-            "share_computation",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &wrapper_dkg_target,
-            &dkg_wrapper_base.join("share_encryption"),
-            "share_encryption",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &wrapper_dkg_target,
-            &dkg_wrapper_base.join("share_decryption"),
-            "share_decryption",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-
-        // Threshold wrapper circuits
-        let threshold_wrapper_base = dv.join("recursive_aggregation/wrapper/threshold");
-        copy_circuit(
-            &wrapper_threshold_target,
-            &threshold_wrapper_base.join("pk_generation"),
-            "pk_generation",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &wrapper_threshold_target,
-            &threshold_wrapper_base.join("pk_aggregation"),
+            &threshold_target,
+            &dv.join("threshold/pk_aggregation"),
             "pk_aggregation",
             ".vk_recursive",
             ".vk_recursive_hash",
         )
         .await;
+
         copy_circuit(
-            &wrapper_threshold_target,
-            &threshold_wrapper_base.join("share_decryption"),
-            "share_decryption",
+            &c3_fold_target,
+            &dv.join("recursive_aggregation/c3_fold"),
+            "c3_fold",
             ".vk_recursive",
             ".vk_recursive_hash",
         )
         .await;
         copy_circuit(
-            &wrapper_threshold_target,
-            &threshold_wrapper_base.join("decrypted_shares_aggregation"),
+            &c3_fold_kernel_target,
+            &dv.join("recursive_aggregation/c3_fold_kernel"),
+            "c3_fold_kernel",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &c6_fold_target,
+            &dv.join("recursive_aggregation/c6_fold"),
+            "c6_fold",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &c6_fold_kernel_target,
+            &dv.join("recursive_aggregation/c6_fold_kernel"),
+            "c6_fold_kernel",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &c2ab_fold_target,
+            &dv.join("recursive_aggregation/c2ab_fold"),
+            "c2ab_fold",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &c3ab_fold_target,
+            &dv.join("recursive_aggregation/c3ab_fold"),
+            "c3ab_fold",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &c4ab_fold_target,
+            &dv.join("recursive_aggregation/c4ab_fold"),
+            "c4ab_fold",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &node_fold_target,
+            &dv.join("recursive_aggregation/node_fold"),
+            "node_fold",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &nodes_fold_target,
+            &dv.join("recursive_aggregation/nodes_fold"),
+            "nodes_fold",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &nodes_fold_kernel_target,
+            &dv.join("recursive_aggregation/nodes_fold_kernel"),
+            "nodes_fold_kernel",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &dkg_aggregator_target,
+            &dv.join("recursive_aggregation/dkg_aggregator"),
+            "dkg_aggregator",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        copy_circuit(
+            &decryption_aggregator_target,
+            &dv.join("recursive_aggregation/decryption_aggregator"),
+            "decryption_aggregator",
+            ".vk_recursive",
+            ".vk_recursive_hash",
+        )
+        .await;
+        // C7 (decrypted_shares_aggregation) — proven with noir-recursive-no-zk and
+        // folded into DecryptionAggregator, so it must also be staged under default/.
+        copy_circuit(
+            &threshold_target,
+            &dv.join("threshold/decrypted_shares_aggregation"),
             "decrypted_shares_aggregation",
             ".vk_recursive",
             ".vk_recursive_hash",
         )
         .await;
 
-        // Fold circuit (default variant)
-        copy_circuit(
-            &fold_target,
-            &dv.join("recursive_aggregation/fold"),
-            "fold",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-
-        // ── evm/ variant (on-chain verification: C5, C7, fold) ───────────
+        // ── evm/ variant (on-chain verification: DKG aggregator, C7) ───────────
 
         let ev = preset_dir.join("evm");
 
-        // C5 (pk_aggregation) — EVM-targeted
+        // DKG aggregator — EVM-targeted (folds + C5 verified inside)
         copy_circuit(
-            &threshold_target,
-            &ev.join("threshold/pk_aggregation"),
-            "pk_aggregation",
+            &dkg_aggregator_target,
+            &ev.join("recursive_aggregation/dkg_aggregator"),
+            "dkg_aggregator",
+            ".vk",
+            ".vk_hash",
+        )
+        .await;
+        // Decryption aggregator — EVM-targeted (C6 fold + C7 verified inside)
+        copy_circuit(
+            &decryption_aggregator_target,
+            &ev.join("recursive_aggregation/decryption_aggregator"),
+            "decryption_aggregator",
             ".vk",
             ".vk_hash",
         )
@@ -323,15 +404,6 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
             &threshold_target,
             &ev.join("threshold/decrypted_shares_aggregation"),
             "decrypted_shares_aggregation",
-            ".vk",
-            ".vk_hash",
-        )
-        .await;
-        // Fold circuit — final EVM fold
-        copy_circuit(
-            &fold_target,
-            &ev.join("recursive_aggregation/fold"),
-            "fold",
             ".vk",
             ".vk_hash",
         )
@@ -593,7 +665,9 @@ fn plaintext_aggregator_marker(data: &EnclaveEventData, e3_id: &E3id) -> Option<
                     ComputeRequestKind::Zk(ZkRequest::VerifyShareProofs(_))
                         | ComputeRequestKind::TrBFV(TrBFVRequest::CalculateThresholdDecryption(_))
                         | ComputeRequestKind::Zk(ZkRequest::DecryptedSharesAggregation(_))
-                        | ComputeRequestKind::Zk(ZkRequest::FoldProofs { .. })
+                        | ComputeRequestKind::Zk(ZkRequest::NodeDkgFold { .. })
+                        | ComputeRequestKind::Zk(ZkRequest::DkgAggregation { .. })
+                        | ComputeRequestKind::Zk(ZkRequest::DecryptionAggregation { .. })
                 ) =>
         {
             Some("ComputeRequest")
@@ -607,7 +681,9 @@ fn plaintext_aggregator_marker(data: &EnclaveEventData, e3_id: &E3id) -> Option<
                             _
                         ))
                         | ComputeResponseKind::Zk(ZkResponse::DecryptedSharesAggregation(_))
-                        | ComputeResponseKind::Zk(ZkResponse::FoldProofs(_))
+                        | ComputeResponseKind::Zk(ZkResponse::NodeDkgFold(_))
+                        | ComputeResponseKind::Zk(ZkResponse::DkgAggregation(_))
+                        | ComputeResponseKind::Zk(ZkResponse::DecryptionAggregation(_))
                 ) =>
         {
             Some("ComputeResponse")
@@ -880,7 +956,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // Trigger actor DKG
     let e3_id = E3id::new("0", 1);
 
-    let proof_aggregation_enabled = false;
+    let proof_aggregation_enabled = true;
 
     let e3_requested = E3Requested {
         e3_id: e3_id.clone(),
@@ -968,14 +1044,40 @@ async fn test_trbfv_actor() -> Result<()> {
         expected_events.extend_from_slice(&KS3);
     }
     expected_events.push("PublicKeyAggregated");
-    let h = expect_node_events_with_timeouts(
-        &nodes,
-        0,
-        &expected_events,
-        Duration::from_secs(5000),
-        Duration::from_secs(5000),
-    )
-    .await?;
+    // KeyshareCreated and DKGRecursiveAggregationComplete are gossiped independently
+    // by different committee members, so at a non-committee observer they can interleave
+    // in any order. Assert the multiset matches and the boundary events are in place,
+    // rather than a strict sequence.
+    let h = nodes
+        .take_history_with_timeouts(
+            0,
+            expected_events.len(),
+            Some(Duration::from_secs(5000)),
+            Some(Duration::from_secs(5000)),
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("FAILURE on node 0: {expected_events:?} : {e}"))?;
+    let actual_types = h.event_types();
+    println!("node 0 >> {:?} =~ {:?}", actual_types, expected_events);
+    let mut actual_sorted = actual_types.clone();
+    let mut expected_sorted: Vec<String> =
+        expected_events.iter().map(|s| (*s).to_string()).collect();
+    actual_sorted.sort();
+    expected_sorted.sort();
+    assert_eq!(
+        actual_sorted, expected_sorted,
+        "node 0 event multiset mismatch"
+    );
+    assert_eq!(
+        actual_types.first().map(String::as_str),
+        Some("AggregatorChanged"),
+        "node 0: first event must be AggregatorChanged"
+    );
+    assert_eq!(
+        actual_types.last().map(String::as_str),
+        Some("PublicKeyAggregated"),
+        "node 0: last event must be PublicKeyAggregated"
+    );
 
     let active_aggregator_history = nodes.get_history(active_aggregator_index).await?;
     let active_aggregator_pubkey_history_len = active_aggregator_history.len();
@@ -999,12 +1101,31 @@ async fn test_trbfv_actor() -> Result<()> {
     // The active aggregator is also a selected committee member, so its node history contains
     // local ThresholdKeyshare DKG work in addition to the public-key aggregation stage. Project
     // only the deterministic pubkey-aggregation signals instead of comparing the whole raw node bus.
+    //
+    // KeyshareCreated and DKGRecursiveAggregationComplete events are produced independently
+    // by each committee member and gossiped in parallel with the active aggregator's own
+    // C1→C5 verification flow, so their positions relative to the C1→C5 sub-sequence are
+    // non-deterministic. Compare as a multiset plus boundary events rather than strict order.
     let active_aggregator_pubkey_events = project_history(&active_aggregator_history, |data| {
         publickey_aggregator_marker(data, &e3_id)
     });
+    let mut actual_sorted = active_aggregator_pubkey_events.clone();
+    let mut expected_sorted = expected_active_aggregator_pubkey_events.clone();
+    actual_sorted.sort();
+    expected_sorted.sort();
     assert_eq!(
-        active_aggregator_pubkey_events, expected_active_aggregator_pubkey_events,
-        "Unexpected active aggregator public-key flow"
+        actual_sorted, expected_sorted,
+        "Active aggregator public-key flow: event multiset mismatch"
+    );
+    assert_eq!(
+        active_aggregator_pubkey_events.first().copied(),
+        Some("CommitteeFinalized"),
+        "Active aggregator: first event must be CommitteeFinalized"
+    );
+    assert_eq!(
+        active_aggregator_pubkey_events.last().copied(),
+        Some("PublicKeyAggregated"),
+        "Active aggregator: last event must be PublicKeyAggregated"
     );
 
     report.push((
@@ -1123,97 +1244,80 @@ async fn test_trbfv_actor() -> Result<()> {
     );
 
     let completion_events = &active_aggregator_plaintext_events[C6_VERIFY_PREFIX.len()..];
-    let c6_proof_count = threshold_n as usize * num_votes_per_voter;
-    let c6_fold_steps = if proof_aggregation_enabled {
-        c6_proof_count.saturating_sub(1)
-    } else {
-        0
-    };
 
+    let mut expected_plaintext_completion = vec![
+        "ComputeRequest",
+        "ComputeResponse",
+        "AggregationProofPending",
+        "ComputeRequest",
+        "ComputeResponse",
+        "AggregationProofSigned",
+    ];
     if proof_aggregation_enabled {
-        let aggregation_pending_index = completion_events
-            .iter()
-            .position(|event| *event == "AggregationProofPending")
-            .expect("AggregationProofPending should be present");
-        let aggregation_signed_index = completion_events
-            .iter()
-            .position(|event| *event == "AggregationProofSigned")
-            .expect("AggregationProofSigned should be present");
-        let plaintext_aggregated_index = completion_events
-            .iter()
-            .position(|event| *event == "PlaintextAggregated")
-            .expect("PlaintextAggregated should be present");
-
-        assert_eq!(
-            completion_events.len(),
-            7 + (2 * c6_fold_steps),
-            "Unexpected active aggregator C6/C7 completion event count"
-        );
-        assert_eq!(
-            &completion_events[..2],
-            ["ComputeRequest", "ComputeRequest"]
-        );
-        assert_eq!(
-            count_projected_events(completion_events, "ComputeRequest"),
-            2 + c6_fold_steps
-        );
-        assert_eq!(
-            count_projected_events(completion_events, "ComputeResponse"),
-            2 + c6_fold_steps
-        );
-        assert_eq!(
-            count_projected_events(completion_events, "AggregationProofPending"),
-            1
-        );
-        assert_eq!(
-            count_projected_events(completion_events, "AggregationProofSigned"),
-            1
-        );
-        assert_eq!(
-            count_projected_events(completion_events, "PlaintextAggregated"),
-            1
-        );
-        assert!(
-            aggregation_pending_index < aggregation_signed_index,
-            "AggregationProofPending must precede AggregationProofSigned"
-        );
-        assert_eq!(
-            plaintext_aggregated_index,
-            completion_events.len() - 1,
-            "PlaintextAggregated must be the last active aggregator completion event"
-        );
-    } else {
-        assert_eq!(
-            completion_events,
-            [
-                "ComputeRequest",
-                "ComputeResponse",
-                "AggregationProofPending",
-                "ComputeRequest",
-                "ComputeResponse",
-                "AggregationProofSigned",
-                "PlaintextAggregated",
-            ],
-            "Unexpected active aggregator plaintext completion flow"
-        );
+        // `DecryptionAggregation`: one compute pair (C6 fold + C7 checked inside the worker).
+        expected_plaintext_completion.push("ComputeRequest");
+        expected_plaintext_completion.push("ComputeResponse");
     }
+    expected_plaintext_completion.push("PlaintextAggregated");
+
+    assert_eq!(
+        completion_events,
+        expected_plaintext_completion.as_slice(),
+        "Unexpected active aggregator plaintext completion flow"
+    );
+    assert_eq!(
+        count_projected_events(completion_events, "AggregationProofPending"),
+        1
+    );
+    assert_eq!(
+        count_projected_events(completion_events, "AggregationProofSigned"),
+        1
+    );
+    assert_eq!(
+        count_projected_events(completion_events, "PlaintextAggregated"),
+        1
+    );
+    let aggregation_pending_index = completion_events
+        .iter()
+        .position(|event| *event == "AggregationProofPending")
+        .expect("AggregationProofPending should be present");
+    let aggregation_signed_index = completion_events
+        .iter()
+        .position(|event| *event == "AggregationProofSigned")
+        .expect("AggregationProofSigned should be present");
+    let plaintext_aggregated_index = completion_events
+        .iter()
+        .position(|event| *event == "PlaintextAggregated")
+        .expect("PlaintextAggregated should be present");
+    assert!(
+        aggregation_pending_index < aggregation_signed_index,
+        "AggregationProofPending must precede AggregationProofSigned"
+    );
+    assert_eq!(
+        plaintext_aggregated_index,
+        completion_events.len() - 1,
+        "PlaintextAggregated must be the last active aggregator completion event"
+    );
 
     report.push((
         "Ciphertext published -> PlaintextAggregated",
         publishing_ct_timer.elapsed(),
     ));
 
-    let (plaintext, aggregation_proofs) = h
+    let (plaintext, decryption_aggregator_proofs) = h
         .iter()
         .rev()
         .find_map(|e| {
             if let EnclaveEventData::PlaintextAggregated(PlaintextAggregated {
                 decrypted_output,
-                aggregation_proofs,
+                decryption_aggregator_proofs,
                 ..
             }) = e.get_data()
             {
-                Some((decrypted_output.clone(), aggregation_proofs.clone()))
+                Some((
+                    decrypted_output.clone(),
+                    decryption_aggregator_proofs.clone(),
+                ))
             } else {
                 None
             }
@@ -1226,8 +1330,8 @@ async fn test_trbfv_actor() -> Result<()> {
         })?;
 
     assert!(
-        !aggregation_proofs.is_empty(),
-        "C7 proofs should be present in PlaintextAggregated"
+        !decryption_aggregator_proofs.is_empty(),
+        "DecryptionAggregator proofs should be present in PlaintextAggregated"
     );
 
     let results = plaintext
@@ -1318,15 +1422,13 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     let evt_1 = PlaintextAggregated {
         e3_id: E3id::new("1235", 1),
         decrypted_output: vec![ArcBytes::from_bytes(&[1, 2, 3, 4])],
-        aggregation_proofs: vec![],
-        c6_aggregated_proof: None,
+        decryption_aggregator_proofs: vec![],
     };
 
     let evt_2 = PlaintextAggregated {
         e3_id: E3id::new("1236", 1),
         decrypted_output: vec![ArcBytes::from_bytes(&[1, 2, 3, 4])],
-        aggregation_proofs: vec![],
-        c6_aggregated_proof: None,
+        decryption_aggregator_proofs: vec![],
     };
 
     let local_evt_3 = CiphernodeSelected {
@@ -1775,14 +1877,18 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         .send(TakeEvents::<e3_events::EnclaveEvent>::new(28))
         .await?;
 
+    let actual_pk_commitment_1 = match history.events.last().cloned().unwrap().into_data() {
+        e3_events::EnclaveEventData::PublicKeyAggregated(ev) => ev.pk_commitment,
+        other => panic!("expected PublicKeyAggregated, got {other:?}"),
+    };
     assert_eq!(
         history.events.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
             pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
             e3_id: E3id::new("1234", 1),
             nodes: OrderedSet::from(eth_addrs.clone()),
-            pk_aggregation_proof: None,
-            dkg_aggregated_proof: None,
+            pk_commitment: actual_pk_commitment_1,
+            dkg_aggregator_proof: None,
         }
         .into()
     );
@@ -1812,14 +1918,18 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         .send(TakeEvents::<e3_events::EnclaveEvent>::new(8))
         .await?;
 
+    let actual_pk_commitment_2 = match history.events.last().cloned().unwrap().into_data() {
+        e3_events::EnclaveEventData::PublicKeyAggregated(ev) => ev.pk_commitment,
+        other => panic!("expected PublicKeyAggregated, got {other:?}"),
+    };
     assert_eq!(
         history.events.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
             pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
             e3_id: E3id::new("1234", 2),
             nodes: OrderedSet::from(eth_addrs.clone()),
-            pk_aggregation_proof: None,
-            dkg_aggregated_proof: None,
+            pk_commitment: actual_pk_commitment_2,
+            dkg_aggregator_proof: None,
         }
         .into()
     );

@@ -5,21 +5,12 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-import recursiveAggregationFoldVerifierModule from "./recursiveAggregationFoldVerifier";
-import thresholdPkAggregationVerifierModule from "./thresholdPkAggregationVerifier";
+import dkgAggregatorVerifierModule from "./dkgAggregatorVerifier";
 
 export default buildModule("BfvPkVerifier", (m) => {
-  const { thresholdPkAggregationVerifier } = m.useModule(
-    thresholdPkAggregationVerifierModule,
-  );
-  const { recursiveAggregationFoldVerifier } = m.useModule(
-    recursiveAggregationFoldVerifierModule,
-  );
+  const { dkgAggregatorVerifier } = m.useModule(dkgAggregatorVerifierModule);
 
-  const bfvPkVerifier = m.contract("BfvPkVerifier", [
-    thresholdPkAggregationVerifier,
-    recursiveAggregationFoldVerifier,
-  ]);
+  const bfvPkVerifier = m.contract("BfvPkVerifier", [dkgAggregatorVerifier]);
 
   return { bfvPkVerifier };
 }) as any;

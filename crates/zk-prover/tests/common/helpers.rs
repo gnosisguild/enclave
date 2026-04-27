@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use e3_config::BBPath;
+use e3_events::CircuitName;
 pub use e3_test_helpers::{find_anvil, find_bb};
 use e3_zk_prover::{ZkBackend, ZkConfig};
 use std::{env, path::PathBuf};
@@ -119,6 +120,70 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
         )
         .await
         .unwrap();
+    }
+}
+
+/// Stages a `recursive_aggregation/*` fold binary for [`CircuitVariant::Default`] (`noir-recursive-no-zk`).
+///
+/// `pnpm build:circuits` writes `{package}.vk_recursive` (+ `_hash`) under `circuits/bin/recursive_aggregation/<name>/target/`.
+/// [`CircuitName::DkgAggregator`] also gets `{package}.vk` / `.vk_hash` (`bb write_vk -t evm`); when present, they are
+/// copied into `insecure-512/evm/...` for [`CircuitVariant::Evm`] proving.
+pub async fn setup_recursive_aggregation_fold_circuit(backend: &ZkBackend, circuit: CircuitName) {
+    let pkg = circuit.as_str();
+    let target_dir = circuits_build_root()
+        .join("recursive_aggregation")
+        .join(pkg)
+        .join("target");
+
+    let json_path = target_dir.join(format!("{pkg}.json"));
+    let vk_recursive_path = target_dir.join(format!("{pkg}.vk_recursive"));
+    let vk_recursive_hash_path = target_dir.join(format!("{pkg}.vk_recursive_hash"));
+    let vk_evm_path = target_dir.join(format!("{pkg}.vk"));
+    let vk_evm_hash_path = target_dir.join(format!("{pkg}.vk_hash"));
+
+    assert!(
+        json_path.exists(),
+        "compiled fold circuit JSON not found: {} (run `pnpm build:circuits --group recursive_aggregation`)",
+        json_path.display()
+    );
+    assert!(
+        vk_recursive_path.exists(),
+        "noir-recursive-no-zk VK not found: {} (aggregation circuits only emit `.vk_recursive`; run `pnpm build:circuits`)",
+        vk_recursive_path.display()
+    );
+
+    let preset_dir = backend.circuits_dir.join("insecure-512");
+    let default_dir = preset_dir.join("default").join(circuit.group()).join(pkg);
+    fs::create_dir_all(&default_dir).await.unwrap();
+    fs::copy(&json_path, default_dir.join(format!("{pkg}.json")))
+        .await
+        .unwrap();
+    fs::copy(&vk_recursive_path, default_dir.join(format!("{pkg}.vk")))
+        .await
+        .unwrap();
+    if vk_recursive_hash_path.exists() {
+        fs::copy(
+            &vk_recursive_hash_path,
+            default_dir.join(format!("{pkg}.vk_hash")),
+        )
+        .await
+        .unwrap();
+    }
+
+    if vk_evm_path.exists() {
+        let evm_dir = preset_dir.join("evm").join(circuit.group()).join(pkg);
+        fs::create_dir_all(&evm_dir).await.unwrap();
+        fs::copy(&json_path, evm_dir.join(format!("{pkg}.json")))
+            .await
+            .unwrap();
+        fs::copy(&vk_evm_path, evm_dir.join(format!("{pkg}.vk")))
+            .await
+            .unwrap();
+        if vk_evm_hash_path.exists() {
+            fs::copy(&vk_evm_hash_path, evm_dir.join(format!("{pkg}.vk_hash")))
+                .await
+                .unwrap();
+        }
     }
 }
 

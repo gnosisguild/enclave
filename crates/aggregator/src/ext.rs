@@ -213,6 +213,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                             sortition: self.sortition.clone(),
                             e3_id: e3_id.clone(),
                             params_preset: meta.params_preset,
+                            proof_aggregation_enabled: meta.proof_aggregation_enabled,
                         },
                         sync_state,
                     )
@@ -252,6 +253,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
                 params_preset: meta.params_preset,
+                proof_aggregation_enabled: meta.proof_aggregation_enabled,
             },
             sync_state,
         )

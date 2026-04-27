@@ -7,19 +7,18 @@ pragma solidity >=0.8.27;
 
 /**
  * @title IDecryptionVerifier
- * @notice Interface for verifying decrypted computation outputs
- * @dev Implements cryptographic verification of plaintext outputs from encrypted computations
+ * @notice Interface for the DecryptionAggregator (EVM) proof verifier.
+ * @dev The DecryptionAggregator circuit internally verifies the C6-fold and C7
+ *      (decrypted_shares_aggregation) sub-proofs; this on-chain verifier only
+ *      needs to verify the final EVM proof and bind it to the claimed plaintext.
  */
 interface IDecryptionVerifier {
-    /// @notice Verify the decryption of a computation output
-    /// @dev This function is called by the Enclave contract when plaintext output is published
-    /// @param plaintextOutputHash The keccak256 hash of the plaintext output to be verified
-    /// @param proof ABI-encoded (bytes, bytes32[]) for C7.
-    /// @param foldProof ABI-encoded fold proof (bytes, bytes32[]) or empty to skip.
-    /// @return success Whether the plaintextOutputHash was successfully verified
+    /// @notice Verify a DecryptionAggregator EVM proof and bind it to `plaintextOutputHash`.
+    /// @param plaintextOutputHash `keccak256(plaintextOutput)` expected by the Enclave.
+    /// @param proof ABI-encoded `(bytes rawProof, bytes32[] publicInputs)`.
+    /// @return success True if the proof is valid and its embedded plaintext matches `plaintextOutputHash`.
     function verify(
         bytes32 plaintextOutputHash,
-        bytes memory proof,
-        bytes memory foldProof
+        bytes calldata proof
     ) external view returns (bool success);
 }

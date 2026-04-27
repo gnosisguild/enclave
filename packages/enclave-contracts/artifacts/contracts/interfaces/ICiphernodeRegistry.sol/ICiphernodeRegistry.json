@@ -336,6 +336,12 @@
         },
         {
           "indexed": false,
+          "internalType": "bytes32",
+          "name": "pkCommitment",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
           "internalType": "bytes",
           "name": "proof",
           "type": "bytes"
@@ -786,13 +792,13 @@
           "type": "bytes"
         },
         {
-          "internalType": "bytes",
-          "name": "proof",
-          "type": "bytes"
+          "internalType": "bytes32",
+          "name": "pkCommitment",
+          "type": "bytes32"
         },
         {
           "internalType": "bytes",
-          "name": "foldProof",
+          "name": "proof",
           "type": "bytes"
         }
       ],
@@ -965,5 +971,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-a5591f76a7a8353e3d0dd83e83c16479678f73a9"
+  "buildInfoId": "solc-0_8_28-64228f31c3990e4616cf0578598d186612e83409"
 }

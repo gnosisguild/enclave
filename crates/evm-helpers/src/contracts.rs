@@ -127,7 +127,7 @@ sol! {
         function request(E3RequestParams calldata requestParams) external returns (uint256 e3Id, E3 memory e3);
         function enableE3Program(address e3Program) public returns (bool success);
         function publishCiphertextOutput(uint256 e3Id, bytes calldata ciphertextOutput, bytes calldata proof) external returns (bool success);
-        function publishPlaintextOutput(uint256 e3Id, bytes calldata data, bytes calldata proof, bytes calldata foldProof) external returns (bool success);
+        function publishPlaintextOutput(uint256 e3Id, bytes calldata data, bytes calldata proof) external returns (bool success);
         function getE3(uint256 e3Id) external view returns (E3 memory e3);
         function paramSetRegistry(uint8 paramSet) external view returns (bytes memory encodedParams);
         function getE3Quote(E3RequestParams memory request) external view returns (uint256 fee);
@@ -211,7 +211,6 @@ pub trait EnclaveWrite {
         e3_id: U256,
         data: Bytes,
         proof: Bytes,
-        fold_proof: Bytes,
     ) -> Result<TransactionReceipt>;
 }
 
@@ -510,7 +509,6 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         e3_id: U256,
         data: Bytes,
         proof: Bytes,
-        fold_proof: Bytes,
     ) -> Result<TransactionReceipt> {
         let _guard = NONCE_LOCK.lock().await;
         let wallet_addr = self
@@ -520,7 +518,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
 
         let contract = Enclave::new(self.contract_address, &self.provider);
         let builder = contract
-            .publishPlaintextOutput(e3_id, data, proof, fold_proof)
+            .publishPlaintextOutput(e3_id, data, proof)
             .nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;
 

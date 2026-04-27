@@ -70,8 +70,8 @@ pub struct Bounds {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Bits {
     pub noise_bit: u32,
-    /// Coefficient bit width for decryption-share commitments (aligned with threshold share_decryption BIT_D).
-    pub d_bit: u32,
+    /// Native \([0, q_l)\) width for hashing decryption-share coefficients (C6/C7 `d_commitment`).
+    pub d_native_bit: u32,
 }
 
 /// Circuit config: moduli count, plaintext modulus, q_inverse_mod_t, bits, bounds, and message polynomial length.
@@ -138,12 +138,15 @@ impl Computation for Bits {
         let ctx = threshold_params
             .ctx_at_level(0)
             .map_err(|e| CircuitsErrors::Other(format!("ctx_at_level: {:?}", e)))?;
-        let mut d_bit = 0u32;
+        let mut d_native_bit = 0u32;
         for qi in ctx.moduli_operators() {
-            let qi_bound = (BigInt::from(qi.modulus()) - 1) / 2;
-            d_bit = d_bit.max(calculate_bit_width(qi_bound));
+            let q = BigInt::from(qi.modulus());
+            d_native_bit = d_native_bit.max(calculate_bit_width(q - 1));
         }
-        Ok(Bits { noise_bit, d_bit })
+        Ok(Bits {
+            noise_bit,
+            d_native_bit,
+        })
     }
 }
 
@@ -330,7 +333,7 @@ impl Computation for Inputs {
             .map(|share| {
                 compute_threshold_decryption_share_commitment(
                     share,
-                    configs.bits.d_bit,
+                    configs.bits.d_native_bit,
                     max_msg_non_zero_coeffs,
                 )
             })
@@ -391,7 +394,7 @@ mod tests {
         assert!(!bounds.delta_half.is_zero());
         assert!(bounds.delta_half < bounds.delta);
         assert!(bits.noise_bit > 0);
-        assert!(bits.d_bit > 0);
+        assert!(bits.d_native_bit > 0);
     }
 
     #[test]
@@ -434,6 +437,6 @@ mod tests {
             configs.max_msg_non_zero_coeffs
         );
         assert!(out.bits.noise_bit > 0);
-        assert!(out.bits.d_bit > 0);
+        assert!(out.bits.d_native_bit > 0);
     }
 }
