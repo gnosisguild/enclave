@@ -155,7 +155,32 @@ PROVE_SUCCESS="false"
 PROOF_SIZE=0
 VERIFY_TIME=0
 VERIFY_SUCCESS="false"
+PUBLIC_INPUT_SIZE=0
+PROOF_CALLDATA_GAS=0
+PUBLIC_INPUT_CALLDATA_GAS=0
+TOTAL_CALLDATA_GAS=0
+PROOF_HEX="0x"
+PUBLIC_INPUTS_HEX="0x"
 ERROR_MSG=""
+
+calculate_calldata_gas() {
+    local file_path="$1"
+    if [ ! -f "$file_path" ]; then
+        echo "0"
+        return
+    fi
+    python3 - "$file_path" <<'PY'
+import sys
+
+path = sys.argv[1]
+with open(path, "rb") as f:
+    data = f.read()
+
+zero = data.count(0)
+non_zero = len(data) - zero
+print((zero * 4) + (non_zero * 16))
+PY
+}
 
 # 1. COMPILE
 if [ "$SKIP_COMPILE" = true ]; then
@@ -282,6 +307,15 @@ if [ "$VK_GEN_SUCCESS" = "true" ]; then
         # Get proof size (bb creates proof file directly in target directory)
         if [ -f "${TARGET_DIR}/proof" ]; then
             PROOF_SIZE=$(wc -c < "${TARGET_DIR}/proof" | tr -d ' ')
+            PROOF_CALLDATA_GAS=$(calculate_calldata_gas "${TARGET_DIR}/proof")
+            PROOF_HEX=$(python3 - "${TARGET_DIR}/proof" <<'PY'
+import binascii
+import pathlib
+import sys
+data = pathlib.Path(sys.argv[1]).read_bytes()
+print("0x" + binascii.hexlify(data).decode())
+PY
+)
         fi
     else
         END=$(get_timestamp)
@@ -302,6 +336,19 @@ if [ "$PROVE_SUCCESS" = "true" ]; then
         VERIFY_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         VERIFY_SUCCESS="true"
         echo "✓ Verification successful (${VERIFY_TIME}s)"
+        if [ -f "${TARGET_DIR}/public_inputs" ]; then
+            PUBLIC_INPUT_SIZE=$(wc -c < "${TARGET_DIR}/public_inputs" | tr -d ' ')
+            PUBLIC_INPUT_CALLDATA_GAS=$(calculate_calldata_gas "${TARGET_DIR}/public_inputs")
+            PUBLIC_INPUTS_HEX=$(python3 - "${TARGET_DIR}/public_inputs" <<'PY'
+import binascii
+import pathlib
+import sys
+data = pathlib.Path(sys.argv[1]).read_bytes()
+print("0x" + binascii.hexlify(data).decode())
+PY
+)
+        fi
+        TOTAL_CALLDATA_GAS=$((PROOF_CALLDATA_GAS + PUBLIC_INPUT_CALLDATA_GAS))
     else
         END=$(get_timestamp)
         VERIFY_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
@@ -390,11 +437,17 @@ cat > "$OUTPUT_JSON" <<EOF
   "proof_generation": {
     "time_seconds": ${PROVE_TIME:-0},
     "success": $PROVE_SUCCESS,
-    "proof_size_bytes": ${PROOF_SIZE:-0}
+    "proof_size_bytes": ${PROOF_SIZE:-0},
+    "proof_hex": $(printf '%s' "$PROOF_HEX" | jq -Rs .)
   },
   "verification": {
     "time_seconds": ${VERIFY_TIME:-0},
-    "success": $VERIFY_SUCCESS
+    "success": $VERIFY_SUCCESS,
+    "public_inputs_hex": $(printf '%s' "$PUBLIC_INPUTS_HEX" | jq -Rs .),
+    "public_inputs_size_bytes": ${PUBLIC_INPUT_SIZE:-0},
+    "calldata_gas_proof": ${PROOF_CALLDATA_GAS:-0},
+    "calldata_gas_public_inputs": ${PUBLIC_INPUT_CALLDATA_GAS:-0},
+    "calldata_gas_total": ${TOTAL_CALLDATA_GAS:-0}
   },
   "error": $(echo "$ERROR_MSG" | jq -Rs .)
 }

@@ -94,6 +94,8 @@ describe('CRISP Contracts', function () {
 
   describe('validate input', () => {
     it('should verify the proof correctly with the crisp verifier', async function () {
+      const verifyGas = await honkVerifier.verify.estimateGas(voteProof.proof, voteProof.publicInputs)
+      console.log(`[bench-gas] crisp_user_verify=${verifyGas.toString()}`)
       const isValid = await honkVerifier.verify(voteProof.proof, voteProof.publicInputs)
 
       expect(isValid).to.be.true

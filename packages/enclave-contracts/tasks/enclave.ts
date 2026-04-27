@@ -3,7 +3,13 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { BigNumberish, ZeroAddress, ZeroHash, isHexString, zeroPadValue } from "ethers";
+import {
+  BigNumberish,
+  ZeroAddress,
+  ZeroHash,
+  isHexString,
+  zeroPadValue,
+} from "ethers";
 import fs from "fs";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
@@ -369,7 +375,9 @@ export const publishCommittee = task(
         throw new Error("pkCommitment must not be the zero hash");
       }
       if (!isHexString(publicKey) || publicKey === "0x") {
-        throw new Error("publicKey is required and must be a non-empty hex string");
+        throw new Error(
+          "publicKey is required and must be a non-empty hex string",
+        );
       }
 
       const tx = await ciphernodeRegistry.publishCommittee(
