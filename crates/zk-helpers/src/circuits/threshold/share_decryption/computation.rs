@@ -219,7 +219,7 @@ impl Computation for Bounds {
             // r_2j bounds: [- (q_j-1)/2 , (q_j-1)/2] (cyclotomic quotients)
             r2_bounds.push(qi_bound.clone());
 
-            // r_1j upper bound: (n * ((q_j-1)/2)^2 + 4 * (q_j-1)/2) / q_j
+            // r_1j upper bound: (((q_j-1)/2)^2 * n + 4 * (q_j-1)/2) / q_j
             // Symmetric lower bound used by range_check_2bounds. Variables: qi_bound = (q_j-1)/2,
             // qi_bigint = q_j, n = degree.
             r1_bounds.push(
