@@ -50,7 +50,7 @@ For secure mode, use `--mode secure` and replace `results_insecure` with `result
 `results_*/report.md` now includes protocol-oriented sections in addition to raw category tables:
 
 - `Circuit Benchmarks` with rows in fixed order: `C0`, `C1`, `C2a`, `C2b`, `C3a`, `C3b`, `C4a`,
-  `C4b`, `C5`, `user-data-enc`, `C6`, `C7`.
+  `C4b`, `C5`, `user-data-encryption`, `C6`, `C7`.
 - `Artifacts` for `Π_DKG`, `Π_user`, `Π_dec` with proof/public-input sizes and gas columns.
 - `Role / Phase / Activity` for P1..P4 operational cost summaries.
 

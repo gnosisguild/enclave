@@ -215,6 +215,8 @@ echo ""
 
 # Try to retrieve verifier gas from the existing CRISP verify test path.
 GAS_JSON_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/crisp_verify_gas.json"
+# Remove any previous gas artifact so failures cannot leak stale values.
+rm -f "${GAS_JSON_FILE}"
 if "${SCRIPT_DIR}/extract_crisp_verify_gas.sh" --output "${GAS_JSON_FILE}"; then
     echo "✓ CRISP verify gas extracted: ${GAS_JSON_FILE}"
 else

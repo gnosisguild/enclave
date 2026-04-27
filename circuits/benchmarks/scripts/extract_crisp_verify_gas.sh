@@ -35,6 +35,11 @@ TMP_LOG_ENCLAVE="$(mktemp)"
 TMP_JSON_ENCLAVE="$(mktemp)"
 TMP_JSON_FOLDED="$(mktemp)"
 
+cleanup_tmp_files() {
+    rm -f "$TMP_LOG_CRISP" "$TMP_LOG_FOLDED" "$TMP_LOG_ENCLAVE" "$TMP_JSON_ENCLAVE" "$TMP_JSON_FOLDED"
+}
+trap cleanup_tmp_files EXIT
+
 if [ ! -d "$CRISP_CONTRACTS_DIR" ]; then
     cat > "$OUTPUT_JSON" <<EOF
 {
@@ -117,5 +122,3 @@ cat > "$OUTPUT_JSON" <<EOF
   }
 }
 EOF
-
-rm -f "$TMP_LOG_CRISP" "$TMP_LOG_FOLDED" "$TMP_LOG_ENCLAVE" "$TMP_JSON_ENCLAVE" "$TMP_JSON_FOLDED"
