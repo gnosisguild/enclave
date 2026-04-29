@@ -271,15 +271,15 @@ export const deployEnclave = async (
   const protocolTreasury = process.env.PROTOCOL_TREASURY || ownerAddress;
   console.log("Setting pricing config...");
   await enclave.setPricingConfig({
-    keyGenFixedPerNode: 50000, // 0.05 USDC
-    keyGenPerEncryptionProof: 25000, // 0.025 USDC
-    coordinationPerPair: 5000, // 0.005 USDC
-    availabilityPerNodePerSec: 20, // 0.00002 USDC
-    decryptionPerNode: 150000, // 0.15 USDC
-    publicationBase: 500000, // 0.50 USDC
-    verificationPerProof: 2000, // 0.002 USDC
+    keyGenFixedPerNode: 100000, // 0.10 USDC
+    keyGenPerEncryptionProof: 50000, // 0.05 USDC
+    coordinationPerPair: 10000, // 0.01 USDC
+    availabilityPerNodePerSec: 50, // 0.00005 USDC
+    decryptionPerNode: 300000, // 0.30 USDC
+    publicationBase: 1000000, // 1.00 USDC
+    verificationPerProof: 5000, // 0.005 USDC
     protocolTreasury: protocolTreasury,
-    marginBps: 1000, // 10%
+    marginBps: 1500, // 15%
     protocolShareBps: 2000, // 20%
     dkgUtilizationBps: 2500, // 25%
     computeUtilizationBps: 5000, // 50%

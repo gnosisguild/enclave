@@ -1,0 +1,197 @@
+---
+title: 'Requestor Guide'
+---
+
+# Requestor Guide
+
+This page is for **anyone using an Enclave-powered application** — voting in a private DAO, joining
+a confidential auction, contributing data to a private analytics round, or anything else built on
+top of Encrypted Execution Environments (E3s).
+
+If you're a developer integrating with the Enclave contracts directly, see
+[Building with Interfold](/building-with-enclave) and the [SDK reference](/sdk). The page you're
+reading now is the plain-English version: what you're paying for, what to do when something goes
+wrong, and how to read the security knobs on a request.
+
+> Most of what an E3 does is invisible by design — your inputs are encrypted before they ever leave
+> your device, and only the _result_ is revealed. This guide explains the few things that _are_
+> visible to you: the fee, the waiting period, and what happens if a round fails.
+
+## 1. What you're paying for
+
+Every E3 request charges a one-time fee, paid in the protocol's fee token (USDC by default). The fee
+covers four things, in roughly this order of cost:
+
+1. **Selecting a Ciphernode committee** — a random subset of operators who will hold a share of the
+   decryption key for your round.
+2. **Generating the shared encryption key** (DKG). This is the cryptographically expensive step and
+   is the largest line item on your bill.
+3. **Running the actual computation** through the compute provider.
+4. **Decrypting the result** and posting it on-chain.
+
+A small protocol share (zero by default, configurable by governance, capped at 100%) is taken on
+successful rounds and routed to the protocol treasury. Everything else is paid out to the operators
+who actually did work.
+
+The fee is **charged once, when you submit the request**, and held in escrow until the round
+finishes. You don't get a refund on success — that's the price of the computation. You _do_ get a
+refund (full or partial, depending on when it failed) on failure.
+
+## 2. The lifecycle of a request
+
+From the moment you submit until the result is published, every E3 walks through five phases:
+
+| #   | Phase                 | What happens                                                                                   | What you see                              |
+| --- | --------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| 1   | **Request**           | Your fee is locked; a committee is chosen by random sortition.                                 | A "request submitted" confirmation.       |
+| 2   | **Key generation**    | The committee runs a distributed key-generation ceremony and publishes a public key.           | Usually 5–20 minutes, depending on size.  |
+| 3   | **Input window**      | You (and possibly other participants) encrypt your inputs to that key and submit them.         | Whatever input form the dApp shows.       |
+| 4   | **Compute**           | The compute provider runs the program over the encrypted inputs and posts an encrypted result. | A waiting state — nothing for you to do.  |
+| 5   | **Decrypt & publish** | The committee jointly decrypts the result and publishes it on-chain.                           | The plaintext result appears in the dApp. |
+
+The application you're using will surface phase changes for you. If you want to inspect them
+yourself, the Enclave contract emits an `E3StageChanged` event for every transition.
+
+## 3. When things go wrong
+
+A round can fail for a handful of reasons. Each one matches a specific phase, and each one comes
+with a different refund split. The general rule is simple:
+
+> **You get refunded for the work that wasn't completed.** Honest operators get paid for the work
+> that _was_ completed. A small fixed share (default 5%) covers protocol overhead.
+
+Concretely, every E3 that ends in a failed state is tagged with a `FailureReason`:
+
+| Failure reason                 | When it happens                                                | Roughly what you get back                  |
+| ------------------------------ | -------------------------------------------------------------- | ------------------------------------------ |
+| `CommitteeFormationTimeout`    | Not enough operators showed up to form a committee in time.    | ~95%                                       |
+| `InsufficientCommitteeMembers` | The registry couldn't supply enough eligible operators.        | ~95%                                       |
+| `DKGTimeout`                   | The committee never finished generating the encryption key.    | ~85%                                       |
+| `DKGInvalidShares`             | An operator submitted bad key shares and was caught.           | ~85%                                       |
+| `NoInputsReceived`             | Nobody submitted any inputs during the input window.           | ~55%                                       |
+| `ComputeTimeout`               | The compute provider didn't post a result before its deadline. | ~55%                                       |
+| `ComputeProviderExpired`       | The compute provider signalled it couldn't finish.             | ~55%                                       |
+| `ComputeProviderFailed`        | The compute provider returned a verifiable error.              | ~55%                                       |
+| `RequesterCancelled`           | You cancelled the round before the result was produced.        | ~55%                                       |
+| `DecryptionTimeout`            | The committee never published the decryption.                  | ~0% (work was already done)                |
+| `DecryptionInvalidShares`      | An operator submitted bad decryption shares and was caught.    | ~0% — but slashed bonds top up your refund |
+| `VerificationFailed`           | The decryption proof didn't verify.                            | ~0%                                        |
+
+> Percentages are based on the default refund policy. Governance can re-tune them; the live values
+> are readable from `E3RefundManager.getWorkAllocation()` if you want to verify before requesting.
+
+A useful mental model: the further along a round got before failing, the more of your fee was
+already spent on legitimate work. Failures during decryption are the worst case for the requester's
+refund, but they're also the case where misbehaving operators get **slashed** — and those slashed
+bonds are added back to your refund automatically. In some failed rounds you can end up receiving
+_more_ than your initial fee.
+
+### How a failed round actually gets marked failed
+
+Most failures are detected automatically by the protocol's slashing manager and mark the round
+failed in the same transaction. A few timeout-based failures (the `*Timeout` reasons in the table)
+need someone to _push_ the round across the finish line by calling `markE3Failed(e3Id)` on the
+Enclave contract. **This call is permissionless** — the application you're using will usually do it
+for you, but you can do it yourself from a block explorer if it's stalled.
+
+### Claiming your refund
+
+Refunds are pull-based: once a round is marked failed and the distribution is calculated, you have
+to claim. The flow is:
+
+1. Confirm the round is in `Failed` state. The application will usually show this; you can also
+   check by reading `getE3Stage(e3Id)`.
+2. Wait for the `RefundDistributionCalculated` event (it's emitted as soon as the slashing manager
+   finalises the round — usually the same transaction that marked it failed).
+3. Call `claimRequesterRefund(e3Id)` on the `E3RefundManager` contract from the **same address that
+   originally submitted the request**. The refund is paid in the same token your original fee was
+   paid in, even if governance has rotated the fee token in the meantime.
+
+Most dApps will offer a "claim refund" button that does this for you. If you submitted from a
+smart-contract wallet (e.g. Safe), use the same wallet to claim.
+
+There's no deadline for claiming. Your refund sits in the refund manager indefinitely until you take
+it.
+
+## 4. Things to know before you submit
+
+A few practical points that catch people out:
+
+- **Approve only the exact fee.** Use the dApp's "estimate" / `getE3Quote` flow to read the exact
+  fee, and approve that amount. Don't grant unlimited approvals to the Enclave contract.
+- **You can't top up later.** If the protocol's pricing changes after you submit, your locked fee is
+  what runs your round. Don't try to amend an in-flight request — submit a new one if needed.
+- **You can cancel before compute starts.** Cancellation routes through the protocol's standard
+  failure path (`RequesterCancelled`) and gives you the matching partial refund. You will still pay
+  for sortition and key generation that already ran.
+- **Set realistic windows.** If you're configuring the round yourself rather than using a preset,
+  give the input window enough time for participants to actually submit, and the compute window
+  enough time for your worst observed program runtime.
+- **Refunds don't expire**, but they also don't auto-claim. Set a reminder to come back, or use a
+  dApp that claims for you.
+
+## 5. Choosing a secure committee
+
+If you're configuring an E3 yourself (most users won't be — applications usually pick sensible
+defaults), the two parameters that matter are the **committee size `n`** and the **decryption
+threshold `m`**.
+
+The high-level intuition:
+
+- `n` is **how many operators** are randomly selected to safeguard your round.
+- `m` is **how many of those `n` operators** must cooperate to decrypt the result.
+
+### Picking `n` (committee size)
+
+`n` controls both **availability** and **collusion resistance**. A larger committee survives more
+simultaneous outages and is harder to bribe, but every additional operator adds coordination work to
+every other operator, so fees grow roughly quadratically in `n`. The right choice is a function of
+how much value is at stake in the round and how deep the live operator set is at the time.
+
+General guidelines:
+
+- Keep `n` comfortably below the number of currently registered operators, so sortition has
+  meaningful entropy.
+- Use a small `n` for development and rehearsal rounds where cost matters more than security.
+- Use a larger `n` for production rounds where the value being protected justifies the extra fee and
+  longer key-generation time.
+- Going beyond a few dozen operators rarely buys meaningful additional security and primarily
+  inflates the fee.
+
+### Picking `m` (decryption threshold)
+
+`m` is the dial between **safety** (no-one can decrypt your data without `m` cooperating operators)
+and **liveness** (the round can only finish if at least `m` are online).
+
+General guidelines:
+
+- A bare majority is the absolute floor: anything less than `m ≥ ⌈n / 2⌉ + 1` means a minority could
+  collude to decrypt your round on its own.
+- A two-thirds threshold (`m ≈ ⌈2n / 3⌉`) tracks the standard byzantine-fault-tolerant trust
+  assumption and is a sensible middle ground.
+- Tighter thresholds (closer to `n`) increase safety against collusion but make the round more
+  fragile — if too few operators are online when decryption time arrives, the round will time out.
+- Never set `m == n`. A single offline operator will then end the round with no decryption.
+
+To make the random committee draw less variable, **increase `n`** rather than push the `m / n` ratio
+higher — doubling `n` roughly halves the chance the random sample is unusually unlucky.
+
+## 6. At-a-glance checklist
+
+Before you click "submit":
+
+- [ ] You've read the dApp's fee estimate and approved exactly that amount.
+- [ ] The committee size and threshold are appropriate for the value of the round.
+- [ ] The input window leaves enough time for everyone (including you) to submit.
+- [ ] You have a way to receive a notification when the round completes or fails.
+- [ ] You know which address to claim a refund from if the round fails.
+
+After the round ends:
+
+- [ ] If it succeeded, you can read the result on-chain or in the dApp.
+- [ ] If it failed, wait for the `RefundDistributionCalculated` event, then claim from the Refund
+      Manager using the same address that submitted the request.
+
+For the design-time companion to this guide, see [Best Practices](/best-practices). For what the
+operators on the other side of your fee are actually doing, see
+[Ciphernode Operators](/ciphernode-operators).
