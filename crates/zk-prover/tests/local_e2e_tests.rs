@@ -11,7 +11,7 @@
 //! produced by `pnpm build:circuits` locally or the `build_circuits` CI job.
 //!
 //! To add a new circuit: add setup_*_test() and one line in `e2e_proof_tests!`
-//! `(name, setup, CircuitVariant::Recursive | Evm)` (C5 pk_aggregation uses Evm).
+//! `(name, setup, CircuitVariant::...)` (C5 uses Default / noir-recursive-no-zk; EVM is `DkgAggregator`).
 //! Commitment consistency tests are defined separately.
 
 mod common;
@@ -500,7 +500,7 @@ e2e_proof_tests! {
     (share_encryption_sk, setup_share_encryption_sk_test(), CircuitVariant::Recursive),
     (share_encryption_e_sm, setup_share_encryption_e_sm_test(), CircuitVariant::Recursive),
     (share_decryption, setup_share_decryption_test(), CircuitVariant::Recursive),
-    (pk_aggregation, setup_pk_aggregation_test(), CircuitVariant::Evm),
+    (pk_aggregation, setup_pk_aggregation_test(), CircuitVariant::Default),
     (decrypted_shares_aggregation, setup_decrypted_shares_aggregation_test(), CircuitVariant::Recursive),
 }
 
@@ -666,8 +666,6 @@ async fn test_pk_aggregation_commitment_consistency() {
         return;
     };
 
-    // C5 uses Evm variant in production; Recursive fails because commitment hashes (256-bit)
-    // exceed the noir-recursive verifier's limb bound.
     let artifacts_dir = preset.artifacts_dir();
     let proof = circuit
         .prove_with_variant(
@@ -675,7 +673,7 @@ async fn test_pk_aggregation_commitment_consistency() {
             &preset,
             &sample,
             e3_id,
-            CircuitVariant::Evm,
+            CircuitVariant::Default,
             &artifacts_dir,
         )
         .expect("proof generation should succeed");
@@ -734,15 +732,15 @@ async fn test_threshold_share_decryption_commitment_consistency() {
     let computation_output = ThresholdShareDecryptionCircuit::compute(preset, &sample).unwrap();
 
     let expected_d_commitment = compute_threshold_decryption_share_commitment(
-        &computation_output.inputs.d,
-        computation_output.bits.d_bit,
+        &computation_output.inputs.d_native_trunc,
+        computation_output.bits.d_native_bit,
         MAX_MSG_NON_ZERO_COEFFS,
     );
 
     let d_commitment_from_proof = extract_field_from_end(&proof.public_signals, 0);
     assert_eq!(
         d_commitment_from_proof, expected_d_commitment,
-        "C6 d_commitment must match compute_threshold_decryption_share_commitment on witness d"
+        "C6 d_commitment must match hash of d_native_trunc (C7-aligned), not centered witness d"
     );
 
     prover.cleanup(e3_id).unwrap();

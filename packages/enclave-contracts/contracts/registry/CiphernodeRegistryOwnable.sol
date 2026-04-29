@@ -188,20 +188,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         success = true;
     }
 
-    /// @notice Publishes a committee for an E3 computation
-    /// @dev Permissionless once the committee is finalized. Verification of C5 proof is
-    /// done in Enclave.onCommitteePublished.
-    /// @param e3Id ID of the E3 computation
-    /// @param nodes Array of ciphernode addresses selected for the committee
-    /// @param publicKey Aggregated public key of the committee
-    /// @param proof C5 proof; aggregate commitment extracted as last public input
-    /// @param foldProof Optional ABI-encoded fold proof (bytes, bytes32[]); empty to skip
+    /// @inheritdoc ICiphernodeRegistry
     function publishCommittee(
         uint256 e3Id,
         address[] calldata nodes,
         bytes calldata publicKey,
-        bytes calldata proof,
-        bytes calldata foldProof
+        bytes32 pkCommitment,
+        bytes calldata proof
     ) external {
         Committee storage c = committees[e3Id];
 
@@ -211,25 +204,23 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         );
         require(c.publicKey == bytes32(0), CommitteeAlreadyPublished());
         require(nodes.length == c.topNodes.length, "Node count mismatch");
-
-        (, bytes32[] memory publicInputs) = abi.decode(
-            proof,
-            (bytes, bytes32[])
-        );
-        require(publicInputs.length > 0, "C5: no public inputs");
-        bytes32 publicKeyHash = publicInputs[publicInputs.length - 1];
+        require(pkCommitment != bytes32(0), "pkCommitment required");
 
         E3 memory e3 = enclave.getE3(e3Id);
         if (e3.proofAggregationEnabled) {
-            e3.pkVerifier.verify(proof, foldProof);
+            require(proof.length > 0, "proof required");
+            require(
+                e3.pkVerifier.verify(pkCommitment, proof),
+                "Invalid DKG proof"
+            );
         }
 
-        c.publicKey = publicKeyHash;
-        publicKeyHashes[e3Id] = publicKeyHash;
+        c.publicKey = pkCommitment;
+        publicKeyHashes[e3Id] = pkCommitment;
 
-        enclave.onCommitteePublished(e3Id, publicKeyHash);
+        enclave.onCommitteePublished(e3Id, pkCommitment);
 
-        emit CommitteePublished(e3Id, nodes, publicKey, proof);
+        emit CommitteePublished(e3Id, nodes, publicKey, pkCommitment, proof);
     }
 
     /// @inheritdoc ICiphernodeRegistry

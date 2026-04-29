@@ -10,7 +10,7 @@ contract FakeEnclave {
   event InputPublished(uint256 indexed e3Id, bytes data, uint256 inputHash, uint256 index);
   event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
   event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput, bytes proof);
-  event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey, bytes proof);
+  event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey, bytes32 pkCommitment, bytes proof);
 
   mapping(uint8 => bytes) public paramSetRegistry;
 
@@ -30,9 +30,9 @@ contract FakeEnclave {
   }
 
   // Emit CommitteePublished event with passed test data
-  function emitCommitteePublished(uint256 e3Id, bytes memory publicKey, bytes memory proof) public {
+  function emitCommitteePublished(uint256 e3Id, bytes memory publicKey, bytes32 pkCommitment, bytes memory proof) public {
     address[] memory nodes = new address[](1);
-    emit CommitteePublished(e3Id, nodes, publicKey, proof);
+    emit CommitteePublished(e3Id, nodes, publicKey, pkCommitment, proof);
   }
 
   function getE3(uint256 _e3Id) external view returns (E3 memory e3) {

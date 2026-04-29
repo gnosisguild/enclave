@@ -5,5 +5,4 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 export { VOTE_TYPEHASH, signAndEncodeAttestation } from "./attestation";
-export { encodePkProof } from "./pkProof";
 export { setupOperatorForSortition } from "./operators";

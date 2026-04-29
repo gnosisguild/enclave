@@ -186,14 +186,18 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                     );
                     return;
                 }
-                if decrypted_output.len() != msg.aggregation_proofs.len() {
+                // `decryption_aggregator_proofs` is empty when proof aggregation is disabled.
+                // When enabled, its length must match `decrypted_output`.
+                if !msg.decryption_aggregator_proofs.is_empty()
+                    && decrypted_output.len() != msg.decryption_aggregator_proofs.len()
+                {
                     bus.err(
                         EType::Evm,
                         anyhow::anyhow!(
-                            "E3 {} decrypted_output len ({}) != aggregation_proofs len ({})",
+                            "E3 {} decrypted_output len ({}) != decryption_aggregator_proofs len ({})",
                             e3_id,
                             decrypted_output.len(),
-                            msg.aggregation_proofs.len()
+                            msg.decryption_aggregator_proofs.len()
                         ),
                     );
                     return;
@@ -223,8 +227,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                     contract_address,
                     e3_id,
                     decrypted.extract_bytes(),
-                    msg.aggregation_proofs.first(),
-                    msg.c6_aggregated_proof.as_ref(),
+                    msg.decryption_aggregator_proofs.first(),
                 )
                 .await;
                 match result {
@@ -296,8 +299,7 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     contract_address: Address,
     e3_id: E3id,
     decrypted_output: Vec<u8>,
-    aggregation_proof: Option<&Proof>,
-    c6_fold_proof: Option<&Proof>,
+    decryption_aggregator_proof: Option<&Proof>,
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = e3_id.try_into()?;
 
@@ -308,10 +310,8 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         .pending()
         .await?;
 
-    let proof = encode_zk_proof(
-        aggregation_proof.ok_or_else(|| anyhow::anyhow!("C7 proof missing or invalid"))?,
-    )?;
-    let fold_proof: Bytes = match c6_fold_proof {
+    // `None` => proof aggregation disabled; contract accepts empty bytes in that case.
+    let proof: Bytes = match decryption_aggregator_proof {
         Some(p) => encode_zk_proof(p)?,
         None => Bytes::new(),
     };
@@ -322,13 +322,12 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         || {
             info!("publishPlaintextOutput() e3_id={:?}", e3_id);
             let decrypted_output = Bytes::from(decrypted_output.clone());
-            let fold_proof = fold_proof.clone();
             let proof = proof.clone();
             let contract = IEnclave::new(contract_address, provider.provider());
 
             async move {
                 let builder = contract
-                    .publishPlaintextOutput(e3_id, decrypted_output, proof, fold_proof)
+                    .publishPlaintextOutput(e3_id, decrypted_output, proof)
                     .nonce(current_nonce);
                 let receipt = builder.send().await?.get_receipt().await?;
                 Ok(receipt)

@@ -10,34 +10,31 @@ import { ICircuitVerifier } from "../../interfaces/ICircuitVerifier.sol";
 
 /**
  * @title BfvDecryptionVerifier
- * @notice Decryption verifier for the fhe.rs:BFV encryption scheme. Verifies C7
- *         (decrypted_shares_aggregation) proofs on-chain by delegating to the Honk
- *         ThresholdDecryptedSharesAggregationVerifier and validating that the
- *         plaintext extracted from public inputs matches the claimed hash.
- *         Optional `foldProof` is ABI-encoded (bytes, bytes32[]) for RecursiveAggregationFoldVerifier
- *         (C6 cross-node fold); pass empty bytes to skip.
- * @dev Use this verifier when the Enclave is configured with encryptionSchemeId
- *      keccak256("fhe.rs:BFV"). Other encryption schemes will have their own verifiers.
+ * @notice Verifies the DecryptionAggregator (EVM) proof produced by the
+ *         recursive aggregation pipeline (C6 folds + C7/decrypted_shares
+ *         verified internally). Binds the proof to the claimed
+ *         `plaintextOutputHash`.
+ * @dev Used when the Enclave is configured with encryptionSchemeId
+ *      keccak256("fhe.rs:BFV"). The plaintext is exposed as the last
+ *      `MESSAGE_COEFFS_COUNT` public inputs, matching
+ *      `MAX_MSG_NON_ZERO_COEFFS` in the decryption_aggregator circuit.
  */
 contract BfvDecryptionVerifier is IDecryptionVerifier {
     /// @dev Message is always the last 100 public inputs (100 uint64 coeffs = 800 bytes plaintext).
-    ///      Layout-agnostic: works for prod and insecure circuit configs.
     uint256 constant MESSAGE_COEFFS_COUNT = 100;
 
+    /// @notice Underlying Honk verifier for the DecryptionAggregator circuit.
     ICircuitVerifier public immutable circuitVerifier;
-    ICircuitVerifier public immutable foldVerifier;
 
-    constructor(address _circuitVerifier, address _foldVerifier) {
+    constructor(address _circuitVerifier) {
         circuitVerifier = ICircuitVerifier(_circuitVerifier);
-        foldVerifier = ICircuitVerifier(_foldVerifier);
     }
 
     /// @inheritdoc IDecryptionVerifier
     function verify(
         bytes32 plaintextOutputHash,
-        bytes memory proof,
-        bytes memory foldProof
-    ) external view override returns (bool success) {
+        bytes calldata proof
+    ) external view override returns (bool) {
         (bytes memory rawProof, bytes32[] memory publicInputs) = abi.decode(
             proof,
             (bytes, bytes32[])
@@ -46,35 +43,10 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
         if (publicInputs.length < MESSAGE_COEFFS_COUNT) {
             return false;
         }
-
-        if (!circuitVerifier.verify(rawProof, publicInputs)) {
-            return false;
-        }
-
         if (!_verifyPlaintextHash(publicInputs, plaintextOutputHash)) {
             return false;
         }
-
-        if (!_verifyFold(foldProof)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    function _verifyFold(bytes memory foldProof) internal view returns (bool) {
-        if (foldProof.length == 0) {
-            return true;
-        }
-
-        (bytes memory foldRawProof, bytes32[] memory foldPublicInputs) = abi
-            .decode(foldProof, (bytes, bytes32[]));
-
-        if (foldRawProof.length == 0 || foldPublicInputs.length == 0) {
-            return false;
-        }
-
-        return foldVerifier.verify(foldRawProof, foldPublicInputs);
+        return circuitVerifier.verify(rawProof, publicInputs);
     }
 
     function _verifyPlaintextHash(

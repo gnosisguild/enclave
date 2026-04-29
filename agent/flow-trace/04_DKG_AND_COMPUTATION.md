@@ -262,15 +262,24 @@ ProofRequestActor receives ThresholdSharePending
    → Ensures no incomplete data is gossiped
 ```
 
-**C2 inner vs wrapper:** For each C2a/C2b request, the prover builds a **recursive** proof for
-`sk_share_computation` / `e_sm_share_computation`. That **inner** `Proof` is what
-`PendingThresholdProofs` stores and what gets ECDSA-signed for gossip
-(`ProofType::C2aSkShareComputation` / `C2bESmShareComputation`). When node proof aggregation is
-enabled, the prover also returns a **wrapper** proof (`CircuitName::ShareComputation`); the actor
-publishes `DKGInnerProofReady` with that wrapper for folding, but does not replace the signed inner
-payload. Verifiers treat C2a/C2b as allowing both inner and wrapper circuit names
-(`ProofType::circuit_names()`); multithread ZK verify uses standard `bb verify` for inner circuits
-and the wrapper VK path when the bundle’s circuit is `ShareComputation`.
+**C2 proofs:** For each C2a/C2b request, the prover builds a **recursive** proof for
+`sk_share_computation` / `e_sm_share_computation`. That `Proof` is what `PendingThresholdProofs`
+stores and what gets ECDSA-signed for gossip (`ProofType::C2aSkShareComputation` /
+`C2bESmShareComputation`). The old generic `recursive_aggregation/wrapper/*` circuits and two-proof
+`recursive_aggregation/fold` were removed; aggregation is done by ad-hoc Noir bins under
+`circuits/bin/recursive_aggregation/` (e.g. `c2ab_fold`, `c3ab_fold`, `c6_fold`, `node_fold`,
+`nodes_fold`, `dkg_aggregator`, `decryption_aggregator` — `nodes_fold` chains `H` `node_fold` proofs
+for `dkg_aggregator`; `decryption_aggregator` folds C6 via non-ZK `c6_fold` then checks C7 with ZK).
+The per-circuit `wrapper/` Noir step was removed; aggregator response structs no longer carry a
+`wrapped_proof` field — the inner recursive proof itself is what flows between stages.
+
+**Ciphernode / aggregator integration:** `ZkRequest::FoldProofs` was removed. The multithread actor
+implements `ZkRequest::NodeDkgFold` (full per-node pipeline to a `NodeFold` proof),
+`ZkRequest::DkgAggregation` (`NodesFold` + C5 + `DkgAggregator`), and
+`ZkRequest::DecryptionAggregation` (per-ciphertext `C6Fold` + C7 + `DecryptionAggregator`).
+`NodeProofAggregator` buffers all `DKGInnerProofReady` proofs then issues one `NodeDkgFold` request;
+`PublicKeyAggregator` and `ThresholdPlaintextAggregator` dispatch the aggregator requests instead of
+pairwise folding.
 
 ### Step 6: Collect All Threshold Shares (with C2/C3 Verification)
 
@@ -348,6 +357,7 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │     C4a→C6  (SameParty):                C4a's commitment == C6's expected_sk_commitment
 │   │   │     C4b→C6  (SameParty):                C4b's commitment == C6's expected_e_sm_commitment
 │   │   │     C6→C7   (CrossParty):               C6's d_commitment matches C7's expected_d_commitment
+│   │   │     (on-chain / E3 state)              C3 `ct_commitment` output and C6 `ct_commitment` input bind to the same ciphertext as user_data_encryption (not a CommitmentLink row)
 │   │   │
 │   │   ├─ On mismatch: publishes CommitmentConsistencyViolation
 │   │   │   → AccusationManager initiates accusation quorum (see Part 5)
@@ -363,8 +373,8 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │     party_proofs, // consistency-passing parties' ZK proof data
 │   │   })
 │   │
-│   ├─ Multithread ZK verify: inner circuits → `bb verify` with recursive VK;
-│   │   `ShareComputation` (wrapper) → wrapper VK / `verify_wrapper_proof` path
+│   ├─ Multithread ZK verify: `bb verify` on inner recursive circuits (same path as
+│   │   `ZkProver::verify_proof`)
 │   │   → Returns per-party pass/fail results
 │   │
 │   └─ On ComputeResponse:

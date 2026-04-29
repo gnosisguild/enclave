@@ -40,7 +40,7 @@ import {
   MockUSDC__factory as MockUSDCFactory,
   SlashingManager__factory as SlashingManagerFactory,
 } from "../../types";
-import { encodePkProof, signAndEncodeAttestation } from "../fixtures";
+import { signAndEncodeAttestation } from "../fixtures";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time } = networkHelpers;
@@ -344,8 +344,14 @@ describe("Committee Expulsion & Fault Tolerance", function () {
 
       const nodes = await Promise.all(operators.map((op) => op.getAddress()));
       const publicKey = ethers.toUtf8Bytes("fake-public-key");
-      const proof = encodePkProof(ethers.keccak256(publicKey));
-      await registry.publishCommittee(e3Id, nodes, publicKey, proof, "0x");
+      const pkCommitment = ethers.keccak256(publicKey);
+      await registry.publishCommittee(
+        e3Id,
+        nodes,
+        publicKey,
+        pkCommitment,
+        "0x",
+      );
     }
 
     // ── Return ─────────────────────────────────────────────────────────────────

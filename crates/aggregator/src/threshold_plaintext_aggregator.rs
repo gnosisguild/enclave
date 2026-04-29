@@ -4,19 +4,19 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
-use crate::proof_fold::ProofFoldState;
 use actix::prelude::*;
 use anyhow::{anyhow, bail, ensure, Result};
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, trap, AggregationProofPending, AggregationProofSigned, BusHandle, CircuitName,
     CommitteeMemberExpelled, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
-    DecryptedSharesAggregationProofRequest, DecryptionshareCreated, Die, E3id, EType, EnclaveEvent,
-    EnclaveEventData, EventContext, PartyProofsToVerify, PlaintextAggregated, Proof, ProofType,
-    Seed, Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed,
-    SignedProofPayload, TypedEvent, VerificationKind, ZkResponse,
+    DecryptedSharesAggregationProofRequest, DecryptionAggregationJobRequest,
+    DecryptionAggregationRequest, DecryptionshareCreated, Die, E3id, EType, EnclaveEvent,
+    EnclaveEventData, EventContext, PartyProofsToVerify, PlaintextAggregated, Proof, Seed,
+    Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload,
+    TypedEvent, VerificationKind, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::BfvPreset;
 use e3_sortition::{E3CommitteeContainsRequest, E3CommitteeContainsResponse, Sortition};
@@ -30,18 +30,15 @@ use e3_zk_helpers::circuits::commitments::compute_threshold_decryption_share_com
 use e3_zk_helpers::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
 use e3_zk_helpers::threshold::share_decryption::{Bits as C6Bits, Bounds as C6Bounds};
 use e3_zk_helpers::Computation;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Collecting {
     threshold_m: u64,
     threshold_n: u64,
-    shares: HashMap<u64, Vec<ArcBytes>>,
+    shares: BTreeMap<u64, Vec<ArcBytes>>,
     /// Signed raw C6 proofs for ShareVerification.
-    c6_proofs: HashMap<u64, Vec<SignedProofPayload>>,
-    /// Wrapped C6 proofs for cross-node fold.
-    #[serde(default)]
-    c6_wrapped_proofs: HashMap<u64, Vec<Proof>>,
+    c6_proofs: BTreeMap<u64, Vec<SignedProofPayload>>,
     seed: Seed,
     ciphertext_output: Vec<ArcBytes>,
     params: ArcBytes,
@@ -51,10 +48,8 @@ pub struct Collecting {
 pub struct VerifyingC6 {
     threshold_m: u64,
     threshold_n: u64,
-    shares: HashMap<u64, Vec<ArcBytes>>,
-    c6_proofs: HashMap<u64, Vec<SignedProofPayload>>,
-    #[serde(default)]
-    c6_wrapped_proofs: HashMap<u64, Vec<Proof>>,
+    shares: BTreeMap<u64, Vec<ArcBytes>>,
+    c6_proofs: BTreeMap<u64, Vec<SignedProofPayload>>,
     ciphertext_output: Vec<ArcBytes>,
     params: ArcBytes,
 }
@@ -162,9 +157,8 @@ impl ThresholdPlaintextAggregatorState {
         ThresholdPlaintextAggregatorState::Collecting(Collecting {
             threshold_m,
             threshold_n,
-            shares: HashMap::new(),
-            c6_proofs: HashMap::new(),
-            c6_wrapped_proofs: HashMap::new(),
+            shares: BTreeMap::new(),
+            c6_proofs: BTreeMap::new(),
             seed,
             ciphertext_output,
             params,
@@ -177,12 +171,17 @@ pub struct ThresholdPlaintextAggregator {
     sortition: Addr<Sortition>,
     e3_id: E3id,
     params_preset: BfvPreset,
+    proof_aggregation_enabled: bool,
     state: Persistable<ThresholdPlaintextAggregatorState>,
-    /// C6 cross-node proof fold state.
-    c6_fold: ProofFoldState,
-    /// C7 proofs stored while waiting for C6 fold completion.
+    /// Honest parties' C6 inner proofs (sorted by party id) for [`ZkRequest::DecryptionAggregation`].
+    honest_c6_proofs_for_agg: Option<Vec<(u64, Vec<Proof>)>>,
+    /// In-flight decryption aggregation request.
+    decryption_aggregation_correlation: Option<CorrelationId>,
+    /// C7 proofs stored while waiting for decryption aggregation.
     c7_proofs_pending: Option<Vec<Proof>>,
-    /// Last event context, reused for fold steps and final publish.
+    /// DecryptionAggregator outputs (set when ZK completes).
+    decryption_aggregator_proofs: Option<Vec<Proof>>,
+    /// Last event context, reused for ZK and final publish.
     last_ec: Option<EventContext<Sequenced>>,
 }
 
@@ -191,6 +190,7 @@ pub struct ThresholdPlaintextAggregatorParams {
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
     pub params_preset: BfvPreset,
+    pub proof_aggregation_enabled: bool,
 }
 
 impl ThresholdPlaintextAggregator {
@@ -203,9 +203,12 @@ impl ThresholdPlaintextAggregator {
             sortition: params.sortition,
             e3_id: params.e3_id,
             params_preset: params.params_preset,
+            proof_aggregation_enabled: params.proof_aggregation_enabled,
             state,
-            c6_fold: ProofFoldState::new(params.params_preset),
+            honest_c6_proofs_for_agg: None,
+            decryption_aggregation_correlation: None,
             c7_proofs_pending: None,
+            decryption_aggregator_proofs: None,
             last_ec: None,
         }
     }
@@ -215,7 +218,6 @@ impl ThresholdPlaintextAggregator {
         party_id: u64,
         share: Vec<ArcBytes>,
         signed_decryption_proofs: Vec<SignedProofPayload>,
-        wrapped_proofs: Vec<Proof>,
         ec: &EventContext<Sequenced>,
     ) -> Result<()> {
         self.state.try_mutate(ec, |state| {
@@ -227,12 +229,10 @@ impl ThresholdPlaintextAggregator {
             let params = current.params.clone();
             let mut shares = current.shares;
             let mut c6_proofs = current.c6_proofs;
-            let mut c6_wrapped_proofs = current.c6_wrapped_proofs;
 
             info!("pushing to share collection {} {:?}", party_id, share);
             shares.insert(party_id, share);
             c6_proofs.insert(party_id, signed_decryption_proofs);
-            c6_wrapped_proofs.insert(party_id, wrapped_proofs);
 
             if (shares.len() as u64) < threshold_n {
                 return Ok(ThresholdPlaintextAggregatorState::Collecting(Collecting {
@@ -242,7 +242,6 @@ impl ThresholdPlaintextAggregator {
                     ciphertext_output,
                     shares,
                     c6_proofs,
-                    c6_wrapped_proofs,
                     seed: current.seed,
                 }));
             }
@@ -256,7 +255,6 @@ impl ThresholdPlaintextAggregator {
                 VerifyingC6 {
                     shares,
                     c6_proofs,
-                    c6_wrapped_proofs,
                     ciphertext_output,
                     threshold_m,
                     threshold_n,
@@ -278,12 +276,10 @@ impl ThresholdPlaintextAggregator {
 
             let mut shares = current.shares;
             let mut c6_proofs = current.c6_proofs;
-            let mut c6_wrapped_proofs = current.c6_wrapped_proofs;
             let mut threshold_n = current.threshold_n;
 
             shares.remove(&party_id);
             c6_proofs.remove(&party_id);
-            c6_wrapped_proofs.remove(&party_id);
 
             if threshold_n > 0 {
                 threshold_n -= 1;
@@ -299,7 +295,6 @@ impl ThresholdPlaintextAggregator {
                     threshold_n,
                     shares,
                     c6_proofs,
-                    c6_wrapped_proofs,
                     seed: current.seed,
                     ciphertext_output: current.ciphertext_output,
                     params: current.params,
@@ -312,7 +307,6 @@ impl ThresholdPlaintextAggregator {
                     threshold_n,
                     shares,
                     c6_proofs,
-                    c6_wrapped_proofs,
                     seed: current.seed,
                     ciphertext_output: current.ciphertext_output,
                     params: current.params,
@@ -324,7 +318,6 @@ impl ThresholdPlaintextAggregator {
                 threshold_n,
                 shares,
                 c6_proofs,
-                c6_wrapped_proofs,
                 ciphertext_output: current.ciphertext_output,
                 params: current.params,
             }))
@@ -334,7 +327,7 @@ impl ThresholdPlaintextAggregator {
     /// Dispatch C6 proof verification through ShareVerificationActor.
     pub fn dispatch_c6_verification(
         &mut self,
-        c6_proofs: HashMap<u64, Vec<SignedProofPayload>>,
+        c6_proofs: BTreeMap<u64, Vec<SignedProofPayload>>,
         ec: EventContext<Sequenced>,
     ) -> Result<()> {
         let party_proofs: Vec<PartyProofsToVerify> = c6_proofs
@@ -432,14 +425,20 @@ impl ThresholdPlaintextAggregator {
             honest_shares.len(),
         );
 
-        // Collect honest C6 wrapped proofs sorted by party_id for cross-node folding.
-        let mut honest_c6_wrapped: Vec<(u64, Vec<Proof>)> = state
-            .c6_wrapped_proofs
+        // Collect honest C6 inner proofs (from signed payloads) for DecryptionAggregation.
+        // BTreeMap iteration yields ascending party_id, matching the slot layout
+        // used by honest_shares above and enforced by decryption_aggregator.nr.
+        let honest_c6: Vec<(u64, Vec<Proof>)> = state
+            .c6_proofs
             .iter()
             .filter(|(id, _)| !dishonest_parties.contains(id))
-            .map(|(id, proofs)| (*id, proofs.clone()))
+            .map(|(id, signed)| {
+                (
+                    *id,
+                    signed.iter().map(|s| s.payload.proof.clone()).collect(),
+                )
+            })
             .collect();
-        honest_c6_wrapped.sort_by_key(|(id, _)| *id);
 
         // Publish ComputeRequest before transitioning state so a publish
         // failure leaves us in VerifyingC6 (retryable) rather than
@@ -461,6 +460,8 @@ impl ThresholdPlaintextAggregator {
         );
         self.bus.publish(event, ec.clone())?;
 
+        self.honest_c6_proofs_for_agg = Some(honest_c6);
+
         self.state.try_mutate(&ec, |_| {
             Ok(ThresholdPlaintextAggregatorState::Computing(Computing {
                 shares: honest_shares,
@@ -471,19 +472,7 @@ impl ThresholdPlaintextAggregator {
             }))
         })?;
 
-        // Start C6 cross-node fold concurrently with threshold decryption.
         self.last_ec = Some(ec.clone());
-        let proofs: Vec<Proof> = honest_c6_wrapped
-            .into_iter()
-            .flat_map(|(_, proofs)| proofs)
-            .collect();
-        self.c6_fold.start(
-            proofs,
-            "ThresholdPlaintextAggregator C6 fold",
-            &self.bus,
-            &self.e3_id,
-            &ec,
-        )?;
         self.try_publish_complete()?;
 
         Ok(())
@@ -495,7 +484,7 @@ impl ThresholdPlaintextAggregator {
     fn verify_shares_match_c6_commitments(
         &self,
         honest_shares: &[(u64, Vec<ArcBytes>)],
-        c6_proofs: &HashMap<u64, Vec<SignedProofPayload>>,
+        c6_proofs: &BTreeMap<u64, Vec<SignedProofPayload>>,
     ) -> BTreeSet<u64> {
         let mut mismatched = BTreeSet::new();
 
@@ -506,7 +495,7 @@ impl ThresholdPlaintextAggregator {
         };
 
         // Reuse the same Bounds/Bits computation that C6 codegen uses,
-        // so d_bit stays in sync if the formula ever changes.
+        // so d_native_bit stays in sync if the formula ever changes.
         let Ok(bounds) = C6Bounds::compute(self.params_preset, &()) else {
             warn!("Could not compute bounds for d_commitment check — skipping");
             return mismatched;
@@ -515,11 +504,10 @@ impl ThresholdPlaintextAggregator {
             warn!("Could not compute bits for d_commitment check — skipping");
             return mismatched;
         };
-        let d_bit = bits.d_bit;
+        let d_native_bit = bits.d_native_bit;
 
         let max_k = MAX_MSG_NON_ZERO_COEFFS;
         let c6_output_layout = CircuitName::ThresholdShareDecryption.output_layout();
-        let moduli: Vec<u64> = threshold_params.moduli().to_vec();
 
         for (party_id, shares) in honest_shares {
             let Some(proofs) = c6_proofs.get(party_id) else {
@@ -566,21 +554,11 @@ impl ThresholdPlaintextAggregator {
                 mismatched.insert(*party_id);
                 continue;
             };
-            let mut crt = e3_polynomial::CrtPolynomial::from_fhe_polynomial(&poly);
+            let crt = e3_polynomial::CrtPolynomial::from_fhe_polynomial(&poly);
 
-            // Apply the same transformations C6's Inputs::compute applies:
-            // reverse coefficient order + center each limb mod qi.
-            crt.reverse();
-            if let Err(e) = crt.center(&moduli) {
-                warn!(
-                    "Could not center d_share for party {} — marking as mismatched: {e}",
-                    party_id
-                );
-                mismatched.insert(*party_id);
-                continue;
-            }
-
-            let computed = compute_threshold_decryption_share_commitment(&crt, d_bit, max_k);
+            // C6 public `d_commitment` hashes native truncated limbs (same layout as C7), not
+            // reversed+centered witness `d`.
+            let computed = compute_threshold_decryption_share_commitment(&crt, d_native_bit, max_k);
 
             // Convert to big-endian 32-byte padded format matching
             // Barretenberg's public_signals encoding.
@@ -659,10 +637,83 @@ impl ThresholdPlaintextAggregator {
             state.plaintext.len()
         );
 
-        info!("C7 proof signed — waiting for C6 cross-node fold to complete...");
+        info!("C7 proof signed — awaiting DecryptionAggregation...");
         self.c7_proofs_pending = Some(proofs);
-        self.last_ec = Some(ec);
+        self.last_ec = Some(ec.clone());
         self.try_publish_complete()
+    }
+
+    fn dispatch_decryption_aggregation(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
+        let Some(c7_proofs) = self.c7_proofs_pending.as_ref() else {
+            return Ok(());
+        };
+        if self.decryption_aggregator_proofs.is_some() {
+            return Ok(());
+        }
+        if self.decryption_aggregation_correlation.is_some() {
+            return Ok(());
+        }
+        if !self.proof_aggregation_enabled {
+            self.decryption_aggregator_proofs = Some(Vec::new());
+            return Ok(());
+        }
+        let Some(honest_c6) = self.honest_c6_proofs_for_agg.as_ref() else {
+            return Ok(());
+        };
+        // With proof aggregation enabled we must have a complete C6 set; otherwise we'd publish
+        // `decryption_aggregator_proofs = Vec::new()`, which downstream consumers interpret as
+        // "aggregation disabled". Fail loudly instead so the missing shares are surfaced.
+        ensure!(
+            !honest_c6.is_empty() && honest_c6.iter().all(|(_, w)| !w.is_empty()),
+            "DecryptionAggregation: honest C6 inner proofs missing while proof aggregation is enabled"
+        );
+        let state: GeneratingC7Proof = self
+            .state
+            .get()
+            .ok_or(anyhow!("Could not get state"))?
+            .try_into()?;
+        // C6Fold witness width is `T + 1` (same `T` as `threshold_m`). C7 is only proven for the
+        // first `T + 1` parties after sorting by party id (`handle_decrypted_shares_aggregation_proof`
+        // truncates); fold slot indices must stay in `0..T+1` and use that same party subset.
+        let c6_total_slots = state.threshold_m as usize + 1;
+        ensure!(
+            honest_c6.len() >= c6_total_slots,
+            "DecryptionAggregation needs at least {} honest C6 parties, have {}",
+            c6_total_slots,
+            honest_c6.len()
+        );
+        let num_ct = c7_proofs.len();
+        let mut jobs = Vec::with_capacity(num_ct);
+        for ct_idx in 0..num_ct {
+            let mut c6_inner_proofs = Vec::with_capacity(c6_total_slots);
+            let c6_slot_indices: Vec<u32> = (0..c6_total_slots as u32).collect();
+            for (_, wps) in honest_c6.iter().take(c6_total_slots) {
+                let Some(p) = wps.get(ct_idx) else {
+                    bail!("C6 inner proof missing for party at ct index {}", ct_idx);
+                };
+                c6_inner_proofs.push(p.clone());
+            }
+            jobs.push(DecryptionAggregationJobRequest {
+                c6_inner_proofs,
+                c6_slot_indices,
+                c7_proof: c7_proofs[ct_idx].clone(),
+            });
+        }
+        let corr = CorrelationId::new();
+        self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::DecryptionAggregation(DecryptionAggregationRequest {
+                    c6_total_slots,
+                    jobs,
+                    params_preset: self.params_preset,
+                }),
+                corr,
+                self.e3_id.clone(),
+            ),
+            ec.clone(),
+        )?;
+        self.decryption_aggregation_correlation = Some(corr);
+        Ok(())
     }
 
     pub fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
@@ -713,20 +764,20 @@ impl ThresholdPlaintextAggregator {
                 })?;
             }
 
-            // C6 cross-node fold response (ignore unrelated FoldProofs, e.g. PK C5 fold on same bus)
-            ComputeResponseKind::Zk(ZkResponse::FoldProofs(resp)) => {
-                if self.c6_fold.awaits_correlation(&correlation_id) {
-                    let fold_ec = self.last_ec.clone().unwrap_or_else(|| ec.clone());
-                    if self.c6_fold.handle_response(
-                        &correlation_id,
-                        resp.proof,
-                        "ThresholdPlaintextAggregator C6 fold",
-                        &self.bus,
-                        &self.e3_id,
-                        &fold_ec,
-                    )? {
-                        self.try_publish_complete()?;
+            ComputeResponseKind::Zk(ZkResponse::DecryptionAggregation(resp)) => {
+                if self.decryption_aggregation_correlation.as_ref() == Some(&correlation_id) {
+                    self.decryption_aggregation_correlation = None;
+                    // Worker must return one DecryptionAggregator proof per pending C7 ciphertext.
+                    if let Some(c7_proofs) = self.c7_proofs_pending.as_ref() {
+                        ensure!(
+                            resp.proofs.len() == c7_proofs.len(),
+                            "DecryptionAggregation response proof count {} != expected {}",
+                            resp.proofs.len(),
+                            c7_proofs.len()
+                        );
                     }
+                    self.decryption_aggregator_proofs = Some(resp.proofs);
+                    self.try_publish_complete()?;
                 }
             }
 
@@ -738,13 +789,17 @@ impl ThresholdPlaintextAggregator {
         Ok(())
     }
 
-    /// Publish `PlaintextAggregated` when both C7 proofs and C6 fold are complete.
+    /// Publish `PlaintextAggregated` when both C7 proofs and decryption aggregation are complete.
     fn try_publish_complete(&mut self) -> Result<()> {
-        let Some(c7_proofs) = self.c7_proofs_pending.as_ref() else {
+        let Some(c7_proofs) = self.c7_proofs_pending.clone() else {
             return Ok(());
         };
-        let c6_ready = self.c6_fold.result.is_some() || self.c6_fold.fold_input_was_empty;
-        if !c6_ready {
+        if let Some(ec) = self.last_ec.clone() {
+            self.dispatch_decryption_aggregation(&ec)?;
+        }
+        let dec_ready = self.decryption_aggregator_proofs.is_some()
+            && self.decryption_aggregation_correlation.is_none();
+        if !dec_ready {
             return Ok(());
         }
 
@@ -759,7 +814,7 @@ impl ThresholdPlaintextAggregator {
             .clone()
             .ok_or_else(|| anyhow!("No EventContext for publish"))?;
 
-        info!("Both C7 and C6 fold proof ready — publishing PlaintextAggregated");
+        info!("C7 + decryption_aggregator proofs ready — publishing PlaintextAggregated");
 
         let len = MAX_MSG_NON_ZERO_COEFFS * 8;
         let decrypted_output: Vec<ArcBytes> = state
@@ -776,17 +831,19 @@ impl ThresholdPlaintextAggregator {
             })
             .collect();
 
+        let decryption_aggregator_proofs = self
+            .decryption_aggregator_proofs
+            .clone()
+            .unwrap_or_default();
+        // Keep c7_proofs for invariant check; they are subsumed by the decryption_aggregator proof.
+        let _ = c7_proofs;
         let event = PlaintextAggregated {
             decrypted_output,
             e3_id: self.e3_id.clone(),
-            aggregation_proofs: c7_proofs.clone(),
-            c6_aggregated_proof: self.c6_fold.result.clone(),
+            decryption_aggregator_proofs,
         };
 
-        info!(
-            "Dispatching plaintext event with C7 and C6 proofs {:?}",
-            event
-        );
+        info!("Dispatching plaintext event {:?}", event);
         self.bus.publish(event, ec.clone())?;
 
         self.state.try_mutate(&ec, |_| {
@@ -888,19 +945,12 @@ impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
                         party_id,
                         decryption_share,
                         signed_decryption_proofs,
-                        wrapped_proofs,
                         ..
                     },
                     ec,
                 ) = msg.into_inner().into_components();
 
-                self.add_share(
-                    party_id,
-                    decryption_share,
-                    signed_decryption_proofs,
-                    wrapped_proofs,
-                    &ec,
-                )?;
+                self.add_share(party_id, decryption_share, signed_decryption_proofs, &ec)?;
 
                 // If we transitioned to VerifyingC6, dispatch C6 verification
                 // using the proofs persisted in state

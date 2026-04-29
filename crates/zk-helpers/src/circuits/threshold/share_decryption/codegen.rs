@@ -69,6 +69,7 @@ pub global {}_BIT_E_SM: u32 = {};
 pub global {}_BIT_R1: u32 = {};
 pub global {}_BIT_R2: u32 = {};
 pub global {}_BIT_D: u32 = {};
+pub global {}_BIT_D_NATIVE: u32 = {};
 
 pub global {}_R1_BOUNDS: [Field; L] = [{}];
 pub global {}_R2_BOUNDS: [Field; L] = [{}];
@@ -94,6 +95,8 @@ pub global {}_CONFIGS: ShareDecryptionConfigs<L> = ShareDecryptionConfigs::new(
         configs.bits.r2_bit,
         prefix,
         configs.bits.d_bit,
+        prefix,
+        configs.bits.d_native_bit,
         prefix,
         r1_bounds_str,
         prefix,

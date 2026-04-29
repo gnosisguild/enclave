@@ -25,7 +25,6 @@ import {
   Enclave__factory as EnclaveFactory,
   MockUSDC__factory as MockUSDCFactory,
 } from "../../types";
-import { encodePkProof } from "../fixtures";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time, mine } = networkHelpers;
@@ -44,15 +43,15 @@ describe("E3 Pricing", function () {
 
   // Default pricing config matching initialize() defaults
   const defaultPricingConfig = {
-    keyGenFixedPerNode: 50000n,
-    keyGenPerEncryptionProof: 25000n,
-    coordinationPerPair: 5000n,
-    availabilityPerNodePerSec: 20n,
-    decryptionPerNode: 150000n,
-    publicationBase: 500000n,
-    verificationPerProof: 2000n,
+    keyGenFixedPerNode: 100000n,
+    keyGenPerEncryptionProof: 50000n,
+    coordinationPerPair: 10000n,
+    availabilityPerNodePerSec: 50n,
+    decryptionPerNode: 300000n,
+    publicationBase: 1000000n,
+    verificationPerProof: 5000n,
     protocolTreasury: ethers.ZeroAddress,
-    marginBps: 1000,
+    marginBps: 1500,
     protocolShareBps: 0,
     dkgUtilizationBps: 2500,
     computeUtilizationBps: 5000,
@@ -141,8 +140,8 @@ describe("E3 Pricing", function () {
     }
     await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
     await registry.finalizeCommittee(e3Id);
-    const proof = encodePkProof(ethers.keccak256(publicKey));
-    await registry.publishCommittee(e3Id, nodes, publicKey, proof, "0x");
+    const pkCommitment = ethers.keccak256(publicKey);
+    await registry.publishCommittee(e3Id, nodes, publicKey, pkCommitment, "0x");
   };
 
   const setup = async () => {
@@ -378,8 +377,8 @@ describe("E3 Pricing", function () {
         (config.computeWindow * BigInt(pc.computeUtilizationBps)) / 10000n +
         (config.decryptionWindow * BigInt(pc.decryptUtilizationBps)) / 10000n;
 
-      // Calculate expected fee (proof-aware)
-      const proofsPerNode = 6n + 2n * (n - 1n) * 2n;
+      // Calculate expected fee (proof-aware): proofsPerNode = 14 + 4 × (N-1)
+      const proofsPerNode = 14n + 4n * (n - 1n);
       let baseFee = pc.keyGenFixedPerNode * n;
       baseFee += pc.keyGenPerEncryptionProof * n * proofsPerNode;
       if (n > 1n) baseFee += (pc.coordinationPerPair * n * (n - 1n)) / 2n;
@@ -495,12 +494,12 @@ describe("E3 Pricing", function () {
       // Double base costs
       await enclave.setPricingConfig({
         ...defaultPricingConfig,
-        keyGenFixedPerNode: 100000n,
-        keyGenPerEncryptionProof: 50000n,
-        coordinationPerPair: 10000n,
-        availabilityPerNodePerSec: 40n,
-        decryptionPerNode: 300000n,
-        publicationBase: 1000000n,
+        keyGenFixedPerNode: 200000n,
+        keyGenPerEncryptionProof: 100000n,
+        coordinationPerPair: 20000n,
+        availabilityPerNodePerSec: 100n,
+        decryptionPerNode: 600000n,
+        publicationBase: 2000000n,
       });
 
       const feeAfter = await enclave.getE3Quote(request);
@@ -636,7 +635,7 @@ describe("E3 Pricing", function () {
       const op3Before = await usdcToken.balanceOf(nodes[2]);
 
       // Publish plaintext (triggers _distributeRewards)
-      await enclave.publishPlaintextOutput(e3Id, data, proof, proof);
+      await enclave.publishPlaintextOutput(e3Id, data, proof);
 
       const op1After = await usdcToken.balanceOf(nodes[0]);
       const op2After = await usdcToken.balanceOf(nodes[1]);
@@ -718,7 +717,7 @@ describe("E3 Pricing", function () {
       const op2Before = await usdcToken.balanceOf(nodes[1]);
       const op3Before = await usdcToken.balanceOf(nodes[2]);
 
-      await enclave.publishPlaintextOutput(e3Id, data, proof, proof);
+      await enclave.publishPlaintextOutput(e3Id, data, proof);
 
       const treasuryAfter = await usdcToken.balanceOf(treasuryAddr);
       const op1After = await usdcToken.balanceOf(nodes[0]);
@@ -743,14 +742,14 @@ describe("E3 Pricing", function () {
     it("has correct default pricing config from initialize", async function () {
       const { enclave } = await loadFixture(setup);
       const pc = await enclave.getPricingConfig();
-      expect(pc.keyGenFixedPerNode).to.equal(50000);
-      expect(pc.keyGenPerEncryptionProof).to.equal(25000);
-      expect(pc.coordinationPerPair).to.equal(5000);
-      expect(pc.availabilityPerNodePerSec).to.equal(20);
-      expect(pc.decryptionPerNode).to.equal(150000);
-      expect(pc.publicationBase).to.equal(500000);
-      expect(pc.verificationPerProof).to.equal(2000);
-      expect(pc.marginBps).to.equal(1000);
+      expect(pc.keyGenFixedPerNode).to.equal(100000);
+      expect(pc.keyGenPerEncryptionProof).to.equal(50000);
+      expect(pc.coordinationPerPair).to.equal(10000);
+      expect(pc.availabilityPerNodePerSec).to.equal(50);
+      expect(pc.decryptionPerNode).to.equal(300000);
+      expect(pc.publicationBase).to.equal(1000000);
+      expect(pc.verificationPerProof).to.equal(5000);
+      expect(pc.marginBps).to.equal(1500);
       expect(pc.protocolShareBps).to.equal(0);
       expect(pc.dkgUtilizationBps).to.equal(2500);
       expect(pc.computeUtilizationBps).to.equal(5000);

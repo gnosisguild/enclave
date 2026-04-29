@@ -3,7 +3,13 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { BigNumberish, ZeroAddress, zeroPadValue } from "ethers";
+import {
+  BigNumberish,
+  ZeroAddress,
+  ZeroHash,
+  isHexString,
+  zeroPadValue,
+} from "ethers";
 import fs from "fs";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
@@ -315,20 +321,21 @@ export const publishCommittee = task(
     type: ArgumentType.STRING,
   })
   .addOption({
-    name: "proof",
+    name: "pkCommitment",
     description:
-      "ABI-encoded pk proof (bytes rawProof, bytes32[] publicInputs); commitment is last input",
+      "Hash-based aggregated PK commitment (bytes32 hex); required even when proof aggregation is disabled",
     defaultValue: "",
     type: ArgumentType.STRING,
   })
   .addOption({
-    name: "foldProof",
-    description: "fold proof to publish",
+    name: "proof",
+    description:
+      "ABI-encoded DkgAggregator (EVM) proof (bytes rawProof, bytes32[] publicInputs); pass 0x when proof aggregation is disabled",
     defaultValue: "0x",
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async ({ e3Id, nodes, publicKey, proof, foldProof }, hre) => {
+    default: async ({ e3Id, nodes, publicKey, pkCommitment, proof }, hre) => {
       const { deployAndSaveCiphernodeRegistryOwnable } = await import(
         "../scripts/deployAndSave/ciphernodeRegistryOwnable"
       );
@@ -353,16 +360,32 @@ export const publishCommittee = task(
         throw new Error("Invalid nodes format: no valid addresses found");
       }
 
-      if (!proof) {
-        throw new Error("proof is required");
+      if (!pkCommitment) {
+        throw new Error("pkCommitment is required");
+      }
+      // pkCommitment is stored and emitted unconditionally by the registry, so off-chain
+      // consumers can read an unusable key if the values are inconsistent. Validate format
+      // and require both publicKey and pkCommitment to be present and non-zero.
+      if (!isHexString(pkCommitment, 32)) {
+        throw new Error(
+          `pkCommitment must be a 32-byte hex string (got ${pkCommitment})`,
+        );
+      }
+      if (pkCommitment === ZeroHash) {
+        throw new Error("pkCommitment must not be the zero hash");
+      }
+      if (!isHexString(publicKey) || publicKey === "0x") {
+        throw new Error(
+          "publicKey is required and must be a non-empty hex string",
+        );
       }
 
       const tx = await ciphernodeRegistry.publishCommittee(
         e3Id,
         nodesToSend,
         publicKey,
+        pkCommitment,
         proof,
-        foldProof,
       );
 
       console.log("Publishing committee... ", tx.hash);
@@ -567,23 +590,8 @@ export const publishPlaintext = task(
     defaultValue: "",
     type: ArgumentType.STRING,
   })
-  .addOption({
-    name: "foldProof",
-    description: "fold proof to publish",
-    defaultValue: "0x",
-    type: ArgumentType.STRING,
-  })
-  .addOption({
-    name: "foldProofFile",
-    description: "file containing fold proof to publish",
-    defaultValue: "",
-    type: ArgumentType.STRING,
-  })
   .setAction(async () => ({
-    default: async (
-      { e3Id, data, dataFile, proof, proofFile, foldProof, foldProofFile },
-      hre,
-    ) => {
+    default: async ({ e3Id, data, dataFile, proof, proofFile }, hre) => {
       const { deployAndSaveEnclave } = await import(
         "../scripts/deployAndSave/enclave"
       );
@@ -600,23 +608,16 @@ export const publishPlaintext = task(
       }
 
       let proofToSend = proof;
-      let foldProofToSend = foldProof;
 
       if (proofFile) {
         const file = fs.readFileSync(proofFile);
         proofToSend = file.toString();
       }
 
-      if (foldProofFile) {
-        const file = fs.readFileSync(foldProofFile);
-        foldProofToSend = file.toString();
-      }
-
       const tx = await enclave.publishPlaintextOutput(
         e3Id,
         dataToSend,
         proofToSend,
-        foldProofToSend,
       );
 
       console.log("Publishing plaintext... ", tx.hash);

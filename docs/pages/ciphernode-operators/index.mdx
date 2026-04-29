@@ -50,15 +50,14 @@ The Interfold protocol uses several contracts that work together:
 | EnclaveToken (ENCL)  | `0x62440E4b344D2A8aAf14c72b845F978eE615B7be` | 10697341     |
 | MockUSDC (fee token) | `0x9B1820D75bb09433D17C674A289fc6dD53e9c389` | 10697340     |
 
-Circuit verifiers (C5, C7, Fold) are deployed with the main flow. The DecryptedSharesAggregation
-circuit (C7) is deployed as a single ThresholdDecryptedSharesAggregationVerifier. See
-`deployed_contracts.json` for addresses.
+The DKG and decryption aggregator circuits are deployed as the sole on-chain verifiers for BFV
+public-key publication and plaintext decryption respectively (each aggregator internally verifies
+the underlying node-fold/C5 and C6-fold/C7 sub-proofs). See `deployed_contracts.json` for addresses.
 
-| Verifier                                         | Address                                    |
-| ------------------------------------------------ | ------------------------------------------ |
-| ThresholdPkAggregationVerifier (C5)              | See `deployed_contracts.json` after deploy |
-| ThresholdDecryptedSharesAggregationVerifier (C7) | See `deployed_contracts.json` after deploy |
-| RecursiveAggregationFoldVerifier (Fold)          | See `deployed_contracts.json` after deploy |
+| Verifier                          | Address                                    |
+| --------------------------------- | ------------------------------------------ |
+| DkgAggregatorVerifier (DKG)       | See `deployed_contracts.json` after deploy |
+| DecryptionAggregatorVerifier (C7) | See `deployed_contracts.json` after deploy |
 
 > Always verify addresses from `packages/enclave-contracts/deployed_contracts.json` or your
 > deployment output. Addresses differ per network.

@@ -278,8 +278,8 @@ Automates the full pipeline from Noir circuits to on-chain Solidity verifiers:
 3. **Generates verification keys** using `bb write_vk -t evm`
 4. **Generates Solidity verifiers** using `bb write_solidity_verifier`
 5. **Post-processes** the generated Solidity:
-   - Renames contract from `HonkVerifier` to descriptive name (e.g.,
-     `ThresholdPkAggregationVerifier`, `ThresholdPkGenerationVerifier`)
+   - Renames contract from `HonkVerifier` to descriptive name (e.g., `DkgAggregatorVerifier`,
+     `DecryptionAggregatorVerifier`)
    - Replaces Apache-2.0 license header with LGPL-3.0-only
 6. **Outputs** to `packages/enclave-contracts/contracts/verifiers/bfv/honk/`
 
@@ -304,13 +304,12 @@ The `generate:verifiers` script in package.json passes `--circuits` with the on-
 ```
 🔮 Generating Solidity verifiers from Noir circuits...
 
-   Found 4 circuit(s)
+   Found 2 circuit(s)
 
-   ✓ threshold/pk_aggregation → ThresholdPkAggregationVerifier.sol
-   ✓ threshold/decrypted_shares_aggregation → ThresholdDecryptedSharesAggregationVerifier.sol
-   ✓ recursive_aggregation/fold → RecursiveAggregationFoldVerifier.sol
+   ✓ recursive_aggregation/dkg_aggregator → DkgAggregatorVerifier.sol
+   ✓ recursive_aggregation/decryption_aggregator → DecryptionAggregatorVerifier.sol
 
-✅ Generated 4 Solidity verifier(s) in:
+✅ Generated 2 Solidity verifier(s) in:
    packages/enclave-contracts/contracts/verifiers/bfv/honk/
 ```
 

@@ -21,23 +21,12 @@ export const deployAndSaveBfvPkVerifier = async (
   const chain = networkName ?? "localhost";
 
   const circuitVerifierArgs = readDeploymentArgs(
-    "ThresholdPkAggregationVerifier",
+    "DkgAggregatorVerifier",
     chain,
   );
   if (!circuitVerifierArgs?.address) {
     throw new Error(
-      "ThresholdPkAggregationVerifier must be deployed first. " +
-        "Run deployAndSaveAllVerifiers or deploy verifiers.",
-    );
-  }
-
-  const foldVerifierArgs = readDeploymentArgs(
-    "RecursiveAggregationFoldVerifier",
-    chain,
-  );
-  if (!foldVerifierArgs?.address) {
-    throw new Error(
-      "RecursiveAggregationFoldVerifier must be deployed first. " +
+      "DkgAggregatorVerifier must be deployed first. " +
         "Run deployAndSaveAllVerifiers or deploy verifiers.",
     );
   }
@@ -55,7 +44,6 @@ export const deployAndSaveBfvPkVerifier = async (
   const bfvPkVerifierFactory = await ethers.getContractFactory("BfvPkVerifier");
   const bfvPkVerifier = await bfvPkVerifierFactory.deploy(
     circuitVerifierArgs.address,
-    foldVerifierArgs.address,
   );
 
   await bfvPkVerifier.waitForDeployment();

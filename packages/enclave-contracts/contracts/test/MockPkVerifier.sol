@@ -9,14 +9,14 @@ import { IPkVerifier } from "../interfaces/IPkVerifier.sol";
 
 contract MockPkVerifier is IPkVerifier {
     function verify(
-        bytes memory proof,
-        bytes memory /* foldProof */
-    ) external pure returns (bytes32 pkCommitment) {
+        bytes32 pkCommitment,
+        bytes calldata proof
+    ) external pure returns (bool) {
         (, bytes32[] memory publicInputs) = abi.decode(
             proof,
             (bytes, bytes32[])
         );
-        require(publicInputs.length > 0, "MockPkVerifier: no public inputs");
-        return publicInputs[publicInputs.length - 1];
+        if (publicInputs.length == 0) return false;
+        return publicInputs[publicInputs.length - 1] == pkCommitment;
     }
 }

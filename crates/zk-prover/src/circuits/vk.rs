@@ -45,16 +45,6 @@ fn load_vk_from_dir(circuit_dir: &Path, circuit_name: &str) -> Result<VkArtifact
     })
 }
 
-/// Loads VK artifacts from the wrapper circuit dir.
-/// Use when folding wrapper proofs (verifier needs the wrapper's VK).
-pub fn load_wrapper_vk_artifacts(
-    circuits_dir: &Path,
-    circuit: CircuitName,
-) -> Result<VkArtifacts, ZkError> {
-    let circuit_dir = circuits_dir.join(circuit.wrapper_dir_path());
-    load_vk_from_dir(&circuit_dir, circuit.as_str())
-}
-
 /// Loads VK artifacts from `.vk` and `.vk_hash` in the variant-specific circuits directory.
 /// The caller is responsible for passing the correct circuits_dir:
 /// - `circuits_dir(CircuitVariant::Recursive)` for inner/base proofs embedded in a wrapper
@@ -67,14 +57,10 @@ pub fn load_vk_artifacts(
     load_vk_from_dir(&circuit_dir, circuit.as_str())
 }
 
-/// VK path by circuit type: Fold uses dir_path, wrappers use wrapper_dir_path.
+/// Loads VK artifacts for a proof being combined into a recursive aggregation circuit.
 pub fn load_vk_for_fold_input(
     circuits_dir: &Path,
     circuit: CircuitName,
 ) -> Result<VkArtifacts, ZkError> {
-    if circuit == CircuitName::Fold {
-        load_vk_artifacts(circuits_dir, circuit)
-    } else {
-        load_wrapper_vk_artifacts(circuits_dir, circuit)
-    }
+    load_vk_artifacts(circuits_dir, circuit)
 }

@@ -78,10 +78,10 @@ mod tests {
         let esm_commitment = make_field(99);
         let source_values = vec![esm_commitment];
 
-        // C6 inputs: [expected_sk_commitment=42, expected_e_sm_commitment=99]
         let mut c6_signals = Vec::new();
         c6_signals.extend_from_slice(&make_field(42));
         c6_signals.extend_from_slice(&esm_commitment);
+        c6_signals.extend_from_slice(&make_field(1));
 
         assert!(link.check_signals(&source_values, &c6_signals));
     }
@@ -91,10 +91,10 @@ mod tests {
         let link = C4bToC6ESmCommitmentLink;
         let source_values = vec![make_field(99)];
 
-        // C6 inputs: [expected_sk_commitment=42, expected_e_sm_commitment=42]
         let mut c6_signals = Vec::new();
         c6_signals.extend_from_slice(&make_field(42));
         c6_signals.extend_from_slice(&make_field(42));
+        c6_signals.extend_from_slice(&make_field(1));
 
         assert!(!link.check_signals(&source_values, &c6_signals));
     }
@@ -104,6 +104,6 @@ mod tests {
         let link = C4bToC6ESmCommitmentLink;
         assert!(link.extract_source_values(&[0u8; 10]).is_empty());
         // Empty source values means malformed proof — should be inconsistent
-        assert!(!link.check_signals(&[], &[0u8; 64]));
+        assert!(!link.check_signals(&[], &[0u8; 3 * FIELD_BYTE_LEN]));
     }
 }
