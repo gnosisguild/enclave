@@ -1,8 +1,8 @@
 {
   "verify_gas": {
-    "dkg": null,
+    "dkg": 3037922,
     "user": 2972869,
-    "dec": null
+    "dec": 3549077
   },
   "source": "folded_proof_export_plus_crisp_verify_test",
   "artifact_sizes_bytes": {
