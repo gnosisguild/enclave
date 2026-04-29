@@ -430,7 +430,6 @@ p2_artifact=$(artifact_size_pair_from_gas "dkg")
 if [ -n "$p2_artifact" ]; then
     IFS='|' read -r p2s p2b <<< "$p2_artifact"
 fi
-p3_artifact_proof=""
 wrapper_json=$(find_json_by_path_fragment "/threshold/user_data_encryption")
 if [ -n "$wrapper_json" ]; then
     p3_proof_bytes=$(jq -r '.proof_generation.proof_size_bytes // 0' "$wrapper_json")
