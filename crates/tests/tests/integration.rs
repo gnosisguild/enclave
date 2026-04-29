@@ -48,6 +48,7 @@ use num_bigint::BigUint;
 use rand::rngs::OsRng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
+use std::ffi::OsString;
 use std::time::{Duration, Instant};
 use std::{fs, path::PathBuf, sync::Arc};
 use tokio::{
@@ -55,10 +56,111 @@ use tokio::{
     time::sleep,
 };
 
+#[derive(Debug, Clone, Copy)]
+struct BenchmarkParams {
+    /// Noir artifact preset directory name under `circuits/bin/` (e.g. `secure-8192`).
+    preset_subdir: &'static str,
+    /// BFV parameter family used for BFV/trBFV computations.
+    bfv_preset: BfvPreset,
+    /// Statistical security parameter λ used for smudging bound / error_size.
+    lambda: usize,
+    /// Collector-timeout env var bundle for secure runs.
+    collection_timeout_secs: Option<(u64, u64, u64)>,
+    /// Expected upper-bounds for history collection (end-to-end wall clock).
+    pubkey_flow_timeout: Duration,
+    plaintext_flow_timeout: Duration,
+}
+
+fn select_benchmark_params() -> BenchmarkParams {
+    let benchmark_mode = std::env::var("BENCHMARK_MODE").unwrap_or_else(|_| "insecure".to_string());
+    let is_secure_mode = benchmark_mode == "secure";
+
+    let bfv_preset = if is_secure_mode {
+        BfvPreset::SecureThreshold8192
+    } else {
+        DEFAULT_BFV_PRESET
+    };
+
+    // λ is part of the preset metadata; using a hard-coded value here will mix parameter
+    // families and can invalidate noise/security assumptions.
+    let lambda = bfv_preset.metadata().lambda;
+
+    let preset_subdir = if is_secure_mode {
+        "secure-8192"
+    } else {
+        "insecure-512"
+    };
+
+    let collection_timeout_secs = if is_secure_mode {
+        Some((1800, 7200, 7200))
+    } else {
+        None
+    };
+
+    let pubkey_flow_timeout = if is_secure_mode {
+        Duration::from_secs(15_000)
+    } else {
+        Duration::from_secs(5_000)
+    };
+    let plaintext_flow_timeout = if is_secure_mode {
+        Duration::from_secs(3_000)
+    } else {
+        Duration::from_secs(1_000)
+    };
+
+    BenchmarkParams {
+        preset_subdir,
+        bfv_preset,
+        lambda,
+        collection_timeout_secs,
+        pubkey_flow_timeout,
+        plaintext_flow_timeout,
+    }
+}
+
+/// RAII guard that restores the benchmark-specific collector-timeout env vars on scope exit.
+/// This prevents leaking secure-mode tuning into other tests/processes.
+struct EnvTimeoutVarsGuard {
+    enc: Option<OsString>,
+    thr: Option<OsString>,
+    dec_shared: Option<OsString>,
+}
+
+impl EnvTimeoutVarsGuard {
+    fn new() -> Self {
+        Self {
+            enc: std::env::var_os("E3_ENCRYPTION_KEY_COLLECTION_TIMEOUT_SECS"),
+            thr: std::env::var_os("E3_THRESHOLD_SHARE_COLLECTION_TIMEOUT_SECS"),
+            dec_shared: std::env::var_os("E3_DECRYPTION_KEY_SHARED_COLLECTION_TIMEOUT_SECS"),
+        }
+    }
+}
+
+impl Drop for EnvTimeoutVarsGuard {
+    fn drop(&mut self) {
+        fn restore(name: &str, original: &Option<OsString>) {
+            if let Some(v) = original {
+                std::env::set_var(name, v);
+            } else {
+                std::env::remove_var(name);
+            }
+        }
+
+        restore("E3_ENCRYPTION_KEY_COLLECTION_TIMEOUT_SECS", &self.enc);
+        restore("E3_THRESHOLD_SHARE_COLLECTION_TIMEOUT_SECS", &self.thr);
+        restore(
+            "E3_DECRYPTION_KEY_SHARED_COLLECTION_TIMEOUT_SECS",
+            &self.dec_shared,
+        );
+    }
+}
+
 /// Create a ZkBackend for integration tests.
 /// If a local bb binary is found, uses it with fixture files (fast path).
 /// Otherwise, calls `ensure_installed()` to download bb + circuits (CI path).
-async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
+async fn setup_test_zk_backend(
+    preset_subdir: &'static str,
+) -> Result<(ZkBackend, tempfile::TempDir)> {
     let temp = get_tempdir().unwrap();
     let temp_path = temp.path();
     let noir_dir = temp_path.join("noir");
@@ -168,13 +270,6 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
         }
 
         // ── recursive/ variant (inner/base proofs, uses .vk_noir) ──────────
-        let benchmark_mode =
-            std::env::var("BENCHMARK_MODE").unwrap_or_else(|_| "insecure".to_string());
-        let preset_subdir = if benchmark_mode == "secure" {
-            "secure-8192"
-        } else {
-            "insecure-512"
-        };
         let preset_dir = circuits_dir.join(preset_subdir);
 
         let rv = preset_dir.join("recursive");
@@ -845,31 +940,24 @@ async fn test_trbfv_actor() -> Result<()> {
     let bus = system.handle()?.enable("test");
 
     // Parameters selected by benchmark mode.
-    let benchmark_mode = std::env::var("BENCHMARK_MODE").unwrap_or_else(|_| "insecure".to_string());
-    let selected_preset = if benchmark_mode == "secure" {
-        BfvPreset::SecureThreshold8192
-    } else {
-        DEFAULT_BFV_PRESET
-    };
-    let is_secure_mode = benchmark_mode == "secure";
-    if is_secure_mode {
-        // Secure runs can spend significantly longer in DKG/decryption collector phases.
-        // Increase actor-level collection deadlines for this benchmark process only.
-        std::env::set_var("E3_ENCRYPTION_KEY_COLLECTION_TIMEOUT_SECS", "1800");
-        std::env::set_var("E3_THRESHOLD_SHARE_COLLECTION_TIMEOUT_SECS", "7200");
-        std::env::set_var("E3_DECRYPTION_KEY_SHARED_COLLECTION_TIMEOUT_SECS", "7200");
+    let benchmark_params = select_benchmark_params();
+    let _env_guard = EnvTimeoutVarsGuard::new();
+    if let Some((enc, threshold, dec_shared)) = benchmark_params.collection_timeout_secs {
+        std::env::set_var("E3_ENCRYPTION_KEY_COLLECTION_TIMEOUT_SECS", enc.to_string());
+        std::env::set_var(
+            "E3_THRESHOLD_SHARE_COLLECTION_TIMEOUT_SECS",
+            threshold.to_string(),
+        );
+        std::env::set_var(
+            "E3_DECRYPTION_KEY_SHARED_COLLECTION_TIMEOUT_SECS",
+            dec_shared.to_string(),
+        );
     }
-    let pubkey_flow_timeout = if is_secure_mode {
-        Duration::from_secs(15_000)
-    } else {
-        Duration::from_secs(5_000)
-    };
-    let plaintext_flow_timeout = if is_secure_mode {
-        Duration::from_secs(3_000)
-    } else {
-        Duration::from_secs(1_000)
-    };
-    let params_raw = BfvParamSet::from(selected_preset).build_arc();
+
+    let pubkey_flow_timeout = benchmark_params.pubkey_flow_timeout;
+    let plaintext_flow_timeout = benchmark_params.plaintext_flow_timeout;
+
+    let params_raw = BfvParamSet::from(benchmark_params.bfv_preset).build_arc();
 
     // Encoded Params
     let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));
@@ -879,11 +967,9 @@ async fn test_trbfv_actor() -> Result<()> {
     let threshold_n = 3;
     let esi_per_ct = 1;
 
-    // WARNING: INSECURE SECURITY PARAMETER LAMBDA.
-    // This is just for INSECURE parameter set.
-    // This is not secure and should not be used in production.
-    // For production use lambda = 80.
-    let lambda = 2;
+    // Statistical security parameter λ used for smudging bound / error_size.
+    // Comes from the selected BFV preset metadata to avoid mixing parameter families.
+    let lambda = benchmark_params.lambda;
 
     let seed = create_seed_from_u64(123);
     let error_size = ArcBytes::from_bytes(&BigUint::to_bytes_be(&calculate_error_size(
@@ -904,7 +990,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let multithread_report = MultithreadReport::new(max_threadroom, concurrent_jobs).start();
 
     // Setup ZK backend for proof generation/verification
-    let (zk_backend, _zk_temp) = setup_test_zk_backend().await?;
+    let (zk_backend, _zk_temp) = setup_test_zk_backend(benchmark_params.preset_subdir).await?;
 
     let nodes = CiphernodeSystemBuilder::new()
         // All nodes run the same binary under the aggregator-committee model.
@@ -988,7 +1074,7 @@ async fn test_trbfv_actor() -> Result<()> {
     //
     //   - m=1.
     //   - n=3
-    //   - lambda=2
+    //   - lambda -> calculate_error_size uses the selected BFV preset metadata
     //   - error_size -> calculate using calculate_error_size
     //   - esi_per_ciphertext = 1
     ///////////////////////////////////////////////////////////////////////////////////
@@ -1007,7 +1093,7 @@ async fn test_trbfv_actor() -> Result<()> {
         seed: seed.clone(),
         error_size,
         esi_per_ct: esi_per_ct as usize,
-        params_preset: selected_preset,
+        params_preset: benchmark_params.bfv_preset,
         params,
         proof_aggregation_enabled,
     };
@@ -1753,7 +1839,8 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         Ok(result)
     }
 
-    let (zk_backend, _zk_temp) = setup_test_zk_backend().await?;
+    let (zk_backend, _zk_temp) =
+        setup_test_zk_backend(select_benchmark_params().preset_subdir).await?;
 
     let e3_id = E3id::new("1234", 1);
     let (rng, cn1_address, cn1_data, cn2_address, cn2_data, cipher, history, params, crpoly) = {
@@ -2008,7 +2095,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     // Setup
     let (bus, rng, seed, params, crpoly, _, _) = get_common_setup(None)?;
     let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
-    let (zk_backend, _zk_temp) = setup_test_zk_backend().await?;
+    let (zk_backend, _zk_temp) =
+        setup_test_zk_backend(select_benchmark_params().preset_subdir).await?;
 
     // Setup actual ciphernodes and dispatch add events
     let ciphernodes = create_local_ciphernodes(&bus, &rng, 3, &cipher, zk_backend.clone()).await?;
