@@ -113,6 +113,15 @@ impl Handler<ToReport> for MultithreadReport {
     }
 }
 
+/// One row of the flattened multithread report (seconds, for export / dashboards).
+#[derive(Debug, Clone, PartialEq)]
+pub struct OperationTimingSec {
+    pub name: String,
+    pub avg_seconds: f64,
+    pub runs: u64,
+    pub total_seconds: f64,
+}
+
 #[derive(MessageResponse, Debug, Clone, Eq, PartialEq)]
 pub struct FlattenedReport {
     cores_available: usize,
@@ -122,6 +131,45 @@ pub struct FlattenedReport {
     total_dur: HashMap<String, Duration>,
     mt_total: Duration,
     runs: HashMap<String, u64>,
+}
+
+impl FlattenedReport {
+    pub fn rayon_threads(&self) -> usize {
+        self.rayon_threads
+    }
+
+    pub fn max_simultaneous_rayon_tasks(&self) -> usize {
+        self.max_simultaneous_rayon_tasks
+    }
+
+    pub fn cores_available(&self) -> usize {
+        self.cores_available
+    }
+
+    /// Wall-clock sum of all tracked operation durations (same as printed "Total time").
+    pub fn tracked_total_seconds(&self) -> f64 {
+        self.mt_total.as_secs_f64()
+    }
+
+    /// Per-operation averages and totals, sorted by name (stable with `Display` output).
+    pub fn operation_timings_sec(&self) -> Vec<OperationTimingSec> {
+        let mut names: Vec<_> = self.avg_dur.keys().cloned().collect();
+        names.sort();
+        names
+            .into_iter()
+            .map(|name| {
+                let runs = *self.runs.get(&name).unwrap_or(&0);
+                let total = *self.total_dur.get(&name).unwrap_or(&Duration::ZERO);
+                let avg = *self.avg_dur.get(&name).unwrap_or(&Duration::ZERO);
+                OperationTimingSec {
+                    name,
+                    avg_seconds: avg.as_secs_f64(),
+                    runs,
+                    total_seconds: total.as_secs_f64(),
+                }
+            })
+            .collect()
+    }
 }
 
 impl std::fmt::Display for FlattenedReport {

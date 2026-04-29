@@ -35,6 +35,17 @@ pub struct ReceivedShareProofs {
 }
 
 const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(3600);
+const COLLECTION_TIMEOUT_ENV: &str = "E3_THRESHOLD_SHARE_COLLECTION_TIMEOUT_SECS";
+
+fn collection_timeout() -> Duration {
+    match std::env::var(COLLECTION_TIMEOUT_ENV)
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+    {
+        Some(0) | None => DEFAULT_COLLECTION_TIMEOUT,
+        Some(secs) => Duration::from_secs(secs),
+    }
+}
 
 pub(crate) enum CollectorState {
     Collecting,
@@ -93,13 +104,14 @@ impl Actor for ThresholdShareCollector {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+        let timeout = collection_timeout();
         info!(
             e3_id = %self.e3_id,
             "ThresholdShareCollector started, scheduling timeout in {:?}",
-            DEFAULT_COLLECTION_TIMEOUT
+            timeout
         );
         // Schedule timeout
-        let handle = ctx.notify_later(ThresholdShareCollectionTimeout, DEFAULT_COLLECTION_TIMEOUT);
+        let handle = ctx.notify_later(ThresholdShareCollectionTimeout, timeout);
         self.timeout_handle = Some(handle);
     }
 }

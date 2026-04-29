@@ -19,6 +19,32 @@ From this directory:
 
 Options and secure-only **config** circuit behavior are documented in the script and `config.json`.
 
+### What gets stored (secure / insecure)
+
+A full `./run_benchmarks.sh --mode <mode>` run writes:
+
+- `results_<mode>/raw/*.json` — Nargo timing + artifact sizes (source for the **Circuit Benchmarks**
+  table)
+- `results_<mode>/crisp_verify_gas.json` — verify gas, calldata gas, artifact sizes, and
+  **`integration_summary`** from `test_trbfv_actor` when gas extraction succeeds
+- `results_<mode>/integration_summary.json` — snapshot of `.integration_summary` (phase timings,
+  folded proofs, **multithread / operation_timings** after a fresh integration export)
+- `results_<mode>/report.md` — rendered summary of all of the above
+
+### Regenerate `report.md` only (no integration re-run)
+
+From this directory, after you already have `raw/` + `crisp_verify_gas.json`:
+
+```bash
+./regenerate_report.sh
+./regenerate_report.sh --mode insecure
+```
+
+`crisp_verify_gas.json` embeds the integration timings; if you also keep `integration_summary.json`
+in the same folder, the script passes it explicitly (useful when gas JSON is missing a field but the
+snapshot is complete). `regenerate_report.sh` itself does not re-run `test_trbfv_actor`; it renders
+from `results_<mode>/raw`, `crisp_verify_gas.json`, and (optionally) `integration_summary.json`.
+
 ## Refresh after parameter changes
 
 If you change circuit/config parameter sets, rerun the full benchmark + gas extraction flow.
@@ -43,6 +69,30 @@ pnpm -C examples/CRISP/packages/crisp-sdk build
   --gas-json "./circuits/benchmarks/results_insecure/crisp_verify_gas.json"
 ```
 
+If Π_DKG / Π_dec **verify gas** is `N/A` because `crisp_verify_gas.json` came from a failed extract,
+but your integration summary still has `folded_artifacts`, replay only the Hardhat `estimateGas`
+step and merge **dkg** / **dec** into the gas file (no Rust re-run):
+
+```bash
+# For secure folded proofs, align Solidity verifiers first (--build may take a while).
+./circuits/benchmarks/scripts/replay_folded_verify_gas.sh \
+  --summary "/tmp/summary_secure.json" \
+  --gas-json "./circuits/benchmarks/results_secure/crisp_verify_gas.json" \
+  --build secure-8192
+```
+
+If `crisp_verify_gas.json` has `integration_summary: null` but you still have the JSON written by
+`BENCHMARK_SUMMARY_OUTPUT` from a successful `test_trbfv_actor` run (e.g.
+`/tmp/summary_secure.json`), pass it so phase timings and folded sizes match that run:
+
+```bash
+./circuits/benchmarks/scripts/generate_report.sh \
+  --input-dir "./circuits/benchmarks/results_secure/raw" \
+  --output "./circuits/benchmarks/results_secure/report.md" \
+  --gas-json "./circuits/benchmarks/results_secure/crisp_verify_gas.json" \
+  --integration-summary "/tmp/summary_secure.json"
+```
+
 For secure mode, use `--mode secure` and replace `results_insecure` with `results_secure`.
 
 ## Reported protocol tables
@@ -53,6 +103,10 @@ For secure mode, use `--mode secure` and replace `results_insecure` with `result
   `C4b`, `C5`, `user-data-encryption`, `C6`, `C7`.
 - `Artifacts` for `Π_DKG`, `Π_user`, `Π_dec` with proof/public-input sizes and gas columns.
 - `Role / Phase / Activity` for P1..P4 operational cost summaries.
+- When `integration_summary` is present, the report also includes:
+  - an `Integration test` section (end-to-end phase wall-clock timings)
+  - a `Thread pool` section (Rayon threads / cores)
+  - `CPU-bound operation timings` (tracked in-process averages/totals)
 
 ## Derivation rules
 
