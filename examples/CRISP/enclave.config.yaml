@@ -21,7 +21,8 @@ chains:
         address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
         deploy_block: 4
   - name: "sepolia"
-    rpc_url: "ws://localhost:8545"
+    # Public Sepolia WebSocket endpoint (see repo docs for the recommended default).
+    rpc_url: "wss://ethereum-sepolia-rpc.publicnode.com"
     contracts:
       e3_program:
         address: "0xba3B07aBFd0B8cad68aa1E946CC7AF5C1B1c8B5D"
