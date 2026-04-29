@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # run_benchmarks.sh - Main orchestration script for benchmarking circuits
-# Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--clean]
+# Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--clean] [--verbose]
 
 set -e
 
@@ -12,6 +12,7 @@ CLEAN_ARTIFACTS=false
 MODE_OVERRIDE=""
 SKIP_COMPILE=false
 CIRCUIT_FILTER=""
+VERBOSE=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -40,9 +41,13 @@ while [[ $# -gt 0 ]]; do
             CLEAN_ARTIFACTS=true
             shift
             ;;
+        --verbose|-v)
+            VERBOSE=true
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--clean]"
+            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--clean] [--verbose]"
             exit 1
             ;;
     esac
@@ -121,6 +126,9 @@ fi
 if [ "$SKIP_COMPILE" = true ]; then
     echo "  Skip Compilation: Yes (using existing artifacts)"
 fi
+if [ "$VERBOSE" = true ]; then
+    echo "  Verbose Logging: Yes"
+fi
 echo "  Git Branch: $GIT_BRANCH"
 echo "  Git Commit: $GIT_COMMIT"
 echo "  Circuits: $(echo $CIRCUITS | wc -w | tr -d ' ')"
@@ -128,6 +136,30 @@ echo "  Oracles: $(echo $ORACLES)"
 echo "  Base Directory: $CIRCUITS_BASE_DIR"
 echo "  Output Directory: ${OUTPUT_DIR}"
 echo ""
+
+# Preflight build for selected preset so raw benches and integration stages
+# use consistent, freshly-generated circuit artifacts.
+if [ "$SKIP_COMPILE" = false ]; then
+    if [ "$MODE" = "secure" ]; then
+        PRESET_NAME="secure-8192"
+    else
+        PRESET_NAME="insecure-512"
+    fi
+    echo "Preflight: pnpm build:circuits --preset ${PRESET_NAME}"
+    if [ "$VERBOSE" = true ]; then
+        (
+          cd "$REPO_ROOT" && \
+          pnpm build:circuits --preset "$PRESET_NAME"
+        )
+    else
+        (
+          cd "$REPO_ROOT" && \
+          pnpm build:circuits --preset "$PRESET_NAME" >/dev/null
+        )
+    fi
+    echo "Preflight build complete."
+    echo ""
+fi
 
 # Circuit-specific modes come from config.json (e.g. "config" has "modes": ["secure"]); see circuits/benchmarks/config.json
 RUN_CIRCUITS=""
@@ -212,18 +244,24 @@ echo "╔═══════════════════════�
 echo "║       Generating Report...                     ║"
 echo "╚════════════════════════════════════════════════╝"
 echo ""
+echo "Stage 1/3: Running gas extraction pipeline (CRISP test + integration + EVM replay)..."
 
 # Try to retrieve verifier gas from the existing CRISP verify test path.
 GAS_JSON_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/crisp_verify_gas.json"
 # Remove any previous gas artifact so failures cannot leak stale values.
 rm -f "${GAS_JSON_FILE}"
-if "${SCRIPT_DIR}/extract_crisp_verify_gas.sh" --output "${GAS_JSON_FILE}"; then
+EXTRACT_ARGS=(--output "${GAS_JSON_FILE}" --mode "$MODE")
+if [ "$VERBOSE" = true ]; then
+    EXTRACT_ARGS+=(--verbose)
+fi
+if "${SCRIPT_DIR}/extract_crisp_verify_gas.sh" "${EXTRACT_ARGS[@]}"; then
     echo "✓ CRISP verify gas extracted: ${GAS_JSON_FILE}"
 else
     echo "⚠️  Could not extract CRISP verify gas; report will show N/A for verify gas"
 fi
 
 # Generate markdown report
+echo "Stage 2/3: Rendering markdown report from benchmarks + gas summary..."
 REPORT_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/report.md"
 "${SCRIPT_DIR}/generate_report.sh" \
     --input-dir "${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw" \
@@ -232,6 +270,13 @@ REPORT_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/report.md"
     --git-branch "$GIT_BRANCH" \
     --gas-json "${GAS_JSON_FILE}"
 
+INTEGRATION_SNAPSHOT="${BENCHMARKS_DIR}/${OUTPUT_DIR}/integration_summary.json"
+if [ -f "${GAS_JSON_FILE}" ] && jq -e '.integration_summary != null' "${GAS_JSON_FILE}" >/dev/null 2>&1; then
+    jq '.integration_summary' "${GAS_JSON_FILE}" > "${INTEGRATION_SNAPSHOT}"
+    echo "✓ Wrote integration summary snapshot: ${INTEGRATION_SNAPSHOT}"
+fi
+
+echo "Stage 3/3: Finalizing outputs..."
 echo "✓ Report generated: ${REPORT_FILE}"
 echo ""
 

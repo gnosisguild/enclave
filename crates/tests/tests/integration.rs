@@ -168,8 +168,14 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
         }
 
         // ── recursive/ variant (inner/base proofs, uses .vk_noir) ──────────
-        // Tests use insecure params, so fixtures go under insecure-512/
-        let preset_dir = circuits_dir.join("insecure-512");
+        let benchmark_mode =
+            std::env::var("BENCHMARK_MODE").unwrap_or_else(|_| "insecure".to_string());
+        let preset_subdir = if benchmark_mode == "secure" {
+            "secure-8192"
+        } else {
+            "insecure-512"
+        };
+        let preset_dir = circuits_dir.join(preset_subdir);
 
         let rv = preset_dir.join("recursive");
 
@@ -758,6 +764,18 @@ fn repeat(ch: char, num: usize) -> String {
     s
 }
 
+fn to_hex(bytes: &[u8]) -> String {
+    let mut out = String::from("0x");
+    for b in bytes {
+        out.push_str(&format!("{:02x}", b));
+    }
+    out
+}
+
+fn json_escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
 impl Report {
     pub fn push(&mut self, repo: (&str, Duration)) {
         let (label, dur) = repo;
@@ -826,8 +844,32 @@ async fn test_trbfv_actor() -> Result<()> {
     let system = EventSystem::new().with_fresh_bus();
     let bus = system.handle()?.enable("test");
 
-    // Parameters (128bits of security)
-    let params_raw = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
+    // Parameters selected by benchmark mode.
+    let benchmark_mode = std::env::var("BENCHMARK_MODE").unwrap_or_else(|_| "insecure".to_string());
+    let selected_preset = if benchmark_mode == "secure" {
+        BfvPreset::SecureThreshold8192
+    } else {
+        DEFAULT_BFV_PRESET
+    };
+    let is_secure_mode = benchmark_mode == "secure";
+    if is_secure_mode {
+        // Secure runs can spend significantly longer in DKG/decryption collector phases.
+        // Increase actor-level collection deadlines for this benchmark process only.
+        std::env::set_var("E3_ENCRYPTION_KEY_COLLECTION_TIMEOUT_SECS", "1800");
+        std::env::set_var("E3_THRESHOLD_SHARE_COLLECTION_TIMEOUT_SECS", "7200");
+        std::env::set_var("E3_DECRYPTION_KEY_SHARED_COLLECTION_TIMEOUT_SECS", "7200");
+    }
+    let pubkey_flow_timeout = if is_secure_mode {
+        Duration::from_secs(15_000)
+    } else {
+        Duration::from_secs(5_000)
+    };
+    let plaintext_flow_timeout = if is_secure_mode {
+        Duration::from_secs(3_000)
+    } else {
+        Duration::from_secs(1_000)
+    };
+    let params_raw = BfvParamSet::from(selected_preset).build_arc();
 
     // Encoded Params
     let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));
@@ -965,7 +1007,7 @@ async fn test_trbfv_actor() -> Result<()> {
         seed: seed.clone(),
         error_size,
         esi_per_ct: esi_per_ct as usize,
-        params_preset: DEFAULT_BFV_PRESET,
+        params_preset: selected_preset,
         params,
         proof_aggregation_enabled,
     };
@@ -1052,8 +1094,8 @@ async fn test_trbfv_actor() -> Result<()> {
         .take_history_with_timeouts(
             0,
             expected_events.len(),
-            Some(Duration::from_secs(5000)),
-            Some(Duration::from_secs(5000)),
+            Some(pubkey_flow_timeout),
+            Some(pubkey_flow_timeout),
         )
         .await
         .map_err(|e| anyhow::anyhow!("FAILURE on node 0: {expected_events:?} : {e}"))?;
@@ -1203,14 +1245,19 @@ async fn test_trbfv_actor() -> Result<()> {
     expected_events.extend_from_slice(&DS3);
     expected_events.push("PlaintextAggregated");
 
+    println!(
+        "[bench-progress] waiting for PlaintextAggregated flow on observer node (expected events: {})",
+        expected_events.len()
+    );
     let h = expect_node_events_with_timeouts(
         &nodes,
         0,
         &expected_events,
-        Duration::from_secs(1000),
-        Duration::from_secs(1000),
+        plaintext_flow_timeout,
+        plaintext_flow_timeout,
     )
     .await?;
+    println!("[bench-progress] PlaintextAggregated observed on collector path");
 
     let active_aggregator_history = nodes.get_history(active_aggregator_index).await?;
     const C6_VERIFY_PREFIX: [&str; 19] = [
@@ -1340,13 +1387,6 @@ async fn test_trbfv_actor() -> Result<()> {
             dkg_aggregator_proof.as_ref(),
             decryption_aggregator_proofs.first(),
         ) {
-            fn to_hex(bytes: &[u8]) -> String {
-                let mut out = String::from("0x");
-                for b in bytes {
-                    out.push_str(&format!("{:02x}", b));
-                }
-                out
-            }
             let json = format!(
                 concat!(
                     "{{\n",
@@ -1404,6 +1444,91 @@ async fn test_trbfv_actor() -> Result<()> {
     println!("{}", mt_report);
 
     report.push(("Entire Test", whole_test.elapsed()));
+    if let Ok(path) = std::env::var("BENCHMARK_SUMMARY_OUTPUT") {
+        let operation_timings_json = mt_report
+            .operation_timings_sec()
+            .iter()
+            .map(|op| {
+                format!(
+                    "    {{\"name\": \"{}\", \"avg_seconds\": {:.9}, \"runs\": {}, \"total_seconds\": {:.9}}}",
+                    json_escape(&op.name),
+                    op.avg_seconds,
+                    op.runs,
+                    op.total_seconds
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",\n");
+
+        let timings_json = report
+            .inner
+            .iter()
+            .map(|(label, duration)| {
+                format!(
+                    "    {{\"label\": \"{}\", \"seconds\": {:.9}}}",
+                    json_escape(label),
+                    duration.as_secs_f64()
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",\n");
+
+        let folded_section = if let (Some(dkg_proof), Some(dec_proof)) = (
+            dkg_aggregator_proof.as_ref(),
+            decryption_aggregator_proofs.first(),
+        ) {
+            format!(
+                concat!(
+                    "  \"folded_artifacts\": {{\n",
+                    "    \"dkg_aggregator\": {{\n",
+                    "      \"proof_hex\": \"{}\",\n",
+                    "      \"public_inputs_hex\": \"{}\"\n",
+                    "    }},\n",
+                    "    \"decryption_aggregator\": {{\n",
+                    "      \"proof_hex\": \"{}\",\n",
+                    "      \"public_inputs_hex\": \"{}\"\n",
+                    "    }}\n",
+                    "  }}\n"
+                ),
+                to_hex(&dkg_proof.data),
+                to_hex(&dkg_proof.public_signals),
+                to_hex(&dec_proof.data),
+                to_hex(&dec_proof.public_signals),
+            )
+        } else {
+            String::from("  \"folded_artifacts\": null\n")
+        };
+
+        let summary_json = format!(
+            concat!(
+                "{{\n",
+                "  \"integration_test\": \"test_trbfv_actor\",\n",
+                "  \"multithread\": {{\n",
+                "    \"rayon_threads\": {},\n",
+                "    \"max_simultaneous_rayon_tasks\": {},\n",
+                "    \"cores_available\": {}\n",
+                "  }},\n",
+                "  \"operation_timings\": [\n",
+                "{}\n",
+                "  ],\n",
+                "  \"operation_timings_total_seconds\": {:.9},\n",
+                "  \"timings_seconds\": [\n",
+                "{}\n",
+                "  ],\n",
+                "{}",
+                "}}\n"
+            ),
+            mt_report.rayon_threads(),
+            mt_report.max_simultaneous_rayon_tasks(),
+            mt_report.cores_available(),
+            operation_timings_json,
+            mt_report.tracked_total_seconds(),
+            timings_json,
+            folded_section
+        );
+        fs::write(&path, summary_json)?;
+        println!("Wrote benchmark summary to {path}");
+    }
     println!("{}", report.serialize());
 
     Ok(())
