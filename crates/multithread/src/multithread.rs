@@ -1122,11 +1122,9 @@ fn handle_dkg_share_decryption_proof(
     req: DkgShareDecryptionProofRequest,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
-    // 1. Build DKG params from preset
     let (_threshold_params, dkg_params) = build_pair_for_preset(req.params_preset)
         .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
 
-    // 2. Decrypt BFV secret key from SensitiveBytes
     let sk_bytes = req
         .sk_bfv
         .access_raw(cipher)
@@ -1134,49 +1132,90 @@ fn handle_dkg_share_decryption_proof(
     let secret_key = deserialize_secret_key(&sk_bytes, &dkg_params)
         .map_err(|e| make_zk_error(&request, format!("sk_bfv deserialize: {}", e)))?;
 
-    // 3. Deserialize ciphertexts from raw bytes [H * L] → Vec<Vec<Ciphertext>> [H][L]
+    // External slots = (H - 1), each carrying L ciphertexts.
     let h = req.num_honest_parties;
     let l = req.num_moduli;
-    if req.honest_ciphertexts_raw.len() != h * l {
+    if req.own_plaintext_idx >= h {
         return Err(make_zk_error(
             &request,
             format!(
-                "Expected {} ciphertexts (H={} * L={}), got {}",
-                h * l,
-                h,
+                "own_plaintext_idx {} out of range (num_honest_parties={})",
+                req.own_plaintext_idx, h
+            ),
+        ));
+    }
+    let expected_external_cts = h.saturating_sub(1) * l;
+    if req.honest_ciphertexts_raw.len() != expected_external_cts {
+        return Err(make_zk_error(
+            &request,
+            format!(
+                "Expected {} external ciphertexts ((H-1)={} * L={}), got {}",
+                expected_external_cts,
+                h.saturating_sub(1),
                 l,
                 req.honest_ciphertexts_raw.len()
             ),
         ));
     }
 
-    let mut honest_ciphertexts: Vec<Vec<Ciphertext>> = Vec::with_capacity(h);
-    for party_idx in 0..h {
+    // Deserialize external ciphertexts → [(H-1)][L]
+    let num_external = h.saturating_sub(1);
+    let mut external_ciphertexts: Vec<Vec<Ciphertext>> = Vec::with_capacity(num_external);
+    for ext_idx in 0..num_external {
         let mut party_cts = Vec::with_capacity(l);
         for mod_idx in 0..l {
-            let raw = &req.honest_ciphertexts_raw[party_idx * l + mod_idx];
+            let raw = &req.honest_ciphertexts_raw[ext_idx * l + mod_idx];
             let ct = Ciphertext::from_bytes(raw, &dkg_params).map_err(|e| {
                 make_zk_error(
                     &request,
-                    format!(
-                        "ciphertext[{}][{}] deserialize: {:?}",
-                        party_idx, mod_idx, e
-                    ),
+                    format!("ciphertext[{}][{}] deserialize: {:?}", ext_idx, mod_idx, e),
                 )
             })?;
             party_cts.push(ct);
         }
-        honest_ciphertexts.push(party_cts);
+        external_ciphertexts.push(party_cts);
     }
 
-    // 4. Build circuit data
+    // Splice None at `own_plaintext_idx` so the H-sized vector matches ascending honest party_id order.
+    let mut honest_ciphertexts: Vec<Option<Vec<Ciphertext>>> = Vec::with_capacity(h);
+    let mut external_iter = external_ciphertexts.into_iter();
+    for slot in 0..h {
+        if slot == req.own_plaintext_idx {
+            honest_ciphertexts.push(None);
+        } else {
+            honest_ciphertexts.push(Some(
+                external_iter
+                    .next()
+                    .expect("external_iter exhausted: lengths validated above"),
+            ));
+        }
+    }
+
+    // Own-plaintext share rows: bincode `Vec<Vec<u64>>` shape [L][N].
+    let own_share_bytes = req
+        .own_share_raw
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("own_share decrypt: {}", e)))?;
+    let own_plaintext_share: Vec<Vec<u64>> = bincode::deserialize(&own_share_bytes)
+        .map_err(|e| make_zk_error(&request, format!("own_share deserialize: {}", e)))?;
+    if own_plaintext_share.len() != l {
+        return Err(make_zk_error(
+            &request,
+            format!(
+                "own_plaintext_share has {} moduli, expected {}",
+                own_plaintext_share.len(),
+                l
+            ),
+        ));
+    }
+
     let circuit_data = ShareDecryptionCircuitData {
         secret_key,
         honest_ciphertexts,
+        own_plaintext_share,
         dkg_input_type: req.dkg_input_type,
     };
 
-    // 5. Generate proof
     let circuit = ShareDecryptionCircuit;
     let bb_work = zk_bb_work_id(&request);
     let artifacts_dir = req.params_preset.artifacts_dir();

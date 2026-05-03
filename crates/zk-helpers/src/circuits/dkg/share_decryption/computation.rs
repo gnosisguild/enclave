@@ -172,37 +172,71 @@ impl Computation for Inputs {
 
         let msg_bit = compute_msg_bit(&dkg_params);
 
-        // Decrypt each ciphertext and compute its commitment
-        for party_cts in data.honest_ciphertexts.iter() {
-            if party_cts.len() < threshold_l {
-                return Err(CircuitsErrors::Other(format!(
-                    "honest_ciphertexts party has {} ciphertexts but threshold_l is {}; \
-                     each party must have at least threshold_l ciphertexts",
-                    party_cts.len(),
-                    threshold_l
-                )));
-            }
+        // Validate own-plaintext shape against L only when an own slot is present.
+        let has_own_slot = data.honest_ciphertexts.iter().any(|s| s.is_none());
+        if has_own_slot && data.own_plaintext_share.len() != threshold_l {
+            return Err(CircuitsErrors::Other(format!(
+                "own_plaintext_share has {} moduli but threshold_l is {}",
+                data.own_plaintext_share.len(),
+                threshold_l
+            )));
+        }
+
+        // Iterate H slots in ascending honest-party order: external slots BFV-decrypt and
+        // commit; the own slot uses the supplied plaintext directly.
+        for slot in data.honest_ciphertexts.iter() {
             let mut party_commitments = Vec::with_capacity(threshold_l);
             let mut party_shares = Vec::with_capacity(threshold_l);
-            for mod_idx in 0..threshold_l {
-                // Decrypt the ciphertext to get the plaintext share
-                let decrypted_pt = data.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
-                let share_coeffs = decrypted_pt.value.deref().to_vec();
-                // Reverse to match C3's message witness, which is constructed as
-                // `pt.value.reversed()` before committing (share_encryption/computation.rs).
-                let mut reversed_coeffs = share_coeffs.clone();
-                reversed_coeffs.reverse();
-                party_commitments.push(compute_share_encryption_commitment_from_message(
-                    &Polynomial::from_u64_vector(reversed_coeffs),
-                    msg_bit,
-                ));
-                party_shares.push(
-                    share_coeffs
-                        .iter()
-                        .map(|c| BigInt::from(*c))
-                        .collect::<Vec<_>>(),
-                );
+
+            match slot {
+                Some(party_cts) => {
+                    if party_cts.len() < threshold_l {
+                        return Err(CircuitsErrors::Other(format!(
+                            "honest_ciphertexts party has {} ciphertexts but threshold_l is {}; \
+                             each party must have at least threshold_l ciphertexts",
+                            party_cts.len(),
+                            threshold_l
+                        )));
+                    }
+                    for mod_idx in 0..threshold_l {
+                        let decrypted_pt =
+                            data.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
+                        let share_coeffs = decrypted_pt.value.deref().to_vec();
+                        // Reverse to match C3's `pt.value.reversed()` commitment convention.
+                        let mut reversed_coeffs = share_coeffs.clone();
+                        reversed_coeffs.reverse();
+                        party_commitments.push(compute_share_encryption_commitment_from_message(
+                            &Polynomial::from_u64_vector(reversed_coeffs),
+                            msg_bit,
+                        ));
+                        party_shares.push(
+                            share_coeffs
+                                .iter()
+                                .map(|c| BigInt::from(*c))
+                                .collect::<Vec<_>>(),
+                        );
+                    }
+                }
+                None => {
+                    for mod_idx in 0..threshold_l {
+                        let share_coeffs = &data.own_plaintext_share[mod_idx];
+                        // Same reverse-then-commit as the BFV-decrypted branch.
+                        let mut reversed_coeffs = share_coeffs.clone();
+                        reversed_coeffs.reverse();
+                        party_commitments.push(compute_share_encryption_commitment_from_message(
+                            &Polynomial::from_u64_vector(reversed_coeffs),
+                            msg_bit,
+                        ));
+                        party_shares.push(
+                            share_coeffs
+                                .iter()
+                                .map(|c| BigInt::from(*c))
+                                .collect::<Vec<_>>(),
+                        );
+                    }
+                }
             }
+
             expected_commitments.push(party_commitments);
             decrypted_shares.push(party_shares);
         }
@@ -307,8 +341,9 @@ mod tests {
         );
     }
 
-    /// Verify expected_commitments[i][j] matches direct commitment computation
-    /// for honest_ciphertexts[i][j], proving row ordering is consistent.
+    /// Verify expected_commitments[i][j] matches direct commitment computation for each
+    /// slot, proving row ordering is consistent. External slots use BFV-decryption; the
+    /// own slot uses the supplied plaintext.
     #[test]
     fn test_commitment_ordering_consistency() {
         let committee = CiphernodesCommitteeSize::Small.values();
@@ -327,10 +362,16 @@ mod tests {
             sample.honest_ciphertexts.len()
         );
 
-        for (party_idx, party_cts) in sample.honest_ciphertexts.iter().enumerate() {
+        for (party_idx, slot) in sample.honest_ciphertexts.iter().enumerate() {
             for mod_idx in 0..threshold_l {
-                let decrypted_pt = sample.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
-                let share_coeffs = decrypted_pt.value.deref().to_vec();
+                let share_coeffs = match slot {
+                    Some(party_cts) => {
+                        let decrypted_pt =
+                            sample.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
+                        decrypted_pt.value.deref().to_vec()
+                    }
+                    None => sample.own_plaintext_share[mod_idx].clone(),
+                };
                 // Reverse to match Inputs::compute, which reverses before committing to align
                 // with C2's commit_to_party_shares (highest-degree-first convention).
                 let mut reversed = share_coeffs.clone();

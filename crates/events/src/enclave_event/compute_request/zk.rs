@@ -166,20 +166,29 @@ impl ShareEncryptionProofRequest {
 
 /// Request to generate a proof for DKG share decryption (C4a or C4b).
 ///
-/// Proves that a node correctly decrypted H honest parties' BFV-encrypted
-/// Shamir shares using its own BFV secret key.
+/// Proves that a node correctly decrypted (H − 1) external honest parties' BFV-encrypted
+/// Shamir shares using its own BFV secret key, and that its own (un-encrypted) share row
+/// matches the C2-bound commitment for its slot. The own slot is supplied as plaintext
+/// because parties no longer self-encrypt during DKG.
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct DkgShareDecryptionProofRequest {
     /// BFV secret key used for decryption (witness — encrypted at rest).
     pub sk_bfv: SensitiveBytes,
-    /// BFV ciphertexts from H honest parties, flattened [H * L] in ascending party_id order.
-    /// Layout: party 0 mod 0, party 0 mod 1, ..., party 1 mod 0, ...
+    /// BFV ciphertexts from the (H − 1) external honest parties, flattened
+    /// `[(H − 1) * L]` in ascending external-party_id order (own party skipped).
+    /// Layout: ext party 0 mod 0, ext party 0 mod 1, ..., ext party 1 mod 0, ...
     pub honest_ciphertexts_raw: Vec<ArcBytes>,
-    /// Number of honest parties (H).
+    /// Total number of honest parties (H), counting the own slot.
     pub num_honest_parties: usize,
     /// Number of CRT moduli (L).
     pub num_moduli: usize,
+    /// Position of the own party within the H ascending-party_id ordering. The prover
+    /// splices `own_share_raw` into this slot when assembling C4 inputs.
+    pub own_plaintext_idx: usize,
+    /// Bincode-serialised `Vec<Vec<u64>>` of shape `[L][N]` — the own party's plaintext
+    /// share row per modulus (witness — encrypted at rest).
+    pub own_share_raw: SensitiveBytes,
     /// SecretKey or SmudgingNoise.
     pub dkg_input_type: DkgInputType,
     /// BFV preset for parameter resolution.

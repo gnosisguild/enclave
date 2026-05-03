@@ -45,10 +45,16 @@ impl ShareDecryptionCircuitData {
         let mut share_manager =
             ShareManager::new(committee.n, committee.threshold, threshold_params.clone());
 
-        let mut honest_ciphertexts: Vec<Vec<Ciphertext>> = Vec::new();
+        let mut honest_ciphertexts: Vec<Option<Vec<Ciphertext>>> = Vec::new();
         let num_honest = committee.h;
-        for _ in 0..num_honest {
+        // Midpoint own slot exercises both the None (own plaintext) and Some (BFV-decrypt) branches.
+        let own_slot_idx = num_honest / 2;
+        let mut own_plaintext_share: Vec<Vec<u64>> =
+            Vec::with_capacity(threshold_params.moduli().len());
+
+        for slot_idx in 0..num_honest {
             let mut party_cts = Vec::new();
+            let mut own_share_for_slot: Vec<Vec<u64>> = Vec::new();
             for _ in 0..threshold_params.moduli().len() {
                 let share_row = match dkg_input_type {
                     DkgInputType::SecretKey => {
@@ -114,6 +120,11 @@ impl ShareDecryptionCircuitData {
                     }
                 };
 
+                if slot_idx == own_slot_idx {
+                    own_share_for_slot.push(share_row);
+                    continue;
+                }
+
                 let pt = Plaintext::try_encode(&share_row, Encoding::poly(), &dkg_params).map_err(
                     |e| CircuitsErrors::Sample(format!("Failed to encode plaintext: {:?}", e)),
                 )?;
@@ -124,11 +135,18 @@ impl ShareDecryptionCircuitData {
 
                 party_cts.push(ct);
             }
-            honest_ciphertexts.push(party_cts);
+
+            if slot_idx == own_slot_idx {
+                own_plaintext_share = own_share_for_slot;
+                honest_ciphertexts.push(None);
+            } else {
+                honest_ciphertexts.push(Some(party_cts));
+            }
         }
 
         Ok(ShareDecryptionCircuitData {
             honest_ciphertexts,
+            own_plaintext_share,
             secret_key: dkg_secret_key,
             dkg_input_type,
         })
