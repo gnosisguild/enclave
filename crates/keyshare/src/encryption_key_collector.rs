@@ -20,6 +20,17 @@ use e3_utils::MAILBOX_LIMIT;
 use tracing::{info, warn};
 
 const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(600);
+const COLLECTION_TIMEOUT_ENV: &str = "E3_ENCRYPTION_KEY_COLLECTION_TIMEOUT_SECS";
+
+fn collection_timeout() -> Duration {
+    match std::env::var(COLLECTION_TIMEOUT_ENV)
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+    {
+        Some(0) | None => DEFAULT_COLLECTION_TIMEOUT,
+        Some(secs) => Duration::from_secs(secs),
+    }
+}
 
 use crate::ThresholdKeyshare;
 
@@ -101,13 +112,14 @@ impl Actor for EncryptionKeyCollector {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+        let timeout = collection_timeout();
         info!(
             e3_id = %self.e3_id,
             "EncryptionKeyCollector started, scheduling timeout in {:?}",
-            DEFAULT_COLLECTION_TIMEOUT
+            timeout
         );
 
-        let handle = ctx.notify_later(EncryptionKeyCollectionTimeout, DEFAULT_COLLECTION_TIMEOUT);
+        let handle = ctx.notify_later(EncryptionKeyCollectionTimeout, timeout);
         self.timeout_handle = Some(handle);
     }
 }

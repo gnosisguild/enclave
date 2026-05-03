@@ -31,6 +31,9 @@
   "best-practices": {
     "title": "Best Practices"
   },
+  "requestor-guide": {
+    "title": "Requestor Guide"
+  },
   "-- Getting Started": {
     "type": "separator",
     "title": "Getting Started"
