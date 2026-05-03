@@ -26,7 +26,7 @@ use e3_events::{
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
-use tracing::{error, info, warn};
+use tracing::{error, info, trace, warn};
 
 #[derive(Clone, Debug)]
 enum ThresholdProofKind {
@@ -1241,36 +1241,44 @@ impl ProofRequestActor {
         );
 
         for (positional_idx, &real_party_id) in pending.recipient_party_ids.iter().enumerate() {
-            if let Some(party_share) = share.extract_for_party(positional_idx) {
-                let c3a_proofs = signed_c3a_map
-                    .get(&positional_idx)
-                    .cloned()
-                    .unwrap_or_default();
-                let c3b_proofs = signed_c3b_map
-                    .get(&positional_idx)
-                    .cloned()
-                    .unwrap_or_default();
+            match share.extract_for_party(positional_idx) {
+                Some(party_share) => {
+                    let c3a_proofs = signed_c3a_map
+                        .get(&positional_idx)
+                        .cloned()
+                        .unwrap_or_default();
+                    let c3b_proofs = signed_c3b_map
+                        .get(&positional_idx)
+                        .cloned()
+                        .unwrap_or_default();
 
-                if let Err(err) = self.bus.publish(
-                    ThresholdShareCreated {
-                        e3_id: e3_id.clone(),
-                        share: Arc::new(party_share),
-                        target_party_id: real_party_id,
-                        external: false,
-                        signed_c2a_proof: Some(signed_c2a.clone()),
-                        signed_c2b_proof: Some(signed_c2b.clone()),
-                        signed_c3a_proofs: c3a_proofs,
-                        signed_c3b_proofs: c3b_proofs,
-                    },
-                    ec.clone(),
-                ) {
-                    error!(
-                        "Failed to publish ThresholdShareCreated for party {} (idx {}): {err}",
-                        real_party_id, positional_idx
+                    if let Err(err) = self.bus.publish(
+                        ThresholdShareCreated {
+                            e3_id: e3_id.clone(),
+                            share: Arc::new(party_share),
+                            target_party_id: real_party_id,
+                            external: false,
+                            signed_c2a_proof: Some(signed_c2a.clone()),
+                            signed_c2b_proof: Some(signed_c2b.clone()),
+                            signed_c3a_proofs: c3a_proofs,
+                            signed_c3b_proofs: c3b_proofs,
+                        },
+                        ec.clone(),
+                    ) {
+                        error!(
+                            "Failed to publish ThresholdShareCreated for party {} (idx {}): {err}",
+                            real_party_id, positional_idx
+                        );
+                    }
+                }
+                None => {
+                    // Own slot is sparse (no self-encryption); nothing to publish.
+                    trace!(
+                        "Skipping ThresholdShareCreated for own slot (party {} idx {})",
+                        real_party_id,
+                        positional_idx
                     );
                 }
-            } else {
-                error!("Failed to extract share for index {}", positional_idx);
             }
         }
     }

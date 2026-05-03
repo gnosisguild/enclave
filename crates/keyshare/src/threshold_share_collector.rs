@@ -47,8 +47,7 @@ pub(crate) enum CollectorState {
 #[rtype(result = "()")]
 pub struct ThresholdShareCollectionTimeout;
 
-/// Removes this party from the `todo` set so the DKG can complete with
-/// N-1 shares instead of waiting for a share that will never arrive.
+/// Remove this party from `todo` so collection finishes without it.
 #[derive(Message, Clone, Debug)]
 #[rtype(result = "()")]
 pub struct ExpelPartyFromShareCollection {
@@ -74,10 +73,16 @@ pub struct ThresholdShareCollector {
 }
 
 impl ThresholdShareCollector {
-    pub fn setup(parent: Addr<ThresholdKeyshare>, total: u64, e3_id: E3id) -> Addr<Self> {
+    /// Excludes `own_party_id` from `todo` (own share is consumed locally for C4).
+    pub fn setup(
+        parent: Addr<ThresholdKeyshare>,
+        total: u64,
+        own_party_id: u64,
+        e3_id: E3id,
+    ) -> Addr<Self> {
         let collector = Self {
             e3_id,
-            todo: (0..total).collect(),
+            todo: (0..total).filter(|p| *p != own_party_id).collect(),
             parent,
             state: CollectorState::Collecting,
             shares: HashMap::new(),

@@ -168,8 +168,8 @@ async fn setup_test_zk_backend() -> Result<(ZkBackend, tempfile::TempDir)> {
         }
 
         // ── recursive/ variant (inner/base proofs, uses .vk_noir) ──────────
-        // Tests use insecure params, so fixtures go under insecure-512/
-        let preset_dir = circuits_dir.join("insecure-512");
+        // Switched to secure-8192 fixtures for the secure benchmark run.
+        let preset_dir = circuits_dir.join("secure-8192");
 
         let rv = preset_dir.join("recursive");
 
