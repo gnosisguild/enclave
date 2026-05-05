@@ -287,9 +287,15 @@ The per-circuit `wrapper/` Noir step was removed; aggregator response structs no
 implements `ZkRequest::NodeDkgFold` (full per-node pipeline to a `NodeFold` proof),
 `ZkRequest::DkgAggregation` (`NodesFold` + C5 + `DkgAggregator`), and
 `ZkRequest::DecryptionAggregation` (per-ciphertext `C6Fold` + C7 + `DecryptionAggregator`).
-`NodeProofAggregator` buffers all `DKGInnerProofReady` proofs then issues one `NodeDkgFold` request;
-`PublicKeyAggregator` and `ThresholdPlaintextAggregator` dispatch the aggregator requests instead of
-pairwise folding.
+`NodeProofAggregator` prebuffers `DKGInnerProofReady` proofs that arrive before
+`ThresholdSharePending`, drains those buffered proofs into collection state once
+`ThresholdSharePending` arrives, and issues one `NodeDkgFold` request when the
+full ordered proof set is available. If that `NodeDkgFold` compute request fails,
+it publishes `DKGRecursiveAggregationComplete { aggregated_proof: None }` so the
+downstream DKG/public-key aggregation path can terminate deterministically instead
+of stalling on missing node-fold output. `PublicKeyAggregator` and
+`ThresholdPlaintextAggregator` dispatch the aggregator requests instead of pairwise
+folding.
 
 ### Step 6: Collect All Threshold Shares (with C2/C3 Verification)
 
