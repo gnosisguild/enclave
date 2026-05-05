@@ -685,6 +685,7 @@ impl ProofRequestActor {
             pending.sk_proof.expect("checked in is_complete"),
         ) else {
             error!("Failed to sign C4a SK proof — DecryptionKeyShared will not be published");
+            self.fail_dkg_round(e3_id.clone(), &pending.ec, "C4a signing error");
             return;
         };
 
@@ -702,6 +703,7 @@ impl ProofRequestActor {
                     "Failed to sign C4b ESM proof [{}] — DecryptionKeyShared will not be published",
                     idx
                 );
+                self.fail_dkg_round(e3_id.clone(), &pending.ec, "C4b signing error");
                 return;
             };
             signed_esms.push(signed);
@@ -802,6 +804,7 @@ impl ProofRequestActor {
                 self.sign_proof(&e3_id, ProofType::C6ThresholdShareDecryption, proof)
             else {
                 error!("Failed to sign C6 proof — DecryptionshareCreated will not be published");
+                self.fail_decryption_round(e3_id.clone(), &pending.ec, "C6 signing error");
                 return;
             };
             signed_proofs.push(signed);
@@ -902,6 +905,7 @@ impl ProofRequestActor {
 
         let Some(signed) = self.sign_proof(&e3_id, ProofType::C5PkAggregation, proof) else {
             error!("Failed to sign C5 proof — PkAggregationProofSigned will not be published");
+            self.fail_dkg_round(e3_id, &pending.ec, "C5 signing error");
             return;
         };
 
@@ -985,6 +989,7 @@ impl ProofRequestActor {
                 self.sign_proof(&e3_id, ProofType::C7DecryptedSharesAggregation, proof)
             else {
                 error!("Failed to sign C7 proof — AggregationProofSigned will not be published");
+                self.fail_decryption_round(e3_id.clone(), &pending.ec, "C7 signing error");
                 return;
             };
             signed_proofs.push(signed);
@@ -1085,6 +1090,32 @@ impl ProofRequestActor {
         }
     }
 
+    fn fail_dkg_round(&self, e3_id: E3id, ec: &EventContext<Sequenced>, context: &str) {
+        if let Err(err) = self.bus.publish(
+            E3Failed {
+                e3_id: e3_id.clone(),
+                failed_at_stage: E3Stage::CommitteeFinalized,
+                reason: FailureReason::DKGInvalidShares,
+            },
+            ec.clone(),
+        ) {
+            error!("Failed to publish E3Failed for {context} on E3 {}: {err}", e3_id);
+        }
+    }
+
+    fn fail_decryption_round(&self, e3_id: E3id, ec: &EventContext<Sequenced>, context: &str) {
+        if let Err(err) = self.bus.publish(
+            E3Failed {
+                e3_id: e3_id.clone(),
+                failed_at_stage: E3Stage::CiphertextReady,
+                reason: FailureReason::DecryptionInvalidShares,
+            },
+            ec.clone(),
+        ) {
+            error!("Failed to publish E3Failed for {context} on E3 {}: {err}", e3_id);
+        }
+    }
+
     fn sign_and_group_proofs(
         &self,
         e3_id: &E3id,
@@ -1111,6 +1142,7 @@ impl ProofRequestActor {
             pending.pk_generation_proof.expect("checked"),
         ) else {
             error!("Failed to sign C1 proof — shares will not be published");
+            self.fail_dkg_round(e3_id.clone(), ec, "C1 signing error");
             return;
         };
 
@@ -1121,6 +1153,7 @@ impl ProofRequestActor {
             pending.sk_share_computation_proof.expect("checked"),
         ) else {
             error!("Failed to sign C2a proof — shares will not be published");
+            self.fail_dkg_round(e3_id.clone(), ec, "C2a signing error");
             return;
         };
 
@@ -1131,6 +1164,7 @@ impl ProofRequestActor {
             pending.e_sm_share_computation_proof.expect("checked"),
         ) else {
             error!("Failed to sign C2b proof — shares will not be published");
+            self.fail_dkg_round(e3_id.clone(), ec, "C2b signing error");
             return;
         };
 
@@ -1143,6 +1177,7 @@ impl ProofRequestActor {
                 .map(|((recipient, _row), proof)| (*recipient, proof.clone())),
         ) else {
             error!("Failed to sign C3a proofs — shares will not be published");
+            self.fail_dkg_round(e3_id.clone(), ec, "C3a signing error");
             return;
         };
 
@@ -1155,6 +1190,7 @@ impl ProofRequestActor {
                 .map(|((_esi, recipient, _row), proof)| (*recipient, proof.clone())),
         ) else {
             error!("Failed to sign C3b proofs — shares will not be published");
+            self.fail_dkg_round(e3_id.clone(), ec, "C3b signing error");
             return;
         };
 
@@ -1312,6 +1348,7 @@ impl ProofRequestActor {
             }
             Err(err) => {
                 error!("Failed to sign C0 proof payload: {err} — proof will not be published");
+                self.fail_dkg_round(e3_id, ec, "C0 signing error");
                 return;
             }
         }
@@ -1395,6 +1432,7 @@ impl ProofRequestActor {
                 "C0 proof request failed for E3 {}: {err} — key will not be published without proof",
                 pending.e3_id
             );
+            self.fail_dkg_round(pending.e3_id, &ec, "C0 proof request error");
             return;
         }
 
@@ -1406,6 +1444,7 @@ impl ProofRequestActor {
             self.threshold_correlation
                 .retain(|_, (eid, _, _)| *eid != e3_id);
             self.pending_threshold.remove(&e3_id);
+            self.fail_dkg_round(e3_id, &ec, "DKG threshold proof request error");
             return;
         }
 
@@ -1418,6 +1457,7 @@ impl ProofRequestActor {
             self.decryption_correlation
                 .retain(|_, (eid, _, _)| *eid != e3_id);
             self.pending_decryption.remove(&e3_id);
+            self.fail_dkg_round(e3_id, &ec, "C4 proof request error");
             return;
         }
 
@@ -1430,16 +1470,7 @@ impl ProofRequestActor {
                 e3_id
             );
             self.pending_share_decryption.remove(&e3_id);
-            if let Err(e) = self.bus.publish(
-                E3Failed {
-                    e3_id,
-                    failed_at_stage: E3Stage::CiphertextReady,
-                    reason: FailureReason::DecryptionInvalidShares,
-                },
-                ec.clone(),
-            ) {
-                error!("Failed to publish E3Failed for C6 error: {e}");
-            }
+            self.fail_decryption_round(e3_id, &ec, "C6 proof request error");
             return;
         }
 
@@ -1450,16 +1481,7 @@ impl ProofRequestActor {
             );
             self.pending_pk_aggregation.remove(&e3_id);
 
-            if let Err(e) = self.bus.publish(
-                E3Failed {
-                    e3_id,
-                    failed_at_stage: E3Stage::CommitteeFinalized,
-                    reason: FailureReason::DKGInvalidShares,
-                },
-                ec.clone(),
-            ) {
-                error!("Failed to publish E3Failed for C5 error: {e}");
-            }
+            self.fail_dkg_round(e3_id, &ec, "C5 proof request error");
             return;
         }
 
@@ -1469,17 +1491,105 @@ impl ProofRequestActor {
                 e3_id
             );
             self.pending_aggregation.remove(&e3_id);
-            if let Err(e) = self.bus.publish(
-                E3Failed {
-                    e3_id,
-                    failed_at_stage: E3Stage::CiphertextReady,
-                    reason: FailureReason::DecryptionInvalidShares,
-                },
-                ec,
-            ) {
-                error!("Failed to publish E3Failed for C7 error: {e}");
-            }
+            self.fail_decryption_round(e3_id, &ec, "C7 proof request error");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy::signers::local::PrivateKeySigner;
+    use anyhow::Result;
+    use e3_events::{
+        ComputeRequestErrorKind, Event, HistoryCollector, TakeEvents, Unsequenced, ZkError,
+    };
+    use e3_test_helpers::get_common_setup;
+    use e3_utils::utility_types::ArcBytes;
+
+    fn test_ctx(data: impl Into<EnclaveEventData>) -> EventContext<Sequenced> {
+        EventContext::<Unsequenced>::from(data.into()).sequence(0)
+    }
+
+    async fn next_event(history: &Addr<HistoryCollector<EnclaveEvent>>) -> Result<EnclaveEvent> {
+        let mut result = history.send(TakeEvents::<EnclaveEvent>::new(1)).await?;
+        assert!(!result.timed_out, "timed out waiting for an event");
+        Ok(result.events.pop().expect("expected one event"))
+    }
+
+    #[actix::test]
+    async fn c0_compute_error_emits_e3_failed() -> Result<()> {
+        let (bus, _rng, _seed, _params, _crp, _errors, history) = get_common_setup(None)?;
+        let mut actor = ProofRequestActor::new(&bus, PrivateKeySigner::random());
+        let e3_id = E3id::new("44", 1);
+        let correlation_id = CorrelationId::new();
+
+        actor.pending.insert(
+            correlation_id,
+            PendingProofRequest {
+                e3_id: e3_id.clone(),
+                key: Arc::new(EncryptionKey::new(7, ArcBytes::from_bytes(&[1]))),
+            },
+        );
+
+        actor.handle_compute_request_error(TypedEvent::new(
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkError::ProofGenerationFailed("boom".to_string())),
+                ComputeRequest::zk(
+                    ZkRequest::PkBfv(PkBfvProofRequest::new(
+                        ArcBytes::from_bytes(&[1]),
+                        e3_fhe_params::BfvPreset::InsecureThreshold512,
+                    )),
+                    correlation_id,
+                    e3_id.clone(),
+                ),
+            ),
+            test_ctx(E3Failed {
+                e3_id: e3_id.clone(),
+                failed_at_stage: E3Stage::CommitteeFinalized,
+                reason: FailureReason::DKGInvalidShares,
+            }),
+        ));
+
+        let event = next_event(&history).await?;
+        assert!(matches!(
+            event.into_data(),
+            EnclaveEventData::E3Failed(data)
+                if data.e3_id == e3_id
+                    && data.failed_at_stage == E3Stage::CommitteeFinalized
+                    && data.reason == FailureReason::DKGInvalidShares
+        ));
+        assert!(actor.pending.is_empty());
+
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn decryption_failure_helper_emits_e3_failed() -> Result<()> {
+        let (bus, _rng, _seed, _params, _crp, _errors, history) = get_common_setup(None)?;
+        let actor = ProofRequestActor::new(&bus, PrivateKeySigner::random());
+        let e3_id = E3id::new("45", 1);
+
+        actor.fail_decryption_round(
+            e3_id.clone(),
+            &test_ctx(E3Failed {
+                e3_id: e3_id.clone(),
+                failed_at_stage: E3Stage::CiphertextReady,
+                reason: FailureReason::DecryptionInvalidShares,
+            }),
+            "test decryption failure",
+        );
+
+        let event = next_event(&history).await?;
+        assert!(matches!(
+            event.into_data(),
+            EnclaveEventData::E3Failed(data)
+                if data.e3_id == e3_id
+                    && data.failed_at_stage == E3Stage::CiphertextReady
+                    && data.reason == FailureReason::DecryptionInvalidShares
+        ));
+
+        Ok(())
     }
 }
 
