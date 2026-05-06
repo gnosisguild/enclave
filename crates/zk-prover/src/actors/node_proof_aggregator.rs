@@ -499,7 +499,9 @@ mod tests {
                 }),
             },
         );
-        aggregator.fold_correlation.insert(correlation_id, e3_id.clone());
+        aggregator
+            .fold_correlation
+            .insert(correlation_id, e3_id.clone());
 
         let request = ComputeRequest::zk(
             ZkRequest::NodeDkgFold(NodeDkgFoldRequest {
@@ -570,7 +572,10 @@ mod tests {
         ));
 
         assert_eq!(
-            aggregator.pending_inner_proofs.get(&e3_id).map(BTreeMap::len),
+            aggregator
+                .pending_inner_proofs
+                .get(&e3_id)
+                .map(BTreeMap::len),
             Some(1)
         );
 
@@ -595,7 +600,13 @@ mod tests {
         );
 
         assert!(!aggregator.pending_inner_proofs.contains_key(&e3_id));
-        assert_eq!(aggregator.states.get(&e3_id).map(|state| state.buffer.len()), Some(1));
+        assert_eq!(
+            aggregator
+                .states
+                .get(&e3_id)
+                .map(|state| state.buffer.len()),
+            Some(1)
+        );
 
         for seq in 1..6 {
             let proof = dummy_proof((10 + seq) as u8);
