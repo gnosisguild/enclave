@@ -1099,7 +1099,10 @@ impl ProofRequestActor {
             },
             ec.clone(),
         ) {
-            error!("Failed to publish E3Failed for {context} on E3 {}: {err}", e3_id);
+            error!(
+                "Failed to publish E3Failed for {context} on E3 {}: {err}",
+                e3_id
+            );
         }
     }
 
@@ -1112,7 +1115,10 @@ impl ProofRequestActor {
             },
             ec.clone(),
         ) {
-            error!("Failed to publish E3Failed for {context} on E3 {}: {err}", e3_id);
+            error!(
+                "Failed to publish E3Failed for {context} on E3 {}: {err}",
+                e3_id
+            );
         }
     }
 
