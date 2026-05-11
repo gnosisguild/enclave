@@ -1208,6 +1208,20 @@ fn handle_dkg_share_decryption_proof(
             ),
         ));
     }
+    let n = dkg_params.degree();
+    for (row_idx, row) in own_plaintext_share.iter().enumerate() {
+        if row.len() != n {
+            return Err(make_zk_error(
+                &request,
+                format!(
+                    "own_plaintext_share[{}] has {} coefficients, expected {}",
+                    row_idx,
+                    row.len(),
+                    n
+                ),
+            ));
+        }
+    }
 
     let circuit_data = ShareDecryptionCircuitData {
         secret_key,

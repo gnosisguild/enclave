@@ -1124,6 +1124,20 @@ impl ThresholdKeyshare {
                     .map_err(|e| anyhow!("Failed to deserialize BFV public key: {:?}", e))
             })
             .collect::<Result<_>>()?;
+        let recipient_party_ids: Vec<u64> = encryption_keys.iter().map(|k| k.party_id).collect();
+        let recipient_share_indices: Vec<usize> = recipient_party_ids
+            .iter()
+            .map(|&recipient_party_id| recipient_party_id as usize)
+            .collect();
+        let own_idx = recipient_party_ids
+            .iter()
+            .position(|&recipient_party_id| recipient_party_id == party_id)
+            .ok_or_else(|| {
+                anyhow!(
+                    "own party {} missing from collected encryption keys",
+                    party_id
+                )
+            })?;
 
         // Decrypt our shares from local storage
         let decrypted_sk_sss: SharedSecret = sk_sss.decrypt(&self.cipher)?;
@@ -1179,23 +1193,26 @@ impl ThresholdKeyshare {
         // BFV-encrypt shares to all recipients except own slot (own share is bound via C2,
         // consumed locally by C4). Returns per-row randomness for C3 proofs.
         let mut rng = OsRng;
-        let (encrypted_sk_sss, sk_witnesses) = BfvEncryptedShares::encrypt_all_extended(
-            &decrypted_sk_sss,
-            &recipient_pks,
-            &params,
-            &mut rng,
-            Some(party_id as usize),
-        )?;
+        let (encrypted_sk_sss, sk_witnesses) =
+            BfvEncryptedShares::encrypt_all_extended_for_share_indices(
+                &decrypted_sk_sss,
+                &recipient_pks,
+                &recipient_share_indices,
+                &params,
+                &mut rng,
+                Some(own_idx),
+            )?;
 
         let (encrypted_esi_sss, esi_witnesses): (Vec<_>, Vec<_>) = decrypted_esi_sss
             .iter()
             .map(|esi| {
-                BfvEncryptedShares::encrypt_all_extended(
+                BfvEncryptedShares::encrypt_all_extended_for_share_indices(
                     esi,
                     &recipient_pks,
+                    &recipient_share_indices,
                     &params,
                     &mut rng,
-                    Some(party_id as usize),
+                    Some(own_idx),
                 )
             })
             .collect::<Result<Vec<_>>>()?
@@ -1245,11 +1262,11 @@ impl ThresholdKeyshare {
         // The own slot was skipped during BFV encryption (witness vec empty), so it
         // contributes no C3a request.
         let mut sk_share_encryption_requests = Vec::new();
-        let own_idx = party_id as usize;
         for (recipient_idx, recipient_witnesses) in sk_witnesses.iter().enumerate() {
             if recipient_idx == own_idx {
                 continue;
             }
+            let recipient_party_id = recipient_share_indices[recipient_idx];
             for (row_idx, witness) in recipient_witnesses.iter().enumerate() {
                 sk_share_encryption_requests.push(ShareEncryptionProofRequest {
                     share_row_raw: SensitiveBytes::new(
@@ -1267,7 +1284,7 @@ impl ThresholdKeyshare {
                     dkg_input_type: DkgInputType::SecretKey,
                     params_preset: threshold_preset,
                     committee_size: derived_committee_size,
-                    recipient_party_id: recipient_idx,
+                    recipient_party_id,
                     row_index: row_idx,
                     esi_index: 0,
                 });
@@ -1281,6 +1298,7 @@ impl ThresholdKeyshare {
                 if recipient_idx == own_idx {
                     continue;
                 }
+                let recipient_party_id = recipient_share_indices[recipient_idx];
                 for (row_idx, witness) in recipient_witnesses.iter().enumerate() {
                     e_sm_share_encryption_requests.push(ShareEncryptionProofRequest {
                         share_row_raw: SensitiveBytes::new(
@@ -1298,7 +1316,7 @@ impl ThresholdKeyshare {
                         dkg_input_type: DkgInputType::SmudgingNoise,
                         params_preset: threshold_preset,
                         committee_size: derived_committee_size,
-                        recipient_party_id: recipient_idx,
+                        recipient_party_id,
                         row_index: row_idx,
                         esi_index: esi_idx,
                     });
@@ -1314,9 +1332,6 @@ impl ThresholdKeyshare {
             sk_share_encryption_requests.len(),
             e_sm_share_encryption_requests.len()
         );
-
-        // Collect real party IDs in positional order (indices match encrypt_all_extended output)
-        let recipient_party_ids: Vec<u64> = encryption_keys.iter().map(|k| k.party_id).collect();
 
         // Publish ThresholdSharePending - ProofRequestActor will generate proof, sign, and publish ThresholdShareCreated
         self.bus.publish(

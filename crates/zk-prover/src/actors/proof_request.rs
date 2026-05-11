@@ -1243,14 +1243,9 @@ impl ProofRequestActor {
         for (positional_idx, &real_party_id) in pending.recipient_party_ids.iter().enumerate() {
             match share.extract_for_party(positional_idx) {
                 Some(party_share) => {
-                    let c3a_proofs = signed_c3a_map
-                        .get(&positional_idx)
-                        .cloned()
-                        .unwrap_or_default();
-                    let c3b_proofs = signed_c3b_map
-                        .get(&positional_idx)
-                        .cloned()
-                        .unwrap_or_default();
+                    let proof_key = real_party_id as usize;
+                    let c3a_proofs = signed_c3a_map.get(&proof_key).cloned().unwrap_or_default();
+                    let c3b_proofs = signed_c3b_map.get(&proof_key).cloned().unwrap_or_default();
 
                     if let Err(err) = self.bus.publish(
                         ThresholdShareCreated {
@@ -1271,12 +1266,18 @@ impl ProofRequestActor {
                         );
                     }
                 }
-                None => {
+                None if real_party_id == party_id => {
                     // Own slot is sparse (no self-encryption); nothing to publish.
                     trace!(
                         "Skipping ThresholdShareCreated for own slot (party {} idx {})",
                         real_party_id,
                         positional_idx
+                    );
+                }
+                None => {
+                    error!(
+                        "Missing encrypted share for recipient party {} (idx {}) from sender party {}; ThresholdShareCreated will not be published for that recipient",
+                        real_party_id, positional_idx, party_id
                     );
                 }
             }

@@ -199,8 +199,15 @@ impl Computation for Inputs {
                         )));
                     }
                     for mod_idx in 0..threshold_l {
-                        let decrypted_pt =
-                            data.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
+                        let decrypted_pt = data
+                            .secret_key
+                            .try_decrypt(&party_cts[mod_idx])
+                            .map_err(|e| {
+                                CircuitsErrors::Other(format!(
+                                    "failed to decrypt honest ciphertext at modulus {}: {:?}",
+                                    mod_idx, e
+                                ))
+                            })?;
                         let share_coeffs = decrypted_pt.value.deref().to_vec();
                         // Reverse to match C3's `pt.value.reversed()` commitment convention.
                         let mut reversed_coeffs = share_coeffs.clone();

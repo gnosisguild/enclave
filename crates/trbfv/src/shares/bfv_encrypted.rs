@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use derivative::Derivative;
 use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
@@ -247,23 +247,60 @@ impl BfvEncryptedShares {
         rng: &mut R,
         skip_idx: Option<usize>,
     ) -> Result<(Self, Vec<Vec<BfvEncryptionWitness>>)> {
+        let recipient_share_indices: Vec<_> = (0..recipient_pks.len()).collect();
+        Self::encrypt_all_extended_for_share_indices(
+            secret,
+            recipient_pks,
+            &recipient_share_indices,
+            params,
+            rng,
+            skip_idx,
+        )
+    }
+
+    /// Encrypt shares for all recipient slots while selecting Shamir rows by real party index.
+    ///
+    /// `recipient_share_indices[slot]` is the row in `secret` encrypted for `recipient_pks[slot]`.
+    /// This supports sparse recipient vectors after expulsions while keeping the encrypted-share
+    /// vector compact and positional.
+    pub fn encrypt_all_extended_for_share_indices<R: RngCore + CryptoRng>(
+        secret: &SharedSecret,
+        recipient_pks: &[PublicKey],
+        recipient_share_indices: &[usize],
+        params: &Arc<BfvParameters>,
+        rng: &mut R,
+        skip_idx: Option<usize>,
+    ) -> Result<(Self, Vec<Vec<BfvEncryptionWitness>>)> {
+        if recipient_pks.len() != recipient_share_indices.len() {
+            bail!(
+                "recipient_pks length ({}) must match recipient_share_indices length ({})",
+                recipient_pks.len(),
+                recipient_share_indices.len()
+            );
+        }
+
         let num_parties = recipient_pks.len();
         let mut shares = Vec::with_capacity(num_parties);
         let mut all_witnesses = Vec::with_capacity(num_parties);
 
-        for party_id in 0..num_parties {
-            if Some(party_id) == skip_idx {
+        for (slot_idx, (recipient_pk, &share_idx)) in recipient_pks
+            .iter()
+            .zip(recipient_share_indices.iter())
+            .enumerate()
+        {
+            if Some(slot_idx) == skip_idx {
                 shares.push(None);
                 all_witnesses.push(Vec::new());
                 continue;
             }
 
-            let share = secret
-                .extract_party_share(party_id)
-                .context(format!("Failed to extract share for party {}", party_id))?;
+            let share = secret.extract_party_share(share_idx).context(format!(
+                "Failed to extract share for party {} at recipient slot {}",
+                share_idx, slot_idx
+            ))?;
 
             let (encrypted, witnesses) =
-                BfvEncryptedShare::encrypt_extended(&share, &recipient_pks[party_id], params, rng)?;
+                BfvEncryptedShare::encrypt_extended(&share, recipient_pk, params, rng)?;
 
             shares.push(Some(encrypted));
             all_witnesses.push(witnesses);
@@ -362,5 +399,46 @@ mod tests {
 
         // Verify coefficients match
         assert_eq!(sk.coeffs, sk_restored.coeffs);
+    }
+
+    #[test]
+    fn test_encrypt_all_extended_for_share_indices_uses_real_share_rows() {
+        let params = BfvParamSet::from(BfvPreset::InsecureDkg512).build_arc();
+        let mut rng = OsRng;
+
+        let _sk_one = SecretKey::random(&params, &mut rng);
+        let pk_one = PublicKey::new(&_sk_one, &mut rng);
+        let sk_two = SecretKey::random(&params, &mut rng);
+        let pk_two = PublicKey::new(&sk_two, &mut rng);
+
+        let degree = params.degree();
+        let mut data = Array2::zeros((3, degree));
+        for party_id in 0..3 {
+            for coeff_idx in 0..degree {
+                data[[party_id, coeff_idx]] = ((party_id as u64) + 1) * 10_000 + coeff_idx as u64;
+            }
+        }
+        let secret = SharedSecret::new(vec![data]);
+
+        let (encrypted, witnesses) = BfvEncryptedShares::encrypt_all_extended_for_share_indices(
+            &secret,
+            &[pk_one, pk_two],
+            &[1, 2],
+            &params,
+            &mut rng,
+            Some(0),
+        )
+        .expect("sparse recipient encryption should succeed");
+
+        assert!(encrypted.clone_share(0).is_none());
+        assert!(witnesses[0].is_empty());
+
+        let decrypted = encrypted
+            .clone_share(1)
+            .expect("slot 1 should be encrypted")
+            .decrypt(&sk_two, &params, degree)
+            .expect("recipient should decrypt its share");
+        let expected = secret.extract_party_share(2).unwrap();
+        assert_eq!(decrypted.deref(), expected.deref());
     }
 }

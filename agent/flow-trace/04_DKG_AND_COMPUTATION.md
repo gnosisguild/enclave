@@ -169,11 +169,13 @@ Both GenPkShareAndSkSss and GenEsiSss complete
 │
 ├─ handle_shares_generated():
 │   │
-│   ├─ 1. For EACH other party j in committee:
-│   │     Encrypt sk_sss[j] under party j's BFV public key
-│   │     Encrypt esi_sss[*][j] under party j's BFV public key
-│   │     → BfvEncryptedShares::encrypt_all()
-│   │     → Only party j can decrypt their share
+│   ├─ 1. For EACH collected recipient slot in sorted real-party order:
+│   │     Map compact recipient slot → real party_id (expelled parties may be absent)
+│   │     Encrypt sk_sss[real_party_id] under that party's BFV public key
+│   │     Encrypt esi_sss[*][real_party_id] under that party's BFV public key
+│   │     Leave the sender's own slot empty (own plaintext rides locally into C4)
+│   │     → BfvEncryptedShares::encrypt_all_extended_for_share_indices()
+│   │     → Only the mapped real party can decrypt their share
 │   │
 │   ├─ 2. Build ThresholdShare struct:
 │   │     {
@@ -242,7 +244,7 @@ ProofRequestActor receives ThresholdSharePending
 │
 ├─ 5. Sign all proofs via sign_and_group_proofs():
 │     → Each proof gets its own SignedProofPayload with ECDSA signature
-│     → C3a/C3b proofs indexed by (recipient_party_id, row_index)
+│     → C3a/C3b proofs indexed by (real recipient_party_id, row_index)
 │
 ├─ 6. Publish events:
 │     ├─ PkGenerationProofSigned { e3_id, party_id, signed_proof(C1) }
