@@ -44,7 +44,12 @@ CiphernodeSelected event arrives at ThresholdKeyshare
 │   │     → These collectors start immediately so early peer keys/shares can
 │   │       be buffered while this node is still finishing earlier DKG phases
 │   │
-│   └─ Each collector has a timeout (60s for keys, 120s for shares)
+│   └─ Collector timeouts are derived from the DKG stage budget:
+│         ├─ shared base window from `E3_DKG_WINDOW_SECS` (default 7200s,
+│         │  matching current production `Enclave` deployment config)
+│         ├─ EncryptionKeyCollector cutoff at 10% of the DKG window
+│         ├─ ThresholdShareCollector cutoff at 60% of the DKG window
+│         └─ per-collector env vars still override these derived defaults
 ```
 
 ### Step 2: C0 Proof Generation → EncryptionKeyCreated
@@ -106,9 +111,14 @@ EncryptionKeyCollector waits for EncryptionKeyCreated from ALL N parties
 │
 ├─ On each arrival: store (party_id → bfv_public_key)
 │
-├─ On TIMEOUT (60s):
-│   └─ Publish EncryptionKeyCollectionFailed
-│   └─ ThresholdKeyshare actor stops
+├─ On TIMEOUT (derived DKG-phase cutoff):
+│   └─ Send EncryptionKeyCollectionFailed to parent ThresholdKeyshare
+│      ├─ ThresholdKeyshare republishes EncryptionKeyCollectionFailed for telemetry
+│      ├─ ThresholdKeyshare emits E3Failed {
+│      │    failed_at_stage: CommitteeFinalized,
+│      │    reason: InsufficientCommitteeMembers
+│      │  }
+│      └─ ThresholdKeyshare actor stops
 │
 └─ When ALL N collected:
     └─ Send AllEncryptionKeysCollected to parent ThresholdKeyshare
@@ -294,9 +304,14 @@ ThresholdShareCollector waits for ThresholdShareCreated from ALL N parties
 │   │   → This node only extracts what's encrypted for it
 │   └─ Forwards filtered share to ThresholdShareCollector
 │
-├─ On TIMEOUT (120s):
-│   └─ Publish ThresholdShareCollectionFailed
-│   └─ ThresholdKeyshare actor stops
+├─ On TIMEOUT (derived DKG-phase cutoff):
+│   └─ Send ThresholdShareCollectionFailed to parent ThresholdKeyshare
+│      ├─ ThresholdKeyshare republishes ThresholdShareCollectionFailed for telemetry
+│      ├─ ThresholdKeyshare emits E3Failed {
+│      │    failed_at_stage: CommitteeFinalized,
+│      │    reason: InsufficientCommitteeMembers
+│      │  }
+│      └─ ThresholdKeyshare actor stops
 │
 └─ When ALL N shares collected:
     ├─ Send AllThresholdSharesCollected to ThresholdKeyshare
