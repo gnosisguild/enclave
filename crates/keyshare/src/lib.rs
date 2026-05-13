@@ -10,6 +10,7 @@ pub mod ext;
 mod repo;
 mod threshold_keyshare;
 mod threshold_share_collector;
+mod timeout_policy;
 pub use encryption_key_collector::{
     AllEncryptionKeysCollected, EncryptionKeyCollector, ExpelPartyFromKeyCollection,
 };
