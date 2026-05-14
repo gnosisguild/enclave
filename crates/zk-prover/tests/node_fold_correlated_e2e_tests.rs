@@ -128,7 +128,7 @@ fn triplicate_honest_rows(mut d: ShareDecryptionCircuitData) -> ShareDecryptionC
 }
 
 #[tokio::test]
-async fn node_fold_correlated_proves_and_verifies() {
+async fn node_fold_correlated_sparse_self_slot_proves_and_verifies() {
     let Some(bb) = find_bb().await else {
         println!("skipping: bb not found");
         return;
@@ -295,10 +295,17 @@ async fn node_fold_correlated_proves_and_verifies() {
 
     let total_slots = c3_fold_total_slots_from_compiled_json();
     assert_eq!(total_slots, 6, "Micro / insecure preset uses 3×2 C3 slots");
+    let slots_per_party = total_slots / committee.n as usize;
+    let own_party_id = 0usize;
 
     let mut c3a_inners = Vec::new();
     let mut c3b_inners = Vec::new();
+    let mut slot_indices = Vec::new();
     for slot in 0..total_slots {
+        if slot / slots_per_party == own_party_id {
+            continue;
+        }
+
         let da = share_encryption_for_slot(
             preset,
             &dkg_sk,
@@ -342,9 +349,10 @@ async fn node_fold_correlated_proves_and_verifies() {
                 )
                 .expect("C3b inner"),
         );
+        slot_indices.push(slot as u32);
     }
+    assert_eq!(slot_indices, vec![2, 3, 4, 5]);
 
-    let slot_indices: Vec<u32> = (0..total_slots as u32).collect();
     let c3a_folded = generate_sequential_c3_fold(
         &prover,
         &c3a_inners,
@@ -377,6 +385,19 @@ async fn node_fold_correlated_proves_and_verifies() {
 
     let c3a_pub = proof_public_fields(&c3a_folded);
     let c3b_pub = proof_public_fields(&c3b_folded);
+    let c3_prefix_len = c3a_pub.len() - (3 * total_slots);
+    for slot in 0..slots_per_party {
+        assert_eq!(c3a_pub[c3_prefix_len + slot], field_str_zero());
+        assert_eq!(
+            c3a_pub[c3_prefix_len + total_slots + slot],
+            field_str_zero()
+        );
+        assert_eq!(c3b_pub[c3_prefix_len + slot], field_str_zero());
+        assert_eq!(
+            c3b_pub[c3_prefix_len + total_slots + slot],
+            field_str_zero()
+        );
+    }
     let c3ab = C3abFoldWitness {
         c3a_vk: c3a_vk.verification_key,
         c3a_proof: fold_witness_field_strings(&c3a_folded.data).expect("c3a fold proof"),
