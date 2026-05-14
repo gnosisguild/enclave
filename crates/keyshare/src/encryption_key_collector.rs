@@ -19,19 +19,6 @@ use e3_trbfv::PartyId;
 use e3_utils::MAILBOX_LIMIT;
 use tracing::{info, warn};
 
-const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(600);
-const COLLECTION_TIMEOUT_ENV: &str = "E3_ENCRYPTION_KEY_COLLECTION_TIMEOUT_SECS";
-
-fn collection_timeout() -> Duration {
-    match std::env::var(COLLECTION_TIMEOUT_ENV)
-        .ok()
-        .and_then(|v| v.parse::<u64>().ok())
-    {
-        Some(0) | None => DEFAULT_COLLECTION_TIMEOUT,
-        Some(secs) => Duration::from_secs(secs),
-    }
-}
-
 use crate::ThresholdKeyshare;
 
 /// State of the collector
@@ -90,17 +77,24 @@ pub struct EncryptionKeyCollector {
     parent: Addr<ThresholdKeyshare>,
     state: CollectorState,
     keys: HashMap<PartyId, Arc<EncryptionKey>>,
+    timeout: Duration,
     timeout_handle: Option<SpawnHandle>,
 }
 
 impl EncryptionKeyCollector {
-    pub fn setup(parent: Addr<ThresholdKeyshare>, total: u64, e3_id: E3id) -> Addr<Self> {
+    pub fn setup(
+        parent: Addr<ThresholdKeyshare>,
+        total: u64,
+        e3_id: E3id,
+        timeout: Duration,
+    ) -> Addr<Self> {
         let collector = Self {
             e3_id,
             todo: (0..total).collect(),
             parent,
             state: CollectorState::Collecting,
             keys: HashMap::new(),
+            timeout,
             timeout_handle: None,
         };
         collector.start()
@@ -112,14 +106,13 @@ impl Actor for EncryptionKeyCollector {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.set_mailbox_capacity(MAILBOX_LIMIT);
-        let timeout = collection_timeout();
         info!(
             e3_id = %self.e3_id,
             "EncryptionKeyCollector started, scheduling timeout in {:?}",
-            timeout
+            self.timeout
         );
 
-        let handle = ctx.notify_later(EncryptionKeyCollectionTimeout, timeout);
+        let handle = ctx.notify_later(EncryptionKeyCollectionTimeout, self.timeout);
         self.timeout_handle = Some(handle);
     }
 }

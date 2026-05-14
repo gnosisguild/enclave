@@ -60,6 +60,7 @@ use crate::encryption_key_collector::{
 use crate::threshold_share_collector::{
     ExpelPartyFromShareCollection, ReceivedShareProofs, ThresholdShareCollector,
 };
+use crate::timeout_policy::{now_unix_secs, resolve_timeout, DkgTimeoutPhase};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "()")]
@@ -268,6 +269,8 @@ pub struct ThresholdKeyshareState {
     /// Honest party IDs in deterministic ascending order (`BTreeSet` guarantees this).
     /// Downstream proof circuits index parties by position in this sorted set.
     pub honest_parties: Option<BTreeSet<u64>>,
+    #[serde(default)]
+    pub dkg_started_at_unix_secs: Option<u64>,
     #[serde(default = "default_proof_agg")]
     pub proof_aggregation_enabled: bool,
 }
@@ -298,6 +301,7 @@ impl ThresholdKeyshareState {
             aggregated_pk: None,
             expelled_parties: HashSet::new(),
             honest_parties: None,
+            dkg_started_at_unix_secs: Some(now_unix_secs()),
             proof_aggregation_enabled,
         }
     }
@@ -492,8 +496,24 @@ impl ThresholdKeyshare {
         let e3_id = state.e3_id.clone();
         let threshold_n = state.threshold_n;
         let own_party_id = state.party_id;
+        let timeout = resolve_timeout(
+            DkgTimeoutPhase::ThresholdShareCollection,
+            state.dkg_started_at_unix_secs,
+        );
+        info!(
+            e3_id = %e3_id,
+            timeout = ?timeout.duration,
+            "{}",
+            timeout.description
+        );
         let addr = self.decryption_key_collector.get_or_insert_with(|| {
-            ThresholdShareCollector::setup(self_addr, threshold_n, own_party_id, e3_id)
+            ThresholdShareCollector::setup(
+                self_addr,
+                threshold_n,
+                own_party_id,
+                e3_id,
+                timeout.duration,
+            )
         });
         Ok(addr.clone())
     }
@@ -512,9 +532,19 @@ impl ThresholdKeyshare {
         );
         let e3_id = state.e3_id.clone();
         let threshold_n = state.threshold_n;
-        let addr = self
-            .encryption_key_collector
-            .get_or_insert_with(|| EncryptionKeyCollector::setup(self_addr, threshold_n, e3_id));
+        let timeout = resolve_timeout(
+            DkgTimeoutPhase::EncryptionKeyCollection,
+            state.dkg_started_at_unix_secs,
+        );
+        info!(
+            e3_id = %e3_id,
+            timeout = ?timeout.duration,
+            "{}",
+            timeout.description
+        );
+        let addr = self.encryption_key_collector.get_or_insert_with(|| {
+            EncryptionKeyCollector::setup(self_addr, threshold_n, e3_id, timeout.duration)
+        });
         Ok(addr.clone())
     }
 
@@ -539,9 +569,19 @@ impl ThresholdKeyshare {
             .collect();
 
         let e3_id = state.e3_id.clone();
-        let addr = self
-            .decryption_key_shared_collector
-            .get_or_insert_with(|| DecryptionKeySharedCollector::setup(self_addr, expected, e3_id));
+        let timeout = resolve_timeout(
+            DkgTimeoutPhase::DecryptionKeySharedCollection,
+            state.dkg_started_at_unix_secs,
+        );
+        info!(
+            e3_id = %e3_id,
+            timeout = ?timeout.duration,
+            "{}",
+            timeout.description
+        );
+        let addr = self.decryption_key_shared_collector.get_or_insert_with(|| {
+            DecryptionKeySharedCollector::setup(self_addr, expected, e3_id, timeout.duration)
+        });
         Ok(addr.clone())
     }
 
@@ -2587,7 +2627,13 @@ impl Handler<EncryptionKeyCollectionFailed> for ThresholdKeyshare {
             self.encryption_key_collector = None;
 
             // Publish failure event to event bus for sync tracking
-            self.bus.publish_without_context(msg)?;
+            self.bus.publish_without_context(msg.clone())?;
+
+            self.bus.publish_without_context(E3Failed {
+                e3_id: msg.e3_id,
+                failed_at_stage: E3Stage::CommitteeFinalized,
+                reason: FailureReason::InsufficientCommitteeMembers,
+            })?;
 
             // Stop this actor since we can't proceed without all encryption keys
             ctx.stop();
@@ -2615,7 +2661,13 @@ impl Handler<ThresholdShareCollectionFailed> for ThresholdKeyshare {
             self.decryption_key_collector = None;
 
             // Publish failure event to event bus for sync tracking
-            self.bus.publish_without_context(msg)?;
+            self.bus.publish_without_context(msg.clone())?;
+
+            self.bus.publish_without_context(E3Failed {
+                e3_id: msg.e3_id,
+                failed_at_stage: E3Stage::CommitteeFinalized,
+                reason: FailureReason::InsufficientCommitteeMembers,
+            })?;
 
             ctx.stop();
             Ok(())
@@ -2689,5 +2741,175 @@ impl Handler<Die> for ThresholdKeyshare {
     fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
         warn!("ThresholdKeyshare is shutting down");
         ctx.stop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::decryption_key_shared_collector::DecryptionKeySharedCollectionFailed;
+    use actix::{Actor, Addr, Handler};
+    use anyhow::Result;
+    use e3_crypto::Cipher;
+    use e3_data::{AutoPersist, DataStore, InMemStore, Persistable, Repository};
+    use e3_events::{
+        hlc_factory::HlcFactory, BusHandle, E3Stage, E3id, EnclaveEvent, EnclaveEventData,
+        EventBus, EventBusConfig, FailureReason, HistoryCollector, Sequencer, StoreEventRequested,
+        StoreEventResponse, TakeEvents,
+    };
+    use e3_fhe_params::DEFAULT_BFV_PRESET;
+    use std::sync::Arc;
+
+    #[derive(Default)]
+    struct TestEventStore {
+        next_seq: u64,
+    }
+
+    impl Actor for TestEventStore {
+        type Context = actix::Context<Self>;
+    }
+
+    impl Handler<StoreEventRequested> for TestEventStore {
+        type Result = ();
+
+        fn handle(&mut self, msg: StoreEventRequested, _: &mut Self::Context) -> Self::Result {
+            let StoreEventRequested { event, sender } = msg;
+            let seq = self.next_seq;
+            self.next_seq += 1;
+            sender.do_send(StoreEventResponse(event.into_sequenced(seq)));
+        }
+    }
+
+    fn test_bus() -> (BusHandle, Addr<HistoryCollector<EnclaveEvent>>) {
+        let event_bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
+        let store = TestEventStore::default().start();
+        let sequencer = Sequencer::new(&event_bus, store.recipient()).start();
+        let bus = BusHandle::new(event_bus, sequencer, HlcFactory::new()).enable("test-keyshare");
+        let history = bus.history();
+        (bus, history)
+    }
+
+    fn test_state() -> Persistable<ThresholdKeyshareState> {
+        let store = InMemStore::new(false).start();
+        let repo = Repository::<ThresholdKeyshareState>::new(DataStore::from_in_mem(&store));
+        repo.send(None)
+    }
+
+    async fn start_actor() -> Result<(
+        Addr<ThresholdKeyshare>,
+        Addr<HistoryCollector<EnclaveEvent>>,
+        E3id,
+    )> {
+        let (bus, history) = test_bus();
+        let actor = ThresholdKeyshare::new(ThresholdKeyshareParams {
+            bus,
+            cipher: Arc::new(Cipher::from_password("test-password").await?),
+            state: test_state(),
+            share_enc_preset: DEFAULT_BFV_PRESET,
+        })
+        .start();
+
+        Ok((actor, history, E3id::new("42", 1)))
+    }
+
+    async fn next_event(history: &Addr<HistoryCollector<EnclaveEvent>>) -> Result<EnclaveEvent> {
+        let mut result = history.send(TakeEvents::<EnclaveEvent>::new(1)).await?;
+        assert!(!result.timed_out, "timed out waiting for an event");
+        Ok(result.events.pop().expect("expected one event"))
+    }
+
+    async fn next_events(
+        history: &Addr<HistoryCollector<EnclaveEvent>>,
+        count: usize,
+    ) -> Result<Vec<EnclaveEvent>> {
+        let result = history.send(TakeEvents::<EnclaveEvent>::new(count)).await?;
+        assert!(!result.timed_out, "timed out waiting for events");
+        assert_eq!(result.events.len(), count, "expected {count} events");
+        Ok(result.events)
+    }
+
+    #[actix::test]
+    async fn encryption_key_collection_failure_preserves_telemetry_and_emits_e3_failed(
+    ) -> Result<()> {
+        let (actor, history, e3_id) = start_actor().await?;
+        let failure = EncryptionKeyCollectionFailed {
+            e3_id,
+            reason: "missing encryption keys".to_string(),
+            missing_parties: vec![2, 3],
+        };
+
+        actor.send(failure.clone()).await?;
+
+        let mut events = next_events(&history, 2).await?;
+        let event = events.remove(0);
+        assert!(matches!(
+            event.into_data(),
+            EnclaveEventData::EncryptionKeyCollectionFailed(data) if data == failure
+        ));
+
+        let event = events.remove(0);
+        assert!(matches!(
+            event.into_data(),
+            EnclaveEventData::E3Failed(data)
+                if data.e3_id == failure.e3_id
+                    && data.failed_at_stage == E3Stage::CommitteeFinalized
+                    && data.reason == FailureReason::InsufficientCommitteeMembers
+        ));
+
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn threshold_share_collection_failure_preserves_telemetry_and_emits_e3_failed(
+    ) -> Result<()> {
+        let (actor, history, e3_id) = start_actor().await?;
+        let failure = ThresholdShareCollectionFailed {
+            e3_id,
+            reason: "missing threshold shares".to_string(),
+            missing_parties: vec![4, 5],
+        };
+
+        actor.send(failure.clone()).await?;
+
+        let mut events = next_events(&history, 2).await?;
+        let event = events.remove(0);
+        assert!(matches!(
+            event.into_data(),
+            EnclaveEventData::ThresholdShareCollectionFailed(data) if data == failure
+        ));
+
+        let event = events.remove(0);
+        assert!(matches!(
+            event.into_data(),
+            EnclaveEventData::E3Failed(data)
+                if data.e3_id == failure.e3_id
+                    && data.failed_at_stage == E3Stage::CommitteeFinalized
+                    && data.reason == FailureReason::InsufficientCommitteeMembers
+        ));
+
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn decryption_key_shared_collection_failure_emits_e3_failed() -> Result<()> {
+        let (actor, history, e3_id) = start_actor().await?;
+        let failure = DecryptionKeySharedCollectionFailed {
+            e3_id,
+            reason: "missing decryption key shares".to_string(),
+            missing_parties: vec![6, 7],
+        };
+
+        actor.send(failure.clone()).await?;
+
+        let event = next_event(&history).await?;
+        assert!(matches!(
+            event.into_data(),
+            EnclaveEventData::E3Failed(data)
+                if data.e3_id == failure.e3_id
+                    && data.failed_at_stage == E3Stage::CommitteeFinalized
+                    && data.reason == FailureReason::InsufficientCommitteeMembers
+        ));
+
+        Ok(())
     }
 }

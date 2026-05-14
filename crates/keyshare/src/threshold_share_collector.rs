@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use core::time;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -32,19 +33,6 @@ pub struct ReceivedShareProofs {
     pub signed_c3a_proofs: Vec<SignedProofPayload>,
     /// Signed C3b proofs (e_sm share encryption per modulus row).
     pub signed_c3b_proofs: Vec<SignedProofPayload>,
-}
-
-const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(3600);
-const COLLECTION_TIMEOUT_ENV: &str = "E3_THRESHOLD_SHARE_COLLECTION_TIMEOUT_SECS";
-
-fn collection_timeout() -> Duration {
-    match std::env::var(COLLECTION_TIMEOUT_ENV)
-        .ok()
-        .and_then(|v| v.parse::<u64>().ok())
-    {
-        Some(0) | None => DEFAULT_COLLECTION_TIMEOUT,
-        Some(secs) => Duration::from_secs(secs),
-    }
 }
 
 pub(crate) enum CollectorState {
@@ -79,6 +67,7 @@ pub struct ThresholdShareCollector {
     shares: HashMap<PartyId, Arc<ThresholdShare>>,
     /// Proofs received alongside each party's shares
     share_proofs: HashMap<PartyId, ReceivedShareProofs>,
+    timeout: Duration,
     /// A timeout handle for when this collector will report failure
     timeout_handle: Option<SpawnHandle>,
 }
@@ -90,6 +79,7 @@ impl ThresholdShareCollector {
         total: u64,
         own_party_id: u64,
         e3_id: E3id,
+        timeout: Duration,
     ) -> Addr<Self> {
         let collector = Self {
             e3_id,
@@ -98,6 +88,7 @@ impl ThresholdShareCollector {
             state: CollectorState::Collecting,
             shares: HashMap::new(),
             share_proofs: HashMap::new(),
+            timeout,
             timeout_handle: None,
         };
         collector.start()
@@ -109,14 +100,13 @@ impl Actor for ThresholdShareCollector {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.set_mailbox_capacity(MAILBOX_LIMIT);
-        let timeout = collection_timeout();
         info!(
             e3_id = %self.e3_id,
             "ThresholdShareCollector started, scheduling timeout in {:?}",
-            timeout
+            self.timeout
         );
         // Schedule timeout
-        let handle = ctx.notify_later(ThresholdShareCollectionTimeout, timeout);
+        let handle = ctx.notify_later(ThresholdShareCollectionTimeout, self.timeout);
         self.timeout_handle = Some(handle);
     }
 }

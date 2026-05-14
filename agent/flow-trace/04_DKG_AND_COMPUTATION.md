@@ -44,7 +44,12 @@ CiphernodeSelected event arrives at ThresholdKeyshare
 │   │     → These collectors start immediately so early peer keys/shares can
 │   │       be buffered while this node is still finishing earlier DKG phases
 │   │
-│   └─ Each collector has a timeout (60s for keys, 120s for shares)
+│   └─ Collector timeouts are derived from the DKG stage budget:
+│         ├─ shared base window from `E3_DKG_WINDOW_SECS` (default 7200s,
+│         │  matching current production `Enclave` deployment config)
+│         ├─ EncryptionKeyCollector cutoff at 10% of the DKG window
+│         ├─ ThresholdShareCollector cutoff at 60% of the DKG window
+│         └─ per-collector env vars still override these derived defaults
 ```
 
 ### Step 2: C0 Proof Generation → EncryptionKeyCreated
@@ -106,9 +111,14 @@ EncryptionKeyCollector waits for EncryptionKeyCreated from ALL N parties
 │
 ├─ On each arrival: store (party_id → bfv_public_key)
 │
-├─ On TIMEOUT (60s):
-│   └─ Publish EncryptionKeyCollectionFailed
-│   └─ ThresholdKeyshare actor stops
+├─ On TIMEOUT (derived DKG-phase cutoff):
+│   └─ Send EncryptionKeyCollectionFailed to parent ThresholdKeyshare
+│      ├─ ThresholdKeyshare republishes EncryptionKeyCollectionFailed for telemetry
+│      ├─ ThresholdKeyshare emits E3Failed {
+│      │    failed_at_stage: CommitteeFinalized,
+│      │    reason: InsufficientCommitteeMembers
+│      │  }
+│      └─ ThresholdKeyshare actor stops
 │
 └─ When ALL N collected:
     └─ Send AllEncryptionKeysCollected to parent ThresholdKeyshare
@@ -279,9 +289,15 @@ The per-circuit `wrapper/` Noir step was removed; aggregator response structs no
 implements `ZkRequest::NodeDkgFold` (full per-node pipeline to a `NodeFold` proof),
 `ZkRequest::DkgAggregation` (`NodesFold` + C5 + `DkgAggregator`), and
 `ZkRequest::DecryptionAggregation` (per-ciphertext `C6Fold` + C7 + `DecryptionAggregator`).
-`NodeProofAggregator` buffers all `DKGInnerProofReady` proofs then issues one `NodeDkgFold` request;
-`PublicKeyAggregator` and `ThresholdPlaintextAggregator` dispatch the aggregator requests instead of
-pairwise folding.
+`NodeProofAggregator` prebuffers `DKGInnerProofReady` proofs that arrive before
+`ThresholdSharePending`, drains those buffered proofs into collection state once
+`ThresholdSharePending` arrives, and issues one `NodeDkgFold` request when the
+full ordered proof set is available. If that `NodeDkgFold` compute request fails,
+it publishes `DKGRecursiveAggregationComplete { aggregated_proof: None }` so the
+downstream DKG/public-key aggregation path can terminate deterministically instead
+of stalling on missing node-fold output. `PublicKeyAggregator` and
+`ThresholdPlaintextAggregator` dispatch the aggregator requests instead of pairwise
+folding.
 
 ### Step 6: Collect All Threshold Shares (with C2/C3 Verification)
 
@@ -296,9 +312,14 @@ ThresholdShareCollector waits for ThresholdShareCreated from ALL N parties
 │   │   → This node only extracts what's encrypted for it
 │   └─ Forwards filtered share to ThresholdShareCollector
 │
-├─ On TIMEOUT (120s):
-│   └─ Publish ThresholdShareCollectionFailed
-│   └─ ThresholdKeyshare actor stops
+├─ On TIMEOUT (derived DKG-phase cutoff):
+│   └─ Send ThresholdShareCollectionFailed to parent ThresholdKeyshare
+│      ├─ ThresholdKeyshare republishes ThresholdShareCollectionFailed for telemetry
+│      ├─ ThresholdKeyshare emits E3Failed {
+│      │    failed_at_stage: CommitteeFinalized,
+│      │    reason: InsufficientCommitteeMembers
+│      │  }
+│      └─ ThresholdKeyshare actor stops
 │
 └─ When ALL N shares collected:
     ├─ Send AllThresholdSharesCollected to ThresholdKeyshare
