@@ -41,6 +41,7 @@ use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
+use ndarray::Array2;
 use rand::rngs::OsRng;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
@@ -138,6 +139,11 @@ pub struct GeneratingThresholdShareData {
 pub struct AggregatingDecryptionKey {
     pk_share: ArcBytes,
     sk_bfv: SensitiveBytes,
+    /// Bincode-serialised `Vec<Vec<u64>>` of shape `[L][N]` — own party's plaintext sk
+    /// share row per modulus. Used by C4a in lieu of self-encryption.
+    own_sk_share_raw: SensitiveBytes,
+    /// One bincode-serialised `Vec<Vec<u64>>` per smudging-noise (esi). Used by C4b.
+    own_esi_shares_raw: Vec<SensitiveBytes>,
     signed_pk_generation_proof: Option<SignedProofPayload>,
     signed_sk_share_computation_proof: Option<SignedProofPayload>,
     signed_e_sm_share_computation_proof: Option<SignedProofPayload>,
@@ -426,6 +432,10 @@ pub struct ThresholdKeyshare {
     )>,
     /// Temporarily stores DecryptionKeyShared while C4 verification is in flight.
     pending_c4_verification_shares: Option<HashMap<u64, DecryptionKeyShared>>,
+    /// Own DKG plaintext shares captured during `handle_shares_generated`, consumed by
+    /// the AggregatingDecryptionKey transition. Tuple is `(own_sk_share, own_esi_shares)`.
+    /// Each entry is bincode-encoded `Vec<Vec<u64>>` of shape `[L][N]`.
+    pending_own_dkg_shares: Option<(SensitiveBytes, Vec<SensitiveBytes>)>,
 }
 
 impl ThresholdKeyshare {
@@ -441,6 +451,7 @@ impl ThresholdKeyshare {
             pending_shares: Vec::new(),
             pending_share_decryption_data: None,
             pending_c4_verification_shares: None,
+            pending_own_dkg_shares: None,
         }
     }
 }
@@ -450,6 +461,23 @@ impl Actor for ThresholdKeyshare {
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.set_mailbox_capacity(MAILBOX_LIMIT);
     }
+}
+
+/// Build a `ShamirShare` (rows = moduli, cols = `N` coefficients) from a `Vec<Vec<u64>>`
+/// of shape `[L][N]`. Used to lift our own plaintext DKG share into the same matrix
+/// shape as BFV-decrypted external shares.
+fn vec_of_rows_to_shamir_share(rows: &[Vec<u64>], degree: usize) -> Result<ShamirShare> {
+    if rows.iter().any(|r| r.len() != degree) {
+        bail!(
+            "ShamirShare row length mismatch: each row must have {} coefficients",
+            degree
+        );
+    }
+    let l = rows.len();
+    let flat: Vec<u64> = rows.iter().flatten().copied().collect();
+    let arr = Array2::from_shape_vec((l, degree), flat)
+        .context("Failed to build Array2 for ShamirShare")?;
+    Ok(ShamirShare::new(arr))
 }
 
 impl ThresholdKeyshare {
@@ -467,6 +495,7 @@ impl ThresholdKeyshare {
         );
         let e3_id = state.e3_id.clone();
         let threshold_n = state.threshold_n;
+        let own_party_id = state.party_id;
         let timeout = resolve_timeout(
             DkgTimeoutPhase::ThresholdShareCollection,
             state.dkg_started_at_unix_secs,
@@ -478,7 +507,13 @@ impl ThresholdKeyshare {
             timeout.description
         );
         let addr = self.decryption_key_collector.get_or_insert_with(|| {
-            ThresholdShareCollector::setup(self_addr, threshold_n, e3_id, timeout.duration)
+            ThresholdShareCollector::setup(
+                self_addr,
+                threshold_n,
+                own_party_id,
+                e3_id,
+                timeout.duration,
+            )
         });
         Ok(addr.clone())
     }
@@ -1060,6 +1095,12 @@ impl ThresholdKeyshare {
             // Call handle_shares_generated while still in GeneratingThresholdShare state
             self.handle_shares_generated(ec.clone())?;
 
+            // Consume the own plaintext shares stashed transiently by handle_shares_generated.
+            let (own_sk_share_raw, own_esi_shares_raw) =
+                self.pending_own_dkg_shares.take().ok_or_else(|| {
+                    anyhow!("pending_own_dkg_shares missing — handle_shares_generated did not run")
+                })?;
+
             // Now transition to AggregatingDecryptionKey with minimal state
             self.state.try_mutate(&ec, |s| {
                 let current: GeneratingThresholdShareData = s.clone().try_into()?;
@@ -1067,6 +1108,8 @@ impl ThresholdKeyshare {
                     AggregatingDecryptionKey {
                         pk_share: current.pk_share.expect("pk_share checked above"),
                         sk_bfv: current.sk_bfv,
+                        own_sk_share_raw: own_sk_share_raw.clone(),
+                        own_esi_shares_raw: own_esi_shares_raw.clone(),
                         signed_pk_generation_proof: None,
                         signed_sk_share_computation_proof: None,
                         signed_e_sm_share_computation_proof: None,
@@ -1121,6 +1164,20 @@ impl ThresholdKeyshare {
                     .map_err(|e| anyhow!("Failed to deserialize BFV public key: {:?}", e))
             })
             .collect::<Result<_>>()?;
+        let recipient_party_ids: Vec<u64> = encryption_keys.iter().map(|k| k.party_id).collect();
+        let recipient_share_indices: Vec<usize> = recipient_party_ids
+            .iter()
+            .map(|&recipient_party_id| recipient_party_id as usize)
+            .collect();
+        let own_idx = recipient_party_ids
+            .iter()
+            .position(|&recipient_party_id| recipient_party_id == party_id)
+            .ok_or_else(|| {
+                anyhow!(
+                    "own party {} missing from collected encryption keys",
+                    party_id
+                )
+            })?;
 
         // Decrypt our shares from local storage
         let decrypted_sk_sss: SharedSecret = sk_sss.decrypt(&self.cipher)?;
@@ -1144,19 +1201,59 @@ impl ThresholdKeyshare {
             })
             .collect::<Result<_>>()?;
 
-        // Encrypt shares for all recipients using BFV (extended to capture randomness for C3 proofs)
-        let mut rng = OsRng;
-        let (encrypted_sk_sss, sk_witnesses) = BfvEncryptedShares::encrypt_all_extended(
-            &decrypted_sk_sss,
-            &recipient_pks,
-            &params,
-            &mut rng,
+        // Cache own plaintext share rows for C4 (no self-encryption); stored encrypted at rest.
+        let own_sk_shamir = decrypted_sk_sss.extract_party_share(party_id as usize)?;
+        let own_sk_rows: Vec<Vec<u64>> = own_sk_shamir
+            .rows()
+            .into_iter()
+            .map(|row| row.iter().copied().collect())
+            .collect();
+        let own_sk_share_raw = SensitiveBytes::new(
+            bincode::serialize(&own_sk_rows)
+                .map_err(|e| anyhow!("Failed to serialize own sk share: {}", e))?,
+            &self.cipher,
         )?;
+
+        let own_esi_shares_raw: Vec<SensitiveBytes> = decrypted_esi_sss
+            .iter()
+            .map(|esi| {
+                let shamir = esi.extract_party_share(party_id as usize)?;
+                let rows: Vec<Vec<u64>> = shamir
+                    .rows()
+                    .into_iter()
+                    .map(|row| row.iter().copied().collect())
+                    .collect();
+                let bytes = bincode::serialize(&rows)
+                    .map_err(|e| anyhow!("Failed to serialize own esi share: {}", e))?;
+                SensitiveBytes::new(bytes, &self.cipher)
+            })
+            .collect::<Result<_>>()?;
+        self.pending_own_dkg_shares = Some((own_sk_share_raw, own_esi_shares_raw));
+
+        // BFV-encrypt shares to all recipients except own slot (own share is bound via C2,
+        // consumed locally by C4). Returns per-row randomness for C3 proofs.
+        let mut rng = OsRng;
+        let (encrypted_sk_sss, sk_witnesses) =
+            BfvEncryptedShares::encrypt_all_extended_for_share_indices(
+                &decrypted_sk_sss,
+                &recipient_pks,
+                &recipient_share_indices,
+                &params,
+                &mut rng,
+                Some(own_idx),
+            )?;
 
         let (encrypted_esi_sss, esi_witnesses): (Vec<_>, Vec<_>) = decrypted_esi_sss
             .iter()
             .map(|esi| {
-                BfvEncryptedShares::encrypt_all_extended(esi, &recipient_pks, &params, &mut rng)
+                BfvEncryptedShares::encrypt_all_extended_for_share_indices(
+                    esi,
+                    &recipient_pks,
+                    &recipient_share_indices,
+                    &params,
+                    &mut rng,
+                    Some(own_idx),
+                )
             })
             .collect::<Result<Vec<_>>>()?
             .into_iter()
@@ -1201,9 +1298,15 @@ impl ThresholdKeyshare {
             committee_size: derived_committee_size,
         };
 
-        // Build C3a proof requests (SK share encryption) from witnesses
+        // Build C3a proof requests (SK share encryption) from witnesses.
+        // The own slot was skipped during BFV encryption (witness vec empty), so it
+        // contributes no C3a request.
         let mut sk_share_encryption_requests = Vec::new();
         for (recipient_idx, recipient_witnesses) in sk_witnesses.iter().enumerate() {
+            if recipient_idx == own_idx {
+                continue;
+            }
+            let recipient_party_id = recipient_share_indices[recipient_idx];
             for (row_idx, witness) in recipient_witnesses.iter().enumerate() {
                 sk_share_encryption_requests.push(ShareEncryptionProofRequest {
                     share_row_raw: SensitiveBytes::new(
@@ -1221,17 +1324,21 @@ impl ThresholdKeyshare {
                     dkg_input_type: DkgInputType::SecretKey,
                     params_preset: threshold_preset,
                     committee_size: derived_committee_size,
-                    recipient_party_id: recipient_idx,
+                    recipient_party_id,
                     row_index: row_idx,
                     esi_index: 0,
                 });
             }
         }
 
-        // Build C3b proof requests (E_SM share encryption) from witnesses
+        // Build C3b proof requests (E_SM share encryption) from witnesses; skip own slot.
         let mut e_sm_share_encryption_requests = Vec::new();
         for (esi_idx, esi_recipient_witnesses) in esi_witnesses.iter().enumerate() {
             for (recipient_idx, recipient_witnesses) in esi_recipient_witnesses.iter().enumerate() {
+                if recipient_idx == own_idx {
+                    continue;
+                }
+                let recipient_party_id = recipient_share_indices[recipient_idx];
                 for (row_idx, witness) in recipient_witnesses.iter().enumerate() {
                     e_sm_share_encryption_requests.push(ShareEncryptionProofRequest {
                         share_row_raw: SensitiveBytes::new(
@@ -1249,7 +1356,7 @@ impl ThresholdKeyshare {
                         dkg_input_type: DkgInputType::SmudgingNoise,
                         params_preset: threshold_preset,
                         committee_size: derived_committee_size,
-                        recipient_party_id: recipient_idx,
+                        recipient_party_id,
                         row_index: row_idx,
                         esi_index: esi_idx,
                     });
@@ -1265,9 +1372,6 @@ impl ThresholdKeyshare {
             sk_share_encryption_requests.len(),
             e_sm_share_encryption_requests.len()
         );
-
-        // Collect real party IDs in positional order (indices match encrypt_all_extended output)
-        let recipient_party_ids: Vec<u64> = encryption_keys.iter().map(|k| k.party_id).collect();
 
         // Publish ThresholdSharePending - ProofRequestActor will generate proof, sign, and publish ThresholdShareCreated
         self.bus.publish(
@@ -1322,24 +1426,20 @@ impl ThresholdKeyshare {
                 .unzip()
         };
 
-        // Derive expected proof counts from our own share (trusted source).
-        // All parties use the same BFV params, so moduli counts are identical.
-        // Using the sender's share would let a malicious party manipulate expected counts.
-        let own_share = shares
-            .iter()
-            .find(|s| s.party_id == own_party_id)
-            .ok_or_else(|| anyhow!("Own share not found in AllThresholdSharesCollected"))?;
-        let expected_c3a = own_share
-            .sk_sss
-            .get_share(0)
-            .map(|s| s.num_moduli())
-            .unwrap_or(0);
-        let expected_c3b: usize = own_share
-            .esi_sss
-            .iter()
-            .map(|esi| esi.get_share(0).map(|s| s.num_moduli()).unwrap_or(0))
-            .sum();
-        let expected_num_esi = own_share.esi_sss.len();
+        // Expected proof counts come from local cached own shares (trusted source); the
+        // collector excludes self from `shares`, so we cannot read them from there.
+        let current: AggregatingDecryptionKey = state.clone().try_into()?;
+        let own_sk_rows: Vec<Vec<u64>> =
+            bincode::deserialize(&current.own_sk_share_raw.access_raw(&self.cipher)?)
+                .context("Failed to deserialize own_sk_share_raw")?;
+        let expected_c3a = own_sk_rows.len();
+        let expected_num_esi = current.own_esi_shares_raw.len();
+        let mut expected_c3b: usize = 0;
+        for esi_raw in current.own_esi_shares_raw.iter() {
+            let rows: Vec<Vec<u64>> = bincode::deserialize(&esi_raw.access_raw(&self.cipher)?)
+                .context("Failed to deserialize own esi share")?;
+            expected_c3b += rows.len();
+        }
 
         // Build verification requests for other parties' proofs
         let mut party_proofs_to_verify: Vec<PartyProofsToVerify> = Vec::new();
@@ -1579,6 +1679,7 @@ impl ThresholdKeyshare {
         let state = self.state.try_get()?;
         let e3_id = state.get_e3_id();
         let party_id = state.party_id as usize;
+        let own_party_id = state.party_id as u64;
         let trbfv_config = state.get_trbfv_config();
 
         // Get our BFV secret key from state, pending shares from the actor
@@ -1592,7 +1693,29 @@ impl ThresholdKeyshare {
         let sk_bfv = deserialize_secret_key(&sk_bytes, &params)?;
         let degree = params.degree();
 
-        // Filter to honest parties only
+        // Own plaintext shares (bincode `Vec<Vec<u64>>` shape [L][N]) cached at generation time.
+        let own_sk_rows: Vec<Vec<u64>> =
+            bincode::deserialize(&current.own_sk_share_raw.access_raw(&cipher)?)
+                .context("Failed to deserialize own_sk_share_raw")?;
+        let own_esi_rows_per_esi: Vec<Vec<Vec<u64>>> = current
+            .own_esi_shares_raw
+            .iter()
+            .map(|sb| {
+                let bytes = sb.access_raw(&cipher)?;
+                bincode::deserialize::<Vec<Vec<u64>>>(&bytes)
+                    .context("Failed to deserialize own esi share")
+            })
+            .collect::<Result<_>>()?;
+
+        // Expected dimensions derived from own (trusted) shares.
+        let expected_num_esi = own_esi_rows_per_esi.len();
+        let expected_num_moduli_sk = own_sk_rows.len();
+        let expected_num_moduli_esi = own_esi_rows_per_esi
+            .first()
+            .map(|rows| rows.len())
+            .unwrap_or(0);
+
+        // Filter to honest external parties (collector already excludes self).
         let honest_shares: Vec<_> = shares
             .iter()
             .filter(|ts| {
@@ -1602,48 +1725,11 @@ impl ThresholdKeyshare {
             })
             .collect();
 
-        // Derive expected dimensions from our own share (trusted source).
-        // All parties use the same on-chain BFV params, so dimensions must be identical.
-        let own_share = honest_shares
-            .iter()
-            .find(|ts| ts.party_id == state.party_id as u64)
-            .ok_or_else(|| anyhow!("Own share not found in honest shares"))?;
-
-        let expected_num_esi = own_share.esi_sss.len();
-        let own_sk_share = own_share
-            .sk_sss
-            .clone_share(if own_share.sk_sss.len() == 1 {
-                0
-            } else {
-                party_id
-            })
-            .ok_or(anyhow!("No own sk_sss share"))?;
-        let expected_num_moduli_sk = own_sk_share.num_moduli();
-        let expected_num_moduli_esi = if expected_num_esi > 0 {
-            own_share.esi_sss[0]
-                .clone_share(if own_share.esi_sss[0].len() == 1 {
-                    0
-                } else {
-                    party_id
-                })
-                .map(|s| s.num_moduli())
-                .unwrap_or(0)
-        } else {
-            0
-        };
-
         // Validate per-party dimensions and exclude mismatched parties.
-        // This prevents a malicious party with wrong-sized shares from
-        // causing a panic or opaque error in downstream matrix building.
         let mut dimension_excluded: Vec<u64> = Vec::new();
         let honest_shares: Vec<_> = honest_shares
             .into_iter()
             .filter(|ts| {
-                // Own share is always valid
-                if ts.party_id == state.party_id as u64 {
-                    return true;
-                }
-                // Check esi count
                 if ts.esi_sss.len() != expected_num_esi {
                     warn!(
                         "Party {} has wrong esi_sss count ({} vs expected {}) — excluding from honest set",
@@ -1652,7 +1738,6 @@ impl ThresholdKeyshare {
                     dimension_excluded.push(ts.party_id);
                     return false;
                 }
-                // Check sk share exists and moduli count
                 let idx = if ts.sk_sss.len() == 1 { 0 } else { party_id };
                 match ts.sk_sss.clone_share(idx) {
                     Some(share) if share.num_moduli() != expected_num_moduli_sk => {
@@ -1673,7 +1758,6 @@ impl ThresholdKeyshare {
                     }
                     _ => {}
                 }
-                // Check esi shares exist and moduli counts
                 for (esi_idx, esi_shares) in ts.esi_sss.iter().enumerate() {
                     let idx = if esi_shares.len() == 1 { 0 } else { party_id };
                     match esi_shares.clone_share(idx) {
@@ -1706,9 +1790,9 @@ impl ThresholdKeyshare {
                 dimension_excluded.len(),
                 dimension_excluded
             );
-            // Re-check threshold after exclusion
+            // Re-check threshold after exclusion (+1 for own share).
             let threshold = state.threshold_m;
-            if (honest_shares.len() as u64) <= threshold {
+            if (honest_shares.len() as u64 + 1) <= threshold {
                 self.pending_shares.clear();
                 self.bus.publish(
                     E3Failed {
@@ -1722,26 +1806,32 @@ impl ThresholdKeyshare {
             }
         }
 
-        // Store honest party IDs in state (after dimension exclusion)
-        let honest_party_ids: BTreeSet<u64> = honest_shares.iter().map(|s| s.party_id).collect();
+        // Honest party IDs include self (signing/aggregation treats own party as honest).
+        let mut honest_party_ids: BTreeSet<u64> =
+            honest_shares.iter().map(|s| s.party_id).collect();
+        honest_party_ids.insert(own_party_id);
 
-        // honest_shares inherits sorted order from AllThresholdSharesCollected.
         debug_assert!(
             honest_shares
                 .windows(2)
                 .all(|w| w[0].party_id < w[1].party_id),
-            "BUG: honest_shares must be in strictly ascending party_id order"
+            "honest_shares must be strictly ascending by party_id"
         );
 
-        let num_honest = honest_shares.len();
+        // Position of own party within sorted {own} ∪ external honest set.
+        let own_plaintext_idx = honest_shares
+            .iter()
+            .position(|ts| ts.party_id > own_party_id)
+            .unwrap_or(honest_shares.len());
+
+        let num_honest = honest_shares.len() + 1;
         info!(
-            "Decrypting shares from {} honest parties for E3 {}",
+            "Decrypting shares from {} honest parties (incl. self) for E3 {}",
             num_honest, e3_id
         );
 
-        // Collect ciphertext bytes for C4 proof requests (built here, sent after CalculateDecryptionKey)
-        // Dimensions are validated per-party above, so all shares are consistent.
-        // C4a: sk_sss ciphertexts from honest parties [H * L]
+        // External ciphertexts for C4: own slot omitted from wire (rides as `own_share_raw`).
+        // C4a: sk_sss external ciphertexts [(H-1) * L]
         let num_moduli_sk = expected_num_moduli_sk;
         let mut sk_ciphertexts_raw = Vec::new();
         for ts in &honest_shares {
@@ -1755,7 +1845,7 @@ impl ThresholdKeyshare {
             }
         }
 
-        // C4b: esi_sss ciphertexts from honest parties — one set per smudging noise
+        // C4b: esi_sss external ciphertexts — one set per smudging noise
         let num_esi = expected_num_esi;
         let num_moduli_esi = expected_num_moduli_esi;
         let mut esi_ciphertexts_raw: Vec<Vec<ArcBytes>> = vec![Vec::new(); num_esi];
@@ -1771,8 +1861,8 @@ impl ThresholdKeyshare {
             }
         }
 
-        // Decrypt our share from each honest sender using BFV
-        let sk_sss_collected: Vec<ShamirShare> = honest_shares
+        // Decrypt our share row from each external honest sender using BFV.
+        let mut sk_sss_collected: Vec<ShamirShare> = honest_shares
             .iter()
             .map(|ts| {
                 let idx = if ts.sk_sss.len() == 1 { 0 } else { party_id };
@@ -1784,8 +1874,12 @@ impl ThresholdKeyshare {
             })
             .collect::<Result<_>>()?;
 
-        // Decrypt per-party ESI shares: shape [party][esm_idx]
-        let per_party_esi: Vec<Vec<ShamirShare>> = honest_shares
+        // Splice own sk share at the sorted-party position.
+        let own_sk_shamir = vec_of_rows_to_shamir_share(&own_sk_rows, degree)?;
+        sk_sss_collected.insert(own_plaintext_idx, own_sk_shamir);
+
+        // Decrypt per-party ESI shares: shape [external_party][esm_idx]
+        let mut per_party_esi: Vec<Vec<ShamirShare>> = honest_shares
             .iter()
             .map(|ts| {
                 ts.esi_sss
@@ -1800,6 +1894,13 @@ impl ThresholdKeyshare {
                     .collect::<Result<Vec<_>>>()
             })
             .collect::<Result<_>>()?;
+
+        // Splice own esi shares (one per smudging noise).
+        let own_esi_shamirs: Vec<ShamirShare> = own_esi_rows_per_esi
+            .iter()
+            .map(|rows| vec_of_rows_to_shamir_share(rows, degree))
+            .collect::<Result<_>>()?;
+        per_party_esi.insert(own_plaintext_idx, own_esi_shamirs);
 
         // Transpose to [esm_idx][party] — CalculateDecryptionKey aggregates per smudging noise
         let esi_sss_collected: Vec<Vec<ShamirShare>> = (0..num_esi)
@@ -1839,17 +1940,22 @@ impl ThresholdKeyshare {
             honest_ciphertexts_raw: sk_ciphertexts_raw,
             num_honest_parties: num_honest,
             num_moduli: num_moduli_sk,
+            own_plaintext_idx,
+            own_share_raw: current.own_sk_share_raw.clone(),
             dkg_input_type: DkgInputType::SecretKey,
             params_preset: threshold_preset,
         };
 
         let esm_requests: Vec<DkgShareDecryptionProofRequest> = esi_ciphertexts_raw
             .into_iter()
-            .map(|esi_cts| DkgShareDecryptionProofRequest {
+            .enumerate()
+            .map(|(esi_idx, esi_cts)| DkgShareDecryptionProofRequest {
                 sk_bfv: current.sk_bfv.clone(),
                 honest_ciphertexts_raw: esi_cts,
                 num_honest_parties: num_honest,
                 num_moduli: num_moduli_esi,
+                own_plaintext_idx,
+                own_share_raw: current.own_esi_shares_raw[esi_idx].clone(),
                 dkg_input_type: DkgInputType::SmudgingNoise,
                 params_preset: threshold_preset,
             })
