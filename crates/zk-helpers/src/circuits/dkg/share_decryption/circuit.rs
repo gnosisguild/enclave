@@ -24,13 +24,20 @@ impl Circuit for ShareDecryptionCircuit {
     const DKG_INPUT_TYPE: Option<DkgInputType> = None;
 }
 
-/// Data for the share-decryption circuit: secret key and honest parties' ciphertexts.
+/// Data for the share-decryption circuit: secret key, ciphertexts from external honest
+/// parties, and the own party's plaintext share row.
 pub struct ShareDecryptionCircuitData {
-    /// DKG secret key used to decrypt (private input).
+    /// DKG secret key used to decrypt external ciphertexts (private input).
     pub secret_key: SecretKey,
-    /// Ciphertexts from H honest parties: [party_idx][mod_idx] (one ciphertext per party per TRBFV modulus).
-    /// party_idx follows ascending party_id among honest parties
-    pub honest_ciphertexts: Vec<Vec<Ciphertext>>,
+    /// Per-honest-party ciphertexts, length H, indexed by ascending honest party_id.
+    /// `None` means that slot is the own party (no ciphertext was produced because the
+    /// party does not self-encrypt during DKG); `Some(cts)` carries one ciphertext per
+    /// CRT modulus for an external honest party.
+    pub honest_ciphertexts: Vec<Option<Vec<Ciphertext>>>,
+    /// Own party's plaintext share row per modulus, shape `[L][N]` (length L, each
+    /// inner Vec length N). Spliced into the H-sized list at the `None` slot when
+    /// computing commitments and decrypted-share inputs.
+    pub own_plaintext_share: Vec<Vec<u64>>,
     /// Which input type (SecretKey or SmudgingNoise) to resolve circuit path.
     pub dkg_input_type: DkgInputType,
 }
