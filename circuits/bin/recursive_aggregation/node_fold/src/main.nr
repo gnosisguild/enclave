@@ -106,22 +106,33 @@ fn main(
         }
     }
 
-    // C2 to C3: all (party, modulus) slots must be bound - msg_a[j*L+l] == c2a_shares[j][l]
-    // and msg_b[j*L+l] == c2b_shares[j][l].
+    // C2 to C3: encrypted recipient slots must be bound - msg_a[j*L+l] == c2a_shares[j][l]
+    // and msg_b[j*L+l] == c2b_shares[j][l]. The node's own slot is intentionally not
+    // C3-encrypted; it is bound through the C4 plaintext/decryption path instead.
     // c3ab layout: key-hash prefix, then pk_a, msg_a, ct_a, pk_b, msg_b, ct_b (`C3_SLOTS` each).
     // c2ab layout: see `C2AB_PREFIX_LEN` / `C2_PUBLIC_LEN`.
     for j in 0..N_PARTIES {
         for l in 0..L_THRESHOLD {
-            let slot = j * L_THRESHOLD + l;
-            assert(c2ab_public[C2A_SHARES_START + slot] == c3ab_public[C3AB_MSG_A_START + slot]);
-            assert(c2ab_public[C2B_SHARES_START + slot] == c3ab_public[C3AB_MSG_B_START + slot]);
+            if party_id != (j as Field) {
+                let slot = j * L_THRESHOLD + l;
+                assert(
+                    c2ab_public[C2A_SHARES_START + slot] == c3ab_public[C3AB_MSG_A_START + slot],
+                );
+                assert(
+                    c2ab_public[C2B_SHARES_START + slot] == c3ab_public[C3AB_MSG_B_START + slot],
+                );
+            }
         }
     }
 
     let mut c3_pk: [Field; N_PARTIES] = [0; N_PARTIES];
     for j in 0..N_PARTIES {
-        // pk is per-party (same DKG key across all moduli of the same recipient): use slot j*L+0.
-        c3_pk[j] = c3ab_public[C3AB_PK_A_START + j * L_THRESHOLD];
+        if party_id == (j as Field) {
+            c3_pk[j] = c0_pk;
+        } else {
+            // pk is per-party (same DKG key across all moduli of the same recipient): use slot j*L+0.
+            c3_pk[j] = c3ab_public[C3AB_PK_A_START + j * L_THRESHOLD];
+        }
     }
 
     let mut c2a: [[Field; L_THRESHOLD]; N_PARTIES] = [[0; L_THRESHOLD]; N_PARTIES];
