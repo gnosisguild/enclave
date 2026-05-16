@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pragma solidity >=0.8.27;
+pragma solidity 0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ICiphernodeRegistry } from "./ICiphernodeRegistry.sol";
@@ -118,6 +118,36 @@ interface IBondingRegistry {
         uint256 ticketAmount,
         uint256 licenseAmount
     );
+
+    /**
+     * @notice Emitted when the slashed funds treasury address is set
+     * @param treasury Address of the slashed funds treasury
+     */
+    event SlashedFundsTreasurySet(address indexed treasury);
+
+    /**
+     * @notice Emitted when the ticket token is set
+     * @param ticketToken Address of the ticket token
+     */
+    event TicketTokenSet(address indexed ticketToken);
+
+    /**
+     * @notice Emitted when the license token is set
+     * @param licenseToken Address of the license token
+     */
+    event LicenseTokenSet(address indexed licenseToken);
+
+    /**
+     * @notice Emitted when the registry is set
+     * @param registry Address of the registry
+     */
+    event RegistrySet(address indexed registry);
+
+    /**
+     * @notice Emitted when the slashing manager is set
+     * @param slashingManager Address of the slashing manager
+     */
+    event SlashingManagerSet(address indexed slashingManager);
 
     // ======================
     // View Functions

@@ -3,13 +3,14 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-pragma solidity >=0.8.27;
+pragma solidity 0.8.28;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract MockUSDC is ERC20, Ownable {
-    uint8 private _decimals;
+    // solhint-disable-next-line immutable-vars-naming
+    uint8 private immutable _decimals;
 
     constructor(
         uint256 initialSupply

@@ -843,6 +843,25 @@
       "inputs": [
         {
           "indexed": true,
+          "internalType": "bytes32",
+          "name": "encryptionSchemeId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "pkVerifier",
+          "type": "address"
+        }
+      ],
+      "name": "PkVerifierSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
@@ -2078,5 +2097,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-64228f31c3990e4616cf0578598d186612e83409"
+  "buildInfoId": "solc-0_8_28-2705a75bc2d2d1f8b1e08ebca4cc37d76480abc8"
 }
