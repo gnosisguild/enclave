@@ -47,7 +47,7 @@ contract BfvPkVerifier is IPkVerifier {
             (bytes, bytes32[])
         );
 
-        if (publicInputs.length < 2) {
+        if (publicInputs.length < 3) {
             return false;
         }
         if (publicInputs[0] != expectedNodesFoldKeyHash) {

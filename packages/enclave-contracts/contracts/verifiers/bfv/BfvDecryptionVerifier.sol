@@ -52,7 +52,7 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
             (bytes, bytes32[])
         );
 
-        if (publicInputs.length < MESSAGE_COEFFS_COUNT) {
+        if (publicInputs.length < MESSAGE_COEFFS_COUNT + 2) {
             return false;
         }
         if (publicInputs[0] != expectedC6FoldKeyHash) {

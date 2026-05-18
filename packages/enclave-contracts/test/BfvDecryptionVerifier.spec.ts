@@ -101,7 +101,7 @@ describe("BfvDecryptionVerifier", function () {
       ).to.be.revert(ethers);
     });
 
-    it("returns false when publicInputs.length < MESSAGE_COEFFS_COUNT", async function () {
+    it("returns false when publicInputs.length < MESSAGE_COEFFS_COUNT + 2", async function () {
       const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
       );
@@ -110,8 +110,8 @@ describe("BfvDecryptionVerifier", function () {
       const messageCoeffs = [1n, 2n, 3n];
       const publicInputs = buildPublicInputsWithMessage(
         messageCoeffs,
-        100,
-      ).slice(0, MESSAGE_COEFFS_COUNT - 1);
+        MESSAGE_COEFFS_COUNT + 2,
+      ).slice(0, MESSAGE_COEFFS_COUNT + 1);
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 

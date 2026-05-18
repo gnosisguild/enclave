@@ -73,6 +73,18 @@ describe("BfvPkVerifier", function () {
       expect(result).to.equal(false);
     });
 
+    it("returns false when publicInputs has only vk hashes (no pkCommitment slot)", async function () {
+      const { bfvPkVerifier } = await loadFixture(deployWithMockCircuit);
+      const pkCommitment = ethers.keccak256("0xabcd");
+      const proof = encodeProof("0x01", [
+        EXPECTED_NODES_FOLD_KEY_HASH,
+        EXPECTED_C5_KEY_HASH,
+      ]);
+
+      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
+      expect(result).to.equal(false);
+    });
+
     it("returns false when nodes_fold key hash does not match", async function () {
       const revertingVerifier = await (
         await ethers.getContractFactory("RevertOnVerifyCircuitVerifier")

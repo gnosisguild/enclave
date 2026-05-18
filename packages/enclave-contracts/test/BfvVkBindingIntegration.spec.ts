@@ -26,13 +26,17 @@ const INTEGRATION_SUMMARY = path.join(
   "circuits/benchmarks/results_insecure/integration_summary.json",
 );
 
-const vkArtifactsPresent = (): boolean =>
+const hasCompiledVkArtifacts = (): boolean =>
   Object.values(BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS).every((p) =>
     fs.existsSync(p),
   ) &&
   Object.values(BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS).every((p) =>
     fs.existsSync(p),
   );
+
+const describeDeployTimeVkChecks = hasCompiledVkArtifacts()
+  ? describe
+  : describe.skip;
 
 function hexToBytes32Array(hex: string): string[] {
   const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
@@ -126,7 +130,7 @@ describe("BfvVkBindingIntegration", function () {
     };
   };
 
-  describe("deploy-time VK staleness checks", function () {
+  describeDeployTimeVkChecks("deploy-time VK staleness checks", function () {
     it("rejects BfvPkVerifier with stale immutables", async function () {
       const { bfvPk } = await loadFixture(deployHonkAndBfv);
       const address = await bfvPk.getAddress();
@@ -176,7 +180,7 @@ describe("BfvVkBindingIntegration", function () {
   });
 
   const runFoldedProofIntegration =
-    fs.existsSync(INTEGRATION_SUMMARY) && vkArtifactsPresent();
+    fs.existsSync(INTEGRATION_SUMMARY) && hasCompiledVkArtifacts();
 
   (runFoldedProofIntegration ? it : it.skip)(
     "folded aggregator proofs: artifact VK hashes match publicInputs[0..1] and verify passes",
