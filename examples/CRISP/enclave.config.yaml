@@ -3,8 +3,8 @@ chains:
     rpc_url: ws://localhost:8545
     contracts:
       e3_program:
-        address: "0x809d550fca64d94Bd9F66E60752A544199cfAC3D"
-        deploy_block: 31
+        address: "0x0E801D84Fa97b50751Dbf25036d067dCf18858bF"
+        deploy_block: 37
       enclave:
         address: "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
         deploy_block: 14
