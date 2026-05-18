@@ -230,6 +230,66 @@ describe("BfvDecryptionVerifier", function () {
       expect(result).to.equal(false);
     });
 
+    it("returns false when c6_fold key hash does not match", async function () {
+      const revertingVerifier = await (
+        await ethers.getContractFactory("RevertOnVerifyCircuitVerifier")
+      ).deploy();
+      await revertingVerifier.waitForDeployment();
+
+      const bfvDecryptionVerifier = await (
+        await ethers.getContractFactory("BfvDecryptionVerifier")
+      ).deploy(
+        await revertingVerifier.getAddress(),
+        EXPECTED_C6_FOLD_KEY_HASH,
+        EXPECTED_C7_KEY_HASH,
+      );
+      await bfvDecryptionVerifier.waitForDeployment();
+
+      const messageCoeffs = [1n, 2n, 3n];
+      const publicInputs = buildPublicInputsWithMessage(messageCoeffs, 402, [
+        ethers.id("wrong-c6"),
+        EXPECTED_C7_KEY_HASH,
+      ]);
+      const plaintextHash = plaintextToHash(messageCoeffs);
+      const proof = encodeProof("0x01", publicInputs);
+
+      const result = await bfvDecryptionVerifier.verify.staticCall(
+        plaintextHash,
+        proof,
+      );
+      expect(result).to.equal(false);
+    });
+
+    it("returns false when c7 key hash does not match", async function () {
+      const revertingVerifier = await (
+        await ethers.getContractFactory("RevertOnVerifyCircuitVerifier")
+      ).deploy();
+      await revertingVerifier.waitForDeployment();
+
+      const bfvDecryptionVerifier = await (
+        await ethers.getContractFactory("BfvDecryptionVerifier")
+      ).deploy(
+        await revertingVerifier.getAddress(),
+        EXPECTED_C6_FOLD_KEY_HASH,
+        EXPECTED_C7_KEY_HASH,
+      );
+      await bfvDecryptionVerifier.waitForDeployment();
+
+      const messageCoeffs = [1n, 2n, 3n];
+      const publicInputs = buildPublicInputsWithMessage(messageCoeffs, 402, [
+        EXPECTED_C6_FOLD_KEY_HASH,
+        ethers.id("wrong-c7"),
+      ]);
+      const plaintextHash = plaintextToHash(messageCoeffs);
+      const proof = encodeProof("0x01", publicInputs);
+
+      const result = await bfvDecryptionVerifier.verify.staticCall(
+        plaintextHash,
+        proof,
+      );
+      expect(result).to.equal(false);
+    });
+
     it("returns false when plaintext hash mismatch", async function () {
       const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
