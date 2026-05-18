@@ -3,7 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-pragma solidity >=0.8.27;
+pragma solidity 0.8.28;
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -54,6 +54,9 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     mapping(uint256 e3Id => address[] nodes) internal _honestNodes;
     /// @notice Pending slashed funds awaiting E3 terminal state
     mapping(uint256 e3Id => uint256 amount) internal _pendingSlashedFunds;
+
+    /// @notice Basis points denominator (100%)
+    uint16 internal constant BPS_BASE = 10000;
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                       Modifiers                        //
@@ -128,8 +131,10 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         );
 
         // Calculate base distribution
-        uint256 honestNodeAmount = (originalPayment * workCompletedBps) / 10000;
-        uint256 requesterAmount = (originalPayment * workRemainingBps) / 10000;
+        uint256 honestNodeAmount = (originalPayment * workCompletedBps) /
+            BPS_BASE;
+        uint256 requesterAmount = (originalPayment * workRemainingBps) /
+            BPS_BASE;
         uint256 protocolAmount = originalPayment -
             honestNodeAmount -
             requesterAmount;
@@ -236,7 +241,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
             workCompletedBps = alloc.committeeFormationBps + alloc.dkgBps;
         }
 
-        workRemainingBps = 10000 - workCompletedBps - alloc.protocolBps;
+        workRemainingBps = BPS_BASE - workCompletedBps - alloc.protocolBps;
     }
 
     ////////////////////////////////////////////////////////////
@@ -359,7 +364,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         require(address(paymentToken) != address(0), "Invalid fee token");
 
         uint256 toNodes = (escrowed * _workAllocation.successSlashedNodeBps) /
-            10000;
+            BPS_BASE;
         uint256 toProtocol = escrowed - toNodes;
 
         if (toProtocol > 0) {
@@ -453,8 +458,8 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
             uint256(allocation.dkgBps) +
             uint256(allocation.decryptionBps) +
             uint256(allocation.protocolBps);
-        require(total == 10000, "Must sum to 10000");
-        require(allocation.successSlashedNodeBps <= 10000, "Invalid BPS");
+        require(total == BPS_BASE, "Must sum to 10000");
+        require(allocation.successSlashedNodeBps <= BPS_BASE, "Invalid BPS");
 
         _workAllocation = allocation;
 
@@ -466,6 +471,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     function setEnclave(address _enclave) external onlyOwner {
         require(_enclave != address(0), "Invalid enclave");
         enclave = IEnclave(_enclave);
+        emit EnclaveSet(_enclave);
     }
 
     /// @notice Set the treasury address
@@ -473,6 +479,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     function setTreasury(address _treasury) external onlyOwner {
         require(_treasury != address(0), "Invalid treasury");
         treasury = _treasury;
+        emit TreasurySet(_treasury);
     }
 
     /// @notice Recover orphaned slashed funds for an E3 that has already completed
