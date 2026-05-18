@@ -29,3 +29,6 @@ e3-zk-helpers = { workspace = true }
 e3-utils = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+e3-test-helpers = { workspace = true }
