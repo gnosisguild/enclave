@@ -3,7 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-pragma solidity ^0.8.27;
+pragma solidity 0.8.28;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -61,6 +61,12 @@ contract EnclaveTicketToken is
     /// @dev Incremented by burnTickets, decremented by payout. Prevents payout exceeding slashed amount.
     uint256 public payableBalance;
 
+    /// @notice Emitted when the registry address is set
+    event RegistrySet(address indexed newRegistry);
+
+    /// @notice Emitted when a payout is made
+    event Payout(address indexed to, uint256 amount);
+
     /// @notice Restricts function access to only the registry contract
     /// @dev Reverts with NotRegistry if caller is not the registry address
     modifier onlyRegistry() {
@@ -98,6 +104,7 @@ contract EnclaveTicketToken is
     function setRegistry(address newRegistry) public onlyOwner {
         require(newRegistry != address(0), ZeroAddress());
         registry = newRegistry;
+        emit RegistrySet(newRegistry);
     }
 
     /**
@@ -191,6 +198,7 @@ contract EnclaveTicketToken is
         require(amount <= payableBalance, "Exceeds payable balance");
         payableBalance -= amount;
         SafeERC20.safeTransfer(IERC20(address(underlying())), to, amount);
+        emit Payout(to, amount);
     }
 
     /**

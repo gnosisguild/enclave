@@ -3,7 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-pragma solidity >=0.8.27;
+pragma solidity 0.8.28;
 
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
@@ -249,7 +249,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             block.timestamp +
             _timeoutConfig.computeWindow +
             _timeoutConfig.decryptionWindow;
-        // TODO do we actually need a max duration?
+        // Validate total duration does not exceed maxDuration
         require(totalDuration < maxDuration, InvalidDuration(totalDuration));
 
         require(
@@ -261,6 +261,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         e3Id = nexte3Id;
         nexte3Id++;
+        // Seed uses block.prevrandao combined with e3Id as additional entropy.
+        // While prevrandao is not cryptographically unpredictable (validator-controlled),
+        // the combination with the unique, incrementing e3Id mitigates manipulation.
+        // The seed is used solely for weighted sortition, not for cryptographic key generation.
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
         e3Payments[e3Id] = e3Fee;
@@ -289,8 +293,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.ciphertextOutput = hex"";
         e3.plaintextOutput = hex"";
         e3.requester = msg.sender;
-
-        feeToken.safeTransferFrom(msg.sender, address(this), e3Fee);
 
         bytes memory e3ProgramParams = paramSetRegistry[requestParams.paramSet];
         require(e3ProgramParams.length > 0, "BFV param set not registered");
@@ -321,7 +323,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.encryptionSchemeId = encryptionSchemeId;
         e3.decryptionVerifier = decryptionVerifier;
         e3.pkVerifier = pkVerifier;
+        // CEI: write all state before external calls below
         e3s[e3Id] = e3;
+
+        // Transfer fee after all validations and state changes
+        feeToken.safeTransferFrom(msg.sender, address(this), e3Fee);
 
         require(
             ciphernodeRegistry.requestCommittee(e3Id, seed, threshold),
@@ -638,6 +644,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InvalidEncryptionScheme(encryptionSchemeId)
         );
         pkVerifiers[encryptionSchemeId] = pkVerifier;
+        emit PkVerifierSet(encryptionSchemeId, address(pkVerifier));
     }
 
     /// @inheritdoc IEnclave

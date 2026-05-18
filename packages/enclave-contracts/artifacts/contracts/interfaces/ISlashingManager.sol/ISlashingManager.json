@@ -222,6 +222,58 @@
         {
           "indexed": true,
           "internalType": "address",
+          "name": "bondingRegistry",
+          "type": "address"
+        }
+      ],
+      "name": "BondingRegistrySet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "ciphernodeRegistry",
+          "type": "address"
+        }
+      ],
+      "name": "CiphernodeRegistrySet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "e3RefundManager",
+          "type": "address"
+        }
+      ],
+      "name": "E3RefundManagerSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "enclave",
+          "type": "address"
+        }
+      ],
+      "name": "EnclaveSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
           "name": "node",
           "type": "address"
         },
@@ -954,5 +1006,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ISlashingManager.sol",
-  "buildInfoId": "solc-0_8_28-64228f31c3990e4616cf0578598d186612e83409"
+  "buildInfoId": "solc-0_8_28-2705a75bc2d2d1f8b1e08ebca4cc37d76480abc8"
 }
