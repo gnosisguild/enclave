@@ -171,11 +171,27 @@ ThresholdKeyshare receives AllEncryptionKeysCollected
     │  │  Output: esi_sss[num_ciphertexts][N]                   │
     │  └─────────────────────────────────────────────────────────┘
 ```
+    │
+    ├─ ThresholdKeyshare tracks the correlation id for both TrBFV requests:
+    │   ├─ `GenPkShareAndSkSss`
+    │   └─ `GenEsiSss`
+    │   → If the worker returns `ComputeRequestError` for either request,
+    │     `ThresholdKeyshare` now emits `E3Failed {
+    │       failed_at_stage: CommitteeFinalized,
+    │       reason: DKGInvalidShares
+    │     }` and stops instead of remaining stuck in `GeneratingThresholdShare`
 
 ### Step 5: Encrypt & Broadcast Shares (with C1, C2, C3 Proofs)
 
 ```
 Both GenPkShareAndSkSss and GenEsiSss complete
+    │
+    ├─ `ThresholdKeyshare` tracks the `CalculateDecryptionKey` correlation id:
+    │   → `ComputeRequestError` for this request now emits
+    │     `E3Failed {
+    │       failed_at_stage: CommitteeFinalized,
+    │       reason: DKGInvalidShares
+    │     }` and stops before C4 proof dispatch
 │
 ├─ handle_shares_generated():
 │   │
@@ -555,8 +571,21 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 │   │          e3_id, party_id, signed_proof(C5)
 │   │        }
 │   │
-│   └─ 5. Publish PublicKeyAggregated {
-│         e3_id, aggregate_pk, pk_hash, node_list
+│   ├─ 5. DKG AGGREGATION REQUEST (when proof aggregation is enabled):
+│   │     ├─ PublicKeyAggregator buffers one optional NodeFold proof per honest party from
+│   │     │   DKGRecursiveAggregationComplete
+│   │     ├─ Dispatches ComputeRequest::zk(ZkRequest::DkgAggregation {
+│   │     │     node_fold_proofs, c5_proof, party_ids, params_preset
+│   │     │   })
+│   │     ├─ Tracks the in-flight correlation id
+│   │     ├─ ComputeRequestError now emits
+│   │     │   E3Failed { failed_at_stage: CommitteeFinalized, reason: DKGInvalidShares }
+│   │     └─ A mixed Some/None honest NodeFold-proof set is treated as the same terminal DKG
+│   │         failure instead of only surfacing as EnclaveError telemetry
+│   │
+│   └─ 6. Publish PublicKeyAggregated {
+│         e3_id, pubkey: aggregate_pk, pk_commitment, nodes,
+│         dkg_aggregator_proof
 │       }
 │
 └─ CiphernodeRegistrySolWriter receives PublicKeyAggregated:
@@ -663,6 +692,13 @@ EnclaveSolReader decodes CiphertextOutputPublished event
     │   │  │                                                     │
     │   │  │  Output: Vec<decryption_share_polynomial>           │
     │   │  └─────────────────────────────────────────────────────┘
+      │
+      ├─ `ThresholdKeyshare` tracks the `CalculateDecryptionShare` correlation id:
+      │   → `ComputeRequestError` for this request now emits
+      │     `E3Failed {
+      │       failed_at_stage: CiphertextReady,
+      │       reason: DecryptionInvalidShares
+      │     }` and stops before C6 proof generation
     │
     ├─ REQUEST C6 PROOF:
     │   Publish ShareDecryptionProofPending {
@@ -736,6 +772,12 @@ EnclaveSolReader decodes CiphertextOutputPublished event
 │   │   │  │  Output: plaintext_bytes                            │
 │   │   │  └─────────────────────────────────────────────────────┘
 │   │
+│   ├─ ThresholdPlaintextAggregator tracks the `CalculateThresholdDecryption` correlation id:
+│   │   ├─ `ComputeRequestError` now emits
+│   │   │   `E3Failed { failed_at_stage: CiphertextReady, reason: DecryptionInvalidShares }`
+│   │   └─ Fatal C6 filtering failures (too few honest shares or post-proof commitment
+│   │       mismatches) emit the same terminal failure instead of only trapping locally
+│   │
 │   ├─ REQUEST C7 PROOF:
 │   │   Publish AggregationProofPending {
 │   │     proof_request: DecryptedSharesAggregationProofRequest,
@@ -755,7 +797,23 @@ EnclaveSolReader decodes CiphertextOutputPublished event
 │   │        e3_id, party_id, signed_proof(C7)
 │   │      }
 │   │
-│   └─ Publish PlaintextAggregated { e3_id, decrypted_output }
+│   ├─ DECRYPTION AGGREGATION REQUEST:
+│   │   ├─ ThresholdPlaintextAggregator stores the signed C7 proofs plus the honest C6 inner
+│   │   │   proofs for the first `T + 1` parties after sorting by `party_id`
+│   │   ├─ Dispatches ComputeRequest::zk(ZkRequest::DecryptionAggregation {
+│   │   │     c6_total_slots, jobs, params_preset
+│   │   │   })
+│   │   ├─ Each job folds the selected C6 proofs for one ciphertext index and checks them
+│   │   │   against the matching C7 proof inside `DecryptionAggregator`
+│   │   ├─ Tracks the in-flight correlation id
+│   │   ├─ ComputeRequestError, missing C6 inner proofs, or C7/decryption-aggregator proof-count
+│   │   │   mismatches now emit
+│   │   │   `E3Failed { failed_at_stage: CiphertextReady, reason: DecryptionInvalidShares }`
+│   │   └─ On success, stores `decryption_aggregator_proofs`
+│   │
+│   └─ Publish PlaintextAggregated {
+│         e3_id, decrypted_output, decryption_aggregator_proofs
+│       }
 │
 └─ EnclaveSolWriter receives PlaintextAggregated:
   ├─ Requires EffectsEnabled
