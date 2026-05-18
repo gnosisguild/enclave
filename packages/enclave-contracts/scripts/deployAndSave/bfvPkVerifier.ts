@@ -9,7 +9,12 @@ import {
   BfvPkVerifier,
   BfvPkVerifier__factory as BfvPkVerifierFactory,
 } from "../../types";
-import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+import {
+  BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS,
+  readDeploymentArgs,
+  readVkRecursiveHash,
+  storeDeploymentArgs,
+} from "../utils";
 
 export const deployAndSaveBfvPkVerifier = async (
   hre: HardhatRuntimeEnvironment,
@@ -41,9 +46,18 @@ export const deployAndSaveBfvPkVerifier = async (
     return { bfvPkVerifier };
   }
 
+  const expectedNodesFoldKeyHash = readVkRecursiveHash(
+    BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS.nodesFold,
+  );
+  const expectedC5KeyHash = readVkRecursiveHash(
+    BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS.c5,
+  );
+
   const bfvPkVerifierFactory = await ethers.getContractFactory("BfvPkVerifier");
   const bfvPkVerifier = await bfvPkVerifierFactory.deploy(
     circuitVerifierArgs.address,
+    expectedNodesFoldKeyHash,
+    expectedC5KeyHash,
   );
 
   await bfvPkVerifier.waitForDeployment();

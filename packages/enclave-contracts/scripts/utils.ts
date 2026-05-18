@@ -4,9 +4,61 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import fs from "fs";
+import { fileURLToPath } from "node:url";
 import path from "path";
 
 export const deploymentsFile = path.join("deployed_contracts.json");
+
+/** Monorepo root (`enclave/`), resolved from `packages/enclave-contracts/scripts/`. */
+export const REPO_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../..",
+);
+
+/** Recursive VK hashes for `BfvPkVerifier` sub-circuits (from `pnpm compile:circuits`). */
+export const BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS = {
+  nodesFold: path.join(
+    REPO_ROOT,
+    "circuits/bin/recursive_aggregation/nodes_fold/target/nodes_fold.vk_recursive_hash",
+  ),
+  c5: path.join(
+    REPO_ROOT,
+    "circuits/bin/threshold/target/pk_aggregation.vk_recursive_hash",
+  ),
+} as const;
+
+/** Recursive VK hashes for `BfvDecryptionVerifier` sub-circuits (from `pnpm compile:circuits`). */
+export const BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS = {
+  c6Fold: path.join(
+    REPO_ROOT,
+    "circuits/bin/recursive_aggregation/c6_fold/target/c6_fold.vk_recursive_hash",
+  ),
+  c7: path.join(
+    REPO_ROOT,
+    "circuits/bin/threshold/target/decrypted_shares_aggregation.vk_recursive_hash",
+  ),
+} as const;
+
+/**
+ * Reads a 32-byte recursive VK hash emitted by the circuit build (`*.vk_recursive_hash`).
+ * Co-redeploy `BfvPkVerifier` / `BfvDecryptionVerifier` when the corresponding sub-circuit VK changes.
+ */
+export function readVkRecursiveHash(filePath: string): string {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(
+      `Missing circuit VK hash file: ${filePath}. Run pnpm compile:circuits.`,
+    );
+  }
+
+  const raw = fs.readFileSync(filePath);
+  if (raw.length !== 32) {
+    throw new Error(
+      `Invalid VK hash length in ${filePath}: expected 32 bytes, got ${raw.length}`,
+    );
+  }
+
+  return `0x${raw.toString("hex")}`;
+}
 
 // Type for deployment arguments
 export interface DeploymentArgs {

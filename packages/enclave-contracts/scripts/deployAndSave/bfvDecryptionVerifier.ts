@@ -9,7 +9,12 @@ import {
   BfvDecryptionVerifier,
   BfvDecryptionVerifier__factory as BfvDecryptionVerifierFactory,
 } from "../../types";
-import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+import {
+  BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS,
+  readDeploymentArgs,
+  readVkRecursiveHash,
+  storeDeploymentArgs,
+} from "../utils";
 
 export const deployAndSaveBfvDecryptionVerifier = async (
   hre: HardhatRuntimeEnvironment,
@@ -43,11 +48,20 @@ export const deployAndSaveBfvDecryptionVerifier = async (
     return { bfvDecryptionVerifier };
   }
 
+  const expectedC6FoldKeyHash = readVkRecursiveHash(
+    BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS.c6Fold,
+  );
+  const expectedC7KeyHash = readVkRecursiveHash(
+    BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS.c7,
+  );
+
   const bfvDecryptionVerifierFactory = await ethers.getContractFactory(
     "BfvDecryptionVerifier",
   );
   const bfvDecryptionVerifier = await bfvDecryptionVerifierFactory.deploy(
     circuitVerifierArgs.address,
+    expectedC6FoldKeyHash,
+    expectedC7KeyHash,
   );
 
   await bfvDecryptionVerifier.waitForDeployment();

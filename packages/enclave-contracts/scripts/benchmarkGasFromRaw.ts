@@ -129,7 +129,7 @@ async function main() {
 
   const bfvPk = await (
     await ethers.getContractFactory("BfvPkVerifier")
-  ).deploy(dkgAggAddress);
+  ).deploy(dkgAggAddress, dkgPublicInputs[0], dkgPublicInputs[1]);
   await bfvPk.waitForDeployment();
 
   const dkgEncodedProof = abiCoder.encode(
@@ -141,7 +141,7 @@ async function main() {
 
   const bfvDec = await (
     await ethers.getContractFactory("BfvDecryptionVerifier")
-  ).deploy(decAggAddress);
+  ).deploy(decAggAddress, decPublicInputs[0], decPublicInputs[1]);
   await bfvDec.waitForDeployment();
 
   const decEncodedProof = abiCoder.encode(
