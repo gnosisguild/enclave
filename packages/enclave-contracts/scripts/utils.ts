@@ -3,9 +3,23 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
+import { getBytes, hexlify, zeroPadValue } from "ethers";
 import fs from "fs";
 import { fileURLToPath } from "node:url";
 import path from "path";
+
+/**
+ * Reconstruct `keccak256(abi.encodePacked(topNodes))` from aggregator public-input
+ * limbs. Each limb is a bytes32 with 128 bits right-aligned (`CommitteeHashLib`).
+ */
+export function committeeHashFromLimbs(hi: string, lo: string): string {
+  const hiBytes = getBytes(zeroPadValue(hi, 32));
+  const loBytes = getBytes(zeroPadValue(lo, 32));
+  const hash = new Uint8Array(32);
+  hash.set(hiBytes.subarray(16, 32), 0);
+  hash.set(loBytes.subarray(16, 32), 16);
+  return hexlify(hash);
+}
 
 export const deploymentsFile = path.join("deployed_contracts.json");
 

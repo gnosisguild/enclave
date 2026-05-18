@@ -7,17 +7,35 @@ pragma solidity 0.8.28;
 
 import { IPkVerifier } from "../../interfaces/IPkVerifier.sol";
 import { ICircuitVerifier } from "../../interfaces/ICircuitVerifier.sol";
+import { CommitteeHashLib } from "../../lib/CommitteeHashLib.sol";
 
 /**
  * @title BfvPkVerifier
  * @notice Verifies the DkgAggregator (EVM) proof produced by the recursive
  *         aggregation pipeline (node folds + C5/pk_aggregation verified
- *         internally). Binds the proof to a caller-supplied `pkCommitment`.
+ *         internally). Binds the proof to a caller-supplied `pkCommitment`
+ *         and on-chain committee hash.
  * @dev Used when the Enclave is configured with encryptionSchemeId
  *      keccak256("fhe.rs:BFV"). The aggregator circuit's last public input is
  *      the hash-based aggregated PK commitment.
  */
 contract BfvPkVerifier is IPkVerifier {
+    /// @dev Must match `lib::configs::default::H` (micro committee size).
+    uint256 internal constant H = 3;
+
+    /// @dev `publicInputs` index for `committee_hash_hi` (after `party_ids`).
+    uint256 internal constant COMMITTEE_HASH_HI_IDX = 2 + H;
+
+    /// @dev `publicInputs` index for `committee_hash_lo` (after `party_ids`).
+    uint256 internal constant COMMITTEE_HASH_LO_IDX = 3 + H;
+
+    /// @dev `7` pub params + `8` return fields for micro `H = 3` (`dkg_aggregator`).
+    uint256 internal constant EXPECTED_PUBLIC_INPUTS_LEN = 15;
+
+    /// @dev Index of `pkCommitment` (last return field).
+    uint256 internal constant PK_COMMITMENT_IDX =
+        EXPECTED_PUBLIC_INPUTS_LEN - 1;
+
     /// @notice Underlying Honk verifier for the DkgAggregator circuit.
     ICircuitVerifier public immutable circuitVerifier;
 
@@ -40,6 +58,7 @@ contract BfvPkVerifier is IPkVerifier {
     /// @inheritdoc IPkVerifier
     function verify(
         bytes32 pkCommitment,
+        bytes32 committeeHash,
         bytes calldata proof
     ) external view override returns (bool) {
         (bytes memory rawProof, bytes32[] memory publicInputs) = abi.decode(
@@ -47,7 +66,7 @@ contract BfvPkVerifier is IPkVerifier {
             (bytes, bytes32[])
         );
 
-        if (publicInputs.length < 3) {
+        if (publicInputs.length != EXPECTED_PUBLIC_INPUTS_LEN) {
             return false;
         }
         if (publicInputs[0] != expectedNodesFoldKeyHash) {
@@ -56,7 +75,19 @@ contract BfvPkVerifier is IPkVerifier {
         if (publicInputs[1] != expectedC5KeyHash) {
             return false;
         }
-        if (publicInputs[publicInputs.length - 1] != pkCommitment) {
+        if (
+            publicInputs[COMMITTEE_HASH_HI_IDX] !=
+            CommitteeHashLib.hi(committeeHash)
+        ) {
+            return false;
+        }
+        if (
+            publicInputs[COMMITTEE_HASH_LO_IDX] !=
+            CommitteeHashLib.lo(committeeHash)
+        ) {
+            return false;
+        }
+        if (publicInputs[PK_COMMITMENT_IDX] != pkCommitment) {
             return false;
         }
         return circuitVerifier.verify(rawProof, publicInputs);
