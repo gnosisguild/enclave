@@ -601,8 +601,15 @@ ThresholdKeyshare receives AllThresholdSharesCollected
         │  │    2. require(publicKeyHashes[e3Id] == 0)           │
         │  │       → Can only publish once                       │
         │  │    3. require(nodes.length == committee.length)     │
-        │  │    4. publicKeyHashes[e3Id] = pkHash                │
-        │  │    5. enclave.onCommitteePublished(e3Id, pkHash)    │
+        │  │    4. When proofAggregationEnabled:                 │
+        │  │       e3.pkVerifier.verify(pkCommitment, proof)     │
+        │  │       → BFV: `BfvPkVerifier` (DkgAggregator Honk)   │
+        │  │         • pins `publicInputs[0]` = nodes_fold VK hash │
+        │  │         • pins `publicInputs[1]` = C5 VK hash         │
+        │  │         • checks last PI = pkCommitment               │
+        │  │       Redeploy verifier when sub-circuit VKs change.  │
+        │  │    5. publicKeyHashes[e3Id] = pkHash                │
+        │  │    6. enclave.onCommitteePublished(e3Id, pkHash)    │
         │  │       │                                             │
         │  │       │  ┌─ Enclave.sol ────────────────────────┐  │
         │  │       │  │  onCommitteePublished(e3Id, pkHash) {│  │
@@ -613,7 +620,7 @@ ThresholdKeyshare receives AllThresholdSharesCollected
         │  │       │  │    Emit E3StageChanged(KeyPublished)  │  │
         │  │       │  │  }                                   │  │
         │  │       │  └──────────────────────────────────────┘  │
-        │  │    6. Emit CommitteePublished(e3Id, nodes, pk, C5 proof) │
+        │  │    7. Emit CommitteePublished(e3Id, nodes, pk, C5 proof) │
         │  │       → Note: emits full pk bytes, NOT just pkHash  │
         │  │  }                                                  │
         │  └─────────────────────────────────────────────────────┘
@@ -830,7 +837,11 @@ EnclaveSolReader decodes CiphertextOutputPublished event
         │  │    4. decryptionVerifier.verify(                    │
         │  │         e3Id, keccak256(output), proof              │
         │  │       )                                             │
-        │  │       → Verifies decryption was done correctly      │
+        │  │       → BFV: `BfvDecryptionVerifier`                │
+        │  │         • pins `publicInputs[0]` = c6_fold VK hash  │
+        │  │         • pins `publicInputs[1]` = C7 VK hash         │
+        │  │         • checks trailing 100 coeffs vs output hash │
+        │  │       Redeploy verifier when sub-circuit VKs change.  │
         │  │    5. stage = Complete                              │
         │  │    6. _distributeRewards(e3Id)                      │
         │  │       │                                             │

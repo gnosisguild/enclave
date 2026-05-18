@@ -11,6 +11,7 @@ import {
 } from "../../types";
 import {
   BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS,
+  assertBfvDecryptionVerifierSubCircuitVkHashes,
   readDeploymentArgs,
   readVkRecursiveHash,
   storeDeploymentArgs,
@@ -44,6 +45,10 @@ export const deployAndSaveBfvDecryptionVerifier = async (
     const bfvDecryptionVerifier = BfvDecryptionVerifierFactory.connect(
       existing.address,
       signer,
+    );
+    await assertBfvDecryptionVerifierSubCircuitVkHashes(
+      bfvDecryptionVerifier,
+      existing.address,
     );
     return { bfvDecryptionVerifier };
   }

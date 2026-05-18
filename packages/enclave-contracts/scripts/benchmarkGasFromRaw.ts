@@ -7,6 +7,12 @@ import { network } from "hardhat";
 import fs from "node:fs";
 import path from "node:path";
 
+import {
+  BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS,
+  BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS,
+  readVkRecursiveHash,
+} from "./utils";
+
 function findRawJson(rawDir: string, fragment: string): any {
   const entries = fs.readdirSync(rawDir).filter((f) => f.endsWith(".json"));
   for (const f of entries) {
@@ -92,6 +98,37 @@ async function main() {
 
   const dkgPublicInputs = hexToBytes32Array(dkgPublicHex);
   const decPublicInputs = hexToBytes32Array(decPublicHex);
+
+  const expectedNodesFoldKeyHash = readVkRecursiveHash(
+    BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS.nodesFold,
+  );
+  const expectedC5KeyHash = readVkRecursiveHash(
+    BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS.c5,
+  );
+  const expectedC6FoldKeyHash = readVkRecursiveHash(
+    BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS.c6Fold,
+  );
+  const expectedC7KeyHash = readVkRecursiveHash(
+    BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS.c7,
+  );
+
+  if (
+    dkgPublicInputs[0] !== expectedNodesFoldKeyHash ||
+    dkgPublicInputs[1] !== expectedC5KeyHash
+  ) {
+    throw new Error(
+      "DKG aggregator proof publicInputs[0..1] do not match nodes_fold / pk_aggregation .vk_recursive_hash artifacts",
+    );
+  }
+  if (
+    decPublicInputs[0] !== expectedC6FoldKeyHash ||
+    decPublicInputs[1] !== expectedC7KeyHash
+  ) {
+    throw new Error(
+      "Decryption aggregator proof publicInputs[0..1] do not match c6_fold / decrypted_shares_aggregation .vk_recursive_hash artifacts",
+    );
+  }
+
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
   const libFactory = await ethers.getContractFactory(
@@ -129,7 +166,7 @@ async function main() {
 
   const bfvPk = await (
     await ethers.getContractFactory("BfvPkVerifier")
-  ).deploy(dkgAggAddress, dkgPublicInputs[0], dkgPublicInputs[1]);
+  ).deploy(dkgAggAddress, expectedNodesFoldKeyHash, expectedC5KeyHash);
   await bfvPk.waitForDeployment();
 
   const dkgEncodedProof = abiCoder.encode(
@@ -137,11 +174,17 @@ async function main() {
     [dkgProofHex, dkgPublicInputs],
   );
   const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
+  const dkgOk = await bfvPk.verify.staticCall(pkCommitment, dkgEncodedProof);
+  if (!dkgOk) {
+    throw new Error(
+      "BfvPkVerifier.verify returned false for folded DKG proof (Honk VK / proof mismatch?)",
+    );
+  }
   const dkgGas = await bfvPk.verify.estimateGas(pkCommitment, dkgEncodedProof);
 
   const bfvDec = await (
     await ethers.getContractFactory("BfvDecryptionVerifier")
-  ).deploy(decAggAddress, decPublicInputs[0], decPublicInputs[1]);
+  ).deploy(decAggAddress, expectedC6FoldKeyHash, expectedC7KeyHash);
   await bfvDec.waitForDeployment();
 
   const decEncodedProof = abiCoder.encode(
@@ -149,6 +192,12 @@ async function main() {
     [decProofHex, decPublicInputs],
   );
   const plaintextHash = plaintextHashFromPublicInputs(decPublicInputs, ethers);
+  const decOk = await bfvDec.verify.staticCall(plaintextHash, decEncodedProof);
+  if (!decOk) {
+    throw new Error(
+      "BfvDecryptionVerifier.verify returned false for folded decryption proof (Honk VK / proof mismatch?)",
+    );
+  }
   const decGas = await bfvDec.verify.estimateGas(
     plaintextHash,
     decEncodedProof,
