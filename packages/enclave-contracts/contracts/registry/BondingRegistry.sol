@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pragma solidity >=0.8.27;
+pragma solidity 0.8.28;
 
 import {
     OwnableUpgradeable
@@ -677,6 +677,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     ) public onlyOwner {
         require(newSlashedFundsTreasury != address(0), ZeroAddress());
         slashedFundsTreasury = newSlashedFundsTreasury;
+        emit SlashedFundsTreasurySet(newSlashedFundsTreasury);
     }
 
     /// @inheritdoc IBondingRegistry
@@ -684,21 +685,25 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         EnclaveTicketToken newTicketToken
     ) public onlyOwner {
         ticketToken = newTicketToken;
+        emit TicketTokenSet(address(newTicketToken));
     }
 
     /// @inheritdoc IBondingRegistry
     function setLicenseToken(IERC20 newLicenseToken) public onlyOwner {
         licenseToken = newLicenseToken;
+        emit LicenseTokenSet(address(newLicenseToken));
     }
 
     /// @inheritdoc IBondingRegistry
     function setRegistry(ICiphernodeRegistry newRegistry) public onlyOwner {
         registry = newRegistry;
+        emit RegistrySet(address(newRegistry));
     }
 
     /// @inheritdoc IBondingRegistry
     function setSlashingManager(address newSlashingManager) public onlyOwner {
         slashingManager = newSlashingManager;
+        emit SlashingManagerSet(newSlashingManager);
     }
 
     /// @notice Authorizes an address to distribute rewards

@@ -3,7 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-pragma solidity >=0.8.27;
+pragma solidity 0.8.28;
 
 import { E3, IE3Program } from "./IE3.sol";
 import { ICiphernodeRegistry } from "./ICiphernodeRegistry.sol";
@@ -197,6 +197,11 @@ interface IEnclave {
     /// @notice Emitted when the SlashingManager contract is set.
     /// @param slashingManager The address of the SlashingManager contract.
     event SlashingManagerSet(address indexed slashingManager);
+
+    /// @notice Emitted when the PkVerifier is set for an encryption scheme.
+    /// @param encryptionSchemeId The encryption scheme identifier.
+    /// @param pkVerifier The address of the PkVerifier contract.
+    event PkVerifierSet(bytes32 indexed encryptionSchemeId, address pkVerifier);
 
     /// @notice Emitted when slashed funds are escrowed for an E3
     /// @param e3Id The E3 ID.

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pragma solidity >=0.8.27;
+pragma solidity 0.8.28;
 
 import {
     AccessControl
@@ -181,6 +181,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(address(newBondingRegistry) != address(0), ZeroAddress());
         bondingRegistry = newBondingRegistry;
+        emit BondingRegistrySet(address(newBondingRegistry));
     }
 
     /// @notice Updates the ciphernode registry contract
@@ -190,6 +191,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(address(newCiphernodeRegistry) != address(0), ZeroAddress());
         ciphernodeRegistry = newCiphernodeRegistry;
+        emit CiphernodeRegistrySet(address(newCiphernodeRegistry));
     }
 
     /// @notice Updates the Enclave contract
@@ -199,6 +201,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(address(newEnclave) != address(0), ZeroAddress());
         enclave = newEnclave;
+        emit EnclaveSet(address(newEnclave));
     }
 
     /// @inheritdoc ISlashingManager
@@ -207,6 +210,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(address(newRefundManager) != address(0), ZeroAddress());
         e3RefundManager = newRefundManager;
+        emit E3RefundManagerSet(address(newRefundManager));
     }
 
     /// @inheritdoc ISlashingManager

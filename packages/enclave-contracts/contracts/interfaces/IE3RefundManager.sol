@@ -3,7 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-pragma solidity >=0.8.27;
+pragma solidity 0.8.28;
 import { IEnclave } from "./IEnclave.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -75,6 +75,10 @@ interface IE3RefundManager {
     event WorkAllocationUpdated(WorkValueAllocation allocation);
     /// @notice Emitted when orphaned slashed funds are withdrawn to treasury
     event OrphanedSlashedFundsWithdrawn(uint256 indexed e3Id, uint256 amount);
+    /// @notice Emitted when the Enclave address is set
+    event EnclaveSet(address indexed enclave);
+    /// @notice Emitted when the treasury address is set
+    event TreasurySet(address indexed treasury);
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                        Errors                          //
