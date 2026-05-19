@@ -20,7 +20,9 @@ library CommitteeHashLib {
     }
 
     /// @notice Same as {hash} for calldata/memory address lists.
-    function hashMemory(address[] memory nodes) internal pure returns (bytes32) {
+    function hashMemory(
+        address[] memory nodes
+    ) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(nodes));
     }
 

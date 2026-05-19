@@ -690,7 +690,8 @@ impl ThresholdPlaintextAggregator {
             let reply = committee_reply
                 .ok_or_else(|| anyhow!("committee reply required to fetch members"))?;
             let e3_id = self.e3_id.clone();
-            self.sortition.do_send(GetCommitteeMembersRequest { e3_id, reply });
+            self.sortition
+                .do_send(GetCommitteeMembersRequest { e3_id, reply });
             return Ok(());
         }
 
@@ -1072,11 +1073,7 @@ impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
 impl Handler<CommitteeMembersResponse> for ThresholdPlaintextAggregator {
     type Result = ();
 
-    fn handle(
-        &mut self,
-        msg: CommitteeMembersResponse,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
+    fn handle(&mut self, msg: CommitteeMembersResponse, ctx: &mut Self::Context) -> Self::Result {
         self.committee_members = Some(msg.members);
         if let Some(ec) = self.last_ec.clone() {
             let _ = self.maybe_start_decryption_aggregation(&ec, ctx.address().recipient());
@@ -1442,8 +1439,9 @@ mod tests {
             (1, vec![dummy_proof(CircuitName::ThresholdShareDecryption)]),
         ]);
 
-        aggregator.committee_members =
-            Some(vec!["0x0000000000000000000000000000000000000001".to_string()]);
+        aggregator.committee_members = Some(vec![
+            "0x0000000000000000000000000000000000000001".to_string()
+        ]);
         let ec = test_ctx(E3Failed {
             e3_id: e3_id.clone(),
             failed_at_stage: E3Stage::None,

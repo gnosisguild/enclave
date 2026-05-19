@@ -734,11 +734,7 @@ impl Handler<TypedEvent<CommitteePublished>> for Sortition {
 impl Handler<GetCommitteeMembersRequest> for Sortition {
     type Result = ();
 
-    fn handle(
-        &mut self,
-        msg: GetCommitteeMembersRequest,
-        _: &mut Self::Context,
-    ) -> Self::Result {
+    fn handle(&mut self, msg: GetCommitteeMembersRequest, _: &mut Self::Context) -> Self::Result {
         let members = self
             .get_committee(&msg.e3_id)
             .map(|c| c.members().to_vec())

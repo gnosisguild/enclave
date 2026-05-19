@@ -41,10 +41,7 @@ pub fn committee_hash_limbs_from_addresses(addresses: &[Address]) -> CommitteeHa
 
 /// Parse checksummed or lowercase hex node addresses (as used in events).
 pub fn hash_committee_node_strings(nodes: &[String]) -> anyhow::Result<B256> {
-    let addresses: Vec<Address> = nodes
-        .iter()
-        .map(|s| s.parse())
-        .collect::<Result<_, _>>()?;
+    let addresses: Vec<Address> = nodes.iter().map(|s| s.parse()).collect::<Result<_, _>>()?;
     Ok(hash_committee_addresses(&addresses))
 }
 

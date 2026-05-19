@@ -438,11 +438,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await registry.finalizeCommittee(0);
 
       // Publish committee (this triggers onCommitteePublished -> onCommitteeFormed)
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
 
@@ -483,17 +478,10 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await registry.finalizeCommittee(0);
 
       // Publish committee and expect CommitteeFormed event
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
 
-      await expect(
-        registry.publishCommittee(0, publicKey, pkCommitment, "0x"),
-      )
+      await expect(registry.publishCommittee(0, publicKey, pkCommitment, "0x"))
         .to.emit(enclave, "CommitteeFormed")
         .withArgs(0);
     });
@@ -749,11 +737,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
       await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
@@ -853,11 +836,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
       await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
@@ -1105,11 +1083,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
       await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
@@ -1184,11 +1157,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
       await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
@@ -1427,11 +1395,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
       await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
@@ -1558,11 +1521,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       expect(await enclave.getE3Stage(0)).to.equal(2); // CommitteeFinalized
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
       await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
@@ -1617,11 +1575,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
       await registry.publishCommittee(0, publicKey, pkCommitment, "0x");

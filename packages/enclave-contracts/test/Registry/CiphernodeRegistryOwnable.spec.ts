@@ -424,9 +424,7 @@ describe("CiphernodeRegistryOwnable", function () {
       await finalizeCommitteeAfterWindow(registry, 0);
 
       await expect(
-        registry
-          .connect(notTheOwner)
-          .publishCommittee(0, data, dataHash, "0x"),
+        registry.connect(notTheOwner).publishCommittee(0, data, dataHash, "0x"),
       )
         .to.emit(registry, "CommitteePublished")
         .withArgs(
@@ -464,10 +462,7 @@ describe("CiphernodeRegistryOwnable", function () {
       await registry.connect(operator3).submitTicket(0, 1);
       await finalizeCommitteeAfterWindow(registry, 0);
 
-      await registry.publishCommittee(0, data,
-        dataHash,
-        "0x",
-      );
+      await registry.publishCommittee(0, data, dataHash, "0x");
       expect(await registry.committeePublicKey(0)).to.equal(dataHash);
     });
     it("emits a CommitteePublished event", async function () {
@@ -494,12 +489,7 @@ describe("CiphernodeRegistryOwnable", function () {
       await registry.connect(operator3).submitTicket(0, 1);
       await finalizeCommitteeAfterWindow(registry, 0);
 
-      await expect(
-        await registry.publishCommittee(0, data,
-          dataHash,
-          "0x",
-        ),
-      )
+      await expect(await registry.publishCommittee(0, data, dataHash, "0x"))
         .to.emit(registry, "CommitteePublished")
         .withArgs(
           0,
@@ -670,10 +660,7 @@ describe("CiphernodeRegistryOwnable", function () {
       await registry.connect(operator3).submitTicket(e3Id, 1);
       await finalizeCommitteeAfterWindow(registry, e3Id);
 
-      await registry.publishCommittee(e3Id, data,
-        dataHash,
-        "0x",
-      );
+      await registry.publishCommittee(e3Id, data, dataHash, "0x");
       expect(await registry.committeePublicKey(e3Id)).to.equal(dataHash);
     });
     it("reverts if the committee has not been published", async function () {

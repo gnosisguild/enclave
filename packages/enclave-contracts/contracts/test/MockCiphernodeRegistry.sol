@@ -79,9 +79,7 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         return _committeeNodes[e3Id];
     }
 
-    function getCommitteeHash(
-        uint256 e3Id
-    ) external view returns (bytes32) {
+    function getCommitteeHash(uint256 e3Id) external view returns (bytes32) {
         return keccak256(abi.encodePacked(_committeeNodes[e3Id]));
     }
 
