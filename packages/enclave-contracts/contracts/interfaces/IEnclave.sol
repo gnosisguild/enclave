@@ -259,11 +259,6 @@ interface IEnclave {
     /// @param slashingManager The address of the SlashingManager contract.
     event SlashingManagerSet(address indexed slashingManager);
 
-    /// @notice Emitted when the PkVerifier is set for an encryption scheme.
-    /// @param encryptionSchemeId The encryption scheme identifier.
-    /// @param pkVerifier The address of the PkVerifier contract.
-    event PkVerifierSet(bytes32 indexed encryptionSchemeId, address pkVerifier);
-
     /// @notice Emitted when slashed funds are escrowed for an E3
     /// @param e3Id The E3 ID.
     /// @param amount The amount of slashed funds escrowed.

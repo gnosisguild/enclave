@@ -39,6 +39,16 @@ interface IBondingRegistry {
     ///         slash proposal against them is still pending execution.
     error OperatorUnderSlash();
 
+    /// @notice Thrown when {setExitDelay} input is outside the permitted range.
+    error ExitDelayOutOfBounds(uint64 exitDelay);
+
+    /// @notice Thrown when {setRewardDistributor} would exceed
+    ///         {MAX_AUTHORIZED_DISTRIBUTORS}.
+    error MaxAuthorizedDistributors();
+
+    /// @notice Thrown when {renounceOwnership} is called.
+    error RenounceOwnershipDisabled();
+
     // ======================
     // Events (Protocol-Named)
     // ======================
@@ -146,13 +156,10 @@ interface IBondingRegistry {
      */
     event RegistrySet(address indexed registry);
 
-    /**
-     * @notice Emitted when the slashing manager is set
-     * @param slashingManager Address of the slashing manager
-     */
+    /// @notice Emitted whenever the slashing manager address is updated.
     event SlashingManagerUpdated(
-        address indexed oldSlashingManager,
-        address indexed newSlashingManager
+        address indexed previous,
+        address indexed next
     );
 
     /**

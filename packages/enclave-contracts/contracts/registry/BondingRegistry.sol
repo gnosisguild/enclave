@@ -98,22 +98,6 @@ contract BondingRegistry is
     /// @notice Basis-points denominator (100% = 10_000 bps).
     uint256 internal constant BPS_BASE = 10_000;
 
-    /// @notice Thrown when {setExitDelay} input is outside the permitted range.
-    error ExitDelayOutOfBounds(uint64 exitDelay);
-
-    /// @notice Thrown when {setRewardDistributor} would exceed
-    ///         {MAX_AUTHORIZED_DISTRIBUTORS}.
-    error MaxAuthorizedDistributors();
-
-    /// @notice Thrown when {renounceOwnership} is called.
-    error RenounceOwnershipDisabled();
-
-    /// @notice Emitted whenever the slashing manager address is updated.
-    event SlashingManagerUpdated(
-        address indexed previous,
-        address indexed next
-    );
-
     /// @notice Treasury address that receives slashed funds
     address public slashedFundsTreasury;
 

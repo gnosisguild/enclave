@@ -19,6 +19,17 @@
       "type": "error"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "exitDelay",
+          "type": "uint64"
+        }
+      ],
+      "name": "ExitDelayOutOfBounds",
+      "type": "error"
+    },
+    {
       "inputs": [],
       "name": "ExitInProgress",
       "type": "error"
@@ -45,6 +56,11 @@
     },
     {
       "inputs": [],
+      "name": "MaxAuthorizedDistributors",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "NoPendingDeregistration",
       "type": "error"
     },
@@ -66,6 +82,11 @@
     {
       "inputs": [],
       "name": "OperatorUnderSlash",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "RenounceOwnershipDisabled",
       "type": "error"
     },
     {
@@ -164,7 +185,19 @@
         {
           "indexed": true,
           "internalType": "address",
-<<<<<<< HEAD
+          "name": "licenseToken",
+          "type": "address"
+        }
+      ],
+      "name": "LicenseTokenSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
           "name": "recipient",
           "type": "address"
         },
@@ -182,13 +215,6 @@
         }
       ],
       "name": "LicenseTransferShortfall",
-=======
-          "name": "licenseToken",
-          "type": "address"
-        }
-      ],
-      "name": "LicenseTokenSet",
->>>>>>> main
       "type": "event"
     },
     {
@@ -286,11 +312,17 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "slashingManager",
+          "name": "previous",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "next",
           "type": "address"
         }
       ],
-      "name": "SlashingManagerSet",
+      "name": "SlashingManagerUpdated",
       "type": "event"
     },
     {
@@ -1030,9 +1062,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IBondingRegistry.sol",
-<<<<<<< HEAD
-  "buildInfoId": "solc-0_8_28-08316200c2ed027c032ded4708a03faf67f258a3"
-=======
-  "buildInfoId": "solc-0_8_28-2705a75bc2d2d1f8b1e08ebca4cc37d76480abc8"
->>>>>>> main
+  "buildInfoId": "solc-0_8_28-be7d92b194132ca5e395ad6966a35a98d06e7bf0"
 }

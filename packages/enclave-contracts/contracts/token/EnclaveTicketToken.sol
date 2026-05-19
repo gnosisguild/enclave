@@ -143,6 +143,9 @@ contract EnclaveTicketToken is
         uint256 amount
     );
 
+    /// @notice Emitted when a payout is made
+    event Payout(address indexed to, uint256 amount);
+
     /// @notice Restricts function access to only the registry contract
     /// @dev Reverts with NotRegistry if caller is not the registry address
     modifier onlyRegistry() {
