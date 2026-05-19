@@ -345,11 +345,15 @@ describe("BfvVkBindingIntegration", function () {
         [folded.dkg_aggregator.proof_hex, dkgPublicInputs],
       );
       const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
+      const dkgCommitteeHash = committeeHashFromLimbs(
+        dkgPublicInputs[DKG_COMMITTEE_HASH_HI_IDX],
+        dkgPublicInputs[DKG_COMMITTEE_HASH_LO_IDX],
+      );
 
       expect(
         await bfvPk.verify.staticCall(
           pkCommitment,
-          ethers.ZeroHash,
+          dkgCommitteeHash,
           dkgEncoded,
         ),
       ).to.equal(false);

@@ -223,7 +223,7 @@ class NoirCircuitBuilder {
         return result
       }
 
-      const sourceHash = this.computeSourceHash()
+      const sourceHash = this.computeSourceHash(preset)
       result.sourceHash = sourceHash
 
       if (this.options.skipIfBuilt && this.isPresetUpToDate(preset, sourceHash)) {
@@ -249,7 +249,9 @@ class NoirCircuitBuilder {
       }
 
       this.copyArtifacts(result.compiled, presetOutputDir, preset)
-      this.writePresetStamp(preset, sourceHash)
+      if (result.errors.length === 0) {
+        this.writePresetStamp(preset, sourceHash)
+      }
       console.log(`\n✅ Built ${result.compiled.length} circuits for preset: ${preset}`)
       if (result.errors.length > 0) {
         console.error('\n❌ Failed circuits:')
@@ -665,8 +667,12 @@ class NoirCircuitBuilder {
     return outputDir
   }
 
-  computeSourceHash(): string {
+  computeSourceHash(preset?: CircuitPreset): string {
     const hash = createHash('sha256')
+    if (preset !== undefined) {
+      hash.update(`preset:${preset}\n`)
+      hash.update(`noir_config:${PRESET_NOIR_CONFIG[preset]}\n`)
+    }
     const circuits = this.discoverCircuits().sort((a, b) => `${a.group}/${a.name}`.localeCompare(`${b.group}/${b.name}`))
     for (const c of circuits) this.hashDir(c.path, hash)
     return hash.digest('hex').substring(0, 16)

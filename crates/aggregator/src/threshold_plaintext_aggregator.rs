@@ -676,6 +676,9 @@ impl ThresholdPlaintextAggregator {
             return Ok(());
         }
         if !self.proof_aggregation_enabled {
+            if self.decryption_aggregator_proofs.is_none() {
+                self.decryption_aggregator_proofs = Some(Vec::new());
+            }
             return Ok(());
         }
         self.dispatch_decryption_aggregation(ec, Some(reply))
@@ -1074,10 +1077,33 @@ impl Handler<CommitteeMembersResponse> for ThresholdPlaintextAggregator {
     type Result = ();
 
     fn handle(&mut self, msg: CommitteeMembersResponse, ctx: &mut Self::Context) -> Self::Result {
-        self.committee_members = Some(msg.members);
+        let Some(members) = msg.members else {
+            warn!(
+                e3_id = %self.e3_id,
+                "committee members unavailable (E3 committee not finalized in sortition)"
+            );
+            if let Some(ec) = self.last_ec.clone() {
+                let _ = self.fail_decryption_round(ec);
+            }
+            return;
+        };
+        self.committee_members = Some(members);
         if let Some(ec) = self.last_ec.clone() {
-            let _ = self.maybe_start_decryption_aggregation(&ec, ctx.address().recipient());
-            let _ = self.try_publish_complete();
+            if let Err(e) = self.maybe_start_decryption_aggregation(&ec, ctx.address().recipient())
+            {
+                warn!(
+                    e3_id = %self.e3_id,
+                    error = %e,
+                    "maybe_start_decryption_aggregation failed after committee members response"
+                );
+            }
+            if let Err(e) = self.try_publish_complete() {
+                warn!(
+                    e3_id = %self.e3_id,
+                    error = %e,
+                    "try_publish_complete failed after committee members response"
+                );
+            }
         }
     }
 }
@@ -1273,6 +1299,7 @@ mod tests {
 
     async fn build_plaintext_aggregator(
         initial_state: ThresholdPlaintextAggregatorState,
+        proof_aggregation_enabled: bool,
     ) -> Result<(
         ThresholdPlaintextAggregator,
         Addr<HistoryCollector<EnclaveEvent>>,
@@ -1287,7 +1314,7 @@ mod tests {
                 sortition: start_sortition(&bus),
                 e3_id: e3_id.clone(),
                 params_preset: BfvPreset::InsecureThreshold512,
-                proof_aggregation_enabled: true,
+                proof_aggregation_enabled,
             },
             test_persistable(initial_state),
         );
@@ -1305,7 +1332,7 @@ mod tests {
     async fn threshold_decryption_compute_error_emits_e3_failed() -> Result<()> {
         let correlation_id = CorrelationId::new();
         let (mut aggregator, history, e3_id) =
-            build_plaintext_aggregator(computing_state()).await?;
+            build_plaintext_aggregator(computing_state(), true).await?;
         aggregator.threshold_decryption_correlation = Some(correlation_id.clone());
 
         let request = ComputeRequest::trbfv(
@@ -1348,7 +1375,7 @@ mod tests {
     #[actix::test]
     async fn insufficient_honest_c6_shares_emit_e3_failed() -> Result<()> {
         let (mut aggregator, history, e3_id) =
-            build_plaintext_aggregator(verifying_c6_state()).await?;
+            build_plaintext_aggregator(verifying_c6_state(), true).await?;
 
         aggregator.handle_c6_verification_complete(TypedEvent::new(
             ShareVerificationComplete {
@@ -1379,7 +1406,7 @@ mod tests {
     async fn decryption_aggregation_compute_error_emits_e3_failed() -> Result<()> {
         let correlation_id = CorrelationId::new();
         let (mut aggregator, history, e3_id) =
-            build_plaintext_aggregator(generating_c7_state()).await?;
+            build_plaintext_aggregator(generating_c7_state(), true).await?;
         aggregator.c7_proofs_pending = Some(vec![dummy_proof(CircuitName::PkAggregation)]);
         aggregator.honest_c6_proofs_for_agg = Some(vec![(
             0,
@@ -1432,7 +1459,7 @@ mod tests {
     #[actix::test]
     async fn missing_c6_inner_proofs_emit_e3_failed() -> Result<()> {
         let (mut aggregator, history, e3_id) =
-            build_plaintext_aggregator(generating_c7_state()).await?;
+            build_plaintext_aggregator(generating_c7_state(), true).await?;
         aggregator.c7_proofs_pending = Some(vec![dummy_proof(CircuitName::PkAggregation)]);
         aggregator.honest_c6_proofs_for_agg = Some(vec![
             (0, vec![]),
@@ -1461,6 +1488,30 @@ mod tests {
         assert!(aggregator.decryption_aggregation_correlation.is_none());
         assert!(aggregator.c7_proofs_pending.is_none());
         assert!(aggregator.decryption_aggregator_proofs.is_none());
+
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn proof_aggregation_disabled_marks_decryption_aggregator_ready() -> Result<()> {
+        let (mut aggregator, _history, _e3_id) =
+            build_plaintext_aggregator(generating_c7_state(), false).await?;
+        aggregator.c7_proofs_pending = Some(vec![dummy_proof(CircuitName::PkAggregation)]);
+        aggregator.committee_members = Some(vec![
+            "0x0000000000000000000000000000000000000001".to_string()
+        ]);
+        let ec = test_ctx(E3Failed {
+            e3_id: aggregator.e3_id.clone(),
+            failed_at_stage: E3Stage::None,
+            reason: FailureReason::None,
+        });
+
+        aggregator.dispatch_decryption_aggregation(&ec, None)?;
+        assert!(aggregator
+            .decryption_aggregator_proofs
+            .as_ref()
+            .is_some_and(|p| p.is_empty()));
+        assert!(aggregator.decryption_aggregation_correlation.is_none());
 
         Ok(())
     }

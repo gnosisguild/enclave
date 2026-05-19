@@ -216,7 +216,8 @@ pub struct GetCommitteeMembersRequest {
 #[derive(Message, Clone, Debug)]
 #[rtype(result = "()")]
 pub struct CommitteeMembersResponse {
-    pub members: Vec<String>,
+    /// `None` when the E3 committee is not finalized in sortition yet.
+    pub members: Option<Vec<String>>,
 }
 
 /// Sortition actor that manages the sortition algorithm and the node state.
@@ -735,10 +736,7 @@ impl Handler<GetCommitteeMembersRequest> for Sortition {
     type Result = ();
 
     fn handle(&mut self, msg: GetCommitteeMembersRequest, _: &mut Self::Context) -> Self::Result {
-        let members = self
-            .get_committee(&msg.e3_id)
-            .map(|c| c.members().to_vec())
-            .unwrap_or_default();
+        let members = self.get_committee(&msg.e3_id).map(|c| c.members().to_vec());
         let _ = msg.reply.do_send(CommitteeMembersResponse { members });
     }
 }
