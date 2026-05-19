@@ -17,6 +17,7 @@ import {
     InternalLazyIMT,
     LazyIMTData
 } from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
+import { CommitteeHashLib } from "../lib/CommitteeHashLib.sol";
 
 /**
  * @title CiphernodeRegistryOwnable
@@ -195,7 +196,6 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @inheritdoc ICiphernodeRegistry
     function publishCommittee(
         uint256 e3Id,
-        address[] calldata nodes,
         bytes calldata publicKey,
         bytes32 pkCommitment,
         bytes calldata proof
@@ -207,14 +207,16 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             CommitteeNotFinalized()
         );
         require(c.publicKey == bytes32(0), CommitteeAlreadyPublished());
-        require(nodes.length == c.topNodes.length, "Node count mismatch");
         require(pkCommitment != bytes32(0), "pkCommitment required");
+
+        bytes32 committeeHash = CommitteeHashLib.hash(c.topNodes);
+        c.committeeHash = committeeHash;
 
         E3 memory e3 = enclave.getE3(e3Id);
         if (e3.proofAggregationEnabled) {
             require(proof.length > 0, "proof required");
             require(
-                e3.pkVerifier.verify(pkCommitment, proof),
+                e3.pkVerifier.verify(pkCommitment, committeeHash, proof),
                 "Invalid DKG proof"
             );
         }
@@ -224,7 +226,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         enclave.onCommitteePublished(e3Id, pkCommitment);
 
-        emit CommitteePublished(e3Id, nodes, publicKey, pkCommitment, proof);
+        emit CommitteePublished(
+            e3Id,
+            c.topNodes,
+            publicKey,
+            pkCommitment,
+            proof
+        );
     }
 
     /// @inheritdoc ICiphernodeRegistry
@@ -462,6 +470,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         Committee storage c = committees[e3Id];
         require(c.publicKey != bytes32(0), CommitteeNotPublished());
         nodes = c.topNodes;
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function getCommitteeHash(
+        uint256 e3Id
+    ) public view returns (bytes32 committeeHash) {
+        Committee storage c = committees[e3Id];
+        require(c.publicKey != bytes32(0), CommitteeNotPublished());
+        committeeHash = c.committeeHash;
     }
 
     /// @notice Returns the current size of the ciphernode IMT

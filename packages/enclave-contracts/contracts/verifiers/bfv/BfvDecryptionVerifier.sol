@@ -7,13 +7,14 @@ pragma solidity 0.8.28;
 
 import { IDecryptionVerifier } from "../../interfaces/IDecryptionVerifier.sol";
 import { ICircuitVerifier } from "../../interfaces/ICircuitVerifier.sol";
+import { CommitteeHashLib } from "../../lib/CommitteeHashLib.sol";
 
 /**
  * @title BfvDecryptionVerifier
  * @notice Verifies the DecryptionAggregator (EVM) proof produced by the
  *         recursive aggregation pipeline (C6 folds + C7/decrypted_shares
  *         verified internally). Binds the proof to the claimed
- *         `plaintextOutputHash`.
+ *         `plaintextOutputHash` and on-chain committee hash.
  * @dev Used when the Enclave is configured with encryptionSchemeId
  *      keccak256("fhe.rs:BFV"). The plaintext is exposed as the last
  *      `MESSAGE_COEFFS_COUNT` public inputs, matching
@@ -22,6 +23,12 @@ import { ICircuitVerifier } from "../../interfaces/ICircuitVerifier.sol";
 contract BfvDecryptionVerifier is IDecryptionVerifier {
     /// @dev Message is always the last 100 public inputs (100 uint64 coeffs = 800 bytes plaintext).
     uint256 constant MESSAGE_COEFFS_COUNT = 100;
+
+    /// @dev `publicInputs` index for `committee_hash_hi` (after sub-circuit key hashes).
+    uint256 internal constant COMMITTEE_HASH_HI_IDX = 2;
+
+    /// @dev `publicInputs` index for `committee_hash_lo`.
+    uint256 internal constant COMMITTEE_HASH_LO_IDX = 3;
 
     /// @notice Underlying Honk verifier for the DecryptionAggregator circuit.
     ICircuitVerifier public immutable circuitVerifier;
@@ -45,6 +52,7 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
     /// @inheritdoc IDecryptionVerifier
     function verify(
         bytes32 plaintextOutputHash,
+        bytes32 committeeHash,
         bytes calldata proof
     ) external view override returns (bool) {
         (bytes memory rawProof, bytes32[] memory publicInputs) = abi.decode(
@@ -52,7 +60,10 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
             (bytes, bytes32[])
         );
 
-        if (publicInputs.length < MESSAGE_COEFFS_COUNT + 2) {
+        if (
+            publicInputs.length <
+            MESSAGE_COEFFS_COUNT + COMMITTEE_HASH_LO_IDX + 1
+        ) {
             return false;
         }
         if (publicInputs[0] != expectedC6FoldKeyHash) {

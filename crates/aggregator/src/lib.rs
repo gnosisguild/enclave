@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+pub mod committee_hash;
 mod committee_finalizer;
 mod decryptionshare_created_buffer;
 pub mod ext;

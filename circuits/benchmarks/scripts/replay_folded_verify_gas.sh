@@ -17,6 +17,8 @@ set -e
 SUMMARY_JSON=""
 GAS_JSON=""
 BUILD_PRESET=""
+FORCE_BUILD=false
+SKIP_BUILD=false
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 ENCLAVE_CONTRACTS="${REPO_ROOT}/packages/enclave-contracts"
@@ -28,6 +30,14 @@ while [[ $# -gt 0 ]]; do
         --build)
             BUILD_PRESET="$2"
             shift 2
+            ;;
+        --force-build)
+            FORCE_BUILD=true
+            shift
+            ;;
+        --skip-build|--no-build)
+            SKIP_BUILD=true
+            shift
             ;;
         *)
             echo "Unknown option: $1"
@@ -68,8 +78,18 @@ trap 'rm -f "$TMP_FOLDED" "$TMP_GAS_PARTIAL"' EXIT
 jq -c '.folded_artifacts' "$SUMMARY_JSON" >"$TMP_FOLDED"
 
 if [ -n "$BUILD_PRESET" ]; then
-    echo "  [replay-gas] Building verifier artifacts: pnpm build:circuits --preset ${BUILD_PRESET}"
-    (cd "$REPO_ROOT" && pnpm build:circuits --preset "$BUILD_PRESET")
+    if [ "$SKIP_BUILD" = true ]; then
+        echo "  [replay-gas] Skipping circuit build (--skip-build)."
+        "${SCRIPT_DIR}/check_circuit_preset_artifacts.sh" "$BUILD_PRESET"
+    else
+        ENSURE_ARGS=("$BUILD_PRESET")
+        if [ "$FORCE_BUILD" = true ]; then
+            ENSURE_ARGS+=(--force-build)
+        fi
+        "${SCRIPT_DIR}/ensure_circuit_preset_built.sh" "${ENSURE_ARGS[@]}"
+        echo "  [replay-gas] Regenerating Honk Solidity verifiers (pnpm generate:verifiers --no-compile)..."
+        (cd "$REPO_ROOT" && pnpm generate:verifiers --no-compile)
+    fi
 fi
 
 echo "  [replay-gas] Running Hardhat benchmarkGasFromRaw.ts (folded proofs)..."

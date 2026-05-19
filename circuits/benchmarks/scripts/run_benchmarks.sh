@@ -145,18 +145,11 @@ if [ "$SKIP_COMPILE" = false ]; then
     else
         PRESET_NAME="insecure-512"
     fi
-    echo "Preflight: pnpm build:circuits --preset ${PRESET_NAME}"
+    ENSURE_ARGS=("$PRESET_NAME")
     if [ "$VERBOSE" = true ]; then
-        (
-          cd "$REPO_ROOT" && \
-          pnpm build:circuits --preset "$PRESET_NAME"
-        )
-    else
-        (
-          cd "$REPO_ROOT" && \
-          pnpm build:circuits --preset "$PRESET_NAME" >/dev/null
-        )
+        ENSURE_ARGS+=(--verbose)
     fi
+    "${SCRIPT_DIR}/ensure_circuit_preset_built.sh" "${ENSURE_ARGS[@]}"
     echo "Preflight build complete."
     echo ""
 fi

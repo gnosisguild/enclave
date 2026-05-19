@@ -382,7 +382,6 @@ export const publishCommittee = task(
 
       const tx = await ciphernodeRegistry.publishCommittee(
         e3Id,
-        nodesToSend,
         publicKey,
         pkCommitment,
         proof,

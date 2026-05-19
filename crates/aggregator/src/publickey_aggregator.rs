@@ -610,6 +610,7 @@ impl PublicKeyAggregator {
     fn try_dispatch_dkg_aggregation(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
         let state = self.state.get();
         let Some(PublicKeyAggregatorState::GeneratingC5Proof {
+            nodes,
             dkg_node_proofs,
             honest_party_ids,
             c5_proof_pending,
@@ -732,6 +733,7 @@ impl PublicKeyAggregator {
                     node_fold_proofs,
                     c5_proof: c5_proof.clone(),
                     party_ids,
+                    committee_addresses: nodes.iter().cloned().collect::<Vec<_>>(),
                     params_preset: self.params_preset,
                 }),
                 corr,
@@ -1348,6 +1350,7 @@ mod tests {
                 node_fold_proofs: vec![dummy_proof(CircuitName::PkAggregation)],
                 c5_proof: dummy_proof(CircuitName::PkAggregation),
                 party_ids: vec![0],
+                committee_addresses: vec!["0x0000000000000000000000000000000000000001".to_string()],
                 params_preset: BfvPreset::InsecureThreshold512,
             }),
             correlation_id,

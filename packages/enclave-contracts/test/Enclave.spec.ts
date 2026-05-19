@@ -79,7 +79,6 @@ describe("Enclave", function () {
   const setupAndPublishCommittee = async (
     registry: any,
     e3Id: number,
-    nodes: string[],
     publicKey: string,
     operators: Signer[],
     committeeProof: string = "0x",
@@ -92,7 +91,6 @@ describe("Enclave", function () {
     const pkCommitment = ethers.keccak256(publicKey);
     await registry.publishCommittee(
       e3Id,
-      nodes,
       publicKey,
       pkCommitment,
       committeeProof,
@@ -825,17 +823,11 @@ describe("Enclave", function () {
         proofAggregationEnabled: false,
       });
 
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
-        data,
-        [operator1, operator2, operator3],
-      );
+      await setupAndPublishCommittee(ciphernodeRegistryContract, e3Id, data, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
       await mine(2, { interval: inputWindowDuration });
 
       await enclave.publishCiphertextOutput(e3Id, data, proof);
@@ -860,17 +852,11 @@ describe("Enclave", function () {
         inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
-        data,
-        [operator1, operator2, operator3],
-      );
+      await setupAndPublishCommittee(ciphernodeRegistryContract, e3Id, data, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
       await mine(2, {
         interval: inputWindowDuration + timeoutConfig.computeWindow,
       });
@@ -900,17 +886,11 @@ describe("Enclave", function () {
         proofAggregationEnabled: false,
       });
 
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
-        data,
-        [operator1, operator2, operator3],
-      );
+      await setupAndPublishCommittee(ciphernodeRegistryContract, e3Id, data, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
       await mine(2, { interval: inputWindowDuration });
       await expect(
         enclave.publishCiphertextOutput(e3Id, "0x", "0x"),
@@ -933,17 +913,11 @@ describe("Enclave", function () {
         inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
-        data,
-        [operator1, operator2, operator3],
-      );
+      await setupAndPublishCommittee(ciphernodeRegistryContract, e3Id, data, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
       await mine(2, { interval: inputWindowDuration });
       expect(await enclave.publishCiphertextOutput(e3Id, data, proof));
       const e3 = await enclave.getE3(e3Id);
@@ -966,17 +940,11 @@ describe("Enclave", function () {
         inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
-        data,
-        [operator1, operator2, operator3],
-      );
+      await setupAndPublishCommittee(ciphernodeRegistryContract, e3Id, data, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
       await mine(2, { interval: inputWindowDuration });
       expect(
         await enclave.publishCiphertextOutput.staticCall(e3Id, data, proof),
@@ -999,17 +967,11 @@ describe("Enclave", function () {
         inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
-        data,
-        [operator1, operator2, operator3],
-      );
+      await setupAndPublishCommittee(ciphernodeRegistryContract, e3Id, data, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
       await mine(2, { interval: inputWindowDuration });
       await expect(enclave.publishCiphertextOutput(e3Id, data, proof))
         .to.emit(enclave, "CiphertextOutputPublished")
@@ -1044,17 +1006,11 @@ describe("Enclave", function () {
         inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
-        data,
-        [operator1, operator2, operator3],
-      );
+      await setupAndPublishCommittee(ciphernodeRegistryContract, e3Id, data, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
       await expect(
         enclave.publishPlaintextOutput(e3Id, data, "0x"),
       ).to.be.revertedWithCustomError(enclave, "InvalidStage");
@@ -1076,17 +1032,11 @@ describe("Enclave", function () {
         inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
-        data,
-        [operator1, operator2, operator3],
-      );
+      await setupAndPublishCommittee(ciphernodeRegistryContract, e3Id, data, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       await enclave.publishPlaintextOutput(e3Id, data, proof);
@@ -1116,11 +1066,6 @@ describe("Enclave", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
         data,
         [operator1, operator2, operator3],
         encodeMockDkgProof(pkCommitment),
@@ -1148,17 +1093,11 @@ describe("Enclave", function () {
         inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
-        data,
-        [operator1, operator2, operator3],
-      );
+      await setupAndPublishCommittee(ciphernodeRegistryContract, e3Id, data, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       expect(await enclave.publishPlaintextOutput(e3Id, data, proof));
@@ -1183,17 +1122,11 @@ describe("Enclave", function () {
         inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
-        data,
-        [operator1, operator2, operator3],
-      );
+      await setupAndPublishCommittee(ciphernodeRegistryContract, e3Id, data, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       expect(
@@ -1217,17 +1150,11 @@ describe("Enclave", function () {
         inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
-        data,
-        [operator1, operator2, operator3],
-      );
+      await setupAndPublishCommittee(ciphernodeRegistryContract, e3Id, data, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       await expect(await enclave.publishPlaintextOutput(e3Id, data, proof))

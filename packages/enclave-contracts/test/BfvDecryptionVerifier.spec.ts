@@ -21,6 +21,12 @@ const MESSAGE_COEFFS_COUNT = 100;
 const EXPECTED_C6_FOLD_KEY_HASH = ethers.id("c6_fold");
 const EXPECTED_C7_KEY_HASH = ethers.id("c7");
 
+/** Must match `BfvDecryptionVerifier.COMMITTEE_HASH_LO_IDX` (3). */
+const COMMITTEE_HASH_LO_IDX = 3;
+
+/** Minimum `publicInputs.length` for verify (message tail + committee limbs). */
+const MIN_PUBLIC_INPUTS_LEN = MESSAGE_COEFFS_COUNT + COMMITTEE_HASH_LO_IDX + 1;
+
 function buildPublicInputsWithMessage(
   messageCoeffs: bigint[],
   totalInputs = 402,
@@ -97,11 +103,15 @@ describe("BfvDecryptionVerifier", function () {
       const invalidProof = "0xdeadbeef";
 
       await expect(
-        bfvDecryptionVerifier.verify.staticCall(plaintextHash, invalidProof),
+        bfvDecryptionVerifier.verify.staticCall(
+          plaintextHash,
+          ethers.ZeroHash,
+          invalidProof,
+        ),
       ).to.be.revert(ethers);
     });
 
-    it("returns false when publicInputs.length < MESSAGE_COEFFS_COUNT + 2", async function () {
+    it("returns false when publicInputs.length < MIN_PUBLIC_INPUTS_LEN", async function () {
       const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
       );
@@ -110,13 +120,14 @@ describe("BfvDecryptionVerifier", function () {
       const messageCoeffs = [1n, 2n, 3n];
       const publicInputs = buildPublicInputsWithMessage(
         messageCoeffs,
-        MESSAGE_COEFFS_COUNT + 2,
-      ).slice(0, MESSAGE_COEFFS_COUNT + 1);
+        MIN_PUBLIC_INPUTS_LEN,
+      ).slice(0, MIN_PUBLIC_INPUTS_LEN - 1);
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
       const result = await bfvDecryptionVerifier.verify.staticCall(
         plaintextHash,
+        ethers.ZeroHash,
         proof,
       );
       expect(result).to.equal(false);
@@ -147,6 +158,7 @@ describe("BfvDecryptionVerifier", function () {
 
       const result = await bfvDecryptionVerifier.verify.staticCall(
         plaintextHash,
+        ethers.ZeroHash,
         proof,
       );
       expect(result).to.equal(false);
@@ -177,6 +189,7 @@ describe("BfvDecryptionVerifier", function () {
 
       const result = await bfvDecryptionVerifier.verify.staticCall(
         plaintextHash,
+        ethers.ZeroHash,
         proof,
       );
       expect(result).to.equal(false);
@@ -255,6 +268,7 @@ describe("BfvDecryptionVerifier", function () {
 
       const result = await bfvDecryptionVerifier.verify.staticCall(
         wrongHash,
+        ethers.ZeroHash,
         proof,
       );
       expect(result).to.equal(false);
@@ -273,6 +287,7 @@ describe("BfvDecryptionVerifier", function () {
 
       const result = await bfvDecryptionVerifier.verify.staticCall(
         plaintextHash,
+        ethers.ZeroHash,
         proof,
       );
       expect(result).to.equal(false);
@@ -295,6 +310,7 @@ describe("BfvDecryptionVerifier", function () {
 
       const result = await bfvDecryptionVerifier.verify.staticCall(
         plaintextHash,
+        ethers.ZeroHash,
         proof,
       );
       expect(result).to.equal(false);
@@ -315,6 +331,7 @@ describe("BfvDecryptionVerifier", function () {
 
       const result = await bfvDecryptionVerifier.verify.staticCall(
         plaintextHash,
+        ethers.ZeroHash,
         proof,
       );
       expect(result).to.equal(true);
@@ -329,13 +346,14 @@ describe("BfvDecryptionVerifier", function () {
       const messageCoeffs = [1n, 2n, 3n];
       const publicInputs = buildPublicInputsWithMessage(
         messageCoeffs,
-        MESSAGE_COEFFS_COUNT + 2,
+        MIN_PUBLIC_INPUTS_LEN,
       );
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
       const result = await bfvDecryptionVerifier.verify.staticCall(
         plaintextHash,
+        ethers.ZeroHash,
         proof,
       );
       expect(result).to.equal(true);

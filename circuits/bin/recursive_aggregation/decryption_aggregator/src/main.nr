@@ -7,6 +7,7 @@
 //! Decryption aggregator: non-ZK `c6_fold` (folded C6 column) + non-ZK `decrypted_shares_aggregation`
 //! (C7, both `noir-recursive-no-zk`). The final `bb prove -t evm` proof of this circuit is what the
 //! contract verifies on-chain.
+//! `committee_hash_hi` / `committee_hash_lo` bind the proof to the full on-chain committee ordering.
 
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
 use lib::configs::default::MAX_MSG_NON_ZERO_COEFFS;
@@ -42,6 +43,8 @@ fn main(
     c7_public: [Field; C7_PUBLIC_LEN],
     c6_fold_key_hash: pub Field,
     c7_key_hash: pub Field,
+    committee_hash_hi: pub Field,
+    committee_hash_lo: pub Field,
 ) -> pub (Field, [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; MAX_MSG_NON_ZERO_COEFFS]) {
     verify_honk_proof_non_zk(c6_fold_vk, c6_fold_proof, c6_fold_public, c6_fold_key_hash);
     verify_honk_proof_non_zk(c7_vk, c7_proof, c7_public, c7_key_hash);

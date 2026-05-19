@@ -6,6 +6,8 @@
 
 //! DKG aggregator: non-ZK `nodes_fold` and non-ZK `pk_aggregation` (both `noir-recursive-no-zk`).
 //! The final `bb prove -t evm` proof of this circuit is what the contract verifies on-chain.
+//! `committee_hash_hi` / `committee_hash_lo` bind the proof to `keccak256(abi.encodePacked(topNodes))`
+//! (128-bit limbs); the contract recomputes the hash from on-chain `topNodes`.
 
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
 use lib::configs::default::dkg::L_THRESHOLD;
@@ -50,6 +52,8 @@ fn main(
     nodes_fold_key_hash: pub Field,
     c5_key_hash: pub Field,
     party_ids: pub [Field; H],
+    committee_hash_hi: pub Field,
+    committee_hash_lo: pub Field,
 ) -> pub (Field, [Field; H], [Field; H], Field) {
     verify_honk_proof_non_zk(
         nodes_fold_vk,

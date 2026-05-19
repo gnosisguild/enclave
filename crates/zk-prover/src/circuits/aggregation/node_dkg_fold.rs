@@ -295,6 +295,8 @@ pub struct DkgAggregationInput<'a> {
     pub c5_proof: &'a Proof,
     /// Honest party ids in the same order as `node_fold_proofs` (e.g. sorted ascending).
     pub party_ids: &'a [u64],
+    /// Ordered committee addresses (`topNodes` / sortition order) for `committee_hash_*` public inputs.
+    pub committee_addresses: &'a [String],
 }
 
 #[derive(Serialize)]
@@ -308,6 +310,8 @@ struct DkgAggregatorWitness {
     nodes_fold_key_hash: String,
     c5_key_hash: String,
     party_ids: Vec<String>,
+    committee_hash_hi: String,
+    committee_hash_lo: String,
 }
 
 /// [`CircuitName::DkgAggregator`] over sequential [`CircuitName::NodesFold`] + C5, proved with
@@ -355,6 +359,10 @@ pub fn prove_dkg_aggregation(
         .map(u64_to_field_hex)
         .collect();
 
+    let (committee_hash_hi, committee_hash_lo) =
+        e3_utils::committee_hash::committee_hash_field_hex(input.committee_addresses)
+            .map_err(|e| ZkError::InvalidInput(e.to_string()))?;
+
     let witness = DkgAggregatorWitness {
         nodes_fold_vk: nodes_fold_vk.verification_key.clone(),
         nodes_fold_proof: proof_field_strings(&nodes_fold_proof)?,
@@ -365,6 +373,8 @@ pub fn prove_dkg_aggregation(
         nodes_fold_key_hash: nodes_fold_vk.key_hash.clone(),
         c5_key_hash: c5_vk.key_hash.clone(),
         party_ids: party_id_fields,
+        committee_hash_hi,
+        committee_hash_lo,
     };
 
     let json =
@@ -403,6 +413,8 @@ struct DecryptionAggregatorWitness {
     c7_public: Vec<String>,
     c6_fold_key_hash: String,
     c7_key_hash: String,
+    committee_hash_hi: String,
+    committee_hash_lo: String,
 }
 
 /// Prove [`CircuitName::DecryptionAggregator`] for each job (C6 fold + C7), with
@@ -411,6 +423,7 @@ pub fn prove_decryption_aggregation_jobs(
     prover: &ZkProver,
     c6_total_slots: usize,
     jobs: &[DecryptionAggregationJob],
+    committee_addresses: &[String],
     e3_id: &str,
     artifacts_dir: &str,
 ) -> Result<Vec<Proof>, ZkError> {
@@ -429,6 +442,10 @@ pub fn prove_decryption_aggregation_jobs(
         CircuitVariant::Default,
         artifacts_dir,
     )?;
+
+    let (committee_hash_hi, committee_hash_lo) =
+        e3_utils::committee_hash::committee_hash_field_hex(committee_addresses)
+            .map_err(|e| ZkError::InvalidInput(e.to_string()))?;
 
     let mut out = Vec::with_capacity(jobs.len());
     for (i, job) in jobs.iter().enumerate() {
@@ -450,6 +467,8 @@ pub fn prove_decryption_aggregation_jobs(
             c7_public: proof_public_field_strings(job.c7_proof)?,
             c6_fold_key_hash: c6_fold_vk.key_hash.clone(),
             c7_key_hash: c7_vk.key_hash.clone(),
+            committee_hash_hi: committee_hash_hi.clone(),
+            committee_hash_lo: committee_hash_lo.clone(),
         };
 
         let json = serde_json::to_value(&witness)

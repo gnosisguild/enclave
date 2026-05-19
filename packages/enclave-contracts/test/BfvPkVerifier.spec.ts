@@ -172,7 +172,11 @@ describe("BfvPkVerifier", function () {
         EXPECTED_C5_KEY_HASH,
       ]);
 
-      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
+      const result = await bfvPkVerifier.verify.staticCall(
+        pkCommitment,
+        ethers.ZeroHash,
+        proof,
+      );
       expect(result).to.equal(false);
     });
 

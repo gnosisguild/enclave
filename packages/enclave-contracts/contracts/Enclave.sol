@@ -419,8 +419,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         if (e3.proofAggregationEnabled) {
             require(proof.length > 0, ProofRequired());
+            bytes32 committeeHash = ciphernodeRegistry.getCommitteeHash(e3Id);
             success = e3.decryptionVerifier.verify(
                 keccak256(plaintextOutput),
+                committeeHash,
                 proof
             );
             require(success, InvalidOutput(plaintextOutput));

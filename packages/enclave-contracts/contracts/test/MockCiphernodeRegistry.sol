@@ -68,7 +68,6 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 
     function publishCommittee(
         uint256,
-        address[] calldata,
         bytes calldata,
         bytes32,
         bytes calldata
@@ -78,6 +77,12 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         uint256 e3Id
     ) external view returns (address[] memory) {
         return _committeeNodes[e3Id];
+    }
+
+    function getCommitteeHash(
+        uint256 e3Id
+    ) external view returns (bytes32) {
+        return keccak256(abi.encodePacked(_committeeNodes[e3Id]));
     }
 
     function root() external pure returns (uint256) {
@@ -209,7 +214,6 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
 
     function publishCommittee(
         uint256,
-        address[] calldata,
         bytes calldata,
         bytes32,
         bytes calldata
@@ -220,6 +224,10 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
     ) external pure returns (address[] memory) {
         address[] memory nodes = new address[](0);
         return nodes;
+    }
+
+    function getCommitteeHash(uint256) external pure returns (bytes32) {
+        return bytes32(0);
     }
 
     function root() external pure returns (uint256) {

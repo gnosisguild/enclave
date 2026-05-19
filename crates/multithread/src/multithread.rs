@@ -733,6 +733,7 @@ fn handle_dkg_aggregation_proof(
         node_fold_proofs: &req.node_fold_proofs,
         c5_proof: &req.c5_proof,
         party_ids: &req.party_ids,
+        committee_addresses: &req.committee_addresses,
     };
     let proof = prove_dkg_aggregation(prover, &input, &job_id, &artifacts_dir).map_err(|e| {
         ComputeRequestError::new(
@@ -767,6 +768,7 @@ fn handle_decryption_aggregation_proof(
         prover,
         req.c6_total_slots,
         &jobs,
+        &req.committee_addresses,
         &job_id,
         &artifacts_dir,
     )

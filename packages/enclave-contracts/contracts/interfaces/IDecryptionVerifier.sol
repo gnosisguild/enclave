@@ -13,12 +13,14 @@ pragma solidity 0.8.28;
  *      needs to verify the final EVM proof and bind it to the claimed plaintext.
  */
 interface IDecryptionVerifier {
-    /// @notice Verify a DecryptionAggregator EVM proof and bind it to `plaintextOutputHash`.
+    /// @notice Verify a DecryptionAggregator EVM proof and bind it to `plaintextOutputHash` and `committeeHash`.
     /// @param plaintextOutputHash `keccak256(plaintextOutput)` expected by the Enclave.
+    /// @param committeeHash `keccak256(abi.encodePacked(topNodes))` for the on-chain committee.
     /// @param proof ABI-encoded `(bytes rawProof, bytes32[] publicInputs)`.
-    /// @return success True if the proof is valid and its embedded plaintext matches `plaintextOutputHash`.
+    /// @return success True if the proof is valid and bound to `plaintextOutputHash` and `committeeHash`.
     function verify(
         bytes32 plaintextOutputHash,
+        bytes32 committeeHash,
         bytes calldata proof
     ) external view returns (bool success);
 }

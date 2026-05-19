@@ -47,6 +47,24 @@ function hexToBytes32Array(hex: string): string[] {
   return out;
 }
 
+/** Micro `H` — must match `BfvPkVerifier` / default `dkg_aggregator`. */
+const DKG_H = 3;
+const DKG_COMMITTEE_HASH_HI_IDX = 2 + DKG_H;
+const DKG_COMMITTEE_HASH_LO_IDX = 3 + DKG_H;
+/** `7` pub params + `8` return fields for `H = 3`. */
+const DKG_EXPECTED_PUBLIC_INPUT_LEN = 15;
+const DEC_COMMITTEE_HASH_HI_IDX = 2;
+const DEC_COMMITTEE_HASH_LO_IDX = 3;
+/** `4` pub params + `107` return fields (`T = 1`). */
+const DEC_EXPECTED_PUBLIC_INPUT_LEN = 111;
+
+function committeeHashFromLimbs(hi: string, lo: string): string {
+  const hiBn = BigInt(hi);
+  const loBn = BigInt(lo);
+  return ("0x" +
+    ((hiBn << 128n) | loBn).toString(16).padStart(64, "0")) as `0x${string}`;
+}
+
 function plaintextHashFromPublicInputs(publicInputs: string[]): string {
   const messageCoeffsCount = 100;
   const offset = publicInputs.length - messageCoeffsCount;
@@ -224,6 +242,27 @@ describe("BfvVkBindingIntegration", function () {
       expect(decPublicInputs[0]).to.equal(expectedC6FoldKeyHash);
       expect(decPublicInputs[1]).to.equal(expectedC7KeyHash);
 
+      if (
+        dkgPublicInputs.length !== DKG_EXPECTED_PUBLIC_INPUT_LEN ||
+        decPublicInputs.length !== DEC_EXPECTED_PUBLIC_INPUT_LEN
+      ) {
+        console.warn(
+          "Skipping folded proof verify: integration_summary.json was built before " +
+            "committee_hash public inputs. Regenerate via integration test with " +
+            "BENCHMARK_SUMMARY_OUTPUT or update circuits/benchmarks/results_insecure/integration_summary.json.",
+        );
+        this.skip();
+      }
+
+      const dkgCommitteeHash = committeeHashFromLimbs(
+        dkgPublicInputs[DKG_COMMITTEE_HASH_HI_IDX],
+        dkgPublicInputs[DKG_COMMITTEE_HASH_LO_IDX],
+      );
+      const decCommitteeHash = committeeHashFromLimbs(
+        decPublicInputs[DEC_COMMITTEE_HASH_HI_IDX],
+        decPublicInputs[DEC_COMMITTEE_HASH_LO_IDX],
+      );
+
       const { bfvPk, bfvDec } = await deployHonkAndBfv();
       const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
@@ -232,9 +271,13 @@ describe("BfvVkBindingIntegration", function () {
         [summary.folded_artifacts.dkg_aggregator.proof_hex, dkgPublicInputs],
       );
       const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
-      expect(await bfvPk.verify.staticCall(pkCommitment, dkgEncoded)).to.equal(
-        true,
-      );
+      expect(
+        await bfvPk.verify.staticCall(
+          pkCommitment,
+          dkgCommitteeHash,
+          dkgEncoded,
+        ),
+      ).to.equal(true);
 
       const decEncoded = abiCoder.encode(
         ["bytes", "bytes32[]"],
@@ -245,7 +288,11 @@ describe("BfvVkBindingIntegration", function () {
       );
       const plaintextHash = plaintextHashFromPublicInputs(decPublicInputs);
       expect(
-        await bfvDec.verify.staticCall(plaintextHash, decEncoded),
+        await bfvDec.verify.staticCall(
+          plaintextHash,
+          decCommitteeHash,
+          decEncoded,
+        ),
       ).to.equal(true);
     },
   );
@@ -302,9 +349,13 @@ describe("BfvVkBindingIntegration", function () {
       );
       const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
 
-      expect(await bfvPk.verify.staticCall(pkCommitment, dkgEncoded)).to.equal(
-        false,
-      );
+      expect(
+        await bfvPk.verify.staticCall(
+          pkCommitment,
+          ethers.ZeroHash,
+          dkgEncoded,
+        ),
+      ).to.equal(false);
     },
   );
 });

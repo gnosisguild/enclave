@@ -204,6 +204,21 @@ impl<T: Send + Sync> Deref for E3CommitteeContainsResponse<T> {
     }
 }
 
+/// Request the ordered finalized committee member list for an E3.
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "()")]
+pub struct GetCommitteeMembersRequest {
+    pub e3_id: E3id,
+    pub reply: Recipient<CommitteeMembersResponse>,
+}
+
+/// Response with committee members in party-id order (index == party_id).
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "()")]
+pub struct CommitteeMembersResponse {
+    pub members: Vec<String>,
+}
+
 /// Sortition actor that manages the sortition algorithm and the node state.
 pub struct Sortition {
     /// Persistent map of `chain_id -> SortitionBackend`.
@@ -713,6 +728,22 @@ impl Handler<TypedEvent<CommitteePublished>> for Sortition {
                 Ok(state_map)
             })
         })
+    }
+}
+
+impl Handler<GetCommitteeMembersRequest> for Sortition {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: GetCommitteeMembersRequest,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let members = self
+            .get_committee(&msg.e3_id)
+            .map(|c| c.members().to_vec())
+            .unwrap_or_default();
+        let _ = msg.reply.do_send(CommitteeMembersResponse { members });
     }
 }
 

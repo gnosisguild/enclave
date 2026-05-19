@@ -134,5 +134,17 @@ For `Π_DKG` and `Π_dec`, verifier gas is sourced from folded recursive-aggrega
 by `cargo test -p e3-tests test_trbfv_actor` (via `BENCHMARK_FOLDED_OUTPUT`) and then replayed into
 EVM verifier `estimateGas` in `packages/enclave-contracts/scripts/benchmarkGasFromRaw.ts`.
 
+`extract_crisp_verify_gas.sh` (and `replay_folded_verify_gas.sh --build <preset>`) call
+`ensure_circuit_preset_built.sh`, which runs
+`pnpm build:circuits --skip-if-built --no-clean --no-clean-targets` by default (skips recompile when
+`dist/circuits/<preset>/.build-stamp.json` and marker artifacts match the current circuit sources).
+Then `pnpm generate:verifiers --no-compile` refreshes Honk contracts before integration export and
+Hardhat replay.
+
+- **`--force-build`** on extract/replay/ensure: full rebuild (same as a fresh `build:circuits`).
+- **`--skip-build`** on extract/replay: skip circuit build and Honk generation (only re-run
+  integration + gas replay). Fails fast unless `dist/circuits/<preset>/` and `circuits/bin` targets
+  are present for that preset (`check_circuit_preset_artifacts.sh`).
+
 `Calldata gas` is computed from benchmark proof/public-input bytes with EVM calldata costs
 (`0x00 -> 4`, non-zero byte -> 16) and stored in raw benchmark JSON.

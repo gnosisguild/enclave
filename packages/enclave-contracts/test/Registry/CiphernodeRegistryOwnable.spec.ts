@@ -426,17 +426,7 @@ describe("CiphernodeRegistryOwnable", function () {
       await expect(
         registry
           .connect(notTheOwner)
-          .publishCommittee(
-            0,
-            [
-              await operator1.getAddress(),
-              await operator2.getAddress(),
-              await operator3.getAddress(),
-            ],
-            data,
-            dataHash,
-            "0x",
-          ),
+          .publishCommittee(0, data, dataHash, "0x"),
       )
         .to.emit(registry, "CommitteePublished")
         .withArgs(
@@ -474,14 +464,7 @@ describe("CiphernodeRegistryOwnable", function () {
       await registry.connect(operator3).submitTicket(0, 1);
       await finalizeCommitteeAfterWindow(registry, 0);
 
-      await registry.publishCommittee(
-        0,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
-        data,
+      await registry.publishCommittee(0, data,
         dataHash,
         "0x",
       );
@@ -512,14 +495,7 @@ describe("CiphernodeRegistryOwnable", function () {
       await finalizeCommitteeAfterWindow(registry, 0);
 
       await expect(
-        await registry.publishCommittee(
-          0,
-          [
-            await operator1.getAddress(),
-            await operator2.getAddress(),
-            await operator3.getAddress(),
-          ],
-          data,
+        await registry.publishCommittee(0, data,
           dataHash,
           "0x",
         ),
@@ -694,14 +670,7 @@ describe("CiphernodeRegistryOwnable", function () {
       await registry.connect(operator3).submitTicket(e3Id, 1);
       await finalizeCommitteeAfterWindow(registry, e3Id);
 
-      await registry.publishCommittee(
-        e3Id,
-        [
-          await operator1.getAddress(),
-          await operator2.getAddress(),
-          await operator3.getAddress(),
-        ],
-        data,
+      await registry.publishCommittee(e3Id, data,
         dataHash,
         "0x",
       );
