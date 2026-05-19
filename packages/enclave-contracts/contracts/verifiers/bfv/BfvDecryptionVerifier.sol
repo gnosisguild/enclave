@@ -72,10 +72,16 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
         if (publicInputs[1] != expectedC7KeyHash) {
             return false;
         }
-        if (publicInputs[0] != expectedC6FoldKeyHash) {
+        if (
+            publicInputs[COMMITTEE_HASH_HI_IDX] !=
+            CommitteeHashLib.hi(committeeHash)
+        ) {
             return false;
         }
-        if (publicInputs[1] != expectedC7KeyHash) {
+        if (
+            publicInputs[COMMITTEE_HASH_LO_IDX] !=
+            CommitteeHashLib.lo(committeeHash)
+        ) {
             return false;
         }
         if (!_verifyPlaintextHash(publicInputs, plaintextOutputHash)) {

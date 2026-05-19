@@ -130,7 +130,7 @@ export const requestCommittee = task(
   .addOption({
     name: "proofAggregationEnabled",
     description: "whether to enable proof aggregation (default: false)",
-    defaultValue: true,
+    defaultValue: false,
     type: ArgumentType.BOOLEAN,
   })
   .setAction(async () => ({

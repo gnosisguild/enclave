@@ -693,6 +693,10 @@ impl ThresholdPlaintextAggregator {
             let reply = committee_reply
                 .ok_or_else(|| anyhow!("committee reply required to fetch members"))?;
             let e3_id = self.e3_id.clone();
+            info!(
+                e3_id = %e3_id,
+                "DecryptionAggregation: fetching committee members from sortition"
+            );
             self.sortition
                 .do_send(GetCommitteeMembersRequest { e3_id, reply });
             return Ok(());
@@ -712,6 +716,10 @@ impl ThresholdPlaintextAggregator {
             return Ok(());
         }
         let Some(honest_c6) = self.honest_c6_proofs_for_agg.as_ref() else {
+            warn!(
+                e3_id = %self.e3_id,
+                "DecryptionAggregation deferred: honest C6 proofs not retained on aggregator"
+            );
             return Ok(());
         };
         // With proof aggregation enabled we must have a complete C6 set; otherwise we'd publish
@@ -759,6 +767,12 @@ impl ThresholdPlaintextAggregator {
             });
         }
         let corr = CorrelationId::new();
+        info!(
+            e3_id = %self.e3_id,
+            num_jobs = num_ct,
+            c6_slots = c6_total_slots,
+            "DecryptionAggregation: publishing Zk compute request"
+        );
         self.bus.publish(
             ComputeRequest::zk(
                 ZkRequest::DecryptionAggregation(DecryptionAggregationRequest {

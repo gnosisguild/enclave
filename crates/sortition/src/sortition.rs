@@ -738,9 +738,18 @@ impl Handler<GetCommitteeMembersRequest> for Sortition {
     fn handle(&mut self, msg: GetCommitteeMembersRequest, _: &mut Self::Context) -> Self::Result {
         trap(EType::Sortition, &self.bus.clone(), || {
             let members = self.get_committee(&msg.e3_id).map(|c| c.members().to_vec());
-            msg.reply
-                .try_send(CommitteeMembersResponse { members })
-                .map_err(|e| anyhow!("committee members reply send failed: {e}"))?;
+            let reply = msg.reply;
+            // `try_send` can drop the reply when the aggregator mailbox is busy (e.g. mid
+            // `AggregationProofSigned`), leaving decryption stuck after C7 with no ZK job.
+            actix::spawn(async move {
+                if reply
+                    .send(CommitteeMembersResponse { members })
+                    .await
+                    .is_err()
+                {
+                    tracing::error!("committee members reply failed: aggregator recipient closed");
+                }
+            });
             Ok(())
         })
     }
