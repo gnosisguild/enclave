@@ -17,9 +17,9 @@
   },
   "calldata_gas": {
     "dkg": {
-      "proof": 169968,
+      "proof": 170052,
       "public_inputs": 6144,
-      "total": 176112
+      "total": 176196
     },
     "dec": {
       "proof": 169848,
