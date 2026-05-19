@@ -736,8 +736,13 @@ impl Handler<GetCommitteeMembersRequest> for Sortition {
     type Result = ();
 
     fn handle(&mut self, msg: GetCommitteeMembersRequest, _: &mut Self::Context) -> Self::Result {
-        let members = self.get_committee(&msg.e3_id).map(|c| c.members().to_vec());
-        let _ = msg.reply.do_send(CommitteeMembersResponse { members });
+        trap(EType::Sortition, &self.bus.clone(), || {
+            let members = self.get_committee(&msg.e3_id).map(|c| c.members().to_vec());
+            msg.reply
+                .try_send(CommitteeMembersResponse { members })
+                .map_err(|e| anyhow!("committee members reply send failed: {e}"))?;
+            Ok(())
+        })
     }
 }
 
