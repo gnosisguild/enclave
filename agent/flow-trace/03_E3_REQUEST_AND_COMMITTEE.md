@@ -50,7 +50,9 @@ Requester calls: Enclave.request({
 ├─ E3 CREATION:
 │   ├─ e3Id = nexte3Id++
 │   ├─ seed = uint256(keccak256(block.prevrandao, e3Id))
-│   │   → Deterministic but unpredictable randomness for sortition
+│   │   → On chains without `prevrandao`, the value is still deterministic
+│   │     per-block; downstream sortition relies on the per-E3 snapshot of
+│   │     ticket balances at `requestBlock - 1` for manipulation resistance.
 │   │
 │   ├─ encryptionSchemeId = e3Program.validate(
 │   │     e3Id, seed, e3ProgramParams, computeProviderParams, customParams
@@ -62,7 +64,7 @@ Requester calls: Enclave.request({
 │   │
 │   ├─ Store E3 struct:
 │   │   e3s[e3Id] = E3 {
-│   │     seed, threshold, requestBlock: block.number,
+│   │     seed, threshold, requestBlock: block.timestamp,  // H-26: EIP-6372 clock
 │   │     inputWindow, encryptionSchemeId, e3Program,
 │   │     e3ProgramParams, customParams, decryptionVerifier,
 │   │     requester: msg.sender
@@ -84,7 +86,7 @@ Requester calls: Enclave.request({
 │   │   │  │    3. committees[e3Id] = Committee {                │
 │   │   │  │         initialized: true,                          │
 │   │   │  │         seed: seed,                                 │
-│   │   │  │         requestBlock: block.number,                 │
+│   │   │  │         requestBlock: block.timestamp, // H-26      │
 │   │   │  │         committeeDeadline:                          │
 │   │   │  │           block.timestamp + sortitionWindow,        │
 │   │   │  │         threshold: threshold                        │
@@ -385,3 +387,28 @@ If any deadline is missed → anyone can call markE3Failed()
 
 6. **IMT root snapshot**: The Merkle tree root is captured at request time. Nodes that join/leave
    after the request don't affect this E3's committee.
+
+---
+
+## Cluster 7 audit additions (post-fix semantics)
+
+### H-04 — snapshot-based eligibility
+
+`CiphernodeRegistryOwnable._validateNodeEligibility` derives the per-node ticket weight from
+`bondingRegistry.getTicketBalanceAtBlock(node, committee.requestBlock - 1)`, which reads the
+`EnclaveTicketToken` ERC20Votes checkpoint history (EIP-6372 timestamp clock). Same-block or
+post-request rebalancing therefore cannot inflate a node's selection weight; the outer
+`isCiphernodeEligible(msg.sender)` still gates on the current `isActive` flag for liveness.
+
+### M-33 — `markE3Failed` grace period
+
+When `markFailedGracePeriod > 0` (set via `Enclave.setMarkFailedGracePeriod`), calling
+`markE3Failed` within `deadline … deadline + markFailedGracePeriod` is restricted to
+`{ original requester, contract owner, any committee member }`. After that window any caller may
+finalize the failure. Default `markFailedGracePeriod = 0` preserves the legacy permissionless flow.
+
+### H-26 — timestamp-clock `requestBlock`
+
+`Committee.requestBlock` stores `block.timestamp` (EIP-6372 timestamp mode) so that `getPastVotes` /
+`getTicketBalanceAtBlock` lookups against the `EnclaveTicketToken` resolve consistently across L1
+and L2 clocks. The field name is preserved for storage / event ABI compatibility.

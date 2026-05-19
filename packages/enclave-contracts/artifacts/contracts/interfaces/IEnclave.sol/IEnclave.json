@@ -180,6 +180,17 @@
     {
       "inputs": [
         {
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "FeeTokenNotAllowed",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
@@ -324,6 +335,38 @@
       "type": "error"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "gracePeriodEnds",
+          "type": "uint256"
+        }
+      ],
+      "name": "MarkE3FailedInGracePeriod",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "quoted",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "maxFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "MaxFeeExceeded",
+      "type": "error"
+    },
+    {
       "inputs": [],
       "name": "MinSizeBelowMinThreshold",
       "type": "error"
@@ -359,6 +402,11 @@
         }
       ],
       "name": "NoPaymentToRefund",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NothingToClaim",
       "type": "error"
     },
     {
@@ -766,6 +814,25 @@
       "anonymous": false,
       "inputs": [
         {
+          "indexed": true,
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "allowed",
+          "type": "bool"
+        }
+      ],
+      "name": "FeeTokenAllowed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
           "indexed": false,
           "internalType": "address",
           "name": "feeToken",
@@ -836,6 +903,50 @@
         }
       ],
       "name": "ParamSetRegistered",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "paramSet",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "previousEncodedParams",
+          "type": "bytes"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "newEncodedParams",
+          "type": "bytes"
+        }
+      ],
+      "name": "ParamSetUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "encryptionSchemeId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "contract IPkVerifier",
+          "name": "pkVerifier",
+          "type": "address"
+        }
+      ],
+      "name": "PkVerifierSet",
       "type": "event"
     },
     {
@@ -963,6 +1074,68 @@
           "type": "uint256"
         },
         {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "RewardClaimed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "RewardCredited",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
           "indexed": false,
           "internalType": "address[]",
           "name": "nodes",
@@ -1041,6 +1214,62 @@
       "type": "event"
     },
     {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "treasury",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "TreasuryClaimed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "treasury",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "TreasuryCredited",
+      "type": "event"
+    },
+    {
       "inputs": [],
       "name": "bondingRegistry",
       "outputs": [
@@ -1075,6 +1304,44 @@
         }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "claimReward",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "e3Ids",
+          "type": "uint256[]"
+        }
+      ],
+      "name": "claimRewards",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "totalClaimed",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -1336,6 +1603,11 @@
               "internalType": "bool",
               "name": "proofAggregationEnabled",
               "type": "bool"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxFee",
+              "type": "uint256"
             }
           ],
           "internalType": "struct IEnclave.E3RequestParams",
@@ -1553,6 +1825,25 @@
     {
       "inputs": [
         {
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "isFeeTokenAllowed",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
@@ -1616,6 +1907,54 @@
       "name": "onE3Failed",
       "outputs": [],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "pendingReward",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "treasury",
+          "type": "address"
+        },
+        {
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "pendingTreasuryClaim",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -1727,6 +2066,11 @@
               "internalType": "bool",
               "name": "proofAggregationEnabled",
               "type": "bool"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxFee",
+              "type": "uint256"
             }
           ],
           "internalType": "struct IEnclave.E3RequestParams",
@@ -1905,6 +2249,24 @@
     {
       "inputs": [
         {
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "allowed",
+          "type": "bool"
+        }
+      ],
+      "name": "setFeeTokenAllowed",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "_maxDuration",
           "type": "uint256"
@@ -2070,6 +2432,25 @@
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "treasuryClaim",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
     }
   ],
   "bytecode": "0x",
@@ -2078,5 +2459,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-64228f31c3990e4616cf0578598d186612e83409"
+  "buildInfoId": "solc-0_8_28-08316200c2ed027c032ded4708a03faf67f258a3"
 }

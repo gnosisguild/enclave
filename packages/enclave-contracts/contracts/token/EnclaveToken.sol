@@ -15,6 +15,7 @@ import {
     ERC20Votes
 } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {
     AccessControl
 } from "@openzeppelin/contracts/access/AccessControl.sol";
@@ -23,17 +24,30 @@ import {
  * @title EnclaveToken
  * @notice The governance and utility token for the Enclave protocol
  * @dev ERC20 token with voting capabilities, permit functionality, and controlled minting.
- *      Implements transfer restrictions that can be toggled by the owner to control token
- *      transferability during early phases. Supports a maximum supply cap and role-based
- *      minting through the MINTER_ROLE.
+ *
+ *      Roles:
+ *      - DEFAULT_ADMIN_ROLE manages role assignments and can {disableTransferRestrictions}.
+ *      - MINTER_ROLE can call {mintAllocation} / {batchMintAllocations} up to MAX_SUPPLY.
+ *      - WHITELIST_ROLE can manage the transfer whitelist independently from minting so
+ *        the same account is not required to control both surfaces.
+ *
+ *      Transfer restrictions are a one-way switch: once {disableTransferRestrictions} is called
+ *      they cannot be re-enabled.
+ *
+ *      Voting uses {block.timestamp} (EIP-6372 "mode=timestamp") so timepoints align with other
+ *      Enclave contracts.
  */
 contract EnclaveToken is
     ERC20,
     ERC20Permit,
     ERC20Votes,
-    Ownable,
+    Ownable2Step,
     AccessControl
 {
+    /// @notice Thrown when {renounceOwnership} is called. Ownership is
+    ///         critical for protocol governance; renouncing would permanently
+    ///         freeze admin functions and is disallowed.
+    error RenounceOwnershipDisabled();
     // Custom errors
 
     /// @notice Thrown when a zero address is provided where a valid address is required
@@ -58,6 +72,10 @@ contract EnclaveToken is
     /// @notice Role identifier for accounts authorized to mint new tokens
     /// @dev Keccak256 hash of "MINTER_ROLE" used in AccessControl
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
+    /// @notice Role identifier for accounts authorized to manage the transfer whitelist.
+    /// @dev Separated from MINTER_ROLE so mint authority does not also control transferability.
+    bytes32 public constant WHITELIST_ROLE = keccak256("WHITELIST_ROLE");
 
     /// @notice Tracks the cumulative amount of tokens minted since deployment
     uint256 public totalMinted;
@@ -91,9 +109,9 @@ contract EnclaveToken is
 
     /**
      * @notice Initializes the Enclave token with name "Enclave" and symbol "ENCL"
-     * @dev Sets up the token with voting and permit functionality. Grants admin and minter
-     *      roles to the owner, enables transfer restrictions, and whitelists the owner.
-     * @param _owner Address that will own the contract and receive DEFAULT_ADMIN_ROLE and MINTER_ROLE
+     * @dev Sets up the token with voting and permit functionality. Grants admin, minter, and
+     *      whitelist roles to the owner; enables transfer restrictions; whitelists the owner.
+     * @param _owner Address that will own the contract and receive admin, minter and whitelist roles.
      */
     constructor(
         address _owner
@@ -101,6 +119,7 @@ contract EnclaveToken is
         // Grant the deployer all admin roles.
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(MINTER_ROLE, _owner);
+        _grantRole(WHITELIST_ROLE, _owner);
 
         // Initialise state variables.
         transfersRestricted = true;
@@ -113,7 +132,7 @@ contract EnclaveToken is
     /**
      * @notice Mints a named allocation of tokens to a specified recipient
      * @dev Only callable by accounts with MINTER_ROLE. Reverts if recipient is zero address,
-     *      amount is zero, or minting would exceed MAX_SUPPLY. Updates totalMinted tracker.
+     *      amount is zero, or minting would exceed MAX_SUPPLY.
      * @param recipient Address to receive the minted tokens (cannot be zero address)
      * @param amount Number of tokens to mint in wei (18 decimals, must be greater than zero)
      * @param allocation Human-readable description of this allocation for tracking and auditing purposes
@@ -136,8 +155,7 @@ contract EnclaveToken is
     /**
      * @notice Mints multiple named allocations to different recipients in a single transaction
      * @dev Only callable by accounts with MINTER_ROLE. All arrays must have the same length.
-     *      Reverts if any amount is zero or if the cumulative minting would exceed MAX_SUPPLY.
-     *      Gas-efficient for distributing tokens to multiple addresses.
+     *      Reverts if any amount is zero, or if cumulative minting would exceed MAX_SUPPLY.
      * @param recipients Array of addresses to receive minted tokens
      * @param amounts Array of token amounts to mint (18 decimals, must match recipients length)
      * @param allocations Array of allocation descriptions (must match recipients length)
@@ -171,25 +189,30 @@ contract EnclaveToken is
     }
 
     /**
-     * @notice Enables or disables transfer restrictions for the token
-     * @dev Only callable by the contract owner. When restrictions are enabled, only whitelisted
-     *      addresses can send or receive tokens. Useful for controlling token circulation during
-     *      early phases before public trading.
-     * @param restricted True to enable restrictions, false to allow unrestricted transfers
+     * @notice Permanently disables transfer restrictions.
+     * @dev Once disabled, restrictions cannot be re-enabled (one-way switch).
+     *      Only callable by DEFAULT_ADMIN_ROLE. Idempotent: a no-op when already disabled
+     *      so deployment/setup scripts can call it unconditionally.
      */
-    function setTransferRestriction(bool restricted) external onlyOwner {
-        transfersRestricted = restricted;
-        emit TransferRestrictionUpdated(restricted);
+    function disableTransferRestrictions()
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        if (!transfersRestricted) return;
+        transfersRestricted = false;
+        emit TransferRestrictionUpdated(false);
     }
 
     /**
      * @notice Toggles an account's transfer whitelist status between enabled and disabled
-     * @dev Only callable by the contract owner. Flips the current whitelist state for the given
-     *      account. Whitelisted accounts can send and receive tokens even when transfer restrictions
-     *      are active.
+     * @dev Only callable by accounts holding WHITELIST_ROLE. Flips the current whitelist
+     *      state for the given account. Whitelisted accounts can send and receive tokens even
+     *      when transfer restrictions are active.
      * @param account Address whose whitelist status will be toggled
      */
-    function toggleTransferWhitelist(address account) external onlyOwner {
+    function toggleTransferWhitelist(
+        address account
+    ) external onlyRole(WHITELIST_ROLE) {
         bool newStatus = !transferWhitelisted[account];
         transferWhitelisted[account] = newStatus;
         emit TransferWhitelistUpdated(account, newStatus);
@@ -197,16 +220,14 @@ contract EnclaveToken is
 
     /**
      * @notice Whitelists key protocol contracts to allow them to transfer tokens during restricted periods
-     * @dev Only callable by the contract owner. Convenience function for whitelisting multiple protocol
-     *      contracts in a single transaction. Zero addresses are safely ignored. Typically used to whitelist
-     *      contracts like bonding managers and vesting escrows that need to handle tokens on behalf of users.
+     * @dev Only callable by accounts holding WHITELIST_ROLE. Zero addresses are safely ignored.
      * @param bondingManager Address of the BondingManager contract (zero address skipped)
      * @param vestingEscrow Address of the VestingEscrow contract (zero address skipped)
      */
     function whitelistContracts(
         address bondingManager,
         address vestingEscrow
-    ) external onlyOwner {
+    ) external onlyRole(WHITELIST_ROLE) {
         if (bondingManager != address(0)) {
             transferWhitelisted[bondingManager] = true;
             emit TransferWhitelistUpdated(bondingManager, true);
@@ -264,5 +285,23 @@ contract EnclaveToken is
         address owner
     ) public view override(ERC20Permit, Nonces) returns (uint256) {
         return super.nonces(owner);
+    }
+
+    // ── EIP-6372 clock (timestamp mode) ───────────────────────────────────────
+
+    /// @notice EIP-6372 clock — uses {block.timestamp}.
+    function clock() public view override returns (uint48) {
+        return uint48(block.timestamp);
+    }
+
+    /// @notice EIP-6372 clock mode.
+    // solhint-disable-next-line func-name-mixedcase
+    function CLOCK_MODE() public pure override returns (string memory) {
+        return "mode=timestamp";
+    }
+
+    /// @notice Disabled. Reverts unconditionally.
+    function renounceOwnership() public view override onlyOwner {
+        revert RenounceOwnershipDisabled();
     }
 }

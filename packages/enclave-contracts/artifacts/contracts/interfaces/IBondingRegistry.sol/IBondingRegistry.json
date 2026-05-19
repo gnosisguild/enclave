@@ -65,6 +65,11 @@
     },
     {
       "inputs": [],
+      "name": "OperatorUnderSlash",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "Unauthorized",
       "type": "error"
     },
@@ -151,6 +156,31 @@
         }
       ],
       "name": "LicenseBondUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "expectedAmount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "actualAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "LicenseTransferShortfall",
       "type": "event"
     },
     {
@@ -940,5 +970,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IBondingRegistry.sol",
-  "buildInfoId": "solc-0_8_28-64228f31c3990e4616cf0578598d186612e83409"
+  "buildInfoId": "solc-0_8_28-08316200c2ed027c032ded4708a03faf67f258a3"
 }

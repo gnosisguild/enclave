@@ -242,6 +242,25 @@ reach into the exit queue and take locked assets. There is
 no safe harbor for misbehaving operators.
 ```
 
+### Exit Queue Internals (audit hardening)
+
+- **Per-asset head indices.** `ExitQueueState` tracks `queueHeadIndexTicket` and
+  `queueHeadIndexLicense` separately so claiming/slashing one asset class cannot strand the other.
+  Previously a single shared head meant `claimAssets({TICKET})` could advance past tranches whose
+  license leg was still locked and silently forfeit them (audit C-03).
+- **`continue`, not `break`, on locked tranches.** Both `previewClaimableAmounts` and
+  `_takeAssetsFromQueue` skip locked tranches instead of stopping, so a later-but-sooner-unlocking
+  tranche (created after governance lowered `exitDelay`) is still reachable (audit M-08).
+- **Tranche cap.** `queueAssetsForExit` reverts with `TooManyTranches` if more than
+  `MAX_ACTIVE_TRANCHES (= 64)` live (post-head) tranches would exist for the operator. This bounds
+  the unbounded loop in `previewClaimableAmounts` / `_takeAssetsFromQueue` so an attacker cannot
+  grief the operator with an ever-growing queue (audit H-21a).
+- **License transfer shortfall.** `claimExits` and `withdrawSlashedFunds` measure the recipient's
+  balance delta around `licenseToken.safeTransfer` and emit
+  `LicenseTransferShortfall(recipient, expectedAmount, actualAmount)` if the recipient received less
+  than expected (e.g. a fee-on-transfer license token). The transfer itself is not reverted —
+  booking is already updated — but indexers can detect the discrepancy (audit M-13).
+
 ---
 
 ## Ban & Unban
@@ -257,3 +276,23 @@ GOVERNANCE lifts ban:
   → banned[operator] = false
   → Operator can re-register
 ```
+
+---
+
+## Cluster 6 Audit Addendum (deregistration & bans)
+
+- **Deregistration is blocked while a Lane B slash is open** (H-05).
+  `BondingRegistry.deregisterOperator()` calls
+  `ISlashingManager(sm).hasOpenLaneBProposal(msg.sender)` and reverts `OperatorUnderSlash()` until
+  `executeSlash` or `resolveAppeal(upheld)` unwinds the open-proposal counter. Lane A is permitted
+  to proceed through the normal exit queue because Lane A is either atomic or closes within the H-06
+  challenge window.
+
+- **Two-step ban** (M-14, M-15): bans now require `proposeBan` → `confirmBan` from a **distinct**
+  signer holding `GOVERNANCE_ROLE`. `cancelBan` rescinds an unconfirmed proposal. Legacy direct-set
+  via `updateBanStatus(_, true, _)` reverts `BanRequiresConfirmation()`. Unban is single-step
+  (`unbanNode`).
+
+- **DEFAULT_ADMIN handover** (M-17): operator-onboarding ops that depend on `DEFAULT_ADMIN_ROLE`
+  rotation must use the `AccessControlDefaultAdminRules` two-step flow (`beginDefaultAdminTransfer`
+  → wait `defaultAdminDelay() = 2 days` → `acceptDefaultAdminTransfer`).

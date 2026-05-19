@@ -8,7 +8,15 @@ pragma solidity >=0.8.27;
 import { IPkVerifier } from "../interfaces/IPkVerifier.sol";
 
 contract MockPkVerifier is IPkVerifier {
+    /// @dev Permissive test mock: only enforces the pk-commitment slot the
+    ///      real wrapper enforces, so existing fixtures (`[pkCommitment]`)
+    ///      keep working. Intentionally ignores VK-hash slots and domain
+    ///      binding — those are exercised by `BfvPkVerifier.spec.ts` against
+    ///      the real wrapper.
     function verify(
+        uint256,
+        uint256,
+        address[] calldata,
         bytes32 pkCommitment,
         bytes calldata proof
     ) external pure returns (bool) {
@@ -16,7 +24,10 @@ contract MockPkVerifier is IPkVerifier {
             proof,
             (bytes, bytes32[])
         );
-        if (publicInputs.length == 0) return false;
-        return publicInputs[publicInputs.length - 1] == pkCommitment;
+        if (publicInputs.length == 0) revert InvalidPublicInputsLength();
+        if (publicInputs[publicInputs.length - 1] != pkCommitment) {
+            revert PkCommitmentMismatch();
+        }
+        return true;
     }
 }

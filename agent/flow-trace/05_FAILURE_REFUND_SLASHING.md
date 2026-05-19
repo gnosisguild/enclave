@@ -132,8 +132,16 @@ Anyone calls: Enclave.processE3Failure(e3Id)
 │     │  │       honestNodeAmount, requesterAmount,              │
 │     │  │       protocolAmount, totalSlashed: 0,                │
 │     │  │       honestNodeCount, feeToken,                      │
-│     │  │       originalPayment                                 │
+│     │  │       originalPayment, perNodeAmount: 0               │
 │     │  │     }                                                 │
+│     │  │                                                       │
+│     │  │  H-08: if honestNodes.length == 0 and                 │
+│     │  │  honestNodeAmount > 0, fold honestNodeAmount back     │
+│     │  │  into requesterAmount before storing — the work-      │
+│     │  │  completed share would otherwise be stranded forever  │
+│     │  │  (claimHonestNodeReward requires honestNodeCount>0,   │
+│     │  │  withdrawOrphanedSlashedFunds only drains             │
+│     │  │  _pendingSlashedFunds).                               │
 │     │  │                                                       │
 │     │  │  5. Drain pending slashed funds queue:                │
 │     │  │     pending = _pendingSlashedFunds[e3Id]              │
@@ -142,6 +150,16 @@ Anyone calls: Enclave.processE3Failure(e3Id)
 │     │  │       (see "Slashed Funds Routing" section below)     │
 │     │  │     → Handles slashes that arrived BEFORE             │
 │     │  │       processE3Failure was called                     │
+│     │  │                                                       │
+│     │  │  M-09: snapshot perNodeAmount AFTER the pending       │
+│     │  │  drain so it reflects the final post-escrow pool:     │
+│     │  │     if honestNodeCount > 0:                           │
+│     │  │       dist.perNodeAmount =                            │
+│     │  │         honestNodeAmount / honestNodeCount            │
+│     │  │  Every claimHonestNodeReward call returns this        │
+│     │  │  immutable snapshot; the last claimant routes the     │
+│     │  │  residual dust to _pendingTreasury (pull) instead     │
+│     │  │  of inflating their own payout.                       │
 │     │  │                                                       │
 │     │  │  6. Emit RefundDistributionCalculated(e3Id,           │
 │     │  │       honestNodeAmount, requesterAmount, protocolAmt) │
@@ -175,7 +193,13 @@ HONEST NODE claims:
 │   • Base compensation (from work-value BPS allocation)
 │   • Slashed funds surplus (after requester is made whole)
 ├─ perNodeAmount = honestNodeAmount / honestNodeCount
-├─ Last claimer gets dust (remainder)
+│   • SNAPSHOTTED at calculateRefund (M-09); also re-snapshotted
+│     inside _applySlashedFunds while _claimCount == 0 so pre-first-
+│     claim escrows are reflected. Post-first-claim escrows route to
+│     _pendingSlashedFunds and never mutate the snapshot.
+├─ Last claimer routes the residual dust to _pendingTreasury via
+│   TreasurySlashedCredited (pull); the last node never gets a
+│   silently-inflated payout, and no per-claim dust is stranded.
 ├─ Transfer directly to node (not via BondingRegistry)
 └─ Emit RefundClaimed(e3Id, node, amount)
 ```
@@ -595,8 +619,6 @@ Anyone calls: SlashingManager.executeSlash(proposalId)
 ```
 _executeSlash(proposalId):
 │
-├─ proposal.executed = true
-│
 ├─ 1. SLASH TICKET BALANCE (if ticketAmount > 0):
 │     actualTicketSlashed = bondingRegistry.slashTicketBalance(
 │       operator, proposal.ticketAmount, reason
@@ -723,9 +745,22 @@ _executeSlash(proposalId):
 │     └─ catch: emit RoutingFailed(e3Id, actualTicketSlashed)
 │        → Slash is NOT rolled back, only fund escrowing fails
 │
-└─ 6. Emit SlashExecuted(proposalId, e3Id, operator, reason,
+├─ 6. proposal.executed = true
+│     → Set AFTER the two bondingRegistry.slash* calls (and AFTER ban
+│       update), so an OOG / revert during slashing leaves `executed`
+│       false and the proposal can be retried (audit H-21b, defence in
+│       depth). Reentrancy is already blocked by `_executeSlash` itself
+│       being reachable only through nonReentrant entry points.
+│
+└─ 7. Emit SlashExecuted(proposalId, e3Id, operator, reason,
        ticketSlashed, licenseSlashed, banned)
 ```
+
+> **License transfer note.** `withdrawSlashedFunds` (the treasury sweep for slashed license bonds)
+> measures the recipient's balance delta around `licenseToken.safeTransfer` and emits
+> `LicenseTransferShortfall(recipient, expected, actual)` if a fee-on-transfer license token
+> short-pays the treasury. Booking has already been zeroed before the transfer; the event exists for
+> indexer-side reconciliation (audit M-13).
 
 ### Slashed Funds Priority Logic (Failure Path): \_applySlashedFunds()
 
@@ -743,9 +778,21 @@ _applySlashedFunds(e3Id, amount):
 ├─ toHonestNodes = amount - toRequester
 │   → Surplus (after requester is whole) goes to honest nodes
 │
+├─ H-08: if dist.honestNodeCount == 0 and toHonestNodes > 0,
+│   redirect toHonestNodes into toRequester. Same rationale as
+│   calculateRefund's H-08 guard — the honest-node bucket would
+│   otherwise be unclaimable.
+│
 ├─ dist.requesterAmount += toRequester
 ├─ dist.honestNodeAmount += toHonestNodes
 ├─ dist.totalSlashed += amount
+│
+├─ M-09: if honestNodeCount > 0, re-snapshot
+│   dist.perNodeAmount = honestNodeAmount / honestNodeCount.
+│   escrowSlashedFunds gates this path on _claimCount == 0, so the
+│   snapshot only moves before any claim has landed; later escrows
+│   land in _pendingSlashedFunds and surface via
+│   withdrawOrphanedSlashedFunds.
 │
 └─ Emit SlashedFundsApplied(e3Id, toRequester, toHonestNodes)
 
@@ -767,24 +814,37 @@ distributeSlashedFundsOnSuccess(e3Id, activeNodes, paymentToken):
 │   if escrowed == 0: return (nothing to distribute)
 │
 ├─ _pendingSlashedFunds[e3Id] = 0
+├─ _slashedSuccessToken[e3Id] = paymentToken   // snapshot for later claims
 │
 ├─ Split using WorkValueAllocation.successSlashedNodeBps (default 5000):
 │   toNodes = escrowed * successSlashedNodeBps / 10000
 │   toTreasury = escrowed - toNodes
 │
-├─ Distribute toNodes evenly to activeNodes:
-│   perNode = toNodes / activeNodes.length
-│   dust = toNodes % activeNodes.length → last node
-│   paymentToken.transfer(node, perNode) for each
+├─ Credit (pull-payment, H-01/M-02) — funds are NOT pushed here:
+│   for node in activeNodes:
+│       perNode = toNodes / activeNodes.length  (dust → last node)
+│       _pendingSlashedSuccess[e3Id][node] += perNode
+│       Emit SlashedFundsCredited(e3Id, node, paymentToken, perNode)
 │
-├─ Transfer toTreasury to protocolTreasury
+├─ Credit treasury for protocol share:
+│   _pendingTreasury[treasury][paymentToken] += toTreasury
+│   Emit TreasurySlashedCredited(treasury, paymentToken, toTreasury)
 │
 └─ Emit SlashedFundsDistributedOnSuccess(e3Id, toNodes, toTreasury)
+
+Claim flow (separate transactions, pull-only):
+  honest node     → e3RefundManager.claimSlashedFundsOnSuccess(e3Id)
+                    / claimSlashedFundsOnSuccessBatch(e3Ids[])
+                    → Emits SlashedFundsClaimed(e3Id, node, token, amt)
+  protocol treasury → e3RefundManager.treasuryClaim(token)
+                    → Emits TreasurySlashedClaimed(treasury, token, amt)
 
 Design rationale:
   On success the requester got their computation. Slashed funds are
   split between honest committee members (reward for completing despite
-  a slashed peer) and the protocol treasury.
+  a slashed peer) and the protocol treasury. Both shares use a per-recipient
+  pull ledger so a single failing recipient (e.g. blacklisted ERC-20 address)
+  cannot brick the success-path or strand other claimants' funds.
 ```
 
 ### Slashed Funds Ordering: Escrow → Terminal State Resolution
@@ -1016,3 +1076,63 @@ When CommitteeMemberExpelled event arrives from EVM:
         ├─ CiphernodeSelector: cleans e3_cache entry for this e3_id
         └─ E3Router: removes E3Context for this e3_id
 ```
+
+---
+
+## Cluster 6 Audit Addendum (SlashingManager Hardening)
+
+Applied audit findings: **C-05, H-05, H-06, H-07, H-09, H-10, H-24, M-14, M-15, M-17, M-24, M-36**.
+
+### Role & access (C-05, H-24, M-17)
+
+- `SLASHER_ROLE` is administered by `GOVERNANCE_ROLE`, not `DEFAULT_ADMIN_ROLE`.
+  `getRoleAdmin(SLASHER_ROLE) == GOVERNANCE_ROLE`. `addSlasher` / `removeSlasher` require
+  `GOVERNANCE_ROLE` and emit only the standard `RoleGranted` / `RoleRevoked` events.
+- Deploy scripts grant `GOVERNANCE_ROLE` explicitly (no implicit default-admin shortcut).
+- `DEFAULT_ADMIN_ROLE` uses `AccessControlDefaultAdminRules(2 days, admin)` — two-step
+  `beginDefaultAdminTransfer` → wait 2 days → `acceptDefaultAdminTransfer`.
+
+### EIP-712 domain (H-10, M-24)
+
+- SlashingManager declares `EIP712("EnclaveSlashing", "1")` so accusation signatures are bound to
+  `verifyingContract` _and_ `chainId`. Signatures produced against a different deployment or chain
+  are rejected with `InvalidSigner()`. Cross-deployment / cross-chain replay is blocked.
+
+### Lane A challenge window (H-06)
+
+- `proposeSlash` no longer auto-executes when the policy's `appealWindow > 0`. The proposal is
+  recorded with `executableAt = block.timestamp + appealWindow` and an event with `lane = LaneA (0)`
+  is emitted. The operator can call `fileAppeal` during that window; otherwise anyone may call
+  `executeSlash` once it elapses.
+
+### Lane B open-proposal gate (H-05)
+
+- `SlashingManager` tracks `_openLaneBCount[operator]`: `proposeSlashEvidence` increments,
+  `executeSlash` decrements before `_executeSlash`, and `resolveAppeal(upheld)` unwinds the counter.
+- `hasOpenLaneBProposal(operator)` is exposed as a public view.
+- `BondingRegistry.deregisterOperator()` reverts `OperatorUnderSlash()` while this gate is true,
+  preventing escape during an active Lane B proceeding. Lane A is intentionally not gated because it
+  is atomic (or short-windowed via H-06) and self-clears.
+
+### Pull-payment slashed funds (H-07, H-09)
+
+- Slashed funds are routed through the same pull-payment pull-pool as E3 rewards (Cluster 3 / H-08
+  path). Recipients claim via `claimReward(e3Id)`; failed-transfer attackers cannot grief the whole
+  distribution. Late credits (e.g. `_applySlashedFunds` racing a prior reward claim) are accumulated
+  rather than lost.
+
+### Two-step ban (M-14, M-15)
+
+- `proposeBan` records the intent; `confirmBan` requires a **distinct** signer (M-14) before
+  `BanStatus` flips. `cancelBan` rescinds the proposal. Legacy `updateBanStatus(_, true, _)` reverts
+  `BanRequiresConfirmation()`. Unban remains single-step under `GOVERNANCE_ROLE`.
+
+### Event lane field (M-36)
+
+- `SlashProposed` and `SlashExecuted` carry a `Lane lane` field (`LaneA = 0`, `LaneB = 1`) so
+  off-chain indexers can disambiguate the two paths without re-deriving from policy bits.
+
+### Upgrade posture
+
+- `SlashingManager` is **non-upgradeable** by design (transparent proxy removed). Migrations require
+  redeployment + GOVERNANCE_ROLE rotation on `BondingRegistry`/`Enclave`.

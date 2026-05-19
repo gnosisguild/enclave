@@ -38,16 +38,30 @@ library ExitQueueLib {
 
     /**
      * @notice Main state structure for the exit queue system
-     * @dev Contains all per-operator queue data and pending totals
+     * @dev Contains all per-operator queue data and pending totals.
+     *      The queue head index is tracked PER ASSET (tickets vs licenses) so that
+     *      consuming one asset class from a tranche does not strand the other asset
+     *      class still pending in the same tranche.
      * @param operatorQueues Maps operator addresses to their arrays of exit tranches
-     * @param queueHeadIndex Maps operator addresses to the current head index (for efficient cleanup)
+     * @param queueHeadIndexTicket Maps operator addresses to the head index for tickets
+     * @param queueHeadIndexLicense Maps operator addresses to the head index for licenses
      * @param pendingTotals Maps operator addresses to their total pending amounts
      */
     struct ExitQueueState {
         mapping(address operator => ExitTranche[] operatorQueues) operatorQueues;
-        mapping(address operator => uint256 queueHeadIndex) queueHeadIndex;
+        mapping(address operator => uint256 queueHeadIndexTicket) queueHeadIndexTicket;
+        mapping(address operator => uint256 queueHeadIndexLicense) queueHeadIndexLicense;
         mapping(address operator => PendingAmounts operatorPendings) pendingTotals;
     }
+
+    /**
+     * @notice Maximum number of live tranches an operator may hold at once.
+     * @dev Bounds the loop length of slash/claim operations to prevent the DoS
+     *      vector where an operator floods their own queue with thousands of
+     *      tiny tranches and pushes per-call gas above the block limit, which
+     *      would brick all subsequent slashing attempts.
+     */
+    uint256 internal constant MAX_ACTIVE_TRANCHES = 64;
 
     /**
      * @notice Types of assets that can be queued for exit
@@ -107,6 +121,12 @@ library ExitQueueLib {
     /// @notice Thrown when accessing an invalid queue index
     error IndexOutOfBounds();
 
+    /// @notice Thrown when an operator's live tranche count would exceed
+    ///         `MAX_ACTIVE_TRANCHES`. Mitigates the queue-flooding DoS where
+    ///         a malicious operator inflates their queue length so that any
+    ///         slash loop exceeds the block gas limit.
+    error TooManyTranches();
+
     /**
      * @notice Queues both tickets and licenses for exit with a time delay
      * @dev Assets are added to the operator's queue and will be claimable after exitDelaySeconds.
@@ -151,6 +171,18 @@ library ExitQueueLib {
         }
 
         if (!merged) {
+            // Enforce a hard cap on the number of LIVE tranches an operator
+            // can hold simultaneously. "Live" = tranches at or after the
+            // earliest per-asset head (the lower of the two head indices).
+            // See `MAX_ACTIVE_TRANCHES`.
+            uint256 headT = state.queueHeadIndexTicket[operator];
+            uint256 headL = state.queueHeadIndexLicense[operator];
+            uint256 earliestHead = headT < headL ? headT : headL;
+            require(
+                len - earliestHead < MAX_ACTIVE_TRANCHES,
+                TooManyTranches()
+            );
+
             ExitTranche storage t = operatorQueue.push();
             t.unlockTimestamp = unlockTimestamp;
             t.ticketAmount = ticketAmount;
@@ -225,7 +257,11 @@ library ExitQueueLib {
 
     /**
      * @notice Previews the amounts that can be claimed at the current block timestamp
-     * @dev Iterates through tranches and sums up amounts where unlock timestamp has passed
+     * @dev Iterates through tranches and sums up amounts where unlock timestamp has passed.
+     *      Locked tranches are skipped with `continue` rather than `break` because per-tranche
+     *      `unlockTimestamp` values are not guaranteed to be monotonically non-decreasing once
+     *      the bonding registry's `exitDelay` is reduced by governance.
+     *      Each asset is scanned starting from its own head index.
      * @param state The exit queue state storage
      * @param operator The operator to query
      * @return ticketAmount Total claimable tickets at current timestamp
@@ -236,17 +272,20 @@ library ExitQueueLib {
         address operator
     ) internal view returns (uint256 ticketAmount, uint256 licenseAmount) {
         ExitTranche[] storage operatorQueue = state.operatorQueues[operator];
-        uint256 currentIndex = state.queueHeadIndex[operator];
+        uint256 headT = state.queueHeadIndexTicket[operator];
+        uint256 headL = state.queueHeadIndexLicense[operator];
+        uint256 startIdx = headT < headL ? headT : headL;
+        uint256 len = operatorQueue.length;
 
-        for (uint256 i = currentIndex; i < operatorQueue.length; i++) {
+        for (uint256 i = startIdx; i < len; i++) {
             ExitTranche storage tranche = operatorQueue[i];
 
             if (block.timestamp < tranche.unlockTimestamp) {
-                break;
+                continue;
             }
 
-            ticketAmount += tranche.ticketAmount;
-            licenseAmount += tranche.licenseAmount;
+            if (i >= headT) ticketAmount += tranche.ticketAmount;
+            if (i >= headL) licenseAmount += tranche.licenseAmount;
         }
     }
 
@@ -294,7 +333,6 @@ library ExitQueueLib {
         }
 
         if (ticketsClaimed > 0 || licensesClaimed > 0) {
-            _cleanupEmptyTranches(state, operator);
             emit AssetsClaimed(operator, ticketsClaimed, licensesClaimed);
         }
     }
@@ -345,7 +383,6 @@ library ExitQueueLib {
         }
 
         if (ticketsSlashed > 0 || licensesSlashed > 0) {
-            _cleanupEmptyTranches(state, operator);
             emit PendingAssetsSlashed(
                 operator,
                 ticketsSlashed,
@@ -393,35 +430,14 @@ library ExitQueueLib {
     }
 
     /**
-     * @notice Cleans up empty tranches from the head of the queue
-     * @dev Advances the queue head index past all tranches with zero tickets and licenses.
-     *      This prevents the queue from growing unbounded and reduces gas costs for future operations.
-     * @param state The exit queue state storage
-     * @param operator The operator whose queue is being cleaned up
-     */
-    function _cleanupEmptyTranches(
-        ExitQueueState storage state,
-        address operator
-    ) private {
-        ExitTranche[] storage operatorQueue = state.operatorQueues[operator];
-        uint256 currentIndex = state.queueHeadIndex[operator];
-
-        while (currentIndex < operatorQueue.length) {
-            ExitTranche storage tranche = operatorQueue[currentIndex];
-            if (tranche.ticketAmount == 0 && tranche.licenseAmount == 0) {
-                currentIndex++;
-            } else {
-                break;
-            }
-        }
-
-        state.queueHeadIndex[operator] = currentIndex;
-    }
-
-    /**
-     * @notice Takes assets from the queue, either for claiming or slashing
-     * @dev Iterates through tranches from head to tail, taking assets up to wantedAmount.
-     *      Respects unlock timestamps unless includeLockedAssets is true.
+     * @notice Takes assets from the queue, either for claiming or slashing.
+     * @dev Iterates through tranches starting at the asset-specific head index.
+     *      Locked tranches are skipped with `continue` (not `break`) because the
+     *      per-tranche `unlockTimestamp` ordering may not be monotonic after the
+     *      bonding registry's `exitDelay` is reduced. Loop length
+     *      is bounded by `MAX_ACTIVE_TRANCHES`. The head for the
+     *      OTHER asset class is left untouched so its still-pending balance is
+     *      not stranded by the head advancing past it.
      * @param state The exit queue state storage
      * @param operator The operator whose assets are being taken
      * @param wantedAmount The maximum amount to take
@@ -429,6 +445,7 @@ library ExitQueueLib {
      * @param includeLockedAssets If true, takes locked assets; if false, only takes unlocked assets
      * @return takenAmount The actual amount taken (may be less than wantedAmount if queue has fewer assets)
      */
+    // solhint-disable-next-line code-complexity
     function _takeAssetsFromQueue(
         ExitQueueState storage state,
         address operator,
@@ -441,37 +458,47 @@ library ExitQueueLib {
         }
 
         ExitTranche[] storage operatorQueue = state.operatorQueues[operator];
-        uint256 currentIndex = state.queueHeadIndex[operator];
+        bool isTicket = assetType == AssetType.Ticket;
+        uint256 head = isTicket
+            ? state.queueHeadIndexTicket[operator]
+            : state.queueHeadIndexLicense[operator];
         uint256 queueLength = operatorQueue.length;
         uint256 remainingWanted = wantedAmount;
 
-        while (remainingWanted > 0 && currentIndex < queueLength) {
-            ExitTranche storage tranche = operatorQueue[currentIndex];
+        for (uint256 i = head; i < queueLength; i++) {
+            ExitTranche storage tranche = operatorQueue[i];
 
+            uint256 availableAmount = isTicket
+                ? tranche.ticketAmount
+                : tranche.licenseAmount;
+
+            if (availableAmount == 0) {
+                // Empty for this asset class — advance the per-asset head only
+                // if the empty tranche is at the current head (contiguous skip).
+                if (i == head) head++;
+                continue;
+            }
+
+            // Skip locked tranches but do NOT break: unlock timestamps may not
+            // be monotonic after `setExitDelay` reduces the delay. Skipping
+            // also must not advance the head, since this asset's balance is
+            // still pending here.
             if (
                 !includeLockedAssets &&
                 block.timestamp < tranche.unlockTimestamp
             ) {
-                break;
-            }
-
-            uint256 availableAmount;
-            if (assetType == AssetType.Ticket) {
-                availableAmount = tranche.ticketAmount;
-            } else {
-                availableAmount = tranche.licenseAmount;
-            }
-
-            if (availableAmount == 0) {
-                currentIndex++;
                 continue;
+            }
+
+            if (remainingWanted == 0) {
+                break;
             }
 
             uint256 amountToTake = remainingWanted < availableAmount
                 ? remainingWanted
                 : availableAmount;
 
-            if (assetType == AssetType.Ticket) {
+            if (isTicket) {
                 tranche.ticketAmount -= amountToTake;
             } else {
                 tranche.licenseAmount -= amountToTake;
@@ -480,11 +507,18 @@ library ExitQueueLib {
             remainingWanted -= amountToTake;
             takenAmount += amountToTake;
 
-            if (tranche.ticketAmount == 0 && tranche.licenseAmount == 0) {
-                currentIndex++;
-            }
+            // Advance head only when the tranche at the current head position
+            // has been fully drained of THIS asset.
+            bool nowEmpty = isTicket
+                ? tranche.ticketAmount == 0
+                : tranche.licenseAmount == 0;
+            if (nowEmpty && i == head) head++;
         }
 
-        state.queueHeadIndex[operator] = currentIndex;
+        if (isTicket) {
+            state.queueHeadIndexTicket[operator] = head;
+        } else {
+            state.queueHeadIndexLicense[operator] = head;
+        }
     }
 }

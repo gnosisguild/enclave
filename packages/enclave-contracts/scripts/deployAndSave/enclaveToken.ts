@@ -35,7 +35,7 @@ async function disableTransferRestrictionsForLocal(
   try {
     const isRestricted = await contract.transfersRestricted();
     if (isRestricted) {
-      const tx = await contract.setTransferRestriction(false);
+      const tx = await contract.disableTransferRestrictions();
       await tx.wait();
       console.log("Transfer restrictions disabled for local development");
     }

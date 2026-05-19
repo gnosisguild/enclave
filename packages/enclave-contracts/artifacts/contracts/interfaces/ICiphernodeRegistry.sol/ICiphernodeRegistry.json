@@ -243,31 +243,6 @@
         },
         {
           "indexed": false,
-          "internalType": "address[]",
-          "name": "committee",
-          "type": "address[]"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256[]",
-          "name": "scores",
-          "type": "uint256[]"
-        }
-      ],
-      "name": "CommitteeFinalized",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "e3Id",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
           "internalType": "uint256",
           "name": "nodesSubmitted",
           "type": "uint256"
@@ -429,6 +404,31 @@
         }
       ],
       "name": "EnclaveSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address[]",
+          "name": "committee",
+          "type": "address[]"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256[]",
+          "name": "scores",
+          "type": "uint256[]"
+        }
+      ],
+      "name": "SortitionCommitteeFinalized",
       "type": "event"
     },
     {
@@ -971,5 +971,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-64228f31c3990e4616cf0578598d186612e83409"
+  "buildInfoId": "solc-0_8_28-08316200c2ed027c032ded4708a03faf67f258a3"
 }

@@ -5,9 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 // Shared operator setup helpers for sortition-based tests.
 import type { Signer } from "ethers";
-import { network } from "hardhat";
 
-const { ethers } = await network.connect();
+import { ethers } from "./connection";
 
 /**
  * Register an operator for sortition: mint license, bond, register,

@@ -85,7 +85,13 @@ interface ICiphernodeRegistry {
     /// @param e3Id ID of the E3 computation
     /// @param committee Array of selected ciphernode addresses
     /// @param scores Array of sortition scores corresponding to each committee member
-    event CommitteeFinalized(
+    /// @notice MUST be emitted when sortition selects a committee for an E3.
+    /// @dev Renamed from `CommitteeFinalized` to avoid clashing with the
+    ///      canonical {IEnclave.CommitteeFinalized} surface.
+    /// @param e3Id ID of the E3 computation
+    /// @param committee Array of selected ciphernode addresses
+    /// @param scores Array of sortition scores corresponding to each committee member
+    event SortitionCommitteeFinalized(
         uint256 indexed e3Id,
         address[] committee,
         uint256[] scores
