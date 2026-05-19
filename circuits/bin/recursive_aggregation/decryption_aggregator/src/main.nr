@@ -15,7 +15,6 @@
 //! supplied in the same order as on-chain `topNodes`; the hash equality pins that order.
 
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
-use lib::configs::default::H;
 use lib::configs::default::MAX_MSG_NON_ZERO_COEFFS;
 use lib::configs::default::N_PARTIES;
 use lib::configs::default::T;
