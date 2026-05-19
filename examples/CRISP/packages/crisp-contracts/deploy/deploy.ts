@@ -33,8 +33,10 @@ export const deploy = async () => {
   const shouldDeployEnclave = Boolean(process.env.DEPLOY_ENCLAVE)
   const shouldPrintEnv = Boolean(process.env.PRINT_ENV_VARS)
 
+  // Mock BFV verifiers only: CRISP E2E uses E3_PROOF_AGGREGATION_ENABLED=false and does not
+  // ship compiled `*.vk_recursive_hash` artifacts required by BfvPkVerifier / BfvDecryptionVerifier.
   if (shouldDeployEnclave) {
-    await deployEnclave(true, true)
+    await deployEnclave(true, false)
   }
   await deployCRISPContracts()
 
@@ -60,5 +62,6 @@ export const deploy = async () => {
 }
 
 deploy().catch((err) => {
-  console.log(err)
+  console.error(err)
+  process.exit(1)
 })

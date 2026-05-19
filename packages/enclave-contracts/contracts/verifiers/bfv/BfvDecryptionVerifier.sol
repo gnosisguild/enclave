@@ -26,8 +26,20 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
     /// @notice Underlying Honk verifier for the DecryptionAggregator circuit.
     ICircuitVerifier public immutable circuitVerifier;
 
-    constructor(address _circuitVerifier) {
+    /// @notice Expected recursive VK hash for the c6_fold sub-circuit (`publicInputs[0]`).
+    bytes32 public immutable expectedC6FoldKeyHash;
+
+    /// @notice Expected recursive VK hash for the C7/decrypted_shares_aggregation sub-circuit (`publicInputs[1]`).
+    bytes32 public immutable expectedC7KeyHash;
+
+    constructor(
+        address _circuitVerifier,
+        bytes32 _expectedC6FoldKeyHash,
+        bytes32 _expectedC7KeyHash
+    ) {
         circuitVerifier = ICircuitVerifier(_circuitVerifier);
+        expectedC6FoldKeyHash = _expectedC6FoldKeyHash;
+        expectedC7KeyHash = _expectedC7KeyHash;
     }
 
     /// @inheritdoc IDecryptionVerifier
@@ -40,7 +52,13 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
             (bytes, bytes32[])
         );
 
-        if (publicInputs.length < MESSAGE_COEFFS_COUNT) {
+        if (publicInputs.length < MESSAGE_COEFFS_COUNT + 2) {
+            return false;
+        }
+        if (publicInputs[0] != expectedC6FoldKeyHash) {
+            return false;
+        }
+        if (publicInputs[1] != expectedC7KeyHash) {
             return false;
         }
         if (!_verifyPlaintextHash(publicInputs, plaintextOutputHash)) {
