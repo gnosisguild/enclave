@@ -1,15 +1,25 @@
 # BFV VK binding fixtures
 
 Golden `dkg_aggregator` / `decryption_aggregator` EVM proofs for
-`test/BfvVkBindingIntegration.spec.ts`. Independent of `circuits/benchmarks/`.
+`test/BfvVkBindingIntegration.spec.ts` (insecure micro preset).
 
-Refresh after circuit or aggregator public-input layout changes:
+## Automatic refresh
+
+After an insecure benchmark run that writes
+`circuits/benchmarks/results_insecure/integration_summary.json`,
+`circuits/benchmarks/scripts/run_benchmarks.sh` calls
+`sync_bfv_vk_binding_fixture.sh` and updates this directory’s
+`folded_artifacts.json`.
+
+`BfvVkBindingIntegration` also reads `integration_summary.json` directly when
+present, so local `pnpm evm:test` stays aligned even before you commit the
+synced fixture.
+
+## Manual override
 
 ```bash
-# From repo root, after insecure integration run exports integration_summary:
-jq '.folded_artifacts' circuits/benchmarks/results_insecure/integration_summary.json \
-  > packages/enclave-contracts/test/fixtures/bfv_vk_binding/folded_artifacts.json
+./circuits/benchmarks/scripts/sync_bfv_vk_binding_fixture.sh
 ```
 
-Or set `BFV_VK_BINDING_FOLDED_ARTIFACTS` to another JSON file with the same
-shape.
+Or set `BFV_VK_BINDING_FOLDED_ARTIFACTS` to a folded-artifacts JSON file (or an
+`integration_summary.json` containing `.folded_artifacts`).

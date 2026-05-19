@@ -23,25 +23,67 @@ const { ethers, networkHelpers } = await network.connect();
 const { loadFixture } = networkHelpers;
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
-
-/** Committed golden folded proofs for on-chain Honk verify (insecure micro preset). */
-const FOLDED_ARTIFACTS_FIXTURE =
-  process.env.BFV_VK_BINDING_FOLDED_ARTIFACTS ??
-  path.join(testDir, "fixtures/bfv_vk_binding/folded_artifacts.json");
+const repoRoot = path.join(testDir, "../../..");
+const COMMITTED_FOLDED_ARTIFACTS_FIXTURE = path.join(
+  testDir,
+  "fixtures/bfv_vk_binding/folded_artifacts.json",
+);
+const INSECURE_INTEGRATION_SUMMARY = path.join(
+  repoRoot,
+  "circuits/benchmarks/results_insecure/integration_summary.json",
+);
 
 type FoldedArtifacts = {
   dkg_aggregator: { proof_hex: string; public_inputs_hex: string };
   decryption_aggregator: { proof_hex: string; public_inputs_hex: string };
 };
 
-const loadFoldedArtifacts = (): FoldedArtifacts | null => {
-  if (!fs.existsSync(FOLDED_ARTIFACTS_FIXTURE)) {
+const isValidFoldedArtifacts = (value: unknown): value is FoldedArtifacts => {
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+  const folded = value as FoldedArtifacts;
+  return (
+    typeof folded.dkg_aggregator?.proof_hex === "string" &&
+    typeof folded.dkg_aggregator?.public_inputs_hex === "string" &&
+    typeof folded.decryption_aggregator?.proof_hex === "string" &&
+    typeof folded.decryption_aggregator?.public_inputs_hex === "string"
+  );
+};
+
+const readFoldedArtifactsFromFile = (
+  filePath: string,
+): FoldedArtifacts | null => {
+  if (!fs.existsSync(filePath)) {
     return null;
   }
-  return JSON.parse(
-    fs.readFileSync(FOLDED_ARTIFACTS_FIXTURE, "utf8"),
-  ) as FoldedArtifacts;
+  const parsed: unknown = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  if (filePath.endsWith("integration_summary.json")) {
+    const summary = parsed as { folded_artifacts?: unknown };
+    return isValidFoldedArtifacts(summary.folded_artifacts)
+      ? summary.folded_artifacts
+      : null;
+  }
+  return isValidFoldedArtifacts(parsed) ? parsed : null;
 };
+
+/** Prefer env override, then fresh insecure benchmark output, then committed fixture. */
+const resolveFoldedArtifacts = (): FoldedArtifacts | null => {
+  const envPath = process.env.BFV_VK_BINDING_FOLDED_ARTIFACTS;
+  if (envPath) {
+    return readFoldedArtifactsFromFile(envPath);
+  }
+  const fromBenchmark = readFoldedArtifactsFromFile(
+    INSECURE_INTEGRATION_SUMMARY,
+  );
+  if (fromBenchmark !== null) {
+    return fromBenchmark;
+  }
+  return readFoldedArtifactsFromFile(COMMITTED_FOLDED_ARTIFACTS_FIXTURE);
+};
+
+const loadFoldedArtifacts = (): FoldedArtifacts | null =>
+  resolveFoldedArtifacts();
 
 const hasCompiledVkArtifacts = (): boolean =>
   Object.values(BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS).every((p) =>
@@ -250,9 +292,9 @@ describe("BfvVkBindingIntegration", function () {
         decPublicInputs.length !== DEC_EXPECTED_PUBLIC_INPUT_LEN
       ) {
         console.warn(
-          "Skipping folded proof verify: fixture public-input layout is stale. " +
-            "Re-run test_trbfv_actor, then refresh test/fixtures/bfv_vk_binding/folded_artifacts.json " +
-            "(see jq one-liner in that directory README).",
+          "Skipping folded proof verify: folded artifact public-input layout is stale. " +
+            "Re-run insecure benchmarks (syncs test/fixtures/bfv_vk_binding/folded_artifacts.json) " +
+            "or set BFV_VK_BINDING_FOLDED_ARTIFACTS.",
         );
         this.skip();
       }

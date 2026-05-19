@@ -269,6 +269,10 @@ if [ -f "${GAS_JSON_FILE}" ] && jq -e '.integration_summary != null' "${GAS_JSON
     echo "✓ Wrote integration summary snapshot: ${INTEGRATION_SNAPSHOT}"
 fi
 
+if [ "${OUTPUT_DIR}" = "results_insecure" ] && [ -f "${INTEGRATION_SNAPSHOT}" ]; then
+    "${SCRIPT_DIR}/sync_bfv_vk_binding_fixture.sh" "${INTEGRATION_SNAPSHOT}"
+fi
+
 echo "Stage 3/3: Finalizing outputs..."
 echo "✓ Report generated: ${REPORT_FILE}"
 echo ""
