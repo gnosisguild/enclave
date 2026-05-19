@@ -7,13 +7,14 @@ import { expect } from "chai";
 import { network } from "hardhat";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS,
   BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS,
-  REPO_ROOT,
   assertBfvDecryptionVerifierSubCircuitVkHashes,
   assertBfvPkVerifierSubCircuitVkHashes,
+  committeeHashFromLimbs,
   readVkRecursiveHash,
 } from "../scripts/utils";
 import type { BfvDecryptionVerifier, BfvPkVerifier } from "../types";
@@ -21,10 +22,26 @@ import type { BfvDecryptionVerifier, BfvPkVerifier } from "../types";
 const { ethers, networkHelpers } = await network.connect();
 const { loadFixture } = networkHelpers;
 
-const INTEGRATION_SUMMARY = path.join(
-  REPO_ROOT,
-  "circuits/benchmarks/results_insecure/integration_summary.json",
-);
+const testDir = path.dirname(fileURLToPath(import.meta.url));
+
+/** Committed golden folded proofs for on-chain Honk verify (insecure micro preset). */
+const FOLDED_ARTIFACTS_FIXTURE =
+  process.env.BFV_VK_BINDING_FOLDED_ARTIFACTS ??
+  path.join(testDir, "fixtures/bfv_vk_binding/folded_artifacts.json");
+
+type FoldedArtifacts = {
+  dkg_aggregator: { proof_hex: string; public_inputs_hex: string };
+  decryption_aggregator: { proof_hex: string; public_inputs_hex: string };
+};
+
+const loadFoldedArtifacts = (): FoldedArtifacts | null => {
+  if (!fs.existsSync(FOLDED_ARTIFACTS_FIXTURE)) {
+    return null;
+  }
+  return JSON.parse(
+    fs.readFileSync(FOLDED_ARTIFACTS_FIXTURE, "utf8"),
+  ) as FoldedArtifacts;
+};
 
 const hasCompiledVkArtifacts = (): boolean =>
   Object.values(BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS).every((p) =>
@@ -57,13 +74,6 @@ const DEC_COMMITTEE_HASH_HI_IDX = 2;
 const DEC_COMMITTEE_HASH_LO_IDX = 3;
 /** `4` pub params + `107` return fields (`T = 1`). */
 const DEC_EXPECTED_PUBLIC_INPUT_LEN = 111;
-
-function committeeHashFromLimbs(hi: string, lo: string): string {
-  const hiBn = BigInt(hi);
-  const loBn = BigInt(lo);
-  return ("0x" +
-    ((hiBn << 128n) | loBn).toString(16).padStart(64, "0")) as `0x${string}`;
-}
 
 function plaintextHashFromPublicInputs(publicInputs: string[]): string {
   const messageCoeffsCount = 100;
@@ -198,30 +208,23 @@ describe("BfvVkBindingIntegration", function () {
   });
 
   const runFoldedProofIntegration =
-    fs.existsSync(INTEGRATION_SUMMARY) && hasCompiledVkArtifacts();
+    loadFoldedArtifacts() !== null && hasCompiledVkArtifacts();
 
   (runFoldedProofIntegration ? it : it.skip)(
     "folded aggregator proofs: artifact VK hashes match publicInputs[0..1] and verify passes",
     async function () {
       this.timeout(120_000);
 
-      const summary = JSON.parse(
-        fs.readFileSync(INTEGRATION_SUMMARY, "utf8"),
-      ) as {
-        folded_artifacts: {
-          dkg_aggregator: { proof_hex: string; public_inputs_hex: string };
-          decryption_aggregator: {
-            proof_hex: string;
-            public_inputs_hex: string;
-          };
-        };
-      };
+      const folded = loadFoldedArtifacts();
+      if (folded === null) {
+        this.skip();
+      }
 
       const dkgPublicInputs = hexToBytes32Array(
-        summary.folded_artifacts.dkg_aggregator.public_inputs_hex,
+        folded.dkg_aggregator.public_inputs_hex,
       );
       const decPublicInputs = hexToBytes32Array(
-        summary.folded_artifacts.decryption_aggregator.public_inputs_hex,
+        folded.decryption_aggregator.public_inputs_hex,
       );
 
       const expectedNodesFoldKeyHash = readVkRecursiveHash(
@@ -247,9 +250,9 @@ describe("BfvVkBindingIntegration", function () {
         decPublicInputs.length !== DEC_EXPECTED_PUBLIC_INPUT_LEN
       ) {
         console.warn(
-          "Skipping folded proof verify: integration_summary.json was built before " +
-            "committee_hash public inputs. Regenerate via integration test with " +
-            "BENCHMARK_SUMMARY_OUTPUT or update circuits/benchmarks/results_insecure/integration_summary.json.",
+          "Skipping folded proof verify: fixture public-input layout is stale. " +
+            "Re-run test_trbfv_actor, then refresh test/fixtures/bfv_vk_binding/folded_artifacts.json " +
+            "(see jq one-liner in that directory README).",
         );
         this.skip();
       }
@@ -268,7 +271,7 @@ describe("BfvVkBindingIntegration", function () {
 
       const dkgEncoded = abiCoder.encode(
         ["bytes", "bytes32[]"],
-        [summary.folded_artifacts.dkg_aggregator.proof_hex, dkgPublicInputs],
+        [folded.dkg_aggregator.proof_hex, dkgPublicInputs],
       );
       const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
       expect(
@@ -281,10 +284,7 @@ describe("BfvVkBindingIntegration", function () {
 
       const decEncoded = abiCoder.encode(
         ["bytes", "bytes32[]"],
-        [
-          summary.folded_artifacts.decryption_aggregator.proof_hex,
-          decPublicInputs,
-        ],
+        [folded.decryption_aggregator.proof_hex, decPublicInputs],
       );
       const plaintextHash = plaintextHashFromPublicInputs(decPublicInputs);
       expect(
@@ -302,16 +302,13 @@ describe("BfvVkBindingIntegration", function () {
     async function () {
       this.timeout(120_000);
 
-      const summary = JSON.parse(
-        fs.readFileSync(INTEGRATION_SUMMARY, "utf8"),
-      ) as {
-        folded_artifacts: {
-          dkg_aggregator: { proof_hex: string; public_inputs_hex: string };
-        };
-      };
+      const folded = loadFoldedArtifacts();
+      if (folded === null) {
+        this.skip();
+      }
 
       const dkgPublicInputs = hexToBytes32Array(
-        summary.folded_artifacts.dkg_aggregator.public_inputs_hex,
+        folded.dkg_aggregator.public_inputs_hex,
       );
       const expectedC5KeyHash = readVkRecursiveHash(
         BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS.c5,
@@ -345,7 +342,7 @@ describe("BfvVkBindingIntegration", function () {
       const abiCoder = ethers.AbiCoder.defaultAbiCoder();
       const dkgEncoded = abiCoder.encode(
         ["bytes", "bytes32[]"],
-        [summary.folded_artifacts.dkg_aggregator.proof_hex, dkgPublicInputs],
+        [folded.dkg_aggregator.proof_hex, dkgPublicInputs],
       );
       const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
 

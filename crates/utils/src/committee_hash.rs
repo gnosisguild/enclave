@@ -7,7 +7,7 @@
 //! Canonical committee hash for DKG / decryption aggregator proofs.
 //! Must match `CommitteeHashLib.sol` (`keccak256(abi.encodePacked(addresses))`).
 
-use alloy::primitives::{keccak256, Address, B256, U256};
+use alloy::primitives::{keccak256, Address, B256};
 
 /// Hi/lo limbs of `keccak256(abi.encodePacked(addresses))` for Noir public inputs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -26,12 +26,16 @@ pub fn hash_committee_addresses(addresses: &[Address]) -> B256 {
 }
 
 /// Split a committee hash into 128-bit limbs for BN254 public inputs.
+/// Each limb is a bytes32 with its 128 bits right-aligned, matching `CommitteeHashLib`.
 pub fn split_committee_hash(hash: B256) -> CommitteeHashLimbs {
-    let value = U256::from_be_bytes(hash.0);
-    let hi = B256::from(value >> 128);
-    let lo_mask = (U256::from(1) << 128) - U256::from(1);
-    let lo = B256::from(value & lo_mask);
-    CommitteeHashLimbs { hi, lo }
+    let mut hi = [0u8; 32];
+    hi[16..].copy_from_slice(&hash.0[..16]);
+    let mut lo = [0u8; 32];
+    lo[16..].copy_from_slice(&hash.0[16..]);
+    CommitteeHashLimbs {
+        hi: B256::from(hi),
+        lo: B256::from(lo),
+    }
 }
 
 /// Hash and split in one step.
@@ -70,5 +74,25 @@ mod tests {
         let limbs = split_committee_hash(hash);
         assert_ne!(limbs.hi, B256::ZERO);
         assert_ne!(limbs.lo, B256::ZERO);
+    }
+
+    /// Limb bytes32 layout must match `CommitteeHashLib.hi` / `lo`.
+    #[test]
+    fn split_limbs_match_solidity_bytes32_layout() {
+        let nodes = vec![
+            address!("0x0000000000000000000000000000000000000001"),
+            address!("0x0000000000000000000000000000000000000002"),
+            address!("0x0000000000000000000000000000000000000003"),
+        ];
+        let hash = hash_committee_addresses(&nodes);
+        let limbs = split_committee_hash(hash);
+
+        let mut expected_hi = [0u8; 32];
+        expected_hi[16..].copy_from_slice(&hash.0[..16]);
+        assert_eq!(limbs.hi.0, expected_hi);
+
+        let mut expected_lo = [0u8; 32];
+        expected_lo[16..].copy_from_slice(&hash.0[16..]);
+        assert_eq!(limbs.lo.0, expected_lo);
     }
 }

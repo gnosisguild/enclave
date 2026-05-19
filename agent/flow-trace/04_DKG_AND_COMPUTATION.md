@@ -600,36 +600,38 @@ ThresholdKeyshare receives AllThresholdSharesCollected
   ├─ Requires EffectsEnabled
   ├─ Requires active_aggregators[e3_id] == true
   ├─ Reads chain state to confirm committee public key is still unset
-  └─ Calls contract.publishCommittee(e3_id, nodes, publicKey, pkHash)
+  └─ Calls contract.publishCommittee(e3_id, publicKey, pkCommitment, proof)
         │
         │  ┌─── ON-CHAIN (CiphernodeRegistryOwnable) ──────────┐
         │  │                                                     │
-        │  │  publishCommittee(e3Id, nodes, pk, pkHash) {        │
-        │  │    1. require(initialized && finalized)             │
-        │  │    2. require(publicKeyHashes[e3Id] == 0)           │
-        │  │       → Can only publish once                       │
-        │  │    3. require(nodes.length == committee.length)     │
+        │  │  publishCommittee(e3Id, publicKey, pkCommitment, proof) { │
+        │  │    1. require(stage == Finalized)                   │
+        │  │    2. require(c.publicKey == 0) — publish once      │
+        │  │    3. committeeHash = keccak256(abi.encodePacked(c.topNodes)) │
+        │  │       c.committeeHash = committeeHash               │
         │  │    4. When proofAggregationEnabled:                 │
-        │  │       e3.pkVerifier.verify(pkCommitment, proof)     │
+        │  │       e3.pkVerifier.verify(pkCommitment, committeeHash, proof) │
         │  │       → BFV: `BfvPkVerifier` (DkgAggregator Honk)   │
         │  │         • pins `publicInputs[0]` = nodes_fold VK hash │
         │  │         • pins `publicInputs[1]` = C5 VK hash         │
-        │  │         • checks last PI = pkCommitment               │
-        │  │       Redeploy verifier when sub-circuit VKs change.  │
-        │  │    5. publicKeyHashes[e3Id] = pkHash                │
-        │  │    6. enclave.onCommitteePublished(e3Id, pkHash)    │
+        │  │         • checks committee_hash_hi/lo vs committeeHash │
+        │  │         • checks last PI == pkCommitment              │
+        │  │       Redeploy `BfvPkVerifier` / `BfvDecryptionVerifier` │
+        │  │       when sub-circuit VK immutables change.        │
+        │  │    5. c.publicKey = pkCommitment                    │
+        │  │       publicKeyHashes[e3Id] = pkCommitment          │
+        │  │    6. enclave.onCommitteePublished(e3Id, pkCommitment) │
         │  │       │                                             │
         │  │       │  ┌─ Enclave.sol ────────────────────────┐  │
-        │  │       │  │  onCommitteePublished(e3Id, pkHash) {│  │
+        │  │       │  │  onCommitteePublished(e3Id, pk) {   │  │
         │  │       │  │    require(stage==CommitteeFinalized) │  │
-        │  │       │  │    e3.committeePublicKey = pkHash     │  │
-        │  │       │  │    → stored as bytes32 (a hash)      │  │
+        │  │       │  │    e3.committeePublicKey = pk         │  │
         │  │       │  │    stage = KeyPublished               │  │
         │  │       │  │    Emit E3StageChanged(KeyPublished)  │  │
         │  │       │  │  }                                   │  │
         │  │       │  └──────────────────────────────────────┘  │
-        │  │    7. Emit CommitteePublished(e3Id, nodes, pk, C5 proof) │
-        │  │       → Note: emits full pk bytes, NOT just pkHash  │
+        │  │    7. Emit CommitteePublished(                    │
+        │  │         e3Id, c.topNodes, publicKey, pkCommitment, proof) │
         │  │  }                                                  │
         │  └─────────────────────────────────────────────────────┘
 ```

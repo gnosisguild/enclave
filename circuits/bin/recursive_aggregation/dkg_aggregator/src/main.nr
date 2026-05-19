@@ -13,6 +13,7 @@ use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_hon
 use lib::configs::default::dkg::L_THRESHOLD;
 use lib::configs::default::{H, N_PARTIES};
 use lib::math::commitments::compute_vk_hash;
+use lib::math::committee_hash::committee_hash_limbs;
 
 /// Must match `node_fold::NODE_FOLD_PUBLIC_LEN`.
 pub global NODE_FOLD_PUBLIC_LEN: u32 = 11 + N_PARTIES + (2 * (N_PARTIES + H) * L_THRESHOLD);
@@ -52,9 +53,14 @@ fn main(
     nodes_fold_key_hash: pub Field,
     c5_key_hash: pub Field,
     party_ids: pub [Field; H],
+    committee_members: [Field; H],
     committee_hash_hi: pub Field,
     committee_hash_lo: pub Field,
 ) -> pub (Field, [Field; H], [Field; H], Field) {
+    let (expected_hi, expected_lo) = committee_hash_limbs(committee_members);
+    assert(expected_hi == committee_hash_hi);
+    assert(expected_lo == committee_hash_lo);
+
     verify_honk_proof_non_zk(
         nodes_fold_vk,
         nodes_fold_proof,

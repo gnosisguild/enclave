@@ -9,3 +9,4 @@ pub mod safe;
 pub mod helpers;
 pub mod modulo;
 pub mod commitments;
+pub mod committee_hash;

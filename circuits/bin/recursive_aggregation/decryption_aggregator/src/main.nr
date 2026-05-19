@@ -10,9 +10,11 @@
 //! `committee_hash_hi` / `committee_hash_lo` bind the proof to the full on-chain committee ordering.
 
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
+use lib::configs::default::H;
 use lib::configs::default::MAX_MSG_NON_ZERO_COEFFS;
 use lib::configs::default::T;
 use lib::math::commitments::compute_vk_hash;
+use lib::math::committee_hash::committee_hash_limbs;
 
 /// Must match `c6_fold::C6_FOLD_PUBLIC_LEN`: pub params + flattened `(out_sk, out_esm, out_ct, out_d)`.
 pub global C6_FOLD_PUBLIC_LEN: u32 = 4 + (4 * (T + 1));
@@ -43,9 +45,14 @@ fn main(
     c7_public: [Field; C7_PUBLIC_LEN],
     c6_fold_key_hash: pub Field,
     c7_key_hash: pub Field,
+    committee_members: [Field; H],
     committee_hash_hi: pub Field,
     committee_hash_lo: pub Field,
 ) -> pub (Field, [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; MAX_MSG_NON_ZERO_COEFFS]) {
+    let (expected_hi, expected_lo) = committee_hash_limbs(committee_members);
+    assert(expected_hi == committee_hash_hi);
+    assert(expected_lo == committee_hash_lo);
+
     verify_honk_proof_non_zk(c6_fold_vk, c6_fold_proof, c6_fold_public, c6_fold_key_hash);
     verify_honk_proof_non_zk(c7_vk, c7_proof, c7_public, c7_key_hash);
 

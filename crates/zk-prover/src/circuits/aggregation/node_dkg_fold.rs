@@ -9,7 +9,7 @@
 
 use crate::circuits::aggregation::c3_accumulator::generate_sequential_c3_fold;
 use crate::circuits::aggregation::c6_accumulator::generate_sequential_c6_fold;
-use crate::circuits::aggregation::helpers::u64_to_field_hex;
+use crate::circuits::aggregation::helpers::{address_to_field_hex, u64_to_field_hex};
 use crate::circuits::aggregation::nodes_fold_accumulator::generate_sequential_nodes_fold;
 use crate::circuits::utils::{bytes_to_field_strings, inputs_json_to_input_map};
 use crate::circuits::vk;
@@ -310,6 +310,7 @@ struct DkgAggregatorWitness {
     nodes_fold_key_hash: String,
     c5_key_hash: String,
     party_ids: Vec<String>,
+    committee_members: Vec<String>,
     committee_hash_hi: String,
     committee_hash_lo: String,
 }
@@ -363,6 +364,12 @@ pub fn prove_dkg_aggregation(
         e3_utils::committee_hash::committee_hash_field_hex(input.committee_addresses)
             .map_err(|e| ZkError::InvalidInput(e.to_string()))?;
 
+    let committee_members: Vec<String> = input
+        .committee_addresses
+        .iter()
+        .map(|addr| address_to_field_hex(addr))
+        .collect::<Result<_, _>>()?;
+
     let witness = DkgAggregatorWitness {
         nodes_fold_vk: nodes_fold_vk.verification_key.clone(),
         nodes_fold_proof: proof_field_strings(&nodes_fold_proof)?,
@@ -373,6 +380,7 @@ pub fn prove_dkg_aggregation(
         nodes_fold_key_hash: nodes_fold_vk.key_hash.clone(),
         c5_key_hash: c5_vk.key_hash.clone(),
         party_ids: party_id_fields,
+        committee_members,
         committee_hash_hi,
         committee_hash_lo,
     };
@@ -413,6 +421,7 @@ struct DecryptionAggregatorWitness {
     c7_public: Vec<String>,
     c6_fold_key_hash: String,
     c7_key_hash: String,
+    committee_members: Vec<String>,
     committee_hash_hi: String,
     committee_hash_lo: String,
 }
@@ -447,6 +456,11 @@ pub fn prove_decryption_aggregation_jobs(
         e3_utils::committee_hash::committee_hash_field_hex(committee_addresses)
             .map_err(|e| ZkError::InvalidInput(e.to_string()))?;
 
+    let committee_members: Vec<String> = committee_addresses
+        .iter()
+        .map(|addr| address_to_field_hex(addr))
+        .collect::<Result<_, _>>()?;
+
     let mut out = Vec::with_capacity(jobs.len());
     for (i, job) in jobs.iter().enumerate() {
         let c6_fold = generate_sequential_c6_fold(
@@ -467,6 +481,7 @@ pub fn prove_decryption_aggregation_jobs(
             c7_public: proof_public_field_strings(job.c7_proof)?,
             c6_fold_key_hash: c6_fold_vk.key_hash.clone(),
             c7_key_hash: c7_vk.key_hash.clone(),
+            committee_members: committee_members.clone(),
             committee_hash_hi: committee_hash_hi.clone(),
             committee_hash_lo: committee_hash_lo.clone(),
         };
