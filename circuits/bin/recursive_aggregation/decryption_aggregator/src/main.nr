@@ -8,10 +8,15 @@
 //! (C7, both `noir-recursive-no-zk`). The final `bb prove -t evm` proof of this circuit is what the
 //! contract verifies on-chain.
 //! `committee_hash_hi` / `committee_hash_lo` bind the proof to the full on-chain committee ordering.
+//!
+//! Committee sizing: `committee_members` covers the **full registered committee** of size
+//! `N_PARTIES`, matching `topNodes` on-chain. The `T + 1` participating `party_ids` (extracted
+//! from the inner C7 proof) are indices into that full committee. `committee_members` must be
+//! supplied in the same order as on-chain `topNodes`; the hash equality pins that order.
 
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
-use lib::configs::default::H;
 use lib::configs::default::MAX_MSG_NON_ZERO_COEFFS;
+use lib::configs::default::N_PARTIES;
 use lib::configs::default::T;
 use lib::math::commitments::compute_vk_hash;
 use lib::math::committee_hash::committee_hash_limbs;
@@ -45,7 +50,7 @@ fn main(
     c7_public: [Field; C7_PUBLIC_LEN],
     c6_fold_key_hash: pub Field,
     c7_key_hash: pub Field,
-    committee_members: [Field; H],
+    committee_members: [Field; N_PARTIES],
     committee_hash_hi: pub Field,
     committee_hash_lo: pub Field,
 ) -> pub (Field, [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; MAX_MSG_NON_ZERO_COEFFS]) {
@@ -77,6 +82,12 @@ fn main(
         party_ids[i] = c7_public[C7_PARTY_ID_OFFSET + i];
         expected_sk[i] = c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_SK_COL_OFFSET + i];
         expected_esm[i] = c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_ESM_COL_OFFSET + i];
+
+        // Range-check each participating `party_ids[i]` against the full committee size
+        // `N_PARTIES`, so `committee_members[party_ids[i]]` is a well-defined committee slot.
+        // Structural pre-condition for future per-party signer/identity constraints.
+        let id = party_ids[i] as u32;
+        assert(id < N_PARTIES);
     }
 
     let mut message: [Field; MAX_MSG_NON_ZERO_COEFFS] = [0; MAX_MSG_NON_ZERO_COEFFS];

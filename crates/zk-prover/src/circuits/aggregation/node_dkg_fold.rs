@@ -334,6 +334,18 @@ pub fn prove_dkg_aggregation(
         ));
     }
     let h = input.node_fold_proofs.len();
+    // `committee_addresses` must cover the full registered committee of size `N_PARTIES`
+    // (matches on-chain `topNodes`), so `committee_hash_limbs` hashes the right list and
+    // `party_ids[i]` is a valid index into `committee_members`. Today `H == N_PARTIES`; once
+    // honest-set selection makes `H < N_PARTIES`, this check should compare against the
+    // preset's `N_PARTIES` directly rather than `h`.
+    if input.committee_addresses.len() != h {
+        return Err(ZkError::InvalidInput(format!(
+            "committee_addresses length {} does not match expected N_PARTIES ({})",
+            input.committee_addresses.len(),
+            h,
+        )));
+    }
     let slot_indices: Vec<u32> = (0u32..h as u32).collect();
     let nodes_fold_proof = generate_sequential_nodes_fold(
         prover,
@@ -451,6 +463,16 @@ pub fn prove_decryption_aggregation_jobs(
         CircuitVariant::Default,
         artifacts_dir,
     )?;
+
+    // `committee_addresses` must cover the full registered committee of size `N_PARTIES`
+    // (matches on-chain `topNodes`); the Noir circuit's `committee_members: [Field; N_PARTIES]`
+    // shape enforces this — supplying the wrong length surfaces as `WitnessGenerationFailed`.
+    // The non-empty guard catches the common misuse early with a clearer error.
+    if committee_addresses.is_empty() {
+        return Err(ZkError::InvalidInput(
+            "prove_decryption_aggregation_jobs: committee_addresses must equal on-chain topNodes (N_PARTIES)".into(),
+        ));
+    }
 
     let (committee_hash_hi, committee_hash_lo) =
         e3_utils::committee_hash::committee_hash_field_hex(committee_addresses)

@@ -6,12 +6,16 @@
 
 //! `keccak256(abi.encodePacked(addresses))` split into hi/lo 128-bit limbs.
 //! Must match `CommitteeHashLib.sol` and `e3_utils::committee_hash`.
+//!
+//! The hash is taken over the **full registered committee** of size `N_PARTIES`
+//! (matches `topNodes` on-chain). It is not parameterised by `H` (the
+//! folded honest-set size) because `topNodes` always carries the full committee.
 
-use crate::configs::committee::micro::H;
+use crate::configs::committee::micro::N_PARTIES;
 use keccak256::keccak256;
 
 global ADDRESS_BYTES: u32 = 20;
-global COMMITTEE_PACKED_BYTES: u32 = H * ADDRESS_BYTES;
+global COMMITTEE_PACKED_BYTES: u32 = N_PARTIES * ADDRESS_BYTES;
 
 fn field_to_address_bytes(member: Field) -> [u8; 20] {
     let be: [u8; 32] = member.to_be_bytes();
@@ -30,10 +34,11 @@ fn bytes32_to_field(bytes: [u8; 32]) -> Field {
     value
 }
 
-/// Hash ordered committee members and return `(committee_hash_hi, committee_hash_lo)` public limbs.
-pub fn committee_hash_limbs(members: [Field; H]) -> (Field, Field) {
+/// Hash the ordered full committee (`N_PARTIES` members, matching on-chain `topNodes`) and
+/// return `(committee_hash_hi, committee_hash_lo)` public limbs.
+pub fn committee_hash_limbs(members: [Field; N_PARTIES]) -> (Field, Field) {
     let mut packed = [0u8; COMMITTEE_PACKED_BYTES];
-    for i in 0..H {
+    for i in 0..N_PARTIES {
         let addr = field_to_address_bytes(members[i]);
         for j in 0..20 {
             packed[i * 20 + j] = addr[j];

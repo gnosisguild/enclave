@@ -419,6 +419,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         if (e3.proofAggregationEnabled) {
             require(proof.length > 0, ProofRequired());
+            // Reaching `CiphertextReady` implies the committee was published, so
+            // `getCommitteeHash` is guaranteed non-zero here; the registry still
+            // reverts with `CommitteeNotPublished` if that invariant ever breaks.
             bytes32 committeeHash = ciphernodeRegistry.getCommitteeHash(e3Id);
             success = e3.decryptionVerifier.verify(
                 keccak256(plaintextOutput),

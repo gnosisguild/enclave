@@ -1,9 +1,9 @@
 # Enclave ZK Circuit Benchmarks
 
-**Generated:** 2026-05-19 14:14:09 UTC
+**Generated:** 2026-05-19 14:41:50 UTC
 
 **Git Branch:** `feat/1525`  
-**Git Commit:** `cfe60a5290ceb27522bdee8a5e7d508e0e556d08`
+**Git Commit:** `d49dd7569dc6968edf92a66bd3ff48b6c5ee0503`
 
 **Committee Size:** `H=3`, `N=3`, `T=1`
 
@@ -15,36 +15,36 @@
 
 | Circuit              | Constraints | Prove time (s) | Verify time (ms) | Proof size (KB) |
 | -------------------- | ----------- | -------------- | ---------------- | --------------- |
-| C0                   | 6847        | 0.13           | 28.33            | 15.88           |
-| C1                   | 57818       | 0.35           | 27.90            | 15.88           |
-| C2a                  | 142625      | 0.83           | 29.66            | 15.88           |
-| C2b                  | 198355      | 0.89           | 28.73            | 15.88           |
-| C3a                  | 132633      | 0.83           | 28.25            | 15.88           |
-| C3b                  | 132633      | 0.83           | 28.25            | 15.88           |
-| C4a                  | 92515       | 0.52           | 29.91            | 15.88           |
-| C4b                  | 92515       | 0.52           | 29.91            | 15.88           |
-| C5                   | 151717      | 0.85           | 28.47            | 15.88           |
-| user_data_encryption | 53732       | 0.35           | 27.79            | 15.88           |
-| C6                   | 86927       | 0.54           | 28.57            | 15.88           |
-| C7                   | 104273      | 0.52           | 28.75            | 15.88           |
+| C0                   | 6847        | 0.13           | 27.23            | 15.88           |
+| C1                   | 57818       | 0.35           | 26.50            | 15.88           |
+| C2a                  | 142625      | 0.83           | 26.50            | 15.88           |
+| C2b                  | 198355      | 0.90           | 27.09            | 15.88           |
+| C3a                  | 132633      | 0.84           | 26.75            | 15.88           |
+| C3b                  | 132633      | 0.84           | 26.75            | 15.88           |
+| C4a                  | 92515       | 0.52           | 26.62            | 15.88           |
+| C4b                  | 92515       | 0.52           | 26.62            | 15.88           |
+| C5                   | 151717      | 0.83           | 27.39            | 15.88           |
+| user_data_encryption | 53732       | 0.34           | 26.43            | 15.88           |
+| C6                   | 86927       | 0.55           | 27.35            | 15.88           |
+| C7                   | 104273      | 0.52           | 26.86            | 15.88           |
 
 ### Artifacts
 
 | Artifact | Proof size | Public input size | Verify gas | Calldata gas | Total gas |
 | -------- | ---------- | ----------------- | ---------- | ------------ | --------- |
-| Π_DKG    | 10.69 KB   | 0.47 KB           | 3042773    | 176244       | 3219017   |
-| Π_user   | 15.88 KB   | 0.12 KB           | 2972965    | 170452       | 3143417   |
-| Π_dec    | 10.69 KB   | 3.47 KB           | 3553807    | 187284       | 3741091   |
+| Π_DKG    | 10.69 KB   | 0.47 KB           | 3042639    | 176112       | 3218751   |
+| Π_user   | 15.88 KB   | 0.12 KB           | 2972941    | 170404       | 3143345   |
+| Π_dec    | 10.69 KB   | 3.47 KB           | 3553795    | 187260       | 3741055   |
 
 ### Role / Phase / Activity
 
 | Role            | Phase | Activity                         | Prove time | Proof size | Bandwidth |
 | --------------- | ----- | -------------------------------- | ---------- | ---------- | --------- |
-| Each ciphernode | P1    | one-time DKG participation       | 309.65 s   | 127.00 KB  | 128.19 KB |
-| Aggregator      | P2    | combine folds + C5               | 0.85 s     | 10.69 KB   | 11.16 KB  |
-| User            | P3    | per user input                   | 0.68 s     | 15.88 KB   | 16.00 KB  |
-| Each ciphernode | P4    | per computation output (C6)      | 0.54 s     | 15.88 KB   | 16.00 KB  |
-| Aggregator      | P4    | per computation output (C7+fold) | 82.61 s    | 10.69 KB   | 14.16 KB  |
+| Each ciphernode | P1    | one-time DKG participation       | 314.97 s   | 127.00 KB  | 128.19 KB |
+| Aggregator      | P2    | combine folds + C5               | 0.83 s     | 10.69 KB   | 11.16 KB  |
+| User            | P3    | per user input                   | 0.67 s     | 15.88 KB   | 16.00 KB  |
+| Each ciphernode | P4    | per computation output (C6)      | 0.55 s     | 15.88 KB   | 16.00 KB  |
+| Aggregator      | P4    | per computation output (C7+fold) | 81.66 s    | 10.69 KB   | 14.16 KB  |
 
 ## Integration test (`test_trbfv_actor`)
 
@@ -54,14 +54,14 @@
 | ------------------------------------------- | ------------ |
 | Starting trbfv actor test                   | 0.00         |
 | Setup completed                             | 3.08         |
-| Committee Setup Completed                   | 20.23        |
+| Committee Setup Completed                   | 20.22        |
 | Committee Finalization Complete             | 0.01         |
-| ThresholdShares -> PublicKeyAggregated      | 309.65       |
-| E3Request -> PublicKeyAggregated            | 312.28       |
+| ThresholdShares -> PublicKeyAggregated      | 314.97       |
+| E3Request -> PublicKeyAggregated            | 317.62       |
 | Application CT Gen                          | 0.32         |
 | Running FHE Application                     | 0.00         |
-| Ciphertext published -> PlaintextAggregated | 82.61        |
-| Entire Test                                 | 418.55       |
+| Ciphertext published -> PlaintextAggregated | 81.66        |
+| Entire Test                                 | 422.92       |
 
 ### Thread pool (same process as integration test)
 
@@ -80,21 +80,21 @@
 | CalculateThresholdDecryption  | 0.57    | 1    | 0.57      |
 | GenEsiSss                     | 0.13    | 3    | 0.38      |
 | GenPkShareAndSkSss            | 0.23    | 3    | 0.69      |
-| ZkDecryptedSharesAggregation  | 8.66    | 1    | 8.66      |
-| ZkDecryptionAggregation       | 51.72   | 1    | 51.72     |
-| ZkDkgAggregation              | 20.93   | 1    | 20.93     |
-| ZkDkgShareDecryption          | 1.50    | 6    | 8.98      |
-| ZkNodeDkgFold                 | 63.68   | 3    | 191.04    |
-| ZkPkAggregation               | 2.15    | 1    | 2.15      |
+| ZkDecryptedSharesAggregation  | 8.51    | 1    | 8.51      |
+| ZkDecryptionAggregation       | 51.14   | 1    | 51.14     |
+| ZkDkgAggregation              | 21.24   | 1    | 21.24     |
+| ZkDkgShareDecryption          | 1.51    | 6    | 9.07      |
+| ZkNodeDkgFold                 | 64.91   | 3    | 194.73    |
+| ZkPkAggregation               | 2.19    | 1    | 2.19      |
 | ZkPkBfv                       | 0.35    | 3    | 1.04      |
-| ZkPkGeneration                | 1.39    | 3    | 4.16      |
-| ZkShareComputation            | 2.75    | 6    | 16.47     |
-| ZkShareEncryption             | 2.55    | 24   | 61.20     |
-| ZkThresholdShareDecryption    | 6.23    | 3    | 18.69     |
-| ZkVerifyShareDecryptionProofs | 0.10    | 3    | 0.31      |
-| ZkVerifyShareProofs           | 0.24    | 5    | 1.20      |
+| ZkPkGeneration                | 1.39    | 3    | 4.17      |
+| ZkShareComputation            | 2.77    | 6    | 16.65     |
+| ZkShareEncryption             | 2.59    | 24   | 62.19     |
+| ZkThresholdShareDecryption    | 6.17    | 3    | 18.50     |
+| ZkVerifyShareDecryptionProofs | 0.10    | 3    | 0.29      |
+| ZkVerifyShareProofs           | 0.23    | 5    | 1.17      |
 
-Sum of tracked operation wall time: **390.36 s** (often much larger than end-to-end wall clock
+Sum of tracked operation wall time: **394.71 s** (often much larger than end-to-end wall clock
 because work runs in parallel).
 
 ## Raw circuit benchmark JSON (Nargo)
