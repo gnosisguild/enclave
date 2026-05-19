@@ -163,6 +163,7 @@ if [ "$SKIP_COMPILE" = false ]; then
     if "${SCRIPT_DIR}/check_circuit_preset_artifacts.sh" "$PRESET_NAME"; then
         PRESET_ARTIFACTS_READY=true
     fi
+    "${SCRIPT_DIR}/ensure_circuit_preset_built.sh" "${ENSURE_ARGS[@]}"
     echo "Preflight build complete."
     echo ""
 fi

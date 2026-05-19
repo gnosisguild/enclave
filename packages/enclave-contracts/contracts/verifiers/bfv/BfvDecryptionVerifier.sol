@@ -45,6 +45,12 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
     /// @dev `4 + DEC_RETURN_PREFIX_LEN + DEC_RETURN_COLUMN_COUNT*(T+1) + MESSAGE_COEFFS_COUNT`.
     uint256 internal immutable expectedPublicInputsLen;
 
+    /// @dev `publicInputs` index for `committee_hash_hi` (after sub-circuit key hashes).
+    uint256 internal constant COMMITTEE_HASH_HI_IDX = 2;
+
+    /// @dev `publicInputs` index for `committee_hash_lo`.
+    uint256 internal constant COMMITTEE_HASH_LO_IDX = 3;
+
     /// @notice Underlying Honk verifier for the DecryptionAggregator circuit.
     ICircuitVerifier public immutable circuitVerifier;
 

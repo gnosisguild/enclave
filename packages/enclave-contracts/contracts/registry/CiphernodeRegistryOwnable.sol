@@ -212,6 +212,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         bytes32 committeeHash = CommitteeHashLib.hash(c.topNodes);
         c.committeeHash = committeeHash;
 
+        bytes32 committeeHash = CommitteeHashLib.hash(c.topNodes);
+        c.committeeHash = committeeHash;
+
         E3 memory e3 = enclave.getE3(e3Id);
         if (e3.proofAggregationEnabled) {
             require(proof.length > 0, DkgProofRequired());

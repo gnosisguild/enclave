@@ -21,7 +21,10 @@ use e3_events::{
     ZkResponse,
 };
 use e3_fhe_params::BfvPreset;
-use e3_sortition::{E3CommitteeContainsRequest, E3CommitteeContainsResponse, Sortition};
+use e3_sortition::{
+    CommitteeMembersResponse, E3CommitteeContainsRequest, E3CommitteeContainsResponse,
+    GetCommitteeMembersRequest, Sortition,
+};
 use e3_trbfv::{
     calculate_threshold_decryption::CalculateThresholdDecryptionRequest, TrBFVConfig, TrBFVRequest,
     TrBFVResponse,
@@ -1071,6 +1074,18 @@ impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
                 Ok(())
             },
         )
+    }
+}
+
+impl Handler<CommitteeMembersResponse> for ThresholdPlaintextAggregator {
+    type Result = ();
+
+    fn handle(&mut self, msg: CommitteeMembersResponse, ctx: &mut Self::Context) -> Self::Result {
+        self.committee_members = Some(msg.members);
+        if let Some(ec) = self.last_ec.clone() {
+            let _ = self.maybe_start_decryption_aggregation(&ec, ctx.address().recipient());
+            let _ = self.try_publish_complete();
+        }
     }
 }
 
