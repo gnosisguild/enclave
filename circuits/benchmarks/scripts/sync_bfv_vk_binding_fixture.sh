@@ -15,8 +15,12 @@ if [ ! -f "${INTEGRATION_JSON}" ]; then
     exit 0
 fi
 
-if ! jq -e '.folded_artifacts.dkg_aggregator.proof_hex and .folded_artifacts.decryption_aggregator.proof_hex' \
-    "${INTEGRATION_JSON}" >/dev/null 2>&1; then
+if ! jq -e '
+    .folded_artifacts.dkg_aggregator.proof_hex
+    and .folded_artifacts.dkg_aggregator.public_inputs_hex
+    and .folded_artifacts.decryption_aggregator.proof_hex
+    and .folded_artifacts.decryption_aggregator.public_inputs_hex
+' "${INTEGRATION_JSON}" >/dev/null 2>&1; then
     echo "Skipping BFV VK binding fixture sync: no valid .folded_artifacts in ${INTEGRATION_JSON}"
     exit 0
 fi

@@ -11,6 +11,8 @@
 //! (matches `topNodes` on-chain). It is not parameterised by `H` (the
 //! folded honest-set size) because `topNodes` always carries the full committee.
 
+// Same value as `configs::default::N_PARTIES` (`committee::micro`, via build-circuits).
+// `default::N_PARTIES` is not importable here: math -> default -> insecure::threshold -> math.
 use crate::configs::committee::micro::N_PARTIES;
 use keccak256::keccak256;
 
