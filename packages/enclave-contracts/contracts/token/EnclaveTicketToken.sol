@@ -3,7 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-pragma solidity ^0.8.27;
+pragma solidity 0.8.28;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -331,6 +331,7 @@ contract EnclaveTicketToken is
         require(amount <= payableBalance, "Exceeds payable balance");
         payableBalance -= amount;
         SafeERC20.safeTransfer(IERC20(address(underlying())), to, amount);
+        emit Payout(to, amount);
     }
 
     /**

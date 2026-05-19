@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pragma solidity >=0.8.27;
+pragma solidity 0.8.28;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {
@@ -111,22 +111,22 @@ contract EnclaveToken is
      * @notice Initializes the Enclave token with name "Enclave" and symbol "ENCL"
      * @dev Sets up the token with voting and permit functionality. Grants admin, minter, and
      *      whitelist roles to the owner; enables transfer restrictions; whitelists the owner.
-     * @param _owner Address that will own the contract and receive admin, minter and whitelist roles.
+     * @param initialOwner_ Address that will own the contract and receive admin, minter and whitelist roles.
      */
     constructor(
-        address _owner
-    ) ERC20("Enclave", "ENCL") ERC20Permit("Enclave") Ownable(_owner) {
+        address initialOwner_
+    ) ERC20("Enclave", "ENCL") ERC20Permit("Enclave") Ownable(initialOwner_) {
         // Grant the deployer all admin roles.
-        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
-        _grantRole(MINTER_ROLE, _owner);
-        _grantRole(WHITELIST_ROLE, _owner);
+        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner_);
+        _grantRole(MINTER_ROLE, initialOwner_);
+        _grantRole(WHITELIST_ROLE, initialOwner_);
 
         // Initialise state variables.
         transfersRestricted = true;
-        transferWhitelisted[_owner] = true;
+        transferWhitelisted[initialOwner_] = true;
 
         emit TransferRestrictionUpdated(true);
-        emit TransferWhitelistUpdated(_owner, true);
+        emit TransferWhitelistUpdated(initialOwner_, true);
     }
 
     /**

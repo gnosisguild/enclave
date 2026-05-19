@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pragma solidity >=0.8.27;
+pragma solidity 0.8.28;
 
 import {
     AccessControlDefaultAdminRules

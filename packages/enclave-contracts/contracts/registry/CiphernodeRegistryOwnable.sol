@@ -3,7 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-pragma solidity >=0.8.27;
+pragma solidity 0.8.28;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
@@ -61,6 +61,10 @@ contract CiphernodeRegistryOwnable is
     /// @notice Emitted when the bonding registry address is set
     /// @param bondingRegistry Address of the bonding registry contract
     event BondingRegistrySet(address indexed bondingRegistry);
+
+    /// @notice Emitted when the slashing manager address is set
+    /// @param slashingManager Address of the slashing manager contract
+    event SlashingManagerSet(address indexed slashingManager);
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -682,7 +686,8 @@ contract CiphernodeRegistryOwnable is
     /// @dev Uses snapshot of ticket balance at (requestBlock - 1) for deterministic validation.
     ///      The -1 offset prevents same-block manipulation attacks where an operator could deposit
     ///      tickets and submit in the same transaction. Deposits in the request block itself are
-    ///      excluded. This is conservative but not fully settled — see TODO below.
+    ///      excluded. This is conservative — deposits in the request block itself are
+    ///      excluded to prevent same-block manipulation attacks.
     /// @param node Address of the ciphernode
     /// @param ticketNumber The ticket number being submitted
     /// @param e3Id ID of the E3 computation

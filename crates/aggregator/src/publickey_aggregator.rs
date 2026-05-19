@@ -8,13 +8,13 @@ use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, BusHandle, CircuitName, ComputeRequest, ComputeResponse, ComputeResponseKind,
-    CorrelationId, DKGRecursiveAggregationComplete, Die, DkgAggregationRequest, E3Failed, E3Stage,
-    E3id, EnclaveEvent, EnclaveEventData, EventContext, FailureReason, KeyshareCreated, OrderedSet,
-    PartyProofsToVerify, PkAggregationProofPending, PkAggregationProofRequest,
-    PkAggregationProofSigned, Proof, ProofType, PublicKeyAggregated, Seed, Sequenced,
-    ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed, SignedProofPayload,
-    TypedEvent, VerificationKind, ZkRequest, ZkResponse,
+    prelude::*, BusHandle, CircuitName, ComputeRequest, ComputeRequestError, ComputeResponse,
+    ComputeResponseKind, CorrelationId, DKGRecursiveAggregationComplete, Die,
+    DkgAggregationRequest, E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EventContext,
+    FailureReason, KeyshareCreated, OrderedSet, PartyProofsToVerify, PkAggregationProofPending,
+    PkAggregationProofRequest, PkAggregationProofSigned, Proof, ProofType, PublicKeyAggregated,
+    Seed, Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed,
+    SignedProofPayload, TypedEvent, VerificationKind, ZkRequest, ZkResponse,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -649,11 +649,51 @@ impl PublicKeyAggregator {
             })
             .count();
         if some_count != 0 && some_count != honest_party_ids.len() {
-            anyhow::bail!(
+            error!(
                 "PublicKeyAggregator: mixed Some/None DKG node proofs across honest parties \
-                 ({some_count} of {} present); refusing to dispatch a truncated DkgAggregation",
-                honest_party_ids.len()
+                 ({some_count} of {} present); failing E3 {}",
+                honest_party_ids.len(),
+                self.e3_id
             );
+            self.bus.publish(
+                E3Failed {
+                    e3_id: self.e3_id.clone(),
+                    failed_at_stage: E3Stage::CommitteeFinalized,
+                    reason: FailureReason::DKGInvalidShares,
+                },
+                ec.clone(),
+            )?;
+            self.state.try_mutate(ec, |state| {
+                let PublicKeyAggregatorState::GeneratingC5Proof {
+                    public_key,
+                    keyshare_bytes,
+                    nodes,
+                    dkg_node_proofs,
+                    honest_party_ids,
+                    dishonest_parties,
+                    dkg_aggregation_correlation: _,
+                    dkg_aggregated_proof,
+                    c5_proof_pending: _,
+                    last_ec,
+                } = state
+                else {
+                    return Ok(state);
+                };
+
+                Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                    public_key,
+                    keyshare_bytes,
+                    nodes,
+                    dkg_node_proofs,
+                    honest_party_ids,
+                    dishonest_parties,
+                    dkg_aggregation_correlation: None,
+                    dkg_aggregated_proof,
+                    c5_proof_pending: None,
+                    last_ec,
+                })
+            })?;
+            return Ok(());
         }
 
         let mut pairs: Vec<_> = dkg_node_proofs
@@ -887,6 +927,73 @@ impl PublicKeyAggregator {
         Ok(())
     }
 
+    fn handle_compute_request_error(&mut self, msg: TypedEvent<ComputeRequestError>) -> Result<()> {
+        let (msg, ec) = msg.into_components();
+        if msg.request().e3_id != self.e3_id {
+            return Ok(());
+        }
+
+        let matched_correlation = matches!(
+            self.state.get(),
+            Some(PublicKeyAggregatorState::GeneratingC5Proof {
+                dkg_aggregation_correlation,
+                ..
+            }) if dkg_aggregation_correlation.as_ref() == Some(msg.correlation_id())
+        );
+
+        if !matched_correlation {
+            return Ok(());
+        }
+
+        error!(
+            "PublicKeyAggregator: DkgAggregation failed for E3 {}: {:?}",
+            self.e3_id,
+            msg.get_err()
+        );
+
+        self.bus.publish(
+            E3Failed {
+                e3_id: self.e3_id.clone(),
+                failed_at_stage: E3Stage::CommitteeFinalized,
+                reason: FailureReason::DKGInvalidShares,
+            },
+            ec.clone(),
+        )?;
+
+        self.state.try_mutate(&ec, |state| {
+            let PublicKeyAggregatorState::GeneratingC5Proof {
+                public_key,
+                keyshare_bytes,
+                nodes,
+                dkg_node_proofs,
+                honest_party_ids,
+                dishonest_parties,
+                dkg_aggregation_correlation: _,
+                dkg_aggregated_proof,
+                c5_proof_pending: _,
+                last_ec,
+            } = state
+            else {
+                return Ok(state);
+            };
+
+            Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                public_key,
+                keyshare_bytes,
+                nodes,
+                dkg_node_proofs,
+                honest_party_ids,
+                dishonest_parties,
+                dkg_aggregation_correlation: None,
+                dkg_aggregated_proof,
+                c5_proof_pending: None,
+                last_ec,
+            })
+        })?;
+
+        Ok(())
+    }
+
     pub fn handle_member_expelled(
         &mut self,
         node: &str,
@@ -975,6 +1082,9 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::ComputeResponse(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::ComputeRequestError(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
@@ -1131,9 +1241,201 @@ impl Handler<TypedEvent<ComputeResponse>> for PublicKeyAggregator {
     }
 }
 
+impl Handler<TypedEvent<ComputeRequestError>> for PublicKeyAggregator {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ComputeRequestError>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(
+            EType::PublickeyAggregation,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_compute_request_error(msg),
+        )
+    }
+}
+
 impl Handler<Die> for PublicKeyAggregator {
     type Result = ();
     fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
         ctx.stop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use e3_data::{AutoPersist, DataStore, InMemStore, Repository};
+    use e3_events::{ComputeRequestErrorKind, HistoryCollector, TakeEvents, Unsequenced, ZkError};
+    use e3_test_helpers::get_common_setup;
+
+    fn test_ctx(data: impl Into<EnclaveEventData>) -> EventContext<Sequenced> {
+        EventContext::<Unsequenced>::from(data.into()).sequence(0)
+    }
+
+    fn test_state(
+        initial_state: PublicKeyAggregatorState,
+    ) -> Persistable<PublicKeyAggregatorState> {
+        let repo = Repository::<PublicKeyAggregatorState>::new(DataStore::from_in_mem(
+            &InMemStore::new(false).start(),
+        ));
+        repo.to_connector().send(Some(initial_state))
+    }
+
+    fn dummy_proof(circuit: CircuitName) -> Proof {
+        Proof::new(
+            circuit,
+            ArcBytes::from_bytes(&[1]),
+            ArcBytes::from_bytes(&[2]),
+        )
+    }
+
+    fn generating_c5_state(correlation_id: CorrelationId) -> PublicKeyAggregatorState {
+        PublicKeyAggregatorState::GeneratingC5Proof {
+            public_key: ArcBytes::from_bytes(&[1, 2, 3]),
+            keyshare_bytes: Vec::new(),
+            nodes: OrderedSet::new(),
+            dkg_node_proofs: HashMap::new(),
+            honest_party_ids: BTreeSet::new(),
+            dishonest_parties: BTreeSet::new(),
+            dkg_aggregation_correlation: Some(correlation_id),
+            dkg_aggregated_proof: None,
+            c5_proof_pending: Some(dummy_proof(CircuitName::PkAggregation)),
+            last_ec: None,
+        }
+    }
+
+    async fn build_public_key_aggregator(
+        initial_state: PublicKeyAggregatorState,
+    ) -> Result<(
+        PublicKeyAggregator,
+        Addr<HistoryCollector<EnclaveEvent>>,
+        E3id,
+    )> {
+        let (bus, rng, _seed, params, crp, _errors, history) =
+            get_common_setup(Some(BfvPreset::InsecureThreshold512.into()))?;
+        let e3_id = E3id::new("42", 1);
+        let fhe = Arc::new(Fhe::new(params, crp, rng));
+        let aggregator = PublicKeyAggregator::new(
+            PublicKeyAggregatorParams {
+                fhe,
+                bus,
+                e3_id: e3_id.clone(),
+                params_preset: BfvPreset::InsecureThreshold512,
+            },
+            test_state(initial_state),
+        );
+
+        Ok((aggregator, history, e3_id))
+    }
+
+    async fn next_event(history: &Addr<HistoryCollector<EnclaveEvent>>) -> Result<EnclaveEvent> {
+        let mut result = history.send(TakeEvents::<EnclaveEvent>::new(1)).await?;
+        assert!(!result.timed_out, "timed out waiting for an event");
+        Ok(result.events.pop().expect("expected one event"))
+    }
+
+    #[actix::test]
+    async fn dkg_aggregation_compute_error_emits_e3_failed() -> Result<()> {
+        let correlation_id = CorrelationId::new();
+        let (mut aggregator, history, e3_id) =
+            build_public_key_aggregator(generating_c5_state(correlation_id.clone())).await?;
+
+        let request = ComputeRequest::zk(
+            ZkRequest::DkgAggregation(DkgAggregationRequest {
+                node_fold_proofs: vec![dummy_proof(CircuitName::PkAggregation)],
+                c5_proof: dummy_proof(CircuitName::PkAggregation),
+                party_ids: vec![0],
+                params_preset: BfvPreset::InsecureThreshold512,
+            }),
+            correlation_id,
+            e3_id.clone(),
+        );
+
+        aggregator.handle_compute_request_error(TypedEvent::new(
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkError::ProofGenerationFailed("boom".to_string())),
+                request,
+            ),
+            test_ctx(E3Failed {
+                e3_id: e3_id.clone(),
+                failed_at_stage: E3Stage::None,
+                reason: FailureReason::None,
+            }),
+        ))?;
+
+        let event = next_event(&history).await?;
+        assert!(matches!(
+            event.into_data(),
+            EnclaveEventData::E3Failed(data)
+                if data.e3_id == e3_id
+                    && data.failed_at_stage == E3Stage::CommitteeFinalized
+                    && data.reason == FailureReason::DKGInvalidShares
+        ));
+
+        let Some(PublicKeyAggregatorState::GeneratingC5Proof {
+            dkg_aggregation_correlation,
+            c5_proof_pending,
+            ..
+        }) = aggregator.state.get()
+        else {
+            panic!("expected GeneratingC5Proof state");
+        };
+        assert!(dkg_aggregation_correlation.is_none());
+        assert!(c5_proof_pending.is_none());
+
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn mixed_dkg_proofs_emit_e3_failed() -> Result<()> {
+        let correlation_id = CorrelationId::new();
+        let mut initial_state = generating_c5_state(correlation_id);
+        let PublicKeyAggregatorState::GeneratingC5Proof {
+            ref mut dkg_aggregation_correlation,
+            ref mut dkg_node_proofs,
+            ref mut honest_party_ids,
+            ..
+        } = initial_state
+        else {
+            unreachable!();
+        };
+        *dkg_aggregation_correlation = None;
+        honest_party_ids.extend([0, 1]);
+        dkg_node_proofs.insert(0, Some(dummy_proof(CircuitName::PkAggregation)));
+        dkg_node_proofs.insert(1, None);
+
+        let (mut aggregator, history, e3_id) = build_public_key_aggregator(initial_state).await?;
+        let ec = test_ctx(E3Failed {
+            e3_id: e3_id.clone(),
+            failed_at_stage: E3Stage::None,
+            reason: FailureReason::None,
+        });
+
+        aggregator.try_dispatch_dkg_aggregation(&ec)?;
+
+        let event = next_event(&history).await?;
+        assert!(matches!(
+            event.into_data(),
+            EnclaveEventData::E3Failed(data)
+                if data.e3_id == e3_id
+                    && data.failed_at_stage == E3Stage::CommitteeFinalized
+                    && data.reason == FailureReason::DKGInvalidShares
+        ));
+
+        let Some(PublicKeyAggregatorState::GeneratingC5Proof {
+            dkg_aggregation_correlation,
+            c5_proof_pending,
+            ..
+        }) = aggregator.state.get()
+        else {
+            panic!("expected GeneratingC5Proof state");
+        };
+        assert!(dkg_aggregation_correlation.is_none());
+        assert!(c5_proof_pending.is_none());
+
+        Ok(())
     }
 }

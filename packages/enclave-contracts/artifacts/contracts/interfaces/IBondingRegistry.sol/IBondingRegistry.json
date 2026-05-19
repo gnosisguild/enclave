@@ -164,6 +164,7 @@
         {
           "indexed": true,
           "internalType": "address",
+<<<<<<< HEAD
           "name": "recipient",
           "type": "address"
         },
@@ -181,6 +182,13 @@
         }
       ],
       "name": "LicenseTransferShortfall",
+=======
+          "name": "licenseToken",
+          "type": "address"
+        }
+      ],
+      "name": "LicenseTokenSet",
+>>>>>>> main
       "type": "event"
     },
     {
@@ -208,6 +216,19 @@
         {
           "indexed": true,
           "internalType": "address",
+          "name": "registry",
+          "type": "address"
+        }
+      ],
+      "name": "RegistrySet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
           "name": "distributor",
           "type": "address"
         },
@@ -219,6 +240,19 @@
         }
       ],
       "name": "RewardDistributorUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "treasury",
+          "type": "address"
+        }
+      ],
+      "name": "SlashedFundsTreasurySet",
       "type": "event"
     },
     {
@@ -252,6 +286,19 @@
         {
           "indexed": true,
           "internalType": "address",
+          "name": "slashingManager",
+          "type": "address"
+        }
+      ],
+      "name": "SlashingManagerSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
           "name": "operator",
           "type": "address"
         },
@@ -275,6 +322,19 @@
         }
       ],
       "name": "TicketBalanceUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "ticketToken",
+          "type": "address"
+        }
+      ],
+      "name": "TicketTokenSet",
       "type": "event"
     },
     {
@@ -970,5 +1030,9 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IBondingRegistry.sol",
+<<<<<<< HEAD
   "buildInfoId": "solc-0_8_28-08316200c2ed027c032ded4708a03faf67f258a3"
+=======
+  "buildInfoId": "solc-0_8_28-2705a75bc2d2d1f8b1e08ebca4cc37d76480abc8"
+>>>>>>> main
 }

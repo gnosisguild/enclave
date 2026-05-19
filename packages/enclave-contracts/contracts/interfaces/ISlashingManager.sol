@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pragma solidity >=0.8.27;
+pragma solidity 0.8.28;
 
 import { IBondingRegistry } from "./IBondingRegistry.sol";
 import { IE3RefundManager } from "./IE3RefundManager.sol";
@@ -339,6 +339,30 @@ interface ISlashingManager {
      * @param amount Amount that failed to route
      */
     event RoutingFailed(uint256 indexed e3Id, uint256 amount);
+
+    /**
+     * @notice Emitted when the bonding registry is set
+     * @param bondingRegistry Address of the bonding registry
+     */
+    event BondingRegistrySet(address indexed bondingRegistry);
+
+    /**
+     * @notice Emitted when the ciphernode registry is set
+     * @param ciphernodeRegistry Address of the ciphernode registry
+     */
+    event CiphernodeRegistrySet(address indexed ciphernodeRegistry);
+
+    /**
+     * @notice Emitted when the Enclave contract is set
+     * @param enclave Address of the Enclave contract
+     */
+    event EnclaveSet(address indexed enclave);
+
+    /**
+     * @notice Emitted when the E3 Refund Manager is set
+     * @param e3RefundManager Address of the E3 Refund Manager
+     */
+    event E3RefundManagerSet(address indexed e3RefundManager);
 
     // ======================
     // View Functions
