@@ -4,9 +4,132 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import fs from "fs";
+import { fileURLToPath } from "node:url";
 import path from "path";
 
 export const deploymentsFile = path.join("deployed_contracts.json");
+
+/** Monorepo root (`enclave/`), resolved from `packages/enclave-contracts/scripts/`. */
+export const REPO_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../..",
+);
+
+/** Recursive VK hashes for `BfvPkVerifier` sub-circuits (from `pnpm compile:circuits`). */
+export const BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS = {
+  nodesFold: path.join(
+    REPO_ROOT,
+    "circuits/bin/recursive_aggregation/nodes_fold/target/nodes_fold.vk_recursive_hash",
+  ),
+  c5: path.join(
+    REPO_ROOT,
+    "circuits/bin/threshold/target/pk_aggregation.vk_recursive_hash",
+  ),
+} as const;
+
+/** Recursive VK hashes for `BfvDecryptionVerifier` sub-circuits (from `pnpm compile:circuits`). */
+export const BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS = {
+  c6Fold: path.join(
+    REPO_ROOT,
+    "circuits/bin/recursive_aggregation/c6_fold/target/c6_fold.vk_recursive_hash",
+  ),
+  c7: path.join(
+    REPO_ROOT,
+    "circuits/bin/threshold/target/decrypted_shares_aggregation.vk_recursive_hash",
+  ),
+} as const;
+
+/**
+ * Reads a 32-byte recursive VK hash emitted by the circuit build (`*.vk_recursive_hash`).
+ * Co-redeploy `BfvPkVerifier` / `BfvDecryptionVerifier` when the corresponding sub-circuit VK changes.
+ */
+export function readVkRecursiveHash(filePath: string): string {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(
+      `Missing circuit VK hash file: ${filePath}. Run pnpm compile:circuits.`,
+    );
+  }
+
+  const raw = fs.readFileSync(filePath);
+  if (raw.length !== 32) {
+    throw new Error(
+      `Invalid VK hash length in ${filePath}: expected 32 bytes, got ${raw.length}`,
+    );
+  }
+
+  return `0x${raw.toString("hex")}`;
+}
+
+/** On-chain `BfvPkVerifier` sub-circuit VK immutables (for deploy-time staleness checks). */
+export interface BfvPkVerifierVkReader {
+  expectedNodesFoldKeyHash(): Promise<string>;
+  expectedC5KeyHash(): Promise<string>;
+}
+
+/** On-chain `BfvDecryptionVerifier` sub-circuit VK immutables (for deploy-time staleness checks). */
+export interface BfvDecryptionVerifierVkReader {
+  expectedC6FoldKeyHash(): Promise<string>;
+  expectedC7KeyHash(): Promise<string>;
+}
+
+/**
+ * Ensures deployed `BfvPkVerifier` immutables match current `*.vk_recursive_hash` artifacts.
+ * Call when reusing an address from `deployed_contracts.json` after `pnpm compile:circuits`.
+ */
+export async function assertBfvPkVerifierSubCircuitVkHashes(
+  verifier: BfvPkVerifierVkReader,
+  address: string,
+): Promise<void> {
+  const expectedNodesFold = readVkRecursiveHash(
+    BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS.nodesFold,
+  );
+  const expectedC5 = readVkRecursiveHash(BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS.c5);
+  const [onChainNodesFold, onChainC5] = await Promise.all([
+    verifier.expectedNodesFoldKeyHash(),
+    verifier.expectedC5KeyHash(),
+  ]);
+
+  if (onChainNodesFold === expectedNodesFold && onChainC5 === expectedC5) {
+    return;
+  }
+
+  throw new Error(
+    `BfvPkVerifier at ${address} has stale sub-circuit VK immutables. ` +
+      `On-chain nodes_fold=${onChainNodesFold} expected=${expectedNodesFold}; ` +
+      `on-chain c5=${onChainC5} expected=${expectedC5}. ` +
+      `Redeploy after pnpm compile:circuits or remove the stale entry from deployed_contracts.json.`,
+  );
+}
+
+/**
+ * Ensures deployed `BfvDecryptionVerifier` immutables match current `*.vk_recursive_hash` artifacts.
+ */
+export async function assertBfvDecryptionVerifierSubCircuitVkHashes(
+  verifier: BfvDecryptionVerifierVkReader,
+  address: string,
+): Promise<void> {
+  const expectedC6Fold = readVkRecursiveHash(
+    BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS.c6Fold,
+  );
+  const expectedC7 = readVkRecursiveHash(
+    BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS.c7,
+  );
+  const [onChainC6Fold, onChainC7] = await Promise.all([
+    verifier.expectedC6FoldKeyHash(),
+    verifier.expectedC7KeyHash(),
+  ]);
+
+  if (onChainC6Fold === expectedC6Fold && onChainC7 === expectedC7) {
+    return;
+  }
+
+  throw new Error(
+    `BfvDecryptionVerifier at ${address} has stale sub-circuit VK immutables. ` +
+      `On-chain c6_fold=${onChainC6Fold} expected=${expectedC6Fold}; ` +
+      `on-chain c7=${onChainC7} expected=${expectedC7}. ` +
+      `Redeploy after pnpm compile:circuits or remove the stale entry from deployed_contracts.json.`,
+  );
+}
 
 // Type for deployment arguments
 export interface DeploymentArgs {
