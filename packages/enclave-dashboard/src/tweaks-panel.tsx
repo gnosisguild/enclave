@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 // tweaks-panel.tsx
 // Reusable Tweaks shell + form-control helpers ported from the Claude Design
 // starter runtime. The host-protocol postMessage bridge (used inside Claude

@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 // E3 Inspector — deep technical record of a single E3.
 
 import React, { useEffect, useRef, useState } from 'react'
-import { STAGES, E3_DETAILS, E3_LIST } from './data'
+import { STAGES } from './data'
 import { CONTRACTS } from './lib/chain'
 import { explorerAddress } from './lib/links'
+import type { InspectorDetail } from './lib/adapt'
+import Loader from './Loader'
 
 export type InspectorE3List = Array<{ id: string; label: string }>
 
@@ -195,26 +202,44 @@ function EventLog({ events }: { events: any[] }) {
 }
 
 export default function Inspector({
-  e3List: e3ListProp,
-  e3Override,
-  selectedId: selectedIdProp,
+  e3List,
+  e3,
+  selectedId,
   onSelect,
   loading,
   error,
 }: {
-  e3List?: InspectorE3List
-  e3Override?: any
+  e3List: InspectorE3List
+  e3: InspectorDetail | null
   selectedId?: string
-  onSelect?: (id: string) => void
+  onSelect: (id: string) => void
   loading?: boolean
   error?: Error | null
-} = {}) {
-  const list = e3ListProp && e3ListProp.length > 0 ? e3ListProp : E3_LIST
-  const fallbackId = list[0]?.id ?? 'E3-0481'
-  const [localId, setLocalId] = useState(fallbackId)
-  const selectedId = selectedIdProp ?? localId
-  const setSelectedId = onSelect ?? setLocalId
-  const e3 = e3Override ?? E3_DETAILS[selectedId] ?? E3_DETAILS['E3-0481']
+}) {
+  const list = e3List
+  const setSelectedId = onSelect
+
+  if (!e3) {
+    return (
+      <div className='inspector'>
+        {error ? (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: 8,
+              fontSize: 12,
+              background: '#fff1f0',
+              color: '#8a1f1f',
+            }}
+          >
+            {`Failed to load on-chain data: ${error.message}.`}
+          </div>
+        ) : (
+          <Loader label='Loading E3 detail' sub='Reading from Sepolia…' />
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className='inspector'>
@@ -229,7 +254,7 @@ export default function Inspector({
             color: error ? '#8a1f1f' : '#3a3f4a',
           }}
         >
-          {error ? `Failed to load on-chain data: ${error.message}. Showing cached preview.` : 'Loading on-chain data from Sepolia…'}
+          {error ? `Failed to load on-chain data: ${error.message}.` : 'Refreshing from Sepolia…'}
         </div>
       )}
       <section className='insp-head'>
@@ -284,14 +309,14 @@ export default function Inspector({
             <div className='insp-stat__sub'>threshold · total nodes</div>
           </div>
           <div className='insp-stat'>
-            <div className='insp-stat__label'>Ballots</div>
-            <div className='insp-stat__value mono'>{e3.input.ballotsReceived.toLocaleString()}</div>
-            <div className='insp-stat__sub'>encrypted · in-flight</div>
+            <div className='insp-stat__label'>Inputs</div>
+            <div className='insp-stat__value mono'>{e3.input.inputsReceived}</div>
+            <div className='insp-stat__sub'>encrypted · published</div>
           </div>
           <div className='insp-stat'>
-            <div className='insp-stat__label'>Compute fee</div>
-            <div className='insp-stat__value mono'>{e3.fees.computeFee}</div>
-            <div className='insp-stat__sub'>of {e3.fees.requesterDeposit} deposit</div>
+            <div className='insp-stat__label'>Fee escrowed</div>
+            <div className='insp-stat__value mono'>{e3.fees.feeEscrowed}</div>
+            <div className='insp-stat__sub'>held by Enclave</div>
           </div>
         </div>
       </section>
@@ -318,7 +343,6 @@ export default function Inspector({
                 </Mono>,
               ],
               ['Selection seed', <Mono>{e3.committee.selectionSeed}</Mono>],
-              ['Selection tx', <CopyableHash value={e3.committee.selectionTx} />],
               ['Drawn at', <Mono>{e3.committee.drawnAt}</Mono>],
               ['Identities', <span className='dl__muted'>{e3.committee.note}</span>],
             ]}
@@ -326,161 +350,85 @@ export default function Inspector({
         </div>
       </SectionCard>
 
-      <SectionCard eyebrow='02 · Keygen' title='Distributed key generation' status={{ kind: 'done', label: 'Complete' }}>
+      <SectionCard eyebrow='02 · Keygen' title='Distributed key generation'>
         <p className='isection__lede'>
-          The committee jointly produced an encryption key in three rounds. The matching <em>decryption</em> key is held in shares — never
-          assembled, never written down.
+          The committee jointly generated an encryption key. The matching <em>decryption</em> key is held in shares — never assembled, never
+          written down.
         </p>
-        <div className='kg-protocol'>
-          <span className='kg-protocol__label'>Protocol</span>
-          <Mono>{e3.keygen.protocol}</Mono>
-        </div>
-        <ol className='kg-rounds'>
-          {e3.keygen.rounds.map((r: any, i: number) => (
-            <li key={i} className={`kg-round kg-round--${r.status}`}>
-              <div className='kg-round__num mono'>{String(i + 1).padStart(2, '0')}</div>
-              <div className='kg-round__body'>
-                <div className='kg-round__top'>
-                  <div className='kg-round__name'>{r.name}</div>
-                  <div className='kg-round__chips'>
-                    <span className='kg-chip'>
-                      <span className='kg-chip__k'>Participants</span>
-                      <span className='mono'>{r.participants}</span>
-                    </span>
-                    <span className='kg-chip'>
-                      <span className='kg-chip__k'>Started</span>
-                      <span className='mono'>{r.startedAt}</span>
-                    </span>
-                    <span className='kg-chip'>
-                      <span className='kg-chip__k'>Duration</span>
-                      <span className='mono'>{r.duration}</span>
-                    </span>
-                    <span className='kg-chip kg-chip--tx'>
-                      <CopyableHash value={r.tx} />
-                    </span>
-                  </div>
-                </div>
-                <div className='kg-round__note'>{r.note}</div>
-              </div>
-            </li>
-          ))}
-        </ol>
-        <div className='kg-pk'>
-          <span className='kg-pk__label'>Joint public key</span>
-          <Mono>{e3.keygen.publicKey}</Mono>
-        </div>
+        <DefList
+          items={[
+            ['Encryption scheme', <Mono>{e3.keygen.scheme}</Mono>],
+            ['Committee finalized', <Mono>{e3.keygen.finalizedAt}</Mono>],
+            ['Public key published', <Mono>{e3.keygen.publishedAt}</Mono>],
+            [
+              'Publish tx',
+              e3.keygen.publishedTx === '—' ? (
+                <Mono>—</Mono>
+              ) : (
+                <CopyableHash
+                  value={`${e3.keygen.publishedTx.slice(0, 10)}…${e3.keygen.publishedTx.slice(-6)}`}
+                  full={e3.keygen.publishedTx}
+                />
+              ),
+            ],
+            ['Joint public key', <Mono>{e3.keygen.publicKey}</Mono>],
+          ]}
+        />
       </SectionCard>
 
-      <SectionCard eyebrow='03 · Input Window' title='Encrypted ballots received' status={{ kind: 'live', label: 'Active' }}>
+      <SectionCard eyebrow='03 · Input Window' title='Encrypted inputs received'>
         <div className='isection__grid'>
           <DefList
             items={[
               ['Opened', <Mono>{e3.input.openedAt}</Mono>],
               ['Closes', <Mono>{e3.input.closesAt}</Mono>],
-              ['Ballots received', <Mono>{e3.input.ballotsReceived.toLocaleString()}</Mono>],
+              ['Inputs received', <Mono>{e3.input.inputsReceived}</Mono>],
             ]}
           />
           <DefList
             items={[
-              ['First ballot', <Mono>{e3.input.firstBallotAt}</Mono>],
-              ['Last ballot', <Mono>{e3.input.lastBallotAt}</Mono>],
-              ['Avg ballot size', <Mono>{e3.input.avgBallotSize}</Mono>],
-              ['Ballot circuit', <Mono>{e3.input.ballotCircuit}</Mono>],
+              ['First input', <Mono>{e3.input.firstBallotAt}</Mono>],
+              ['Last input', <Mono>{e3.input.lastBallotAt}</Mono>],
             ]}
           />
         </div>
       </SectionCard>
 
-      <SectionCard eyebrow='04 · Compute' title='Homomorphic tally' status={{ kind: 'pending', label: 'Pending' }}>
+      <SectionCard eyebrow='04 · Compute' title='FHE computation' status={{ kind: 'pending', label: 'Pending' }}>
         <p className='isection__lede'>{e3.compute.note}</p>
-        <DefList
-          items={[
-            ['Tally circuit', <Mono>{e3.compute.circuit}</Mono>],
-            ['Estimated duration', <Mono>{e3.compute.estDuration}</Mono>],
-            ['Estimated gas', <Mono>{e3.compute.estGas}</Mono>],
-          ]}
-        />
       </SectionCard>
 
       <SectionCard eyebrow='05 · Decryption' title='Threshold decryption' status={{ kind: 'pending', label: 'Pending' }}>
         <p className='isection__lede'>{e3.decryption.note}</p>
-        <div className='dec-progress'>
-          <div className='dec-progress__head'>
-            <span>Partial decryptions received</span>
-            <Mono>
-              {e3.decryption.sharesReceived} / {e3.decryption.sharesRequired}
-            </Mono>
-          </div>
-          <div className='dec-progress__bar'>
-            <div
-              className='dec-progress__fill'
-              style={{
-                width: `${(e3.decryption.sharesReceived / e3.decryption.sharesRequired) * 100}%`,
-              }}
-            />
-          </div>
-          <div className='dec-progress__sub'>
-            {e3.decryption.sharesRequired} of {e3.committee.size} committee members must each publish a partial share.
-          </div>
-        </div>
+        <DefList
+          items={[
+            [
+              'Decryption threshold',
+              <Mono>
+                {e3.decryption.threshold} of {e3.decryption.committeeSize}
+              </Mono>,
+            ],
+          ]}
+        />
       </SectionCard>
 
       <SectionCard eyebrow='06 · Publication' title='Result on-chain' status={{ kind: 'pending', label: 'Pending' }}>
         <p className='isection__lede'>{e3.publication.note}</p>
       </SectionCard>
 
-      <SectionCard eyebrow='07 · Fees & settlement' title='Where the deposit goes'>
+      <SectionCard eyebrow='07 · Fees & settlement' title='Fees'>
         <div className='fees'>
-          <div className='fees__split' aria-hidden='true'>
-            <div
-              className='fees__split-seg fees__split-seg--committee'
-              style={{ flex: 0.0312 }}
-              title={`Committee reward · ${e3.fees.committeeReward}`}
-            />
-            <div
-              className='fees__split-seg fees__split-seg--network'
-              style={{ flex: 0.0084 }}
-              title={`Network fee · ${e3.fees.networkFee}`}
-            />
-            <div
-              className='fees__split-seg fees__split-seg--refund'
-              style={{ flex: 0.454 }}
-              title={`Refundable · ${e3.fees.refundAvailable}`}
-            />
-          </div>
-          <ul className='fees__legend'>
-            <li>
-              <span className='fees__swatch fees__swatch--committee' />
-              <div className='fees__legend-body'>
-                <div className='fees__legend-k'>Committee reward</div>
-                <div className='mono fees__legend-v'>{e3.fees.committeeReward}</div>
-                <div className='fees__legend-pct'>6.2% of deposit</div>
-              </div>
-            </li>
-            <li>
-              <span className='fees__swatch fees__swatch--network' />
-              <div className='fees__legend-body'>
-                <div className='fees__legend-k'>Network fee</div>
-                <div className='mono fees__legend-v'>{e3.fees.networkFee}</div>
-                <div className='fees__legend-pct'>1.7% of deposit</div>
-              </div>
-            </li>
-            <li>
-              <span className='fees__swatch fees__swatch--refund' />
-              <div className='fees__legend-body'>
-                <div className='fees__legend-k'>Refundable to requester</div>
-                <div className='mono fees__legend-v'>{e3.fees.refundAvailable}</div>
-                <div className='fees__legend-pct'>90.8% of deposit</div>
-              </div>
-            </li>
-          </ul>
           <DefList
             items={[
-              ['Requester deposit', <Mono>{e3.fees.requesterDeposit}</Mono>],
-              ['Compute fee', <Mono>{e3.fees.computeFee}</Mono>],
+              ['Fee escrowed', <Mono>{e3.fees.feeEscrowed}</Mono>],
+              ['Committee reward paid', <Mono>{e3.fees.committeeReward}</Mono>],
               ['Settlement', <span className='dl__muted'>{e3.fees.currency}</span>],
             ]}
           />
+          <p className='isection__lede'>
+            Fee escrowed is the amount currently held by the Enclave contract for this E3; it is released to the committee and any refund on
+            settlement, so a completed E3 reads 0. Committee reward shows the total paid out once rewards are distributed.
+          </p>
         </div>
       </SectionCard>
 

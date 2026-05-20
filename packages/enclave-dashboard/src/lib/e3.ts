@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 // On-chain E3 fetchers — read events + view functions and assemble dashboard records.
 
 import { CONTRACTS, DEPLOY_BLOCK, E3Stage, ciphernodeRegistryAbi, enclaveAbi, publicClient } from './chain'
@@ -10,11 +15,26 @@ function eventAbi(abi: readonly any[], name: string): any {
 }
 
 const ENCLAVE_E3_REQUESTED = eventAbi(enclaveAbi as any, 'E3Requested')
-const ENCLAVE_INPUT_PUBLISHED = eventAbi(enclaveAbi as any, 'InputPublished')
 const ENCLAVE_PLAINTEXT_PUBLISHED = eventAbi(enclaveAbi as any, 'PlaintextOutputPublished')
+const ENCLAVE_REWARDS_DISTRIBUTED = eventAbi(enclaveAbi as any, 'RewardsDistributed')
 const REGISTRY_COMMITTEE_REQUESTED = eventAbi(ciphernodeRegistryAbi as any, 'CommitteeRequested')
 const REGISTRY_COMMITTEE_FINALIZED = eventAbi(ciphernodeRegistryAbi as any, 'CommitteeFinalized')
 const REGISTRY_COMMITTEE_PUBLISHED = eventAbi(ciphernodeRegistryAbi as any, 'CommitteePublished')
+
+// CRISP votes are NOT published through Enclave (its IEnclave.InputPublished
+// event is declared but never emitted). Each E3 program records its own inputs.
+// CRISPProgram emits this on every accepted ballot; a re-vote reuses the same
+// `index` (the vote's Merkle-tree leaf), so the true ballot count is the number
+// of DISTINCT indexes, not the event count.
+const CRISP_INPUT_PUBLISHED = {
+  type: 'event',
+  name: 'InputPublished',
+  inputs: [
+    { name: 'e3Id', type: 'uint256', indexed: true },
+    { name: 'encryptedVote', type: 'bytes', indexed: false },
+    { name: 'index', type: 'uint256', indexed: false },
+  ],
+} as const
 
 // Public RPCs cap getLogs range. 9_500 keeps us safely under common 10k limits.
 const LOG_CHUNK = 9_500n
@@ -61,43 +81,64 @@ export type E3Summary = {
   requestTxHash: `0x${string}`
   inputWindow: [bigint, bigint]
   committeeSize: number
-  stage: number // raw Solidity E3Stage enum
-}
-
-// Whether an E3 is a "real" poll worth surfacing. Hides:
-//  - Failed E3s.
-//  - Abandoned E3s: voting window has closed but the E3 never reached the
-//    compute phase (CiphertextReady) and never completed — i.e. it stalled
-//    before producing anything. (A poll legitimately in compute/decryption has
-//    a closed window but stage >= CiphertextReady, so it stays visible.)
-export function isRealPoll(stage: number, inputWindowClose: bigint): boolean {
-  if (stage === E3Stage.Failed) return false
-  if (stage === E3Stage.Complete) return true
-  const now = BigInt(Math.floor(Date.now() / 1000))
-  const windowClosed = inputWindowClose !== 0n && now > inputWindowClose
-  if (windowClosed && stage < E3Stage.CiphertextReady) return false
-  return true
 }
 
 export type E3FullDetails = E3Summary & {
   stage: number // raw Solidity enum
   uiStageIdx: number
+  seed: bigint
+  encryptionSchemeId: `0x${string}`
   committeePublicKey: `0x${string}`
   ciphertextOutput: `0x${string}`
   plaintextOutput: `0x${string}`
+  requestedAt?: number // unix seconds (block time of the request)
   // From CiphernodeRegistry:
   committeeThreshold: [number, number] // [M, N]
   committeeMembers: `0x${string}`[]
   committeeFinalizedTx?: `0x${string}`
+  committeeFinalizedAt?: number
+  committeeFinalizedBlock?: bigint
   committeePublishedTx?: `0x${string}`
-  // Aggregated:
+  committeePublishedAt?: number
+  committeePublishedBlock?: bigint
+  // Aggregated inputs. inputsTracked is true only for programs whose input
+  // event we understand (CRISP); for other programs inputs aren't observable
+  // from the dashboard, so ballotCount is 0 and inputsTracked is false.
+  // ballotCount is the number of DISTINCT ballots (re-votes are not counted
+  // twice). ballotEvents holds the raw on-chain events (incl. re-votes).
+  inputsTracked: boolean
   ballotCount: number
   ballotEvents: Array<{
     blockNumber: bigint
     txHash: `0x${string}`
     index: bigint
+    timestamp?: number
   }>
   resultTxHash?: `0x${string}`
+  resultAt?: number
+  resultBlock?: bigint
+  // Fees, in fee-token base units (MockUSDC, 6 decimals). feeEscrowed is the
+  // amount currently held for the E3 — note Enclave zeroes it on settlement or
+  // refund, so a completed/refunded E3 reads 0. committeeReward is the real
+  // total paid out to the committee (only known once RewardsDistributed fires).
+  feeEscrowed: bigint
+  committeeReward?: bigint
+}
+
+// Resolve unix timestamps for a (small, bounded) set of block numbers, deduped.
+async function blockTimestamps(blocks: bigint[]): Promise<Map<string, number>> {
+  const uniq = Array.from(new Set(blocks.filter((b) => b > 0n).map((b) => b.toString())))
+  const entries = await Promise.all(
+    uniq.map(async (s) => {
+      try {
+        const b = await publicClient.getBlock({ blockNumber: BigInt(s) })
+        return [s, Number(b.timestamp)] as const
+      } catch {
+        return [s, 0] as const
+      }
+    }),
+  )
+  return new Map(entries)
 }
 
 async function getLogsChunked<T>(
@@ -118,7 +159,14 @@ export async function fetchLatestBlock(): Promise<bigint> {
   return publicClient.getBlockNumber()
 }
 
-export async function fetchE3List(toBlock?: bigint): Promise<E3Summary[]> {
+export type FetchE3Opts = {
+  // CRISP poll view: only E3s whose program is the CRISPProgram.
+  crispOnly?: boolean
+  toBlock?: bigint
+}
+
+export async function fetchE3List(opts: FetchE3Opts = {}): Promise<E3Summary[]> {
+  const { crispOnly = false, toBlock } = opts
   const head = toBlock ?? (await fetchLatestBlock())
   const logs = await getLogsChunked<any>(
     {
@@ -129,38 +177,20 @@ export async function fetchE3List(toBlock?: bigint): Promise<E3Summary[]> {
     head,
   )
 
-  // Only CRISP-program E3s are polls. Skip everything else.
-  const crispLogs = logs.filter((log) => isCrispE3(log.args.e3.e3Program))
+  const scoped = crispOnly ? logs.filter((log) => isCrispE3(log.args.e3.e3Program)) : logs
 
-  // Fetch the current stage of each E3 in one multicall so we can drop failed
-  // and abandoned polls (see isRealPoll).
-  const stages = await (publicClient.multicall as any)({
-    contracts: crispLogs.map((log) => ({
-      address: CONTRACTS.Enclave,
-      abi: enclaveAbi,
-      functionName: 'getE3Stage',
-      args: [log.args.e3Id],
-    })),
-    allowFailure: true,
+  const out: E3Summary[] = scoped.map((log) => {
+    const { e3Id, e3 } = log.args
+    return {
+      id: e3Id,
+      e3Program: e3.e3Program,
+      requester: e3.requester,
+      requestBlock: e3.requestBlock,
+      requestTxHash: log.transactionHash,
+      inputWindow: [e3.inputWindow[0], e3.inputWindow[1]] as [bigint, bigint],
+      committeeSize: Number(e3.committeeSize),
+    }
   })
-
-  const out: E3Summary[] = crispLogs
-    .map((log, i) => {
-      const { e3Id, e3 } = log.args
-      const stageResult = stages[i]
-      const stage = stageResult.status === 'success' ? Number(stageResult.result) : E3Stage.None
-      return {
-        id: e3Id,
-        e3Program: e3.e3Program,
-        requester: e3.requester,
-        requestBlock: e3.requestBlock,
-        requestTxHash: log.transactionHash,
-        inputWindow: [e3.inputWindow[0], e3.inputWindow[1]] as [bigint, bigint],
-        committeeSize: Number(e3.committeeSize),
-        stage,
-      }
-    })
-    .filter((s) => isRealPoll(s.stage, s.inputWindow[1]))
 
   // Sort newest first.
   out.sort((a, b) => Number(b.requestBlock - a.requestBlock))
@@ -170,8 +200,8 @@ export async function fetchE3List(toBlock?: bigint): Promise<E3Summary[]> {
 export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3FullDetails> {
   const head = toBlock ?? (await fetchLatestBlock())
 
-  // 1. Pull live E3 struct + stage.
-  const [e3, stage] = await Promise.all([
+  // 1. Pull live E3 struct + stage + currently-escrowed fee.
+  const [e3, stage, feeEscrowed] = await Promise.all([
     (publicClient.readContract as any)({
       address: CONTRACTS.Enclave,
       abi: enclaveAbi,
@@ -184,6 +214,12 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
       functionName: 'getE3Stage',
       args: [e3Id],
     }) as Promise<number>,
+    (publicClient.readContract as any)({
+      address: CONTRACTS.Enclave,
+      abi: enclaveAbi,
+      functionName: 'e3Payments',
+      args: [e3Id],
+    }).catch(() => 0n) as Promise<bigint>,
   ])
 
   // 2. Find the E3Requested tx for this id (for the inspector header).
@@ -236,17 +272,22 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
   const threshold: [number, number] = reqLog ? [Number(reqLog.args.threshold[0]), Number(reqLog.args.threshold[1])] : [0, 0]
   const members: `0x${string}`[] = (finLog?.args?.committee ?? pubLog?.args?.nodes ?? []) as `0x${string}`[]
 
-  // 4. Ballots (InputPublished) + result.
-  const [inputs, results] = await Promise.all([
-    getLogsChunked<any>(
-      {
-        address: CONTRACTS.Enclave,
-        event: ENCLAVE_INPUT_PUBLISHED,
-        args: { e3Id },
-      } as any,
-      DEPLOY_BLOCK,
-      head,
-    ),
+  // 4. Inputs + result + committee rewards.
+  // Inputs come from the E3 program, not Enclave. We only understand CRISP's
+  // event shape, so non-CRISP programs report no observable inputs.
+  const inputsTracked = isCrispE3(e3.e3Program)
+  const [inputs, results, rewards] = await Promise.all([
+    inputsTracked
+      ? getLogsChunked<any>(
+          {
+            address: CONTRACTS.CRISPProgram,
+            event: CRISP_INPUT_PUBLISHED,
+            args: { e3Id },
+          } as any,
+          DEPLOY_BLOCK,
+          head,
+        )
+      : Promise.resolve([] as any[]),
     getLogsChunked<any>(
       {
         address: CONTRACTS.Enclave,
@@ -256,7 +297,38 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
       DEPLOY_BLOCK,
       head,
     ),
+    getLogsChunked<any>(
+      {
+        address: CONTRACTS.Enclave,
+        event: ENCLAVE_REWARDS_DISTRIBUTED,
+        args: { e3Id },
+      } as any,
+      DEPLOY_BLOCK,
+      head,
+    ),
   ])
+  // Distinct ballots: re-votes reuse the same Merkle-leaf index, so dedupe.
+  const ballotCount = inputsTracked ? new Set(inputs.map((l: any) => l.args.index.toString())).size : 0
+  // Real committee reward total (sum of per-node amounts), once distributed.
+  const committeeReward = rewards.length
+    ? rewards.reduce((sum: bigint, log: any) => sum + (log.args.amounts as bigint[]).reduce((a, b) => a + b, 0n), 0n)
+    : undefined
+  const resultLog = results[0]
+
+  // 5. Resolve block timestamps for the events we surface (bounded set: request,
+  // committee finalize/publish, result, and the first/last few ballots).
+  const shownBallots = inputs.slice(0, 6)
+  if (inputs.length > 6) shownBallots.push(inputs[inputs.length - 1])
+  const ts = await blockTimestamps(
+    [
+      e3.requestBlock,
+      finLog?.blockNumber,
+      pubLog?.blockNumber,
+      resultLog?.blockNumber,
+      ...shownBallots.map((l: any) => l.blockNumber),
+    ].filter((b): b is bigint => typeof b === 'bigint'),
+  )
+  const at = (bn?: bigint) => (bn != null ? ts.get(bn.toString()) : undefined)
 
   return {
     id: e3Id,
@@ -264,24 +336,37 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
     requester: e3.requester,
     requestBlock: e3.requestBlock,
     requestTxHash,
+    requestedAt: at(e3.requestBlock),
     inputWindow: [e3.inputWindow[0], e3.inputWindow[1]] as [bigint, bigint],
     committeeSize: Number(e3.committeeSize),
     stage,
     uiStageIdx: solidityStageToUiIdx(stage, [e3.inputWindow[0], e3.inputWindow[1]]),
+    seed: e3.seed,
+    encryptionSchemeId: e3.encryptionSchemeId,
     committeePublicKey: e3.committeePublicKey,
     ciphertextOutput: e3.ciphertextOutput,
     plaintextOutput: e3.plaintextOutput,
     committeeThreshold: threshold,
     committeeMembers: members,
     committeeFinalizedTx: finLog?.transactionHash,
+    committeeFinalizedAt: at(finLog?.blockNumber),
+    committeeFinalizedBlock: finLog?.blockNumber,
     committeePublishedTx: pubLog?.transactionHash,
-    ballotCount: inputs.length,
+    committeePublishedAt: at(pubLog?.blockNumber),
+    committeePublishedBlock: pubLog?.blockNumber,
+    inputsTracked,
+    ballotCount,
     ballotEvents: inputs.map((l: any) => ({
       blockNumber: l.blockNumber,
       txHash: l.transactionHash,
       index: l.args.index,
+      timestamp: at(l.blockNumber),
     })),
-    resultTxHash: results[0]?.transactionHash,
+    resultTxHash: resultLog?.transactionHash,
+    resultAt: at(resultLog?.blockNumber),
+    resultBlock: resultLog?.blockNumber,
+    feeEscrowed,
+    committeeReward,
   }
 }
 

@@ -1,7 +1,11 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 // Poll history archive — past completed polls. Rows expand to show detail.
 
-import React, { useState } from 'react'
-import { STAGES } from './data'
+import { useState } from 'react'
 
 type Entry = {
   id: string
@@ -19,91 +23,21 @@ const HIST_FILTERS = [
   { id: '2026', label: '2026', test: (e: Entry) => /2026/.test(e.closed) },
 ]
 
-function pctFromResultStr(s: string) {
-  const m = s.match(/(\d+)%/)
-  return m ? Number(m[1]) : 50
-}
-
-function MiniTimeline({ stages }: { stages: typeof STAGES }) {
-  return (
-    <div className='mini-timeline' aria-hidden='true'>
-      {stages.map((s, i) => (
-        <React.Fragment key={s.id}>
-          <span className='mini-timeline__dot' title={s.label} />
-          {i < stages.length - 1 && <span className='mini-timeline__rule' />}
-        </React.Fragment>
-      ))}
-      <span className='mini-timeline__label'>All seven stages completed</span>
-    </div>
-  )
-}
-
 function HistoryDetail({ entry, onNavigate }: { entry: Entry; onNavigate?: (view: string) => void }) {
-  const winnerPct = pctFromResultStr(entry.result)
-  const isApproved = !/Declined/i.test(entry.result)
-  const otherPct = 100 - winnerPct
-  const absPct = Math.min(8, Math.max(2, Math.round(otherPct * 0.15)))
-  const losePct = otherPct - absPct
-  const winnerLabel = isApproved ? 'Yes / Approve' : 'No / Decline'
-  const loseLabel = isApproved ? 'No / Decline' : 'Yes / Approve'
-
   return (
     <div className='hist-detail'>
-      <div className='hist-detail__grid'>
-        <div className='hist-detail__col'>
-          <div className='hist-detail__head'>Final tally</div>
-          <ul className='result__bars hist-detail__bars'>
-            <li className='result__bar result__bar--win'>
-              <div className='result__bar-row'>
-                <span className='result__bar-label'>{winnerLabel}</span>
-                <span className='result__bar-pct'>
-                  <span className='result__bar-pct-num'>{winnerPct}%</span>
-                </span>
-              </div>
-              <div className='result__bar-track'>
-                <div className='result__bar-fill' style={{ width: `${winnerPct}%` }} />
-              </div>
-            </li>
-            <li className='result__bar'>
-              <div className='result__bar-row'>
-                <span className='result__bar-label'>{loseLabel}</span>
-                <span className='result__bar-pct'>
-                  <span className='result__bar-pct-num'>{losePct}%</span>
-                </span>
-              </div>
-              <div className='result__bar-track'>
-                <div className='result__bar-fill' style={{ width: `${losePct}%` }} />
-              </div>
-            </li>
-            <li className='result__bar'>
-              <div className='result__bar-row'>
-                <span className='result__bar-label'>Abstain</span>
-                <span className='result__bar-pct'>
-                  <span className='result__bar-pct-num'>{absPct}%</span>
-                </span>
-              </div>
-              <div className='result__bar-track'>
-                <div className='result__bar-fill' style={{ width: `${absPct}%` }} />
-              </div>
-            </li>
-          </ul>
-        </div>
-
-        <div className='hist-detail__col'>
-          <div className='hist-detail__head'>Lifecycle</div>
-          <MiniTimeline stages={STAGES} />
-          <dl className='hist-detail__dl'>
-            <dt>Ballots tallied</dt>
-            <dd className='mono'>{entry.ballotCount.toLocaleString()}</dd>
-            <dt>Open for</dt>
-            <dd className='mono'>{entry.duration}</dd>
-            <dt>Closed</dt>
-            <dd className='mono'>{entry.closed}</dd>
-            <dt>Privacy</dt>
-            <dd>No individual ballot was ever decrypted.</dd>
-          </dl>
-        </div>
-      </div>
+      <dl className='hist-detail__dl'>
+        <dt>Result</dt>
+        <dd>{entry.result}</dd>
+        <dt>Ballots</dt>
+        <dd className='mono'>{entry.ballotCount.toLocaleString()}</dd>
+        <dt>Open for</dt>
+        <dd className='mono'>{entry.duration}</dd>
+        <dt>Closed</dt>
+        <dd className='mono'>{entry.closed}</dd>
+        <dt>Privacy</dt>
+        <dd>No individual ballot was ever decrypted.</dd>
+      </dl>
 
       <div className='hist-detail__foot'>
         <a

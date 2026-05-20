@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 // External destinations. Only URLs we can verify (from the repo's docs/llms.txt,
 // README, and the Sepolia block explorer) — no guessed paths.
 
@@ -6,7 +11,6 @@ export const LINKS = {
   blog: 'https://blog.theinterfold.com/',
   docs: 'https://docs.theinterfold.com/introduction',
   architecture: 'https://docs.theinterfold.com/architecture-overview',
-  useCases: 'https://docs.theinterfold.com/use-cases',
   crisp: 'https://docs.theinterfold.com/CRISP/introduction',
   repo: 'https://github.com/gnosisguild/enclave',
   explorer: 'https://sepolia.etherscan.io',
@@ -14,8 +18,4 @@ export const LINKS = {
 
 export function explorerAddress(address: string): string {
   return `${LINKS.explorer}/address/${address}`
-}
-
-export function explorerTx(txHash: string): string {
-  return `${LINKS.explorer}/tx/${txHash}`
 }

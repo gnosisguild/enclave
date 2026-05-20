@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 // React hooks wrapping the on-chain fetchers. Polls every POLL_MS while mounted.
 
 import { useEffect, useRef, useState } from 'react'
@@ -10,7 +15,7 @@ export type LoadState<T> =
   | { status: 'ready'; data: T; error: null }
   | { status: 'error'; data: null; error: Error }
 
-export function useE3List(): LoadState<E3Summary[]> {
+function useE3List(crispOnly: boolean): LoadState<E3Summary[]> {
   const [state, setState] = useState<LoadState<E3Summary[]>>({
     status: 'loading',
     data: null,
@@ -24,7 +29,7 @@ export function useE3List(): LoadState<E3Summary[]> {
 
     const tick = async () => {
       try {
-        const list = await fetchE3List()
+        const list = await fetchE3List({ crispOnly })
         if (!cancelled && mounted.current) {
           setState({ status: 'ready', data: list, error: null })
         }
@@ -41,9 +46,19 @@ export function useE3List(): LoadState<E3Summary[]> {
       mounted.current = false
       clearInterval(id)
     }
-  }, [])
+  }, [crispOnly])
 
   return state
+}
+
+// CRISP poll view — every CRISP-program E3 (newest featured, the rest archived).
+export function useCrispPolls(): LoadState<E3Summary[]> {
+  return useE3List(true)
+}
+
+// Generic E3 inspector — every E3 on the network, any program.
+export function useAllE3s(): LoadState<E3Summary[]> {
+  return useE3List(false)
 }
 
 export function useE3Details(e3Id: bigint | null): LoadState<E3FullDetails> {

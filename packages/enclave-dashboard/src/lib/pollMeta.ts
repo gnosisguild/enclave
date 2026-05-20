@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 // Off-chain poll metadata. CRISPProgram does not store the human-readable
 // question or option labels on-chain — only the ballot/tally circuits and the
 // encrypted votes. This map gives each E3 a friendly question/options/context.
 // For unknown E3s we synthesize a generic record from the id.
+
+import { CONTRACTS } from './chain'
 
 export type PollMeta = {
   question: string
@@ -10,20 +17,10 @@ export type PollMeta = {
   programLabel?: string
 }
 
-const META: Record<string, PollMeta> = {
-  // Sample seed entry for the demo CRISP deployment. Replace/extend as new
-  // E3s are requested on-chain.
-  '0': {
-    question: 'Should the borough fund a year-round bus lane on Mercer Street, paid for by a small uplift on commercial rates?',
-    context: 'Open consultation, citywide. Results are advisory and will be published to the council record.',
-    options: [
-      { id: 'yes', label: 'Yes, fund the bus lane' },
-      { id: 'no', label: 'No, leave the street as it is' },
-      { id: 'abs', label: 'Abstain / no opinion' },
-    ],
-    programLabel: 'CRISP / Binary + Abstain · v0.4.2',
-  },
-}
+// Known E3 questions/options keyed by E3 id. CRISPProgram does not store the
+// human-readable question on-chain, so real polls are added here as they launch.
+// Empty by default — unknown ids fall back to a generic record.
+const META: Record<string, PollMeta> = {}
 
 export function pollMetaFor(e3Id: bigint): PollMeta {
   const m = META[e3Id.toString()]
@@ -52,4 +49,18 @@ export function shortAddr(addr: string): string {
 export function shortHash(hex: string): string {
   if (!hex || hex.length < 14) return hex
   return `${hex.slice(0, 10)}…${hex.slice(-6)}`
+}
+
+// Friendly name for an E3 program contract. Known programs get a label;
+// everything else falls back to a shortened address.
+const KNOWN_PROGRAMS: Record<string, string> = {
+  [CONTRACTS.CRISPProgram.toLowerCase()]: 'CRISP',
+}
+
+export function programName(addr: string): string {
+  return KNOWN_PROGRAMS[addr?.toLowerCase()] ?? shortAddr(addr)
+}
+
+export function isCrispProgram(addr: string): boolean {
+  return addr?.toLowerCase() === CONTRACTS.CRISPProgram.toLowerCase()
 }

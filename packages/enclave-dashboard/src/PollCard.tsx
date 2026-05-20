@@ -1,10 +1,27 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 // Today's CRISP poll card — the most prominent surface when a poll is live.
 
 import React, { useEffect, useRef, useState } from 'react'
-import { STAGES, STAGE_TIMING, TODAYS_POLL } from './data'
+import { STAGES, STAGE_STATUS, type Poll } from './data'
 import { LINKS } from './lib/links'
 
-type Poll = typeof TODAYS_POLL
+// Live "time remaining" for the input window, from the on-chain close time.
+function formatRemaining(closesTs: number): string {
+  if (!closesTs) return 'Voting open'
+  const secs = closesTs - Math.floor(Date.now() / 1000)
+  if (secs <= 0) return 'Voting closed'
+  const d = Math.floor(secs / 86400)
+  const h = Math.floor((secs % 86400) / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  if (d > 0) return `${d} day${d === 1 ? '' : 's'}, ${h} hour${h === 1 ? '' : 's'} remaining`
+  if (h > 0) return `${h} hour${h === 1 ? '' : 's'}, ${m} min remaining`
+  if (m > 0) return `${m} min remaining`
+  return `${secs}s remaining`
+}
 
 function StageBadge({ stageIdx }: { stageIdx: number }) {
   const s = STAGES[stageIdx]
@@ -175,7 +192,7 @@ export default function PollCard({
   onToggleLive,
   ballotCount,
   onNavigate,
-  poll: pollProp,
+  poll,
 }: {
   pollState: string
   currentStageIdx: number
@@ -184,14 +201,16 @@ export default function PollCard({
   onToggleLive?: () => void
   ballotCount?: number
   onNavigate?: (view: string) => void
-  poll?: Poll
+  poll: Poll
 }) {
-  const poll = pollProp ?? TODAYS_POLL
   const effective = { ...poll, ballotCount: ballotCount ?? poll.ballotCount }
-  const timing = STAGE_TIMING[STAGES[currentStageIdx].id]
+  const stageId = STAGES[currentStageIdx].id
+  const status = STAGE_STATUS[stageId]
   const isPublished = pollState === 'published'
   const isOpen = pollState === 'open'
   const isComputing = pollState === 'computing'
+  // Live countdown only meaningful while the input window is open.
+  const timeValue = stageId === 'input' ? formatRemaining(poll.closesTs) : status.label
 
   return (
     <section className='poll-card' aria-label="Today's CRISP poll">
@@ -233,8 +252,8 @@ export default function PollCard({
         <div className='poll-card__timing'>
           <div>
             <div className='poll-card__timing-label'>Time</div>
-            <div className='poll-card__timing-value'>{timing.remaining}</div>
-            <div className='poll-card__timing-sub'>{timing.sub}</div>
+            <div className='poll-card__timing-value'>{timeValue}</div>
+            <div className='poll-card__timing-sub'>{status.sub}</div>
           </div>
           <div>
             <div className='poll-card__timing-label'>Opened</div>
@@ -248,15 +267,6 @@ export default function PollCard({
 
         {!isPublished && (
           <div className='poll-card__options'>
-            <div className='poll-card__options-label'>Options on the ballot</div>
-            <ul className='options'>
-              {poll.options.map((o, i) => (
-                <li key={o.id} className='option'>
-                  <span className='option__index'>{String.fromCharCode(65 + i)}</span>
-                  <span className='option__label'>{o.label}</span>
-                </li>
-              ))}
-            </ul>
             <div className='poll-card__cta-row'>
               <span className='poll-card__cta-note'>
                 {isOpen

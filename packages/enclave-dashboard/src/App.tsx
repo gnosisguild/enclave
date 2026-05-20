@@ -1,16 +1,23 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 // Main app shell + tweak wiring.
 
-import { useEffect, useMemo, useState } from 'react'
-import { STAGES, TODAYS_POLL, HISTORY, PULSE } from './data'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { STAGES } from './data'
 import PollCard from './PollCard'
 import Timeline from './Timeline'
 import History from './History'
 import Pulse from './Pulse'
 import Inspector from './Inspector'
-import { useE3Details, useE3List } from './lib/useE3s'
+import Loader from './Loader'
+import { useAllE3s, useCrispPolls, useE3Details } from './lib/useE3s'
 import { adaptHistoryEntries, adaptInspectorDetail, adaptInspectorE3List, adaptTodaysPoll } from './lib/adapt'
 import { formatE3Id } from './lib/pollMeta'
-import { LINKS } from './lib/links'
+import { LINKS, explorerAddress } from './lib/links'
+import { CONTRACTS } from './lib/chain'
 import type { E3FullDetails } from './lib/e3'
 import { useTweaks } from './useTweaks'
 import { TweaksPanel, TweakSection, TweakSelect, TweakRadio, TweakToggle } from './tweaks-panel'
@@ -36,7 +43,7 @@ function Header({ density, view, onNav }: { density: string; view: string; onNav
           href='#'
           onClick={(e) => {
             e.preventDefault()
-            onNav('crisp')
+            onNav('inspector')
           }}
           aria-label='Interfold home'
         >
@@ -50,8 +57,8 @@ function Header({ density, view, onNav }: { density: string; view: string; onNav
           <span className='wordmark__text'>Interfold</span>
         </a>
         <nav className='site-nav' aria-label='Primary'>
-          {link('crisp', 'CRISP')}
           {link('inspector', 'E3 inspector')}
+          {link('crisp', 'CRISP')}
         </nav>
       </div>
     </header>
@@ -66,19 +73,19 @@ function Intro() {
       </div>
       <h1 className='intro__title'>Watch an encrypted poll execute on the Interfold network.</h1>
       <p className='intro__lede'>
-        CRISP is an example poll running live. Ballots are encrypted on each voter's device, tallied without ever being decrypted, and only
+        CRISP is an example e3 running live. Ballots are encrypted on each voter's device, tallied without ever being decrypted, and only
         the final result is revealed. This page shows the lifecycle as it happens — and the archive of every poll that came before.
       </p>
     </section>
   )
 }
 
-function NoActivePollHero() {
+function StatusNote({ children }: { children: ReactNode }) {
   return (
     <div className='emptystate'>
       <div className='emptystate__note'>
         <span className='emptystate__dot' aria-hidden='true' />
-        <span>No poll is currently open. Showing the most recent published result. A new CRISP poll will appear here when one starts.</span>
+        <span>{children}</span>
       </div>
     </div>
   )
@@ -132,15 +139,17 @@ function SiteFooter() {
         </div>
       </div>
       <div className='site-foot__rule'>
-        <span>© 2026 Interfold Foundation · Built in the open</span>
-        <span className='mono'>commit a1f9c4d · indexer green</span>
+        <span>© 2026 Interfold · Built in the open</span>
+        <a className='mono' href={explorerAddress(CONTRACTS.Enclave)} target='_blank' rel='noreferrer'>
+          Enclave on Sepolia ↗
+        </a>
       </div>
     </footer>
   )
 }
 
 const TWEAK_DEFAULTS = {
-  view: 'crisp',
+  view: 'inspector',
   stageIdx: 3,
   pollState: 'open',
   density: 'comfortable',
@@ -159,26 +168,28 @@ export default function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS)
   const setView = (v: string) => setTweak('view', v)
 
-  const [ballotDelta, setBallotDelta] = useState(0)
   const [, setNowTick] = useState(0)
   const [liveMode, setLiveMode] = useState(false)
 
   // ─── On-chain data (Sepolia) ──────────────────────────────────────────────
-  const e3List = useE3List()
-  // The newest E3 (first entry; useE3List returns newest first) is "today's poll".
-  const todaysId = e3List.data && e3List.data.length > 0 ? e3List.data[0].id : null
+  // CRISP tab: only CRISP-program polls. Inspector tab: every E3 on the network.
+  const crispPolls = useCrispPolls()
+  const allE3s = useAllE3s()
+
+  // The newest CRISP poll (first entry; lists are newest-first) is "today's poll".
+  const todaysId = crispPolls.data && crispPolls.data.length > 0 ? crispPolls.data[0].id : null
   const todaysDetail = useE3Details(todaysId)
 
   // Inspector keeps its own selection — track which id is currently selected.
   const [inspectorIdStr, setInspectorIdStr] = useState<string | null>(null)
   const selectedInspectorId = useMemo(() => {
-    if (!e3List.data || e3List.data.length === 0) return null
+    if (!allE3s.data || allE3s.data.length === 0) return null
     if (inspectorIdStr) {
-      const match = e3List.data.find((e) => formatE3Id(e.id) === inspectorIdStr)
+      const match = allE3s.data.find((e) => formatE3Id(e.id) === inspectorIdStr)
       if (match) return match.id
     }
-    return e3List.data[0].id
-  }, [e3List.data, inspectorIdStr])
+    return allE3s.data[0].id
+  }, [allE3s.data, inspectorIdStr])
   const inspectorDetail = useE3Details(selectedInspectorId)
 
   // Latest detail per E3 id, for history rows. Derived from the two detail
@@ -191,12 +202,17 @@ export default function App() {
     return m
   }, [todaysDetail.data, inspectorDetail.data])
 
-  const livePoll = useMemo(() => adaptTodaysPoll(todaysDetail.data), [todaysDetail.data])
-  const liveHistory = useMemo(() => {
-    if (!e3List.data || e3List.data.length <= 1) return HISTORY
-    return adaptHistoryEntries(e3List.data.slice(1), detailsCache)
-  }, [e3List.data, detailsCache])
-  const inspectorList = useMemo(() => (e3List.data ? adaptInspectorE3List(e3List.data) : undefined), [e3List.data])
+  // CRISP tab state.
+  const crispReady = crispPolls.status === 'ready'
+  const polls = useMemo(() => crispPolls.data ?? [], [crispPolls.data])
+  const hasPolls = polls.length > 0
+  const livePoll = useMemo(() => (todaysDetail.data ? adaptTodaysPoll(todaysDetail.data) : null), [todaysDetail.data])
+  const liveHistory = useMemo(() => (polls.length > 1 ? adaptHistoryEntries(polls.slice(1), detailsCache) : []), [polls, detailsCache])
+
+  // Inspector tab state.
+  const inspectorReady = allE3s.status === 'ready'
+  const hasE3s = (allE3s.data?.length ?? 0) > 0
+  const inspectorList = useMemo(() => adaptInspectorE3List(allE3s.data ?? []), [allE3s.data])
   const inspectorE3 = useMemo(() => adaptInspectorDetail(inspectorDetail.data), [inspectorDetail.data])
 
   // Sync poll stage to the live chain-derived stage whenever it changes (so
@@ -221,14 +237,6 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (t.pollState !== 'open') return undefined
-    const id = setInterval(() => {
-      setBallotDelta((d) => d + 1 + Math.floor(Math.random() * 3))
-    }, 2400)
-    return () => clearInterval(id)
-  }, [t.pollState])
-
-  useEffect(() => {
     if (!liveMode) return undefined
     const program = [
       { state: 'open', stage: 0, hold: 2200 },
@@ -247,7 +255,6 @@ export default function App() {
       const step = program[i]
       setTweak('pollState', step.state)
       setTweak('stageIdx', step.stage)
-      if (step.stage === 0) setBallotDelta(0)
       i = (i + 1) % program.length
       timer = setTimeout(advance, step.hold)
     }
@@ -258,7 +265,7 @@ export default function App() {
     }
   }, [liveMode, setTweak])
 
-  const effectiveBallotCount = (todaysDetail.data ? todaysDetail.data.ballotCount : TODAYS_POLL.ballotCount) + ballotDelta
+  const effectiveBallotCount = todaysDetail.data?.ballotCount ?? 0
 
   const reconciledStage = (() => {
     if (t.pollState === 'published') return 6
@@ -283,48 +290,70 @@ export default function App() {
       <Header density={t.density} view={t.view} onNav={setView} />
       {t.view === 'inspector' ? (
         <main className='main'>
-          <Inspector
-            e3List={inspectorList}
-            e3Override={inspectorE3 ?? undefined}
-            selectedId={selectedInspectorId ? formatE3Id(selectedInspectorId) : undefined}
-            onSelect={(id) => setInspectorIdStr(id)}
-            loading={e3List.status === 'loading' || (selectedInspectorId != null && inspectorDetail.status === 'loading')}
-            error={inspectorDetail.status === 'error' ? inspectorDetail.error : null}
-          />
+          {!inspectorReady ? (
+            <div className='inspector'>
+              <Loader label='Loading E3s' sub='Reading from Sepolia…' />
+            </div>
+          ) : !hasE3s ? (
+            <div className='inspector'>
+              <StatusNote>No E3s on the network yet. They will appear here once one is requested on-chain.</StatusNote>
+            </div>
+          ) : (
+            <Inspector
+              e3List={inspectorList}
+              e3={inspectorE3}
+              selectedId={selectedInspectorId ? formatE3Id(selectedInspectorId) : undefined}
+              onSelect={(id) => setInspectorIdStr(id)}
+              loading={inspectorDetail.status === 'loading'}
+              error={inspectorDetail.status === 'error' ? inspectorDetail.error : null}
+            />
+          )}
         </main>
       ) : (
         <main className='main'>
           <Intro />
 
-          {noActive && <NoActivePollHero />}
+          {!crispReady ? (
+            <Loader label='Loading CRISP polls' sub='Reading from Sepolia…' />
+          ) : !hasPolls ? (
+            <StatusNote>
+              No live CRISP polls right now. A new poll will appear here automatically when one is requested on-chain.
+            </StatusNote>
+          ) : !livePoll ? (
+            <Loader label='Loading the latest poll' sub='Reading from Sepolia…' />
+          ) : (
+            <>
+              <PollCard
+                poll={livePoll}
+                pollState={noActive ? 'published' : t.pollState}
+                currentStageIdx={reconciledStage}
+                resultVariant={t.resultVariant}
+                liveMode={liveMode}
+                onToggleLive={() => setLiveMode((v) => !v)}
+                ballotCount={effectiveBallotCount}
+                onNavigate={setView}
+              />
 
-          <PollCard
-            poll={livePoll}
-            pollState={noActive ? 'published' : t.pollState}
-            currentStageIdx={reconciledStage}
-            resultVariant={t.resultVariant}
-            liveMode={liveMode}
-            onToggleLive={() => setLiveMode((v) => !v)}
-            ballotCount={effectiveBallotCount}
-            onNavigate={setView}
-          />
+              <Timeline
+                stages={STAGES}
+                currentStageIdx={reconciledStage}
+                pollId={livePoll.id}
+                density={t.density}
+                onStageClick={setStage}
+              />
 
-          <Timeline stages={STAGES} currentStageIdx={reconciledStage} pollId={livePoll.id} density={t.density} onStageClick={setStage} />
-
-          <History entries={liveHistory} onNavigate={setView} />
+              {liveHistory.length > 0 && <History entries={liveHistory} onNavigate={setView} />}
+            </>
+          )}
         </main>
       )}
 
       <Pulse
-        data={
-          e3List.data
-            ? {
-                activeNow: todaysDetail.data && todaysDetail.data.uiStageIdx < 6 ? 1 : 0,
-                ballots24h: todaysDetail.data?.ballotCount ?? 0,
-                pollsAllTime: e3List.data.length,
-              }
-            : PULSE
-        }
+        data={{
+          activeNow: todaysDetail.data && todaysDetail.data.uiStageIdx < 6 ? 1 : 0,
+          ballots24h: todaysDetail.data?.ballotCount ?? 0,
+          pollsAllTime: polls.length,
+        }}
         show={t.showPulse}
       />
       <SiteFooter />
@@ -335,8 +364,8 @@ export default function App() {
           label='Tab'
           value={t.view}
           options={[
-            { value: 'crisp', label: 'CRISP' },
             { value: 'inspector', label: 'Inspector' },
+            { value: 'crisp', label: 'CRISP' },
           ]}
           onChange={(v) => setTweak('view', v)}
         />

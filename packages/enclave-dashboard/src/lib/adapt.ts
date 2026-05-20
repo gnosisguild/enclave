@@ -1,12 +1,24 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 // Adapters: shape on-chain data into the prop shapes the React components expect.
 
-import { TODAYS_POLL, HISTORY, E3_DETAILS } from '../data'
+import { formatUnits, numberToHex } from 'viem'
+import type { HistoryEntry, Poll } from '../data'
 import type { E3FullDetails, E3Summary } from './e3'
 import { decodeCrispTally } from './e3'
-import { formatE3Id, pollMetaFor, shortAddr, shortHash } from './pollMeta'
+import { formatE3Id, isCrispProgram, pollMetaFor, programName, shortAddr, shortHash } from './pollMeta'
 
-export function adaptTodaysPoll(detail: E3FullDetails | null): typeof TODAYS_POLL {
-  if (!detail) return TODAYS_POLL
+// Fee token is MockUSDC (6 decimals) on the Sepolia deployment.
+const FEE_DECIMALS = 6
+function fmtUsdc(v: bigint | undefined): string {
+  if (v == null) return '—'
+  return `${formatUnits(v, FEE_DECIMALS)} USDC`
+}
+
+export function adaptTodaysPoll(detail: E3FullDetails): Poll {
   const meta = pollMetaFor(detail.id)
   const tally = decodeCrispTally(detail.plaintextOutput)
   const totals: Record<string, number> = {}
@@ -26,12 +38,13 @@ export function adaptTodaysPoll(detail: E3FullDetails | null): typeof TODAYS_POL
     options: meta.options,
     opened: openedTs > 0n ? fmtUtc(openedTs) : '—',
     closes: closesTs > 0n ? fmtUtc(closesTs) : '—',
+    closesTs: Number(closesTs),
     ballotCount: detail.ballotCount,
     result: { winner: winnerKey, totals },
   }
 }
 
-export function adaptHistoryEntries(list: E3Summary[], detailsCache: Map<string, E3FullDetails>): typeof HISTORY {
+export function adaptHistoryEntries(list: E3Summary[], detailsCache: Map<string, E3FullDetails>): HistoryEntry[] {
   return list.map((s) => {
     const detail = detailsCache.get(s.id.toString())
     const meta = pollMetaFor(s.id)
@@ -62,98 +75,126 @@ export function adaptHistoryEntries(list: E3Summary[], detailsCache: Map<string,
 export function adaptInspectorE3List(list: E3Summary[]) {
   return list.map((s) => ({
     id: formatE3Id(s.id),
-    label: pollMetaFor(s.id).question.slice(0, 64),
+    label: isCrispProgram(s.e3Program) ? pollMetaFor(s.id).question.slice(0, 64) : programName(s.e3Program),
   }))
 }
 
-export function adaptInspectorDetail(detail: E3FullDetails | null) {
+// ─── Inspector detail shape (consumed by Inspector.tsx) ──────────────────────
+
+export type InspectorEvent = {
+  t: string
+  block: number | string
+  name: string
+  stage: string
+  tx: string
+  gas: string
+}
+
+export type InspectorDetail = {
+  id: string
+  program: string
+  programAddr: string
+  requestedBy: string
+  requestedByLabel: string
+  requestedTx: string
+  requestedAt: string
+  requestedBlock: number
+  currentStage: number
+  summary: string
+  committee: { size: number; threshold: number; selectionSeed: string; drawnAt: string; note: string }
+  fees: {
+    feeEscrowed: string
+    committeeReward: string
+    currency: string
+  }
+  keygen: {
+    scheme: string
+    finalizedAt: string
+    publishedAt: string
+    publishedTx: string
+    publicKey: string
+  }
+  input: {
+    openedAt: string
+    closesAt: string
+    inputsReceived: string
+    firstBallotAt: string
+    lastBallotAt: string
+  }
+  compute: { status: string; note: string }
+  decryption: { status: string; note: string; threshold: number; committeeSize: number }
+  publication: { status: string; note: string }
+  events: InspectorEvent[]
+}
+
+const ZERO_HASH = '0x' + '0'.repeat(64)
+
+export function adaptInspectorDetail(detail: E3FullDetails | null): InspectorDetail | null {
   if (!detail) return null
+  const isCrisp = isCrispProgram(detail.e3Program)
   const meta = pollMetaFor(detail.id)
-  const friendlyId = formatE3Id(detail.id)
-  const ballotsReceived = detail.ballotCount
+  const inputsReceived = detail.inputsTracked ? detail.ballotCount.toLocaleString() : '—'
   const sharesRequired = detail.committeeThreshold[0] || 0
   const committeeSize = detail.committeeThreshold[1] || detail.committeeMembers.length
 
   return {
-    id: friendlyId,
-    program: meta.programLabel ?? 'CRISP',
+    id: formatE3Id(detail.id),
+    program: programName(detail.e3Program),
     programAddr: shortAddr(detail.e3Program),
     requestedBy: shortAddr(detail.requester),
     requestedByLabel: 'Requester',
     requestedTx: detail.requestTxHash,
-    requestedAt: `block #${detail.requestBlock.toString()}`,
+    requestedAt: detail.requestedAt ? fmtUtcFromUnix(detail.requestedAt) : `block #${detail.requestBlock.toString()}`,
     requestedBlock: Number(detail.requestBlock),
     currentStage: detail.uiStageIdx,
-    summary: meta.question,
+    summary: isCrisp ? meta.question : `Encrypted execution ${formatE3Id(detail.id)}`,
 
     committee: {
       size: committeeSize,
       threshold: sharesRequired,
-      selectionSeed: '—',
-      selectionTx: shortHash(detail.committeeFinalizedTx ?? '—'),
-      drawnAt: detail.committeeFinalizedTx ? 'on-chain' : '—',
+      selectionSeed: detail.seed > 0n ? shortHash(numberToHex(detail.seed, { size: 32 })) : '—',
+      drawnAt: detail.committeeFinalizedAt ? fmtUtcFromUnix(detail.committeeFinalizedAt) : '—',
       note: 'Identities are sealed. Only the count and threshold are public.',
     },
 
     fees: {
-      requesterDeposit: '—',
-      computeFee: '—',
-      committeeReward: '—',
-      networkFee: '—',
-      refundAvailable: '—',
+      feeEscrowed: fmtUsdc(detail.feeEscrowed),
+      committeeReward: fmtUsdc(detail.committeeReward),
       currency: 'USDC · Sepolia',
     },
 
     keygen: {
-      protocol: 'Threshold BFV · DKG',
-      rounds: [
-        {
-          name: 'Round · DKG aggregation',
-          status: detail.committeePublishedTx ? 'complete' : 'pending',
-          participants: `${committeeSize} of ${committeeSize}`,
-          startedAt: detail.committeeFinalizedTx ? 'after sortition' : '—',
-          duration: '—',
-          tx: shortHash(detail.committeePublishedTx ?? detail.committeeFinalizedTx ?? '—'),
-          note: detail.committeePublishedTx
-            ? 'The joint public key has been published on-chain.'
-            : 'DKG runs once the committee is finalized.',
-        },
-      ],
-      publicKey:
-        detail.committeePublicKey && detail.committeePublicKey !== '0x' + '0'.repeat(64)
-          ? `bfv:pk:${shortHash(detail.committeePublicKey)}`
-          : '—',
+      scheme: detail.encryptionSchemeId && detail.encryptionSchemeId !== ZERO_HASH ? shortHash(detail.encryptionSchemeId) : '—',
+      finalizedAt: detail.committeeFinalizedAt ? fmtUtcFromUnix(detail.committeeFinalizedAt) : '—',
+      publishedAt: detail.committeePublishedAt ? fmtUtcFromUnix(detail.committeePublishedAt) : '—',
+      publishedTx: detail.committeePublishedTx ?? '—',
+      publicKey: detail.committeePublicKey && detail.committeePublicKey !== ZERO_HASH ? shortHash(detail.committeePublicKey) : '—',
     },
 
     input: {
       openedAt: detail.inputWindow[0] > 0n ? fmtUtc(detail.inputWindow[0]) : '—',
       closesAt: detail.inputWindow[1] > 0n ? fmtUtc(detail.inputWindow[1]) : '—',
-      ballotsReceived,
-      firstBallotAt: detail.ballotEvents[0] ? `block #${detail.ballotEvents[0].blockNumber.toString()}` : '—',
-      lastBallotAt: detail.ballotEvents[detail.ballotEvents.length - 1]
-        ? `block #${detail.ballotEvents[detail.ballotEvents.length - 1].blockNumber.toString()}`
-        : '—',
-      avgBallotSize: '—',
-      ballotCircuit: 'crisp-vote',
+      inputsReceived,
+      firstBallotAt: ballotTime(detail.ballotEvents[0]),
+      lastBallotAt: ballotTime(detail.ballotEvents[detail.ballotEvents.length - 1]),
     },
 
     compute: {
       status: detail.uiStageIdx >= 4 ? 'active' : 'pending',
       note:
-        detail.uiStageIdx < 4 ? 'Compute begins automatically when the input window closes.' : 'Tally is being computed under encryption.',
-      circuit: 'crisp-tally',
-      estDuration: '—',
-      estGas: '—',
+        detail.uiStageIdx < 4
+          ? 'Compute begins automatically when the input window closes.'
+          : "The program's FHE computation runs over the encrypted inputs, without decrypting any individual input.",
     },
 
     decryption: {
       status: detail.uiStageIdx >= 5 ? 'active' : 'pending',
       note:
         sharesRequired > 0
-          ? `≥ ${sharesRequired} of ${committeeSize} committee members must each publish a partial share.`
+          ? `A threshold of ${sharesRequired} of ${committeeSize} committee members must each publish a partial decryption to recover the result.`
           : 'Threshold decryption begins after compute.',
-      sharesReceived: detail.uiStageIdx >= 6 ? sharesRequired : 0,
-      sharesRequired: sharesRequired || 1,
+      threshold: sharesRequired,
+      committeeSize,
     },
 
     publication: {
@@ -167,10 +208,15 @@ export function adaptInspectorDetail(detail: E3FullDetails | null) {
   }
 }
 
-function buildEventLog(d: E3FullDetails) {
-  const evs: Array<any> = []
+function ballotTime(b?: { blockNumber: bigint; timestamp?: number }): string {
+  if (!b) return '—'
+  return b.timestamp ? fmtClock(b.timestamp) : `block #${b.blockNumber.toString()}`
+}
+
+function buildEventLog(d: E3FullDetails): InspectorEvent[] {
+  const evs: InspectorEvent[] = []
   evs.push({
-    t: '—',
+    t: d.requestedAt ? fmtClock(d.requestedAt) : '—',
     block: Number(d.requestBlock),
     name: 'E3Requested',
     stage: 'Requested',
@@ -179,8 +225,8 @@ function buildEventLog(d: E3FullDetails) {
   })
   if (d.committeeFinalizedTx) {
     evs.push({
-      t: '—',
-      block: '—',
+      t: d.committeeFinalizedAt ? fmtClock(d.committeeFinalizedAt) : '—',
+      block: d.committeeFinalizedBlock != null ? Number(d.committeeFinalizedBlock) : '—',
       name: 'CommitteeFinalized',
       stage: 'Committee Selected',
       tx: shortHash(d.committeeFinalizedTx),
@@ -189,8 +235,8 @@ function buildEventLog(d: E3FullDetails) {
   }
   if (d.committeePublishedTx) {
     evs.push({
-      t: '—',
-      block: '—',
+      t: d.committeePublishedAt ? fmtClock(d.committeePublishedAt) : '—',
+      block: d.committeePublishedBlock != null ? Number(d.committeePublishedBlock) : '—',
       name: 'CommitteePublished',
       stage: 'Keygen',
       tx: shortHash(d.committeePublishedTx),
@@ -199,7 +245,7 @@ function buildEventLog(d: E3FullDetails) {
   }
   d.ballotEvents.slice(0, 5).forEach((b) => {
     evs.push({
-      t: '—',
+      t: b.timestamp ? fmtClock(b.timestamp) : '—',
       block: Number(b.blockNumber),
       name: 'InputPublished',
       stage: 'Input Window',
@@ -219,8 +265,8 @@ function buildEventLog(d: E3FullDetails) {
   }
   if (d.resultTxHash) {
     evs.push({
-      t: '—',
-      block: '—',
+      t: d.resultAt ? fmtClock(d.resultAt) : '—',
+      block: d.resultBlock != null ? Number(d.resultBlock) : '—',
       name: 'PlaintextOutputPublished',
       stage: 'Published',
       tx: shortHash(d.resultTxHash),
@@ -230,33 +276,36 @@ function buildEventLog(d: E3FullDetails) {
   return evs
 }
 
+// ─── Time formatting ─────────────────────────────────────────────────────────
+
+function fmtUtcFromUnix(sec: number): string {
+  return fmtUtc(BigInt(sec))
+}
+
 function fmtUtc(ts: bigint): string {
   const d = new Date(Number(ts) * 1000)
   return (
-    d.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    }) +
+    d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }) +
     ' · ' +
-    d.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'UTC',
-      hour12: false,
-    }) +
+    d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false }) +
     ' UTC'
   )
 }
 
+function fmtClock(sec: number): string {
+  return (
+    new Date(sec * 1000).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: 'UTC',
+      hour12: false,
+    }) + ' UTC'
+  )
+}
+
 function fmtDate(ts: bigint): string {
-  return new Date(Number(ts) * 1000).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  })
+  return new Date(Number(ts) * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
 }
 
 function fmtDuration(seconds: bigint): string {
@@ -266,6 +315,3 @@ function fmtDuration(seconds: bigint): string {
   if (s < 86400) return `${Math.round(s / 3600)}h`
   return `${Math.round(s / 86400)} days`
 }
-
-// Re-export the mock for callers that want a clean fallback.
-export const MOCK_INSPECTOR_DETAIL = E3_DETAILS['E3-0481']

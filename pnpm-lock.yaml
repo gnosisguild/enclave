@@ -581,9 +581,6 @@ importers:
       '@enclave-e3/contracts':
         specifier: workspace:*
         version: link:../enclave-contracts
-      '@enclave-e3/sdk':
-        specifier: workspace:*
-        version: link:../enclave-sdk
       react:
         specifier: ^18.3.1
         version: 18.3.1
