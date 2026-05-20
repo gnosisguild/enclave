@@ -133,12 +133,6 @@ export default function History({ entries, onNavigate }: { entries: Entry[]; onN
         ))}
         {filtered.length === 0 && <li className='hist-empty'>No polls match this filter.</li>}
       </ul>
-      <div className='history__more'>
-        <button className='link-btn'>
-          Load earlier polls
-          <span aria-hidden='true'>↓</span>
-        </button>
-      </div>
     </section>
   )
 }

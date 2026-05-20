@@ -26,8 +26,11 @@ function useE3List(crispOnly: boolean): LoadState<E3Summary[]> {
   useEffect(() => {
     mounted.current = true
     let cancelled = false
+    let inFlight = false
 
     const tick = async () => {
+      if (inFlight) return // skip if a slow fetch is still running
+      inFlight = true
       try {
         const list = await fetchE3List({ crispOnly })
         if (!cancelled && mounted.current) {
@@ -37,6 +40,8 @@ function useE3List(crispOnly: boolean): LoadState<E3Summary[]> {
         if (!cancelled && mounted.current) {
           setState((prev) => (prev.status === 'ready' ? prev : { status: 'error', data: null, error: e }))
         }
+      } finally {
+        inFlight = false
       }
     }
     tick()
@@ -77,8 +82,11 @@ export function useE3Details(e3Id: bigint | null): LoadState<E3FullDetails> {
       return
     }
     let cancelled = false
+    let inFlight = false
 
     const tick = async () => {
+      if (inFlight) return // skip if a slow fetch is still running
+      inFlight = true
       try {
         const detail = await fetchE3Details(e3Id)
         if (!cancelled && mounted.current) {
@@ -88,6 +96,8 @@ export function useE3Details(e3Id: bigint | null): LoadState<E3FullDetails> {
         if (!cancelled && mounted.current) {
           setState((prev) => (prev.status === 'ready' ? prev : { status: 'error', data: null, error: e }))
         }
+      } finally {
+        inFlight = false
       }
     }
     tick()

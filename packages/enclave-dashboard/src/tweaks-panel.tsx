@@ -317,9 +317,26 @@ export function TweakRadio({
     window.addEventListener('pointerup', up)
   }
 
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    const cur = opts.findIndex((o: any) => o.value === value)
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      onChange(opts[Math.min(opts.length - 1, cur + 1)].value)
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      onChange(opts[Math.max(0, cur - 1)].value)
+    }
+  }
+
   return (
     <TweakRow label={label}>
-      <div ref={trackRef} role='radiogroup' onPointerDown={onPointerDown} className={dragging ? 'twk-seg dragging' : 'twk-seg'}>
+      <div
+        ref={trackRef}
+        role='radiogroup'
+        onPointerDown={onPointerDown}
+        onKeyDown={onKeyDown}
+        className={dragging ? 'twk-seg dragging' : 'twk-seg'}
+      >
         <div
           className='twk-seg-thumb'
           style={{
@@ -328,7 +345,14 @@ export function TweakRadio({
           }}
         />
         {opts.map((o: any) => (
-          <button key={o.value} type='button' role='radio' aria-checked={o.value === value}>
+          <button
+            key={o.value}
+            type='button'
+            role='radio'
+            aria-checked={o.value === value}
+            tabIndex={o.value === value ? 0 : -1}
+            onClick={() => onChange(o.value)}
+          >
             {o.label}
           </button>
         ))}

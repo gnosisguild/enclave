@@ -50,7 +50,8 @@ export default function Timeline({
   onStageClick?: (i: number) => void
 }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
-  const explainerIdx = hoverIdx ?? currentStageIdx
+  const clamp = (i: number) => Math.min(Math.max(i, 0), stages.length - 1)
+  const explainerIdx = clamp(hoverIdx ?? currentStageIdx)
   const explainer = stages[explainerIdx]
 
   return (

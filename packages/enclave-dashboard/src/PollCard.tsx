@@ -143,9 +143,10 @@ function ResultPanel({ poll, variant }: { poll: Poll; variant: string }) {
     count: totals[o.id] ?? 0,
     pct: total > 0 ? (totals[o.id] ?? 0) / total : 0,
   }))
-  const winner = items.find((i) => i.id === poll.result.winner)!
+  const winner = items.find((i) => i.id === poll.result.winner) ?? items[0]
   const showBars = variant === 'bars' || variant === 'all'
   const showSentence = variant === 'sentence' || variant === 'all'
+  if (!winner) return null
 
   return (
     <div className='result'>
@@ -204,7 +205,8 @@ export default function PollCard({
   poll: Poll
 }) {
   const effective = { ...poll, ballotCount: ballotCount ?? poll.ballotCount }
-  const stageId = STAGES[currentStageIdx].id
+  const safeStageIdx = Math.min(Math.max(currentStageIdx, 0), STAGES.length - 1)
+  const stageId = STAGES[safeStageIdx].id
   const status = STAGE_STATUS[stageId]
   const isPublished = pollState === 'published'
   const isOpen = pollState === 'open'
@@ -243,7 +245,7 @@ export default function PollCard({
               <span>{liveMode ? 'Pause demo' : 'Watch the lifecycle'}</span>
             </button>
           )}
-          <StageBadge stageIdx={currentStageIdx} />
+          <StageBadge stageIdx={safeStageIdx} />
         </header>
 
         <h1 className='poll-card__question'>{poll.question}</h1>
@@ -279,8 +281,10 @@ export default function PollCard({
                 className='link-inline'
                 href='#inspector'
                 onClick={(e) => {
-                  e.preventDefault()
-                  onNavigate?.('inspector')
+                  if (onNavigate) {
+                    e.preventDefault()
+                    onNavigate('inspector')
+                  }
                 }}
               >
                 Inspect this E3

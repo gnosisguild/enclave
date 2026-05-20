@@ -222,13 +222,17 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
     }).catch(() => 0n) as Promise<bigint>,
   ])
 
+  // Every event for this E3 happens at or after its request block, so scan from
+  // there instead of DEPLOY_BLOCK — bounds the work per poll tick.
+  const fromBlock = e3.requestBlock > DEPLOY_BLOCK ? (e3.requestBlock as bigint) : DEPLOY_BLOCK
+
   // 2. Find the E3Requested tx for this id (for the inspector header).
   const requestLogs = await getLogsChunked<any>(
     {
       address: CONTRACTS.Enclave,
       event: ENCLAVE_E3_REQUESTED,
     },
-    DEPLOY_BLOCK,
+    fromBlock,
     head,
   )
   const requestLog = requestLogs.find((l: any) => l.args.e3Id === e3Id)
@@ -242,7 +246,7 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
         event: REGISTRY_COMMITTEE_REQUESTED,
         args: { e3Id },
       } as any,
-      DEPLOY_BLOCK,
+      fromBlock,
       head,
     ),
     getLogsChunked<any>(
@@ -251,7 +255,7 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
         event: REGISTRY_COMMITTEE_FINALIZED,
         args: { e3Id },
       } as any,
-      DEPLOY_BLOCK,
+      fromBlock,
       head,
     ),
     getLogsChunked<any>(
@@ -260,7 +264,7 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
         event: REGISTRY_COMMITTEE_PUBLISHED,
         args: { e3Id },
       } as any,
-      DEPLOY_BLOCK,
+      fromBlock,
       head,
     ),
   ])
@@ -284,7 +288,7 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
             event: CRISP_INPUT_PUBLISHED,
             args: { e3Id },
           } as any,
-          DEPLOY_BLOCK,
+          fromBlock,
           head,
         )
       : Promise.resolve([] as any[]),
@@ -294,7 +298,7 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
         event: ENCLAVE_PLAINTEXT_PUBLISHED,
         args: { e3Id },
       } as any,
-      DEPLOY_BLOCK,
+      fromBlock,
       head,
     ),
     getLogsChunked<any>(
@@ -303,7 +307,7 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
         event: ENCLAVE_REWARDS_DISTRIBUTED,
         args: { e3Id },
       } as any,
-      DEPLOY_BLOCK,
+      fromBlock,
       head,
     ),
   ])
@@ -388,7 +392,10 @@ export function decodeCrispTally(plaintextOutput: `0x${string}`): number[] | nul
     for (let i = 0; i < len; i++) {
       const word = hex.slice(128 + i * 64, 128 + (i + 1) * 64)
       if (word.length !== 64) return null
-      out.push(Number(BigInt('0x' + word)))
+      // Guard against silent precision loss converting a >2^53 word to a JS number.
+      const v = BigInt('0x' + word)
+      if (v > BigInt(Number.MAX_SAFE_INTEGER)) return null
+      out.push(Number(v))
     }
     return out
   } catch {

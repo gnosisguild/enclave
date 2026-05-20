@@ -241,6 +241,13 @@ export default function Inspector({
     )
   }
 
+  // Section status derived from the E3's current UI stage index (see STAGES order).
+  const stageStatus = (targetStage: number) => {
+    if (e3.currentStage > targetStage) return { kind: 'done', label: 'Done' }
+    if (e3.currentStage === targetStage) return { kind: 'live', label: 'In progress' }
+    return { kind: 'pending', label: 'Pending' }
+  }
+
   return (
     <div className='inspector'>
       {(loading || error) && (
@@ -394,11 +401,11 @@ export default function Inspector({
         </div>
       </SectionCard>
 
-      <SectionCard eyebrow='04 · Compute' title='FHE computation' status={{ kind: 'pending', label: 'Pending' }}>
+      <SectionCard eyebrow='04 · Compute' title='FHE computation' status={stageStatus(4)}>
         <p className='isection__lede'>{e3.compute.note}</p>
       </SectionCard>
 
-      <SectionCard eyebrow='05 · Decryption' title='Threshold decryption' status={{ kind: 'pending', label: 'Pending' }}>
+      <SectionCard eyebrow='05 · Decryption' title='Threshold decryption' status={stageStatus(5)}>
         <p className='isection__lede'>{e3.decryption.note}</p>
         <DefList
           items={[
@@ -412,7 +419,7 @@ export default function Inspector({
         />
       </SectionCard>
 
-      <SectionCard eyebrow='06 · Publication' title='Result on-chain' status={{ kind: 'pending', label: 'Pending' }}>
+      <SectionCard eyebrow='06 · Publication' title='Result on-chain' status={stageStatus(6)}>
         <p className='isection__lede'>{e3.publication.note}</p>
       </SectionCard>
 

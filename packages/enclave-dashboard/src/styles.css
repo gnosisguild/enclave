@@ -983,25 +983,6 @@ button {
   color: var(--ink-4);
 }
 
-.history__more {
-  display: flex;
-  justify-content: center;
-  margin-top: 18px;
-}
-.link-btn {
-  background: transparent;
-  border: 0;
-  color: var(--ink-3);
-  font-size: 13.5px;
-  padding: 8px 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.link-btn:hover {
-  color: var(--ink);
-}
-
 /* ── Empty state ─────────────────────────────────────────────────────────── */
 /* Live toggle (Watch lifecycle) ---------------------------------------- */
 .live-toggle {
@@ -1915,7 +1896,8 @@ button {
   font-size: 13.5px;
   color: var(--ink);
   min-width: 0;
-  word-break: break-word;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 .dl dd .mono {
   font-size: 12.5px;

@@ -290,7 +290,11 @@ export default function App() {
       <Header density={t.density} view={t.view} onNav={setView} />
       {t.view === 'inspector' ? (
         <main className='main'>
-          {!inspectorReady ? (
+          {allE3s.status === 'error' ? (
+            <div className='inspector'>
+              <StatusNote>Couldn't load E3s from Sepolia. Retrying automatically…</StatusNote>
+            </div>
+          ) : !inspectorReady ? (
             <div className='inspector'>
               <Loader label='Loading E3s' sub='Reading from Sepolia…' />
             </div>
@@ -313,12 +317,16 @@ export default function App() {
         <main className='main'>
           <Intro />
 
-          {!crispReady ? (
+          {crispPolls.status === 'error' ? (
+            <StatusNote>Couldn't load CRISP polls from Sepolia. Retrying automatically…</StatusNote>
+          ) : !crispReady ? (
             <Loader label='Loading CRISP polls' sub='Reading from Sepolia…' />
           ) : !hasPolls ? (
             <StatusNote>
               No live CRISP polls right now. A new poll will appear here automatically when one is requested on-chain.
             </StatusNote>
+          ) : todaysDetail.status === 'error' ? (
+            <StatusNote>Couldn't load the latest poll details from Sepolia. Retrying automatically…</StatusNote>
           ) : !livePoll ? (
             <Loader label='Loading the latest poll' sub='Reading from Sepolia…' />
           ) : (
