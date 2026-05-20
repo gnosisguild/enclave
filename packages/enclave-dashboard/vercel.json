@@ -3,6 +3,5 @@
   "framework": "vite",
   "installCommand": "cd ../.. && pnpm install",
   "buildCommand": "cd ../.. && pnpm --filter @enclave-e3/contracts build && pnpm --filter @enclave-e3/dashboard build",
-  "outputDirectory": "dist",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- packages/enclave-dashboard packages/enclave-contracts pnpm-lock.yaml"
+  "outputDirectory": "dist"
 }
