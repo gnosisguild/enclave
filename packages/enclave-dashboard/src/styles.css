@@ -96,12 +96,18 @@ button {
   letter-spacing: -0.012em;
   color: var(--ink);
 }
-.wordmark__mark {
-  display: inline-flex;
-  color: var(--accent-deep);
+/* Official Interfold wordmark (src/assets/interfold.svg), masked so it inherits
+   a theme color and stays legible on the light chrome. */
+.wordmark__logo {
+  display: inline-block;
+  height: 20px;
+  aspect-ratio: 259 / 37;
+  background-color: var(--ink);
+  -webkit-mask: url('./assets/interfold.svg') no-repeat center / contain;
+  mask: url('./assets/interfold.svg') no-repeat center / contain;
 }
-.wordmark__text {
-  font-weight: 540;
+.wordmark--foot .wordmark__logo {
+  height: 18px;
 }
 .site-nav {
   display: flex;
@@ -440,139 +446,11 @@ button {
   margin-top: 6px;
   line-height: 1.45;
 }
-.ballot-grid__grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 7px 8px;
-  margin-top: auto;
-  color: color-mix(in oklab, var(--accent-deep) 65%, transparent);
-}
-.ballot-glyph {
-  aspect-ratio: 14 / 10;
-  display: grid;
-  place-items: center;
-  background: color-mix(in oklab, var(--accent-soft) 50%, transparent);
-  border-radius: 3px;
-  animation: ballot-in 600ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
-}
-.ballot-glyph--more {
-  background: var(--accent-deep);
-  color: var(--paper-2);
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 540;
-  grid-column: span 2;
-}
-@keyframes ballot-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px) scale(0.92);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
 /* ── Result panel (when published) ──────────────────────────────────────── */
 .poll-card__result {
   display: flex;
   flex-direction: column;
   gap: 22px;
-}
-.result__eyebrow {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent-deep);
-  font-weight: 540;
-  margin-bottom: 8px;
-}
-.result__headline {
-  display: flex;
-  align-items: baseline;
-  gap: 18px;
-  font-family: var(--serif);
-  font-weight: 400;
-  font-size: 30px;
-  line-height: 1.15;
-  margin: 0;
-  color: var(--ink);
-  letter-spacing: -0.015em;
-}
-.result__pct {
-  font-family: var(--mono);
-  font-size: 24px;
-  color: var(--accent-deep);
-  font-weight: 500;
-  letter-spacing: -0.02em;
-}
-.result__sentence {
-  font-size: 16px;
-  color: var(--ink-2);
-  max-width: 580px;
-  margin: 0;
-  text-wrap: pretty;
-}
-.result__bars {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.result__bar-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 8px;
-}
-.result__bar-label {
-  font-size: 14.5px;
-  color: var(--ink-2);
-  min-width: 0;
-  text-wrap: pretty;
-}
-.result__bar-pct {
-  flex: none;
-}
-.result__bar--win .result__bar-label {
-  color: var(--ink);
-  font-weight: 500;
-}
-.result__bar-pct {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  font-family: var(--mono);
-}
-.result__bar-count {
-  font-size: 12px;
-  color: var(--ink-4);
-}
-.result__bar-pct-num {
-  font-size: 14px;
-  color: var(--ink-2);
-}
-.result__bar--win .result__bar-pct-num {
-  color: var(--accent-deep);
-}
-.result__bar-track {
-  height: 10px;
-  background: var(--rule-soft);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.result__bar-fill {
-  height: 100%;
-  background: var(--accent-soft);
-  border-radius: 999px;
-  transition: width 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-.result__bar--win .result__bar-fill {
-  background: var(--accent-deep);
 }
 
 /* ── Privacy explainer ──────────────────────────────────────────────────── */
@@ -965,9 +843,13 @@ button {
   font-size: 13px;
   font-weight: 540;
 }
-.hist-row__verdict--declined {
-  background: var(--paper-3);
-  color: var(--ink-2);
+.hist-row__verdict--good {
+  background: #e6f6ec;
+  color: #1f7a45;
+}
+.hist-row__verdict--bad {
+  background: #fcebea;
+  color: #b23a36;
 }
 .hist-row__verdict-pct {
   font-size: 12px;
@@ -1055,25 +937,6 @@ button {
     transform: translateY(0);
   }
 }
-.ballot-glyph--new {
-  animation: ballot-arrive 700ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards !important;
-}
-@keyframes ballot-arrive {
-  0% {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.5);
-    filter: blur(2px);
-  }
-  60% {
-    opacity: 1;
-    transform: translateY(0) scale(1.08);
-    filter: blur(0);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
 /* History row expand --------------------------------------------------- */
 .hist-row + .hist-row {
   border-top: 1px solid var(--rule);
@@ -1351,8 +1214,8 @@ button {
 .wordmark--foot {
   color: var(--paper);
 }
-.wordmark--foot .wordmark__mark {
-  color: var(--accent-soft);
+.wordmark--foot .wordmark__logo {
+  background-color: #d9fce8;
 }
 .site-foot__tag {
   font-size: 14px;
@@ -1935,11 +1798,6 @@ button {
   color: var(--ink);
   border-color: var(--ink-4);
   background: var(--paper-2);
-}
-.hash--copied {
-  color: var(--accent-deep);
-  border-color: var(--accent-soft);
-  background: var(--accent-bg);
 }
 .hash__icon {
   display: inline-flex;

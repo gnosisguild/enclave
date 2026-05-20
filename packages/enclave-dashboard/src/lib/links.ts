@@ -19,3 +19,7 @@ export const LINKS = {
 export function explorerAddress(address: string): string {
   return `${LINKS.explorer}/address/${address}`
 }
+
+export function explorerTx(txHash: string): string {
+  return `${LINKS.explorer}/tx/${txHash}`
+}

@@ -5,8 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 // Network pulse — small, low-emphasis footer strip.
 
-export default function Pulse({ data, show }: { data: { activeNow: number; ballots24h: number; pollsAllTime: number }; show: boolean }) {
-  if (!show) return null
+export default function Pulse({ data }: { data: { activeNow: number; ballots24h: number; pollsAllTime: number } }) {
   return (
     <section className='pulse' aria-label='Network activity'>
       <div className='pulse__inner'>
@@ -25,7 +24,7 @@ export default function Pulse({ data, show }: { data: { activeNow: number; ballo
           </div>
           <div className='pulse__metric'>
             <span className='pulse__metric-num mono'>{data.pollsAllTime.toLocaleString()}</span>
-            <span className='pulse__metric-label'>polls completed, all-time</span>
+            <span className='pulse__metric-label'>CRISP polls, all-time</span>
           </div>
         </div>
         <div className='pulse__status'>

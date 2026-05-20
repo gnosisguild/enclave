@@ -52,5 +52,12 @@ export const CONTRACTS = {
 // First block to scan from — lower bound for getLogs (the Enclave deploy block).
 export const DEPLOY_BLOCK = BigInt(envStr('VITE_DEPLOY_BLOCK', '10697349'))
 
+// E3 timeout windows (seconds), matching the deployment's timeoutConfig. Used to
+// decide whether an E3 is still genuinely active vs. expired without completing.
+export const TIMEOUTS = {
+  computeWindow: Number(envStr('VITE_COMPUTE_WINDOW', '86400')),
+  decryptionWindow: Number(envStr('VITE_DECRYPTION_WINDOW', '3600')),
+}
+
 export const enclaveAbi = Enclave__factory.abi
 export const ciphernodeRegistryAbi = CiphernodeRegistryOwnable__factory.abi

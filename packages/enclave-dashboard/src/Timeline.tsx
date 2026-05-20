@@ -66,7 +66,9 @@ export default function Timeline({
 
       <div className='timeline__track' role='list'>
         {stages.map((s, i) => {
-          const state = i < currentStageIdx ? 'done' : i === currentStageIdx ? 'active' : 'todo'
+          // The final stage (Published) is terminal — when reached it's complete, not in-progress.
+          const isLast = i === stages.length - 1
+          const state = i < currentStageIdx ? 'done' : i === currentStageIdx ? (isLast ? 'done' : 'active') : 'todo'
           const isClickable = !!onStageClick
           const Tag: any = isClickable ? 'button' : 'div'
           return (

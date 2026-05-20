@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 // Main app shell + tweak wiring.
 
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { STAGES } from './data'
 import PollCard from './PollCard'
 import Timeline from './Timeline'
@@ -13,14 +13,12 @@ import History from './History'
 import Pulse from './Pulse'
 import Inspector from './Inspector'
 import Loader from './Loader'
-import { useAllE3s, useCrispPolls, useE3Details } from './lib/useE3s'
+import { useAllE3s, useCrispPolls, useE3Details, useRecentBallots } from './lib/useE3s'
 import { adaptHistoryEntries, adaptInspectorDetail, adaptInspectorE3List, adaptTodaysPoll } from './lib/adapt'
 import { formatE3Id } from './lib/pollMeta'
 import { LINKS, explorerAddress } from './lib/links'
 import { CONTRACTS } from './lib/chain'
-import type { E3FullDetails } from './lib/e3'
-import { useTweaks } from './useTweaks'
-import { TweaksPanel, TweakSection, TweakSelect, TweakRadio, TweakToggle } from './tweaks-panel'
+import { isE3Active, type E3FullDetails } from './lib/e3'
 
 function Header({ density, view, onNav }: { density: string; view: string; onNav: (id: string) => void }) {
   const link = (id: string, label: string) => (
@@ -47,14 +45,7 @@ function Header({ density, view, onNav }: { density: string; view: string; onNav
           }}
           aria-label='Interfold home'
         >
-          <span className='wordmark__mark' aria-hidden='true'>
-            <svg viewBox='0 0 22 22' width='22' height='22'>
-              <path d='M2 19 L11 3 L20 19 Z' fill='none' stroke='currentColor' strokeWidth='1.5' strokeLinejoin='round' />
-              <path d='M11 3 L11 19' stroke='currentColor' strokeWidth='1.5' strokeLinecap='round' />
-              <path d='M11 11 L20 19' stroke='currentColor' strokeWidth='1.5' strokeLinecap='round' />
-            </svg>
-          </span>
-          <span className='wordmark__text'>Interfold</span>
+          <span className='wordmark__logo' aria-hidden='true' />
         </a>
         <nav className='site-nav' aria-label='Primary'>
           {link('inspector', 'E3 inspector')}
@@ -97,14 +88,7 @@ function SiteFooter() {
       <div className='site-foot__inner'>
         <div className='site-foot__brand'>
           <div className='wordmark wordmark--foot'>
-            <span className='wordmark__mark' aria-hidden='true'>
-              <svg viewBox='0 0 22 22' width='20' height='20'>
-                <path d='M2 19 L11 3 L20 19 Z' fill='none' stroke='currentColor' strokeWidth='1.5' strokeLinejoin='round' />
-                <path d='M11 3 L11 19' stroke='currentColor' strokeWidth='1.5' strokeLinecap='round' />
-                <path d='M11 11 L20 19' stroke='currentColor' strokeWidth='1.5' strokeLinecap='round' />
-              </svg>
-            </span>
-            <span className='wordmark__text'>Interfold</span>
+            <span className='wordmark__logo' aria-label='Interfold' role='img' />
           </div>
           <p className='site-foot__tag'>
             Infrastructure for confidential coordination between independent parties. CRISP is one of the example applications running on
@@ -127,7 +111,7 @@ function SiteFooter() {
           <div>
             <div className='site-foot__col-head'>Project</div>
             <a href={LINKS.repo} target='_blank' rel='noreferrer'>
-              Open source
+              Github
             </a>
             <a href={LINKS.blog} target='_blank' rel='noreferrer'>
               Blog
@@ -148,33 +132,26 @@ function SiteFooter() {
   )
 }
 
-const TWEAK_DEFAULTS = {
-  view: 'inspector',
-  stageIdx: 3,
-  pollState: 'open',
-  density: 'comfortable',
-  resultVariant: 'all',
-  showPulse: true,
-  accent: 'mint',
-}
-
-const ACCENT_PRESETS: Record<string, { bg: string; deep: string; soft: string; ink: string }> = {
-  mint: { bg: '#e8faf0', deep: '#1f6b4a', soft: '#cdeede', ink: '#163d2c' },
-  dusk: { bg: '#e6e8fa', deep: '#3a3f8a', soft: '#cdd2ee', ink: '#1f2347' },
-  paper: { bg: '#f1ece2', deep: '#5a4a2a', soft: '#e3d9c2', ink: '#3a2f17' },
-}
+// Fixed presentation density (the live tweak panel was removed).
+const DENSITY = 'comfortable'
 
 export default function App() {
-  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS)
-  const setView = (v: string) => setTweak('view', v)
+  // View (tab) + demo poll state. These are the only values that change at
+  // runtime; everything else is fixed (accent comes from the CSS :root mint).
+  const [view, setView] = useState('inspector')
+  const [pollState, setPollState] = useState('open')
+  const [stageIdx, setStageIdx] = useState(3)
 
   const [, setNowTick] = useState(0)
   const [liveMode, setLiveMode] = useState(false)
+  // Demo autoplay step, persisted so pausing/resuming continues where it left off.
+  const liveStepRef = useRef(0)
 
   // ─── On-chain data (Sepolia) ──────────────────────────────────────────────
   // CRISP tab: only CRISP-program polls. Inspector tab: every E3 on the network.
   const crispPolls = useCrispPolls()
   const allE3s = useAllE3s()
+  const recentBallots = useRecentBallots()
 
   // The newest CRISP poll (first entry; lists are newest-first) is "today's poll".
   const todaysId = crispPolls.data && crispPolls.data.length > 0 ? crispPolls.data[0].id : null
@@ -220,15 +197,20 @@ export default function App() {
   const liveStageIdx = todaysDetail.data?.uiStageIdx
   useEffect(() => {
     if (liveStageIdx == null) return
-    setTweak('stageIdx', liveStageIdx)
-    setTweak('pollState', liveStageIdx >= 6 ? 'published' : liveStageIdx >= 4 ? 'computing' : 'open')
-  }, [liveStageIdx, setTweak])
+    if (liveMode) return // the demo drives the stage while it plays
+    // Sync the on-chain stage (external store) into local UI state. Also runs
+    // when the demo ends (liveMode → false), restoring the real state.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setStageIdx(liveStageIdx)
+    setPollState(liveStageIdx >= 6 ? 'published' : liveStageIdx >= 4 ? 'computing' : 'open')
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [liveStageIdx, liveMode])
 
   const setStage = (i: number) => {
-    setTweak('stageIdx', i)
-    if (i >= 6) setTweak('pollState', 'published')
-    else if (i >= 4) setTweak('pollState', 'computing')
-    else setTweak('pollState', 'open')
+    setStageIdx(i)
+    if (i >= 6) setPollState('published')
+    else if (i >= 4) setPollState('computing')
+    else setPollState('open')
   }
 
   useEffect(() => {
@@ -247,15 +229,21 @@ export default function App() {
       { state: 'computing', stage: 5, hold: 2400 },
       { state: 'published', stage: 6, hold: 4000 },
     ]
-    let i = 0
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
     const advance = () => {
       if (cancelled) return
+      const i = liveStepRef.current
+      if (i >= program.length) {
+        // Completed one full lifecycle — stop instead of looping.
+        liveStepRef.current = 0
+        setLiveMode(false)
+        return
+      }
       const step = program[i]
-      setTweak('pollState', step.state)
-      setTweak('stageIdx', step.stage)
-      i = (i + 1) % program.length
+      setPollState(step.state)
+      setStageIdx(step.stage)
+      liveStepRef.current = i + 1
       timer = setTimeout(advance, step.hold)
     }
     advance()
@@ -263,32 +251,23 @@ export default function App() {
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [liveMode, setTweak])
+  }, [liveMode])
 
   const effectiveBallotCount = todaysDetail.data?.ballotCount ?? 0
 
   const reconciledStage = (() => {
-    if (t.pollState === 'published') return 6
-    if (t.pollState === 'computing') return Math.max(4, Math.min(5, t.stageIdx))
-    if (t.pollState === 'none') return 6
-    return Math.min(t.stageIdx, 3)
+    if (pollState === 'published') return 6
+    if (pollState === 'computing') return Math.max(4, Math.min(5, stageIdx))
+    if (pollState === 'none') return 6
+    return Math.min(stageIdx, 3)
   })()
 
-  useEffect(() => {
-    const a = ACCENT_PRESETS[t.accent] ?? ACCENT_PRESETS.mint
-    const root = document.documentElement
-    root.style.setProperty('--accent-bg', a.bg)
-    root.style.setProperty('--accent-deep', a.deep)
-    root.style.setProperty('--accent-soft', a.soft)
-    root.style.setProperty('--accent-ink', a.ink)
-  }, [t.accent])
-
-  const noActive = t.pollState === 'none'
+  const noActive = pollState === 'none'
 
   return (
-    <div className={`page page--${t.density}`}>
-      <Header density={t.density} view={t.view} onNav={setView} />
-      {t.view === 'inspector' ? (
+    <div className={`page page--${DENSITY}`}>
+      <Header density={DENSITY} view={view} onNav={setView} />
+      {view === 'inspector' ? (
         <main className='main'>
           {allE3s.status === 'error' ? (
             <div className='inspector'>
@@ -333,9 +312,8 @@ export default function App() {
             <>
               <PollCard
                 poll={livePoll}
-                pollState={noActive ? 'published' : t.pollState}
+                pollState={noActive ? 'published' : pollState}
                 currentStageIdx={reconciledStage}
-                resultVariant={t.resultVariant}
                 liveMode={liveMode}
                 onToggleLive={() => setLiveMode((v) => !v)}
                 ballotCount={effectiveBallotCount}
@@ -346,8 +324,8 @@ export default function App() {
                 stages={STAGES}
                 currentStageIdx={reconciledStage}
                 pollId={livePoll.id}
-                density={t.density}
-                onStageClick={setStage}
+                density={DENSITY}
+                onStageClick={liveMode ? undefined : setStage}
               />
 
               {liveHistory.length > 0 && <History entries={liveHistory} onNavigate={setView} />}
@@ -358,63 +336,12 @@ export default function App() {
 
       <Pulse
         data={{
-          activeNow: todaysDetail.data && todaysDetail.data.uiStageIdx < 6 ? 1 : 0,
-          ballots24h: todaysDetail.data?.ballotCount ?? 0,
+          activeNow: todaysDetail.data && isE3Active(todaysDetail.data.stage, todaysDetail.data.inputWindow[1]) ? 1 : 0,
+          ballots24h: recentBallots,
           pollsAllTime: polls.length,
         }}
-        show={t.showPulse}
       />
       <SiteFooter />
-
-      <TweaksPanel title='Tweaks'>
-        <TweakSection label='View' />
-        <TweakRadio
-          label='Tab'
-          value={t.view}
-          options={[
-            { value: 'inspector', label: 'Inspector' },
-            { value: 'crisp', label: 'CRISP' },
-          ]}
-          onChange={(v) => setTweak('view', v)}
-        />
-
-        <TweakSection label='Poll state' />
-        <TweakSelect
-          label='State'
-          value={t.pollState}
-          options={[
-            { value: 'open', label: 'Open · accepting votes' },
-            { value: 'computing', label: 'Computing · tallying' },
-            { value: 'published', label: 'Published · result live' },
-            { value: 'none', label: 'No active poll' },
-          ]}
-          onChange={(v) => setTweak('pollState', v)}
-        />
-        <TweakSelect
-          label='Current stage'
-          value={String(t.stageIdx)}
-          options={STAGES.map((s, i) => ({
-            value: String(i),
-            label: `${i + 1}. ${s.label}`,
-          }))}
-          onChange={(v) => setTweak('stageIdx', Number(v))}
-        />
-
-        <TweakSection label='Presentation' />
-        <TweakRadio label='Density' value={t.density} options={['compact', 'comfortable']} onChange={(v) => setTweak('density', v)} />
-        <TweakSelect
-          label='Result variant'
-          value={t.resultVariant}
-          options={[
-            { value: 'all', label: 'Sentence + bars' },
-            { value: 'bars', label: 'Bars only' },
-            { value: 'sentence', label: 'Sentence only' },
-          ]}
-          onChange={(v) => setTweak('resultVariant', v)}
-        />
-        <TweakRadio label='Accent' value={t.accent} options={['mint', 'dusk', 'paper']} onChange={(v) => setTweak('accent', v)} />
-        <TweakToggle label='Show network pulse' value={t.showPulse} onChange={(v) => setTweak('showPulse', v)} />
-      </TweaksPanel>
     </div>
   )
 }

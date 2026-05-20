@@ -18,9 +18,9 @@ type Entry = {
 
 const HIST_FILTERS = [
   { id: 'all', label: 'All', test: () => true },
-  { id: 'appr', label: 'Approved', test: (e: Entry) => /Approved|Adopted/i.test(e.result) },
-  { id: 'decl', label: 'Declined', test: (e: Entry) => /Declined/i.test(e.result) },
-  { id: '2026', label: '2026', test: (e: Entry) => /2026/.test(e.closed) },
+  { id: 'appr', label: 'Approved', test: (e: Entry) => /Approved|Adopted|Completed/i.test(e.result) },
+  { id: 'failed', label: 'Failed', test: (e: Entry) => /Failed/i.test(e.result) },
+  { id: 'expired', label: 'Expired', test: (e: Entry) => /Expired/i.test(e.result) },
 ]
 
 function HistoryDetail({ entry, onNavigate }: { entry: Entry; onNavigate?: (view: string) => void }) {
@@ -68,7 +68,10 @@ function HistoryRow({
   onNavigate?: (view: string) => void
 }) {
   const [winner, pct] = entry.result.split(' · ')
-  const declined = winner.toLowerCase().includes('declined')
+  const lower = winner.toLowerCase()
+  const bad = /declined|failed|expired/.test(lower)
+  const good = /approved|adopted|completed/.test(lower)
+  const tone = bad ? 'hist-row__verdict--bad' : good ? 'hist-row__verdict--good' : ''
   return (
     <li className={`hist-row ${expanded ? 'hist-row--open' : ''}`}>
       <button type='button' className='hist-row__btn' onClick={onToggle} aria-expanded={expanded}>
@@ -83,7 +86,7 @@ function HistoryRow({
           <div className='hist-row__q'>{entry.question}</div>
         </div>
         <div className='hist-row__result'>
-          <div className={`hist-row__verdict ${declined ? 'hist-row__verdict--declined' : ''}`}>
+          <div className={`hist-row__verdict ${tone}`}>
             <span className='hist-row__verdict-text'>{winner}</span>
             <span className='hist-row__verdict-pct mono'>{pct}</span>
           </div>

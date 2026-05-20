@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 // On-chain E3 fetchers — read events + view functions and assemble dashboard records.
 
-import { CONTRACTS, DEPLOY_BLOCK, E3Stage, ciphernodeRegistryAbi, enclaveAbi, publicClient } from './chain'
+import { CONTRACTS, DEPLOY_BLOCK, E3Stage, TIMEOUTS, ciphernodeRegistryAbi, enclaveAbi, publicClient } from './chain'
 
 // Helper: pull a single named event ABI item out of the typechain bundle.
 function eventAbi(abi: readonly any[], name: string): any {
@@ -17,9 +17,12 @@ function eventAbi(abi: readonly any[], name: string): any {
 const ENCLAVE_E3_REQUESTED = eventAbi(enclaveAbi as any, 'E3Requested')
 const ENCLAVE_PLAINTEXT_PUBLISHED = eventAbi(enclaveAbi as any, 'PlaintextOutputPublished')
 const ENCLAVE_REWARDS_DISTRIBUTED = eventAbi(enclaveAbi as any, 'RewardsDistributed')
+// The Enclave E3StageChanged event is the reliable, program-agnostic signal for
+// each lifecycle transition (the registry's CommitteePublished event signature
+// has drifted from this package's ABI on the live deployment, so we don't use it).
+const ENCLAVE_E3_STAGE_CHANGED = eventAbi(enclaveAbi as any, 'E3StageChanged')
 const REGISTRY_COMMITTEE_REQUESTED = eventAbi(ciphernodeRegistryAbi as any, 'CommitteeRequested')
 const REGISTRY_COMMITTEE_FINALIZED = eventAbi(ciphernodeRegistryAbi as any, 'CommitteeFinalized')
-const REGISTRY_COMMITTEE_PUBLISHED = eventAbi(ciphernodeRegistryAbi as any, 'CommitteePublished')
 
 // CRISP votes are NOT published through Enclave (its IEnclave.InputPublished
 // event is declared but never emitted). Each E3 program records its own inputs.
@@ -73,6 +76,20 @@ export function solidityStageToUiIdx(stage: number, inputWindow: [bigint, bigint
   }
 }
 
+// Whether an E3 is genuinely still active right now. An E3 that's Complete or
+// Failed isn't active; neither is one that blew past its expected deadline
+// (input window close + compute + decryption windows) without completing —
+// even if the chain hasn't formally marked it Failed yet.
+export function isE3Active(stage: number, inputWindowClose: bigint): boolean {
+  if (stage === E3Stage.Complete || stage === E3Stage.Failed) return false
+  if (inputWindowClose > 0n) {
+    const now = BigInt(Math.floor(Date.now() / 1000))
+    const deadline = inputWindowClose + BigInt(TIMEOUTS.computeWindow + TIMEOUTS.decryptionWindow)
+    if (now > deadline) return false
+  }
+  return true
+}
+
 export type E3Summary = {
   id: bigint
   e3Program: `0x${string}`
@@ -81,6 +98,7 @@ export type E3Summary = {
   requestTxHash: `0x${string}`
   inputWindow: [bigint, bigint]
   committeeSize: number
+  stage: number // raw Solidity E3Stage enum
 }
 
 export type E3FullDetails = E3Summary & {
@@ -159,6 +177,17 @@ export async function fetchLatestBlock(): Promise<bigint> {
   return publicClient.getBlockNumber()
 }
 
+// ~24h of blocks at ~12s/block. Approximate window for the "last 24h" stat.
+const BLOCKS_PER_DAY = 7200n
+
+// Count CRISP ballots (InputPublished events) submitted in roughly the last 24h.
+export async function fetchRecentBallotCount(): Promise<number> {
+  const head = await fetchLatestBlock()
+  const from = head > BLOCKS_PER_DAY + DEPLOY_BLOCK ? head - BLOCKS_PER_DAY : DEPLOY_BLOCK
+  const logs = await getLogsChunked<any>({ address: CONTRACTS.CRISPProgram, event: CRISP_INPUT_PUBLISHED }, from, head)
+  return logs.length
+}
+
 export type FetchE3Opts = {
   // CRISP poll view: only E3s whose program is the CRISPProgram.
   crispOnly?: boolean
@@ -179,8 +208,21 @@ export async function fetchE3List(opts: FetchE3Opts = {}): Promise<E3Summary[]> 
 
   const scoped = crispOnly ? logs.filter((log) => isCrispE3(log.args.e3.e3Program)) : logs
 
-  const out: E3Summary[] = scoped.map((log) => {
+  // Current stage of each E3 in one multicall — lets the list show real status
+  // (completed / failed / expired) rather than guessing.
+  const stages = await (publicClient.multicall as any)({
+    contracts: scoped.map((log) => ({
+      address: CONTRACTS.Enclave,
+      abi: enclaveAbi,
+      functionName: 'getE3Stage',
+      args: [log.args.e3Id],
+    })),
+    allowFailure: true,
+  })
+
+  const out: E3Summary[] = scoped.map((log, i) => {
     const { e3Id, e3 } = log.args
+    const stageResult = stages[i]
     return {
       id: e3Id,
       e3Program: e3.e3Program,
@@ -189,6 +231,7 @@ export async function fetchE3List(opts: FetchE3Opts = {}): Promise<E3Summary[]> 
       requestTxHash: log.transactionHash,
       inputWindow: [e3.inputWindow[0], e3.inputWindow[1]] as [bigint, bigint],
       committeeSize: Number(e3.committeeSize),
+      stage: stageResult.status === 'success' ? Number(stageResult.result) : E3Stage.None,
     }
   })
 
@@ -238,8 +281,10 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
   const requestLog = requestLogs.find((l: any) => l.args.e3Id === e3Id)
   const requestTxHash = (requestLog?.transactionHash ?? ('0x' as `0x${string}`)) as `0x${string}`
 
-  // 3. Committee data from CiphernodeRegistry.
-  const [requestedEvents, finalizedEvents, publishedEvents] = await Promise.all([
+  // 3. Committee data: requested (threshold/seed) + finalized (members) from the
+  // registry; the key-publish moment from the Enclave E3StageChanged → KeyPublished
+  // transition (the registry's CommitteePublished event has drifted from our ABI).
+  const [requestedEvents, finalizedEvents, stageChanges] = await Promise.all([
     getLogsChunked<any>(
       {
         address: CONTRACTS.CiphernodeRegistry,
@@ -260,8 +305,8 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
     ),
     getLogsChunked<any>(
       {
-        address: CONTRACTS.CiphernodeRegistry,
-        event: REGISTRY_COMMITTEE_PUBLISHED,
+        address: CONTRACTS.Enclave,
+        event: ENCLAVE_E3_STAGE_CHANGED,
         args: { e3Id },
       } as any,
       fromBlock,
@@ -271,10 +316,11 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
 
   const reqLog = requestedEvents[0]
   const finLog = finalizedEvents[0]
-  const pubLog = publishedEvents[0]
+  // The key was published when the E3 transitioned into KeyPublished.
+  const pubLog = stageChanges.find((l: any) => Number(l.args.newStage) === E3Stage.KeyPublished)
 
   const threshold: [number, number] = reqLog ? [Number(reqLog.args.threshold[0]), Number(reqLog.args.threshold[1])] : [0, 0]
-  const members: `0x${string}`[] = (finLog?.args?.committee ?? pubLog?.args?.nodes ?? []) as `0x${string}`[]
+  const members: `0x${string}`[] = (finLog?.args?.committee ?? []) as `0x${string}`[]
 
   // 4. Inputs + result + committee rewards.
   // Inputs come from the E3 program, not Enclave. We only understand CRISP's

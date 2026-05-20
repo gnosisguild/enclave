@@ -5,11 +5,12 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 // Adapters: shape on-chain data into the prop shapes the React components expect.
 
-import { formatUnits, numberToHex } from 'viem'
+import { formatUnits, keccak256, numberToHex, toHex } from 'viem'
 import type { HistoryEntry, Poll } from '../data'
 import type { E3FullDetails, E3Summary } from './e3'
-import { decodeCrispTally } from './e3'
-import { formatE3Id, isCrispProgram, pollMetaFor, programName, shortAddr, shortHash } from './pollMeta'
+import { decodeCrispTally, isE3Active } from './e3'
+import { E3Stage } from './chain'
+import { formatE3Id, isCrispProgram, pollMetaFor, programName, shortHash } from './pollMeta'
 
 // Fee token is MockUSDC (6 decimals) on the Sepolia deployment.
 const FEE_DECIMALS = 6
@@ -20,14 +21,6 @@ function fmtUsdc(v: bigint | undefined): string {
 
 export function adaptTodaysPoll(detail: E3FullDetails): Poll {
   const meta = pollMetaFor(detail.id)
-  const tally = decodeCrispTally(detail.plaintextOutput)
-  const totals: Record<string, number> = {}
-  meta.options.forEach((o, i) => {
-    totals[o.id] = tally && tally[i] != null ? tally[i] : 0
-  })
-  const winnerKey =
-    tally && tally.length > 0 ? (meta.options[tally.indexOf(Math.max(...tally))]?.id ?? meta.options[0].id) : meta.options[0].id
-
   const openedTs = detail.inputWindow[0]
   const closesTs = detail.inputWindow[1]
 
@@ -35,12 +28,10 @@ export function adaptTodaysPoll(detail: E3FullDetails): Poll {
     id: formatE3Id(detail.id),
     question: meta.question,
     context: meta.context,
-    options: meta.options,
     opened: openedTs > 0n ? fmtUtc(openedTs) : '—',
     closes: closesTs > 0n ? fmtUtc(closesTs) : '—',
     closesTs: Number(closesTs),
     ballotCount: detail.ballotCount,
-    result: { winner: winnerKey, totals },
   }
 }
 
@@ -48,28 +39,36 @@ export function adaptHistoryEntries(list: E3Summary[], detailsCache: Map<string,
   return list.map((s) => {
     const detail = detailsCache.get(s.id.toString())
     const meta = pollMetaFor(s.id)
-    let resultText = 'Pending'
-    if (detail) {
-      const tally = decodeCrispTally(detail.plaintextOutput)
-      if (tally && tally.length > 0) {
-        const total = tally.reduce((a, b) => a + b, 0)
-        const max = Math.max(...tally)
-        const pct = total > 0 ? Math.round((max / total) * 100) : 0
-        const winnerIdx = tally.indexOf(max)
-        const winnerLabel = meta.options[winnerIdx]?.label ?? 'Outcome'
-        const verdict = /^no/i.test(winnerLabel) ? 'Declined' : /^abs/i.test(winnerLabel) ? 'Inconclusive' : 'Approved'
-        resultText = `${verdict} · ${pct}%`
-      }
-    }
     return {
       id: formatE3Id(s.id),
       question: meta.question,
       closed: s.inputWindow[1] > 0n ? fmtDate(s.inputWindow[1]) : 'in progress',
       duration: s.inputWindow[1] > s.inputWindow[0] && s.inputWindow[0] > 0n ? fmtDuration(s.inputWindow[1] - s.inputWindow[0]) : '—',
       ballotCount: detail?.ballotCount ?? 0,
-      result: resultText,
+      result: historyResult(s, detail, meta),
     }
   })
+}
+
+// A truthful one-line status for a past poll. Prefers the decoded verdict when
+// we have the result; otherwise reflects the on-chain stage (failed / expired /
+// in progress / completed) rather than a blanket "Pending".
+function historyResult(s: E3Summary, detail: E3FullDetails | undefined, meta: ReturnType<typeof pollMetaFor>): string {
+  if (detail) {
+    const tally = decodeCrispTally(detail.plaintextOutput)
+    if (tally && tally.length > 0) {
+      const total = tally.reduce((a, b) => a + b, 0)
+      const max = Math.max(...tally)
+      const pct = total > 0 ? Math.round((max / total) * 100) : 0
+      const winnerLabel = meta.options[tally.indexOf(max)]?.label ?? 'Outcome'
+      const verdict = /^no/i.test(winnerLabel) ? 'Declined' : /^abs/i.test(winnerLabel) ? 'Inconclusive' : 'Approved'
+      return `${verdict} · ${pct}%`
+    }
+  }
+  if (s.stage === E3Stage.Complete) return 'Completed'
+  if (s.stage === E3Stage.Failed) return 'Failed'
+  if (isE3Active(s.stage, s.inputWindow[1])) return 'In progress'
+  return 'Expired'
 }
 
 export function adaptInspectorE3List(list: E3Summary[]) {
@@ -86,8 +85,8 @@ export type InspectorEvent = {
   block: number | string
   name: string
   stage: string
-  tx: string
-  gas: string
+  tx: string // shortened for display
+  txHash?: string // full hash for the explorer link ('—'/none → omitted)
 }
 
 export type InspectorDetail = {
@@ -101,7 +100,7 @@ export type InspectorDetail = {
   requestedBlock: number
   currentStage: number
   summary: string
-  committee: { size: number; threshold: number; selectionSeed: string; drawnAt: string; note: string }
+  committee: { size: number; threshold: number; selectionSeed: string; drawnAt: string }
   fees: {
     feeEscrowed: string
     committeeReward: string
@@ -123,11 +122,21 @@ export type InspectorDetail = {
   }
   compute: { status: string; note: string }
   decryption: { status: string; note: string; threshold: number; committeeSize: number }
-  publication: { status: string; note: string }
+  publication: { status: string; note: string; resultTx?: string }
   events: InspectorEvent[]
 }
 
 const ZERO_HASH = '0x' + '0'.repeat(64)
+
+// Encryption-scheme ids are keccak256 of a label string, so map known hashes
+// back to a readable name (can't be reversed otherwise).
+const KNOWN_SCHEMES: Record<string, string> = {
+  [keccak256(toHex('fhe.rs:BFV'))]: 'BFV (fhe.rs)',
+}
+function schemeName(id: string): string {
+  if (!id || id === ZERO_HASH) return '—'
+  return KNOWN_SCHEMES[id.toLowerCase()] ?? shortHash(id)
+}
 
 export function adaptInspectorDetail(detail: E3FullDetails | null): InspectorDetail | null {
   if (!detail) return null
@@ -140,8 +149,8 @@ export function adaptInspectorDetail(detail: E3FullDetails | null): InspectorDet
   return {
     id: formatE3Id(detail.id),
     program: programName(detail.e3Program),
-    programAddr: shortAddr(detail.e3Program),
-    requestedBy: shortAddr(detail.requester),
+    programAddr: detail.e3Program,
+    requestedBy: detail.requester,
     requestedByLabel: 'Requester',
     requestedTx: detail.requestTxHash,
     requestedAt: detail.requestedAt ? fmtUtcFromUnix(detail.requestedAt) : `block #${detail.requestBlock.toString()}`,
@@ -154,7 +163,6 @@ export function adaptInspectorDetail(detail: E3FullDetails | null): InspectorDet
       threshold: sharesRequired,
       selectionSeed: detail.seed > 0n ? shortHash(numberToHex(detail.seed, { size: 32 })) : '—',
       drawnAt: detail.committeeFinalizedAt ? fmtUtcFromUnix(detail.committeeFinalizedAt) : '—',
-      note: 'Identities are sealed. Only the count and threshold are public.',
     },
 
     fees: {
@@ -164,11 +172,11 @@ export function adaptInspectorDetail(detail: E3FullDetails | null): InspectorDet
     },
 
     keygen: {
-      scheme: detail.encryptionSchemeId && detail.encryptionSchemeId !== ZERO_HASH ? shortHash(detail.encryptionSchemeId) : '—',
+      scheme: schemeName(detail.encryptionSchemeId),
       finalizedAt: detail.committeeFinalizedAt ? fmtUtcFromUnix(detail.committeeFinalizedAt) : '—',
       publishedAt: detail.committeePublishedAt ? fmtUtcFromUnix(detail.committeePublishedAt) : '—',
       publishedTx: detail.committeePublishedTx ?? '—',
-      publicKey: detail.committeePublicKey && detail.committeePublicKey !== ZERO_HASH ? shortHash(detail.committeePublicKey) : '—',
+      publicKey: detail.committeePublicKey && detail.committeePublicKey !== ZERO_HASH ? detail.committeePublicKey : '—',
     },
 
     input: {
@@ -200,8 +208,9 @@ export function adaptInspectorDetail(detail: E3FullDetails | null): InspectorDet
     publication: {
       status: detail.resultTxHash ? 'complete' : 'pending',
       note: detail.resultTxHash
-        ? `Result published in tx ${shortHash(detail.resultTxHash)}.`
+        ? 'The result has been published on-chain. Individual ballots remain encrypted.'
         : 'Final result will be written on-chain. Individual ballots remain encrypted.',
+      resultTx: detail.resultTxHash,
     },
 
     events: buildEventLog(detail),
@@ -221,7 +230,7 @@ function buildEventLog(d: E3FullDetails): InspectorEvent[] {
     name: 'E3Requested',
     stage: 'Requested',
     tx: shortHash(d.requestTxHash),
-    gas: '—',
+    txHash: d.requestTxHash,
   })
   if (d.committeeFinalizedTx) {
     evs.push({
@@ -230,7 +239,7 @@ function buildEventLog(d: E3FullDetails): InspectorEvent[] {
       name: 'CommitteeFinalized',
       stage: 'Committee Selected',
       tx: shortHash(d.committeeFinalizedTx),
-      gas: '—',
+      txHash: d.committeeFinalizedTx,
     })
   }
   if (d.committeePublishedTx) {
@@ -240,7 +249,7 @@ function buildEventLog(d: E3FullDetails): InspectorEvent[] {
       name: 'CommitteePublished',
       stage: 'Keygen',
       tx: shortHash(d.committeePublishedTx),
-      gas: '—',
+      txHash: d.committeePublishedTx,
     })
   }
   d.ballotEvents.slice(0, 5).forEach((b) => {
@@ -250,7 +259,7 @@ function buildEventLog(d: E3FullDetails): InspectorEvent[] {
       name: 'InputPublished',
       stage: 'Input Window',
       tx: shortHash(b.txHash),
-      gas: '—',
+      txHash: b.txHash,
     })
   })
   if (d.ballotEvents.length > 5) {
@@ -260,7 +269,6 @@ function buildEventLog(d: E3FullDetails): InspectorEvent[] {
       name: `InputPublished (×${d.ballotEvents.length - 5} more)`,
       stage: 'Input Window',
       tx: '—',
-      gas: '—',
     })
   }
   if (d.resultTxHash) {
@@ -270,7 +278,7 @@ function buildEventLog(d: E3FullDetails): InspectorEvent[] {
       name: 'PlaintextOutputPublished',
       stage: 'Published',
       tx: shortHash(d.resultTxHash),
-      gas: '—',
+      txHash: d.resultTxHash,
     })
   }
   return evs

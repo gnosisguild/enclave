@@ -6,7 +6,7 @@
 // React hooks wrapping the on-chain fetchers. Polls every POLL_MS while mounted.
 
 import { useEffect, useRef, useState } from 'react'
-import { fetchE3Details, fetchE3List, type E3FullDetails, type E3Summary } from './e3'
+import { fetchE3Details, fetchE3List, fetchRecentBallotCount, type E3FullDetails, type E3Summary } from './e3'
 
 const POLL_MS = 15_000
 
@@ -66,6 +66,39 @@ export function useAllE3s(): LoadState<E3Summary[]> {
   return useE3List(false)
 }
 
+// CRISP ballots submitted in roughly the last 24h (0 until first load).
+export function useRecentBallots(): number {
+  const [count, setCount] = useState(0)
+  const mounted = useRef(true)
+
+  useEffect(() => {
+    mounted.current = true
+    let cancelled = false
+    let inFlight = false
+    const tick = async () => {
+      if (inFlight) return
+      inFlight = true
+      try {
+        const n = await fetchRecentBallotCount()
+        if (!cancelled && mounted.current) setCount(n)
+      } catch {
+        /* keep last value on transient errors */
+      } finally {
+        inFlight = false
+      }
+    }
+    tick()
+    const id = setInterval(tick, POLL_MS)
+    return () => {
+      cancelled = true
+      mounted.current = false
+      clearInterval(id)
+    }
+  }, [])
+
+  return count
+}
+
 export function useE3Details(e3Id: bigint | null): LoadState<E3FullDetails> {
   const [state, setState] = useState<LoadState<E3FullDetails>>({
     status: 'loading',
@@ -77,8 +110,10 @@ export function useE3Details(e3Id: bigint | null): LoadState<E3FullDetails> {
 
   useEffect(() => {
     mounted.current = true
+    // Reset to loading whenever the selected E3 changes so the UI shows a
+    // spinner instead of the previous E3's (stale) data while the new one loads.
+    setState({ status: 'loading', data: null, error: null })
     if (e3Id === null) {
-      setState({ status: 'loading', data: null, error: null })
       return
     }
     let cancelled = false

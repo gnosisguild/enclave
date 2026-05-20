@@ -8,7 +8,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { STAGES } from './data'
 import { CONTRACTS } from './lib/chain'
-import { explorerAddress } from './lib/links'
+import { explorerAddress, explorerTx } from './lib/links'
 import type { InspectorDetail } from './lib/adapt'
 import Loader from './Loader'
 
@@ -18,31 +18,25 @@ function Mono({ children, className = '' }: { children: React.ReactNode; classNa
   return <span className={`mono ${className}`}>{children}</span>
 }
 
-function CopyableHash({ value, full }: { value: string; full?: string }) {
-  const [copied, setCopied] = useState(false)
-  const onClick = () => {
-    if (navigator.clipboard) navigator.clipboard.writeText(full || value)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1100)
-  }
+function short(hex: string): string {
+  if (!hex || hex.length < 14) return hex
+  return `${hex.slice(0, 10)}…${hex.slice(-6)}`
+}
+
+// A hash/address rendered as a link out to the block explorer.
+function ExplorerLink({ value, href }: { value: string; href: string }) {
   return (
-    <button type='button' className={`hash ${copied ? 'hash--copied' : ''}`} onClick={onClick} title={full || value}>
-      <span className='mono'>{value}</span>
+    <a className='hash' href={href} target='_blank' rel='noreferrer' title={value}>
+      <span className='mono'>{short(value)}</span>
       <span className='hash__icon' aria-hidden='true'>
-        {copied ? (
-          <svg viewBox='0 0 12 12' width='11' height='11'>
-            <path d='M2 6.5 L5 9 L10 3' fill='none' stroke='currentColor' strokeWidth='1.6' strokeLinecap='round' strokeLinejoin='round' />
-          </svg>
-        ) : (
-          <svg viewBox='0 0 12 12' width='11' height='11'>
-            <rect x='3.5' y='3.5' width='6.5' height='6.5' rx='1' fill='none' stroke='currentColor' strokeWidth='1.1' />
-            <path d='M2 7.5 V2 H7.5' fill='none' stroke='currentColor' strokeWidth='1.1' />
-          </svg>
-        )}
+        ↗
       </span>
-    </button>
+    </a>
   )
 }
+
+const TxLink = ({ hash }: { hash: string }) => <ExplorerLink value={hash} href={explorerTx(hash)} />
+const AddrLink = ({ address }: { address: string }) => <ExplorerLink value={address} href={explorerAddress(address)} />
 
 function InspStatusBadge({ stageIdx }: { stageIdx: number }) {
   const s = STAGES[stageIdx]
@@ -120,7 +114,8 @@ function InspectorStageStrip({ stages, currentStageIdx }: { stages: typeof STAGE
     <div className='insp-head__strip' ref={wrapRef} data-overflow={overflow ? '1' : '0'}>
       <div className='istrip' role='list'>
         {stages.map((s, i) => {
-          const state = i < currentStageIdx ? 'done' : i === currentStageIdx ? 'active' : 'todo'
+          const isLast = i === stages.length - 1
+          const state = i < currentStageIdx ? 'done' : i === currentStageIdx ? (isLast ? 'done' : 'active') : 'todo'
           return (
             <React.Fragment key={s.id}>
               <div role='listitem' className={`istrip__node istrip__node--${state}`}>
@@ -160,7 +155,6 @@ function EventLog({ events }: { events: any[] }) {
             <th>Event</th>
             <th>Stage</th>
             <th>Tx</th>
-            <th className='evlog__num'>Gas</th>
           </tr>
         </thead>
         <tbody>
@@ -178,13 +172,12 @@ function EventLog({ events }: { events: any[] }) {
               <td>
                 <span className='evlog__stage'>{ev.stage}</span>
               </td>
-              <td>{ev.tx === '—' ? <Mono>—</Mono> : <CopyableHash value={ev.tx} />}</td>
-              <td className='evlog__num mono'>{ev.gas}</td>
+              <td>{ev.txHash ? <TxLink hash={ev.txHash} /> : <Mono>{ev.tx}</Mono>}</td>
             </tr>
           ))}
           {filtered.length === 0 && (
             <tr>
-              <td colSpan={6} className='evlog__empty'>
+              <td colSpan={5} className='evlog__empty'>
                 No events match this filter.
               </td>
             </tr>
@@ -242,9 +235,13 @@ export default function Inspector({
   }
 
   // Section status derived from the E3's current UI stage index (see STAGES order).
+  // The final stage (Published, index 6) is terminal: reaching it = complete.
+  const lastStage = STAGES.length - 1
   const stageStatus = (targetStage: number) => {
     if (e3.currentStage > targetStage) return { kind: 'done', label: 'Done' }
-    if (e3.currentStage === targetStage) return { kind: 'live', label: 'In progress' }
+    if (e3.currentStage === targetStage) {
+      return targetStage >= lastStage ? { kind: 'done', label: 'Complete' } : { kind: 'live', label: 'In progress' }
+    }
     return { kind: 'pending', label: 'Pending' }
   }
 
@@ -280,9 +277,7 @@ export default function Inspector({
               <Mono>{e3.program}</Mono>
               <span className='insp-head__meta-sep'>·</span>
               <span>Requested by</span>
-              <Mono>
-                {e3.requestedByLabel} · {e3.requestedBy}
-              </Mono>
+              <AddrLink address={e3.requestedBy} />
             </div>
           </div>
           <div className='insp-head__selector'>
@@ -333,11 +328,11 @@ export default function Inspector({
           <DefList
             items={[
               ['Requested at', <Mono>{e3.requestedAt}</Mono>],
-              ['Request tx', <CopyableHash value={`${e3.requestedTx.slice(0, 10)}…${e3.requestedTx.slice(-6)}`} full={e3.requestedTx} />],
+              ['Request tx', <TxLink hash={e3.requestedTx} />],
               ['Block', <Mono>#{e3.requestedBlock.toLocaleString()}</Mono>],
-              ['Requested by', <Mono>{e3.requestedBy}</Mono>],
+              ['Requested by', <AddrLink address={e3.requestedBy} />],
               ['Program', <Mono>{e3.program}</Mono>],
-              ['Program address', <Mono>{e3.programAddr}</Mono>],
+              ['Program address', <AddrLink address={e3.programAddr} />],
             ]}
           />
           <DefList
@@ -351,7 +346,6 @@ export default function Inspector({
               ],
               ['Selection seed', <Mono>{e3.committee.selectionSeed}</Mono>],
               ['Drawn at', <Mono>{e3.committee.drawnAt}</Mono>],
-              ['Identities', <span className='dl__muted'>{e3.committee.note}</span>],
             ]}
           />
         </div>
@@ -359,7 +353,7 @@ export default function Inspector({
 
       <SectionCard eyebrow='02 · Keygen' title='Distributed key generation'>
         <p className='isection__lede'>
-          The committee jointly generated an encryption key. The matching <em>decryption</em> key is held in shares — never assembled, never
+          The committee jointly generated an encryption key. The matching <em>decryption</em> key is held in shares - never assembled, never
           written down.
         </p>
         <DefList
@@ -367,18 +361,8 @@ export default function Inspector({
             ['Encryption scheme', <Mono>{e3.keygen.scheme}</Mono>],
             ['Committee finalized', <Mono>{e3.keygen.finalizedAt}</Mono>],
             ['Public key published', <Mono>{e3.keygen.publishedAt}</Mono>],
-            [
-              'Publish tx',
-              e3.keygen.publishedTx === '—' ? (
-                <Mono>—</Mono>
-              ) : (
-                <CopyableHash
-                  value={`${e3.keygen.publishedTx.slice(0, 10)}…${e3.keygen.publishedTx.slice(-6)}`}
-                  full={e3.keygen.publishedTx}
-                />
-              ),
-            ],
-            ['Joint public key', <Mono>{e3.keygen.publicKey}</Mono>],
+            ['Publish tx', e3.keygen.publishedTx === '—' ? <Mono>—</Mono> : <TxLink hash={e3.keygen.publishedTx} />],
+            ['Committee public key', <Mono>{e3.keygen.publicKey}</Mono>],
           ]}
         />
       </SectionCard>
@@ -421,6 +405,7 @@ export default function Inspector({
 
       <SectionCard eyebrow='06 · Publication' title='Result on-chain' status={stageStatus(6)}>
         <p className='isection__lede'>{e3.publication.note}</p>
+        {e3.publication.resultTx && <DefList items={[['Result tx', <TxLink hash={e3.publication.resultTx} />]]} />}
       </SectionCard>
 
       <SectionCard eyebrow='07 · Fees & settlement' title='Fees'>

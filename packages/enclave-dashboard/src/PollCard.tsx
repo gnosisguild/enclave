@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 // Today's CRISP poll card — the most prominent surface when a poll is live.
 
-import React, { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { STAGES, STAGE_STATUS, type Poll } from './data'
 import { LINKS } from './lib/links'
 
@@ -34,14 +34,7 @@ function StageBadge({ stageIdx }: { stageIdx: number }) {
   )
 }
 
-function EncryptedBallotGrid({ count, cap = 60 }: { count: number; cap?: number }) {
-  const glyphs = Math.min(count, cap)
-  const prevRef = useRef(glyphs)
-  const [newSince, setNewSince] = useState(0)
-  useEffect(() => {
-    setNewSince(Math.max(0, glyphs - prevRef.current))
-    prevRef.current = glyphs
-  }, [glyphs])
+function EncryptedBallotGrid({ count }: { count: number }) {
   return (
     <div className='ballot-grid' aria-label={`${count} encrypted ballots received`}>
       <div className='ballot-grid__head'>
@@ -52,20 +45,6 @@ function EncryptedBallotGrid({ count, cap = 60 }: { count: number; cap?: number 
           encrypted ballots received
           <div className='ballot-grid__sub'>Each is sealed on the voter's device. None have been opened.</div>
         </div>
-      </div>
-      <div className='ballot-grid__grid' aria-hidden='true'>
-        {Array.from({ length: glyphs }).map((_, i) => {
-          const isNew = i >= glyphs - newSince
-          return (
-            <span key={i} className={`ballot-glyph ${isNew ? 'ballot-glyph--new' : ''}`} style={!isNew ? { animation: 'none' } : undefined}>
-              <svg viewBox='0 0 14 10' width='14' height='10'>
-                <rect x='0.5' y='0.5' width='13' height='9' rx='1.2' fill='none' stroke='currentColor' strokeWidth='0.8' />
-                <path d='M0.7 1 L7 5.2 L13.3 1' fill='none' stroke='currentColor' strokeWidth='0.8' strokeLinecap='round' />
-              </svg>
-            </span>
-          )
-        })}
-        {count > cap && <span className='ballot-glyph ballot-glyph--more'>+{(count - cap).toLocaleString()}</span>}
       </div>
     </div>
   )
@@ -135,60 +114,9 @@ function PrivacyExplainer() {
   )
 }
 
-function ResultPanel({ poll, variant }: { poll: Poll; variant: string }) {
-  const totals = poll.result.totals
-  const total = Object.values(totals).reduce((a, b) => a + b, 0)
-  const items = poll.options.map((o) => ({
-    ...o,
-    count: totals[o.id] ?? 0,
-    pct: total > 0 ? (totals[o.id] ?? 0) / total : 0,
-  }))
-  const winner = items.find((i) => i.id === poll.result.winner) ?? items[0]
-  const showBars = variant === 'bars' || variant === 'all'
-  const showSentence = variant === 'sentence' || variant === 'all'
-  if (!winner) return null
-
-  return (
-    <div className='result'>
-      <div className='result__head'>
-        <div className='result__eyebrow'>Result · published on-chain</div>
-        <h3 className='result__headline'>
-          {winner.label}
-          <span className='result__pct'>{Math.round(winner.pct * 100)}%</span>
-        </h3>
-      </div>
-      {showSentence && (
-        <p className='result__sentence'>
-          Of {total.toLocaleString()} encrypted ballots, {winner.count.toLocaleString()} voted for{' '}
-          <b>{winner.label.toLowerCase().replace(/^yes,\s*/, '')}</b>. Individual votes were never seen by anyone.
-        </p>
-      )}
-      {showBars && (
-        <ul className='result__bars'>
-          {items.map((it) => (
-            <li key={it.id} className={`result__bar ${it.id === poll.result.winner ? 'result__bar--win' : ''}`}>
-              <div className='result__bar-row'>
-                <span className='result__bar-label'>{it.label}</span>
-                <span className='result__bar-pct'>
-                  <span className='result__bar-count'>{it.count.toLocaleString()}</span>
-                  <span className='result__bar-pct-num'>{(it.pct * 100).toFixed(0)}%</span>
-                </span>
-              </div>
-              <div className='result__bar-track'>
-                <div className='result__bar-fill' style={{ width: `${it.pct * 100}%` }} />
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
 export default function PollCard({
   pollState,
   currentStageIdx,
-  resultVariant,
   liveMode,
   onToggleLive,
   ballotCount,
@@ -197,7 +125,6 @@ export default function PollCard({
 }: {
   pollState: string
   currentStageIdx: number
-  resultVariant: string
   liveMode?: boolean
   onToggleLive?: () => void
   ballotCount?: number
@@ -298,7 +225,6 @@ export default function PollCard({
 
         {isPublished && (
           <div className='poll-card__result'>
-            <ResultPanel poll={poll} variant={resultVariant} />
             <PrivacyExplainer />
           </div>
         )}

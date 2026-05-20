@@ -65,20 +65,14 @@ export const STAGE_STATUS: Record<string, { label: string; sub: string }> = {
 
 // ─── Shared UI types ─────────────────────────────────────────────────────────
 
-export type PollOption = { id: string; label: string }
-
-export type PollResult = { winner: string; totals: Record<string, number> }
-
 export type Poll = {
   id: string
   question: string
   context: string
-  options: PollOption[]
   opened: string
   closes: string
   closesTs: number // unix seconds; 0 if unknown
   ballotCount: number
-  result: PollResult
 }
 
 export type HistoryEntry = {
