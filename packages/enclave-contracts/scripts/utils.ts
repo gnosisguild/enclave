@@ -62,14 +62,14 @@ export function readVkRecursiveHash(filePath: string): string {
 
 /** On-chain `BfvPkVerifier` sub-circuit VK immutables (for deploy-time staleness checks). */
 export interface BfvPkVerifierVkReader {
-  expectedNodesFoldKeyHash(): Promise<string>;
-  expectedC5KeyHash(): Promise<string>;
+  NODES_FOLD_KEY_HASH(): Promise<string>;
+  C5_KEY_HASH(): Promise<string>;
 }
 
 /** On-chain `BfvDecryptionVerifier` sub-circuit VK immutables (for deploy-time staleness checks). */
 export interface BfvDecryptionVerifierVkReader {
-  expectedC6FoldKeyHash(): Promise<string>;
-  expectedC7KeyHash(): Promise<string>;
+  C6_FOLD_KEY_HASH(): Promise<string>;
+  C7_KEY_HASH(): Promise<string>;
 }
 
 /**
@@ -85,8 +85,8 @@ export async function assertBfvPkVerifierSubCircuitVkHashes(
   );
   const expectedC5 = readVkRecursiveHash(BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS.c5);
   const [onChainNodesFold, onChainC5] = await Promise.all([
-    verifier.expectedNodesFoldKeyHash(),
-    verifier.expectedC5KeyHash(),
+    verifier.NODES_FOLD_KEY_HASH(),
+    verifier.C5_KEY_HASH(),
   ]);
 
   if (onChainNodesFold === expectedNodesFold && onChainC5 === expectedC5) {
@@ -115,8 +115,8 @@ export async function assertBfvDecryptionVerifierSubCircuitVkHashes(
     BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS.c7,
   );
   const [onChainC6Fold, onChainC7] = await Promise.all([
-    verifier.expectedC6FoldKeyHash(),
-    verifier.expectedC7KeyHash(),
+    verifier.C6_FOLD_KEY_HASH(),
+    verifier.C7_KEY_HASH(),
   ]);
 
   if (onChainC6Fold === expectedC6Fold && onChainC7 === expectedC7) {

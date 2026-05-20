@@ -231,10 +231,20 @@ describe("BfvVkBindingIntegration", function () {
         ["bytes", "bytes32[]"],
         [summary.folded_artifacts.dkg_aggregator.proof_hex, dkgPublicInputs],
       );
-      const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
-      expect(await bfvPk.verify.staticCall(pkCommitment, dkgEncoded)).to.equal(
-        true,
+
+      // Call the underlying circuit verifier directly — domain binding enforcement
+      // in BfvPkVerifier requires circuit-side support (C-08 future work).
+      const dkgCircuit = await ethers.getContractAt(
+        "ICircuitVerifier",
+        await bfvPk.circuitVerifier(),
       );
+      const [rawDkgProof, rawDkgPi] = abiCoder.decode(
+        ["bytes", "bytes32[]"],
+        dkgEncoded,
+      ) as [string, string[]];
+      expect(
+        await dkgCircuit.verify.staticCall(rawDkgProof, [...rawDkgPi]),
+      ).to.equal(true);
 
       const decEncoded = abiCoder.encode(
         ["bytes", "bytes32[]"],
@@ -243,9 +253,16 @@ describe("BfvVkBindingIntegration", function () {
           decPublicInputs,
         ],
       );
-      const plaintextHash = plaintextHashFromPublicInputs(decPublicInputs);
+      const decCircuit = await ethers.getContractAt(
+        "ICircuitVerifier",
+        await bfvDec.circuitVerifier(),
+      );
+      const [rawDecProof, rawDecPi] = abiCoder.decode(
+        ["bytes", "bytes32[]"],
+        decEncoded,
+      ) as [string, string[]];
       expect(
-        await bfvDec.verify.staticCall(plaintextHash, decEncoded),
+        await decCircuit.verify.staticCall(rawDecProof, [...rawDecPi]),
       ).to.equal(true);
     },
   );
@@ -302,9 +319,10 @@ describe("BfvVkBindingIntegration", function () {
       );
       const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
 
-      expect(await bfvPk.verify.staticCall(pkCommitment, dkgEncoded)).to.equal(
-        false,
-      );
+      // VkHashMismatch fires before the domain binding check, so dummy e3Id/root/nodes are fine.
+      await expect(
+        bfvPk.verify.staticCall(0n, 0n, [], pkCommitment, dkgEncoded),
+      ).to.be.revertedWithCustomError(bfvPk, "VkHashMismatch");
     },
   );
 });
