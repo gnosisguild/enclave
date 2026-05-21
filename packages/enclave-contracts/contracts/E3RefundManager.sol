@@ -690,8 +690,9 @@ contract E3RefundManager is
     /// @inheritdoc IE3RefundManager
     function claimSlashedFundsOnSuccessBatch(
         uint256[] calldata e3Ids
-    ) external nonReentrant returns (uint256 totalClaimed) {
+    ) external nonReentrant {
         uint256 len = e3Ids.length;
+        uint256 totalClaimed;
         for (uint256 i = 0; i < len; i++) {
             totalClaimed += _claimSlashedFundsOnSuccess(e3Ids[i], msg.sender);
         }

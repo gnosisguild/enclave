@@ -301,7 +301,7 @@ CiphernodeRegistrySolWriter receives CommitteeFinalizeRequested
     │  │       │  │  }                                       │  │
     │  │       │  └──────────────────────────────────────────┘  │
     │  │                                                         │
-    │  │    6. Emit SortitionCommitteeFinalized(e3Id, committee)│
+    │  │    6. Emit SortitionCommitteeFinalized(e3Id, committee, scores)│
     │  │       [ICiphernodeRegistry event]                       │
     │  │  }                                                      │
     │  └─────────────────────────────────────────────────────────┘
@@ -309,7 +309,7 @@ CiphernodeRegistrySolWriter receives CommitteeFinalizeRequested
 
 ### 3c. SortitionCommitteeFinalized Event Processing (Rust-Side)
 
-```
+```text
 CiphernodeRegistrySolReader decodes SortitionCommitteeFinalized event
 │  [ICiphernodeRegistry.SortitionCommitteeFinalized — NOT IEnclave.CommitteeFinalized]
 │

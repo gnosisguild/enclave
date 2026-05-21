@@ -10,6 +10,9 @@ const DEFAULT_ADMIN_DELAY = 60 * 60 * 24 * 2;
 
 export default buildModule("SlashingManager", (m) => {
   const admin = m.getParameter("admin");
+  // WARNING: overriding initialDelay to 0 collapses the two-step DEFAULT_ADMIN
+  // handover into a single transaction, removing the timelock protection (M-17).
+  // Always use a non-zero value in production deployments.
   const initialDelay = m.getParameter("initialDelay", DEFAULT_ADMIN_DELAY);
 
   const slashingManager = m.contract("SlashingManager", [initialDelay, admin]);

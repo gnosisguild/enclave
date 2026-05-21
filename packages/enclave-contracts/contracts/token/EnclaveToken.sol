@@ -304,4 +304,30 @@ contract EnclaveToken is
     function renounceOwnership() public view override onlyOwner {
         revert RenounceOwnershipDisabled();
     }
+
+    /**
+     * @notice Synchronises AccessControl roles whenever Ownable2Step completes a
+     *         transfer (i.e. when {acceptOwnership} is called by the pending owner).
+     * @dev Without this override, the new `owner()` would have no roles: the previous
+     *      owner would silently retain DEFAULT_ADMIN_ROLE, MINTER_ROLE, and WHITELIST_ROLE.
+     *      Called internally by {Ownable._transferOwnership}; never call directly.
+     *
+     *      Roles are also granted during construction (previousOwner == address(0)),
+     *      but the constructor body already calls `_grantRole` explicitly, so the
+     *      grant here is idempotent for the deployment case and adds no overhead.
+     */
+    function _transferOwnership(address newOwner) internal override {
+        address previousOwner = owner();
+        super._transferOwnership(newOwner);
+        if (previousOwner != address(0)) {
+            _revokeRole(DEFAULT_ADMIN_ROLE, previousOwner);
+            _revokeRole(MINTER_ROLE, previousOwner);
+            _revokeRole(WHITELIST_ROLE, previousOwner);
+        }
+        if (newOwner != address(0)) {
+            _grantRole(DEFAULT_ADMIN_ROLE, newOwner);
+            _grantRole(MINTER_ROLE, newOwner);
+            _grantRole(WHITELIST_ROLE, newOwner);
+        }
+    }
 }

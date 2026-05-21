@@ -227,9 +227,10 @@ interface IE3RefundManager {
     ) external returns (uint256 amount);
 
     /// @notice Batch pull credited success-path slashed funds across multiple E3s.
-    function claimSlashedFundsOnSuccessBatch(
-        uint256[] calldata e3Ids
-    ) external returns (uint256 totalClaimed);
+    /// @dev Each e3Id may use a different reward token (recorded at request time);
+    ///      events carry the per-E3 token address. A mixed-token sum return would be
+    ///      meaningless, so the function is intentionally void.
+    function claimSlashedFundsOnSuccessBatch(uint256[] calldata e3Ids) external;
 
     /// @notice Get pending success-path slashed-funds credit for (e3Id, account).
     function pendingSlashedFundsOnSuccess(

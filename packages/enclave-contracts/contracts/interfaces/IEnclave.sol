@@ -781,12 +781,11 @@ interface IEnclave {
     function claimReward(uint256 e3Id) external returns (uint256 amount);
 
     /// @notice Batch claim rewards across multiple completed E3s.
-    /// @dev Per-id transfer; different e3Ids may use different fee tokens.
+    /// @dev Per-id transfer; different e3Ids may use different fee tokens (each token
+    ///      is snapshotted at request time). A mixed-token sum return would be
+    ///      meaningless; listen to per-E3 {RewardClaimed} events instead.
     /// @param e3Ids The E3 IDs to claim from.
-    /// @return totalClaimed Sum of all amounts transferred (across tokens).
-    function claimRewards(
-        uint256[] calldata e3Ids
-    ) external returns (uint256 totalClaimed);
+    function claimRewards(uint256[] calldata e3Ids) external;
 
     /// @notice Get the pending reward balance for an account on a given E3.
     function pendingReward(
