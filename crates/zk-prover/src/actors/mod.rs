@@ -69,10 +69,10 @@ pub fn setup_zk_actors(bus: &BusHandle, backend: &ZkBackend, signer: PrivateKeyS
     let zk_actor = ZkActor::new(backend).start();
     let verifier = zk_actor.clone().recipient();
 
-    let proof_request = ProofRequestActor::setup(bus, signer);
+    let proof_request = ProofRequestActor::setup(bus, signer.clone());
     let proof_verification = ProofVerificationActor::setup(bus, verifier);
     let share_verification = ShareVerificationActor::setup(bus);
-    let node_proof_aggregator = NodeProofAggregator::setup(bus);
+    let node_proof_aggregator = NodeProofAggregator::setup(bus, signer);
 
     ZkActors {
         zk_actor,

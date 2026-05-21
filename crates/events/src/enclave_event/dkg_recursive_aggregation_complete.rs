@@ -10,7 +10,7 @@
 //! [`PublicKeyAggregator`] collects these from all honest nodes for the
 //! cross-node aggregation phase.
 
-use crate::{E3id, Proof};
+use crate::{E3id, Proof, SignedDkgFoldAttestation};
 use serde::{Deserialize, Serialize};
 
 /// NodeProofAggregator -> PublicKeyAggregator: fully aggregated DKG node proof.
@@ -20,4 +20,23 @@ pub struct DKGRecursiveAggregationComplete {
     pub e3_id: E3id,
     pub party_id: u64,
     pub aggregated_proof: Option<Proof>,
+    /// Binds the fold to the operator's registered address via `sk_agg` / `esm_agg` commits.
+    #[serde(default)]
+    pub fold_attestation: Option<SignedDkgFoldAttestation>,
+}
+
+impl DKGRecursiveAggregationComplete {
+    pub fn with_attestation(
+        e3_id: E3id,
+        party_id: u64,
+        aggregated_proof: Option<Proof>,
+        fold_attestation: Option<SignedDkgFoldAttestation>,
+    ) -> Self {
+        Self {
+            e3_id,
+            party_id,
+            aggregated_proof,
+            fold_attestation,
+        }
+    }
 }

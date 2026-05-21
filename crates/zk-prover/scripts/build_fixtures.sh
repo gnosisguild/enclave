@@ -22,3 +22,11 @@ fi
 echo "Building circuits..."
 
 pnpm install && pnpm build:circuits
+
+# Keep integration-test fixture in sync when the dummy circuit is built.
+dummy_artifact="./circuits/bin/dummy/dummy.json"
+fixture="./crates/zk-prover/tests/fixtures/dummy.json"
+if [ -f "$dummy_artifact" ]; then
+  mkdir -p "$(dirname "$fixture")"
+  cp "$dummy_artifact" "$fixture"
+fi

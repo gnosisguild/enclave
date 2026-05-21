@@ -70,7 +70,8 @@ sol! {
             uint8 failureReason;
         }
 
-        function proposeSlash(uint256 e3Id, address operator, bytes32 reason, bytes calldata proof) external returns (uint256 proposalId);
+        function proposeSlash(uint256 e3Id, address operator, bytes calldata proof) external returns (uint256 proposalId);
+        function getSlashPolicy(bytes32 reason) external view returns (SlashPolicy memory);
         function setSlashPolicy(bytes32 reason, SlashPolicy calldata policy) external;
         function setBondingRegistry(address newBondingRegistry) external;
         function setCiphernodeRegistry(address newCiphernodeRegistry) external;
@@ -91,6 +92,7 @@ sol! {
         function setCommitteeNodes(uint256 e3Id, address[] calldata nodes) external;
         function setThreshold(uint256 e3Id, uint32 m) external;
     }
+
 }
 
 // ── Helpers ──
@@ -372,6 +374,22 @@ fn test_digest_matches_solidity_encoding() {
 const VOTE_TYPEHASH_STR: &str =
     "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)";
 
+/// Lane A policy key: `keccak256(abi.encodePacked(proofType))` (must match `SlashingManager.proposeSlash`).
+fn reason_for_proof_type(proof_type: u8) -> FixedBytes<32> {
+    keccak256(&U256::from(proof_type).abi_encode_packed()).into()
+}
+
+/// Custom error selectors from `SlashingManager` (Anvil returns selector, not name).
+fn err_has_selector(err: &str, selector: &str) -> bool {
+    err.contains(selector) || err.contains(selector.trim_start_matches("0x"))
+}
+
+const SEL_INSUFFICIENT_ATTESTATIONS: &str = "0xe424f994";
+const SEL_DUPLICATE_VOTER: &str = "0xcbceb64b";
+const SEL_VOTER_NOT_IN_COMMITTEE: &str = "0x4ca81c26";
+const SEL_INVALID_VOTE_SIGNATURE: &str = "0x64a283db";
+const SEL_DUPLICATE_EVIDENCE: &str = "0x5be07e5e";
+
 /// Compute `accusationId = keccak256(abi.encodePacked(chainId, e3Id, operator, proofType))`
 /// matching `AccusationManager::accusation_id()` and `SlashingManager._verifyAttestationEvidence()`.
 fn compute_accusation_id(
@@ -447,12 +465,32 @@ fn encode_attestation_evidence(
     let data_hashes: Vec<FixedBytes<32>> = votes.iter().map(|(_, _, d, _)| *d).collect();
     let sigs: Vec<Bytes> = votes.iter().map(|(_, _, _, s)| s.clone()).collect();
 
-    Bytes::from((U256::from(proof_type), voters, agrees, data_hashes, sigs).abi_encode())
+    // `abi_encode_params` matches Solidity `abi.encode(a,b,...)`; `abi_encode` adds an extra
+    // outer offset word that breaks `abi.decode(proof, (uint256))` in `proposeSlash`.
+    (
+        U256::from(proof_type),
+        voters,
+        agrees,
+        data_hashes.to_vec(),
+        sigs,
+    )
+        .abi_encode_params()
+        .into()
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 // Pure Rust attestation tests — no Anvil required
 // ════════════════════════════════════════════════════════════════════════════
+
+/// Lane A reason key must match Hardhat `REASON_PT_0` / `keccak256(solidityPacked(uint256, 0))`.
+#[test]
+fn test_reason_for_proof_type_matches_solidity() {
+    let expected: FixedBytes<32> =
+        "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563"
+            .parse()
+            .unwrap();
+    assert_eq!(reason_for_proof_type(0), expected);
+}
 
 /// Verifies the VOTE_TYPEHASH constant matches the keccak256 of the vote type string.
 #[test]
@@ -540,6 +578,36 @@ fn test_vote_signing_roundtrip() {
         signer.address(),
         "recovered address should match signer"
     );
+}
+
+/// First ABI word of attestation evidence must be `proofType` (SlashingManager decodes only that).
+#[test]
+fn test_evidence_leading_word_is_proof_type() {
+    let evidence = encode_attestation_evidence(
+        0,
+        vec![
+            (
+                "0x1111111111111111111111111111111111111111"
+                    .parse()
+                    .unwrap(),
+                true,
+                FixedBytes::from([1u8; 32]),
+                Bytes::from(vec![0u8; 65]),
+            ),
+            (
+                "0x2222222222222222222222222222222222222222"
+                    .parse()
+                    .unwrap(),
+                true,
+                FixedBytes::from([2u8; 32]),
+                Bytes::from(vec![0u8; 65]),
+            ),
+        ],
+    );
+    let leading = U256::from_be_slice(&evidence[..32]);
+    assert_eq!(leading, U256::ZERO, "leading word must be proofType");
+    let derived_reason: FixedBytes<32> = keccak256(&leading.abi_encode_packed()).into();
+    assert_eq!(derived_reason, reason_for_proof_type(0));
 }
 
 /// Verifies attestation evidence encoding structure.
@@ -688,9 +756,9 @@ async fn test_onchain_valid_attestation_executes_slash() {
     let (sm_addr, _admin) = deploy_and_configure(&provider, &sm_bytecode, mock_registry_addr).await;
     let slashing_mgr = SlashingManager::new(sm_addr, &provider);
 
-    let reason: FixedBytes<32> = keccak256("E3_BAD_DKG_PROOF");
     let e3_id: u64 = 42;
     let proof_type = 0u8; // C0PkBfv
+    let reason = reason_for_proof_type(proof_type);
 
     // Set slash policy (attestation-based: requiresProof=true, appealWindow=0)
     slashing_mgr
@@ -715,8 +783,23 @@ async fn test_onchain_valid_attestation_executes_slash() {
         .await
         .unwrap();
 
-    // Set committee: 3 voters, threshold M=2
+    let stored_policy = slashing_mgr
+        .getSlashPolicy(reason)
+        .call()
+        .await
+        .expect("getSlashPolicy should succeed");
+    assert!(
+        stored_policy.enabled,
+        "slash policy must be enabled after setSlashPolicy"
+    );
+    assert!(
+        stored_policy.requiresProof,
+        "slash policy must be attestation-based (requiresProof)"
+    );
+
+    // Set committee: operator + 3 voters, threshold M=2 (operator must be a member)
     let committee = vec![
+        operator_addr,
         voter_signer1.address(),
         voter_signer2.address(),
         voter_signer3.address(),
@@ -790,7 +873,7 @@ async fn test_onchain_valid_attestation_executes_slash() {
 
     // Submit slash — should succeed (3 valid votes, threshold M=2)
     let receipt = slashing_mgr
-        .proposeSlash(U256::from(e3_id), operator_addr, reason, evidence)
+        .proposeSlash(U256::from(e3_id), operator_addr, evidence)
         .send()
         .await
         .expect("proposeSlash tx should not fail to send")
@@ -853,9 +936,9 @@ async fn test_onchain_insufficient_attestations_reverts() {
     let (sm_addr, _admin) = deploy_and_configure(&provider, &sm_bytecode, mock_registry_addr).await;
     let slashing_mgr = SlashingManager::new(sm_addr, &provider);
 
-    let reason: FixedBytes<32> = keccak256("E3_BAD_DKG_PROOF");
     let e3_id: u64 = 42;
     let proof_type = 0u8;
+    let reason = reason_for_proof_type(proof_type);
 
     slashing_mgr
         .setSlashPolicy(
@@ -879,11 +962,12 @@ async fn test_onchain_insufficient_attestations_reverts() {
         .await
         .unwrap();
 
-    // Committee: 3 voters, threshold M=2
+    // Committee: operator + 3 voters, threshold M=2
     mock_registry
         .setCommitteeNodes(
             U256::from(e3_id),
             vec![
+                operator_addr,
                 voter_signer1.address(),
                 voter_signer2.address(),
                 voter_signer3.address(),
@@ -920,7 +1004,7 @@ async fn test_onchain_insufficient_attestations_reverts() {
     let evidence = encode_attestation_evidence(proof_type, vec![(v1, true, data_hash, s1)]);
 
     let result = slashing_mgr
-        .proposeSlash(U256::from(e3_id), operator_addr, reason, evidence)
+        .proposeSlash(U256::from(e3_id), operator_addr, evidence)
         .call()
         .await;
 
@@ -931,7 +1015,7 @@ async fn test_onchain_insufficient_attestations_reverts() {
 
     let err_string = format!("{:?}", result.unwrap_err());
     assert!(
-        err_string.contains("InsufficientAttestations"),
+        err_has_selector(&err_string, SEL_INSUFFICIENT_ATTESTATIONS),
         "expected InsufficientAttestations revert, got: {err_string}"
     );
 
@@ -970,9 +1054,9 @@ async fn test_onchain_voter_not_in_committee_reverts() {
     let (sm_addr, _admin) = deploy_and_configure(&provider, &sm_bytecode, mock_registry_addr).await;
     let slashing_mgr = SlashingManager::new(sm_addr, &provider);
 
-    let reason: FixedBytes<32> = keccak256("E3_BAD_DKG_PROOF");
     let e3_id: u64 = 42;
     let proof_type = 0u8;
+    let reason = reason_for_proof_type(proof_type);
 
     slashing_mgr
         .setSlashPolicy(
@@ -996,9 +1080,12 @@ async fn test_onchain_voter_not_in_committee_reverts() {
         .await
         .unwrap();
 
-    // Committee only contains committee_signer, NOT outsider_signer
+    // Committee: operator + committee_signer (outsider is NOT a member)
     mock_registry
-        .setCommitteeNodes(U256::from(e3_id), vec![committee_signer.address()])
+        .setCommitteeNodes(
+            U256::from(e3_id),
+            vec![operator_addr, committee_signer.address()],
+        )
         .send()
         .await
         .unwrap()
@@ -1030,7 +1117,7 @@ async fn test_onchain_voter_not_in_committee_reverts() {
     let evidence = encode_attestation_evidence(proof_type, vec![(v_out, true, data_hash, s_out)]);
 
     let result = slashing_mgr
-        .proposeSlash(U256::from(e3_id), operator_addr, reason, evidence)
+        .proposeSlash(U256::from(e3_id), operator_addr, evidence)
         .call()
         .await;
 
@@ -1041,7 +1128,7 @@ async fn test_onchain_voter_not_in_committee_reverts() {
 
     let err_string = format!("{:?}", result.unwrap_err());
     assert!(
-        err_string.contains("VoterNotInCommittee"),
+        err_has_selector(&err_string, SEL_VOTER_NOT_IN_COMMITTEE),
         "expected VoterNotInCommittee revert, got: {err_string}"
     );
 
@@ -1080,9 +1167,9 @@ async fn test_onchain_invalid_vote_signature_reverts() {
     let (sm_addr, _admin) = deploy_and_configure(&provider, &sm_bytecode, mock_registry_addr).await;
     let slashing_mgr = SlashingManager::new(sm_addr, &provider);
 
-    let reason: FixedBytes<32> = keccak256("E3_BAD_DKG_PROOF");
     let e3_id: u64 = 42;
     let proof_type = 0u8;
+    let reason = reason_for_proof_type(proof_type);
 
     slashing_mgr
         .setSlashPolicy(
@@ -1106,9 +1193,12 @@ async fn test_onchain_invalid_vote_signature_reverts() {
         .await
         .unwrap();
 
-    // victim_signer is in the committee
+    // operator + victim_signer are committee members
     mock_registry
-        .setCommitteeNodes(U256::from(e3_id), vec![victim_signer.address()])
+        .setCommitteeNodes(
+            U256::from(e3_id),
+            vec![operator_addr, victim_signer.address()],
+        )
         .send()
         .await
         .unwrap()
@@ -1142,19 +1232,18 @@ async fn test_onchain_invalid_vote_signature_reverts() {
         .expect("signing should succeed");
 
     // Build evidence claiming the vote is from victim_signer but signed by impersonator
-    let evidence = Bytes::from(
-        (
-            U256::from(proof_type),
-            vec![victim_signer.address()],
-            vec![true],
-            vec![data_hash],
-            vec![Bytes::from(bad_sig.as_bytes().to_vec())],
-        )
-            .abi_encode(),
-    );
+    let evidence = (
+        U256::from(proof_type),
+        vec![victim_signer.address()],
+        vec![true],
+        vec![data_hash],
+        vec![Bytes::from(bad_sig.as_bytes().to_vec())],
+    )
+        .abi_encode_params()
+        .into();
 
     let result = slashing_mgr
-        .proposeSlash(U256::from(e3_id), operator_addr, reason, evidence)
+        .proposeSlash(U256::from(e3_id), operator_addr, evidence)
         .call()
         .await;
 
@@ -1165,7 +1254,7 @@ async fn test_onchain_invalid_vote_signature_reverts() {
 
     let err_string = format!("{:?}", result.unwrap_err());
     assert!(
-        err_string.contains("InvalidVoteSignature"),
+        err_has_selector(&err_string, SEL_INVALID_VOTE_SIGNATURE),
         "expected InvalidVoteSignature revert, got: {err_string}"
     );
 
@@ -1206,9 +1295,9 @@ async fn test_onchain_duplicate_voter_reverts() {
     let (sm_addr, _admin) = deploy_and_configure(&provider, &sm_bytecode, mock_registry_addr).await;
     let slashing_mgr = SlashingManager::new(sm_addr, &provider);
 
-    let reason: FixedBytes<32> = keccak256("E3_BAD_DKG_PROOF");
     let e3_id: u64 = 42;
     let proof_type = 0u8;
+    let reason = reason_for_proof_type(proof_type);
 
     slashing_mgr
         .setSlashPolicy(
@@ -1233,7 +1322,10 @@ async fn test_onchain_duplicate_voter_reverts() {
         .unwrap();
 
     mock_registry
-        .setCommitteeNodes(U256::from(e3_id), vec![voter_signer.address()])
+        .setCommitteeNodes(
+            U256::from(e3_id),
+            vec![operator_addr, voter_signer.address()],
+        )
         .send()
         .await
         .unwrap()
@@ -1264,19 +1356,18 @@ async fn test_onchain_duplicate_voter_reverts() {
 
     // Submit evidence with duplicate voter entries (bypassing encode_attestation_evidence
     // which would deduplicate — construct manually to have same address appear twice)
-    let evidence = Bytes::from(
-        (
-            U256::from(proof_type),
-            vec![voter, voter], // duplicate!
-            vec![true, true],
-            vec![data_hash, data_hash],
-            vec![sig.clone(), sig],
-        )
-            .abi_encode(),
-    );
+    let evidence = (
+        U256::from(proof_type),
+        vec![voter, voter],
+        vec![true, true],
+        vec![data_hash, data_hash],
+        vec![sig.clone(), sig],
+    )
+        .abi_encode_params()
+        .into();
 
     let result = slashing_mgr
-        .proposeSlash(U256::from(e3_id), operator_addr, reason, evidence)
+        .proposeSlash(U256::from(e3_id), operator_addr, evidence)
         .call()
         .await;
 
@@ -1287,7 +1378,7 @@ async fn test_onchain_duplicate_voter_reverts() {
 
     let err_string = format!("{:?}", result.unwrap_err());
     assert!(
-        err_string.contains("DuplicateVoter"),
+        err_has_selector(&err_string, SEL_DUPLICATE_VOTER),
         "expected DuplicateVoter revert, got: {err_string}"
     );
 
@@ -1326,9 +1417,9 @@ async fn test_onchain_duplicate_evidence_reverts() {
     let (sm_addr, _admin) = deploy_and_configure(&provider, &sm_bytecode, mock_registry_addr).await;
     let slashing_mgr = SlashingManager::new(sm_addr, &provider);
 
-    let reason: FixedBytes<32> = keccak256("E3_BAD_DKG_PROOF");
     let e3_id: u64 = 42;
     let proof_type = 0u8;
+    let reason = reason_for_proof_type(proof_type);
 
     slashing_mgr
         .setSlashPolicy(
@@ -1355,7 +1446,11 @@ async fn test_onchain_duplicate_evidence_reverts() {
     mock_registry
         .setCommitteeNodes(
             U256::from(e3_id),
-            vec![voter_signer1.address(), voter_signer2.address()],
+            vec![
+                operator_addr,
+                voter_signer1.address(),
+                voter_signer2.address(),
+            ],
         )
         .send()
         .await
@@ -1399,7 +1494,7 @@ async fn test_onchain_duplicate_evidence_reverts() {
 
     // First submission should succeed
     slashing_mgr
-        .proposeSlash(U256::from(e3_id), operator_addr, reason, evidence.clone())
+        .proposeSlash(U256::from(e3_id), operator_addr, evidence.clone())
         .send()
         .await
         .expect("first proposeSlash should succeed")
@@ -1409,7 +1504,7 @@ async fn test_onchain_duplicate_evidence_reverts() {
 
     // Second submission with same evidence should revert
     let result = slashing_mgr
-        .proposeSlash(U256::from(e3_id), operator_addr, reason, evidence)
+        .proposeSlash(U256::from(e3_id), operator_addr, evidence)
         .call()
         .await;
 
@@ -1420,7 +1515,7 @@ async fn test_onchain_duplicate_evidence_reverts() {
 
     let err_string = format!("{:?}", result.unwrap_err());
     assert!(
-        err_string.contains("DuplicateEvidence"),
+        err_has_selector(&err_string, SEL_DUPLICATE_EVIDENCE),
         "expected DuplicateEvidence revert, got: {err_string}"
     );
 

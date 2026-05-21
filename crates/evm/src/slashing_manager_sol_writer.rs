@@ -209,7 +209,7 @@ fn encode_attestation_evidence(data: &AccusationQuorumReached) -> Vec<u8> {
         .map(|v| Bytes::from(v.signature.extract_bytes()))
         .collect();
 
-    (proof_type, voters, agrees, data_hashes, signatures).abi_encode()
+    (proof_type, voters, agrees, data_hashes, signatures).abi_encode_params()
 }
 
 async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
