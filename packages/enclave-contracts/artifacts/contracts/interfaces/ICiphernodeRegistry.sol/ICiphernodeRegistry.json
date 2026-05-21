@@ -5,6 +5,11 @@
   "abi": [
     {
       "inputs": [],
+      "name": "AttestationBindingCountMismatch",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "BondingRegistryNotSet",
       "type": "error"
     },
@@ -60,6 +65,21 @@
       "type": "error"
     },
     {
+      "inputs": [],
+      "name": "DkgProofRequired",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "FoldAttestationVerifierNotSet",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "FoldAttestationsRequired",
+      "type": "error"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256",
@@ -73,6 +93,16 @@
         }
       ],
       "name": "InsufficientCiphernodes",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidDkgProof",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidFoldAttestation",
       "type": "error"
     },
     {
@@ -124,6 +154,16 @@
     {
       "inputs": [],
       "name": "OnlyEnclave",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "PartyIdNotInProof",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "PkCommitmentRequired",
       "type": "error"
     },
     {
@@ -691,6 +731,35 @@
     {
       "inputs": [
         {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getDkgAnchors",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "partyIds",
+          "type": "uint256[]"
+        },
+        {
+          "internalType": "bytes32[]",
+          "name": "skAggCommits",
+          "type": "bytes32[]"
+        },
+        {
+          "internalType": "bytes32[]",
+          "name": "esmAggCommits",
+          "type": "bytes32[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "address",
           "name": "ciphernode",
           "type": "address"
@@ -813,6 +882,11 @@
         {
           "internalType": "bytes",
           "name": "proof",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
+          "name": "dkgAttestationBundle",
           "type": "bytes"
         }
       ],
@@ -985,5 +1059,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-e33d1cfedc69d8ad74eec5a84c8ef358a020ec1a"
+  "buildInfoId": "solc-0_8_28-ce9a7610acb826f83b656ea800eb1bae5dae3ce6"
 }
