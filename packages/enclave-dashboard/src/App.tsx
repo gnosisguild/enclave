@@ -5,8 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 // Main app shell + tweak wiring.
 
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { STAGES } from './data'
+import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { STAGES, type Poll } from './data'
 import PollCard from './PollCard'
 import Timeline from './Timeline'
 import History from './History'
@@ -14,11 +14,11 @@ import Pulse from './Pulse'
 import Inspector from './Inspector'
 import Loader from './Loader'
 import { useAllE3s, useCrispPolls, useE3Details, useRecentBallots } from './lib/useE3s'
-import { adaptHistoryEntries, adaptInspectorDetail, adaptInspectorE3List, adaptTodaysPoll } from './lib/adapt'
+import { adaptHistoryEntries, adaptInspectorDetail, adaptInspectorE3List, adaptPoll } from './lib/adapt'
 import { formatE3Id } from './lib/pollMeta'
 import { LINKS, explorerAddress } from './lib/links'
 import { CONTRACTS } from './lib/chain'
-import { isE3Active, type E3FullDetails } from './lib/e3'
+import { isE3Active, solidityStageToUiIdx, type E3FullDetails, type E3Summary } from './lib/e3'
 
 function Header({ density, view, onNav }: { density: string; view: string; onNav: (id: string) => void }) {
   const link = (id: string, label: string) => (
@@ -135,6 +135,19 @@ function SiteFooter() {
 // Fixed presentation density (the live tweak panel was removed).
 const DENSITY = 'comfortable'
 
+const pollStateForStage = (uiStageIdx: number) => (uiStageIdx >= 6 ? 'published' : uiStageIdx >= 4 ? 'computing' : 'open')
+
+// Synthetic poll used only for the "Watch the lifecycle" demo when nothing is live.
+const DEMO_POLL: Poll = {
+  id: 'Sample',
+  question: 'A sample CRISP poll — watch how an encrypted poll moves through its lifecycle.',
+  context: 'This is an interactive demonstration, not a live poll.',
+  opened: '—',
+  closes: '—',
+  closesTs: 0,
+  ballotCount: 0,
+}
+
 export default function App() {
   // View (tab) + demo poll state. These are the only values that change at
   // runtime; everything else is fixed (accent comes from the CSS :root mint).
@@ -153,10 +166,6 @@ export default function App() {
   const allE3s = useAllE3s()
   const recentBallots = useRecentBallots()
 
-  // The newest CRISP poll (first entry; lists are newest-first) is "today's poll".
-  const todaysId = crispPolls.data && crispPolls.data.length > 0 ? crispPolls.data[0].id : null
-  const todaysDetail = useE3Details(todaysId)
-
   // Inspector keeps its own selection — track which id is currently selected.
   const [inspectorIdStr, setInspectorIdStr] = useState<string | null>(null)
   const selectedInspectorId = useMemo(() => {
@@ -169,42 +178,26 @@ export default function App() {
   }, [allE3s.data, inspectorIdStr])
   const inspectorDetail = useE3Details(selectedInspectorId)
 
-  // Latest detail per E3 id, for history rows. Derived from the two detail
-  // sources we actively poll (today's poll + the inspector selection) — no
-  // effect needed, so no cascading renders.
+  // Detail cache for history verdicts (the inspector-selected E3, if any).
   const detailsCache = useMemo(() => {
     const m = new Map<string, E3FullDetails>()
-    if (todaysDetail.data) m.set(todaysDetail.data.id.toString(), todaysDetail.data)
     if (inspectorDetail.data) m.set(inspectorDetail.data.id.toString(), inspectorDetail.data)
     return m
-  }, [todaysDetail.data, inspectorDetail.data])
+  }, [inspectorDetail.data])
 
-  // CRISP tab state.
+  // CRISP tab state: split into currently-active polls (featured) and the rest
+  // (archived). Card data comes straight from the list summary — no per-poll fetch.
   const crispReady = crispPolls.status === 'ready'
   const polls = useMemo(() => crispPolls.data ?? [], [crispPolls.data])
-  const hasPolls = polls.length > 0
-  const livePoll = useMemo(() => (todaysDetail.data ? adaptTodaysPoll(todaysDetail.data) : null), [todaysDetail.data])
-  const liveHistory = useMemo(() => (polls.length > 1 ? adaptHistoryEntries(polls.slice(1), detailsCache) : []), [polls, detailsCache])
+  const activePolls = useMemo<E3Summary[]>(() => polls.filter((p) => isE3Active(p.stage, p.inputWindow[1])), [polls])
+  const pastPolls = useMemo<E3Summary[]>(() => polls.filter((p) => !isE3Active(p.stage, p.inputWindow[1])), [polls])
+  const liveHistory = useMemo(() => adaptHistoryEntries(pastPolls, detailsCache), [pastPolls, detailsCache])
 
   // Inspector tab state.
   const inspectorReady = allE3s.status === 'ready'
   const hasE3s = (allE3s.data?.length ?? 0) > 0
   const inspectorList = useMemo(() => adaptInspectorE3List(allE3s.data ?? []), [allE3s.data])
   const inspectorE3 = useMemo(() => adaptInspectorDetail(inspectorDetail.data), [inspectorDetail.data])
-
-  // Sync poll stage to the live chain-derived stage whenever it changes (so
-  // the timeline reflects reality, while still allowing manual overrides).
-  const liveStageIdx = todaysDetail.data?.uiStageIdx
-  useEffect(() => {
-    if (liveStageIdx == null) return
-    if (liveMode) return // the demo drives the stage while it plays
-    // Sync the on-chain stage (external store) into local UI state. Also runs
-    // when the demo ends (liveMode → false), restoring the real state.
-    /* eslint-disable react-hooks/set-state-in-effect */
-    setStageIdx(liveStageIdx)
-    setPollState(liveStageIdx >= 6 ? 'published' : liveStageIdx >= 4 ? 'computing' : 'open')
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [liveStageIdx, liveMode])
 
   const setStage = (i: number) => {
     setStageIdx(i)
@@ -253,16 +246,12 @@ export default function App() {
     }
   }, [liveMode])
 
-  const effectiveBallotCount = todaysDetail.data?.ballotCount ?? 0
-
-  const reconciledStage = (() => {
+  // Demo card's current stage, reconciled from the demo's pollState/stageIdx.
+  const demoStage = (() => {
     if (pollState === 'published') return 6
     if (pollState === 'computing') return Math.max(4, Math.min(5, stageIdx))
-    if (pollState === 'none') return 6
     return Math.min(stageIdx, 3)
   })()
-
-  const noActive = pollState === 'none'
 
   return (
     <div className={`page page--${DENSITY}`}>
@@ -300,43 +289,55 @@ export default function App() {
             <StatusNote>Couldn't load CRISP polls from Sepolia. Retrying automatically…</StatusNote>
           ) : !crispReady ? (
             <Loader label='Loading CRISP polls' sub='Reading from Sepolia…' />
-          ) : !hasPolls ? (
-            <StatusNote>
-              No live CRISP polls right now. A new poll will appear here automatically when one is requested on-chain.
-            </StatusNote>
-          ) : todaysDetail.status === 'error' ? (
-            <StatusNote>Couldn't load the latest poll details from Sepolia. Retrying automatically…</StatusNote>
-          ) : !livePoll ? (
-            <Loader label='Loading the latest poll' sub='Reading from Sepolia…' />
-          ) : (
+          ) : activePolls.length > 0 ? (
             <>
+              {activePolls.map((s) => {
+                const poll = adaptPoll(s)
+                const stageIdx = solidityStageToUiIdx(s.stage, s.inputWindow)
+                return (
+                  <Fragment key={s.id.toString()}>
+                    <PollCard
+                      poll={poll}
+                      pollState={pollStateForStage(stageIdx)}
+                      currentStageIdx={stageIdx}
+                      ballotCount={s.ballotCount}
+                      onNavigate={setView}
+                    />
+                    <Timeline stages={STAGES} currentStageIdx={stageIdx} pollId={poll.id} density={DENSITY} />
+                  </Fragment>
+                )
+              })}
+            </>
+          ) : (
+            // No live polls — offer the lifecycle as an interactive demo.
+            <>
+              <StatusNote>No live CRISP polls right now. Here's how an encrypted poll moves through its lifecycle:</StatusNote>
               <PollCard
-                poll={livePoll}
-                pollState={noActive ? 'published' : pollState}
-                currentStageIdx={reconciledStage}
+                poll={DEMO_POLL}
+                pollState={pollState}
+                currentStageIdx={demoStage}
                 liveMode={liveMode}
                 onToggleLive={() => setLiveMode((v) => !v)}
-                ballotCount={effectiveBallotCount}
+                ballotCount={0}
                 onNavigate={setView}
               />
-
               <Timeline
                 stages={STAGES}
-                currentStageIdx={reconciledStage}
-                pollId={livePoll.id}
+                currentStageIdx={demoStage}
+                pollId='demo'
                 density={DENSITY}
                 onStageClick={liveMode ? undefined : setStage}
               />
-
-              {liveHistory.length > 0 && <History entries={liveHistory} onNavigate={setView} />}
             </>
           )}
+
+          {liveHistory.length > 0 && <History entries={liveHistory} onNavigate={setView} />}
         </main>
       )}
 
       <Pulse
         data={{
-          activeNow: todaysDetail.data && isE3Active(todaysDetail.data.stage, todaysDetail.data.inputWindow[1]) ? 1 : 0,
+          activeNow: activePolls.length,
           ballots24h: recentBallots,
           pollsAllTime: polls.length,
         }}
