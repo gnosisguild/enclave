@@ -170,7 +170,6 @@ export const deployAndSaveAllVerifiers = async (
   hre: HardhatRuntimeEnvironment,
 ): Promise<VerifierDeployments> => {
   const contractNames = discoverVerifierContracts();
-  const { ethers } = await hre.network.connect();
   const chain = getDeploymentChain(hre);
   console.log(`   Deploying to network: ${chain}`);
 
