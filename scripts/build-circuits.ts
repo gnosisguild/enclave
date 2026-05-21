@@ -259,6 +259,10 @@ class NoirCircuitBuilder {
         this.setNoirConfigPreset(modNrPath, preset)
       }
 
+      if (modNrPath) {
+        this.setNoirConfigPreset(modNrPath, preset)
+      }
+
       if (!this.options.noCleanTargets) {
         this.cleanTargetDirs(circuits)
       }
