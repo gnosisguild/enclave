@@ -199,6 +199,25 @@ class NoirCircuitBuilder {
     return this.requiredPresetMarkers(preset).every((path) => existsSync(path))
   }
 
+  private logSkipIfBuiltBlocked(preset: string, sourceHash: string): void {
+    const stamp = this.readPresetStamp(preset)
+    const stampPath = this.presetStampPath(preset)
+    if (!stamp?.sourceHash) {
+      console.log(`   ℹ️  --skip-if-built: no stamp at ${stampPath}`)
+      return
+    }
+    if (stamp.sourceHash !== sourceHash) {
+      console.log(
+        `   ℹ️  --skip-if-built: circuit sources changed (stamp ${stamp.sourceHash} → ${sourceHash}). ` +
+          `Run without --skip-if-built or \`pnpm build:circuits --preset ${preset}\` once to refresh.`,
+      )
+    }
+    const missing = this.requiredPresetMarkers(preset).filter((path) => !existsSync(path))
+    if (missing.length > 0) {
+      console.log(`   ℹ️  --skip-if-built: missing ${missing.length} marker artifact(s), e.g. ${missing[0]}`)
+    }
+  }
+
   private async buildForPreset(preset: CircuitPreset, modNrPath?: string): Promise<BuildResult> {
     const result: BuildResult = { success: true, compiled: [], errors: [] }
     const presetOutputDir = join(this.options.outputDir!, preset)
@@ -225,12 +244,15 @@ class NoirCircuitBuilder {
       const sourceHash = this.computeSourceHash(preset)
       result.sourceHash = sourceHash
 
-      if (this.options.skipIfBuilt && this.isPresetUpToDate(preset, sourceHash)) {
-        console.log(
-          `   ⏭️  Skipping preset ${preset} (artifacts up to date; source_hash=${sourceHash}). ` +
-            `Use a full rebuild without --skip-if-built to refresh.`,
-        )
-        return result
+      if (this.options.skipIfBuilt) {
+        if (this.isPresetUpToDate(preset, sourceHash)) {
+          console.log(
+            `   ⏭️  Skipping preset ${preset} (artifacts up to date; source_hash=${sourceHash}). ` +
+              `Use a full rebuild without --skip-if-built to refresh.`,
+          )
+          return result
+        }
+        this.logSkipIfBuiltBlocked(preset, sourceHash)
       }
 
       if (modNrPath) {
@@ -747,7 +769,8 @@ async function main() {
   const builder = new NoirCircuitBuilder(undefined, options)
 
   if (command === 'hash') {
-    const hash = builder.computeSourceHash()
+    const preset = options.preset === 'all' ? undefined : options.preset
+    const hash = builder.computeSourceHash(preset)
     console.log(hash)
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `source_hash=${hash}\n`)
   } else {

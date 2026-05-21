@@ -237,8 +237,10 @@ for CIRCUIT in $RUN_CIRCUITS; do
         
         # Run benchmark
         BENCHMARK_ARGS=("$CIRCUIT_PATH" "$ORACLE" "$OUTPUT_FILE" "$MODE")
-        if [ "$BENCH_COMPILE" != true ] && { [ "$SKIP_COMPILE" = true ] || [ "$PRESET_ARTIFACTS_READY" = true ]; }; then
-            BENCHMARK_ARGS+=("--skip-compile")
+        if [ "$BENCH_COMPILE" != true ]; then
+            if [ "$SKIP_COMPILE" = true ] || [ "$PRESET_ARTIFACTS_READY" = true ]; then
+                BENCHMARK_ARGS+=("--skip-compile")
+            fi
         fi
         "${SCRIPT_DIR}/benchmark_circuit.sh" "${BENCHMARK_ARGS[@]}"
         
