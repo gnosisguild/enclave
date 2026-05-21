@@ -3,9 +3,9 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-pragma solidity >=0.8.27;
+pragma solidity 0.8.28;
 
-import { IRiscZeroVerifier } from "@risc0/ethereum/contracts/IRiscZeroVerifier.sol";
+import { IRiscZeroVerifier } from "risc0/IRiscZeroVerifier.sol";
 import { IE3Program } from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import { IEnclave } from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import { E3 } from "@enclave-e3/contracts/contracts/interfaces/IE3.sol";
@@ -53,9 +53,7 @@ contract MyProgram is IE3Program, Ownable {
     authorizedContracts[address(_enclave)] = true;
   }
 
-  /// @notice Validate the E3 program parameters
-  /// @param e3Id The E3 program ID
-  /// @param e3ProgramParams The E3 program parameters
+  /// @inheritdoc IE3Program
   function validate(uint256 e3Id, uint256, bytes calldata e3ProgramParams, bytes calldata, bytes calldata) external returns (bytes32) {
     require(authorizedContracts[msg.sender] || msg.sender == owner(), CallerNotAuthorized());
     require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
@@ -91,7 +89,7 @@ contract MyProgram is IE3Program, Ownable {
   /// @param e3Id The E3 program ID
   /// @param ciphertextOutputHash The hash of the ciphertext output
   /// @param proof The proof to verify
-  function verify(uint256 e3Id, bytes32 ciphertextOutputHash, bytes memory proof) external view override returns (bool) {
+  function verify(uint256 e3Id, bytes32 ciphertextOutputHash, bytes memory proof) external override returns (bool) {
     require(paramsHashes[e3Id] != bytes32(0), E3DoesNotExist());
     bytes32 inputRoot = bytes32(inputs[e3Id]._root());
     bytes memory journal = new bytes(396); // (32 + 1) * 4 * 3

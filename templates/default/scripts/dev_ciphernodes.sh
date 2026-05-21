@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
 SIGNAL_FILE=/tmp/enclave_ciphernodes_ready
 
 cleanup() {
@@ -20,7 +22,12 @@ trap cleanup INT TERM
 echo "Waiting for local evm node..."
 pnpm wait-on tcp:localhost:8545
 
-# nuke past installations as we are adding these nodes to the contract
+if [ ! -f './.enclave/generated/contracts/ImageID.sol' ]; then
+  echo "Compiling guest program (ImageID)..."
+  enclave program compile
+fi
+
+# Fresh node state for this deploy
 rm -rf .enclave/data
 rm -rf .enclave/config
 
@@ -39,10 +46,14 @@ enclave wallet set --name cn5 --private-key "$PRIVATE_KEY_CN5"
 echo "Setting up ZK prover..."
 enclave noir setup
 
-# using & instead of -d so that wait works below
-enclave nodes up -v &
-
-sleep 2
+# Deploy before starting nodes so enclave.config.yaml addresses match the chain.
+echo "Deploying protocol + MyProgram..."
+pnpm exec hardhat utils:clean-deployments --network localhost
+pnpm exec hardhat run scripts/deploy-local.ts --network localhost
+if ! grep -q '"MyProgram"' deployed_contracts.json; then
+  echo "deployTemplate did not record MyProgram — check deploy logs above"
+  exit 1
+fi
 
 CN1=$(grep -A 1 'cn1:' enclave.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
 CN2=$(grep -A 1 'cn2:' enclave.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
@@ -50,8 +61,10 @@ CN3=$(grep -A 1 'cn3:' enclave.config.yaml | grep 'address:' | sed 's/.*address:
 CN4=$(grep -A 1 'cn4:' enclave.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
 CN5=$(grep -A 1 'cn5:' enclave.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
 
-# Add ciphernodes using variables from config.sh
-pnpm run deploy && sleep 2
+echo "Starting ciphernodes (post-deploy config)..."
+enclave nodes up -v &
+
+sleep 4
 
 pnpm hardhat ciphernode:admin-add --ciphernode-address $CN1 --network localhost
 pnpm hardhat ciphernode:admin-add --ciphernode-address $CN2 --network localhost

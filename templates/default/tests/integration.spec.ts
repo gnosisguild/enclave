@@ -25,6 +25,8 @@ import { publishInput } from '../server/input'
 import { privateKeyToAccount } from 'viem/accounts'
 import { anvil } from 'viem/chains'
 
+import { advanceAnvilTime, sleep } from './anvil-helpers'
+
 export function getContractAddresses() {
   return {
     enclave: process.env.ENCLAVE_ADDRESS as `0x${string}`,
@@ -189,7 +191,8 @@ describe('Integration', () => {
     const { waitForEvent } = await setupEventListeners(sdk, store)
 
     const committeeSize = CommitteeSize.Micro
-    const duration = 1000
+    // Input window length (seconds); also used as vitest wait budget per phase.
+    const duration = 120
     const inputWindow = await calculateInputWindow(publicClient, duration)
     const computeProviderParams = encodeComputeProviderParams(
       DEFAULT_COMPUTE_PROVIDER_PARAMS,
@@ -217,7 +220,7 @@ describe('Integration', () => {
     const hash = await sdk.approveFeeToken(quote)
     console.log('Fee token approved:', hash)
 
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    await sleep(1000)
 
     // REQUEST phase
     const timeoutMs = duration * 1000
@@ -241,7 +244,15 @@ describe('Integration', () => {
     const stageAfterRequest = await sdk.getE3Stage(state.e3Id)
     assert.strictEqual(stageAfterRequest, E3Stage.Requested, 'E3 stage should be Requested after requestE3')
 
+    // Ciphernodes submit tickets during the on-chain sortition window (10s). Anvil must mine so
+    // block.timestamp passes committeeDeadline before finalizeCommittee (see anvil-automine.mjs).
+    console.log('Waiting for ciphernode sortition tickets...')
+    await sleep(8000)
+    await advanceAnvilTime(publicClient, 15)
+    console.log('Advanced anvil past sortition deadline')
+
     // Ciphernodes will publish a public key within the COMMITTEE_PUBLISHED event
+    console.log('Waiting for committee + DKG (CommitteePublished)...')
     event = await waitForEvent(RegistryEventType.COMMITTEE_PUBLISHED, undefined, timeoutMs)
 
     const publicKeyBytes = hexToBytes(event.data.publicKey as `0x${string}`)
