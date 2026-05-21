@@ -7,7 +7,7 @@
 use actix::Actor;
 use alloy::primitives::{Address, FixedBytes, I256, U256};
 use alloy::signers::local::PrivateKeySigner;
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use e3_bfv_client::decode_bytes_to_vec_u64;
 use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
 use e3_config::BBPath;
@@ -155,6 +155,29 @@ impl Drop for EnvTimeoutVarsGuard {
     }
 }
 
+async fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> Result<()> {
+    tokio::fs::create_dir_all(dst).await?;
+    let mut entries = tokio::fs::read_dir(src).await?;
+    while let Some(entry) = entries.next_entry().await? {
+        let file_type = entry.file_type().await?;
+        let dest = dst.join(entry.file_name());
+        if file_type.is_dir() {
+            Box::pin(copy_dir_recursive(&entry.path(), &dest)).await?;
+        } else {
+            tokio::fs::copy(entry.path(), &dest)
+                .await
+                .with_context(|| {
+                    format!(
+                        "copy circuit artifact {} -> {}",
+                        entry.path().display(),
+                        dest.display()
+                    )
+                })?;
+        }
+    }
+    Ok(())
+}
+
 /// Create a ZkBackend for integration tests.
 /// If a local bb binary is found, uses it with fixture files (fast path).
 /// Otherwise, calls `ensure_installed()` to download bb + circuits (CI path).
@@ -167,6 +190,10 @@ async fn setup_test_zk_backend(
     let bb_binary = noir_dir.join("bin").join("bb");
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..");
+    let dist_preset = repo_root.join("dist/circuits").join(preset_subdir);
 
     if let Some(bb) = find_bb().await {
         tokio::fs::create_dir_all(bb_binary.parent().unwrap())
@@ -180,335 +207,362 @@ async fn setup_test_zk_backend(
         #[cfg(not(unix))]
         compile_error!("Integration tests require unix symlink support");
 
-        let circuits_build_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
-            .join("circuits")
-            .join("bin");
-        let dkg_target = circuits_build_root.join("dkg").join("target");
-        let threshold_target = circuits_build_root.join("threshold").join("target");
-        let c3_fold_target = circuits_build_root
-            .join("recursive_aggregation")
-            .join("c3_fold")
-            .join("target");
-        let c3_fold_kernel_target = circuits_build_root
-            .join("recursive_aggregation")
-            .join("c3_fold_kernel")
-            .join("target");
-        let c6_fold_target = circuits_build_root
-            .join("recursive_aggregation")
-            .join("c6_fold")
-            .join("target");
-        let c6_fold_kernel_target = circuits_build_root
-            .join("recursive_aggregation")
-            .join("c6_fold_kernel")
-            .join("target");
-        let c2ab_fold_target = circuits_build_root
-            .join("recursive_aggregation")
-            .join("c2ab_fold")
-            .join("target");
-        let c3ab_fold_target = circuits_build_root
-            .join("recursive_aggregation")
-            .join("c3ab_fold")
-            .join("target");
-        let c4ab_fold_target = circuits_build_root
-            .join("recursive_aggregation")
-            .join("c4ab_fold")
-            .join("target");
-        let node_fold_target = circuits_build_root
-            .join("recursive_aggregation")
-            .join("node_fold")
-            .join("target");
-        let nodes_fold_target = circuits_build_root
-            .join("recursive_aggregation")
-            .join("nodes_fold")
-            .join("target");
-        let nodes_fold_kernel_target = circuits_build_root
-            .join("recursive_aggregation")
-            .join("nodes_fold_kernel")
-            .join("target");
-        let dkg_aggregator_target = circuits_build_root
-            .join("recursive_aggregation")
-            .join("dkg_aggregator")
-            .join("target");
-        let decryption_aggregator_target = circuits_build_root
-            .join("recursive_aggregation")
-            .join("decryption_aggregator")
-            .join("target");
+        let preset_out = circuits_dir.join(preset_subdir);
+        let dist_marker = dist_preset.join("recursive/dkg/pk/pk.json");
+        let circuits_bin_marker = repo_root.join("circuits/bin/dkg/target/pk.json");
 
-        // Helper: copy {name}.json + VK artifacts into a destination directory.
-        // vk_suffix/vk_hash_suffix select the source VK flavor:
-        //   ".vk_noir" / ".vk_noir_hash"       → Recursive variant (inner proofs)
-        //   ".vk_recursive" / ".vk_recursive_hash" → Default variant (wrapper/fold proofs)
-        //   ".vk" / ".vk_hash"                  → EVM variant
-        async fn copy_circuit(
-            src_dir: &std::path::Path,
-            dst_dir: &std::path::Path,
-            name: &str,
-            vk_suffix: &str,
-            vk_hash_suffix: &str,
-        ) {
-            tokio::fs::create_dir_all(dst_dir).await.unwrap();
-            tokio::fs::copy(
-                src_dir.join(format!("{name}.json")),
-                dst_dir.join(format!("{name}.json")),
+        if dist_marker.exists() {
+            copy_dir_recursive(&dist_preset, &preset_out).await?;
+        } else if !circuits_bin_marker.exists() {
+            // CI `rust_integration_tests` does not run `pnpm build:circuits`; download the
+            // pinned release tarball when no local fixtures are present.
+            println!(
+                "No local circuit fixtures under dist/circuits or circuits/bin; \
+                 downloading release circuits via ensure_installed()..."
+            );
+            let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
+            backend
+                .ensure_installed()
+                .await
+                .context("download ZK circuits for integration tests")?;
+            return Ok((backend, temp));
+        } else {
+            let circuits_build_root = repo_root.join("circuits").join("bin");
+            let dkg_target = circuits_build_root.join("dkg").join("target");
+            let threshold_target = circuits_build_root.join("threshold").join("target");
+            let c3_fold_target = circuits_build_root
+                .join("recursive_aggregation")
+                .join("c3_fold")
+                .join("target");
+            let c3_fold_kernel_target = circuits_build_root
+                .join("recursive_aggregation")
+                .join("c3_fold_kernel")
+                .join("target");
+            let c6_fold_target = circuits_build_root
+                .join("recursive_aggregation")
+                .join("c6_fold")
+                .join("target");
+            let c6_fold_kernel_target = circuits_build_root
+                .join("recursive_aggregation")
+                .join("c6_fold_kernel")
+                .join("target");
+            let c2ab_fold_target = circuits_build_root
+                .join("recursive_aggregation")
+                .join("c2ab_fold")
+                .join("target");
+            let c3ab_fold_target = circuits_build_root
+                .join("recursive_aggregation")
+                .join("c3ab_fold")
+                .join("target");
+            let c4ab_fold_target = circuits_build_root
+                .join("recursive_aggregation")
+                .join("c4ab_fold")
+                .join("target");
+            let node_fold_target = circuits_build_root
+                .join("recursive_aggregation")
+                .join("node_fold")
+                .join("target");
+            let nodes_fold_target = circuits_build_root
+                .join("recursive_aggregation")
+                .join("nodes_fold")
+                .join("target");
+            let nodes_fold_kernel_target = circuits_build_root
+                .join("recursive_aggregation")
+                .join("nodes_fold_kernel")
+                .join("target");
+            let dkg_aggregator_target = circuits_build_root
+                .join("recursive_aggregation")
+                .join("dkg_aggregator")
+                .join("target");
+            let decryption_aggregator_target = circuits_build_root
+                .join("recursive_aggregation")
+                .join("decryption_aggregator")
+                .join("target");
+
+            // Helper: copy {name}.json + VK artifacts into a destination directory.
+            // vk_suffix/vk_hash_suffix select the source VK flavor:
+            //   ".vk_noir" / ".vk_noir_hash"       → Recursive variant (inner proofs)
+            //   ".vk_recursive" / ".vk_recursive_hash" → Default variant (wrapper/fold proofs)
+            //   ".vk" / ".vk_hash"                  → EVM variant
+            async fn copy_circuit(
+                src_dir: &std::path::Path,
+                dst_dir: &std::path::Path,
+                name: &str,
+                vk_suffix: &str,
+                vk_hash_suffix: &str,
+            ) -> Result<()> {
+                tokio::fs::create_dir_all(dst_dir).await?;
+                let copy_file = |src: std::path::PathBuf, dst: std::path::PathBuf| async move {
+                    tokio::fs::copy(&src, &dst).await.with_context(|| {
+                        format!(
+                            "copy circuit artifact {} -> {}",
+                            src.display(),
+                            dst.display()
+                        )
+                    })
+                };
+                copy_file(
+                    src_dir.join(format!("{name}.json")),
+                    dst_dir.join(format!("{name}.json")),
+                )
+                .await?;
+                copy_file(
+                    src_dir.join(format!("{name}{vk_suffix}")),
+                    dst_dir.join(format!("{name}.vk")),
+                )
+                .await?;
+                let vk_hash_src = src_dir.join(format!("{name}{vk_hash_suffix}"));
+                let vk_hash_src = if tokio::fs::try_exists(&vk_hash_src).await? {
+                    vk_hash_src
+                } else {
+                    // `bb write_vk` leaves `vk_hash` in some aggregation target dirs.
+                    src_dir.join("vk_hash")
+                };
+                copy_file(vk_hash_src, dst_dir.join(format!("{name}.vk_hash"))).await?;
+                Ok(())
+            }
+
+            // ── recursive/ variant (inner/base proofs, uses .vk_noir) ──────────
+            let preset_dir = circuits_dir.join(preset_subdir);
+
+            let rv = preset_dir.join("recursive");
+
+            // T0 (pk)
+            copy_circuit(
+                &dkg_target,
+                &rv.join("dkg/pk"),
+                "pk",
+                ".vk_noir",
+                ".vk_noir_hash",
             )
-            .await
-            .unwrap();
-            tokio::fs::copy(
-                src_dir.join(format!("{name}{vk_suffix}")),
-                dst_dir.join(format!("{name}.vk")),
+            .await?;
+            // C1 (pk_generation)
+            copy_circuit(
+                &threshold_target,
+                &rv.join("threshold/pk_generation"),
+                "pk_generation",
+                ".vk_noir",
+                ".vk_noir_hash",
             )
-            .await
-            .unwrap();
-            tokio::fs::copy(
-                src_dir.join(format!("{name}{vk_hash_suffix}")),
-                dst_dir.join(format!("{name}.vk_hash")),
+            .await?;
+            // C2a (sk_share_computation)
+            copy_circuit(
+                &dkg_target,
+                &rv.join("dkg/sk_share_computation"),
+                "sk_share_computation",
+                ".vk_noir",
+                ".vk_noir_hash",
             )
-            .await
-            .unwrap();
+            .await?;
+            // C2b (e_sm_share_computation)
+            copy_circuit(
+                &dkg_target,
+                &rv.join("dkg/e_sm_share_computation"),
+                "e_sm_share_computation",
+                ".vk_noir",
+                ".vk_noir_hash",
+            )
+            .await?;
+            // C3 (share_encryption)
+            copy_circuit(
+                &dkg_target,
+                &rv.join("dkg/share_encryption"),
+                "share_encryption",
+                ".vk_noir",
+                ".vk_noir_hash",
+            )
+            .await?;
+            // C4 (dkg/share_decryption)
+            copy_circuit(
+                &dkg_target,
+                &rv.join("dkg/share_decryption"),
+                "share_decryption",
+                ".vk_noir",
+                ".vk_noir_hash",
+            )
+            .await?;
+            // C5 (pk_aggregation)
+            copy_circuit(
+                &threshold_target,
+                &rv.join("threshold/pk_aggregation"),
+                "pk_aggregation",
+                ".vk_noir",
+                ".vk_noir_hash",
+            )
+            .await?;
+            // C6 (threshold/share_decryption)
+            copy_circuit(
+                &threshold_target,
+                &rv.join("threshold/share_decryption"),
+                "share_decryption",
+                ".vk_noir",
+                ".vk_noir_hash",
+            )
+            .await?;
+            // C7 (decrypted_shares_aggregation)
+            copy_circuit(
+                &threshold_target,
+                &rv.join("threshold/decrypted_shares_aggregation"),
+                "decrypted_shares_aggregation",
+                ".vk_noir",
+                ".vk_noir_hash",
+            )
+            .await?;
+
+            // ── default/ variant (recursive aggregation bins, uses .vk_recursive) ───
+
+            let dv = preset_dir.join("default");
+
+            // C5 (pk_aggregation) — proven with noir-recursive-no-zk and folded into
+            // DkgAggregator, so it must be staged under default/ too.
+            copy_circuit(
+                &threshold_target,
+                &dv.join("threshold/pk_aggregation"),
+                "pk_aggregation",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+
+            copy_circuit(
+                &c3_fold_target,
+                &dv.join("recursive_aggregation/c3_fold"),
+                "c3_fold",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+            copy_circuit(
+                &c3_fold_kernel_target,
+                &dv.join("recursive_aggregation/c3_fold_kernel"),
+                "c3_fold_kernel",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+            copy_circuit(
+                &c6_fold_target,
+                &dv.join("recursive_aggregation/c6_fold"),
+                "c6_fold",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+            copy_circuit(
+                &c6_fold_kernel_target,
+                &dv.join("recursive_aggregation/c6_fold_kernel"),
+                "c6_fold_kernel",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+            copy_circuit(
+                &c2ab_fold_target,
+                &dv.join("recursive_aggregation/c2ab_fold"),
+                "c2ab_fold",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+            copy_circuit(
+                &c3ab_fold_target,
+                &dv.join("recursive_aggregation/c3ab_fold"),
+                "c3ab_fold",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+            copy_circuit(
+                &c4ab_fold_target,
+                &dv.join("recursive_aggregation/c4ab_fold"),
+                "c4ab_fold",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+            copy_circuit(
+                &node_fold_target,
+                &dv.join("recursive_aggregation/node_fold"),
+                "node_fold",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+            copy_circuit(
+                &nodes_fold_target,
+                &dv.join("recursive_aggregation/nodes_fold"),
+                "nodes_fold",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+            copy_circuit(
+                &nodes_fold_kernel_target,
+                &dv.join("recursive_aggregation/nodes_fold_kernel"),
+                "nodes_fold_kernel",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+            copy_circuit(
+                &dkg_aggregator_target,
+                &dv.join("recursive_aggregation/dkg_aggregator"),
+                "dkg_aggregator",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+            copy_circuit(
+                &decryption_aggregator_target,
+                &dv.join("recursive_aggregation/decryption_aggregator"),
+                "decryption_aggregator",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+            // C7 (decrypted_shares_aggregation) — proven with noir-recursive-no-zk and
+            // folded into DecryptionAggregator, so it must also be staged under default/.
+            copy_circuit(
+                &threshold_target,
+                &dv.join("threshold/decrypted_shares_aggregation"),
+                "decrypted_shares_aggregation",
+                ".vk_recursive",
+                ".vk_recursive_hash",
+            )
+            .await?;
+
+            // ── evm/ variant (on-chain verification: DKG aggregator, C7) ───────────
+
+            let ev = preset_dir.join("evm");
+
+            // DKG aggregator — EVM-targeted (folds + C5 verified inside)
+            copy_circuit(
+                &dkg_aggregator_target,
+                &ev.join("recursive_aggregation/dkg_aggregator"),
+                "dkg_aggregator",
+                ".vk",
+                ".vk_hash",
+            )
+            .await?;
+            // Decryption aggregator — EVM-targeted (C6 fold + C7 verified inside)
+            copy_circuit(
+                &decryption_aggregator_target,
+                &ev.join("recursive_aggregation/decryption_aggregator"),
+                "decryption_aggregator",
+                ".vk",
+                ".vk_hash",
+            )
+            .await?;
+            // C7 (decrypted_shares_aggregation) — EVM-targeted
+            copy_circuit(
+                &threshold_target,
+                &ev.join("threshold/decrypted_shares_aggregation"),
+                "decrypted_shares_aggregation",
+                ".vk",
+                ".vk_hash",
+            )
+            .await?;
         }
-
-        // ── recursive/ variant (inner/base proofs, uses .vk_noir) ──────────
-        let preset_dir = circuits_dir.join(preset_subdir);
-
-        let rv = preset_dir.join("recursive");
-
-        // T0 (pk)
-        copy_circuit(
-            &dkg_target,
-            &rv.join("dkg/pk"),
-            "pk",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C1 (pk_generation)
-        copy_circuit(
-            &threshold_target,
-            &rv.join("threshold/pk_generation"),
-            "pk_generation",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C2a (sk_share_computation)
-        copy_circuit(
-            &dkg_target,
-            &rv.join("dkg/sk_share_computation"),
-            "sk_share_computation",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C2b (e_sm_share_computation)
-        copy_circuit(
-            &dkg_target,
-            &rv.join("dkg/e_sm_share_computation"),
-            "e_sm_share_computation",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C3 (share_encryption)
-        copy_circuit(
-            &dkg_target,
-            &rv.join("dkg/share_encryption"),
-            "share_encryption",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C4 (dkg/share_decryption)
-        copy_circuit(
-            &dkg_target,
-            &rv.join("dkg/share_decryption"),
-            "share_decryption",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C5 (pk_aggregation)
-        copy_circuit(
-            &threshold_target,
-            &rv.join("threshold/pk_aggregation"),
-            "pk_aggregation",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C6 (threshold/share_decryption)
-        copy_circuit(
-            &threshold_target,
-            &rv.join("threshold/share_decryption"),
-            "share_decryption",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-        // C7 (decrypted_shares_aggregation)
-        copy_circuit(
-            &threshold_target,
-            &rv.join("threshold/decrypted_shares_aggregation"),
-            "decrypted_shares_aggregation",
-            ".vk_noir",
-            ".vk_noir_hash",
-        )
-        .await;
-
-        // ── default/ variant (recursive aggregation bins, uses .vk_recursive) ───
-
-        let dv = preset_dir.join("default");
-
-        // C5 (pk_aggregation) — proven with noir-recursive-no-zk and folded into
-        // DkgAggregator, so it must be staged under default/ too.
-        copy_circuit(
-            &threshold_target,
-            &dv.join("threshold/pk_aggregation"),
-            "pk_aggregation",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-
-        copy_circuit(
-            &c3_fold_target,
-            &dv.join("recursive_aggregation/c3_fold"),
-            "c3_fold",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &c3_fold_kernel_target,
-            &dv.join("recursive_aggregation/c3_fold_kernel"),
-            "c3_fold_kernel",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &c6_fold_target,
-            &dv.join("recursive_aggregation/c6_fold"),
-            "c6_fold",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &c6_fold_kernel_target,
-            &dv.join("recursive_aggregation/c6_fold_kernel"),
-            "c6_fold_kernel",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &c2ab_fold_target,
-            &dv.join("recursive_aggregation/c2ab_fold"),
-            "c2ab_fold",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &c3ab_fold_target,
-            &dv.join("recursive_aggregation/c3ab_fold"),
-            "c3ab_fold",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &c4ab_fold_target,
-            &dv.join("recursive_aggregation/c4ab_fold"),
-            "c4ab_fold",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &node_fold_target,
-            &dv.join("recursive_aggregation/node_fold"),
-            "node_fold",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &nodes_fold_target,
-            &dv.join("recursive_aggregation/nodes_fold"),
-            "nodes_fold",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &nodes_fold_kernel_target,
-            &dv.join("recursive_aggregation/nodes_fold_kernel"),
-            "nodes_fold_kernel",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &dkg_aggregator_target,
-            &dv.join("recursive_aggregation/dkg_aggregator"),
-            "dkg_aggregator",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        copy_circuit(
-            &decryption_aggregator_target,
-            &dv.join("recursive_aggregation/decryption_aggregator"),
-            "decryption_aggregator",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-        // C7 (decrypted_shares_aggregation) — proven with noir-recursive-no-zk and
-        // folded into DecryptionAggregator, so it must also be staged under default/.
-        copy_circuit(
-            &threshold_target,
-            &dv.join("threshold/decrypted_shares_aggregation"),
-            "decrypted_shares_aggregation",
-            ".vk_recursive",
-            ".vk_recursive_hash",
-        )
-        .await;
-
-        // ── evm/ variant (on-chain verification: DKG aggregator, C7) ───────────
-
-        let ev = preset_dir.join("evm");
-
-        // DKG aggregator — EVM-targeted (folds + C5 verified inside)
-        copy_circuit(
-            &dkg_aggregator_target,
-            &ev.join("recursive_aggregation/dkg_aggregator"),
-            "dkg_aggregator",
-            ".vk",
-            ".vk_hash",
-        )
-        .await;
-        // Decryption aggregator — EVM-targeted (C6 fold + C7 verified inside)
-        copy_circuit(
-            &decryption_aggregator_target,
-            &ev.join("recursive_aggregation/decryption_aggregator"),
-            "decryption_aggregator",
-            ".vk",
-            ".vk_hash",
-        )
-        .await;
-        // C7 (decrypted_shares_aggregation) — EVM-targeted
-        copy_circuit(
-            &threshold_target,
-            &ev.join("threshold/decrypted_shares_aggregation"),
-            "decrypted_shares_aggregation",
-            ".vk",
-            ".vk_hash",
-        )
-        .await;
 
         let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
 
@@ -636,6 +690,27 @@ fn determine_committee(
     }
 
     Ok((committee, committee_scores, buffer_nodes))
+}
+
+/// Lowest-address committee member after `CommitteeFinalized::sort_by_score` (party 0 / active aggregator).
+fn active_aggregator_address(
+    committee: &[String],
+    scores: &[String],
+    e3_id: &E3id,
+    chain_id: u64,
+) -> String {
+    let mut finalized = CommitteeFinalized {
+        e3_id: e3_id.clone(),
+        committee: committee.to_vec(),
+        scores: scores.to_vec(),
+        chain_id,
+    };
+    finalized.sort_by_score();
+    finalized
+        .committee
+        .first()
+        .cloned()
+        .expect("committee must be non-empty")
 }
 
 fn find_node_index_by_address(nodes: &CiphernodeSystem, address: &str) -> Result<usize> {
@@ -1117,10 +1192,8 @@ async fn test_trbfv_actor() -> Result<()> {
         buffer_nodes.len()
     ));
 
-    let active_aggregator_addr = committee
-        .first()
-        .cloned()
-        .expect("committee should have an active aggregator");
+    let active_aggregator_addr =
+        active_aggregator_address(&committee, &committee_scores, &e3_id, chain_id);
     let active_aggregator_index = find_node_index_by_address(&nodes, &active_aggregator_addr)?;
 
     println!(
