@@ -46,10 +46,7 @@ pub fn committee_hash_limbs_from_addresses(addresses: &[Address]) -> CommitteeHa
 /// Field hex strings (`0x…`, 32 bytes) for Noir witness `committee_hash_hi` / `committee_hash_lo`.
 pub fn committee_hash_field_hex(addresses: &[Address]) -> (String, String) {
     let limbs = committee_hash_limbs_from_addresses(addresses);
-    (
-        field_hex_from_b256(limbs.hi),
-        field_hex_from_b256(limbs.lo),
-    )
+    (field_hex_from_b256(limbs.hi), field_hex_from_b256(limbs.lo))
 }
 
 fn field_hex_from_b256(value: B256) -> String {

@@ -119,15 +119,15 @@
   "timings_seconds": [
     {
       "label": "Starting trbfv actor test",
-      "seconds": 0E-9
+      "seconds": 0e-9
     },
     {
       "label": "Setup completed",
-      "seconds": 3.071508500
+      "seconds": 3.0715085
     },
     {
       "label": "Committee Setup Completed",
-      "seconds": 20.228290750
+      "seconds": 20.22829075
     },
     {
       "label": "Committee Finalization Complete",
@@ -155,7 +155,7 @@
     },
     {
       "label": "Entire Test",
-      "seconds": 410.211371500
+      "seconds": 410.2113715
     }
   ],
   "folded_artifacts": {
