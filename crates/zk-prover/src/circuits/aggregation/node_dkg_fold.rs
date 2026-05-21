@@ -16,6 +16,7 @@ use crate::circuits::vk;
 use crate::error::ZkError;
 use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
+use alloy::primitives::Address;
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use serde::Serialize;
 
@@ -296,7 +297,7 @@ pub struct DkgAggregationInput<'a> {
     /// Honest party ids in the same order as `node_fold_proofs` (e.g. sorted ascending).
     pub party_ids: &'a [u64],
     /// Ordered committee addresses (`topNodes` / sortition order) for `committee_hash_*` public inputs.
-    pub committee_addresses: &'a [String],
+    pub committee_addresses: &'a [Address],
 }
 
 #[derive(Serialize)]
@@ -373,14 +374,13 @@ pub fn prove_dkg_aggregation(
         .collect();
 
     let (committee_hash_hi, committee_hash_lo) =
-        e3_utils::committee_hash::committee_hash_field_hex(input.committee_addresses)
-            .map_err(|e| ZkError::InvalidInput(e.to_string()))?;
+        e3_utils::committee_hash::committee_hash_field_hex(input.committee_addresses);
 
     let committee_members: Vec<String> = input
         .committee_addresses
         .iter()
-        .map(|addr| address_to_field_hex(addr))
-        .collect::<Result<_, _>>()?;
+        .map(address_to_field_hex)
+        .collect();
 
     let witness = DkgAggregatorWitness {
         nodes_fold_vk: nodes_fold_vk.verification_key.clone(),
@@ -444,7 +444,7 @@ pub fn prove_decryption_aggregation_jobs(
     prover: &ZkProver,
     c6_total_slots: usize,
     jobs: &[DecryptionAggregationJob],
-    committee_addresses: &[String],
+    committee_addresses: &[Address],
     e3_id: &str,
     artifacts_dir: &str,
 ) -> Result<Vec<Proof>, ZkError> {
@@ -475,13 +475,12 @@ pub fn prove_decryption_aggregation_jobs(
     }
 
     let (committee_hash_hi, committee_hash_lo) =
-        e3_utils::committee_hash::committee_hash_field_hex(committee_addresses)
-            .map_err(|e| ZkError::InvalidInput(e.to_string()))?;
+        e3_utils::committee_hash::committee_hash_field_hex(committee_addresses);
 
     let committee_members: Vec<String> = committee_addresses
         .iter()
-        .map(|addr| address_to_field_hex(addr))
-        .collect::<Result<_, _>>()?;
+        .map(address_to_field_hex)
+        .collect();
 
     let mut out = Vec::with_capacity(jobs.len());
     for (i, job) in jobs.iter().enumerate() {

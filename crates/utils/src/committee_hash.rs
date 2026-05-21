@@ -43,16 +43,13 @@ pub fn committee_hash_limbs_from_addresses(addresses: &[Address]) -> CommitteeHa
     split_committee_hash(hash_committee_addresses(addresses))
 }
 
-/// Parse checksummed or lowercase hex node addresses (as used in events).
-pub fn hash_committee_node_strings(nodes: &[String]) -> anyhow::Result<B256> {
-    let addresses: Vec<Address> = nodes.iter().map(|s| s.parse()).collect::<Result<_, _>>()?;
-    Ok(hash_committee_addresses(&addresses))
-}
-
 /// Field hex strings (`0x…`, 32 bytes) for Noir witness `committee_hash_hi` / `committee_hash_lo`.
-pub fn committee_hash_field_hex(nodes: &[String]) -> anyhow::Result<(String, String)> {
-    let limbs = split_committee_hash(hash_committee_node_strings(nodes)?);
-    Ok((field_hex_from_b256(limbs.hi), field_hex_from_b256(limbs.lo)))
+pub fn committee_hash_field_hex(addresses: &[Address]) -> (String, String) {
+    let limbs = committee_hash_limbs_from_addresses(addresses);
+    (
+        field_hex_from_b256(limbs.hi),
+        field_hex_from_b256(limbs.lo),
+    )
 }
 
 fn field_hex_from_b256(value: B256) -> String {

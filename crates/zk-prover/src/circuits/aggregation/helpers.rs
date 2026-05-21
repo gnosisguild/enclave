@@ -43,13 +43,10 @@ pub fn u64_to_field_hex(value: u64) -> String {
 }
 
 /// Encode an EVM address as a 32-byte field hex string (20-byte address right-aligned).
-pub fn address_to_field_hex(address: &str) -> Result<String, ZkError> {
-    let parsed: alloy::primitives::Address = address
-        .parse()
-        .map_err(|e| ZkError::InvalidInput(format!("invalid address {address}: {e}")))?;
+pub fn address_to_field_hex(address: &alloy::primitives::Address) -> String {
     let mut bytes = [0u8; 32];
-    bytes[12..].copy_from_slice(parsed.as_slice());
-    Ok(format!("0x{}", hex::encode(bytes)))
+    bytes[12..].copy_from_slice(address.as_slice());
+    format!("0x{}", hex::encode(bytes))
 }
 
 /// Extract a single 32-byte public input/output by name. `kind` must be `"input"` or `"output"`.

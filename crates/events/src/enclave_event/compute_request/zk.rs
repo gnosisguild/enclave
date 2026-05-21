@@ -77,7 +77,7 @@ pub struct DkgAggregationRequest {
     pub c5_proof: Proof,
     pub party_ids: Vec<u64>,
     /// Ordered committee addresses (`topNodes`) for `committee_hash_*` public inputs.
-    pub committee_addresses: Vec<String>,
+    pub committee_addresses: Vec<Address>,
     pub params_preset: BfvPreset,
 }
 
@@ -87,7 +87,7 @@ pub struct DecryptionAggregationRequest {
     pub c6_total_slots: usize,
     pub jobs: Vec<DecryptionAggregationJobRequest>,
     /// Ordered committee addresses (`topNodes`) for `committee_hash_*` public inputs.
-    pub committee_addresses: Vec<String>,
+    pub committee_addresses: Vec<Address>,
     pub params_preset: BfvPreset,
 }
 
