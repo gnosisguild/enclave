@@ -78,8 +78,8 @@ This is a separate Vercel **Project** from the CRISP client, both pointing at th
    - serves `dist/`.
 3. Optionally set `VITE_SEPOLIA_RPC` in the project's Environment Variables.
 
-> No "Ignored Build Step" is configured, so every push to the deployed branch builds. If you want
-> to skip builds when the dashboard/contracts are untouched, add a `git diff` against
+> No "Ignored Build Step" is configured, so every push to the deployed branch builds. If you want to
+> skip builds when the dashboard/contracts are untouched, add a `git diff` against
 > `VERCEL_GIT_PREVIOUS_SHA` (not `HEAD^`, which only sees the latest commit and wrongly cancels
 > deploys when an unrelated commit is on top).
 

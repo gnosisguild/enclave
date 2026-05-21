@@ -99,6 +99,7 @@ export type E3Summary = {
   inputWindow: [bigint, bigint]
   committeeSize: number
   stage: number // raw Solidity E3Stage enum
+  ballotCount: number // distinct CRISP ballots (0 for non-CRISP / when not scanned)
 }
 
 export type E3FullDetails = E3Summary & {
@@ -208,17 +209,22 @@ export async function fetchE3List(opts: FetchE3Opts = {}): Promise<E3Summary[]> 
 
   const scoped = crispOnly ? logs.filter((log) => isCrispE3(log.args.e3.e3Program)) : logs
 
-  // Current stage of each E3 in one multicall — lets the list show real status
-  // (completed / failed / expired) rather than guessing.
-  const stages = await (publicClient.multicall as any)({
-    contracts: scoped.map((log) => ({
-      address: CONTRACTS.Enclave,
-      abi: enclaveAbi,
-      functionName: 'getE3Stage',
-      args: [log.args.e3Id],
-    })),
-    allowFailure: true,
-  })
+  const [stages, ballotCounts] = await Promise.all([
+    // Current stage of each E3 in one multicall — lets the list show real status
+    // (completed / failed / expired) rather than guessing.
+    (publicClient.multicall as any)({
+      contracts: scoped.map((log) => ({
+        address: CONTRACTS.Enclave,
+        abi: enclaveAbi,
+        functionName: 'getE3Stage',
+        args: [log.args.e3Id],
+      })),
+      allowFailure: true,
+    }),
+    // CRISP view: one scan of all ballots, grouped per E3 (distinct voteIndex),
+    // so every history row shows its real count without a per-poll fetch.
+    crispOnly ? fetchCrispBallotCounts(head) : Promise.resolve(new Map<string, number>()),
+  ])
 
   const out: E3Summary[] = scoped.map((log, i) => {
     const { e3Id, e3 } = log.args
@@ -232,12 +238,27 @@ export async function fetchE3List(opts: FetchE3Opts = {}): Promise<E3Summary[]> 
       inputWindow: [e3.inputWindow[0], e3.inputWindow[1]] as [bigint, bigint],
       committeeSize: Number(e3.committeeSize),
       stage: stageResult.status === 'success' ? Number(stageResult.result) : E3Stage.None,
+      ballotCount: ballotCounts.get(e3Id.toString()) ?? 0,
     }
   })
 
   // Sort newest first.
   out.sort((a, b) => Number(b.requestBlock - a.requestBlock))
   return out
+}
+
+// Distinct ballot count per CRISP E3, from a single scan of all InputPublished
+// events grouped by e3Id (re-votes reuse a voteIndex, so we count unique ones).
+async function fetchCrispBallotCounts(head: bigint): Promise<Map<string, number>> {
+  const inputs = await getLogsChunked<any>({ address: CONTRACTS.CRISPProgram, event: CRISP_INPUT_PUBLISHED }, DEPLOY_BLOCK, head)
+  const byE3 = new Map<string, Set<string>>()
+  for (const l of inputs) {
+    const id = l.args.e3Id.toString()
+    const set = byE3.get(id) ?? new Set<string>()
+    set.add(l.args.index.toString())
+    byE3.set(id, set)
+  }
+  return new Map(Array.from(byE3, ([id, set]) => [id, set.size]))
 }
 
 export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3FullDetails> {
