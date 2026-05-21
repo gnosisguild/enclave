@@ -103,7 +103,7 @@ describe("BfvDecryptionVerifier", function () {
     return { bfvDecryptionVerifier: dv, mockCircuit: mc };
   };
 
-  describe("reverts / false", function () {
+  describe("reverts", function () {
     it("reverts on invalid proof encoding", async function () {
       const { bfvDecryptionVerifier } = await loadFixture(
         deployWithMockCircuit,
@@ -120,7 +120,7 @@ describe("BfvDecryptionVerifier", function () {
       ).to.be.revert(ethers);
     });
 
-    it("returns false when publicInputs.length is below expected", async function () {
+    it("reverts with BadPublicInputsLen when publicInputs.length is below expected", async function () {
       const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
       );
@@ -134,15 +134,19 @@ describe("BfvDecryptionVerifier", function () {
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
-      const result = await bfvDecryptionVerifier.verify.staticCall(
-        plaintextHash,
-        ethers.ZeroHash,
-        proof,
+      await expect(
+        bfvDecryptionVerifier.verify.staticCall(
+          plaintextHash,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(
+        bfvDecryptionVerifier,
+        "BadPublicInputsLen",
       );
-      expect(result).to.equal(false);
     });
 
-    it("returns false when publicInputs.length exceeds expected", async function () {
+    it("reverts with BadPublicInputsLen when publicInputs.length exceeds expected", async function () {
       const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
       );
@@ -156,15 +160,19 @@ describe("BfvDecryptionVerifier", function () {
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
-      const result = await bfvDecryptionVerifier.verify.staticCall(
-        plaintextHash,
-        ethers.ZeroHash,
-        proof,
+      await expect(
+        bfvDecryptionVerifier.verify.staticCall(
+          plaintextHash,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(
+        bfvDecryptionVerifier,
+        "BadPublicInputsLen",
       );
-      expect(result).to.equal(false);
     });
 
-    it("returns false when c6_fold key hash does not match", async function () {
+    it("reverts with BadC6FoldKeyHash when c6_fold key hash does not match", async function () {
       const revertingVerifier = await (
         await ethers.getContractFactory("RevertOnVerifyCircuitVerifier")
       ).deploy();
@@ -189,15 +197,19 @@ describe("BfvDecryptionVerifier", function () {
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
-      const result = await bfvDecryptionVerifier.verify.staticCall(
-        plaintextHash,
-        ethers.ZeroHash,
-        proof,
+      await expect(
+        bfvDecryptionVerifier.verify.staticCall(
+          plaintextHash,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(
+        bfvDecryptionVerifier,
+        "BadC6FoldKeyHash",
       );
-      expect(result).to.equal(false);
     });
 
-    it("returns false when c7 key hash does not match", async function () {
+    it("reverts with BadC7KeyHash when c7 key hash does not match", async function () {
       const revertingVerifier = await (
         await ethers.getContractFactory("RevertOnVerifyCircuitVerifier")
       ).deploy();
@@ -222,15 +234,16 @@ describe("BfvDecryptionVerifier", function () {
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
-      const result = await bfvDecryptionVerifier.verify.staticCall(
-        plaintextHash,
-        ethers.ZeroHash,
-        proof,
-      );
-      expect(result).to.equal(false);
+      await expect(
+        bfvDecryptionVerifier.verify.staticCall(
+          plaintextHash,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(bfvDecryptionVerifier, "BadC7KeyHash");
     });
 
-    it("returns false when plaintext hash mismatch", async function () {
+    it("reverts with BadPlaintextHash when plaintext hash mismatch", async function () {
       const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
       );
@@ -241,15 +254,21 @@ describe("BfvDecryptionVerifier", function () {
       const wrongHash = ethers.keccak256("0x0000");
       const proof = encodeProof("0x01", publicInputs);
 
-      const result = await bfvDecryptionVerifier.verify.staticCall(
-        wrongHash,
-        ethers.ZeroHash,
-        proof,
+      await expect(
+        bfvDecryptionVerifier.verify.staticCall(
+          wrongHash,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(
+        bfvDecryptionVerifier,
+        "BadPlaintextHash",
       );
-      expect(result).to.equal(false);
     });
 
     it("returns false when circuit verifier returns false", async function () {
+      // Circuit-verify failure is still expressed as `return false` because the
+      // bool return reflects the underlying Honk verifier's bool result.
       const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
       );
@@ -268,7 +287,7 @@ describe("BfvDecryptionVerifier", function () {
       expect(result).to.equal(false);
     });
 
-    it("returns false when constructor expected hashes do not match proof", async function () {
+    it("reverts with BadC6FoldKeyHash when constructor expected hashes do not match proof", async function () {
       const { mockCircuit } = await loadFixture(deployWithMockCircuit);
       await mockCircuit.setReturnValue(true);
       const mockAddr = await mockCircuit.getAddress();
@@ -288,12 +307,18 @@ describe("BfvDecryptionVerifier", function () {
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x0102", publicInputs);
 
-      const result = await bfvDecryptionVerifier.verify.staticCall(
-        plaintextHash,
-        ethers.ZeroHash,
-        proof,
+      // The proof's c6_fold hash is checked first and won't match the
+      // constructor's "wrong-c6", so BadC6FoldKeyHash fires.
+      await expect(
+        bfvDecryptionVerifier.verify.staticCall(
+          plaintextHash,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(
+        bfvDecryptionVerifier,
+        "BadC6FoldKeyHash",
       );
-      expect(result).to.equal(false);
     });
   });
 

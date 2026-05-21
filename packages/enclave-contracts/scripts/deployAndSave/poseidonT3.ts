@@ -6,7 +6,7 @@
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 import poseidon from "poseidon-solidity";
 
-import { storeDeploymentArgs } from "../utils";
+import { getDeploymentChain, storeDeploymentArgs } from "../utils";
 
 interface PoseidonT3ProxyDeployArgs {
   hre: HardhatRuntimeEnvironment;
@@ -20,7 +20,7 @@ export const deployAndSavePoseidonT3 = async ({
   hre,
 }: PoseidonT3ProxyDeployArgs): Promise<string> => {
   const { ethers } = await hre.network.connect();
-  const chain = hre.globalOptions.network;
+  const chain = getDeploymentChain(hre);
 
   // First check if the proxy exists
   if ((await ethers.provider.getCode(poseidon.proxy.address)) === "0x") {

@@ -258,7 +258,7 @@ ciphernode in **A**.
 
 ## P2: Public Key Aggregation (C5)
 
-The aggregator (party_id=0) collects all public key shares from C1 and sums them:
+The aggregator (the elected node for this E3) collects all public key shares from C1 and sums them:
 
 ```
 pk_threshold = Σ pk_share_i   for i ∈ A
@@ -325,6 +325,95 @@ steps:
 C7 proves all three steps were done correctly. The output is the final plaintext — the result of the
 encrypted computation, publicly verifiable by anyone. This circuit runs once, executed by the
 aggregator.
+
+---
+
+## Proof Aggregation and On-Chain Anchoring
+
+E3 programs can opt into **proof aggregation** by setting `proofAggregationEnabled = true` at
+request time. In that mode the network does not post per-node, per-circuit proofs on chain. Instead
+the aggregator submits two recursive proofs — one for DKG, one for decryption — together with
+per-node attestations that bind each surfaced commitment to a specific registered operator.
+
+### Canonical party_id assignment
+
+`party_id` is each node's index in the committee's canonical ordering. On chain, the committee is
+finalised as `topNodes`, sorted by **ascending address** (lowest numeric address = party 0). The
+ciphernodes derive their own `party_id` from `position()` in the `CommitteeFinalized.committee`
+array, which carries the same canonical order. Address-sort is deterministic and reproducible by
+both sides from just the set of committee addresses, so the Rust and Solidity sides never need to
+agree on per-run sortition scores to agree on the labeling.
+
+### Committee hash binding
+
+Both recursive proofs include a `committee_hash` in their public inputs, split into 128-bit
+`committee_hash_hi` and `committee_hash_lo` for the BN254 field. The hash is `keccak256` over the
+raw 20-byte addresses of `topNodes` concatenated in address-ascending order (see
+`CommitteeHashLib.hash` in the registry and `e3_utils::committee_hash::hash_committee_addresses` in
+Rust). The two implementations produce byte-identical output for the same committee, so the proof's
+bound hash matches whatever the registry computed at `publishCommittee` — failing the verifier
+otherwise.
+
+### NodeDkgFold and fold attestations
+
+After completing C0–C4 locally, each ciphernode folds its proofs into a single `NodeDkgFold` proof
+that surfaces three values: `sk_agg_commit`, `esm_agg_commit`, and the node's `party_id`. The node
+then signs an EIP-712-style digest over `(chainId, e3Id, partyId, skAggCommit, esmAggCommit)` with
+its operator key and gossips the signed fold output to peers via `DKGRecursiveAggregationComplete`.
+
+In proof-aggregation mode, the aggregator collects all honest parties' fold outputs and:
+
+1. Recursively verifies each `NodeDkgFold` inside the DKG aggregator proof (so an aggregator cannot
+   fabricate a node's fold without the recursive proof failing).
+2. Assembles a **DKG fold-attestation bundle**: one signed attestation per honest party plus a
+   `(partyId → node address)` binding table.
+
+The DKG aggregator proof surfaces, as public outputs, the array of `party_ids`, `sk_agg_commits[]`,
+`esm_agg_commits[]`, the committee hash limbs, and the aggregated public-key commitment.
+
+### `publishCommittee` verification
+
+When the aggregator calls
+[`CiphernodeRegistry.publishCommittee`](https://github.com/gnosisguild/enclave/blob/main/packages/enclave-contracts/contracts/registry/CiphernodeRegistryOwnable.sol),
+the registry runs two checks in order:
+
+1. **Honk proof verification** via
+   [`BfvPkVerifier`](https://github.com/gnosisguild/enclave/blob/main/packages/enclave-contracts/contracts/verifiers/bfv/BfvPkVerifier.sol).
+   It checks the recursive VK hashes for `node_fold` and `pk_aggregation` (so the underlying
+   circuits are the deployed ones), the committee-hash hi/lo limbs match
+   `CommitteeHashLib.hash(c.topNodes)`, the surfaced `pkCommitment` equals the caller-supplied
+   value, and the raw Honk proof verifies.
+2. **Fold-attestation verification** via
+   [`DkgFoldAttestationVerifier`](https://github.com/gnosisguild/enclave/blob/main/packages/enclave-contracts/contracts/verifiers/DkgFoldAttestationVerifier.sol).
+   It walks the bundle's `(partyId, node)` bindings — strictly ascending by `partyId`, no duplicates
+   — and for each binding: requires `isCommitteeMemberActive(e3Id, node)`, recovers the signer of
+   the attestation via `ecrecover` against the EIP-191/712 digest, requires `signer == node`, and
+   checks that the signed `skAggCommit` / `esmAggCommit` match the DKG proof's surfaced commitments
+   at that party's slot. The honest-set cardinality must equal the honest-party count derived from
+   the proof's public-input shape (`(len - 6) / 3`).
+
+Only if both succeed does the registry store the per-party anchors:
+
+```solidity
+dkgPartyIds[e3Id] = partyIds;
+dkgSkAggCommits[e3Id] = skAgg;
+dkgEsmAggCommits[e3Id] = esmAgg;
+```
+
+These anchors are what downstream decryption verifies against, and what slashing-by-attribution can
+read to identify which registered operator produced which DKG output. The mapping
+`operator = topNodes[partyIds[i]]` is a closed cryptographic chain: the proof binds to the addresses
+(via committee hash), the attestation binds to the proof commitments and the operator key, and the
+operator key was registered against `topNodes` at committee finalisation.
+
+### Decryption recursive proof
+
+The decryption recursive proof (`BfvDecryptionVerifier`) follows the same shape: a recursive Honk
+proof aggregates **C6** from at least **T+1** parties plus **C7**, surfaces `expected_sk_commits[]`
+and `expected_esm_commits[]` per party, and binds to the on-chain committee hash. The registry
+compares the surfaced commitments against the anchors stored at `publishCommittee` — if any anchor
+differs the proof is rejected — and the plaintext is decoded from the proof's last 100 public inputs
+(one `uint64` coefficient each, packed into bytes).
 
 ---
 

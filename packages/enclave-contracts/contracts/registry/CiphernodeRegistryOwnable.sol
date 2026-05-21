@@ -18,6 +18,9 @@ import {
     LazyIMTData
 } from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
 import { CommitteeHashLib } from "../lib/CommitteeHashLib.sol";
+import {
+    IDkgFoldAttestationVerifier
+} from "../interfaces/IDkgFoldAttestationVerifier.sol";
 
 /**
  * @title CiphernodeRegistryOwnable
@@ -84,6 +87,14 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     /// @notice Address of the slashing manager authorized to expel committee members
     ISlashingManager public slashingManager;
+
+    /// @notice Verifies per-node DKG fold attestations at publication (external contract).
+    IDkgFoldAttestationVerifier public dkgFoldAttestationVerifier;
+
+    /// @notice DKG anchor commitments stored when the committee public key is published.
+    mapping(uint256 e3Id => uint256[]) internal dkgPartyIds;
+    mapping(uint256 e3Id => bytes32[]) internal dkgSkAggCommits;
+    mapping(uint256 e3Id => bytes32[]) internal dkgEsmAggCommits;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -198,7 +209,8 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         uint256 e3Id,
         bytes calldata publicKey,
         bytes32 pkCommitment,
-        bytes calldata proof
+        bytes calldata proof,
+        bytes calldata dkgAttestationBundle
     ) external {
         Committee storage c = committees[e3Id];
 
@@ -217,10 +229,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         E3 memory e3 = enclave.getE3(e3Id);
         if (e3.proofAggregationEnabled) {
-            require(proof.length > 0, DkgProofRequired());
-            require(
-                e3.pkVerifier.verify(pkCommitment, committeeHash, proof),
-                InvalidDkgProof()
+            _verifyAndStoreDkgAnchors(
+                e3Id,
+                e3,
+                pkCommitment,
+                committeeHash,
+                proof,
+                dkgAttestationBundle
             );
         }
 
@@ -236,6 +251,50 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             pkCommitment,
             proof
         );
+    }
+
+    function _verifyAndStoreDkgAnchors(
+        uint256 e3Id,
+        E3 memory e3,
+        bytes32 pkCommitment,
+        bytes32 committeeHash,
+        bytes calldata proof,
+        bytes calldata dkgAttestationBundle
+    ) internal {
+        require(proof.length > 0, DkgProofRequired());
+        require(
+            e3.pkVerifier.verify(pkCommitment, committeeHash, proof),
+            InvalidDkgProof()
+        );
+        require(dkgAttestationBundle.length > 0, FoldAttestationsRequired());
+        require(
+            address(dkgFoldAttestationVerifier) != address(0),
+            FoldAttestationVerifierNotSet()
+        );
+
+        (
+            uint256[] memory partyIds,
+            bytes32[] memory skAgg,
+            bytes32[] memory esmAgg
+        ) = dkgFoldAttestationVerifier.verify(
+                address(this),
+                block.chainid,
+                e3Id,
+                proof,
+                dkgAttestationBundle
+            );
+
+        dkgPartyIds[e3Id] = partyIds;
+        dkgSkAggCommits[e3Id] = skAgg;
+        dkgEsmAggCommits[e3Id] = esmAgg;
+    }
+
+    /// @notice Sets the DKG fold attestation verifier (required when proof aggregation is enabled).
+    function setDkgFoldAttestationVerifier(
+        IDkgFoldAttestationVerifier verifier
+    ) external onlyOwner {
+        require(address(verifier) != address(0), ZeroAddress());
+        dkgFoldAttestationVerifier = verifier;
     }
 
     /// @inheritdoc ICiphernodeRegistry
@@ -353,6 +412,8 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             );
             return false;
         }
+
+        _sortTopNodesByAscendingScore(c);
 
         c.stage = ICiphernodeRegistry.CommitteeStage.Finalized;
         c.activeCount = c.topNodes.length;
@@ -482,6 +543,26 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         Committee storage c = committees[e3Id];
         require(c.publicKey != bytes32(0), CommitteeNotPublished());
         committeeHash = c.committeeHash;
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function getDkgAnchors(
+        uint256 e3Id
+    )
+        external
+        view
+        returns (
+            uint256[] memory partyIds,
+            bytes32[] memory skAggCommits,
+            bytes32[] memory esmAggCommits
+        )
+    {
+        require(publicKeyHashes[e3Id] != bytes32(0), CommitteeNotPublished());
+        return (
+            dkgPartyIds[e3Id],
+            dkgSkAggCommits[e3Id],
+            dkgEsmAggCommits[e3Id]
+        );
     }
 
     /// @notice Returns the current size of the ciphernode IMT
@@ -671,6 +752,27 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         require(availableTickets > 0, NodeNotEligible());
         require(ticketNumber <= availableTickets, InvalidTicketNumber());
+    }
+
+    /// @notice Sort `topNodes` by ascending address before committee finalization.
+    /// @dev Canonical address-ascending order so `CommitteeHashLib.hash(topNodes)`
+    ///      matches what off-chain aggregators independently compute over the same
+    ///      address set (Rust uses `BTreeSet<String>` which iterates lexicographically,
+    ///      equivalent to numeric address-ascending for hex-encoded addresses).
+    ///      This also defines `party_id` = position in the address-sorted committee.
+    /// @param c Committee storage reference
+    function _sortTopNodesByAscendingScore(Committee storage c) internal {
+        uint256 len = c.topNodes.length;
+        for (uint256 i = 0; i < len; ++i) {
+            for (uint256 j = i + 1; j < len; ++j) {
+                address left = c.topNodes[i];
+                address right = c.topNodes[j];
+                if (right < left) {
+                    c.topNodes[i] = right;
+                    c.topNodes[j] = left;
+                }
+            }
+        }
     }
 
     /// @notice Inserts a node into the top-N list - Smallest scores

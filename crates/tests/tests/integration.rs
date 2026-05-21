@@ -2144,6 +2144,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
             nodes: OrderedSet::from(eth_addrs.clone()),
             pk_commitment: actual_pk_commitment_1,
             dkg_aggregator_proof: None,
+            dkg_attestation_bundle: None,
         }
         .into()
     );
@@ -2185,6 +2186,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
             nodes: OrderedSet::from(eth_addrs.clone()),
             pk_commitment: actual_pk_commitment_2,
             dkg_aggregator_proof: None,
+            dkg_attestation_bundle: None,
         }
         .into()
     );

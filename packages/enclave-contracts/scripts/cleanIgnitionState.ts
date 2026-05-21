@@ -3,8 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import fs from "fs";
-import path from "path";
+import { cleanLocalDeployments } from "./utils";
 
 /**
  * Cleans deployment records for a specific network from deployed_contracts.json
@@ -12,26 +11,8 @@ import path from "path";
  * @param networkName - The network name (e.g., "localhost", "hardhat")
  */
 export const cleanDeploymentRecords = (networkName: string): void => {
-  const deploymentsFile = path.join(process.cwd(), "deployed_contracts.json");
-
-  if (!fs.existsSync(deploymentsFile)) {
-    return;
-  }
-
-  try {
-    const deployments = JSON.parse(fs.readFileSync(deploymentsFile, "utf8"));
-
-    if (deployments[networkName]) {
-      console.log(
-        `Cleaning deployment records for network '${networkName}'...`,
-      );
-      delete deployments[networkName];
-      fs.writeFileSync(deploymentsFile, JSON.stringify(deployments, null, 2));
-      console.log(`Cleaned deployment records for '${networkName}'`);
-    }
-  } catch (error) {
-    console.warn("Failed to clean deployment records:", error);
-  }
+  cleanLocalDeployments(networkName);
+  console.log(`Cleaned deployment records for local network '${networkName}'`);
 };
 
 /**

@@ -18,7 +18,14 @@ until curl -sf -X POST http://localhost:8545 -H 'Content-Type: application/json'
 done
 
 pnpm evm:clean
-pnpm evm:deploy --network localhost
+
+if [[ "${PROOF_AGGREGATION_ENABLED:-false}" == "true" ]]; then
+  ENABLE_ZK_VERIFICATION=true pnpm evm:deploy
+else
+  pnpm evm:deploy
+fi
+
+(cd "$ROOT_DIR/packages/enclave-contracts" && pnpm utils:sync-integration-config)
 
 enclave_wallet_set cn1 "$PRIVATE_KEY_CN1"
 enclave_wallet_set cn2 "$PRIVATE_KEY_CN2"
@@ -67,9 +74,9 @@ pnpm committee:new \
   --input-window-end "$INPUT_WINDOW_END" \
   --e3-params "$ENCODED_PARAMS" \
   --committee-size 0 \
-  --proof-aggregation-enabled false
+  --proof-aggregation-enabled "${PROOF_AGGREGATION_ENABLED:-false}"
 
-wait_for_committee_pubkey 0 "$SCRIPT_DIR/output/pubkey.bin"
+wait_for_committee_pubkey 0 "$SCRIPT_DIR/output/pubkey.bin" "${INTEGRATION_DKG_TIMEOUT:-1300}"
 
 ACTIVE_AGG_ADDRESS=$(wait_for_active_aggregator_address 0)
 if ! ACTIVE_AGG=$(node_name_for_address "$ACTIVE_AGG_ADDRESS"); then

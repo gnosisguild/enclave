@@ -70,6 +70,7 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         uint256,
         bytes calldata,
         bytes32,
+        bytes calldata,
         bytes calldata
     ) external pure {} // solhint-disable-line no-empty-blocks
 
@@ -81,6 +82,20 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 
     function getCommitteeHash(uint256 e3Id) external view returns (bytes32) {
         return keccak256(abi.encodePacked(_committeeNodes[e3Id]));
+    }
+
+    function getDkgAnchors(
+        uint256
+    )
+        external
+        pure
+        returns (
+            uint256[] memory partyIds,
+            bytes32[] memory skAggCommits,
+            bytes32[] memory esmAggCommits
+        )
+    {
+        return (partyIds, skAggCommits, esmAggCommits);
     }
 
     function root() external pure returns (uint256) {
@@ -214,6 +229,7 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         uint256,
         bytes calldata,
         bytes32,
+        bytes calldata,
         bytes calldata
     ) external pure {} // solhint-disable-line no-empty-blocks
 
@@ -226,6 +242,20 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
 
     function getCommitteeHash(uint256) external pure returns (bytes32) {
         return bytes32(0);
+    }
+
+    function getDkgAnchors(
+        uint256
+    )
+        external
+        pure
+        returns (
+            uint256[] memory partyIds,
+            bytes32[] memory skAggCommits,
+            bytes32[] memory esmAggCommits
+        )
+    {
+        return (partyIds, skAggCommits, esmAggCommits);
     }
 
     function root() external pure returns (uint256) {

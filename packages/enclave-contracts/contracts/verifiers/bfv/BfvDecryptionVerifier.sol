@@ -24,6 +24,16 @@ import { CommitteeHashLib } from "../../lib/CommitteeHashLib.sol";
  *      indices 2 and 3; total public-input length is preset-dependent.
  */
 contract BfvDecryptionVerifier is IDecryptionVerifier {
+    /// @dev Debug-mode errors that pinpoint which check in `verify` failed.
+    /// These replace the previous silent `return false` so callers (e.g. Enclave's
+    /// `require(verify(...), InvalidDecryptionProof())`) surface the specific failure.
+    error BadPublicInputsLen(uint256 actual, uint256 expected);
+    error BadC6FoldKeyHash(bytes32 actual, bytes32 expected);
+    error BadC7KeyHash(bytes32 actual, bytes32 expected);
+    error BadCommitteeHashHi(bytes32 actual, bytes32 expected);
+    error BadCommitteeHashLo(bytes32 actual, bytes32 expected);
+    error BadPlaintextHash(bytes32 actual, bytes32 expected);
+
     /// @dev Message is always the last 100 public inputs (100 uint64 coeffs = 800 bytes plaintext).
     uint256 internal constant MESSAGE_COEFFS_COUNT = 100;
 
@@ -97,36 +107,41 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
         );
 
         if (publicInputs.length != expectedPublicInputsLen) {
-            return false;
+            revert BadPublicInputsLen(
+                publicInputs.length,
+                expectedPublicInputsLen
+            );
         }
         if (publicInputs[0] != expectedC6FoldKeyHash) {
-            return false;
+            revert BadC6FoldKeyHash(publicInputs[0], expectedC6FoldKeyHash);
         }
         if (publicInputs[1] != expectedC7KeyHash) {
-            return false;
+            revert BadC7KeyHash(publicInputs[1], expectedC7KeyHash);
         }
-        if (
-            publicInputs[COMMITTEE_HASH_HI_IDX] !=
-            CommitteeHashLib.hi(committeeHash)
-        ) {
-            return false;
+        bytes32 expectedHi = CommitteeHashLib.hi(committeeHash);
+        if (publicInputs[COMMITTEE_HASH_HI_IDX] != expectedHi) {
+            revert BadCommitteeHashHi(
+                publicInputs[COMMITTEE_HASH_HI_IDX],
+                expectedHi
+            );
         }
-        if (
-            publicInputs[COMMITTEE_HASH_LO_IDX] !=
-            CommitteeHashLib.lo(committeeHash)
-        ) {
-            return false;
+        bytes32 expectedLo = CommitteeHashLib.lo(committeeHash);
+        if (publicInputs[COMMITTEE_HASH_LO_IDX] != expectedLo) {
+            revert BadCommitteeHashLo(
+                publicInputs[COMMITTEE_HASH_LO_IDX],
+                expectedLo
+            );
         }
-        if (!_verifyPlaintextHash(publicInputs, plaintextOutputHash)) {
-            return false;
+        bytes32 actualPlaintextHash = _computePlaintextHash(publicInputs);
+        if (actualPlaintextHash != plaintextOutputHash) {
+            revert BadPlaintextHash(actualPlaintextHash, plaintextOutputHash);
         }
         return circuitVerifier.verify(rawProof, publicInputs);
     }
 
-    function _verifyPlaintextHash(
-        bytes32[] memory publicInputs,
-        bytes32 plaintextOutputHash
-    ) internal view returns (bool) {
+    function _computePlaintextHash(
+        bytes32[] memory publicInputs
+    ) internal view returns (bytes32) {
         uint256 offset = expectedPublicInputsLen - MESSAGE_COEFFS_COUNT;
         bytes memory plaintext = new bytes(MESSAGE_COEFFS_COUNT * 8);
         for (uint256 i = 0; i < MESSAGE_COEFFS_COUNT; i++) {
@@ -135,6 +150,6 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
                 plaintext[i * 8 + j] = bytes1(uint8(coeff >> (j * 8)));
             }
         }
-        return keccak256(plaintext) == plaintextOutputHash;
+        return keccak256(plaintext);
     }
 }

@@ -6,6 +6,7 @@
 
 mod bonding_registry_sol;
 mod ciphernode_registry_sol;
+mod dkg_attestation_bundle;
 mod enclave_sol_reader;
 mod enclave_sol_writer;
 pub mod error_decoder;
@@ -27,6 +28,7 @@ pub use bonding_registry_sol::BondingRegistrySolReader;
 pub use ciphernode_registry_sol::{
     CiphernodeRegistrySol, CiphernodeRegistrySolReader, CiphernodeRegistrySolWriter,
 };
+pub use dkg_attestation_bundle::encode_dkg_attestation_bundle;
 pub use enclave_sol_reader::EnclaveSolReader;
 pub use enclave_sol_writer::EnclaveSolWriter;
 pub use events::*;

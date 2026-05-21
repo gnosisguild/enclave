@@ -69,6 +69,10 @@ describe("Enclave", function () {
   const data = "0xda7a";
   const proof = "0x1337";
 
+  const DKG_FOLD_ATTESTATION_TYPEHASH = ethers.id(
+    "DkgFoldAttestation(uint256 chainId,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)",
+  );
+
   /** ABI-encoded fake DKG proof for `MockPkVerifier` (last public input must equal `pkCommitment`). */
   const encodeMockDkgProof = (pkCommitment: string): string =>
     ethers.AbiCoder.defaultAbiCoder().encode(
@@ -76,12 +80,122 @@ describe("Enclave", function () {
       ["0x", [pkCommitment]],
     );
 
+  /** Public inputs layout for `DkgFoldAttestationVerifier` with `h` honest parties. */
+  const encodeMockDkgProofForAttestation = (
+    pkCommitment: string,
+    partyIds: number[],
+    skCommits: string[],
+    esmCommits: string[],
+  ): string => {
+    const h = partyIds.length;
+    const publicInputs: string[] = Array.from(
+      { length: 6 + 3 * h },
+      () => ethers.ZeroHash,
+    );
+    publicInputs[publicInputs.length - 1] = pkCommitment;
+    for (let i = 0; i < h; i++) {
+      publicInputs[2 + i] = ethers.zeroPadValue(
+        ethers.toBeHex(partyIds[i]),
+        32,
+      );
+      publicInputs[5 + h + i] = skCommits[i];
+      publicInputs[5 + 2 * h + i] = esmCommits[i];
+    }
+    return ethers.AbiCoder.defaultAbiCoder().encode(
+      ["bytes", "bytes32[]"],
+      ["0x", publicInputs],
+    );
+  };
+
+  const signFoldAttestation = async (
+    signer: Signer,
+    chainId: bigint,
+    e3Id: number,
+    partyId: number,
+    skAggCommit: string,
+    esmAggCommit: string,
+  ): Promise<string> => {
+    const digest = ethers.keccak256(
+      ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "uint256", "uint256", "uint256", "bytes32", "bytes32"],
+        [
+          DKG_FOLD_ATTESTATION_TYPEHASH,
+          chainId,
+          e3Id,
+          partyId,
+          skAggCommit,
+          esmAggCommit,
+        ],
+      ),
+    );
+    return signer.signMessage(ethers.getBytes(digest));
+  };
+
+  /** Proof + attestation bundle for `publishCommittee` when proof aggregation is enabled. */
+  const buildMockAggregationPublishArgs = async (
+    operators: Signer[],
+    e3Id: number,
+    publicKey: string,
+  ): Promise<{ proof: string; bundle: string }> => {
+    const pkCommitment = ethers.keccak256(publicKey);
+    const h = operators.length;
+    const partyIds = Array.from({ length: h }, (_, i) => i);
+    const skCommits = partyIds.map((i) => ethers.id(`sk-${e3Id}-${i}`));
+    const esmCommits = partyIds.map((i) => ethers.id(`esm-${e3Id}-${i}`));
+    const proof = encodeMockDkgProofForAttestation(
+      pkCommitment,
+      partyIds,
+      skCommits,
+      esmCommits,
+    );
+
+    const { chainId } = await ethers.provider.getNetwork();
+    const attestations: {
+      partyId: number;
+      skAggCommit: string;
+      esmAggCommit: string;
+      signature: string;
+    }[] = [];
+    const bindings: { partyId: number; node: string }[] = [];
+
+    for (let i = 0; i < h; i++) {
+      const operator = operators[i]!;
+      const node = await operator.getAddress();
+      const partyId = partyIds[i]!;
+      attestations.push({
+        partyId,
+        skAggCommit: skCommits[i]!,
+        esmAggCommit: esmCommits[i]!,
+        signature: await signFoldAttestation(
+          operator,
+          chainId,
+          e3Id,
+          partyId,
+          skCommits[i]!,
+          esmCommits[i]!,
+        ),
+      });
+      bindings.push({ partyId, node });
+    }
+
+    const bundle = ethers.AbiCoder.defaultAbiCoder().encode(
+      [
+        "tuple(uint256 partyId, bytes32 skAggCommit, bytes32 esmAggCommit, bytes signature)[]",
+        "tuple(uint256 partyId, address node)[]",
+      ],
+      [attestations, bindings],
+    );
+
+    return { proof, bundle };
+  };
+
   const setupAndPublishCommittee = async (
     registry: any,
     e3Id: number,
     publicKey: string,
     operators: Signer[],
     committeeProof: string = "0x",
+    attestationBundle: string = "0x",
   ): Promise<void> => {
     for (const operator of operators) {
       await registry.connect(operator).submitTicket(e3Id, 1);
@@ -94,6 +208,7 @@ describe("Enclave", function () {
       publicKey,
       pkCommitment,
       committeeProof,
+      attestationBundle,
     );
   };
 
@@ -262,6 +377,13 @@ describe("Enclave", function () {
     await enclave.setPkVerifier(
       encryptionSchemeId,
       await mockPkVerifier.getAddress(),
+    );
+
+    const dkgFoldAttestationVerifier = await ethers.deployContract(
+      "DkgFoldAttestationVerifier",
+    );
+    await ciphernodeRegistryContract.setDkgFoldAttestationVerifier(
+      await dkgFoldAttestationVerifier.getAddress(),
     );
 
     // ── Operators ─────────────────────────────────────────────────────────────
@@ -1062,13 +1184,19 @@ describe("Enclave", function () {
         proofAggregationEnabled: true,
       });
 
-      const pkCommitment = ethers.keccak256(data);
+      const operators = [operator1, operator2, operator3];
+      const { proof, bundle } = await buildMockAggregationPublishArgs(
+        operators,
+        e3Id,
+        data,
+      );
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
         data,
-        [operator1, operator2, operator3],
-        encodeMockDkgProof(pkCommitment),
+        operators,
+        proof,
+        bundle,
       );
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);

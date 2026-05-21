@@ -7,7 +7,7 @@ import hre from "hardhat";
 
 import { upgradeAndSaveCiphernodeRegistryOwnable } from "../deployAndSave/ciphernodeRegistryOwnable";
 import { deployAndSavePoseidonT3 } from "../deployAndSave/poseidonT3";
-import { readDeploymentArgs } from "../utils";
+import { getDeploymentChain, readDeploymentArgs } from "../utils";
 
 /**
  * Upgrades the CiphernodeRegistryOwnable contract implementation and saves the deployment arguments
@@ -17,7 +17,7 @@ export const upgradeCiphernodeRegistryOwnable = async () => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const signerAddress = await signer.getAddress();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = getDeploymentChain(hre);
   console.log("Signer:", signerAddress);
 
   const poseidonT3 = await deployAndSavePoseidonT3({ hre });

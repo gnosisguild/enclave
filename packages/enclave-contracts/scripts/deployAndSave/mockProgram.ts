@@ -9,7 +9,7 @@ import {
   MockE3Program,
   MockE3Program__factory as MockE3ProgramFactory,
 } from "../../types";
-import { storeDeploymentArgs } from "../utils";
+import { getDeploymentChain, storeDeploymentArgs } from "../utils";
 
 interface MockProgramArgs {
   hre: HardhatRuntimeEnvironment;
@@ -22,7 +22,7 @@ export const deployAndSaveMockProgram = async ({
 }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = getDeploymentChain(hre);
 
   const e3ProgramFactory = await ethers.getContractFactory("MockE3Program");
   const e3Program = await e3ProgramFactory.deploy();

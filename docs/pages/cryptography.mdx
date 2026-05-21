@@ -196,9 +196,6 @@ keep different commitment kinds from being confused with one another.
 
 ### Proof aggregation
 
-> **Note:** this section describes a proposed design that has not been implemented yet. It is
-> included here as the target architecture for proof aggregation and on-chain verification.
-
 Individual circuit proofs cover each step in isolation, but the protocol must land them on-chain as
 a compact, verifiable package. A naive fold of all proofs into one recursive aggregate produces an
 opaque commitment that the contract cannot interpret without the original public inputs, and if
@@ -209,20 +206,58 @@ expected commitments match
 outputs) is only checked off-chain, end-to-end correctness still depends on trusting the committee
 network rather than on verifiable mathematics.
 
-The aggregation design addresses both problems. Only **two recursive proofs** are posted on-chain
-per E3 session:
+The aggregation design addresses both problems. When an E3 is requested with
+`proofAggregationEnabled = true`, only **two recursive proofs** are posted on-chain per E3 session:
 
-1. **DKG recursive proof**: the aggregator recursively verifies every node's C0-C4 fold chain
-   together with **C5**, which aggregates the public key.
+1. **DKG recursive proof**: the aggregator recursively verifies every node's C0–C4 fold chain
+   together with **C5**, which aggregates the public key. Verified on-chain by
+   [`BfvPkVerifier`](https://github.com/gnosisguild/enclave/blob/main/packages/enclave-contracts/contracts/verifiers/bfv/BfvPkVerifier.sol)
+   at `publishCommittee`.
 2. **Decryption recursive proof**: the aggregator recursively verifies **C6** proofs from at least
-   **T+1** parties together with **C7**, which reconstructs the plaintext.
+   **T+1** parties together with **C7**, which reconstructs the plaintext. Verified on-chain by
+   [`BfvDecryptionVerifier`](https://github.com/gnosisguild/enclave/blob/main/packages/enclave-contracts/contracts/verifiers/bfv/BfvDecryptionVerifier.sol)
+   at `publishPlaintextOutput`.
 
-Nodes do not post proofs on-chain. Each node folds its own C0-C4 chain, **signs** the fold output,
-and relays it to the aggregator via P2P gossip. The recursive proof verifies each signature inside
-ZK, so the aggregator cannot substitute or fabricate any node's contribution without the proof
-failing. During registration the contract stores the submitting address for each `party_id`;
-verification recovers the signer via `ecrecover` and checks it matches, binding each fold output to
-its creator.
+Individual nodes do not post their inner proofs on-chain. Each node folds its own C0–C4 chain into a
+`NodeDkgFold` proof, **signs** the surfaced commitments, and relays the signed fold output to the
+aggregator via P2P gossip. The aggregator then assembles the recursive DKG proof from all honest
+nodes' fold outputs and submits it together with a **fold-attestation bundle**.
+
+#### Per-node attestations and topNodes binding
+
+The fold-attestation bundle is the on-chain link from "this aggregated proof was produced by the
+right operators" to "this specific signature came from the registered operator for `partyId = i`".
+At `publishCommittee` the registry has already finalised `topNodes` (the address-sorted committee;
+party 0 = lowest address, party 1 = next, ...), so the on-chain canonical mapping from a `partyId`
+to an operator address is `topNodes[partyId]`.
+
+Each node's fold attestation signs an EIP-712-style digest over
+`(chainId, e3Id, partyId, skAggCommit, esmAggCommit)` with the operator's registered key. The
+on-chain
+[`DkgFoldAttestationVerifier`](https://github.com/gnosisguild/enclave/blob/main/packages/enclave-contracts/contracts/verifiers/DkgFoldAttestationVerifier.sol)
+then enforces three properties per attestation:
+
+1. **Signer = registered operator**: `ecrecover` over the signed digest must equal the `node`
+   address bound to that `partyId` in the bundle, and that address must be an active committee
+   member for this E3 (`isCommitteeMemberActive(e3Id, node)`).
+2. **Commitments match the DKG proof**: the signed `skAggCommit` and `esmAggCommit` must equal the
+   `partyId`'s slot in the DKG aggregator proof's public inputs.
+3. **Honest-set cardinality**: the bundle must contain exactly one attestation per honest party in
+   the proof, with `partyId` strictly ascending (no duplicates, no partial subsets).
+
+This closes the per-operator attribution gap: the aggregator cannot present a valid DKG proof
+without also producing one signed attestation per honest party, each bound to the operator
+registered at the corresponding `topNodes` slot. The recovered `partyIds`, `skAggCommits`, and
+`esmAggCommits` are persisted as on-chain anchors (`dkgPartyIds`, `dkgSkAggCommits`,
+`dkgEsmAggCommits`) so future decryption proofs can be checked against them.
+
+#### Committee hash binding
+
+The DKG proof's public inputs include a `committee_hash` split into 128-bit hi/lo limbs.
+`CommitteeHashLib.hash` computes this as `keccak256` over the raw 20-byte addresses of `topNodes`
+concatenated in address-ascending order (the same canonical order the off-chain Rust side uses, so
+the hashes match byte-for-byte). This binds the proof to the exact committee finalised on-chain — no
+other permutation of those addresses, and no other set of addresses, would produce a matching hash.
 
 #### Surfaced anchor values
 

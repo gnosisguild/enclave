@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { getBytes, hexlify, zeroPadValue } from "ethers";
 import fs from "fs";
+import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 import { fileURLToPath } from "node:url";
 import path from "path";
 
@@ -22,6 +23,34 @@ export function committeeHashFromLimbs(hi: string, lo: string): string {
 }
 
 export const deploymentsFile = path.join("deployed_contracts.json");
+
+/** Hardhat network names used for local development. */
+export const LOCAL_DEPLOYMENT_NETWORKS = [
+  "localhost",
+  "hardhat",
+  "anvil",
+  "ganache",
+] as const;
+
+/**
+ * Legacy deployment bucket keys written when scripts used `provider.getNetwork().name`
+ * (ethers reports "default" / "undefined" on local chains). Cleared with local deploys.
+ */
+export const LEGACY_LOCAL_DEPLOYMENT_ALIASES = [
+  "default",
+  "undefined",
+] as const;
+
+/**
+ * Chain key for `deployed_contracts.json`. Use Hardhat's network name, not the provider's
+ * `network.name` (which is often `"default"` on localhost and does not match clean/deploy).
+ */
+export const getDeploymentChain = (hre: HardhatRuntimeEnvironment): string =>
+  hre.globalOptions.network ?? "localhost";
+
+export const isLocalDeploymentChain = (chain: string): boolean =>
+  (LOCAL_DEPLOYMENT_NETWORKS as readonly string[]).includes(chain) ||
+  (LEGACY_LOCAL_DEPLOYMENT_ALIASES as readonly string[]).includes(chain);
 
 /** Monorepo root (`enclave/`), resolved from `packages/enclave-contracts/scripts/`. */
 export const REPO_ROOT = path.resolve(
@@ -307,6 +336,41 @@ export const cleanDeployments = (network: string): void => {
     delete deployments[network];
   }
   fs.writeFileSync(deploymentsFile, JSON.stringify(deployments, null, 2));
+};
+
+/**
+ * Remove deployment records for a local Hardhat network and legacy provider-name buckets.
+ */
+export const cleanLocalDeployments = (network: string): void => {
+  const isLocalNetwork =
+    (LOCAL_DEPLOYMENT_NETWORKS as readonly string[]).includes(network) ||
+    (LEGACY_LOCAL_DEPLOYMENT_ALIASES as readonly string[]).includes(network);
+
+  const targets = new Set<string>([network]);
+  if (isLocalNetwork) {
+    for (const name of LOCAL_DEPLOYMENT_NETWORKS) {
+      targets.add(name);
+    }
+    for (const alias of LEGACY_LOCAL_DEPLOYMENT_ALIASES) {
+      targets.add(alias);
+    }
+  }
+
+  if (!fs.existsSync(deploymentsFile)) {
+    return;
+  }
+
+  const deployments = readAllDeployments();
+  let changed = false;
+  for (const key of targets) {
+    if (deployments[key]) {
+      delete deployments[key];
+      changed = true;
+    }
+  }
+  if (changed) {
+    fs.writeFileSync(deploymentsFile, JSON.stringify(deployments, null, 2));
+  }
 };
 
 /**

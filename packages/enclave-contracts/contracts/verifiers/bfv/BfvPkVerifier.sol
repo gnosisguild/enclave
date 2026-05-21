@@ -21,6 +21,17 @@ import { CommitteeHashLib } from "../../lib/CommitteeHashLib.sol";
  *      compiled DkgAggregator honest-set size (`lib::configs::default::H`).
  */
 contract BfvPkVerifier is IPkVerifier {
+    /// @dev Debug-mode errors that pinpoint which check in `verify` failed.
+    /// These replace the previous silent `return false` so callers (e.g. the
+    /// registry's `require(verify(...), InvalidDkgProof())`) surface the
+    /// specific failure selector instead of the generic `InvalidDkgProof`.
+    error BadPublicInputsLen(uint256 actual, uint256 expected);
+    error BadNodesFoldKeyHash(bytes32 actual, bytes32 expected);
+    error BadC5KeyHash(bytes32 actual, bytes32 expected);
+    error BadCommitteeHashHi(bytes32 actual, bytes32 expected);
+    error BadCommitteeHashLo(bytes32 actual, bytes32 expected);
+    error BadPkCommitment(bytes32 actual, bytes32 expected);
+
     /// @dev `dkg_aggregator` return field count: `1 + H + H + 1` (key hash + two `H` arrays + pk commitment).
     uint256 internal constant DKG_RETURN_TAIL_LEN = 2;
 
@@ -78,28 +89,36 @@ contract BfvPkVerifier is IPkVerifier {
         );
 
         if (publicInputs.length != expectedPublicInputsLen) {
-            return false;
+            revert BadPublicInputsLen(
+                publicInputs.length,
+                expectedPublicInputsLen
+            );
         }
         if (publicInputs[0] != expectedNodesFoldKeyHash) {
-            return false;
+            revert BadNodesFoldKeyHash(
+                publicInputs[0],
+                expectedNodesFoldKeyHash
+            );
         }
         if (publicInputs[1] != expectedC5KeyHash) {
-            return false;
+            revert BadC5KeyHash(publicInputs[1], expectedC5KeyHash);
         }
-        if (
-            publicInputs[committeeHashHiIdx] !=
-            CommitteeHashLib.hi(committeeHash)
-        ) {
-            return false;
+        bytes32 expectedHi = CommitteeHashLib.hi(committeeHash);
+        if (publicInputs[committeeHashHiIdx] != expectedHi) {
+            revert BadCommitteeHashHi(
+                publicInputs[committeeHashHiIdx],
+                expectedHi
+            );
         }
-        if (
-            publicInputs[committeeHashLoIdx] !=
-            CommitteeHashLib.lo(committeeHash)
-        ) {
-            return false;
+        bytes32 expectedLo = CommitteeHashLib.lo(committeeHash);
+        if (publicInputs[committeeHashLoIdx] != expectedLo) {
+            revert BadCommitteeHashLo(
+                publicInputs[committeeHashLoIdx],
+                expectedLo
+            );
         }
         if (publicInputs[pkCommitmentIdx] != pkCommitment) {
-            return false;
+            revert BadPkCommitment(publicInputs[pkCommitmentIdx], pkCommitment);
         }
         return circuitVerifier.verify(rawProof, publicInputs);
     }

@@ -6,7 +6,7 @@
 import hre from "hardhat";
 
 import { upgradeAndSaveEnclave } from "../deployAndSave/enclave";
-import { readDeploymentArgs } from "../utils";
+import { getDeploymentChain, readDeploymentArgs } from "../utils";
 
 /**
  * Upgrades the Enclave contract implementation and saves the deployment arguments
@@ -16,7 +16,7 @@ export const upgradeEnclave = async () => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const signerAddress = await signer.getAddress();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = getDeploymentChain(hre);
   console.log("Signer:", signerAddress);
 
   const preDeployedArgs = readDeploymentArgs("Enclave", chain);

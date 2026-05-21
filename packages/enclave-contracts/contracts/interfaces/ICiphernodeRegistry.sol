@@ -220,6 +220,21 @@ interface ICiphernodeRegistry {
     /// @notice Supplied DKG aggregator proof failed verification
     error InvalidDkgProof();
 
+    /// @notice Proof aggregation enabled but no fold attestation bundle was supplied
+    error FoldAttestationsRequired();
+
+    /// @notice `dkgFoldAttestationVerifier` is not configured on the registry
+    error FoldAttestationVerifierNotSet();
+
+    /// @notice Fold attestation bundle failed signature or public-input binding checks
+    error InvalidFoldAttestation();
+
+    /// @notice `partyId` from an attestation does not appear in the DKG proof public inputs
+    error PartyIdNotInProof();
+
+    /// @notice Attestation count does not match bindings or proof honest-set size
+    error AttestationBindingCountMismatch();
+
     /// @notice Node has already submitted a ticket for this E3
     error NodeAlreadySubmitted();
 
@@ -319,12 +334,32 @@ interface ICiphernodeRegistry {
     /// @param pkCommitment Hash-based aggregated PK commitment for the committee.
     /// @param proof DkgAggregator (EVM) proof ABI-encoded `(bytes rawProof, bytes32[] publicInputs)`,
     ///              or empty bytes when proof aggregation is disabled.
+    /// @param dkgAttestationBundle ABI-encoded
+    ///        `(DkgFoldAttestationLib.Attestation[] attestations, DkgFoldAttestationLib.PartySlotBinding[] bindings)`.
+    ///        Required (non-empty) when proof aggregation is enabled; ignored otherwise.
     function publishCommittee(
         uint256 e3Id,
         bytes calldata publicKey,
         bytes32 pkCommitment,
-        bytes calldata proof
+        bytes calldata proof,
+        bytes calldata dkgAttestationBundle
     ) external;
+
+    /// @notice Returns DKG anchor commitments stored at publication (empty if not yet published).
+    /// @param e3Id ID of the E3
+    /// @return partyIds Honest party ids (same order as stored sk/esm arrays)
+    /// @return skAggCommits Per-party secret-key aggregate commitments from NodeFold
+    /// @return esmAggCommits Per-party smudging-noise aggregate commitments from NodeFold
+    function getDkgAnchors(
+        uint256 e3Id
+    )
+        external
+        view
+        returns (
+            uint256[] memory partyIds,
+            bytes32[] memory skAggCommits,
+            bytes32[] memory esmAggCommits
+        );
 
     /// @notice This function should be called by the Enclave contract to get the public key of a committee.
     /// @dev This function MUST revert if no committee has been requested for the given E3.

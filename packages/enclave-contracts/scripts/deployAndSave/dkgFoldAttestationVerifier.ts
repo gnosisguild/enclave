@@ -1,0 +1,49 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
+
+import type { DkgFoldAttestationVerifier } from "../../types";
+import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+
+export const deployAndSaveDkgFoldAttestationVerifier = async (
+  hre: HardhatRuntimeEnvironment,
+): Promise<{
+  dkgFoldAttestationVerifier: DkgFoldAttestationVerifier;
+}> => {
+  const { ethers, networkName } = await hre.network.connect();
+  const chain = networkName ?? "localhost";
+
+  const existing = readDeploymentArgs("DkgFoldAttestationVerifier", chain);
+  if (existing?.address) {
+    console.log(
+      `   DkgFoldAttestationVerifier already deployed at ${existing.address}`,
+    );
+    const dkgFoldAttestationVerifier = (await ethers.getContractAt(
+      "DkgFoldAttestationVerifier",
+      existing.address,
+    )) as DkgFoldAttestationVerifier;
+    return { dkgFoldAttestationVerifier };
+  }
+
+  const dkgFoldAttestationVerifier = await ethers.deployContract(
+    "DkgFoldAttestationVerifier",
+  );
+  await dkgFoldAttestationVerifier.waitForDeployment();
+  const address = await dkgFoldAttestationVerifier.getAddress();
+  const blockNumber = await ethers.provider.getBlockNumber();
+
+  storeDeploymentArgs(
+    { address, blockNumber },
+    "DkgFoldAttestationVerifier",
+    chain,
+  );
+  console.log(`   DkgFoldAttestationVerifier deployed to: ${address}`);
+
+  return {
+    dkgFoldAttestationVerifier:
+      dkgFoldAttestationVerifier as DkgFoldAttestationVerifier,
+  };
+};

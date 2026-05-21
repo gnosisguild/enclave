@@ -491,6 +491,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
         let pubkey = msg.pubkey.clone();
         let pk_commitment = msg.pk_commitment;
         let dkg_aggregator_proof = msg.dkg_aggregator_proof.clone();
+        let dkg_attestation_bundle = msg.dkg_attestation_bundle.clone();
         let contract_address = self.contract_address;
         let provider = self.provider.clone();
         let bus = self.bus.clone();
@@ -519,6 +520,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                 pubkey,
                 pk_commitment,
                 dkg_aggregator_proof.as_ref(),
+                dkg_attestation_bundle.as_ref().map(|b| b.as_ref()),
             )
             .await;
             match result {
@@ -671,6 +673,7 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
     public_key: ArcBytes,
     pk_commitment: [u8; 32],
     dkg_aggregator_proof: Option<&Proof>,
+    dkg_attestation_bundle: Option<&[u8]>,
 ) -> Result<TransactionReceipt> {
     let e3_id_u256: U256 = e3_id.try_into()?;
     let public_key_bytes = Bytes::from(public_key.extract_bytes());
@@ -682,12 +685,17 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
         Some(p) => encode_zk_proof(p)?,
         None => Bytes::new(),
     };
+    let attestation_bundle: Bytes = match dkg_attestation_bundle {
+        Some(b) => Bytes::copy_from_slice(b),
+        None => Bytes::new(),
+    };
 
     // RPC may not have synced finalization yet
     send_tx_with_retry("publishCommittee", &["CommitteeNotFinalized"], || {
         let provider = provider.clone();
         let public_key_bytes = public_key_bytes.clone();
         let proof = proof.clone();
+        let attestation_bundle = attestation_bundle.clone();
         async move {
             info!("Calling: contract.publishCommittee(..)");
             let from_address = provider.provider().default_signer_address();
@@ -698,7 +706,13 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
                 .await?;
             let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
             let builder = contract
-                .publishCommittee(e3_id_u256, public_key_bytes, pk_commitment_b256, proof)
+                .publishCommittee(
+                    e3_id_u256,
+                    public_key_bytes,
+                    pk_commitment_b256,
+                    proof,
+                    attestation_bundle,
+                )
                 .nonce(current_nonce);
             let receipt = builder.send().await?.get_receipt().await?;
             Ok(receipt)

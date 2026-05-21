@@ -11,6 +11,7 @@ import { deployAndSaveBfvDecryptionVerifier } from "./deployAndSave/bfvDecryptio
 import { deployAndSaveBfvPkVerifier } from "./deployAndSave/bfvPkVerifier";
 import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
+import { deployAndSaveDkgFoldAttestationVerifier } from "./deployAndSave/dkgFoldAttestationVerifier";
 import { deployAndSaveE3RefundManager } from "./deployAndSave/e3RefundManager";
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";
 import { deployAndSaveEnclaveTicketToken } from "./deployAndSave/enclaveTicketToken";
@@ -127,6 +128,14 @@ export const deployEnclave = async (
   });
   const enclaveTokenAddress = await enclaveToken.getAddress();
   console.log("EnclaveToken deployed to:", enclaveTokenAddress);
+
+  if (enclaveTokenAddress.toLowerCase() === feeTokenAddress.toLowerCase()) {
+    throw new Error(
+      "MockUSDC and EnclaveToken resolved to the same address. " +
+        "Start a fresh Anvil on http://127.0.0.1:8545 (e.g. `anvil --chain-id 31337`) " +
+        "and rerun deploy so token nonces advance separately.",
+    );
+  }
 
   console.log("Deploying EnclaveTicketToken...");
   const { enclaveTicketToken } = await deployAndSaveEnclaveTicketToken({
@@ -390,6 +399,26 @@ export const deployEnclave = async (
     }
   }
 
+  let dkgFoldAttestationVerifierAddress: string | undefined;
+  if (shouldHaveZKVerification) {
+    console.log("Deploying DkgFoldAttestationVerifier...");
+    const { dkgFoldAttestationVerifier } =
+      await deployAndSaveDkgFoldAttestationVerifier(hre);
+    dkgFoldAttestationVerifierAddress =
+      await dkgFoldAttestationVerifier.getAddress();
+    const currentVerifier =
+      await ciphernodeRegistry.dkgFoldAttestationVerifier();
+    if (currentVerifier !== dkgFoldAttestationVerifierAddress) {
+      const tx = await ciphernodeRegistry.setDkgFoldAttestationVerifier(
+        dkgFoldAttestationVerifierAddress,
+      );
+      await tx.wait();
+      console.log(
+        "Successfully set DkgFoldAttestationVerifier on CiphernodeRegistry",
+      );
+    }
+  }
+
   const verifierLines =
     verifierEntries.length > 0
       ? verifierEntries.map(([name, addr]) => `    ${name}: ${addr}`).join("\n")
@@ -415,6 +444,7 @@ export const deployEnclave = async (
     PkVerifier (BFV): ${pkVerifierAddress}
     Circuit Verifiers:
 ${verifierLines}
+    DkgFoldAttestationVerifier: ${dkgFoldAttestationVerifierAddress ?? "(not deployed)"}
     ============================================
   `);
 };

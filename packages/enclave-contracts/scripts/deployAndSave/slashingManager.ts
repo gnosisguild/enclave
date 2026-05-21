@@ -9,7 +9,11 @@ import {
   SlashingManager,
   SlashingManager__factory as SlashingManagerFactory,
 } from "../../types";
-import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+import {
+  getDeploymentChain,
+  readDeploymentArgs,
+  storeDeploymentArgs,
+} from "../utils";
 
 /**
  * The arguments for the deployAndSaveSlashingManager function
@@ -32,7 +36,7 @@ export const deployAndSaveSlashingManager = async ({
 }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = getDeploymentChain(hre);
 
   const preDeployedArgs = readDeploymentArgs("SlashingManager", chain);
 

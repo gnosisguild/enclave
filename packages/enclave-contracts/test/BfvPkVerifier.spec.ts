@@ -71,7 +71,7 @@ describe("BfvPkVerifier", function () {
     return { bfvPkVerifier: pk, mockCircuit: mc };
   };
 
-  describe("reverts / false", function () {
+  describe("reverts", function () {
     it("reverts on invalid proof encoding", async function () {
       const { bfvPkVerifier } = await loadFixture(deployWithMockCircuit);
       const pkCommitment = ethers.keccak256("0x1234");
@@ -86,33 +86,35 @@ describe("BfvPkVerifier", function () {
       ).to.be.revert(ethers);
     });
 
-    it("returns false when publicInputs is empty", async function () {
+    it("reverts with BadPublicInputsLen when publicInputs is empty", async function () {
       const { bfvPkVerifier } = await loadFixture(deployWithMockCircuit);
       const pkCommitment = ethers.keccak256("0x1234");
       const proof = encodeProof("0x01", []);
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        ethers.ZeroHash,
-        proof,
-      );
-      expect(result).to.equal(false);
+      await expect(
+        bfvPkVerifier.verify.staticCall(
+          pkCommitment,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(bfvPkVerifier, "BadPublicInputsLen");
     });
 
-    it("returns false when publicInputs has only one entry", async function () {
+    it("reverts with BadPublicInputsLen when publicInputs has only one entry", async function () {
       const { bfvPkVerifier } = await loadFixture(deployWithMockCircuit);
       const pkCommitment = ethers.keccak256("0xabcd");
       const proof = encodeProof("0x01", [pkCommitment]);
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        ethers.ZeroHash,
-        proof,
-      );
-      expect(result).to.equal(false);
+      await expect(
+        bfvPkVerifier.verify.staticCall(
+          pkCommitment,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(bfvPkVerifier, "BadPublicInputsLen");
     });
 
-    it("returns false when publicInputs has trailing elements past expected length", async function () {
+    it("reverts with BadPublicInputsLen when publicInputs has trailing elements past expected length", async function () {
       const { bfvPkVerifier } = await loadFixture(deployWithMockCircuit);
       const pkCommitment = ethers.keccak256("0xabcd");
       const proof = encodeProof("0x01", [
@@ -120,15 +122,16 @@ describe("BfvPkVerifier", function () {
         ethers.ZeroHash,
       ]);
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        ethers.ZeroHash,
-        proof,
-      );
-      expect(result).to.equal(false);
+      await expect(
+        bfvPkVerifier.verify.staticCall(
+          pkCommitment,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(bfvPkVerifier, "BadPublicInputsLen");
     });
 
-    it("returns false when publicInputs has only pub params (length 7, no return fields)", async function () {
+    it("reverts with BadPublicInputsLen when publicInputs has only pub params (no return fields)", async function () {
       const { bfvPkVerifier } = await loadFixture(deployWithMockCircuit);
       const pkCommitment = ethers.keccak256("0xabcd");
       const [hi, lo] = committeeHashLimbs(ethers.ZeroHash);
@@ -141,15 +144,16 @@ describe("BfvPkVerifier", function () {
         pkCommitment,
       ]);
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        ethers.ZeroHash,
-        proof,
-      );
-      expect(result).to.equal(false);
+      await expect(
+        bfvPkVerifier.verify.staticCall(
+          pkCommitment,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(bfvPkVerifier, "BadPublicInputsLen");
     });
 
-    it("returns false when publicInputs has only vk hashes (no pkCommitment slot)", async function () {
+    it("reverts with BadPublicInputsLen when publicInputs has only vk hashes (no pkCommitment slot)", async function () {
       const { bfvPkVerifier } = await loadFixture(deployWithMockCircuit);
       const pkCommitment = ethers.keccak256("0xabcd");
       const proof = encodeProof("0x01", [
@@ -157,31 +161,16 @@ describe("BfvPkVerifier", function () {
         EXPECTED_C5_KEY_HASH,
       ]);
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        ethers.ZeroHash,
-        proof,
-      );
-      expect(result).to.equal(false);
+      await expect(
+        bfvPkVerifier.verify.staticCall(
+          pkCommitment,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(bfvPkVerifier, "BadPublicInputsLen");
     });
 
-    it("returns false when publicInputs has only vk hashes (no pkCommitment slot)", async function () {
-      const { bfvPkVerifier } = await loadFixture(deployWithMockCircuit);
-      const pkCommitment = ethers.keccak256("0xabcd");
-      const proof = encodeProof("0x01", [
-        EXPECTED_NODES_FOLD_KEY_HASH,
-        EXPECTED_C5_KEY_HASH,
-      ]);
-
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        ethers.ZeroHash,
-        proof,
-      );
-      expect(result).to.equal(false);
-    });
-
-    it("returns false when nodes_fold key hash does not match", async function () {
+    it("reverts with BadNodesFoldKeyHash when nodes_fold key hash does not match", async function () {
       const revertingVerifier = await (
         await ethers.getContractFactory("RevertOnVerifyCircuitVerifier")
       ).deploy();
@@ -205,15 +194,16 @@ describe("BfvPkVerifier", function () {
         ),
       );
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        ethers.ZeroHash,
-        proof,
-      );
-      expect(result).to.equal(false);
+      await expect(
+        bfvPkVerifier.verify.staticCall(
+          pkCommitment,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(bfvPkVerifier, "BadNodesFoldKeyHash");
     });
 
-    it("returns false when c5 key hash does not match", async function () {
+    it("reverts with BadC5KeyHash when c5 key hash does not match", async function () {
       const revertingVerifier = await (
         await ethers.getContractFactory("RevertOnVerifyCircuitVerifier")
       ).deploy();
@@ -237,15 +227,16 @@ describe("BfvPkVerifier", function () {
         ),
       );
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        ethers.ZeroHash,
-        proof,
-      );
-      expect(result).to.equal(false);
+      await expect(
+        bfvPkVerifier.verify.staticCall(
+          pkCommitment,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(bfvPkVerifier, "BadC5KeyHash");
     });
 
-    it("returns false when pkCommitment does not match last public input", async function () {
+    it("reverts with BadPkCommitment when pkCommitment does not match last public input", async function () {
       const { bfvPkVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
       );
@@ -255,15 +246,18 @@ describe("BfvPkVerifier", function () {
       const wrong = ethers.keccak256("0x1234");
       const proof = encodeProof("0x01", minimalDkgPublicInputs(wrong));
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        ethers.ZeroHash,
-        proof,
-      );
-      expect(result).to.equal(false);
+      await expect(
+        bfvPkVerifier.verify.staticCall(
+          pkCommitment,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(bfvPkVerifier, "BadPkCommitment");
     });
 
     it("returns false when circuit verifier returns false", async function () {
+      // Circuit-verify failure is still expressed as `return false` because the
+      // bool return reflects the underlying Honk verifier's bool result.
       const { bfvPkVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
       );
@@ -280,7 +274,7 @@ describe("BfvPkVerifier", function () {
       expect(result).to.equal(false);
     });
 
-    it("returns false when constructor expected hashes do not match proof", async function () {
+    it("reverts with BadNodesFoldKeyHash when constructor expected hashes do not match proof", async function () {
       const { mockCircuit } = await loadFixture(deployWithMockCircuit);
       await mockCircuit.setReturnValue(true);
       const mockAddr = await mockCircuit.getAddress();
@@ -298,12 +292,15 @@ describe("BfvPkVerifier", function () {
       const pkCommitment = ethers.keccak256("0xabcd");
       const proof = encodeProof("0x0102", minimalDkgPublicInputs(pkCommitment));
 
-      const result = await bfvPkVerifier.verify.staticCall(
-        pkCommitment,
-        ethers.ZeroHash,
-        proof,
-      );
-      expect(result).to.equal(false);
+      // The proof's nodes_fold hash is checked first and won't match the
+      // constructor's "wrong-nodes-fold", so BadNodesFoldKeyHash fires.
+      await expect(
+        bfvPkVerifier.verify.staticCall(
+          pkCommitment,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(bfvPkVerifier, "BadNodesFoldKeyHash");
     });
   });
 
