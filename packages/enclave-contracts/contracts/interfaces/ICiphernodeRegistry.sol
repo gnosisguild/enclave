@@ -211,6 +211,15 @@ interface ICiphernodeRegistry {
     /// @notice Committee has not been finalized yet for this E3
     error CommitteeNotFinalized();
 
+    /// @notice `publishCommittee` requires a non-zero PK commitment
+    error PkCommitmentRequired();
+
+    /// @notice Proof aggregation is enabled but no DKG proof was supplied
+    error DkgProofRequired();
+
+    /// @notice Supplied DKG aggregator proof failed verification
+    error InvalidDkgProof();
+
     /// @notice Node has already submitted a ticket for this E3
     error NodeAlreadySubmitted();
 

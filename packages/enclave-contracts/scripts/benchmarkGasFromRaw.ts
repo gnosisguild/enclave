@@ -12,6 +12,8 @@ import {
   BFV_DKG_H,
   BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS,
   BFV_THRESHOLD_T,
+  bfvDecCommitteeHashIndices,
+  bfvDkgCommitteeHashIndices,
   committeeHashFromLimbs,
   readVkRecursiveHash,
 } from "./utils";
@@ -27,10 +29,8 @@ function findRawJson(rawDir: string, fragment: string): any {
 }
 
 const MIN_VK_HASH_PUBLIC_INPUTS = 2;
-const DKG_COMMITTEE_HASH_IDX_HI = 5;
-const DKG_COMMITTEE_HASH_IDX_LO = 6;
-const DEC_COMMITTEE_HASH_IDX_HI = 2;
-const DEC_COMMITTEE_HASH_IDX_LO = 3;
+const DKG_COMMITTEE_HASH_IDX = bfvDkgCommitteeHashIndices(BFV_DKG_H);
+const DEC_COMMITTEE_HASH_IDX = bfvDecCommitteeHashIndices();
 
 function requirePublicInputLen(
   label: string,
@@ -212,12 +212,12 @@ async function main() {
   requirePublicInputLen(
     "dkg_aggregator committee_hash",
     dkgPublicInputs,
-    DKG_COMMITTEE_HASH_IDX_LO + 1,
+    DKG_COMMITTEE_HASH_IDX.lo + 1,
   );
   const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
   const dkgCommitteeHash = committeeHashFromLimbs(
-    dkgPublicInputs[DKG_COMMITTEE_HASH_IDX_HI],
-    dkgPublicInputs[DKG_COMMITTEE_HASH_IDX_LO],
+    dkgPublicInputs[DKG_COMMITTEE_HASH_IDX.hi],
+    dkgPublicInputs[DKG_COMMITTEE_HASH_IDX.lo],
   );
   const dkgOk = await bfvPk.verify.staticCall(
     pkCommitment,
@@ -253,11 +253,11 @@ async function main() {
   requirePublicInputLen(
     "decryption_aggregator committee_hash",
     decPublicInputs,
-    DEC_COMMITTEE_HASH_IDX_LO + 1,
+    DEC_COMMITTEE_HASH_IDX.lo + 1,
   );
   const decCommitteeHash = committeeHashFromLimbs(
-    decPublicInputs[DEC_COMMITTEE_HASH_IDX_HI],
-    decPublicInputs[DEC_COMMITTEE_HASH_IDX_LO],
+    decPublicInputs[DEC_COMMITTEE_HASH_IDX.hi],
+    decPublicInputs[DEC_COMMITTEE_HASH_IDX.lo],
   );
   const decOk = await bfvDec.verify.staticCall(
     plaintextHash,

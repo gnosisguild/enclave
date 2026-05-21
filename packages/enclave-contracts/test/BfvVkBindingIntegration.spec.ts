@@ -16,7 +16,9 @@ import {
   BFV_THRESHOLD_T,
   assertBfvDecryptionVerifierSubCircuitVkHashes,
   assertBfvPkVerifierSubCircuitVkHashes,
+  bfvDecCommitteeHashIndices,
   bfvDecExpectedPublicInputsLen,
+  bfvDkgCommitteeHashIndices,
   bfvPkExpectedPublicInputsLen,
   committeeHashFromLimbs,
   readVkRecursiveHash,
@@ -110,11 +112,9 @@ function hexToBytes32Array(hex: string): string[] {
   return out;
 }
 
-const DKG_COMMITTEE_HASH_HI_IDX = 2 + BFV_DKG_H;
-const DKG_COMMITTEE_HASH_LO_IDX = 3 + BFV_DKG_H;
+const DKG_COMMITTEE_HASH_IDX = bfvDkgCommitteeHashIndices(BFV_DKG_H);
 const DKG_EXPECTED_PUBLIC_INPUT_LEN = bfvPkExpectedPublicInputsLen(BFV_DKG_H);
-const DEC_COMMITTEE_HASH_HI_IDX = 2;
-const DEC_COMMITTEE_HASH_LO_IDX = 3;
+const DEC_COMMITTEE_HASH_IDX = bfvDecCommitteeHashIndices();
 const DEC_EXPECTED_PUBLIC_INPUT_LEN =
   bfvDecExpectedPublicInputsLen(BFV_THRESHOLD_T);
 
@@ -305,12 +305,12 @@ describe("BfvVkBindingIntegration", function () {
       }
 
       const dkgCommitteeHash = committeeHashFromLimbs(
-        dkgPublicInputs[DKG_COMMITTEE_HASH_HI_IDX],
-        dkgPublicInputs[DKG_COMMITTEE_HASH_LO_IDX],
+        dkgPublicInputs[DKG_COMMITTEE_HASH_IDX.hi],
+        dkgPublicInputs[DKG_COMMITTEE_HASH_IDX.lo],
       );
       const decCommitteeHash = committeeHashFromLimbs(
-        decPublicInputs[DEC_COMMITTEE_HASH_HI_IDX],
-        decPublicInputs[DEC_COMMITTEE_HASH_LO_IDX],
+        decPublicInputs[DEC_COMMITTEE_HASH_IDX.hi],
+        decPublicInputs[DEC_COMMITTEE_HASH_IDX.lo],
       );
 
       const { bfvPk, bfvDec } = await deployHonkAndBfv();
@@ -398,8 +398,8 @@ describe("BfvVkBindingIntegration", function () {
       );
       const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
       const dkgCommitteeHash = committeeHashFromLimbs(
-        dkgPublicInputs[DKG_COMMITTEE_HASH_HI_IDX],
-        dkgPublicInputs[DKG_COMMITTEE_HASH_LO_IDX],
+        dkgPublicInputs[DKG_COMMITTEE_HASH_IDX.hi],
+        dkgPublicInputs[DKG_COMMITTEE_HASH_IDX.lo],
       );
 
       expect(

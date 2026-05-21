@@ -738,6 +738,15 @@ impl PublicKeyAggregator {
         }
 
         let committee_addresses = committee_addresses_from_nodes(nodes)?;
+        #[cfg(debug_assertions)]
+        {
+            let n_registered = committee_addresses.len();
+            debug_assert_eq!(
+                party_ids.len(),
+                n_registered,
+                "honest NodeFold count must equal registered committee size until expulsion enables H < N"
+            );
+        }
 
         let corr = CorrelationId::new();
         self.bus.publish(

@@ -207,17 +207,17 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             CommitteeNotFinalized()
         );
         require(c.publicKey == bytes32(0), CommitteeAlreadyPublished());
-        require(pkCommitment != bytes32(0), "pkCommitment required");
+        require(pkCommitment != bytes32(0), PkCommitmentRequired());
 
         bytes32 committeeHash = CommitteeHashLib.hash(c.topNodes);
         c.committeeHash = committeeHash;
 
         E3 memory e3 = enclave.getE3(e3Id);
         if (e3.proofAggregationEnabled) {
-            require(proof.length > 0, "proof required");
+            require(proof.length > 0, DkgProofRequired());
             require(
                 e3.pkVerifier.verify(pkCommitment, committeeHash, proof),
-                "Invalid DKG proof"
+                InvalidDkgProof()
             );
         }
 

@@ -41,9 +41,22 @@ export function bfvPkExpectedPublicInputsLen(h: number): number {
   return 3 * h + 6;
 }
 
+/** `publicInputs` indices for `committee_hash_hi` / `committee_hash_lo` (matches `BfvPkVerifier`). */
+export function bfvDkgCommitteeHashIndices(h: number): {
+  hi: number;
+  lo: number;
+} {
+  return { hi: 2 + h, lo: 3 + h };
+}
+
 /** `decryption_aggregator` EVM public-input count for BFV threshold `t`. */
 export function bfvDecExpectedPublicInputsLen(threshold: number): number {
   return 108 + 3 * threshold;
+}
+
+/** `publicInputs` indices for decryption-aggregator committee hash limbs. */
+export function bfvDecCommitteeHashIndices(): { hi: number; lo: number } {
+  return { hi: 2, lo: 3 };
 }
 
 /** Recursive VK hashes for `BfvPkVerifier` sub-circuits (from `pnpm compile:circuits`). */

@@ -18,6 +18,7 @@ use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
 use alloy::primitives::Address;
 use e3_events::{CircuitName, CircuitVariant, Proof};
+use e3_fhe_params::BfvPreset;
 use serde::Serialize;
 
 fn proof_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
@@ -322,8 +323,10 @@ pub fn prove_dkg_aggregation(
     prover: &ZkProver,
     input: &DkgAggregationInput,
     e3_id: &str,
-    artifacts_dir: &str,
+    preset: BfvPreset,
 ) -> Result<Proof, ZkError> {
+    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir = artifacts_dir.as_str();
     if input.node_fold_proofs.len() != input.party_ids.len() {
         return Err(ZkError::InvalidInput(
             "node_fold_proofs and party_ids length mismatch".into(),
@@ -335,17 +338,21 @@ pub fn prove_dkg_aggregation(
         ));
     }
     let h = input.node_fold_proofs.len();
-    // `committee_addresses` must cover the full registered committee of size `N_PARTIES`
-    // (matches on-chain `topNodes`), so `committee_hash_limbs` hashes the right list and
-    // `party_ids[i]` is a valid index into `committee_members`. Today `H == N_PARTIES`; once
-    // honest-set selection makes `H < N_PARTIES`, this check should compare against the
-    // preset's `N_PARTIES` directly rather than `h`.
-    if input.committee_addresses.len() != h {
-        return Err(ZkError::InvalidInput(format!(
-            "committee_addresses length {} does not match expected N_PARTIES ({})",
-            input.committee_addresses.len(),
-            h,
-        )));
+    // Full on-chain `topNodes` (must match compiled `N_PARTIES` in the circuit artifact).
+    // Do not use `preset.metadata().num_parties` — that is BFV search metadata, not circuit size.
+    let n_registered = input.committee_addresses.len();
+    if n_registered == 0 {
+        return Err(ZkError::InvalidInput(
+            "prove_dkg_aggregation: committee_addresses must be non-empty (on-chain topNodes)"
+                .into(),
+        ));
+    }
+    #[cfg(debug_assertions)]
+    {
+        debug_assert_eq!(
+            h, n_registered,
+            "DkgAggregator honest-set H must equal registered committee size until expulsion enables H < N"
+        );
     }
     let slot_indices: Vec<u32> = (0u32..h as u32).collect();
     let nodes_fold_proof = generate_sequential_nodes_fold(
@@ -446,8 +453,10 @@ pub fn prove_decryption_aggregation_jobs(
     jobs: &[DecryptionAggregationJob],
     committee_addresses: &[Address],
     e3_id: &str,
-    artifacts_dir: &str,
+    preset: BfvPreset,
 ) -> Result<Vec<Proof>, ZkError> {
+    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir = artifacts_dir.as_str();
     // VKs and the compiled circuit are job-independent: load once, reuse per ciphertext.
     let c6_fold_vk = vk::load_vk_artifacts(
         &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
@@ -464,13 +473,9 @@ pub fn prove_decryption_aggregation_jobs(
         artifacts_dir,
     )?;
 
-    // `committee_addresses` must cover the full registered committee of size `N_PARTIES`
-    // (matches on-chain `topNodes`); the Noir circuit's `committee_members: [Field; N_PARTIES]`
-    // shape enforces this — supplying the wrong length surfaces as `WitnessGenerationFailed`.
-    // The non-empty guard catches the common misuse early with a clearer error.
     if committee_addresses.is_empty() {
         return Err(ZkError::InvalidInput(
-            "prove_decryption_aggregation_jobs: committee_addresses must equal on-chain topNodes (N_PARTIES)".into(),
+            "prove_decryption_aggregation_jobs: committee_addresses must be non-empty (on-chain topNodes)".into(),
         ));
     }
 

@@ -15,14 +15,8 @@ library CommitteeHashLib {
     uint256 private constant _LO_MASK = (uint256(1) << 128) - 1;
 
     /// @notice `keccak256(abi.encodePacked(nodes))` for the ordered on-chain committee.
-    function hash(address[] storage nodes) internal view returns (bytes32) {
-        return hashMemory(nodes);
-    }
-
-    /// @notice Same as {hash} for calldata/memory address lists.
-    function hashMemory(
-        address[] memory nodes
-    ) internal pure returns (bytes32) {
+    /// @dev Callers pass `storage` arrays via implicit copy to this `memory` parameter.
+    function hash(address[] memory nodes) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(nodes));
     }
 
