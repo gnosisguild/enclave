@@ -92,11 +92,7 @@ describe("BfvPkVerifier", function () {
       const proof = encodeProof("0x01", []);
 
       await expect(
-        bfvPkVerifier.verify.staticCall(
-          pkCommitment,
-          ethers.ZeroHash,
-          proof,
-        ),
+        bfvPkVerifier.verify.staticCall(pkCommitment, ethers.ZeroHash, proof),
       ).to.be.revertedWithCustomError(bfvPkVerifier, "BadPublicInputsLen");
     });
 
@@ -106,11 +102,7 @@ describe("BfvPkVerifier", function () {
       const proof = encodeProof("0x01", [pkCommitment]);
 
       await expect(
-        bfvPkVerifier.verify.staticCall(
-          pkCommitment,
-          ethers.ZeroHash,
-          proof,
-        ),
+        bfvPkVerifier.verify.staticCall(pkCommitment, ethers.ZeroHash, proof),
       ).to.be.revertedWithCustomError(bfvPkVerifier, "BadPublicInputsLen");
     });
 
@@ -123,11 +115,7 @@ describe("BfvPkVerifier", function () {
       ]);
 
       await expect(
-        bfvPkVerifier.verify.staticCall(
-          pkCommitment,
-          ethers.ZeroHash,
-          proof,
-        ),
+        bfvPkVerifier.verify.staticCall(pkCommitment, ethers.ZeroHash, proof),
       ).to.be.revertedWithCustomError(bfvPkVerifier, "BadPublicInputsLen");
     });
 
@@ -145,11 +133,7 @@ describe("BfvPkVerifier", function () {
       ]);
 
       await expect(
-        bfvPkVerifier.verify.staticCall(
-          pkCommitment,
-          ethers.ZeroHash,
-          proof,
-        ),
+        bfvPkVerifier.verify.staticCall(pkCommitment, ethers.ZeroHash, proof),
       ).to.be.revertedWithCustomError(bfvPkVerifier, "BadPublicInputsLen");
     });
 
@@ -162,11 +146,7 @@ describe("BfvPkVerifier", function () {
       ]);
 
       await expect(
-        bfvPkVerifier.verify.staticCall(
-          pkCommitment,
-          ethers.ZeroHash,
-          proof,
-        ),
+        bfvPkVerifier.verify.staticCall(pkCommitment, ethers.ZeroHash, proof),
       ).to.be.revertedWithCustomError(bfvPkVerifier, "BadPublicInputsLen");
     });
 
@@ -195,11 +175,7 @@ describe("BfvPkVerifier", function () {
       );
 
       await expect(
-        bfvPkVerifier.verify.staticCall(
-          pkCommitment,
-          ethers.ZeroHash,
-          proof,
-        ),
+        bfvPkVerifier.verify.staticCall(pkCommitment, ethers.ZeroHash, proof),
       ).to.be.revertedWithCustomError(bfvPkVerifier, "BadNodesFoldKeyHash");
     });
 
@@ -228,11 +204,7 @@ describe("BfvPkVerifier", function () {
       );
 
       await expect(
-        bfvPkVerifier.verify.staticCall(
-          pkCommitment,
-          ethers.ZeroHash,
-          proof,
-        ),
+        bfvPkVerifier.verify.staticCall(pkCommitment, ethers.ZeroHash, proof),
       ).to.be.revertedWithCustomError(bfvPkVerifier, "BadC5KeyHash");
     });
 
@@ -247,11 +219,7 @@ describe("BfvPkVerifier", function () {
       const proof = encodeProof("0x01", minimalDkgPublicInputs(wrong));
 
       await expect(
-        bfvPkVerifier.verify.staticCall(
-          pkCommitment,
-          ethers.ZeroHash,
-          proof,
-        ),
+        bfvPkVerifier.verify.staticCall(pkCommitment, ethers.ZeroHash, proof),
       ).to.be.revertedWithCustomError(bfvPkVerifier, "BadPkCommitment");
     });
 
@@ -295,11 +263,7 @@ describe("BfvPkVerifier", function () {
       // The proof's nodes_fold hash is checked first and won't match the
       // constructor's "wrong-nodes-fold", so BadNodesFoldKeyHash fires.
       await expect(
-        bfvPkVerifier.verify.staticCall(
-          pkCommitment,
-          ethers.ZeroHash,
-          proof,
-        ),
+        bfvPkVerifier.verify.staticCall(pkCommitment, ethers.ZeroHash, proof),
       ).to.be.revertedWithCustomError(bfvPkVerifier, "BadNodesFoldKeyHash");
     });
   });
