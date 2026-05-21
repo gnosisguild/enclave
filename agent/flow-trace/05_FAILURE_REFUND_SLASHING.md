@@ -258,13 +258,14 @@ Same scenario as above, then 2 nodes are slashed for 300,000 each:
 
 **Actor:** `AccusationManager` (`crates/zk-prover/src/actors/accusation_manager.rs`)
 
-The AccusationManager is a per-E3 ephemeral actor created when `CommitteeFinalized` fires. It
+The AccusationManager is a per-E3 ephemeral actor created when `SortitionCommitteeFinalized`
+(the `ICiphernodeRegistry` event) fires. It
 bridges proof verification failures to on-chain slashing through an off-chain committee quorum
 protocol.
 
 ```
 LIFECYCLE:
-  Created by AccusationManagerExtension on CommitteeFinalized
+  Created by AccusationManagerExtension on SortitionCommitteeFinalized
   → Stores committee list, threshold_m, this node's address + signer
   → In-memory only (ephemeral — no persistence)
   → Destroyed by E3RequestComplete (Die signal)
