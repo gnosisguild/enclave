@@ -18,7 +18,8 @@ import {
  *      `crates/events/src/enclave_event/dkg_fold_attestation.rs`.
  */
 library DkgFoldAttestationLib {
-    /// @dev `keccak256("DkgFoldAttestation(uint256 chainId,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)")`
+    /// @dev `keccak256("DkgFoldAttestation(uint256 chainId,uint256 e3Id,
+    /// uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)")`
     bytes32 public constant TYPEHASH =
         keccak256(
             "DkgFoldAttestation(uint256 chainId,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)"
