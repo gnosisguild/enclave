@@ -235,21 +235,49 @@ Each node's fold attestation signs an EIP-712-style digest over
 `(chainId, e3Id, partyId, skAggCommit, esmAggCommit)` with the operator's registered key. The
 on-chain
 [`DkgFoldAttestationVerifier`](https://github.com/gnosisguild/enclave/blob/main/packages/enclave-contracts/contracts/verifiers/DkgFoldAttestationVerifier.sol)
-then enforces three properties per attestation:
+then enforces four properties per attestation:
 
-1. **Signer = registered operator**: `ecrecover` over the signed digest must equal the `node`
-   address bound to that `partyId` in the bundle, and that address must be an active committee
-   member for this E3 (`isCommitteeMemberActive(e3Id, node)`).
-2. **Commitments match the DKG proof**: the signed `skAggCommit` and `esmAggCommit` must equal the
+1. **Slot binding**: `getCommitteeNodeAt(e3Id, binding.partyId) == binding.node`. The aggregator
+   cannot claim that the operator at `topNodes[0]` is party 1 — the registry's canonical slot
+   mapping is checked directly. Available before `publishCommittee` completes (the registry sorts
+   `topNodes` at finalisation, well before the attestation verifier runs).
+2. **Signer = registered operator**: `ecrecover` over the signed digest must equal that `node`
+   address, and the address must be an active committee member for this E3
+   (`isCommitteeMemberActive(e3Id, node)`).
+3. **Commitments match the DKG proof**: the signed `skAggCommit` and `esmAggCommit` must equal the
    `partyId`'s slot in the DKG aggregator proof's public inputs.
-3. **Honest-set cardinality**: the bundle must contain exactly one attestation per honest party in
+4. **Honest-set cardinality**: the bundle must contain exactly one attestation per honest party in
    the proof, with `partyId` strictly ascending (no duplicates, no partial subsets).
 
 This closes the per-operator attribution gap: the aggregator cannot present a valid DKG proof
 without also producing one signed attestation per honest party, each bound to the operator
-registered at the corresponding `topNodes` slot. The recovered `partyIds`, `skAggCommits`, and
-`esmAggCommits` are persisted as on-chain anchors (`dkgPartyIds`, `dkgSkAggCommits`,
-`dkgEsmAggCommits`) so future decryption proofs can be checked against them.
+registered at the corresponding `topNodes` slot, and slot-shuffling between operators is
+structurally prevented. The recovered `partyIds`, `skAggCommits`, and `esmAggCommits` are persisted
+as on-chain anchors (`dkgPartyIds`, `dkgSkAggCommits`, `dkgEsmAggCommits`) so future decryption
+proofs can be checked against them.
+
+#### Per-operator attribution for slashing
+
+When a node misbehaves, the off-chain accusation quorum protocol produces a
+[`SlashingManager.proposeSlash`](https://github.com/gnosisguild/enclave/blob/main/packages/enclave-contracts/contracts/slashing/SlashingManager.sol)
+call. The on-chain check enforces, in `_verifyAttestationEvidence`:
+
+1. **Voter quorum and signatures**: ≥ `M` committee-member voters (sorted ascending, accused
+   excluded), each signing `(VOTE_TYPEHASH, chainId, e3Id, accusationId, voter, agrees, dataHash)`
+   over the same accusation.
+2. **Same evidence across voters**: all `dataHashes[i]` must equal a common `dataHash`. Without this
+   each voter could be agreeing to "something bad" of their own — the quorum would not actually
+   agree on what they observed.
+3. **Evidence preimage on chain**: the proposal payload includes a `bytes evidence` field, and
+   `keccak256(evidence) == commonDataHash` is required. The evidence is the raw
+   `abi.encode(proof.data, public_signals)` of the faulty proof, so the contract — and any third
+   party reading the transaction calldata — can audit exactly which bytes the committee voted on,
+   not just a hash.
+
+Combined with the fold-attestation chain, the slashing flow forms a complete attribution chain:
+operator → registered address at `topNodes[partyId]` → signature on a specific commitment → faulty
+proof bytes auditable on chain. Both the DKG fault-attribution side and the slashing-evidence side
+are cryptographically bound on chain.
 
 #### Committee hash binding
 

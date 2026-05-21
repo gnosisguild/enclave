@@ -33,6 +33,7 @@
 use super::commitment_links::{CommitmentLink, LinkScope};
 use actix::{Actor, Addr, Context, Handler};
 use alloy::primitives::Address;
+use alloy::sol_types::SolValue;
 use e3_events::{
     BusHandle, CommitmentConsistencyCheckComplete, CommitmentConsistencyCheckRequested,
     CommitmentConsistencyViolation, E3id, EnclaveEvent, EnclaveEventData, EventContext,
@@ -50,6 +51,11 @@ struct VerifiedProofData {
     address: Address,
     public_signals: ArcBytes,
     data_hash: [u8; 32],
+    /// Raw `proof.data` bytes. Together with `public_signals` they form the
+    /// preimage `abi.encode(proof.data, public_signals)` of `data_hash` —
+    /// forwarded to slashing so the on-chain contract can verify the dataHash
+    /// bound in voter signatures.
+    proof_data: ArcBytes,
 }
 
 /// Describes a source entry whose commitments are inconsistent with a target.
@@ -58,6 +64,11 @@ struct Mismatch {
     address: Address,
     proof_type: ProofType,
     data_hash: [u8; 32],
+    /// Same preimage as `VerifiedProofData.proof_data` paired with
+    /// `public_signals`. Carried from cache into the emitted violation so
+    /// downstream slashing can bind voter signatures to evidence bytes.
+    proof_data: ArcBytes,
+    public_signals: ArcBytes,
 }
 
 /// Per-E3 actor that enforces cross-circuit commitment consistency.
@@ -138,6 +149,8 @@ impl CommitmentConsistencyChecker {
                                     address: *addr,
                                     proof_type: src_type,
                                     data_hash: src.data_hash,
+                                    proof_data: src.proof_data.clone(),
+                                    public_signals: src.public_signals.clone(),
                                 });
                                 break; // one mismatch per source entry is enough
                             }
@@ -188,6 +201,8 @@ impl CommitmentConsistencyChecker {
                                 address: src.address,
                                 proof_type: src_type,
                                 data_hash: src.data_hash,
+                                proof_data: src.proof_data.clone(),
+                                public_signals: src.public_signals.clone(),
                             });
                         }
                     }
@@ -235,6 +250,8 @@ impl CommitmentConsistencyChecker {
                                 address: src.address,
                                 proof_type: src_type,
                                 data_hash: src.data_hash,
+                                proof_data: src.proof_data.clone(),
+                                public_signals: src.public_signals.clone(),
                             });
                         }
                     }
@@ -275,26 +292,32 @@ impl CommitmentConsistencyChecker {
                     m.address,
                     m.proof_type,
                 );
-                self.emit_violation(m.party_id, m.address, m.proof_type, m.data_hash, ec);
+                self.emit_violation(&m, ec);
             }
         }
     }
 
     /// Publish a [`CommitmentConsistencyViolation`] for the accusation pipeline.
-    fn emit_violation(
-        &self,
-        accused_party_id: u64,
-        accused_address: Address,
-        proof_type: ProofType,
-        data_hash: [u8; 32],
-        ec: &EventContext<Sequenced>,
-    ) {
+    fn emit_violation(&self, m: &Mismatch, ec: &EventContext<Sequenced>) {
+        // Evidence preimage = `abi.encode(proof.data, public_signals)`. The
+        // on-chain `SlashingManager.proposeSlash` recomputes `keccak256(evidence)`
+        // and requires it to equal each voter's signed `dataHash`. Without
+        // these bytes, slashing via the consistency-violation path would be
+        // gated by the evidence binding (safe but unable to slash).
+        let evidence = alloy::primitives::Bytes::from(
+            (
+                alloy::primitives::Bytes::copy_from_slice(&m.proof_data),
+                alloy::primitives::Bytes::copy_from_slice(&m.public_signals),
+            )
+                .abi_encode(),
+        );
         let violation = CommitmentConsistencyViolation {
             e3_id: self.e3_id.clone(),
-            accused_party_id,
-            accused_address,
-            proof_type,
-            data_hash,
+            accused_party_id: m.party_id,
+            accused_address: m.address,
+            proof_type: m.proof_type,
+            data_hash: m.data_hash,
+            evidence,
         };
         if let Err(err) = self.bus.publish(violation, ec.clone()) {
             error!("Failed to publish CommitmentConsistencyViolation: {err}");
@@ -352,6 +375,7 @@ impl Handler<TypedEvent<ProofVerificationPassed>> for CommitmentConsistencyCheck
                 address,
                 public_signals: data.public_signals,
                 data_hash: data.data_hash,
+                proof_data: data.proof_data,
             },
         );
 
@@ -373,7 +397,7 @@ impl Handler<TypedEvent<CommitmentConsistencyCheckRequested>> for CommitmentCons
 
         // Cache each party's proof data for link evaluation.
         for party in &data.party_proofs {
-            for (proof_type, public_signals, data_hash) in &party.proofs {
+            for (proof_type, public_signals, data_hash, proof_data) in &party.proofs {
                 self.insert_verified(
                     party.address,
                     *proof_type,
@@ -382,6 +406,7 @@ impl Handler<TypedEvent<CommitmentConsistencyCheckRequested>> for CommitmentCons
                         address: party.address,
                         public_signals: public_signals.clone(),
                         data_hash: *data_hash,
+                        proof_data: proof_data.clone(),
                     },
                 );
             }
@@ -401,7 +426,7 @@ impl Handler<TypedEvent<CommitmentConsistencyCheckRequested>> for CommitmentCons
                     m.address,
                 );
                 inconsistent_parties.insert(m.party_id);
-                self.emit_violation(m.party_id, m.address, m.proof_type, m.data_hash, &ec);
+                self.emit_violation(&m, &ec);
             }
         }
 

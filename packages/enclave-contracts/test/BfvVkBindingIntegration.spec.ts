@@ -402,13 +402,9 @@ describe("BfvVkBindingIntegration", function () {
         dkgPublicInputs[DKG_COMMITTEE_HASH_IDX.lo],
       );
 
-      expect(
-        await bfvPk.verify.staticCall(
-          pkCommitment,
-          dkgCommitteeHash,
-          dkgEncoded,
-        ),
-      ).to.equal(false);
+      await expect(
+        bfvPk.verify.staticCall(pkCommitment, dkgCommitteeHash, dkgEncoded),
+      ).to.be.revertedWithCustomError(bfvPk, "BadNodesFoldKeyHash");
     },
   );
 });

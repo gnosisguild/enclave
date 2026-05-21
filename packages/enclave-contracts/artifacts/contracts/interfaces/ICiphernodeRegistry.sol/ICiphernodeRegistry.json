@@ -162,6 +162,22 @@
       "type": "error"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "partyId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "committeeSize",
+          "type": "uint256"
+        }
+      ],
+      "name": "PartyIdOutOfBounds",
+      "type": "error"
+    },
+    {
       "inputs": [],
       "name": "PkCommitmentRequired",
       "type": "error"
@@ -681,6 +697,30 @@
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "partyId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getCommitteeNodeAt",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
         }
       ],
       "name": "getCommitteeNodes",
@@ -1059,5 +1099,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-ce9a7610acb826f83b656ea800eb1bae5dae3ce6"
+  "buildInfoId": "solc-0_8_28-369f1ad8eea78d4c2afd75f88d1b51906ad9ac6c"
 }

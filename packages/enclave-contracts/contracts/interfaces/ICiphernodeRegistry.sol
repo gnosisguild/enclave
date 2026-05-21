@@ -235,6 +235,9 @@ interface ICiphernodeRegistry {
     /// @notice Attestation count does not match bindings or proof honest-set size
     error AttestationBindingCountMismatch();
 
+    /// @notice `partyId` is out of bounds for the finalized committee's `topNodes`
+    error PartyIdOutOfBounds(uint256 partyId, uint256 committeeSize);
+
     /// @notice Node has already submitted a ticket for this E3
     error NodeAlreadySubmitted();
 
@@ -476,6 +479,20 @@ interface ICiphernodeRegistry {
         uint256 e3Id,
         address node
     ) external view returns (bool);
+
+    /// @notice Return the operator address at slot `partyId` in the finalized
+    ///         committee's `topNodes` (address-ascending order).
+    /// @dev Unlike `getCommitteeNodes`, this does NOT require the committee to
+    ///      be published yet — it works as soon as the committee is finalized,
+    ///      which is what `publishCommittee` callers need in order to bind a
+    ///      `partyId` to a specific operator before the public key is stored.
+    /// @param e3Id ID of the E3 computation
+    /// @param partyId Index into `topNodes`
+    /// @return Operator address at `topNodes[partyId]`
+    function getCommitteeNodeAt(
+        uint256 e3Id,
+        uint256 partyId
+    ) external view returns (address);
 
     /// @notice Get active (non-expelled) committee nodes for an E3
     /// @param e3Id ID of the E3 computation

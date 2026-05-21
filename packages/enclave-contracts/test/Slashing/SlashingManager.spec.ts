@@ -692,11 +692,15 @@ describe("SlashingManager", function () {
       const dataHashes: string[] = [];
       const signatures: string[] = [];
 
+      // `dataHash` must equal `keccak256(evidence)` per the on-chain check.
+      const evidence = "0x";
+      const evidenceHash = ethers.keccak256(evidence);
+
       for (let i = 0; i < sortedVoters.length; i++) {
         const voterAddr = sortedVoters[i];
         voters.push(voterAddr);
         agrees.push(true);
-        dataHashes.push(ethers.ZeroHash);
+        dataHashes.push(evidenceHash);
 
         // For the second voter, use notTheOwner to sign (wrong signer)
         const signerToUse =
@@ -719,7 +723,7 @@ describe("SlashingManager", function () {
               accusationId,
               voterAddr,
               true,
-              ethers.ZeroHash,
+              evidenceHash,
             ],
           ),
         );
@@ -730,8 +734,8 @@ describe("SlashingManager", function () {
       }
 
       const proof = abiCoder.encode(
-        ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]"],
-        [0, voters, agrees, dataHashes, signatures],
+        ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]", "bytes"],
+        [0, voters, agrees, dataHashes, signatures, evidence],
       );
 
       await expect(

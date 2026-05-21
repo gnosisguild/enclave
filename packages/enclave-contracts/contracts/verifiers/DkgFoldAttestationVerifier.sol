@@ -144,6 +144,20 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
         BundleData memory data,
         DkgFoldAttestationLib.PartySlotBinding memory binding
     ) private view returns (uint256 slot, bytes32 skCommit, bytes32 esmCommit) {
+        // Structural check: the binding's `node` must be the operator
+        // registered at `topNodes[partyId]` on chain. This prevents an
+        // aggregator from reassigning a node's signed attestation to a
+        // different slot (e.g. claiming the operator at `topNodes[0]` is
+        // party 1) even if the operator cooperated by signing with the
+        // wrong `partyId`. Combined with the `ecrecover` check below, the
+        // attestation is bound to *both* the right address and the right slot.
+        require(
+            ICiphernodeRegistry(registry).getCommitteeNodeAt(
+                e3Id,
+                binding.partyId
+            ) == binding.node,
+            ICiphernodeRegistry.InvalidFoldAttestation()
+        );
         require(
             ICiphernodeRegistry(registry).isCommitteeMemberActive(
                 e3Id,

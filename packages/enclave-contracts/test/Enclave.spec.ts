@@ -142,6 +142,19 @@ describe("Enclave", function () {
       esmCommits,
     );
 
+    // `topNodes` is address-ascending on chain; bindings must map
+    // `partyId -> topNodes[partyId]`, so sort operators by address first.
+    const operatorWithAddrs = await Promise.all(
+      operators.map(async (op) => ({ op, addr: await op.getAddress() })),
+    );
+    operatorWithAddrs.sort((a, b) =>
+      a.addr.toLowerCase() < b.addr.toLowerCase()
+        ? -1
+        : a.addr.toLowerCase() > b.addr.toLowerCase()
+          ? 1
+          : 0,
+    );
+
     const { chainId } = await ethers.provider.getNetwork();
     const attestations: {
       partyId: number;
@@ -152,8 +165,8 @@ describe("Enclave", function () {
     const bindings: { partyId: number; node: string }[] = [];
 
     for (let i = 0; i < h; i++) {
-      const operator = operators[i]!;
-      const node = await operator.getAddress();
+      const operator = operatorWithAddrs[i]!.op;
+      const node = operatorWithAddrs[i]!.addr;
       const partyId = partyIds[i]!;
       attestations.push({
         partyId,

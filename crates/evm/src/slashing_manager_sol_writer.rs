@@ -192,9 +192,11 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
 
 /// Encode `AccusationQuorumReached` into the attestation evidence format expected
 /// by `SlashingManager.proposeSlash()`:
-/// `abi.encode(uint256 proofType, address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures)`
+/// `abi.encode(uint256 proofType, address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures, bytes evidence)`
 ///
 /// Voters are sorted ascending by address to satisfy the contract's duplicate-prevention check.
+/// `evidence` is the `abi.encode(proof.data, public_signals)` preimage of `dataHash` — the contract
+/// recomputes `keccak256(evidence)` and requires it to equal the common voter `dataHash`.
 fn encode_attestation_evidence(data: &AccusationQuorumReached) -> Vec<u8> {
     // Collect and sort votes by voter address (ascending)
     let mut votes = data.votes_for.clone();
@@ -208,8 +210,17 @@ fn encode_attestation_evidence(data: &AccusationQuorumReached) -> Vec<u8> {
         .iter()
         .map(|v| Bytes::from(v.signature.extract_bytes()))
         .collect();
+    let evidence: Bytes = data.evidence.clone();
 
-    (proof_type, voters, agrees, data_hashes, signatures).abi_encode_params()
+    (
+        proof_type,
+        voters,
+        agrees,
+        data_hashes,
+        signatures,
+        evidence,
+    )
+        .abi_encode_params()
 }
 
 async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(

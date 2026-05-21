@@ -647,6 +647,16 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     /// @inheritdoc ICiphernodeRegistry
+    function getCommitteeNodeAt(
+        uint256 e3Id,
+        uint256 partyId
+    ) external view returns (address) {
+        address[] storage top = committees[e3Id].topNodes;
+        require(partyId < top.length, PartyIdOutOfBounds(partyId, top.length));
+        return top[partyId];
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
     function getActiveCommitteeNodes(
         uint256 e3Id
     ) external view returns (address[] memory nodes, uint256[] memory scores) {

@@ -386,11 +386,14 @@ the registry runs two checks in order:
 2. **Fold-attestation verification** via
    [`DkgFoldAttestationVerifier`](https://github.com/gnosisguild/enclave/blob/main/packages/enclave-contracts/contracts/verifiers/DkgFoldAttestationVerifier.sol).
    It walks the bundle's `(partyId, node)` bindings — strictly ascending by `partyId`, no duplicates
-   — and for each binding: requires `isCommitteeMemberActive(e3Id, node)`, recovers the signer of
-   the attestation via `ecrecover` against the EIP-191/712 digest, requires `signer == node`, and
-   checks that the signed `skAggCommit` / `esmAggCommit` match the DKG proof's surfaced commitments
-   at that party's slot. The honest-set cardinality must equal the honest-party count derived from
-   the proof's public-input shape (`(len - 6) / 3`).
+   — and for each binding: requires `getCommitteeNodeAt(e3Id, partyId) == node` (slot binding),
+   requires `isCommitteeMemberActive(e3Id, node)`, recovers the signer of the attestation via
+   `ecrecover` against the EIP-191/712 digest, requires `signer == node`, and checks that the signed
+   `skAggCommit` / `esmAggCommit` match the DKG proof's surfaced commitments at that party's slot.
+   The honest-set cardinality must equal the honest-party count derived from the proof's
+   public-input shape (`(len - 6) / 3`). The slot binding prevents an aggregator from reassigning a
+   node's signed attestation to a different slot — even an actively cooperating signer cannot be
+   "moved" between partyIds because the registry's own slot mapping is checked structurally.
 
 Only if both succeed does the registry store the per-party anchors:
 
@@ -414,6 +417,27 @@ and `expected_esm_commits[]` per party, and binds to the on-chain committee hash
 compares the surfaced commitments against the anchors stored at `publishCommittee` — if any anchor
 differs the proof is rejected — and the plaintext is decoded from the proof's last 100 public inputs
 (one `uint64` coefficient each, packed into bytes).
+
+### Slashing-evidence binding
+
+When fault attribution leads to a slash, the off-chain accusation quorum produces a payload that
+[`SlashingManager.proposeSlash`](https://github.com/gnosisguild/enclave/blob/main/packages/enclave-contracts/contracts/slashing/SlashingManager.sol)
+decodes as `(proofType, voters[], agrees[], dataHashes[], signatures[], evidence)`.
+`_verifyAttestationEvidence` enforces:
+
+- ≥ `M` voters, sorted ascending, accused excluded, each signing the standard
+  `VOTE_TYPEHASH(chainId, e3Id, accusationId, voter, agrees, dataHash)` digest.
+- All `dataHashes[i]` equal a common `dataHash` (voters must agree on the same evidence, not just
+  "something bad").
+- `keccak256(evidence) == commonDataHash`. The `evidence` field is the raw
+  `abi.encode(proof.data, public_signals)` of the faulty proof, transported on chain so the contract
+  — and any third party — can recompute the dataHash from the bytes the committee voted on.
+
+On the Rust side, the evidence bytes are populated for every accusation path that leads to a slash
+(ZK verification failures via `ProofVerificationFailed`, forwarded C3a/C3b accusations via the
+re-verification path, and commitment-consistency violations via `CommitmentConsistencyViolation`).
+This means every slash carries auditable evidence to chain — there is no path that produces a slash
+without binding voter signatures to specific proof bytes.
 
 ---
 

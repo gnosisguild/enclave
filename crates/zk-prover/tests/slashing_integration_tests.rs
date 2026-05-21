@@ -452,11 +452,13 @@ fn sign_vote(
 
 /// Encode attestation evidence for `proposeSlash()`.
 ///
-/// Format: `abi.encode(uint256 proofType, address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures)`
+/// Format: `abi.encode(uint256 proofType, address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures, bytes evidence)`
 /// Voters are sorted ascending by address (contract requires strict ascending order).
+/// `evidence` is the preimage of `dataHash` (the contract enforces `keccak256(evidence) == commonDataHash`).
 fn encode_attestation_evidence(
     proof_type: u8,
     mut votes: Vec<(Address, bool, FixedBytes<32>, Bytes)>,
+    evidence: Bytes,
 ) -> Bytes {
     votes.sort_by_key(|(addr, _, _, _)| *addr);
 
@@ -473,6 +475,7 @@ fn encode_attestation_evidence(
         agrees,
         data_hashes.to_vec(),
         sigs,
+        evidence,
     )
         .abi_encode_params()
         .into()
@@ -603,6 +606,7 @@ fn test_evidence_leading_word_is_proof_type() {
                 Bytes::from(vec![0u8; 65]),
             ),
         ],
+        Bytes::new(),
     );
     let leading = U256::from_be_slice(&evidence[..32]);
     assert_eq!(leading, U256::ZERO, "leading word must be proofType");
@@ -622,10 +626,12 @@ fn test_attestation_evidence_encoding() {
         .parse()
         .unwrap();
     let proof_type = 0u8;
-    let data_hash = FixedBytes::from([0xcc; 32]);
 
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator, proof_type);
 
+    // Evidence preimage must hash to dataHash on chain.
+    let evidence_bytes = Bytes::from(vec![0xab, 0xcd, 0xef]);
+    let data_hash: FixedBytes<32> = keccak256(&evidence_bytes).into();
     let (voter1, sig1) = sign_vote(&signer1, chain_id, e3_id, accusation_id, true, data_hash);
     let (voter2, sig2) = sign_vote(&signer2, chain_id, e3_id, accusation_id, true, data_hash);
 
@@ -635,20 +641,22 @@ fn test_attestation_evidence_encoding() {
             (voter1, true, data_hash, sig1),
             (voter2, true, data_hash, sig2),
         ],
+        evidence_bytes.clone(),
     );
 
-    // Decode and verify structure: (uint256, address[], bool[], bytes32[], bytes[])
+    // Decode and verify structure: (uint256, address[], bool[], bytes32[], bytes[], bytes)
     type AttestationTuple = (
         U256,
         Vec<Address>,
         Vec<bool>,
         Vec<FixedBytes<32>>,
         Vec<Bytes>,
+        Bytes,
     );
     let decoded =
         AttestationTuple::abi_decode_params(&evidence).expect("evidence should ABI-decode");
 
-    let (dec_proof_type, dec_voters, dec_agrees, dec_hashes, dec_sigs) = decoded;
+    let (dec_proof_type, dec_voters, dec_agrees, dec_hashes, dec_sigs, dec_evidence) = decoded;
     assert_eq!(dec_proof_type, U256::from(proof_type), "proofType mismatch");
     assert_eq!(dec_voters.len(), 2, "should have 2 voters");
     assert!(
@@ -658,6 +666,12 @@ fn test_attestation_evidence_encoding() {
     assert!(dec_agrees.iter().all(|a| *a), "all votes should agree");
     assert_eq!(dec_hashes.len(), 2, "should have 2 data hashes");
     assert_eq!(dec_sigs.len(), 2, "should have 2 signatures");
+    assert_eq!(dec_evidence, evidence_bytes, "evidence bytes mismatch");
+    let recomputed: FixedBytes<32> = keccak256(&dec_evidence).into();
+    assert_eq!(
+        recomputed, dec_hashes[0],
+        "keccak256(evidence) must equal commonDataHash"
+    );
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -823,7 +837,8 @@ async fn test_onchain_valid_attestation_executes_slash() {
 
     // All 3 voters sign accusation votes (agrees=true)
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
-    let data_hash = FixedBytes::from([0xaa; 32]);
+    let evidence_bytes = Bytes::from(vec![0xaa]);
+    let data_hash: FixedBytes<32> = keccak256(&evidence_bytes).into();
 
     let (v1, s1) = sign_vote(
         &voter_signer1,
@@ -857,6 +872,7 @@ async fn test_onchain_valid_attestation_executes_slash() {
             (v2, true, data_hash, s2),
             (v3, true, data_hash, s3),
         ],
+        evidence_bytes,
     );
 
     // Verify proposal count before
@@ -1001,7 +1017,8 @@ async fn test_onchain_insufficient_attestations_reverts() {
         data_hash,
     );
 
-    let evidence = encode_attestation_evidence(proof_type, vec![(v1, true, data_hash, s1)]);
+    let evidence =
+        encode_attestation_evidence(proof_type, vec![(v1, true, data_hash, s1)], Bytes::new());
 
     let result = slashing_mgr
         .proposeSlash(U256::from(e3_id), operator_addr, evidence)
@@ -1103,7 +1120,8 @@ async fn test_onchain_voter_not_in_committee_reverts() {
 
     // Outsider signs a vote (valid signature, but not a committee member)
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
-    let data_hash = FixedBytes::from([0xcc; 32]);
+    let evidence_bytes = Bytes::from(vec![0xcc]);
+    let data_hash: FixedBytes<32> = keccak256(&evidence_bytes).into();
 
     let (v_out, s_out) = sign_vote(
         &outsider_signer,
@@ -1114,7 +1132,11 @@ async fn test_onchain_voter_not_in_committee_reverts() {
         data_hash,
     );
 
-    let evidence = encode_attestation_evidence(proof_type, vec![(v_out, true, data_hash, s_out)]);
+    let evidence = encode_attestation_evidence(
+        proof_type,
+        vec![(v_out, true, data_hash, s_out)],
+        evidence_bytes,
+    );
 
     let result = slashing_mgr
         .proposeSlash(U256::from(e3_id), operator_addr, evidence)
@@ -1216,7 +1238,8 @@ async fn test_onchain_invalid_vote_signature_reverts() {
 
     // Impersonator signs the vote with their key, but we claim it's from victim_signer
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
-    let data_hash = FixedBytes::from([0xdd; 32]);
+    let evidence_bytes = Bytes::from(vec![0xdd]);
+    let data_hash: FixedBytes<32> = keccak256(&evidence_bytes).into();
 
     // Sign using impersonator's key but construct the digest for victim_signer's address
     let digest = compute_vote_digest(
@@ -1232,12 +1255,13 @@ async fn test_onchain_invalid_vote_signature_reverts() {
         .expect("signing should succeed");
 
     // Build evidence claiming the vote is from victim_signer but signed by impersonator
-    let evidence = (
+    let evidence: Bytes = (
         U256::from(proof_type),
         vec![victim_signer.address()],
         vec![true],
         vec![data_hash],
         vec![Bytes::from(bad_sig.as_bytes().to_vec())],
+        evidence_bytes,
     )
         .abi_encode_params()
         .into();
@@ -1343,7 +1367,8 @@ async fn test_onchain_duplicate_voter_reverts() {
 
     // Create TWO votes from the same voter (duplicate addresses)
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
-    let data_hash = FixedBytes::from([0xee; 32]);
+    let evidence_bytes = Bytes::from(vec![0xee]);
+    let data_hash: FixedBytes<32> = keccak256(&evidence_bytes).into();
 
     let (voter, sig) = sign_vote(
         &voter_signer,
@@ -1356,12 +1381,13 @@ async fn test_onchain_duplicate_voter_reverts() {
 
     // Submit evidence with duplicate voter entries (bypassing encode_attestation_evidence
     // which would deduplicate — construct manually to have same address appear twice)
-    let evidence = (
+    let evidence: Bytes = (
         U256::from(proof_type),
         vec![voter, voter],
         vec![true, true],
         vec![data_hash, data_hash],
         vec![sig.clone(), sig],
+        evidence_bytes,
     )
         .abi_encode_params()
         .into();
@@ -1468,7 +1494,8 @@ async fn test_onchain_duplicate_evidence_reverts() {
         .unwrap();
 
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
-    let data_hash = FixedBytes::from([0xff; 32]);
+    let evidence_bytes = Bytes::from(vec![0xff]);
+    let data_hash: FixedBytes<32> = keccak256(&evidence_bytes).into();
 
     let (v1, s1) = sign_vote(
         &voter_signer1,
@@ -1490,6 +1517,7 @@ async fn test_onchain_duplicate_evidence_reverts() {
     let evidence = encode_attestation_evidence(
         proof_type,
         vec![(v1, true, data_hash, s1), (v2, true, data_hash, s2)],
+        evidence_bytes,
     );
 
     // First submission should succeed

@@ -238,11 +238,14 @@ contract SlashingManager is ISlashingManager, AccessControl {
     ///      to pass a reason and preventing cross-reason replay attacks.
     ///      Evidence format:
     ///      `abi.encode(uint256 proofType,
-    ///         address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures)`
+    ///         address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures,
+    ///         bytes evidence)`
     ///      Each voter must sign via `personal_sign`/`signMessage()` (EIP-191 prefixed):
     ///      `personal_sign(keccak256(abi.encode(VOTE_TYPEHASH,
     ///         block.chainid, e3Id, accusationId, voter, agrees, dataHash)))`
     ///      where `accusationId = keccak256(abi.encodePacked(block.chainid, e3Id, operator, proofType))`
+    ///      and `evidence` is the preimage of every voter's `dataHash`, i.e.
+    ///      `keccak256(evidence) == dataHashes[i]` for all i.
     function proposeSlash(
         uint256 e3Id,
         address operator,
@@ -398,8 +401,12 @@ contract SlashingManager is ISlashingManager, AccessControl {
             address[] memory voters,
             bool[] memory agrees,
             bytes32[] memory dataHashes,
-            bytes[] memory signatures
-        ) = abi.decode(proof, (uint256, address[], bool[], bytes32[], bytes[]));
+            bytes[] memory signatures,
+            bytes memory evidence
+        ) = abi.decode(
+                proof,
+                (uint256, address[], bool[], bytes32[], bytes[], bytes)
+            );
 
         uint256 numVotes = voters.length;
         require(
@@ -409,12 +416,10 @@ contract SlashingManager is ISlashingManager, AccessControl {
             InvalidProof()
         );
 
-        // Compute accusation ID matching AccusationManager::accusation_id() on the Rust side
-        bytes32 accusationId = keccak256(
-            abi.encodePacked(block.chainid, e3Id, operator, proofType)
-        );
-
-        // Get committee threshold — need at least M agreeing votes
+        // Get committee threshold — need at least M agreeing votes.
+        // Checked before the evidence binding so cardinality errors surface
+        // as `InsufficientAttestations` rather than masquerading as `InvalidProof`.
+        require(numVotes > 0, InsufficientAttestations());
         {
             (, uint32 thresholdM, , ) = ciphernodeRegistry
                 .getCommitteeViability(e3Id);
@@ -422,48 +427,84 @@ contract SlashingManager is ISlashingManager, AccessControl {
             require(numVotes >= thresholdM, InsufficientAttestations());
         }
 
-        // Verify each vote signature and membership
-        address prevVoter = address(0);
-        for (uint256 i = 0; i < numVotes; i++) {
-            address voter = voters[i];
+        // All voters must attest to the *same* evidence, and that evidence
+        // must be cryptographically bound to actual on-chain bytes:
+        //   1. dataHashes[i] all equal a single `commonDataHash`.
+        //   2. `keccak256(evidence) == commonDataHash`.
+        //
+        // Together these close the attribution chain: voters don't just say
+        // "I saw something bad", they cryptographically agree on the exact
+        // bytes — which the contract can inspect and which any third party
+        // can audit from the transaction calldata.
+        bytes32 commonDataHash = dataHashes[0];
+        require(keccak256(evidence) == commonDataHash, InvalidProof());
 
-            // Sorted ascending order prevents duplicate voters
+        // Verify each vote signature and membership. Computed inside a helper
+        // to keep the outer frame's local-variable count under the EVM stack
+        // limit (16 slots).
+        _verifyVotes(
+            VoteVerifyInputs({
+                e3Id: e3Id,
+                operator: operator,
+                proofType: proofType,
+                commonDataHash: commonDataHash,
+                voters: voters,
+                agrees: agrees,
+                dataHashes: dataHashes,
+                signatures: signatures
+            })
+        );
+    }
+
+    struct VoteVerifyInputs {
+        uint256 e3Id;
+        address operator;
+        uint256 proofType;
+        bytes32 commonDataHash;
+        address[] voters;
+        bool[] agrees;
+        bytes32[] dataHashes;
+        bytes[] signatures;
+    }
+
+    function _verifyVotes(VoteVerifyInputs memory v) private view {
+        bytes32 accusationId = keccak256(
+            abi.encodePacked(block.chainid, v.e3Id, v.operator, v.proofType)
+        );
+
+        address prevVoter = address(0);
+        uint256 numVotes = v.voters.length;
+        for (uint256 i = 0; i < numVotes; i++) {
+            address voter = v.voters[i];
+
             require(voter > prevVoter, DuplicateVoter());
             prevVoter = voter;
 
-            // The accused cannot vote on their own accusation (conflict of interest)
-            require(voter != operator, VoterIsAccused());
-
-            // All votes must agree the proof is bad (fault confirmed)
-            require(agrees[i], InvalidProof());
-
-            // Verify voter is an active committee member for this E3
+            require(voter != v.operator, VoterIsAccused());
+            require(v.agrees[i], InvalidProof());
+            require(v.dataHashes[i] == v.commonDataHash, InvalidProof());
             require(
-                ciphernodeRegistry.isCommitteeMemberActive(e3Id, voter),
+                ciphernodeRegistry.isCommitteeMemberActive(v.e3Id, voter),
                 VoterNotInCommittee()
             );
 
-            // Reconstruct vote digest and verify signature in a scoped block
-            // to avoid stack-too-deep
-            {
-                bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(
-                    keccak256(
-                        abi.encode(
-                            VOTE_TYPEHASH,
-                            block.chainid,
-                            e3Id,
-                            accusationId,
-                            voter,
-                            agrees[i],
-                            dataHashes[i]
-                        )
+            bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(
+                keccak256(
+                    abi.encode(
+                        VOTE_TYPEHASH,
+                        block.chainid,
+                        v.e3Id,
+                        accusationId,
+                        voter,
+                        v.agrees[i],
+                        v.dataHashes[i]
                     )
-                );
-                require(
-                    ECDSA.recover(ethSignedHash, signatures[i]) == voter,
-                    InvalidVoteSignature()
-                );
-            }
+                )
+            );
+            require(
+                ECDSA.recover(ethSignedHash, v.signatures[i]) == voter,
+                InvalidVoteSignature()
+            );
         }
     }
 

@@ -178,6 +178,18 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         return false;
     }
 
+    function getCommitteeNodeAt(
+        uint256 e3Id,
+        uint256 partyId
+    ) external view returns (address) {
+        address[] storage nodes = _committeeNodes[e3Id];
+        require(
+            partyId < nodes.length,
+            PartyIdOutOfBounds(partyId, nodes.length)
+        );
+        return nodes[partyId];
+    }
+
     function getActiveCommitteeNodes(
         uint256
     ) external pure returns (address[] memory nodes, uint256[] memory scores) {
@@ -317,6 +329,13 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
 
     function isCommitteeMember(uint256, address) external pure returns (bool) {
         return false;
+    }
+
+    function getCommitteeNodeAt(
+        uint256,
+        uint256
+    ) external pure returns (address) {
+        return address(0);
     }
 
     function getActiveCommitteeNodes(

@@ -1400,6 +1400,7 @@ impl ProofRequestActor {
                     proof_type: ProofType::C0PkBfv,
                     data_hash,
                     public_signals: proof.public_signals.clone(),
+                    proof_data: proof.data.clone(),
                 },
                 ec.clone(),
             ) {

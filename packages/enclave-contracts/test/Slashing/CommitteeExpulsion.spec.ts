@@ -523,13 +523,18 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       ]);
 
       // Lane A: Slash op1 with attestation from [op2, op3] — active 3→2, still >= M=2
+      // Evidence is the preimage of dataHash; the contract enforces
+      // `keccak256(evidence) == dataHash` and equal dataHashes across voters.
+      const evidence1 = ethers.hexlify(ethers.toUtf8Bytes("data1"));
       const proof = await signAndEncodeAttestation(
         [operator2, operator3],
         0,
         await operator1.getAddress(),
         0,
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("data1")),
+        ethers.keccak256(evidence1),
+        undefined,
+        evidence1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -592,13 +597,16 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       ]);
 
       // Slash operator1 once
+      const ev1 = ethers.hexlify(ethers.toUtf8Bytes("first"));
       const proof1 = await signAndEncodeAttestation(
         [operator2, operator3],
         0,
         await operator1.getAddress(),
         0,
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("first")),
+        ethers.keccak256(ev1),
+        undefined,
+        ev1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -610,13 +618,16 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       // Slash operator1 again for a different proof type to verify expulsion is idempotent.
       // Same (e3Id, operator, proofType) would revert DuplicateEvidence — that's correct.
       // Using proofType=7 (C6ThresholdShareDecryption) with REASON_PT_7 instead.
+      const ev2 = ethers.hexlify(ethers.toUtf8Bytes("second"));
       const proof2 = await signAndEncodeAttestation(
         [operator2, operator3],
         0,
         await operator1.getAddress(),
         7, // C6ThresholdShareDecryption — different proofType
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("second")),
+        ethers.keccak256(ev2),
+        undefined,
+        ev2,
       );
       await slashingManager.proposeSlash(
         0,
@@ -724,13 +735,16 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       expect((await registry.getCommitteeViability(0)).activeCount).to.equal(4);
 
       // Expel 2 out of 4 — still have 2 >= M=2
+      const evExpel1 = ethers.hexlify(ethers.toUtf8Bytes("expel1"));
       const proof1 = await signAndEncodeAttestation(
         [operator2, operator3],
         0,
         await operator1.getAddress(),
         0,
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("expel1")),
+        ethers.keccak256(evExpel1),
+        undefined,
+        evExpel1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -739,13 +753,16 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       );
       expect((await registry.getCommitteeViability(0)).activeCount).to.equal(3);
 
+      const evExpel2 = ethers.hexlify(ethers.toUtf8Bytes("expel2"));
       const proof2 = await signAndEncodeAttestation(
         [operator3, operator4],
         0,
         await operator2.getAddress(),
         0,
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("expel2")),
+        ethers.keccak256(evExpel2),
+        undefined,
+        evExpel2,
       );
       await slashingManager.proposeSlash(
         0,
@@ -869,13 +886,16 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       ]);
 
       // Expel operator1 — still viable (3 >= 2)
+      const evExpelOp1 = ethers.hexlify(ethers.toUtf8Bytes("expel-op1"));
       const proof1 = await signAndEncodeAttestation(
         [operator2, operator3],
         0,
         await operator1.getAddress(),
         0,
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("expel-op1")),
+        ethers.keccak256(evExpelOp1),
+        undefined,
+        evExpelOp1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -884,13 +904,16 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       );
 
       // Expel operator2 — still viable (2 >= 2)
+      const evExpelOp2 = ethers.hexlify(ethers.toUtf8Bytes("expel-op2"));
       const proof2 = await signAndEncodeAttestation(
         [operator3, operator4],
         0,
         await operator2.getAddress(),
         0,
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("expel-op2")),
+        ethers.keccak256(evExpelOp2),
+        undefined,
+        evExpelOp2,
       );
       await slashingManager.proposeSlash(
         0,

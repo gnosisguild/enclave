@@ -20,8 +20,14 @@ export const VOTE_TYPEHASH = ethers.keccak256(
 /**
  * Helper to create signed committee attestation evidence for Lane A.
  * Each voter signs a VOTE_TYPEHASH-structured digest via personal_sign (EIP-191).
- * Returns abi.encode(proofType, voters, agrees, dataHashes, signatures)
+ * Returns
+ *   abi.encode(proofType, voters, agrees, dataHashes, signatures, evidence)
  * with voters sorted ascending by address.
+ *
+ * `evidence` is the preimage of `dataHash` (the SlashingManager contract enforces
+ * `keccak256(evidence) == dataHash`). If `evidence` is provided, `dataHash` is
+ * derived from it automatically; pass `dataHash` explicitly only to test the
+ * keccak-binding check itself.
  */
 export async function signAndEncodeAttestation(
   voterSigners: Signer[],
@@ -29,9 +35,13 @@ export async function signAndEncodeAttestation(
   operator: string,
   proofType: number = 0,
   chainId: number = 31337,
-  dataHash: string = ethers.ZeroHash,
+  dataHash?: string,
   agreesOverride?: boolean[],
+  evidence: string = "0x",
 ): Promise<string> {
+  if (dataHash === undefined) {
+    dataHash = ethers.keccak256(evidence);
+  }
   const accusationId = ethers.keccak256(
     ethers.solidityPacked(
       ["uint256", "uint256", "address", "uint256"],
@@ -99,7 +109,7 @@ export async function signAndEncodeAttestation(
   }
 
   return abiCoder.encode(
-    ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]"],
-    [proofType, voters, agrees, dataHashes, signatures],
+    ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]", "bytes"],
+    [proofType, voters, agrees, dataHashes, signatures, evidence],
   );
 }

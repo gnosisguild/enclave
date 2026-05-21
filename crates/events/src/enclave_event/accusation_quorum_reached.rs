@@ -6,7 +6,7 @@
 
 use crate::{AccusationVote, E3id, ProofType};
 use actix::Message;
-use alloy::primitives::Address;
+use alloy::primitives::{Address, Bytes};
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
@@ -54,6 +54,15 @@ pub struct AccusationQuorumReached {
     pub votes_against: Vec<AccusationVote>,
     /// The quorum decision.
     pub outcome: AccusationOutcome,
+    /// Raw `abi.encode(proof.data, public_signals)` — preimage of every voter's
+    /// `data_hash`. The on-chain `SlashingManager.proposeSlash` recomputes
+    /// `keccak256(evidence)` and requires it to equal the common voter
+    /// `dataHash`, binding the votes to specific evidence bytes on-chain.
+    /// Empty when this node didn't have the raw bytes locally (e.g. consistency-
+    /// violation path); slashing still works in that case but without the
+    /// on-chain evidence binding.
+    #[serde(default)]
+    pub evidence: Bytes,
 }
 
 impl Display for AccusationQuorumReached {

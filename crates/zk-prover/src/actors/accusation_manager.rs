@@ -65,6 +65,13 @@ struct ReceivedProofData {
     data_hash: [u8; 32],
     /// `true` if our local verification passed, `false` if it failed.
     verification_passed: bool,
+    /// Raw `abi.encode(proof.data, proof.public_signals)` — preimage of
+    /// `data_hash`. Forwarded to the on-chain slashing contract so it can
+    /// recompute and verify the dataHash bound in voter signatures. Empty
+    /// only on paths where the raw bytes weren't available locally; those
+    /// paths can still slash, but they fall back to off-chain trust for
+    /// the evidence binding.
+    evidence: Bytes,
 }
 
 /// Tracks an in-flight ZK re-verification for a forwarded C3a/C3b proof.
@@ -73,6 +80,9 @@ struct PendingReVerification {
     data_hash: [u8; 32],
     accused: Address,
     proof_type: ProofType,
+    /// Evidence preimage bytes from the forwarded proof, used to populate
+    /// `ReceivedProofData.evidence` after ZK re-verification completes.
+    evidence: Bytes,
 }
 
 /// Manages the off-chain accusation quorum protocol.
@@ -348,12 +358,22 @@ impl AccusationManager {
             event.accused_address
         };
 
-        // Cache the failed verification result
+        // Cache the failed verification result.
+        // Evidence preimage = `abi.encode(proof.data, public_signals)` — matches
+        // the on-chain `keccak256(evidence) == dataHash` check in SlashingManager.
+        let evidence = Bytes::from(
+            (
+                Bytes::copy_from_slice(&event.signed_payload.payload.proof.data),
+                Bytes::copy_from_slice(&event.signed_payload.payload.proof.public_signals),
+            )
+                .abi_encode(),
+        );
         self.received_data.insert(
             (accused_address, event.proof_type),
             ReceivedProofData {
                 data_hash: event.data_hash,
                 verification_passed: false,
+                evidence,
             },
         );
 
@@ -387,12 +407,17 @@ impl AccusationManager {
         ec: &EventContext<Sequenced>,
         ctx: &mut Context<Self>,
     ) {
-        // Cache as a failed verification for voting on future accusations
+        // Cache as a failed verification for voting on future accusations.
+        // `data.evidence` carries the raw `abi.encode(proof.data, public_signals)`
+        // preimage of `data_hash`, populated by the consistency checker. Slashing
+        // via this path now binds voter signatures to evidence bytes on-chain
+        // just like the ProofVerificationFailed path.
         self.received_data.insert(
             (data.accused_address, data.proof_type),
             ReceivedProofData {
                 data_hash: data.data_hash,
                 verification_passed: false,
+                evidence: data.evidence.clone(),
             },
         );
 
@@ -592,6 +617,12 @@ impl AccusationManager {
             }
 
             let data_hash = Self::compute_payload_hash(forwarded);
+            let evidence: Bytes = (
+                Bytes::copy_from_slice(&forwarded.payload.proof.data),
+                Bytes::copy_from_slice(&forwarded.payload.proof.public_signals),
+            )
+                .abi_encode()
+                .into();
             let accused_party_id = accusation.accused_party_id;
             let forwarded_clone = forwarded.clone();
 
@@ -634,6 +665,7 @@ impl AccusationManager {
                     data_hash,
                     accused: key.0,
                     proof_type: key.1,
+                    evidence,
                 },
             );
 
@@ -941,6 +973,11 @@ impl AccusationManager {
             outcome
         );
 
+        let evidence = self
+            .received_data
+            .get(&(pending.accusation.accused, pending.accusation.proof_type))
+            .map(|d| d.evidence.clone())
+            .unwrap_or_default();
         if let Err(err) = self.bus.publish(
             AccusationQuorumReached {
                 e3_id: self.e3_id.clone(),
@@ -950,6 +987,7 @@ impl AccusationManager {
                 votes_for: pending.votes_for,
                 votes_against: pending.votes_against,
                 outcome,
+                evidence,
             },
             pending.ec,
         ) {
@@ -982,6 +1020,11 @@ impl AccusationManager {
             outcome
         );
 
+        let evidence = self
+            .received_data
+            .get(&(pending.accusation.accused, pending.accusation.proof_type))
+            .map(|d| d.evidence.clone())
+            .unwrap_or_default();
         if let Err(err) = self.bus.publish(
             AccusationQuorumReached {
                 e3_id: self.e3_id.clone(),
@@ -991,6 +1034,7 @@ impl AccusationManager {
                 votes_for: pending.votes_for,
                 votes_against: pending.votes_against,
                 outcome,
+                evidence,
             },
             ec.clone(),
         ) {
@@ -1033,12 +1077,14 @@ impl AccusationManager {
         proof_type: ProofType,
         data_hash: [u8; 32],
         passed: bool,
+        evidence: Bytes,
     ) {
         self.received_data.insert(
             (accused, proof_type),
             ReceivedProofData {
                 data_hash,
                 verification_passed: passed,
+                evidence,
             },
         );
     }
@@ -1093,6 +1139,7 @@ impl AccusationManager {
             reverif.proof_type,
             reverif.data_hash,
             zk_passed,
+            reverif.evidence.clone(),
         );
 
         // Get ec from the PendingAccusation
@@ -1217,12 +1264,20 @@ impl Handler<TypedEvent<ProofVerificationPassed>> for AccusationManager {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let (data, _ec) = msg.into_components();
-        // Cache successful verification for voting on future accusations
+        // Cache successful verification for voting on future accusations.
+        // Evidence preimage = `abi.encode(proof.data, public_signals)`.
+        let evidence: Bytes = (
+            Bytes::copy_from_slice(&data.proof_data),
+            Bytes::copy_from_slice(&data.public_signals),
+        )
+            .abi_encode()
+            .into();
         self.received_data.insert(
             (data.address, data.proof_type),
             ReceivedProofData {
                 data_hash: data.data_hash,
                 verification_passed: true,
+                evidence,
             },
         );
     }
