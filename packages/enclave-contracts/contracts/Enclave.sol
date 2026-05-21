@@ -339,7 +339,6 @@ contract Enclave is
         e3.requester = msg.sender;
 
         bytes memory e3ProgramParams = paramSetRegistry[requestParams.paramSet];
-        require(e3ProgramParams.length > 0, "BFV param set not registered");
 
         bytes32 encryptionSchemeId = requestParams.e3Program.validate(
             e3Id,
@@ -689,7 +688,7 @@ contract Enclave is
     }
 
     /// @inheritdoc IEnclave
-    function enableE3Program(IE3Program e3Program) public {
+    function enableE3Program(IE3Program e3Program) external {
         require(
             !e3Programs[e3Program],
             ModuleAlreadyEnabled(address(e3Program))
@@ -699,7 +698,7 @@ contract Enclave is
     }
 
     /// @inheritdoc IEnclave
-    function disableE3Program(IE3Program e3Program) public onlyOwner {
+    function disableE3Program(IE3Program e3Program) external onlyOwner {
         require(e3Programs[e3Program], ModuleNotEnabled(address(e3Program)));
         delete e3Programs[e3Program];
         emit E3ProgramDisabled(e3Program);
@@ -709,7 +708,7 @@ contract Enclave is
     function setDecryptionVerifier(
         bytes32 encryptionSchemeId,
         IDecryptionVerifier decryptionVerifier
-    ) public onlyOwner {
+    ) external onlyOwner {
         require(
             decryptionVerifier != IDecryptionVerifier(address(0)) &&
                 decryptionVerifiers[encryptionSchemeId] != decryptionVerifier,
@@ -723,7 +722,7 @@ contract Enclave is
     function setPkVerifier(
         bytes32 encryptionSchemeId,
         IPkVerifier pkVerifier
-    ) public onlyOwner {
+    ) external onlyOwner {
         require(
             address(pkVerifier) != address(0) &&
                 pkVerifiers[encryptionSchemeId] != pkVerifier,
@@ -736,7 +735,7 @@ contract Enclave is
     /// @inheritdoc IEnclave
     function disableEncryptionScheme(
         bytes32 encryptionSchemeId
-    ) public onlyOwner {
+    ) external onlyOwner {
         require(
             decryptionVerifiers[encryptionSchemeId] !=
                 IDecryptionVerifier(address(0)),
@@ -758,7 +757,7 @@ contract Enclave is
     function setParamSet(
         uint8 paramSet,
         bytes calldata encodedParams
-    ) public onlyOwner {
+    ) external onlyOwner {
         require(encodedParams.length > 0, "Empty params");
         bytes memory previous = paramSetRegistry[paramSet];
         paramSetRegistry[paramSet] = encodedParams;
@@ -786,7 +785,7 @@ contract Enclave is
     /// @param _slashingManager The new Slashing Manager contract address
     function setSlashingManager(
         ISlashingManager _slashingManager
-    ) public onlyOwner {
+    ) external onlyOwner {
         require(
             address(_slashingManager) != address(0),
             "Invalid SlashingManager address"
@@ -884,8 +883,9 @@ contract Enclave is
             reason > 0 && reason <= uint8(FailureReason._MAX_FAILURE_REASON),
             "Invalid failure reason"
         );
-        // Mark E3 as failed with the given reason
-        _markE3FailedWithReason(e3Id, FailureReason(reason));
+        E3Stage current = _e3Stages[e3Id];
+        EnclavePricing.validateMarkFailedStage(e3Id, uint8(current));
+        _markE3FailedWithReason(e3Id, current, FailureReason(reason));
     }
 
     ////////////////////////////////////////////////////////////
@@ -927,24 +927,18 @@ contract Enclave is
             }
         }
 
-        _e3Stages[e3Id] = E3Stage.Failed;
-        _e3FailureReasons[e3Id] = reason;
-
-        emit E3StageChanged(e3Id, current, E3Stage.Failed);
-        emit E3Failed(e3Id, current, reason);
+        _markE3FailedWithReason(e3Id, current, reason);
     }
 
     /// @notice Internal function to mark E3 as failed with specific reason
     /// @param e3Id The E3 ID
+    /// @param current The current stage (already loaded by caller)
     /// @param reason The failure reason
     function _markE3FailedWithReason(
         uint256 e3Id,
+        E3Stage current,
         FailureReason reason
     ) internal {
-        E3Stage current = _e3Stages[e3Id];
-
-        EnclavePricing.validateMarkFailedStage(e3Id, uint8(current));
-
         _e3Stages[e3Id] = E3Stage.Failed;
         _e3FailureReasons[e3Id] = reason;
 
@@ -1077,7 +1071,9 @@ contract Enclave is
     }
 
     /// @inheritdoc IEnclave
-    function setPricingConfig(PricingConfig calldata config) public onlyOwner {
+    function setPricingConfig(
+        PricingConfig calldata config
+    ) external onlyOwner {
         // Validation is delegated to {EnclavePricing.validatePricingConfig}
         // (external library link) to keep the deployed Enclave runtime
         // bytecode under the EIP-170 24,576-byte cap. Revert selectors are
@@ -1141,14 +1137,14 @@ contract Enclave is
     /// @inheritdoc IEnclave
     function getDecryptionVerifier(
         bytes32 encryptionSchemeId
-    ) public view returns (IDecryptionVerifier) {
+    ) external view returns (IDecryptionVerifier) {
         return decryptionVerifiers[encryptionSchemeId];
     }
 
     /// @inheritdoc IEnclave
     function getPkVerifier(
         bytes32 encryptionSchemeId
-    ) public view returns (IPkVerifier) {
+    ) external view returns (IPkVerifier) {
         return pkVerifiers[encryptionSchemeId];
     }
 

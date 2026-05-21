@@ -131,12 +131,11 @@ describe("Enclave — pull payments + fee-token allow-list", function () {
       await operator2.getAddress(),
       await operator3.getAddress(),
     ];
-    await setupAndPublishCommittee(
-      ciphernodeRegistryContract,
-      e3Id,
-      "0x1234",
-      [operator1, operator2, operator3],
-    );
+    await setupAndPublishCommittee(ciphernodeRegistryContract, e3Id, "0x1234", [
+      operator1,
+      operator2,
+      operator3,
+    ]);
     await time.increase(inputWindowDuration + 200);
     await enclave.publishCiphertextOutput(e3Id, data, proof);
     await enclave.publishPlaintextOutput(e3Id, data, proof);

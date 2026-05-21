@@ -116,10 +116,16 @@ contract BfvPkVerifier is IPkVerifier {
         }
 
         // Bind to the on-chain committee hash (hi/lo split per Noir field convention).
-        if (publicInputs[committeeHashHiIdx] != CommitteeHashLib.hi(committeeHash)) {
+        if (
+            publicInputs[committeeHashHiIdx] !=
+            CommitteeHashLib.hi(committeeHash)
+        ) {
             revert DomainBindingMismatch();
         }
-        if (publicInputs[committeeHashLoIdx] != CommitteeHashLib.lo(committeeHash)) {
+        if (
+            publicInputs[committeeHashLoIdx] !=
+            CommitteeHashLib.lo(committeeHash)
+        ) {
             revert DomainBindingMismatch();
         }
 

@@ -18,6 +18,7 @@ import {
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture } = networkHelpers;
+const [testSigner] = await ethers.getSigners();
 
 /** Must match `BfvDecryptionVerifier.MESSAGE_COEFFS_COUNT` / circuit `MAX_MSG_NON_ZERO_COEFFS`. */
 const MESSAGE_COEFFS_COUNT = 100;
@@ -121,11 +122,11 @@ describe("BfvDecryptionVerifier", function () {
     return { bfvDecryptionVerifier: dv, mockCircuit: mc };
   };
 
-  /** Dummy contextual params — passed through to verify but not validated against circuit outputs. */
+  /** Contextual params forwarded to verify; not checked against circuit outputs (future domain binding). */
   const ctx = () => {
     const e3Id = 7n;
-    const root = 1234n;
-    const nodes = [ethers.ZeroAddress];
+    const root = BigInt(ethers.id("test-root"));
+    const nodes = [testSigner.address];
     const ciphertextHash = ethers.id("ct-hash");
     const committeePk = ethers.id("committee-pk");
     return { e3Id, root, nodes, ciphertextHash, committeePk };
@@ -133,7 +134,9 @@ describe("BfvDecryptionVerifier", function () {
 
   describe("reverts", function () {
     it("reverts on invalid proof encoding", async function () {
-      const { bfvDecryptionVerifier } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier } = await loadFixture(
+        deployWithMockCircuit,
+      );
       const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
       const plaintextHash = ethers.keccak256("0x1234");
 
@@ -152,7 +155,9 @@ describe("BfvDecryptionVerifier", function () {
     });
 
     it("reverts InvalidPublicInputsLength when length differs from expected (M-34)", async function () {
-      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
@@ -182,7 +187,9 @@ describe("BfvDecryptionVerifier", function () {
     });
 
     it("reverts InvalidPublicInputsLength when length exceeds expected", async function () {
-      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
@@ -212,7 +219,9 @@ describe("BfvDecryptionVerifier", function () {
     });
 
     it("reverts VkHashMismatch when c6_fold key hash does not match (M-34)", async function () {
-      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
@@ -240,7 +249,9 @@ describe("BfvDecryptionVerifier", function () {
     });
 
     it("reverts VkHashMismatch when c7 key hash does not match (M-34)", async function () {
-      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
@@ -268,7 +279,9 @@ describe("BfvDecryptionVerifier", function () {
     });
 
     it("reverts DomainBindingMismatch when committee hash hi limb mismatches (C-08)", async function () {
-      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
@@ -304,7 +317,9 @@ describe("BfvDecryptionVerifier", function () {
     });
 
     it("reverts PlaintextHashMismatch when message coeffs don't hash to plaintextHash", async function () {
-      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
@@ -331,7 +346,9 @@ describe("BfvDecryptionVerifier", function () {
     });
 
     it("reverts InvalidProof when circuit verifier returns false (M-35)", async function () {
-      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(false);
       const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
@@ -386,16 +403,15 @@ describe("BfvDecryptionVerifier", function () {
           ethers.ZeroHash,
           proof,
         ),
-      ).to.be.revertedWithCustomError(
-        bfvDecryptionVerifier,
-        "VkHashMismatch",
-      );
+      ).to.be.revertedWithCustomError(bfvDecryptionVerifier, "VkHashMismatch");
     });
   });
 
   describe("success", function () {
     it("returns true with mock ICircuitVerifier and matching plaintext hash", async function () {
-      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
@@ -418,7 +434,9 @@ describe("BfvDecryptionVerifier", function () {
     });
 
     it("returns true with exact-length public inputs", async function () {
-      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
@@ -444,7 +462,9 @@ describe("BfvDecryptionVerifier", function () {
     });
 
     it("returns true when committee hash matches proof slots 2/3 (hi/lo)", async function () {
-      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
@@ -473,7 +493,9 @@ describe("BfvDecryptionVerifier", function () {
     });
 
     it("verifies all-zero message coefficients", async function () {
-      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
@@ -496,7 +518,9 @@ describe("BfvDecryptionVerifier", function () {
     });
 
     it("verifies all 100 message coefficients", async function () {
-      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
@@ -524,19 +548,25 @@ describe("BfvDecryptionVerifier", function () {
 
   describe("immutables (M-34)", function () {
     it("exposes correct threshold", async function () {
-      const { bfvDecryptionVerifier } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier } = await loadFixture(
+        deployWithMockCircuit,
+      );
       expect(await bfvDecryptionVerifier.threshold()).to.equal(THRESHOLD);
     });
 
     it("exposes correct expectedC6FoldKeyHash", async function () {
-      const { bfvDecryptionVerifier } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier } = await loadFixture(
+        deployWithMockCircuit,
+      );
       expect(await bfvDecryptionVerifier.expectedC6FoldKeyHash()).to.equal(
         EXPECTED_C6_FOLD_KEY_HASH,
       );
     });
 
     it("exposes correct expectedC7KeyHash", async function () {
-      const { bfvDecryptionVerifier } = await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier } = await loadFixture(
+        deployWithMockCircuit,
+      );
       expect(await bfvDecryptionVerifier.expectedC7KeyHash()).to.equal(
         EXPECTED_C7_KEY_HASH,
       );

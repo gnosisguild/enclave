@@ -15,6 +15,7 @@ import {
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture } = networkHelpers;
+const [testSigner] = await ethers.getSigners();
 
 const EXPECTED_NODES_FOLD_KEY_HASH = ethers.id("nodes_fold");
 const EXPECTED_C5_KEY_HASH = ethers.id("c5");
@@ -74,11 +75,11 @@ describe("BfvPkVerifier", function () {
     return { bfvPkVerifier: pk, mockCircuit: mc };
   };
 
-  /** Dummy contextual params — passed through to verify but not validated against circuit outputs. */
+  /** Contextual params forwarded to verify; not checked against circuit outputs (future domain binding). */
   const ctx = () => ({
     e3Id: 7n,
-    root: 1234n,
-    nodes: [ethers.ZeroAddress],
+    root: BigInt(ethers.id("test-root")),
+    nodes: [testSigner.address],
   });
 
   describe("reverts", function () {
@@ -215,7 +216,9 @@ describe("BfvPkVerifier", function () {
     });
 
     it("reverts DomainBindingMismatch when committeeHash hi/lo does not match public inputs (C-08)", async function () {
-      const { bfvPkVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvPkVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes } = ctx();
 
@@ -223,7 +226,10 @@ describe("BfvPkVerifier", function () {
       const wrongCommitteeHash = ethers.id("wrong-committee");
       const pkCommitment = ethers.keccak256("0xabcd");
       // proof encodes real committeeHash in hi/lo slots
-      const publicInputs = minimalDkgPublicInputs(pkCommitment, realCommitteeHash);
+      const publicInputs = minimalDkgPublicInputs(
+        pkCommitment,
+        realCommitteeHash,
+      );
       const proof = encodeProof("0x01", publicInputs);
 
       // pass wrong committeeHash — hi/lo mismatch
@@ -240,7 +246,9 @@ describe("BfvPkVerifier", function () {
     });
 
     it("reverts PkCommitmentMismatch when last slot != pkCommitment (M-34)", async function () {
-      const { bfvPkVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvPkVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes } = ctx();
 
@@ -262,7 +270,9 @@ describe("BfvPkVerifier", function () {
     });
 
     it("reverts InvalidProof when underlying circuit verifier returns false (M-35)", async function () {
-      const { bfvPkVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvPkVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(false);
       const { e3Id, root, nodes } = ctx();
 
@@ -316,7 +326,9 @@ describe("BfvPkVerifier", function () {
 
   describe("success", function () {
     it("returns true when commitment matches and circuit verifier passes", async function () {
-      const { bfvPkVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvPkVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes } = ctx();
 
@@ -336,7 +348,9 @@ describe("BfvPkVerifier", function () {
     });
 
     it("returns true with exact-length public inputs", async function () {
-      const { bfvPkVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvPkVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes } = ctx();
 
@@ -357,7 +371,9 @@ describe("BfvPkVerifier", function () {
     });
 
     it("returns true when committee hash matches proof slots hi/lo", async function () {
-      const { bfvPkVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      const { bfvPkVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
       await mockCircuit.setReturnValue(true);
       const { e3Id, root, nodes } = ctx();
 

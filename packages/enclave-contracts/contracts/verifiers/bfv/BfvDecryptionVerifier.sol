@@ -121,10 +121,16 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
         }
 
         // Bind to the on-chain committee hash (hi/lo split per Noir field convention).
-        if (publicInputs[COMMITTEE_HASH_HI_IDX] != CommitteeHashLib.hi(committeeHash)) {
+        if (
+            publicInputs[COMMITTEE_HASH_HI_IDX] !=
+            CommitteeHashLib.hi(committeeHash)
+        ) {
             revert DomainBindingMismatch();
         }
-        if (publicInputs[COMMITTEE_HASH_LO_IDX] != CommitteeHashLib.lo(committeeHash)) {
+        if (
+            publicInputs[COMMITTEE_HASH_LO_IDX] !=
+            CommitteeHashLib.lo(committeeHash)
+        ) {
             revert DomainBindingMismatch();
         }
 
