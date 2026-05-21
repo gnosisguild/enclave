@@ -19,19 +19,19 @@ function fmtUsdc(v: bigint | undefined): string {
   return `${formatUnits(v, FEE_DECIMALS)} USDC`
 }
 
-export function adaptTodaysPoll(detail: E3FullDetails): Poll {
-  const meta = pollMetaFor(detail.id)
-  const openedTs = detail.inputWindow[0]
-  const closesTs = detail.inputWindow[1]
+export function adaptPoll(s: E3Summary): Poll {
+  const meta = pollMetaFor(s.id)
+  const openedTs = s.inputWindow[0]
+  const closesTs = s.inputWindow[1]
 
   return {
-    id: formatE3Id(detail.id),
+    id: formatE3Id(s.id),
     question: meta.question,
     context: meta.context,
     opened: openedTs > 0n ? fmtUtc(openedTs) : '—',
     closes: closesTs > 0n ? fmtUtc(closesTs) : '—',
     closesTs: Number(closesTs),
-    ballotCount: detail.ballotCount,
+    ballotCount: s.ballotCount,
   }
 }
 
@@ -44,7 +44,7 @@ export function adaptHistoryEntries(list: E3Summary[], detailsCache: Map<string,
       question: meta.question,
       closed: s.inputWindow[1] > 0n ? fmtDate(s.inputWindow[1]) : 'in progress',
       duration: s.inputWindow[1] > s.inputWindow[0] && s.inputWindow[0] > 0n ? fmtDuration(s.inputWindow[1] - s.inputWindow[0]) : '—',
-      ballotCount: detail?.ballotCount ?? 0,
+      ballotCount: s.ballotCount,
       result: historyResult(s, detail, meta),
     }
   })
