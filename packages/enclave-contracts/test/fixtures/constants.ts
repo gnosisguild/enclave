@@ -20,9 +20,11 @@ export const THIRTY_DAYS = 30 * ONE_DAY;
 // ── Sortition ────────────────────────────────────────────────────────────────
 export const SORTITION_SUBMISSION_WINDOW = 10;
 
-// ── Encryption scheme (keccak256("fhe.bfv.2.0")) ────────────────────────────
-export const ENCRYPTION_SCHEME_ID =
-  "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
+// ── Encryption scheme ───────────────────────────────────────────────────────
+// Derived from the same string the BFV verifier wrappers and
+// `MockE3Program` use (`keccak256("fhe.rs:BFV")`) so the test constant
+// stays aligned with the contracts if either side ever changes.
+export const ENCRYPTION_SCHEME_ID = ethers.id("fhe.rs:BFV");
 
 // ── Fake ciphertext / proof payloads used across spec files ──────────────────
 export const DATA = "0xda7a";

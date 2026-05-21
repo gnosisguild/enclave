@@ -39,8 +39,10 @@ contract MockBlacklistUSDC is ERC20 {
         address to,
         uint256 value
     ) internal override {
-        if (isBlacklisted[from]) revert Blacklisted(from);
-        if (isBlacklisted[to]) revert Blacklisted(to);
+        // Skip blacklist check for mint (from == 0) and burn (to == 0)
+        // so seeding/burning balances cannot be bricked by the mock.
+        if (from != address(0) && isBlacklisted[from]) revert Blacklisted(from);
+        if (to != address(0) && isBlacklisted[to]) revert Blacklisted(to);
         super._update(from, to, value);
     }
 }

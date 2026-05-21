@@ -775,6 +775,10 @@ contract SlashingManager is
     function unbanNode(address node, bytes32 reason) external onlyGovernance {
         require(node != address(0), ZeroAddress());
         banned[node] = false;
+        if (_pendingBans[node].proposer != address(0)) {
+            delete _pendingBans[node];
+            emit BanCancelled(node, msg.sender);
+        }
         emit NodeBanUpdated(node, false, reason, msg.sender);
     }
 
@@ -788,6 +792,10 @@ contract SlashingManager is
         // bans must use the two-step `proposeBan` / `confirmBan` flow.
         require(!status, BanRequiresConfirmation());
         banned[node] = false;
+        if (_pendingBans[node].proposer != address(0)) {
+            delete _pendingBans[node];
+            emit BanCancelled(node, msg.sender);
+        }
         emit NodeBanUpdated(node, false, reason, msg.sender);
     }
 

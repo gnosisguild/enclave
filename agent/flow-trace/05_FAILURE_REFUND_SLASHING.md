@@ -258,10 +258,9 @@ Same scenario as above, then 2 nodes are slashed for 300,000 each:
 
 **Actor:** `AccusationManager` (`crates/zk-prover/src/actors/accusation_manager.rs`)
 
-The AccusationManager is a per-E3 ephemeral actor created when `SortitionCommitteeFinalized`
-(the `ICiphernodeRegistry` event) fires. It
-bridges proof verification failures to on-chain slashing through an off-chain committee quorum
-protocol.
+The AccusationManager is a per-E3 ephemeral actor created when `SortitionCommitteeFinalized` (the
+`ICiphernodeRegistry` event) fires. It bridges proof verification failures to on-chain slashing
+through an off-chain committee quorum protocol.
 
 ```
 LIFECYCLE:
@@ -780,9 +779,12 @@ _applySlashedFunds(e3Id, amount):
 │   → Surplus (after requester is whole) goes to honest nodes
 │
 ├─ H-08: if dist.honestNodeCount == 0 and toHonestNodes > 0,
-│   redirect toHonestNodes into toRequester. Same rationale as
-│   calculateRefund's H-08 guard — the honest-node bucket would
-│   otherwise be unclaimable.
+│   route toHonestNodes to the treasury pull-credit pool
+│   (_pendingTreasury[treasury][feeToken]) and emit
+│   TreasurySlashedCredited. The requester cap (originalPayment)
+│   is preserved; the honest-node bucket would otherwise be
+│   unclaimable since `claimHonestNodeReward` reverts when
+│   honestNodeCount == 0.
 │
 ├─ dist.requesterAmount += toRequester
 ├─ dist.honestNodeAmount += toHonestNodes

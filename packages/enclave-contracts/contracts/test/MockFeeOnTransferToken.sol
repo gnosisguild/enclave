@@ -7,10 +7,11 @@ pragma solidity >=0.8.27;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-/// @notice Minimal ERC-20 that burns a configurable basis-point fee on every
-///         `transfer` / `transferFrom`. Used in tests to validate that the
-///         BondingRegistry's license-payout paths detect short transfers
-///.
+/// @notice Minimal ERC-20 that redirects a configurable basis-point fee to a
+///         dead-address sink (`0xdead`) on every `transfer` / `transferFrom`
+///         (total supply is unchanged; the fee portion is not actually burned).
+///         Used in tests to validate that the BondingRegistry's license-payout
+///         paths detect short transfers.
 contract MockFeeOnTransferToken is ERC20 {
     uint256 public feeBps;
 

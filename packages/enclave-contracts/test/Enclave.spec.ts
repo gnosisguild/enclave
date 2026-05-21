@@ -34,9 +34,9 @@ describe("Enclave", function () {
     return {
       owner: sys.owner,
       notTheOwner: sys.notTheOwner,
-      operator1: sys.operator1,
-      operator2: sys.operator2,
-      operator3: sys.operator3,
+      operator1: sys.operator1!,
+      operator2: sys.operator2!,
+      operator3: sys.operator3!,
       enclave: sys.enclave,
       ciphernodeRegistryContract: sys.ciphernodeRegistry,
       bondingRegistry: sys.bondingRegistry,

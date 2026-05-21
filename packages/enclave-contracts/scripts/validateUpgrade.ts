@@ -40,17 +40,17 @@ interface StorageLayout {
 }
 
 const UPGRADEABLE_CONTRACTS: { source: string; contract: string }[] = [
-  { source: "project/contracts/Enclave.sol", contract: "Enclave" },
+  { source: "contracts/Enclave.sol", contract: "Enclave" },
   {
-    source: "project/contracts/registry/CiphernodeRegistryOwnable.sol",
+    source: "contracts/registry/CiphernodeRegistryOwnable.sol",
     contract: "CiphernodeRegistryOwnable",
   },
   {
-    source: "project/contracts/registry/BondingRegistry.sol",
+    source: "contracts/registry/BondingRegistry.sol",
     contract: "BondingRegistry",
   },
   {
-    source: "project/contracts/E3RefundManager.sol",
+    source: "contracts/E3RefundManager.sol",
     contract: "E3RefundManager",
   },
 ];

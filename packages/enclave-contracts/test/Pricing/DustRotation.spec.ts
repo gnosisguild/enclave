@@ -47,14 +47,17 @@ describe("Pricing — per-E3 dust rotation across consecutive E3s", function () 
     });
     const {
       owner,
-      operator1,
-      operator2,
-      operator3,
+      operator1: operator1Maybe,
+      operator2: operator2Maybe,
+      operator3: operator3Maybe,
       enclave,
       ciphernodeRegistry: ciphernodeRegistryContract,
       usdcToken: feeToken,
       mocks: { e3Program, decryptionVerifier },
     } = sys;
+    const operator1 = operator1Maybe!;
+    const operator2 = operator2Maybe!;
+    const operator3 = operator3Maybe!;
     const [, , , , , treasury] = await ethers.getSigners();
     const treasuryAddress = await treasury.getAddress();
     const ownerAddress = await owner.getAddress();

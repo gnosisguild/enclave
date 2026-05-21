@@ -70,9 +70,9 @@ describe("E3 Pricing", function () {
     return {
       owner: sys.owner,
       notTheOwner: sys.notTheOwner,
-      operator1: sys.operator1,
-      operator2: sys.operator2,
-      operator3: sys.operator3,
+      operator1: sys.operator1!,
+      operator2: sys.operator2!,
+      operator3: sys.operator3!,
       treasury: treasurySigner,
       enclave: sys.enclave,
       ciphernodeRegistryContract: sys.ciphernodeRegistry,

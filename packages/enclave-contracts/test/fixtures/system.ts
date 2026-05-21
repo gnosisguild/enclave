@@ -184,9 +184,9 @@ export interface EnclaveSystem {
   notTheOwner: Signer;
   operators: Signer[];
   /** First 3 onboarded operators (when `setupOperators >= 3`). */
-  operator1: Signer;
-  operator2: Signer;
-  operator3: Signer;
+  operator1: Signer | undefined;
+  operator2: Signer | undefined;
+  operator3: Signer | undefined;
   /** Resolved treasury signer for `E3RefundManager`. */
   treasury: Signer;
   /** Resolved slashedFundsTreasury signer for `BondingRegistry`. */
@@ -221,6 +221,11 @@ export async function deployEnclaveSystem(
   const signers = await ethers.getSigners();
   const [owner, notTheOwner] = signers;
   const ownerAddress = await owner.getAddress();
+  if (setupOperators > signers.length - 2) {
+    throw new Error(
+      `setupOperators (${setupOperators}) exceeds available signers (${signers.length - 2})`,
+    );
+  }
   const operators: Signer[] = [];
   for (let i = 0; i < setupOperators; i++) {
     operators.push(signers[2 + i]);

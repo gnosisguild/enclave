@@ -45,6 +45,14 @@ export const deployAndSaveSlashingManager = async ({
   const delay =
     initialDelay !== undefined ? BigInt(initialDelay) : DEFAULT_ADMIN_DELAY;
 
+  // Reject zero delay: a zero `initialDelay` collapses the two-step
+  // DEFAULT_ADMIN_ROLE handover (M-17) into a single transaction.
+  if (delay === 0n) {
+    throw new Error(
+      "SlashingManager initialDelay must be > 0 (two-step admin handover)",
+    );
+  }
+
   const preDeployedArgs = readDeploymentArgs("SlashingManager", chain);
 
   if (

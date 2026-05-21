@@ -39,9 +39,9 @@ describe("CiphernodeRegistryOwnable", function () {
     return {
       owner: sys.owner,
       notTheOwner: sys.notTheOwner,
-      operator1: sys.operator1,
-      operator2: sys.operator2,
-      operator3: sys.operator3,
+      operator1: sys.operator1!,
+      operator2: sys.operator2!,
+      operator3: sys.operator3!,
       registry: sys.ciphernodeRegistry,
       enclave: sys.enclave,
       bondingRegistry: sys.bondingRegistry,

@@ -44,9 +44,9 @@ describe("Enclave — pull payments + fee-token allow-list", function () {
     });
     const {
       owner,
-      operator1,
-      operator2,
-      operator3,
+      operator1: operator1Maybe,
+      operator2: operator2Maybe,
+      operator3: operator3Maybe,
       enclave,
       ciphernodeRegistry: ciphernodeRegistryContract,
       bondingRegistry,
@@ -55,6 +55,9 @@ describe("Enclave — pull payments + fee-token allow-list", function () {
       usdcToken: feeToken,
       mocks: { e3Program, decryptionVerifier },
     } = sys;
+    const operator1 = operator1Maybe!;
+    const operator2 = operator2Maybe!;
+    const operator3 = operator3Maybe!;
     const [, , , , , treasury] = await ethers.getSigners();
     const treasuryAddress = await treasury.getAddress();
 

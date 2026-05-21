@@ -283,7 +283,8 @@ export const deployEnclave = async (
     );
   }
   console.log(`Granting SLASHER_ROLE to ${slasherAddress}...`);
-  await slashingManager.addSlasher(slasherAddress);
+  const addSlasherTx = await slashingManager.addSlasher(slasherAddress);
+  await addSlasherTx.wait();
   const slasherRole = await slashingManager.SLASHER_ROLE();
   const slasherGranted = await slashingManager.hasRole(
     slasherRole,

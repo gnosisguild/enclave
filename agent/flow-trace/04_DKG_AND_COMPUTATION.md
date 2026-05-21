@@ -643,9 +643,9 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 > `verify(e3Id, committeeRoot, sortedNodes, pkCommitment, committeeHash, proof)` signature.
 > `committeeHash` (computed on-chain as `keccak256(abi.encodePacked(c.topNodes))`) is split into
 > 128-bit Noir field limbs and checked against `publicInputs[committeeHashHiIdx]` and
-> `publicInputs[committeeHashLoIdx]`, binding the proof to the specific committee.
-> The contextual params `(e3Id, committeeRoot, sortedNodes)` are forwarded for interface
-> compatibility and future circuit-level binding.
+> `publicInputs[committeeHashLoIdx]`, binding the proof to the specific committee. The contextual
+> params `(e3Id, committeeRoot, sortedNodes)` are forwarded for interface compatibility and future
+> circuit-level binding.
 
 ---
 
