@@ -73,13 +73,6 @@ describe("Enclave", function () {
     "DkgFoldAttestation(uint256 chainId,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)",
   );
 
-  /** ABI-encoded fake DKG proof for `MockPkVerifier` (last public input must equal `pkCommitment`). */
-  const encodeMockDkgProof = (pkCommitment: string): string =>
-    ethers.AbiCoder.defaultAbiCoder().encode(
-      ["bytes", "bytes32[]"],
-      ["0x", [pkCommitment]],
-    );
-
   /** Public inputs layout for `DkgFoldAttestationVerifier` with `h` honest parties. */
   const encodeMockDkgProofForAttestation = (
     pkCommitment: string,
