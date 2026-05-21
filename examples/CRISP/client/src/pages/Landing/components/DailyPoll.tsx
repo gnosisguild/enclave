@@ -70,6 +70,7 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
       if (trackedRoundId.current !== roundState.id) {
         trackedRoundId.current = roundState.id
         setTallyReady(false)
+        setIsEnded(false)
       }
 
       const block = await client.getBlock()
