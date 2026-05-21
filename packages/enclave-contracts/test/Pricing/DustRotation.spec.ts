@@ -104,7 +104,6 @@ describe("Pricing — per-E3 dust rotation across consecutive E3s", function () 
           ["0x1234567890123456789012345678901234567890"],
         ),
         proofAggregationEnabled: false,
-        maxFee: 0,
       } as any;
     };
 
@@ -124,7 +123,6 @@ describe("Pricing — per-E3 dust rotation across consecutive E3s", function () 
           ["0x1234567890123456789012345678901234567890"],
         ),
         proofAggregationEnabled: false,
-        maxFee: 0,
       };
       await feeToken.approve(await enclave.getAddress(), ethers.MaxUint256);
       await enclave.request(req);

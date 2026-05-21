@@ -353,7 +353,6 @@ describe("E3 Pricing", function () {
           ["0x1234567890123456789012345678901234567890"],
         ),
         proofAggregationEnabled: false,
-        maxFee: 0,
       };
 
       // Make request with large approval to avoid fee mismatch
@@ -442,7 +441,6 @@ describe("E3 Pricing", function () {
           ["0x1234567890123456789012345678901234567890"],
         ),
         proofAggregationEnabled: false,
-        maxFee: 0,
       };
 
       // Make request with large approval

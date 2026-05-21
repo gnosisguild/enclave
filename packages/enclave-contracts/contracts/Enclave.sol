@@ -284,9 +284,8 @@ contract Enclave is
             requestParams.committeeSize
         ];
 
-        // Input-window / duration / maxFee gates are enforced by
+        // Input-window / duration gates are enforced by
         // {EnclavePricing.validateRequest} (external library link, EIP-170 cap).
-        // `maxFee == 0` means "no cap".
         require(
             e3Programs[requestParams.e3Program],
             E3ProgramNotAllowed(requestParams.e3Program)
@@ -299,8 +298,7 @@ contract Enclave is
             _timeoutConfig.computeWindow,
             _timeoutConfig.decryptionWindow,
             maxDuration,
-            e3Fee,
-            requestParams.maxFee
+            e3Fee
         );
 
         e3Id = nexte3Id;

@@ -199,7 +199,6 @@ describe("Enclave", function () {
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
         proofAggregationEnabled: false,
-        maxFee: 0,
       });
 
       const e3 = await enclave.getE3(0);
@@ -404,7 +403,6 @@ describe("Enclave", function () {
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
           proofAggregationEnabled: false,
-          maxFee: 0,
         }),
       ).to.be.revertedWithCustomError(usdcToken, "ERC20InsufficientAllowance");
     });
@@ -420,7 +418,6 @@ describe("Enclave", function () {
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
           proofAggregationEnabled: false,
-          maxFee: 0,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "CommitteeSizeNotConfigured")
@@ -441,7 +438,6 @@ describe("Enclave", function () {
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
           proofAggregationEnabled: false,
-          maxFee: 0,
         }),
       ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
     });
@@ -457,7 +453,6 @@ describe("Enclave", function () {
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
           proofAggregationEnabled: false,
-          maxFee: 0,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "E3ProgramNotAllowed")
@@ -475,7 +470,6 @@ describe("Enclave", function () {
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
           proofAggregationEnabled: false,
-          maxFee: 0,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
@@ -492,7 +486,6 @@ describe("Enclave", function () {
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
         proofAggregationEnabled: false,
-        maxFee: 0,
       });
 
       const e3 = await enclave.getE3(0);
@@ -524,7 +517,6 @@ describe("Enclave", function () {
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
         proofAggregationEnabled: false,
-        maxFee: 0,
       });
       const e3 = await enclave.getE3(0);
 
@@ -563,7 +555,6 @@ describe("Enclave", function () {
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
         proofAggregationEnabled: false,
-        maxFee: 0,
       });
 
       await setupAndPublishCommittee(
@@ -639,7 +630,6 @@ describe("Enclave", function () {
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
         proofAggregationEnabled: false,
-        maxFee: 0,
       });
 
       await setupAndPublishCommittee(
@@ -852,7 +842,6 @@ describe("Enclave", function () {
         ...request,
         inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
         proofAggregationEnabled: true,
-        maxFee: 0,
       });
 
       const pkCommitment = ethers.keccak256(data);

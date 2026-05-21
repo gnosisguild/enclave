@@ -204,7 +204,7 @@ library EnclavePricing {
             revert IEnclave.BelowMinThreshold(threshold[0], minThreshold);
     }
 
-    /// @notice Mirrors the input-window / duration / maxFee gates at the top
+    /// @notice Mirrors the input-window / duration gates at the top
     ///         of {Enclave.request}. Reverts with the same selectors so off-
     ///         chain `revertedWithCustomError(enclave, ...)` lookups keep
     ///         working.
@@ -214,15 +214,13 @@ library EnclavePricing {
     /// @param decryptionWindow `_timeoutConfig.decryptionWindow`.
     /// @param maxDuration      The Enclave-wide upper bound.
     /// @param quotedFee        Fee returned by {EnclavePricing.quote}.
-    /// @param maxFee           Requester-supplied price ceiling (0 = none).
     function validateRequest(
         uint256[2] calldata inputWindow,
         uint256 nowTs,
         uint256 computeWindow,
         uint256 decryptionWindow,
         uint256 maxDuration,
-        uint256 quotedFee,
-        uint256 maxFee
+        uint256 quotedFee
     ) external pure {
         if (inputWindow[0] < nowTs)
             revert IEnclave.InvalidInputDeadlineStart(inputWindow[0]);
@@ -234,8 +232,6 @@ library EnclavePricing {
             decryptionWindow;
         if (totalDuration >= maxDuration)
             revert IEnclave.InvalidDuration(totalDuration);
-        if (maxFee != 0 && quotedFee > maxFee)
-            revert IEnclave.MaxFeeExceeded(quotedFee, maxFee);
     }
 
     /// @notice Mirrors {Enclave.setPricingConfig} validation.

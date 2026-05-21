@@ -171,6 +171,7 @@ ThresholdKeyshare receives AllEncryptionKeysCollected
     │  │  Output: esi_sss[num_ciphertexts][N]                   │
     │  └─────────────────────────────────────────────────────────┘
 ```
+
     │
     ├─ ThresholdKeyshare tracks the correlation id for both TrBFV requests:
     │   ├─ `GenPkShareAndSkSss`
@@ -314,11 +315,11 @@ aggregation path can terminate deterministically instead of stalling on missing 
 `PublicKeyAggregator` and `ThresholdPlaintextAggregator` dispatch the aggregator requests instead of
 pairwise folding.
 
-**Failure bridge:** `ProofRequestActor` now converts proof-generation worker failures
-and local proof-signing failures into terminal round failures instead of only
-logging that the proof-bearing artifact will not be published. DKG-path proofs
-(`C0` through `C5`) emit `E3Failed { failed_at_stage: CommitteeFinalized,
-reason: DKGInvalidShares }`; decryption-path proofs (`C6` and `C7`) emit
+**Failure bridge:** `ProofRequestActor` now converts proof-generation worker failures and local
+proof-signing failures into terminal round failures instead of only logging that the proof-bearing
+artifact will not be published. DKG-path proofs (`C0` through `C5`) emit
+`E3Failed { failed_at_stage: CommitteeFinalized, reason: DKGInvalidShares }`; decryption-path proofs
+(`C6` and `C7`) emit
 `E3Failed { failed_at_stage: CiphertextReady, reason: DecryptionInvalidShares }`.
 
 ### Step 6: Collect All Threshold Shares (with C2/C3 Verification)

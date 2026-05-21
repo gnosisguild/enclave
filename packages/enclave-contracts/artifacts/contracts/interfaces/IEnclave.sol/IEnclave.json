@@ -351,22 +351,6 @@
       "type": "error"
     },
     {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "quoted",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "maxFee",
-          "type": "uint256"
-        }
-      ],
-      "name": "MaxFeeExceeded",
-      "type": "error"
-    },
-    {
       "inputs": [],
       "name": "MinSizeBelowMinThreshold",
       "type": "error"
@@ -1603,11 +1587,6 @@
               "internalType": "bool",
               "name": "proofAggregationEnabled",
               "type": "bool"
-            },
-            {
-              "internalType": "uint256",
-              "name": "maxFee",
-              "type": "uint256"
             }
           ],
           "internalType": "struct IEnclave.E3RequestParams",
@@ -2066,11 +2045,6 @@
               "internalType": "bool",
               "name": "proofAggregationEnabled",
               "type": "bool"
-            },
-            {
-              "internalType": "uint256",
-              "name": "maxFee",
-              "type": "uint256"
             }
           ],
           "internalType": "struct IEnclave.E3RequestParams",
@@ -2459,5 +2433,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-ee3e68d8a650a056068588f9d90f1fd47f52f8c7"
+  "buildInfoId": "solc-0_8_28-c51161cea4a45d33ff84bc79e462ea2baa9b3ab6"
 }

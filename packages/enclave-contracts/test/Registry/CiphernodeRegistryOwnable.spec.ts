@@ -78,7 +78,6 @@ describe("CiphernodeRegistryOwnable", function () {
         ["0x1234567890123456789012345678901234567890"],
       ),
       proofAggregationEnabled: false,
-      maxFee: 0,
     };
 
     const fee = await enclave.getE3Quote(requestParams);

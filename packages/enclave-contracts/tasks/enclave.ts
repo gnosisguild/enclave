@@ -235,7 +235,6 @@ export const requestCommittee = task(
         computeProviderParams,
         customParams,
         proofAggregationEnabled,
-        maxFee: 0n,
       };
 
       console.log("Request parameters:", requestParams);

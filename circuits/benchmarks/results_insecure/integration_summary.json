@@ -8,7 +8,7 @@
   "operation_timings": [
     {
       "name": "CalculateDecryptionKey",
-      "avg_seconds": 0.115728250,
+      "avg_seconds": 0.11572825,
       "runs": 3,
       "total_seconds": 0.347184751
     },
@@ -44,15 +44,15 @@
     },
     {
       "name": "ZkDecryptionAggregation",
-      "avg_seconds": 49.047040500,
+      "avg_seconds": 49.0470405,
       "runs": 1,
-      "total_seconds": 49.047040500
+      "total_seconds": 49.0470405
     },
     {
       "name": "ZkDkgAggregation",
-      "avg_seconds": 20.151443750,
+      "avg_seconds": 20.15144375,
       "runs": 1,
-      "total_seconds": 20.151443750
+      "total_seconds": 20.15144375
     },
     {
       "name": "ZkDkgShareDecryption",
@@ -62,15 +62,15 @@
     },
     {
       "name": "ZkNodeDkgFold",
-      "avg_seconds": 62.889247500,
+      "avg_seconds": 62.8892475,
       "runs": 3,
-      "total_seconds": 188.667742500
+      "total_seconds": 188.6677425
     },
     {
       "name": "ZkPkAggregation",
-      "avg_seconds": 2.156797250,
+      "avg_seconds": 2.15679725,
       "runs": 1,
-      "total_seconds": 2.156797250
+      "total_seconds": 2.15679725
     },
     {
       "name": "ZkPkBfv",
@@ -119,7 +119,7 @@
   "timings_seconds": [
     {
       "label": "Starting trbfv actor test",
-      "seconds": 0E-9
+      "seconds": 0e-9
     },
     {
       "label": "Setup completed",

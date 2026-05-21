@@ -241,7 +241,7 @@ describe("BfvVkBindingIntegration", function () {
       const [rawDkgProof, rawDkgPi] = abiCoder.decode(
         ["bytes", "bytes32[]"],
         dkgEncoded,
-      ) as [string, string[]];
+      ) as unknown as [string, string[]];
       expect(
         await dkgCircuit.verify.staticCall(rawDkgProof, [...rawDkgPi]),
       ).to.equal(true);
@@ -260,7 +260,7 @@ describe("BfvVkBindingIntegration", function () {
       const [rawDecProof, rawDecPi] = abiCoder.decode(
         ["bytes", "bytes32[]"],
         decEncoded,
-      ) as [string, string[]];
+      ) as unknown as [string, string[]];
       expect(
         await decCircuit.verify.staticCall(rawDecProof, [...rawDecPi]),
       ).to.equal(true);

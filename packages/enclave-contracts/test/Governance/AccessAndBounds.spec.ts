@@ -4,8 +4,7 @@
 // Covers Ownable2Step + renounceOwnership disabling on the four
 // upgradeable contracts and the two ERC20 tokens, public bounds on
 // Enclave / CiphernodeRegistry / BondingRegistry / E3RefundManager /
-// SlashingManager, the BondingRegistry distributor cap, the MaxFeeExceeded
-// custom error, the PkVerifierSet / SlashingManager setter events, the
+// SlashingManager, the BondingRegistry distributor cap, the PkVerifierSet / SlashingManager setter events, the
 // SortitionCommitteeFinalized event rename, and ParamSetUpdated on
 // `setParamSet` overwrites.
 import { expect } from "chai";
@@ -213,13 +212,6 @@ describe("Governance — access control, bounds & events", function () {
       );
       await bondingRegistry.revokeRewardDistributor(distributors[0]!);
       await bondingRegistry.setRewardDistributor(extra.address);
-    });
-  });
-
-  describe("Enclave.request — MaxFeeExceeded custom error", function () {
-    it("exposes MaxFeeExceeded on ABI", async function () {
-      const { enclave } = await deployAll();
-      expect(enclave.interface.getError("MaxFeeExceeded")).to.not.equal(null);
     });
   });
 

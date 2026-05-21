@@ -354,12 +354,6 @@ interface IEnclave {
     /// @param duration The invalid duration value.
     error InvalidDuration(uint256 duration);
 
-    /// @notice Thrown when the resolved E3 quote exceeds the requester-supplied
-    ///         price ceiling (`E3RequestParams.maxFee`).
-    /// @param quoted  The fee computed by {Enclave.getE3Quote}.
-    /// @param maxFee  The requester-supplied upper bound.
-    error MaxFeeExceeded(uint256 quoted, uint256 maxFee);
-
     /// @notice Thrown when output verification fails.
     /// @param output The invalid output data.
     error InvalidOutput(bytes output);
@@ -516,12 +510,6 @@ interface IEnclave {
         ///         C5 and C7 proofs are always generated and verified on-chain
         ///         regardless of this flag.
         bool proofAggregationEnabled;
-        /// @notice Maximum quoted fee the requester is willing to pay,
-        ///         denominated in the configured fee token. Set to `0` to
-        ///         opt out of the ceiling (legacy callers). When non-zero,
-        ///         {Enclave.request} reverts with {MaxFeeExceeded} if the
-        ///         live quote exceeds this value.
-        uint256 maxFee;
     }
 
     ////////////////////////////////////////////////////////////

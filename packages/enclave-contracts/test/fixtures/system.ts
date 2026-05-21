@@ -503,7 +503,6 @@ export async function deployEnclaveSystem(
       ["0x1234567890123456789012345678901234567890"],
     ),
     proofAggregationEnabled: false,
-    maxFee: 0,
   };
 
   return {

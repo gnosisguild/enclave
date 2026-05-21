@@ -89,8 +89,6 @@ export interface BuildRequestParamsOptions {
   windowDuration?: number;
   /** Defaults to `false`. */
   proofAggregationEnabled?: boolean;
-  /** Defaults to `0n` (no cap). */
-  maxFee?: bigint;
   /** Override custom params bytes. Defaults to an ABI-encoded throwaway address. */
   customParams?: string;
   /** Param-set id registered on the Enclave. Defaults to `0`. */
@@ -131,6 +129,5 @@ export const buildRequestParams = async (
         ["0x1234567890123456789012345678901234567890"],
       ),
     proofAggregationEnabled: opts.proofAggregationEnabled ?? false,
-    maxFee: opts.maxFee ?? 0n,
   };
 };
