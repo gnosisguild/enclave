@@ -50,6 +50,10 @@ contract MockE3Program is IE3Program {
             revert InvalidInput();
         }
         if (address(enclave) != address(0)) {
+            // Test-only: external call to Enclave with no reentrancy guard.
+            // Deliberate — this contract is only deployed in integration tests
+            // and `enclave` is set via `setEnclave` to the trusted Enclave
+            // proxy. Do not copy this pattern into a production E3 program.
             // Pass `data` as the proof too so `MockE3Program.verify` (which
             // requires `proof.length > 0`) returns true.
             enclave.publishCiphertextOutput(e3Id, data, data);

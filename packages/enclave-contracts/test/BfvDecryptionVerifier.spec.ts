@@ -77,6 +77,12 @@ function encodeProof(rawProof: string, publicInputs: string[]): string {
   return abiCoder.encode(["bytes", "bytes32[]"], [rawProof, publicInputs]);
 }
 
+// `BfvDecryptionVerifier.verify` reverts with a granular custom error per
+// failed check (`BadPublicInputsLen`, `BadC6FoldKeyHash`, `BadC7KeyHash`,
+// `BadCommitteeHashHi/Lo`, `BadPlaintextHash`) instead of returning `false`,
+// so failure modes are visible in the revert selector. The bool return is
+// preserved only for the final Honk-verifier call, where `false` reflects
+// the underlying circuit verifier's bool result.
 describe("BfvDecryptionVerifier", function () {
   const deployWithMockCircuit = async () => {
     const [owner] = await ethers.getSigners();

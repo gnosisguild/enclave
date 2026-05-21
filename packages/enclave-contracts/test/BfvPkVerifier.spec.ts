@@ -50,6 +50,13 @@ function encodeProof(rawProof: string, publicInputs: string[]): string {
   return abiCoder.encode(["bytes", "bytes32[]"], [rawProof, publicInputs]);
 }
 
+// `BfvPkVerifier.verify` reverts with a granular custom error per failed
+// check (`BadPublicInputsLen`, `BadNodesFoldKeyHash`, `BadC5KeyHash`,
+// `BadCommitteeHashHi/Lo`, `BadPkCommitment`) instead of returning `false`,
+// so calls like `require(verify(...), InvalidDkgProof())` surface the
+// specific mismatch rather than collapsing to a generic revert. The bool
+// return is preserved only for the final Honk-verifier call, where `false`
+// reflects the underlying circuit verifier's bool result.
 describe("BfvPkVerifier", function () {
   const deployWithMockCircuit = async () => {
     const [owner] = await ethers.getSigners();
