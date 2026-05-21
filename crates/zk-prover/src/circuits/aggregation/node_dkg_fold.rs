@@ -9,14 +9,16 @@
 
 use crate::circuits::aggregation::c3_accumulator::generate_sequential_c3_fold;
 use crate::circuits::aggregation::c6_accumulator::generate_sequential_c6_fold;
-use crate::circuits::aggregation::helpers::u64_to_field_hex;
+use crate::circuits::aggregation::helpers::{address_to_field_hex, u64_to_field_hex};
 use crate::circuits::aggregation::nodes_fold_accumulator::generate_sequential_nodes_fold;
 use crate::circuits::utils::{bytes_to_field_strings, inputs_json_to_input_map};
 use crate::circuits::vk;
 use crate::error::ZkError;
 use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
+use alloy::primitives::Address;
 use e3_events::{CircuitName, CircuitVariant, Proof};
+use e3_fhe_params::BfvPreset;
 use serde::Serialize;
 
 fn proof_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
@@ -295,6 +297,8 @@ pub struct DkgAggregationInput<'a> {
     pub c5_proof: &'a Proof,
     /// Honest party ids in the same order as `node_fold_proofs` (e.g. sorted ascending).
     pub party_ids: &'a [u64],
+    /// Ordered committee addresses (`topNodes` / sortition order) for `committee_hash_*` public inputs.
+    pub committee_addresses: &'a [Address],
 }
 
 #[derive(Serialize)]
@@ -308,6 +312,9 @@ struct DkgAggregatorWitness {
     nodes_fold_key_hash: String,
     c5_key_hash: String,
     party_ids: Vec<String>,
+    committee_members: Vec<String>,
+    committee_hash_hi: String,
+    committee_hash_lo: String,
 }
 
 /// [`CircuitName::DkgAggregator`] over sequential [`CircuitName::NodesFold`] + C5, proved with
@@ -316,8 +323,10 @@ pub fn prove_dkg_aggregation(
     prover: &ZkProver,
     input: &DkgAggregationInput,
     e3_id: &str,
-    artifacts_dir: &str,
+    preset: BfvPreset,
 ) -> Result<Proof, ZkError> {
+    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir = artifacts_dir.as_str();
     if input.node_fold_proofs.len() != input.party_ids.len() {
         return Err(ZkError::InvalidInput(
             "node_fold_proofs and party_ids length mismatch".into(),
@@ -329,6 +338,22 @@ pub fn prove_dkg_aggregation(
         ));
     }
     let h = input.node_fold_proofs.len();
+    // Full on-chain `topNodes` (must match compiled `N_PARTIES` in the circuit artifact).
+    // Do not use `preset.metadata().num_parties` — that is BFV search metadata, not circuit size.
+    let n_registered = input.committee_addresses.len();
+    if n_registered == 0 {
+        return Err(ZkError::InvalidInput(
+            "prove_dkg_aggregation: committee_addresses must be non-empty (on-chain topNodes)"
+                .into(),
+        ));
+    }
+    #[cfg(debug_assertions)]
+    {
+        debug_assert_eq!(
+            h, n_registered,
+            "DkgAggregator honest-set H must equal registered committee size until expulsion enables H < N"
+        );
+    }
     let slot_indices: Vec<u32> = (0u32..h as u32).collect();
     let nodes_fold_proof = generate_sequential_nodes_fold(
         prover,
@@ -355,6 +380,15 @@ pub fn prove_dkg_aggregation(
         .map(u64_to_field_hex)
         .collect();
 
+    let (committee_hash_hi, committee_hash_lo) =
+        e3_utils::committee_hash::committee_hash_field_hex(input.committee_addresses);
+
+    let committee_members: Vec<String> = input
+        .committee_addresses
+        .iter()
+        .map(address_to_field_hex)
+        .collect();
+
     let witness = DkgAggregatorWitness {
         nodes_fold_vk: nodes_fold_vk.verification_key.clone(),
         nodes_fold_proof: proof_field_strings(&nodes_fold_proof)?,
@@ -365,6 +399,9 @@ pub fn prove_dkg_aggregation(
         nodes_fold_key_hash: nodes_fold_vk.key_hash.clone(),
         c5_key_hash: c5_vk.key_hash.clone(),
         party_ids: party_id_fields,
+        committee_members,
+        committee_hash_hi,
+        committee_hash_lo,
     };
 
     let json =
@@ -403,6 +440,9 @@ struct DecryptionAggregatorWitness {
     c7_public: Vec<String>,
     c6_fold_key_hash: String,
     c7_key_hash: String,
+    committee_members: Vec<String>,
+    committee_hash_hi: String,
+    committee_hash_lo: String,
 }
 
 /// Prove [`CircuitName::DecryptionAggregator`] for each job (C6 fold + C7), with
@@ -411,9 +451,12 @@ pub fn prove_decryption_aggregation_jobs(
     prover: &ZkProver,
     c6_total_slots: usize,
     jobs: &[DecryptionAggregationJob],
+    committee_addresses: &[Address],
     e3_id: &str,
-    artifacts_dir: &str,
+    preset: BfvPreset,
 ) -> Result<Vec<Proof>, ZkError> {
+    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir = artifacts_dir.as_str();
     // VKs and the compiled circuit are job-independent: load once, reuse per ciphertext.
     let c6_fold_vk = vk::load_vk_artifacts(
         &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
@@ -429,6 +472,20 @@ pub fn prove_decryption_aggregation_jobs(
         CircuitVariant::Default,
         artifacts_dir,
     )?;
+
+    if committee_addresses.is_empty() {
+        return Err(ZkError::InvalidInput(
+            "prove_decryption_aggregation_jobs: committee_addresses must be non-empty (on-chain topNodes)".into(),
+        ));
+    }
+
+    let (committee_hash_hi, committee_hash_lo) =
+        e3_utils::committee_hash::committee_hash_field_hex(committee_addresses);
+
+    let committee_members: Vec<String> = committee_addresses
+        .iter()
+        .map(address_to_field_hex)
+        .collect();
 
     let mut out = Vec::with_capacity(jobs.len());
     for (i, job) in jobs.iter().enumerate() {
@@ -450,6 +507,9 @@ pub fn prove_decryption_aggregation_jobs(
             c7_public: proof_public_field_strings(job.c7_proof)?,
             c6_fold_key_hash: c6_fold_vk.key_hash.clone(),
             c7_key_hash: c7_vk.key_hash.clone(),
+            committee_members: committee_members.clone(),
+            committee_hash_hi: committee_hash_hi.clone(),
+            committee_hash_lo: committee_hash_lo.clone(),
         };
 
         let json = serde_json::to_value(&witness)

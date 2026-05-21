@@ -8,6 +8,10 @@ import { network } from "hardhat";
 
 import MockCircuitVerifierModule from "../ignition/modules/mockSlashingVerifier";
 import {
+  BFV_THRESHOLD_T,
+  bfvDecExpectedPublicInputsLen,
+} from "../scripts/utils";
+import {
   BfvDecryptionVerifier__factory as BfvDecryptionVerifierFactory,
   MockCircuitVerifier__factory as MockCircuitVerifierFactory,
 } from "../types";
@@ -15,21 +19,50 @@ import {
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture } = networkHelpers;
 
-/** Must match `BfvDecryptionVerifier.MESSAGE_COEFFS_COUNT`. */
+/** Must match `BfvDecryptionVerifier.MESSAGE_COEFFS_COUNT` / circuit `MAX_MSG_NON_ZERO_COEFFS`. */
 const MESSAGE_COEFFS_COUNT = 100;
-const C6_FOLD_KEY_HASH = ethers.id("test:c6-fold-vk");
-const C7_KEY_HASH = ethers.id("test:c7-vk");
 
-function buildPublicInputs(
-  domainBinding: string,
+const EXPECTED_C6_FOLD_KEY_HASH = ethers.id("c6_fold");
+const EXPECTED_C7_KEY_HASH = ethers.id("c7");
+
+/** Must match `BfvDecryptionVerifier.threshold` / default circuit `T`. */
+const THRESHOLD = BFV_THRESHOLD_T;
+
+/** Exact `publicInputs.length` for the configured threshold. */
+const EXPECTED_PUBLIC_INPUTS_LEN = bfvDecExpectedPublicInputsLen(THRESHOLD);
+
+/** Indices for committee hash limbs (fixed layout). */
+const COMMITTEE_HASH_HI_IDX = 2;
+const COMMITTEE_HASH_LO_IDX = 3;
+
+function committeeHashHi(committeeHash: string): string {
+  const v = BigInt(committeeHash);
+  return "0x" + (v >> 128n).toString(16).padStart(64, "0");
+}
+
+function committeeHashLo(committeeHash: string): string {
+  const mask = (1n << 128n) - 1n;
+  const v = BigInt(committeeHash);
+  return "0x" + (v & mask).toString(16).padStart(64, "0");
+}
+
+function buildPublicInputsWithMessage(
   messageCoeffs: bigint[],
-  totalInputs = 402,
+  totalInputs = EXPECTED_PUBLIC_INPUTS_LEN,
+  subCircuitHashes: [string, string] = [
+    EXPECTED_C6_FOLD_KEY_HASH,
+    EXPECTED_C7_KEY_HASH,
+  ],
+  committeeHash = ethers.ZeroHash,
 ): string[] {
   const arr: string[] = new Array(totalInputs);
-  for (let i = 0; i < totalInputs; i++) arr[i] = "0x" + "00".repeat(32);
-  arr[0] = C6_FOLD_KEY_HASH;
-  arr[1] = C7_KEY_HASH;
-  arr[totalInputs - MESSAGE_COEFFS_COUNT - 1] = domainBinding;
+  arr[0] = subCircuitHashes[0];
+  arr[1] = subCircuitHashes[1];
+  for (let i = 2; i < totalInputs; i++) {
+    arr[i] = "0x" + "00".repeat(32);
+  }
+  arr[COMMITTEE_HASH_HI_IDX] = committeeHashHi(committeeHash);
+  arr[COMMITTEE_HASH_LO_IDX] = committeeHashLo(committeeHash);
   const offset = totalInputs - MESSAGE_COEFFS_COUNT;
   for (let i = 0; i < messageCoeffs.length && i < MESSAGE_COEFFS_COUNT; i++) {
     arr[offset + i] = "0x" + messageCoeffs[i].toString(16).padStart(64, "0");
@@ -57,42 +90,6 @@ function plaintextToHash(messageCoeffs: bigint[]): string {
   return ethers.keccak256(hex);
 }
 
-function computeDomainBinding(
-  verifierAddr: string,
-  chainId: bigint,
-  e3Id: bigint,
-  committeeRoot: bigint,
-  sortedNodes: string[],
-  ciphertextOutputHash: string,
-  committeePublicKey: string,
-  plaintextOutputHash: string,
-): string {
-  return ethers.keccak256(
-    ethers.AbiCoder.defaultAbiCoder().encode(
-      [
-        "uint256",
-        "address",
-        "uint256",
-        "uint256",
-        "address[]",
-        "bytes32",
-        "bytes32",
-        "bytes32",
-      ],
-      [
-        chainId,
-        verifierAddr,
-        e3Id,
-        committeeRoot,
-        sortedNodes,
-        ciphertextOutputHash,
-        committeePublicKey,
-        plaintextOutputHash,
-      ],
-    ),
-  );
-}
-
 function encodeProof(rawProof: string, publicInputs: string[]): string {
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
   return abiCoder.encode(["bytes", "bytes32[]"], [rawProof, publicInputs]);
@@ -108,7 +105,12 @@ describe("BfvDecryptionVerifier", function () {
 
     const bfvDecryptionVerifier = await (
       await ethers.getContractFactory("BfvDecryptionVerifier")
-    ).deploy(mockAddr, C6_FOLD_KEY_HASH, C7_KEY_HASH);
+    ).deploy(
+      mockAddr,
+      EXPECTED_C6_FOLD_KEY_HASH,
+      EXPECTED_C7_KEY_HASH,
+      THRESHOLD,
+    );
 
     await bfvDecryptionVerifier.waitForDeployment();
     const dv = BfvDecryptionVerifierFactory.connect(
@@ -116,19 +118,14 @@ describe("BfvDecryptionVerifier", function () {
       owner,
     );
     const mc = MockCircuitVerifierFactory.connect(mockAddr, owner);
-    const chainId = (await ethers.provider.getNetwork()).chainId;
-    return {
-      bfvDecryptionVerifier: dv,
-      mockCircuit: mc,
-      verifierAddr: await dv.getAddress(),
-      chainId,
-    };
+    return { bfvDecryptionVerifier: dv, mockCircuit: mc };
   };
 
-  const ctx = (verifierAddr: string) => {
+  /** Dummy contextual params — passed through to verify but not validated against circuit outputs. */
+  const ctx = () => {
     const e3Id = 7n;
     const root = 1234n;
-    const nodes = [verifierAddr, ethers.ZeroAddress];
+    const nodes = [ethers.ZeroAddress];
     const ciphertextHash = ethers.id("ct-hash");
     const committeePk = ethers.id("committee-pk");
     return { e3Id, root, nodes, ciphertextHash, committeePk };
@@ -136,12 +133,10 @@ describe("BfvDecryptionVerifier", function () {
 
   describe("reverts", function () {
     it("reverts on invalid proof encoding", async function () {
-      const { bfvDecryptionVerifier, verifierAddr } = await loadFixture(
-        deployWithMockCircuit,
-      );
-      const { e3Id, root, nodes, ciphertextHash, committeePk } =
-        ctx(verifierAddr);
+      const { bfvDecryptionVerifier } = await loadFixture(deployWithMockCircuit);
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
       const plaintextHash = ethers.keccak256("0x1234");
+
       await expect(
         bfvDecryptionVerifier.verify.staticCall(
           e3Id,
@@ -150,20 +145,23 @@ describe("BfvDecryptionVerifier", function () {
           ciphertextHash,
           committeePk,
           plaintextHash,
+          ethers.ZeroHash,
           "0xdeadbeef",
         ),
       ).to.be.revert(ethers);
     });
 
-    it("reverts InvalidPublicInputsLength when too short", async function () {
-      const { bfvDecryptionVerifier, verifierAddr } = await loadFixture(
-        deployWithMockCircuit,
+    it("reverts InvalidPublicInputsLength when length differs from expected (M-34)", async function () {
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      await mockCircuit.setReturnValue(true);
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
+
+      const messageCoeffs = [1n, 2n, 3n];
+      const publicInputs = buildPublicInputsWithMessage(messageCoeffs).slice(
+        0,
+        EXPECTED_PUBLIC_INPUTS_LEN - 1,
       );
-      const { e3Id, root, nodes, ciphertextHash, committeePk } =
-        ctx(verifierAddr);
-      const plaintextHash = ethers.keccak256("0x1234");
-      // need >= MESSAGE_COEFFS_COUNT + 3 = 103
-      const publicInputs = new Array(102).fill("0x" + "00".repeat(32));
+      const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
       await expect(
@@ -174,6 +172,7 @@ describe("BfvDecryptionVerifier", function () {
           ciphertextHash,
           committeePk,
           plaintextHash,
+          ethers.ZeroHash,
           proof,
         ),
       ).to.be.revertedWithCustomError(
@@ -182,27 +181,17 @@ describe("BfvDecryptionVerifier", function () {
       );
     });
 
-    it("reverts VkHashMismatch when slot 0 differs (M-34)", async function () {
-      const { bfvDecryptionVerifier, mockCircuit, verifierAddr, chainId } =
-        await loadFixture(deployWithMockCircuit);
+    it("reverts InvalidPublicInputsLength when length exceeds expected", async function () {
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
       await mockCircuit.setReturnValue(true);
-      const { e3Id, root, nodes, ciphertextHash, committeePk } =
-        ctx(verifierAddr);
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
       const messageCoeffs = [1n, 2n, 3n];
-      const plaintextHash = plaintextToHash(messageCoeffs);
-      const binding = computeDomainBinding(
-        verifierAddr,
-        chainId,
-        e3Id,
-        root,
-        nodes,
-        ciphertextHash,
-        committeePk,
-        plaintextHash,
+      const publicInputs = buildPublicInputsWithMessage(
+        messageCoeffs,
+        EXPECTED_PUBLIC_INPUTS_LEN + 1,
       );
-      const publicInputs = buildPublicInputs(binding, messageCoeffs);
-      publicInputs[0] = ethers.id("wrong-vk");
+      const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
       await expect(
@@ -213,32 +202,55 @@ describe("BfvDecryptionVerifier", function () {
           ciphertextHash,
           committeePk,
           plaintextHash,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(
+        bfvDecryptionVerifier,
+        "InvalidPublicInputsLength",
+      );
+    });
+
+    it("reverts VkHashMismatch when c6_fold key hash does not match (M-34)", async function () {
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      await mockCircuit.setReturnValue(true);
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
+
+      const messageCoeffs = [1n, 2n, 3n];
+      const publicInputs = buildPublicInputsWithMessage(
+        messageCoeffs,
+        EXPECTED_PUBLIC_INPUTS_LEN,
+        [ethers.id("wrong-c6"), EXPECTED_C7_KEY_HASH],
+      );
+      const plaintextHash = plaintextToHash(messageCoeffs);
+      const proof = encodeProof("0x01", publicInputs);
+
+      await expect(
+        bfvDecryptionVerifier.verify.staticCall(
+          e3Id,
+          root,
+          nodes,
+          ciphertextHash,
+          committeePk,
+          plaintextHash,
+          ethers.ZeroHash,
           proof,
         ),
       ).to.be.revertedWithCustomError(bfvDecryptionVerifier, "VkHashMismatch");
     });
 
-    it("reverts VkHashMismatch when slot 1 differs (M-34)", async function () {
-      const { bfvDecryptionVerifier, mockCircuit, verifierAddr, chainId } =
-        await loadFixture(deployWithMockCircuit);
+    it("reverts VkHashMismatch when c7 key hash does not match (M-34)", async function () {
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
       await mockCircuit.setReturnValue(true);
-      const { e3Id, root, nodes, ciphertextHash, committeePk } =
-        ctx(verifierAddr);
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
       const messageCoeffs = [1n, 2n, 3n];
-      const plaintextHash = plaintextToHash(messageCoeffs);
-      const binding = computeDomainBinding(
-        verifierAddr,
-        chainId,
-        e3Id,
-        root,
-        nodes,
-        ciphertextHash,
-        committeePk,
-        plaintextHash,
+      const publicInputs = buildPublicInputsWithMessage(
+        messageCoeffs,
+        EXPECTED_PUBLIC_INPUTS_LEN,
+        [EXPECTED_C6_FOLD_KEY_HASH, ethers.id("wrong-c7")],
       );
-      const publicInputs = buildPublicInputs(binding, messageCoeffs);
-      publicInputs[1] = ethers.id("wrong-c7-vk");
+      const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
       await expect(
@@ -249,36 +261,57 @@ describe("BfvDecryptionVerifier", function () {
           ciphertextHash,
           committeePk,
           plaintextHash,
+          ethers.ZeroHash,
           proof,
         ),
       ).to.be.revertedWithCustomError(bfvDecryptionVerifier, "VkHashMismatch");
+    });
+
+    it("reverts DomainBindingMismatch when committee hash hi limb mismatches (C-08)", async function () {
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      await mockCircuit.setReturnValue(true);
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
+
+      const committeeHash = ethers.id("real-committee");
+      const wrongCommitteeHash = ethers.id("wrong-committee");
+      const messageCoeffs = [1n, 2n, 3n];
+      // proof built with real committeeHash in slots 2/3
+      const publicInputs = buildPublicInputsWithMessage(
+        messageCoeffs,
+        EXPECTED_PUBLIC_INPUTS_LEN,
+        [EXPECTED_C6_FOLD_KEY_HASH, EXPECTED_C7_KEY_HASH],
+        committeeHash,
+      );
+      const plaintextHash = plaintextToHash(messageCoeffs);
+      const proof = encodeProof("0x01", publicInputs);
+
+      // pass wrong committeeHash to verify — hi/lo check should fail
+      await expect(
+        bfvDecryptionVerifier.verify.staticCall(
+          e3Id,
+          root,
+          nodes,
+          ciphertextHash,
+          committeePk,
+          plaintextHash,
+          wrongCommitteeHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(
+        bfvDecryptionVerifier,
+        "DomainBindingMismatch",
+      );
     });
 
     it("reverts PlaintextHashMismatch when message coeffs don't hash to plaintextHash", async function () {
-      const { bfvDecryptionVerifier, mockCircuit, verifierAddr, chainId } =
-        await loadFixture(deployWithMockCircuit);
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
       await mockCircuit.setReturnValue(true);
-      const { e3Id, root, nodes, ciphertextHash, committeePk } =
-        ctx(verifierAddr);
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
       const messageCoeffs = [1n, 2n, 3n];
-      const realHash = plaintextToHash(messageCoeffs);
       const wrongHash = ethers.keccak256("0x0000");
-      // build a valid binding for the wrong hash (so binding check passes)
-      const binding = computeDomainBinding(
-        verifierAddr,
-        chainId,
-        e3Id,
-        root,
-        nodes,
-        ciphertextHash,
-        committeePk,
-        wrongHash,
-      );
-      const publicInputs = buildPublicInputs(binding, messageCoeffs);
+      const publicInputs = buildPublicInputsWithMessage(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
-      // sanity: coeffs hash != wrongHash
-      expect(realHash).to.not.equal(wrongHash);
 
       await expect(
         bfvDecryptionVerifier.verify.staticCall(
@@ -288,6 +321,7 @@ describe("BfvDecryptionVerifier", function () {
           ciphertextHash,
           committeePk,
           wrongHash,
+          ethers.ZeroHash,
           proof,
         ),
       ).to.be.revertedWithCustomError(
@@ -296,116 +330,14 @@ describe("BfvDecryptionVerifier", function () {
       );
     });
 
-    it("reverts DomainBindingMismatch on replay across e3Id (C-08)", async function () {
-      const { bfvDecryptionVerifier, mockCircuit, verifierAddr, chainId } =
-        await loadFixture(deployWithMockCircuit);
-      await mockCircuit.setReturnValue(true);
-      const { root, nodes, ciphertextHash, committeePk } = ctx(verifierAddr);
-
-      const messageCoeffs = [1n, 2n, 3n];
-      const plaintextHash = plaintextToHash(messageCoeffs);
-      // build proof for e3Id=1
-      const binding = computeDomainBinding(
-        verifierAddr,
-        chainId,
-        1n,
-        root,
-        nodes,
-        ciphertextHash,
-        committeePk,
-        plaintextHash,
-      );
-      const publicInputs = buildPublicInputs(binding, messageCoeffs);
-      const proof = encodeProof("0x01", publicInputs);
-
-      // verify for e3Id=2 -> mismatch
-      await expect(
-        bfvDecryptionVerifier.verify.staticCall(
-          2,
-          root,
-          nodes,
-          ciphertextHash,
-          committeePk,
-          plaintextHash,
-          proof,
-        ),
-      ).to.be.revertedWithCustomError(
-        bfvDecryptionVerifier,
-        "DomainBindingMismatch",
-      );
-    });
-
-    it("reverts DomainBindingMismatch on replay across wrapper address (C-08)", async function () {
-      const {
-        mockCircuit,
-        verifierAddr: addr1,
-        chainId,
-      } = await loadFixture(deployWithMockCircuit);
-      await mockCircuit.setReturnValue(true);
-      const mockAddr = await mockCircuit.getAddress();
-
-      const dv2 = await (
-        await ethers.getContractFactory("BfvDecryptionVerifier")
-      ).deploy(mockAddr, C6_FOLD_KEY_HASH, C7_KEY_HASH);
-      await dv2.waitForDeployment();
-      const addr2 = await dv2.getAddress();
-      expect(addr2).to.not.equal(addr1);
-
-      const e3Id = 1n;
-      const root = 0n;
-      const nodes = [addr1];
-      const ciphertextHash = ethers.id("ct");
-      const committeePk = ethers.id("pk");
-      const messageCoeffs = [1n, 2n];
-      const plaintextHash = plaintextToHash(messageCoeffs);
-      // binding for wrapper #1
-      const binding = computeDomainBinding(
-        addr1,
-        chainId,
-        e3Id,
-        root,
-        nodes,
-        ciphertextHash,
-        committeePk,
-        plaintextHash,
-      );
-      const publicInputs = buildPublicInputs(binding, messageCoeffs);
-      const proof = encodeProof("0x01", publicInputs);
-
-      // call wrapper #2 -> binding for #1 won't match
-      await expect(
-        dv2.verify.staticCall(
-          e3Id,
-          root,
-          nodes,
-          ciphertextHash,
-          committeePk,
-          plaintextHash,
-          proof,
-        ),
-      ).to.be.revertedWithCustomError(dv2, "DomainBindingMismatch");
-    });
-
-    it("reverts InvalidProof when underlying honk verifier rejects (M-35)", async function () {
-      const { bfvDecryptionVerifier, mockCircuit, verifierAddr, chainId } =
-        await loadFixture(deployWithMockCircuit);
+    it("reverts InvalidProof when circuit verifier returns false (M-35)", async function () {
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
       await mockCircuit.setReturnValue(false);
-      const { e3Id, root, nodes, ciphertextHash, committeePk } =
-        ctx(verifierAddr);
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
       const messageCoeffs = [1n, 2n, 3n];
+      const publicInputs = buildPublicInputsWithMessage(messageCoeffs);
       const plaintextHash = plaintextToHash(messageCoeffs);
-      const binding = computeDomainBinding(
-        verifierAddr,
-        chainId,
-        e3Id,
-        root,
-        nodes,
-        ciphertextHash,
-        committeePk,
-        plaintextHash,
-      );
-      const publicInputs = buildPublicInputs(binding, messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
       await expect(
@@ -416,33 +348,60 @@ describe("BfvDecryptionVerifier", function () {
           ciphertextHash,
           committeePk,
           plaintextHash,
+          ethers.ZeroHash,
           proof,
         ),
       ).to.be.revertedWithCustomError(bfvDecryptionVerifier, "InvalidProof");
     });
+
+    it("reverts VkHashMismatch when constructor expected hashes do not match proof", async function () {
+      const { mockCircuit } = await loadFixture(deployWithMockCircuit);
+      await mockCircuit.setReturnValue(true);
+      const mockAddr = await mockCircuit.getAddress();
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
+
+      const bfvDecryptionVerifier = await (
+        await ethers.getContractFactory("BfvDecryptionVerifier")
+      ).deploy(
+        mockAddr,
+        ethers.id("wrong-c6"),
+        ethers.id("wrong-c7"),
+        THRESHOLD,
+      );
+      await bfvDecryptionVerifier.waitForDeployment();
+
+      const messageCoeffs = [1n, 2n, 3n];
+      const publicInputs = buildPublicInputsWithMessage(messageCoeffs);
+      const plaintextHash = plaintextToHash(messageCoeffs);
+      const proof = encodeProof("0x0102", publicInputs);
+
+      await expect(
+        bfvDecryptionVerifier.verify.staticCall(
+          e3Id,
+          root,
+          nodes,
+          ciphertextHash,
+          committeePk,
+          plaintextHash,
+          ethers.ZeroHash,
+          proof,
+        ),
+      ).to.be.revertedWithCustomError(
+        bfvDecryptionVerifier,
+        "VkHashMismatch",
+      );
+    });
   });
 
   describe("success", function () {
-    it("returns true when all checks pass", async function () {
-      const { bfvDecryptionVerifier, mockCircuit, verifierAddr, chainId } =
-        await loadFixture(deployWithMockCircuit);
+    it("returns true with mock ICircuitVerifier and matching plaintext hash", async function () {
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
       await mockCircuit.setReturnValue(true);
-      const { e3Id, root, nodes, ciphertextHash, committeePk } =
-        ctx(verifierAddr);
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
       const messageCoeffs = [1n, 2n, 3n, 42n, 100n];
+      const publicInputs = buildPublicInputsWithMessage(messageCoeffs);
       const plaintextHash = plaintextToHash(messageCoeffs);
-      const binding = computeDomainBinding(
-        verifierAddr,
-        chainId,
-        e3Id,
-        root,
-        nodes,
-        ciphertextHash,
-        committeePk,
-        plaintextHash,
-      );
-      const publicInputs = buildPublicInputs(binding, messageCoeffs);
       const proof = encodeProof("0x0102", publicInputs);
 
       const result = await bfvDecryptionVerifier.verify.staticCall(
@@ -452,35 +411,23 @@ describe("BfvDecryptionVerifier", function () {
         ciphertextHash,
         committeePk,
         plaintextHash,
+        ethers.ZeroHash,
         proof,
       );
       expect(result).to.equal(true);
     });
 
-    it("returns true with minimal public inputs (totalInputs == 103)", async function () {
-      const { bfvDecryptionVerifier, mockCircuit, verifierAddr, chainId } =
-        await loadFixture(deployWithMockCircuit);
+    it("returns true with exact-length public inputs", async function () {
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
       await mockCircuit.setReturnValue(true);
-      const { e3Id, root, nodes, ciphertextHash, committeePk } =
-        ctx(verifierAddr);
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
 
       const messageCoeffs = [1n, 2n, 3n];
-      const plaintextHash = plaintextToHash(messageCoeffs);
-      const binding = computeDomainBinding(
-        verifierAddr,
-        chainId,
-        e3Id,
-        root,
-        nodes,
-        ciphertextHash,
-        committeePk,
-        plaintextHash,
-      );
-      const publicInputs = buildPublicInputs(
-        binding,
+      const publicInputs = buildPublicInputsWithMessage(
         messageCoeffs,
-        MESSAGE_COEFFS_COUNT + 3,
+        EXPECTED_PUBLIC_INPUTS_LEN,
       );
+      const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
       const result = await bfvDecryptionVerifier.verify.staticCall(
@@ -490,9 +437,109 @@ describe("BfvDecryptionVerifier", function () {
         ciphertextHash,
         committeePk,
         plaintextHash,
+        ethers.ZeroHash,
         proof,
       );
       expect(result).to.equal(true);
+    });
+
+    it("returns true when committee hash matches proof slots 2/3 (hi/lo)", async function () {
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      await mockCircuit.setReturnValue(true);
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
+
+      const committeeHash = ethers.id("the-committee");
+      const messageCoeffs = [10n, 20n, 30n];
+      const publicInputs = buildPublicInputsWithMessage(
+        messageCoeffs,
+        EXPECTED_PUBLIC_INPUTS_LEN,
+        [EXPECTED_C6_FOLD_KEY_HASH, EXPECTED_C7_KEY_HASH],
+        committeeHash,
+      );
+      const plaintextHash = plaintextToHash(messageCoeffs);
+      const proof = encodeProof("0x01", publicInputs);
+
+      const result = await bfvDecryptionVerifier.verify.staticCall(
+        e3Id,
+        root,
+        nodes,
+        ciphertextHash,
+        committeePk,
+        plaintextHash,
+        committeeHash,
+        proof,
+      );
+      expect(result).to.equal(true);
+    });
+
+    it("verifies all-zero message coefficients", async function () {
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      await mockCircuit.setReturnValue(true);
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
+
+      const messageCoeffs: bigint[] = [];
+      const publicInputs = buildPublicInputsWithMessage(messageCoeffs);
+      const plaintextHash = plaintextToHash(messageCoeffs);
+      const proof = encodeProof("0x01", publicInputs);
+
+      const result = await bfvDecryptionVerifier.verify.staticCall(
+        e3Id,
+        root,
+        nodes,
+        ciphertextHash,
+        committeePk,
+        plaintextHash,
+        ethers.ZeroHash,
+        proof,
+      );
+      expect(result).to.equal(true);
+    });
+
+    it("verifies all 100 message coefficients", async function () {
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(deployWithMockCircuit);
+      await mockCircuit.setReturnValue(true);
+      const { e3Id, root, nodes, ciphertextHash, committeePk } = ctx();
+
+      const messageCoeffs = Array.from(
+        { length: MESSAGE_COEFFS_COUNT },
+        (_, i) => BigInt(i + 1),
+      );
+      const publicInputs = buildPublicInputsWithMessage(messageCoeffs);
+      const plaintextHash = plaintextToHash(messageCoeffs);
+      const proof = encodeProof("0x01", publicInputs);
+
+      const result = await bfvDecryptionVerifier.verify.staticCall(
+        e3Id,
+        root,
+        nodes,
+        ciphertextHash,
+        committeePk,
+        plaintextHash,
+        ethers.ZeroHash,
+        proof,
+      );
+      expect(result).to.equal(true);
+    });
+  });
+
+  describe("immutables (M-34)", function () {
+    it("exposes correct threshold", async function () {
+      const { bfvDecryptionVerifier } = await loadFixture(deployWithMockCircuit);
+      expect(await bfvDecryptionVerifier.threshold()).to.equal(THRESHOLD);
+    });
+
+    it("exposes correct expectedC6FoldKeyHash", async function () {
+      const { bfvDecryptionVerifier } = await loadFixture(deployWithMockCircuit);
+      expect(await bfvDecryptionVerifier.expectedC6FoldKeyHash()).to.equal(
+        EXPECTED_C6_FOLD_KEY_HASH,
+      );
+    });
+
+    it("exposes correct expectedC7KeyHash", async function () {
+      const { bfvDecryptionVerifier } = await loadFixture(deployWithMockCircuit);
+      expect(await bfvDecryptionVerifier.expectedC7KeyHash()).to.equal(
+        EXPECTED_C7_KEY_HASH,
+      );
     });
   });
 });

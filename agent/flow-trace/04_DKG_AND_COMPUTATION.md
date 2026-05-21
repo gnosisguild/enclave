@@ -600,50 +600,52 @@ ThresholdKeyshare receives AllThresholdSharesCollected
   ├─ Requires EffectsEnabled
   ├─ Requires active_aggregators[e3_id] == true
   ├─ Reads chain state to confirm committee public key is still unset
-  └─ Calls contract.publishCommittee(e3_id, nodes, publicKey, pkHash)
+  └─ Calls contract.publishCommittee(e3_id, publicKey, pkCommitment, proof)
         │
         │  ┌─── ON-CHAIN (CiphernodeRegistryOwnable) ──────────┐
         │  │                                                     │
-        │  │  publishCommittee(e3Id, nodes, pk, pkHash) {        │
-        │  │    1. require(initialized && finalized)             │
-        │  │    2. require(publicKeyHashes[e3Id] == 0)           │
-        │  │       → Can only publish once                       │
-        │  │    3. require(nodes.length == committee.length)     │
-        │  │    4. pkVerifier.verify(                            │
-        │  │         e3Id, committeeRoot,                        │
-        │  │         c.topNodes /* sortedNodes from chain */,    │
-        │  │         pkHash, proof                               │
+        │  │  publishCommittee(e3Id, publicKey, pkCommitment, proof) { │
+        │  │    1. require(stage == Finalized)                   │
+        │  │    2. require(c.publicKey == 0) — publish once      │
+        │  │    3. committeeHash = keccak256(abi.encodePacked(c.topNodes)) │
+        │  │       c.committeeHash = committeeHash               │
+        │  │    4. When proofAggregationEnabled:                 │
+        │  │       e3.pkVerifier.verify(                         │
+        │  │         e3Id, committeeRoot, c.topNodes,            │
+        │  │         pkCommitment, committeeHash, proof          │
         │  │       )                                             │
-        │  │       → C-08: wrapper binds proof to e3Id + root    │
-        │  │         + sortedNodes (slot stored, see note).      │
-        │  │       → M-34: nodesFold / C5 VK hashes are          │
-        │  │         immutable constructor args.                 │
-        │  │       → M-35: revert path only (no `bool false`).   │
-        │  │    5. publicKeyHashes[e3Id] = pkHash                │
-        │  │    6. enclave.onCommitteePublished(e3Id, pkHash)    │
+        │  │       → BFV: `BfvPkVerifier` (DkgAggregator Honk)  │
+        │  │         • M-34: immutable nodesFold / C5 VK hashes  │
+        │  │           checked against publicInputs[0..1]        │
+        │  │         • C-08: committee_hash_hi/lo (slots         │
+        │  │           [2+H] & [3+H]) vs committeeHash           │
+        │  │         • last PI == pkCommitment                   │
+        │  │         • M-35: revert on failure (no `bool false`) │
+        │  │    5. c.publicKey = pkCommitment                    │
+        │  │       publicKeyHashes[e3Id] = pkCommitment          │
+        │  │    6. enclave.onCommitteePublished(e3Id, pkCommitment) │
         │  │       │                                             │
         │  │       │  ┌─ Enclave.sol ────────────────────────┐  │
-        │  │       │  │  onCommitteePublished(e3Id, pkHash) {│  │
+        │  │       │  │  onCommitteePublished(e3Id, pk) {   │  │
         │  │       │  │    require(stage==CommitteeFinalized) │  │
-        │  │       │  │    e3.committeePublicKey = pkHash     │  │
-        │  │       │  │    → stored as bytes32 (a hash)      │  │
+        │  │       │  │    e3.committeePublicKey = pk         │  │
         │  │       │  │    stage = KeyPublished               │  │
         │  │       │  │    Emit E3StageChanged(KeyPublished)  │  │
         │  │       │  │  }                                   │  │
         │  │       │  └──────────────────────────────────────┘  │
-        │  │    7. Emit CommitteePublished(e3Id, nodes, pk, C5 proof) │
-        │  │       → Note: emits full pk bytes, NOT just pkHash  │
+        │  │    7. Emit CommitteePublished(                    │
+        │  │         e3Id, c.topNodes, publicKey, pkCommitment, proof) │
         │  │  }                                                  │
         │  └─────────────────────────────────────────────────────┘
 ```
 
-> **C-08 (BfvPkVerifier domain binding) — partial / future work** The wrapper now exposes a
-> `verify(e3Id, committeeRoot, sortedNodes, pkCommitment, proof)` signature and writes the
-> call-context slot
-> `keccak256(e3Id, committeeRoot, keccak256(abi.encode(sortedNodes)), pkCommitment)`. Cryptographic
-> enforcement (binding this slot inside the proof) requires regenerating the Noir circuits with a
-> `domain_binding: pub Field` input — out of scope per the audit-fix hard constraint that
-> `contracts/verifiers/bfv/honk/*` is untouched; tracked as future work.
+> **C-08 (BfvPkVerifier domain binding) — implemented** The wrapper exposes a
+> `verify(e3Id, committeeRoot, sortedNodes, pkCommitment, committeeHash, proof)` signature.
+> `committeeHash` (computed on-chain as `keccak256(abi.encodePacked(c.topNodes))`) is split into
+> 128-bit Noir field limbs and checked against `publicInputs[committeeHashHiIdx]` and
+> `publicInputs[committeeHashLoIdx]`, binding the proof to the specific committee.
+> The contextual params `(e3Id, committeeRoot, sortedNodes)` are forwarded for interface
+> compatibility and future circuit-level binding.
 
 ---
 

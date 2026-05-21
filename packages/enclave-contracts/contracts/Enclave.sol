@@ -451,9 +451,11 @@ contract Enclave is
 
         if (e3.proofAggregationEnabled) {
             require(proof.length > 0, ProofRequired());
-            // wrapper now binds proof to full call context
-            // and reverts on any failure with a typed error (no `bool false`),
-            // so we no longer capture / require a return value.
+            // Reaching `CiphertextReady` implies the committee was published, so
+            // `getCommitteeHash` is guaranteed non-zero here; the registry still
+            // reverts with `CommitteeNotPublished` if that invariant ever breaks.
+            bytes32 committeeHash = ciphernodeRegistry.getCommitteeHash(e3Id);
+            // Wrapper reverts on any failure with a typed error (no `bool false`).
             e3.decryptionVerifier.verify(
                 e3Id,
                 ciphernodeRegistry.rootAt(e3Id),
@@ -461,6 +463,7 @@ contract Enclave is
                 e3.ciphertextOutput,
                 e3.committeePublicKey,
                 keccak256(plaintextOutput),
+                committeeHash,
                 proof
             );
             success = true;

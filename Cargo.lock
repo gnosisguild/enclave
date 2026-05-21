@@ -3046,6 +3046,7 @@ name = "e3-aggregator"
 version = "0.1.15"
 dependencies = [
  "actix",
+ "alloy",
  "anyhow",
  "async-trait",
  "bincode 1.3.3",
@@ -3065,6 +3066,7 @@ dependencies = [
  "e3-utils",
  "e3-zk-helpers",
  "fhe-math",
+ "futures",
  "num-bigint",
  "serde",
  "tracing",

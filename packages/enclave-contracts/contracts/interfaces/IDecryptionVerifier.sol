@@ -49,6 +49,7 @@ interface IDecryptionVerifier {
     /// @param committeePublicKey The committee's aggregated PK commitment
     ///        (`e3.committeePublicKey`).
     /// @param plaintextOutputHash `keccak256(plaintextOutput)` expected by the Enclave.
+    /// @param committeeHash `keccak256(abi.encodePacked(topNodes))` for the on-chain committee.
     /// @param proof ABI-encoded `(bytes rawProof, bytes32[] publicInputs)`.
     /// @return success Always `true` on success; the wrapper reverts on any failure.
     function verify(
@@ -58,6 +59,7 @@ interface IDecryptionVerifier {
         bytes32 ciphertextOutputHash,
         bytes32 committeePublicKey,
         bytes32 plaintextOutputHash,
+        bytes32 committeeHash,
         bytes calldata proof
     ) external view returns (bool success);
 }

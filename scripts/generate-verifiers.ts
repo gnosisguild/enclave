@@ -18,6 +18,7 @@
  *   pnpm generate:verifiers --circuits pk,fold  # Specific circuits
  *   pnpm generate:verifiers --clean          # Remove existing verifiers first
  *   pnpm generate:verifiers --dry-run        # Show what would be generated
+ *   pnpm generate:verifiers --no-compile     # Use artifacts from build:circuits (skips target cleanup)
  */
 
 import { execSync } from 'child_process'
@@ -49,6 +50,7 @@ interface GenerateOptions {
   clean?: boolean
   dryRun?: boolean
   compile?: boolean // compile circuits before generating verifiers
+  noCleanTargets?: boolean // skip deleting nargo target dirs before generation
 }
 
 // ---------------------------------------------------------------------------
@@ -93,8 +95,10 @@ class VerifierGenerator {
       return
     }
 
-    // Clean stale nargo build caches to prevent using outdated artifacts
-    this.cleanTargetDirs(circuits)
+    // Clean stale nargo build caches unless caller just ran build:circuits (--no-compile / --no-clean-targets).
+    if (!this.options.noCleanTargets && this.options.compile !== false) {
+      this.cleanTargetDirs(circuits)
+    }
 
     // Prepare output directory
     if (this.options.clean && existsSync(this.verifierDir)) {
@@ -375,6 +379,9 @@ async function main() {
       options.clean = true
     } else if (arg === '--no-compile') {
       options.compile = false
+      options.noCleanTargets = true
+    } else if (arg === '--no-clean-targets') {
+      options.noCleanTargets = true
     } else if (arg === '--group') {
       const value = args[++i]
       if (!value || value.startsWith('--')) {
@@ -407,7 +414,9 @@ Options:
   --circuits <list>      Circuit names (comma-separated). When omitted, generates all circuits.
   --group <groups>       Circuit groups (comma-separated: dkg,threshold,recursive_aggregation)
   --clean                Remove existing verifier directory before generating
-  --no-compile           Don't compile circuits automatically (fail if not already compiled)
+  --no-compile           Don't compile circuits automatically (fail if not already compiled);
+                         also skips cleaning nargo target dirs (use after build:circuits)
+  --no-clean-targets     Don't delete nargo target dirs before generating verifiers
   --dry-run              Show what would be generated without doing anything
   -h, --help             Show this help message
 

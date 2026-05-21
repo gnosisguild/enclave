@@ -370,7 +370,6 @@ describe("E3 Pricing", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        nodes,
         "0x1234",
         [operator1, operator2, operator3],
       );
@@ -458,7 +457,6 @@ describe("E3 Pricing", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        nodes,
         "0x1234",
         [operator1, operator2, operator3],
       );

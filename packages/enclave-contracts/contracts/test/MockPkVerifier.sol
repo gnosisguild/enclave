@@ -18,6 +18,7 @@ contract MockPkVerifier is IPkVerifier {
         uint256,
         address[] calldata,
         bytes32 pkCommitment,
+        bytes32,
         bytes calldata proof
     ) external pure returns (bool) {
         (, bytes32[] memory publicInputs) = abi.decode(

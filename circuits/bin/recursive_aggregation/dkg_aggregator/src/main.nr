@@ -6,11 +6,20 @@
 
 //! DKG aggregator: non-ZK `nodes_fold` and non-ZK `pk_aggregation` (both `noir-recursive-no-zk`).
 //! The final `bb prove -t evm` proof of this circuit is what the contract verifies on-chain.
+//! `committee_hash_hi` / `committee_hash_lo` bind the proof to `keccak256(abi.encodePacked(topNodes))`
+//! (128-bit limbs); the contract recomputes the hash from on-chain `topNodes`.
+//!
+//! Committee sizing: `committee_members` covers the **full registered committee** of size
+//! `N_PARTIES`, matching `topNodes` on-chain. The H folded `party_ids` are indices into that
+//! full committee (today `H == N_PARTIES`; after future honest-set selection `H` may be smaller
+//! than `N_PARTIES`). `committee_members` must be supplied in the same order as on-chain
+//! `topNodes`; the hash equality is what pins that order.
 
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
 use lib::configs::default::dkg::L_THRESHOLD;
 use lib::configs::default::{H, N_PARTIES};
 use lib::math::commitments::compute_vk_hash;
+use lib::math::committee_hash::committee_hash_limbs;
 
 /// Must match `node_fold::NODE_FOLD_PUBLIC_LEN`.
 pub global NODE_FOLD_PUBLIC_LEN: u32 = 11 + N_PARTIES + (2 * (N_PARTIES + H) * L_THRESHOLD);
@@ -50,7 +59,23 @@ fn main(
     nodes_fold_key_hash: pub Field,
     c5_key_hash: pub Field,
     party_ids: pub [Field; H],
+    committee_members: [Field; N_PARTIES],
+    committee_hash_hi: pub Field,
+    committee_hash_lo: pub Field,
 ) -> pub (Field, [Field; H], [Field; H], Field) {
+    let (expected_hi, expected_lo) = committee_hash_limbs(committee_members);
+    assert(expected_hi == committee_hash_hi);
+    assert(expected_lo == committee_hash_lo);
+
+    // Range-check each folded `party_ids[i]` against the full committee size `N_PARTIES`.
+    // This makes `committee_members[party_ids[i]]` a well-defined committee slot (today
+    // `H == N_PARTIES`; preserves soundness once `H < N_PARTIES`) and is the structural
+    // pre-condition for future per-party signer/identity constraints.
+    for i in 0..H {
+        let id = party_ids[i] as u32;
+        assert(id < N_PARTIES);
+    }
+
     verify_honk_proof_non_zk(
         nodes_fold_vk,
         nodes_fold_proof,

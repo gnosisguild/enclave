@@ -11,6 +11,7 @@ import {
 } from "../../types";
 import {
   BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS,
+  BFV_THRESHOLD_T,
   assertBfvDecryptionVerifierSubCircuitVkHashes,
   readDeploymentArgs,
   readVkRecursiveHash,
@@ -67,6 +68,7 @@ export const deployAndSaveBfvDecryptionVerifier = async (
     circuitVerifierArgs.address,
     expectedC6FoldKeyHash,
     expectedC7KeyHash,
+    BFV_THRESHOLD_T,
   );
 
   await bfvDecryptionVerifier.waitForDeployment();

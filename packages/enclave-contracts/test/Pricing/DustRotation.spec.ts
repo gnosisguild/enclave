@@ -28,7 +28,6 @@ describe("Pricing — per-E3 dust rotation across consecutive E3s", function () 
   const setupAndPublishCommittee = async (
     registry: any,
     e3Id: number,
-    nodes: string[],
     publicKey: string,
     operators: Signer[],
   ) => {
@@ -38,7 +37,7 @@ describe("Pricing — per-E3 dust rotation across consecutive E3s", function () 
     await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
     await registry.finalizeCommittee(e3Id);
     const pkCommitment = ethers.keccak256(publicKey);
-    await registry.publishCommittee(e3Id, nodes, publicKey, pkCommitment, "0x");
+    await registry.publishCommittee(e3Id, publicKey, pkCommitment, "0x");
   };
 
   const setup = async () => {
@@ -134,7 +133,6 @@ describe("Pricing — per-E3 dust rotation across consecutive E3s", function () 
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        nodes,
         e3Id === 0 ? "0x1234" : "0x5678",
         [operator1, operator2, operator3],
       );

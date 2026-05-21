@@ -204,6 +204,22 @@ impl<T: Send + Sync> Deref for E3CommitteeContainsResponse<T> {
     }
 }
 
+/// Request the ordered finalized committee member list for an E3.
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "()")]
+pub struct GetCommitteeMembersRequest {
+    pub e3_id: E3id,
+    pub reply: Recipient<CommitteeMembersResponse>,
+}
+
+/// Response with committee members in party-id order (index == party_id).
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "()")]
+pub struct CommitteeMembersResponse {
+    /// `None` when the E3 committee is not finalized in sortition yet.
+    pub members: Option<Vec<String>>,
+}
+
 /// Sortition actor that manages the sortition algorithm and the node state.
 pub struct Sortition {
     /// Persistent map of `chain_id -> SortitionBackend`.
@@ -712,6 +728,29 @@ impl Handler<TypedEvent<CommitteePublished>> for Sortition {
 
                 Ok(state_map)
             })
+        })
+    }
+}
+
+impl Handler<GetCommitteeMembersRequest> for Sortition {
+    type Result = ();
+
+    fn handle(&mut self, msg: GetCommitteeMembersRequest, _: &mut Self::Context) -> Self::Result {
+        trap(EType::Sortition, &self.bus.clone(), || {
+            let members = self.get_committee(&msg.e3_id).map(|c| c.members().to_vec());
+            let reply = msg.reply;
+            // `try_send` can drop the reply when the aggregator mailbox is busy (e.g. mid
+            // `AggregationProofSigned`), leaving decryption stuck after C7 with no ZK job.
+            actix::spawn(async move {
+                if reply
+                    .send(CommitteeMembersResponse { members })
+                    .await
+                    .is_err()
+                {
+                    tracing::error!("committee members reply failed: aggregator recipient closed");
+                }
+            });
+            Ok(())
         })
     }
 }

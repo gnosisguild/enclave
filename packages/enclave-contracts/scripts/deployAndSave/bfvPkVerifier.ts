@@ -10,6 +10,7 @@ import {
   BfvPkVerifier__factory as BfvPkVerifierFactory,
 } from "../../types";
 import {
+  BFV_DKG_H,
   BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS,
   assertBfvPkVerifierSubCircuitVkHashes,
   readDeploymentArgs,
@@ -63,6 +64,7 @@ export const deployAndSaveBfvPkVerifier = async (
     circuitVerifierArgs.address,
     expectedNodesFoldKeyHash,
     expectedC5KeyHash,
+    BFV_DKG_H,
   );
 
   await bfvPkVerifier.waitForDeployment();

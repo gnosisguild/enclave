@@ -9,7 +9,12 @@ import path from "node:path";
 
 import {
   BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS,
+  BFV_DKG_H,
   BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS,
+  BFV_THRESHOLD_T,
+  bfvDecCommitteeHashIndices,
+  bfvDkgCommitteeHashIndices,
+  committeeHashFromLimbs,
   readVkRecursiveHash,
 } from "./utils";
 
@@ -21,6 +26,22 @@ function findRawJson(rawDir: string, fragment: string): any {
     return JSON.parse(fs.readFileSync(full, "utf8"));
   }
   throw new Error(`Missing raw benchmark JSON for fragment: ${fragment}`);
+}
+
+const MIN_VK_HASH_PUBLIC_INPUTS = 2;
+const DKG_COMMITTEE_HASH_IDX = bfvDkgCommitteeHashIndices(BFV_DKG_H);
+const DEC_COMMITTEE_HASH_IDX = bfvDecCommitteeHashIndices();
+
+function requirePublicInputLen(
+  label: string,
+  publicInputs: string[],
+  minLen: number,
+): void {
+  if (publicInputs.length < minLen) {
+    throw new Error(
+      `${label}: public_inputs length ${publicInputs.length} < ${minLen} (truncated or stale artifact?)`,
+    );
+  }
 }
 
 function hexToBytes32Array(hex: string): string[] {
@@ -98,6 +119,16 @@ async function main() {
 
   const dkgPublicInputs = hexToBytes32Array(dkgPublicHex);
   const decPublicInputs = hexToBytes32Array(decPublicHex);
+  requirePublicInputLen(
+    "dkg_aggregator",
+    dkgPublicInputs,
+    MIN_VK_HASH_PUBLIC_INPUTS,
+  );
+  requirePublicInputLen(
+    "decryption_aggregator",
+    decPublicInputs,
+    MIN_VK_HASH_PUBLIC_INPUTS,
+  );
 
   const expectedNodesFoldKeyHash = readVkRecursiveHash(
     BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS.nodesFold,
@@ -166,25 +197,52 @@ async function main() {
 
   const bfvPk = await (
     await ethers.getContractFactory("BfvPkVerifier")
-  ).deploy(dkgAggAddress, expectedNodesFoldKeyHash, expectedC5KeyHash);
+  ).deploy(
+    dkgAggAddress,
+    expectedNodesFoldKeyHash,
+    expectedC5KeyHash,
+    BFV_DKG_H,
+  );
   await bfvPk.waitForDeployment();
 
   const dkgEncodedProof = abiCoder.encode(
     ["bytes", "bytes32[]"],
     [dkgProofHex, dkgPublicInputs],
   );
+  requirePublicInputLen(
+    "dkg_aggregator committee_hash",
+    dkgPublicInputs,
+    DKG_COMMITTEE_HASH_IDX.lo + 1,
+  );
   const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
-  const dkgOk = await bfvPk.verify.staticCall(pkCommitment, dkgEncodedProof);
+  const dkgCommitteeHash = committeeHashFromLimbs(
+    dkgPublicInputs[DKG_COMMITTEE_HASH_IDX.hi],
+    dkgPublicInputs[DKG_COMMITTEE_HASH_IDX.lo],
+  );
+  const dkgOk = await bfvPk.verify.staticCall(
+    pkCommitment,
+    dkgCommitteeHash,
+    dkgEncodedProof,
+  );
   if (!dkgOk) {
     throw new Error(
       "BfvPkVerifier.verify returned false for folded DKG proof (Honk VK / proof mismatch?)",
     );
   }
-  const dkgGas = await bfvPk.verify.estimateGas(pkCommitment, dkgEncodedProof);
+  const dkgGas = await bfvPk.verify.estimateGas(
+    pkCommitment,
+    dkgCommitteeHash,
+    dkgEncodedProof,
+  );
 
   const bfvDec = await (
     await ethers.getContractFactory("BfvDecryptionVerifier")
-  ).deploy(decAggAddress, expectedC6FoldKeyHash, expectedC7KeyHash);
+  ).deploy(
+    decAggAddress,
+    expectedC6FoldKeyHash,
+    expectedC7KeyHash,
+    BFV_THRESHOLD_T,
+  );
   await bfvDec.waitForDeployment();
 
   const decEncodedProof = abiCoder.encode(
@@ -192,7 +250,20 @@ async function main() {
     [decProofHex, decPublicInputs],
   );
   const plaintextHash = plaintextHashFromPublicInputs(decPublicInputs, ethers);
-  const decOk = await bfvDec.verify.staticCall(plaintextHash, decEncodedProof);
+  requirePublicInputLen(
+    "decryption_aggregator committee_hash",
+    decPublicInputs,
+    DEC_COMMITTEE_HASH_IDX.lo + 1,
+  );
+  const decCommitteeHash = committeeHashFromLimbs(
+    decPublicInputs[DEC_COMMITTEE_HASH_IDX.hi],
+    decPublicInputs[DEC_COMMITTEE_HASH_IDX.lo],
+  );
+  const decOk = await bfvDec.verify.staticCall(
+    plaintextHash,
+    decCommitteeHash,
+    decEncodedProof,
+  );
   if (!decOk) {
     throw new Error(
       "BfvDecryptionVerifier.verify returned false for folded decryption proof (Honk VK / proof mismatch?)",
@@ -200,6 +271,7 @@ async function main() {
   }
   const decGas = await bfvDec.verify.estimateGas(
     plaintextHash,
+    decCommitteeHash,
     decEncodedProof,
   );
 

@@ -46,6 +46,7 @@ interface IPkVerifier {
     ///        for another.
     /// @param pkCommitment Hash-based aggregated PK commitment the proof must attest to
     ///        (equals `publicInputs[publicInputs.length - 1]`).
+    /// @param committeeHash `keccak256(abi.encodePacked(topNodes))` for the on-chain committee.
     /// @param proof ABI-encoded `(bytes rawProof, bytes32[] publicInputs)`.
     /// @return success Always `true` on success; the wrapper reverts on any failure.
     function verify(
@@ -53,6 +54,7 @@ interface IPkVerifier {
         uint256 committeeRoot,
         address[] calldata sortedNodes,
         bytes32 pkCommitment,
+        bytes32 committeeHash,
         bytes calldata proof
     ) external view returns (bool success);
 }

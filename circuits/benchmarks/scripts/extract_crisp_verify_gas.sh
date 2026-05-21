@@ -2,12 +2,15 @@
 
 # extract_crisp_verify_gas.sh - Runs CRISP verifier test with gas reporter and emits JSON.
 # Usage: ./extract_crisp_verify_gas.sh --output <json_file> [--mode insecure|secure] [--verbose]
+#        [--skip-build] [--force-build]
 
 set -e
 
 OUTPUT_JSON=""
 MODE="insecure"
 VERBOSE=false
+SKIP_BUILD=false
+FORCE_BUILD=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -23,16 +26,28 @@ while [[ $# -gt 0 ]]; do
             VERBOSE=true
             shift
             ;;
+        --skip-build|--no-build)
+            SKIP_BUILD=true
+            shift
+            ;;
+        --force-build)
+            FORCE_BUILD=true
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 --output <json_file> [--mode insecure|secure] [--verbose]"
+            echo "Usage: $0 --output <json_file> [--mode insecure|secure] [--verbose] [--skip-build] [--force-build]"
             exit 1
             ;;
     esac
 done
 
 if [ -z "$OUTPUT_JSON" ]; then
-    echo "Usage: $0 --output <json_file> [--mode insecure|secure] [--verbose]"
+    echo "Usage: $0 --output <json_file> [--mode insecure|secure] [--verbose] [--skip-build] [--force-build]"
+    exit 1
+fi
+if [ "$SKIP_BUILD" = true ] && [ "$FORCE_BUILD" = true ]; then
+    echo "Error: --skip-build and --force-build are mutually exclusive"
     exit 1
 fi
 if [ "$MODE" != "insecure" ] && [ "$MODE" != "secure" ]; then
@@ -77,20 +92,43 @@ if [ "$MODE" = "secure" ]; then
 else
     PRESET_NAME="insecure-512"
 fi
-echo "  [gas] Preparing recursive verifier artifacts (build:circuits ${PRESET_NAME})..."
-if [ "$VERBOSE" = true ]; then
-    echo "  [gas] [verbose] Running: pnpm build:circuits --preset ${PRESET_NAME}"
-    (
-      cd "$REPO_ROOT" && \
-      pnpm build:circuits --preset "$PRESET_NAME"
-    )
+
+require_preset_artifacts() {
+    if ! "${SCRIPT_DIR}/check_circuit_preset_artifacts.sh" "$PRESET_NAME"; then
+        exit 1
+    fi
+}
+
+if [ "$SKIP_BUILD" = true ]; then
+    echo "  [gas] Skipping circuit build and Honk verifier generation (--skip-build)."
+    require_preset_artifacts
 else
-    (
-      cd "$REPO_ROOT" && \
-      pnpm build:circuits --preset "$PRESET_NAME" >/dev/null
-    )
+    ENSURE_ARGS=("$PRESET_NAME")
+    if [ "$FORCE_BUILD" = true ]; then
+        ENSURE_ARGS+=(--force-build)
+    fi
+    if [ "$VERBOSE" = true ]; then
+        ENSURE_ARGS+=(--verbose)
+    fi
+    "${SCRIPT_DIR}/ensure_circuit_preset_built.sh" "${ENSURE_ARGS[@]}"
+    echo "  [gas] Build artifacts ready."
+
+    echo "  [gas] Regenerating Honk Solidity verifiers (dkg_aggregator, decryption_aggregator)..."
+    if [ "$VERBOSE" = true ]; then
+        echo "  [gas] [verbose] Running: pnpm generate:verifiers --no-compile"
+        (
+          cd "$REPO_ROOT" && \
+          pnpm generate:verifiers --no-compile
+        )
+    else
+        (
+          cd "$REPO_ROOT" && \
+          pnpm generate:verifiers --no-compile >/dev/null
+        )
+    fi
+    echo "  [gas] Honk verifiers ready."
+    require_preset_artifacts
 fi
-echo "  [gas] Build artifacts ready."
 
 set +e
 echo "  [gas] Running CRISP verifier test for Pi_user gas..."
@@ -100,6 +138,7 @@ echo "  [gas] Running CRISP verifier test for Pi_user gas..."
 ) 2>&1 | tee "$TMP_LOG_CRISP"
 CRISP_TEST_EXIT_CODE=${PIPESTATUS[0]}
 echo "  [gas] CRISP test completed (exit=${CRISP_TEST_EXIT_CODE})."
+require_preset_artifacts
 echo "  [gas] Running integration test (test_trbfv_actor) for folded proofs + timings..."
 (
   cd "$REPO_ROOT" && \

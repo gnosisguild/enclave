@@ -4,9 +4,4 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod polynomial;
-pub mod safe;
-pub mod helpers;
-pub mod modulo;
-pub mod commitments;
-pub mod committee_hash;
+pub use e3_utils::committee_hash::*;

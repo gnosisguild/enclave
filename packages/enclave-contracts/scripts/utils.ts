@@ -3,9 +3,23 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
+import { getBytes, hexlify, zeroPadValue } from "ethers";
 import fs from "fs";
 import { fileURLToPath } from "node:url";
 import path from "path";
+
+/**
+ * Reconstruct `keccak256(abi.encodePacked(topNodes))` from aggregator public-input
+ * limbs. Each limb is a bytes32 with 128 bits right-aligned (`CommitteeHashLib`).
+ */
+export function committeeHashFromLimbs(hi: string, lo: string): string {
+  const hiBytes = getBytes(zeroPadValue(hi, 32));
+  const loBytes = getBytes(zeroPadValue(lo, 32));
+  const hash = new Uint8Array(32);
+  hash.set(hiBytes.subarray(16, 32), 0);
+  hash.set(loBytes.subarray(16, 32), 16);
+  return hexlify(hash);
+}
 
 export const deploymentsFile = path.join("deployed_contracts.json");
 
@@ -14,6 +28,36 @@ export const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../..",
 );
+
+/**
+ * Default insecure-512 / micro committee layout for BFV aggregator verifiers.
+ * Must match `lib::configs::default::{H, T}` in compiled circuits.
+ */
+export const BFV_DKG_H = 3;
+export const BFV_THRESHOLD_T = 1;
+
+/** `dkg_aggregator` EVM public-input count for honest-set size `h`. */
+export function bfvPkExpectedPublicInputsLen(h: number): number {
+  return 3 * h + 6;
+}
+
+/** `publicInputs` indices for `committee_hash_hi` / `committee_hash_lo` (matches `BfvPkVerifier`). */
+export function bfvDkgCommitteeHashIndices(h: number): {
+  hi: number;
+  lo: number;
+} {
+  return { hi: 2 + h, lo: 3 + h };
+}
+
+/** `decryption_aggregator` EVM public-input count for BFV threshold `t`. */
+export function bfvDecExpectedPublicInputsLen(threshold: number): number {
+  return 108 + 3 * threshold;
+}
+
+/** `publicInputs` indices for decryption-aggregator committee hash limbs. */
+export function bfvDecCommitteeHashIndices(): { hi: number; lo: number } {
+  return { hi: 2, lo: 3 };
+}
 
 /** Recursive VK hashes for `BfvPkVerifier` sub-circuits (from `pnpm compile:circuits`). */
 export const BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS = {
@@ -62,14 +106,14 @@ export function readVkRecursiveHash(filePath: string): string {
 
 /** On-chain `BfvPkVerifier` sub-circuit VK immutables (for deploy-time staleness checks). */
 export interface BfvPkVerifierVkReader {
-  NODES_FOLD_KEY_HASH(): Promise<string>;
-  C5_KEY_HASH(): Promise<string>;
+  expectedNodesFoldKeyHash(): Promise<string>;
+  expectedC5KeyHash(): Promise<string>;
 }
 
 /** On-chain `BfvDecryptionVerifier` sub-circuit VK immutables (for deploy-time staleness checks). */
 export interface BfvDecryptionVerifierVkReader {
-  C6_FOLD_KEY_HASH(): Promise<string>;
-  C7_KEY_HASH(): Promise<string>;
+  expectedC6FoldKeyHash(): Promise<string>;
+  expectedC7KeyHash(): Promise<string>;
 }
 
 /**
@@ -85,8 +129,8 @@ export async function assertBfvPkVerifierSubCircuitVkHashes(
   );
   const expectedC5 = readVkRecursiveHash(BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS.c5);
   const [onChainNodesFold, onChainC5] = await Promise.all([
-    verifier.NODES_FOLD_KEY_HASH(),
-    verifier.C5_KEY_HASH(),
+    verifier.expectedNodesFoldKeyHash(),
+    verifier.expectedC5KeyHash(),
   ]);
 
   if (onChainNodesFold === expectedNodesFold && onChainC5 === expectedC5) {
@@ -115,8 +159,8 @@ export async function assertBfvDecryptionVerifierSubCircuitVkHashes(
     BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS.c7,
   );
   const [onChainC6Fold, onChainC7] = await Promise.all([
-    verifier.C6_FOLD_KEY_HASH(),
-    verifier.C7_KEY_HASH(),
+    verifier.expectedC6FoldKeyHash(),
+    verifier.expectedC7KeyHash(),
   ]);
 
   if (onChainC6Fold === expectedC6Fold && onChainC7 === expectedC7) {

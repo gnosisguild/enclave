@@ -60,6 +60,11 @@
       "type": "error"
     },
     {
+      "inputs": [],
+      "name": "DkgProofRequired",
+      "type": "error"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256",
@@ -73,6 +78,11 @@
         }
       ],
       "name": "InsufficientCiphernodes",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidDkgProof",
       "type": "error"
     },
     {
@@ -124,6 +134,11 @@
     {
       "inputs": [],
       "name": "OnlyEnclave",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "PkCommitmentRequired",
       "type": "error"
     },
     {
@@ -624,6 +639,25 @@
           "type": "uint256"
         }
       ],
+      "name": "getCommitteeHash",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "committeeHash",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
       "name": "getCommitteeNodes",
       "outputs": [
         {
@@ -780,11 +814,6 @@
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
-        },
-        {
-          "internalType": "address[]",
-          "name": "nodes",
-          "type": "address[]"
         },
         {
           "internalType": "bytes",
@@ -971,5 +1000,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-c51161cea4a45d33ff84bc79e462ea2baa9b3ab6"
+  "buildInfoId": "solc-0_8_28-6326ac427a5471359bd6a3cc51e54c590daedb09"
 }

@@ -36,7 +36,6 @@ export const encodeMockDkgProof = (pkCommitment: string): string =>
 export const setupAndPublishCommittee = async (
   registry: any,
   e3Id: number,
-  nodes: string[],
   publicKey: string,
   operators: Signer[],
   committeeProof: string = "0x",
@@ -49,7 +48,6 @@ export const setupAndPublishCommittee = async (
   const pkCommitment = ethers.keccak256(publicKey);
   await registry.publishCommittee(
     e3Id,
-    nodes,
     publicKey,
     pkCommitment,
     committeeProof,

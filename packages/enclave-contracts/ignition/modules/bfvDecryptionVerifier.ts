@@ -7,6 +7,7 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 import {
   BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS,
+  BFV_THRESHOLD_T,
   readVkRecursiveHash,
 } from "../../scripts/utils";
 import decryptionAggregatorVerifierModule from "./decryptionAggregatorVerifier";
@@ -27,6 +28,7 @@ export default buildModule("BfvDecryptionVerifier", (m) => {
     decryptionAggregatorVerifier,
     c6FoldKeyHash,
     c7KeyHash,
+    BFV_THRESHOLD_T,
   ]);
 
   return { bfvDecryptionVerifier };

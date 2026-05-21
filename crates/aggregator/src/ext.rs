@@ -6,6 +6,7 @@
 
 use std::sync::Arc;
 
+use crate::committee::committee_addresses_from_nodes;
 use crate::decryptionshare_created_buffer::DecryptionshareCreatedBuffer;
 use crate::keyshare_created_filter_buffer::KeyshareCreatedFilterBuffer;
 use crate::{
@@ -14,6 +15,7 @@ use crate::{
     ThresholdPlaintextAggregatorState, TrBfvPlaintextRepositoryFactory,
 };
 use actix::{Actor, Addr, Recipient};
+use alloy::primitives::Address;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_data::{AutoPersist, Persistable, RepositoriesFactory};
@@ -22,8 +24,11 @@ use e3_events::{BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use e3_fhe::ext::FHE_KEY;
 use e3_fhe::Fhe;
 use e3_fhe_params::BfvPreset;
-use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
+use e3_request::{E3Context, E3ContextSnapshot, E3Extension, TypedKey, META_KEY};
 use e3_sortition::Sortition;
+
+/// Finalized committee (`PublicKeyAggregated.nodes`) parsed once for downstream ZK requests.
+pub const COMMITTEE_ADDRESSES_KEY: TypedKey<Vec<Address>> = TypedKey::new("committee_addresses");
 
 pub struct PublicKeyAggregatorExtension {
     bus: BusHandle,
@@ -168,10 +173,40 @@ impl ThresholdPlaintextAggregatorExtension {
 }
 
 const ERROR_TRBFV_PLAINTEXT_META_MISSING:&str = "Could not create ThresholdPlaintextAggregator because the meta instance it depends on was not set on the context.";
+const ERROR_TRBFV_PLAINTEXT_COMMITTEE_MISSING: &str =
+    "Could not create ThresholdPlaintextAggregator because committee addresses were not set (expected PublicKeyAggregated before CiphertextOutputPublished).";
+
+fn load_committee_addresses(ctx: &E3Context, e3_id: &E3id) -> Result<Vec<Address>> {
+    if let Some(addrs) = ctx.get_dependency(COMMITTEE_ADDRESSES_KEY) {
+        return Ok(addrs.clone());
+    }
+    // Restart/hydrate path: read from persisted public-key aggregator state.
+    let repo = ctx.repositories().publickey(e3_id);
+    let state = futures::executor::block_on(repo.read())?;
+    let Some(state) = state else {
+        return Err(anyhow!(ERROR_TRBFV_PLAINTEXT_COMMITTEE_MISSING));
+    };
+    let nodes = state
+        .committee_nodes()
+        .ok_or_else(|| anyhow!(ERROR_TRBFV_PLAINTEXT_COMMITTEE_MISSING))?;
+    committee_addresses_from_nodes(nodes)
+}
 
 #[async_trait]
 impl E3Extension for ThresholdPlaintextAggregatorExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
+        if let EnclaveEventData::PublicKeyAggregated(data) = evt.get_data() {
+            match committee_addresses_from_nodes(&data.nodes) {
+                Ok(addrs) => {
+                    let _ = ctx.set_dependency(COMMITTEE_ADDRESSES_KEY, addrs);
+                }
+                Err(e) => {
+                    self.bus.err(EType::PlaintextAggregation, e);
+                }
+            }
+            return;
+        }
+
         if ctx.get_event_recipient("threshold_keyshare").is_none() {
             return;
         }
@@ -194,6 +229,14 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
         };
 
         let e3_id = data.e3_id.clone();
+        let committee_addresses = match load_committee_addresses(ctx, &e3_id) {
+            Ok(addrs) => addrs,
+            Err(e) => {
+                self.bus.err(EType::PlaintextAggregation, e);
+                return;
+            }
+        };
+
         let repo = ctx.repositories().trbfv_plaintext(&e3_id);
         let sync_state = repo.send(Some(ThresholdPlaintextAggregatorState::init(
             meta.threshold_m as u64,
@@ -214,6 +257,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                             e3_id: e3_id.clone(),
                             params_preset: meta.params_preset,
                             proof_aggregation_enabled: meta.proof_aggregation_enabled,
+                            committee_addresses,
                         },
                         sync_state,
                     )
@@ -247,6 +291,9 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
 
             return Ok(());
         };
+
+        let committee_addresses = load_committee_addresses(ctx, &ctx.e3_id)?;
+
         let value = ThresholdPlaintextAggregator::new(
             ThresholdPlaintextAggregatorParams {
                 bus: self.bus.clone(),
@@ -254,6 +301,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                 e3_id: ctx.e3_id.clone(),
                 params_preset: meta.params_preset,
                 proof_aggregation_enabled: meta.proof_aggregation_enabled,
+                committee_addresses,
             },
             sync_state,
         )

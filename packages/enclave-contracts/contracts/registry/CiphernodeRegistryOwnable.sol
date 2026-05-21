@@ -23,6 +23,7 @@ import {
 import {
     IERC165
 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { CommitteeHashLib } from "../lib/CommitteeHashLib.sol";
 
 /**
  * @title CiphernodeRegistryOwnable
@@ -233,7 +234,6 @@ contract CiphernodeRegistryOwnable is
     /// @inheritdoc ICiphernodeRegistry
     function publishCommittee(
         uint256 e3Id,
-        address[] calldata nodes,
         bytes calldata publicKey,
         bytes32 pkCommitment,
         bytes calldata proof
@@ -245,15 +245,17 @@ contract CiphernodeRegistryOwnable is
             CommitteeNotFinalized()
         );
         require(c.publicKey == bytes32(0), CommitteeAlreadyPublished());
-        require(nodes.length == c.topNodes.length, "Node count mismatch");
-        require(pkCommitment != bytes32(0), "pkCommitment required");
+        require(pkCommitment != bytes32(0), PkCommitmentRequired());
+
+        bytes32 committeeHash = CommitteeHashLib.hash(c.topNodes);
+        c.committeeHash = committeeHash;
 
         E3 memory e3 = enclave.getE3(e3Id);
         if (e3.proofAggregationEnabled) {
-            require(proof.length > 0, "proof required");
+            require(proof.length > 0, DkgProofRequired());
             // Wrapper binds proof to full call context (chainId, this, e3Id, committeeRoot,
-            // sortedNodes, pkCommitment) and anchors recursive-aggregation VKs against
-            // immutables; reverts on mismatch with a typed error. Bind to the on-chain
+            // sortedNodes, pkCommitment, committeeHash) and anchors recursive-aggregation VKs
+            // against immutables; reverts on mismatch with a typed error. Bind to the on-chain
             // selected committee (`c.topNodes`), not caller-supplied `nodes`, so a wrong
             // `nodes` input cannot pre-commit the prover to the attacker's set.
             e3.pkVerifier.verify(
@@ -261,6 +263,7 @@ contract CiphernodeRegistryOwnable is
                 roots[e3Id],
                 c.topNodes,
                 pkCommitment,
+                committeeHash,
                 proof
             );
         }
@@ -270,7 +273,13 @@ contract CiphernodeRegistryOwnable is
 
         enclave.onCommitteePublished(e3Id, pkCommitment);
 
-        emit CommitteePublished(e3Id, nodes, publicKey, pkCommitment, proof);
+        emit CommitteePublished(
+            e3Id,
+            c.topNodes,
+            publicKey,
+            pkCommitment,
+            proof
+        );
     }
 
     /// @inheritdoc ICiphernodeRegistry
@@ -529,6 +538,15 @@ contract CiphernodeRegistryOwnable is
         Committee storage c = committees[e3Id];
         require(c.publicKey != bytes32(0), CommitteeNotPublished());
         nodes = c.topNodes;
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function getCommitteeHash(
+        uint256 e3Id
+    ) public view returns (bytes32 committeeHash) {
+        Committee storage c = committees[e3Id];
+        require(c.publicKey != bytes32(0), CommitteeNotPublished());
+        committeeHash = c.committeeHash;
     }
 
     /// @notice Returns the current size of the ciphernode IMT

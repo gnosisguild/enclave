@@ -254,15 +254,10 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await registry.finalizeCommittee(0);
 
       // Publish committee (this triggers onCommitteePublished -> onCommitteeFormed)
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
 
-      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
+      await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
 
       // Verify stage transitioned to KeyPublished (after publishCommittee which calls onKeyPublished)
       stage = await enclave.getE3Stage(0);
@@ -299,17 +294,10 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await registry.finalizeCommittee(0);
 
       // Publish committee and expect CommitteeFormed event
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
 
-      await expect(
-        registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x"),
-      )
+      await expect(registry.publishCommittee(0, publicKey, pkCommitment, "0x"))
         .to.emit(enclave, "CommitteeFormed")
         .withArgs(0);
     });
@@ -565,14 +553,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
-      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
+      await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
 
       // 2. Wait past compute deadline → mark as failed
       const e3 = await enclave.getE3(0);
@@ -670,14 +653,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
-      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
+      await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
 
       // 2. Fail via compute timeout
       const e3 = await enclave.getE3(0);
@@ -919,14 +897,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
-      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
+      await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
 
       stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(3); // KeyPublished
@@ -998,14 +971,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
-      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
+      await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
 
       stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(3); // KeyPublished
@@ -1241,14 +1209,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
-      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
+      await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
 
       expect(await enclave.getE3Stage(0)).to.equal(3); // KeyPublished
 
@@ -1400,14 +1363,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       expect(await enclave.getE3Stage(0)).to.equal(2); // CommitteeFinalized
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
-      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
+      await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
 
       expect(await enclave.getE3Stage(0)).to.equal(3); // KeyPublished
 
@@ -1459,14 +1417,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(0);
 
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-        await operator3.getAddress(),
-      ];
       const publicKey = "0x1234567890abcdef1234567890abcdef";
       const pkCommitment = ethers.keccak256(publicKey);
-      await registry.publishCommittee(0, nodes, publicKey, pkCommitment, "0x");
+      await registry.publishCommittee(0, publicKey, pkCommitment, "0x");
 
       // Publish outputs
       const e3 = await enclave.getE3(0);

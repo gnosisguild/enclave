@@ -493,7 +493,6 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
 
         let e3_id = msg.e3_id.clone();
         let pubkey = msg.pubkey.clone();
-        let nodes = msg.nodes.clone();
         let pk_commitment = msg.pk_commitment;
         let dkg_aggregator_proof = msg.dkg_aggregator_proof.clone();
         let contract_address = self.contract_address;
@@ -521,7 +520,6 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                 provider,
                 contract_address,
                 e3_id,
-                nodes,
                 pubkey,
                 pk_commitment,
                 dkg_aggregator_proof.as_ref(),
@@ -674,7 +672,6 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
     provider: EthProvider<P>,
     contract_address: Address,
     e3_id: E3id,
-    nodes: OrderedSet<String>,
     public_key: ArcBytes,
     pk_commitment: [u8; 32],
     dkg_aggregator_proof: Option<&Proof>,
@@ -690,15 +687,9 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
         None => Bytes::new(),
     };
 
-    let nodes_vec: Vec<Address> = nodes
-        .into_iter()
-        .filter_map(|node| node.parse().ok())
-        .collect();
-
     // RPC may not have synced finalization yet
     send_tx_with_retry("publishCommittee", &["CommitteeNotFinalized"], || {
         let provider = provider.clone();
-        let nodes_vec = nodes_vec.clone();
         let public_key_bytes = public_key_bytes.clone();
         let proof = proof.clone();
         async move {
@@ -711,13 +702,7 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
                 .await?;
             let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
             let builder = contract
-                .publishCommittee(
-                    e3_id_u256,
-                    nodes_vec,
-                    public_key_bytes,
-                    pk_commitment_b256,
-                    proof,
-                )
+                .publishCommittee(e3_id_u256, public_key_bytes, pk_commitment_b256, proof)
                 .nonce(current_nonce);
             let receipt = builder.send().await?.get_receipt().await?;
             Ok(receipt)
