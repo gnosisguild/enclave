@@ -3,7 +3,6 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import type { Provider } from "ethers";
 import fs from "fs";
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 import path from "path";
@@ -17,25 +16,6 @@ const NPM_HONK_SOURCE_PREFIX =
 // Hardhat uses npm/package@version/ for library linking when built from npm deps (pnpm workspace: @local)
 const NPM_HONK_LIBRARY_LINK_PREFIX =
   "npm/@enclave-e3/contracts@local/contracts/verifiers/bfv/honk";
-
-/**
- * Deployment bucket key from the connected provider (avoids hre.globalOptions.network).
- * Uses network.name when set and not "unknown"; otherwise chainId.
- */
-const chainBucketKeyFromProvider = async (
-  provider: Provider,
-): Promise<string> => {
-  try {
-    const network = await provider.getNetwork();
-    const name = network.name?.trim();
-    if (name && name !== "unknown") {
-      return name;
-    }
-    return `chainId:${network.chainId.toString()}`;
-  } catch {
-    return "localhost";
-  }
-};
 
 /** True when Hardhat artifacts use npm paths (consuming project like CRISP). */
 const isNpmArtifactContext = (): boolean =>
@@ -132,7 +112,7 @@ export const deployAndSaveVerifier = async (
   zkTranscriptLibAddress: string,
 ): Promise<{ address: string }> => {
   const { ethers } = await hre.network.connect();
-  const chain = await chainBucketKeyFromProvider(ethers.provider);
+  const chain = hre.globalOptions.network;
 
   // Check if already deployed
   const existing = readDeploymentArgs(contractName, chain);
@@ -186,8 +166,7 @@ export const deployAndSaveAllVerifiers = async (
   hre: HardhatRuntimeEnvironment,
 ): Promise<VerifierDeployments> => {
   const contractNames = discoverVerifierContracts();
-  const { ethers } = await hre.network.connect();
-  const chain = await chainBucketKeyFromProvider(ethers.provider);
+  const chain = hre.globalOptions.network;
   console.log(`   Deploying to network: ${chain}`);
 
   if (contractNames.length === 0) {

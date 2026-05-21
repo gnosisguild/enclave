@@ -22,7 +22,7 @@ export const deployAndSaveMockProgram = async ({
 }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = hre.globalOptions.network;
 
   const e3ProgramFactory = await ethers.getContractFactory("MockE3Program");
   const e3Program = await e3ProgramFactory.deploy();

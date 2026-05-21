@@ -2,8 +2,11 @@ chains:
   - name: "localhost"
     rpc_url: "ws://localhost:8545"
     contracts:
+      e3_program:
+        address: "0x95401dc811bb5740090279Ba06cfA8fcF6113778"
+        deploy_block: 46
       enclave:
-        address: "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+        address: "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0"
         deploy_block: 27
       ciphernode_registry:
         address: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
@@ -17,9 +20,6 @@ chains:
       fee_token:
         address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
         deploy_block: 18
-      e3_program:
-        address: "0x36C02dA8a0983159322a80FFE9F24b1acfF8B570"
-        deploy_block: 46
 program:
   dev: true
 nodes:
