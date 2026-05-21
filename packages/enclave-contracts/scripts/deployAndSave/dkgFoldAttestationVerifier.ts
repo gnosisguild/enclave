@@ -5,7 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import type { DkgFoldAttestationVerifier } from "../../types";
+import {
+  DkgFoldAttestationVerifier,
+  DkgFoldAttestationVerifier__factory as DkgFoldAttestationVerifierFactory,
+} from "../../types";
 import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 
 export const deployAndSaveDkgFoldAttestationVerifier = async (
@@ -14,6 +17,7 @@ export const deployAndSaveDkgFoldAttestationVerifier = async (
   dkgFoldAttestationVerifier: DkgFoldAttestationVerifier;
 }> => {
   const { ethers, networkName } = await hre.network.connect();
+  const [signer] = await ethers.getSigners();
   const chain = networkName ?? "localhost";
 
   const existing = readDeploymentArgs("DkgFoldAttestationVerifier", chain);
@@ -21,16 +25,13 @@ export const deployAndSaveDkgFoldAttestationVerifier = async (
     console.log(
       `   DkgFoldAttestationVerifier already deployed at ${existing.address}`,
     );
-    const dkgFoldAttestationVerifier = (await ethers.getContractAt(
-      "DkgFoldAttestationVerifier",
-      existing.address,
-    )) as DkgFoldAttestationVerifier;
+    const dkgFoldAttestationVerifier =
+      DkgFoldAttestationVerifierFactory.connect(existing.address, signer);
     return { dkgFoldAttestationVerifier };
   }
 
-  const dkgFoldAttestationVerifier = await ethers.deployContract(
-    "DkgFoldAttestationVerifier",
-  );
+  const dkgFoldAttestationVerifier =
+    await new DkgFoldAttestationVerifierFactory(signer).deploy();
   await dkgFoldAttestationVerifier.waitForDeployment();
   const address = await dkgFoldAttestationVerifier.getAddress();
   const blockNumber = await ethers.provider.getBlockNumber();
@@ -42,8 +43,5 @@ export const deployAndSaveDkgFoldAttestationVerifier = async (
   );
   console.log(`   DkgFoldAttestationVerifier deployed to: ${address}`);
 
-  return {
-    dkgFoldAttestationVerifier:
-      dkgFoldAttestationVerifier as DkgFoldAttestationVerifier,
-  };
+  return { dkgFoldAttestationVerifier };
 };

@@ -2132,8 +2132,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         .send(TakeEvents::<e3_events::EnclaveEvent>::new(28))
         .await?;
 
-    let actual_pk_commitment_1 = match history.events.last().cloned().unwrap().into_data() {
-        e3_events::EnclaveEventData::PublicKeyAggregated(ev) => ev.pk_commitment,
+    let actual_pubkey_agg_1 = match history.events.last().cloned().unwrap().into_data() {
+        e3_events::EnclaveEventData::PublicKeyAggregated(ev) => ev,
         other => panic!("expected PublicKeyAggregated, got {other:?}"),
     };
     assert_eq!(
@@ -2142,7 +2142,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
             pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
             e3_id: E3id::new("1234", 1),
             nodes: OrderedSet::from(eth_addrs.clone()),
-            pk_commitment: actual_pk_commitment_1,
+            committee_addresses: actual_pubkey_agg_1.committee_addresses,
+            pk_commitment: actual_pubkey_agg_1.pk_commitment,
             dkg_aggregator_proof: None,
             dkg_attestation_bundle: None,
         }
@@ -2174,8 +2175,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         .send(TakeEvents::<e3_events::EnclaveEvent>::new(8))
         .await?;
 
-    let actual_pk_commitment_2 = match history.events.last().cloned().unwrap().into_data() {
-        e3_events::EnclaveEventData::PublicKeyAggregated(ev) => ev.pk_commitment,
+    let actual_pubkey_agg_2 = match history.events.last().cloned().unwrap().into_data() {
+        e3_events::EnclaveEventData::PublicKeyAggregated(ev) => ev,
         other => panic!("expected PublicKeyAggregated, got {other:?}"),
     };
     assert_eq!(
@@ -2184,7 +2185,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
             pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
             e3_id: E3id::new("1234", 2),
             nodes: OrderedSet::from(eth_addrs.clone()),
-            pk_commitment: actual_pk_commitment_2,
+            committee_addresses: actual_pubkey_agg_2.committee_addresses,
+            pk_commitment: actual_pubkey_agg_2.pk_commitment,
             dkg_aggregator_proof: None,
             dkg_attestation_bundle: None,
         }

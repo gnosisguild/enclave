@@ -22,8 +22,8 @@ use anyhow::Result;
 use e3_events::{
     prelude::*, AggregatorChanged, BusHandle, CommitteeFinalizeRequested, CommitteeFinalized,
     E3RequestComplete, E3id, EType, EffectsEnabled, EnclaveEvent, EnclaveEventData,
-    EventSubscriber, EventType, OrderedSet, Proof, PublicKeyAggregated, Seed, Shutdown,
-    TicketGenerated, TicketId,
+    EventSubscriber, EventType, Proof, PublicKeyAggregated, Seed, Shutdown, TicketGenerated,
+    TicketId,
 };
 use e3_utils::{ArcBytes, NotifySync, MAILBOX_LIMIT};
 use std::collections::HashMap;
