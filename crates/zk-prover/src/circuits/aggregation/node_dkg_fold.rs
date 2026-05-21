@@ -392,8 +392,8 @@ pub fn prove_dkg_aggregation(
     let committee_members: Vec<String> = input
         .committee_addresses
         .iter()
-        .map(|addr| address_to_field_hex(addr))
-        .collect::<Result<_, _>>()?;
+        .map(address_to_field_hex)
+        .collect();
 
     let witness = DkgAggregatorWitness {
         nodes_fold_vk: nodes_fold_vk.verification_key.clone(),
@@ -495,8 +495,8 @@ pub fn prove_decryption_aggregation_jobs(
 
     let committee_members: Vec<String> = committee_addresses
         .iter()
-        .map(|addr| address_to_field_hex(addr))
-        .collect::<Result<_, _>>()?;
+        .map(address_to_field_hex)
+        .collect();
 
     let mut out = Vec::with_capacity(jobs.len());
     for (i, job) in jobs.iter().enumerate() {

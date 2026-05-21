@@ -21,10 +21,7 @@ use e3_events::{
     ZkResponse,
 };
 use e3_fhe_params::BfvPreset;
-use e3_sortition::{
-    CommitteeMembersResponse, E3CommitteeContainsRequest, E3CommitteeContainsResponse,
-    GetCommitteeMembersRequest, Sortition,
-};
+use e3_sortition::{E3CommitteeContainsRequest, E3CommitteeContainsResponse, Sortition};
 use e3_trbfv::{
     calculate_threshold_decryption::CalculateThresholdDecryptionRequest, TrBFVConfig, TrBFVRequest,
     TrBFVResponse,
@@ -1074,41 +1071,6 @@ impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
                 Ok(())
             },
         )
-    }
-}
-
-impl Handler<CommitteeMembersResponse> for ThresholdPlaintextAggregator {
-    type Result = ();
-
-    fn handle(&mut self, msg: CommitteeMembersResponse, ctx: &mut Self::Context) -> Self::Result {
-        let Some(members) = msg.members else {
-            warn!(
-                e3_id = %self.e3_id,
-                "committee members unavailable (E3 committee not finalized in sortition)"
-            );
-            if let Some(ec) = self.last_ec.clone() {
-                let _ = self.fail_decryption_round(ec);
-            }
-            return;
-        };
-        self.committee_members = Some(members);
-        if let Some(ec) = self.last_ec.clone() {
-            if let Err(e) = self.maybe_start_decryption_aggregation(&ec, ctx.address().recipient())
-            {
-                warn!(
-                    e3_id = %self.e3_id,
-                    error = %e,
-                    "maybe_start_decryption_aggregation failed after committee members response"
-                );
-            }
-            if let Err(e) = self.try_publish_complete() {
-                warn!(
-                    e3_id = %self.e3_id,
-                    error = %e,
-                    "try_publish_complete failed after committee members response"
-                );
-            }
-        }
     }
 }
 
