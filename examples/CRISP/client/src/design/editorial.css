@@ -32,9 +32,9 @@
   --paper-card: #daf7e4;
   --shadow-1: 0 1px 0 0 #0a0b0a0d;
 
-  --f-serif: 'Source Serif 4', 'Source Serif Pro', 'Iowan Old Style', Georgia, serif;
-  --f-italic: 'Source Serif 4', Georgia, serif;
-  --f-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --f-serif: 'Source Serif 4', 'Source Serif Pro', 'Iowan Old Style', 'Georgia', serif;
+  --f-italic: 'Source Serif 4', 'Georgia', serif;
+  --f-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Menlo', monospace;
   --f-sans: 'Inter', system-ui, sans-serif;
 
   --pad-x: clamp(28px, 4vw, 72px);

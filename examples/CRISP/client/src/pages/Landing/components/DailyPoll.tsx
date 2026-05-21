@@ -57,9 +57,9 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
   const { setOpen } = useModal()
   const { castVoteWithProof, isVoting: isCastingVote, isMasking, votingStep, lastActiveStep, stepMessage } = useVoteCasting()
 
-  // Derived state (isEnded, tallyReady) is round-local. Tracking the round id
-  // lets us clear tallyReady when the round changes so a new active poll doesn't
-  // inherit the previous round's results state.
+  // Derived and selection state are round-local. Tracking the round id lets us
+  // clear them when the round changes so a new active poll doesn't inherit the
+  // previous round's results state or vote selection.
   const trackedRoundId = useRef(roundState?.id)
 
   useEffect(() => {
@@ -71,11 +71,17 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
         trackedRoundId.current = roundState.id
         setTallyReady(false)
         setIsEnded(false)
+        setPollSelected(null)
+        setNoPollSelected(true)
       }
 
-      const block = await client.getBlock()
-      if (!cancelled) {
-        setIsEnded(block.timestamp > roundState.end_time)
+      try {
+        const block = await client.getBlock()
+        if (!cancelled) {
+          setIsEnded(block.timestamp > roundState.end_time)
+        }
+      } catch {
+        // Transient RPC failure — leave isEnded untouched and retry on the next run.
       }
     })()
 
