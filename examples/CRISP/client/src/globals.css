@@ -39,7 +39,7 @@ footer {
   /* Global Styles */
 
   body {
-    @apply transition-element bg-slate-200 p-0 font-jakarta text-slate-600;
+    @apply transition-element bg-[#CFF5DD] p-0 font-jakarta text-slate-600;
   }
 
   img {

@@ -11,39 +11,33 @@ import { CastleTurret, GithubLogo, TelegramLogo, TwitterLogo } from '@phosphor-i
 
 const Footer: React.FC = () => {
   return (
-    <footer className='relative z-10 flex w-full border-t-2 border-slate-600/20 bg-slate-200 p-6'>
-      <div className='mx-auto flex w-full max-w-screen-xl items-center justify-start gap-3 md:flex-row'>
-        <Link to='https://github.com/gnosisguild/enclave' target='_blank'>
-          <GithubLogo size={24} />
-        </Link>
-        <Link to='https://x.com/EnclaveE3' target='_blank'>
-          <TwitterLogo size={24} />
-        </Link>
-        <Link to='https://t.me/enclave_e3' target='_blank'>
-          <TelegramLogo size={24} />
-        </Link>
-        <Link to='https://warpcast.com/enclavee3' target='_blank'>
-          <CastleTurret size={24} />
-        </Link>
-      </div>
-      <div className='mx-auto flex w-full max-w-screen-xl flex-col items-center justify-end gap-1 md:flex-row'>
-        <div className='flex items-center gap-1'>
-          <p className='text-sm'>Secured with</p>
-          <Link to='https://enclave.gg' target='_blank'>
-            <p className='font-serif font-bold'>Enclave</p>
+    <div className='crisp-editorial' data-palette='interfold' data-mode='light' data-density='comfortable'>
+      <footer className='footer'>
+        <span>© 2026 — Crisp Protocol</span>
+        <span className='muted'>Secret-ballot voting with FHE + threshold MPC</span>
+        <div className='links' style={{ alignItems: 'center' }}>
+          <Link to='https://github.com/gnosisguild/enclave' target='_blank' aria-label='GitHub'>
+            <GithubLogo size={18} />
+          </Link>
+          <Link to='https://x.com/EnclaveE3' target='_blank' aria-label='X'>
+            <TwitterLogo size={18} />
+          </Link>
+          <Link to='https://t.me/enclave_e3' target='_blank' aria-label='Telegram'>
+            <TelegramLogo size={18} />
+          </Link>
+          <Link to='https://warpcast.com/enclavee3' target='_blank' aria-label='Farcaster'>
+            <CastleTurret size={18} />
+          </Link>
+          <Link to='https://theinterfold.com' target='_blank'>
+            Secured with The Interfold
+          </Link>
+          <Link to='https://www.gnosisguild.org/' target='_blank' style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            Gnosis Guild
+            <img src={GnosisGuildLogo} className='h-4 w-4' alt='Gnosis Guild' />
           </Link>
         </div>
-        <div className='flex items-center gap-1'>
-          <p className='text-sm'>built by</p>
-          <div className='flex items-center gap-1 duration-300 ease-in-out hover:opacity-70'>
-            <Link to='https://www.gnosisguild.org/' target='_blank' className='flex items-center gap-2 md:flex-row'>
-              <p className='text-sm font-bold'>Gnosis Guild</p>
-              <img src={GnosisGuildLogo} className='h-6 w-6' />
-            </Link>
-          </div>
-        </div>
-      </div>
-    </footer>
+      </footer>
+    </div>
   )
 }
 

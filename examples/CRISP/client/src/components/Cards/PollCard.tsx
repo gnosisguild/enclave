@@ -60,23 +60,19 @@ const PollCard: React.FC<PollResult> = ({ roundId, options, totalVotes, date, en
 
   return (
     <div
-      className='relative flex min-h-[248px] w-full cursor-pointer flex-col items-center justify-center space-y-4 rounded-3xl border-2 border-slate-600/20 bg-white/50 p-8 pt-2 shadow-lg md:max-w-[274px] hover:border-slate-600/40 transition-colors'
+      className='card col'
+      style={{ width: '100%', maxWidth: 300, gap: 16, cursor: 'pointer', alignItems: 'center' }}
       onClick={handleNavigation}
     >
-      <div className='external-icon absolute right-4 top-4' />
-      <div className='text-xs font-bold text-slate-600'>{formatDate(date)}</div>
-      <div className='flex space-x-8 '>
-        <PollCardResult results={results} totalVotes={displayVoteCount} isActive={isActive} />
+      <div className='between' style={{ width: '100%' }}>
+        <span className='mono-sm muted'>{formatDate(date)}</span>
+        <span className='linkish' style={{ border: 'none', padding: 0 }}>
+          View →
+        </span>
       </div>
-      {isActive && (
-        <div
-          className={`flex items-center space-x-2 rounded-lg border-2 ${isCurrentRound ? 'border-lime-600/80 bg-lime-400' : 'border-blue-600/80 bg-blue-400'} px-2 py-1 text-center font-bold uppercase leading-none text-white`}
-        >
-          <div className='h-1.5 w-1.5 animate-pulse rounded-full bg-white'></div>
-          <div>{isCurrentRound ? 'Live' : 'Active'}</div>
-        </div>
-      )}
-      <div className='absolute bottom-[-1rem] left-1/2 -translate-x-1/2 transform '>
+      <PollCardResult results={results} totalVotes={displayVoteCount} isActive={isActive} />
+      <div className='row' style={{ gap: 8, justifyContent: 'center' }}>
+        {isActive && <span className={`tag dot ${isCurrentRound ? 'live' : 'tally'}`}>{isCurrentRound ? 'Live' : 'Active'}</span>}
         <VotesBadge totalVotes={displayVoteCount} />
       </div>
     </div>

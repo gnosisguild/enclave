@@ -5,9 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Poll } from '@/model/poll.model'
-import Card from '@/components/Cards/Card'
-import CircularTiles from '@/components/CircularTiles'
 
 import { useVoteManagementContext } from '@/context/voteManagement'
 import LoadingAnimation from '@/components/LoadingAnimation'
@@ -16,6 +15,7 @@ import { useModal } from 'connectkit'
 import { useVoteCasting } from '@/hooks/voting/useVoteCasting'
 import VotingStepIndicator from '@/components/VotingStepIndicator'
 import { usePublicClient } from 'wagmi'
+import { EditorialShell, Cipher } from '@/design/Editorial'
 
 type DailyPollSectionProps = {
   loading?: boolean
@@ -23,10 +23,35 @@ type DailyPollSectionProps = {
   title?: string
 }
 
-const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, title = 'Daily Poll' }) => {
-  const { user, pollOptions, setPollOptions, roundState, hasVotedInCurrentRound, voteStatusLoading } = useVoteManagementContext()
+const FaceoffSlot: React.FC<{
+  poll?: Poll
+  side: 'A' | 'B'
+  disabled: boolean
+  onSelect: (poll: Poll) => void
+}> = ({ poll, side, disabled, onSelect }) => {
+  if (!poll) return <div className='faceoff-slot' />
+  return (
+    <button
+      type='button'
+      data-test-id={`poll-button-${poll.value}`}
+      className={`faceoff-slot ${poll.checked ? 'selected' : ''}`}
+      disabled={disabled}
+      onClick={() => onSelect(poll)}
+    >
+      <span className='mono muted faceoff-corner'>{side}</span>
+      <span className='faceoff-emoji'>{poll.label}</span>
+      {poll.checked && <span className='tag live dot faceoff-pick'>Picked</span>}
+    </button>
+  )
+}
+
+const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, title = 'The Faceoff' }) => {
+  const { user, pollOptions, setPollOptions, roundState, hasVotedInCurrentRound, voteStatusLoading, isLoading, getWebResultByRound } =
+    useVoteManagementContext()
+  const navigate = useNavigate()
   const client = usePublicClient()
   const [isEnded, setIsEnded] = useState(false)
+  const [tallyReady, setTallyReady] = useState(false)
   const [pollSelected, setPollSelected] = useState<Poll | null>(null)
   const [noPollSelected, setNoPollSelected] = useState<boolean>(true)
   const { setOpen } = useModal()
@@ -44,6 +69,26 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
       }
     })()
   }, [roundState, client])
+
+  // Once the poll is over, poll the backend until the FHE tally is published.
+  useEffect(() => {
+    if (!isEnded || !roundState || tallyReady) return
+
+    let cancelled = false
+    const check = async () => {
+      const result = await getWebResultByRound(roundState.id)
+      if (!cancelled && result && Array.isArray(result.tally) && result.tally.length > 0) {
+        setTallyReady(true)
+      }
+    }
+
+    check()
+    const interval = setInterval(check, 8000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [isEnded, roundState, tallyReady, getWebResultByRound])
 
   const handleChecked = (selectedPoll: Poll) => {
     const isAlreadySelected = pollSelected?.value === selectedPoll.value
@@ -73,89 +118,110 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
     await castVoteWithProof(pollSelected, isMasking)
   }
 
+  const busy = isCastingVote || isMasking
+  const optionA = pollOptions[0]
+  const optionB = pollOptions[1]
+  const hasPoll = Boolean(roundState && optionA?.label && optionB?.label)
+  const slotDisabled = busy || isEnded || Boolean(loading)
+
   return (
-    <>
-      <div className='relative flex w-full flex-1 items-center justify-center px-6 pb-12 pt-20 md:py-12'>
-        <div className='absolute bottom-0 right-0 grid w-full grid-cols-2 gap-2 max-md:opacity-50 md:w-[70vh]'>
-          <CircularTiles count={4} />
-        </div>
+    <EditorialShell className='flex w-full flex-1 flex-col'>
+      <section className='pad-section' style={{ flex: 1 }}>
+        <div className='split'>
+          {/* Left — context + actions */}
+          <div className='col' style={{ gap: 28 }}>
+            <div className='col' style={{ gap: 12 }}>
+              <div className='mono muted'>{title}</div>
+              {hasPoll && <h1 className='h1'>Choose your favorite</h1>}
+              {!roundState && !isLoading && <p className='lede'>No active poll found. Check back when the next round opens.</p>}
+            </div>
 
-        <div className='relative mx-auto flex w-full max-w-screen-md flex-col items-center justify-center space-y-8'>
-          <div className='space-y-2'>
-            <p className='text-center text-sm font-extrabold uppercase text-slate-400'>{title}</p>
-            <h3 className='md:text-h3 text-center font-bold leading-none text-slate-600'>Choose your favorite</h3>
-            {!roundState && <p className='text-center text-2xl font-bold text-slate-600/50 '>No active poll found.</p>}
-          </div>
-          {roundState && (
-            <div className='flex items-center justify-center space-x-2 flex-wrap gap-2'>
-              <div
-                className={
-                  !isEnded
-                    ? 'flex items-center space-x-2 rounded-lg border-2 border-lime-600/80 bg-lime-400 px-2 py-1 text-center font-bold uppercase leading-none text-white'
-                    : 'flex items-center space-x-2 rounded-lg border-2 border-red-600/80 bg-red-400 px-2 py-1 text-center font-bold uppercase leading-none text-white'
-                }
-              >
-                <div className='h-1.5 w-1.5 animate-pulse rounded-full bg-white'></div>
-                <div>{!isEnded ? 'Live' : 'Ended'}</div>
+            {roundState && (
+              <div className='row' style={{ gap: 10, flexWrap: 'wrap' }}>
+                {!isEnded && <span className='tag dot live'>Live</span>}
+                {isEnded && tallyReady && <span className='tag dot closed'>Closed</span>}
+                {isEnded && !tallyReady && <span className='tag dot tally'>Over · Tallying…</span>}
+                <span className='tag'>
+                  {roundState.vote_count} {roundState.vote_count === 1 ? 'vote' : 'votes'}
+                </span>
+                {hasVotedInCurrentRound && <span className='tag tally'>You voted</span>}
+                {voteStatusLoading && <span className='tag closed'>Checking…</span>}
               </div>
-              <div className='rounded-lg border-2 border-slate-600/20 bg-white px-2 py-1.5 text-center font-bold uppercase leading-none text-slate-800/50'>
-                {roundState.vote_count} votes
-              </div>
-              {hasVotedInCurrentRound && (
-                <div className='rounded-lg border-2 border-blue-500/80 bg-blue-100 px-2 py-1.5 text-center font-bold uppercase leading-none text-blue-600'>
-                  You voted
-                </div>
-              )}
-              {voteStatusLoading && (
-                <div className='rounded-lg border-2 border-slate-300 bg-slate-100 px-2 py-1.5 text-center font-bold uppercase leading-none text-slate-500'>
-                  Checking...
-                </div>
-              )}
-            </div>
-          )}
+            )}
 
-          {endTime && !isEnded && !isCastingVote && (
-            <div className='flex items-center justify-center max-sm:py-5 '>
-              <CountdownTimer endTime={endTime} />
-            </div>
-          )}
-          {(isCastingVote || isMasking) && <VotingStepIndicator step={votingStep} message={stepMessage} lastActiveStep={lastActiveStep} />}
-          {loading && !isCastingVote && !isMasking && <LoadingAnimation isLoading={loading} />}
-          <div className=' grid w-full grid-cols-2 gap-4 md:gap-8'>
-            {pollOptions.map((poll) => (
-              <div data-test-id={`poll-button-${poll.value}`} key={poll.label} className='col-span-2 md:col-span-1'>
-                <Card checked={poll.checked} onChecked={() => handleChecked(poll)}>
-                  <p className='inline-block text-6xl leading-none md:text-8xl'>{poll.label}</p>
-                </Card>
+            {endTime && !isEnded && !busy && (
+              <div className='col' style={{ gap: 6 }}>
+                <div className='cap'>Closes in</div>
+                <CountdownTimer endTime={endTime} />
               </div>
-            ))}
-          </div>
-          {roundState && (
-            <div className='space-y-4 flex flex-col items-center justify-center'>
-              {noPollSelected && !isEnded && (
-                <div className='text-center text-sm leading-none text-slate-500'>
-                  {hasVotedInCurrentRound ? 'Select an option to update your vote' : 'Select your favorite'}
+            )}
+
+            {busy && <VotingStepIndicator step={votingStep} message={stepMessage} lastActiveStep={lastActiveStep} />}
+            {isLoading && !roundState && !busy && <LoadingAnimation isLoading />}
+
+            {/* Active poll — voting actions */}
+            {roundState && !isEnded && (
+              <div className='col' style={{ gap: 14 }}>
+                {noPollSelected && (
+                  <div className='cap muted'>
+                    {hasVotedInCurrentRound ? 'Select an option to update your vote' : 'Select your favorite'}
+                  </div>
+                )}
+                <div className='row' style={{ gap: 12, flexWrap: 'wrap' }}>
+                  <button className='btn lg' disabled={noPollSelected || loading || busy} onClick={() => castVote(false)}>
+                    {isCastingVote ? 'Processing…' : hasVotedInCurrentRound ? 'Update vote →' : 'Cast →'}
+                  </button>
+                  <button className='btn ghost lg' disabled={loading || busy} onClick={() => castVote(true)}>
+                    {isMasking ? 'Masking…' : 'Mask vote'}
+                  </button>
                 </div>
-              )}
-              <button
-                className={`button-outlined button-max ${noPollSelected ? 'button-disabled' : ''}`}
-                disabled={noPollSelected || loading || !roundState || isEnded || isCastingVote || isMasking}
-                onClick={() => castVote(false)}
-              >
-                {isCastingVote ? 'Processing Vote...' : hasVotedInCurrentRound ? 'Update Vote' : 'Cast Vote'}
-              </button>
-              <button
-                className='button-outlined button-max'
-                disabled={loading || !roundState || isEnded || isCastingVote || isMasking}
-                onClick={() => castVote(true)}
-              >
-                {isMasking ? 'Masking vote...' : 'Mask vote'}
-              </button>
+              </div>
+            )}
+
+            {/* Poll over — tallying / results, no more voting */}
+            {roundState && isEnded && (
+              <div className='col' style={{ gap: 14 }}>
+                {tallyReady ? (
+                  <>
+                    <div className='cap muted'>The threshold committee has decrypted the result.</div>
+                    <div>
+                      <button className='btn lg' onClick={() => navigate(`/result/${roundState.id}`)}>
+                        View results →
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className='cap muted'>
+                    Voting is closed. Ballots are being tallied under encryption — results will appear here once the committee publishes the
+                    decrypted tally.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Right — faceoff + ciphertext */}
+          {hasPoll && (
+            <div className='split-visual col' style={{ gap: 18 }}>
+              <div className='faceoff' style={{ maxWidth: 'none' }}>
+                <FaceoffSlot poll={optionA} side='A' disabled={slotDisabled} onSelect={handleChecked} />
+                <div className='faceoff-vs'>
+                  <span className='mono'>vs</span>
+                </div>
+                <FaceoffSlot poll={optionB} side='B' disabled={slotDisabled} onSelect={handleChecked} />
+              </div>
+
+              <div className='card'>
+                <div className='mono muted' style={{ marginBottom: 10 }}>
+                  {busy ? 'Encrypting your ballot…' : 'Your ballot will be encrypted before it leaves this page'}
+                </div>
+                <Cipher seed={roundState ? roundState.vote_count + 3 : 11} length={160} blockSize={4} highlight />
+              </div>
             </div>
           )}
         </div>
-      </div>
-    </>
+      </section>
+    </EditorialShell>
   )
 }
 

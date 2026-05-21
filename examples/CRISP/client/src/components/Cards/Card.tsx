@@ -31,20 +31,8 @@ const Card: React.FC<CardProps> = ({ children, isActive, isDetails, checked, onC
   return (
     <div
       data-test-id='card'
-      className={`
-        h-full w-full
-        cursor-pointer
-        ${isDetails ? ' p-4' : 'min-h-[144px] p-10 md:min-h-[288px] md:p-20'}
-        rounded-[24px] bg-white text-black
-        ${!isDetails && 'shadow-md'}
-        transform 
-        border-2 transition-all duration-300 ease-in-out 
-        ${derivedIsClicked ? 'scale-105 border-lime-400' : ''}
-        ${derivedIsClicked ? 'border-lime-400' : 'border-slate-600/20'}
-        ${derivedIsClicked ? 'bg-white' : 'bg-slate-100'}
-        ${!isDetails && 'hover:border-lime-300 hover:bg-white hover:shadow-lg'}
-        flex w-full items-center justify-center
-      `}
+      className={`faceoff-slot ${derivedIsClicked ? 'selected' : ''}`}
+      style={{ aspectRatio: '1 / 1', cursor: isDetails ? 'default' : 'pointer', minHeight: isDetails ? 96 : 144 }}
       onClick={handleClick}
     >
       {children}
