@@ -67,8 +67,8 @@ const HeroSection: React.FC = () => {
                 </a>
               </div>
               <div>
-                <Link to='/current'>
-                  <button className='btn lg'>Try the demo →</button>
+                <Link to='/current' className='btn lg'>
+                  Try the demo →
                 </Link>
               </div>
             </div>

@@ -30,8 +30,8 @@ const PastPollSection: React.FC<PastPollSectionProps> = ({ customLabel = 'Past p
             <PollCard key={poll.roundId} {...poll} />
           ))}
         </div>
-        <Link to={'/historic'}>
-          <button className='btn ghost'>View all polls →</button>
+        <Link to='/historic' className='btn ghost'>
+          View all polls →
         </Link>
       </section>
     </EditorialShell>

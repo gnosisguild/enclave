@@ -6,7 +6,6 @@
 
 import React from 'react'
 import GnosisGuildLogo from '@/assets/icons/gg.svg'
-import { Link } from 'react-router-dom'
 import { CastleTurret, GithubLogo, TelegramLogo, TwitterLogo } from '@phosphor-icons/react'
 
 const Footer: React.FC = () => {
@@ -16,25 +15,30 @@ const Footer: React.FC = () => {
         <span>© 2026 — Crisp Protocol</span>
         <span className='muted'>Secret-ballot voting with FHE + threshold MPC</span>
         <div className='links' style={{ alignItems: 'center' }}>
-          <Link to='https://github.com/gnosisguild/enclave' target='_blank' aria-label='GitHub'>
+          <a href='https://github.com/gnosisguild/enclave' target='_blank' rel='noopener noreferrer' aria-label='GitHub'>
             <GithubLogo size={18} />
-          </Link>
-          <Link to='https://x.com/EnclaveE3' target='_blank' aria-label='X'>
+          </a>
+          <a href='https://x.com/EnclaveE3' target='_blank' rel='noopener noreferrer' aria-label='X'>
             <TwitterLogo size={18} />
-          </Link>
-          <Link to='https://t.me/enclave_e3' target='_blank' aria-label='Telegram'>
+          </a>
+          <a href='https://t.me/enclave_e3' target='_blank' rel='noopener noreferrer' aria-label='Telegram'>
             <TelegramLogo size={18} />
-          </Link>
-          <Link to='https://warpcast.com/enclavee3' target='_blank' aria-label='Farcaster'>
+          </a>
+          <a href='https://warpcast.com/enclavee3' target='_blank' rel='noopener noreferrer' aria-label='Farcaster'>
             <CastleTurret size={18} />
-          </Link>
-          <Link to='https://theinterfold.com' target='_blank'>
+          </a>
+          <a href='https://theinterfold.com' target='_blank' rel='noopener noreferrer'>
             Secured with The Interfold
-          </Link>
-          <Link to='https://www.gnosisguild.org/' target='_blank' style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          </a>
+          <a
+            href='https://www.gnosisguild.org/'
+            target='_blank'
+            rel='noopener noreferrer'
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+          >
             Gnosis Guild
             <img src={GnosisGuildLogo} className='h-4 w-4' alt='Gnosis Guild' />
-          </Link>
+          </a>
         </div>
       </footer>
     </div>

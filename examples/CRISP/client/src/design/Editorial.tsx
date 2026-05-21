@@ -54,9 +54,10 @@ export function Cipher({
   className?: string
 }) {
   const blocks = useMemo(() => {
+    const step = Math.max(1, Math.floor(blockSize))
     const raw = makeHex(seed + length, length)
     const arr: string[] = []
-    for (let i = 0; i < length; i += blockSize) arr.push(raw.slice(i, i + blockSize))
+    for (let i = 0; i < length; i += step) arr.push(raw.slice(i, i + step))
     return arr
   }, [seed, length, blockSize])
   return (

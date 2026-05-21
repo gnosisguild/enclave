@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Poll } from '@/model/poll.model'
 
@@ -57,17 +57,30 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
   const { setOpen } = useModal()
   const { castVoteWithProof, isVoting: isCastingVote, isMasking, votingStep, lastActiveStep, stepMessage } = useVoteCasting()
 
+  // Derived state (isEnded, tallyReady) is round-local. Tracking the round id
+  // lets us clear tallyReady when the round changes so a new active poll doesn't
+  // inherit the previous round's results state.
+  const trackedRoundId = useRef(roundState?.id)
+
   useEffect(() => {
+    let cancelled = false
     ;(async () => {
-      if (!client) return
-      if (!roundState) return
+      if (!client || !roundState) return
+
+      if (trackedRoundId.current !== roundState.id) {
+        trackedRoundId.current = roundState.id
+        setTallyReady(false)
+      }
 
       const block = await client.getBlock()
-
-      if (block.timestamp > roundState.end_time) {
-        setIsEnded(true)
+      if (!cancelled) {
+        setIsEnded(block.timestamp > roundState.end_time)
       }
     })()
+
+    return () => {
+      cancelled = true
+    }
   }, [roundState, client])
 
   // Once the poll is over, poll the backend until the FHE tally is published.
@@ -76,9 +89,13 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
 
     let cancelled = false
     const check = async () => {
-      const result = await getWebResultByRound(roundState.id)
-      if (!cancelled && result && Array.isArray(result.tally) && result.tally.length > 0) {
-        setTallyReady(true)
+      try {
+        const result = await getWebResultByRound(roundState.id)
+        if (!cancelled && result && Array.isArray(result.tally) && result.tally.length > 0) {
+          setTallyReady(true)
+        }
+      } catch {
+        // Transient failure — keep polling on the next interval tick.
       }
     }
 

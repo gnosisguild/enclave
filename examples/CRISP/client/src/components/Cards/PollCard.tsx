@@ -59,9 +59,20 @@ const PollCard: React.FC<PollResult> = ({ roundId, options, totalVotes, date, en
   }
 
   return (
-    <div
+    <button
+      type='button'
       className='card col'
-      style={{ width: '100%', maxWidth: 300, gap: 16, cursor: 'pointer', alignItems: 'center' }}
+      style={{
+        width: '100%',
+        maxWidth: 300,
+        gap: 16,
+        cursor: 'pointer',
+        alignItems: 'center',
+        background: 'transparent',
+        border: 'none',
+        textAlign: 'inherit',
+        font: 'inherit',
+      }}
       onClick={handleNavigation}
     >
       <div className='between' style={{ width: '100%' }}>
@@ -75,7 +86,7 @@ const PollCard: React.FC<PollResult> = ({ roundId, options, totalVotes, date, en
         {isActive && <span className={`tag dot ${isCurrentRound ? 'live' : 'tally'}`}>{isCurrentRound ? 'Live' : 'Active'}</span>}
         <VotesBadge totalVotes={displayVoteCount} />
       </div>
-    </div>
+    </button>
   )
 }
 
