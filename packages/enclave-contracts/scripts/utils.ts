@@ -29,6 +29,23 @@ export const REPO_ROOT = path.resolve(
   "../../..",
 );
 
+/**
+ * Default insecure-512 / micro committee layout for BFV aggregator verifiers.
+ * Must match `lib::configs::default::{H, T}` in compiled circuits.
+ */
+export const BFV_DKG_H = 3;
+export const BFV_THRESHOLD_T = 1;
+
+/** `dkg_aggregator` EVM public-input count for honest-set size `h`. */
+export function bfvPkExpectedPublicInputsLen(h: number): number {
+  return 3 * h + 6;
+}
+
+/** `decryption_aggregator` EVM public-input count for BFV threshold `t`. */
+export function bfvDecExpectedPublicInputsLen(threshold: number): number {
+  return 108 + 3 * threshold;
+}
+
 /** Recursive VK hashes for `BfvPkVerifier` sub-circuits (from `pnpm compile:circuits`). */
 export const BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS = {
   nodesFold: path.join(

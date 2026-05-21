@@ -17,24 +17,27 @@ import { CommitteeHashLib } from "../../lib/CommitteeHashLib.sol";
  *         and on-chain committee hash.
  * @dev Used when the Enclave is configured with encryptionSchemeId
  *      keccak256("fhe.rs:BFV"). The aggregator circuit's last public input is
- *      the hash-based aggregated PK commitment.
+ *      the hash-based aggregated PK commitment. Constructor `h` must match the
+ *      compiled DkgAggregator honest-set size (`lib::configs::default::H`).
  */
 contract BfvPkVerifier is IPkVerifier {
-    /// @dev Must match `lib::configs::default::H` (micro committee size).
-    uint256 internal constant H = 3;
+    /// @dev `dkg_aggregator` return field count: `1 + H + H + 1` (key hash + two `H` arrays + pk commitment).
+    uint256 internal constant DKG_RETURN_TAIL_LEN = 2;
+
+    /// @notice Honest-set size `H` (`party_ids` length); must match the compiled DkgAggregator circuit.
+    uint256 public immutable h;
 
     /// @dev `publicInputs` index for `committee_hash_hi` (after `party_ids`).
-    uint256 internal constant COMMITTEE_HASH_HI_IDX = 2 + H;
+    uint256 internal immutable committeeHashHiIdx;
 
-    /// @dev `publicInputs` index for `committee_hash_lo` (after `party_ids`).
-    uint256 internal constant COMMITTEE_HASH_LO_IDX = 3 + H;
+    /// @dev `publicInputs` index for `committee_hash_lo`.
+    uint256 internal immutable committeeHashLoIdx;
 
-    /// @dev `7` pub params + `8` return fields for micro `H = 3` (`dkg_aggregator`).
-    uint256 internal constant EXPECTED_PUBLIC_INPUTS_LEN = 15;
+    /// @dev `2 + H + 2 + (2*H + DKG_RETURN_TAIL_LEN)` for `dkg_aggregator` EVM public inputs.
+    uint256 internal immutable expectedPublicInputsLen;
 
     /// @dev Index of `pkCommitment` (last return field).
-    uint256 internal constant PK_COMMITMENT_IDX =
-        EXPECTED_PUBLIC_INPUTS_LEN - 1;
+    uint256 internal immutable pkCommitmentIdx;
 
     /// @notice Underlying Honk verifier for the DkgAggregator circuit.
     ICircuitVerifier public immutable circuitVerifier;
@@ -48,8 +51,16 @@ contract BfvPkVerifier is IPkVerifier {
     constructor(
         address _circuitVerifier,
         bytes32 _expectedNodesFoldKeyHash,
-        bytes32 _expectedC5KeyHash
+        bytes32 _expectedC5KeyHash,
+        uint256 _h
     ) {
+        require(_h > 0, "BfvPkVerifier: h=0");
+        h = _h;
+        committeeHashHiIdx = 2 + _h;
+        committeeHashLoIdx = 3 + _h;
+        expectedPublicInputsLen = (3 * _h) + 6;
+        pkCommitmentIdx = expectedPublicInputsLen - 1;
+
         circuitVerifier = ICircuitVerifier(_circuitVerifier);
         expectedNodesFoldKeyHash = _expectedNodesFoldKeyHash;
         expectedC5KeyHash = _expectedC5KeyHash;
@@ -66,7 +77,7 @@ contract BfvPkVerifier is IPkVerifier {
             (bytes, bytes32[])
         );
 
-        if (publicInputs.length != EXPECTED_PUBLIC_INPUTS_LEN) {
+        if (publicInputs.length != expectedPublicInputsLen) {
             return false;
         }
         if (publicInputs[0] != expectedNodesFoldKeyHash) {
@@ -76,18 +87,18 @@ contract BfvPkVerifier is IPkVerifier {
             return false;
         }
         if (
-            publicInputs[COMMITTEE_HASH_HI_IDX] !=
+            publicInputs[committeeHashHiIdx] !=
             CommitteeHashLib.hi(committeeHash)
         ) {
             return false;
         }
         if (
-            publicInputs[COMMITTEE_HASH_LO_IDX] !=
+            publicInputs[committeeHashLoIdx] !=
             CommitteeHashLib.lo(committeeHash)
         ) {
             return false;
         }
-        if (publicInputs[PK_COMMITMENT_IDX] != pkCommitment) {
+        if (publicInputs[pkCommitmentIdx] != pkCommitment) {
             return false;
         }
         return circuitVerifier.verify(rawProof, publicInputs);

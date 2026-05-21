@@ -110,8 +110,7 @@ class NoirCircuitBuilder {
       mkdirSync(this.options.outputDir!, { recursive: true })
 
       for (const preset of presets) {
-        this.setNoirConfigPreset(modNrPath, preset)
-        const presetResult = await this.buildForPreset(preset)
+        const presetResult = await this.buildForPreset(preset, modNrPath)
         result.compiled.push(...presetResult.compiled)
         result.errors.push(...presetResult.errors)
         if (!presetResult.success) result.success = false
@@ -200,7 +199,7 @@ class NoirCircuitBuilder {
     return this.requiredPresetMarkers(preset).every((path) => existsSync(path))
   }
 
-  private async buildForPreset(preset: CircuitPreset): Promise<BuildResult> {
+  private async buildForPreset(preset: CircuitPreset, modNrPath?: string): Promise<BuildResult> {
     const result: BuildResult = { success: true, compiled: [], errors: [] }
     const presetOutputDir = join(this.options.outputDir!, preset)
 
@@ -232,6 +231,10 @@ class NoirCircuitBuilder {
             `Use a full rebuild without --skip-if-built to refresh.`,
         )
         return result
+      }
+
+      if (modNrPath) {
+        this.setNoirConfigPreset(modNrPath, preset)
       }
 
       if (!this.options.noCleanTargets) {
@@ -678,9 +681,12 @@ class NoirCircuitBuilder {
     return hash.digest('hex').substring(0, 16)
   }
 
+  /** Generated at bench time; must not invalidate `--skip-if-built` between ensure passes. */
+  private static readonly SKIP_SOURCE_HASH_ENTRIES = new Set(['target', 'Prover.toml', 'Witness.toml'])
+
   private hashDir(dirPath: string, hash: ReturnType<typeof createHash>, relativePath = ''): void {
     for (const entry of readdirSync(dirPath).sort()) {
-      if (entry === 'target' || entry.startsWith('.')) continue
+      if (entry.startsWith('.') || NoirCircuitBuilder.SKIP_SOURCE_HASH_ENTRIES.has(entry)) continue
       const fullPath = join(dirPath, entry)
       const entryRelativePath = relativePath ? `${relativePath}/${entry}` : entry
       const stat = statSync(fullPath)

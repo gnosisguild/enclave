@@ -20,9 +20,9 @@
     },
     {
       "name": "CalculateThresholdDecryption",
-      "avg_seconds": 1.957074250,
+      "avg_seconds": 1.95707425,
       "runs": 1,
-      "total_seconds": 1.957074250
+      "total_seconds": 1.95707425
     },
     {
       "name": "GenEsiSss",
@@ -94,13 +94,13 @@
       "name": "ZkShareEncryption",
       "avg_seconds": 114.608395854,
       "runs": 36,
-      "total_seconds": 4125.902250750
+      "total_seconds": 4125.90225075
     },
     {
       "name": "ZkThresholdShareDecryption",
       "avg_seconds": 251.230740403,
       "runs": 3,
-      "total_seconds": 753.692221210
+      "total_seconds": 753.69222121
     },
     {
       "name": "ZkVerifyShareDecryptionProofs",
@@ -119,11 +119,11 @@
   "timings_seconds": [
     {
       "label": "Starting trbfv actor test",
-      "seconds": 0E-9
+      "seconds": 0e-9
     },
     {
       "label": "Setup completed",
-      "seconds": 3.273315000
+      "seconds": 3.273315
     },
     {
       "label": "Committee Setup Completed",
@@ -135,7 +135,7 @@
     },
     {
       "label": "ThresholdShares -> PublicKeyAggregated",
-      "seconds": 5158.129704250
+      "seconds": 5158.12970425
     },
     {
       "label": "E3Request -> PublicKeyAggregated",
@@ -147,7 +147,7 @@
     },
     {
       "label": "Running FHE Application",
-      "seconds": 0.071059500
+      "seconds": 0.0710595
     },
     {
       "label": "Ciphertext published -> PlaintextAggregated",

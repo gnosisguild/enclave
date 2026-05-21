@@ -68,9 +68,9 @@
     },
     {
       "name": "ZkPkAggregation",
-      "avg_seconds": 2.150821000,
+      "avg_seconds": 2.150821,
       "runs": 1,
-      "total_seconds": 2.150821000
+      "total_seconds": 2.150821
     },
     {
       "name": "ZkPkBfv",
@@ -119,7 +119,7 @@
   "timings_seconds": [
     {
       "label": "Starting trbfv actor test",
-      "seconds": 0E-9
+      "seconds": 0e-9
     },
     {
       "label": "Setup completed",
@@ -127,7 +127,7 @@
     },
     {
       "label": "Committee Setup Completed",
-      "seconds": 20.239957500
+      "seconds": 20.2399575
     },
     {
       "label": "Committee Finalization Complete",

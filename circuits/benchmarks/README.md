@@ -146,5 +146,10 @@ Hardhat replay.
   integration + gas replay). Fails fast unless `dist/circuits/<preset>/` and `circuits/bin` targets
   are present for that preset (`check_circuit_preset_artifacts.sh`).
 
+`run_benchmarks.sh` preflight uses the same `ensure` + `--skip-if-built`. When preset artifacts are
+ready, per-circuit `nargo compile` is skipped automatically (Stage 1 `ensure` skips too). Generated
+`Prover.toml` files under `circuits/bin/` are excluded from the preset source hash so benchmarks do
+not invalidate the stamp. Use **`--bench-compile`** to force per-circuit compile timings anyway.
+
 `Calldata gas` is computed from benchmark proof/public-input bytes with EVM calldata costs
 (`0x00 -> 4`, non-zero byte -> 16) and stored in raw benchmark JSON.

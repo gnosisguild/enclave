@@ -8,6 +8,10 @@ import { network } from "hardhat";
 
 import MockCircuitVerifierModule from "../ignition/modules/mockSlashingVerifier";
 import {
+  BFV_THRESHOLD_T,
+  bfvDecExpectedPublicInputsLen,
+} from "../scripts/utils";
+import {
   BfvDecryptionVerifier__factory as BfvDecryptionVerifierFactory,
   MockCircuitVerifier__factory as MockCircuitVerifierFactory,
 } from "../types";
@@ -21,15 +25,15 @@ const MESSAGE_COEFFS_COUNT = 100;
 const EXPECTED_C6_FOLD_KEY_HASH = ethers.id("c6_fold");
 const EXPECTED_C7_KEY_HASH = ethers.id("c7");
 
-/** Must match `BfvDecryptionVerifier.COMMITTEE_HASH_LO_IDX` (3). */
-const COMMITTEE_HASH_LO_IDX = 3;
+/** Must match `BfvDecryptionVerifier.threshold` / default circuit `T`. */
+const THRESHOLD = BFV_THRESHOLD_T;
 
-/** Minimum `publicInputs.length` for verify (message tail + committee limbs). */
-const MIN_PUBLIC_INPUTS_LEN = MESSAGE_COEFFS_COUNT + COMMITTEE_HASH_LO_IDX + 1;
+/** Exact `publicInputs.length` for the configured threshold. */
+const EXPECTED_PUBLIC_INPUTS_LEN = bfvDecExpectedPublicInputsLen(THRESHOLD);
 
 function buildPublicInputsWithMessage(
   messageCoeffs: bigint[],
-  totalInputs = 402,
+  totalInputs = EXPECTED_PUBLIC_INPUTS_LEN,
   subCircuitHashes: [string, string] = [
     EXPECTED_C6_FOLD_KEY_HASH,
     EXPECTED_C7_KEY_HASH,
@@ -83,7 +87,12 @@ describe("BfvDecryptionVerifier", function () {
 
     const bfvDecryptionVerifier = await (
       await ethers.getContractFactory("BfvDecryptionVerifier")
-    ).deploy(mockAddr, EXPECTED_C6_FOLD_KEY_HASH, EXPECTED_C7_KEY_HASH);
+    ).deploy(
+      mockAddr,
+      EXPECTED_C6_FOLD_KEY_HASH,
+      EXPECTED_C7_KEY_HASH,
+      THRESHOLD,
+    );
 
     await bfvDecryptionVerifier.waitForDeployment();
     const dv = BfvDecryptionVerifierFactory.connect(
@@ -111,7 +120,7 @@ describe("BfvDecryptionVerifier", function () {
       ).to.be.revert(ethers);
     });
 
-    it("returns false when publicInputs.length < MIN_PUBLIC_INPUTS_LEN", async function () {
+    it("returns false when publicInputs.length is below expected", async function () {
       const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
       );
@@ -120,8 +129,30 @@ describe("BfvDecryptionVerifier", function () {
       const messageCoeffs = [1n, 2n, 3n];
       const publicInputs = buildPublicInputsWithMessage(
         messageCoeffs,
-        MIN_PUBLIC_INPUTS_LEN,
-      ).slice(0, MIN_PUBLIC_INPUTS_LEN - 1);
+        EXPECTED_PUBLIC_INPUTS_LEN,
+      ).slice(0, EXPECTED_PUBLIC_INPUTS_LEN - 1);
+      const plaintextHash = plaintextToHash(messageCoeffs);
+      const proof = encodeProof("0x01", publicInputs);
+
+      const result = await bfvDecryptionVerifier.verify.staticCall(
+        plaintextHash,
+        ethers.ZeroHash,
+        proof,
+      );
+      expect(result).to.equal(false);
+    });
+
+    it("returns false when publicInputs.length exceeds expected", async function () {
+      const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
+        deployWithMockCircuit,
+      );
+      await mockCircuit.setReturnValue(true);
+
+      const messageCoeffs = [1n, 2n, 3n];
+      const publicInputs = buildPublicInputsWithMessage(
+        messageCoeffs,
+        EXPECTED_PUBLIC_INPUTS_LEN + 1,
+      );
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
@@ -145,14 +176,16 @@ describe("BfvDecryptionVerifier", function () {
         await revertingVerifier.getAddress(),
         EXPECTED_C6_FOLD_KEY_HASH,
         EXPECTED_C7_KEY_HASH,
+        THRESHOLD,
       );
       await bfvDecryptionVerifier.waitForDeployment();
 
       const messageCoeffs = [1n, 2n, 3n];
-      const publicInputs = buildPublicInputsWithMessage(messageCoeffs, 402, [
-        ethers.id("wrong-c6"),
-        EXPECTED_C7_KEY_HASH,
-      ]);
+      const publicInputs = buildPublicInputsWithMessage(
+        messageCoeffs,
+        EXPECTED_PUBLIC_INPUTS_LEN,
+        [ethers.id("wrong-c6"), EXPECTED_C7_KEY_HASH],
+      );
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
@@ -176,14 +209,16 @@ describe("BfvDecryptionVerifier", function () {
         await revertingVerifier.getAddress(),
         EXPECTED_C6_FOLD_KEY_HASH,
         EXPECTED_C7_KEY_HASH,
+        THRESHOLD,
       );
       await bfvDecryptionVerifier.waitForDeployment();
 
       const messageCoeffs = [1n, 2n, 3n];
-      const publicInputs = buildPublicInputsWithMessage(messageCoeffs, 402, [
-        EXPECTED_C6_FOLD_KEY_HASH,
-        ethers.id("wrong-c7"),
-      ]);
+      const publicInputs = buildPublicInputsWithMessage(
+        messageCoeffs,
+        EXPECTED_PUBLIC_INPUTS_LEN,
+        [EXPECTED_C6_FOLD_KEY_HASH, ethers.id("wrong-c7")],
+      );
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
@@ -240,7 +275,12 @@ describe("BfvDecryptionVerifier", function () {
 
       const bfvDecryptionVerifier = await (
         await ethers.getContractFactory("BfvDecryptionVerifier")
-      ).deploy(mockAddr, ethers.id("wrong-c6"), ethers.id("wrong-c7"));
+      ).deploy(
+        mockAddr,
+        ethers.id("wrong-c6"),
+        ethers.id("wrong-c7"),
+        THRESHOLD,
+      );
       await bfvDecryptionVerifier.waitForDeployment();
 
       const messageCoeffs = [1n, 2n, 3n];
@@ -277,7 +317,7 @@ describe("BfvDecryptionVerifier", function () {
       expect(result).to.equal(true);
     });
 
-    it("returns true with minimal public inputs (vk hashes + message tail)", async function () {
+    it("returns true with exact-length public inputs", async function () {
       const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
       );
@@ -286,7 +326,7 @@ describe("BfvDecryptionVerifier", function () {
       const messageCoeffs = [1n, 2n, 3n];
       const publicInputs = buildPublicInputsWithMessage(
         messageCoeffs,
-        MIN_PUBLIC_INPUTS_LEN,
+        EXPECTED_PUBLIC_INPUTS_LEN,
       );
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);

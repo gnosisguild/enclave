@@ -9,7 +9,9 @@ import path from "node:path";
 
 import {
   BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS,
+  BFV_DKG_H,
   BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS,
+  BFV_THRESHOLD_T,
   committeeHashFromLimbs,
   readVkRecursiveHash,
 } from "./utils";
@@ -195,7 +197,12 @@ async function main() {
 
   const bfvPk = await (
     await ethers.getContractFactory("BfvPkVerifier")
-  ).deploy(dkgAggAddress, expectedNodesFoldKeyHash, expectedC5KeyHash);
+  ).deploy(
+    dkgAggAddress,
+    expectedNodesFoldKeyHash,
+    expectedC5KeyHash,
+    BFV_DKG_H,
+  );
   await bfvPk.waitForDeployment();
 
   const dkgEncodedProof = abiCoder.encode(
@@ -230,7 +237,12 @@ async function main() {
 
   const bfvDec = await (
     await ethers.getContractFactory("BfvDecryptionVerifier")
-  ).deploy(decAggAddress, expectedC6FoldKeyHash, expectedC7KeyHash);
+  ).deploy(
+    decAggAddress,
+    expectedC6FoldKeyHash,
+    expectedC7KeyHash,
+    BFV_THRESHOLD_T,
+  );
   await bfvDec.waitForDeployment();
 
   const decEncodedProof = abiCoder.encode(

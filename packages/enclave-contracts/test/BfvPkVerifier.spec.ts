@@ -7,6 +7,7 @@ import { expect } from "chai";
 import { network } from "hardhat";
 
 import MockCircuitVerifierModule from "../ignition/modules/mockSlashingVerifier";
+import { BFV_DKG_H } from "../scripts/utils";
 import {
   BfvPkVerifier__factory as BfvPkVerifierFactory,
   MockCircuitVerifier__factory as MockCircuitVerifierFactory,
@@ -17,8 +18,8 @@ const { loadFixture } = networkHelpers;
 
 const EXPECTED_NODES_FOLD_KEY_HASH = ethers.id("nodes_fold");
 const EXPECTED_C5_KEY_HASH = ethers.id("c5");
-/** Must match `BfvPkVerifier` / default circuit `H`. */
-const H = 3;
+/** Must match `BfvPkVerifier.h` / default circuit `H`. */
+const H = BFV_DKG_H;
 const DKG_RETURN_FIELD_COUNT = 8;
 
 function committeeHashLimbs(committeeHash: string): [string, string] {
@@ -59,7 +60,7 @@ describe("BfvPkVerifier", function () {
 
     const bfvPkVerifier = await (
       await ethers.getContractFactory("BfvPkVerifier")
-    ).deploy(mockAddr, EXPECTED_NODES_FOLD_KEY_HASH, EXPECTED_C5_KEY_HASH);
+    ).deploy(mockAddr, EXPECTED_NODES_FOLD_KEY_HASH, EXPECTED_C5_KEY_HASH, H);
 
     await bfvPkVerifier.waitForDeployment();
     const pk = BfvPkVerifierFactory.connect(
@@ -192,6 +193,7 @@ describe("BfvPkVerifier", function () {
         await revertingVerifier.getAddress(),
         EXPECTED_NODES_FOLD_KEY_HASH,
         EXPECTED_C5_KEY_HASH,
+        H,
       );
       await bfvPkVerifier.waitForDeployment();
 
@@ -223,6 +225,7 @@ describe("BfvPkVerifier", function () {
         await revertingVerifier.getAddress(),
         EXPECTED_NODES_FOLD_KEY_HASH,
         EXPECTED_C5_KEY_HASH,
+        H,
       );
       await bfvPkVerifier.waitForDeployment();
 
@@ -284,7 +287,12 @@ describe("BfvPkVerifier", function () {
 
       const bfvPkVerifier = await (
         await ethers.getContractFactory("BfvPkVerifier")
-      ).deploy(mockAddr, ethers.id("wrong-nodes-fold"), ethers.id("wrong-c5"));
+      ).deploy(
+        mockAddr,
+        ethers.id("wrong-nodes-fold"),
+        ethers.id("wrong-c5"),
+        H,
+      );
       await bfvPkVerifier.waitForDeployment();
 
       const pkCommitment = ethers.keccak256("0xabcd");

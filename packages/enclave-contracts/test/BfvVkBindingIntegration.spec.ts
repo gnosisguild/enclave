@@ -11,9 +11,13 @@ import { fileURLToPath } from "node:url";
 
 import {
   BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS,
+  BFV_DKG_H,
   BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS,
+  BFV_THRESHOLD_T,
   assertBfvDecryptionVerifierSubCircuitVkHashes,
   assertBfvPkVerifierSubCircuitVkHashes,
+  bfvDecExpectedPublicInputsLen,
+  bfvPkExpectedPublicInputsLen,
   committeeHashFromLimbs,
   readVkRecursiveHash,
 } from "../scripts/utils";
@@ -106,16 +110,13 @@ function hexToBytes32Array(hex: string): string[] {
   return out;
 }
 
-/** Micro `H` — must match `BfvPkVerifier` / default `dkg_aggregator`. */
-const DKG_H = 3;
-const DKG_COMMITTEE_HASH_HI_IDX = 2 + DKG_H;
-const DKG_COMMITTEE_HASH_LO_IDX = 3 + DKG_H;
-/** `7` pub params + `8` return fields for `H = 3`. */
-const DKG_EXPECTED_PUBLIC_INPUT_LEN = 15;
+const DKG_COMMITTEE_HASH_HI_IDX = 2 + BFV_DKG_H;
+const DKG_COMMITTEE_HASH_LO_IDX = 3 + BFV_DKG_H;
+const DKG_EXPECTED_PUBLIC_INPUT_LEN = bfvPkExpectedPublicInputsLen(BFV_DKG_H);
 const DEC_COMMITTEE_HASH_HI_IDX = 2;
 const DEC_COMMITTEE_HASH_LO_IDX = 3;
-/** `4` pub params + `107` return fields (`T = 1`). */
-const DEC_EXPECTED_PUBLIC_INPUT_LEN = 111;
+const DEC_EXPECTED_PUBLIC_INPUT_LEN =
+  bfvDecExpectedPublicInputsLen(BFV_THRESHOLD_T);
 
 function plaintextHashFromPublicInputs(publicInputs: string[]): string {
   const messageCoeffsCount = 100;
@@ -182,6 +183,7 @@ describe("BfvVkBindingIntegration", function () {
       await dkgAgg.getAddress(),
       expectedNodesFoldKeyHash,
       expectedC5KeyHash,
+      BFV_DKG_H,
     );
     await bfvPk.waitForDeployment();
 
@@ -191,6 +193,7 @@ describe("BfvVkBindingIntegration", function () {
       await decAgg.getAddress(),
       expectedC6FoldKeyHash,
       expectedC7KeyHash,
+      BFV_THRESHOLD_T,
     );
     await bfvDec.waitForDeployment();
 
@@ -210,6 +213,7 @@ describe("BfvVkBindingIntegration", function () {
         await bfvPk.circuitVerifier(),
         ethers.id("stale-nodes-fold"),
         ethers.id("stale-c5"),
+        BFV_DKG_H,
       );
       await stale.waitForDeployment();
 
@@ -233,6 +237,7 @@ describe("BfvVkBindingIntegration", function () {
         await bfvDec.circuitVerifier(),
         ethers.id("stale-c6"),
         ethers.id("stale-c7"),
+        BFV_THRESHOLD_T,
       );
       await stale.waitForDeployment();
 
@@ -378,7 +383,12 @@ describe("BfvVkBindingIntegration", function () {
 
       const bfvPk = await (
         await ethers.getContractFactory("BfvPkVerifier")
-      ).deploy(await dkgAgg.getAddress(), wrongNodesFold, expectedC5KeyHash);
+      ).deploy(
+        await dkgAgg.getAddress(),
+        wrongNodesFold,
+        expectedC5KeyHash,
+        BFV_DKG_H,
+      );
       await bfvPk.waitForDeployment();
 
       const abiCoder = ethers.AbiCoder.defaultAbiCoder();
