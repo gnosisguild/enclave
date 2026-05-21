@@ -6,6 +6,7 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 import {
+  BFV_DKG_H,
   BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS,
   readVkRecursiveHash,
 } from "../../scripts/utils";
@@ -25,6 +26,7 @@ export default buildModule("BfvPkVerifier", (m) => {
     dkgAggregatorVerifier,
     expectedNodesFoldKeyHash,
     expectedC5KeyHash,
+    BFV_DKG_H,
   ]);
 
   return { bfvPkVerifier };

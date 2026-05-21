@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # run_benchmarks.sh - Main orchestration script for benchmarking circuits
-# Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--clean] [--verbose]
+# Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--bench-compile] [--clean] [--verbose]
 
 set -e
 
@@ -11,8 +11,10 @@ CONFIG_FILE="${BENCHMARKS_DIR}/config.json"
 CLEAN_ARTIFACTS=false
 MODE_OVERRIDE=""
 SKIP_COMPILE=false
+BENCH_COMPILE=false
 CIRCUIT_FILTER=""
 VERBOSE=false
+PRESET_ARTIFACTS_READY=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -37,6 +39,10 @@ while [[ $# -gt 0 ]]; do
             SKIP_COMPILE=true
             shift
             ;;
+        --bench-compile)
+            BENCH_COMPILE=true
+            shift
+            ;;
         --clean)
             CLEAN_ARTIFACTS=true
             shift
@@ -47,7 +53,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--clean] [--verbose]"
+            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--bench-compile] [--clean] [--verbose]"
             exit 1
             ;;
     esac
@@ -125,6 +131,10 @@ if [ -n "$CIRCUIT_FILTER" ]; then
 fi
 if [ "$SKIP_COMPILE" = true ]; then
     echo "  Skip Compilation: Yes (using existing artifacts)"
+elif [ "$BENCH_COMPILE" = true ]; then
+    echo "  Per-circuit compile: Yes (--bench-compile)"
+elif [ "$PRESET_ARTIFACTS_READY" = true ]; then
+    echo "  Per-circuit compile: No (preset artifacts ready; use --bench-compile to measure compile time)"
 fi
 if [ "$VERBOSE" = true ]; then
     echo "  Verbose Logging: Yes"
@@ -145,17 +155,13 @@ if [ "$SKIP_COMPILE" = false ]; then
     else
         PRESET_NAME="insecure-512"
     fi
-    echo "Preflight: pnpm build:circuits --preset ${PRESET_NAME}"
+    ENSURE_ARGS=("$PRESET_NAME")
     if [ "$VERBOSE" = true ]; then
-        (
-          cd "$REPO_ROOT" && \
-          pnpm build:circuits --preset "$PRESET_NAME"
-        )
-    else
-        (
-          cd "$REPO_ROOT" && \
-          pnpm build:circuits --preset "$PRESET_NAME" >/dev/null
-        )
+        ENSURE_ARGS+=(--verbose)
+    fi
+    "${SCRIPT_DIR}/ensure_circuit_preset_built.sh" "${ENSURE_ARGS[@]}"
+    if "${SCRIPT_DIR}/check_circuit_preset_artifacts.sh" "$PRESET_NAME"; then
+        PRESET_ARTIFACTS_READY=true
     fi
     echo "Preflight build complete."
     echo ""
@@ -231,8 +237,10 @@ for CIRCUIT in $RUN_CIRCUITS; do
         
         # Run benchmark
         BENCHMARK_ARGS=("$CIRCUIT_PATH" "$ORACLE" "$OUTPUT_FILE" "$MODE")
-        if [ "$SKIP_COMPILE" = true ]; then
-            BENCHMARK_ARGS+=("--skip-compile")
+        if [ "$BENCH_COMPILE" != true ]; then
+            if [ "$SKIP_COMPILE" = true ] || [ "$PRESET_ARTIFACTS_READY" = true ]; then
+                BENCHMARK_ARGS+=("--skip-compile")
+            fi
         fi
         "${SCRIPT_DIR}/benchmark_circuit.sh" "${BENCHMARK_ARGS[@]}"
         
@@ -274,6 +282,10 @@ INTEGRATION_SNAPSHOT="${BENCHMARKS_DIR}/${OUTPUT_DIR}/integration_summary.json"
 if [ -f "${GAS_JSON_FILE}" ] && jq -e '.integration_summary != null' "${GAS_JSON_FILE}" >/dev/null 2>&1; then
     jq '.integration_summary' "${GAS_JSON_FILE}" > "${INTEGRATION_SNAPSHOT}"
     echo "✓ Wrote integration summary snapshot: ${INTEGRATION_SNAPSHOT}"
+fi
+
+if [ "${OUTPUT_DIR}" = "results_insecure" ] && [ -f "${INTEGRATION_SNAPSHOT}" ]; then
+    "${SCRIPT_DIR}/sync_bfv_vk_binding_fixture.sh" "${INTEGRATION_SNAPSHOT}"
 fi
 
 echo "Stage 3/3: Finalizing outputs..."

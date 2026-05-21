@@ -14,6 +14,7 @@ contract MockDecryptionVerifier is IDecryptionVerifier {
 
     function verify(
         bytes32,
+        bytes32,
         bytes calldata proof
     ) external pure returns (bool success) {
         if (proof.length >= 4 && bytes4(proof[0:4]) == _FAIL_MAGIC) {

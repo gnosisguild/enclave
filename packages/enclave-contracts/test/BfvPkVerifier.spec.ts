@@ -7,6 +7,7 @@ import { expect } from "chai";
 import { network } from "hardhat";
 
 import MockCircuitVerifierModule from "../ignition/modules/mockSlashingVerifier";
+import { BFV_DKG_H } from "../scripts/utils";
 import {
   BfvPkVerifier__factory as BfvPkVerifierFactory,
   MockCircuitVerifier__factory as MockCircuitVerifierFactory,
@@ -17,6 +18,32 @@ const { loadFixture } = networkHelpers;
 
 const EXPECTED_NODES_FOLD_KEY_HASH = ethers.id("nodes_fold");
 const EXPECTED_C5_KEY_HASH = ethers.id("c5");
+/** Must match `BfvPkVerifier.h` / default circuit `H`. */
+const H = BFV_DKG_H;
+const DKG_RETURN_FIELD_COUNT = 8;
+
+function committeeHashLimbs(committeeHash: string): [string, string] {
+  const bn = BigInt(committeeHash);
+  const hi = ethers.toBeHex(bn >> 128n, 32);
+  const lo = ethers.toBeHex(bn & ((1n << 128n) - 1n), 32);
+  return [hi, lo];
+}
+
+function minimalDkgPublicInputs(
+  pkCommitment: string,
+  committeeHash: string = ethers.ZeroHash,
+): string[] {
+  const [hi, lo] = committeeHashLimbs(committeeHash);
+  return [
+    EXPECTED_NODES_FOLD_KEY_HASH,
+    EXPECTED_C5_KEY_HASH,
+    ...Array(H).fill(ethers.ZeroHash),
+    hi,
+    lo,
+    ...Array(DKG_RETURN_FIELD_COUNT - 1).fill(ethers.ZeroHash),
+    pkCommitment,
+  ];
+}
 
 function encodeProof(rawProof: string, publicInputs: string[]): string {
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
@@ -33,7 +60,7 @@ describe("BfvPkVerifier", function () {
 
     const bfvPkVerifier = await (
       await ethers.getContractFactory("BfvPkVerifier")
-    ).deploy(mockAddr, EXPECTED_NODES_FOLD_KEY_HASH, EXPECTED_C5_KEY_HASH);
+    ).deploy(mockAddr, EXPECTED_NODES_FOLD_KEY_HASH, EXPECTED_C5_KEY_HASH, H);
 
     await bfvPkVerifier.waitForDeployment();
     const pk = BfvPkVerifierFactory.connect(
@@ -51,7 +78,11 @@ describe("BfvPkVerifier", function () {
       const invalidProof = "0xdeadbeef";
 
       await expect(
-        bfvPkVerifier.verify.staticCall(pkCommitment, invalidProof),
+        bfvPkVerifier.verify.staticCall(
+          pkCommitment,
+          ethers.ZeroHash,
+          invalidProof,
+        ),
       ).to.be.revert(ethers);
     });
 
@@ -60,7 +91,11 @@ describe("BfvPkVerifier", function () {
       const pkCommitment = ethers.keccak256("0x1234");
       const proof = encodeProof("0x01", []);
 
-      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
+      const result = await bfvPkVerifier.verify.staticCall(
+        pkCommitment,
+        ethers.ZeroHash,
+        proof,
+      );
       expect(result).to.equal(false);
     });
 
@@ -69,7 +104,48 @@ describe("BfvPkVerifier", function () {
       const pkCommitment = ethers.keccak256("0xabcd");
       const proof = encodeProof("0x01", [pkCommitment]);
 
-      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
+      const result = await bfvPkVerifier.verify.staticCall(
+        pkCommitment,
+        ethers.ZeroHash,
+        proof,
+      );
+      expect(result).to.equal(false);
+    });
+
+    it("returns false when publicInputs has trailing elements past expected length", async function () {
+      const { bfvPkVerifier } = await loadFixture(deployWithMockCircuit);
+      const pkCommitment = ethers.keccak256("0xabcd");
+      const proof = encodeProof("0x01", [
+        ...minimalDkgPublicInputs(pkCommitment),
+        ethers.ZeroHash,
+      ]);
+
+      const result = await bfvPkVerifier.verify.staticCall(
+        pkCommitment,
+        ethers.ZeroHash,
+        proof,
+      );
+      expect(result).to.equal(false);
+    });
+
+    it("returns false when publicInputs has only pub params (length 7, no return fields)", async function () {
+      const { bfvPkVerifier } = await loadFixture(deployWithMockCircuit);
+      const pkCommitment = ethers.keccak256("0xabcd");
+      const [hi, lo] = committeeHashLimbs(ethers.ZeroHash);
+      const proof = encodeProof("0x01", [
+        EXPECTED_NODES_FOLD_KEY_HASH,
+        EXPECTED_C5_KEY_HASH,
+        ...Array(H).fill(ethers.ZeroHash),
+        hi,
+        lo,
+        pkCommitment,
+      ]);
+
+      const result = await bfvPkVerifier.verify.staticCall(
+        pkCommitment,
+        ethers.ZeroHash,
+        proof,
+      );
       expect(result).to.equal(false);
     });
 
@@ -81,7 +157,27 @@ describe("BfvPkVerifier", function () {
         EXPECTED_C5_KEY_HASH,
       ]);
 
-      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
+      const result = await bfvPkVerifier.verify.staticCall(
+        pkCommitment,
+        ethers.ZeroHash,
+        proof,
+      );
+      expect(result).to.equal(false);
+    });
+
+    it("returns false when publicInputs has only vk hashes (no pkCommitment slot)", async function () {
+      const { bfvPkVerifier } = await loadFixture(deployWithMockCircuit);
+      const pkCommitment = ethers.keccak256("0xabcd");
+      const proof = encodeProof("0x01", [
+        EXPECTED_NODES_FOLD_KEY_HASH,
+        EXPECTED_C5_KEY_HASH,
+      ]);
+
+      const result = await bfvPkVerifier.verify.staticCall(
+        pkCommitment,
+        ethers.ZeroHash,
+        proof,
+      );
       expect(result).to.equal(false);
     });
 
@@ -97,17 +193,23 @@ describe("BfvPkVerifier", function () {
         await revertingVerifier.getAddress(),
         EXPECTED_NODES_FOLD_KEY_HASH,
         EXPECTED_C5_KEY_HASH,
+        H,
       );
       await bfvPkVerifier.waitForDeployment();
 
       const pkCommitment = ethers.keccak256("0xabcd");
-      const proof = encodeProof("0x01", [
-        ethers.id("wrong-nodes-fold"),
-        EXPECTED_C5_KEY_HASH,
-        pkCommitment,
-      ]);
+      const proof = encodeProof(
+        "0x01",
+        minimalDkgPublicInputs(pkCommitment).map((v, i) =>
+          i === 0 ? ethers.id("wrong-nodes-fold") : v,
+        ),
+      );
 
-      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
+      const result = await bfvPkVerifier.verify.staticCall(
+        pkCommitment,
+        ethers.ZeroHash,
+        proof,
+      );
       expect(result).to.equal(false);
     });
 
@@ -123,17 +225,23 @@ describe("BfvPkVerifier", function () {
         await revertingVerifier.getAddress(),
         EXPECTED_NODES_FOLD_KEY_HASH,
         EXPECTED_C5_KEY_HASH,
+        H,
       );
       await bfvPkVerifier.waitForDeployment();
 
       const pkCommitment = ethers.keccak256("0xabcd");
-      const proof = encodeProof("0x01", [
-        EXPECTED_NODES_FOLD_KEY_HASH,
-        ethers.id("wrong-c5"),
-        pkCommitment,
-      ]);
+      const proof = encodeProof(
+        "0x01",
+        minimalDkgPublicInputs(pkCommitment).map((v, i) =>
+          i === 1 ? ethers.id("wrong-c5") : v,
+        ),
+      );
 
-      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
+      const result = await bfvPkVerifier.verify.staticCall(
+        pkCommitment,
+        ethers.ZeroHash,
+        proof,
+      );
       expect(result).to.equal(false);
     });
 
@@ -145,13 +253,13 @@ describe("BfvPkVerifier", function () {
 
       const pkCommitment = ethers.keccak256("0xabcd");
       const wrong = ethers.keccak256("0x1234");
-      const proof = encodeProof("0x01", [
-        EXPECTED_NODES_FOLD_KEY_HASH,
-        EXPECTED_C5_KEY_HASH,
-        wrong,
-      ]);
+      const proof = encodeProof("0x01", minimalDkgPublicInputs(wrong));
 
-      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
+      const result = await bfvPkVerifier.verify.staticCall(
+        pkCommitment,
+        ethers.ZeroHash,
+        proof,
+      );
       expect(result).to.equal(false);
     });
 
@@ -162,13 +270,13 @@ describe("BfvPkVerifier", function () {
       await mockCircuit.setReturnValue(false);
 
       const pkCommitment = ethers.keccak256("0xabcd");
-      const proof = encodeProof("0x01", [
-        EXPECTED_NODES_FOLD_KEY_HASH,
-        EXPECTED_C5_KEY_HASH,
-        pkCommitment,
-      ]);
+      const proof = encodeProof("0x01", minimalDkgPublicInputs(pkCommitment));
 
-      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
+      const result = await bfvPkVerifier.verify.staticCall(
+        pkCommitment,
+        ethers.ZeroHash,
+        proof,
+      );
       expect(result).to.equal(false);
     });
 
@@ -179,17 +287,22 @@ describe("BfvPkVerifier", function () {
 
       const bfvPkVerifier = await (
         await ethers.getContractFactory("BfvPkVerifier")
-      ).deploy(mockAddr, ethers.id("wrong-nodes-fold"), ethers.id("wrong-c5"));
+      ).deploy(
+        mockAddr,
+        ethers.id("wrong-nodes-fold"),
+        ethers.id("wrong-c5"),
+        H,
+      );
       await bfvPkVerifier.waitForDeployment();
 
       const pkCommitment = ethers.keccak256("0xabcd");
-      const proof = encodeProof("0x0102", [
-        EXPECTED_NODES_FOLD_KEY_HASH,
-        EXPECTED_C5_KEY_HASH,
-        pkCommitment,
-      ]);
+      const proof = encodeProof("0x0102", minimalDkgPublicInputs(pkCommitment));
 
-      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
+      const result = await bfvPkVerifier.verify.staticCall(
+        pkCommitment,
+        ethers.ZeroHash,
+        proof,
+      );
       expect(result).to.equal(false);
     });
   });
@@ -202,14 +315,13 @@ describe("BfvPkVerifier", function () {
       await mockCircuit.setReturnValue(true);
 
       const pkCommitment = ethers.keccak256("0xabcd");
-      const proof = encodeProof("0x0102", [
-        EXPECTED_NODES_FOLD_KEY_HASH,
-        EXPECTED_C5_KEY_HASH,
-        "0x" + "00".repeat(32),
-        pkCommitment,
-      ]);
+      const proof = encodeProof("0x0102", minimalDkgPublicInputs(pkCommitment));
 
-      const result = await bfvPkVerifier.verify.staticCall(pkCommitment, proof);
+      const result = await bfvPkVerifier.verify.staticCall(
+        pkCommitment,
+        ethers.ZeroHash,
+        proof,
+      );
       expect(result).to.equal(true);
     });
   });

@@ -7,6 +7,7 @@ description = "E3 - Enclave Ciphernode Aggregators"
 repository = "https://github.com/gnosisguild/enclave/crates/aggregator"
 
 [dependencies]
+alloy = { workspace = true }
 actix = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -27,6 +28,7 @@ e3-request = { workspace = true }
 e3-sortition = {  workspace = true }
 e3-zk-helpers = { workspace = true }
 e3-utils = { workspace = true }
+futures = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
 

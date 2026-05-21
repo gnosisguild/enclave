@@ -14,13 +14,15 @@ pragma solidity 0.8.28;
  *      matches the committee's aggregated public-key commitment.
  */
 interface IPkVerifier {
-    /// @notice Verify a DkgAggregator EVM proof and bind it to `pkCommitment`.
+    /// @notice Verify a DkgAggregator EVM proof and bind it to `pkCommitment` and `committeeHash`.
     /// @param pkCommitment Hash-based aggregated PK commitment the proof must attest to
     ///        (equals `publicInputs[publicInputs.length - 1]`).
+    /// @param committeeHash `keccak256(abi.encodePacked(topNodes))` for the on-chain committee.
     /// @param proof ABI-encoded `(bytes rawProof, bytes32[] publicInputs)`.
-    /// @return success True if the proof is valid and its last public input equals `pkCommitment`.
+    /// @return success True if the proof is valid and bound to `pkCommitment` and `committeeHash`.
     function verify(
         bytes32 pkCommitment,
+        bytes32 committeeHash,
         bytes calldata proof
     ) external view returns (bool success);
 }

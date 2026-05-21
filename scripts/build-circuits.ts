@@ -55,8 +55,16 @@ interface BuildOptions {
   skipVk?: boolean
   outputDir?: string
   clean?: boolean
+  noCleanTargets?: boolean
+  skipIfBuilt?: boolean
   dryRun?: boolean
   preset?: CircuitPreset | 'all'
+}
+
+interface PresetBuildStamp {
+  preset: string
+  sourceHash: string
+  builtAt: string
 }
 interface BuildResult {
   success: boolean
@@ -102,8 +110,7 @@ class NoirCircuitBuilder {
       mkdirSync(this.options.outputDir!, { recursive: true })
 
       for (const preset of presets) {
-        this.setNoirConfigPreset(modNrPath, preset)
-        const presetResult = await this.buildForPreset(preset)
+        const presetResult = await this.buildForPreset(preset, modNrPath)
         result.compiled.push(...presetResult.compiled)
         result.errors.push(...presetResult.errors)
         if (!presetResult.success) result.success = false
@@ -146,7 +153,72 @@ class NoirCircuitBuilder {
     console.log(`   📋 Set Noir config to: ${configModule} (preset: ${preset})`)
   }
 
-  private async buildForPreset(preset: CircuitPreset): Promise<BuildResult> {
+  private presetStampPath(preset: string): string {
+    return join(this.options.outputDir!, preset, '.build-stamp.json')
+  }
+
+  private readPresetStamp(preset: string): PresetBuildStamp | null {
+    const stampPath = this.presetStampPath(preset)
+    if (!existsSync(stampPath)) return null
+    try {
+      return JSON.parse(readFileSync(stampPath, 'utf-8')) as PresetBuildStamp
+    } catch {
+      return null
+    }
+  }
+
+  private writePresetStamp(preset: string, sourceHash: string): void {
+    const stamp: PresetBuildStamp = {
+      preset,
+      sourceHash,
+      builtAt: new Date().toISOString(),
+    }
+    mkdirSync(join(this.options.outputDir!, preset), { recursive: true })
+    writeFileSync(this.presetStampPath(preset), JSON.stringify(stamp, null, 2) + '\n')
+  }
+
+  /** Marker files required by `test_trbfv_actor` / gas extraction (dist + circuits/bin targets). */
+  private requiredPresetMarkers(preset: string): string[] {
+    const dist = join(this.options.outputDir!, preset)
+    const bin = this.circuitsDir
+    return [
+      join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.AGGREGATION, 'dkg_aggregator', 'dkg_aggregator.json'),
+      join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.AGGREGATION, 'decryption_aggregator', 'decryption_aggregator.json'),
+      join(bin, CIRCUIT_GROUPS.AGGREGATION, 'dkg_aggregator', 'target', 'dkg_aggregator.json'),
+      join(bin, CIRCUIT_GROUPS.AGGREGATION, 'dkg_aggregator', 'target', 'dkg_aggregator.vk_recursive'),
+      join(bin, CIRCUIT_GROUPS.AGGREGATION, 'decryption_aggregator', 'target', 'decryption_aggregator.json'),
+      join(bin, CIRCUIT_GROUPS.AGGREGATION, 'decryption_aggregator', 'target', 'decryption_aggregator.vk_recursive'),
+      join(bin, CIRCUIT_GROUPS.DKG, 'target', 'pk.json'),
+      join(bin, CIRCUIT_GROUPS.THRESHOLD, 'target', 'pk_aggregation.json'),
+    ]
+  }
+
+  private isPresetUpToDate(preset: string, sourceHash: string): boolean {
+    const stamp = this.readPresetStamp(preset)
+    if (!stamp?.sourceHash || stamp.sourceHash !== sourceHash) return false
+    return this.requiredPresetMarkers(preset).every((path) => existsSync(path))
+  }
+
+  private logSkipIfBuiltBlocked(preset: string, sourceHash: string): void {
+    const stamp = this.readPresetStamp(preset)
+    const stampPath = this.presetStampPath(preset)
+    if (!stamp?.sourceHash) {
+      console.log(`   ℹ️  --skip-if-built: no stamp at ${stampPath}`)
+      return
+    }
+    if (stamp.sourceHash !== sourceHash) {
+      console.log(
+        `   ℹ️  --skip-if-built: circuit sources changed (stamp ${stamp.sourceHash} → ${sourceHash}). ` +
+          `Run without --skip-if-built or \`pnpm build:circuits --preset ${preset}\` once to refresh.`,
+      )
+    }
+    const missing = this.requiredPresetMarkers(preset).filter((path) => !existsSync(path))
+    if (missing.length > 0) {
+      console.log(`   ℹ️  --skip-if-built: missing ${missing.length} marker artifact(s), e.g. ${missing[0]}`)
+    }
+  }
+
+  private async buildForPreset(preset: CircuitPreset, modNrPath?: string): Promise<BuildResult> {
     const result: BuildResult = { success: true, compiled: [], errors: [] }
     const presetOutputDir = join(this.options.outputDir!, preset)
 
@@ -169,10 +241,28 @@ class NoirCircuitBuilder {
         return result
       }
 
-      this.cleanTargetDirs(circuits)
-      mkdirSync(presetOutputDir, { recursive: true })
+      const sourceHash = this.computeSourceHash(preset)
+      result.sourceHash = sourceHash
 
-      result.sourceHash = this.computeSourceHash()
+      if (this.options.skipIfBuilt) {
+        if (this.isPresetUpToDate(preset, sourceHash)) {
+          console.log(
+            `   ⏭️  Skipping preset ${preset} (artifacts up to date; source_hash=${sourceHash}). ` +
+              `Use a full rebuild without --skip-if-built to refresh.`,
+          )
+          return result
+        }
+        this.logSkipIfBuiltBlocked(preset, sourceHash)
+      }
+
+      if (modNrPath) {
+        this.setNoirConfigPreset(modNrPath, preset)
+      }
+
+      if (!this.options.noCleanTargets) {
+        this.cleanTargetDirs(circuits)
+      }
+      mkdirSync(presetOutputDir, { recursive: true })
 
       for (const circuit of circuits) {
         try {
@@ -184,6 +274,9 @@ class NoirCircuitBuilder {
       }
 
       this.copyArtifacts(result.compiled, presetOutputDir, preset)
+      if (result.errors.length === 0) {
+        this.writePresetStamp(preset, sourceHash)
+      }
       console.log(`\n✅ Built ${result.compiled.length} circuits for preset: ${preset}`)
       if (result.errors.length > 0) {
         console.error('\n❌ Failed circuits:')
@@ -599,16 +692,23 @@ class NoirCircuitBuilder {
     return outputDir
   }
 
-  computeSourceHash(): string {
+  computeSourceHash(preset?: CircuitPreset): string {
     const hash = createHash('sha256')
+    if (preset !== undefined) {
+      hash.update(`preset:${preset}\n`)
+      hash.update(`noir_config:${PRESET_NOIR_CONFIG[preset]}\n`)
+    }
     const circuits = this.discoverCircuits().sort((a, b) => `${a.group}/${a.name}`.localeCompare(`${b.group}/${b.name}`))
     for (const c of circuits) this.hashDir(c.path, hash)
     return hash.digest('hex').substring(0, 16)
   }
 
+  /** Generated at bench time; must not invalidate `--skip-if-built` between ensure passes. */
+  private static readonly SKIP_SOURCE_HASH_ENTRIES = new Set(['target', 'Prover.toml', 'Witness.toml'])
+
   private hashDir(dirPath: string, hash: ReturnType<typeof createHash>, relativePath = ''): void {
     for (const entry of readdirSync(dirPath).sort()) {
-      if (entry === 'target' || entry.startsWith('.')) continue
+      if (entry.startsWith('.') || NoirCircuitBuilder.SKIP_SOURCE_HASH_ENTRIES.has(entry)) continue
       const fullPath = join(dirPath, entry)
       const entryRelativePath = relativePath ? `${relativePath}/${entry}` : entry
       const stat = statSync(fullPath)
@@ -651,6 +751,8 @@ async function main() {
     else if (arg === '--skip-checksums') options.skipChecksums = true
     else if (arg === '--skip-vk') options.skipVk = true
     else if (arg === '--no-clean') options.clean = false
+    else if (arg === '--no-clean-targets') options.noCleanTargets = true
+    else if (arg === '--skip-if-built') options.skipIfBuilt = true
     else if (arg === '--group') options.groups = args[++i]?.split(',') as CircuitGroup[]
     else if (arg === '--circuit') (options.circuits ??= []).push(args[++i])
     else if (arg === '-o' || arg === '--output') options.outputDir = resolve(args[++i])
@@ -667,7 +769,8 @@ async function main() {
   const builder = new NoirCircuitBuilder(undefined, options)
 
   if (command === 'hash') {
-    const hash = builder.computeSourceHash()
+    const preset = options.preset === 'all' ? undefined : options.preset
+    const hash = builder.computeSourceHash(preset)
     console.log(hash)
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `source_hash=${hash}\n`)
   } else {
@@ -692,6 +795,8 @@ Options:
   -o, --output <dir>  Output directory (default: dist/circuits)
   --dry-run           Show what would be built
   --no-clean          Don't clean output directory
+  --no-clean-targets  Don't delete circuits/bin target dirs before compiling
+  --skip-if-built     Skip preset when dist stamp + marker artifacts match circuit sources
   -h, --help          Show help
 `)
 }

@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::committee::committee_addresses_from_nodes;
 use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
@@ -96,6 +97,16 @@ pub enum PublicKeyAggregatorState {
 }
 
 impl PublicKeyAggregatorState {
+    /// Ordered `topNodes` when the committee set is known (post–committee formation).
+    pub fn committee_nodes(&self) -> Option<&OrderedSet<String>> {
+        match self {
+            PublicKeyAggregatorState::Collecting { nodes, .. } if !nodes.is_empty() => Some(nodes),
+            PublicKeyAggregatorState::GeneratingC5Proof { nodes, .. } => Some(nodes),
+            PublicKeyAggregatorState::Complete { nodes, .. } => Some(nodes),
+            _ => None,
+        }
+    }
+
     pub fn init(threshold_n: usize, threshold_m: usize, seed: Seed) -> Self {
         PublicKeyAggregatorState::Collecting {
             threshold_n,
@@ -610,6 +621,7 @@ impl PublicKeyAggregator {
     fn try_dispatch_dkg_aggregation(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
         let state = self.state.get();
         let Some(PublicKeyAggregatorState::GeneratingC5Proof {
+            nodes,
             dkg_node_proofs,
             honest_party_ids,
             c5_proof_pending,
@@ -725,6 +737,17 @@ impl PublicKeyAggregator {
             return Ok(());
         }
 
+        let committee_addresses = committee_addresses_from_nodes(nodes)?;
+        #[cfg(debug_assertions)]
+        {
+            let n_registered = committee_addresses.len();
+            debug_assert_eq!(
+                party_ids.len(),
+                n_registered,
+                "honest NodeFold count must equal registered committee size until expulsion enables H < N"
+            );
+        }
+
         let corr = CorrelationId::new();
         self.bus.publish(
             ComputeRequest::zk(
@@ -732,6 +755,7 @@ impl PublicKeyAggregator {
                     node_fold_proofs,
                     c5_proof: c5_proof.clone(),
                     party_ids,
+                    committee_addresses,
                     params_preset: self.params_preset,
                 }),
                 corr,
@@ -1348,6 +1372,9 @@ mod tests {
                 node_fold_proofs: vec![dummy_proof(CircuitName::PkAggregation)],
                 c5_proof: dummy_proof(CircuitName::PkAggregation),
                 party_ids: vec![0],
+                committee_addresses: vec!["0x0000000000000000000000000000000000000001"
+                    .parse()
+                    .expect("test address")],
                 params_preset: BfvPreset::InsecureThreshold512,
             }),
             correlation_id,

@@ -3,9 +3,23 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
+import { getBytes, hexlify, zeroPadValue } from "ethers";
 import fs from "fs";
 import { fileURLToPath } from "node:url";
 import path from "path";
+
+/**
+ * Reconstruct `keccak256(abi.encodePacked(topNodes))` from aggregator public-input
+ * limbs. Each limb is a bytes32 with 128 bits right-aligned (`CommitteeHashLib`).
+ */
+export function committeeHashFromLimbs(hi: string, lo: string): string {
+  const hiBytes = getBytes(zeroPadValue(hi, 32));
+  const loBytes = getBytes(zeroPadValue(lo, 32));
+  const hash = new Uint8Array(32);
+  hash.set(hiBytes.subarray(16, 32), 0);
+  hash.set(loBytes.subarray(16, 32), 16);
+  return hexlify(hash);
+}
 
 export const deploymentsFile = path.join("deployed_contracts.json");
 
@@ -14,6 +28,36 @@ export const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../..",
 );
+
+/**
+ * Default insecure-512 / micro committee layout for BFV aggregator verifiers.
+ * Must match `lib::configs::default::{H, T}` in compiled circuits.
+ */
+export const BFV_DKG_H = 3;
+export const BFV_THRESHOLD_T = 1;
+
+/** `dkg_aggregator` EVM public-input count for honest-set size `h`. */
+export function bfvPkExpectedPublicInputsLen(h: number): number {
+  return 3 * h + 6;
+}
+
+/** `publicInputs` indices for `committee_hash_hi` / `committee_hash_lo` (matches `BfvPkVerifier`). */
+export function bfvDkgCommitteeHashIndices(h: number): {
+  hi: number;
+  lo: number;
+} {
+  return { hi: 2 + h, lo: 3 + h };
+}
+
+/** `decryption_aggregator` EVM public-input count for BFV threshold `t`. */
+export function bfvDecExpectedPublicInputsLen(threshold: number): number {
+  return 108 + 3 * threshold;
+}
+
+/** `publicInputs` indices for decryption-aggregator committee hash limbs. */
+export function bfvDecCommitteeHashIndices(): { hi: number; lo: number } {
+  return { hi: 2, lo: 3 };
+}
 
 /** Recursive VK hashes for `BfvPkVerifier` sub-circuits (from `pnpm compile:circuits`). */
 export const BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS = {

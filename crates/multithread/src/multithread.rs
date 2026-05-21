@@ -727,14 +727,14 @@ fn handle_dkg_aggregation_proof(
     req: DkgAggregationRequest,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
-    let artifacts_dir = req.params_preset.artifacts_dir();
     let job_id = zk_bb_work_id(&request);
     let input = DkgAggregationInput {
         node_fold_proofs: &req.node_fold_proofs,
         c5_proof: &req.c5_proof,
         party_ids: &req.party_ids,
+        committee_addresses: &req.committee_addresses,
     };
-    let proof = prove_dkg_aggregation(prover, &input, &job_id, &artifacts_dir).map_err(|e| {
+    let proof = prove_dkg_aggregation(prover, &input, &job_id, req.params_preset).map_err(|e| {
         ComputeRequestError::new(
             ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
             request.clone(),
@@ -752,7 +752,6 @@ fn handle_decryption_aggregation_proof(
     req: DecryptionAggregationRequest,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
-    let artifacts_dir = req.params_preset.artifacts_dir();
     let job_id = zk_bb_work_id(&request);
     let jobs: Vec<DecryptionAggregationJob> = req
         .jobs
@@ -767,8 +766,9 @@ fn handle_decryption_aggregation_proof(
         prover,
         req.c6_total_slots,
         &jobs,
+        &req.committee_addresses,
         &job_id,
-        &artifacts_dir,
+        req.params_preset,
     )
     .map_err(|e| {
         ComputeRequestError::new(
