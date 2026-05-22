@@ -8,9 +8,6 @@ import {
     Ownable2StepUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {
-    ReentrancyGuardUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -29,8 +26,7 @@ import { IBondingRegistry } from "./interfaces/IBondingRegistry.sol";
  */
 contract E3RefundManager is
     IE3RefundManager,
-    Ownable2StepUpgradeable,
-    ReentrancyGuardUpgradeable
+    Ownable2StepUpgradeable
 {
     using SafeERC20 for IERC20;
     ////////////////////////////////////////////////////////////
@@ -106,7 +102,6 @@ contract E3RefundManager is
     ) public initializer {
         require(_owner != address(0), "Invalid owner");
         __Ownable_init(msg.sender);
-        __ReentrancyGuard_init();
 
         require(_enclave != address(0), "Invalid enclave");
         require(_treasury != address(0), "Invalid treasury");
@@ -318,7 +313,7 @@ contract E3RefundManager is
     /// @inheritdoc IE3RefundManager
     function claimRequesterRefund(
         uint256 e3Id
-    ) external nonReentrant returns (uint256 amount) {
+    ) external returns (uint256 amount) {
         RefundDistribution storage dist = _distributions[e3Id];
         if (!dist.calculated) revert RefundNotCalculated(e3Id);
 
@@ -348,7 +343,7 @@ contract E3RefundManager is
     /// @inheritdoc IE3RefundManager
     function claimHonestNodeReward(
         uint256 e3Id
-    ) external nonReentrant returns (uint256 amount) {
+    ) external returns (uint256 amount) {
         RefundDistribution storage dist = _distributions[e3Id];
         require(dist.calculated, RefundNotCalculated(e3Id));
 
@@ -639,7 +634,7 @@ contract E3RefundManager is
     function withdrawOrphanedSlashedFunds(
         uint256 e3Id,
         IERC20 paymentToken
-    ) external onlyOwner nonReentrant {
+    ) external onlyOwner {
         uint256 amount = _pendingSlashedFunds[e3Id];
         require(amount > 0, "No orphaned funds");
 
@@ -682,7 +677,7 @@ contract E3RefundManager is
     /// @inheritdoc IE3RefundManager
     function claimSlashedFundsOnSuccess(
         uint256 e3Id
-    ) external nonReentrant returns (uint256 amount) {
+    ) external returns (uint256 amount) {
         amount = _claimSlashedFundsOnSuccess(e3Id, msg.sender);
         require(amount > 0, NothingToClaim());
     }
@@ -690,7 +685,7 @@ contract E3RefundManager is
     /// @inheritdoc IE3RefundManager
     function claimSlashedFundsOnSuccessBatch(
         uint256[] calldata e3Ids
-    ) external nonReentrant {
+    ) external {
         uint256 len = e3Ids.length;
         uint256 totalClaimed;
         for (uint256 i = 0; i < len; i++) {
@@ -722,7 +717,7 @@ contract E3RefundManager is
     /// @inheritdoc IE3RefundManager
     function treasuryClaim(
         IERC20 token
-    ) external nonReentrant returns (uint256 amount) {
+    ) external returns (uint256 amount) {
         amount = _pendingTreasury[msg.sender][token];
         require(amount > 0, NothingToClaim());
         _pendingTreasury[msg.sender][token] = 0;

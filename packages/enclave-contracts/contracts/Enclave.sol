@@ -16,9 +16,6 @@ import {
     Ownable2StepUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {
-    ReentrancyGuardUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -32,8 +29,7 @@ import { EnclavePricing } from "./lib/EnclavePricing.sol";
 // solhint-disable-next-line max-states-count
 contract Enclave is
     IEnclave,
-    Ownable2StepUpgradeable,
-    ReentrancyGuardUpgradeable
+    Ownable2StepUpgradeable
 {
     using SafeERC20 for IERC20;
 
@@ -241,7 +237,6 @@ contract Enclave is
     ) public initializer {
         require(_owner != address(0), "Invalid owner");
         __Ownable_init(msg.sender);
-        __ReentrancyGuard_init();
         setMaxDuration(_maxDuration);
         setCiphernodeRegistry(_ciphernodeRegistry);
         setBondingRegistry(_bondingRegistry);
@@ -273,7 +268,7 @@ contract Enclave is
     /// @inheritdoc IEnclave
     function request(
         E3RequestParams calldata requestParams
-    ) external nonReentrant returns (uint256 e3Id, E3 memory e3) {
+    ) external returns (uint256 e3Id, E3 memory e3) {
         // Fee-token allow-list gate: protects requesters from being
         // forced into a fee token they did not consent to (e.g. a malicious
         // owner pointing `feeToken` at a fee-on-transfer or rebasing token).
@@ -385,7 +380,7 @@ contract Enclave is
         uint256 e3Id,
         bytes calldata ciphertextOutput,
         bytes calldata proof
-    ) external nonReentrant returns (bool success) {
+    ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
         E3Stage current = _e3Stages[e3Id];
@@ -426,7 +421,7 @@ contract Enclave is
         uint256 e3Id,
         bytes calldata plaintextOutput,
         bytes calldata proof
-    ) external nonReentrant returns (bool success) {
+    ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
         // Check we are in the right stage
@@ -1157,13 +1152,13 @@ contract Enclave is
     /// @inheritdoc IEnclave
     function claimReward(
         uint256 e3Id
-    ) external nonReentrant returns (uint256 amount) {
+    ) external returns (uint256 amount) {
         amount = _claimReward(e3Id, msg.sender);
         require(amount > 0, NothingToClaim());
     }
 
     /// @inheritdoc IEnclave
-    function claimRewards(uint256[] calldata e3Ids) external nonReentrant {
+    function claimRewards(uint256[] calldata e3Ids) external {
         uint256 len = e3Ids.length;
         uint256 totalClaimed;
         for (uint256 i = 0; i < len; i++) {
@@ -1198,7 +1193,7 @@ contract Enclave is
     /// @inheritdoc IEnclave
     function treasuryClaim(
         IERC20 token
-    ) external nonReentrant returns (uint256 amount) {
+    ) external returns (uint256 amount) {
         amount = _pendingTreasury[msg.sender][token];
         require(amount > 0, NothingToClaim());
         _pendingTreasury[msg.sender][token] = 0;
