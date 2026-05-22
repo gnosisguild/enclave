@@ -508,7 +508,12 @@ meaningful inside a proof.
 Some statements, especially the large **C2** pipeline, do not fit in one proof: the repository uses
 inner UltraHonk proofs, wrapper circuits, and the folding machinery under
 [`recursive_aggregation/`](https://github.com/gnosisguild/enclave/tree/main/circuits/bin/recursive_aggregation);
-see [Noir Circuits](./noir-circuits) for how to build and verify them.
+see [Noir Circuits](./noir-circuits) for how to build and verify them. The on-chain Honk verifier
+contracts that consume the outer `dkg_aggregator` and `decryption_aggregator` proofs are generated
+from the circuits' recursive VKs and committed to git; the repo enforces they stay in lockstep via
+`pnpm generate:verifiers --check` (run automatically by integration tests and benchmarks). See
+[`internals/dkg#keeping-the-on-chain-honk-verifiers-in-sync`](./internals/dkg#keeping-the-on-chain-honk-verifiers-in-sync)
+for the contract.
 
 ## Where to go next
 

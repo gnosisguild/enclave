@@ -87,8 +87,12 @@ if [ -n "$BUILD_PRESET" ]; then
             ENSURE_ARGS+=(--force-build)
         fi
         "${SCRIPT_DIR}/ensure_circuit_preset_built.sh" "${ENSURE_ARGS[@]}"
-        echo "  [replay-gas] Regenerating Honk Solidity verifiers (pnpm generate:verifiers --no-compile)..."
-        (cd "$REPO_ROOT" && pnpm generate:verifiers --no-compile)
+        # `--check`: verify the committed Honk Solidity verifiers match the
+        # current circuits' recursive VKs. Fails loudly on drift; replays must
+        # not silently rewrite committed contracts. If this errors, run
+        # `pnpm generate:verifiers --write` and commit the diff.
+        echo "  [replay-gas] Checking Honk Solidity verifiers (pnpm generate:verifiers --check --no-compile)..."
+        (cd "$REPO_ROOT" && pnpm generate:verifiers --check --no-compile)
     fi
 fi
 

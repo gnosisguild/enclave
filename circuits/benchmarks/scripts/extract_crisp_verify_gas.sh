@@ -118,20 +118,25 @@ else
     "${SCRIPT_DIR}/ensure_circuit_preset_built.sh" "${ENSURE_ARGS[@]}"
     echo "  [gas] Build artifacts ready."
 
-    echo "  [gas] Regenerating Honk Solidity verifiers (dkg_aggregator, decryption_aggregator)..."
+    # `--check`: verify the committed Honk Solidity verifiers
+    # (DkgAggregatorVerifier.sol, DecryptionAggregatorVerifier.sol) match the
+    # current circuits' recursive VKs. Fails loudly on drift; benchmarks must
+    # not silently rewrite committed contracts. If this errors, run
+    # `pnpm generate:verifiers --write` and commit the diff before benchmarking.
+    echo "  [gas] Checking Honk Solidity verifiers are in sync with circuit VKs..."
     if [ "$VERBOSE" = true ]; then
-        echo "  [gas] [verbose] Running: pnpm generate:verifiers --no-compile"
+        echo "  [gas] [verbose] Running: pnpm generate:verifiers --check --no-compile"
         (
           cd "$REPO_ROOT" && \
-          pnpm generate:verifiers --no-compile
+          pnpm generate:verifiers --check --no-compile
         )
     else
         (
           cd "$REPO_ROOT" && \
-          pnpm generate:verifiers --no-compile >/dev/null
+          pnpm generate:verifiers --check --no-compile >/dev/null
         )
     fi
-    echo "  [gas] Honk verifiers ready."
+    echo "  [gas] Honk verifiers in sync."
     require_preset_artifacts
 fi
 

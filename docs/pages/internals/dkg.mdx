@@ -410,6 +410,42 @@ read to identify which registered operator produced which DKG output. The mappin
 (via committee hash), the attestation binds to the proof commitments and the operator key, and the
 operator key was registered against `topNodes` at committee finalisation.
 
+### Keeping the on-chain Honk verifiers in sync
+
+The two on-chain Honk verifiers consumed by `publishCommittee` and the decryption flow
+(`DkgAggregatorVerifier.sol`, `DecryptionAggregatorVerifier.sol`, both under
+`packages/enclave-contracts/contracts/verifiers/bfv/honk/`) are **generated** from the recursive VKs
+of `recursive_aggregation/dkg_aggregator` and `recursive_aggregation/decryption_aggregator` via
+`bb write_solidity_verifier`. They are committed to git so production deploys are reproducible, but
+they must stay in lockstep with the circuits' recursive VKs — a verifier whose baked-in VK doesn't
+match the circuit will silently reject every proof.
+
+**Preset is pinned.** The committed `.sol` files correspond to exactly one BFV preset:
+**`insecure-512`** (the dev / CI / benchmark default). The recursive VKs are preset-dependent —
+different BFV parameter sets compile to different VKs and therefore different `.sol` bytes — so "the
+committed verifier" is only well-defined for one preset. `pnpm generate:verifiers` refuses to run
+(in both `--check` and `--write` modes) unless `dist/circuits/insecure-512/.build-stamp.json` exists
+and reports that preset. If `pnpm build:circuits --preset secure-8192` was the last build, the
+generator surfaces this loudly with a fix recipe instead of silently producing wrong VK bytes.
+Production deploys on a non-canonical preset must regenerate locally for that deploy.
+
+The repo enforces sync with two modes of `pnpm generate:verifiers`:
+
+- **`--check`** — used by `tests/integration/lib/prebuild.sh` (when
+  `PROOF_AGGREGATION_ENABLED=true`) and by the benchmark gas-extraction scripts. Regenerates each
+  verifier in memory, runs the same `prettier-plugin-solidity` formatting the committed files use,
+  and diffs against the committed `.sol`. Any drift fails the run with a clear fix recipe instead of
+  silently rewriting committed contracts mid-test.
+- **`--write`** (the default for manual invocation) — overwrites the committed files. Run this when
+  you intentionally bump the canonical-preset circuits or the Noir/bb toolchain, then commit the
+  diff.
+
+The version pinning lives in `crates/zk-prover/versions.json` (consumed by `enclave noir setup` and
+by the integration test prebuild). If `--check` fails after a clean
+`pnpm build:circuits --preset insecure-512`, your local toolchain is out of sync with that pin. See
+[`scripts/README.md`](https://github.com/gnosisguild/enclave/blob/main/scripts/README.md#verifier-generator)
+for the full contract.
+
 ### Decryption recursive proof
 
 The decryption recursive proof (`BfvDecryptionVerifier`) follows the same shape: a recursive Honk

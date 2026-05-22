@@ -181,8 +181,16 @@ EVM verifier `estimateGas` in `packages/enclave-contracts/scripts/benchmarkGasFr
 `ensure_circuit_preset_built.sh`, which runs
 `pnpm build:circuits --skip-if-built --no-clean --no-clean-targets` by default (skips recompile when
 `dist/circuits/<preset>/.build-stamp.json` and marker artifacts match the current circuit sources).
-Then `pnpm generate:verifiers --no-compile` refreshes Honk contracts before integration export and
-Hardhat replay.
+Then `pnpm generate:verifiers --check --no-compile` **verifies** the committed Honk Solidity
+verifiers (`DkgAggregatorVerifier.sol`, `DecryptionAggregatorVerifier.sol`) match the current
+circuits' recursive VKs. Benchmarks do **not** rewrite the committed verifiers — drift fails the run
+loudly. The committed verifiers are pinned to the **`insecure-512`** preset, so `--check` only runs
+after `dist/circuits/insecure-512/.build-stamp.json` confirms that preset was last built; the secure
+benchmark path (`--mode secure --build secure-8192`) builds and proves against `secure-8192`
+artifacts but does not regenerate or check the committed `.sol` files — those are locked to
+`insecure-512` (see [`scripts/README.md`](../../scripts/README.md#verifier-generator)). If you see
+`❌ Solidity verifier(s) drift from current circuit VKs` or
+`❌ Canonical preset 'insecure-512' is not built`, follow the fix recipe printed by the script.
 
 - **`--force-build`** on extract/replay/ensure: full rebuild (same as a fresh `build:circuits`).
 - **`--skip-build`** on extract/replay: skip circuit build and Honk generation (only re-run

@@ -27,7 +27,12 @@ if [[ "${PROOF_AGGREGATION_ENABLED:-false}" == "true" ]]; then
   mkdir -p "${INTEGRATION_NOIR}/circuits"
 
   (cd "$ROOT_DIR" && pnpm build:circuits --preset insecure-512 -o "${INTEGRATION_NOIR}/circuits")
-  (cd "$ROOT_DIR" && pnpm generate:verifiers --no-compile --no-clean-targets)
+  # `--check`: verify the committed Honk Solidity verifiers in
+  # packages/enclave-contracts/contracts/verifiers/bfv/honk/ match the
+  # freshly-built circuits' recursive VKs. Fails loudly on drift instead of
+  # silently rewriting committed contracts mid-test. If this errors, run
+  # `pnpm generate:verifiers --write` and commit the diff.
+  (cd "$ROOT_DIR" && pnpm generate:verifiers --check --no-compile --no-clean-targets)
 
   if ! command -v jq >/dev/null 2>&1; then
     echo "jq is required to pin noir/version.json for integration ZK fixtures" >&2
