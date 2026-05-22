@@ -6,11 +6,9 @@
 
 use crate::server::{
     app_data::AppData,
-    database::SledDB,
     models::{
         VoteRequest, VoteResponse, VoteResponseStatus, VoteStatusRequest, VoteStatusResponse,
     },
-    repo::CrispE3Repository,
     CONFIG,
 };
 use actix_web::{web, HttpResponse, Responder};
@@ -127,14 +125,6 @@ async fn broadcast_encrypted_vote(
                 "[e3_id={}] Failed to decode encoded_proof: {:?}",
                 vote.round_id, e
             );
-            // Rollback voter insertion before returning error
-
-            if !is_vote_update {
-                let _ = match repo.remove_voter_address(&vote.address).await {
-                    Ok(_) => (),
-                    Err(e) => error!("Error rolling back the vote: {e}"),
-                };
-            }
 
             return HttpResponse::BadRequest().json(VoteResponse {
                 status: VoteResponseStatus::FailedBroadcast,
@@ -187,7 +177,7 @@ async fn broadcast_encrypted_vote(
                 is_vote_update: Some(is_vote_update),
             })
         }
-        Err(e) => handle_vote_error(e, repo, &vote.address, has_voted).await,
+        Err(e) => handle_vote_error(e, has_voted).await,
     }
 }
 
@@ -222,25 +212,10 @@ fn extract_error_message(e: &Error) -> String {
 /// # Arguments
 ///
 /// * `e` - The error that occurred
-/// * `repo` - The repository to rollback
-/// * `address` - The address for the vote
-/// * `was_update` - Whether this was a vote update (don't rollback if true)
-async fn handle_vote_error(
-    e: Error,
-    mut repo: CrispE3Repository<SledDB>,
-    address: &str,
-    was_update: bool,
-) -> HttpResponse {
+/// * `was_update` - Whether this was a vote update
+async fn handle_vote_error(e: Error, was_update: bool) -> HttpResponse {
     // Log the full error for debugging
     error!("Error while sending vote transaction: {:?}", e);
-
-    // Only rollback the vote if this was a new vote, not an update
-    if !was_update {
-        match repo.remove_voter_address(address).await {
-            Ok(_) => (),
-            Err(err) => error!("Error rolling back the vote: {err}"),
-        };
-    }
 
     let user_message = extract_error_message(&e);
 

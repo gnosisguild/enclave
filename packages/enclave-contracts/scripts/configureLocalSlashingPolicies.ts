@@ -34,6 +34,8 @@ function localAttestationSlashPolicy(
   ethers: typeof EthersTypes,
   failureReason: number,
 ): ISlashingManager.SlashPolicyStruct {
+  // Lane A (`proposeSlash`): committee attestation is verified in SlashingManager;
+  // `proofVerifier` is unused (reserved for future ZK verifier wiring). ZeroAddress is intentional.
   return {
     ticketPenalty: ethers.parseUnits("10", 6),
     licensePenalty: ethers.parseEther("50"),

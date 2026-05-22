@@ -172,6 +172,7 @@ pub async fn initialize_crisp_round(
     )
     .await?;
     let e3_program: Address = CONFIG.e3_program_address.parse()?;
+    ensure_e3_program_deployed(e3_program).await?;
 
     info!("Enabling E3 Program with address: {}", e3_program);
     match contract.is_e3_program_enabled(e3_program).await {
@@ -191,7 +192,6 @@ pub async fn initialize_crisp_round(
     }
 
     let token_address_str = resolve_voting_token(token_address)?;
-    ensure_e3_program_deployed(e3_program).await?;
 
     info!(
         "Starting new CRISP round with token address: {} and balance threshold: {}",

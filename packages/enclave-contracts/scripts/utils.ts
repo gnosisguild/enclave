@@ -57,14 +57,12 @@ function resolveRepoRoot(): string {
   let dir = path.dirname(fileURLToPath(import.meta.url));
   const root = path.parse(dir).root;
   while (dir !== root) {
-    if (
-      fs.existsSync(path.join(dir, "circuits", "bin")) &&
-      fs.existsSync(path.join(dir, "package.json"))
-    ) {
+    const pkgPath = path.join(dir, "package.json");
+    if (fs.existsSync(pkgPath)) {
       try {
-        const pkg = JSON.parse(
-          fs.readFileSync(path.join(dir, "package.json"), "utf8"),
-        ) as { name?: string };
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
+          name?: string;
+        };
         if (pkg.name === "@enclave/main") {
           return dir;
         }
@@ -75,7 +73,7 @@ function resolveRepoRoot(): string {
     dir = path.dirname(dir);
   }
   throw new Error(
-    "Could not find enclave repo root (expected circuits/bin and package.json name @enclave/main)",
+    "Could not find enclave repo root (expected package.json name @enclave/main)",
   );
 }
 

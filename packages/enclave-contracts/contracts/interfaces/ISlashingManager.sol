@@ -27,7 +27,8 @@ interface ISlashingManager {
      * @param ticketPenalty Amount of ticket collateral to slash (in wei)
      * @param licensePenalty Amount of license bond to slash (in wei)
      * @param requiresProof Whether this slash type requires cryptographic proof verification
-     * @param proofVerifier Address of the ISlashVerifier contract for proof validation
+     * @param proofVerifier Optional ISlashVerifier for ZK-based slashes; Lane A (`proposeSlash`)
+     *        uses on-chain attestation verification and may leave this as `address(0)`.
      * @param banNode Whether executing this slash will permanently ban the node
      * @param appealWindow Time window in seconds for operators to appeal (0 = immediate execution, no appeals)
      * @param enabled Whether this slash type is currently active and can be proposed
@@ -371,8 +372,8 @@ interface ISlashingManager {
      * - reason must not be bytes32(0)
      * - policy.enabled must be true
      * - At least one of ticketPenalty or licensePenalty must be non-zero
-     * - If requiresProof is true, proofVerifier must be set and appealWindow must be 0
-     * - If requiresProof is false, appealWindow must be greater than 0
+     * - If requiresProof is true (Lane A), appealWindow may be 0 (immediate execute) or > 0
+     * - If requiresProof is false (Lane B), appealWindow must be greater than 0
      */
     function setSlashPolicy(
         bytes32 reason,
