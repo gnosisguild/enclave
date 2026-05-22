@@ -14,9 +14,6 @@ import {
     Ownable2StepUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {
-    ReentrancyGuardUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {
     InternalLazyIMT,
     LazyIMTData
 } from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
@@ -32,8 +29,7 @@ import { CommitteeHashLib } from "../lib/CommitteeHashLib.sol";
  */
 contract CiphernodeRegistryOwnable is
     ICiphernodeRegistry,
-    Ownable2StepUpgradeable,
-    ReentrancyGuardUpgradeable
+    Ownable2StepUpgradeable
 {
     using InternalLazyIMT for LazyIMTData;
 
@@ -175,7 +171,6 @@ contract CiphernodeRegistryOwnable is
         require(_owner != address(0), ZeroAddress());
 
         __Ownable_init(msg.sender);
-        __ReentrancyGuard_init();
         ciphernodes._init(TREE_DEPTH);
         setSortitionSubmissionWindow(_submissionWindow);
         if (_owner != owner()) _transferOwnership(_owner);
@@ -237,7 +232,7 @@ contract CiphernodeRegistryOwnable is
         bytes calldata publicKey,
         bytes32 pkCommitment,
         bytes calldata proof
-    ) external nonReentrant {
+    ) external {
         Committee storage c = committees[e3Id];
 
         require(
@@ -249,6 +244,8 @@ contract CiphernodeRegistryOwnable is
 
         bytes32 committeeHash = CommitteeHashLib.hash(c.topNodes);
         c.committeeHash = committeeHash;
+        c.publicKey = pkCommitment;
+        publicKeyHashes[e3Id] = pkCommitment;
 
         E3 memory e3 = enclave.getE3(e3Id);
         if (e3.proofAggregationEnabled) {
@@ -267,9 +264,6 @@ contract CiphernodeRegistryOwnable is
                 proof
             );
         }
-
-        c.publicKey = pkCommitment;
-        publicKeyHashes[e3Id] = pkCommitment;
 
         enclave.onCommitteePublished(e3Id, pkCommitment);
 
@@ -377,9 +371,7 @@ contract CiphernodeRegistryOwnable is
     /// @dev Can be called by anyone after the deadline. If threshold not met, marks E3 as failed.
     /// @param e3Id ID of the E3 computation
     /// @return success True if committee formed successfully, false if threshold not met
-    function finalizeCommittee(
-        uint256 e3Id
-    ) external nonReentrant returns (bool success) {
+    function finalizeCommittee(uint256 e3Id) external returns (bool success) {
         Committee storage c = committees[e3Id];
         require(
             c.stage != ICiphernodeRegistry.CommitteeStage.None,
