@@ -119,24 +119,17 @@ async function main() {
   }
 
   if (!dkgProofHex || !dkgPublicHex || !decProofHex || !decPublicHex) {
-    const out = {
-      verify_gas: { dkg: null, user: null, dec: null },
-      source: "folded_proof_export_plus_crisp_verify_test",
-      note: "Missing folded or raw benchmark proofs — run test_trbfv_actor successfully first",
-      artifact_sizes_bytes: {
-        dkg: { proof: 0, public_inputs: 0 },
-        dec: { proof: 0, public_inputs: 0 },
-      },
-      calldata_gas: {
-        dkg: { proof: 0, public_inputs: 0, total: 0 },
-        dec: { proof: 0, public_inputs: 0, total: 0 },
-      },
-    };
-    fs.writeFileSync(outputPath, JSON.stringify(out, null, 2) + "\n");
-    console.warn(
-      "[benchmarkGasFromRaw] Wrote placeholder gas JSON (no proofs to replay)",
+    const missing = [
+      !dkgProofHex && "dkg proof",
+      !dkgPublicHex && "dkg public inputs",
+      !decProofHex && "decryption proof",
+      !decPublicHex && "decryption public inputs",
+    ]
+      .filter(Boolean)
+      .join(", ");
+    throw new Error(
+      `[benchmarkGasFromRaw] Missing benchmark proofs (${missing}); run test_trbfv_actor successfully first. outputPath=${outputPath}`,
     );
-    return;
   }
 
   const dkgPublicInputs = hexToBytes32Array(dkgPublicHex);

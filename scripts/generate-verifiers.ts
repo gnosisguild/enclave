@@ -34,7 +34,7 @@
  *   pnpm generate:verifiers --no-compile          # Use artifacts from build:circuits (skips target cleanup)
  */
 
-import { execSync } from 'child_process'
+import { execFileSync, execSync } from 'child_process'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { basename, join, resolve } from 'path'
 import { ALL_GROUPS, CIRCUIT_GROUPS, type CircuitGroup } from './circuit-constants'
@@ -303,7 +303,7 @@ class VerifierGenerator {
 
     // 3. Generate Solidity verifier
     const rawSolPath = join(targetDir, `${packageName}_verifier.sol`)
-    execSync(`bb write_solidity_verifier -k "${vkPath}" -o "${rawSolPath}"`, { stdio: 'pipe' })
+    execFileSync('bb', ['write_solidity_verifier', '-k', vkPath, '-o', rawSolPath], { stdio: 'pipe' })
 
     if (!existsSync(rawSolPath)) {
       throw new Error('bb write_solidity_verifier did not produce output')
@@ -350,7 +350,7 @@ class VerifierGenerator {
   private formatSolidity(content: string, outputPath: string): string {
     const contractsDir = join(this.rootDir, 'packages', 'enclave-contracts')
     // Use prettier --stdin-filepath so plugin selection is by extension.
-    const result = execSync(`pnpm exec prettier --stdin-filepath "${outputPath}"`, {
+    const result = execFileSync('pnpm', ['exec', 'prettier', '--stdin-filepath', outputPath], {
       cwd: contractsDir,
       input: content,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -404,7 +404,7 @@ class VerifierGenerator {
     }
 
     // Generate VK (EVM target for Solidity verifiers)
-    execSync(`bb write_vk -b "${jsonFile}" -o "${targetDir}" -t evm`, { stdio: 'pipe' })
+    execFileSync('bb', ['write_vk', '-b', jsonFile, '-o', targetDir, '-t', 'evm'], { stdio: 'pipe' })
 
     // bb writes to 'vk' by default, rename to <packageName>.vk
     if (existsSync(defaultVk) && !existsSync(vkFile)) {

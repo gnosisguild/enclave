@@ -86,6 +86,10 @@ case "$(echo "$PROOF_AGGREGATION" | tr '[:upper:]' '[:lower:]')" in
         ;;
 esac
 if [ -n "$MULTITHREAD_JOBS" ]; then
+    if ! [[ "$MULTITHREAD_JOBS" =~ ^[1-9][0-9]*$ ]]; then
+        echo "Error: --multithread-jobs must be a positive integer (got: $MULTITHREAD_JOBS)"
+        exit 1
+    fi
     export BENCHMARK_MULTITHREAD_JOBS="$MULTITHREAD_JOBS"
 fi
 

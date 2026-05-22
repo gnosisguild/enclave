@@ -277,8 +277,8 @@ integration_timing_seconds() {
     local label="$1"
     local val=""
     local f blob
-    if [ -n "${3:-}" ]; then
-        val=$(integration_phase_seconds "$label" "$3")
+    if [ -n "${2:-}" ]; then
+        val=$(integration_phase_seconds "$label" "$2")
         [ -n "$val" ] && [ "$val" != "null" ] && echo "$val" && return
     fi
     for f in "$INTEGRATION_SUMMARY_FILE" "$GAS_JSON"; do

@@ -485,13 +485,26 @@ impl ThresholdKeyshare {
         })
     }
 
+    fn keyshare_created_fields(
+        state: &KeyshareState,
+    ) -> Option<(&ArcBytes, &Option<SignedProofPayload>)> {
+        use KeyshareState as K;
+        match state {
+            K::ReadyForDecryption(s) => Some((&s.pk_share, &s.signed_pk_generation_proof)),
+            K::Decrypting(s) => Some((&s.pk_share, &s.signed_pk_generation_proof)),
+            _ => None,
+        }
+    }
+
     fn try_finish_deferred_keyshare_publish(&mut self, ec: EventContext<Sequenced>) -> Result<()> {
         if !self.pending_keyshare_publish {
             return Ok(());
         }
         let state = self.state.try_get()?;
-        let current: ReadyForDecryption = state.clone().try_into()?;
-        if current.signed_pk_generation_proof.is_none() {
+        let Some((_, signed)) = Self::keyshare_created_fields(&state.state) else {
+            return Ok(());
+        };
+        if signed.is_none() {
             return Ok(());
         }
         self.pending_keyshare_publish = false;
@@ -2237,9 +2250,20 @@ impl ThresholdKeyshare {
         let e3_id = state.get_e3_id();
         let address = state.get_address().to_owned();
         let party_id = state.get_party_id();
-        let current: ReadyForDecryption = state.clone().try_into()?;
+        let Some((pk_share, signed_pk_generation_proof)) =
+            Self::keyshare_created_fields(&state.state)
+        else {
+            warn!(
+                "Deferring KeyshareCreated for party {} E3 {} — not in ReadyForDecryption/Decrypting ({})",
+                party_id,
+                e3_id,
+                state.state.variant_name()
+            );
+            self.pending_keyshare_publish = true;
+            return Ok(());
+        };
 
-        if current.signed_pk_generation_proof.is_none() {
+        if signed_pk_generation_proof.is_none() {
             warn!(
                 "Deferring KeyshareCreated for party {} E3 {} — C1 proof not stored yet (PkGenerationProofSigned race)",
                 party_id, e3_id
@@ -2252,11 +2276,11 @@ impl ThresholdKeyshare {
 
         self.bus.publish(
             KeyshareCreated {
-                pubkey: current.pk_share,
+                pubkey: pk_share.clone(),
                 e3_id: e3_id.clone(),
                 node: address,
                 party_id,
-                signed_pk_generation_proof: current.signed_pk_generation_proof,
+                signed_pk_generation_proof: signed_pk_generation_proof.clone(),
             },
             ec,
         )?;

@@ -165,7 +165,7 @@ ENCLAVE_TEST_EXIT_CODE=0
 if [ "$FOLDED_TEST_EXIT_CODE" -ne 0 ]; then
     echo "  [gas] Skipping EVM replay: test_trbfv_actor failed (exit=${FOLDED_TEST_EXIT_CODE})."
     echo '{}' >"$TMP_JSON_ENCLAVE"
-elif [ ! -s "$TMP_JSON_FOLDED" ] || ! jq -e '.dkg_aggregator.proof_hex and .decryption_aggregator.proof_hex' "$TMP_JSON_FOLDED" >/dev/null 2>&1; then
+elif [ ! -s "$TMP_JSON_FOLDED" ] || ! jq -e '(.dkg_aggregator.proof_hex != "") and (.decryption_aggregator.proof_hex != "")' "$TMP_JSON_FOLDED" >/dev/null 2>&1; then
     echo "  [gas] Skipping EVM replay: folded proof export missing or empty."
     echo '{}' >"$TMP_JSON_ENCLAVE"
 else
@@ -320,6 +320,6 @@ if [ "$FOLDED_TEST_EXIT_CODE" -ne 0 ]; then
     echo "  [gas] ERROR: test_trbfv_actor failed — Pi_DKG/Pi_dec verify gas and integration timings will be incomplete."
     echo "  [gas]        Re-run after a successful integration export (no Anvil required)."
 fi
-if [ "$FOLDED_TEST_EXIT_CODE" -ne 0 ] || [ "$ENCLAVE_TEST_EXIT_CODE" -ne 0 ]; then
+if [ "$CRISP_TEST_EXIT_CODE" -ne 0 ] || [ "$FOLDED_TEST_EXIT_CODE" -ne 0 ] || [ "$ENCLAVE_TEST_EXIT_CODE" -ne 0 ]; then
     exit 1
 fi
