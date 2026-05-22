@@ -311,7 +311,12 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
     ///
     /// # Panics
     /// The circuit will fail if the decryption share computation formula doesn't hold for the specified basis.
-    fn verify_decryption_share_computation(self, basis_idx: u32, gamma: Field, cyclo_at_gamma: Field) {
+    fn verify_decryption_share_computation(
+        self,
+        basis_idx: u32,
+        gamma: Field,
+        cyclo_at_gamma: Field,
+    ) {
         // Evaluate ciphertext components at gamma
         let c_0_at_gamma = self.ct0[basis_idx].eval(gamma);
         let c_1_at_gamma = self.ct1[basis_idx].eval(gamma);

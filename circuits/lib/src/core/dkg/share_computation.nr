@@ -195,11 +195,7 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
                 let c = self.e_sm_secret[j].coefficients[N - 1 - i];
                 // Center: shift [0, q) to [-(q-1)/2, (q-1)/2].
                 // c = e_sm_secret coeff in [0, q) < 2^62; half < 2^61: u64 saves 22 gates.
-                let centered = if (c as u64) > (half as u64) {
-                    c - q
-                } else {
-                    c
-                };
+                let centered = if (c as u64) > (half as u64) { c - q } else { c };
                 coeffs[i] = centered;
             }
             normalized[j] = Polynomial::new(coeffs);

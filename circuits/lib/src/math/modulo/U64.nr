@@ -11,8 +11,7 @@
 //! Each `mul_mod` therefore saves ~22 gates over `ModU128` (two range checks per call).
 
 use super::unconstrained_U64::{
-    __inv_mod_u64, __mul_mod_witness_u64, __neg_u64, __reduce_witness_u64,
-    __sub_with_underflow_u64,
+    __inv_mod_u64, __mul_mod_witness_u64, __neg_u64, __reduce_witness_u64, __sub_with_underflow_u64,
 };
 
 /// Modular arithmetic context for prime moduli < 2^62.

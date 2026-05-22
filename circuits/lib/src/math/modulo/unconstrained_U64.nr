@@ -36,7 +36,11 @@ pub unconstrained fn __sub_with_underflow_u64(lhs: Field, rhs: Field, m: u64) ->
 
 /// Returns (-val) mod m.
 pub unconstrained fn __neg_u64(val: Field, m: u64) -> u64 {
-    if val == 0 { 0 } else { m - val as u64 }
+    if val == 0 {
+        0
+    } else {
+        m - val as u64
+    }
 }
 
 /// Square-and-multiply modular exponentiation using u128 arithmetic.
