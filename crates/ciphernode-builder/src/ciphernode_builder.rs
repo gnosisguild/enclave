@@ -6,6 +6,7 @@
 
 use crate::{CiphernodeHandle, EventSystem, EvmSystemChainBuilder, ProviderCache, WriteEnabled};
 use actix::{Actor, Addr};
+use alloy::primitives::Address;
 use alloy::signers::local::PrivateKeySigner;
 use anyhow::Result;
 use derivative::Derivative;
@@ -81,6 +82,8 @@ pub struct CiphernodeBuilder {
     testmode_signer: Option<PrivateKeySigner>,
     threshold_plaintext_agg: bool,
     zk_backend: Option<ZkBackend>,
+    /// Test/benchmark: EIP-712 verifying contract for DKG fold attestations (no RPC required).
+    dkg_fold_attestation_verifier: Option<Address>,
     net_config: Option<NetConfig>,
     ignore_address_check: bool,
     global_shared_store: bool,
@@ -149,6 +152,7 @@ impl CiphernodeBuilder {
             threads: None,
             testmode_signer: None,
             threshold_plaintext_agg: false,
+            dkg_fold_attestation_verifier: None,
             net_config: None,
             zk_backend: None,
             ignore_address_check: false,
@@ -211,6 +215,23 @@ impl CiphernodeBuilder {
     pub fn with_chains(mut self, chains: &[ChainConfig]) -> Self {
         self.chains = chains.to_vec();
         self
+    }
+
+    /// Benchmark/test: set fold attestation verifier without configuring EVM chains (no RPC).
+    pub fn testmode_with_dkg_fold_attestation_verifier(mut self, verifier: Address) -> Self {
+        self.dkg_fold_attestation_verifier = Some(verifier);
+        self
+    }
+
+    fn resolve_dkg_fold_attestation_verifier(&self) -> Result<Option<Address>> {
+        if let Some(addr) = self.dkg_fold_attestation_verifier {
+            return Ok(Some(addr));
+        }
+        self.chains
+            .first()
+            .and_then(|c| c.contracts.dkg_fold_attestation_verifier.as_ref())
+            .map(|c| c.address())
+            .transpose()
     }
 
     /// Log data actor events
@@ -486,12 +507,7 @@ impl CiphernodeBuilder {
             ));
 
             info!("Setting up ZK actors");
-            let dkg_fold_verifier_addr = self
-                .chains
-                .first()
-                .and_then(|c| c.contracts.dkg_fold_attestation_verifier.as_ref())
-                .map(|c| c.address())
-                .transpose()?;
+            let dkg_fold_verifier_addr = self.resolve_dkg_fold_attestation_verifier()?;
             setup_zk_actors(&bus, backend, signer, dkg_fold_verifier_addr);
         }
 
@@ -513,12 +529,7 @@ impl CiphernodeBuilder {
                     .ok_or_else(|| anyhow::anyhow!("ZK backend is required for aggregator"))?;
                 let signer = provider_cache.ensure_signer().await?;
                 info!("Setting up ZK actors for aggregator");
-                let dkg_fold_verifier_addr = self
-                    .chains
-                    .first()
-                    .and_then(|c| c.contracts.dkg_fold_attestation_verifier.as_ref())
-                    .map(|c| c.address())
-                    .transpose()?;
+                let dkg_fold_verifier_addr = self.resolve_dkg_fold_attestation_verifier()?;
                 setup_zk_actors(&bus, backend, signer, dkg_fold_verifier_addr);
             }
         }

@@ -26,7 +26,8 @@ pub use circuits::aggregation::c3_accumulator::generate_sequential_c3_fold;
 pub use circuits::aggregation::c6_accumulator::generate_sequential_c6_fold;
 pub use circuits::aggregation::node_dkg_fold::{
     prove_decryption_aggregation_jobs, prove_dkg_aggregation, prove_node_dkg_fold,
-    DecryptionAggregationJob, DkgAggregationInput, NodeDkgFoldInput,
+    DecryptionAggregationJob, DkgAggregationInput, FoldProveStepTiming, NodeDkgFoldInput,
+    NodeDkgFoldProveResult,
 };
 pub use circuits::aggregation::nodes_fold_accumulator::generate_sequential_nodes_fold;
 pub use config::{verify_checksum, BbTarget, CircuitInfo, VersionInfo, ZkConfig};

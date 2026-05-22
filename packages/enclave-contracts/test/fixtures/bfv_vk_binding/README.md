@@ -6,7 +6,7 @@ Golden `dkg_aggregator` / `decryption_aggregator` EVM proofs for
 ## Automatic refresh
 
 After an insecure benchmark run that writes
-`circuits/benchmarks/results_insecure/integration_summary.json`,
+`circuits/benchmarks/results_insecure_agg/integration_summary.json`,
 `circuits/benchmarks/scripts/run_benchmarks.sh` calls
 `sync_bfv_vk_binding_fixture.sh` and updates this directory’s
 `folded_artifacts.json`.

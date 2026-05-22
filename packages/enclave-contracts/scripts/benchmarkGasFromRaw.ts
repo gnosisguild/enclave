@@ -94,11 +94,18 @@ async function main() {
   let decPublicHex: string | undefined;
 
   if (foldedPath && fs.existsSync(foldedPath)) {
-    const folded = JSON.parse(fs.readFileSync(foldedPath, "utf8"));
-    dkgProofHex = folded?.dkg_aggregator?.proof_hex;
-    dkgPublicHex = folded?.dkg_aggregator?.public_inputs_hex;
-    decProofHex = folded?.decryption_aggregator?.proof_hex;
-    decPublicHex = folded?.decryption_aggregator?.public_inputs_hex;
+    const raw = fs.readFileSync(foldedPath, "utf8").trim();
+    if (!raw) {
+      console.warn(
+        `[benchmarkGasFromRaw] ${foldedPath} is empty — integration test likely failed before exporting folded proofs`,
+      );
+    } else {
+      const folded = JSON.parse(raw);
+      dkgProofHex = folded?.dkg_aggregator?.proof_hex;
+      dkgPublicHex = folded?.dkg_aggregator?.public_inputs_hex;
+      decProofHex = folded?.decryption_aggregator?.proof_hex;
+      decPublicHex = folded?.decryption_aggregator?.public_inputs_hex;
+    }
   } else {
     const dkgRaw = findRawJson(rawDir, "threshold_pk_aggregation");
     const decRaw = findRawJson(
@@ -112,9 +119,24 @@ async function main() {
   }
 
   if (!dkgProofHex || !dkgPublicHex || !decProofHex || !decPublicHex) {
-    throw new Error(
-      "Missing proof/public_inputs hex fields in raw benchmark JSON",
+    const out = {
+      verify_gas: { dkg: null, user: null, dec: null },
+      source: "folded_proof_export_plus_crisp_verify_test",
+      note: "Missing folded or raw benchmark proofs — run test_trbfv_actor successfully first",
+      artifact_sizes_bytes: {
+        dkg: { proof: 0, public_inputs: 0 },
+        dec: { proof: 0, public_inputs: 0 },
+      },
+      calldata_gas: {
+        dkg: { proof: 0, public_inputs: 0, total: 0 },
+        dec: { proof: 0, public_inputs: 0, total: 0 },
+      },
+    };
+    fs.writeFileSync(outputPath, JSON.stringify(out, null, 2) + "\n");
+    console.warn(
+      "[benchmarkGasFromRaw] Wrote placeholder gas JSON (no proofs to replay)",
     );
+    return;
   }
 
   const dkgPublicInputs = hexToBytes32Array(dkgPublicHex);

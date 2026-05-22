@@ -36,7 +36,7 @@ const COMMITTED_FOLDED_ARTIFACTS_FIXTURE = path.join(
 );
 const INSECURE_INTEGRATION_SUMMARY = path.join(
   repoRoot,
-  "circuits/benchmarks/results_insecure/integration_summary.json",
+  "circuits/benchmarks/results_insecure_agg/integration_summary.json",
 );
 
 type FoldedArtifacts = {

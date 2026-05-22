@@ -13,11 +13,12 @@ use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
 use e3_config::BBPath;
 use e3_crypto::Cipher;
 use e3_events::{
-    prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized, ComputeRequestKind,
-    ComputeResponseKind, ConfigurationUpdated, E3Requested, E3id, EffectsEnabled, EnclaveEvent,
-    EnclaveEventData, EventType, GetEvents, HistoryCollector, OperatorActivationChanged,
-    OrderedSet, PkAggregationProofPending, PkAggregationProofRequest, PlaintextAggregated,
-    ProofType, Seed, TakeEvents, TicketBalanceUpdated, VerificationKind, ZkRequest, ZkResponse,
+    hlc::HlcTimestamp, prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized,
+    ComputeRequestKind, ComputeResponseKind, ConfigurationUpdated, E3Requested, E3id,
+    EffectsEnabled, EnclaveEvent, EnclaveEventData, EventType, GetEvents, HistoryCollector,
+    OperatorActivationChanged, OrderedSet, PkAggregationProofPending, PkAggregationProofRequest,
+    PlaintextAggregated, ProofType, Seed, TakeEvents, TicketBalanceUpdated, VerificationKind,
+    ZkRequest, ZkResponse,
 };
 use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_fhe_params::{build_pair_for_preset, create_deterministic_crp_from_default_seed};
@@ -116,6 +117,39 @@ fn select_benchmark_params() -> BenchmarkParams {
         pubkey_flow_timeout,
         plaintext_flow_timeout,
     }
+}
+
+/// Whether `test_trbfv_actor` runs the full recursive fold + aggregator path (default: on).
+///
+/// Set `BENCHMARK_PROOF_AGGREGATION=false` for a baseline run without node folds / folded Π_DKG.
+fn benchmark_proof_aggregation_enabled() -> bool {
+    match std::env::var("BENCHMARK_PROOF_AGGREGATION")
+        .unwrap_or_else(|_| "true".into())
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "0" | "false" | "no" | "off" => false,
+        _ => true,
+    }
+}
+
+/// Rayon multithread pool concurrency for benchmark runs (`BENCHMARK_MULTITHREAD_JOBS`, default 1).
+fn benchmark_multithread_concurrent_jobs() -> usize {
+    std::env::var("BENCHMARK_MULTITHREAD_JOBS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .filter(|&n| n >= 1)
+        .unwrap_or(1)
+}
+
+/// Fold attestation verifier for benchmarks (no live RPC; used only for EIP-712 signing).
+fn benchmark_dkg_fold_attestation_verifier_address() -> Option<Address> {
+    if !benchmark_proof_aggregation_enabled() {
+        return None;
+    }
+    let addr = std::env::var("BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER")
+        .unwrap_or_else(|_| "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0".to_string());
+    addr.parse().ok()
 }
 
 /// RAII guard that restores the benchmark-specific collector-timeout env vars on scope exit.
@@ -767,6 +801,23 @@ fn count_projected_events(projected: &[&str], event_type: &str) -> usize {
     projected.iter().filter(|seen| **seen == event_type).count()
 }
 
+/// Wall seconds between first `start_when` and last `end_when` event in `history` (HLC physical time).
+fn history_wall_seconds_between<F1, F2>(
+    history: &[EnclaveEvent],
+    start_when: F1,
+    end_when: F2,
+) -> Option<f64>
+where
+    F1: Fn(&EnclaveEventData) -> bool,
+    F2: Fn(&EnclaveEventData) -> bool,
+{
+    let start = history.iter().find(|e| start_when(e.get_data()))?;
+    let end = history.iter().rfind(|e| end_when(e.get_data()))?;
+    let start_us = HlcTimestamp::wall_time(start.ts());
+    let end_us = HlcTimestamp::wall_time(end.ts());
+    (end_us >= start_us).then(|| (end_us - start_us) as f64 / 1_000_000.0)
+}
+
 fn publickey_aggregator_marker(data: &EnclaveEventData, e3_id: &E3id) -> Option<&'static str> {
     match data {
         EnclaveEventData::CommitteeFinalized(data) if data.e3_id == *e3_id => {
@@ -930,9 +981,22 @@ async fn setup_score_sortition_environment(
     Ok(())
 }
 
+#[derive(Clone, Copy)]
+enum PhaseMetric {
+    WallClock,
+}
+
+impl PhaseMetric {
+    fn as_str(self) -> &'static str {
+        match self {
+            PhaseMetric::WallClock => "wall_clock",
+        }
+    }
+}
+
 #[derive(Default)]
 struct Report {
-    inner: Vec<(String, Duration)>,
+    inner: Vec<(String, Duration, PhaseMetric)>,
 }
 
 fn repeat(ch: char, num: usize) -> String {
@@ -956,10 +1020,14 @@ fn json_escape(s: &str) -> String {
 }
 
 impl Report {
-    pub fn push(&mut self, repo: (&str, Duration)) {
-        let (label, dur) = repo;
+    pub fn push_wall(&mut self, label: &str, dur: Duration) {
         self.show(label);
-        self.inner.push((label.to_owned(), dur));
+        self.inner
+            .push((label.to_owned(), dur, PhaseMetric::WallClock));
+    }
+
+    pub fn push(&mut self, repo: (&str, Duration)) {
+        self.push_wall(repo.0, repo.1);
     }
 
     pub fn show(&self, label: &str) {
@@ -974,11 +1042,16 @@ impl Report {
     }
 
     pub fn serialize(&self) -> String {
-        let max_key_len = self.inner.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+        let max_key_len = self
+            .inner
+            .iter()
+            .map(|(k, _, _)| k.len())
+            .max()
+            .unwrap_or(0);
 
         self.inner
             .iter()
-            .map(|(key, duration)| {
+            .map(|(key, duration, _)| {
                 format!(
                     "{:width$}: {:.3}s",
                     key,
@@ -1067,8 +1140,8 @@ async fn test_trbfv_actor() -> Result<()> {
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
 
     // Actor system setup
-    // Seems like you cannot send more than one job at a time to rayon
-    let concurrent_jobs = 1;
+    let concurrent_jobs = benchmark_multithread_concurrent_jobs();
+    let dkg_fold_verifier = benchmark_dkg_fold_attestation_verifier_address();
     let max_threadroom = Multithread::get_max_threads_minus(1);
     let task_pool = Multithread::create_taskpool(max_threadroom, concurrent_jobs);
     let multithread_report = MultithreadReport::new(max_threadroom, concurrent_jobs).start();
@@ -1083,42 +1156,50 @@ async fn test_trbfv_actor() -> Result<()> {
         .add_group(1, || async {
             let addr = rand_eth_addr(&rng);
             println!("Building collector {}!", addr);
-            CiphernodeBuilder::new(rng.clone(), cipher.clone())
-                .testmode_with_history()
-                .with_shared_taskpool(&task_pool)
-                .with_multithread_concurrent_jobs(concurrent_jobs)
-                .with_shared_multithread_report(&multithread_report)
-                .with_trbfv()
-                .with_zkproof(zk_backend.clone())
-                .testmode_with_signer(PrivateKeySigner::random())
-                .with_pubkey_aggregation()
-                .with_sortition_score()
-                .with_threshold_plaintext_aggregation()
-                .testmode_with_forked_bus(bus.event_bus())
-                .testmode_ignore_address_check()
-                .with_logging()
-                .build()
-                .await
+            {
+                let mut b = CiphernodeBuilder::new(rng.clone(), cipher.clone())
+                    .testmode_with_history()
+                    .with_shared_taskpool(&task_pool)
+                    .with_multithread_concurrent_jobs(concurrent_jobs)
+                    .with_shared_multithread_report(&multithread_report)
+                    .with_trbfv()
+                    .with_zkproof(zk_backend.clone())
+                    .testmode_with_signer(PrivateKeySigner::random())
+                    .with_pubkey_aggregation()
+                    .with_sortition_score()
+                    .with_threshold_plaintext_aggregation()
+                    .testmode_with_forked_bus(bus.event_bus())
+                    .testmode_ignore_address_check()
+                    .with_logging();
+                if let Some(verifier) = dkg_fold_verifier {
+                    b = b.testmode_with_dkg_fold_attestation_verifier(verifier);
+                }
+                b.build().await
+            }
         })
         .add_group(19, || async {
             let addr = rand_eth_addr(&rng);
             println!("Building normal {}", &addr);
-            CiphernodeBuilder::new(rng.clone(), cipher.clone())
-                .testmode_with_history()
-                .with_shared_taskpool(&task_pool)
-                .with_multithread_concurrent_jobs(concurrent_jobs)
-                .with_shared_multithread_report(&multithread_report)
-                .with_trbfv()
-                .with_zkproof(zk_backend.clone())
-                .testmode_with_signer(PrivateKeySigner::random())
-                .with_pubkey_aggregation()
-                .with_sortition_score()
-                .with_threshold_plaintext_aggregation()
-                .testmode_with_forked_bus(bus.event_bus())
-                .testmode_ignore_address_check()
-                .with_logging()
-                .build()
-                .await
+            {
+                let mut b = CiphernodeBuilder::new(rng.clone(), cipher.clone())
+                    .testmode_with_history()
+                    .with_shared_taskpool(&task_pool)
+                    .with_multithread_concurrent_jobs(concurrent_jobs)
+                    .with_shared_multithread_report(&multithread_report)
+                    .with_trbfv()
+                    .with_zkproof(zk_backend.clone())
+                    .testmode_with_signer(PrivateKeySigner::random())
+                    .with_pubkey_aggregation()
+                    .with_sortition_score()
+                    .with_threshold_plaintext_aggregation()
+                    .testmode_with_forked_bus(bus.event_bus())
+                    .testmode_ignore_address_check()
+                    .with_logging();
+                if let Some(verifier) = dkg_fold_verifier {
+                    b = b.testmode_with_dkg_fold_attestation_verifier(verifier);
+                }
+                b.build().await
+            }
         })
         .simulate_libp2p()
         .build()
@@ -1168,7 +1249,11 @@ async fn test_trbfv_actor() -> Result<()> {
     // Trigger actor DKG
     let e3_id = E3id::new("0", 1);
 
-    let proof_aggregation_enabled = true;
+    let proof_aggregation_enabled = benchmark_proof_aggregation_enabled();
+    println!(
+        "Benchmark trbfv: proof_aggregation={proof_aggregation_enabled}, preset={}, multithread_jobs={concurrent_jobs}",
+        benchmark_params.preset_subdir
+    );
 
     let e3_requested = E3Requested {
         e3_id: e3_id.clone(),
@@ -1338,10 +1423,26 @@ async fn test_trbfv_actor() -> Result<()> {
         "Active aggregator: last event must be PublicKeyAggregated"
     );
 
-    report.push((
+    if let Some(secs) = history_wall_seconds_between(
+        &active_aggregator_history,
+        |d| {
+            matches!(
+                d,
+                EnclaveEventData::PkAggregationProofPending(data) if data.e3_id == e3_id
+            )
+        },
+        |d| matches!(d, EnclaveEventData::PublicKeyAggregated(data) if data.e3_id == e3_id),
+    ) {
+        report.push_wall(
+            "Aggregator P2: PkAggregation pending -> PublicKeyAggregated (wall)",
+            Duration::from_secs_f64(secs),
+        );
+    }
+
+    report.push_wall(
         "ThresholdShares -> PublicKeyAggregated",
         shares_to_pubkey_agg_timer.elapsed(),
-    ));
+    );
 
     report.push((
         "E3Request -> PublicKeyAggregated",
@@ -1515,10 +1616,26 @@ async fn test_trbfv_actor() -> Result<()> {
         "PlaintextAggregated must be the last active aggregator completion event"
     );
 
-    report.push((
+    if let Some(secs) = history_wall_seconds_between(
+        &active_aggregator_history[active_aggregator_pubkey_history_len..],
+        |d| {
+            matches!(
+                d,
+                EnclaveEventData::AggregationProofPending(data) if data.e3_id == e3_id
+            )
+        },
+        |d| matches!(d, EnclaveEventData::PlaintextAggregated(data) if data.e3_id == e3_id),
+    ) {
+        report.push_wall(
+            "Aggregator P4: Aggregation pending -> PlaintextAggregated (wall)",
+            Duration::from_secs_f64(secs),
+        );
+    }
+
+    report.push_wall(
         "Ciphertext published -> PlaintextAggregated",
         publishing_ct_timer.elapsed(),
-    ));
+    );
 
     let (plaintext, decryption_aggregator_proofs) = h
         .iter()
@@ -1545,10 +1662,12 @@ async fn test_trbfv_actor() -> Result<()> {
             )
         })?;
 
-    assert!(
-        !decryption_aggregator_proofs.is_empty(),
-        "DecryptionAggregator proofs should be present in PlaintextAggregated"
-    );
+    if proof_aggregation_enabled {
+        assert!(
+            !decryption_aggregator_proofs.is_empty(),
+            "DecryptionAggregator proofs should be present in PlaintextAggregated when proof_aggregation_enabled"
+        );
+    }
 
     if let Ok(path) = std::env::var("BENCHMARK_FOLDED_OUTPUT") {
         if let (Some(dkg_proof), Some(dec_proof)) = (
@@ -1628,14 +1747,15 @@ async fn test_trbfv_actor() -> Result<()> {
             .collect::<Vec<_>>()
             .join(",\n");
 
-        let timings_json = report
+        let phase_timings_json = report
             .inner
             .iter()
-            .map(|(label, duration)| {
+            .map(|(label, duration, metric)| {
                 format!(
-                    "    {{\"label\": \"{}\", \"seconds\": {:.9}}}",
+                    "    {{\"label\": \"{}\", \"seconds\": {:.9}, \"metric\": \"{}\"}}",
                     json_escape(label),
-                    duration.as_secs_f64()
+                    duration.as_secs_f64(),
+                    metric.as_str()
                 )
             })
             .collect::<Vec<_>>()
@@ -1667,10 +1787,48 @@ async fn test_trbfv_actor() -> Result<()> {
             String::from("  \"folded_artifacts\": null\n")
         };
 
+        let dkg_fold_verifier_json = benchmark_dkg_fold_attestation_verifier_address()
+            .map(|addr| format!("  \"dkg_fold_attestation_verifier\": \"{addr}\",\n"))
+            .unwrap_or_default();
+
+        let benchmark_mode =
+            std::env::var("BENCHMARK_MODE").unwrap_or_else(|_| "insecure".to_string());
+        let benchmark_config_json = format!(
+            concat!(
+                "  \"benchmark_config\": {{\n",
+                "    \"mode\": \"{}\",\n",
+                "    \"bfv_preset_subdir\": \"{}\",\n",
+                "    \"bfv_preset\": \"{:?}\",\n",
+                "    \"lambda\": {},\n",
+                "    \"proof_aggregation_enabled\": {},\n",
+                "    \"multithread_concurrent_jobs\": {},\n",
+                "    \"committee_h\": {},\n",
+                "    \"committee_n\": {},\n",
+                "    \"committee_t\": {},\n",
+                "    \"nodes_spawned\": {},\n",
+                "    \"network_model\": \"in_process_bus\",\n",
+                "    \"testmode_harness\": true\n",
+                "  }},\n"
+            ),
+            json_escape(&benchmark_mode),
+            json_escape(benchmark_params.preset_subdir),
+            benchmark_params.bfv_preset,
+            benchmark_params.lambda,
+            proof_aggregation_enabled,
+            concurrent_jobs,
+            threshold_n, // micro committee: H == N_PARTIES
+            threshold_n,
+            threshold_m,
+            20usize,
+        );
+
         let summary_json = format!(
             concat!(
                 "{{\n",
                 "  \"integration_test\": \"test_trbfv_actor\",\n",
+                "{benchmark_config_json}",
+                "  \"proof_aggregation_enabled\": {},\n",
+                "{dkg_fold_verifier_json}",
                 "  \"multithread\": {{\n",
                 "    \"rayon_threads\": {},\n",
                 "    \"max_simultaneous_rayon_tasks\": {},\n",
@@ -1680,19 +1838,23 @@ async fn test_trbfv_actor() -> Result<()> {
                 "{}\n",
                 "  ],\n",
                 "  \"operation_timings_total_seconds\": {:.9},\n",
-                "  \"timings_seconds\": [\n",
+                "  \"operation_timings_metric\": \"tracked_job_wall\",\n",
+                "  \"phase_timings\": [\n",
                 "{}\n",
                 "  ],\n",
                 "{}",
                 "}}\n"
             ),
+            proof_aggregation_enabled,
             mt_report.rayon_threads(),
             mt_report.max_simultaneous_rayon_tasks(),
             mt_report.cores_available(),
             operation_timings_json,
             mt_report.tracked_total_seconds(),
-            timings_json,
-            folded_section
+            phase_timings_json,
+            folded_section,
+            benchmark_config_json = benchmark_config_json,
+            dkg_fold_verifier_json = dkg_fold_verifier_json,
         );
         fs::write(&path, summary_json)?;
         println!("Wrote benchmark summary to {path}");

@@ -19,31 +19,71 @@ From this directory:
 
 Options and secure-only **config** circuit behavior are documented in the script and `config.json`.
 
+### Proof aggregation and folding (integration)
+
+The gas / integration stage runs `cargo test -p e3-tests test_trbfv_actor` with **proof aggregation
+enabled by default** (`E3Requested.proof_aggregation_enabled = true`): per-node `ZkNodeDkgFold`,
+fold attestations (EIP-712 against `DkgFoldAttestationVerifier`), and exported folded
+`dkg_aggregator` / `decryption_aggregator` proofs for Π_DKG / Π_dec on-chain gas.
+
+| Flag / env                                              | Effect                                                                               |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `--proof-aggregation on` (default)                      | Full fold + aggregator path; folded artifacts in report                              |
+| `--proof-aggregation off` / `--no-proof-aggregation`    | Baseline without node folds / folded export                                          |
+| `BENCHMARK_PROOF_AGGREGATION`                           | Same as above when calling `extract_crisp_verify_gas.sh` directly                    |
+| `BENCHMARK_MULTITHREAD_JOBS=N` / `--multithread-jobs N` | Rayon concurrent ZK jobs (default `1`)                                               |
+| `BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER=0x…`           | EIP-712 verifying contract for fold attestations (default: localhost deploy address) |
+
+**Default output directories** (under `circuits/benchmarks/`; aggregation on/off no longer
+overwrites the same folder):
+
+| Mode       | Proof aggregation on (default) | Proof aggregation off (`--no-proof-aggregation`) |
+| ---------- | ------------------------------ | ------------------------------------------------ |
+| `insecure` | `results_insecure_agg/`        | `results_insecure_no_agg/`                       |
+| `secure`   | `results_secure_agg/`          | `results_secure_no_agg/`                         |
+
+**A/B comparison** (from `circuits/benchmarks`):
+
+```bash
+./run_benchmarks.sh --mode insecure --no-proof-aggregation
+./run_benchmarks.sh --mode insecure
+# Compare results_insecure_no_agg/report.md vs results_insecure_agg/report.md
+```
+
+`report.md` includes **Audit status**, **Measurement methodology** (metric kinds), labeled **Role /
+Phase** rows (`wall_clock` vs `isolated_nargo` vs `tracked_job_wall`), **NodeDkgFold sub-steps**,
+and **Folded on-chain artifacts** when `integration_summary` is present. Verify gas must be complete
+(not N/A) for audit sign-off.
+
 ### What gets stored (secure / insecure)
 
-A full `./run_benchmarks.sh --mode <mode>` run writes:
+A full `./run_benchmarks.sh --mode <mode>` run writes to `results_<mode>_agg/` or
+`results_<mode>_no_agg/` (see table above):
 
-- `results_<mode>/raw/*.json` — Nargo timing + artifact sizes (source for the **Circuit Benchmarks**
-  table)
-- `results_<mode>/crisp_verify_gas.json` — verify gas, calldata gas, artifact sizes, and
-  **`integration_summary`** from `test_trbfv_actor` when gas extraction succeeds
-- `results_<mode>/integration_summary.json` — snapshot of `.integration_summary` (phase timings,
-  folded proofs, **multithread / operation_timings** after a fresh integration export)
-- `results_<mode>/report.md` — rendered summary of all of the above
+- `raw/*.json` — Nargo timing + artifact sizes (source for the **Circuit Benchmarks** table)
+- `crisp_verify_gas.json` — verify gas, calldata gas, artifact sizes, and **`integration_summary`**
+  from `test_trbfv_actor` when gas extraction succeeds
+- `integration_summary.json` — snapshot of `integration_summary` (phase timings, folded proofs,
+  multithread / operation timings)
+- `benchmark_run_meta.json` — CLI flags (mode, proof aggregation, multithread jobs, verbose)
+- `report.md` — rendered summary of all of the above
+
+Older runs used `results_<mode>/` without the `_agg` / `_no_agg` suffix; `regenerate_report.sh`
+still finds that layout as a fallback.
 
 ### Regenerate `report.md` only (no integration re-run)
 
 From this directory, after you already have `raw/` + `crisp_verify_gas.json`:
 
 ```bash
-./regenerate_report.sh
 ./regenerate_report.sh --mode insecure
+./regenerate_report.sh --mode insecure --no-proof-aggregation
 ```
 
 `crisp_verify_gas.json` embeds the integration timings; if you also keep `integration_summary.json`
 in the same folder, the script passes it explicitly (useful when gas JSON is missing a field but the
 snapshot is complete). `regenerate_report.sh` itself does not re-run `test_trbfv_actor`; it renders
-from `results_<mode>/raw`, `crisp_verify_gas.json`, and (optionally) `integration_summary.json`.
+from the matching `results_<mode>_{agg|no_agg}/` directory.
 
 ## Refresh after parameter changes
 
@@ -60,13 +100,13 @@ pnpm -C examples/CRISP/packages/crisp-sdk build
 
 # Extract on-chain verify gas from simulated verifier tests
 ./circuits/benchmarks/scripts/extract_crisp_verify_gas.sh \
-  --output "./circuits/benchmarks/results_insecure/crisp_verify_gas.json"
+  --output "./circuits/benchmarks/results_insecure_agg/crisp_verify_gas.json"
 
 # Regenerate report with gas values
 ./circuits/benchmarks/scripts/generate_report.sh \
-  --input-dir "./circuits/benchmarks/results_insecure/raw" \
-  --output "./circuits/benchmarks/results_insecure/report.md" \
-  --gas-json "./circuits/benchmarks/results_insecure/crisp_verify_gas.json"
+  --input-dir "./circuits/benchmarks/results_insecure_agg/raw" \
+  --output "./circuits/benchmarks/results_insecure_agg/report.md" \
+  --gas-json "./circuits/benchmarks/results_insecure_agg/crisp_verify_gas.json"
 ```
 
 If Π_DKG / Π_dec **verify gas** is `N/A` because `crisp_verify_gas.json` came from a failed extract,
@@ -77,7 +117,7 @@ step and merge **dkg** / **dec** into the gas file (no Rust re-run):
 # For secure folded proofs, align Solidity verifiers first (--build may take a while).
 ./circuits/benchmarks/scripts/replay_folded_verify_gas.sh \
   --summary "/tmp/summary_secure.json" \
-  --gas-json "./circuits/benchmarks/results_secure/crisp_verify_gas.json" \
+  --gas-json "./circuits/benchmarks/results_secure_agg/crisp_verify_gas.json" \
   --build secure-8192
 ```
 
@@ -87,13 +127,13 @@ If `crisp_verify_gas.json` has `integration_summary: null` but you still have th
 
 ```bash
 ./circuits/benchmarks/scripts/generate_report.sh \
-  --input-dir "./circuits/benchmarks/results_secure/raw" \
-  --output "./circuits/benchmarks/results_secure/report.md" \
-  --gas-json "./circuits/benchmarks/results_secure/crisp_verify_gas.json" \
+  --input-dir "./circuits/benchmarks/results_secure_agg/raw" \
+  --output "./circuits/benchmarks/results_secure_agg/report.md" \
+  --gas-json "./circuits/benchmarks/results_secure_agg/crisp_verify_gas.json" \
   --integration-summary "/tmp/summary_secure.json"
 ```
 
-For secure mode, use `--mode secure` and replace `results_insecure` with `results_secure`.
+For secure mode, use `--mode secure` and the `results_secure_{agg|no_agg}/` directories.
 
 ## Reported protocol tables
 
@@ -107,6 +147,9 @@ For secure mode, use `--mode secure` and replace `results_insecure` with `result
   - an `Integration test` section (end-to-end phase wall-clock timings)
   - a `Thread pool` section (Rayon threads / cores)
   - `CPU-bound operation timings` (tracked in-process averages/totals)
+  - `Proof aggregation / folding` (enabled flag, fold attestation verifier address)
+  - `Aggregation / fold operation timings` (`ZkNodeDkgFold`, `ZkDkgAggregation`, etc.)
+  - `Folded on-chain artifacts` (byte sizes used for Π_DKG / Π_dec gas replay)
 
 ## Derivation rules
 

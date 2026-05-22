@@ -6,7 +6,7 @@
 # Usage (from repo root):
 #   ./circuits/benchmarks/scripts/replay_folded_verify_gas.sh \
 #     --summary /tmp/summary_secure.json \
-#     --gas-json ./circuits/benchmarks/results_secure/crisp_verify_gas.json \
+#     --gas-json ./circuits/benchmarks/results_secure_agg/crisp_verify_gas.json \
 #     --build secure-8192
 #
 # Use --build <preset> when Hardhat reverts with SumcheckFailed (verifier VKs must match the

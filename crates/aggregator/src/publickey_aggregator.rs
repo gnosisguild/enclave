@@ -362,6 +362,7 @@ impl PublicKeyAggregator {
         };
 
         let mut dishonest_parties = msg.dishonest_parties.clone();
+        let committee_n = submission_order.len();
 
         // Filter out parties that failed C1 ZK verification. Keyed by the real
         // sortition party_id carried in `submission_order`, not arrival index.
@@ -473,6 +474,24 @@ impl PublicKeyAggregator {
                 "Not enough honest parties after filtering: {} (need > {})",
                 honest_keyshares.len(),
                 threshold_m
+            );
+            self.bus.publish(
+                E3Failed {
+                    e3_id: self.e3_id.clone(),
+                    failed_at_stage: E3Stage::CommitteeFinalized,
+                    reason: FailureReason::DKGInvalidShares,
+                },
+                ec,
+            )?;
+            return Ok(());
+        }
+
+        // C5 (PkAggregation) is compiled for a fixed committee size H; partial committees fail witness encoding.
+        if honest_keyshares.len() != committee_n {
+            error!(
+                "C5 requires all {committee_n} committee parties with valid C1 proofs; only {} honest after verification (dishonest: {:?})",
+                honest_keyshares.len(),
+                dishonest_parties
             );
             self.bus.publish(
                 E3Failed {
