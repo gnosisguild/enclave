@@ -130,6 +130,7 @@ const config: HardhatUserConfig = {
       '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol',
       '@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol',
       '@enclave-e3/contracts/contracts/Enclave.sol',
+      '@enclave-e3/contracts/contracts/lib/EnclavePricing.sol',
       '@enclave-e3/contracts/contracts/registry/CiphernodeRegistryOwnable.sol',
       '@enclave-e3/contracts/contracts/registry/BondingRegistry.sol',
       '@enclave-e3/contracts/contracts/slashing/SlashingManager.sol',

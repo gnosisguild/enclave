@@ -19,6 +19,17 @@
       "type": "error"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "exitDelay",
+          "type": "uint64"
+        }
+      ],
+      "name": "ExitDelayOutOfBounds",
+      "type": "error"
+    },
+    {
       "inputs": [],
       "name": "ExitInProgress",
       "type": "error"
@@ -45,6 +56,11 @@
     },
     {
       "inputs": [],
+      "name": "MaxAuthorizedDistributors",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "NoPendingDeregistration",
       "type": "error"
     },
@@ -61,6 +77,16 @@
     {
       "inputs": [],
       "name": "OnlyRewardDistributor",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "OperatorUnderSlash",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "RenounceOwnershipDisabled",
       "type": "error"
     },
     {
@@ -172,6 +198,31 @@
         {
           "indexed": true,
           "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "expectedAmount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "actualAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "LicenseTransferShortfall",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
           "name": "operator",
           "type": "address"
         },
@@ -261,11 +312,17 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "slashingManager",
+          "name": "previous",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "next",
           "type": "address"
         }
       ],
-      "name": "SlashingManagerSet",
+      "name": "SlashingManagerUpdated",
       "type": "event"
     },
     {
@@ -1005,5 +1062,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IBondingRegistry.sol",
-  "buildInfoId": "solc-0_8_28-e33d1cfedc69d8ad74eec5a84c8ef358a020ec1a"
+  "buildInfoId": "solc-0_8_28-ee94505d711997b4b070a2e6b0539519e6dc16bf"
 }

@@ -13,7 +13,6 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
  * Timeout configuration for E3 stages
  */
 export interface E3TimeoutConfig {
-  committeeFormationWindow: number;
   dkgWindow: number;
   computeWindow: number;
   decryptionWindow: number;
@@ -81,7 +80,18 @@ export const deployAndSaveEnclave = async ({
     return { enclave: enclaveContract };
   }
 
-  const enclaveFactory = await ethers.getContractFactory("Enclave", signer);
+  const pricingLibFactory = await ethers.getContractFactory(
+    "EnclavePricing",
+    signer,
+  );
+  const pricingLib = await pricingLibFactory.deploy();
+  await pricingLib.waitForDeployment();
+  const pricingLibAddress = await pricingLib.getAddress();
+
+  const enclaveFactory = await ethers.getContractFactory("Enclave", {
+    signer,
+    libraries: { EnclavePricing: pricingLibAddress },
+  });
 
   const enclave = await enclaveFactory.deploy();
   await enclave.waitForDeployment();
@@ -166,7 +176,18 @@ export const upgradeAndSaveEnclave = async ({
   );
   console.log("Auto-deployed ProxyAdmin address:", autoProxyAdminAddress);
 
-  const enclaveFactory = await ethers.getContractFactory("Enclave", signer);
+  const pricingLibFactory = await ethers.getContractFactory(
+    "EnclavePricing",
+    signer,
+  );
+  const pricingLib = await pricingLibFactory.deploy();
+  await pricingLib.waitForDeployment();
+  const pricingLibAddress = await pricingLib.getAddress();
+
+  const enclaveFactory = await ethers.getContractFactory("Enclave", {
+    signer,
+    libraries: { EnclavePricing: pricingLibAddress },
+  });
 
   const newImplementation = await enclaveFactory.deploy();
   await newImplementation.waitForDeployment();

@@ -5,30 +5,16 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { expect } from "chai";
 import type { Signer } from "ethers";
-import { network } from "hardhat";
 
-import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
-import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
-import E3RefundManagerModule from "../../ignition/modules/e3RefundManager";
-import EnclaveModule from "../../ignition/modules/enclave";
-import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
-import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
-import MockDecryptionVerifierModule from "../../ignition/modules/mockDecryptionVerifier";
-import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
-import MockPkVerifierModule from "../../ignition/modules/mockPkVerifier";
-import MockStableTokenModule from "../../ignition/modules/mockStableToken";
-import SlashingManagerModule from "../../ignition/modules/slashingManager";
+import { CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory } from "../../types";
 import {
-  BondingRegistry__factory as BondingRegistryFactory,
-  CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
-  Enclave__factory as EnclaveFactory,
-} from "../../types";
-import { setupOperatorForSortition } from "../fixtures";
+  ADDRESS_ONE as AddressOne,
+  ADDRESS_TWO as AddressTwo,
+  deployEnclaveSystem,
+  ethers,
+  networkHelpers,
+} from "../fixtures";
 
-const AddressOne = "0x0000000000000000000000000000000000000001";
-const AddressTwo = "0x0000000000000000000000000000000000000002";
-
-const { ethers, networkHelpers, ignition } = await network.connect();
 const { loadFixture } = networkHelpers;
 
 const data = "0xda7a";
@@ -45,200 +31,25 @@ describe("CiphernodeRegistryOwnable", function () {
   }
 
   async function setup() {
-    // ── Signers ────────────────────────────────────────────────────────────────
-    const [owner, notTheOwner, operator1, operator2, operator3] =
-      await ethers.getSigners();
-    const ownerAddress = await owner.getAddress();
-
-    // ── E3 Program Params ──────────────────────────────────────────────────────
-    const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-    const polynomial_degree = ethers.toBigInt(2048);
-    const plaintext_modulus = ethers.toBigInt(1032193);
-    const moduli = [ethers.toBigInt("18014398492704769")];
-    const encodedE3ProgramParams = abiCoder.encode(
-      ["uint256", "uint256", "uint256[]"],
-      [polynomial_degree, plaintext_modulus, moduli],
-    );
-    const encryptionSchemeId =
-      "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
-
-    // ── Token Contracts ────────────────────────────────────────────────────────
-    const { mockUSDC: usdcToken } = await ignition.deploy(
-      MockStableTokenModule,
-      {
-        parameters: { MockUSDC: { initialSupply: 1_000_000 } },
-      },
-    );
-
-    const { enclaveToken: licenseToken } = await ignition.deploy(
-      EnclaveTokenModule,
-      {
-        parameters: { EnclaveToken: { owner: ownerAddress } },
-      },
-    );
-
-    const { enclaveTicketToken: ticketToken } = await ignition.deploy(
-      EnclaveTicketTokenModule,
-      {
-        parameters: {
-          EnclaveTicketToken: {
-            baseToken: await usdcToken.getAddress(),
-            registry: AddressOne,
-            owner: ownerAddress,
-          },
-        },
-      },
-    );
-
-    // ── Registry & Slashing ────────────────────────────────────────────────────
-    const { slashingManager } = await ignition.deploy(SlashingManagerModule, {
-      parameters: {
-        SlashingManager: {
-          admin: ownerAddress,
-        },
-      },
+    const sys = await deployEnclaveSystem({
+      submissionWindow: SORTITION_SUBMISSION_WINDOW,
+      bfvParams: "large",
+      committeeThresholds: [[0, [1, 3]]],
     });
-
-    const { cipherNodeRegistry } = await ignition.deploy(
-      CiphernodeRegistryModule,
-      {
-        parameters: {
-          CiphernodeRegistry: {
-            owner: ownerAddress,
-            submissionWindow: SORTITION_SUBMISSION_WINDOW,
-          },
-        },
-      },
-    );
-    const registryAddress = await cipherNodeRegistry.getAddress();
-    const registry = CiphernodeRegistryFactory.connect(registryAddress, owner);
-
-    const { bondingRegistry: _bondingRegistry } = await ignition.deploy(
-      BondingRegistryModule,
-      {
-        parameters: {
-          BondingRegistry: {
-            owner: ownerAddress,
-            ticketToken: await ticketToken.getAddress(),
-            licenseToken: await licenseToken.getAddress(),
-            registry: registryAddress,
-            slashedFundsTreasury: ownerAddress,
-            ticketPrice: ethers.parseUnits("10", 6),
-            licenseRequiredBond: ethers.parseEther("1000"),
-            minTicketBalance: 5,
-            exitDelay: 7 * 24 * 60 * 60,
-          },
-        },
-      },
-    );
-    const bondingRegistry = BondingRegistryFactory.connect(
-      await _bondingRegistry.getAddress(),
-      owner,
-    );
-
-    // ── Enclave ────────────────────────────────────────────────────────────────
-    const { enclave: _enclave } = await ignition.deploy(EnclaveModule, {
-      parameters: {
-        Enclave: {
-          owner: ownerAddress,
-          maxDuration: 60 * 60 * 24 * 30, // 30 days
-          registry: registryAddress,
-          bondingRegistry: await bondingRegistry.getAddress(),
-          e3RefundManager: AddressOne, // placeholder — updated below
-          feeToken: await usdcToken.getAddress(),
-          timeoutConfig: {
-            committeeFormationWindow: 3600,
-            dkgWindow: 3600,
-            computeWindow: 3600,
-            decryptionWindow: 3600,
-          },
-        },
-      },
-    });
-    const enclaveAddress = await _enclave.getAddress();
-    const enclave = EnclaveFactory.connect(enclaveAddress, owner);
-
-    const { e3RefundManager } = await ignition.deploy(E3RefundManagerModule, {
-      parameters: {
-        E3RefundManager: {
-          owner: ownerAddress,
-          enclave: enclaveAddress,
-          treasury: ownerAddress,
-        },
-      },
-    });
-    await enclave.setE3RefundManager(await e3RefundManager.getAddress());
-
-    // ── Wire Up Contracts ──────────────────────────────────────────────────────
-    await ticketToken.setRegistry(await bondingRegistry.getAddress());
-    await bondingRegistry.setSlashingManager(
-      await slashingManager.getAddress(),
-    );
-    await bondingRegistry.setRewardDistributor(enclaveAddress);
-    await bondingRegistry.setSlashingManager(
-      await slashingManager.getAddress(),
-    );
-    await slashingManager.setBondingRegistry(
-      await bondingRegistry.getAddress(),
-    );
-    await registry.setBondingRegistry(await bondingRegistry.getAddress());
-    await registry.setEnclave(enclaveAddress);
-
-    // ── Mock E3 Program & Decryption Verifier ──────────────────────────────────
-    const { mockE3Program } = await ignition.deploy(MockE3ProgramModule);
-    const { mockDecryptionVerifier } = await ignition.deploy(
-      MockDecryptionVerifierModule,
-    );
-    const { mockPkVerifier } = await ignition.deploy(MockPkVerifierModule);
-
-    await enclave.enableE3Program(await mockE3Program.getAddress());
-    await enclave.setParamSet(0, encodedE3ProgramParams);
-    await enclave.setDecryptionVerifier(
-      encryptionSchemeId,
-      await mockDecryptionVerifier.getAddress(),
-    );
-    await enclave.setPkVerifier(
-      encryptionSchemeId,
-      await mockPkVerifier.getAddress(),
-    );
-
-    // Set up committee thresholds
-    await enclave.setCommitteeThresholds(0, [1, 3]); // Micro
-
-    // ── Operators ──────────────────────────────────────────────────────────────
-    await licenseToken.setTransferRestriction(false);
-
-    for (const operator of [operator1, operator2, operator3]) {
-      await setupOperatorForSortition(
-        operator,
-        bondingRegistry,
-        licenseToken,
-        usdcToken,
-        ticketToken,
-        registry,
-      );
-    }
-    await networkHelpers.mine(1);
-
-    // ── Return ─────────────────────────────────────────────────────────────────
     return {
-      owner,
-      notTheOwner,
-      operator1,
-      operator2,
-      operator3,
-      registry,
-      enclave,
-      bondingRegistry,
-      licenseToken,
-      ticketToken,
-      usdcToken,
-      mockE3Program,
-      mockDecryptionVerifier,
-      request: {
-        e3Id: 0,
-        committeeSize: 0,
-      },
+      owner: sys.owner,
+      notTheOwner: sys.notTheOwner,
+      operator1: sys.operator1!,
+      operator2: sys.operator2!,
+      operator3: sys.operator3!,
+      registry: sys.ciphernodeRegistry,
+      enclave: sys.enclave,
+      bondingRegistry: sys.bondingRegistry,
+      licenseToken: sys.licenseToken,
+      ticketToken: sys.ticketToken,
+      usdcToken: sys.usdcToken,
+      mockE3Program: sys.mocks.e3Program,
+      mockDecryptionVerifier: sys.mocks.decryptionVerifier,
     };
   }
 
@@ -530,7 +341,7 @@ describe("CiphernodeRegistryOwnable", function () {
       await finalizeCommitteeAfterWindow(registry, 0);
 
       const finalizedEvents = await registry.queryFilter(
-        registry.filters.CommitteeFinalized(0),
+        registry.filters.SortitionCommitteeFinalized(0),
       );
       expect(finalizedEvents.length).to.equal(1);
 

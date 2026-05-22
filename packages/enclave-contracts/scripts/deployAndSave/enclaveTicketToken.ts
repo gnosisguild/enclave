@@ -36,7 +36,7 @@ export const deployAndSaveEnclaveTicketToken = async ({
 }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = hre.globalOptions.network;
 
   const preDeployedArgs = readDeploymentArgs("EnclaveTicketToken", chain);
 

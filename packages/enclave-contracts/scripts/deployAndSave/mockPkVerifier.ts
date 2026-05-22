@@ -18,7 +18,7 @@ export const deployAndSaveMockPkVerifier = async (
 }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = hre.globalOptions.network;
 
   const pkVerifierFactory = await ethers.getContractFactory("MockPkVerifier");
   const pkVerifier = await pkVerifierFactory.deploy();

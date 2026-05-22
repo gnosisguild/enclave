@@ -314,6 +314,9 @@ describe("BfvVkBindingIntegration", function () {
       );
 
       const { bfvPk, bfvDec } = await deployHonkAndBfv();
+      const [testSigner] = await ethers.getSigners();
+      const testE3Id = 1n;
+      const testRoot = BigInt(ethers.id("test-root"));
       const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
       const dkgEncoded = abiCoder.encode(
@@ -323,6 +326,9 @@ describe("BfvVkBindingIntegration", function () {
       const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
       expect(
         await bfvPk.verify.staticCall(
+          testE3Id,
+          testRoot,
+          [testSigner.address],
           pkCommitment,
           dkgCommitteeHash,
           dkgEncoded,
@@ -336,6 +342,11 @@ describe("BfvVkBindingIntegration", function () {
       const plaintextHash = plaintextHashFromPublicInputs(decPublicInputs);
       expect(
         await bfvDec.verify.staticCall(
+          testE3Id,
+          testRoot,
+          [testSigner.address],
+          ethers.id("test-ciphertext"),
+          ethers.id("test-pubkey"),
           plaintextHash,
           decCommitteeHash,
           decEncoded,
@@ -353,6 +364,7 @@ describe("BfvVkBindingIntegration", function () {
       if (folded === null) {
         this.skip();
       }
+      const [testSigner] = await ethers.getSigners();
 
       const dkgPublicInputs = hexToBytes32Array(
         folded.dkg_aggregator.public_inputs_hex,
@@ -402,13 +414,16 @@ describe("BfvVkBindingIntegration", function () {
         dkgPublicInputs[DKG_COMMITTEE_HASH_IDX.lo],
       );
 
-      expect(
-        await bfvPk.verify.staticCall(
+      await expect(
+        bfvPk.verify.staticCall(
+          1n,
+          BigInt(ethers.id("test-root")),
+          [testSigner.address],
           pkCommitment,
           dkgCommitteeHash,
           dkgEncoded,
         ),
-      ).to.equal(false);
+      ).to.be.revertedWithCustomError(bfvPk, "VkHashMismatch");
     },
   );
 });

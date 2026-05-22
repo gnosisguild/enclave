@@ -115,7 +115,10 @@ impl From<CommitteeRequestedWithChainId> for EnclaveEventData {
     }
 }
 
-struct CommitteeFinalizedWithChainId(pub ICiphernodeRegistry::CommitteeFinalized, pub u64);
+struct CommitteeFinalizedWithChainId(
+    pub ICiphernodeRegistry::SortitionCommitteeFinalized,
+    pub u64,
+);
 
 impl From<CommitteeFinalizedWithChainId> for CommitteeFinalized {
     fn from(value: CommitteeFinalizedWithChainId) -> Self {
@@ -216,9 +219,10 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 event, chain_id,
             )))
         }
-        Some(&ICiphernodeRegistry::CommitteeFinalized::SIGNATURE_HASH) => {
-            let Ok(event) = ICiphernodeRegistry::CommitteeFinalized::decode_log_data(data) else {
-                error!("Error parsing event CommitteeFinalized after topic was matched!");
+        Some(&ICiphernodeRegistry::SortitionCommitteeFinalized::SIGNATURE_HASH) => {
+            let Ok(event) = ICiphernodeRegistry::SortitionCommitteeFinalized::decode_log_data(data)
+            else {
+                error!("Error parsing event SortitionCommitteeFinalized after topic was matched!");
                 return None;
             };
             Some(EnclaveEventData::from(CommitteeFinalizedWithChainId(

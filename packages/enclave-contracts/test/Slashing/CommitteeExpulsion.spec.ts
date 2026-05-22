@@ -16,70 +16,28 @@
  */
 import { expect } from "chai";
 import type { Signer } from "ethers";
-import { network } from "hardhat";
 
-import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
-import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
-import EnclaveModule from "../../ignition/modules/enclave";
-import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
-import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
-import MockDecryptionVerifierModule from "../../ignition/modules/mockDecryptionVerifier";
-import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
-import MockPkVerifierModule from "../../ignition/modules/mockPkVerifier";
-import MockCircuitVerifierModule from "../../ignition/modules/mockSlashingVerifier";
-import MockStableTokenModule from "../../ignition/modules/mockStableToken";
-import SlashingManagerModule from "../../ignition/modules/slashingManager";
 import {
-  BondingRegistry__factory as BondingRegistryFactory,
-  CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
-  Enclave__factory as EnclaveFactory,
-  EnclaveToken__factory as EnclaveTokenFactory,
-  MockCircuitVerifier__factory as MockCircuitVerifierFactory,
-  MockDecryptionVerifier__factory as MockDecryptionVerifierFactory,
-  MockE3Program__factory as MockE3ProgramFactory,
-  MockUSDC__factory as MockUSDCFactory,
-  SlashingManager__factory as SlashingManagerFactory,
-} from "../../types";
-import { signAndEncodeAttestation } from "../fixtures";
+  LARGE_TIMEOUT_CONFIG,
+  ONE_DAY,
+  SORTITION_SUBMISSION_WINDOW,
+  deployEnclaveSystem,
+  ethers,
+  networkHelpers,
+  signAndEncodeAttestation,
+} from "../fixtures";
 
-const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time } = networkHelpers;
 
 describe("Committee Expulsion & Fault Tolerance", function () {
-  const ONE_HOUR = 60 * 60;
-  const ONE_DAY = 24 * ONE_HOUR;
-  const THREE_DAYS = 3 * ONE_DAY;
-  const SEVEN_DAYS = 7 * ONE_DAY;
-  const THIRTY_DAYS = 30 * ONE_DAY;
-  const SORTITION_SUBMISSION_WINDOW = 10;
-  const addressOne = "0x0000000000000000000000000000000000000001";
-
   // Lane A reasons are derived on-chain as keccak256(abi.encodePacked(proofType))
   const REASON_PT_0 = ethers.keccak256(ethers.solidityPacked(["uint256"], [0]));
   const REASON_PT_7 = ethers.keccak256(ethers.solidityPacked(["uint256"], [7]));
 
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-  const polynomial_degree = ethers.toBigInt(2048);
-  const plaintext_modulus = ethers.toBigInt(1032193);
-  const moduli = [ethers.toBigInt("18014398492704769")];
-
-  const encodedE3ProgramParams = abiCoder.encode(
-    ["uint256", "uint256", "uint256[]"],
-    [polynomial_degree, plaintext_modulus, moduli],
-  );
-
-  const encryptionSchemeId =
-    "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
-
-  const defaultTimeoutConfig = {
-    committeeFormationWindow: ONE_DAY,
-    dkgWindow: ONE_DAY,
-    computeWindow: THREE_DAYS,
-    decryptionWindow: ONE_DAY,
-  };
 
   const setup = async () => {
-    // ── Signers ────────────────────────────────────────────────────────────────
+    const signers = await ethers.getSigners();
     const [
       owner,
       requester,
@@ -88,181 +46,41 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       operator2,
       operator3,
       operator4,
-    ] = await ethers.getSigners();
-
-    const ownerAddress = await owner.getAddress();
-    const treasuryAddress = await treasury.getAddress();
+    ] = signers;
     const requesterAddress = await requester.getAddress();
 
-    // ── Tokens ─────────────────────────────────────────────────────────────────
-    const { mockUSDC } = await ignition.deploy(MockStableTokenModule, {
-      parameters: { MockUSDC: { initialSupply: 10_000_000 } },
+    const sys = await deployEnclaveSystem({
+      bfvParams: "large",
+      timeoutConfig: LARGE_TIMEOUT_CONFIG,
+      committeeThresholds: [
+        [0, [1, 3]], // Micro
+        [1, [2, 3]], // Small
+        [2, [2, 4]], // Medium
+      ],
+      deployCircuitVerifier: true,
+      setupOperators: 0,
+      slashedFundsTreasury: treasury,
+      mintUsdcTo: [],
     });
-    const usdcToken = MockUSDCFactory.connect(
-      await mockUSDC.getAddress(),
-      owner,
-    );
+    const {
+      enclave,
+      ciphernodeRegistry: registry,
+      slashingManager,
+      bondingRegistry,
+      licenseToken: enclToken,
+      ticketToken,
+      usdcToken,
+      mocks,
+    } = sys;
+    const mockVerifier = mocks.circuitVerifier!;
+    const e3Program = mocks.e3Program;
+    const decryptionVerifier = mocks.decryptionVerifier;
+    const enclaveAddress = await enclave.getAddress();
 
-    const { enclaveToken } = await ignition.deploy(EnclaveTokenModule, {
-      parameters: { EnclaveToken: { owner: ownerAddress } },
-    });
-    const enclToken = EnclaveTokenFactory.connect(
-      await enclaveToken.getAddress(),
-      owner,
-    );
-    await enclToken.setTransferRestriction(false);
-
-    const { enclaveTicketToken } = await ignition.deploy(
-      EnclaveTicketTokenModule,
-      {
-        parameters: {
-          EnclaveTicketToken: {
-            baseToken: await usdcToken.getAddress(),
-            registry: addressOne,
-            owner: ownerAddress,
-          },
-        },
-      },
-    );
-    const ticketToken = enclaveTicketToken;
-
-    const { mockCircuitVerifier } = await ignition.deploy(
-      MockCircuitVerifierModule,
-    );
-    const mockVerifier = MockCircuitVerifierFactory.connect(
-      await mockCircuitVerifier.getAddress(),
-      owner,
-    );
-
-    // ── Registry & Slashing ────────────────────────────────────────────────────
-    const { slashingManager: _slashingManager } = await ignition.deploy(
-      SlashingManagerModule,
-      {
-        parameters: {
-          SlashingManager: {
-            admin: ownerAddress,
-          },
-        },
-      },
-    );
-    const slashingManager = SlashingManagerFactory.connect(
-      await _slashingManager.getAddress(),
-      owner,
-    );
-
-    const { cipherNodeRegistry } = await ignition.deploy(
-      CiphernodeRegistryModule,
-      {
-        parameters: {
-          CiphernodeRegistry: {
-            owner: ownerAddress,
-            submissionWindow: SORTITION_SUBMISSION_WINDOW,
-          },
-        },
-      },
-    );
-    const registryAddress = await cipherNodeRegistry.getAddress();
-    const registry = CiphernodeRegistryOwnableFactory.connect(
-      registryAddress,
-      owner,
-    );
-
-    const { bondingRegistry: _bondingRegistry } = await ignition.deploy(
-      BondingRegistryModule,
-      {
-        parameters: {
-          BondingRegistry: {
-            owner: ownerAddress,
-            ticketToken: await ticketToken.getAddress(),
-            licenseToken: await enclToken.getAddress(),
-            registry: registryAddress,
-            slashedFundsTreasury: treasuryAddress,
-            ticketPrice: ethers.parseUnits("10", 6),
-            licenseRequiredBond: ethers.parseEther("1000"),
-            minTicketBalance: 1,
-            exitDelay: SEVEN_DAYS,
-          },
-        },
-      },
-    );
-    const bondingRegistry = BondingRegistryFactory.connect(
-      await _bondingRegistry.getAddress(),
-      owner,
-    );
-
-    // ── Enclave ────────────────────────────────────────────────────────────────
-    const { enclave: _enclave } = await ignition.deploy(EnclaveModule, {
-      parameters: {
-        Enclave: {
-          owner: ownerAddress,
-          maxDuration: THIRTY_DAYS,
-          registry: registryAddress,
-          e3RefundManager: addressOne,
-          bondingRegistry: await bondingRegistry.getAddress(),
-          feeToken: await usdcToken.getAddress(),
-          timeoutConfig: defaultTimeoutConfig,
-        },
-      },
-    });
-    const enclaveAddress = await _enclave.getAddress();
-    const enclave = EnclaveFactory.connect(enclaveAddress, owner);
-
-    // ── Mocks ──────────────────────────────────────────────────────────────────
-    const { mockE3Program } = await ignition.deploy(MockE3ProgramModule, {
-      parameters: { MockE3Program: { encryptionSchemeId } },
-    });
-    const e3Program = MockE3ProgramFactory.connect(
-      await mockE3Program.getAddress(),
-      owner,
-    );
-
-    const { mockDecryptionVerifier } = await ignition.deploy(
-      MockDecryptionVerifierModule,
-    );
-    const { mockPkVerifier } = await ignition.deploy(MockPkVerifierModule);
-    const decryptionVerifier = MockDecryptionVerifierFactory.connect(
-      await mockDecryptionVerifier.getAddress(),
-      owner,
-    );
-
-    // ── Wire Up ────────────────────────────────────────────────────────────────
-    await registry.setEnclave(enclaveAddress);
-    await registry.setBondingRegistry(await bondingRegistry.getAddress());
-    await registry.setSlashingManager(await slashingManager.getAddress());
-
-    await enclave.enableE3Program(await e3Program.getAddress());
-    await enclave.setParamSet(0, encodedE3ProgramParams);
-    await enclave.setDecryptionVerifier(
-      encryptionSchemeId,
-      await decryptionVerifier.getAddress(),
-    );
-    await enclave.setPkVerifier(
-      encryptionSchemeId,
-      await mockPkVerifier.getAddress(),
-    );
-    await enclave.setSlashingManager(await slashingManager.getAddress());
-
-    // Set up committee thresholds
-    await enclave.setCommitteeThresholds(0, [1, 3]); // Micro
-    await enclave.setCommitteeThresholds(1, [2, 3]); // Small
-    await enclave.setCommitteeThresholds(2, [2, 4]); // Medium
-
-    await bondingRegistry.setRewardDistributor(enclaveAddress);
-    await bondingRegistry.setSlashingManager(
-      await slashingManager.getAddress(),
-    );
-
-    await slashingManager.setBondingRegistry(
-      await bondingRegistry.getAddress(),
-    );
-    await slashingManager.setCiphernodeRegistry(registryAddress);
-    await slashingManager.setEnclave(enclaveAddress);
-    await slashingManager.setE3RefundManager(addressOne);
-
-    await ticketToken.setRegistry(await bondingRegistry.getAddress());
+    // Fund the requester (fixture's `mintUsdcTo: []` skipped this).
     await usdcToken.mint(requesterAddress, ethers.parseUnits("100000", 6));
 
-    // ── Slash Policies ─────────────────────────────────────────────────────────
+    // ── Slash Policies ─────────────────────────────────────────────────────
     const baseSlashPolicy = {
       ticketPenalty: ethers.parseUnits("10", 6),
       licensePenalty: ethers.parseEther("50"),
@@ -283,7 +101,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       failureReason: 11, // FailureReason.DecryptionInvalidShares
     });
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
+    // ── Helpers ────────────────────────────────────────────────────────────
     async function setupOperator(operator: Signer) {
       const operatorAddress = await operator.getAddress();
 
@@ -347,7 +165,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await registry.publishCommittee(e3Id, publicKey, pkCommitment, "0x");
     }
 
-    // ── Return ─────────────────────────────────────────────────────────────────
     return {
       enclave,
       registry,
@@ -406,6 +223,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         op1Address,
+        await slashingManager.getAddress(),
       );
       const tx = await slashingManager.proposeSlash(0, op1Address, proof);
 
@@ -453,6 +271,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
       );
       await slashingManager.proposeSlash(
         0,
@@ -521,6 +340,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
         0,
         31337,
         ethers.keccak256(ethers.toUtf8Bytes("data1")),
@@ -590,6 +410,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
         0,
         31337,
         ethers.keccak256(ethers.toUtf8Bytes("first")),
@@ -608,6 +429,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
         7, // C6ThresholdShareDecryption — different proofType
         31337,
         ethers.keccak256(ethers.toUtf8Bytes("second")),
@@ -664,6 +486,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
       );
       await slashingManager.proposeSlash(
         0,
@@ -722,6 +545,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
         0,
         31337,
         ethers.keccak256(ethers.toUtf8Bytes("expel1")),
@@ -737,6 +561,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator3, operator4],
         0,
         await operator2.getAddress(),
+        await slashingManager.getAddress(),
         0,
         31337,
         ethers.keccak256(ethers.toUtf8Bytes("expel2")),
@@ -803,6 +628,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
       );
       await slashingManager.proposeSlash(
         0,
@@ -867,6 +693,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
         0,
         31337,
         ethers.keccak256(ethers.toUtf8Bytes("expel-op1")),
@@ -882,6 +709,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator3, operator4],
         0,
         await operator2.getAddress(),
+        await slashingManager.getAddress(),
         0,
         31337,
         ethers.keccak256(ethers.toUtf8Bytes("expel-op2")),
@@ -909,6 +737,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
             [operator4],
             0,
             await operator3.getAddress(),
+            await slashingManager.getAddress(),
             0,
             31337,
             ethers.keccak256(ethers.toUtf8Bytes("expel-op3")),
@@ -952,6 +781,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
       );
       const op1Addr = await operator1.getAddress();
       const tx = await slashingManager.proposeSlash(0, op1Addr, proof);
@@ -964,6 +794,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         ethers.parseUnits("10", 6), // ticketPenalty
         ethers.parseEther("50"), // licensePenalty
         true, // executed
+        0, // lane: LaneA (attestation/proof-based via proposeSlash)
       );
     });
   });

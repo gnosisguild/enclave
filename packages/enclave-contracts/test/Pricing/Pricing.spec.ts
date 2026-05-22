@@ -4,43 +4,19 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { expect } from "chai";
-import type { Signer } from "ethers";
-import { network } from "hardhat";
 
-import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
-import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
-import E3RefundManagerModule from "../../ignition/modules/e3RefundManager";
-import EnclaveModule from "../../ignition/modules/enclave";
-import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
-import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
-import mockComputeProviderModule from "../../ignition/modules/mockComputeProvider";
-import MockDecryptionVerifierModule from "../../ignition/modules/mockDecryptionVerifier";
-import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
-import MockPkVerifierModule from "../../ignition/modules/mockPkVerifier";
-import MockStableTokenModule from "../../ignition/modules/mockStableToken";
-import SlashingManagerModule from "../../ignition/modules/slashingManager";
 import {
-  BondingRegistry__factory as BondingRegistryFactory,
-  CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
-  Enclave__factory as EnclaveFactory,
-  MockUSDC__factory as MockUSDCFactory,
-} from "../../types";
+  DATA as data,
+  deployEnclaveSystem,
+  ethers,
+  networkHelpers,
+  PROOF as proof,
+  setupAndPublishCommittee,
+} from "../fixtures";
 
-const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time, mine } = networkHelpers;
 
 describe("E3 Pricing", function () {
-  const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
-  const SORTITION_SUBMISSION_WINDOW = 10;
-  const addressOne = "0x0000000000000000000000000000000000000001";
-
-  const timeoutConfig = {
-    committeeFormationWindow: 3600,
-    dkgWindow: 3600,
-    computeWindow: 3600,
-    decryptionWindow: 3600,
-  };
-
   // Default pricing config matching initialize() defaults
   const defaultPricingConfig = {
     keyGenFixedPerNode: 100000n,
@@ -80,265 +56,34 @@ describe("E3 Pricing", function () {
   });
 
   const inputWindowDuration = 300;
-
-  const encryptionSchemeId =
-    "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
-
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-  const polynomial_degree = ethers.toBigInt(512);
-  const plaintext_modulus = ethers.toBigInt(10);
-  const moduli = [
-    ethers.toBigInt("0xffffee001"),
-    ethers.toBigInt("0xffffc4001"),
-  ];
-  const encodedE3ProgramParams = abiCoder.encode(
-    ["uint256", "uint256", "uint256[]"],
-    [polynomial_degree, plaintext_modulus, moduli],
-  );
-  const data = "0xda7a";
-  const proof = "0x1337";
-
-  async function setupOperatorForSortition(
-    operator: Signer,
-    bondingRegistry: any,
-    licenseToken: any,
-    usdcToken: any,
-    ticketToken: any,
-    registry: any,
-  ): Promise<void> {
-    const operatorAddress = await operator.getAddress();
-    await licenseToken.mintAllocation(
-      operatorAddress,
-      ethers.parseEther("10000"),
-      "Test allocation",
-    );
-    await usdcToken.mint(operatorAddress, ethers.parseUnits("100000", 6));
-    await licenseToken
-      .connect(operator)
-      .approve(await bondingRegistry.getAddress(), ethers.parseEther("2000"));
-    await bondingRegistry
-      .connect(operator)
-      .bondLicense(ethers.parseEther("1000"));
-    await bondingRegistry.connect(operator).registerOperator();
-    const ticketAmount = ethers.parseUnits("100", 6);
-    await usdcToken
-      .connect(operator)
-      .approve(await ticketToken.getAddress(), ticketAmount);
-    await bondingRegistry.connect(operator).addTicketBalance(ticketAmount);
-    await registry.addCiphernode(operatorAddress);
-  }
-
-  const setupAndPublishCommittee = async (
-    registry: any,
-    e3Id: number,
-    nodes: string[],
-    publicKey: string,
-    operators: Signer[],
-  ): Promise<void> => {
-    for (const operator of operators) {
-      await registry.connect(operator).submitTicket(e3Id, 1);
-    }
-    await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
-    await registry.finalizeCommittee(e3Id);
-    const pkCommitment = ethers.keccak256(publicKey);
-    await registry.publishCommittee(e3Id, publicKey, pkCommitment, "0x");
-  };
 
   const setup = async () => {
-    const [owner, notTheOwner, operator1, operator2, operator3, treasury] =
-      await ethers.getSigners();
-    const ownerAddress = await owner.getAddress();
-    const treasuryAddress = await treasury.getAddress();
-
-    const { mockUSDC } = await ignition.deploy(MockStableTokenModule, {
-      parameters: { MockUSDC: { initialSupply: 1_000_000 } },
+    // Pricing.spec.ts historically used signers[5] as the treasury.
+    const signers = await ethers.getSigners();
+    const treasurySigner = signers[5];
+    const sys = await deployEnclaveSystem({
+      treasury: treasurySigner,
+      wireSlashingManager: false,
     });
-    const usdcToken = MockUSDCFactory.connect(
-      await mockUSDC.getAddress(),
-      owner,
-    );
-
-    const { enclaveToken: licenseToken } = await ignition.deploy(
-      EnclaveTokenModule,
-      { parameters: { EnclaveToken: { owner: ownerAddress } } },
-    );
-    const { enclaveTicketToken: ticketToken } = await ignition.deploy(
-      EnclaveTicketTokenModule,
-      {
-        parameters: {
-          EnclaveTicketToken: {
-            baseToken: await usdcToken.getAddress(),
-            registry: addressOne,
-            owner: ownerAddress,
-          },
-        },
-      },
-    );
-
-    const { slashingManager } = await ignition.deploy(SlashingManagerModule, {
-      parameters: { SlashingManager: { admin: ownerAddress } },
-    });
-    const { cipherNodeRegistry } = await ignition.deploy(
-      CiphernodeRegistryModule,
-      {
-        parameters: {
-          CiphernodeRegistry: {
-            owner: ownerAddress,
-            submissionWindow: SORTITION_SUBMISSION_WINDOW,
-          },
-        },
-      },
-    );
-    const ciphernodeRegistryAddress = await cipherNodeRegistry.getAddress();
-    const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
-      ciphernodeRegistryAddress,
-      owner,
-    );
-
-    const { bondingRegistry: _bondingRegistry } = await ignition.deploy(
-      BondingRegistryModule,
-      {
-        parameters: {
-          BondingRegistry: {
-            owner: ownerAddress,
-            ticketToken: await ticketToken.getAddress(),
-            licenseToken: await licenseToken.getAddress(),
-            registry: ciphernodeRegistryAddress,
-            slashedFundsTreasury: ownerAddress,
-            ticketPrice: ethers.parseUnits("10", 6),
-            licenseRequiredBond: ethers.parseEther("1000"),
-            minTicketBalance: 5,
-            exitDelay: 7 * 24 * 60 * 60,
-          },
-        },
-      },
-    );
-    const bondingRegistry = BondingRegistryFactory.connect(
-      await _bondingRegistry.getAddress(),
-      owner,
-    );
-
-    const { enclave: _enclave } = await ignition.deploy(EnclaveModule, {
-      parameters: {
-        Enclave: {
-          owner: ownerAddress,
-          maxDuration: THIRTY_DAYS_IN_SECONDS,
-          registry: ciphernodeRegistryAddress,
-          bondingRegistry: await bondingRegistry.getAddress(),
-          e3RefundManager: addressOne,
-          feeToken: await usdcToken.getAddress(),
-          timeoutConfig,
-        },
-      },
-    });
-    const enclaveAddress = await _enclave.getAddress();
-    const enclave = EnclaveFactory.connect(enclaveAddress, owner);
-
-    const { e3RefundManager } = await ignition.deploy(E3RefundManagerModule, {
-      parameters: {
-        E3RefundManager: {
-          owner: ownerAddress,
-          enclave: enclaveAddress,
-          treasury: treasuryAddress,
-        },
-      },
-    });
-    await enclave.setE3RefundManager(await e3RefundManager.getAddress());
-
-    // Wire up
-    await ciphernodeRegistryContract.setEnclave(enclaveAddress);
-    await ciphernodeRegistryContract.setBondingRegistry(
-      await bondingRegistry.getAddress(),
-    );
-    await ticketToken.setRegistry(await bondingRegistry.getAddress());
-    await bondingRegistry.setSlashingManager(
-      await slashingManager.getAddress(),
-    );
-    await bondingRegistry.setRewardDistributor(enclaveAddress);
-    await slashingManager.setBondingRegistry(
-      await bondingRegistry.getAddress(),
-    );
-
-    // Mocks
-    const { mockComputeProvider } = await ignition.deploy(
-      mockComputeProviderModule,
-    );
-    const { mockDecryptionVerifier: decryptionVerifier } =
-      await ignition.deploy(MockDecryptionVerifierModule);
-    const { mockE3Program: e3Program } =
-      await ignition.deploy(MockE3ProgramModule);
-    const { mockPkVerifier: pkVerifier } =
-      await ignition.deploy(MockPkVerifierModule);
-
-    await enclave.enableE3Program(await e3Program.getAddress());
-    await enclave.setParamSet(0, encodedE3ProgramParams);
-    await enclave.setDecryptionVerifier(
-      encryptionSchemeId,
-      await decryptionVerifier.getAddress(),
-    );
-    await enclave.setPkVerifier(
-      encryptionSchemeId,
-      await pkVerifier.getAddress(),
-    );
-
-    // Operators
-    await licenseToken.setTransferRestriction(false);
-    for (const operator of [operator1, operator2, operator3]) {
-      await setupOperatorForSortition(
-        operator,
-        bondingRegistry,
-        licenseToken,
-        usdcToken,
-        ticketToken,
-        ciphernodeRegistryContract,
-      );
-    }
     await mine(1);
-
-    // Mint USDC
-    const mintAmount = ethers.parseUnits("1000000", 6);
-    await usdcToken.mint(ownerAddress, mintAmount);
-    await usdcToken.mint(await notTheOwner.getAddress(), mintAmount);
-
-    // Committee Thresholds: Micro [1,3], Small [2,5]
-    await enclave.setCommitteeThresholds(0, [1, 3]);
-    await enclave.setCommitteeThresholds(1, [2, 5]);
-
-    // Build request params
-    const now = await time.latest();
-    const request = {
-      committeeSize: 0, // Micro
-      inputWindow: [now + 10, now + inputWindowDuration] as [number, number],
-      e3Program: await e3Program.getAddress(),
-      paramSet: 0,
-      computeProviderParams: abiCoder.encode(
-        ["address"],
-        [await decryptionVerifier.getAddress()],
-      ),
-      customParams: abiCoder.encode(
-        ["address"],
-        ["0x1234567890123456789012345678901234567890"],
-      ),
-      proofAggregationEnabled: false,
-    };
-
     return {
-      owner,
-      notTheOwner,
-      operator1,
-      operator2,
-      operator3,
-      treasury,
-      enclave,
-      ciphernodeRegistryContract,
-      bondingRegistry,
-      licenseToken,
-      ticketToken,
-      usdcToken,
-      slashingManager,
-      e3RefundManager,
-      request,
-      mocks: { decryptionVerifier, e3Program, mockComputeProvider, pkVerifier },
+      owner: sys.owner,
+      notTheOwner: sys.notTheOwner,
+      operator1: sys.operator1!,
+      operator2: sys.operator2!,
+      operator3: sys.operator3!,
+      treasury: treasurySigner,
+      enclave: sys.enclave,
+      ciphernodeRegistryContract: sys.ciphernodeRegistry,
+      bondingRegistry: sys.bondingRegistry,
+      licenseToken: sys.licenseToken,
+      ticketToken: sys.ticketToken,
+      usdcToken: sys.usdcToken,
+      slashingManager: sys.slashingManager,
+      e3RefundManager: sys.e3RefundManager,
+      request: sys.request,
+      mocks: sys.mocks,
     };
   };
 
@@ -372,10 +117,15 @@ describe("E3 Pricing", function () {
         await ciphernodeRegistryContract.sortitionSubmissionWindow();
       const duration =
         sortitionWindow +
-        BigInt(request.inputWindow[1] - request.inputWindow[0]) +
-        (config.dkgWindow * BigInt(pc.dkgUtilizationBps)) / 10000n +
-        (config.computeWindow * BigInt(pc.computeUtilizationBps)) / 10000n +
-        (config.decryptionWindow * BigInt(pc.decryptUtilizationBps)) / 10000n;
+        (BigInt(request.inputWindow[1]) - BigInt(request.inputWindow[0])) +
+        // M-06: sum BPS-weighted windows first then divide once. With the
+        // default config (windows=3600, bps=2500/5000/2500) the per-term and
+        // sum-then-divide formulas coincide, but this matches the on-chain
+        // implementation and the dedicated DurationPrecision tests.
+        (config.dkgWindow * BigInt(pc.dkgUtilizationBps) +
+          config.computeWindow * BigInt(pc.computeUtilizationBps) +
+          config.decryptionWindow * BigInt(pc.decryptUtilizationBps)) /
+          10000n;
 
       // Calculate expected fee (proof-aware): proofsPerNode = 14 + 4 × (N-1)
       const proofsPerNode = 14n + 4n * (n - 1n);
@@ -620,7 +370,6 @@ describe("E3 Pricing", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        nodes,
         "0x1234",
         [operator1, operator2, operator3],
       );
@@ -636,6 +385,11 @@ describe("E3 Pricing", function () {
 
       // Publish plaintext (triggers _distributeRewards)
       await enclave.publishPlaintextOutput(e3Id, data, proof);
+
+      // Pull-payment: each operator claims their reward.
+      for (const op of [operator1, operator2, operator3]) {
+        await enclave.connect(op).claimReward(e3Id);
+      }
 
       const op1After = await usdcToken.balanceOf(nodes[0]);
       const op2After = await usdcToken.balanceOf(nodes[1]);
@@ -703,7 +457,6 @@ describe("E3 Pricing", function () {
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
-        nodes,
         "0x1234",
         [operator1, operator2, operator3],
       );
@@ -718,6 +471,14 @@ describe("E3 Pricing", function () {
       const op3Before = await usdcToken.balanceOf(nodes[2]);
 
       await enclave.publishPlaintextOutput(e3Id, data, proof);
+
+      // Pull-payment: treasury & operators claim.
+      await enclave
+        .connect(treasury)
+        .treasuryClaim(await usdcToken.getAddress());
+      for (const op of [operator1, operator2, operator3]) {
+        await enclave.connect(op).claimReward(e3Id);
+      }
 
       const treasuryAfter = await usdcToken.balanceOf(treasuryAddr);
       const op1After = await usdcToken.balanceOf(nodes[0]);
@@ -789,6 +550,94 @@ describe("E3 Pricing", function () {
         usdcToken,
         "ERC20InsufficientAllowance",
       );
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  //  M-06 — Duration precision (sum-then-divide, not per-term truncation)
+  //
+  //  With per-term truncation a configuration like windows=2s and utilization
+  //  bps=3000 each rounds every term to zero (`2 * 3000 / 10000 == 0`),
+  //  losing 1.8 seconds of weight. Sum-then-divide preserves the full
+  //  weighted contribution: `(2*3000 + 2*3000 + 2*3000) / 10000 == 1`.
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe("M-06 — duration precision", function () {
+    it("sums weighted timeouts before dividing by BPS_BASE", async function () {
+      const { enclave, request, ciphernodeRegistryContract, owner } =
+        await loadFixture(setup);
+
+      // Configure windows + utilization bps that would round to zero under
+      // the old per-term formula but yield exactly 1 extra second under the
+      // new sum-then-divide formula.
+      await enclave.connect(owner).setTimeoutConfig({
+        dkgWindow: 2,
+        computeWindow: 2,
+        decryptionWindow: 2,
+      });
+
+      const pc = await enclave.getPricingConfig();
+      await enclave.connect(owner).setPricingConfig({
+        ...toPlainConfig(pc),
+        dkgUtilizationBps: 3000,
+        computeUtilizationBps: 3000,
+        decryptUtilizationBps: 3000,
+      });
+
+      const sortitionWindow =
+        await ciphernodeRegistryContract.sortitionSubmissionWindow();
+      const inputWindowSecs =
+        BigInt(request.inputWindow[1]) - BigInt(request.inputWindow[0]);
+
+      // New (correct) formula: sum then divide.
+      const newDuration =
+        sortitionWindow +
+        inputWindowSecs +
+        (2n * 3000n + 2n * 3000n + 2n * 3000n) / 10000n; // = +1
+
+      // Old (buggy) per-term formula would have produced this:
+      const oldDuration =
+        sortitionWindow +
+        inputWindowSecs +
+        (2n * 3000n) / 10000n + // 0
+        (2n * 3000n) / 10000n + // 0
+        (2n * 3000n) / 10000n; // 0
+
+      expect(newDuration - oldDuration).to.equal(1n);
+
+      // Compute the expected fee using the new duration.
+      const pc2 = await enclave.getPricingConfig();
+      const n = 3n;
+      const m = 1n;
+      const proofsPerNode = 14n + 4n * (n - 1n);
+      let baseFee = pc2.keyGenFixedPerNode * n;
+      baseFee += pc2.keyGenPerEncryptionProof * n * proofsPerNode;
+      if (n > 1n) baseFee += (pc2.coordinationPerPair * n * (n - 1n)) / 2n;
+      baseFee += pc2.verificationPerProof * n * proofsPerNode;
+      baseFee += pc2.availabilityPerNodePerSec * n * newDuration;
+      baseFee += pc2.decryptionPerNode * m;
+      if (m > 1n) baseFee += (pc2.coordinationPerPair * m * (m - 1n)) / 2n;
+      baseFee += pc2.publicationBase;
+      const expectedFee = (baseFee * (10000n + BigInt(pc2.marginBps))) / 10000n;
+
+      // Quote against the same request — only the timeout config changed.
+      const actualFee = await enclave.getE3Quote(request);
+      expect(actualFee).to.equal(expectedFee);
+
+      // The fee under the old (per-term) formula would have been smaller by
+      // exactly `availabilityPerNodePerSec * n * 1s * marginMultiplier`.
+      let oldBaseFee = pc2.keyGenFixedPerNode * n;
+      oldBaseFee += pc2.keyGenPerEncryptionProof * n * proofsPerNode;
+      if (n > 1n) oldBaseFee += (pc2.coordinationPerPair * n * (n - 1n)) / 2n;
+      oldBaseFee += pc2.verificationPerProof * n * proofsPerNode;
+      oldBaseFee += pc2.availabilityPerNodePerSec * n * oldDuration;
+      oldBaseFee += pc2.decryptionPerNode * m;
+      if (m > 1n) oldBaseFee += (pc2.coordinationPerPair * m * (m - 1n)) / 2n;
+      oldBaseFee += pc2.publicationBase;
+      const oldFee = (oldBaseFee * (10000n + BigInt(pc2.marginBps))) / 10000n;
+
+      // The new formula must price strictly higher when the old one truncated.
+      expect(actualFee).to.be.gt(oldFee);
     });
   });
 });

@@ -13,12 +13,16 @@ import { IE3RefundManager } from "./interfaces/IE3RefundManager.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import { IPkVerifier } from "./interfaces/IPkVerifier.sol";
 import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+    Ownable2StepUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { EnclavePricing } from "./lib/EnclavePricing.sol";
 
 /**
  * @title Enclave
@@ -26,8 +30,37 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @dev Coordinates E3 lifecycle including request, activation, input publishing, and output verification
  */
 // solhint-disable-next-line max-states-count
-contract Enclave is IEnclave, OwnableUpgradeable {
+contract Enclave is
+    IEnclave,
+    Ownable2StepUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     using SafeERC20 for IERC20;
+
+    /// @notice Thrown when {renounceOwnership} is called.
+    error RenounceOwnershipDisabled();
+
+    /// @notice Upper bound on {maxDuration}.
+    uint256 public constant MAX_DURATION_CAP = 365 days; // duration in seconds; not calendar-aware
+
+    /// @notice Upper bound on any single timeout window.
+    uint256 public constant MAX_TIMEOUT_WINDOW = 30 days;
+
+    /// @notice Upper bound on configured committee size.
+    uint32 public constant MAX_COMMITTEE_SIZE = 256;
+
+    /// @notice Cap on {PricingConfig.protocolShareBps}. Protocol share
+    ///         is hard-capped at 50% so a compromised owner cannot route an
+    ///         arbitrary fraction of every E3 fee away from honest nodes.
+    uint16 public constant MAX_PROTOCOL_SHARE_BPS = 5_000;
+
+    /// @notice Cap on {PricingConfig.marginBps}. Mirrors the protocol-share cap so
+    ///         operator margin cannot be configured to make requests unaffordable.
+    uint16 public constant MAX_MARGIN_BPS = 5_000;
+
+    /// @notice Thrown when the quoted fee exceeds the requester-supplied bound.
+    ///         Declared in {IEnclave} so {EnclavePricing} can revert with the
+    ///         same selector when validating a quote via DELEGATECALL.
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -123,6 +156,31 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice Basis points denominator
     uint16 internal constant BPS_BASE = 10000;
 
+    /// @notice Allow-list of ERC20 tokens that may be used as the contract fee token.
+    /// @dev Owner-managed. `request()` reverts if the active `feeToken` is not allow-listed.
+    mapping(IERC20 token => bool allowed) internal _feeTokenAllowed;
+
+    /// @notice Pull-payment ledger for committee rewards. (e3Id => account => amount)
+    /// @dev Credited by `_distributeRewards`, drained by `claimReward` / `claimRewards`.
+    mapping(uint256 e3Id => mapping(address account => uint256 amount))
+        internal _pendingRewards;
+
+    /// @notice Pull-payment ledger for treasury protocol-share credits.
+    /// @dev Per-treasury / per-token so treasury rotations are non-destructive.
+    mapping(address treasury => mapping(IERC20 token => uint256 amount))
+        internal _pendingTreasury;
+
+    /// @notice Grace window (seconds) after a stage deadline during which only
+    ///         the original requester, owner, or an active committee member
+    ///         can call {markE3Failed}. After the grace window, anyone
+    ///         may finalise the failure. Default `0` preserves legacy
+    ///         permissionless behaviour for tests and chains where the
+    ///         restriction is undesired.
+    uint256 public markFailedGracePeriod;
+
+    /// @notice Emitted when the {markFailedGracePeriod} value is updated.
+    event MarkFailedGracePeriodSet(uint256 gracePeriod);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                       Modifiers                        //
@@ -159,15 +217,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                   Initialization                       //
     ////////////////////////////////////////////////////////////
 
-    /// @notice Constructor that disables initializers.
-    /// @dev Prevents the implementation contract from being initialized. Initialization is performed
-    /// via the initialize() function when deployed behind a proxy.
+    /// @notice Locks the implementation; initialize via the proxy.
     constructor() {
         _disableInitializers();
     }
 
     /// @notice Initializes the Enclave contract with initial configuration.
-    /// @dev This function can only be called once due to the initializer modifier. Sets up core dependencies.
     /// @param _owner The owner address of this contract.
     /// @param _ciphernodeRegistry The address of the Ciphernode Registry contract.
     /// @param _bondingRegistry The address of the Bonding Registry contract.
@@ -184,7 +239,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 _maxDuration,
         E3TimeoutConfig calldata config
     ) public initializer {
+        require(_owner != address(0), "Invalid owner");
         __Ownable_init(msg.sender);
+        __ReentrancyGuard_init();
         setMaxDuration(_maxDuration);
         setCiphernodeRegistry(_ciphernodeRegistry);
         setBondingRegistry(_bondingRegistry);
@@ -192,26 +249,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         setFeeToken(_feeToken);
         _setTimeoutConfig(config);
 
-        // Default pricing parameters
-        _pricingConfig = PricingConfig({
-            keyGenFixedPerNode: 100000, // 0.10 USDC
-            keyGenPerEncryptionProof: 50000, // 0.05 USDC
-            coordinationPerPair: 10000, // 0.01 USDC
-            availabilityPerNodePerSec: 50, // 0.00005 USDC
-            decryptionPerNode: 300000, // 0.30 USDC
-            publicationBase: 1000000, // 1.00 USDC
-            verificationPerProof: 5000, // 0.005 USDC
-            protocolTreasury: address(0),
-            marginBps: 1500, // 15%
-            protocolShareBps: 0,
-            dkgUtilizationBps: 2500, // 25% — typical DKG completes in ~25% of window
-            computeUtilizationBps: 5000, // 50% — compute has moderate variance
-            decryptUtilizationBps: 2500, // 25% — decryption is fast when nodes cooperate
-            minCommitteeSize: 0,
-            minThreshold: 0
-        });
+        // Default pricing parameters applied via the linked EnclavePricing
+        // library (assembly SSTOREs against the caller's _pricingConfig
+        // slots) so the 15-field literal stays out of Enclave's runtime
+        // bytecode (EIP-170 24,576-byte cap).
+        EnclavePricing.applyDefaultPricingConfig();
 
-        if (_owner != owner()) transferOwnership(_owner);
+        if (_owner != owner()) _transferOwnership(_owner);
+    }
+
+    /// @notice Disabled. Reverts unconditionally to prevent permanent
+    ///         loss of administrative control over Enclave.
+    function renounceOwnership() public view override onlyOwner {
+        revert RenounceOwnershipDisabled();
     }
 
     ////////////////////////////////////////////////////////////
@@ -223,41 +273,33 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @inheritdoc IEnclave
     function request(
         E3RequestParams calldata requestParams
-    ) external returns (uint256 e3Id, E3 memory e3) {
-        // Resolve committee size to threshold values
+    ) external nonReentrant returns (uint256 e3Id, E3 memory e3) {
+        // Fee-token allow-list gate: protects requesters from being
+        // forced into a fee token they did not consent to (e.g. a malicious
+        // owner pointing `feeToken` at a fee-on-transfer or rebasing token).
+        require(_feeTokenAllowed[feeToken], FeeTokenNotAllowed(feeToken));
+
+        // Threshold gates ([1] > 0, min size, min threshold) are enforced inside {getE3Quote} below.
         uint32[2] memory threshold = committeeThresholds[
             requestParams.committeeSize
         ];
-        require(
-            threshold[1] > 0,
-            CommitteeSizeNotConfigured(requestParams.committeeSize)
-        );
 
-        // input start date should be in the future
-        require(
-            requestParams.inputWindow[0] >= block.timestamp,
-            InvalidInputDeadlineStart(requestParams.inputWindow[0])
-        );
-        // the end of the input window should be after the start
-        require(
-            requestParams.inputWindow[1] >= requestParams.inputWindow[0],
-            InvalidInputDeadlineEnd(requestParams.inputWindow[1])
-        );
-
-        // The total duration cannot be > maxDuration
-        uint256 totalDuration = requestParams.inputWindow[1] -
-            block.timestamp +
-            _timeoutConfig.computeWindow +
-            _timeoutConfig.decryptionWindow;
-        // Validate total duration does not exceed maxDuration
-        require(totalDuration < maxDuration, InvalidDuration(totalDuration));
-
+        // Input-window / duration gates are enforced by
+        // {EnclavePricing.validateRequest} (external library link, EIP-170 cap).
         require(
             e3Programs[requestParams.e3Program],
             E3ProgramNotAllowed(requestParams.e3Program)
         );
 
         uint256 e3Fee = getE3Quote(requestParams);
+        EnclavePricing.validateRequest(
+            requestParams.inputWindow,
+            block.timestamp,
+            _timeoutConfig.computeWindow,
+            _timeoutConfig.decryptionWindow,
+            maxDuration,
+            e3Fee
+        );
 
         e3Id = nexte3Id;
         nexte3Id++;
@@ -283,19 +325,20 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         e3.seed = seed;
         e3.committeeSize = requestParams.committeeSize;
-        e3.requestBlock = block.number;
+        // store request timepoint as `block.timestamp` (EIP-6372
+        // timestamp clock) so it matches the registry's `c.requestBlock`
+        // and ticket-token `getPastVotes` lookups across L2s (e.g.
+        // Arbitrum where `block.number` ticks every ~250ms and is
+        // inconsistent with consensus-time deadlines).
+        e3.requestBlock = block.timestamp;
         e3.inputWindow = requestParams.inputWindow;
         e3.e3Program = requestParams.e3Program;
         e3.paramSet = requestParams.paramSet;
         e3.customParams = requestParams.customParams;
         e3.proofAggregationEnabled = requestParams.proofAggregationEnabled;
-        e3.committeePublicKey = hex"";
-        e3.ciphertextOutput = hex"";
-        e3.plaintextOutput = hex"";
         e3.requester = msg.sender;
 
         bytes memory e3ProgramParams = paramSetRegistry[requestParams.paramSet];
-        require(e3ProgramParams.length > 0, "BFV param set not registered");
 
         bytes32 encryptionSchemeId = requestParams.e3Program.validate(
             e3Id,
@@ -309,8 +352,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         ];
 
         require(
-            decryptionVerifiers[encryptionSchemeId] !=
-                IDecryptionVerifier(address(0)),
+            address(decryptionVerifier) != address(0),
             InvalidEncryptionScheme(encryptionSchemeId)
         );
 
@@ -343,33 +385,22 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 e3Id,
         bytes calldata ciphertextOutput,
         bytes calldata proof
-    ) external returns (bool success) {
+    ) external nonReentrant returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
         E3Stage current = _e3Stages[e3Id];
-        require(
-            current == E3Stage.KeyPublished,
-            InvalidStage(e3Id, E3Stage.KeyPublished, current)
-        );
-
         E3Deadlines memory deadlines = _e3Deadlines[e3Id];
-
-        // You cannot post outputs after the compute deadline
-        require(
-            deadlines.computeDeadline >= block.timestamp,
-            CommitteeDutiesCompleted(e3Id, deadlines.computeDeadline)
-        );
-
-        // The program need to have stopped accepting inputs
-        require(
-            block.timestamp >= e3.inputWindow[1],
-            InputDeadlineNotReached(e3Id, e3.inputWindow[1])
-        );
-
-        // For now we only accept one output
-        require(
-            e3.ciphertextOutput == bytes32(0),
-            CiphertextOutputAlreadyPublished(e3Id)
+        // Validation gates are delegated to {EnclavePricing} (external
+        // library link) to keep the deployed Enclave runtime bytecode under
+        // the EIP-170 24,576-byte cap. Revert selectors are preserved via
+        // shared {IEnclave} error declarations.
+        EnclavePricing.validatePublishCiphertext(
+            e3Id,
+            uint8(current),
+            deadlines.computeDeadline,
+            e3.inputWindow[1],
+            e3.ciphertextOutput,
+            block.timestamp
         );
 
         bytes32 ciphertextOutputHash = keccak256(ciphertextOutput);
@@ -395,7 +426,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 e3Id,
         bytes calldata plaintextOutput,
         bytes calldata proof
-    ) external returns (bool success) {
+    ) external nonReentrant returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
         // Check we are in the right stage
@@ -423,12 +454,18 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             // `getCommitteeHash` is guaranteed non-zero here; the registry still
             // reverts with `CommitteeNotPublished` if that invariant ever breaks.
             bytes32 committeeHash = ciphernodeRegistry.getCommitteeHash(e3Id);
-            success = e3.decryptionVerifier.verify(
+            // Wrapper reverts on any failure with a typed error (no `bool false`).
+            e3.decryptionVerifier.verify(
+                e3Id,
+                ciphernodeRegistry.rootAt(e3Id),
+                ciphernodeRegistry.getCommitteeNodes(e3Id),
+                e3.ciphertextOutput,
+                e3.committeePublicKey,
                 keccak256(plaintextOutput),
                 committeeHash,
                 proof
             );
-            require(success, InvalidOutput(plaintextOutput));
+            success = true;
         } else {
             success = true;
         }
@@ -445,11 +482,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    /// @notice Distributes rewards to active committee members after successful E3 completion.
-    /// @dev Uses active committee nodes (excluding expelled members).
-    ///      Divides the E3 payment equally among active members and transfers via bonding registry.
-    ///      If no active members remain (e.g., all expelled), refunds the requester to prevent fund lockup.
-    ///      Any division dust is sent to the last member rather than being lost.
+    /// @notice Credits per-node rewards to the pull-payment ledger after a successful E3.
+    /// @dev Pull payment so one reverting/blacklisted recipient cannot brick payouts.
+    ///      Requester refund (when the whole committee is expelled) stays a direct
+    ///      transfer — single recipient, no other party harmed.
     /// @param e3Id The ID of the E3 for which to distribute rewards.
     function _distributeRewards(uint256 e3Id) internal {
         (address[] memory activeNodes, ) = ciphernodeRegistry
@@ -496,31 +532,28 @@ contract Enclave is IEnclave, OwnableUpgradeable {
                 (totalAmount * uint256(_protocolShareBps)) /
                 uint256(BPS_BASE);
             if (protocolAmount > 0) {
-                paymentToken.safeTransfer(_protocolTreasury, protocolAmount);
+                _pendingTreasury[_protocolTreasury][
+                    paymentToken
+                ] += protocolAmount;
+                emit TreasuryCredited(
+                    e3Id,
+                    _protocolTreasury,
+                    paymentToken,
+                    protocolAmount
+                );
             }
         }
 
         uint256 cnAmount = totalAmount - protocolAmount;
 
-        uint256[] memory amounts = new uint256[](activeLength);
+        uint256[] memory amounts = EnclavePricing.computeNodeAmounts(
+            cnAmount,
+            activeLength,
+            e3Id
+        );
 
-        // Distribute CN share equally among active (non-expelled) committee members
-        uint256 amount = cnAmount / activeLength;
-        uint256 distributed = 0;
-        for (uint256 i = 0; i < activeLength; i++) {
-            amounts[i] = amount;
-            distributed += amount;
-        }
-        uint256 dust = cnAmount - distributed;
-        if (dust > 0) {
-            amounts[activeLength - 1] += dust;
-        }
-
-        paymentToken.forceApprove(address(bondingRegistry), cnAmount);
-
-        bondingRegistry.distributeRewards(paymentToken, activeNodes, amounts);
-
-        paymentToken.forceApprove(address(bondingRegistry), 0);
+        // Credit each node's pull-payment balance (instead of pushing via bondingRegistry)
+        _creditRewards(e3Id, activeNodes, amounts, paymentToken);
 
         emit RewardsDistributed(e3Id, activeNodes, amounts);
 
@@ -529,6 +562,22 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             activeNodes,
             paymentToken
         );
+    }
+
+    /// @notice Credits per-node reward balances and emits `RewardCredited`.
+    function _creditRewards(
+        uint256 e3Id,
+        address[] memory nodes,
+        uint256[] memory amounts,
+        IERC20 token
+    ) private {
+        uint256 n = nodes.length;
+        for (uint256 i = 0; i < n; i++) {
+            uint256 a = amounts[i];
+            if (a == 0) continue;
+            _pendingRewards[e3Id][nodes[i]] += a;
+            emit RewardCredited(e3Id, nodes[i], token, a);
+        }
     }
 
     /// @notice Retrieves the honest committee nodes for a given E3.
@@ -567,6 +616,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @inheritdoc IEnclave
     function setMaxDuration(uint256 _maxDuration) public onlyOwner {
+        require(
+            _maxDuration > 0 && _maxDuration <= MAX_DURATION_CAP,
+            InvalidDuration(_maxDuration)
+        );
         maxDuration = _maxDuration;
         emit MaxDurationSet(_maxDuration);
     }
@@ -604,11 +657,38 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InvalidFeeToken(_feeToken)
         );
         feeToken = _feeToken;
+        // Auto allow-list the active fee token so `request()` keeps working
+        // after a rotation. Owner can still explicitly toggle later.
+        if (!_feeTokenAllowed[_feeToken]) {
+            _feeTokenAllowed[_feeToken] = true;
+            emit FeeTokenAllowed(_feeToken, true);
+        }
         emit FeeTokenSet(address(_feeToken));
     }
 
     /// @inheritdoc IEnclave
-    function enableE3Program(IE3Program e3Program) public {
+    function setFeeTokenAllowed(IERC20 token, bool allowed) external onlyOwner {
+        require(address(token) != address(0), InvalidFeeToken(token));
+        _feeTokenAllowed[token] = allowed;
+        emit FeeTokenAllowed(token, allowed);
+    }
+
+    /// @notice Configure the post-deadline {markE3Failed} grace window.
+    /// @dev Inside the window only requester / owner / active committee member may
+    ///      call {markE3Failed}; permissionless after. Pass `0` to disable.
+    /// @param gracePeriod Seconds of caller-restriction after the relevant deadline.
+    function setMarkFailedGracePeriod(uint256 gracePeriod) external onlyOwner {
+        markFailedGracePeriod = gracePeriod;
+        emit MarkFailedGracePeriodSet(gracePeriod);
+    }
+
+    /// @inheritdoc IEnclave
+    function isFeeTokenAllowed(IERC20 token) external view returns (bool) {
+        return _feeTokenAllowed[token];
+    }
+
+    /// @inheritdoc IEnclave
+    function enableE3Program(IE3Program e3Program) external {
         require(
             !e3Programs[e3Program],
             ModuleAlreadyEnabled(address(e3Program))
@@ -618,7 +698,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     /// @inheritdoc IEnclave
-    function disableE3Program(IE3Program e3Program) public onlyOwner {
+    function disableE3Program(IE3Program e3Program) external onlyOwner {
         require(e3Programs[e3Program], ModuleNotEnabled(address(e3Program)));
         delete e3Programs[e3Program];
         emit E3ProgramDisabled(e3Program);
@@ -628,7 +708,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function setDecryptionVerifier(
         bytes32 encryptionSchemeId,
         IDecryptionVerifier decryptionVerifier
-    ) public onlyOwner {
+    ) external onlyOwner {
         require(
             decryptionVerifier != IDecryptionVerifier(address(0)) &&
                 decryptionVerifiers[encryptionSchemeId] != decryptionVerifier,
@@ -642,20 +722,20 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function setPkVerifier(
         bytes32 encryptionSchemeId,
         IPkVerifier pkVerifier
-    ) public onlyOwner {
+    ) external onlyOwner {
         require(
             address(pkVerifier) != address(0) &&
                 pkVerifiers[encryptionSchemeId] != pkVerifier,
             InvalidEncryptionScheme(encryptionSchemeId)
         );
         pkVerifiers[encryptionSchemeId] = pkVerifier;
-        emit PkVerifierSet(encryptionSchemeId, address(pkVerifier));
+        emit PkVerifierSet(encryptionSchemeId, pkVerifier);
     }
 
     /// @inheritdoc IEnclave
     function disableEncryptionScheme(
         bytes32 encryptionSchemeId
-    ) public onlyOwner {
+    ) external onlyOwner {
         require(
             decryptionVerifiers[encryptionSchemeId] !=
                 IDecryptionVerifier(address(0)),
@@ -667,20 +747,25 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit EncryptionSchemeDisabled(encryptionSchemeId);
     }
 
-    /// @notice Registers ABI-encoded BFV parameters for a param set index.
+    /// @notice Registers or updates ABI-encoded BFV parameters for a param
+    ///         set index.
+    /// @dev Owner may overwrite an existing slot. The previous value
+    ///      is emitted via {ParamSetUpdated} so off-chain consumers can
+    ///      reconcile state. Fresh registrations emit {ParamSetRegistered}.
     /// @param paramSet The param set index (0 = Insecure512, 1 = Secure8192, ...).
     /// @param encodedParams ABI-encoded BFV parameters (degree, plaintext_modulus, moduli[]).
     function setParamSet(
         uint8 paramSet,
         bytes calldata encodedParams
-    ) public onlyOwner {
+    ) external onlyOwner {
         require(encodedParams.length > 0, "Empty params");
-        require(
-            paramSetRegistry[paramSet].length == 0,
-            "ParamSet already registered"
-        );
+        bytes memory previous = paramSetRegistry[paramSet];
         paramSetRegistry[paramSet] = encodedParams;
-        emit ParamSetRegistered(paramSet, encodedParams);
+        if (previous.length == 0) {
+            emit ParamSetRegistered(paramSet, encodedParams);
+        } else {
+            emit ParamSetUpdated(paramSet, previous, encodedParams);
+        }
     }
 
     /// @notice Sets the E3 Refund Manager contract address
@@ -700,7 +785,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param _slashingManager The new Slashing Manager contract address
     function setSlashingManager(
         ISlashingManager _slashingManager
-    ) public onlyOwner {
+    ) external onlyOwner {
         require(
             address(_slashingManager) != address(0),
             "Invalid SlashingManager address"
@@ -798,8 +883,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             reason > 0 && reason <= uint8(FailureReason._MAX_FAILURE_REASON),
             "Invalid failure reason"
         );
-        // Mark E3 as failed with the given reason
-        _markE3FailedWithReason(e3Id, FailureReason(reason));
+        E3Stage current = _e3Stages[e3Id];
+        EnclavePricing.validateMarkFailedStage(e3Id, uint8(current));
+        _markE3FailedWithReason(e3Id, current, FailureReason(reason));
     }
 
     ////////////////////////////////////////////////////////////
@@ -809,6 +895,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     /// @notice Anyone can mark an E3 as failed if timeout passed
+    /// @dev While `markFailedGracePeriod > 0` and inside the window, only requester /
+    ///      owner / active committee member may call; permissionless once
+    ///      `block.timestamp > relevantDeadline + markFailedGracePeriod`. Protects
+    ///      against L2 sequencer-hiccup races without giving up liveness.
     /// @param e3Id The E3 ID
     /// @return reason The failure reason
     function markE3Failed(
@@ -816,36 +906,39 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ) external returns (FailureReason reason) {
         E3Stage current = _e3Stages[e3Id];
 
-        if (current == E3Stage.None)
-            revert InvalidStage(e3Id, E3Stage.Requested, current);
-        if (current == E3Stage.Complete) revert E3AlreadyComplete(e3Id);
-        if (current == E3Stage.Failed) revert E3AlreadyFailed(e3Id);
+        EnclavePricing.validateMarkFailedStage(e3Id, uint8(current));
 
         bool canFail;
-        (canFail, reason) = _checkFailureCondition(e3Id, current);
+        uint256 deadline;
+        (canFail, reason, deadline) = _checkFailureCondition(e3Id, current);
         if (!canFail) revert FailureConditionNotMet(e3Id);
 
-        _e3Stages[e3Id] = E3Stage.Failed;
-        _e3FailureReasons[e3Id] = reason;
+        // enforce caller restriction inside the grace window.
+        uint256 grace = markFailedGracePeriod;
+        if (grace > 0) {
+            uint256 graceEnds = deadline + grace;
+            if (
+                block.timestamp < graceEnds &&
+                msg.sender != _e3Requesters[e3Id] &&
+                msg.sender != owner() &&
+                !ciphernodeRegistry.isCommitteeMember(e3Id, msg.sender)
+            ) {
+                revert MarkE3FailedInGracePeriod(e3Id, graceEnds);
+            }
+        }
 
-        emit E3StageChanged(e3Id, current, E3Stage.Failed);
-        emit E3Failed(e3Id, current, reason);
+        _markE3FailedWithReason(e3Id, current, reason);
     }
 
     /// @notice Internal function to mark E3 as failed with specific reason
     /// @param e3Id The E3 ID
+    /// @param current The current stage (already loaded by caller)
     /// @param reason The failure reason
     function _markE3FailedWithReason(
         uint256 e3Id,
+        E3Stage current,
         FailureReason reason
     ) internal {
-        E3Stage current = _e3Stages[e3Id];
-
-        if (current == E3Stage.None)
-            revert InvalidStage(e3Id, E3Stage.Requested, current);
-        if (current == E3Stage.Complete) revert E3AlreadyComplete(e3Id);
-        if (current == E3Stage.Failed) revert E3AlreadyFailed(e3Id);
-
         _e3Stages[e3Id] = E3Stage.Failed;
         _e3FailureReasons[e3Id] = reason;
 
@@ -861,42 +954,46 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 e3Id
     ) external view returns (bool canFail, FailureReason reason) {
         E3Stage current = _e3Stages[e3Id];
-        return _checkFailureCondition(e3Id, current);
+        (canFail, reason, ) = _checkFailureCondition(e3Id, current);
     }
 
     /// @notice Internal function to check failure conditions
+    /// @return canFail Whether the failure condition is satisfied.
+    /// @return reason  The failure reason classifier.
+    /// @return deadline The relevant stage deadline (used by {markE3Failed}
+    ///         to compute the {markFailedGracePeriod} window).
     function _checkFailureCondition(
         uint256 e3Id,
         E3Stage stage
-    ) internal view returns (bool canFail, FailureReason reason) {
+    )
+        internal
+        view
+        returns (bool canFail, FailureReason reason, uint256 deadline)
+    {
+        (deadline, reason) = _stageDeadlineAndReason(e3Id, stage);
+        canFail = deadline != 0 && block.timestamp > deadline;
+        if (!canFail) reason = FailureReason.None;
+    }
+
+    /// @dev Returns the deadline and matching failure reason for `stage`.
+    ///      A `deadline == 0` (unknown stage) signals "no failure possible".
+    function _stageDeadlineAndReason(
+        uint256 e3Id,
+        E3Stage stage
+    ) private view returns (uint256 deadline, FailureReason reason) {
+        if (stage == E3Stage.Requested)
+            return (
+                ciphernodeRegistry.getCommitteeDeadline(e3Id),
+                FailureReason.CommitteeFormationTimeout
+            );
         E3Deadlines memory d = _e3Deadlines[e3Id];
-
-        uint256 committeeDeadline = ciphernodeRegistry.getCommitteeDeadline(
-            e3Id
-        );
-
-        if (stage == E3Stage.Requested && block.timestamp > committeeDeadline) {
-            return (true, FailureReason.CommitteeFormationTimeout);
-        }
-        if (
-            stage == E3Stage.CommitteeFinalized &&
-            block.timestamp > d.dkgDeadline
-        ) {
-            return (true, FailureReason.DKGTimeout);
-        }
-        if (
-            stage == E3Stage.KeyPublished && block.timestamp > d.computeDeadline
-        ) {
-            return (true, FailureReason.ComputeTimeout);
-        }
-        if (
-            stage == E3Stage.CiphertextReady &&
-            block.timestamp > d.decryptionDeadline
-        ) {
-            return (true, FailureReason.DecryptionTimeout);
-        }
-
-        return (false, FailureReason.None);
+        if (stage == E3Stage.CommitteeFinalized)
+            return (d.dkgDeadline, FailureReason.DKGTimeout);
+        if (stage == E3Stage.KeyPublished)
+            return (d.computeDeadline, FailureReason.ComputeTimeout);
+        if (stage == E3Stage.CiphertextReady)
+            return (d.decryptionDeadline, FailureReason.DecryptionTimeout);
+        return (0, FailureReason.None);
     }
 
     /// @notice Get current stage of an E3
@@ -953,12 +1050,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @notice Internal function to set timeout config
     function _setTimeoutConfig(E3TimeoutConfig calldata config) internal {
-        require(config.dkgWindow > 0, InvalidTimeoutWindow());
-        require(config.computeWindow > 0, InvalidTimeoutWindow());
-        require(config.decryptionWindow > 0, InvalidTimeoutWindow());
-
+        EnclavePricing.validateTimeoutConfig(config, MAX_TIMEOUT_WINDOW);
         _timeoutConfig = config;
-
         emit TimeoutConfigUpdated(config);
     }
 
@@ -967,56 +1060,25 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         CommitteeSize size,
         uint32[2] calldata threshold
     ) external onlyOwner {
-        require(
-            threshold[1] >= threshold[0] && threshold[0] > 0,
-            InvalidThresholdValues()
-        );
-        // Enforce minimum committee bounds if configured
         PricingConfig memory pc = _pricingConfig;
-        if (pc.minCommitteeSize > 0) {
-            require(
-                threshold[1] >= pc.minCommitteeSize,
-                BelowMinCommitteeSize(threshold[1], pc.minCommitteeSize)
-            );
-        }
-        if (pc.minThreshold > 0) {
-            require(
-                threshold[0] >= pc.minThreshold,
-                BelowMinThreshold(threshold[0], pc.minThreshold)
-            );
-        }
+        EnclavePricing.validateCommitteeThresholds(
+            threshold,
+            pc.minCommitteeSize,
+            pc.minThreshold
+        );
         committeeThresholds[size] = threshold;
         emit CommitteeThresholdsUpdated(size, threshold);
     }
 
     /// @inheritdoc IEnclave
-    function setPricingConfig(PricingConfig calldata config) public onlyOwner {
-        require(config.marginBps <= BPS_BASE, BpsExceedsMax(config.marginBps));
-        require(
-            config.protocolShareBps <= BPS_BASE,
-            BpsExceedsMax(config.protocolShareBps)
-        );
-        require(
-            config.dkgUtilizationBps <= BPS_BASE,
-            UtilizationBpsExceedsMax(config.dkgUtilizationBps)
-        );
-        require(
-            config.computeUtilizationBps <= BPS_BASE,
-            UtilizationBpsExceedsMax(config.computeUtilizationBps)
-        );
-        require(
-            config.decryptUtilizationBps <= BPS_BASE,
-            UtilizationBpsExceedsMax(config.decryptUtilizationBps)
-        );
-        require(
-            config.protocolShareBps == 0 ||
-                config.protocolTreasury != address(0),
-            TreasuryRequired()
-        );
-        require(
-            config.minCommitteeSize >= config.minThreshold,
-            MinSizeBelowMinThreshold()
-        );
+    function setPricingConfig(
+        PricingConfig calldata config
+    ) external onlyOwner {
+        // Validation is delegated to {EnclavePricing.validatePricingConfig}
+        // (external library link) to keep the deployed Enclave runtime
+        // bytecode under the EIP-170 24,576-byte cap. Revert selectors are
+        // preserved via shared {IEnclave} error declarations.
+        EnclavePricing.validatePricingConfig(config);
         _pricingConfig = config;
         emit PricingConfigUpdated(config);
     }
@@ -1044,84 +1106,27 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint32[2] memory threshold = committeeThresholds[
             requestParams.committeeSize
         ];
-        require(
-            threshold[1] > 0,
-            CommitteeSizeNotConfigured(requestParams.committeeSize)
-        );
-        uint256 n = uint256(threshold[1]); // total committee size
-        uint256 m = uint256(threshold[0]); // quorum/decryption threshold
-
         PricingConfig memory pc = _pricingConfig;
-
-        if (pc.minCommitteeSize > 0) {
-            require(
-                threshold[1] >= pc.minCommitteeSize,
-                CommitteeSizeTooSmall(requestParams.committeeSize)
-            );
-        }
-        if (pc.minThreshold > 0) {
-            require(
-                threshold[0] >= pc.minThreshold,
-                ThresholdTooSmall(threshold[0])
-            );
-        }
-
-        require(
-            requestParams.inputWindow[1] >= requestParams.inputWindow[0],
-            InvalidInputDeadlineEnd(requestParams.inputWindow[1])
+        EnclavePricing.validateQuoteThresholds(
+            threshold,
+            uint8(requestParams.committeeSize),
+            pc.minCommitteeSize,
+            pc.minThreshold
         );
 
-        // Duration covers the full availability period, using expected-case
-        // utilization fractions for protocol-controlled timeout windows.
-        // sortitionSubmissionWindow is included — CNs are locked during this phase.
-        uint256 duration = ciphernodeRegistry.sortitionSubmissionWindow() +
-            requestParams.inputWindow[1] -
-            requestParams.inputWindow[0] +
-            (_timeoutConfig.dkgWindow * uint256(pc.dkgUtilizationBps)) /
-            uint256(BPS_BASE) +
-            (_timeoutConfig.computeWindow * uint256(pc.computeUtilizationBps)) /
-            uint256(BPS_BASE) +
-            (_timeoutConfig.decryptionWindow *
-                uint256(pc.decryptUtilizationBps)) /
-            uint256(BPS_BASE);
-
-        // ZK proof count per node: 14 fixed + 4 × (N-1) scaling.
-        // Each of the 7 per-node circuits (C0, C1, C2a, C2b, C4a, C4b, C6) produces
-        // 2 proofs (EVM target + recursion target) → 14 fixed proofs.
-        // C3a + C3b add 2 circuits per peer × 2 proofs each = 4 × (N-1) scaling proofs.
-        uint256 proofsPerNode = 14 + 4 * (n - 1);
-
-        // Key generation cost: fixed per-node + per-proof (quadratic in n)
-        uint256 baseFee = pc.keyGenFixedPerNode * n;
-        baseFee += pc.keyGenPerEncryptionProof * n * proofsPerNode;
-
-        // Key generation coordination cost (quadratic in n)
-        if (n > 1) {
-            baseFee += (pc.coordinationPerPair * (n * (n - 1))) / 2;
-        }
-
-        // Proof verification cost: each node verifies all others' proofs (quadratic)
-        baseFee += pc.verificationPerProof * n * proofsPerNode;
-
-        // Availability cost (linear in n × duration)
-        baseFee += pc.availabilityPerNodePerSec * n * duration;
-
-        // Decryption cost (linear in m)
-        baseFee += pc.decryptionPerNode * m;
-        // Decryption coordination cost (quadratic in m)
-        if (m > 1) {
-            baseFee += (pc.coordinationPerPair * (m * (m - 1))) / 2;
-        }
-
-        // Publication base cost
-        baseFee += pc.publicationBase;
-
-        // Apply margin markup
-        fee =
-            (baseFee * (uint256(BPS_BASE) + uint256(pc.marginBps))) /
-            uint256(BPS_BASE);
-
-        require(fee > 0, PaymentRequired(fee));
+        // Pure fee math is delegated to {EnclavePricing.quote} (external
+        // library link) to keep the deployed Enclave runtime bytecode under
+        // the EIP-170 24,576-byte cap. Inputs are snapshotted into calldata
+        // for the call site; behaviour and revert selectors match the
+        // original inlined implementation.
+        fee = EnclavePricing.quote(
+            _pricingConfig,
+            _timeoutConfig,
+            ciphernodeRegistry.sortitionSubmissionWindow(),
+            threshold,
+            requestParams.inputWindow[0],
+            requestParams.inputWindow[1]
+        );
     }
 
     /// @inheritdoc IEnclave
@@ -1132,14 +1137,105 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @inheritdoc IEnclave
     function getDecryptionVerifier(
         bytes32 encryptionSchemeId
-    ) public view returns (IDecryptionVerifier) {
+    ) external view returns (IDecryptionVerifier) {
         return decryptionVerifiers[encryptionSchemeId];
     }
 
     /// @inheritdoc IEnclave
     function getPkVerifier(
         bytes32 encryptionSchemeId
-    ) public view returns (IPkVerifier) {
+    ) external view returns (IPkVerifier) {
         return pkVerifiers[encryptionSchemeId];
     }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //              Pull-Payment Claim Functions              //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @inheritdoc IEnclave
+    function claimReward(
+        uint256 e3Id
+    ) external nonReentrant returns (uint256 amount) {
+        amount = _claimReward(e3Id, msg.sender);
+        require(amount > 0, NothingToClaim());
+    }
+
+    /// @inheritdoc IEnclave
+    function claimRewards(uint256[] calldata e3Ids) external nonReentrant {
+        uint256 len = e3Ids.length;
+        uint256 totalClaimed;
+        for (uint256 i = 0; i < len; i++) {
+            totalClaimed += _claimReward(e3Ids[i], msg.sender);
+        }
+        require(totalClaimed > 0, NothingToClaim());
+    }
+
+    /// @notice Internal helper: drains the caller's pull balance for one E3
+    ///         and emits `RewardClaimed`. Returns 0 if nothing to claim
+    ///         (so batch calls don't revert on partially-empty inputs).
+    function _claimReward(
+        uint256 e3Id,
+        address account
+    ) internal returns (uint256 amount) {
+        amount = _pendingRewards[e3Id][account];
+        if (amount == 0) return 0;
+        _pendingRewards[e3Id][account] = 0;
+        IERC20 token = _e3FeeTokens[e3Id];
+        token.safeTransfer(account, amount);
+        emit RewardClaimed(e3Id, account, token, amount);
+    }
+
+    /// @inheritdoc IEnclave
+    function pendingReward(
+        uint256 e3Id,
+        address account
+    ) external view returns (uint256) {
+        return _pendingRewards[e3Id][account];
+    }
+
+    /// @inheritdoc IEnclave
+    function treasuryClaim(
+        IERC20 token
+    ) external nonReentrant returns (uint256 amount) {
+        amount = _pendingTreasury[msg.sender][token];
+        require(amount > 0, NothingToClaim());
+        _pendingTreasury[msg.sender][token] = 0;
+        token.safeTransfer(msg.sender, amount);
+        emit TreasuryClaimed(msg.sender, token, amount);
+    }
+
+    /// @inheritdoc IEnclave
+    function pendingTreasuryClaim(
+        address treasury,
+        IERC20 token
+    ) external view returns (uint256) {
+        return _pendingTreasury[treasury][token];
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //              ERC-165 Interface Detection               //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice ERC-165 interface detection. Advertises {IEnclave} and
+    ///         {IERC165} so off-chain integrators can discover the public ABI.
+    /// @param interfaceId Candidate interface identifier.
+    /// @return True if `interfaceId` matches a supported interface.
+    function supportsInterface(
+        bytes4 interfaceId
+    ) external pure virtual returns (bool) {
+        return
+            interfaceId == type(IEnclave).interfaceId ||
+            interfaceId == 0x01ffc9a7; // IERC165.supportsInterface selector
+    }
+
+    /// @dev Reserved storage slots for future upgrades. Adding new state
+    ///      variables in derived versions of this contract must reduce this
+    ///      array's length accordingly to preserve storage layout compatibility
+    ///      across upgrades.
+    // solhint-disable-next-line var-name-mixedcase
+    uint256[50] private __gap;
 }

@@ -60,6 +60,11 @@
       "type": "error"
     },
     {
+      "inputs": [],
+      "name": "DkgProofRequired",
+      "type": "error"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256",
@@ -73,6 +78,11 @@
         }
       ],
       "name": "InsufficientCiphernodes",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidDkgProof",
       "type": "error"
     },
     {
@@ -124,6 +134,11 @@
     {
       "inputs": [],
       "name": "OnlyEnclave",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "PkCommitmentRequired",
       "type": "error"
     },
     {
@@ -230,31 +245,6 @@
         }
       ],
       "name": "CommitteeActivationChanged",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "e3Id",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "address[]",
-          "name": "committee",
-          "type": "address[]"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256[]",
-          "name": "scores",
-          "type": "uint256[]"
-        }
-      ],
-      "name": "CommitteeFinalized",
       "type": "event"
     },
     {
@@ -429,6 +419,31 @@
         }
       ],
       "name": "EnclaveSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address[]",
+          "name": "committee",
+          "type": "address[]"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256[]",
+          "name": "scores",
+          "type": "uint256[]"
+        }
+      ],
+      "name": "SortitionCommitteeFinalized",
       "type": "event"
     },
     {
@@ -985,5 +1000,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-e33d1cfedc69d8ad74eec5a84c8ef358a020ec1a"
+  "buildInfoId": "solc-0_8_28-ee94505d711997b4b070a2e6b0539519e6dc16bf"
 }
