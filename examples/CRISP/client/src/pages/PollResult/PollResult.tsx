@@ -13,7 +13,7 @@ import PastPollSection from '@/pages/Landing/components/PastPoll'
 import { useParams } from 'react-router-dom'
 import LoadingAnimation from '@/components/LoadingAnimation'
 import { useVoteManagementContext } from '@/context/voteManagement'
-import CircularTiles from '@/components/CircularTiles'
+import { EditorialShell } from '@/design/Editorial'
 import CountdownTimer from '@/components/CountdownTime'
 import ConfirmVote from '../DailyPoll/components/ConfirmVote'
 
@@ -56,11 +56,8 @@ const PollResult: React.FC = () => {
   }, [pollResult])
 
   return (
-    <div className='relative flex w-full flex-1 items-center justify-center px-6 py-12'>
-      <div className='absolute bottom-0 right-0 grid w-full grid-cols-2 gap-2 max-md:opacity-50 md:w-[70vh]'>
-        <CircularTiles count={4} />
-      </div>
-      <div className='mb-28 flex min-h-[730px] w-screen flex-col  items-center justify-center'>
+    <EditorialShell className='flex w-full flex-1 flex-col'>
+      <section className='pad-section col' style={{ flex: 1, alignItems: 'center', gap: 36 }}>
         {loading && !pollResult && (
           <div className='flex items-center justify-center'>
             <LoadingAnimation isLoading={loading} />
@@ -68,22 +65,19 @@ const PollResult: React.FC = () => {
         )}
         {!loading && pollResult && (
           <Fragment>
-            <div className='my-28 flex w-full flex-col items-center justify-center space-y-12'>
-              <div className='flex flex-col items-center justify-center space-y-6'>
-                <div className='space-y-2 text-center'>
-                  <p className='text-sm font-extrabold uppercase'>Poll {pollResult.roundId}</p>
-                  <h1 className='text-h1 font-bold  text-slate-600 max-sm:text-3xl'>
-                    {type === 'confirmation' ? 'Thanks for voting!' : 'Poll Results'}
-                  </h1>
-                  {type !== 'confirmation' && <p className='text-2xl font-bold max-sm:text-lg'>{formatDate(pollResult.date)}</p>}
-                </div>
-                {type === 'confirmation' && roundEndDate && (
-                  <div className='flex items-center justify-center max-sm:py-5 '>
-                    <CountdownTimer endTime={roundEndDate} />
-                  </div>
-                )}
-                <VotesBadge totalVotes={activeTotalCount ?? 0} />
+            <div className='col' style={{ alignItems: 'center', gap: 24, width: '100%' }}>
+              <div className='col' style={{ alignItems: 'center', gap: 8, textAlign: 'center' }}>
+                <p className='mono muted'>Poll {pollResult.roundId}</p>
+                <h1 className='h1'>{type === 'confirmation' ? 'Thanks for voting!' : 'Poll Results'}</h1>
+                {type !== 'confirmation' && <p className='cap'>{formatDate(pollResult.date)}</p>}
               </div>
+              {type === 'confirmation' && roundEndDate && (
+                <div className='col' style={{ alignItems: 'center', gap: 6 }}>
+                  <div className='cap'>Closes in</div>
+                  <CountdownTimer endTime={roundEndDate} />
+                </div>
+              )}
+              <VotesBadge totalVotes={activeTotalCount ?? 0} />
               <PollCardResult
                 results={markWinner(pollResult.options)}
                 totalVotes={pollResult.totalVotes}
@@ -95,21 +89,19 @@ const PollResult: React.FC = () => {
             {type === 'confirmation' && txUrl && <ConfirmVote confirmationUrl={txUrl} />}
             {type !== 'confirmation' && (
               <CardContent>
-                <div className='space-y-4'>
-                  <p className='text-base font-extrabold uppercase text-slate-600/50'>WHAT JUST HAPPENED?</p>
-                  <div className='space-y-2'>
-                    <p className='text-xl leading-8 text-slate-600 max-sm:text-lg'>
-                      After casting your vote, CRISP securely processed your selection using a blend of Fully Homomorphic Encryption (FHE),
-                      threshold cryptography, and zero-knowledge proofs (ZKPs), without revealing your identity or choice. Your vote was
-                      encrypted and anonymously aggregated with others, ensuring the integrity of the voting process while strictly
-                      maintaining confidentiality. The protocol's advanced cryptographic techniques guarantee that your vote contributes to
-                      the final outcome without any risk of privacy breaches or undue influence.
-                    </p>
-                  </div>
+                <div className='col' style={{ gap: 10 }}>
+                  <p className='mono muted'>WHAT JUST HAPPENED?</p>
+                  <p className='lede' style={{ maxWidth: 'none' }}>
+                    After casting your vote, CRISP securely processed your selection using a blend of Fully Homomorphic Encryption (FHE),
+                    threshold cryptography, and zero-knowledge proofs (ZKPs), without revealing your identity or choice. Your vote was
+                    encrypted and anonymously aggregated with others, ensuring the integrity of the voting process while strictly
+                    maintaining confidentiality. The protocol's advanced cryptographic techniques guarantee that your vote contributes to
+                    the final outcome without any risk of privacy breaches or undue influence.
+                  </p>
                 </div>
-                <div className='space-y-4'>
-                  <p className='text-base font-extrabold uppercase text-slate-600/50'>WHAT DOES THIS MEAN?</p>
-                  <p className='text-xl leading-8 text-slate-600 max-sm:text-lg'>
+                <div className='col' style={{ gap: 10 }}>
+                  <p className='mono muted'>WHAT DOES THIS MEAN?</p>
+                  <p className='lede' style={{ maxWidth: 'none' }}>
                     Your participation has directly contributed to a transparent and fair decision-making process, showcasing the power of
                     privacy-preserving technology in governance and beyond. The use of CRISP in this vote represents a significant step
                     towards secure, anonymous, and tamper-proof digital elections and polls. This innovation ensures that every vote counts
@@ -119,15 +111,11 @@ const PollResult: React.FC = () => {
                 </div>
               </CardContent>
             )}
-            {pastPolls.length > 0 && (
-              <div className='z-50'>
-                <PastPollSection customLabel='Historic polls' useFullHeight={false} limit={3} />
-              </div>
-            )}
+            {pastPolls.length > 0 && <PastPollSection customLabel='Past polls' useFullHeight={false} limit={3} />}
           </Fragment>
         )}
-      </div>
-    </div>
+      </section>
+    </EditorialShell>
   )
 }
 

@@ -68,7 +68,7 @@ const test = testWithSynpress(metaMaskFixtures(basicSetup))
 const { expect } = test
 
 async function ensureHomePageLoaded(page: Page) {
-  return await expect(page.locator('h4')).toHaveText('Coercion-Resistant Impartial Selection Protocol')
+  return await expect(page.getByText('Coercion-Resistant Impartial Selection Protocol')).toBeVisible()
 }
 
 function log(msg: string) {
@@ -133,7 +133,7 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
   log(`connecting to dapp...`)
   await metamask.connectToDapp()
   log(`clicking try demo...`)
-  await page.locator('button:has-text("Try Demo")').click()
+  await page.locator('a:has-text("Try the demo")').click()
 
   log(`waiting for E3 Committee being published...`)
   await waitForE3Ready(e3id)
@@ -143,22 +143,22 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
   await page.reload()
 
   log(`clicking first vote card...`)
-  await page.locator("[data-test-id='poll-button-0'] > [data-test-id='card']").click()
+  await page.locator("[data-test-id='poll-button-0']").click()
   log(`clicking Cast Vote...`)
-  await page.locator('button:has-text("Cast Vote")').click()
+  await page.locator('button:has-text("Cast")').click()
   log(`confirming MetaMask signature request...`)
   await metamask.confirmSignature()
   const WAIT = E3_DURATION - DKG_DURATION + OUTPUT_DECRYPTION_WAIT
   log(`waiting ${WAIT}ms...`)
   await page.waitForTimeout(WAIT)
   log(`clicking historic polls button...`)
-  await page.locator('a:has-text("Historic polls")').click()
+  await page.locator('a:has-text("Historic Polls")').click()
   log(`asserting that Historic polls exists...`)
-  await expect(page.locator('h1')).toHaveText('Historic polls')
+  await expect(page.locator('h1')).toHaveText('Past polls')
   log(`asserting that result has 100% on the vote we clicked on...`)
-  await expect(page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-0'] h3")).toHaveText('100%')
+  await expect(page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-0'] .h2")).toHaveText('100%')
   log(`asserting that result has 0% on the vote we did not click on...`)
-  await expect(page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-1'] h3")).toHaveText('0%')
+  await expect(page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-1'] .h2")).toHaveText('0%')
 
   log('============================================')
   log('        PLAYWRIGHT TEST IS COMPLETE         ')
