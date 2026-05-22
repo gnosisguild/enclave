@@ -485,7 +485,17 @@ emit_run_configuration_section() {
         bench_preset=$(jq -r '.benchmark_config.bfv_preset_subdir // empty' <<<"$blob")
         bench_preset_name=$(jq -r '.benchmark_config.bfv_preset // empty' <<<"$blob")
         bench_lambda=$(jq -r '.benchmark_config.lambda // empty' <<<"$blob")
-        proof_agg=$(jq -r '.benchmark_config.proof_aggregation_enabled // .proof_aggregation_enabled // empty' <<<"$blob")
+        # NOTE: cannot use `//` here — jq's alt-operator treats `false` as null
+        # and would fall through, dropping the legitimate `false` value.
+        proof_agg=$(jq -r '
+            if .benchmark_config.proof_aggregation_enabled != null then
+              .benchmark_config.proof_aggregation_enabled
+            elif .proof_aggregation_enabled != null then
+              .proof_aggregation_enabled
+            else
+              empty
+            end
+        ' <<<"$blob")
         multithread_jobs=$(jq -r '.benchmark_config.multithread_concurrent_jobs // .multithread.max_simultaneous_rayon_tasks // empty' <<<"$blob")
         rayon_threads=$(jq -r '.multithread.rayon_threads // empty' <<<"$blob")
         cores_avail=$(jq -r '.multithread.cores_available // empty' <<<"$blob")
@@ -497,9 +507,9 @@ emit_run_configuration_section() {
     if [ -n "$meta_file" ]; then
         [ -z "$bench_mode" ] || [ "$bench_mode" = "null" ] && bench_mode=$(jq -r '.benchmark_mode // empty' "$meta_file")
         [ -z "$bench_preset" ] || [ "$bench_preset" = "null" ] && bench_preset=$(jq -r '.bfv_preset_subdir // empty' "$meta_file")
-        [ -z "$proof_agg" ] || [ "$proof_agg" = "null" ] && proof_agg=$(jq -r '.proof_aggregation // empty' "$meta_file")
+        [ -z "$proof_agg" ] || [ "$proof_agg" = "null" ] && proof_agg=$(jq -r 'if .proof_aggregation != null then .proof_aggregation else empty end' "$meta_file")
         [ -z "$multithread_jobs" ] || [ "$multithread_jobs" = "null" ] && multithread_jobs=$(jq -r '.multithread_jobs // empty' "$meta_file")
-        verbose_flag=$(jq -r '.verbose // empty' "$meta_file")
+        verbose_flag=$(jq -r 'if .verbose != null then .verbose else empty end' "$meta_file")
     fi
 
     [ -z "$bench_mode" ] || [ "$bench_mode" = "null" ] && bench_mode="unknown"
@@ -538,7 +548,7 @@ emit_run_configuration_section() {
         local nodes_spawned network_model testmode_harness
         nodes_spawned=$(jq -r '.benchmark_config.nodes_spawned // empty' <<<"$blob")
         network_model=$(jq -r '.benchmark_config.network_model // empty' <<<"$blob")
-        testmode_harness=$(jq -r '.benchmark_config.testmode_harness // empty' <<<"$blob")
+        testmode_harness=$(jq -r 'if .benchmark_config.testmode_harness != null then .benchmark_config.testmode_harness else empty end' <<<"$blob")
         if [ -n "$nodes_spawned" ] && [ "$nodes_spawned" != "null" ]; then
             echo "| Nodes spawned (builder) | $nodes_spawned |"
         fi
@@ -812,7 +822,9 @@ if [ -n "$INTEGRATION_BLOB" ]; then
         fi
     fi
 
-    agg_enabled=$(jq -r '.proof_aggregation_enabled // true' <<<"$INTEGRATION_BLOB")
+    # NOTE: cannot use `// true` here — jq's `//` treats `false` as null and
+    # would incorrectly return `true` when aggregation is explicitly disabled.
+    agg_enabled=$(jq -r 'if .proof_aggregation_enabled == false then "false" else "true" end' <<<"$INTEGRATION_BLOB")
     if [ "$agg_enabled" = "false" ]; then
         echo "" >> "$OUTPUT_FILE"
         echo "_Baseline run: node DKG folds and folded Π_DKG / Π_dec export are disabled. Compare with \`BENCHMARK_PROOF_AGGREGATION=true\` (default)._" >> "$OUTPUT_FILE"

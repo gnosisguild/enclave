@@ -84,6 +84,8 @@ pub struct CiphernodeBuilder {
     zk_backend: Option<ZkBackend>,
     /// Test/benchmark: EIP-712 verifying contract for DKG fold attestations (no RPC required).
     dkg_fold_attestation_verifier: Option<Address>,
+    /// Test/benchmark: EIP-712 verifying contract for accusation votes (no RPC required).
+    slashing_manager: Option<Address>,
     net_config: Option<NetConfig>,
     ignore_address_check: bool,
     global_shared_store: bool,
@@ -153,6 +155,7 @@ impl CiphernodeBuilder {
             testmode_signer: None,
             threshold_plaintext_agg: false,
             dkg_fold_attestation_verifier: None,
+            slashing_manager: None,
             net_config: None,
             zk_backend: None,
             ignore_address_check: false,
@@ -223,15 +226,48 @@ impl CiphernodeBuilder {
         self
     }
 
+    /// Benchmark/test: set slashing manager address (EIP-712 verifyingContract for
+    /// accusation votes) without configuring EVM chains (no RPC).
+    pub fn testmode_with_slashing_manager(mut self, slashing_manager: Address) -> Self {
+        self.slashing_manager = Some(slashing_manager);
+        self
+    }
+
+    fn resolve_slashing_manager(&self) -> Result<Address> {
+        if let Some(addr) = self.slashing_manager {
+            return Ok(addr);
+        }
+        self.chains
+            .first()
+            .and_then(|c| c.contracts.slashing_manager.as_ref())
+            .map(|c| c.address())
+            .transpose()?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "`slashing_manager` contract address is required in chain config — \
+                     it is the EIP-712 `verifyingContract` for accusation vote signatures"
+                )
+            })
+    }
+
     fn resolve_dkg_fold_attestation_verifier(&self) -> Result<Option<Address>> {
         if let Some(addr) = self.dkg_fold_attestation_verifier {
             return Ok(Some(addr));
         }
-        self.chains
+        let resolved = self
+            .chains
             .first()
             .and_then(|c| c.contracts.dkg_fold_attestation_verifier.as_ref())
             .map(|c| c.address())
-            .transpose()
+            .transpose()?;
+        if resolved.is_none() {
+            tracing::warn!(
+                "`dkg_fold_attestation_verifier` contract address is not set in chain config. \
+                 If any E3 enables `proof_aggregation_enabled`, this node will fail to sign \
+                 DKG fold attestations and be counted as dishonest."
+            );
+        }
+        Ok(resolved)
     }
 
     /// Log data actor events
@@ -545,8 +581,13 @@ impl CiphernodeBuilder {
         // AccusationManager extension — per-E3 fault attribution quorum
         {
             let signer = provider_cache.ensure_signer().await?;
+            let slashing_manager_addr = self.resolve_slashing_manager()?;
             info!("Setting up AccusationManagerExtension");
-            e3_builder = e3_builder.with(AccusationManagerExtension::create(&bus, signer));
+            e3_builder = e3_builder.with(AccusationManagerExtension::create(
+                &bus,
+                signer,
+                slashing_manager_addr,
+            ));
         }
 
         // CommitmentConsistencyChecker extension — per-E3 cross-circuit commitment validation

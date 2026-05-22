@@ -117,6 +117,9 @@ pub struct AccusationManager {
     my_address: Address,
     signer: PrivateKeySigner,
 
+    /// On-chain `SlashingManager` address (EIP-712 `verifyingContract` for vote signatures).
+    slashing_manager: Address,
+
     /// All committee member addresses for this E3.
     committee: Vec<Address>,
     /// Quorum threshold — matches the cryptographic threshold M.
@@ -152,6 +155,7 @@ impl AccusationManager {
         bus: &BusHandle,
         e3_id: E3id,
         signer: PrivateKeySigner,
+        slashing_manager: Address,
         committee: Vec<Address>,
         threshold_m: usize,
         params_preset: e3_fhe_params::BfvPreset,
@@ -162,6 +166,7 @@ impl AccusationManager {
             e3_id,
             my_address,
             signer,
+            slashing_manager,
             committee,
             threshold_m,
             pending: HashMap::new(),
@@ -178,11 +183,21 @@ impl AccusationManager {
         bus: &BusHandle,
         e3_id: E3id,
         signer: PrivateKeySigner,
+        slashing_manager: Address,
         committee: Vec<Address>,
         threshold_m: usize,
         params_preset: e3_fhe_params::BfvPreset,
     ) -> Addr<Self> {
-        let addr = Self::new(bus, e3_id, signer, committee, threshold_m, params_preset).start();
+        let addr = Self::new(
+            bus,
+            e3_id,
+            signer,
+            slashing_manager,
+            committee,
+            threshold_m,
+            params_preset,
+        )
+        .start();
         bus.subscribe(EventType::ProofVerificationFailed, addr.clone().into());
         bus.subscribe(EventType::ProofVerificationPassed, addr.clone().into());
         bus.subscribe(EventType::ProofFailureAccusation, addr.clone().into());
@@ -276,53 +291,78 @@ impl AccusationManager {
         }
     }
 
-    fn sign_vote_digest(&self, vote: &AccusationVote) -> Vec<u8> {
-        let digest = Self::vote_digest(vote);
-        self.signer
-            .sign_message_sync(&digest)
-            .map(|sig| sig.as_bytes().to_vec())
-            .unwrap_or_default()
+    fn sign_vote_digest(&self, vote: &AccusationVote) -> Result<Vec<u8>, alloy::signers::Error> {
+        let digest = Self::vote_digest(vote, self.slashing_manager);
+        // `sign_hash_sync` signs the raw 32-byte hash without EIP-191 wrapping,
+        // which is what EIP-712 requires (`digest` is already the
+        // `\x19\x01 || domainSeparator || structHash` hash).
+        let sig = self.signer.sign_hash_sync(&digest.into())?;
+        Ok(sig.as_bytes().to_vec())
     }
 
-    /// Structured digest for ECDSA signing of votes.
-    ///
-    /// ```text
-    /// keccak256(abi.encode(
-    ///     VOTE_TYPEHASH,
-    ///     chainId, e3Id, accusationId, voter, agrees,
-    ///     dataHash
-    /// ))
-    /// ```
-    fn vote_digest(vote: &AccusationVote) -> [u8; 32] {
+    /// Canonical EIP-712 domain separator for vote signatures.
+    /// Must match `SlashingManager`'s domain construction:
+    /// `keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, DOMAIN_NAME_HASH, DOMAIN_VERSION_HASH,
+    /// chainId, verifyingContract))`.
+    fn vote_domain_separator(chain_id: u64, verifying_contract: Address) -> [u8; 32] {
+        let domain_typehash: [u8; 32] = keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
+        )
+        .into();
+        let name_hash: [u8; 32] = keccak256("EnclaveSlashingManager").into();
+        let version_hash: [u8; 32] = keccak256("1").into();
+        let encoded = (
+            domain_typehash,
+            name_hash,
+            version_hash,
+            U256::from(chain_id),
+            verifying_contract,
+        )
+            .abi_encode();
+        keccak256(&encoded).into()
+    }
+
+    /// Canonical EIP-712 typed-data hash for a vote.
+    /// `keccak256("\x19\x01" || domainSeparator || structHash)` where
+    /// `structHash = keccak256(abi.encode(VOTE_TYPEHASH, e3Id, accusationId, voter, agrees, dataHash))`.
+    fn vote_digest(vote: &AccusationVote, verifying_contract: Address) -> [u8; 32] {
         let e3_id_u256: U256 = vote
             .e3_id
             .clone()
             .try_into()
             .expect("E3id should be valid U256");
         let typehash: [u8; 32] = keccak256(
-            "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)"
+            "AccusationVote(uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)"
         ).into();
-        let encoded = (
-            typehash,
-            U256::from(vote.e3_id.chain_id()),
-            e3_id_u256,
-            vote.accusation_id,
-            vote.voter,
-            vote.agrees,
-            vote.data_hash,
+        let struct_hash: [u8; 32] = keccak256(
+            &(
+                typehash,
+                e3_id_u256,
+                vote.accusation_id,
+                vote.voter,
+                vote.agrees,
+                vote.data_hash,
+            )
+                .abi_encode(),
         )
-            .abi_encode();
-        keccak256(&encoded).into()
+        .into();
+        let domain = Self::vote_domain_separator(vote.e3_id.chain_id(), verifying_contract);
+        let mut buf = Vec::with_capacity(2 + 32 + 32);
+        buf.push(0x19);
+        buf.push(0x01);
+        buf.extend_from_slice(&domain);
+        buf.extend_from_slice(&struct_hash);
+        keccak256(&buf).into()
     }
 
     fn verify_vote_signature(&self, vote: &AccusationVote) -> bool {
-        let digest = Self::vote_digest(vote);
+        let digest = Self::vote_digest(vote, self.slashing_manager);
         let sig =
             match alloy::primitives::Signature::try_from(vote.signature.extract_bytes().as_ref()) {
                 Ok(s) => s,
                 Err(_) => return false,
             };
-        match sig.recover_address_from_msg(&digest) {
+        match sig.recover_address_from_prehash(&digest.into()) {
             Ok(addr) => addr == vote.voter,
             Err(_) => false,
         }
@@ -526,7 +566,13 @@ impl AccusationManager {
             data_hash,
             signature: ArcBytes::default(),
         };
-        own_vote.signature = ArcBytes::from_bytes(&self.sign_vote_digest(&own_vote));
+        match self.sign_vote_digest(&own_vote) {
+            Ok(sig) => own_vote.signature = ArcBytes::from_bytes(&sig),
+            Err(err) => {
+                error!("Failed to sign own AccusationVote: {err}");
+                return;
+            }
+        }
 
         if let Err(err) = self.bus.publish(own_vote.clone(), ec.clone()) {
             error!("Failed to broadcast own AccusationVote: {err}");
@@ -739,7 +785,13 @@ impl AccusationManager {
             data_hash: our_data_hash,
             signature: ArcBytes::default(),
         };
-        vote.signature = ArcBytes::from_bytes(&self.sign_vote_digest(&vote));
+        match self.sign_vote_digest(&vote) {
+            Ok(sig) => vote.signature = ArcBytes::from_bytes(&sig),
+            Err(err) => {
+                error!("Failed to sign AccusationVote: {err}");
+                return;
+            }
+        }
 
         info!(
             "Voting {} on accusation against {} for {:?}",
@@ -1192,7 +1244,13 @@ impl AccusationManager {
             data_hash: reverif.data_hash,
             signature: ArcBytes::default(),
         };
-        vote.signature = ArcBytes::from_bytes(&self.sign_vote_digest(&vote));
+        match self.sign_vote_digest(&vote) {
+            Ok(sig) => vote.signature = ArcBytes::from_bytes(&sig),
+            Err(err) => {
+                error!("Failed to sign C3a/C3b AccusationVote: {err}");
+                return;
+            }
+        }
 
         info!(
             "C3a/C3b re-verification complete — voting {} on accusation against {:?}",

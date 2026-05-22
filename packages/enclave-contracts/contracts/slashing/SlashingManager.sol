@@ -10,9 +10,6 @@ import {
     AccessControl
 } from "@openzeppelin/contracts/access/AccessControl.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {
-    MessageHashUtils
-} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
@@ -84,19 +81,28 @@ contract SlashingManager is ISlashingManager, AccessControl {
             "ProofPayload(uint256 chainId,uint256 e3Id,uint256 proofType,bytes zkProof,bytes publicSignals)"
         );
 
-    /// @notice EIP-712 style typehash for committee attestation votes.
-    /// @dev Must match `AccusationManager::vote_digest()` in `crates/zk-prover/src/actors/accusation_manager.rs`.
-    ///      Includes chainId to prevent cross-chain replay and dataHash for equivocation detection.
-    /// @dev Signature scheme uses EIP-191 (`personal_sign`) wrapping rather than a
-    ///      full EIP-712 domain separator with `verifyingContract`; canonicalising the
-    ///      domain is tracked as a follow-up (requires plumbing the SlashingManager
-    ///      address into off-chain signers).
+    /// @notice Canonical EIP-712 struct typehash for committee attestation votes.
+    /// @dev Must match `vote_struct_hash` layout in
+    ///      `crates/zk-prover/src/actors/accusation_manager.rs`.
+    ///      `chainId` and `verifyingContract` are bound by the EIP-712 domain,
+    ///      not the struct, so they are not duplicated here.
     bytes32 public constant VOTE_TYPEHASH =
         keccak256(
-            "AccusationVote(uint256 chainId,uint256 e3Id,"
-            "bytes32 accusationId,address voter,"
-            "bool agrees,bytes32 dataHash)"
+            "AccusationVote(uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)"
         );
+
+    /// @dev `keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")`.
+    bytes32 public constant EIP712_DOMAIN_TYPEHASH =
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
+
+    /// @dev `keccak256("EnclaveSlashingManager")`.
+    bytes32 public constant DOMAIN_NAME_HASH =
+        keccak256(bytes("EnclaveSlashingManager"));
+
+    /// @dev `keccak256("1")`.
+    bytes32 public constant DOMAIN_VERSION_HASH = keccak256(bytes("1"));
 
     // ======================
     // Modifiers
@@ -252,9 +258,12 @@ contract SlashingManager is ISlashingManager, AccessControl {
     ///      `abi.encode(uint256 proofType,
     ///         address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures,
     ///         bytes evidence)`
-    ///      Each voter must sign via `personal_sign`/`signMessage()` (EIP-191 prefixed):
-    ///      `personal_sign(keccak256(abi.encode(VOTE_TYPEHASH,
-    ///         block.chainid, e3Id, accusationId, voter, agrees, dataHash)))`
+    ///      Each voter must sign the EIP-712 typed-data hash:
+    ///      `keccak256("\x19\x01" || domainSeparator || structHash)` where
+    ///      `domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH,
+    ///         DOMAIN_NAME_HASH, DOMAIN_VERSION_HASH, chainId, address(this)))`
+    ///      and `structHash = keccak256(abi.encode(VOTE_TYPEHASH,
+    ///         e3Id, accusationId, voter, agrees, dataHash))`
     ///      where `accusationId = keccak256(abi.encodePacked(block.chainid, e3Id, operator, proofType))`
     ///      and `evidence` is the preimage of every voter's `dataHash`, i.e.
     ///      `keccak256(evidence) == dataHashes[i]` for all i.
@@ -492,6 +501,15 @@ contract SlashingManager is ISlashingManager, AccessControl {
         bytes32 accusationId = keccak256(
             abi.encodePacked(block.chainid, v.e3Id, v.operator, v.proofType)
         );
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                EIP712_DOMAIN_TYPEHASH,
+                DOMAIN_NAME_HASH,
+                DOMAIN_VERSION_HASH,
+                block.chainid,
+                address(this)
+            )
+        );
 
         address prevVoter = address(0);
         uint256 numVotes = v.voters.length;
@@ -509,21 +527,21 @@ contract SlashingManager is ISlashingManager, AccessControl {
                 VoterNotInCommittee()
             );
 
-            bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(
-                keccak256(
-                    abi.encode(
-                        VOTE_TYPEHASH,
-                        block.chainid,
-                        v.e3Id,
-                        accusationId,
-                        voter,
-                        v.agrees[i],
-                        v.dataHashes[i]
-                    )
+            bytes32 structHash = keccak256(
+                abi.encode(
+                    VOTE_TYPEHASH,
+                    v.e3Id,
+                    accusationId,
+                    voter,
+                    v.agrees[i],
+                    v.dataHashes[i]
                 )
             );
+            bytes32 digest = keccak256(
+                abi.encodePacked("\x19\x01", domainSeparator, structHash)
+            );
             require(
-                ECDSA.recover(ethSignedHash, v.signatures[i]) == voter,
+                ECDSA.recover(digest, v.signatures[i]) == voter,
                 InvalidVoteSignature()
             );
         }

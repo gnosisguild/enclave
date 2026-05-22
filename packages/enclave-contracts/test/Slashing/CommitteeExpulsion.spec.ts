@@ -412,6 +412,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         op1Address,
+        await slashingManager.getAddress(),
       );
       const tx = await slashingManager.proposeSlash(0, op1Address, proof);
 
@@ -459,6 +460,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
       );
       await slashingManager.proposeSlash(
         0,
@@ -530,6 +532,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
         0,
         31337,
         ethers.keccak256(evidence1),
@@ -602,6 +605,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
         0,
         31337,
         ethers.keccak256(ev1),
@@ -623,6 +627,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
         7, // C6ThresholdShareDecryption — different proofType
         31337,
         ethers.keccak256(ev2),
@@ -681,6 +686,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
       );
       await slashingManager.proposeSlash(
         0,
@@ -740,6 +746,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
         0,
         31337,
         ethers.keccak256(evExpel1),
@@ -758,6 +765,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator3, operator4],
         0,
         await operator2.getAddress(),
+        await slashingManager.getAddress(),
         0,
         31337,
         ethers.keccak256(evExpel2),
@@ -826,6 +834,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
       );
       await slashingManager.proposeSlash(
         0,
@@ -891,6 +900,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
         0,
         31337,
         ethers.keccak256(evExpelOp1),
@@ -909,6 +919,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator3, operator4],
         0,
         await operator2.getAddress(),
+        await slashingManager.getAddress(),
         0,
         31337,
         ethers.keccak256(evExpelOp2),
@@ -938,6 +949,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
             [operator4],
             0,
             await operator3.getAddress(),
+            await slashingManager.getAddress(),
             0,
             31337,
             ethers.keccak256(ethers.toUtf8Bytes("expel-op3")),
@@ -981,6 +993,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
       );
       const op1Addr = await operator1.getAddress();
       const tx = await slashingManager.proposeSlash(0, op1Addr, proof);

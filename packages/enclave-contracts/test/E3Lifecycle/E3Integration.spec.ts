@@ -770,6 +770,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
       );
 
       await slashingManager.proposeSlash(
@@ -859,6 +860,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
       );
       await slashingManager.proposeSlash(
         0,
@@ -1413,6 +1415,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         [operator2, operator3],
         0,
         await operator1.getAddress(),
+        await slashingManager.getAddress(),
       );
       await slashingManager.proposeSlash(
         0,

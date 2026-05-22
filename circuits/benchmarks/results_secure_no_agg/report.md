@@ -1,9 +1,9 @@
 # Enclave ZK Circuit Benchmarks
 
-**Generated:** 2026-05-22 16:16:15 UTC
+**Generated:** 2026-05-22 17:39:46 UTC
 
 **Git Branch:** `feat/1549`  
-**Git Commit:** `201c73cc0eb6b0030e7c6076b86038baac37fea3`
+**Git Commit:** `f5c2fef8490fc34fe7357743220321af9626c879`
 
 **Committee Size:** `H=3`, `N=3`, `T=1`
 
@@ -13,20 +13,21 @@ Settings for this benchmark run (integration test + Nargo circuit benches on the
 
 ### Integration test (`test_trbfv_actor`)
 
-| Setting                                               | Value                 |
-| ----------------------------------------------------- | --------------------- |
-| Benchmark mode                                        | `secure`              |
-| BFV preset (artifacts)                                | `secure-8192`         |
-| BFV preset (enum)                                     | `SecureThreshold8192` |
-| λ (smudging / error)                                  | 60                    |
-| Nodes spawned (builder)                               | 20                    |
-| Network model                                         | `in_process_bus`      |
-| Testmode harness                                      | true                  |
-| `proof_aggregation_enabled`                           | unknown               |
-| `BENCHMARK_MULTITHREAD_JOBS` (max concurrent ZK jobs) | 13                    |
-| Rayon worker threads                                  | 13                    |
-| CPU cores (host)                                      | 14                    |
-| Verbose logging (`run_benchmarks.sh --verbose`)       | true                  |
+| Setting                                               | Value                                |
+| ----------------------------------------------------- | ------------------------------------ |
+| Benchmark mode                                        | `secure`                             |
+| BFV preset (artifacts)                                | `secure-8192`                        |
+| BFV preset (enum)                                     | `SecureThreshold8192`                |
+| λ (smudging / error)                                  | 60                                   |
+| Nodes spawned (builder)                               | 20                                   |
+| Network model                                         | `in_process_bus`                     |
+| Testmode harness                                      | true                                 |
+| `proof_aggregation_enabled`                           | false                                |
+| `BENCHMARK_MULTITHREAD_JOBS` (max concurrent ZK jobs) | 13                                   |
+| Rayon worker threads                                  | 13                                   |
+| CPU cores (host)                                      | 14                                   |
+| `dkg_fold_attestation_verifier`                       | _(disabled — proof aggregation off)_ |
+| Verbose logging (`run_benchmarks.sh --verbose`)       | true                                 |
 
 ### Hardware & software (Nargo / Barretenberg host)
 
@@ -150,6 +151,9 @@ comparable to P2 wall_clock row above._
 Sum of tracked job wall time: **13907.01 s** — **not** end-to-end latency (jobs run in parallel up
 to `BENCHMARK_MULTITHREAD_JOBS`).
 
+_Baseline run: node DKG folds and folded Π_DKG / Π_dec export are disabled. Compare with
+`BENCHMARK_PROOF_AGGREGATION=true` (default)._
+
 ### Aggregation jobs (`tracked_job_wall`)
 
 | Operation                    | Avg (s) | Runs | Total (s) |
@@ -158,8 +162,6 @@ to `BENCHMARK_MULTITHREAD_JOBS`).
 | ZkPkAggregation              | 49.00   | 1    | 49.00     |
 
 Sum of aggregation job tracked time: **67.94 s** (parallel CPU work; not P1/P2 wall clock).
-
-_No `folded_artifacts` in integration summary (export failed or test exited early)._
 
 ## Raw circuit benchmark JSON (Nargo)
 

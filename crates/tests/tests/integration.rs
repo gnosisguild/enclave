@@ -152,6 +152,15 @@ fn benchmark_dkg_fold_attestation_verifier_address() -> Option<Address> {
     addr.parse().ok()
 }
 
+/// Slashing manager address for benchmarks (no live RPC; used as EIP-712
+/// `verifyingContract` for accusation vote signatures).
+fn benchmark_slashing_manager_address() -> Address {
+    let addr = std::env::var("BENCHMARK_SLASHING_MANAGER")
+        .unwrap_or_else(|_| "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707".to_string());
+    addr.parse()
+        .expect("BENCHMARK_SLASHING_MANAGER must be a valid address")
+}
+
 /// RAII guard that restores the benchmark-specific collector-timeout env vars on scope exit.
 /// This prevents leaking secure-mode tuning into other tests/processes.
 struct EnvTimeoutVarsGuard {
@@ -1142,6 +1151,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // Actor system setup
     let concurrent_jobs = benchmark_multithread_concurrent_jobs();
     let dkg_fold_verifier = benchmark_dkg_fold_attestation_verifier_address();
+    let slashing_manager_addr = benchmark_slashing_manager_address();
     let max_threadroom = Multithread::get_max_threads_minus(1);
     let task_pool = Multithread::create_taskpool(max_threadroom, concurrent_jobs);
     let multithread_report = MultithreadReport::new(max_threadroom, concurrent_jobs).start();
@@ -1170,6 +1180,7 @@ async fn test_trbfv_actor() -> Result<()> {
                     .with_threshold_plaintext_aggregation()
                     .testmode_with_forked_bus(bus.event_bus())
                     .testmode_ignore_address_check()
+                    .testmode_with_slashing_manager(slashing_manager_addr)
                     .with_logging();
                 if let Some(verifier) = dkg_fold_verifier {
                     b = b.testmode_with_dkg_fold_attestation_verifier(verifier);
@@ -1194,6 +1205,7 @@ async fn test_trbfv_actor() -> Result<()> {
                     .with_threshold_plaintext_aggregation()
                     .testmode_with_forked_bus(bus.event_bus())
                     .testmode_ignore_address_check()
+                    .testmode_with_slashing_manager(slashing_manager_addr)
                     .with_logging();
                 if let Some(verifier) = dkg_fold_verifier {
                     b = b.testmode_with_dkg_fold_attestation_verifier(verifier);

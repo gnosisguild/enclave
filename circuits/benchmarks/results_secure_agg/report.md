@@ -1,9 +1,9 @@
 # Enclave ZK Circuit Benchmarks
 
-**Generated:** 2026-05-22 17:01:00 UTC
+**Generated:** 2026-05-22 17:39:45 UTC
 
 **Git Branch:** `feat/1549`  
-**Git Commit:** `201c73cc0eb6b0030e7c6076b86038baac37fea3`
+**Git Commit:** `f5c2fef8490fc34fe7357743220321af9626c879`
 
 **Committee Size:** `H=3`, `N=3`, `T=1`
 
@@ -27,6 +27,7 @@ Settings for this benchmark run (integration test + Nargo circuit benches on the
 | Rayon worker threads                                  | 13                                           |
 | CPU cores (host)                                      | 14                                           |
 | `dkg_fold_attestation_verifier` (EIP-712)             | `0x7969c5eD335650692Bc04293B07F5BF2e7A673C0` |
+| Verbose logging (`run_benchmarks.sh --verbose`)       | false                                        |
 
 ### Hardware & software (Nargo / Barretenberg host)
 

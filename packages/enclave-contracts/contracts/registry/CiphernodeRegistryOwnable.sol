@@ -163,6 +163,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ) public initializer {
         require(_owner != address(0), ZeroAddress());
 
+        // Hold ownership transiently as `msg.sender` so the internal call to
+        // `setSortitionSubmissionWindow` (which is `onlyOwner`) succeeds, then
+        // transfer to the final `_owner` before returning.
         __Ownable_init(msg.sender);
         ciphernodes._init(TREE_DEPTH);
         setSortitionSubmissionWindow(_submissionWindow);
@@ -487,7 +490,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             return false;
         }
 
-        _sortTopNodesByAscendingScore(c);
+        _sortTopNodesByAscendingAddress(c);
 
         c.stage = ICiphernodeRegistry.CommitteeStage.Finalized;
         c.activeCount = c.topNodes.length;
@@ -855,7 +858,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ///      equivalent to numeric address-ascending for hex-encoded addresses).
     ///      This also defines `party_id` = position in the address-sorted committee.
     /// @param c Committee storage reference
-    function _sortTopNodesByAscendingScore(Committee storage c) internal {
+    function _sortTopNodesByAscendingAddress(Committee storage c) internal {
         uint256 len = c.topNodes.length;
         for (uint256 i = 0; i < len; ++i) {
             for (uint256 j = i + 1; j < len; ++j) {

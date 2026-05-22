@@ -50,6 +50,18 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
     ) private pure returns (BundleData memory data) {
         (, data.publicInputs) = abi.decode(proof, (bytes, bytes32[]));
         data.h = _honestPartyCount(data.publicInputs);
+        // Defense in depth: require the public-inputs `partyId` slots
+        // (`publicInputs[2..2+h]`) to be strictly ascending. The zk circuit
+        // already enforces this, but rejecting duplicates here prevents two
+        // bindings from resolving to the same slot in `_partySlot` (which
+        // would silently overwrite each other in `partyIdsOut` etc.).
+        for (uint256 k = 1; k < data.h; k++) {
+            require(
+                uint256(data.publicInputs[2 + k]) >
+                    uint256(data.publicInputs[2 + k - 1]),
+                ICiphernodeRegistry.InvalidFoldAttestation()
+            );
+        }
         (data.attestations, data.bindings) = abi.decode(
             dkgAttestationBundle,
             (
@@ -135,6 +147,10 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
             ICiphernodeRegistry.InvalidFoldAttestation()
         );
         h = (publicInputs.length - 6) / 3;
+        // Defense in depth: the BFV pk-verifier already rejects `h == 0`, but
+        // a zero-honest-party proof would otherwise pass this verifier with no
+        // attestations to check and write empty anchors to the registry.
+        require(h > 0, ICiphernodeRegistry.InvalidFoldAttestation());
     }
 
     function _verifyBinding(

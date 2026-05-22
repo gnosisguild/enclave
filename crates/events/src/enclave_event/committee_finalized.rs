@@ -21,7 +21,7 @@ pub struct CommitteeFinalized {
 impl CommitteeFinalized {
     /// Sort committee members by ascending address so every node derives the same
     /// deterministic ordering, matching the on-chain registry's canonical address-ascending
-    /// `topNodes` layout (see `_sortTopNodesByAscendingScore` in `CiphernodeRegistryOwnable`).
+    /// `topNodes` layout (see `_sortTopNodesByAscendingAddress` in `CiphernodeRegistryOwnable`).
     /// The node with the numerically lowest address ends up at index 0 (= party 0).
     /// Address comparison is done in lowercase to be independent of EIP-55 checksumming.
     pub fn sort_by_score(&mut self) {

@@ -573,6 +573,7 @@ describe("SlashingManager", function () {
         [voter1, voter2],
         e3Id,
         operatorAddress,
+        await slashingManager.getAddress(),
       );
 
       // Anyone can submit the signed attestation evidence (permissionless for Lane A)
@@ -628,6 +629,7 @@ describe("SlashingManager", function () {
         [voter1], // only 1 voter, need 2
         0,
         operatorAddress,
+        await slashingManager.getAddress(),
       );
       await expect(
         slashingManager
@@ -782,6 +784,7 @@ describe("SlashingManager", function () {
         [voter1, voter2], // voter2 is NOT in committee
         0,
         operatorAddress,
+        await slashingManager.getAddress(),
       );
       await expect(
         slashingManager
@@ -876,6 +879,7 @@ describe("SlashingManager", function () {
         [voter1, voter2],
         0,
         operatorAddress,
+        await slashingManager.getAddress(),
       );
       await slashingManager
         .connect(proposer)
@@ -922,6 +926,7 @@ describe("SlashingManager", function () {
         [voter1, voter2],
         0,
         operatorAddress,
+        await slashingManager.getAddress(),
       );
       await slashingManager
         .connect(proposer)
@@ -933,6 +938,7 @@ describe("SlashingManager", function () {
         [voter1, voter2],
         1,
         operatorAddress,
+        await slashingManager.getAddress(),
       );
       await slashingManager
         .connect(proposer)
@@ -968,6 +974,7 @@ describe("SlashingManager", function () {
         [voter1, voter2],
         0,
         operatorAddress,
+        await slashingManager.getAddress(),
         1, // proofType=1 maps to REASON_PT_1 (ban policy)
       );
       await slashingManager
@@ -1105,6 +1112,7 @@ describe("SlashingManager", function () {
         [voter1, voter2],
         0,
         operatorAddress,
+        await slashingManager.getAddress(),
       );
       await slashingManager
         .connect(proposer)
@@ -1264,6 +1272,7 @@ describe("SlashingManager", function () {
         [voter1, voter2],
         0,
         operatorAddress,
+        await slashingManager.getAddress(),
       );
       await slashingManager
         .connect(proposer)
@@ -1531,6 +1540,7 @@ describe("SlashingManager", function () {
         [voter1, voter2],
         0,
         operatorAddress,
+        await slashingManager.getAddress(),
       );
       await slashingManager
         .connect(proposer)

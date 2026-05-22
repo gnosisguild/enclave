@@ -372,7 +372,12 @@ fn test_digest_matches_solidity_encoding() {
 // ════════════════════════════════════════════════════════════════════════════
 
 const VOTE_TYPEHASH_STR: &str =
-    "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)";
+    "AccusationVote(uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)";
+
+const VOTE_DOMAIN_TYPEHASH_STR: &str =
+    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)";
+const VOTE_DOMAIN_NAME: &str = "EnclaveSlashingManager";
+const VOTE_DOMAIN_VERSION: &str = "1";
 
 /// Lane A policy key: `keccak256(abi.encodePacked(proofType))` (must match `SlashingManager.proposeSlash`).
 fn reason_for_proof_type(proof_type: u8) -> FixedBytes<32> {
@@ -409,9 +414,28 @@ fn compute_accusation_id(
     )
 }
 
-/// Compute the structured vote digest matching `AccusationManager::vote_digest()`.
+/// Compute the canonical EIP-712 vote domain separator.
+fn compute_vote_domain_separator(chain_id: u64, verifying_contract: Address) -> FixedBytes<32> {
+    let domain_typehash = keccak256(VOTE_DOMAIN_TYPEHASH_STR);
+    let name_hash = keccak256(VOTE_DOMAIN_NAME.as_bytes());
+    let version_hash = keccak256(VOTE_DOMAIN_VERSION.as_bytes());
+    keccak256(
+        &(
+            domain_typehash,
+            name_hash,
+            version_hash,
+            U256::from(chain_id),
+            verifying_contract,
+        )
+            .abi_encode(),
+    )
+}
+
+/// Compute the canonical EIP-712 typed-data hash for a vote, matching
+/// `AccusationManager::vote_digest()` and `SlashingManager._verifyVotes`.
 fn compute_vote_digest(
     chain_id: u64,
+    verifying_contract: Address,
     e3_id: u64,
     accusation_id: FixedBytes<32>,
     voter: Address,
@@ -419,10 +443,9 @@ fn compute_vote_digest(
     data_hash: FixedBytes<32>,
 ) -> FixedBytes<32> {
     let typehash = keccak256(VOTE_TYPEHASH_STR);
-    keccak256(
+    let struct_hash = keccak256(
         &(
             typehash,
-            U256::from(chain_id),
             U256::from(e3_id),
             accusation_id,
             voter,
@@ -430,22 +453,39 @@ fn compute_vote_digest(
             data_hash,
         )
             .abi_encode(),
-    )
+    );
+    let domain = compute_vote_domain_separator(chain_id, verifying_contract);
+    let mut buf = Vec::with_capacity(2 + 32 + 32);
+    buf.push(0x19);
+    buf.push(0x01);
+    buf.extend_from_slice(domain.as_ref());
+    buf.extend_from_slice(struct_hash.as_ref());
+    keccak256(&buf)
 }
 
-/// Sign a vote and return `(voter_address, signature_bytes)`.
+/// Sign a vote and return `(voter_address, signature_bytes)`. EIP-712 typed-data signature.
 fn sign_vote(
     signer: &PrivateKeySigner,
     chain_id: u64,
+    verifying_contract: Address,
     e3_id: u64,
     accusation_id: FixedBytes<32>,
     agrees: bool,
     data_hash: FixedBytes<32>,
 ) -> (Address, Bytes) {
     let voter = signer.address();
-    let digest = compute_vote_digest(chain_id, e3_id, accusation_id, voter, agrees, data_hash);
+    let digest = compute_vote_digest(
+        chain_id,
+        verifying_contract,
+        e3_id,
+        accusation_id,
+        voter,
+        agrees,
+        data_hash,
+    );
+    // EIP-712: sign the typed-data hash directly (no EIP-191 wrapping).
     let sig = signer
-        .sign_message_sync(digest.as_ref())
+        .sign_hash_sync(&digest)
         .expect("vote signing should succeed");
     (voter, Bytes::from(sig.as_bytes().to_vec()))
 }
@@ -500,7 +540,7 @@ fn test_reason_for_proof_type_matches_solidity() {
 fn test_vote_typehash() {
     let expected: [u8; 32] = keccak256(VOTE_TYPEHASH_STR).into();
     // Cross-check with the exact string the Solidity contract uses:
-    let sol_str = "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)";
+    let sol_str = "AccusationVote(uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)";
     let sol_hash: [u8; 32] = keccak256(sol_str).into();
     assert_eq!(
         expected, sol_hash,
@@ -508,10 +548,13 @@ fn test_vote_typehash() {
     );
 }
 
-/// Verifies vote digest computation matches manual abi.encode + keccak256.
+/// Verifies vote digest computation matches the canonical EIP-712 typed-data hash.
 #[test]
 fn test_vote_digest_manual_computation() {
     let chain_id = 31337u64;
+    let verifying_contract: Address = "0x9999999999999999999999999999999999999999"
+        .parse()
+        .unwrap();
     let e3_id = 42u64;
     let operator: Address = "0x1111111111111111111111111111111111111111"
         .parse()
@@ -523,29 +566,44 @@ fn test_vote_digest_manual_computation() {
     let data_hash = FixedBytes::from([0xab; 32]);
 
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator, proof_type);
-    let digest = compute_vote_digest(chain_id, e3_id, accusation_id, voter, true, data_hash);
-
-    // Manual computation
-    let typehash = keccak256(VOTE_TYPEHASH_STR);
-    let encoded = (
-        typehash,
-        U256::from(chain_id),
-        U256::from(e3_id),
+    let digest = compute_vote_digest(
+        chain_id,
+        verifying_contract,
+        e3_id,
         accusation_id,
         voter,
         true,
         data_hash,
-    )
-        .abi_encode();
-    let expected: FixedBytes<32> = keccak256(&encoded);
+    );
+
+    // Manual EIP-712 computation
+    let typehash = keccak256(VOTE_TYPEHASH_STR);
+    let struct_hash: FixedBytes<32> = keccak256(
+        &(
+            typehash,
+            U256::from(e3_id),
+            accusation_id,
+            voter,
+            true,
+            data_hash,
+        )
+            .abi_encode(),
+    );
+    let domain = compute_vote_domain_separator(chain_id, verifying_contract);
+    let mut buf = Vec::with_capacity(2 + 32 + 32);
+    buf.push(0x19);
+    buf.push(0x01);
+    buf.extend_from_slice(domain.as_ref());
+    buf.extend_from_slice(struct_hash.as_ref());
+    let expected: FixedBytes<32> = keccak256(&buf);
 
     assert_eq!(
         digest, expected,
-        "vote digest should match manual computation"
+        "vote digest should match canonical EIP-712 typed-data hash"
     );
 }
 
-/// Verifies vote sign/recover roundtrip.
+/// Verifies vote sign/recover roundtrip (EIP-712, no EIP-191 wrapping).
 #[test]
 fn test_vote_signing_roundtrip() {
     let signer: PrivateKeySigner =
@@ -553,6 +611,9 @@ fn test_vote_signing_roundtrip() {
             .parse()
             .unwrap();
     let chain_id = 31337u64;
+    let verifying_contract: Address = "0x9999999999999999999999999999999999999999"
+        .parse()
+        .unwrap();
     let e3_id = 42u64;
     let operator: Address = "0x1111111111111111111111111111111111111111"
         .parse()
@@ -561,7 +622,15 @@ fn test_vote_signing_roundtrip() {
     let data_hash = FixedBytes::from([0xab; 32]);
 
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator, proof_type);
-    let (voter, sig_bytes) = sign_vote(&signer, chain_id, e3_id, accusation_id, true, data_hash);
+    let (voter, sig_bytes) = sign_vote(
+        &signer,
+        chain_id,
+        verifying_contract,
+        e3_id,
+        accusation_id,
+        true,
+        data_hash,
+    );
 
     assert_eq!(
         voter,
@@ -569,12 +638,20 @@ fn test_vote_signing_roundtrip() {
         "voter should be the signer address"
     );
 
-    // Verify recover
-    let digest = compute_vote_digest(chain_id, e3_id, accusation_id, voter, true, data_hash);
+    // Verify recover (raw prehash, no EIP-191 wrapping)
+    let digest = compute_vote_digest(
+        chain_id,
+        verifying_contract,
+        e3_id,
+        accusation_id,
+        voter,
+        true,
+        data_hash,
+    );
     let sig =
         alloy::primitives::Signature::try_from(sig_bytes.as_ref()).expect("signature should parse");
     let recovered = sig
-        .recover_address_from_msg(digest.as_slice())
+        .recover_address_from_prehash(&digest)
         .expect("recovery should succeed");
     assert_eq!(
         recovered,
@@ -621,6 +698,9 @@ fn test_attestation_evidence_encoding() {
     let signer2: PrivateKeySigner = PrivateKeySigner::random();
 
     let chain_id = 31337u64;
+    let verifying_contract: Address = "0x9999999999999999999999999999999999999999"
+        .parse()
+        .unwrap();
     let e3_id = 1u64;
     let operator: Address = "0x1111111111111111111111111111111111111111"
         .parse()
@@ -632,8 +712,24 @@ fn test_attestation_evidence_encoding() {
     // Evidence preimage must hash to dataHash on chain.
     let evidence_bytes = Bytes::from(vec![0xab, 0xcd, 0xef]);
     let data_hash: FixedBytes<32> = keccak256(&evidence_bytes).into();
-    let (voter1, sig1) = sign_vote(&signer1, chain_id, e3_id, accusation_id, true, data_hash);
-    let (voter2, sig2) = sign_vote(&signer2, chain_id, e3_id, accusation_id, true, data_hash);
+    let (voter1, sig1) = sign_vote(
+        &signer1,
+        chain_id,
+        verifying_contract,
+        e3_id,
+        accusation_id,
+        true,
+        data_hash,
+    );
+    let (voter2, sig2) = sign_vote(
+        &signer2,
+        chain_id,
+        verifying_contract,
+        e3_id,
+        accusation_id,
+        true,
+        data_hash,
+    );
 
     let evidence = encode_attestation_evidence(
         proof_type,
@@ -843,6 +939,7 @@ async fn test_onchain_valid_attestation_executes_slash() {
     let (v1, s1) = sign_vote(
         &voter_signer1,
         chain_id,
+        sm_addr,
         e3_id,
         accusation_id,
         true,
@@ -851,6 +948,7 @@ async fn test_onchain_valid_attestation_executes_slash() {
     let (v2, s2) = sign_vote(
         &voter_signer2,
         chain_id,
+        sm_addr,
         e3_id,
         accusation_id,
         true,
@@ -859,6 +957,7 @@ async fn test_onchain_valid_attestation_executes_slash() {
     let (v3, s3) = sign_vote(
         &voter_signer3,
         chain_id,
+        sm_addr,
         e3_id,
         accusation_id,
         true,
@@ -1011,6 +1110,7 @@ async fn test_onchain_insufficient_attestations_reverts() {
     let (v1, s1) = sign_vote(
         &voter_signer1,
         chain_id,
+        sm_addr,
         e3_id,
         accusation_id,
         true,
@@ -1126,6 +1226,7 @@ async fn test_onchain_voter_not_in_committee_reverts() {
     let (v_out, s_out) = sign_vote(
         &outsider_signer,
         chain_id,
+        sm_addr,
         e3_id,
         accusation_id,
         true,
@@ -1244,6 +1345,7 @@ async fn test_onchain_invalid_vote_signature_reverts() {
     // Sign using impersonator's key but construct the digest for victim_signer's address
     let digest = compute_vote_digest(
         chain_id,
+        sm_addr,
         e3_id,
         accusation_id,
         victim_signer.address(),
@@ -1251,7 +1353,7 @@ async fn test_onchain_invalid_vote_signature_reverts() {
         data_hash,
     );
     let bad_sig = impersonator_signer
-        .sign_message_sync(digest.as_ref())
+        .sign_hash_sync(&digest)
         .expect("signing should succeed");
 
     // Build evidence claiming the vote is from victim_signer but signed by impersonator
@@ -1373,6 +1475,7 @@ async fn test_onchain_duplicate_voter_reverts() {
     let (voter, sig) = sign_vote(
         &voter_signer,
         chain_id,
+        sm_addr,
         e3_id,
         accusation_id,
         true,
@@ -1500,6 +1603,7 @@ async fn test_onchain_duplicate_evidence_reverts() {
     let (v1, s1) = sign_vote(
         &voter_signer1,
         chain_id,
+        sm_addr,
         e3_id,
         accusation_id,
         true,
@@ -1508,6 +1612,7 @@ async fn test_onchain_duplicate_evidence_reverts() {
     let (v2, s2) = sign_vote(
         &voter_signer2,
         chain_id,
+        sm_addr,
         e3_id,
         accusation_id,
         true,

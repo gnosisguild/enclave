@@ -22,13 +22,20 @@ use tracing::{error, info};
 pub struct AccusationManagerExtension {
     bus: BusHandle,
     signer: PrivateKeySigner,
+    /// On-chain `SlashingManager` address (EIP-712 `verifyingContract` for vote sigs).
+    slashing_manager: Address,
 }
 
 impl AccusationManagerExtension {
-    pub fn create(bus: &BusHandle, signer: PrivateKeySigner) -> Box<Self> {
+    pub fn create(
+        bus: &BusHandle,
+        signer: PrivateKeySigner,
+        slashing_manager: Address,
+    ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             signer: signer.clone(),
+            slashing_manager,
         })
     }
 }
@@ -87,6 +94,7 @@ impl E3Extension for AccusationManagerExtension {
             &self.bus,
             e3_id,
             self.signer.clone(),
+            self.slashing_manager,
             committee_addresses,
             threshold_m,
             meta.params_preset,
