@@ -9,16 +9,20 @@ import {
   DkgFoldAttestationVerifier,
   DkgFoldAttestationVerifier__factory as DkgFoldAttestationVerifierFactory,
 } from "../../types";
-import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+import {
+  getDeploymentChain,
+  readDeploymentArgs,
+  storeDeploymentArgs,
+} from "../utils";
 
 export const deployAndSaveDkgFoldAttestationVerifier = async (
   hre: HardhatRuntimeEnvironment,
 ): Promise<{
   dkgFoldAttestationVerifier: DkgFoldAttestationVerifier;
 }> => {
-  const { ethers, networkName } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = networkName ?? "localhost";
+  const chain = getDeploymentChain(hre);
 
   const existing = readDeploymentArgs("DkgFoldAttestationVerifier", chain);
   if (existing?.address) {

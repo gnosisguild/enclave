@@ -144,15 +144,17 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
         BundleData memory data,
         DkgFoldAttestationLib.PartySlotBinding memory binding
     ) private view returns (uint256 slot, bytes32 skCommit, bytes32 esmCommit) {
-        // Structural check: the binding's `node` must be the operator
-        // registered at `topNodes[partyId]` on chain. This prevents an
-        // aggregator from reassigning a node's signed attestation to a
-        // different slot (e.g. claiming the operator at `topNodes[0]` is
-        // party 1) even if the operator cooperated by signing with the
-        // wrong `partyId`. Combined with the `ecrecover` check below, the
-        // attestation is bound to *both* the right address and the right slot.
+        // Canonical-slot binding: `binding.node` must equal the canonical
+        // operator at index `partyId` of the finalized committee — i.e.
+        // `canonicalCommitteeNodeAt(e3Id, partyId)`, which returns
+        // `topNodes[partyId]` in address-ascending order. `partyId` is the
+        // canonical sortition slot id, so this rejects any binding pointing
+        // to an operator who is not the canonical occupant of that slot,
+        // even one who is otherwise an active committee member. Combined
+        // with the EIP-712 `ecrecover` check below, the attestation is
+        // bound to *both* the right address and the right canonical slot.
         require(
-            ICiphernodeRegistry(registry).getCommitteeNodeAt(
+            ICiphernodeRegistry(registry).canonicalCommitteeNodeAt(
                 e3Id,
                 binding.partyId
             ) == binding.node,

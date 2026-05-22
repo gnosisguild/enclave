@@ -389,12 +389,6 @@ pub fn prove_dkg_aggregation(
         .map(address_to_field_hex)
         .collect();
 
-    let committee_members: Vec<String> = input
-        .committee_addresses
-        .iter()
-        .map(address_to_field_hex)
-        .collect();
-
     let witness = DkgAggregatorWitness {
         nodes_fold_vk: nodes_fold_vk.verification_key.clone(),
         nodes_fold_proof: proof_field_strings(&nodes_fold_proof)?,
@@ -487,11 +481,6 @@ pub fn prove_decryption_aggregation_jobs(
 
     let (committee_hash_hi, committee_hash_lo) =
         e3_utils::committee_hash::committee_hash_field_hex(committee_addresses);
-
-    let committee_members: Vec<String> = committee_addresses
-        .iter()
-        .map(address_to_field_hex)
-        .collect();
 
     let committee_members: Vec<String> = committee_addresses
         .iter()

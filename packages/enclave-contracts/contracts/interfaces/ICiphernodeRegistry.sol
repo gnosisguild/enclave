@@ -515,10 +515,12 @@ interface ICiphernodeRegistry {
     ///      be published yet — it works as soon as the committee is finalized,
     ///      which is what `publishCommittee` callers need in order to bind a
     ///      `partyId` to a specific operator before the public key is stored.
+    ///      Reverts `CommitteeNotFinalized` for non-finalized committees so the
+    ///      provisional, sortition-in-progress `topNodes` is never exposed.
     /// @param e3Id ID of the E3 computation
     /// @param partyId Index into `topNodes`
     /// @return Operator address at `topNodes[partyId]`
-    function getCommitteeNodeAt(
+    function canonicalCommitteeNodeAt(
         uint256 e3Id,
         uint256 partyId
     ) external view returns (address);

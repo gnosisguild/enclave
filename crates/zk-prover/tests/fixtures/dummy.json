@@ -15,7 +15,7 @@
   "file_map": {
     "50": {
       "source": "pub fn main(\n    x: Field,\n    y: Field,\n    _sum: pub Field\n) {\n    let sum = x + y;\n    assert(sum == _sum);\n}\n",
-      "path": "/Users/ctrlc03/Documents/zk/enclave/circuits/bin/dummy/src/main.nr"
+      "path": "circuits/bin/dummy/src/main.nr"
     }
   },
   "expression_width": { "Bounded": { "width": 4 } }

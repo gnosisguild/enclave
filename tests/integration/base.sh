@@ -103,7 +103,7 @@ if [[ "$PROOF_AGGREGATION_ENABLED" == "true" ]]; then
   pnpm e3-program:setMockEnclave --network localhost
 
   heading "Encrypt plaintext under the published committee pubkey"
-  $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
+  $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext "$PLAINTEXT" --params "$ENCODED_PARAMS"
   waiton "$SCRIPT_DIR/output/output.bin"
 
   heading "Publish E3 input (forwards to publishCiphertextOutput; nodes run decryption with ZK proofs)"
@@ -113,7 +113,7 @@ if [[ "$PROOF_AGGREGATION_ENABLED" == "true" ]]; then
   wait_for_plaintext_output 0 "$SCRIPT_DIR/output/plaintext.txt" "$INTEGRATION_DKG_TIMEOUT"
 else
   heading "Mock encrypted plaintext"
-  $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
+  $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext "$PLAINTEXT" --params "$ENCODED_PARAMS"
 
   heading "Mock publish input e3-id"
   pnpm e3-program:publishInput --network localhost  --e3-id 0 --data 0x12345678

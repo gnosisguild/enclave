@@ -210,15 +210,24 @@ async fn setup_test_zk_backend(
         let preset_out = circuits_dir.join(preset_subdir);
         let dist_marker = dist_preset.join("recursive/dkg/pk/pk.json");
         let circuits_bin_marker = repo_root.join("circuits/bin/dkg/target/pk.json");
+        // `circuits/bin` is preset-agnostic on disk — only `dist/circuits/<preset>/.build-stamp.json`
+        // (written by `pnpm build:circuits --preset <preset>`) records which preset the
+        // most recent local build targeted. Without it we cannot tell whether `circuits/bin`
+        // matches `preset_subdir`, and copying the wrong preset's artifacts would silently
+        // produce invalid proofs.
+        let preset_build_stamp = dist_preset.join(".build-stamp.json");
 
         if dist_marker.exists() {
             copy_dir_recursive(&dist_preset, &preset_out).await?;
-        } else if !circuits_bin_marker.exists() {
-            // CI `rust_integration_tests` does not run `pnpm build:circuits`; download the
-            // pinned release tarball when no local fixtures are present.
+        } else if !circuits_bin_marker.exists() || !preset_build_stamp.exists() {
+            // Either no local build exists, or the local build cannot be proven to match
+            // the requested preset; download the pinned release tarball instead.
             println!(
-                "No local circuit fixtures under dist/circuits or circuits/bin; \
-                 downloading release circuits via ensure_installed()..."
+                "No verifiable local circuit fixtures for preset `{}` \
+                 (need either dist/circuits/{}/recursive/dkg/pk/pk.json \
+                 or circuits/bin + dist/circuits/{}/.build-stamp.json); \
+                 downloading release circuits via ensure_installed()...",
+                preset_subdir, preset_subdir, preset_subdir
             );
             let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
             backend

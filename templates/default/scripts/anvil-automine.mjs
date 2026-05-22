@@ -18,12 +18,22 @@ async function rpc(method, params = []) {
   }
 }
 
+let failureCount = 0
+let lastLoggedTime = 0
+const LOG_INTERVAL_MS = 30_000
+
 async function loop() {
   for (;;) {
     try {
       await rpc('evm_mine')
-    } catch {
-      // anvil not up yet
+      failureCount = 0
+    } catch (err) {
+      failureCount++
+      const now = Date.now()
+      if (failureCount === 1 || now - lastLoggedTime >= LOG_INTERVAL_MS) {
+        console.error(`[anvil-automine] evm_mine failed (attempt ${failureCount}):`, err)
+        lastLoggedTime = now
+      }
     }
     await new Promise((r) => setTimeout(r, 1000))
   }

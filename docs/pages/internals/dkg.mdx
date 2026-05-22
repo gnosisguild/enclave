@@ -331,7 +331,7 @@ aggregator.
 ## Proof Aggregation and On-Chain Anchoring
 
 E3 programs can opt into **proof aggregation** by setting `proofAggregationEnabled = true` at
-request time. In that mode the network does not post per-node, per-circuit proofs on chain. Instead
+request time. In that mode the network does not post per-node, per-circuit proofs on-chain. Instead
 the aggregator submits two recursive proofs — one for DKG, one for decryption — together with
 per-node attestations that bind each surfaced commitment to a specific registered operator.
 
@@ -386,14 +386,15 @@ the registry runs two checks in order:
 2. **Fold-attestation verification** via
    [`DkgFoldAttestationVerifier`](https://github.com/gnosisguild/enclave/blob/main/packages/enclave-contracts/contracts/verifiers/DkgFoldAttestationVerifier.sol).
    It walks the bundle's `(partyId, node)` bindings — strictly ascending by `partyId`, no duplicates
-   — and for each binding: requires `getCommitteeNodeAt(e3Id, partyId) == node` (slot binding),
-   requires `isCommitteeMemberActive(e3Id, node)`, recovers the signer of the attestation via
-   `ecrecover` against the EIP-191/712 digest, requires `signer == node`, and checks that the signed
-   `skAggCommit` / `esmAggCommit` match the DKG proof's surfaced commitments at that party's slot.
-   The honest-set cardinality must equal the honest-party count derived from the proof's
-   public-input shape (`(len - 6) / 3`). The slot binding prevents an aggregator from reassigning a
-   node's signed attestation to a different slot — even an actively cooperating signer cannot be
-   "moved" between partyIds because the registry's own slot mapping is checked structurally.
+   — and for each binding: requires `canonicalCommitteeNodeAt(e3Id, partyId) == node` (slot
+   binding), requires `isCommitteeMemberActive(e3Id, node)`, recovers the signer via `ecrecover` on
+   the canonical EIP-712 typed-data digest (with `chainId` and this verifier address in the domain
+   separator), requires `signer == node`, and checks that the signed `skAggCommit` / `esmAggCommit`
+   match the DKG proof's surfaced commitments at that party's slot. The honest-set cardinality must
+   equal the honest-party count derived from the proof's public-input shape (`(len - 6) / 3`). The
+   slot binding prevents an aggregator from reassigning a node's signed attestation to a different
+   slot — even an actively cooperating signer cannot be "moved" between partyIds because the
+   registry's own slot mapping is checked structurally.
 
 Only if both succeed does the registry store the per-party anchors:
 
@@ -430,7 +431,7 @@ decodes as `(proofType, voters[], agrees[], dataHashes[], signatures[], evidence
 - All `dataHashes[i]` equal a common `dataHash` (voters must agree on the same evidence, not just
   "something bad").
 - `keccak256(evidence) == commonDataHash`. The `evidence` field is the raw
-  `abi.encode(proof.data, public_signals)` of the faulty proof, transported on chain so the contract
+  `abi.encode(proof.data, public_signals)` of the faulty proof, transported on-chain so the contract
   — and any third party — can recompute the dataHash from the bytes the committee voted on.
 
 On the Rust side, the evidence bytes are populated for every accusation path that leads to a slash

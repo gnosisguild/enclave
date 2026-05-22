@@ -178,7 +178,7 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         return false;
     }
 
-    function getCommitteeNodeAt(
+    function canonicalCommitteeNodeAt(
         uint256 e3Id,
         uint256 partyId
     ) external view returns (address) {
@@ -331,7 +331,7 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         return false;
     }
 
-    function getCommitteeNodeAt(
+    function canonicalCommitteeNodeAt(
         uint256,
         uint256
     ) external pure returns (address) {

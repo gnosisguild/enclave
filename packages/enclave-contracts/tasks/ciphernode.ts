@@ -7,6 +7,45 @@ import { ZeroAddress } from "ethers";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 
+/**
+ * Resolve the right impersonation RPC prefix for the connected provider.
+ * Anvil exposes `anvil_*`; Hardhat's in-process network exposes `hardhat_*`.
+ * Probes once via `anvil_impersonateAccount` and falls back to `hardhat_*`.
+ * Throws a clear error if neither is supported (e.g. a real RPC).
+ */
+async function resolveImpersonationRpc(
+  provider: { send: (method: string, params: unknown[]) => Promise<unknown> },
+  probeAddress: string,
+): Promise<{
+  impersonate: string;
+  setBalance: string;
+  stopImpersonating: string;
+}> {
+  try {
+    await provider.send("anvil_impersonateAccount", [probeAddress]);
+    await provider.send("anvil_stopImpersonatingAccount", [probeAddress]);
+    return {
+      impersonate: "anvil_impersonateAccount",
+      setBalance: "anvil_setBalance",
+      stopImpersonating: "anvil_stopImpersonatingAccount",
+    };
+  } catch {
+    try {
+      await provider.send("hardhat_impersonateAccount", [probeAddress]);
+      await provider.send("hardhat_stopImpersonatingAccount", [probeAddress]);
+      return {
+        impersonate: "hardhat_impersonateAccount",
+        setBalance: "hardhat_setBalance",
+        stopImpersonating: "hardhat_stopImpersonatingAccount",
+      };
+    } catch (err) {
+      throw new Error(
+        "Provider does not support account impersonation. Run this task against an Anvil or Hardhat local node (e.g. `--network localhost` with `anvil` or `npx hardhat node`).",
+      );
+    }
+  }
+}
+
 export const ciphernodeAdd = task(
   "ciphernode:add",
   "Register a ciphernode to the bonding registry and ciphernode registry",
@@ -280,7 +319,7 @@ export const ciphernodeMintTokens = task(
 
 export const ciphernodeAdminAdd = task(
   "ciphernode:admin-add",
-  "Register a ciphernode using admin privileges (for testing/setup)",
+  "Register a ciphernode using admin privileges (for testing/setup). Requires a local node that supports account impersonation (Anvil or Hardhat).",
 )
   .addOption({
     name: "ciphernodeAddress",
@@ -401,8 +440,12 @@ export const ciphernodeAdminAdd = task(
         console.log(
           "Step 3: Impersonating ciphernode for license operations...",
         );
-        await provider.send("anvil_impersonateAccount", [ciphernodeAddress]);
-        await provider.send("anvil_setBalance", [
+        const impersonationRpc = await resolveImpersonationRpc(
+          provider,
+          ciphernodeAddress,
+        );
+        await provider.send(impersonationRpc.impersonate, [ciphernodeAddress]);
+        await provider.send(impersonationRpc.setBalance, [
           ciphernodeAddress,
           "0x1000000000000000000000",
         ]);
@@ -429,7 +472,7 @@ export const ciphernodeAdminAdd = task(
           "Operator registered (automatically added to CiphernodeRegistry)",
         );
 
-        await provider.send("anvil_stopImpersonatingAccount", [
+        await provider.send(impersonationRpc.stopImpersonating, [
           ciphernodeAddress,
         ]);
 
@@ -441,8 +484,8 @@ export const ciphernodeAdminAdd = task(
         );
         await approveUsdcTx.wait();
 
-        await provider.send("anvil_impersonateAccount", [ciphernodeAddress]);
-        await provider.send("anvil_setBalance", [
+        await provider.send(impersonationRpc.impersonate, [ciphernodeAddress]);
+        await provider.send(impersonationRpc.setBalance, [
           ciphernodeAddress,
           "0x1000000000000000000000",
         ]);
@@ -469,7 +512,7 @@ export const ciphernodeAdminAdd = task(
         await addTicketTx.wait();
         console.log(`Ticket balance added: ${ticketAmount} USDC worth`);
 
-        await provider.send("anvil_stopImpersonatingAccount", [
+        await provider.send(impersonationRpc.stopImpersonating, [
           ciphernodeAddress,
         ]);
 

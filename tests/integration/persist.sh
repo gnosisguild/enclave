@@ -100,7 +100,7 @@ enclave_nodes_start "$ACTIVE_AGG"
 sleep 5
 
 heading "Mock encrypted plaintext"
-$SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
+$SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext "$PLAINTEXT" --params "$ENCODED_PARAMS"
 
 heading "Mock publish input e3-id"
 pnpm e3-program:publishInput --network localhost  --e3-id 0 --data 0x12345678

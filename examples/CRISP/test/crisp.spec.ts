@@ -8,22 +8,29 @@ import { ConsoleMessage, Page } from '@playwright/test'
 import { testWithSynpress } from '@synthetixio/synpress'
 import { MetaMask, metaMaskFixtures } from '@synthetixio/synpress/playwright'
 import basicSetup from './wallet-setup/basic.setup'
-import { execSync } from 'child_process'
+import { execFileSync } from 'child_process'
 import { config } from 'dotenv'
 import path from 'path'
 
+const CLI = path.join(process.cwd(), 'target', 'debug', 'cli')
+
 config({ path: path.join(process.cwd(), 'server', '.env') })
+config({ path: path.join(process.cwd(), 'client', '.env') })
 
 const E3_DURATION = parseInt(process.env.E3_DURATION as string, 10) * 1000
 const OUTPUT_DECRYPTION_WAIT = 80_000 // A small buffer for decryption
 
+function crispTokenAddress(): string {
+  const tokenAddress = process.env.VITE_CRISP_TOKEN
+  if (!tokenAddress) {
+    throw new Error('VITE_CRISP_TOKEN must be set (see client/.env after deploy)')
+  }
+  return tokenAddress
+}
+
 async function runCliInit(): Promise<number> {
   try {
-    // Execute the command and wait for it to complete
-    const tokenAddress = process.env.VITE_CRISP_TOKEN ?? '0x9d4454B023096f34B160D6B654540c56A1F81688'
-    const output = execSync(`pnpm cli init --token-address ${tokenAddress} --balance-threshold 1000`, {
-      encoding: 'utf-8',
-    })
+    const output = execFileSync(CLI, ['init', '--token-address', crispTokenAddress(), '--balance-threshold', '1000'], { encoding: 'utf-8' })
     console.log('Command output:', output)
     const lines = output.trim().split('\n')
     const lastLine = lines[lines.length - 1].trim()
@@ -40,7 +47,7 @@ async function runCliInit(): Promise<number> {
 
 async function checkE3Ready(e3id: number): Promise<boolean> {
   try {
-    const output = execSync(`pnpm cli check-e3-ready --e3id ${e3id}`, {
+    const output = execFileSync(CLI, ['check-e3-ready', '--e3id', String(e3id)], {
       encoding: 'utf-8',
     })
     const lines = output.trim().split('\n')

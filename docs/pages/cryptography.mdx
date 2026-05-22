@@ -231,19 +231,21 @@ At `publishCommittee` the registry has already finalised `topNodes` (the address
 party 0 = lowest address, party 1 = next, ...), so the on-chain canonical mapping from a `partyId`
 to an operator address is `topNodes[partyId]`.
 
-Each node's fold attestation signs an EIP-712-style digest over
-`(chainId, e3Id, partyId, skAggCommit, esmAggCommit)` with the operator's registered key. The
-on-chain
+Each node's fold attestation signs the canonical **EIP-712 typed-data digest**
+(`keccak256("\x19\x01" || domainSeparator || structHash)`). The **domain separator** binds `chainId`
+and `verifyingContract` (the deployed `DkgFoldAttestationVerifier` address); off-chain signers must
+include those domain fields. The **struct hash** binds `(e3Id, partyId, skAggCommit, esmAggCommit)`
+— the tuple values in the signed payload, separate from the domain. The on-chain
 [`DkgFoldAttestationVerifier`](https://github.com/gnosisguild/enclave/blob/main/packages/enclave-contracts/contracts/verifiers/DkgFoldAttestationVerifier.sol)
 then enforces four properties per attestation:
 
-1. **Slot binding**: `getCommitteeNodeAt(e3Id, binding.partyId) == binding.node`. The aggregator
-   cannot claim that the operator at `topNodes[0]` is party 1 — the registry's canonical slot
-   mapping is checked directly. Available before `publishCommittee` completes (the registry sorts
-   `topNodes` at finalisation, well before the attestation verifier runs).
-2. **Signer = registered operator**: `ecrecover` over the signed digest must equal that `node`
-   address, and the address must be an active committee member for this E3
-   (`isCommitteeMemberActive(e3Id, node)`).
+1. **Slot binding**: `canonicalCommitteeNodeAt(e3Id, binding.partyId) == binding.node`. The
+   aggregator cannot claim that the operator at `topNodes[0]` is party 1 — the registry's canonical
+   slot mapping is checked directly. Available before `publishCommittee` completes (the registry
+   sorts `topNodes` at finalisation, well before the attestation verifier runs).
+2. **Signer = registered operator**: `ecrecover` on the EIP-712 digest (with this verifier as
+   `verifyingContract`) must equal `binding.node`, and the address must be an active committee
+   member for this E3 (`isCommitteeMemberActive(e3Id, node)`).
 3. **Commitments match the DKG proof**: the signed `skAggCommit` and `esmAggCommit` must equal the
    `partyId`'s slot in the DKG aggregator proof's public inputs.
 4. **Honest-set cardinality**: the bundle must contain exactly one attestation per honest party in

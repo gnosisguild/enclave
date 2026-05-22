@@ -360,6 +360,14 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         );
         require(address(verifier) != address(0), ZeroAddress());
         dkgFoldAttestationVerifier = verifier;
+        // Invalidate any stale pending proposal made before the initial set,
+        // so it cannot later be committed and silently bypass the timelock.
+        if (pendingDkgFoldAttestationVerifier != address(0)) {
+            address staleProposal = pendingDkgFoldAttestationVerifier;
+            pendingDkgFoldAttestationVerifier = address(0);
+            pendingDkgFoldAttestationVerifierAt = 0;
+            emit DkgFoldAttestationVerifierProposalCancelled(staleProposal);
+        }
         emit DkgFoldAttestationVerifierUpdated(address(verifier));
     }
 
@@ -716,13 +724,23 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     /// @inheritdoc ICiphernodeRegistry
-    function getCommitteeNodeAt(
+    function canonicalCommitteeNodeAt(
         uint256 e3Id,
         uint256 partyId
     ) external view returns (address) {
-        address[] storage top = committees[e3Id].topNodes;
-        require(partyId < top.length, PartyIdOutOfBounds(partyId, top.length));
-        return top[partyId];
+        Committee storage c = committees[e3Id];
+        // Only expose `partyId -> node` for canonical (finalized) committees.
+        // Pre-finalization, `topNodes` is still being populated by sortition
+        // and is not the canonical mapping.
+        require(
+            c.stage == ICiphernodeRegistry.CommitteeStage.Finalized,
+            CommitteeNotFinalized()
+        );
+        require(
+            partyId < c.topNodes.length,
+            PartyIdOutOfBounds(partyId, c.topNodes.length)
+        );
+        return c.topNodes[partyId];
     }
 
     /// @inheritdoc ICiphernodeRegistry
