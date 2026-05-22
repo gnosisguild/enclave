@@ -52,11 +52,34 @@ export const isLocalDeploymentChain = (chain: string): boolean =>
   (LOCAL_DEPLOYMENT_NETWORKS as readonly string[]).includes(chain) ||
   (LEGACY_LOCAL_DEPLOYMENT_ALIASES as readonly string[]).includes(chain);
 
-/** Monorepo root (`enclave/`), resolved from `packages/enclave-contracts/scripts/`. */
-export const REPO_ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../..",
-);
+/** Monorepo root (`enclave/`). Works from `scripts/` and compiled `dist/scripts/`. */
+function resolveRepoRoot(): string {
+  let dir = path.dirname(fileURLToPath(import.meta.url));
+  const root = path.parse(dir).root;
+  while (dir !== root) {
+    if (
+      fs.existsSync(path.join(dir, "circuits", "bin")) &&
+      fs.existsSync(path.join(dir, "package.json"))
+    ) {
+      try {
+        const pkg = JSON.parse(
+          fs.readFileSync(path.join(dir, "package.json"), "utf8"),
+        ) as { name?: string };
+        if (pkg.name === "@enclave/main") {
+          return dir;
+        }
+      } catch {
+        // keep walking
+      }
+    }
+    dir = path.dirname(dir);
+  }
+  throw new Error(
+    "Could not find enclave repo root (expected circuits/bin and package.json name @enclave/main)",
+  );
+}
+
+export const REPO_ROOT = resolveRepoRoot();
 
 /**
  * Default insecure-512 / micro committee layout for BFV aggregator verifiers.
@@ -119,7 +142,7 @@ export const BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS = {
 export function readVkRecursiveHash(filePath: string): string {
   if (!fs.existsSync(filePath)) {
     throw new Error(
-      `Missing circuit VK hash file: ${filePath}. Run pnpm compile:circuits.`,
+      `Missing circuit VK hash file: ${filePath}. From repo root run: pnpm build:circuits --preset insecure-512`,
     );
   }
 

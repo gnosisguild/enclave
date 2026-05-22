@@ -363,6 +363,9 @@ impl Handler<TypedEvent<ProofVerificationPassed>> for CommitmentConsistencyCheck
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let (data, ec) = msg.into_components();
+        if data.e3_id != self.e3_id {
+            return;
+        }
 
         let proof_type = data.proof_type;
         let address = data.address;
@@ -392,6 +395,9 @@ impl Handler<TypedEvent<CommitmentConsistencyCheckRequested>> for CommitmentCons
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let (data, ec) = msg.into_components();
+        if data.e3_id != self.e3_id {
+            return;
+        }
 
         let mut inconsistent_parties = BTreeSet::new();
 

@@ -50,13 +50,13 @@ export const convertPollData = (request: PollRequestResult[]): PollResult[] => {
     const options: PollOption[] = [
       {
         value: 0,
-        votes: poll.tally[0] ?? 0,
+        votes: Number.parseInt(poll.tally[0] ?? '0', 10) || 0,
         label: poll.option_1_emoji,
         checked: false,
       },
       {
         value: 1,
-        votes: poll.tally[1] ?? 0,
+        votes: Number.parseInt(poll.tally[1] ?? '0', 10) || 0,
         label: poll.option_2_emoji,
         checked: false,
       },

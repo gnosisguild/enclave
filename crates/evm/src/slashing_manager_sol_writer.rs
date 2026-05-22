@@ -160,13 +160,15 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<AccusationQuorumRea
                     }
                     Err(err) => {
                         let decoded = format_evm_error(&err);
-                        if rank > 0 {
+                        let benign = decoded.contains("OperatorNotInCommittee")
+                            || decoded.contains("VoterNotInCommittee")
+                            || decoded.contains("DuplicateEvidence");
+                        if rank > 0 || benign {
                             // Fallback submitters expect DuplicateEvidence reverts
                             // when the primary submitter has already landed the tx.
-                            warn!(
-                                "Fallback submitter (rank {rank}): slash submission failed \
-                                 (likely already submitted by primary): {decoded}"
-                            );
+                            // Operator/VoterNotInCommittee indicate a stale off-chain accusation
+                            // (e.g. cross-E3 race) — not a node-local fault.
+                            warn!("Slash submission skipped (rank {rank}): {decoded}");
                         } else {
                             bus.err(
                                 EType::Evm,

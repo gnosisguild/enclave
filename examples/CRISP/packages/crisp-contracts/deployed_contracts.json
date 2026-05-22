@@ -255,36 +255,66 @@
       "address": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82"
     },
     "MockComputeProvider": {
-      "blockNumber": 17,
-      "address": "0x9E545E3C0baAB3E08CdfD552C960A1050f373042"
+      "blockNumber": 28,
+      "address": "0x8f86403A4DE0BB5791fa46B8e795C547942fE4Cf"
     },
     "MockDecryptionVerifier": {
-      "blockNumber": 18,
-      "address": "0xa82fF9aFd8f496c3d6ac40E2a0F282E47488CFc9"
+      "blockNumber": 29,
+      "address": "0x9d4454B023096f34B160D6B654540c56A1F81688"
     },
     "MockPkVerifier": {
-      "blockNumber": 19,
-      "address": "0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8"
+      "blockNumber": 30,
+      "address": "0x5eb3Bc0a489C5A8288765d2336659EbCA68FCd00"
     },
     "MockE3Program": {
-      "blockNumber": 20,
-      "address": "0x851356ae760d987E095750cCeb3bC6014560891C"
+      "blockNumber": 31,
+      "address": "0x36C02dA8a0983159322a80FFE9F24b1acfF8B570"
     },
     "ZKTranscriptLib": {
-      "blockNumber": 22,
-      "address": "0x95401dc811bb5740090279Ba06cfA8fcF6113778"
+      "blockNumber": 33,
+      "address": "0x4c5859f0F772848b2D91F1D83E2Fe57935348029"
+    },
+    "DecryptionAggregatorVerifier": {
+      "blockNumber": 34,
+      "address": "0x1291Be112d480055DaFd8a610b7d1e203891C274"
+    },
+    "DkgAggregatorVerifier": {
+      "blockNumber": 35,
+      "address": "0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154"
+    },
+    "BfvDecryptionVerifier": {
+      "blockNumber": 36,
+      "address": "0xb7278A61aa25c888815aFC32Ad3cC52fF24fE575"
+    },
+    "BfvPkVerifier": {
+      "blockNumber": 38,
+      "address": "0x82e01223d51Eb87e16A03E24687EDF0F294da6f1"
+    },
+    "DkgFoldAttestationVerifier": {
+      "address": "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0",
+      "blockNumber": 40
+    },
+    "MockRISC0Verifier": {
+      "address": "0xc351628EB244ec633d5f21fBD6621e1a683B1181",
+      "blockNumber": 42
     },
     "HonkVerifier": {
-      "blockNumber": 23,
-      "address": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+      "address": "0xcbEAF3BDe82155F56486Fb5a1072cb8baAf547cc",
+      "blockNumber": 43
     },
     "CRISPProgram": {
-      "blockNumber": 25,
-      "address": "0x0E801D84Fa97b50751Dbf25036d067dCf18858bF"
+      "address": "0x1429859428C0aBc9C2C47C8Ee9FBaf82cFA0F20f",
+      "blockNumber": 43,
+      "constructorArgs": {
+        "enclave": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+        "verifierAddress": "0xc351628EB244ec633d5f21fBD6621e1a683B1181",
+        "honkVerifierAddress": "0xcbEAF3BDe82155F56486Fb5a1072cb8baAf547cc",
+        "imageId": "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
+      }
     },
     "MockVotingToken": {
-      "blockNumber": 26,
-      "address": "0x9d4454B023096f34B160D6B654540c56A1F81688"
+      "address": "0x162A433068F51e18b7d13932F27e66a3f99E6890",
+      "blockNumber": 45
     }
   }
 }

@@ -113,16 +113,6 @@ async fn broadcast_encrypted_vote(
 
     let mut repo = store.e3(vote.round_id);
 
-    if !has_voted {
-        if let Err(e) = repo.insert_voter_address(vote.address.clone()).await {
-            error!(
-                "[e3_id={}] Database error inserting voter: {:?}",
-                vote.round_id, e
-            );
-            return HttpResponse::InternalServerError().json("Internal server error");
-        }
-    }
-
     let e3_id = U256::from(vote.round_id);
 
     // encoded_proof is already encoded in JavaScript, just decode from hex
@@ -172,6 +162,15 @@ async fn broadcast_encrypted_vote(
 
     match contract.publish_input(e3_id, encoded_proof).await {
         Ok(hash) => {
+            if !has_voted {
+                if let Err(e) = repo.insert_voter_address(vote.address.clone()).await {
+                    error!(
+                        "[e3_id={}] Vote on-chain but failed to record voter locally: {:?}",
+                        vote.round_id, e
+                    );
+                }
+            }
+
             let message = if is_vote_update {
                 "Vote Updated Successfully"
             } else {

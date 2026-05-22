@@ -28,7 +28,7 @@ use e3_sdk::{
 };
 use evm_helpers::{CRISPContractFactory, InputPublished};
 use eyre::Context;
-use log::info;
+use log::{info, warn};
 use num_bigint::BigUint;
 use std::error::Error;
 
@@ -240,17 +240,37 @@ async fn handle_e3_input_deadline_expiration(
 
     repo.update_status("Expired").await?;
 
-    if repo.get_vote_count().await? > 0 {
-        info!("[e3_id={}] Starting computation for E3", e3_id);
-        repo.update_status("Computing").await?;
+    let voter_count = repo.get_vote_count().await?;
+    let votes = repo.get_ciphertext_inputs().await?;
 
-        let votes = repo.get_ciphertext_inputs().await?;
+    if voter_count > 0 && votes.is_empty() {
+        warn!(
+            "[e3_id={}] {} voter(s) recorded but no InputPublished ciphertexts indexed — \
+             skipping FHE compute (check CRISP indexer + on-chain publishInput)",
+            e3_id, voter_count
+        );
+        repo.update_status("Finished").await?;
+        info!("[e3_id={}] E3 request handled successfully.", e3_id);
+        return Ok(());
+    }
+
+    if !votes.is_empty() {
+        info!(
+            "[e3_id={}] Starting computation for E3 ({} ciphertext input(s), {} voter(s))",
+            e3_id,
+            votes.len(),
+            voter_count
+        );
+        repo.update_status("Computing").await?;
 
         let (id, status) = run_compute(
             e3_id,
             e3.e3_params,
             votes,
-            format!("{}/state/add-result", CONFIG.enclave_server_url),
+            format!(
+                "{}/state/add-result",
+                CONFIG.enclave_server_url_for_clients()
+            ),
         )
         .await
         .map_err(|e| eyre::eyre!("Error sending run compute request: {e}"))?;

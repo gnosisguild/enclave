@@ -18,6 +18,7 @@ const contractMapping: Record<string, string> = {
   BondingRegistry: 'bonding_registry',
   SlashingManager: 'slashing_manager',
   MockUSDC: 'fee_token',
+  DkgFoldAttestationVerifier: 'dkg_fold_attestation_verifier',
 }
 
 // Get __dirname equivalent in ES modules
@@ -45,18 +46,26 @@ export const deploy = async () => {
 
   if (shouldPrintEnv) {
     const enclaveAddress = readDeploymentArgs('Enclave', chain)?.address
-    const tokenAddress = readDeploymentArgs('MockUSDC', chain)?.address
+    const feeTokenAddress = readDeploymentArgs('MockUSDC', chain)?.address
     const programAddress = readDeploymentArgs('CRISPProgram', chain)?.address
     const ciphernodeRegistryAddress = readDeploymentArgs('CiphernodeRegistryOwnable', chain)?.address
+    const votingTokenAddress = readDeploymentArgs('MockVotingToken', chain)?.address
 
-    if (!enclaveAddress || !tokenAddress || !programAddress || !ciphernodeRegistryAddress) {
+    if (!enclaveAddress || !feeTokenAddress || !programAddress || !ciphernodeRegistryAddress || !votingTokenAddress) {
       console.error('Error: Missing deployment addresses. Ensure all contracts are deployed.')
       return
     }
 
-    console.log('\nAdd these to your server .env')
+    console.log('\nAdd these to examples/CRISP/server/.env (and client/.env for VITE_CRISP_TOKEN):')
     console.log(
-      `ENCLAVE_ADDRESS=${enclaveAddress}\nFEE_TOKEN_ADDRESS=${tokenAddress}\nE3_PROGRAM_ADDRESS=${programAddress}\nCIPHERNODE_REGISTRY_ADDRESS=${ciphernodeRegistryAddress}`,
+      [
+        `ENCLAVE_ADDRESS=${enclaveAddress}`,
+        `FEE_TOKEN_ADDRESS=${feeTokenAddress}`,
+        `E3_PROGRAM_ADDRESS=${programAddress}`,
+        `CIPHERNODE_REGISTRY_ADDRESS=${ciphernodeRegistryAddress}`,
+        `CRISP_VOTING_TOKEN=${votingTokenAddress}`,
+        `VITE_CRISP_TOKEN=${votingTokenAddress}`,
+      ].join('\n'),
     )
   }
 }

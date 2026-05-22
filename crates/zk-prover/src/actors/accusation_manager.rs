@@ -340,6 +340,10 @@ impl AccusationManager {
         ec: &EventContext<Sequenced>,
         ctx: &mut Context<Self>,
     ) {
+        if event.e3_id != self.e3_id {
+            return;
+        }
+
         let accused_address = if event.accused_address == Address::ZERO {
             if let Some(&addr) = self.committee.get(event.accused_party_id as usize) {
                 warn!(
@@ -357,6 +361,14 @@ impl AccusationManager {
         } else {
             event.accused_address
         };
+
+        if !self.committee.contains(&accused_address) {
+            warn!(
+                "Ignoring proof failure for {} — not on E3 {} committee",
+                accused_address, self.e3_id
+            );
+            return;
+        }
 
         // Cache the failed verification result.
         // Evidence preimage = `abi.encode(proof.data, public_signals)` — matches
@@ -407,6 +419,18 @@ impl AccusationManager {
         ec: &EventContext<Sequenced>,
         ctx: &mut Context<Self>,
     ) {
+        if data.e3_id != self.e3_id {
+            return;
+        }
+
+        if !self.committee.contains(&data.accused_address) {
+            warn!(
+                "Ignoring commitment violation for {} — not on E3 {} committee",
+                data.accused_address, self.e3_id
+            );
+            return;
+        }
+
         // Cache as a failed verification for voting on future accusations.
         // `data.evidence` carries the raw `abi.encode(proof.data, public_signals)`
         // preimage of `data_hash`, populated by the consistency checker. Slashing
@@ -448,6 +472,14 @@ impl AccusationManager {
         ec: &EventContext<Sequenced>,
         ctx: &mut Context<Self>,
     ) {
+        if !self.committee.contains(&accused_address) {
+            warn!(
+                "Refusing accusation against {} — not on E3 {} committee",
+                accused_address, self.e3_id
+            );
+            return;
+        }
+
         let key = (accused_address, proof_type);
 
         // Dedup: don't create multiple accusations for the same (accused, proof_type)
@@ -1264,6 +1296,12 @@ impl Handler<TypedEvent<ProofVerificationPassed>> for AccusationManager {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let (data, _ec) = msg.into_components();
+        if data.e3_id != self.e3_id {
+            return;
+        }
+        if !self.committee.contains(&data.address) {
+            return;
+        }
         // Cache successful verification for voting on future accusations.
         // Evidence preimage = `abi.encode(proof.data, public_signals)`.
         let evidence: Bytes = (

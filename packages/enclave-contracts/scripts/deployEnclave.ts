@@ -7,6 +7,7 @@ import { ethers as ethersLib } from "ethers";
 import hre from "hardhat";
 
 import { autoCleanForLocalhost } from "./cleanIgnitionState";
+import { configureLocalSlashingPolicies } from "./configureLocalSlashingPolicies";
 import { deployAndSaveBfvDecryptionVerifier } from "./deployAndSave/bfvDecryptionVerifier";
 import { deployAndSaveBfvPkVerifier } from "./deployAndSave/bfvPkVerifier";
 import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
@@ -252,6 +253,11 @@ export const deployEnclave = async (
 
   console.log("Setting SlashingManager address in CiphernodeRegistry...");
   await ciphernodeRegistry.setSlashingManager(slashingManagerAddress);
+
+  if (shouldDeployMocks) {
+    console.log("Configuring local SlashingManager slash policies...");
+    await configureLocalSlashingPolicies(hre, slashingManager);
+  }
 
   console.log("Setting Enclave as reward distributor in BondingRegistry...");
   await bondingRegistry.setRewardDistributor(enclaveAddress);
