@@ -182,11 +182,6 @@ describe("Enclave — pull payments + fee-token allow-list", function () {
       };
       await enclave.request(req2);
       const e3Id2 = 1;
-      const nodes = [
-        await ctx.operator1.getAddress(),
-        await ctx.operator2.getAddress(),
-        await ctx.operator3.getAddress(),
-      ];
       await setupAndPublishCommittee(
         ctx.ciphernodeRegistryContract,
         e3Id2,
