@@ -38,9 +38,9 @@ async function resolveImpersonationRpc(
         setBalance: "hardhat_setBalance",
         stopImpersonating: "hardhat_stopImpersonatingAccount",
       };
-    } catch (err) {
+    } catch {
       throw new Error(
-        "Provider does not support account impersonation. Run this task against an Anvil or Hardhat local node (e.g. `--network localhost` with `anvil` or `npx hardhat node`).",
+        "Provider does not support account impersonation. Run this task against an Anvil or Hardhat local node (e.g. `--network localhost` with `anvil` or `npx hardhat node`)",
       );
     }
   }
