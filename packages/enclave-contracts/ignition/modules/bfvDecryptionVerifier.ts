@@ -17,17 +17,17 @@ export default buildModule("BfvDecryptionVerifier", (m) => {
     decryptionAggregatorVerifierModule,
   );
 
-  const expectedC6FoldKeyHash = readVkRecursiveHash(
+  const c6FoldKeyHash = readVkRecursiveHash(
     BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS.c6Fold,
   );
-  const expectedC7KeyHash = readVkRecursiveHash(
+  const c7KeyHash = readVkRecursiveHash(
     BFV_DECRYPTION_SUB_CIRCUIT_VK_HASH_PATHS.c7,
   );
 
   const bfvDecryptionVerifier = m.contract("BfvDecryptionVerifier", [
     decryptionAggregatorVerifier,
-    expectedC6FoldKeyHash,
-    expectedC7KeyHash,
+    c6FoldKeyHash,
+    c7KeyHash,
     BFV_THRESHOLD_T,
   ]);
 

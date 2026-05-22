@@ -7,13 +7,19 @@
 pragma solidity 0.8.28;
 
 import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+    Ownable2StepUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import {
+    IERC165
+} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { ExitQueueLib } from "../lib/ExitQueueLib.sol";
 
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
@@ -27,7 +33,11 @@ import { EnclaveTicketToken } from "../token/EnclaveTicketToken.sol";
  * @dev Handles deposits, withdrawals, slashing, exits, and integrates with registry and slashing manager
  */
 // solhint-disable-next-line max-states-count
-contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
+contract BondingRegistry is
+    IBondingRegistry,
+    Ownable2StepUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     using SafeERC20 for IERC20;
     using ExitQueueLib for ExitQueueLib.ExitQueueState;
 
@@ -68,6 +78,25 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     ///      Each authorized distributor must approve this contract for the reward token.
     mapping(address distributor => bool authorized)
         public authorizedDistributors;
+
+    /// @notice Current count of authorized distributors. Bounded by
+    ///         {MAX_AUTHORIZED_DISTRIBUTORS}.
+    uint256 public authorizedDistributorCount;
+
+    /// @notice Hard cap on the number of authorized reward distributors so
+    ///         downstream payout loops stay bounded.
+    uint256 public constant MAX_AUTHORIZED_DISTRIBUTORS = 32;
+
+    /// @notice Minimum permitted value for {exitDelay}. Set to one day so
+    ///         an attacker cannot drain stake immediately after winning ownership.
+    uint64 public constant MIN_EXIT_DELAY = 1 days;
+
+    /// @notice Maximum permitted value for {exitDelay}. Caps the freeze
+    ///         duration so operators retain a meaningful exit path.
+    uint64 public constant MAX_EXIT_DELAY = 90 days; // duration in seconds; not calendar-aware
+
+    /// @notice Basis-points denominator (100% = 10_000 bps).
+    uint256 internal constant BPS_BASE = 10_000;
 
     /// @notice Treasury address that receives slashed funds
     address public slashedFundsTreasury;
@@ -153,15 +182,12 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    /// @notice Constructor that disables initializers.
-    /// @dev Prevents the implementation contract from being initialized. Initialization is performed
-    /// via the initialize() function when deployed behind a proxy.
+    /// @notice Locks the implementation; initialize via the proxy.
     constructor() {
         _disableInitializers();
     }
 
     /// @notice Initializes the bonding registry contract
-    /// @dev Can only be called once due to initializer modifier
     /// @param _owner Address that will own the contract
     /// @param _ticketToken Ticket token contract for collateral
     /// @param _licenseToken License token contract for bonding
@@ -183,6 +209,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         uint64 _exitDelay
     ) public initializer {
         __Ownable_init(msg.sender);
+        __ReentrancyGuard_init();
         setTicketToken(_ticketToken);
         setLicenseToken(_licenseToken);
         setRegistry(_registry);
@@ -192,7 +219,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         setMinTicketBalance(_minTicketBalance);
         setExitDelay(_exitDelay);
         setLicenseActiveBps(8_000);
-        if (_owner != owner()) transferOwnership(_owner);
+        if (_owner != owner()) _transferOwnership(_owner);
     }
 
     // ======================
@@ -228,11 +255,13 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         return ticketToken.balanceOf(operator) / ticketPrice;
     }
 
-    /// @notice Get operator's ticket balance at a specific block
-    /// @dev Uses checkpoint mechanism from ticket token
+    /// @notice Get operator's ticket balance at a specific timepoint (EIP-6372).
+    /// @dev The ticket token uses {block.timestamp} (mode=timestamp) for its voting clock, so
+    ///      `blockNumber` is in fact a unix timestamp. Name is preserved for storage/event
+    ///      compatibility.
     /// @param operator Address of the operator
-    /// @param blockNumber Block number to query
-    /// @return Ticket balance at the specified block
+    /// @param blockNumber Timepoint (block.timestamp) to query
+    /// @return Ticket balance at the specified timepoint
     function getTicketBalanceAtBlock(
         address operator,
         uint256 blockNumber
@@ -315,6 +344,17 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     function deregisterOperator() external noExitInProgress(msg.sender) {
         Operator storage op = operators[msg.sender];
         require(op.registered, NotRegistered());
+
+        // block deregistration while an unresolved Lane B slash proposal exists.
+        // An operator could otherwise drain ticket / license collateral during the appeal
+        // window and leave the slasher with nothing to slash.
+        address sm = slashingManager;
+        if (sm != address(0)) {
+            require(
+                !ISlashingManager(sm).hasOpenLaneBProposal(msg.sender),
+                OperatorUnderSlash()
+            );
+        }
 
         op.registered = false;
         op.exitRequested = true;
@@ -401,7 +441,9 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     }
 
     /// @inheritdoc IBondingRegistry
-    function bondLicense(uint256 amount) external noExitInProgress(msg.sender) {
+    function bondLicense(
+        uint256 amount
+    ) external nonReentrant noExitInProgress(msg.sender) {
         require(amount != 0, ZeroAmount());
 
         uint256 balanceBefore = licenseToken.balanceOf(address(this));
@@ -452,7 +494,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     function claimExits(
         uint256 maxTicketAmount,
         uint256 maxLicenseAmount
-    ) external {
+    ) external nonReentrant {
         (uint256 ticketClaim, uint256 licenseClaim) = _exits.claimAssets(
             msg.sender,
             maxTicketAmount,
@@ -462,7 +504,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
 
         if (ticketClaim > 0) ticketToken.payout(msg.sender, ticketClaim);
         if (licenseClaim > 0) {
-            licenseToken.safeTransfer(msg.sender, licenseClaim);
+            _safeTransferLicenseWithDeltaCheck(msg.sender, licenseClaim);
         }
     }
 
@@ -596,7 +638,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         IERC20 rewardToken,
         address[] calldata recipients,
         uint256[] calldata amounts
-    ) external onlyAuthorizedDistributor {
+    ) external nonReentrant onlyAuthorizedDistributor {
         require(recipients.length == amounts.length, ArrayLengthMismatch());
 
         uint256 len = recipients.length;
@@ -643,7 +685,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
 
     /// @inheritdoc IBondingRegistry
     function setLicenseActiveBps(uint256 newBps) public onlyOwner {
-        require(newBps > 0 && newBps <= 10_000, InvalidConfiguration());
+        require(newBps > 0 && newBps <= BPS_BASE, InvalidConfiguration());
 
         uint256 oldValue = licenseActiveBps;
         licenseActiveBps = newBps;
@@ -665,6 +707,13 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
 
     /// @inheritdoc IBondingRegistry
     function setExitDelay(uint64 newExitDelay) public onlyOwner {
+        // bound the configurable exit delay so a malicious owner cannot
+        // instantly drain operator stake (delay too short) or permanently
+        // freeze withdrawals (delay too long).
+        require(
+            newExitDelay >= MIN_EXIT_DELAY && newExitDelay <= MAX_EXIT_DELAY,
+            ExitDelayOutOfBounds(newExitDelay)
+        );
         uint256 oldValue = uint256(exitDelay);
         exitDelay = newExitDelay;
 
@@ -702,8 +751,17 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
 
     /// @inheritdoc IBondingRegistry
     function setSlashingManager(address newSlashingManager) public onlyOwner {
+        // zero-address protection and explicit event so a missed setter
+        // call is observable off-chain.
+        require(newSlashingManager != address(0), ZeroAddress());
+        address oldValue = slashingManager;
         slashingManager = newSlashingManager;
-        emit SlashingManagerSet(newSlashingManager);
+        emit SlashingManagerUpdated(oldValue, newSlashingManager);
+    }
+
+    /// @notice Disabled. Reverts unconditionally.
+    function renounceOwnership() public view override onlyOwner {
+        revert RenounceOwnershipDisabled();
     }
 
     /// @notice Authorizes an address to distribute rewards
@@ -713,6 +771,15 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         address newRewardDistributor
     ) public onlyOwner {
         require(newRewardDistributor != address(0), ZeroAddress());
+        // hard cap on the number of authorized reward distributors so
+        // payout fan-out loops in downstream consumers stay bounded.
+        if (!authorizedDistributors[newRewardDistributor]) {
+            require(
+                authorizedDistributorCount < MAX_AUTHORIZED_DISTRIBUTORS,
+                MaxAuthorizedDistributors()
+            );
+            authorizedDistributorCount++;
+        }
         authorizedDistributors[newRewardDistributor] = true;
         emit RewardDistributorUpdated(newRewardDistributor, true);
     }
@@ -721,6 +788,9 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     /// @dev Only callable by owner
     /// @param distributor Address to revoke
     function revokeRewardDistributor(address distributor) public onlyOwner {
+        if (authorizedDistributors[distributor]) {
+            authorizedDistributorCount--;
+        }
         authorizedDistributors[distributor] = false;
         emit RewardDistributorUpdated(distributor, false);
     }
@@ -729,7 +799,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     function withdrawSlashedFunds(
         uint256 ticketAmount,
         uint256 licenseAmount
-    ) public onlyOwner {
+    ) public nonReentrant onlyOwner {
         require(ticketAmount <= slashedTicketBalance, InsufficientBalance());
         require(licenseAmount <= slashedLicenseBond, InsufficientBalance());
 
@@ -740,7 +810,10 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
 
         if (licenseAmount > 0) {
             slashedLicenseBond -= licenseAmount;
-            licenseToken.safeTransfer(slashedFundsTreasury, licenseAmount);
+            _safeTransferLicenseWithDeltaCheck(
+                slashedFundsTreasury,
+                licenseAmount
+            );
         }
 
         emit SlashedFundsWithdrawn(
@@ -778,6 +851,49 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     /// @dev Calculates the minimum license bond required to maintain active status
     /// @return Minimum license bond (licenseRequiredBond * licenseActiveBps / 10000)
     function _minLicenseBond() internal view returns (uint256) {
-        return (licenseRequiredBond * licenseActiveBps) / 10_000;
+        return (licenseRequiredBond * licenseActiveBps) / BPS_BASE;
     }
+
+    /// @dev `safeTransfer` of the license token, measuring the RECIPIENT-side delta
+    ///      to detect fee-on-transfer / rebasing behavior (sender-side delta misses
+    ///      fees that burn or reroute). Internal accounting is already decremented at
+    ///      the call site, so a shortfall emits {LicenseTransferShortfall} rather than
+    ///      reverting (a revert would brick claims if the token starts taking fees);
+    ///      the owner can swap the token via {setLicenseToken}.
+    function _safeTransferLicenseWithDeltaCheck(
+        address recipient,
+        uint256 expectedAmount
+    ) internal {
+        uint256 balanceBefore = licenseToken.balanceOf(recipient);
+        licenseToken.safeTransfer(recipient, expectedAmount);
+        uint256 balanceAfter = licenseToken.balanceOf(recipient);
+        uint256 actualReceived = balanceAfter - balanceBefore;
+        if (actualReceived != expectedAmount) {
+            emit LicenseTransferShortfall(
+                recipient,
+                expectedAmount,
+                actualReceived
+            );
+        }
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //              ERC-165 Interface Detection               //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice ERC-165 interface detection. Advertises
+    ///         {IBondingRegistry} and {IERC165}.
+    function supportsInterface(
+        bytes4 interfaceId
+    ) external pure virtual returns (bool) {
+        return
+            interfaceId == type(IBondingRegistry).interfaceId ||
+            interfaceId == type(IERC165).interfaceId;
+    }
+
+    /// @dev Reserved storage slots for future upgrades.
+    // solhint-disable-next-line var-name-mixedcase
+    uint256[50] private __gap;
 }

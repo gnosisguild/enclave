@@ -610,14 +610,17 @@ ThresholdKeyshare receives AllThresholdSharesCollected
         │  │    3. committeeHash = keccak256(abi.encodePacked(c.topNodes)) │
         │  │       c.committeeHash = committeeHash               │
         │  │    4. When proofAggregationEnabled:                 │
-        │  │       e3.pkVerifier.verify(pkCommitment, committeeHash, proof) │
-        │  │       → BFV: `BfvPkVerifier` (DkgAggregator Honk)   │
-        │  │         • pins `publicInputs[0]` = nodes_fold VK hash │
-        │  │         • pins `publicInputs[1]` = C5 VK hash         │
-        │  │         • checks committee_hash_hi/lo vs committeeHash │
-        │  │         • checks last PI == pkCommitment              │
-        │  │       Redeploy `BfvPkVerifier` / `BfvDecryptionVerifier` │
-        │  │       when sub-circuit VK immutables change.        │
+        │  │       e3.pkVerifier.verify(                         │
+        │  │         e3Id, committeeRoot, c.topNodes,            │
+        │  │         pkCommitment, committeeHash, proof          │
+        │  │       )                                             │
+        │  │       → BFV: `BfvPkVerifier` (DkgAggregator Honk)  │
+        │  │         • M-34: immutable nodesFold / C5 VK hashes  │
+        │  │           checked against publicInputs[0..1]        │
+        │  │         • C-08: committee_hash_hi/lo (slots         │
+        │  │           [2+H] & [3+H]) vs committeeHash           │
+        │  │         • last PI == pkCommitment                   │
+        │  │         • M-35: revert on failure (no `bool false`) │
         │  │    5. c.publicKey = pkCommitment                    │
         │  │       publicKeyHashes[e3Id] = pkCommitment          │
         │  │    6. enclave.onCommitteePublished(e3Id, pkCommitment) │
@@ -635,6 +638,14 @@ ThresholdKeyshare receives AllThresholdSharesCollected
         │  │  }                                                  │
         │  └─────────────────────────────────────────────────────┘
 ```
+
+> **C-08 (BfvPkVerifier domain binding) — implemented** The wrapper exposes a
+> `verify(e3Id, committeeRoot, sortedNodes, pkCommitment, committeeHash, proof)` signature.
+> `committeeHash` (computed on-chain as `keccak256(abi.encodePacked(c.topNodes))`) is split into
+> 128-bit Noir field limbs and checked against `publicInputs[committeeHashHiIdx]` and
+> `publicInputs[committeeHashLoIdx]`, binding the proof to the specific committee. The contextual
+> params `(e3Id, committeeRoot, sortedNodes)` are forwarded for interface compatibility and future
+> circuit-level binding.
 
 ---
 
@@ -845,35 +856,54 @@ EnclaveSolReader decodes CiphertextOutputPublished event
         │  │    2. require(now <= decryptionDeadline)            │
         │  │    3. e3.plaintextOutput = output                   │
         │  │    4. decryptionVerifier.verify(                    │
-        │  │         e3Id, keccak256(output), proof              │
+        │  │         e3Id, committeeRoot,                        │
+        │  │         committeeNodes, ciphertextOutput,           │
+        │  │         committeePublicKey,                         │
+        │  │         keccak256(output), proof                    │
         │  │       )                                             │
-        │  │       → BFV: `BfvDecryptionVerifier`                │
-        │  │         • pins `publicInputs[0]` = c6_fold VK hash  │
-        │  │         • pins `publicInputs[1]` = C7 VK hash         │
-        │  │         • checks trailing 100 coeffs vs output hash │
-        │  │       Redeploy verifier when sub-circuit VKs change.  │
+        │  │       → M-34: c6Fold / C7 VK hashes are immutable.  │
+        │  │       → M-35: revert path only (no `bool false`).   │
         │  │    5. stage = Complete                              │
         │  │    6. _distributeRewards(e3Id)                      │
         │  │       │                                             │
-        │  │       │  ┌─ Reward Distribution ────────────────┐  │
-        │  │       │  │  1. Get active committee nodes:      │  │
-        │  │       │  │     nodes = ciphernodeRegistry       │  │
-        │  │       │  │       .getActiveCommitteeNodes(e3Id) │  │
-        │  │       │  │  2. If no active nodes:              │  │
-        │  │       │  │     → Refund requester               │  │
-        │  │       │  │  3. Divide payment equally:          │  │
-        │  │       │  │     perNode = payment / nodes.length │  │
-        │  │       │  │     dust → last member               │  │
-        │  │       │  │  4. Approve BondingRegistry          │  │
-        │  │       │  │  5. bondingRegistry.distributeRewards│  │
-        │  │       │  │       (token, nodes, amounts)        │  │
-        │  │       │  │     → Transfers fee tokens to each   │  │
-        │  │       │  │       registered operator            │  │
-        │  │       │  │  6. Emit RewardsDistributed          │  │
-        │  │       │  └──────────────────────────────────────┘  │
+        │  │       │  ┌─ Reward Distribution (pull, H-01/M-02) ┐  │
+        │  │       │  │  1. Get active committee nodes:        │  │
+        │  │       │  │     nodes = ciphernodeRegistry         │  │
+        │  │       │  │       .getActiveCommitteeNodes(e3Id)   │  │
+        │  │       │  │  2. If no active nodes:                │  │
+        │  │       │  │     → push refund to requester         │  │
+        │  │       │  │  3. Split payment:                     │  │
+        │  │       │  │     protocolAmount = total * shareBps  │  │
+        │  │       │  │     cnAmount       = total - protocol  │  │
+        │  │       │  │     perNode = cnAmount / nodes.length  │  │
+        │  │       │  │     dust → nodes[e3Id % n] (M-07:      │  │
+        │  │       │  │       rotates dust slot per E3 so the  │  │
+        │  │       │  │       same physical node is not always │  │
+        │  │       │  │       favored)                         │  │
+        │  │       │  │  4. Credit treasury (no push):         │  │
+        │  │       │  │     _pendingTreasury[treasury][token]  │  │
+        │  │       │  │       += protocolAmount                │  │
+        │  │       │  │     Emit TreasuryCredited(...)         │  │
+        │  │       │  │  5. Credit each node (no push):        │  │
+        │  │       │  │     _pendingRewards[e3Id][node]        │  │
+        │  │       │  │       += perNode                       │  │
+        │  │       │  │     Emit RewardCredited(...)           │  │
+        │  │       │  │  6. Emit RewardsDistributed (compat)   │  │
+        │  │       │  │  7. e3RefundManager                    │  │
+        │  │       │  │       .distributeSlashedFundsOnSuccess │  │
+        │  │       │  │       (e3Id, nodes, token)             │  │
+        │  │       │  │       (also pull-based; see flow-05)   │  │
+        │  │       │  └────────────────────────────────────────┘  │
         │  │    7. Emit PlaintextOutputPublished(e3Id, output, C7 proof) │
         │  │    8. Emit E3StageChanged(Complete)                 │
         │  │  }                                                  │
+        │  │                                                     │
+        │  │  // Funds are NOT pushed at publish-time.           │
+        │  │  // Recipients must call:                           │
+        │  │  //   - enclave.claimReward(e3Id) or                │
+        │  │  //     enclave.claimRewards(e3Ids[])               │
+        │  │  //   - enclave.treasuryClaim(token)                │
+        │  │  // emitting RewardClaimed / TreasuryClaimed.       │
         │  └─────────────────────────────────────────────────────┘
 ```
 

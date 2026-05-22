@@ -4,326 +4,52 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { expect } from "chai";
-import type { Signer } from "ethers";
-import { network } from "hardhat";
 
-import BondingRegistryModule from "../ignition/modules/bondingRegistry";
-import CiphernodeRegistryModule from "../ignition/modules/ciphernodeRegistry";
-import E3RefundManagerModule from "../ignition/modules/e3RefundManager";
-import EnclaveModule from "../ignition/modules/enclave";
-import EnclaveTicketTokenModule from "../ignition/modules/enclaveTicketToken";
-import EnclaveTokenModule from "../ignition/modules/enclaveToken";
-import mockComputeProviderModule from "../ignition/modules/mockComputeProvider";
-import MockDecryptionVerifierModule from "../ignition/modules/mockDecryptionVerifier";
-import MockE3ProgramModule from "../ignition/modules/mockE3Program";
-import MockPkVerifierModule from "../ignition/modules/mockPkVerifier";
-import MockStableTokenModule from "../ignition/modules/mockStableToken";
-import SlashingManagerModule from "../ignition/modules/slashingManager";
 import {
-  BondingRegistry__factory as BondingRegistryFactory,
-  CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
-  Enclave__factory as EnclaveFactory,
-  MockUSDC__factory as MockUSDCFactory,
-} from "../types";
-import type { Enclave } from "../types/contracts/Enclave";
-import type { MockUSDC } from "../types/contracts/test/MockStableToken.sol/MockUSDC";
-import { setupOperatorForSortition } from "./fixtures";
+  ADDRESS_TWO as AddressTwo,
+  DATA as data,
+  deployEnclaveSystem,
+  encodeMockDkgProof,
+  BFV_PARAMS_DEFAULT as encodedE3ProgramParams,
+  ENCRYPTION_SCHEME_ID as encryptionSchemeId,
+  ethers,
+  makeRequest,
+  networkHelpers,
+  PROOF as proof,
+  setupAndPublishCommittee,
+  DEFAULT_TIMEOUT_CONFIG as timeoutConfig,
+} from "./fixtures";
 
-const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time, mine } = networkHelpers;
 
 describe("Enclave", function () {
-  const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
-  const SORTITION_SUBMISSION_WINDOW = 10;
-  const addressOne = "0x0000000000000000000000000000000000000001";
-  const AddressTwo = "0x0000000000000000000000000000000000000002";
-
-  const timeoutConfig = {
-    committeeFormationWindow: 3600, // 1 hour
-    dkgWindow: 3600, // 1 hour
-    computeWindow: 3600, // 1 hour
-    decryptionWindow: 3600, // 1 hour
-  };
-
-  const inputWindowDuration = 300;
-
-  const encryptionSchemeId =
-    "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
   const newEncryptionSchemeId =
     "0x0000000000000000000000000000000000000000000000000000000000000002";
 
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-
-  const polynomial_degree = ethers.toBigInt(512);
-  const plaintext_modulus = ethers.toBigInt(10);
-  const moduli = [
-    ethers.toBigInt("0xffffee001"),
-    ethers.toBigInt("0xffffc4001"),
-  ];
-
-  const encodedE3ProgramParams = abiCoder.encode(
-    ["uint256", "uint256", "uint256[]"],
-    [polynomial_degree, plaintext_modulus, moduli],
-  );
-
-  const data = "0xda7a";
-  const proof = "0x1337";
-
-  /** ABI-encoded fake DKG proof for `MockPkVerifier` (last public input must equal `pkCommitment`). */
-  const encodeMockDkgProof = (pkCommitment: string): string =>
-    ethers.AbiCoder.defaultAbiCoder().encode(
-      ["bytes", "bytes32[]"],
-      ["0x", [pkCommitment]],
-    );
-
-  const setupAndPublishCommittee = async (
-    registry: any,
-    e3Id: number,
-    publicKey: string,
-    operators: Signer[],
-    committeeProof: string = "0x",
-  ): Promise<void> => {
-    for (const operator of operators) {
-      await registry.connect(operator).submitTicket(e3Id, 1);
-    }
-    await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
-    await registry.finalizeCommittee(e3Id);
-    const pkCommitment = ethers.keccak256(publicKey);
-    await registry.publishCommittee(
-      e3Id,
-      publicKey,
-      pkCommitment,
-      committeeProof,
-    );
-  };
-
-  // Helper function to approve USDC and make request
-  const makeRequest = async (
-    enclave: Enclave,
-    usdcToken: MockUSDC,
-    requestParams: Parameters<Enclave["request"]>[0],
-    signer?: Signer,
-  ) => {
-    const fee = await enclave.getE3Quote(requestParams);
-    const tokenContract = signer ? usdcToken.connect(signer) : usdcToken;
-    const enclaveContract = signer ? enclave.connect(signer) : enclave;
-
-    await tokenContract.approve(await enclave.getAddress(), fee);
-    return enclaveContract.request(requestParams);
-  };
+  const inputWindowDuration = 300;
 
   const setup = async () => {
-    // ── Signers ──────────────────────────────────────────────────────────────
-    const [owner, notTheOwner, operator1, operator2, operator3] =
-      await ethers.getSigners();
-    const ownerAddress = await owner.getAddress();
-
-    // ── Token Contracts ───────────────────────────────────────────────────────
-    const { mockUSDC } = await ignition.deploy(MockStableTokenModule, {
-      parameters: { MockUSDC: { initialSupply: 1_000_000 } },
-    });
-    const usdcToken = MockUSDCFactory.connect(
-      await mockUSDC.getAddress(),
-      owner,
-    );
-
-    const { enclaveToken: licenseToken } = await ignition.deploy(
-      EnclaveTokenModule,
-      {
-        parameters: { EnclaveToken: { owner: ownerAddress } },
-      },
-    );
-
-    const { enclaveTicketToken: ticketToken } = await ignition.deploy(
-      EnclaveTicketTokenModule,
-      {
-        parameters: {
-          EnclaveTicketToken: {
-            baseToken: await usdcToken.getAddress(),
-            registry: addressOne,
-            owner: ownerAddress,
-          },
-        },
-      },
-    );
-
-    // ── Registry & Slashing ───────────────────────────────────────────────────
-    const { slashingManager } = await ignition.deploy(SlashingManagerModule, {
-      parameters: {
-        SlashingManager: {
-          admin: ownerAddress,
-        },
-      },
-    });
-
-    const { cipherNodeRegistry } = await ignition.deploy(
-      CiphernodeRegistryModule,
-      {
-        parameters: {
-          CiphernodeRegistry: {
-            owner: ownerAddress,
-            submissionWindow: SORTITION_SUBMISSION_WINDOW,
-          },
-        },
-      },
-    );
-    const ciphernodeRegistryAddress = await cipherNodeRegistry.getAddress();
-    const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
-      ciphernodeRegistryAddress,
-      owner,
-    );
-
-    const { bondingRegistry: _bondingRegistry } = await ignition.deploy(
-      BondingRegistryModule,
-      {
-        parameters: {
-          BondingRegistry: {
-            owner: ownerAddress,
-            ticketToken: await ticketToken.getAddress(),
-            licenseToken: await licenseToken.getAddress(),
-            registry: ciphernodeRegistryAddress,
-            slashedFundsTreasury: ownerAddress,
-            ticketPrice: ethers.parseUnits("10", 6),
-            licenseRequiredBond: ethers.parseEther("1000"),
-            minTicketBalance: 5,
-            exitDelay: 7 * 24 * 60 * 60,
-          },
-        },
-      },
-    );
-    const bondingRegistry = BondingRegistryFactory.connect(
-      await _bondingRegistry.getAddress(),
-      owner,
-    );
-
-    // ── Enclave ───────────────────────────────────────────────────────────────
-    const { enclave: _enclave } = await ignition.deploy(EnclaveModule, {
-      parameters: {
-        Enclave: {
-          owner: ownerAddress,
-          maxDuration: THIRTY_DAYS_IN_SECONDS,
-          registry: ciphernodeRegistryAddress,
-          bondingRegistry: await bondingRegistry.getAddress(),
-          e3RefundManager: addressOne, // placeholder — updated below
-          feeToken: await usdcToken.getAddress(),
-          timeoutConfig,
-        },
-      },
-    });
-    const enclaveAddress = await _enclave.getAddress();
-    const enclave = EnclaveFactory.connect(enclaveAddress, owner);
-
-    const { e3RefundManager } = await ignition.deploy(E3RefundManagerModule, {
-      parameters: {
-        E3RefundManager: {
-          owner: ownerAddress,
-          enclave: enclaveAddress,
-          treasury: ownerAddress,
-        },
-      },
-    });
-    await enclave.setE3RefundManager(await e3RefundManager.getAddress());
-
-    // ── Wire Up Contracts ─────────────────────────────────────────────────────
-    const registryAddress = await enclave.ciphernodeRegistry();
-    if (registryAddress !== ciphernodeRegistryAddress) {
-      await enclave.setCiphernodeRegistry(ciphernodeRegistryAddress);
-    }
-
-    await ciphernodeRegistryContract.setEnclave(enclaveAddress);
-    await ciphernodeRegistryContract.setBondingRegistry(
-      await bondingRegistry.getAddress(),
-    );
-    await ticketToken.setRegistry(await bondingRegistry.getAddress());
-    await bondingRegistry.setSlashingManager(
-      await slashingManager.getAddress(),
-    );
-    await bondingRegistry.setRewardDistributor(enclaveAddress);
-    await slashingManager.setBondingRegistry(
-      await bondingRegistry.getAddress(),
-    );
-
-    // ── Mocks ─────────────────────────────────────────────────────────────────
-    const { mockComputeProvider } = await ignition.deploy(
-      mockComputeProviderModule,
-    );
-    const { mockDecryptionVerifier: decryptionVerifier } =
-      await ignition.deploy(MockDecryptionVerifierModule);
-    const { mockPkVerifier } = await ignition.deploy(MockPkVerifierModule);
-    const { mockE3Program: e3Program } =
-      await ignition.deploy(MockE3ProgramModule);
-
-    await enclave.enableE3Program(await e3Program.getAddress());
-    await enclave.setParamSet(0, encodedE3ProgramParams);
-    await enclave.setDecryptionVerifier(
-      encryptionSchemeId,
-      await decryptionVerifier.getAddress(),
-    );
-    await enclave.setPkVerifier(
-      encryptionSchemeId,
-      await mockPkVerifier.getAddress(),
-    );
-
-    // ── Operators ─────────────────────────────────────────────────────────────
-    await licenseToken.setTransferRestriction(false);
-
-    for (const operator of [operator1, operator2, operator3]) {
-      await setupOperatorForSortition(
-        operator,
-        bondingRegistry,
-        licenseToken,
-        usdcToken,
-        ticketToken,
-        ciphernodeRegistryContract,
-      );
-    }
-    await mine(1);
-
-    // ── Mint USDC ─────────────────────────────────────────────────────────────
-    const mintAmount = ethers.parseUnits("1000000", 6);
-    await usdcToken.mint(ownerAddress, mintAmount);
-    await usdcToken.mint(await notTheOwner.getAddress(), mintAmount);
-
-    // ── Committee Thresholds ──────────────────────────────────────────────────
-    // CommitteeSize.Micro = 0 → [1, 3]
-    await enclave.setCommitteeThresholds(0, [1, 3]);
-    // CommitteeSize.Small = 1 → [2, 5]
-    await enclave.setCommitteeThresholds(1, [2, 5]);
-
-    // ── Request ───────────────────────────────────────────────────────────────
-    const now = await time.latest();
-    const request = {
-      committeeSize: 0, // Micro
-      inputWindow: [now + 10, now + inputWindowDuration] as [number, number],
-      e3Program: await e3Program.getAddress(),
-      paramSet: 0,
-      computeProviderParams: abiCoder.encode(
-        ["address"],
-        [await decryptionVerifier.getAddress()],
-      ),
-      customParams: abiCoder.encode(
-        ["address"],
-        ["0x1234567890123456789012345678901234567890"],
-      ),
-      proofAggregationEnabled: false,
-    };
-
-    // ── Return ────────────────────────────────────────────────────────────────
+    const sys = await deployEnclaveSystem({ wireSlashingManager: false });
     return {
-      owner,
-      notTheOwner,
-      operator1,
-      operator2,
-      operator3,
-      enclave,
-      ciphernodeRegistryContract,
-      bondingRegistry,
-      licenseToken,
-      ticketToken,
-      usdcToken,
-      slashingManager,
-      request,
-      mocks: { decryptionVerifier, e3Program, mockComputeProvider },
+      owner: sys.owner,
+      notTheOwner: sys.notTheOwner,
+      operator1: sys.operator1!,
+      operator2: sys.operator2!,
+      operator3: sys.operator3!,
+      enclave: sys.enclave,
+      ciphernodeRegistryContract: sys.ciphernodeRegistry,
+      bondingRegistry: sys.bondingRegistry,
+      licenseToken: sys.licenseToken,
+      ticketToken: sys.ticketToken,
+      usdcToken: sys.usdcToken,
+      slashingManager: sys.slashingManager,
+      request: sys.request,
+      mocks: {
+        decryptionVerifier: sys.mocks.decryptionVerifier,
+        e3Program: sys.mocks.e3Program,
+        mockComputeProvider: sys.mocks.mockComputeProvider,
+      },
     };
   };
 
@@ -443,8 +169,12 @@ describe("Enclave", function () {
     it("reverts with empty params", async function () {
       const { enclave } = await loadFixture(setup);
 
-      await expect(enclave.setParamSet(0, "0x")).to.be.revertedWith(
-        "Empty params",
+      // `debug.revertStrings: "strip"` is enabled in hardhat.config.ts to
+      // keep `Enclave` under the EIP-170 24,576-byte runtime cap, so the
+      // original "Empty params" reason string is removed from bytecode.
+      // Behaviour (revert) is preserved.
+      await expect(enclave.setParamSet(0, "0x")).to.be.revertedWithoutReason(
+        ethers,
       );
     });
   });
@@ -701,7 +431,7 @@ describe("Enclave", function () {
           committeeSize: request.committeeSize,
           inputWindow: [
             request.inputWindow[0],
-            request.inputWindow[1] + time.duration.days(31),
+            Number(request.inputWindow[1]) + time.duration.days(31),
           ],
           e3Program: request.e3Program,
           paramSet: request.paramSet,
@@ -765,7 +495,11 @@ describe("Enclave", function () {
       expect(e3.inputWindow[0]).to.equal(request.inputWindow[0]);
       expect(e3.inputWindow[1]).to.equal(request.inputWindow[1]);
       expect(e3.e3Program).to.equal(request.e3Program);
-      expect(e3.requestBlock).to.equal(block.number);
+      // H-26: `requestBlock` now stores `block.timestamp` (a stable EIP-6372
+      // clock) instead of `block.number`, so the snapshot agrees with the
+      // bonding registry / token checkpoints across L2s with variable block
+      // production.
+      expect(e3.requestBlock).to.equal(block.timestamp);
       expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.computeProviderParams)[0],
       );
@@ -1072,9 +806,12 @@ describe("Enclave", function () {
       );
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
-      await expect(enclave.publishPlaintextOutput(e3Id, data, "0xdeadbeef"))
-        .to.be.revertedWithCustomError(enclave, "InvalidOutput")
-        .withArgs(data);
+      // M-35: decryption verifier now reverts with a typed error instead of
+      // returning false, so the call reverts before Enclave's own InvalidOutput
+      // wrapping (which now only guards ciphertext output).
+      await expect(
+        enclave.publishPlaintextOutput(e3Id, data, "0xdeadbeef"),
+      ).to.be.revert(ethers);
     });
     it("sets plaintextOutput correctly", async function () {
       const {

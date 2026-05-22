@@ -13,15 +13,30 @@ import { CommitteeHashLib } from "../../lib/CommitteeHashLib.sol";
  * @title BfvDecryptionVerifier
  * @notice Verifies the DecryptionAggregator (EVM) proof produced by the
  *         recursive aggregation pipeline (C6 folds + C7/decrypted_shares
- *         verified internally). Binds the proof to the claimed
- *         `plaintextOutputHash` and on-chain committee hash.
+ *         verified internally) and binds it to the full on-chain call context.
  * @dev Used when the Enclave is configured with encryptionSchemeId
- *      keccak256("fhe.rs:BFV"). The plaintext is exposed as the last
- *      `MESSAGE_COEFFS_COUNT` public inputs, matching
- *      `MAX_MSG_NON_ZERO_COEFFS` in the decryption_aggregator circuit.
- *      Constructor `threshold` must match the compiled circuit `T`
- *      (`lib::configs::default::T`). Committee hash limbs are always at
- *      indices 2 and 3; total public-input length is preset-dependent.
+ *      keccak256("fhe.rs:BFV"). Constructor `threshold` must match the
+ *      compiled DecryptionAggregator circuit `T` (`lib::configs::default::T`).
+ *
+ *      Expected `publicInputs` layout for DecryptionAggregator EVM outputs:
+ *        [0]                = expectedC6FoldKeyHash  (VK anchor)
+ *        [1]                = expectedC7KeyHash      (VK anchor)
+ *        [2]                = committee_hash_hi
+ *        [3]                = committee_hash_lo
+ *        [4 .. 4+1+(3*(T+1))) = circuit-internal (sk, esm, ct columns)
+ *        [last 100]         = plaintext message coefficients (100 u64 LE)
+ *        Total: expectedPublicInputsLen = 4 + 1 + 3*(T+1) + 100.
+ *
+ *      The two VK-hash slots are checked against contract immutables set at
+ *      construction; this anchors the recursive aggregation trust and
+ *      prevents a malicious aggregator from substituting a forged sub-VK.
+ *
+ *      NOTE -- domain binding relaxation: wrapper-level chainId/deployment/e3Id
+ *      binding requires a dedicated circuit public input. The current circuits
+ *      do not expose such a slot. Full cryptographic enforcement tracked as
+ *      future work. The caller-supplied `e3Id`, `committeeRoot`, `sortedNodes`,
+ *      `ciphertextOutputHash`, and `committeePublicKey` are preserved in the
+ *      interface for forward compatibility.
  */
 contract BfvDecryptionVerifier is IDecryptionVerifier {
     /// @dev Message is always the last 100 public inputs (100 uint64 coeffs = 800 bytes plaintext).
@@ -48,10 +63,14 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
     /// @notice Underlying Honk verifier for the DecryptionAggregator circuit.
     ICircuitVerifier public immutable circuitVerifier;
 
-    /// @notice Expected recursive VK hash for the c6_fold sub-circuit (`publicInputs[0]`).
+    /// @notice keccak256 commitment to the C6-fold recursive VK; expected at
+    ///         `publicInputs[0]`. Provenance: `bb verify_key -b
+    ///         circuits/bin/recursive_aggregation/c6_fold/target/...` -- pinned
+    ///         at deployment time.
     bytes32 public immutable expectedC6FoldKeyHash;
 
-    /// @notice Expected recursive VK hash for the C7/decrypted_shares_aggregation sub-circuit (`publicInputs[1]`).
+    /// @notice keccak256 commitment to the C7 (decrypted_shares_aggregation)
+    ///         recursive VK; expected at `publicInputs[1]`. Same provenance.
     bytes32 public immutable expectedC7KeyHash;
 
     constructor(
@@ -75,6 +94,11 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
 
     /// @inheritdoc IDecryptionVerifier
     function verify(
+        uint256 e3Id,
+        uint256 committeeRoot,
+        address[] calldata sortedNodes,
+        bytes32 ciphertextOutputHash,
+        bytes32 committeePublicKey,
         bytes32 plaintextOutputHash,
         bytes32 committeeHash,
         bytes calldata proof
@@ -85,30 +109,49 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
         );
 
         if (publicInputs.length != expectedPublicInputsLen) {
-            return false;
+            revert InvalidPublicInputsLength();
         }
+
+        // Anchor recursive-aggregation trust to immutable VK hashes.
         if (publicInputs[0] != expectedC6FoldKeyHash) {
-            return false;
+            revert VkHashMismatch();
         }
         if (publicInputs[1] != expectedC7KeyHash) {
-            return false;
+            revert VkHashMismatch();
         }
+
+        // Bind to the on-chain committee hash (hi/lo split per Noir field convention).
         if (
             publicInputs[COMMITTEE_HASH_HI_IDX] !=
             CommitteeHashLib.hi(committeeHash)
         ) {
-            return false;
+            revert DomainBindingMismatch();
         }
         if (
             publicInputs[COMMITTEE_HASH_LO_IDX] !=
             CommitteeHashLib.lo(committeeHash)
         ) {
-            return false;
+            revert DomainBindingMismatch();
         }
+
+        // Plaintext hash check: 100-coefficient plaintext must hash to the claimed value.
         if (!_verifyPlaintextHash(publicInputs, plaintextOutputHash)) {
-            return false;
+            revert PlaintextHashMismatch();
         }
-        return circuitVerifier.verify(rawProof, publicInputs);
+
+        // Suppress unused-variable warnings for forward-compatibility params.
+        // These will be used for circuit-level domain binding in a future circuit update.
+        e3Id;
+        committeeRoot;
+        sortedNodes;
+        ciphertextOutputHash;
+        committeePublicKey;
+
+        // Bubble up as a revert instead of a silent `false`.
+        if (!circuitVerifier.verify(rawProof, publicInputs)) {
+            revert InvalidProof();
+        }
+        return true;
     }
 
     function _verifyPlaintextHash(

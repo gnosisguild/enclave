@@ -35,7 +35,7 @@ async function disableTransferRestrictionsForLocal(
   try {
     const isRestricted = await contract.transfersRestricted();
     if (isRestricted) {
-      const tx = await contract.setTransferRestriction(false);
+      const tx = await contract.disableTransferRestrictions();
       await tx.wait();
       console.log("Transfer restrictions disabled for local development");
     }
@@ -57,7 +57,7 @@ export const deployAndSaveEnclaveToken = async ({
 }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = hre.globalOptions.network;
 
   const preDeployedArgs = readDeploymentArgs("EnclaveToken", chain);
 

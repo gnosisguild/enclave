@@ -36,6 +36,7 @@ interface IE3RefundManager {
         bool calculated; // Whether distribution is calculated
         IERC20 feeToken; // The fee token used for this E3's payment (stored per-E3 to survive token rotations)
         uint256 originalPayment; // Original E3 payment amount (for making requester whole)
+        uint256 perNodeAmount; // Snapshotted per-honest-node payout; 0 when honestNodeCount==0
     }
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -66,10 +67,38 @@ interface IE3RefundManager {
         uint256 toHonestNodes
     );
     /// @notice Emitted when escrowed slashed funds are distributed on success
+    /// @dev Both `toNodes` and `toProtocol` are credited (pull-payment) — see
+    ///      `SlashedFundsCredited` / `TreasurySlashedCredited` for per-recipient detail.
     event SlashedFundsDistributedOnSuccess(
         uint256 indexed e3Id,
         uint256 toNodes,
         uint256 toProtocol
+    );
+    /// @notice Emitted when an honest node is credited slashed funds (success path).
+    event SlashedFundsCredited(
+        uint256 indexed e3Id,
+        address indexed account,
+        IERC20 indexed token,
+        uint256 amount
+    );
+    /// @notice Emitted when an honest node claims credited slashed funds (success path).
+    event SlashedFundsClaimed(
+        uint256 indexed e3Id,
+        address indexed account,
+        IERC20 indexed token,
+        uint256 amount
+    );
+    /// @notice Emitted when the treasury slashed-fund share is credited for later pull.
+    event TreasurySlashedCredited(
+        address indexed treasury,
+        IERC20 indexed token,
+        uint256 amount
+    );
+    /// @notice Emitted when the treasury pulls accrued slashed-fund credits.
+    event TreasurySlashedClaimed(
+        address indexed treasury,
+        IERC20 indexed token,
+        uint256 amount
     );
     /// @notice Emitted when work allocation is updated
     event WorkAllocationUpdated(WorkValueAllocation allocation);
@@ -98,6 +127,8 @@ interface IE3RefundManager {
     error NoRefundAvailable(uint256 e3Id);
     /// @notice Caller not authorized
     error Unauthorized();
+    /// @notice Caller has no pending balance to claim
+    error NothingToClaim();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -181,4 +212,39 @@ interface IE3RefundManager {
         external
         view
         returns (WorkValueAllocation memory allocation);
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //          Success-Path Slashed-Funds Pull Payments      //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice Honest node pulls credited success-path slashed funds.
+    /// @param e3Id The successful E3 ID.
+    /// @return amount Amount transferred.
+    function claimSlashedFundsOnSuccess(
+        uint256 e3Id
+    ) external returns (uint256 amount);
+
+    /// @notice Batch pull credited success-path slashed funds across multiple E3s.
+    /// @dev Each e3Id may use a different reward token (recorded at request time);
+    ///      events carry the per-E3 token address. A mixed-token sum return would be
+    ///      meaningless, so the function is intentionally void.
+    function claimSlashedFundsOnSuccessBatch(uint256[] calldata e3Ids) external;
+
+    /// @notice Get pending success-path slashed-funds credit for (e3Id, account).
+    function pendingSlashedFundsOnSuccess(
+        uint256 e3Id,
+        address account
+    ) external view returns (uint256);
+
+    /// @notice Treasury pulls accrued credits (protocol slashed-fund share + dust).
+    /// @dev Caller must be the treasury that was credited.
+    function treasuryClaim(IERC20 token) external returns (uint256 amount);
+
+    /// @notice Get pending treasury credits for a (treasury, token) pair.
+    function pendingTreasuryClaim(
+        address treasury,
+        IERC20 token
+    ) external view returns (uint256);
 }
