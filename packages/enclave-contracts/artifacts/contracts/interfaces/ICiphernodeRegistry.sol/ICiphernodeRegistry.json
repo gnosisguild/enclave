@@ -71,6 +71,11 @@
     },
     {
       "inputs": [],
+      "name": "FoldAttestationVerifierAlreadySet",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "FoldAttestationVerifierNotSet",
       "type": "error"
     },
@@ -108,6 +113,11 @@
     {
       "inputs": [],
       "name": "InvalidTicketNumber",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NoPendingVerifierUpdate",
       "type": "error"
     },
     {
@@ -200,6 +210,38 @@
     {
       "inputs": [],
       "name": "Unauthorized",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "pending",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "provided",
+          "type": "address"
+        }
+      ],
+      "name": "VerifierMismatch",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "readyAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "nowAt",
+          "type": "uint256"
+        }
+      ],
+      "name": "VerifierUpdateTimelockActive",
       "type": "error"
     },
     {
@@ -472,6 +514,51 @@
         }
       ],
       "name": "CommitteeViabilityUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "verifier",
+          "type": "address"
+        }
+      ],
+      "name": "DkgFoldAttestationVerifierProposalCancelled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "verifier",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "readyAt",
+          "type": "uint256"
+        }
+      ],
+      "name": "DkgFoldAttestationVerifierProposed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "verifier",
+          "type": "address"
+        }
+      ],
+      "name": "DkgFoldAttestationVerifierUpdated",
       "type": "event"
     },
     {
@@ -1099,5 +1186,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-369f1ad8eea78d4c2afd75f88d1b51906ad9ac6c"
+  "buildInfoId": "solc-0_8_28-da8d0a9494cb27300af0bf31d68e29d6a69f32c3"
 }

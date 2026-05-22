@@ -69,10 +69,6 @@ describe("Enclave", function () {
   const data = "0xda7a";
   const proof = "0x1337";
 
-  const DKG_FOLD_ATTESTATION_TYPEHASH = ethers.id(
-    "DkgFoldAttestation(uint256 chainId,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)",
-  );
-
   /** Public inputs layout for `DkgFoldAttestationVerifier` with `h` honest parties. */
   const encodeMockDkgProofForAttestation = (
     pkCommitment: string,
@@ -103,25 +99,28 @@ describe("Enclave", function () {
   const signFoldAttestation = async (
     signer: Signer,
     chainId: bigint,
+    verifyingContract: string,
     e3Id: number,
     partyId: number,
     skAggCommit: string,
     esmAggCommit: string,
   ): Promise<string> => {
-    const digest = ethers.keccak256(
-      ethers.AbiCoder.defaultAbiCoder().encode(
-        ["bytes32", "uint256", "uint256", "uint256", "bytes32", "bytes32"],
-        [
-          DKG_FOLD_ATTESTATION_TYPEHASH,
-          chainId,
-          e3Id,
-          partyId,
-          skAggCommit,
-          esmAggCommit,
-        ],
-      ),
-    );
-    return signer.signMessage(ethers.getBytes(digest));
+    const domain = {
+      name: "EnclaveDkgFoldAttestation",
+      version: "1",
+      chainId,
+      verifyingContract,
+    };
+    const types = {
+      DkgFoldAttestation: [
+        { name: "e3Id", type: "uint256" },
+        { name: "partyId", type: "uint256" },
+        { name: "skAggCommit", type: "bytes32" },
+        { name: "esmAggCommit", type: "bytes32" },
+      ],
+    };
+    const value = { e3Id, partyId, skAggCommit, esmAggCommit };
+    return signer.signTypedData(domain, types, value);
   };
 
   /** Proof + attestation bundle for `publishCommittee` when proof aggregation is enabled. */
@@ -129,6 +128,7 @@ describe("Enclave", function () {
     operators: Signer[],
     e3Id: number,
     publicKey: string,
+    verifyingContract: string,
   ): Promise<{ proof: string; bundle: string }> => {
     const pkCommitment = ethers.keccak256(publicKey);
     const h = operators.length;
@@ -175,6 +175,7 @@ describe("Enclave", function () {
         signature: await signFoldAttestation(
           operator,
           chainId,
+          verifyingContract,
           e3Id,
           partyId,
           skCommits[i]!,
@@ -388,7 +389,7 @@ describe("Enclave", function () {
     const dkgFoldAttestationVerifier = await ethers.deployContract(
       "DkgFoldAttestationVerifier",
     );
-    await ciphernodeRegistryContract.setDkgFoldAttestationVerifier(
+    await ciphernodeRegistryContract.setInitialDkgFoldAttestationVerifier(
       await dkgFoldAttestationVerifier.getAddress(),
     );
 
@@ -450,6 +451,7 @@ describe("Enclave", function () {
       ticketToken,
       usdcToken,
       slashingManager,
+      dkgFoldAttestationVerifier,
       request,
       mocks: { decryptionVerifier, e3Program, mockComputeProvider },
     };
@@ -1181,6 +1183,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
         operator3,
+        dkgFoldAttestationVerifier,
       } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1195,6 +1198,7 @@ describe("Enclave", function () {
         operators,
         e3Id,
         data,
+        await dkgFoldAttestationVerifier.getAddress(),
       );
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,

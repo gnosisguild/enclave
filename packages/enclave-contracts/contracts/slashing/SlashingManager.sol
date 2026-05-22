@@ -87,6 +87,10 @@ contract SlashingManager is ISlashingManager, AccessControl {
     /// @notice EIP-712 style typehash for committee attestation votes.
     /// @dev Must match `AccusationManager::vote_digest()` in `crates/zk-prover/src/actors/accusation_manager.rs`.
     ///      Includes chainId to prevent cross-chain replay and dataHash for equivocation detection.
+    /// @dev Signature scheme uses EIP-191 (`personal_sign`) wrapping rather than a
+    ///      full EIP-712 domain separator with `verifyingContract`; canonicalising the
+    ///      domain is tracked as a follow-up (requires plumbing the SlashingManager
+    ///      address into off-chain signers).
     bytes32 public constant VOTE_TYPEHASH =
         keccak256(
             "AccusationVote(uint256 chainId,uint256 e3Id,"
@@ -164,12 +168,16 @@ contract SlashingManager is ISlashingManager, AccessControl {
             InvalidPolicy()
         );
 
-        if (policy.requiresProof) {
-            // Attestation-based slashes: no proofVerifier needed, no appeal window
-            require(policy.appealWindow == 0, InvalidPolicy());
-        } else {
+        if (!policy.requiresProof) {
+            // Lane B: evidence-based slashes must give the accused an appeal window.
             require(policy.appealWindow > 0, InvalidPolicy());
         }
+        // Lane A (requiresProof=true): `appealWindow` is the execution-delay
+        // window during which the accused can file an appeal before the slash
+        // executes. `0` means execute immediately (preserves backwards-compatible
+        // behavior for policies that opt out of recourse), but governance is
+        // free to set a non-zero window for added recourse on attestation-based
+        // slashes.
 
         slashPolicies[reason] = policy;
         emit SlashPolicyUpdated(reason, policy);
@@ -232,7 +240,11 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
     /// @inheritdoc ISlashingManager
     /// @dev Lane A: Permissionless committee attestation-based slash. Anyone can call.
-    ///      Atomically proposes, verifies committee vote signatures, and executes slash.
+    ///      Proposes the slash and verifies committee vote signatures. Execution
+    ///      timing depends on the policy's `appealWindow`:
+    ///        - `appealWindow == 0`: execute atomically in this call (no recourse).
+    ///        - `appealWindow > 0`: defer; the accused has `appealWindow` seconds
+    ///          to `fileAppeal`, after which anyone can call `executeSlash(proposalId)`.
     ///      The slash reason is derived deterministically from proofType as
     ///      `keccak256(abi.encodePacked(proofType))`, eliminating the need for the caller
     ///      to pass a reason and preventing cross-reason replay attacks.
@@ -281,6 +293,8 @@ contract SlashingManager is ISlashingManager, AccessControl {
         proposalId = totalProposals;
         totalProposals = proposalId + 1;
 
+        uint256 executableAt = block.timestamp + policy.appealWindow;
+
         SlashProposal storage p = _proposals[proposalId];
         p.e3Id = e3Id;
         p.operator = operator;
@@ -288,7 +302,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         p.ticketAmount = policy.ticketPenalty;
         p.licenseAmount = policy.licensePenalty;
         p.proposedAt = block.timestamp;
-        p.executableAt = block.timestamp;
+        p.executableAt = executableAt;
         p.proposer = msg.sender;
         p.proofHash = keccak256(proof);
         p.proofVerified = true;
@@ -303,11 +317,17 @@ contract SlashingManager is ISlashingManager, AccessControl {
             reason,
             policy.ticketPenalty,
             policy.licensePenalty,
-            block.timestamp,
+            executableAt,
             msg.sender
         );
 
-        _executeSlash(proposalId);
+        // If `appealWindow == 0` (no recourse), execute atomically as before.
+        // Otherwise, wait for the appeal window: the accused can call
+        // `fileAppeal` before `executableAt`, then anyone (or governance,
+        // after appeal resolution) can call `executeSlash(proposalId)`.
+        if (policy.appealWindow == 0) {
+            _executeSlash(proposalId);
+        }
     }
 
     /// @inheritdoc ISlashingManager
@@ -364,16 +384,17 @@ contract SlashingManager is ISlashingManager, AccessControl {
     }
 
     /// @inheritdoc ISlashingManager
-    /// @dev Only for evidence-based slashes (Lane B). Proof-based slashes execute atomically.
+    /// @dev Used for:
+    ///        - Lane B (evidence-based) slashes after the appeal window.
+    ///        - Lane A (proof-based) slashes whose policy has a non-zero
+    ///          `appealWindow`. Lane A policies with `appealWindow == 0` are
+    ///          already executed atomically inside `proposeSlash`.
     function executeSlash(uint256 proposalId) external {
         require(proposalId < totalProposals, InvalidProposal());
         SlashProposal storage p = _proposals[proposalId];
         require(!p.executed, AlreadyExecuted());
 
-        // Use snapshotted requiresProof state: proof-based slashes are already executed atomically in proposeSlash
-        require(!p.proofVerified, InvalidPolicy());
-
-        // Evidence mode: check appeal window
+        // Both lanes share the same appeal-window machinery now.
         require(block.timestamp >= p.executableAt, AppealWindowActive());
         if (p.appealed) {
             require(p.resolved, AppealPending());
@@ -607,12 +628,12 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
         // Only the accused can appeal
         require(msg.sender == p.operator, Unauthorized());
+        // Already-executed slashes (Lane A with appealWindow == 0) cannot be appealed.
+        require(!p.executed, AlreadyExecuted());
         // Only within the appeal window
         require(block.timestamp < p.executableAt, AppealWindowExpired());
         // Only once
         require(!p.appealed, AlreadyAppealed());
-        // Cannot appeal proof-verified slashes (they have no appeal window)
-        require(!p.proofVerified, InvalidProposal());
 
         p.appealed = true;
 

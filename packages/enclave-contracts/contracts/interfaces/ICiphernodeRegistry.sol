@@ -150,6 +150,20 @@ interface ICiphernodeRegistry {
     /// @param enclave Address of the enclave contract.
     event EnclaveSet(address indexed enclave);
 
+    /// @notice Emitted when the owner proposes a new DKG fold-attestation verifier.
+    /// @dev The new verifier becomes active only after `commitDkgFoldAttestationVerifier`
+    ///      is called and at least `DKG_FOLD_VERIFIER_TIMELOCK` has elapsed.
+    event DkgFoldAttestationVerifierProposed(
+        address indexed verifier,
+        uint256 readyAt
+    );
+
+    /// @notice Emitted when the proposed DKG fold-attestation verifier becomes active.
+    event DkgFoldAttestationVerifierUpdated(address indexed verifier);
+
+    /// @notice Emitted when the owner cancels a pending verifier proposal.
+    event DkgFoldAttestationVerifierProposalCancelled(address indexed verifier);
+
     /// @notice This event MUST be emitted when a ciphernode is added to the registry.
     /// @param node Address of the ciphernode.
     /// @param index Index of the ciphernode in the registry.
@@ -226,6 +240,11 @@ interface ICiphernodeRegistry {
     /// @notice `dkgFoldAttestationVerifier` is not configured on the registry
     error FoldAttestationVerifierNotSet();
 
+    /// @notice Initial verifier set was attempted after one was already configured.
+    /// @dev Subsequent changes must go through `proposeDkgFoldAttestationVerifier` →
+    ///      `commitDkgFoldAttestationVerifier` (timelocked).
+    error FoldAttestationVerifierAlreadySet();
+
     /// @notice Fold attestation bundle failed signature or public-input binding checks
     error InvalidFoldAttestation();
 
@@ -237,6 +256,16 @@ interface ICiphernodeRegistry {
 
     /// @notice `partyId` is out of bounds for the finalized committee's `topNodes`
     error PartyIdOutOfBounds(uint256 partyId, uint256 committeeSize);
+
+    /// @notice A `setDkgFoldAttestationVerifier` commit was attempted before the timelock elapsed.
+    error VerifierUpdateTimelockActive(uint256 readyAt, uint256 nowAt);
+
+    /// @notice `commitDkgFoldAttestationVerifier` was called but no proposal is pending.
+    error NoPendingVerifierUpdate();
+
+    /// @notice `commitDkgFoldAttestationVerifier` was called with an address that does
+    /// not match the pending proposal (prevents commit-time substitution).
+    error VerifierMismatch(address pending, address provided);
 
     /// @notice Node has already submitted a ticket for this E3
     error NodeAlreadySubmitted();

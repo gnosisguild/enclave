@@ -187,7 +187,7 @@ describe("CiphernodeRegistryOwnable", function () {
     const dkgFoldAttestationVerifier = await ethers.deployContract(
       "DkgFoldAttestationVerifier",
     );
-    await registry.setDkgFoldAttestationVerifier(
+    await registry.setInitialDkgFoldAttestationVerifier(
       await dkgFoldAttestationVerifier.getAddress(),
     );
 

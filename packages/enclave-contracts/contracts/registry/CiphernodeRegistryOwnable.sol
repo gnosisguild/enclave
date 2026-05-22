@@ -91,6 +91,17 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Verifies per-node DKG fold attestations at publication (external contract).
     IDkgFoldAttestationVerifier public dkgFoldAttestationVerifier;
 
+    /// @notice Minimum delay between proposing a verifier change and committing it.
+    /// @dev Treats `dkgFoldAttestationVerifier` as a critical admin key: a compromised
+    ///      owner cannot instantly swap it for a weak verifier that bypasses
+    ///      per-party attestation checks; the proposal is visible on-chain for
+    ///      this window and can be cancelled by the (recovered) legitimate owner.
+    uint256 public constant DKG_FOLD_VERIFIER_TIMELOCK = 2 days;
+
+    /// @notice Pending verifier proposal awaiting commit. `pendingAt == 0` means no proposal.
+    address public pendingDkgFoldAttestationVerifier;
+    uint256 public pendingDkgFoldAttestationVerifierAt;
+
     /// @notice DKG anchor commitments stored when the committee public key is published.
     mapping(uint256 e3Id => uint256[]) internal dkgPartyIds;
     mapping(uint256 e3Id => bytes32[]) internal dkgSkAggCommits;
@@ -286,12 +297,70 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         dkgEsmAggCommits[e3Id] = esmAgg;
     }
 
-    /// @notice Sets the DKG fold attestation verifier (required when proof aggregation is enabled).
-    function setDkgFoldAttestationVerifier(
+    /// @notice Propose a new DKG fold-attestation verifier. The change becomes active
+    ///         only after `DKG_FOLD_VERIFIER_TIMELOCK` has elapsed and `commitDkgFoldAttestationVerifier`
+    ///         is called. Replaces any pending proposal.
+    /// @dev First-time set is also subject to the timelock — operators must wait
+    ///      the same window before the verifier is active. For the deploy-time
+    ///      initial set, see `setInitialDkgFoldAttestationVerifier`.
+    function proposeDkgFoldAttestationVerifier(
         IDkgFoldAttestationVerifier verifier
     ) external onlyOwner {
         require(address(verifier) != address(0), ZeroAddress());
+        pendingDkgFoldAttestationVerifier = address(verifier);
+        pendingDkgFoldAttestationVerifierAt = block.timestamp;
+        emit DkgFoldAttestationVerifierProposed(
+            address(verifier),
+            block.timestamp + DKG_FOLD_VERIFIER_TIMELOCK
+        );
+    }
+
+    /// @notice Commit a previously proposed verifier change after the timelock elapses.
+    /// @param verifier Must match the pending proposal (prevents commit-time substitution).
+    function commitDkgFoldAttestationVerifier(
+        IDkgFoldAttestationVerifier verifier
+    ) external onlyOwner {
+        address pending = pendingDkgFoldAttestationVerifier;
+        require(pending != address(0), NoPendingVerifierUpdate());
+        require(
+            pending == address(verifier),
+            VerifierMismatch(pending, address(verifier))
+        );
+        uint256 readyAt = pendingDkgFoldAttestationVerifierAt +
+            DKG_FOLD_VERIFIER_TIMELOCK;
+        require(
+            block.timestamp >= readyAt,
+            VerifierUpdateTimelockActive(readyAt, block.timestamp)
+        );
         dkgFoldAttestationVerifier = verifier;
+        pendingDkgFoldAttestationVerifier = address(0);
+        pendingDkgFoldAttestationVerifierAt = 0;
+        emit DkgFoldAttestationVerifierUpdated(address(verifier));
+    }
+
+    /// @notice Cancel a pending verifier proposal.
+    function cancelDkgFoldAttestationVerifierProposal() external onlyOwner {
+        address pending = pendingDkgFoldAttestationVerifier;
+        require(pending != address(0), NoPendingVerifierUpdate());
+        pendingDkgFoldAttestationVerifier = address(0);
+        pendingDkgFoldAttestationVerifierAt = 0;
+        emit DkgFoldAttestationVerifierProposalCancelled(pending);
+    }
+
+    /// @notice One-shot initial set, allowed only when no verifier has ever been configured.
+    /// @dev Lets deploy scripts wire the verifier without first waiting the timelock.
+    ///      Subsequent changes must go through `propose`/`commit`. Cannot be used to
+    ///      bypass the timelock for replacement — only for the very first set.
+    function setInitialDkgFoldAttestationVerifier(
+        IDkgFoldAttestationVerifier verifier
+    ) external onlyOwner {
+        require(
+            address(dkgFoldAttestationVerifier) == address(0),
+            FoldAttestationVerifierAlreadySet()
+        );
+        require(address(verifier) != address(0), ZeroAddress());
+        dkgFoldAttestationVerifier = verifier;
+        emit DkgFoldAttestationVerifierUpdated(address(verifier));
     }
 
     /// @inheritdoc ICiphernodeRegistry

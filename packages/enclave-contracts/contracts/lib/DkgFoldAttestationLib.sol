@@ -7,22 +7,37 @@
 pragma solidity 0.8.28;
 
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {
-    MessageHashUtils
-} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 /**
  * @title DkgFoldAttestationLib
- * @notice EIP-712-style digests for per-node DKG fold attestations.
- * @dev Must stay aligned with `DkgFoldAttestationPayload::typehash()` in
+ * @notice Canonical EIP-712 digests for per-node DKG fold attestations.
+ * @dev Must stay aligned with `DkgFoldAttestationPayload` in
  *      `crates/events/src/enclave_event/dkg_fold_attestation.rs`.
+ *
+ *      Domain binds `chainId` and `verifyingContract` (the
+ *      `DkgFoldAttestationVerifier` address); the struct binds `e3Id`,
+ *      `partyId`, and the two NodeFold commitments. Signatures cannot be
+ *      replayed across chains, verifier deployments, or E3s.
  */
 library DkgFoldAttestationLib {
-    /// @dev `keccak256("DkgFoldAttestation(uint256 chainId,uint256 e3Id,
-    /// uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)")`
+    /// @dev `keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")`
+    bytes32 public constant EIP712_DOMAIN_TYPEHASH =
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
+
+    /// @dev `keccak256("EnclaveDkgFoldAttestation")`
+    bytes32 public constant DOMAIN_NAME_HASH =
+        keccak256(bytes("EnclaveDkgFoldAttestation"));
+
+    /// @dev `keccak256("1")`
+    bytes32 public constant DOMAIN_VERSION_HASH = keccak256(bytes("1"));
+
+    /// @dev `keccak256("DkgFoldAttestation(uint256 e3Id,uint256 partyId,
+    /// bytes32 skAggCommit,bytes32 esmAggCommit)")`
     bytes32 public constant TYPEHASH =
         keccak256(
-            "DkgFoldAttestation(uint256 chainId,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)"
+            "DkgFoldAttestation(uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)"
         );
 
     /// @notice One node's signed fold output.
@@ -39,9 +54,25 @@ library DkgFoldAttestationLib {
         address node;
     }
 
-    /// @notice `personal_sign` digest for a fold attestation (EIP-191 applied by callers).
-    function digest(
+    /// @notice EIP-712 domain separator bound to `chainId` and `verifyingContract`.
+    function domainSeparator(
         uint256 chainId,
+        address verifyingContract
+    ) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    EIP712_DOMAIN_TYPEHASH,
+                    DOMAIN_NAME_HASH,
+                    DOMAIN_VERSION_HASH,
+                    chainId,
+                    verifyingContract
+                )
+            );
+    }
+
+    /// @notice `hashStruct(DkgFoldAttestation)` per EIP-712.
+    function structHash(
         uint256 e3Id,
         uint256 partyId,
         bytes32 skAggCommit,
@@ -49,33 +80,44 @@ library DkgFoldAttestationLib {
     ) internal pure returns (bytes32) {
         return
             keccak256(
-                abi.encode(
-                    TYPEHASH,
-                    chainId,
-                    e3Id,
-                    partyId,
-                    skAggCommit,
-                    esmAggCommit
+                abi.encode(TYPEHASH, e3Id, partyId, skAggCommit, esmAggCommit)
+            );
+    }
+
+    /// @notice EIP-712 typed-data hash: `keccak256("\x19\x01" || domainSeparator || structHash)`.
+    function typedDataHash(
+        uint256 chainId,
+        address verifyingContract,
+        uint256 e3Id,
+        uint256 partyId,
+        bytes32 skAggCommit,
+        bytes32 esmAggCommit
+    ) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    domainSeparator(chainId, verifyingContract),
+                    structHash(e3Id, partyId, skAggCommit, esmAggCommit)
                 )
             );
     }
 
-    /// @notice Recover the signer for a fold attestation.
+    /// @notice Recover the EIP-712 signer for a fold attestation.
     function recoverSigner(
         uint256 chainId,
+        address verifyingContract,
         uint256 e3Id,
         Attestation memory attestation
     ) internal pure returns (address) {
-        bytes32 structHash = digest(
+        bytes32 digest = typedDataHash(
             chainId,
+            verifyingContract,
             e3Id,
             attestation.partyId,
             attestation.skAggCommit,
             attestation.esmAggCommit
         );
-        bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(
-            structHash
-        );
-        return ECDSA.recover(ethSignedHash, attestation.signature);
+        return ECDSA.recover(digest, attestation.signature);
     }
 }

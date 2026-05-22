@@ -486,7 +486,13 @@ impl CiphernodeBuilder {
             ));
 
             info!("Setting up ZK actors");
-            setup_zk_actors(&bus, backend, signer);
+            let dkg_fold_verifier_addr = self
+                .chains
+                .first()
+                .and_then(|c| c.contracts.dkg_fold_attestation_verifier.as_ref())
+                .map(|c| c.address())
+                .transpose()?;
+            setup_zk_actors(&bus, backend, signer, dkg_fold_verifier_addr);
         }
 
         if self.pubkey_agg {
@@ -507,7 +513,13 @@ impl CiphernodeBuilder {
                     .ok_or_else(|| anyhow::anyhow!("ZK backend is required for aggregator"))?;
                 let signer = provider_cache.ensure_signer().await?;
                 info!("Setting up ZK actors for aggregator");
-                setup_zk_actors(&bus, backend, signer);
+                let dkg_fold_verifier_addr = self
+                    .chains
+                    .first()
+                    .and_then(|c| c.contracts.dkg_fold_attestation_verifier.as_ref())
+                    .map(|c| c.address())
+                    .transpose()?;
+                setup_zk_actors(&bus, backend, signer, dkg_fold_verifier_addr);
             }
         }
 

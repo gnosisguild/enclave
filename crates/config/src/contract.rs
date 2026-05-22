@@ -49,6 +49,10 @@ pub struct ContractAddresses {
     pub e3_program: Option<Contract>,
     pub fee_token: Option<Contract>,
     pub slashing_manager: Option<Contract>,
+    /// On-chain `DkgFoldAttestationVerifier` address. Required when running with
+    /// proof aggregation; used as the EIP-712 `verifyingContract` when nodes
+    /// sign DKG fold attestations.
+    pub dkg_fold_attestation_verifier: Option<Contract>,
 }
 
 impl ContractAddresses {
@@ -60,6 +64,7 @@ impl ContractAddresses {
             self.e3_program.as_ref(),
             self.fee_token.as_ref(),
             self.slashing_manager.as_ref(),
+            self.dkg_fold_attestation_verifier.as_ref(),
         ]
         .into_iter()
         .flatten()

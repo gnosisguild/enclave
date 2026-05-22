@@ -90,6 +90,7 @@ mod tests {
                 .unwrap();
         let payload = DkgFoldAttestationPayload {
             e3_id: E3id::new("31337", 1),
+            verifying_contract: Address::from([0x22u8; 20]),
             party_id: 2,
             agg_commits: DkgFoldAggCommits {
                 sk_agg_commit: [1u8; 32],
@@ -109,7 +110,7 @@ mod tests {
         assert!(!encoded.is_empty());
 
         let typehash = keccak256(
-            "DkgFoldAttestation(uint256 chainId,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)",
+            "DkgFoldAttestation(uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)",
         );
         assert_eq!(typehash.len(), 32);
     }

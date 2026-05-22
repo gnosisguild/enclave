@@ -447,7 +447,9 @@ describe("SlashingManager", function () {
         .withArgs(REASON_PT_0, Object.values(policy));
     });
 
-    it("should revert if proof required but appeal window set", async function () {
+    it("should allow proof-based policy with appeal window (deferred execution)", async function () {
+      // Lane A policies may now opt into a non-zero appealWindow, deferring
+      // _executeSlash to give the accused a window to file an appeal.
       const { slashingManager, _mockVerifier } = await loadFixture(setup);
 
       const policy = {
@@ -464,7 +466,7 @@ describe("SlashingManager", function () {
 
       await expect(
         slashingManager.setSlashPolicy(REASON_PT_0, policy),
-      ).to.be.revertedWithCustomError(slashingManager, "InvalidPolicy");
+      ).to.not.be.revert(ethers);
     });
 
     it("should revert if no proof required but no appeal window", async function () {
@@ -1267,10 +1269,12 @@ describe("SlashingManager", function () {
         .connect(proposer)
         .proposeSlash(0, operatorAddress, proof);
 
-      // Cannot appeal proof-verified slashes — appeal window is 0 so it's already expired
+      // Cannot appeal proof-verified slashes whose policy has appealWindow == 0:
+      // they auto-execute inside `proposeSlash`, so the proposal is already
+      // marked executed by the time the accused tries to file an appeal.
       await expect(
         slashingManager.connect(operator).fileAppeal(0, "Cannot appeal proof"),
-      ).to.be.revertedWithCustomError(slashingManager, "AppealWindowExpired");
+      ).to.be.revertedWithCustomError(slashingManager, "AlreadyExecuted");
     });
 
     it("should allow governance to resolve appeal (approve)", async function () {

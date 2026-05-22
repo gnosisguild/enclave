@@ -10,6 +10,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use actix::{Actor, Addr, Context, Handler};
+use alloy::primitives::Address;
 use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind,
@@ -48,24 +49,36 @@ struct DkgProofCollectionState {
 pub struct NodeProofAggregator {
     bus: BusHandle,
     signer: PrivateKeySigner,
+    /// On-chain `DkgFoldAttestationVerifier` address (EIP-712 `verifyingContract`).
+    /// `None` is only valid when proof aggregation will never run for this node.
+    dkg_fold_attestation_verifier: Option<Address>,
     states: HashMap<E3id, DkgProofCollectionState>,
     fold_correlation: HashMap<CorrelationId, E3id>,
     pending_inner_proofs: HashMap<E3id, BTreeMap<usize, Proof>>,
 }
 
 impl NodeProofAggregator {
-    pub fn new(bus: &BusHandle, signer: PrivateKeySigner) -> Self {
+    pub fn new(
+        bus: &BusHandle,
+        signer: PrivateKeySigner,
+        dkg_fold_attestation_verifier: Option<Address>,
+    ) -> Self {
         Self {
             bus: bus.clone(),
             signer,
+            dkg_fold_attestation_verifier,
             states: HashMap::new(),
             fold_correlation: HashMap::new(),
             pending_inner_proofs: HashMap::new(),
         }
     }
 
-    pub fn setup(bus: &BusHandle, signer: PrivateKeySigner) -> Addr<Self> {
-        let addr = Self::new(bus, signer).start();
+    pub fn setup(
+        bus: &BusHandle,
+        signer: PrivateKeySigner,
+        dkg_fold_attestation_verifier: Option<Address>,
+    ) -> Addr<Self> {
+        let addr = Self::new(bus, signer, dkg_fold_attestation_verifier).start();
         bus.subscribe(EventType::ThresholdSharePending, addr.clone().into());
         bus.subscribe(EventType::DKGInnerProofReady, addr.clone().into());
         bus.subscribe(EventType::ComputeResponse, addr.clone().into());
@@ -315,47 +328,59 @@ impl NodeProofAggregator {
         let committee_h = committee_n;
         let n_moduli = state.meta.n_moduli;
 
-        let fold_attestation =
-            match extract_node_fold_agg_commits(&proof, committee_n, committee_h, n_moduli) {
-                Ok((extracted_party, commits)) => {
-                    if extracted_party != party_id {
-                        error!(
-                            e3_id = %e3_id,
-                            expected_party_id = party_id,
-                            extracted_party_id = extracted_party,
-                            "NodeFold public party_id does not match sortition party_id"
-                        );
-                        None
-                    } else {
-                        let payload = DkgFoldAttestationPayload {
-                            e3_id: e3_id.clone(),
-                            party_id,
-                            agg_commits: commits,
-                        };
-                        match SignedDkgFoldAttestation::sign(payload, &self.signer) {
-                            Ok(signed) => Some(signed),
-                            Err(e) => {
-                                error!(
-                                    e3_id = %e3_id,
-                                    party_id,
-                                    error = %e,
-                                    "failed to sign DkgFoldAttestation"
-                                );
-                                None
-                            }
+        let fold_attestation = match extract_node_fold_agg_commits(
+            &proof,
+            committee_n,
+            committee_h,
+            n_moduli,
+        ) {
+            Ok((extracted_party, commits)) => {
+                if extracted_party != party_id {
+                    error!(
+                        e3_id = %e3_id,
+                        expected_party_id = party_id,
+                        extracted_party_id = extracted_party,
+                        "NodeFold public party_id does not match sortition party_id"
+                    );
+                    None
+                } else if let Some(verifying_contract) = self.dkg_fold_attestation_verifier {
+                    let payload = DkgFoldAttestationPayload {
+                        e3_id: e3_id.clone(),
+                        verifying_contract,
+                        party_id,
+                        agg_commits: commits,
+                    };
+                    match SignedDkgFoldAttestation::sign(payload, &self.signer) {
+                        Ok(signed) => Some(signed),
+                        Err(e) => {
+                            error!(
+                                e3_id = %e3_id,
+                                party_id,
+                                error = %e,
+                                "failed to sign DkgFoldAttestation"
+                            );
+                            None
                         }
                     }
-                }
-                Err(e) => {
+                } else {
                     error!(
                         e3_id = %e3_id,
                         party_id,
-                        error = %e,
-                        "failed to extract sk_agg/esm_agg from NodeFold proof"
+                        "NodeProofAggregator: cannot sign DkgFoldAttestation — `dkg_fold_attestation_verifier` address not configured"
                     );
                     None
                 }
-            };
+            }
+            Err(e) => {
+                error!(
+                    e3_id = %e3_id,
+                    party_id,
+                    error = %e,
+                    "failed to extract sk_agg/esm_agg from NodeFold proof"
+                );
+                None
+            }
+        };
 
         if fold_attestation.is_none() {
             error!(
@@ -556,7 +581,7 @@ mod tests {
     #[actix::test]
     async fn node_dkg_fold_compute_error_emits_none_aggregation_result() -> Result<()> {
         let (bus, _rng, _seed, _params, _crp, _errors, history) = get_common_setup(None)?;
-        let mut aggregator = NodeProofAggregator::new(&bus, test_signer());
+        let mut aggregator = NodeProofAggregator::new(&bus, test_signer(), None);
         let e3_id = E3id::new("42", 1);
         let correlation_id = CorrelationId::new();
 
@@ -638,7 +663,7 @@ mod tests {
     #[actix::test]
     async fn early_inner_proof_is_prebuffered_until_collection_starts() -> Result<()> {
         let (bus, _rng, _seed, _params, _crp, _errors, history) = get_common_setup(None)?;
-        let mut aggregator = NodeProofAggregator::new(&bus, test_signer());
+        let mut aggregator = NodeProofAggregator::new(&bus, test_signer(), None);
         let e3_id = E3id::new("43", 1);
         let early_proof = dummy_proof(10);
 

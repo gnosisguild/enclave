@@ -409,7 +409,7 @@ export const deployEnclave = async (
     const currentVerifier =
       await ciphernodeRegistry.dkgFoldAttestationVerifier();
     if (currentVerifier !== dkgFoldAttestationVerifierAddress) {
-      const tx = await ciphernodeRegistry.setDkgFoldAttestationVerifier(
+      const tx = await ciphernodeRegistry.setInitialDkgFoldAttestationVerifier(
         dkgFoldAttestationVerifierAddress,
       );
       await tx.wait();

@@ -26,25 +26,64 @@ pub struct DkgFoldAggCommits {
     pub esm_agg_commit: [u8; 32],
 }
 
-/// Payload signed after `NodeDkgFold` completes.
+/// Canonical EIP-712 payload signed after `NodeDkgFold` completes.
+///
+/// `chainId` and `verifying_contract` (the `DkgFoldAttestationVerifier`) are
+/// part of the EIP-712 domain; `e3_id`, `party_id`, and the commitments are the
+/// struct fields. Must stay aligned with `DkgFoldAttestationLib` in
+/// `packages/enclave-contracts`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DkgFoldAttestationPayload {
     pub e3_id: E3id,
+    /// Address of the on-chain `DkgFoldAttestationVerifier` (EIP-712 `verifyingContract`).
+    pub verifying_contract: Address,
     /// Sortition / committee slot id (index into on-chain `topNodes` when ids are dense).
     pub party_id: u64,
     pub agg_commits: DkgFoldAggCommits,
 }
 
 impl DkgFoldAttestationPayload {
-    /// Must match `DKG_FOLD_ATTESTATION_TYPEHASH` in `CiphernodeRegistryOwnable.sol` when added.
-    pub fn typehash() -> [u8; 32] {
+    /// `keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")`.
+    pub fn domain_typehash() -> [u8; 32] {
         keccak256(
-            "DkgFoldAttestation(uint256 chainId,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)",
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
         )
         .into()
     }
 
-    pub fn digest(&self) -> Result<[u8; 32]> {
+    /// `keccak256("EnclaveDkgFoldAttestation")`.
+    pub fn domain_name_hash() -> [u8; 32] {
+        keccak256("EnclaveDkgFoldAttestation").into()
+    }
+
+    /// `keccak256("1")`.
+    pub fn domain_version_hash() -> [u8; 32] {
+        keccak256("1").into()
+    }
+
+    /// `keccak256("DkgFoldAttestation(uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)")`.
+    pub fn typehash() -> [u8; 32] {
+        keccak256(
+            "DkgFoldAttestation(uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)",
+        )
+        .into()
+    }
+
+    /// EIP-712 domain separator for this payload's chain + verifier.
+    pub fn domain_separator(&self) -> [u8; 32] {
+        let encoded = (
+            Self::domain_typehash(),
+            Self::domain_name_hash(),
+            Self::domain_version_hash(),
+            U256::from(self.e3_id.chain_id()),
+            self.verifying_contract,
+        )
+            .abi_encode();
+        keccak256(&encoded).into()
+    }
+
+    /// EIP-712 `hashStruct(DkgFoldAttestation)`.
+    pub fn struct_hash(&self) -> Result<[u8; 32]> {
         let e3_id_u256: U256 = self
             .e3_id
             .clone()
@@ -52,7 +91,6 @@ impl DkgFoldAttestationPayload {
             .map_err(|_| anyhow!("E3id cannot be converted to U256"))?;
         let encoded = (
             Self::typehash(),
-            U256::from(self.e3_id.chain_id()),
             e3_id_u256,
             U256::from(self.party_id),
             self.agg_commits.sk_agg_commit,
@@ -61,9 +99,21 @@ impl DkgFoldAttestationPayload {
             .abi_encode();
         Ok(keccak256(&encoded).into())
     }
+
+    /// EIP-712 typed-data hash: `keccak256("\x19\x01" || domainSeparator || structHash)`.
+    pub fn digest(&self) -> Result<[u8; 32]> {
+        let domain = self.domain_separator();
+        let struct_hash = self.struct_hash()?;
+        let mut buf = Vec::with_capacity(2 + 32 + 32);
+        buf.push(0x19);
+        buf.push(0x01);
+        buf.extend_from_slice(&domain);
+        buf.extend_from_slice(&struct_hash);
+        Ok(keccak256(&buf).into())
+    }
 }
 
-/// `eth_sign` over [`DkgFoldAttestationPayload::digest`].
+/// EIP-712 typed-data signature over [`DkgFoldAttestationPayload::digest`].
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct SignedDkgFoldAttestation {
@@ -75,8 +125,11 @@ pub struct SignedDkgFoldAttestation {
 impl SignedDkgFoldAttestation {
     pub fn sign(payload: DkgFoldAttestationPayload, signer: &PrivateKeySigner) -> Result<Self> {
         let digest = payload.digest()?;
+        // `sign_hash_sync` signs the raw 32-byte hash without EIP-191
+        // wrapping, which is what EIP-712 requires (`digest` is already
+        // the `\x19\x01 || domainSeparator || structHash` hash).
         let sig = signer
-            .sign_message_sync(&digest)
+            .sign_hash_sync(&digest.into())
             .map_err(|e| anyhow!("Failed to sign DkgFoldAttestation: {e}"))?;
         Ok(Self {
             payload,
@@ -89,7 +142,7 @@ impl SignedDkgFoldAttestation {
         let sig = Signature::try_from(&self.signature[..])
             .map_err(|e| anyhow!("Invalid DkgFoldAttestation signature: {e}"))?;
         let digest = self.payload.digest()?;
-        sig.recover_address_from_msg(&digest)
+        sig.recover_address_from_prehash(&digest.into())
             .map_err(|e| anyhow!("Failed to recover DkgFoldAttestation signer: {e}"))
     }
 
@@ -111,6 +164,7 @@ mod tests {
                 .unwrap();
         let payload = DkgFoldAttestationPayload {
             e3_id: E3id::new("0", 1),
+            verifying_contract: Address::from([0x11u8; 20]),
             party_id: 1,
             agg_commits: DkgFoldAggCommits {
                 sk_agg_commit: [7u8; 32],

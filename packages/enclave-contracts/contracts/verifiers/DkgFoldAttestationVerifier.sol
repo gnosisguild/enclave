@@ -173,6 +173,7 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
 
         address signer = DkgFoldAttestationLib.recoverSigner(
             chainId,
+            address(this),
             e3Id,
             att
         );
