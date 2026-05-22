@@ -11,9 +11,6 @@ import {
 } from "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {
-    ReentrancyGuard
-} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
@@ -32,8 +29,7 @@ import { IE3RefundManager } from "../interfaces/IE3RefundManager.sol";
 contract SlashingManager is
     ISlashingManager,
     AccessControlDefaultAdminRules,
-    EIP712,
-    ReentrancyGuard
+    EIP712
 {
     // ======================
     // Constants & Roles
@@ -331,7 +327,7 @@ contract SlashingManager is
         uint256 e3Id,
         address operator,
         bytes calldata proof
-    ) external nonReentrant returns (uint256 proposalId) {
+    ) external returns (uint256 proposalId) {
         require(operator != address(0), ZeroAddress());
         require(proof.length != 0, ProofRequired());
 
@@ -457,7 +453,7 @@ contract SlashingManager is
 
     /// @inheritdoc ISlashingManager
     /// @dev Executes a deferred Lane A or Lane B proposal after the appeal window has elapsed.
-    function executeSlash(uint256 proposalId) external nonReentrant {
+    function executeSlash(uint256 proposalId) external {
         require(proposalId < totalProposals, InvalidProposal());
         SlashProposal storage p = _proposals[proposalId];
         require(!p.executed, AlreadyExecuted());

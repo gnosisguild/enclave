@@ -327,10 +327,7 @@ contract EnclaveTicketToken is
      * @param to Address to payout to.
      * @param amount Amount of ticket tokens to payout.
      */
-    function payout(
-        address to,
-        uint256 amount
-    ) external onlyRegistry nonReentrant {
+    function payout(address to, uint256 amount) external onlyRegistry {
         require(amount <= payableBalance, "Exceeds payable balance");
         payableBalance -= amount;
         SafeERC20.safeTransfer(IERC20(address(underlying())), to, amount);
@@ -348,7 +345,7 @@ contract EnclaveTicketToken is
         IERC20 token,
         address to,
         uint256 amount
-    ) external onlyOwner nonReentrant {
+    ) external onlyOwner {
         if (address(token) == address(underlying())) {
             revert CannotRescueUnderlying();
         }

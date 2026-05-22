@@ -494,7 +494,7 @@ contract BondingRegistry is
     function claimExits(
         uint256 maxTicketAmount,
         uint256 maxLicenseAmount
-    ) external nonReentrant {
+    ) external {
         (uint256 ticketClaim, uint256 licenseClaim) = _exits.claimAssets(
             msg.sender,
             maxTicketAmount,
@@ -638,7 +638,7 @@ contract BondingRegistry is
         IERC20 rewardToken,
         address[] calldata recipients,
         uint256[] calldata amounts
-    ) external nonReentrant onlyAuthorizedDistributor {
+    ) external onlyAuthorizedDistributor {
         require(recipients.length == amounts.length, ArrayLengthMismatch());
 
         uint256 len = recipients.length;
@@ -799,7 +799,7 @@ contract BondingRegistry is
     function withdrawSlashedFunds(
         uint256 ticketAmount,
         uint256 licenseAmount
-    ) public nonReentrant onlyOwner {
+    ) public onlyOwner {
         require(ticketAmount <= slashedTicketBalance, InsufficientBalance());
         require(licenseAmount <= slashedLicenseBond, InsufficientBalance());
 
