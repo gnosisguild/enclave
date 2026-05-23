@@ -86,6 +86,32 @@ function log(msg: string) {
 // ConnectKit modal animations + app initialization (initialLoad/switchChain)
 // can cause the MetaMask button to be detached from the DOM or the page to
 // navigate while the modal is opening. Retry the whole flow up to 3 times.
+// After reload, wagmi/ConnectKit reconnect and App.tsx switchChain can lag on CI.
+// Wait until the demo poll is interactive and the wallet session is restored.
+async function waitForDemoPollReady(page: Page) {
+  await page.waitForLoadState('load')
+  await expect(page.locator("[data-test-id='poll-button-0']")).toBeVisible({ timeout: 60_000 })
+  await expect(page.locator('button:has-text("Connect Wallet")')).not.toBeVisible({ timeout: 60_000 })
+  await expect(page.locator('.tag.live')).toBeVisible({ timeout: 60_000 })
+}
+
+async function castVoteWithSignature(page: Page, metamask: MetaMask) {
+  log(`clicking first vote card...`)
+  await page.locator("[data-test-id='poll-button-0']").click()
+
+  const castBtn = page.locator('button:has-text("Cast")')
+  await expect(castBtn).toBeEnabled({ timeout: 30_000 })
+
+  log(`clicking Cast Vote...`)
+  await castBtn.click()
+
+  log(`waiting for wallet signing prompt...`)
+  await expect(page.getByText('Please sign the message in your wallet')).toBeVisible({ timeout: 30_000 })
+
+  log(`confirming MetaMask signature request...`)
+  await metamask.confirmSignature()
+}
+
 async function connectWalletWithRetry(page: Page, maxAttempts = 3) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -149,13 +175,10 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
   log(`DKG duration: ${DKG_DURATION}ms`)
   log(`forcing page reload...`)
   await page.reload()
-
-  log(`clicking first vote card...`)
-  await page.locator("[data-test-id='poll-button-0']").click()
-  log(`clicking Cast Vote...`)
-  await page.locator('button:has-text("Cast")').click()
-  log(`confirming MetaMask signature request...`)
-  await metamask.confirmSignature()
+  log(`ensuring local anvil network after reload...`)
+  await metamask.switchNetwork('localwallet')
+  await waitForDemoPollReady(page)
+  await castVoteWithSignature(page, metamask)
   const WAIT = E3_DURATION - DKG_DURATION + OUTPUT_DECRYPTION_WAIT
   log(`waiting ${WAIT}ms...`)
   await page.waitForTimeout(WAIT)
