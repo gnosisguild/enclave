@@ -8,15 +8,11 @@ import type { Signer } from "ethers";
 
 import {
   ADDRESS_TWO as AddressTwo,
-  DATA as data,
   deployEnclaveSystem,
-  encodeMockDkgProof,
-  BFV_PARAMS_DEFAULT as encodedE3ProgramParams,
   ENCRYPTION_SCHEME_ID as encryptionSchemeId,
   ethers,
   makeRequest,
   networkHelpers,
-  PROOF as proof,
   setupAndPublishCommittee,
   DEFAULT_TIMEOUT_CONFIG as timeoutConfig,
 } from "./fixtures";

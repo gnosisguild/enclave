@@ -629,9 +629,7 @@ describe("SlashingManager", function () {
       const signatures: string[] = [];
 
       // `dataHash` must equal `keccak256(evidence)` per the on-chain check.
-      const evidence = "0x";
-      const evidenceHash = ethers.keccak256(evidence);
-
+      // This case signs `ZeroHash` deliberately (mismatched vs real evidence).
       for (let i = 0; i < sortedVoters.length; i++) {
         const voterAddr = sortedVoters[i];
         voters.push(voterAddr);
