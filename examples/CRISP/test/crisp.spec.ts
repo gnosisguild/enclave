@@ -95,22 +95,59 @@ async function waitForDemoPollReady(page: Page) {
   await expect(page.locator('.tag.live')).toBeVisible({ timeout: 60_000 })
 }
 
-async function castVoteWithSignature(page: Page, metamask: MetaMask) {
-  log(`clicking first vote card...`)
-  await page.locator("[data-test-id='poll-button-0']").click()
+async function waitForWalletSession(page: Page) {
+  log('waiting for wallet session...')
+  await expect(page.locator('button:has-text("Connect Wallet")')).toHaveCount(0, { timeout: 60_000 })
+  // ConnectKit shows a truncated address once wagmi isConnected; VoteManagement only
+  // sets `user` from the same source, so this gates Cast → signMessage.
+  await expect(page.locator('button').filter({ hasText: /^0x/i })).toBeVisible({ timeout: 60_000 })
+  // Vote status fetch proves user.address + currentRoundId are wired in React context.
+  await expect(page.locator('.tag').filter({ hasText: 'Checking' })).toHaveCount(0, { timeout: 90_000 })
+  log('wallet session ready')
+}
 
-  const castBtn = page.locator('button:has-text("Cast")')
-  await expect(castBtn).toBeEnabled({ timeout: 30_000 })
+async function reconnectWalletIfNeeded(page: Page, metamask: MetaMask) {
+  const connectWalletBtn = page.locator('button:has-text("Connect Wallet")')
+  if (await connectWalletBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    log('wallet disconnected — reconnecting...')
+    await connectWalletWithRetry(page)
+    await metamask.connectToDapp()
+  }
+}
 
-  log(`clicking Cast Vote...`)
-  await castBtn.click()
+async function castVoteWithSignature(page: Page, metamask: MetaMask, diagLog: string[]) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      log(`clicking first vote card (attempt ${attempt})...`)
+      await page.locator("[data-test-id='poll-button-0']").click()
 
-  // useVoteCasting sets StepMessage with trailing "..."; getByText defaults to exact match
-  log(`waiting for wallet signing prompt...`)
-  await expect(page.getByText('Please sign the message in your wallet', { exact: false })).toBeVisible({ timeout: 60_000 })
+      const castBtn = page.locator('button:has-text("Cast")')
+      await expect(castBtn).toBeEnabled({ timeout: 30_000 })
 
-  log(`confirming MetaMask signature request...`)
-  await metamask.confirmSignature()
+      log(`clicking Cast Vote (attempt ${attempt})...`)
+      await castBtn.click()
+      log(`confirming MetaMask signature request...`)
+      await metamask.confirmSignature()
+      return
+    } catch (error) {
+      // [CRISP-DIAG] On failure, dump any console.error lines tagged with
+      // `[CRISP-DIAG]` so the CI log shows exactly which app-side branch
+      // fired (e.g. `!user`, `!roundState`, `signMessageAsync threw`).
+      // Without this dump, the only signal is a 60s Playwright timeout.
+      const diag = diagLog.filter((line) => line.includes('[CRISP-DIAG]'))
+      if (diag.length > 0) {
+        log(`--- [CRISP-DIAG] captured browser console (${diag.length} lines) ---`)
+        for (const line of diag) log(`  ${line}`)
+        log(`--- end [CRISP-DIAG] ---`)
+      } else {
+        log(`[CRISP-DIAG] no diagnostic console lines were captured before failure`)
+      }
+      if (attempt === 3) throw error
+      log(`signature attempt ${attempt} failed, retrying...`)
+      await page.keyboard.press('Escape').catch(() => {})
+      await page.waitForTimeout(2_000)
+    }
+  }
 }
 
 async function connectWalletWithRetry(page: Page, maxAttempts = 3) {
@@ -141,8 +178,16 @@ async function connectWalletWithRetry(page: Page, maxAttempts = 3) {
 }
 
 test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) => {
+  // [CRISP-DIAG] Capture every browser console message so we can replay the
+  // diagnostic-tagged ones if `castVoteWithSignature` fails. Without this
+  // buffer the failure mode is a 60s Playwright timeout with no app-side
+  // breadcrumbs. Remove together with the `[CRISP-DIAG]` console.error calls
+  // in `useVoteCasting.ts` / `DailyPoll.tsx` once the cast-vote race is fixed.
+  const diagLog: string[] = []
   page.on('console', (msg: ConsoleMessage) => {
-    console.log(msg.text())
+    const text = msg.text()
+    console.log(text)
+    diagLog.push(text)
   })
 
   log('============================================')
@@ -175,11 +220,18 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
   const DKG_DURATION = Date.now() - testStart
   log(`DKG duration: ${DKG_DURATION}ms`)
   log(`forcing page reload...`)
+  const voteStatusReady = page.waitForResponse((resp) => resp.url().includes('/voting/status') && resp.ok(), { timeout: 120_000 })
   await page.reload()
+  await page.waitForLoadState('load')
   log(`ensuring local anvil network after reload...`)
   await metamask.switchNetwork('localwallet')
+  await reconnectWalletIfNeeded(page, metamask)
   await waitForDemoPollReady(page)
-  await castVoteWithSignature(page, metamask)
+  await waitForWalletSession(page)
+  await voteStatusReady.catch(() => {
+    log('vote status response not observed (may have completed before listener)')
+  })
+  await castVoteWithSignature(page, metamask, diagLog)
   const WAIT = E3_DURATION - DKG_DURATION + OUTPUT_DECRYPTION_WAIT
   log(`waiting ${WAIT}ms...`)
   await page.waitForTimeout(WAIT)

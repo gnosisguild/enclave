@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { WagmiProvider, createConfig, http } from 'wagmi'
-import { sepolia, anvil } from 'wagmi/chains'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ConnectKitProvider, getDefaultConfig } from 'connectkit'
 import React from 'react'
@@ -15,13 +14,15 @@ const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 
 if (!walletConnectProjectId)
   console.warn('VITE_WALLETCONNECT_PROJECT_ID is not set in .env file. WalletConnect will not function properly.')
 
+const chain = getChain()
+const rpcUrl = import.meta.env.VITE_RPC_URL || 'http://127.0.0.1:8545'
+
 const config = createConfig(
   getDefaultConfig({
     appName: 'CRISP',
-    chains: [getChain()],
+    chains: [chain],
     transports: {
-      [anvil.id]: http(anvil.rpcUrls.default.http[0]),
-      [sepolia.id]: http(sepolia.rpcUrls.default.http[0]),
+      [chain.id]: http(rpcUrl),
     },
     walletConnectProjectId: walletConnectProjectId,
   }),

@@ -178,7 +178,19 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
    */
   const handleVote = useCallback(
     async (pollSelected: Poll, slotAddress: string): Promise<VoteData> => {
+      // [CRISP-DIAG] See castVote() in DailyPoll.tsx for context. These logs
+      // identify whether handleVote reaches signMessageAsync at all, and
+      // whether signMessageAsync resolves or throws — Playwright observes
+      // them via the console listener wired in test/crisp.spec.ts.
+      console.error('[CRISP-DIAG] handleVote: entered', {
+        hasRoundState: Boolean(roundState),
+        roundId: roundState?.id,
+        pollValue: pollSelected.value,
+        slotAddress,
+      })
+
       if (!roundState) {
+        console.error('[CRISP-DIAG] handleVote: !roundState — throwing before setStepMessage')
         throw new Error('No round state available for voting')
       }
 
@@ -186,6 +198,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
       setVotingStep('signing')
       setLastActiveStep('signing')
       setStepMessage('Please sign the message in your wallet...')
+      console.error('[CRISP-DIAG] handleVote: step="signing" set, message set, about to await signMessageAsync')
 
       const message = `Vote for round ${roundState.id}`
       const messageHash = hashMessage(message)
@@ -197,6 +210,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
       let signature: string
       try {
         signature = await signMessageAsync({ message })
+        console.error('[CRISP-DIAG] handleVote: signMessageAsync resolved, signature length =', signature?.length)
         return {
           signature,
           messageHash,
@@ -205,7 +219,10 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
           balance,
         }
       } catch (error) {
-        console.log('User rejected signature or signing failed', error)
+        console.error(
+          '[CRISP-DIAG] handleVote: signMessageAsync THREW — resetting votingState (this clears the "Please sign…" text before Playwright can observe it)',
+          error,
+        )
         resetVotingState()
         return {
           signature: '',
@@ -222,13 +239,25 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
 
   const castVoteWithProof = useCallback(
     async (pollSelected: Poll | null, isAMask: boolean = false) => {
+      // [CRISP-DIAG] See castVote() in DailyPoll.tsx for context.
+      console.error('[CRISP-DIAG] castVoteWithProof: entered', {
+        isAMask,
+        hasPollSelected: Boolean(pollSelected),
+        hasUser: Boolean(user),
+        hasRoundState: Boolean(roundState),
+        roundId: roundState?.id,
+      })
+
       if (!isAMask && !pollSelected) {
-        console.log('Cannot cast vote: Poll option not selected.')
+        console.error('[CRISP-DIAG] castVoteWithProof: EARLY EXIT — !isAMask && !pollSelected')
         showToast({ type: 'danger', message: 'Please select a poll option first.' })
         return
       }
       if (!user || !roundState) {
-        console.error('Cannot cast vote: Missing user or round state.')
+        console.error('[CRISP-DIAG] castVoteWithProof: EARLY EXIT — !user || !roundState', {
+          hasUser: Boolean(user),
+          hasRoundState: Boolean(roundState),
+        })
         showToast({
           type: 'danger',
           message: 'Cannot cast vote. Ensure you are connected, and the round is active.',

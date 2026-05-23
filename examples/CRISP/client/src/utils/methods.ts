@@ -23,6 +23,8 @@ export const convertTimestampToDate = (timestamp: number, secondsToAdd: number =
 }
 
 export const getChain = (): Chain => {
+  const chainId = import.meta.env.VITE_CHAIN_ID
+  if (chainId === '31337' || chainId === 31337) return anvil
   return import.meta.env.DEV ? anvil : sepolia
 }
 

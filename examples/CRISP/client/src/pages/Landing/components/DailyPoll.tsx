@@ -134,11 +134,26 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
   }
 
   const castVote = async (isMasking: boolean) => {
+    // [CRISP-DIAG] Temporary instrumentation: the e2e CI is racing here when
+    // wagmi hasn't populated `user` by the time the test clicks Cast (after a
+    // post-DKG page reload). The branch silently opens the ConnectKit modal
+    // and Playwright sees no signing prompt → 60s timeout. Tag every
+    // diagnostic with `[CRISP-DIAG]` so it's trivially greppable in CI logs
+    // and obvious which lines to delete once the real fix lands.
     if (!user) {
+      console.error('[CRISP-DIAG] castVote: !user — opening connect modal instead of signing', {
+        isMasking,
+        pollSelected,
+      })
       setOpen(true)
       return
     }
 
+    console.error('[CRISP-DIAG] castVote: dispatching castVoteWithProof', {
+      isMasking,
+      pollSelected,
+      userAddress: user.address,
+    })
     await castVoteWithProof(pollSelected, isMasking)
   }
 
