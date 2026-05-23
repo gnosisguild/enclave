@@ -66,7 +66,6 @@ function encodeBfvParams(params: {
  * Default timeout configuration (in seconds)
  */
 const DEFAULT_TIMEOUT_CONFIG = {
-  committeeFormationWindow: 3600,
   dkgWindow: 7200,
   computeWindow: 86400,
   decryptionWindow: 3600,
@@ -105,6 +104,31 @@ export const deployEnclave = async (
   const shouldDeployMocks = process.env.DEPLOY_MOCKS === "true" || withMocks;
   const shouldHaveZKVerification =
     process.env.ENABLE_ZK_VERIFICATION === "true" || withZKVerification;
+
+  // H-23: refuse to deploy mocks (MockUSDC / MockE3Program) and the
+  // `insecure512` BFV preset on any chain that is not a recognised local /
+  // test network. Override via `ALLOW_MOCKS_ON_PRODUCTION=true` only for
+  // explicit dry-runs.
+  if (shouldDeployMocks) {
+    const network = await ethers.provider.getNetwork();
+    const chainId = Number(network.chainId);
+    const LOCAL_CHAIN_IDS = new Set<number>([
+      31337, // hardhat
+      1337, // ganache / local
+      11155111, // sepolia (testnet)
+      5, // goerli (testnet)
+      80001, // polygon mumbai (testnet)
+    ]);
+    if (
+      !LOCAL_CHAIN_IDS.has(chainId) &&
+      process.env.ALLOW_MOCKS_ON_PRODUCTION !== "true"
+    ) {
+      throw new Error(
+        `Refusing to deploy mocks / insecure512 BFV preset on chainId ${chainId}. ` +
+          `Set ALLOW_MOCKS_ON_PRODUCTION=true to override (H-23).`,
+      );
+    }
+  }
 
   let feeTokenAddress: string;
 
@@ -258,6 +282,35 @@ export const deployEnclave = async (
     console.log("Configuring local SlashingManager slash policies...");
     await configureLocalSlashingPolicies(hre, slashingManager);
   }
+
+  // H-24: SLASHER_ROLE must be granted explicitly. Without this, Lane B
+  // (evidence-based) slash proposals are uncallable and there is no on-chain
+  // path to penalise nodes for off-chain misbehaviour. Source the slasher
+  // address from $SLASHER_ADDRESS, falling back to the deployer with a
+  // visible warning so testnet deployments stay functional but production
+  // operators are forced to set it intentionally.
+  const slasherAddress = process.env.SLASHER_ADDRESS || ownerAddress;
+  if (!process.env.SLASHER_ADDRESS) {
+    console.warn(
+      "[WARN] SLASHER_ADDRESS not set \u2014 granting SLASHER_ROLE to deployer.\n" +
+        "       Set SLASHER_ADDRESS to the production slasher EOA / multisig\n" +
+        "       and revoke from the deployer before going live.",
+    );
+  }
+  console.log(`Granting SLASHER_ROLE to ${slasherAddress}...`);
+  const addSlasherTx = await slashingManager.addSlasher(slasherAddress);
+  await addSlasherTx.wait();
+  const slasherRole = await slashingManager.SLASHER_ROLE();
+  const slasherGranted = await slashingManager.hasRole(
+    slasherRole,
+    slasherAddress,
+  );
+  if (!slasherGranted) {
+    throw new Error(
+      `Failed to grant SLASHER_ROLE to ${slasherAddress} \u2014 aborting deployment`,
+    );
+  }
+  console.log("SLASHER_ROLE granted.");
 
   console.log("Setting Enclave as reward distributor in BondingRegistry...");
   await bondingRegistry.setRewardDistributor(enclaveAddress);

@@ -40,6 +40,11 @@
     },
     {
       "inputs": [],
+      "name": "BanRequiresConfirmation",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "ChainIdMismatch",
       "type": "error"
     },
@@ -56,6 +61,11 @@
     {
       "inputs": [],
       "name": "DuplicateVoter",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "EquivocationDetected",
       "type": "error"
     },
     {
@@ -85,7 +95,17 @@
     },
     {
       "inputs": [],
+      "name": "NoPendingBan",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "OperatorNotInCommittee",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "OperatorUnderSlash",
       "type": "error"
     },
     {
@@ -96,6 +116,11 @@
     {
       "inputs": [],
       "name": "ProofRequired",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "SignatureExpired",
       "type": "error"
     },
     {
@@ -214,6 +239,50 @@
         }
       ],
       "name": "AppealResolved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "canceller",
+          "type": "address"
+        }
+      ],
+      "name": "BanCancelled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "reason",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "proposer",
+          "type": "address"
+        }
+      ],
+      "name": "BanProposed",
       "type": "event"
     },
     {
@@ -362,6 +431,12 @@
           "internalType": "bool",
           "name": "executed",
           "type": "bool"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum ISlashingManager.Lane",
+          "name": "lane",
+          "type": "uint8"
         }
       ],
       "name": "SlashExecuted",
@@ -483,6 +558,12 @@
           "internalType": "address",
           "name": "proposer",
           "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum ISlashingManager.Lane",
+          "name": "lane",
+          "type": "uint8"
         }
       ],
       "name": "SlashProposed",
@@ -522,6 +603,19 @@
     },
     {
       "inputs": [],
+      "name": "attestationDomainSeparator",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "bondingRegistry",
       "outputs": [
         {
@@ -531,6 +625,37 @@
         }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        }
+      ],
+      "name": "cancelBan",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "reason",
+          "type": "bytes32"
+        }
+      ],
+      "name": "confirmBan",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -758,6 +883,25 @@
       "inputs": [
         {
           "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        }
+      ],
+      "name": "hasOpenLaneBProposal",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
           "name": "node",
           "type": "address"
         }
@@ -771,6 +915,24 @@
         }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "reason",
+          "type": "bytes32"
+        }
+      ],
+      "name": "proposeBan",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -984,6 +1146,24 @@
           "type": "address"
         },
         {
+          "internalType": "bytes32",
+          "name": "reason",
+          "type": "bytes32"
+        }
+      ],
+      "name": "unbanNode",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        },
+        {
           "internalType": "bool",
           "name": "status",
           "type": "bool"
@@ -1006,5 +1186,9 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ISlashingManager.sol",
+<<<<<<< HEAD
   "buildInfoId": "solc-0_8_28-c510d3f82db7eda6957be691c11709bfbc8fd9ed"
+=======
+  "buildInfoId": "solc-0_8_28-ce8ef221f0c6b7e9da5e81af1e5b728128db3d16"
+>>>>>>> main
 }

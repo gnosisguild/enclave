@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::math::commitments::{compute_pk_aggregation_commitment, compute_threshold_pk_commitment};
-use crate::math::modulo::U128::ModU128;
+use crate::math::modulo::U64::ModU64;
 use crate::math::polynomial::Polynomial;
 
 /// Parameters for threshold public key aggregation (C5).
@@ -100,7 +100,8 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> PkAggregation<N, H, L,
         basis_idx: u32,
     ) {
         let q_l = self.configs.qis[basis_idx];
-        let mod_q_l = ModU128::new(q_l);
+        // sum_shifted < H*2*q_l; quotient < 2H (small) -- safe for ModU64.
+        let mod_q_l = ModU64::new(q_l as u64);
 
         let half_qi: Field = (q_l - 1) / 2;
         let h_half_qi: Field = H as Field * half_qi;

@@ -305,7 +305,7 @@ export const ciphernodeMintTokens = task(
         if (transfersRestricted) {
           console.log("Allowing EnclaveToken to be transferrable...");
           const transferEnabledTx =
-            await enclaveTokenContract.setTransferRestriction(false);
+            await enclaveTokenContract.disableTransferRestrictions();
           await transferEnabledTx.wait();
           console.log("EnclaveToken transfers are now enabled");
         }

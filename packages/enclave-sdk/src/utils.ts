@@ -127,7 +127,7 @@ export function encodeBfvParams(params: BfvParams): `0x${string}` {
  */
 export function encodeComputeProviderParams(params: ComputeProviderParams, mock: boolean = false): `0x${string}` {
   if (mock) {
-    return `0x${'0'.repeat(32)}` as `0x${string}`
+    return `0x${'00'.repeat(32)}` as `0x${string}`
   }
 
   const jsonString = JSON.stringify(params)

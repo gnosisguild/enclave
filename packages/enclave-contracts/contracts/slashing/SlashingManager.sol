@@ -7,8 +7,9 @@
 pragma solidity 0.8.28;
 
 import {
-    AccessControl
-} from "@openzeppelin/contracts/access/AccessControl.sol";
+    AccessControlDefaultAdminRules
+} from "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
+import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
@@ -19,12 +20,17 @@ import { IE3RefundManager } from "../interfaces/IE3RefundManager.sol";
 /**
  * @title SlashingManager
  * @notice Implementation of slashing management with two-lane architecture:
- *         Lane A (proof-based): permissionless, atomic propose+execute, no appeals
- *         Lane B (evidence-based): SLASHER_ROLE required, appeal window, separate execute
- * @dev Role-based access control for slashers and governance with configurable slash policies.
- *      Integrates with CiphernodeRegistry for committee expulsion and Enclave for E3 failure.
+ *         Lane A (proof-based): permissionless, configurable challenge window.
+ *         Lane B (evidence-based): SLASHER_ROLE required, appeal window, separate execute.
+ * @dev Role-based access control with two-step DEFAULT_ADMIN handover. GOVERNANCE_ROLE
+ *      is the admin of SLASHER_ROLE. Attestation votes are authenticated via EIP-712
+ * and equivocation across voters is rejected.
  */
-contract SlashingManager is ISlashingManager, AccessControl {
+contract SlashingManager is
+    ISlashingManager,
+    AccessControlDefaultAdminRules,
+    EIP712
+{
     // ======================
     // Constants & Roles
     // ======================
@@ -34,6 +40,31 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
     /// @notice Role identifier for governance accounts that can configure policies, resolve appeals, and manage bans
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
+
+    /// @notice Upper bound on {SlashPolicy.appealWindow}. Caps the
+    ///         period during which governance can delay slash execution.
+    uint64 public constant MAX_APPEAL_WINDOW = 30 days;
+
+    /// @notice Emitted when {bondingRegistry} is updated.
+    event BondingRegistryUpdated(
+        address indexed previous,
+        address indexed next
+    );
+
+    /// @notice Emitted when {ciphernodeRegistry} is updated.
+    event CiphernodeRegistryUpdated(
+        address indexed previous,
+        address indexed next
+    );
+
+    /// @notice Emitted when {enclave} is updated.
+    event EnclaveUpdated(address indexed previous, address indexed next);
+
+    /// @notice Emitted when {e3RefundManager} is updated.
+    event E3RefundManagerUpdated(
+        address indexed previous,
+        address indexed next
+    );
 
     // ======================
     // Storage
@@ -69,6 +100,24 @@ contract SlashingManager is ISlashingManager, AccessControl {
     ///      Lane B key is keccak256(abi.encode(e3Id, operator, keccak256(evidence))) — exact evidence bytes.
     mapping(bytes32 evidenceKey => bool consumed) public evidenceConsumed;
 
+    /// @notice Number of unexecuted Lane B proposals per operator.
+    /// @dev Incremented in `proposeSlashEvidence`, decremented in `executeSlash` and on
+    ///      `resolveAppeal(upheld=true)`. `BondingRegistry.deregisterOperator` blocks while
+    ///      this is > 0 so an operator cannot evade an inbound Lane B slash by exiting
+    ///      during the appeal window.
+    mapping(address operator => uint256 openCount) internal _openLaneBCount;
+
+    /// @notice Pending two-step manual ban proposals.
+    /// @dev `unbanNode` is single-step because it is strictly less dangerous than ban.
+    ///      Slashing-triggered bans (via `_executeSlash`) bypass this flow because they are
+    ///      already authorized by the slash proposal lifecycle.
+    struct PendingBan {
+        address proposer;
+        bytes32 reason;
+        uint256 proposedAt;
+    }
+    mapping(address node => PendingBan pending) internal _pendingBans;
+
     // ======================
     // Constants
     // ======================
@@ -81,14 +130,16 @@ contract SlashingManager is ISlashingManager, AccessControl {
             "ProofPayload(uint256 chainId,uint256 e3Id,uint256 proofType,bytes zkProof,bytes publicSignals)"
         );
 
-    /// @notice Canonical EIP-712 struct typehash for committee attestation votes.
-    /// @dev Must match `vote_struct_hash` layout in
-    ///      `crates/zk-prover/src/actors/accusation_manager.rs`.
-    ///      `chainId` and `verifyingContract` are bound by the EIP-712 domain,
-    ///      not the struct, so they are not duplicated here.
+    /// @notice EIP-712 typehash for committee attestation votes.
+    /// @dev Cross-chain replay is prevented by the EIP-712 domain separator's chainId
+    ///      (no need to fold chainId into the struct hash). `agrees` is dropped (always
+    ///      true for an accusation), and `deadline` is added so stale signatures are
+    ///      rejected by `_verifyAttestationEvidence`. `dataHash` is retained so all
+    ///      voters' hashes can be compared for equivocation detection.
     bytes32 public constant VOTE_TYPEHASH =
         keccak256(
-            "AccusationVote(uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)"
+            "AccusationVote(uint256 e3Id,bytes32 accusationId,"
+            "address voter,bytes32 dataHash,uint256 deadline)"
         );
 
     /// @dev `keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")`.
@@ -126,12 +177,27 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
     /**
      * @notice Initializes the SlashingManager contract
+     * @dev Uses `AccessControlDefaultAdminRules` so `DEFAULT_ADMIN_ROLE` can only be
+     *      handed over via the two-step `beginDefaultAdminTransfer` /
+     *      `acceptDefaultAdminTransfer` flow with `initialDelay` enforced.
+     *      `GOVERNANCE_ROLE` is set as the admin of `SLASHER_ROLE` so slasher membership
+     *      is gated by governance rather than the default admin.
+     * @param initialDelay Required delay (seconds) between `beginDefaultAdminTransfer`
+     *        and `acceptDefaultAdminTransfer`. Production deployments should set a
+     *        meaningful value (e.g. 2 days). Pass 0 for local tests.
      * @param admin Address to receive DEFAULT_ADMIN_ROLE and GOVERNANCE_ROLE
      */
-    constructor(address admin) {
+    constructor(
+        uint48 initialDelay,
+        address admin
+    )
+        AccessControlDefaultAdminRules(initialDelay, admin)
+        EIP712("EnclaveSlashing", "1")
+    {
         require(admin != address(0), ZeroAddress());
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(GOVERNANCE_ROLE, admin);
+        // governance — not the default admin — manages slasher membership.
+        _setRoleAdmin(SLASHER_ROLE, GOVERNANCE_ROLE);
     }
 
     // ======================
@@ -158,6 +224,18 @@ contract SlashingManager is ISlashingManager, AccessControl {
         return banned[node];
     }
 
+    /// @inheritdoc ISlashingManager
+    function hasOpenLaneBProposal(
+        address operator
+    ) external view returns (bool) {
+        return _openLaneBCount[operator] > 0;
+    }
+
+    /// @inheritdoc ISlashingManager
+    function attestationDomainSeparator() external view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+
     // ======================
     // Admin Functions
     // ======================
@@ -168,22 +246,20 @@ contract SlashingManager is ISlashingManager, AccessControl {
         SlashPolicy calldata policy
     ) external onlyRole(GOVERNANCE_ROLE) {
         require(reason != bytes32(0), InvalidPolicy());
-        require(policy.enabled, InvalidPolicy());
+        // `enabled = false` is allowed so governance can pre-stage / pause a policy.
+        // Per-call enforcement happens in `proposeSlash` / `proposeSlashEvidence`.
         require(
             policy.ticketPenalty > 0 || policy.licensePenalty > 0,
             InvalidPolicy()
         );
 
+        // Evidence-based (Lane B) policies require a non-zero `appealWindow`.
+        // Proof-based (Lane A) may use `appealWindow == 0` for atomic propose+execute.
         if (!policy.requiresProof) {
-            // Lane B: evidence-based slashes must give the accused an appeal window.
             require(policy.appealWindow > 0, InvalidPolicy());
         }
-        // Lane A (requiresProof=true): `appealWindow` is the execution-delay
-        // window during which the accused can file an appeal before the slash
-        // executes. `0` means execute immediately (preserves backwards-compatible
-        // behavior for policies that opt out of recourse), but governance is
-        // free to set a non-zero window for added recourse on attestation-based
-        // slashes.
+        // Cap the appeal window so governance cannot indefinitely delay slashing.
+        require(policy.appealWindow <= MAX_APPEAL_WINDOW, InvalidPolicy());
 
         slashPolicies[reason] = policy;
         emit SlashPolicyUpdated(reason, policy);
@@ -194,8 +270,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
         IBondingRegistry newBondingRegistry
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(address(newBondingRegistry) != address(0), ZeroAddress());
+        address oldValue = address(bondingRegistry);
         bondingRegistry = newBondingRegistry;
-        emit BondingRegistrySet(address(newBondingRegistry));
+        emit BondingRegistryUpdated(oldValue, address(newBondingRegistry));
     }
 
     /// @notice Updates the ciphernode registry contract
@@ -204,8 +281,12 @@ contract SlashingManager is ISlashingManager, AccessControl {
         ICiphernodeRegistry newCiphernodeRegistry
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(address(newCiphernodeRegistry) != address(0), ZeroAddress());
+        address oldValue = address(ciphernodeRegistry);
         ciphernodeRegistry = newCiphernodeRegistry;
-        emit CiphernodeRegistrySet(address(newCiphernodeRegistry));
+        emit CiphernodeRegistryUpdated(
+            oldValue,
+            address(newCiphernodeRegistry)
+        );
     }
 
     /// @notice Updates the Enclave contract
@@ -214,8 +295,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
         IEnclave newEnclave
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(address(newEnclave) != address(0), ZeroAddress());
+        address oldValue = address(enclave);
         enclave = newEnclave;
-        emit EnclaveSet(address(newEnclave));
+        emit EnclaveUpdated(oldValue, address(newEnclave));
     }
 
     /// @inheritdoc ISlashingManager
@@ -223,20 +305,21 @@ contract SlashingManager is ISlashingManager, AccessControl {
         IE3RefundManager newRefundManager
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(address(newRefundManager) != address(0), ZeroAddress());
+        address oldValue = address(e3RefundManager);
         e3RefundManager = newRefundManager;
-        emit E3RefundManagerSet(address(newRefundManager));
+        emit E3RefundManagerUpdated(oldValue, address(newRefundManager));
     }
 
     /// @inheritdoc ISlashingManager
-    function addSlasher(address slasher) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    /// @dev Slasher membership is administered via `GOVERNANCE_ROLE`, not the default
+    ///      admin, so a compromised default admin alone cannot grant SLASHER_ROLE.
+    function addSlasher(address slasher) external onlyRole(GOVERNANCE_ROLE) {
         require(slasher != address(0), ZeroAddress());
         _grantRole(SLASHER_ROLE, slasher);
     }
 
     /// @inheritdoc ISlashingManager
-    function removeSlasher(
-        address slasher
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function removeSlasher(address slasher) external onlyRole(GOVERNANCE_ROLE) {
         _revokeRole(SLASHER_ROLE, slasher);
     }
 
@@ -245,28 +328,14 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // ======================
 
     /// @inheritdoc ISlashingManager
-    /// @dev Lane A: Permissionless committee attestation-based slash. Anyone can call.
-    ///      Proposes the slash and verifies committee vote signatures. Execution
-    ///      timing depends on the policy's `appealWindow`:
-    ///        - `appealWindow == 0`: execute atomically in this call (no recourse).
-    ///        - `appealWindow > 0`: defer; the accused has `appealWindow` seconds
-    ///          to `fileAppeal`, after which anyone can call `executeSlash(proposalId)`.
-    ///      The slash reason is derived deterministically from proofType as
-    ///      `keccak256(abi.encodePacked(proofType))`, eliminating the need for the caller
-    ///      to pass a reason and preventing cross-reason replay attacks.
-    ///      Evidence format:
-    ///      `abi.encode(uint256 proofType,
-    ///         address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures,
-    ///         bytes evidence)`
-    ///      Each voter must sign the EIP-712 typed-data hash:
-    ///      `keccak256("\x19\x01" || domainSeparator || structHash)` where
-    ///      `domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH,
-    ///         DOMAIN_NAME_HASH, DOMAIN_VERSION_HASH, chainId, address(this)))`
-    ///      and `structHash = keccak256(abi.encode(VOTE_TYPEHASH,
-    ///         e3Id, accusationId, voter, agrees, dataHash))`
-    ///      where `accusationId = keccak256(abi.encodePacked(block.chainid, e3Id, operator, proofType))`
-    ///      and `evidence` is the preimage of every voter's `dataHash`, i.e.
-    ///      `keccak256(evidence) == dataHashes[i]` for all i.
+    /// @dev Lane A permissionless attestation-based slash. Reason is derived as
+    ///      `keccak256(abi.encodePacked(proofType))` (prevents cross-reason replay).
+    ///      Execution is atomic when `policy.appealWindow == 0`, otherwise deferred so
+    ///      the accused can {fileAppeal}. Evidence format:
+    ///      `abi.encode(uint256 proofType, address[] voters, bytes32[] dataHashes,
+    ///      uint256 deadline, bytes[] signatures)`. Voters sign the EIP-712
+    ///      `AccusationVote` against this contract's domain; all `dataHash` values
+    ///      must be identical or the call reverts with `EquivocationDetected`.
     function proposeSlash(
         uint256 e3Id,
         address operator,
@@ -295,7 +364,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(!evidenceConsumed[evidenceKey], DuplicateEvidence());
         evidenceConsumed[evidenceKey] = true;
 
-        // Verify committee attestation: vote signatures and quorum
+        // Verify committee attestation: vote signatures, quorum, equivocation, deadline
         _verifyAttestationEvidence(proof, e3Id, operator);
 
         // Create proposal
@@ -303,7 +372,6 @@ contract SlashingManager is ISlashingManager, AccessControl {
         totalProposals = proposalId + 1;
 
         uint256 executableAt = block.timestamp + policy.appealWindow;
-
         SlashProposal storage p = _proposals[proposalId];
         p.e3Id = e3Id;
         p.operator = operator;
@@ -327,15 +395,14 @@ contract SlashingManager is ISlashingManager, AccessControl {
             policy.ticketPenalty,
             policy.licensePenalty,
             executableAt,
-            msg.sender
+            msg.sender,
+            Lane.LaneA
         );
 
-        // If `appealWindow == 0` (no recourse), execute atomically as before.
-        // Otherwise, wait for the appeal window: the accused can call
-        // `fileAppeal` before `executableAt`, then anyone (or governance,
-        // after appeal resolution) can call `executeSlash(proposalId)`.
+        // Legacy atomic path: when no challenge window is configured, execute now.
+        // Otherwise defer to `executeSlash` after `executableAt`.
         if (policy.appealWindow == 0) {
-            _executeSlash(proposalId);
+            _executeSlash(proposalId, Lane.LaneA);
         }
     }
 
@@ -363,6 +430,10 @@ contract SlashingManager is ISlashingManager, AccessControl {
         proposalId = totalProposals;
         totalProposals = proposalId + 1;
 
+        // Track unresolved Lane B proposals per operator so BondingRegistry blocks
+        // `deregisterOperator` until they execute, expire, or are upheld on appeal.
+        _openLaneBCount[operator] += 1;
+
         uint256 executableAt = block.timestamp + policy.appealWindow;
         SlashProposal storage p = _proposals[proposalId];
         p.e3Id = e3Id;
@@ -388,39 +459,44 @@ contract SlashingManager is ISlashingManager, AccessControl {
             policy.ticketPenalty,
             policy.licensePenalty,
             executableAt,
-            msg.sender
+            msg.sender,
+            Lane.LaneB
         );
     }
 
     /// @inheritdoc ISlashingManager
-    /// @dev Used for:
-    ///        - Lane B (evidence-based) slashes after the appeal window.
-    ///        - Lane A (proof-based) slashes whose policy has a non-zero
-    ///          `appealWindow`. Lane A policies with `appealWindow == 0` are
-    ///          already executed atomically inside `proposeSlash`.
+    /// @dev Executes a deferred Lane A or Lane B proposal after the appeal window has elapsed.
     function executeSlash(uint256 proposalId) external {
         require(proposalId < totalProposals, InvalidProposal());
         SlashProposal storage p = _proposals[proposalId];
         require(!p.executed, AlreadyExecuted());
 
-        // Both lanes share the same appeal-window machinery now.
+        // Appeal-window check applies to both lanes whenever it is in the future.
         require(block.timestamp >= p.executableAt, AppealWindowActive());
         if (p.appealed) {
             require(p.resolved, AppealPending());
             require(!p.appealUpheld, AppealUpheld());
         }
 
-        _executeSlash(proposalId);
+        Lane lane = p.proofVerified ? Lane.LaneA : Lane.LaneB;
+        if (lane == Lane.LaneB) {
+            // Decrement BEFORE `_executeSlash` so a reentrant deregister triggered by
+            // slash side-effects (e.g. `expelCommitteeMember`) is not gated on this
+            // proposal. Other open Lane B proposals keep the gate raised.
+            _openLaneBCount[p.operator] -= 1;
+        }
+
+        _executeSlash(proposalId, lane);
     }
 
     // ======================
     // Internal Execution
     // ======================
 
-    /// @dev Verifies committee attestation evidence for Lane A slashes.
-    ///      Decodes the attestation, checks quorum (>= threshold M), verifies each voter's
-    ///      ECDSA signature against the VOTE_TYPEHASH-structured digest, and confirms each
-    ///      voter is a committee member. Voters must be sorted ascending to prevent duplicates.
+    /// @dev Verifies Lane A attestation evidence: decodes, checks quorum (>= M), verifies
+    ///      each EIP-712 `AccusationVote` signature, confirms voters are active committee
+    ///      members, enforces the shared `deadline`, and rejects equivocation (all
+    ///      `dataHash` values must match). Voters must be sorted ascending (no duplicates).
     function _verifyAttestationEvidence(
         bytes calldata proof,
         uint256 e3Id,
@@ -429,27 +505,27 @@ contract SlashingManager is ISlashingManager, AccessControl {
         (
             uint256 proofType,
             address[] memory voters,
-            bool[] memory agrees,
             bytes32[] memory dataHashes,
-            bytes[] memory signatures,
-            bytes memory evidence
+            uint256 deadline,
+            bytes[] memory signatures
         ) = abi.decode(
                 proof,
-                (uint256, address[], bool[], bytes32[], bytes[], bytes)
+                (uint256, address[], bytes32[], uint256, bytes[])
             );
 
         uint256 numVotes = voters.length;
         require(
-            numVotes == agrees.length &&
-                numVotes == dataHashes.length &&
-                numVotes == signatures.length,
+            numVotes == dataHashes.length && numVotes == signatures.length,
             InvalidProof()
         );
+        require(block.timestamp <= deadline, SignatureExpired());
 
-        // Get committee threshold — need at least M agreeing votes.
-        // Checked before the evidence binding so cardinality errors surface
-        // as `InsufficientAttestations` rather than masquerading as `InvalidProof`.
-        require(numVotes > 0, InsufficientAttestations());
+        // Compute accusation ID matching AccusationManager::accusation_id() on the Rust side
+        bytes32 accusationId = keccak256(
+            abi.encodePacked(block.chainid, e3Id, operator, proofType)
+        );
+
+        // Get committee threshold — need at least M agreeing votes
         {
             (, uint32 thresholdM, , ) = ciphernodeRegistry
                 .getCommitteeViability(e3Id);
@@ -457,102 +533,68 @@ contract SlashingManager is ISlashingManager, AccessControl {
             require(numVotes >= thresholdM, InsufficientAttestations());
         }
 
-        // All voters must attest to the *same* evidence, and that evidence
-        // must be cryptographically bound to actual on-chain bytes:
-        //   1. dataHashes[i] all equal a single `commonDataHash`.
-        //   2. `keccak256(evidence) == commonDataHash`.
-        //
-        // Together these close the attribution chain: voters don't just say
-        // "I saw something bad", they cryptographically agree on the exact
-        // bytes — which the contract can inspect and which any third party
-        // can audit from the transaction calldata.
-        bytes32 commonDataHash = dataHashes[0];
-        require(keccak256(evidence) == commonDataHash, InvalidProof());
+        // detect equivocation across voters — the entire committee must agree
+        // on the exact `dataHash` they witnessed. Divergent hashes indicate at least
+        // one voter is signing inconsistent statements and the attestation must not be
+        // accepted as a single fault witness.
+        bytes32 sharedDataHash = dataHashes[0];
 
-        // Verify each vote signature and membership. Computed inside a helper
-        // to keep the outer frame's local-variable count under the EVM stack
-        // limit (16 slots).
-        _verifyVotes(
-            VoteVerifyInputs({
-                e3Id: e3Id,
-                operator: operator,
-                proofType: proofType,
-                commonDataHash: commonDataHash,
-                voters: voters,
-                agrees: agrees,
-                dataHashes: dataHashes,
-                signatures: signatures
-            })
-        );
-    }
-
-    struct VoteVerifyInputs {
-        uint256 e3Id;
-        address operator;
-        uint256 proofType;
-        bytes32 commonDataHash;
-        address[] voters;
-        bool[] agrees;
-        bytes32[] dataHashes;
-        bytes[] signatures;
-    }
-
-    function _verifyVotes(VoteVerifyInputs memory v) private view {
-        bytes32 accusationId = keccak256(
-            abi.encodePacked(block.chainid, v.e3Id, v.operator, v.proofType)
-        );
-        bytes32 domainSeparator = keccak256(
-            abi.encode(
-                EIP712_DOMAIN_TYPEHASH,
-                DOMAIN_NAME_HASH,
-                DOMAIN_VERSION_HASH,
-                block.chainid,
-                address(this)
-            )
-        );
-
+        // Verify each vote signature and membership
         address prevVoter = address(0);
-        uint256 numVotes = v.voters.length;
         for (uint256 i = 0; i < numVotes; i++) {
-            address voter = v.voters[i];
+            address voter = voters[i];
 
+            // Sorted ascending order prevents duplicate voters
             require(voter > prevVoter, DuplicateVoter());
             prevVoter = voter;
 
-            require(voter != v.operator, VoterIsAccused());
-            require(v.agrees[i], InvalidProof());
-            require(v.dataHashes[i] == v.commonDataHash, InvalidProof());
+            // The accused cannot vote on their own accusation (conflict of interest)
+            require(voter != operator, VoterIsAccused());
+
+            // every voter must witness the same data hash
+            require(dataHashes[i] == sharedDataHash, EquivocationDetected());
+
+            // Verify voter is an active committee member for this E3
             require(
-                ciphernodeRegistry.isCommitteeMemberActive(v.e3Id, voter),
+                ciphernodeRegistry.isCommitteeMemberActive(e3Id, voter),
                 VoterNotInCommittee()
             );
 
-            bytes32 structHash = keccak256(
-                abi.encode(
-                    VOTE_TYPEHASH,
-                    v.e3Id,
-                    accusationId,
-                    voter,
-                    v.agrees[i],
-                    v.dataHashes[i]
-                )
-            );
-            bytes32 digest = keccak256(
-                abi.encodePacked("\x19\x01", domainSeparator, structHash)
-            );
-            require(
-                ECDSA.recover(digest, v.signatures[i]) == voter,
-                InvalidVoteSignature()
-            );
+            // EIP-712 vote digest — cross-chain replay is prevented by the domain
+            // separator's chainId, and cross-contract replay by `verifyingContract`.
+            // Scoped block avoids stack-too-deep.
+            {
+                bytes32 structHash = keccak256(
+                    abi.encode(
+                        VOTE_TYPEHASH,
+                        e3Id,
+                        accusationId,
+                        voter,
+                        dataHashes[i],
+                        deadline
+                    )
+                );
+                bytes32 digest = _hashTypedDataV4(structHash);
+                require(
+                    ECDSA.recover(digest, signatures[i]) == voter,
+                    InvalidVoteSignature()
+                );
+            }
         }
     }
 
     /// @dev Executes a slash: applies financial penalties, optional ban, and committee expulsion.
     ///      Lane B: if the operator deregistered or exited during the appeal window, penalties
     ///      gracefully become 0 (BondingRegistry uses min(requested, available)). Accepted tradeoff.
-    function _executeSlash(uint256 proposalId) internal {
+    /// @dev `p.executed = true` is deferred until AFTER the two `bondingRegistry.slash*`
+    ///      calls succeed but BEFORE any other external interaction. This protects the
+    ///      proposal from being permanently marked as executed when the financial leg
+    ///      reverts (e.g. an attacker griefs the operator's exit queue with enough
+    ///      tranches to OOG `_takeAssetsFromQueue` — a Lane B operator could otherwise
+    ///      lose all retry attempts). The `MAX_ACTIVE_TRANCHES` cap in ExitQueueLib is
+    ///      the primary defence; this ordering provides defence-in-depth.
+    function _executeSlash(uint256 proposalId, Lane lane) internal {
         SlashProposal storage p = _proposals[proposalId];
-        p.executed = true;
 
         uint256 actualTicketSlashed = 0;
 
@@ -572,6 +614,13 @@ contract SlashingManager is ISlashingManager, AccessControl {
                 p.reason
             );
         }
+
+        // Financial penalties succeeded — commit `executed` before any further
+        // external interaction (committee expulsion, refund escrow self-call,
+        // enclave routing) so that reentrancy via those paths cannot re-enter
+        // _executeSlash for the same proposal, while still allowing Lane B
+        // to retry if either bondingRegistry.slash* leg above reverts.
+        p.executed = true;
 
         // Ban node if snapshotted policy requires it
         if (p.banNode) {
@@ -617,7 +666,8 @@ contract SlashingManager is ISlashingManager, AccessControl {
             p.reason,
             p.ticketAmount,
             p.licenseAmount,
-            true
+            true,
+            lane
         );
     }
 
@@ -640,6 +690,8 @@ contract SlashingManager is ISlashingManager, AccessControl {
     /// @inheritdoc ISlashingManager
     /// @dev Only the accused operator may appeal (no delegate support). Consider an `appealDelegate`
     ///      mapping for production to handle lost-key or banned-operator scenarios.
+    ///      Appeals are now permitted for proof-verified (Lane A) proposals when their
+    ///      policy is configured with a non-zero `appealWindow`.
     function fileAppeal(uint256 proposalId, string calldata evidence) external {
         require(proposalId < totalProposals, InvalidProposal());
         SlashProposal storage p = _proposals[proposalId];
@@ -673,6 +725,12 @@ contract SlashingManager is ISlashingManager, AccessControl {
         p.resolved = true;
         p.appealUpheld = appealUpheld;
 
+        // an upheld appeal terminates the proposal — it can never `executeSlash`,
+        // so the open Lane B gate must drop here. Lane A proposals are not counted.
+        if (appealUpheld && !p.proofVerified) {
+            _openLaneBCount[p.operator] -= 1;
+        }
+
         emit AppealResolved(
             proposalId,
             p.operator,
@@ -687,14 +745,76 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // ======================
 
     /// @inheritdoc ISlashingManager
+    function proposeBan(address node, bytes32 reason) external onlyGovernance {
+        require(node != address(0), ZeroAddress());
+        require(!banned[node], InvalidPolicy());
+
+        _pendingBans[node] = PendingBan({
+            proposer: msg.sender,
+            reason: reason,
+            proposedAt: block.timestamp
+        });
+
+        emit BanProposed(node, reason, msg.sender);
+    }
+
+    /// @inheritdoc ISlashingManager
+    function confirmBan(address node, bytes32 reason) external onlyGovernance {
+        PendingBan memory pending = _pendingBans[node];
+        require(pending.proposer != address(0), NoPendingBan());
+        require(pending.reason == reason, InvalidPolicy());
+        // a single governance signer cannot both propose and confirm a manual ban.
+        require(pending.proposer != msg.sender, BanRequiresConfirmation());
+
+        delete _pendingBans[node];
+        banned[node] = true;
+
+        emit NodeBanUpdated(node, true, reason, msg.sender);
+    }
+
+    /// @inheritdoc ISlashingManager
+    function cancelBan(address node) external onlyGovernance {
+        require(_pendingBans[node].proposer != address(0), NoPendingBan());
+        delete _pendingBans[node];
+        emit BanCancelled(node, msg.sender);
+    }
+
+    /// @inheritdoc ISlashingManager
+    function unbanNode(address node, bytes32 reason) external onlyGovernance {
+        require(node != address(0), ZeroAddress());
+        banned[node] = false;
+        if (_pendingBans[node].proposer != address(0)) {
+            delete _pendingBans[node];
+            emit BanCancelled(node, msg.sender);
+        }
+        emit NodeBanUpdated(node, false, reason, msg.sender);
+    }
+
+    /// @inheritdoc ISlashingManager
     function updateBanStatus(
         address node,
         bool status,
         bytes32 reason
     ) external onlyGovernance {
         require(node != address(0), ZeroAddress());
+        // bans must use the two-step `proposeBan` / `confirmBan` flow.
+        require(!status, BanRequiresConfirmation());
+        banned[node] = false;
+        if (_pendingBans[node].proposer != address(0)) {
+            delete _pendingBans[node];
+            emit BanCancelled(node, msg.sender);
+        }
+        emit NodeBanUpdated(node, false, reason, msg.sender);
+    }
 
-        banned[node] = status;
-        emit NodeBanUpdated(node, status, reason, msg.sender);
+    /// @notice ERC-165 interface detection. Advertises {ISlashingManager}
+    ///         in addition to interfaces inherited from
+    ///         {AccessControlDefaultAdminRules}.
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override returns (bool) {
+        return
+            interfaceId == type(ISlashingManager).interfaceId ||
+            super.supportsInterface(interfaceId);
     }
 }

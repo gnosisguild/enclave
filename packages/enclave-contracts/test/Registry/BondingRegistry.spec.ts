@@ -4,26 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { expect } from "chai";
-import { network } from "hardhat";
 
-import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
-import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
-import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
-import MockCiphernodeRegistryModule from "../../ignition/modules/mockCiphernodeRegistry";
-import MockStableTokenModule from "../../ignition/modules/mockStableToken";
-import SlashingManagerModule from "../../ignition/modules/slashingManager";
 import {
-  BondingRegistry__factory as BondingRegistryFactory,
-  CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
-  EnclaveTicketToken__factory as EnclaveTicketTokenFactory,
-  EnclaveToken__factory as EnclaveTokenFactory,
-  MockUSDC__factory as MockUSDCFactory,
-  SlashingManager__factory as SlashingManagerFactory,
-} from "../../types";
+  LICENSE_REQUIRED_BOND,
+  MIN_TICKET_BALANCE,
+  SEVEN_DAYS,
+  TICKET_PRICE,
+  deployEnclaveSystem,
+  ethers,
+  networkHelpers,
+} from "../fixtures";
 
-const AddressOne = "0x0000000000000000000000000000000000000001";
-
-const { ethers, networkHelpers, ignition } = await network.connect();
 const { loadFixture, time } = networkHelpers;
 
 const REASON_DEPOSIT = ethers.encodeBytes32String("DEPOSIT");
@@ -32,116 +23,34 @@ const REASON_BOND = ethers.encodeBytes32String("BOND");
 const REASON_UNBOND = ethers.encodeBytes32String("UNBOND");
 
 describe("BondingRegistry", function () {
-  const SEVEN_DAYS_IN_SECONDS = 7 * 24 * 60 * 60;
-  const TICKET_PRICE = ethers.parseUnits("10", 6);
-  const LICENSE_REQUIRED_BOND = ethers.parseEther("1000");
-  const MIN_TICKET_BALANCE = 5;
+  const SEVEN_DAYS_IN_SECONDS = SEVEN_DAYS;
   async function setup() {
-    // ── Signers ────────────────────────────────────────────────────────────────
-    const [owner, operator1, operator2, treasury, notTheOwner] =
-      await ethers.getSigners();
+    const signers = await ethers.getSigners();
+    const [owner, operator1, operator2, treasury, notTheOwner] = signers;
     const ownerAddress = await owner.getAddress();
     const operator1Address = await operator1.getAddress();
     const operator2Address = await operator2.getAddress();
     const treasuryAddress = await treasury.getAddress();
 
-    // ── Token Contracts ────────────────────────────────────────────────────────
-    const { mockUSDC } = await ignition.deploy(MockStableTokenModule, {
-      parameters: { MockUSDC: { initialSupply: 1_000_000 } },
+    const sys = await deployEnclaveSystem({
+      useMockCiphernodeRegistry: true,
+      setupOperators: 0,
+      wireSlashingManager: false,
+      slashedFundsTreasury: treasury,
+      mintUsdcTo: [],
     });
-    const { enclaveToken } = await ignition.deploy(EnclaveTokenModule, {
-      parameters: { EnclaveToken: { owner: ownerAddress } },
-    });
-    const { enclaveTicketToken } = await ignition.deploy(
-      EnclaveTicketTokenModule,
-      {
-        parameters: {
-          EnclaveTicketToken: {
-            baseToken: await mockUSDC.getAddress(),
-            registry: AddressOne,
-            owner: ownerAddress,
-          },
-        },
-      },
-    );
+    const {
+      bondingRegistry,
+      ticketToken,
+      licenseToken,
+      usdcToken,
+      slashingManager,
+      mockCiphernodeRegistry,
+    } = sys;
+    // Spec consumes the (mock) registry typed as the real interface.
+    const ciphernodeRegistry = mockCiphernodeRegistry!;
 
-    // ── Registry & Slashing ────────────────────────────────────────────────────
-    const { mockCiphernodeRegistry } = await ignition.deploy(
-      MockCiphernodeRegistryModule,
-      {
-        parameters: {
-          CiphernodeRegistry: {
-            enclaveAddress: ownerAddress,
-            owner: ownerAddress,
-          },
-        },
-      },
-    );
-    const { slashingManager: _slashingManager } = await ignition.deploy(
-      SlashingManagerModule,
-      {
-        parameters: {
-          SlashingManager: {
-            admin: ownerAddress,
-          },
-        },
-      },
-    );
-    const { bondingRegistry: _bondingRegistry } = await ignition.deploy(
-      BondingRegistryModule,
-      {
-        parameters: {
-          BondingRegistry: {
-            owner: ownerAddress,
-            ticketToken: await enclaveTicketToken.getAddress(),
-            licenseToken: await enclaveToken.getAddress(),
-            registry: await mockCiphernodeRegistry.getAddress(),
-            slashedFundsTreasury: treasuryAddress,
-            ticketPrice: TICKET_PRICE,
-            licenseRequiredBond: LICENSE_REQUIRED_BOND,
-            minTicketBalance: MIN_TICKET_BALANCE,
-            exitDelay: SEVEN_DAYS_IN_SECONDS,
-          },
-        },
-      },
-    );
-
-    // ── Typed Contract Instances ───────────────────────────────────────────────
-    const bondingRegistry = BondingRegistryFactory.connect(
-      await _bondingRegistry.getAddress(),
-      owner,
-    );
-    const ticketToken = EnclaveTicketTokenFactory.connect(
-      await enclaveTicketToken.getAddress(),
-      owner,
-    );
-    const licenseToken = EnclaveTokenFactory.connect(
-      await enclaveToken.getAddress(),
-      owner,
-    );
-    const usdcToken = MockUSDCFactory.connect(
-      await mockUSDC.getAddress(),
-      owner,
-    );
-    const slashingManager = SlashingManagerFactory.connect(
-      await _slashingManager.getAddress(),
-      owner,
-    );
-    const ciphernodeRegistry = CiphernodeRegistryOwnableFactory.connect(
-      await mockCiphernodeRegistry.getAddress(),
-      owner,
-    );
-
-    // ── Wire Up Contracts ──────────────────────────────────────────────────────
-    await ticketToken.setRegistry(await bondingRegistry.getAddress());
-    await slashingManager.setBondingRegistry(
-      await bondingRegistry.getAddress(),
-    );
-    await bondingRegistry.setSlashingManager(
-      await slashingManager.getAddress(),
-    );
-
-    // ── Mint Tokens ────────────────────────────────────────────────────────────
+    // ── Mint Tokens (owner + spec-local operator1/operator2) ─────────────────
     const USDC_AMOUNT = ethers.parseUnits("100000", 6);
     const LICENSE_AMOUNT = ethers.parseEther("100000");
 
@@ -153,9 +62,7 @@ describe("BondingRegistry", function () {
         "Test allocation",
       );
     }
-    await licenseToken.setTransferRestriction(false);
 
-    // ── Return ─────────────────────────────────────────────────────────────────
     return {
       bondingRegistry,
       ticketToken,
@@ -174,7 +81,6 @@ describe("BondingRegistry", function () {
       treasuryAddress,
     };
   }
-
   describe("constructor / initialize()", function () {
     it("correctly sets initial parameters", async function () {
       const { bondingRegistry, ticketToken, licenseToken, treasuryAddress } =
@@ -1130,6 +1036,221 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).registerOperator();
       expect(await bondingRegistry.isRegistered(await operator1.getAddress()))
         .to.be.true;
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Audit regression — exit queue and license payout
+  // See: audits/enclave-contracts-ethskills-audit-opus-v2.md
+  // ───────────────────────────────────────────────────────────────────────────
+  describe("audit regression — exit queue & license payout", function () {
+    /**
+     * C-03 reproduction guard.
+     *
+     * Pre-fix the exit queue used a single per-operator `queueHeadIndex`
+     * advanced whenever the tranche at the head was fully drained of EITHER
+     * asset. A mixed queue (ticket-only tranche followed by license-only
+     * tranche) could therefore strand the license assets once the tickets
+     * were claimed: the shared head advanced past the second tranche while
+     * its license balance was still pending.
+     *
+     * With the per-asset heads (`queueHeadIndexTicket` /
+     * `queueHeadIndexLicense`) both balances must remain claimable
+     * independently.
+     */
+    it("C-03: per-asset heads do not strand the other asset class", async function () {
+      const {
+        bondingRegistry,
+        licenseToken,
+        ticketToken,
+        usdcToken,
+        operator1,
+        operator1Address,
+      } = await loadFixture(setup);
+
+      // Bond + register so we can unbond into the exit queue.
+      const bondAmount = LICENSE_REQUIRED_BOND;
+      await licenseToken
+        .connect(operator1)
+        .approve(await bondingRegistry.getAddress(), bondAmount);
+      await bondingRegistry.connect(operator1).bondLicense(bondAmount);
+      await bondingRegistry.connect(operator1).registerOperator();
+
+      const ticketAmount = ethers.parseUnits("100", 6);
+      await usdcToken
+        .connect(operator1)
+        .approve(await ticketToken.getAddress(), ticketAmount);
+      await bondingRegistry.connect(operator1).addTicketBalance(ticketAmount);
+
+      // Tranche #0 (license-only): unbond half the license.
+      const halfLicense = bondAmount / 2n;
+      await bondingRegistry.connect(operator1).unbondLicense(halfLicense);
+
+      // Advance time so the next tranche gets a distinct unlock timestamp
+      // (otherwise it would merge into tranche #0 and defeat the test).
+      await time.increase(60);
+
+      // Tranche #1 (ticket-only): remove some tickets to the queue.
+      const halfTickets = ticketAmount / 2n;
+      await bondingRegistry.connect(operator1).removeTicketBalance(halfTickets);
+
+      // Wait past the exit delay so both tranches are unlocked.
+      await time.increase(SEVEN_DAYS_IN_SECONDS + 1);
+
+      // Claim ONLY the ticket leg from tranche #1.
+      // Pre-fix: this would advance the shared head past tranche #0 too,
+      // permanently stranding `halfLicense` in the queue.
+      await bondingRegistry.connect(operator1).claimExits(halfTickets, 0);
+
+      // The license leg from tranche #0 must still be claimable.
+      const [pendingTickets, pendingLicense] =
+        await bondingRegistry.pendingExits(operator1Address);
+      expect(pendingTickets).to.equal(0n);
+      expect(pendingLicense).to.equal(halfLicense);
+
+      const beforeLicense = await licenseToken.balanceOf(operator1Address);
+      await bondingRegistry.connect(operator1).claimExits(0, halfLicense);
+      expect(await licenseToken.balanceOf(operator1Address)).to.equal(
+        beforeLicense + halfLicense,
+      );
+    });
+
+    /**
+     * M-08 reproduction guard.
+     *
+     * Pre-fix the scan loops in `previewClaimableAmounts` and
+     * `_takeAssetsFromQueue` used `break` on the first locked tranche they
+     * encountered. That was sound only while `unlockTimestamp` values were
+     * guaranteed to be monotonically non-decreasing across the queue —
+     * an invariant `setExitDelay` can violate by reducing the delay between
+     * two unbond calls. The fix replaces `break` with `continue` so locked
+     * tranches no longer mask later unlocked ones.
+     */
+    it("M-08: reducing exitDelay does not strand later, sooner-unlocking tranches", async function () {
+      const { bondingRegistry, licenseToken, operator1, operator1Address } =
+        await loadFixture(setup);
+
+      const bondAmount = LICENSE_REQUIRED_BOND;
+      await licenseToken
+        .connect(operator1)
+        .approve(await bondingRegistry.getAddress(), bondAmount);
+      await bondingRegistry.connect(operator1).bondLicense(bondAmount);
+      await bondingRegistry.connect(operator1).registerOperator();
+
+      // Tranche A: unbond with the original 7-day delay.
+      const quarter = bondAmount / 4n;
+      await bondingRegistry.connect(operator1).unbondLicense(quarter);
+
+      // Governance reduces the exit delay to 1 day.
+      const ONE_DAY = 24 * 60 * 60;
+      await bondingRegistry.setExitDelay(ONE_DAY);
+      // Advance time so tranche B gets a distinct unlock timestamp.
+      await time.increase(60);
+
+      // Tranche B: unbond under the new 1-day delay.
+      await bondingRegistry.connect(operator1).unbondLicense(quarter);
+
+      // Move ~2 days forward — B is unlocked, A is still locked.
+      await time.increase(2 * ONE_DAY);
+
+      const [, pendingLicense] =
+        await bondingRegistry.previewClaimable(operator1Address);
+      // Pre-fix `break` would have returned 0; with `continue` we see B.
+      expect(pendingLicense).to.equal(quarter);
+
+      const beforeLicense = await licenseToken.balanceOf(operator1Address);
+      await bondingRegistry.connect(operator1).claimExits(0, quarter);
+      expect(await licenseToken.balanceOf(operator1Address)).to.equal(
+        beforeLicense + quarter,
+      );
+
+      // Tranche A must still be pending (and become claimable later).
+      const [, stillPending] =
+        await bondingRegistry.pendingExits(operator1Address);
+      expect(stillPending).to.equal(quarter);
+    });
+
+    /**
+     * H-21 reproduction guard (part A: queue cap).
+     *
+     * `MAX_ACTIVE_TRANCHES = 64` bounds the per-operator live tranche count.
+     * The 65th distinct-timestamp unbond must revert with `TooManyTranches`,
+     * preventing an attacker from inflating the operator's queue to OOG
+     * `_takeAssetsFromQueue` during a slash.
+     */
+    it("H-21: queueAssetsForExit reverts after MAX_ACTIVE_TRANCHES live tranches", async function () {
+      const { bondingRegistry, licenseToken, operator1 } =
+        await loadFixture(setup);
+
+      // Bond a large enough amount to do many tiny unbonds.
+      const big = ethers.parseEther("10000");
+      await licenseToken
+        .connect(operator1)
+        .approve(await bondingRegistry.getAddress(), big);
+      await bondingRegistry.connect(operator1).bondLicense(big);
+      await bondingRegistry.connect(operator1).registerOperator();
+
+      // Fill the queue with 64 distinct-timestamp tranches.
+      const step = ethers.parseEther("1");
+      for (let i = 0; i < 64; i++) {
+        await bondingRegistry.connect(operator1).unbondLicense(step);
+        // Ensure next unlock timestamp differs (no merge).
+        await time.increase(1);
+      }
+
+      // The 65th must revert.
+      await expect(
+        bondingRegistry.connect(operator1).unbondLicense(step),
+      ).to.be.revertedWithCustomError(bondingRegistry, "TooManyTranches");
+    });
+
+    /**
+     * M-13 reproduction guard.
+     *
+     * `claimExits` / `withdrawSlashedFunds` previously called
+     * `licenseToken.safeTransfer` without measuring the registry's
+     * own balance delta. A fee-on-transfer / rebasing token configured
+     * via `setLicenseToken` would silently underpay the recipient while
+     * the registry's internal accounting was still decremented by the
+     * requested amount. The fix measures the delta and emits
+     * `LicenseTransferShortfall(recipient, expected, actual)`.
+     */
+    it("M-13: emits LicenseTransferShortfall when license token charges a transfer fee", async function () {
+      const { bondingRegistry, licenseToken, operator1, operator1Address } =
+        await loadFixture(setup);
+
+      // Bond + queue a license exit with the well-behaved token.
+      const bondAmount = LICENSE_REQUIRED_BOND;
+      await licenseToken
+        .connect(operator1)
+        .approve(await bondingRegistry.getAddress(), bondAmount);
+      await bondingRegistry.connect(operator1).bondLicense(bondAmount);
+      await bondingRegistry.connect(operator1).registerOperator();
+      await bondingRegistry.connect(operator1).unbondLicense(bondAmount);
+      await time.increase(SEVEN_DAYS_IN_SECONDS + 1);
+
+      // Swap the license token for a 1% fee-on-transfer token.
+      const FoTFactory = await ethers.getContractFactory(
+        "MockFeeOnTransferToken",
+      );
+      const fot = await FoTFactory.deploy(100n); // 100 bps = 1%
+      // Seed the registry with enough FoT tokens to honor the (gross) claim
+      // amount: tests need to verify the delta-detection emits, not that the
+      // registry magically conjures tokens. We mint `bondAmount` directly to
+      // the registry's address.
+      await fot.mint(await bondingRegistry.getAddress(), bondAmount);
+      await bondingRegistry.setLicenseToken(await fot.getAddress());
+
+      // Claim — the safeTransfer will short by 1%.
+      const expectedFee = bondAmount / 100n;
+      const expectedActual = bondAmount - expectedFee;
+
+      await expect(bondingRegistry.connect(operator1).claimExits(0, bondAmount))
+        .to.emit(bondingRegistry, "LicenseTransferShortfall")
+        .withArgs(operator1Address, bondAmount, expectedActual);
+
+      // Operator received the net (post-fee) amount.
+      expect(await fot.balanceOf(operator1Address)).to.equal(expectedActual);
     });
   });
 });

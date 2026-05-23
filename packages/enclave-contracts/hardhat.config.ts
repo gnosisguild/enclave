@@ -182,12 +182,33 @@ const config: HardhatUserConfig = {
       {
         version: "0.8.28",
         settings: {
+          // H-27: Pin EVM target to `paris` so artifacts are portable across
+          // chains that do not yet support post-Shanghai/Cancun opcodes (e.g.
+          // PUSH0, MCOPY, TLOAD/TSTORE).
+          evmVersion: "paris",
           optimizer: {
             enabled: true,
-            runs: 100,
+            runs: 1,
+          },
+          debug: {
+            revertStrings: "strip",
           },
           metadata: {
             bytecodeHash: "none",
+          },
+          // H-22: emit storage layouts so `scripts/validateUpgrade.ts` can
+          // snapshot and diff upgradeable contracts across releases.
+          outputSelection: {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "storageLayout",
+              ],
+            },
           },
         },
       },

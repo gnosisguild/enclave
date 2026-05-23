@@ -70,6 +70,7 @@
       "type": "error"
     },
     {
+<<<<<<< HEAD
       "inputs": [],
       "name": "FoldAttestationVerifierAlreadySet",
       "type": "error"
@@ -85,6 +86,8 @@
       "type": "error"
     },
     {
+=======
+>>>>>>> main
       "inputs": [
         {
           "internalType": "uint256",
@@ -107,11 +110,14 @@
     },
     {
       "inputs": [],
+<<<<<<< HEAD
       "name": "InvalidFoldAttestation",
       "type": "error"
     },
     {
       "inputs": [],
+=======
+>>>>>>> main
       "name": "InvalidTicketNumber",
       "type": "error"
     },
@@ -168,6 +174,7 @@
     },
     {
       "inputs": [],
+<<<<<<< HEAD
       "name": "PartyIdNotInProof",
       "type": "error"
     },
@@ -189,6 +196,8 @@
     },
     {
       "inputs": [],
+=======
+>>>>>>> main
       "name": "PkCommitmentRequired",
       "type": "error"
     },
@@ -328,31 +337,6 @@
         }
       ],
       "name": "CommitteeActivationChanged",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "e3Id",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "address[]",
-          "name": "committee",
-          "type": "address[]"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256[]",
-          "name": "scores",
-          "type": "uint256[]"
-        }
-      ],
-      "name": "CommitteeFinalized",
       "type": "event"
     },
     {
@@ -572,6 +556,31 @@
         }
       ],
       "name": "EnclaveSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address[]",
+          "name": "committee",
+          "type": "address[]"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256[]",
+          "name": "scores",
+          "type": "uint256[]"
+        }
+      ],
+      "name": "SortitionCommitteeFinalized",
       "type": "event"
     },
     {
@@ -1186,5 +1195,9 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
+<<<<<<< HEAD
   "buildInfoId": "solc-0_8_28-c510d3f82db7eda6957be691c11709bfbc8fd9ed"
+=======
+  "buildInfoId": "solc-0_8_28-ce8ef221f0c6b7e9da5e81af1e5b728128db3d16"
+>>>>>>> main
 }

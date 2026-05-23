@@ -4,53 +4,59 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 // Shared attestation helpers for committee-based slashing tests.
-import type { Signer } from "ethers";
-import { network } from "hardhat";
+import type { Signer, TypedDataDomain } from "ethers";
 
-const { ethers } = await network.connect();
+import { ethers } from "./connection";
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
-/// Canonical EIP-712 struct typehash for vote sigs (matches SlashingManager.VOTE_TYPEHASH).
+// EIP-712 type string for AccusationVote. Mirrors VOTE_TYPEHASH constant in
+// SlashingManager.sol. The struct intentionally omits `chainId` and
+// `verifyingContract` — those are bound via the EIP-712 domain separator (H-10).
+// `agrees` was dropped (sig-L): every signature now implicitly asserts agreement
+// and the contract enforces witness equality across all voters via `dataHash`.
 export const VOTE_TYPEHASH = ethers.keccak256(
   ethers.toUtf8Bytes(
-    "AccusationVote(uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)",
+    "AccusationVote(uint256 e3Id,bytes32 accusationId,address voter,bytes32 dataHash,uint256 deadline)",
   ),
 );
 
-const VOTE_DOMAIN_NAME = "EnclaveSlashingManager";
-const VOTE_DOMAIN_VERSION = "1";
+// MaxUint256 sentinel for "no expiry" used in tests that don't exercise the
+// signature deadline path. Real signers should pick a tight deadline.
+const NO_EXPIRY = ethers.MaxUint256;
 
 /**
  * Helper to create signed committee attestation evidence for Lane A.
- * Each voter signs the canonical EIP-712 typed-data hash matching
- * `SlashingManager._verifyVotes`.
- * Returns
- *   abi.encode(proofType, voters, agrees, dataHashes, signatures, evidence)
- * with voters sorted ascending by address.
  *
- * `evidence` is the preimage of `dataHash` (the SlashingManager contract enforces
- * `keccak256(evidence) == dataHash`). If `evidence` is provided, `dataHash` is
- * derived from it automatically; pass `dataHash` explicitly only to test the
- * keccak-binding check itself.
+ * Returns `abi.encode(uint256 proofType, address[] voters, bytes32[] dataHashes,
+ *                     uint256 deadline, bytes[] signatures)` with voters sorted
+ * ascending by address.
  *
- * `slashingManager` is the deployed SlashingManager address — used as the
- * EIP-712 `verifyingContract`.
+ * Each voter signs the EIP-712 `AccusationVote` struct against the
+ * `EnclaveSlashing/1` domain anchored at `verifyingContract`. This binds the
+ * attestation to a specific SlashingManager deployment on a specific chain,
+ * eliminating the cross-chain / cross-contract replay class (H-10, M-24).
+ *
+ * @param voterSigners - Committee members signing the accusation.
+ * @param e3Id         - The E3 the accusation targets.
+ * @param operator     - The accused operator address.
+ * @param verifyingContract - Address of the SlashingManager (EIP-712 domain).
+ * @param proofType    - Numeric proof type, mapped to a slash reason on-chain.
+ * @param chainId      - Chain ID for the EIP-712 domain. Defaults to 31337 (hardhat).
+ * @param dataHash     - Witness hash. All voters must sign the same `dataHash`
+ *                       or `proposeSlash` reverts with `EquivocationDetected`.
+ * @param deadline     - Optional unix expiry. Defaults to MaxUint256.
  */
 export async function signAndEncodeAttestation(
   voterSigners: Signer[],
   e3Id: number,
   operator: string,
-  slashingManager: string,
+  verifyingContract: string,
   proofType: number = 0,
   chainId: number = 31337,
-  dataHash?: string,
-  agreesOverride?: boolean[],
-  evidence: string = "0x",
+  dataHash: string = ethers.ZeroHash,
+  deadline: bigint = NO_EXPIRY,
 ): Promise<string> {
-  if (dataHash === undefined) {
-    dataHash = ethers.keccak256(evidence);
-  }
   const accusationId = ethers.keccak256(
     ethers.solidityPacked(
       ["uint256", "uint256", "address", "uint256"],
@@ -58,11 +64,27 @@ export async function signAndEncodeAttestation(
     ),
   );
 
+  const domain: TypedDataDomain = {
+    name: "EnclaveSlashing",
+    version: "1",
+    chainId,
+    verifyingContract,
+  };
+
+  const types = {
+    AccusationVote: [
+      { name: "e3Id", type: "uint256" },
+      { name: "accusationId", type: "bytes32" },
+      { name: "voter", type: "address" },
+      { name: "dataHash", type: "bytes32" },
+      { name: "deadline", type: "uint256" },
+    ],
+  } as const;
+
   const signersWithAddrs = await Promise.all(
-    voterSigners.map(async (s, idx) => ({
+    voterSigners.map(async (s) => ({
       signer: s,
       address: await s.getAddress(),
-      originalIndex: idx,
     })),
   );
   signersWithAddrs.sort((a, b) =>
@@ -74,52 +96,39 @@ export async function signAndEncodeAttestation(
   );
 
   const voters: string[] = [];
-  const agrees: boolean[] = [];
   const dataHashes: string[] = [];
   const signatures: string[] = [];
 
-  const domain = {
-    name: VOTE_DOMAIN_NAME,
-    version: VOTE_DOMAIN_VERSION,
-    chainId,
-    verifyingContract: slashingManager,
-  };
-  const types = {
-    AccusationVote: [
-      { name: "e3Id", type: "uint256" },
-      { name: "accusationId", type: "bytes32" },
-      { name: "voter", type: "address" },
-      { name: "agrees", type: "bool" },
-      { name: "dataHash", type: "bytes32" },
-    ],
-  };
-
-  for (let i = 0; i < signersWithAddrs.length; i++) {
-    const {
-      signer,
-      address: voterAddress,
-      originalIndex,
-    } = signersWithAddrs[i]!;
-    const voteAgrees =
-      agreesOverride !== undefined ? agreesOverride[originalIndex]! : true;
-
+  for (const { signer, address: voterAddress } of signersWithAddrs) {
     voters.push(voterAddress);
-    agrees.push(voteAgrees);
     dataHashes.push(dataHash);
 
     const value = {
       e3Id,
       accusationId,
       voter: voterAddress,
-      agrees: voteAgrees,
       dataHash,
+      deadline,
     };
-    const signature = await signer.signTypedData(domain, types, value);
+
+    const signature = await (
+      signer as Signer & {
+        signTypedData: (
+          d: TypedDataDomain,
+          t: typeof types,
+          v: typeof value,
+        ) => Promise<string>;
+      }
+    ).signTypedData(domain, types, value);
     signatures.push(signature);
   }
 
-  return abiCoder.encode(
-    ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]", "bytes"],
-    [proofType, voters, agrees, dataHashes, signatures, evidence],
+  // Silence unused-import lint when abiCoder is the only escape hatch consumers
+  // may want for non-EIP-712 negative tests. (Kept for future negative cases.)
+  void abiCoder;
+
+  return ethers.AbiCoder.defaultAbiCoder().encode(
+    ["uint256", "address[]", "bytes32[]", "uint256", "bytes[]"],
+    [proofType, voters, dataHashes, deadline, signatures],
   );
 }

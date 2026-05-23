@@ -154,6 +154,7 @@
     },
     "SlashingManager": {
       "constructorArgs": {
+        "initialDelay": "172800",
         "admin": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
       },
       "blockNumber": 11,
@@ -171,7 +172,7 @@
         "proxyAdminAddress": "0x9bd03768a7DCc129555dE410FF8E85528A4F88b5",
         "implementationAddress": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
       },
-      "blockNumber": 12,
+      "blockNumber": 11,
       "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
     },
     "BondingRegistry": {
@@ -193,7 +194,7 @@
         "proxyAdminAddress": "0x8aCd85898458400f7Db866d53FCFF6f0D49741FF",
         "implementationAddress": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
       },
-      "blockNumber": 13,
+      "blockNumber": 12,
       "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
     },
     "Enclave": {
@@ -213,7 +214,7 @@
         "proxyAdminAddress": "0x8dAF17A20c9DBA35f005b6324F493785D239719d",
         "implementationAddress": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
       },
-      "blockNumber": 16,
+      "blockNumber": 15,
       "address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
     },
     "E3RefundManager": {
@@ -229,48 +230,24 @@
         "proxyAdminAddress": "0x32467b43BFa67273FC7dDda0999Ee9A12F2AaA08",
         "implementationAddress": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0"
       },
-      "blockNumber": 18,
+      "blockNumber": 17,
       "address": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82"
     },
     "MockComputeProvider": {
-      "blockNumber": 20,
+      "blockNumber": 19,
       "address": "0x9E545E3C0baAB3E08CdfD552C960A1050f373042"
     },
     "MockDecryptionVerifier": {
-      "blockNumber": 21,
+      "blockNumber": 20,
       "address": "0xa82fF9aFd8f496c3d6ac40E2a0F282E47488CFc9"
     },
     "MockPkVerifier": {
-      "blockNumber": 22,
+      "blockNumber": 21,
       "address": "0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8"
     },
     "MockE3Program": {
-      "blockNumber": 23,
+      "blockNumber": 22,
       "address": "0x851356ae760d987E095750cCeb3bC6014560891C"
-    },
-    "ZKTranscriptLib": {
-      "blockNumber": 25,
-      "address": "0x95401dc811bb5740090279Ba06cfA8fcF6113778"
-    },
-    "DecryptionAggregatorVerifier": {
-      "blockNumber": 26,
-      "address": "0x998abeb3E57409262aE5b751f60747921B33613E"
-    },
-    "DkgAggregatorVerifier": {
-      "blockNumber": 27,
-      "address": "0x70e0bA845a1A0F2DA3359C97E0285013525FFC49"
-    },
-    "BfvDecryptionVerifier": {
-      "blockNumber": 28,
-      "address": "0x4826533B4897376654Bb4d4AD88B7faFD0C98528"
-    },
-    "BfvPkVerifier": {
-      "blockNumber": 30,
-      "address": "0x0E801D84Fa97b50751Dbf25036d067dCf18858bF"
-    },
-    "DkgFoldAttestationVerifier": {
-      "address": "0x9d4454B023096f34B160D6B654540c56A1F81688",
-      "blockNumber": 32
     }
   }
 }

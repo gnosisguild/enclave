@@ -11,12 +11,15 @@ import { E3 } from "../interfaces/IE3.sol";
 import { IEnclave } from "../interfaces/IEnclave.sol";
 import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
 import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+    Ownable2StepUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {
     InternalLazyIMT,
     LazyIMTData
 } from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
+import {
+    IERC165
+} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { CommitteeHashLib } from "../lib/CommitteeHashLib.sol";
 import {
     IDkgFoldAttestationVerifier
@@ -27,8 +30,27 @@ import {
  * @notice Ownable implementation of the ciphernode registry with IMT-based membership tracking
  * @dev Manages ciphernode registration, committee selection, and integrates with bonding registry
  */
-contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
+contract CiphernodeRegistryOwnable is
+    ICiphernodeRegistry,
+    Ownable2StepUpgradeable
+{
     using InternalLazyIMT for LazyIMTData;
+
+    /// @notice Thrown when {renounceOwnership} is called.
+    error RenounceOwnershipDisabled();
+
+    /// @notice Minimum permitted value for {sortitionSubmissionWindow}.
+    uint256 public constant MIN_SORTITION_SUBMISSION_WINDOW = 1;
+
+    /// @notice Maximum permitted value for {sortitionSubmissionWindow}.
+    uint256 public constant MAX_SORTITION_SUBMISSION_WINDOW = 7 days;
+
+    /// @notice Thrown when {setSortitionSubmissionWindow} input is outside the
+    ///         permitted window.
+    error SortitionSubmissionWindowOutOfBounds(uint256 window);
+
+    /// @notice Emitted whenever {slashingManager} is updated.
+    event RegistrySlashingManagerSet(address indexed slashingManager);
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -66,6 +88,16 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     /// @notice Depth of the LazyIMT tree
     uint8 public constant TREE_DEPTH = 20;
+
+    /// @notice Maximum number of leaves the underlying LazyIMT can hold.
+    /// @dev Slots freed by {removeCiphernode} are NOT reused (`_update(0, index)` zeroes
+    ///      the slot but never decrements the leaf count), so {addCiphernode} reverts
+    ///      with {CiphernodeTreeExhausted} once `numberOfLeaves` reaches this cap.
+    uint256 public constant MAX_CIPHERNODE_LEAVES = uint256(1) << TREE_DEPTH;
+
+    /// @notice Thrown when {addCiphernode} would push the LazyIMT past its
+    ///         configured {TREE_DEPTH} capacity.
+    error CiphernodeTreeExhausted();
 
     /// @notice Incremental Merkle Tree (IMT) containing all registered ciphernodes
     LazyIMTData public ciphernodes;
@@ -146,15 +178,12 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    /// @notice Constructor that disables initializers.
-    /// @dev Prevents the implementation contract from being initialized. Initialization is performed
-    /// via the initialize() function when deployed behind a proxy.
+    /// @notice Locks the implementation; initialize via the proxy.
     constructor() {
         _disableInitializers();
     }
 
     /// @notice Initializes the registry contract
-    /// @dev Can only be called once due to initializer modifier
     /// @param _owner Address that will own the contract
     /// @param _submissionWindow The submission window for the E3 sortition in seconds
     function initialize(
@@ -169,7 +198,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         __Ownable_init(msg.sender);
         ciphernodes._init(TREE_DEPTH);
         setSortitionSubmissionWindow(_submissionWindow);
-        if (_owner != owner()) transferOwnership(_owner);
+        if (_owner != owner()) _transferOwnership(_owner);
     }
 
     ////////////////////////////////////////////////////////////
@@ -203,7 +232,11 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         c.stage = ICiphernodeRegistry.CommitteeStage.Requested;
         c.seed = seed;
-        c.requestBlock = block.number;
+        // NOTE: `requestBlock` stores a timepoint per EIP-6372 (mode=timestamp) — its name
+        // is kept for storage/event compatibility but it must be compared to
+        // {block.timestamp}. This matches the EnclaveTicketToken's timestamp-mode clock so
+        // {getPastVotes} lookups resolve consistently.
+        c.requestBlock = block.timestamp;
         c.committeeDeadline = block.timestamp + sortitionSubmissionWindow;
         c.threshold = threshold;
         roots[e3Id] = root();
@@ -237,21 +270,25 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         bytes32 committeeHash = CommitteeHashLib.hash(c.topNodes);
         c.committeeHash = committeeHash;
+        c.publicKey = pkCommitment;
+        publicKeyHashes[e3Id] = pkCommitment;
 
         E3 memory e3 = enclave.getE3(e3Id);
         if (e3.proofAggregationEnabled) {
+            // Bind to the on-chain committee (c.topNodes), not caller-supplied
+            // nodes, so a wrong `nodes` input cannot pre-commit the prover to
+            // an attacker's set (C-08).
             _verifyAndStoreDkgAnchors(
                 e3Id,
                 e3,
+                roots[e3Id],
+                c.topNodes,
                 pkCommitment,
                 committeeHash,
                 proof,
                 dkgAttestationBundle
             );
         }
-
-        c.publicKey = pkCommitment;
-        publicKeyHashes[e3Id] = pkCommitment;
 
         enclave.onCommitteePublished(e3Id, pkCommitment);
 
@@ -267,16 +304,33 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     function _verifyAndStoreDkgAnchors(
         uint256 e3Id,
         E3 memory e3,
+        uint256 committeeRoot,
+        address[] memory sortedNodes,
         bytes32 pkCommitment,
         bytes32 committeeHash,
         bytes calldata proof,
         bytes calldata dkgAttestationBundle
     ) internal {
         require(proof.length > 0, DkgProofRequired());
-        require(
-            e3.pkVerifier.verify(pkCommitment, committeeHash, proof),
-            InvalidDkgProof()
+        // Reverts with a typed error on any mismatch; binds to the on-chain
+        // committee (sortedNodes = c.topNodes) per audit finding C-08.
+        e3.pkVerifier.verify(
+            e3Id,
+            committeeRoot,
+            sortedNodes,
+            pkCommitment,
+            committeeHash,
+            proof
         );
+        _verifyAndStoreFoldAttestation(e3Id, proof, dkgAttestationBundle);
+    }
+
+    /// @dev Split out to avoid "stack too deep" in `_verifyAndStoreDkgAnchors`.
+    function _verifyAndStoreFoldAttestation(
+        uint256 e3Id,
+        bytes calldata proof,
+        bytes calldata dkgAttestationBundle
+    ) internal {
         require(dkgAttestationBundle.length > 0, FoldAttestationsRequired());
         require(
             address(dkgFoldAttestationVerifier) != address(0),
@@ -381,6 +435,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         }
 
         uint40 index = ciphernodes.numberOfLeaves;
+        // cap insertions before LazyIMT depth is exhausted. Slots
+        // freed by {removeCiphernode} are not reclaimed, so monotonic
+        // register/deregister churn would otherwise brick the registry.
+        require(
+            uint256(index) < MAX_CIPHERNODE_LEAVES,
+            CiphernodeTreeExhausted()
+        );
         ciphernodes._insert(uint160(node));
         ciphernodeEnabled[node] = true;
         ciphernodeTreeIndex[node] = index;
@@ -439,7 +500,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         // Validate node eligibility and ticket number
         _validateNodeEligibility(msg.sender, ticketNumber, e3Id);
 
-        // Compute score
+        // Compute score using the seed committed at request time. Same-block
+        // manipulation is bounded by the snapshot of ticket balances at
+        // `c.requestBlock - 1` performed inside {_validateNodeEligibility}.
         uint256 score = _computeTicketScore(
             msg.sender,
             ticketNumber,
@@ -502,7 +565,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         }
 
         enclave.onCommitteeFinalized(e3Id);
-        emit CommitteeFinalized(e3Id, c.topNodes, scores);
+        emit SortitionCommitteeFinalized(e3Id, c.topNodes, scores);
         return true;
     }
 
@@ -540,13 +603,23 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ) public onlyOwner {
         require(address(_slashingManager) != address(0), ZeroAddress());
         slashingManager = _slashingManager;
-        emit SlashingManagerSet(address(_slashingManager));
+        emit RegistrySlashingManagerSet(address(_slashingManager));
+    }
+
+    /// @notice Disabled. Reverts unconditionally.
+    function renounceOwnership() public view override onlyOwner {
+        revert RenounceOwnershipDisabled();
     }
 
     /// @inheritdoc ICiphernodeRegistry
     function setSortitionSubmissionWindow(
         uint256 _sortitionSubmissionWindow
     ) public onlyOwner {
+        require(
+            _sortitionSubmissionWindow >= MIN_SORTITION_SUBMISSION_WINDOW &&
+                _sortitionSubmissionWindow <= MAX_SORTITION_SUBMISSION_WINDOW,
+            SortitionSubmissionWindowOutOfBounds(_sortitionSubmissionWindow)
+        );
         sortitionSubmissionWindow = _sortitionSubmissionWindow;
         emit SortitionSubmissionWindowSet(_sortitionSubmissionWindow);
     }
@@ -835,9 +908,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         Committee storage c = committees[e3Id];
 
-        // Use ticket balance snapshot at (requestBlock - 1) for deterministic validation.
-        // The -1 offset prevents same-block manipulation attacks. All call sites must use
-        // the same snapshot convention for consistency.
+        // bind ticket weight to the request-time snapshot via the
+        // ticket token's EIP-6372 ERC20Votes checkpoints. The outer
+        // `isCiphernodeEligible(msg.sender)` check in {submitTicket} still
+        // gates on the operator's *current* `isActive` flag, but the score
+        // and selection weight below derive purely from the historical
+        // ticket balance at `c.requestBlock - 1`, so churn between request
+        // time and the ticket submission window cannot inflate weights.
         uint256 ticketBalance = bondingRegistry.getTicketBalanceAtBlock(
             node,
             c.requestBlock - 1
@@ -916,4 +993,24 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         return true;
     }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //              ERC-165 Interface Detection               //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice ERC-165 interface detection. Advertises
+    ///         {ICiphernodeRegistry} and {IERC165}.
+    function supportsInterface(
+        bytes4 interfaceId
+    ) external pure virtual returns (bool) {
+        return
+            interfaceId == type(ICiphernodeRegistry).interfaceId ||
+            interfaceId == type(IERC165).interfaceId;
+    }
+
+    /// @dev Reserved storage slots for future upgrades.
+    // solhint-disable-next-line var-name-mixedcase
+    uint256[50] private __gap;
 }

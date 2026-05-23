@@ -349,3 +349,56 @@ active = registered
                    ENCL → returned from ExitQueue
                    USDC → paid out from ETK.payableBalance
 ```
+
+---
+
+## Audit Cluster 2 Changes (Tokens)
+
+The token contracts were hardened against the following audit findings. All changes are covered by
+`packages/enclave-contracts/test/Token/` and have no runtime impact outside the touched contracts.
+
+### EnclaveTicketToken (ETK)
+
+- **H-02 — registry initialization.** The constructor now takes
+  `(IERC20 baseToken, address registry_, address initialOwner_)` and assigns `registry = registry_`
+  directly (emitting `RegistryChanged(0, registry_)`) instead of requiring the deployer to call
+  `setRegistry()` later. Reverts `ZeroAddress` if `registry_ == 0`.
+- **H-03 — fee-on-transfer safe deposits.** `depositFor` and `depositFrom` measure the underlying
+  balance before/after `safeTransferFrom` and mint the _actual_ amount received. Operators auto
+  self-delegate on first deposit.
+- **H-16 / H-20 / M-22 — registry swap timelock.** Once `lockRegistry()` is called (one-way,
+  `RegistryLockAlreadySet` on repeat) further registry swaps must go through
+  `requestRegistryChange(addr)` → wait `REGISTRY_CHANGE_DELAY = 1 day` → `activateRegistryChange()`.
+  Errors: `RegistryNotLocked`, `RegistryChangeNotReady`, `NoPendingRegistry`,
+  `RegistryAlreadyLocked`. `cancelRegistryChange()` clears the pending swap.
+- **M-11 — permit disabled.** `permit()` always reverts `PermitDisabled` so non-transferable tickets
+  cannot be moved via off-chain signatures.
+- **M-12 — rescueERC20.** `rescueERC20(token, to, amount)` lets the owner recover stray ERC-20s but
+  refuses the underlying asset (`CannotRescueUnderlying`).
+- **M-25 — delegation locked to self.** `delegate()` only accepts the caller's own address (else
+  `DelegationLocked`); `delegateBySig` always reverts.
+- **M-29 — EIP-6372 timestamp clock.** `clock() = uint48(block.timestamp)`,
+  `CLOCK_MODE() = "mode=timestamp"`.
+
+### EnclaveToken (ENCL)
+
+- **H-15 — WHITELIST_ROLE separation + one-way disable.** New `WHITELIST_ROLE` gates
+  `toggleTransferWhitelist` and `whitelistContracts`, decoupling whitelist edits from `MINTER_ROLE`.
+  `disableTransferRestrictions` is `DEFAULT_ADMIN_ROLE` only and idempotent (silent no-op when
+  already disabled) so deployment/setup scripts can call it unconditionally.
+- **M-21 — per-epoch mint cap.** New rolling cap configured via
+  `setMintCap(epochLength, capPerEpoch)` (`ZeroEpochLength` on zero length). Both `mintAllocation`
+  and `batchMintAllocations` route through `_accountForMintAgainstCap`, which rolls the epoch
+  (`MintEpochRolled(newStart)`) and reverts `ExceedsMintCap` on overflow. Constructor defaults to a
+  30-day epoch with `cap = MAX_SUPPLY` so bootstrap deployments keep working; governance is expected
+  to tighten this before broad distribution.
+- **M-29 — EIP-6372 timestamp clock.** Same timestamp clock as ETK, aligning ENCL voting checkpoints
+  with timepoints used elsewhere.
+
+### Registry coordination
+
+- `CiphernodeRegistryOwnable.requestBlock` now stores `block.timestamp` (the storage slot and event
+  field names are preserved for backwards compatibility). All callers — including
+  `BondingRegistry.getTicketBalanceAtBlock(node, c.requestBlock - 1)` — pass the value through
+  unchanged; the parameter is now a timepoint per EIP-6372 rather than a block number, which is
+  required for the ETK timestamp clock to be valid.

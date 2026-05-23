@@ -4,29 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { expect } from "chai";
-import { network } from "hardhat";
 
-import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
-import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
-import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
-import MockCiphernodeRegistryModule from "../../ignition/modules/mockCiphernodeRegistry";
-import MockCircuitVerifierModule from "../../ignition/modules/mockSlashingVerifier";
-import MockStableTokenModule from "../../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../../ignition/modules/slashingManager";
-import {
-  BondingRegistry__factory as BondingRegistryFactory,
-  EnclaveTicketToken__factory as EnclaveTicketTokenFactory,
-  EnclaveToken__factory as EnclaveTokenFactory,
-  MockCiphernodeRegistry__factory as MockCiphernodeRegistryFactory,
-  MockCircuitVerifier__factory as MockCircuitVerifierFactory,
-  MockUSDC__factory as MockUSDCFactory,
-  SlashingManager__factory as SlashingManagerFactory,
-} from "../../types";
 import type { MockCircuitVerifier } from "../../types";
 import type { SlashingManager } from "../../types/contracts/slashing/SlashingManager";
-import { VOTE_TYPEHASH, signAndEncodeAttestation } from "../fixtures";
+import {
+  deployEnclaveSystem,
+  ethers,
+  ignition,
+  networkHelpers,
+  signAndEncodeAttestation,
+} from "../fixtures";
 
-const { ethers, networkHelpers, ignition } = await network.connect();
 const { loadFixture, time } = networkHelpers;
 
 describe("SlashingManager", function () {
@@ -105,7 +94,7 @@ describe("SlashingManager", function () {
   }
 
   async function setup() {
-    // ── Signers ────────────────────────────────────────────────────────────────
+    const signers = await ethers.getSigners();
     const [
       owner,
       slasher,
@@ -115,113 +104,30 @@ describe("SlashingManager", function () {
       voter1,
       voter2,
       voter3,
-    ] = await ethers.getSigners();
-    const ownerAddress = await owner.getAddress();
+    ] = signers;
     const operatorAddress = await operator.getAddress();
 
-    // ── Token Contracts ────────────────────────────────────────────────────────
-    const { mockUSDC } = await ignition.deploy(MockStableTokenModule, {
-      parameters: { MockUSDC: { initialSupply: 1_000_000 } },
+    const sys = await deployEnclaveSystem({
+      useMockCiphernodeRegistry: true,
+      deployCircuitVerifier: true,
+      setupOperators: 0,
+      wireSlashingManager: false,
+      mintUsdcTo: [],
     });
-    const { enclaveToken: _enclaveToken } = await ignition.deploy(
-      EnclaveTokenModule,
-      {
-        parameters: { EnclaveToken: { owner: ownerAddress } },
-      },
-    );
-    const { enclaveTicketToken } = await ignition.deploy(
-      EnclaveTicketTokenModule,
-      {
-        parameters: {
-          EnclaveTicketToken: {
-            baseToken: await mockUSDC.getAddress(),
-            registry: ownerAddress,
-            owner: ownerAddress,
-          },
-        },
-      },
-    );
-
-    // ── Mock Contracts ─────────────────────────────────────────────────────────
-    const { mockCircuitVerifier } = await ignition.deploy(
-      MockCircuitVerifierModule,
-    );
-    const { mockCiphernodeRegistry: _mockCiphernodeRegistry } =
-      await ignition.deploy(MockCiphernodeRegistryModule);
+    const {
+      slashingManager,
+      bondingRegistry,
+      licenseToken: enclaveToken,
+      ticketToken,
+      usdcToken,
+      mocks,
+      mockCiphernodeRegistry: mockCiphernodeRegistryOpt,
+    } = sys;
+    const mockCiphernodeRegistry = mockCiphernodeRegistryOpt!;
+    const _mockVerifier = mocks.circuitVerifier!;
     const mockCiphernodeRegistryAddress =
-      await _mockCiphernodeRegistry.getAddress();
+      await mockCiphernodeRegistry.getAddress();
 
-    // ── Slashing & Bonding ─────────────────────────────────────────────────────
-    const { slashingManager: _slashingManager } = await ignition.deploy(
-      SlashingManagerModule,
-      {
-        parameters: {
-          SlashingManager: {
-            admin: ownerAddress,
-          },
-        },
-      },
-    );
-
-    const { bondingRegistry: _bondingRegistry } = await ignition.deploy(
-      BondingRegistryModule,
-      {
-        parameters: {
-          BondingRegistry: {
-            owner: ownerAddress,
-            ticketToken: await enclaveTicketToken.getAddress(),
-            licenseToken: await _enclaveToken.getAddress(),
-            registry: ethers.ZeroAddress,
-            slashedFundsTreasury: ownerAddress,
-            ticketPrice: ethers.parseUnits("10", 6),
-            licenseRequiredBond: ethers.parseEther("1000"),
-            minTicketBalance: 5,
-            exitDelay: APPEAL_WINDOW,
-          },
-        },
-      },
-    );
-
-    // ── Connect Factories ──────────────────────────────────────────────────────
-    const usdcToken = MockUSDCFactory.connect(
-      await mockUSDC.getAddress(),
-      owner,
-    );
-    const enclaveToken = EnclaveTokenFactory.connect(
-      await _enclaveToken.getAddress(),
-      owner,
-    );
-    const ticketToken = EnclaveTicketTokenFactory.connect(
-      await enclaveTicketToken.getAddress(),
-      owner,
-    );
-    const _mockVerifier = MockCircuitVerifierFactory.connect(
-      await mockCircuitVerifier.getAddress(),
-      owner,
-    );
-    const mockCiphernodeRegistry = MockCiphernodeRegistryFactory.connect(
-      mockCiphernodeRegistryAddress,
-      owner,
-    );
-    const slashingManager = SlashingManagerFactory.connect(
-      await _slashingManager.getAddress(),
-      owner,
-    );
-    const bondingRegistry = BondingRegistryFactory.connect(
-      await _bondingRegistry.getAddress(),
-      owner,
-    );
-
-    // ── Wire Up & Configure ────────────────────────────────────────────────────
-    await ticketToken.setRegistry(await bondingRegistry.getAddress());
-    await slashingManager.setBondingRegistry(
-      await bondingRegistry.getAddress(),
-    );
-    await bondingRegistry.setSlashingManager(
-      await slashingManager.getAddress(),
-    );
-
-    await enclaveToken.setTransferRestriction(false);
     await enclaveToken.mintAllocation(
       operatorAddress,
       ethers.parseEther("2000"),
@@ -232,7 +138,6 @@ describe("SlashingManager", function () {
     await slashingManager.setEnclave(addressOne);
     await slashingManager.setE3RefundManager(addressOne);
 
-    // ── Return ─────────────────────────────────────────────────────────────────
     return {
       owner,
       slasher,
@@ -387,7 +292,11 @@ describe("SlashingManager", function () {
       ).to.be.revertedWithCustomError(slashingManager, "InvalidPolicy");
     });
 
-    it("should revert if policy is disabled", async function () {
+    // M-14: the `enabled` field on `SlashPolicy` is now informational only —
+    // the on-chain validator no longer rejects policies based on this flag.
+    // The whole-policy disable path is provided via reason removal/zeroing
+    // in governance, not via this boolean. We assert the call succeeds.
+    it("should accept policy with enabled=false (M-14 field is informational)", async function () {
       const { slashingManager } = await loadFixture(setup);
 
       const policy = {
@@ -402,9 +311,10 @@ describe("SlashingManager", function () {
         failureReason: 0,
       };
 
-      await expect(
-        slashingManager.setSlashPolicy(REASON_PT_0, policy),
-      ).to.be.revertedWithCustomError(slashingManager, "InvalidPolicy");
+      await expect(slashingManager.setSlashPolicy(REASON_PT_0, policy)).to.emit(
+        slashingManager,
+        "SlashPolicyUpdated",
+      );
     });
 
     it("should revert if no penalties are set", async function () {
@@ -447,9 +357,11 @@ describe("SlashingManager", function () {
         .withArgs(REASON_PT_0, Object.values(policy));
     });
 
-    it("should allow proof-based policy with appeal window (deferred execution)", async function () {
-      // Lane A policies may now opt into a non-zero appealWindow, deferring
-      // _executeSlash to give the accused a window to file an appeal.
+    // Lane A (proof-based) policies may opt into a challenge window:
+    // setting both `requiresProof=true` and a non-zero
+    // `appealWindow` is now valid — `proposeSlash` will defer execution to
+    // allow the operator to file an appeal.
+    it("should accept proof-required policy with non-zero appeal window (Lane A challenge window)", async function () {
       const { slashingManager, _mockVerifier } = await loadFixture(setup);
 
       const policy = {
@@ -464,9 +376,10 @@ describe("SlashingManager", function () {
         failureReason: 0,
       };
 
-      await expect(
-        slashingManager.setSlashPolicy(REASON_PT_0, policy),
-      ).to.not.be.revert(ethers);
+      await expect(slashingManager.setSlashPolicy(REASON_PT_0, policy)).to.emit(
+        slashingManager,
+        "SlashPolicyUpdated",
+      );
     });
 
     it("should revert if no proof required but no appeal window", async function () {
@@ -674,14 +587,18 @@ describe("SlashingManager", function () {
       ]);
       await mockCiphernodeRegistry.setThreshold(0, 2);
 
-      // Build attestation manually with voter2's address but notTheOwner's signature
+      // Build attestation manually with voter2's address but notTheOwner's
+      // signature. The helper cannot forge identity mismatches because it
+      // derives voter addresses from each signer's getAddress().
       const chainId = 31337;
+      const verifyingContract = await slashingManager.getAddress();
       const accusationId = ethers.keccak256(
         ethers.solidityPacked(
           ["uint256", "uint256", "address", "uint256"],
           [chainId, 0, operatorAddress, 0],
         ),
       );
+      const deadline = ethers.MaxUint256;
 
       // Sort voters ascending
       const sortedVoters = [voter1Addr, voter2Addr].sort((a, b) =>
@@ -691,8 +608,23 @@ describe("SlashingManager", function () {
         addr.toLowerCase() === voter1Addr.toLowerCase() ? voter1 : voter2,
       );
 
+      const domain = {
+        name: "EnclaveSlashing",
+        version: "1",
+        chainId,
+        verifyingContract,
+      };
+      const types = {
+        AccusationVote: [
+          { name: "e3Id", type: "uint256" },
+          { name: "accusationId", type: "bytes32" },
+          { name: "voter", type: "address" },
+          { name: "dataHash", type: "bytes32" },
+          { name: "deadline", type: "uint256" },
+        ],
+      };
+
       const voters: string[] = [];
-      const agrees: boolean[] = [];
       const dataHashes: string[] = [];
       const signatures: string[] = [];
 
@@ -703,43 +635,25 @@ describe("SlashingManager", function () {
       for (let i = 0; i < sortedVoters.length; i++) {
         const voterAddr = sortedVoters[i];
         voters.push(voterAddr);
-        agrees.push(true);
-        dataHashes.push(evidenceHash);
+        dataHashes.push(ethers.ZeroHash);
 
         // For the second voter, use notTheOwner to sign (wrong signer)
         const signerToUse =
           i === sortedVoters.length - 1 ? notTheOwner : sortedSigners[i];
-        const messageHash = ethers.keccak256(
-          abiCoder.encode(
-            [
-              "bytes32",
-              "uint256",
-              "uint256",
-              "bytes32",
-              "address",
-              "bool",
-              "bytes32",
-            ],
-            [
-              VOTE_TYPEHASH,
-              chainId,
-              0,
-              accusationId,
-              voterAddr,
-              true,
-              evidenceHash,
-            ],
-          ),
-        );
-        const signature = await signerToUse.signMessage(
-          ethers.getBytes(messageHash),
-        );
+        const value = {
+          e3Id: 0,
+          accusationId,
+          voter: voterAddr,
+          dataHash: ethers.ZeroHash,
+          deadline,
+        };
+        const signature = await signerToUse.signTypedData(domain, types, value);
         signatures.push(signature);
       }
 
       const proof = abiCoder.encode(
-        ["uint256", "address[]", "bool[]", "bytes32[]", "bytes[]", "bytes"],
-        [0, voters, agrees, dataHashes, signatures, evidence],
+        ["uint256", "address[]", "bytes32[]", "uint256", "bytes[]"],
+        [0, voters, dataHashes, deadline, signatures],
       );
 
       await expect(
@@ -1419,55 +1333,108 @@ describe("SlashingManager", function () {
     });
   });
 
-  describe("ban management", function () {
-    it("should allow governance to ban node", async function () {
-      const { slashingManager, owner, operatorAddress } =
+  describe("ban management (two-step M-15)", function () {
+    it("should ban a node via two-step propose/confirm with distinct governance signers", async function () {
+      const { slashingManager, owner, notTheOwner, operatorAddress } =
         await loadFixture(setup);
+
+      // Grant GOVERNANCE_ROLE to a second account so we can satisfy the
+      // "distinct proposer/confirmer" constraint.
+      const GOVERNANCE_ROLE = await slashingManager.GOVERNANCE_ROLE();
+      await slashingManager
+        .connect(owner)
+        .grantRole(GOVERNANCE_ROLE, await notTheOwner.getAddress());
 
       const reason = ethers.encodeBytes32String("manual_ban");
 
       await expect(
+        slashingManager.connect(owner).proposeBan(operatorAddress, reason),
+      )
+        .to.emit(slashingManager, "BanProposed")
+        .withArgs(operatorAddress, reason, await owner.getAddress());
+
+      // Same proposer cannot confirm \u2014 enforces two-of-N.
+      await expect(
+        slashingManager.connect(owner).confirmBan(operatorAddress, reason),
+      ).to.be.revertedWithCustomError(
+        slashingManager,
+        "BanRequiresConfirmation",
+      );
+
+      await expect(
         slashingManager
-          .connect(owner)
-          .updateBanStatus(operatorAddress, true, reason),
+          .connect(notTheOwner)
+          .confirmBan(operatorAddress, reason),
       )
         .to.emit(slashingManager, "NodeBanUpdated")
-        .withArgs(operatorAddress, true, reason, await owner.getAddress());
+        .withArgs(
+          operatorAddress,
+          true,
+          reason,
+          await notTheOwner.getAddress(),
+        );
 
       expect(await slashingManager.isBanned(operatorAddress)).to.be.true;
     });
 
-    it("should allow governance to unban node", async function () {
+    it("should allow governance to unban via unbanNode() (single step)", async function () {
+      const { slashingManager, owner, notTheOwner, operatorAddress } =
+        await loadFixture(setup);
+
+      const GOVERNANCE_ROLE = await slashingManager.GOVERNANCE_ROLE();
+      await slashingManager
+        .connect(owner)
+        .grantRole(GOVERNANCE_ROLE, await notTheOwner.getAddress());
+
+      const reason = ethers.encodeBytes32String("test");
+      await slashingManager.connect(owner).proposeBan(operatorAddress, reason);
+      await slashingManager
+        .connect(notTheOwner)
+        .confirmBan(operatorAddress, reason);
+      expect(await slashingManager.isBanned(operatorAddress)).to.be.true;
+
+      await expect(
+        slashingManager.connect(owner).unbanNode(operatorAddress, reason),
+      )
+        .to.emit(slashingManager, "NodeBanUpdated")
+        .withArgs(operatorAddress, false, reason, await owner.getAddress());
+
+      expect(await slashingManager.isBanned(operatorAddress)).to.be.false;
+    });
+
+    it("should allow governance to cancel a pending ban proposal", async function () {
       const { slashingManager, owner, operatorAddress } =
         await loadFixture(setup);
 
-      await slashingManager
-        .connect(owner)
-        .updateBanStatus(
-          operatorAddress,
-          true,
-          ethers.encodeBytes32String("test"),
-        );
-      expect(await slashingManager.isBanned(operatorAddress)).to.be.true;
+      const reason = ethers.encodeBytes32String("manual_ban");
+      await slashingManager.connect(owner).proposeBan(operatorAddress, reason);
+
+      await expect(slashingManager.connect(owner).cancelBan(operatorAddress))
+        .to.emit(slashingManager, "BanCancelled")
+        .withArgs(operatorAddress, await owner.getAddress());
+
+      // After cancel, confirm should revert NoPendingBan.
+      await expect(
+        slashingManager.connect(owner).confirmBan(operatorAddress, reason),
+      ).to.be.revertedWithCustomError(slashingManager, "NoPendingBan");
+    });
+
+    it("should revert updateBanStatus(true,...) (legacy single-step ban path is locked)", async function () {
+      const { slashingManager, owner, operatorAddress } =
+        await loadFixture(setup);
 
       await expect(
         slashingManager
           .connect(owner)
           .updateBanStatus(
             operatorAddress,
-            false,
+            true,
             ethers.encodeBytes32String("test"),
           ),
-      )
-        .to.emit(slashingManager, "NodeBanUpdated")
-        .withArgs(
-          operatorAddress,
-          false,
-          ethers.encodeBytes32String("test"),
-          await owner.getAddress(),
-        );
-
-      expect(await slashingManager.isBanned(operatorAddress)).to.be.false;
+      ).to.be.revertedWithCustomError(
+        slashingManager,
+        "BanRequiresConfirmation",
+      );
     });
 
     it("should revert if non-governance tries to ban", async function () {
@@ -1477,11 +1444,7 @@ describe("SlashingManager", function () {
       await expect(
         slashingManager
           .connect(notTheOwner)
-          .updateBanStatus(
-            operatorAddress,
-            false,
-            ethers.encodeBytes32String("test"),
-          ),
+          .proposeBan(operatorAddress, ethers.encodeBytes32String("test")),
       ).to.be.revertedWithCustomError(slashingManager, "Unauthorized");
     });
   });

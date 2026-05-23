@@ -159,7 +159,8 @@ interface IEnclave {
     /// @param feeToken The address of the fee token.
     event FeeTokenSet(address feeToken);
 
-    /// @notice This event MUST be emitted when rewards are distributed to committee members.
+    /// @notice This event MUST be emitted when rewards are credited to committee members.
+    /// @dev Distribution is pull-based — recipients must call `claimReward(e3Id)`.
     /// @param e3Id The ID of the E3 computation.
     /// @param nodes The addresses of the committee members receiving rewards.
     /// @param amounts The reward amounts for each committee member.
@@ -168,6 +169,57 @@ interface IEnclave {
         address[] nodes,
         uint256[] amounts
     );
+
+    /// @notice Emitted when a reward is credited to a committee member's pull-payment balance.
+    /// @param e3Id The ID of the E3 computation.
+    /// @param account The committee-member address being credited.
+    /// @param token The ERC20 fee token used for this E3.
+    /// @param amount The amount credited.
+    event RewardCredited(
+        uint256 indexed e3Id,
+        address indexed account,
+        IERC20 indexed token,
+        uint256 amount
+    );
+
+    /// @notice Emitted when a recipient claims their accrued E3 reward.
+    /// @param e3Id The ID of the E3 computation.
+    /// @param account The claimant address.
+    /// @param token The ERC20 fee token transferred.
+    /// @param amount The amount claimed.
+    event RewardClaimed(
+        uint256 indexed e3Id,
+        address indexed account,
+        IERC20 indexed token,
+        uint256 amount
+    );
+
+    /// @notice Emitted when the protocol-treasury share is credited for later pull.
+    /// @param e3Id The ID of the E3 computation.
+    /// @param treasury The treasury address credited (snapshotted at request time).
+    /// @param token The ERC20 fee token used for this E3.
+    /// @param amount The amount credited.
+    event TreasuryCredited(
+        uint256 indexed e3Id,
+        address indexed treasury,
+        IERC20 indexed token,
+        uint256 amount
+    );
+
+    /// @notice Emitted when a treasury withdraws its accrued protocol share.
+    /// @param treasury The treasury address pulling its credits.
+    /// @param token The ERC20 token transferred.
+    /// @param amount The amount transferred.
+    event TreasuryClaimed(
+        address indexed treasury,
+        IERC20 indexed token,
+        uint256 amount
+    );
+
+    /// @notice Emitted when an ERC20 token is allow-listed or removed as an E3 fee token.
+    /// @param token The ERC20 token.
+    /// @param allowed The new allow-list status.
+    event FeeTokenAllowed(IERC20 indexed token, bool allowed);
 
     /// @notice The event MUST be emitted any time an encryption scheme is enabled.
     /// @param encryptionSchemeId The ID of the encryption scheme that was enabled.
@@ -190,6 +242,15 @@ interface IEnclave {
     /// @param encodedParams ABI-encoded BFV parameters.
     event ParamSetRegistered(uint8 paramSet, bytes encodedParams);
 
+    /// @notice Emitted when an existing param set slot is overwritten by
+    ///         {Enclave.setParamSet}. The new value replaces the
+    ///         previous encoded parameters atomically.
+    event ParamSetUpdated(
+        uint8 paramSet,
+        bytes previousEncodedParams,
+        bytes newEncodedParams
+    );
+
     /// @notice Emitted when E3RefundManager contract is set.
     /// @param e3RefundManager The address of the E3RefundManager contract.
     event E3RefundManagerSet(address indexed e3RefundManager);
@@ -197,11 +258,6 @@ interface IEnclave {
     /// @notice Emitted when the SlashingManager contract is set.
     /// @param slashingManager The address of the SlashingManager contract.
     event SlashingManagerSet(address indexed slashingManager);
-
-    /// @notice Emitted when the PkVerifier is set for an encryption scheme.
-    /// @param encryptionSchemeId The encryption scheme identifier.
-    /// @param pkVerifier The address of the PkVerifier contract.
-    event PkVerifierSet(bytes32 indexed encryptionSchemeId, address pkVerifier);
 
     /// @notice Emitted when slashed funds are escrowed for an E3
     /// @param e3Id The E3 ID.
@@ -225,6 +281,13 @@ interface IEnclave {
     /// @notice Emitted when a committee is finalized (sortition complete, DKG starting).
     /// @param e3Id The ID of the E3.
     event CommitteeFinalized(uint256 indexed e3Id);
+
+    /// @notice MUST be emitted whenever {Enclave.setPkVerifier} updates the
+    ///         verifier address for an encryption scheme.
+    event PkVerifierSet(
+        bytes32 indexed encryptionSchemeId,
+        IPkVerifier indexed pkVerifier
+    );
 
     /// @notice Emitted when E3 stage changes
     event E3StageChanged(
@@ -369,6 +432,10 @@ interface IEnclave {
     /// @notice Caller is not the CiphernodeRegistry or SlashingManager
     error OnlyCiphernodeRegistryOrSlashingManager();
 
+    /// @notice Thrown when {markE3Failed} is called by a non-privileged
+    ///         account inside the grace window.
+    error MarkE3FailedInGracePeriod(uint256 e3Id, uint256 gracePeriodEnds);
+
     /// @notice Caller is not the SlashingManager
     error OnlySlashingManager();
 
@@ -409,6 +476,13 @@ interface IEnclave {
     /// @notice Utilization BPS exceeds 100%
     /// @param value The invalid utilization BPS value
     error UtilizationBpsExceedsMax(uint256 value);
+
+    /// @notice The supplied or current fee token is not on the allow-list.
+    /// @param token The disallowed token.
+    error FeeTokenNotAllowed(IERC20 token);
+
+    /// @notice Caller has no balance to claim for the given E3 / treasury / token.
+    error NothingToClaim();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -503,8 +577,18 @@ interface IEnclave {
 
     /// @notice Sets the fee token used for E3 payments.
     /// @dev This function MUST revert if the address is zero or the same as the current fee token.
+    ///      Auto-adds the token to the fee-token allow-list.
     /// @param _feeToken The address of the new fee token.
     function setFeeToken(IERC20 _feeToken) external;
+
+    /// @notice Add or remove a token from the fee-token allow-list.
+    /// @dev Owner-only. The contract `feeToken()` must be on the allow-list for `request()` to succeed.
+    /// @param token The ERC20 token.
+    /// @param allowed `true` to allow, `false` to remove.
+    function setFeeTokenAllowed(IERC20 token, bool allowed) external;
+
+    /// @notice Returns whether a token is currently allow-listed as an E3 fee token.
+    function isFeeTokenAllowed(IERC20 token) external view returns (bool);
 
     /// @notice This function should be called to enable an E3 Program.
     /// @param e3Program The address of the E3 Program.
@@ -682,4 +766,43 @@ interface IEnclave {
         CommitteeSize size,
         uint32[2] calldata threshold
     ) external;
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //              Pull-Payment Claim Functions              //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice Claim accrued reward for a single completed E3.
+    /// @dev Pull-payment counterpart to `RewardsDistributed`. Transfers the caller's
+    ///      pending balance for `e3Id` in the E3's fee token.
+    /// @param e3Id The E3 ID to claim from.
+    /// @return amount The amount transferred to the caller.
+    function claimReward(uint256 e3Id) external returns (uint256 amount);
+
+    /// @notice Batch claim rewards across multiple completed E3s.
+    /// @dev Per-id transfer; different e3Ids may use different fee tokens (each token
+    ///      is snapshotted at request time). A mixed-token sum return would be
+    ///      meaningless; listen to per-E3 {RewardClaimed} events instead.
+    /// @param e3Ids The E3 IDs to claim from.
+    function claimRewards(uint256[] calldata e3Ids) external;
+
+    /// @notice Get the pending reward balance for an account on a given E3.
+    function pendingReward(
+        uint256 e3Id,
+        address account
+    ) external view returns (uint256);
+
+    /// @notice Treasury pull-payment for accumulated protocol-share credits.
+    /// @dev Caller must be the treasury that was credited; transfers all credits
+    ///      for the given token. Each treasury address pulls its own balance.
+    /// @param token The ERC20 token to claim.
+    /// @return amount The amount transferred.
+    function treasuryClaim(IERC20 token) external returns (uint256 amount);
+
+    /// @notice Get pending treasury credits for a (treasury, token) pair.
+    function pendingTreasuryClaim(
+        address treasury,
+        IERC20 token
+    ) external view returns (uint256);
 }

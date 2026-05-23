@@ -35,6 +35,19 @@ interface IBondingRegistry {
     error NoPendingDeregistration();
     error OnlyRewardDistributor();
     error ArrayLengthMismatch();
+    /// @notice Thrown when an operator attempts to deregister while at least one Lane B
+    ///         slash proposal against them is still pending execution.
+    error OperatorUnderSlash();
+
+    /// @notice Thrown when {setExitDelay} input is outside the permitted range.
+    error ExitDelayOutOfBounds(uint64 exitDelay);
+
+    /// @notice Thrown when {setRewardDistributor} would exceed
+    ///         {MAX_AUTHORIZED_DISTRIBUTORS}.
+    error MaxAuthorizedDistributors();
+
+    /// @notice Thrown when {renounceOwnership} is called.
+    error RenounceOwnershipDisabled();
 
     // ======================
     // Events (Protocol-Named)
@@ -143,11 +156,32 @@ interface IBondingRegistry {
      */
     event RegistrySet(address indexed registry);
 
+    /// @notice Emitted whenever the slashing manager address is updated.
+    event SlashingManagerUpdated(
+        address indexed previous,
+        address indexed next
+    );
+
     /**
-     * @notice Emitted when the slashing manager is set
-     * @param slashingManager Address of the slashing manager
+     * @notice Emitted whenever a `licenseToken.safeTransfer` performed by the
+     *         registry sends FEWER tokens than requested (typical of
+     *         fee-on-transfer or rebasing tokens). The registry's internal
+     *         accounting is decremented by the requested amount, but the
+     *         recipient only receives `actualAmount`. The difference is left
+     *         in the registry as an unaccounted-for surplus. Operators and
+     *         monitoring infrastructure should treat any emission of this
+     *         event as evidence that the configured `licenseToken` is not a
+     *         well-behaved ERC-20 and should be replaced via
+     *         `setLicenseToken`.
+     * @param recipient The address that received the (short) transfer
+     * @param expectedAmount The amount the registry intended to send
+     * @param actualAmount The actual delta in registry-held balance
      */
-    event SlashingManagerSet(address indexed slashingManager);
+    event LicenseTransferShortfall(
+        address indexed recipient,
+        uint256 expectedAmount,
+        uint256 actualAmount
+    );
 
     // ======================
     // View Functions
@@ -245,10 +279,11 @@ interface IBondingRegistry {
     function exitDelay() external view returns (uint64);
 
     /**
-     * @notice Get operator's ticket balance at a specific block
+     * @notice Get operator's ticket balance at a specific timepoint (EIP-6372).
+     * @dev The ticket token uses {block.timestamp} for its voting clock.
      * @param operator Address of the operator
-     * @param blockNumber Block number to query
-     * @return Ticket balance at the specified block
+     * @param blockNumber Timepoint (block.timestamp) to query
+     * @return Ticket balance at the specified timepoint
      */
     function getTicketBalanceAtBlock(
         address operator,

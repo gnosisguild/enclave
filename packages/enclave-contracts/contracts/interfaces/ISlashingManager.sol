@@ -18,6 +18,21 @@ import { IE3RefundManager } from "./IE3RefundManager.sol";
  */
 interface ISlashingManager {
     // ======================
+    // Enums
+    // ======================
+
+    /**
+     * @notice Distinguishes the two slash lanes for event consumers and downstream
+     *         consensus / accounting.
+     * @dev Lane A is permissionless proof / attestation-based; Lane B is
+     *      evidence-based and requires `SLASHER_ROLE`.
+     */
+    enum Lane {
+        LaneA,
+        LaneB
+    }
+
+    // ======================
     // Structs
     // ======================
 
@@ -179,6 +194,21 @@ interface ISlashingManager {
     /// @notice Thrown when the accused operator is included as a voter in the attestation
     error VoterIsAccused();
 
+    /// @notice Thrown when attestation voters submit divergent dataHashes (equivocation)
+    error EquivocationDetected();
+
+    /// @notice Thrown when the attestation `deadline` has passed at the time of submission
+    error SignatureExpired();
+
+    /// @notice Thrown when an operator action is gated by an unresolved Lane B slash proposal
+    error OperatorUnderSlash();
+
+    /// @notice Thrown when a ban operation requires a distinct governance confirmer
+    error BanRequiresConfirmation();
+
+    /// @notice Thrown when no pending ban proposal exists for the target node
+    error NoPendingBan();
+
     // ======================
     // Events
     // ======================
@@ -209,7 +239,8 @@ interface ISlashingManager {
         uint256 ticketAmount,
         uint256 licenseAmount,
         uint256 executableAt,
-        address proposer
+        address proposer,
+        Lane lane
     );
 
     /**
@@ -229,8 +260,28 @@ interface ISlashingManager {
         bytes32 indexed reason,
         uint256 ticketAmount,
         uint256 licenseAmount,
-        bool executed
+        bool executed,
+        Lane lane
     );
+
+    /**
+     * @notice Emitted when a node ban is proposed (two-step ban)
+     * @param node Address being proposed for ban
+     * @param reason Hash of the reason for the ban
+     * @param proposer Governance address that initiated the proposal
+     */
+    event BanProposed(
+        address indexed node,
+        bytes32 indexed reason,
+        address proposer
+    );
+
+    /**
+     * @notice Emitted when a pending ban is cancelled before confirmation
+     * @param node Address whose pending ban was cancelled
+     * @param canceller Governance address that cancelled the proposal
+     */
+    event BanCancelled(address indexed node, address canceller);
 
     /**
      * @notice Emitted when an operator files an appeal against a slash proposal
@@ -349,6 +400,15 @@ interface ISlashingManager {
      * @return isBanned True if the node is banned, false otherwise
      */
     function isBanned(address node) external view returns (bool isBanned);
+
+    /**
+     * @notice Returns true if the operator has at least one unresolved Lane B slash proposal
+     * @dev Used by BondingRegistry to block `deregisterOperator` while a slash is pending.
+     * @param operator Operator address to check
+     */
+    function hasOpenLaneBProposal(
+        address operator
+    ) external view returns (bool);
 
     /**
      * @notice Returns the bonding registry contract used for executing slashes
@@ -477,6 +537,11 @@ interface ISlashingManager {
      */
     function escrowSlashedFundsToRefund(uint256 e3Id, uint256 amount) external;
 
+    /**
+     * @notice Returns the EIP-712 domain separator used to authenticate attestation votes
+     */
+    function attestationDomainSeparator() external view returns (bytes32);
+
     // ======================
     // Appeal Functions
     // ======================
@@ -507,8 +572,45 @@ interface ISlashingManager {
     // ======================
 
     /**
-     * @notice Bans or unbans a node from the network
-     * @dev Only callable by GOVERNANCE_ROLE. Bans can also occur automatically via executeSlash
+     * @notice Proposes a manual ban on a node. Requires a second distinct governance
+     *         signer to call `confirmBan`.
+     * @dev Only callable by GOVERNANCE_ROLE. Slashing-triggered bans (via `_executeSlash`)
+     *      bypass this two-step flow because they are already authorized by the slash
+     *      proposal lifecycle. Unbans are single-step via `unbanNode`.
+     * @param node Address of the node to ban (must be non-zero)
+     * @param reason Hash of the reason for banning
+     */
+    function proposeBan(address node, bytes32 reason) external;
+
+    /**
+     * @notice Confirms a pending ban. Must be called by a governance signer
+     *         distinct from the original proposer.
+     * @param node Address of the node whose pending ban is being confirmed
+     * @param reason Hash of the reason (must match the proposal)
+     */
+    function confirmBan(address node, bytes32 reason) external;
+
+    /**
+     * @notice Cancels a pending ban proposal before it is confirmed.
+     * @dev Only callable by GOVERNANCE_ROLE.
+     * @param node Address whose pending ban is being cancelled
+     */
+    function cancelBan(address node) external;
+
+    /**
+     * @notice Lifts an existing ban. Single-step because unbanning is a strictly less
+     *         dangerous operation than banning.
+     * @dev Only callable by GOVERNANCE_ROLE.
+     * @param node Address of the node to unban
+     * @param reason Hash of the reason for unbanning
+     */
+    function unbanNode(address node, bytes32 reason) external;
+
+    /**
+     * @notice Bans or unbans a node from the network (legacy single-step API).
+     * @dev DEPRECATED: For bans, prefer `proposeBan` + `confirmBan` which enforces
+     *      a two-signer flow. `updateBanStatus(_, true, _)` reverts with `BanRequiresConfirmation`.
+     *      `updateBanStatus(_, false, _)` delegates to `unbanNode`.
      * @param node Address of the node to ban (must be non-zero)
      * @param status Whether to ban the node
      * @param reason Hash of the reason for banning

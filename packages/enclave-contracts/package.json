@@ -163,6 +163,7 @@
     "deploy:verifiers": "hardhat run scripts/deployVerifiers.ts",
     "upgrade:enclave": "hardhat run scripts/upgrade/enclave.ts",
     "upgrade:bondingRegistry": "hardhat run scripts/upgrade/bondingRegistry.ts",
+    "validate:upgrade": "hardhat run scripts/validateUpgrade.ts",
     "upgrade:ciphernodeRegistryOwnable": "hardhat run scripts/upgrade/ciphernodeRegistryOwnable.ts",
     "e3:activate": "hardhat e3:activate",
     "e3:enable": "hardhat enclave:enableE3",

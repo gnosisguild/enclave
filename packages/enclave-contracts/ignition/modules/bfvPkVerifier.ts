@@ -15,17 +15,15 @@ import dkgAggregatorVerifierModule from "./dkgAggregatorVerifier";
 export default buildModule("BfvPkVerifier", (m) => {
   const { dkgAggregatorVerifier } = m.useModule(dkgAggregatorVerifierModule);
 
-  const expectedNodesFoldKeyHash = readVkRecursiveHash(
+  const nodesFoldKeyHash = readVkRecursiveHash(
     BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS.nodesFold,
   );
-  const expectedC5KeyHash = readVkRecursiveHash(
-    BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS.c5,
-  );
+  const c5KeyHash = readVkRecursiveHash(BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS.c5);
 
   const bfvPkVerifier = m.contract("BfvPkVerifier", [
     dkgAggregatorVerifier,
-    expectedNodesFoldKeyHash,
-    expectedC5KeyHash,
+    nodesFoldKeyHash,
+    c5KeyHash,
     BFV_DKG_H,
   ]);
 

@@ -9,6 +9,7 @@ use alloy::sol_types::SolInterface;
 
 sol!(
     #[derive(Debug)]
+    #[sol(ignore_unlinked)]
     Enclave,
     "../../packages/enclave-contracts/artifacts/contracts/Enclave.sol/Enclave.json"
 );
