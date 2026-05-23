@@ -18,10 +18,10 @@ use e3_data::{InMemStore, RepositoriesFactory};
 use e3_events::{
     AggregateConfig, AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig,
 };
-use e3_evm::{BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter};
 use e3_evm::{
-    CiphernodeRegistrySol, EnclaveSolReader, ProviderConfig, SlashingManagerSolReader,
-    SlashingManagerSolWriter,
+    fetch_accusation_vote_validity, fetch_dkg_fold_attestation_verifier, BondingRegistrySolReader,
+    CiphernodeRegistrySol, CiphernodeRegistrySolReader, EnclaveSolReader, EnclaveSolWriter,
+    ProviderConfig, SlashingManagerSolReader, SlashingManagerSolWriter,
 };
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::ThresholdKeyshareExtension;
@@ -82,8 +82,6 @@ pub struct CiphernodeBuilder {
     testmode_signer: Option<PrivateKeySigner>,
     threshold_plaintext_agg: bool,
     zk_backend: Option<ZkBackend>,
-    /// Test/benchmark: EIP-712 verifying contract for DKG fold attestations (no RPC required).
-    dkg_fold_attestation_verifier: Option<Address>,
     /// Test/benchmark: EIP-712 verifying contract for accusation votes (no RPC required).
     slashing_manager: Option<Address>,
     net_config: Option<NetConfig>,
@@ -154,7 +152,6 @@ impl CiphernodeBuilder {
             threads: None,
             testmode_signer: None,
             threshold_plaintext_agg: false,
-            dkg_fold_attestation_verifier: None,
             slashing_manager: None,
             net_config: None,
             zk_backend: None,
@@ -220,12 +217,6 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Benchmark/test: set fold attestation verifier without configuring EVM chains (no RPC).
-    pub fn testmode_with_dkg_fold_attestation_verifier(mut self, verifier: Address) -> Self {
-        self.dkg_fold_attestation_verifier = Some(verifier);
-        self
-    }
-
     /// Benchmark/test: set slashing manager address (EIP-712 verifyingContract for
     /// accusation votes) without configuring EVM chains (no RPC).
     pub fn testmode_with_slashing_manager(mut self, slashing_manager: Address) -> Self {
@@ -250,24 +241,75 @@ impl CiphernodeBuilder {
             })
     }
 
-    fn resolve_dkg_fold_attestation_verifier(&self) -> Result<Option<Address>> {
-        if let Some(addr) = self.dkg_fold_attestation_verifier {
-            return Ok(Some(addr));
-        }
-        let resolved = self
-            .chains
-            .first()
-            .and_then(|c| c.contracts.dkg_fold_attestation_verifier.as_ref())
-            .map(|c| c.address())
-            .transpose()?;
-        if resolved.is_none() {
+    /// Fetch `CiphernodeRegistry.dkgFoldAttestationVerifier()` at startup (EIP-712 verifying contract).
+    async fn fetch_dkg_fold_attestation_verifier_from_registry(
+        provider_cache: &mut ProviderCache<WriteEnabled>,
+        chains: &[ChainConfig],
+    ) -> Result<Option<Address>> {
+        let Some(chain) = chains.iter().find(|c| c.enabled.unwrap_or(true)) else {
+            return Ok(None);
+        };
+        let provider = provider_cache.ensure_read_provider(chain).await?;
+        let registry = chain.contracts.ciphernode_registry.address()?;
+        let verifier = fetch_dkg_fold_attestation_verifier(provider.provider(), registry).await?;
+        if verifier.is_none() {
             tracing::warn!(
-                "`dkg_fold_attestation_verifier` contract address is not set in chain config. \
-                 If any E3 enables `proof_aggregation_enabled`, this node will fail to sign \
-                 DKG fold attestations and be counted as dishonest."
+                registry = %registry,
+                "CiphernodeRegistry.dkgFoldAttestationVerifier is not set on-chain; \
+                 nodes will not sign DKG fold attestations when proof aggregation is enabled"
+            );
+        } else if let Some(addr) = verifier {
+            info!(
+                registry = %registry,
+                verifier = %addr,
+                "loaded dkgFoldAttestationVerifier from CiphernodeRegistry"
             );
         }
-        Ok(resolved)
+        Ok(verifier)
+    }
+
+    /// Fetch `CiphernodeRegistry.accusationVoteValidity()` at startup (off-chain
+    /// vote freshness window in seconds). Returns `0` when the registry has
+    /// disabled slashing (governance emergency stop) or when no chain is
+    /// configured (in-process benchmarks); the actor will then refuse to stamp
+    /// votes that would be rejected on chain.
+    ///
+    /// The `u256` returned by the registry is clamped to `u64`. The contract
+    /// has no upper bound but `u64::MAX` seconds is already ~5.8 × 10¹¹ years —
+    /// any value that doesn't fit in `u64` is treated as "effectively infinite"
+    /// by saturating at `u64::MAX`, matching the on-chain `block.timestamp`
+    /// comparison.
+    async fn fetch_accusation_vote_validity_from_registry(
+        provider_cache: &mut ProviderCache<WriteEnabled>,
+        chains: &[ChainConfig],
+    ) -> Result<u64> {
+        let Some(chain) = chains.iter().find(|c| c.enabled.unwrap_or(true)) else {
+            return Ok(0);
+        };
+        let provider = provider_cache.ensure_read_provider(chain).await?;
+        let registry = chain.contracts.ciphernode_registry.address()?;
+        let validity = fetch_accusation_vote_validity(provider.provider(), registry).await?;
+        let secs = match validity {
+            Some(v) => {
+                let clamped: u64 = v.try_into().unwrap_or(u64::MAX);
+                info!(
+                    registry = %registry,
+                    accusation_vote_validity_secs = clamped,
+                    "loaded accusationVoteValidity from CiphernodeRegistry"
+                );
+                clamped
+            }
+            None => {
+                tracing::warn!(
+                    registry = %registry,
+                    "CiphernodeRegistry.accusationVoteValidity is 0; the off-chain \
+                     accusation manager will not produce votes (governance-disabled \
+                     or pre-initialized registry)"
+                );
+                0
+            }
+        };
+        Ok(secs)
     }
 
     /// Log data actor events
@@ -304,6 +346,27 @@ impl CiphernodeBuilder {
     /// rayon based workloads
     pub fn with_max_threads(mut self) -> Self {
         self.threads = Some(Multithread::get_max_threads_minus(1));
+        self
+    }
+
+    /// Configure the Rayon compute pool for production workloads.
+    ///
+    /// Reserves `reserve_threads` CPUs for Actix / networking, uses the remainder for Rayon, and
+    /// allows up to `concurrent_jobs` CPU-bound tasks at once (ZK + TrBFV). When `concurrent_jobs`
+    /// is `None`, uses all available compute threads.
+    pub fn with_multithread_config(
+        mut self,
+        reserve_threads: usize,
+        concurrent_jobs: Option<usize>,
+    ) -> Self {
+        let max_threads = Multithread::get_max_threads_minus(reserve_threads);
+        let jobs = concurrent_jobs.unwrap_or(max_threads).max(1);
+        let pool_threads = jobs.min(max_threads).max(1);
+        info!(
+            "Multithread pool: rayon_threads={pool_threads}, max_concurrent_jobs={jobs}, reserve_threads={reserve_threads}"
+        );
+        self.threads = Some(pool_threads);
+        self.multithread_concurrent_jobs = Some(jobs);
         self
     }
 
@@ -520,6 +583,40 @@ impl CiphernodeBuilder {
         )
         .await?;
 
+        let needs_zk_actors =
+            self.keyshare.is_some() || (self.pubkey_agg && self.keyshare.is_none());
+        let dkg_fold_verifier_addr = if needs_zk_actors {
+            if !self.chains.is_empty() {
+                Self::fetch_dkg_fold_attestation_verifier_from_registry(
+                    &mut provider_cache,
+                    &self.chains,
+                )
+                .await?
+            } else {
+                // In-process benchmark harness (no EVM chains): optional env override.
+                std::env::var("BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+            }
+        } else {
+            None
+        };
+
+        // Off-chain freshness window for accusation votes — fetched alongside
+        // the verifier so AccusationManagerExtension (created below) has
+        // everything it needs without re-walking the chain. Benchmark harness
+        // falls back to the env var so deterministic builds don't require
+        // RPC access.
+        let accusation_vote_validity_secs = if !self.chains.is_empty() {
+            Self::fetch_accusation_vote_validity_from_registry(&mut provider_cache, &self.chains)
+                .await?
+        } else {
+            std::env::var("BENCHMARK_ACCUSATION_VOTE_VALIDITY_SECS")
+                .ok()
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(0)
+        };
+
         // E3 specific setup
         let mut e3_builder = E3Router::builder(&bus, store.clone());
 
@@ -543,7 +640,6 @@ impl CiphernodeBuilder {
             ));
 
             info!("Setting up ZK actors");
-            let dkg_fold_verifier_addr = self.resolve_dkg_fold_attestation_verifier()?;
             setup_zk_actors(&bus, backend, signer, dkg_fold_verifier_addr);
         }
 
@@ -565,7 +661,6 @@ impl CiphernodeBuilder {
                     .ok_or_else(|| anyhow::anyhow!("ZK backend is required for aggregator"))?;
                 let signer = provider_cache.ensure_signer().await?;
                 info!("Setting up ZK actors for aggregator");
-                let dkg_fold_verifier_addr = self.resolve_dkg_fold_attestation_verifier()?;
                 setup_zk_actors(&bus, backend, signer, dkg_fold_verifier_addr);
             }
         }
@@ -582,11 +677,15 @@ impl CiphernodeBuilder {
         {
             let signer = provider_cache.ensure_signer().await?;
             let slashing_manager_addr = self.resolve_slashing_manager()?;
-            info!("Setting up AccusationManagerExtension");
+            info!(
+                vote_validity_secs = accusation_vote_validity_secs,
+                "Setting up AccusationManagerExtension"
+            );
             e3_builder = e3_builder.with(AccusationManagerExtension::create(
                 &bus,
                 signer,
                 slashing_manager_addr,
+                accusation_vote_validity_secs,
             ));
         }
 
@@ -651,10 +750,10 @@ impl CiphernodeBuilder {
 
         // Setup threadpool if not set
         let task_pool = self.task_pool.clone().unwrap_or_else(|| {
-            Multithread::create_taskpool(
-                self.threads.unwrap_or(1),
-                self.multithread_concurrent_jobs.unwrap_or(1),
-            )
+            let pool_threads = self.threads.unwrap_or(1);
+            let concurrent_jobs = self.multithread_concurrent_jobs.unwrap_or(1);
+            let pool_threads = concurrent_jobs.min(pool_threads).max(1);
+            Multithread::create_taskpool(pool_threads, concurrent_jobs)
         });
 
         // Create it with or without ZK prover

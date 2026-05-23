@@ -1,9 +1,9 @@
 # Enclave ZK Circuit Benchmarks
 
-**Generated:** 2026-05-22 17:39:43 UTC
+**Generated:** 2026-05-23 10:09:34 UTC
 
 **Git Branch:** `feat/1549`  
-**Git Commit:** `f5c2fef8490fc34fe7357743220321af9626c879`
+**Git Commit:** `8a841717468169df094b7316e57e1008d4ba34b0`
 
 **Committee Size:** `H=3`, `N=3`, `T=1`
 
@@ -27,7 +27,7 @@ Settings for this benchmark run (integration test + Nargo circuit benches on the
 | Rayon worker threads                                  | 13                                   |
 | CPU cores (host)                                      | 14                                   |
 | `dkg_fold_attestation_verifier`                       | _(disabled — proof aggregation off)_ |
-| Verbose logging (`run_benchmarks.sh --verbose`)       | false                                |
+| Verbose logging (`run_benchmarks.sh --verbose`)       | true                                 |
 
 ### Hardware & software (Nargo / Barretenberg host)
 
@@ -45,7 +45,7 @@ Settings for this benchmark run (integration test + Nargo circuit benches on the
 
 ## Audit status
 
-> **Incomplete on-chain verify gas:** 2 of 3 artifact verify-gas values are **N/A**. Re-run
+> **Incomplete on-chain verify gas:** 3 of 3 artifact verify-gas values are **N/A**. Re-run
 > `./run_benchmarks.sh` and ensure `extract_crisp_verify_gas.sh` completes (CRISP test +
 > `test_trbfv_actor` + EVM replay). Calldata gas alone is not sufficient for audit sign-off.
 
@@ -74,26 +74,26 @@ Single-circuit `bb prove` on the benchmark oracle witness (not the integration a
 
 | Circuit              | Constraints | Prove (s) | Verify (ms) | Proof (KB) |
 | -------------------- | ----------- | --------- | ----------- | ---------- |
-| C0                   | 6847        | 0.12      | 25.14       | 15.88      |
-| C1                   | 57818       | 0.36      | 25.40       | 15.88      |
-| C2a                  | 142625      | 0.83      | 26.78       | 15.88      |
-| C2b                  | 198355      | 0.85      | 24.42       | 15.88      |
-| C3a                  | 132633      | 0.81      | 31.38       | 15.88      |
-| C3b                  | 132633      | 0.81      | 31.38       | 15.88      |
-| C4a                  | 92515       | 0.48      | 24.11       | 15.88      |
-| C4b                  | 92515       | 0.48      | 24.11       | 15.88      |
-| C5                   | 151717      | 0.79      | 27.23       | 15.88      |
-| user_data_encryption | 53732       | 0.32      | 25.77       | 15.88      |
-| C6                   | 86927       | 0.53      | 24.62       | 15.88      |
-| C7                   | 104273      | 0.49      | 25.28       | 15.88      |
+| C0                   | 6847        | 0.13      | 26.12       | 15.88      |
+| C1                   | 57818       | 0.34      | 27.04       | 15.88      |
+| C2a                  | 41244       | 0.32      | 27.34       | 15.88      |
+| C2b                  | 79591       | 0.52      | 27.21       | 15.88      |
+| C3a                  | 120114      | 0.58      | 26.59       | 15.88      |
+| C3b                  | 120114      | 0.58      | 26.59       | 15.88      |
+| C4a                  | 67494       | 0.46      | 26.91       | 15.88      |
+| C4b                  | 67494       | 0.46      | 26.91       | 15.88      |
+| C5                   | 123624      | 0.57      | 25.66       | 15.88      |
+| user_data_encryption | 53732       | 0.34      | 27.20       | 15.88      |
+| C6                   | 86927       | 0.53      | 26.33       | 15.88      |
+| C7                   | 90841       | 0.49      | 26.71       | 15.88      |
 
 ### Artifacts
 
 | Artifact | Proof size | Public input size | Verify gas | Calldata gas | Total gas |
 | -------- | ---------- | ----------------- | ---------- | ------------ | --------- |
-| Π_DKG    | 15.88 KB   | 0.12 KB           | N/A        | 179524       | N/A       |
-| Π_user   | 15.88 KB   | 0.12 KB           | 2972965    | 170392       | 3143357   |
-| Π_dec    | 15.88 KB   | 3.25 KB           | N/A        | 188220       | N/A       |
+| Π_DKG    | 15.88 KB   | 0.12 KB           | N/A        | 175000       | N/A       |
+| Π_user   | 15.88 KB   | 0.12 KB           | N/A        | 170320       | N/A       |
+| Π_dec    | 15.88 KB   | 3.25 KB           | N/A        | 188232       | N/A       |
 
 ### Role / Phase / Activity
 
@@ -101,7 +101,7 @@ Single-circuit `bb prove` on the benchmark oracle witness (not the integration a
 | --------------- | ----- | ----------------------------------------- | -------------- | -------- | ---------- | --------- |
 | Each ciphernode | P1    | one-time DKG participation (test harness) | wall_clock     | 29.42 s  | 127.00 KB  | 128.19 KB |
 | Aggregator      | P2    | C5 + Π_DKG fold (aggregator span)         | wall_clock     | 2.13 s   | 15.88 KB   | 16.00 KB  |
-| User            | P3    | per user input                            | isolated_nargo | 0.64 s   | 15.88 KB   | 16.00 KB  |
+| User            | P3    | per user input                            | isolated_nargo | 0.67 s   | 15.88 KB   | 16.00 KB  |
 | Each ciphernode | P4    | per computation output (C6)               | isolated_nargo | 0.53 s   | 15.88 KB   | 16.00 KB  |
 | Aggregator      | P4    | C7 + Π_dec fold (full publish→aggregate)  | wall_clock     | 18.68 s  | 15.88 KB   | 19.12 KB  |
 | Aggregator      | P4    | C7 + fold only (pending→plaintext span)   | wall_clock     | 8.47 s   | 15.88 KB   | 19.12 KB  |

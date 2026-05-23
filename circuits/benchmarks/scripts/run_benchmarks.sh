@@ -91,6 +91,8 @@ if [ -n "$MULTITHREAD_JOBS" ]; then
         exit 1
     fi
     export BENCHMARK_MULTITHREAD_JOBS="$MULTITHREAD_JOBS"
+elif [ -n "${BENCHMARK_MULTITHREAD_JOBS:-}" ]; then
+    echo "  Using BENCHMARK_MULTITHREAD_JOBS from environment: $BENCHMARK_MULTITHREAD_JOBS"
 fi
 
 if [ ! -f "$CONFIG_FILE" ]; then

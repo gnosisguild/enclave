@@ -25,6 +25,12 @@ chains:
         deploy_block: 51
 program:
   dev: true
+# Default profile: multithread uses (logical CPUs - 1) Rayon workers and the same concurrent job
+# limit. Reserve threads with `multithread_reserve_threads` (default 1 for Actix / libp2p).
+# Example override on a 16-core host:
+# node:
+#   multithread_reserve_threads: 1
+#   multithread_concurrent_jobs: 8
 nodes:
   cn1:
     address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"

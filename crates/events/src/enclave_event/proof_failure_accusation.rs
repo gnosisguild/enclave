@@ -33,6 +33,11 @@ pub struct ProofFailureAccusation {
     pub proof_type: ProofType,
     /// keccak256 hash of (data + proof) as received by the accuser.
     pub data_hash: [u8; 32],
+    /// Unix-seconds deadline after which votes signed for this accusation must be
+    /// rejected on-chain (`SlashingManager._verifyAttestationEvidence` enforces
+    /// `block.timestamp <= deadline`). Set by the accuser; every voter signs the
+    /// same value so the aggregated evidence carries one shared deadline.
+    pub deadline: u64,
     /// For C3a/C3b: the signed proof payload so other nodes can re-verify.
     /// `None` for proofs that all nodes already received.
     pub signed_payload: Option<SignedProofPayload>,

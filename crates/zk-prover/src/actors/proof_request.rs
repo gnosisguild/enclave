@@ -20,9 +20,9 @@ use e3_events::{
     EventContext, EventPublisher, EventSubscriber, EventType, FailureReason,
     PkAggregationProofPending, PkAggregationProofRequest, PkAggregationProofSigned,
     PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload, ProofType,
-    ProofVerificationPassed, Sequenced, ShareDecryptionProofPending, SignedProofFailed,
-    SignedProofPayload, ThresholdShare, ThresholdShareCreated, ThresholdSharePending, TypedEvent,
-    ZkRequest, ZkResponse,
+    ProofVerificationPassed, Sequenced, ShareDecryptionProofPending, SignedProofPayload,
+    ThresholdShare, ThresholdShareCreated, ThresholdSharePending, TypedEvent, ZkRequest,
+    ZkResponse,
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;

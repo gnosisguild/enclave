@@ -15,7 +15,13 @@ use std::fmt::{self, Display};
 pub enum AccusationOutcome {
     /// >= M nodes agree the proof is bad → slash the accused.
     AccusedFaulted,
-    /// Only the accuser says bad, same data_hash as others → accuser lied.
+    /// **Deprecated.** Previously emitted when `votes_against >= M`. The
+    /// `AccusationVote` gossip wire no longer carries disagreement
+    /// signatures (a peer who finds the proof passes simply stays silent),
+    /// so this outcome is no longer produced by the off-chain quorum
+    /// protocol. Kept in the enum for serialized-event backwards
+    /// compatibility — downstream consumers should treat any historic
+    /// `AccuserLied` event the same as `Inconclusive`.
     AccuserLied,
     /// data_hashes differ between voters → accused sent different data to different nodes.
     Equivocation,
@@ -49,18 +55,23 @@ pub struct AccusationQuorumReached {
     /// Which proof type was disputed.
     pub proof_type: ProofType,
     /// Votes from nodes that agreed the proof is bad.
+    ///
+    /// There is no `votes_against` companion: the gossip protocol no longer
+    /// carries disagreement signatures, so silence is the only signal of
+    /// disagreement. See the `AccusationVote` docstring for the rationale.
     pub votes_for: Vec<AccusationVote>,
-    /// Votes from nodes that said the proof is fine.
-    pub votes_against: Vec<AccusationVote>,
     /// The quorum decision.
     pub outcome: AccusationOutcome,
     /// Raw `abi.encode(proof.data, public_signals)` — preimage of every voter's
-    /// `data_hash`. The on-chain `SlashingManager.proposeSlash` recomputes
-    /// `keccak256(evidence)` and requires it to equal the common voter
-    /// `dataHash`, binding the votes to specific evidence bytes on-chain.
-    /// Empty when this node didn't have the raw bytes locally (e.g. consistency-
-    /// violation path); slashing still works in that case but without the
-    /// on-chain evidence binding.
+    /// `data_hash`.
+    ///
+    /// **Off-chain audit metadata only.** The current Solidity
+    /// `SlashingManager.proposeSlash` no longer recomputes
+    /// `keccak256(evidence)` on chain (it equates voter `dataHash`es directly
+    /// for equivocation detection). The preimage is kept here so off-chain
+    /// observers can independently verify what every voter claimed to see
+    /// without re-fetching the proof from peers. Empty when this node didn't
+    /// have the raw bytes locally (e.g. consistency-violation path).
     #[serde(default)]
     pub evidence: Bytes,
 }

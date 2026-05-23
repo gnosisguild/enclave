@@ -3,7 +3,7 @@
   "bfv_preset_subdir": "insecure-512",
   "proof_aggregation": true,
   "multithread_jobs": 13,
-  "verbose": false,
+  "verbose": true,
   "nodes_spawned": 20,
   "committee_size_n": 3,
   "network_model": "in_process_bus",

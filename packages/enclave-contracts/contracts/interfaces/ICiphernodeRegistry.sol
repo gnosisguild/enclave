@@ -198,6 +198,10 @@ interface ICiphernodeRegistry {
     /// @param sortitionSubmissionWindow The submission window for the E3 sortition in seconds.
     event SortitionSubmissionWindowSet(uint256 sortitionSubmissionWindow);
 
+    /// @notice Emitted whenever the registry-wide accusation vote validity window changes.
+    /// @param accusationVoteValidity New validity window, in seconds.
+    event AccusationVoteValiditySet(uint256 accusationVoteValidity);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                        Errors                          //

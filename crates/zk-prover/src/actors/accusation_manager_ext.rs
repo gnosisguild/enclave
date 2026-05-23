@@ -24,6 +24,11 @@ pub struct AccusationManagerExtension {
     signer: PrivateKeySigner,
     /// On-chain `SlashingManager` address (EIP-712 `verifyingContract` for vote sigs).
     slashing_manager: Address,
+    /// Registry-wide off-chain freshness window (seconds), read from
+    /// `CiphernodeRegistry.accusationVoteValidity()` at process startup.
+    /// Passed to every per-E3 actor; governance changes require a node restart
+    /// to take effect (same lifecycle contract as `slashing_manager`).
+    vote_validity_secs: u64,
 }
 
 impl AccusationManagerExtension {
@@ -31,11 +36,13 @@ impl AccusationManagerExtension {
         bus: &BusHandle,
         signer: PrivateKeySigner,
         slashing_manager: Address,
+        vote_validity_secs: u64,
     ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             signer: signer.clone(),
             slashing_manager,
+            vote_validity_secs,
         })
     }
 }
@@ -97,6 +104,7 @@ impl E3Extension for AccusationManagerExtension {
             self.slashing_manager,
             committee_addresses,
             threshold_m,
+            self.vote_validity_secs,
             meta.params_preset,
         );
 

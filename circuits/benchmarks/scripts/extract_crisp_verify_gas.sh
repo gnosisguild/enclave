@@ -150,14 +150,14 @@ CRISP_TEST_EXIT_CODE=${PIPESTATUS[0]}
 echo "  [gas] CRISP test completed (exit=${CRISP_TEST_EXIT_CODE})."
 require_preset_artifacts
 BENCHMARK_PROOF_AGGREGATION="${BENCHMARK_PROOF_AGGREGATION:-true}"
-echo "  [gas] Running integration test (test_trbfv_actor); proof_aggregation=${BENCHMARK_PROOF_AGGREGATION}..."
+echo "  [gas] Running integration test (test_trbfv_actor); proof_aggregation=${BENCHMARK_PROOF_AGGREGATION}, multithread_jobs=${BENCHMARK_MULTITHREAD_JOBS:-1}, profile=release..."
 (
   cd "$REPO_ROOT" && \
   BENCHMARK_MODE="$MODE" \
   BENCHMARK_PROOF_AGGREGATION="$BENCHMARK_PROOF_AGGREGATION" \
   BENCHMARK_FOLDED_OUTPUT="$TMP_JSON_FOLDED" \
   BENCHMARK_SUMMARY_OUTPUT="$TMP_JSON_SUMMARY" \
-  cargo test -p e3-tests test_trbfv_actor -- --nocapture
+  cargo test --release -p e3-tests test_trbfv_actor -- --nocapture
 ) 2>&1 | tee "$TMP_LOG_FOLDED"
 FOLDED_TEST_EXIT_CODE=${PIPESTATUS[0]}
 echo "  [gas] Integration export completed (exit=${FOLDED_TEST_EXIT_CODE})."

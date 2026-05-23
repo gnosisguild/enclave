@@ -87,6 +87,17 @@ async function main() {
   }
 
   const { ethers } = await network.connect();
+  const [benchmarkSigner] = await ethers.getSigners();
+  // e3Id / committeeRoot / sortedNodes are forward-compat params; wrappers do not
+  // bind them yet (see BfvPkVerifier / BfvDecryptionVerifier). Any fixed values
+  // yield representative verify gas for the Honk + wrapper path.
+  const benchmarkE3Id = 1n;
+  const benchmarkCommitteeRoot = BigInt(
+    ethers.id("benchmark-gas-committee-root"),
+  );
+  const benchmarkSortedNodes = [benchmarkSigner.address];
+  const benchmarkCiphertextHash = ethers.ZeroHash;
+  const benchmarkCommitteePublicKey = ethers.ZeroHash;
 
   let dkgProofHex: string | undefined;
   let dkgPublicHex: string | undefined;
@@ -235,6 +246,9 @@ async function main() {
     dkgPublicInputs[DKG_COMMITTEE_HASH_IDX.lo],
   );
   const dkgOk = await bfvPk.verify.staticCall(
+    benchmarkE3Id,
+    benchmarkCommitteeRoot,
+    benchmarkSortedNodes,
     pkCommitment,
     dkgCommitteeHash,
     dkgEncodedProof,
@@ -245,6 +259,9 @@ async function main() {
     );
   }
   const dkgGas = await bfvPk.verify.estimateGas(
+    benchmarkE3Id,
+    benchmarkCommitteeRoot,
+    benchmarkSortedNodes,
     pkCommitment,
     dkgCommitteeHash,
     dkgEncodedProof,
@@ -275,6 +292,11 @@ async function main() {
     decPublicInputs[DEC_COMMITTEE_HASH_IDX.lo],
   );
   const decOk = await bfvDec.verify.staticCall(
+    benchmarkE3Id,
+    benchmarkCommitteeRoot,
+    benchmarkSortedNodes,
+    benchmarkCiphertextHash,
+    benchmarkCommitteePublicKey,
     plaintextHash,
     decCommitteeHash,
     decEncodedProof,
@@ -285,6 +307,11 @@ async function main() {
     );
   }
   const decGas = await bfvDec.verify.estimateGas(
+    benchmarkE3Id,
+    benchmarkCommitteeRoot,
+    benchmarkSortedNodes,
+    benchmarkCiphertextHash,
+    benchmarkCommitteePublicKey,
     plaintextHash,
     decCommitteeHash,
     decEncodedProof,

@@ -18,7 +18,6 @@ const contractMapping: Record<string, string> = {
   BondingRegistry: 'bonding_registry',
   SlashingManager: 'slashing_manager',
   MockUSDC: 'fee_token',
-  DkgFoldAttestationVerifier: 'dkg_fold_attestation_verifier',
 }
 
 // Get __dirname equivalent in ES modules

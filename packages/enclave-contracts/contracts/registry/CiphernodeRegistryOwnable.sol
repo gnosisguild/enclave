@@ -135,6 +135,26 @@ contract CiphernodeRegistryOwnable is
     address public pendingDkgFoldAttestationVerifier;
     uint256 public pendingDkgFoldAttestationVerifierAt;
 
+    /// @notice Registry-wide validity window (seconds) accusers stamp on accusation
+    ///         vote signatures. Ciphernodes fetch this on startup and add it to the
+    ///         current wall-clock when populating `AccusationVote.deadline`. The
+    ///         on-chain `SlashingManager._verifyAttestationEvidence` then enforces
+    ///         `block.timestamp <= deadline`, so this value bounds how long a leaked
+    ///         vote signature stays replayable.
+    ///
+    /// @dev Set with [`setAccusationVoteValidity`] by `owner()`. Defaults to the
+    ///      [`DEFAULT_ACCUSATION_VOTE_VALIDITY`] constant on initialize so newly-
+    ///      deployed registries are operational without an extra setter call.
+    ///      Setting to zero disables the off-chain freshness window (deadlines
+    ///      collapse to "now", effectively rejecting every vote on chain) — intentionally
+    ///      allowed so governance can hard-stop slashing in an emergency.
+    uint256 public accusationVoteValidity;
+
+    /// @notice Default value for `accusationVoteValidity` applied at `initialize`.
+    /// @dev 30 minutes covers gossip latency, vote-collection timeout, and mempool
+    ///      congestion while keeping stolen signatures from being replayed indefinitely.
+    uint256 public constant DEFAULT_ACCUSATION_VOTE_VALIDITY = 30 minutes;
+
     /// @notice DKG anchor commitments stored when the committee public key is published.
     mapping(uint256 e3Id => uint256[] partyIds) internal dkgPartyIds;
     mapping(uint256 e3Id => bytes32[] skAggCommits) internal dkgSkAggCommits;
@@ -199,6 +219,11 @@ contract CiphernodeRegistryOwnable is
         __Ownable_init(msg.sender);
         ciphernodes._init(TREE_DEPTH);
         setSortitionSubmissionWindow(_submissionWindow);
+        // Seed the off-chain freshness window with a sensible default so new
+        // deployments don't immediately need a governance call before slashing
+        // becomes operational.
+        accusationVoteValidity = DEFAULT_ACCUSATION_VOTE_VALIDITY;
+        emit AccusationVoteValiditySet(DEFAULT_ACCUSATION_VOTE_VALIDITY);
         if (_owner != owner()) _transferOwnership(_owner);
     }
 
@@ -361,6 +386,22 @@ contract CiphernodeRegistryOwnable is
     /// @dev First-time set is also subject to the timelock — operators must wait
     ///      the same window before the verifier is active. For the deploy-time
     ///      initial set, see `setInitialDkgFoldAttestationVerifier`.
+    ///
+    /// @dev **Node-operator requirement.** Ciphernodes fetch
+    ///      `dkgFoldAttestationVerifier()` from this registry **once at process
+    ///      startup** and use the returned address as the EIP-712 `verifyingContract`
+    ///      for every fold attestation they sign during the process lifetime.
+    ///      After a successful `commitDkgFoldAttestationVerifier`, signatures
+    ///      produced by long-running nodes will be rejected on-chain by the new
+    ///      verifier (different `verifyingContract` → different EIP-712 domain
+    ///      separator → `ECDSA.recover` returns the wrong address).
+    ///
+    ///      Operators MUST restart all ciphernodes within `DKG_FOLD_VERIFIER_TIMELOCK`
+    ///      after this function is called — the 2-day window is sized to give
+    ///      operators time to coordinate a rolling restart before the swap
+    ///      becomes effective. Nodes that miss the window will silently produce
+    ///      invalid fold attestations and be treated as dishonest by aggregators
+    ///      until they restart.
     function proposeDkgFoldAttestationVerifier(
         IDkgFoldAttestationVerifier verifier
     ) external onlyOwner {
@@ -623,6 +664,23 @@ contract CiphernodeRegistryOwnable is
         );
         sortitionSubmissionWindow = _sortitionSubmissionWindow;
         emit SortitionSubmissionWindowSet(_sortitionSubmissionWindow);
+    }
+
+    /// @notice Update the registry-wide vote validity window used by accusers
+    ///         when stamping `AccusationVote.deadline`.
+    /// @dev Ciphernodes fetch this once at startup. After a change, in-flight
+    ///      ciphernode processes continue to use the previous value until
+    ///      restarted — operators should coordinate a restart if the new
+    ///      window is materially shorter than the old one, otherwise stale
+    ///      nodes will produce votes the on-chain verifier rejects.
+    /// @param _accusationVoteValidity New validity window in seconds.
+    ///        Zero is allowed and intentionally disables slashing submission
+    ///        until governance restores a nonzero value.
+    function setAccusationVoteValidity(
+        uint256 _accusationVoteValidity
+    ) external onlyOwner {
+        accusationVoteValidity = _accusationVoteValidity;
+        emit AccusationVoteValiditySet(_accusationVoteValidity);
     }
 
     ////////////////////////////////////////////////////////////

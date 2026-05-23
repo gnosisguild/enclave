@@ -725,6 +725,54 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
     .await
 }
 
+/// Read `CiphernodeRegistry.dkgFoldAttestationVerifier()` (EIP-712 verifying contract for fold attestations).
+pub async fn fetch_dkg_fold_attestation_verifier<P: Provider + Clone>(
+    provider: &P,
+    registry_address: Address,
+) -> Result<Option<Address>> {
+    sol! {
+        #[sol(rpc)]
+        interface ICiphernodeRegistryDkgFoldView {
+            function dkgFoldAttestationVerifier() external view returns (address);
+        }
+    }
+
+    let contract = ICiphernodeRegistryDkgFoldView::new(registry_address, provider);
+    let verifier = contract.dkgFoldAttestationVerifier().call().await?;
+    if verifier == Address::ZERO {
+        Ok(None)
+    } else {
+        Ok(Some(verifier))
+    }
+}
+
+/// Read `CiphernodeRegistry.accusationVoteValidity()` — registry-wide off-chain
+/// freshness window (seconds) accusers stamp on `AccusationVote.deadline`.
+/// Returns the raw `uint256` as `U256`; callers decide how to clamp it to
+/// their own arithmetic type. `Ok(None)` is reserved for the case where the
+/// registry has been governance-disabled (`accusationVoteValidity = 0`) so
+/// the caller can short-circuit without producing votes that will never
+/// verify on chain.
+pub async fn fetch_accusation_vote_validity<P: Provider + Clone>(
+    provider: &P,
+    registry_address: Address,
+) -> Result<Option<U256>> {
+    sol! {
+        #[sol(rpc)]
+        interface ICiphernodeRegistryAccusationVoteView {
+            function accusationVoteValidity() external view returns (uint256);
+        }
+    }
+
+    let contract = ICiphernodeRegistryAccusationVoteView::new(registry_address, provider);
+    let validity = contract.accusationVoteValidity().call().await?;
+    if validity.is_zero() {
+        Ok(None)
+    } else {
+        Ok(Some(validity))
+    }
+}
+
 /// Wrapper for a reader and writer
 pub struct CiphernodeRegistrySol;
 

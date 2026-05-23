@@ -26,7 +26,8 @@ mod sync_start_extractor;
 
 pub use bonding_registry_sol::BondingRegistrySolReader;
 pub use ciphernode_registry_sol::{
-    CiphernodeRegistrySol, CiphernodeRegistrySolReader, CiphernodeRegistrySolWriter,
+    fetch_accusation_vote_validity, fetch_dkg_fold_attestation_verifier, CiphernodeRegistrySol,
+    CiphernodeRegistrySolReader, CiphernodeRegistrySolWriter,
 };
 pub use dkg_attestation_bundle::encode_dkg_attestation_bundle;
 pub use enclave_sol_reader::EnclaveSolReader;
@@ -41,5 +42,5 @@ pub use fix_historical_order::*;
 pub use helpers::*;
 pub use repo::*;
 pub use slashing_manager_sol_reader::SlashingManagerSolReader;
-pub use slashing_manager_sol_writer::SlashingManagerSolWriter;
+pub use slashing_manager_sol_writer::{encode_attestation_evidence, SlashingManagerSolWriter};
 pub use sync_start_extractor::*;

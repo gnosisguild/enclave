@@ -22,9 +22,6 @@ chains:
       fee_token:
         address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
         deploy_block: 4
-      dkg_fold_attestation_verifier:
-        address: "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0"
-        deploy_block: 40
   - name: "sepolia"
     enabled: false
     # Public Sepolia WebSocket endpoint (see repo docs for the recommended default).

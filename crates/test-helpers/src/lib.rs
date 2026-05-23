@@ -99,6 +99,15 @@ pub fn create_shared_rng_from_u64(value: u64) -> Arc<std::sync::Mutex<ChaCha20Rn
     Arc::new(std::sync::Mutex::new(ChaCha20Rng::seed_from_u64(value)))
 }
 
+/// Derive a separate [`SharedRng`] instance (distinct mutex) for parallel harness nodes.
+///
+/// Integration tests that share one [`SharedRng`] via [`Arc::clone`] serialize all TrBFV
+/// work on a single lock. Give each ciphernode its own derived RNG so `BENCHMARK_MULTITHREAD_JOBS>1`
+/// can run `GenPkShare` / `GenEsiSss` in parallel.
+pub fn derive_shared_rng(base_seed: u64, salt: u64) -> SharedRng {
+    create_shared_rng_from_u64(base_seed.wrapping_add(salt))
+}
+
 pub fn create_seed_from_u64(value: u64) -> Seed {
     Seed(ChaCha20Rng::seed_from_u64(value).get_seed())
 }

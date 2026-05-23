@@ -66,8 +66,8 @@ use crate::ZkBackend;
 ///
 /// Requires a `ZkBackend` for proof generation/verification and a
 /// `PrivateKeySigner` for signing proofs (fault attribution).
-/// `dkg_fold_attestation_verifier` is the on-chain verifier address used as
-/// the EIP-712 `verifyingContract` for fold attestations; required when
+/// `dkg_fold_attestation_verifier` is `CiphernodeRegistry.dkgFoldAttestationVerifier()`
+/// (EIP-712 `verifyingContract` for fold attestations). Fetched at node startup when
 /// proof aggregation is enabled.
 pub fn setup_zk_actors(
     bus: &BusHandle,

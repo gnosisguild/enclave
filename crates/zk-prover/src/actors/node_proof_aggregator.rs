@@ -366,7 +366,7 @@ impl NodeProofAggregator {
                     error!(
                         e3_id = %e3_id,
                         party_id,
-                        "NodeProofAggregator: cannot sign DkgFoldAttestation — `dkg_fold_attestation_verifier` address not configured"
+                        "NodeProofAggregator: cannot sign DkgFoldAttestation — CiphernodeRegistry.dkgFoldAttestationVerifier not configured"
                     );
                     None
                 }

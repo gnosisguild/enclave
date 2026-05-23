@@ -32,7 +32,7 @@ use e3_test_helpers::ciphernode_system::{
     CiphernodeHistory, CiphernodeSystem, CiphernodeSystemBuilder,
 };
 use e3_test_helpers::{
-    create_seed_from_u64, create_shared_rng_from_u64, find_bb, with_tracing, AddToCommittee,
+    create_seed_from_u64, derive_shared_rng, find_bb, with_tracing, AddToCommittee,
 };
 use e3_trbfv::helpers::calculate_error_size;
 use e3_trbfv::{TrBFVRequest, TrBFVResponse};
@@ -50,6 +50,7 @@ use rand::rngs::OsRng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::ffi::OsString;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use std::{fs, path::PathBuf, sync::Arc};
 use tokio::{
@@ -142,14 +143,23 @@ fn benchmark_multithread_concurrent_jobs() -> usize {
         .unwrap_or(1)
 }
 
-/// Fold attestation verifier for benchmarks (no live RPC; used only for EIP-712 signing).
+static NEXT_BENCHMARK_NODE_RNG_SALT: AtomicU64 = AtomicU64::new(1);
+
+/// One ChaCha20 mutex per ciphernode in `test_trbfv_actor` (see `derive_shared_rng`).
+fn next_benchmark_node_rng(base_seed: u64) -> e3_utils::SharedRng {
+    let salt = NEXT_BENCHMARK_NODE_RNG_SALT.fetch_add(1, Ordering::Relaxed);
+    derive_shared_rng(base_seed, salt)
+}
+
+/// Fold attestation verifier address for benchmark JSON reports (env override or default).
 fn benchmark_dkg_fold_attestation_verifier_address() -> Option<Address> {
     if !benchmark_proof_aggregation_enabled() {
         return None;
     }
-    let addr = std::env::var("BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER")
-        .unwrap_or_else(|_| "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0".to_string());
-    addr.parse().ok()
+    std::env::var("BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .or_else(|| "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0".parse().ok())
 }
 
 /// Slashing manager address for benchmarks (no live RPC; used as EIP-712
@@ -1098,8 +1108,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let setup = Instant::now();
 
-    // Create rng
-    let rng = create_shared_rng_from_u64(42);
+    const BENCHMARK_NODE_RNG_BASE: u64 = 42;
 
     // Create "trigger" bus
     let system = EventSystem::new().with_fresh_bus();
@@ -1150,11 +1159,20 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // Actor system setup
     let concurrent_jobs = benchmark_multithread_concurrent_jobs();
-    let dkg_fold_verifier = benchmark_dkg_fold_attestation_verifier_address();
+    if benchmark_proof_aggregation_enabled()
+        && std::env::var("BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER").is_err()
+    {
+        // In-process benchmark has no RPC; same default as pre-registry-fetch harness.
+        std::env::set_var(
+            "BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER",
+            "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0",
+        );
+    }
     let slashing_manager_addr = benchmark_slashing_manager_address();
     let max_threadroom = Multithread::get_max_threads_minus(1);
-    let task_pool = Multithread::create_taskpool(max_threadroom, concurrent_jobs);
-    let multithread_report = MultithreadReport::new(max_threadroom, concurrent_jobs).start();
+    let pool_threads = concurrent_jobs.min(max_threadroom).max(1);
+    let task_pool = Multithread::create_taskpool(pool_threads, concurrent_jobs);
+    let multithread_report = MultithreadReport::new(pool_threads, concurrent_jobs).start();
 
     // Setup ZK backend for proof generation/verification
     let (zk_backend, _zk_temp) = setup_test_zk_backend(benchmark_params.preset_subdir).await?;
@@ -1164,10 +1182,11 @@ async fn test_trbfv_actor() -> Result<()> {
         // Node 0 stays an observer only because it is excluded from sortition registration.
         // Adding 20 total nodes: 3 for committee + 3 buffer = 6 selected, 14 unselected
         .add_group(1, || async {
-            let addr = rand_eth_addr(&rng);
+            let node_rng = next_benchmark_node_rng(BENCHMARK_NODE_RNG_BASE);
+            let addr = rand_eth_addr(&node_rng);
             println!("Building collector {}!", addr);
             {
-                let mut b = CiphernodeBuilder::new(rng.clone(), cipher.clone())
+                let mut b = CiphernodeBuilder::new(node_rng, cipher.clone())
                     .testmode_with_history()
                     .with_shared_taskpool(&task_pool)
                     .with_multithread_concurrent_jobs(concurrent_jobs)
@@ -1182,17 +1201,15 @@ async fn test_trbfv_actor() -> Result<()> {
                     .testmode_ignore_address_check()
                     .testmode_with_slashing_manager(slashing_manager_addr)
                     .with_logging();
-                if let Some(verifier) = dkg_fold_verifier {
-                    b = b.testmode_with_dkg_fold_attestation_verifier(verifier);
-                }
                 b.build().await
             }
         })
         .add_group(19, || async {
-            let addr = rand_eth_addr(&rng);
+            let node_rng = next_benchmark_node_rng(BENCHMARK_NODE_RNG_BASE);
+            let addr = rand_eth_addr(&node_rng);
             println!("Building normal {}", &addr);
             {
-                let mut b = CiphernodeBuilder::new(rng.clone(), cipher.clone())
+                let mut b = CiphernodeBuilder::new(node_rng, cipher.clone())
                     .testmode_with_history()
                     .with_shared_taskpool(&task_pool)
                     .with_multithread_concurrent_jobs(concurrent_jobs)
@@ -1207,9 +1224,6 @@ async fn test_trbfv_actor() -> Result<()> {
                     .testmode_ignore_address_check()
                     .testmode_with_slashing_manager(slashing_manager_addr)
                     .with_logging();
-                if let Some(verifier) = dkg_fold_verifier {
-                    b = b.testmode_with_dkg_fold_attestation_verifier(verifier);
-                }
                 b.build().await
             }
         })
@@ -1263,7 +1277,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let proof_aggregation_enabled = benchmark_proof_aggregation_enabled();
     println!(
-        "Benchmark trbfv: proof_aggregation={proof_aggregation_enabled}, preset={}, multithread_jobs={concurrent_jobs}",
+        "Benchmark trbfv: proof_aggregation={proof_aggregation_enabled}, preset={}, pool_threads={pool_threads}, max_concurrent_jobs={concurrent_jobs}",
         benchmark_params.preset_subdir
     );
 

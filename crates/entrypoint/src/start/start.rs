@@ -12,7 +12,7 @@ use e3_zk_prover::ZkBackend;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use std::sync::{Arc, Mutex};
-use tracing::instrument;
+use tracing::{info, instrument};
 
 #[instrument(name = "app", skip_all)]
 pub async fn execute(config: &AppConfig) -> Result<CiphernodeHandle> {
@@ -20,13 +20,22 @@ pub async fn execute(config: &AppConfig) -> Result<CiphernodeHandle> {
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
     let backend = ZkBackend::new(config.bb_binary(), config.circuits_dir(), config.work_dir());
 
+    let reserve = config.multithread_reserve_threads();
+    let concurrent_jobs = config.multithread_concurrent_jobs();
+    info!(
+        "Ciphernode multithread: reserve_threads={reserve}, concurrent_jobs={}",
+        concurrent_jobs
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| "auto (CPUs - reserve)".to_string())
+    );
+
     let node = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_persistence(&config.log_file(), &config.db_file())
         .with_sortition_score()
         .with_chains(&config.chains())
         .with_contract_enclave_full()
         .with_contract_bonding_registry()
-        .with_max_threads()
+        .with_multithread_config(reserve, concurrent_jobs)
         .with_contract_ciphernode_registry()
         .with_contract_slashing_manager()
         .with_trbfv()

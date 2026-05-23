@@ -194,35 +194,35 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
 
 /// Encode `AccusationQuorumReached` into the attestation evidence format expected
 /// by `SlashingManager.proposeSlash()`:
-/// `abi.encode(uint256 proofType, address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures, bytes evidence)`
+/// `abi.encode(uint256 proofType, address[] voters, bytes32[] dataHashes, uint256 deadline, bytes[] signatures)`
 ///
-/// Voters are sorted ascending by address to satisfy the contract's duplicate-prevention check.
-/// `evidence` is the `abi.encode(proof.data, public_signals)` preimage of `dataHash` — the contract
-/// recomputes `keccak256(evidence)` and requires it to equal the common voter `dataHash`.
-fn encode_attestation_evidence(data: &AccusationQuorumReached) -> Vec<u8> {
+/// Voters are sorted ascending by address to satisfy the contract's duplicate-prevention
+/// check. All `votes_for` share the same `deadline` (the accuser stamps one value at
+/// accusation time and `AccusationManager::on_vote_received` rejects votes whose
+/// deadline disagrees), so the encoder pulls it from the first vote. Returns `None`
+/// if `votes_for` is empty — the on-chain submitter must skip the submission in that
+/// case rather than send malformed calldata.
+pub fn encode_attestation_evidence(data: &AccusationQuorumReached) -> Option<Vec<u8>> {
+    if data.votes_for.is_empty() {
+        return None;
+    }
+
     // Collect and sort votes by voter address (ascending)
     let mut votes = data.votes_for.clone();
     votes.sort_by_key(|v| v.voter);
 
     let proof_type = U256::from(data.proof_type as u8);
     let voters: Vec<Address> = votes.iter().map(|v| v.voter).collect();
-    let agrees: Vec<bool> = votes.iter().map(|v| v.agrees).collect();
     let data_hashes: Vec<[u8; 32]> = votes.iter().map(|v| v.data_hash).collect();
+    // All voters signed the same deadline (enforced off-chain by AccusationManager);
+    // pick any one — the first vote suffices.
+    let deadline = U256::from(votes[0].deadline);
     let signatures: Vec<Bytes> = votes
         .iter()
         .map(|v| Bytes::from(v.signature.extract_bytes()))
         .collect();
-    let evidence: Bytes = data.evidence.clone();
 
-    (
-        proof_type,
-        voters,
-        agrees,
-        data_hashes,
-        signatures,
-        evidence,
-    )
-        .abi_encode_params()
+    Some((proof_type, voters, data_hashes, deadline, signatures).abi_encode_params())
 }
 
 async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
@@ -233,7 +233,30 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
     let e3_id: U256 = data.e3_id.clone().try_into()?;
     let operator = data.accused;
 
-    let proof_data = encode_attestation_evidence(&data);
+    // Empty `votes_for` only reaches this point if upstream invariants broke
+    // — `check_quorum` requires `len >= threshold_m >= 1` before emitting
+    // `AccusedFaulted`/`Equivocation`. Refuse to submit malformed calldata
+    // and surface a structured warning so an operator can debug the upstream
+    // gossip/quorum path rather than seeing a generic ABI-decode revert
+    // on chain.
+    let proof_data = match encode_attestation_evidence(&data) {
+        Some(bytes) => bytes,
+        None => {
+            warn!(
+                e3_id = %data.e3_id,
+                accused = %operator,
+                outcome = %data.outcome,
+                "Refusing to submit proposeSlash: AccusationQuorumReached carries no \
+                 agreeing votes — upstream quorum invariant violated, dropping submission"
+            );
+            return Err(anyhow::anyhow!(
+                "AccusationQuorumReached has empty votes_for; refused proposeSlash submission \
+                 (e3_id={}, accused={})",
+                data.e3_id,
+                operator
+            ));
+        }
+    };
 
     send_tx_with_retry("proposeSlash", &[], || {
         info!("proposeSlash() e3_id={:?} operator={:?}", e3_id, operator);

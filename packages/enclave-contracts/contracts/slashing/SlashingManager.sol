@@ -143,17 +143,28 @@ contract SlashingManager is
         );
 
     /// @dev `keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")`.
+    ///      Exposed for off-chain signers that recompute the domain separator manually
+    ///      (e.g. `AccusationManager::vote_domain_separator` in the Rust prover crate).
     bytes32 public constant EIP712_DOMAIN_TYPEHASH =
         keccak256(
             "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
         );
 
-    /// @dev `keccak256("EnclaveSlashingManager")`.
-    bytes32 public constant DOMAIN_NAME_HASH =
-        keccak256(bytes("EnclaveSlashingManager"));
+    /// @dev EIP-712 domain `name`. Must match the literal passed to `EIP712(...)`
+    ///      in the constructor below; off-chain signers MUST hash this exact byte
+    ///      string for `recover` to match.
+    string public constant EIP712_DOMAIN_NAME = "EnclaveSlashing";
 
-    /// @dev `keccak256("1")`.
-    bytes32 public constant DOMAIN_VERSION_HASH = keccak256(bytes("1"));
+    /// @dev EIP-712 domain `version`. Same alignment rule as `EIP712_DOMAIN_NAME`.
+    string public constant EIP712_DOMAIN_VERSION = "1";
+
+    /// @dev `keccak256(bytes(EIP712_DOMAIN_NAME))`.
+    bytes32 public constant DOMAIN_NAME_HASH =
+        keccak256(bytes(EIP712_DOMAIN_NAME));
+
+    /// @dev `keccak256(bytes(EIP712_DOMAIN_VERSION))`.
+    bytes32 public constant DOMAIN_VERSION_HASH =
+        keccak256(bytes(EIP712_DOMAIN_VERSION));
 
     // ======================
     // Modifiers
@@ -192,7 +203,7 @@ contract SlashingManager is
         address admin
     )
         AccessControlDefaultAdminRules(initialDelay, admin)
-        EIP712("EnclaveSlashing", "1")
+        EIP712(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION)
     {
         require(admin != address(0), ZeroAddress());
         _grantRole(GOVERNANCE_ROLE, admin);

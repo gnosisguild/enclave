@@ -21,9 +21,6 @@ chains:
       fee_token:
         address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
         deploy_block: 7
-      dkg_fold_attestation_verifier:
-        address: "0x9d4454B023096f34B160D6B654540c56A1F81688"
-        deploy_block: 32
 
 program:
   dev: true

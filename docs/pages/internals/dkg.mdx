@@ -410,6 +410,49 @@ read to identify which registered operator produced which DKG output. The mappin
 (via committee hash), the attestation binds to the proof commitments and the operator key, and the
 operator key was registered against `topNodes` at committee finalisation.
 
+### Fold-attestation verifier rotation (operator restart requirement)
+
+The address of the on-chain `DkgFoldAttestationVerifier` is governance-mutable on the registry via a
+2-day timelocked propose / commit / cancel flow (`DKG_FOLD_VERIFIER_TIMELOCK`). This is intentional
+— the verifier is treated as a critical admin key so a compromised owner cannot instantly swap in a
+weakened verifier that bypasses per-party attestation checks.
+
+**Node-operator requirement.** Ciphernodes fetch `dkgFoldAttestationVerifier()` from the registry
+**once at process startup** and use the returned address as the EIP-712 `verifyingContract` for
+every fold attestation they sign during the process lifetime (see
+[`fetch_dkg_fold_attestation_verifier`](https://github.com/gnosisguild/enclave/blob/main/crates/evm/src/ciphernode_registry_sol.rs)
+and the `setup_zk_actors` call in `ciphernode-builder`). After a successful
+`commitDkgFoldAttestationVerifier`, signatures produced by long-running nodes will be rejected
+on-chain by the new verifier — different `verifyingContract` means a different EIP-712 domain
+separator, so `ECDSA.recover` returns the wrong address, the canonical-slot binding check fails, and
+aggregators will treat those nodes as dishonest until they restart.
+
+The 2-day timelock window exists for exactly this reason: it gives operators time to coordinate a
+rolling restart before the swap becomes effective. Operators MUST restart all ciphernodes within
+`DKG_FOLD_VERIFIER_TIMELOCK` of the propose event being emitted; this is a strict requirement, not a
+recommendation. Nodes that miss the window silently produce invalid attestations until restarted.
+The same rule applies to the one-shot deploy-time `setInitialDkgFoldAttestationVerifier`, except
+that call is only valid when no verifier is yet configured.
+
+**Multi-chain caveat.** When `enclave.config.yaml` lists more than one chain, the node reads
+`dkgFoldAttestationVerifier` and `accusationVoteValidity` from the **first enabled** chain only
+(`fetch_dkg_fold_attestation_verifier_from_registry` /
+`fetch_accusation_vote_validity_from_registry` in `ciphernode-builder`). That single value is then
+used for every E3 the node participates in, regardless of which chain the E3 lives on. This is a
+deliberate trade-off:
+
+- **Today most operators run single-chain nodes**, so the practical risk is zero.
+- A multi-chain node whose first-enabled chain has a _stricter_ setter for either knob produces
+  values the other chain's contract may refuse — e.g. a `verifyingContract` on chain A is
+  meaningless when chain B's verifier recomputes the EIP-712 domain against its own address. There
+  is no in-flight fallback.
+- If you add a new chain to a running node's config, or rotate any chain's verifier / vote-validity
+  window, restart the node so all per-chain fetches re-run.
+
+A robust per-E3 lookup (re-fetch from the chain that owns the E3 every time we sign or encode) is
+left as future work — the design is straightforward but the wiring crosses multiple actors and isn't
+worth the surface area until a multi-chain deployment makes the trade-off concrete.
+
 ### Keeping the on-chain Honk verifiers in sync
 
 The two on-chain Honk verifiers consumed by `publishCommittee` and the decryption flow
