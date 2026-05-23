@@ -18,7 +18,6 @@ if (!walletConnectProjectId)
 const config = createConfig(
   getDefaultConfig({
     appName: 'CRISP',
-    enableFamily: false,
     chains: [getChain()],
     transports: {
       [anvil.id]: http(anvil.rpcUrls.default.http[0]),

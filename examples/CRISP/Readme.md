@@ -191,6 +191,19 @@ Edit **`crisp.dev.env`** (created from `crisp.dev.env.example` on first `pnpm de
 See **[docs/PROOF_AGGREGATION_AND_ZK.md](./docs/PROOF_AGGREGATION_AND_ZK.md)** for modes, address
 sync, and troubleshooting (`VkHashMismatch`, etc.).
 
+### Vercel (CRISP client)
+
+Deploy from **`examples/CRISP/client`**. The build uses the published **`@crisp-e3/sdk@0.9.0`** on
+npm (`pnpm install --ignore-workspace`), not the monorepo workspace — so it does not compile Noir
+circuits on Vercel.
+
+- **Project root directory:** `examples/CRISP/client`
+- **`vercel build` in CI:** run from the **repository root** (not `cd examples/CRISP/client` first)
+- Optional Vercel env: `ENABLE_EXPERIMENTAL_COREPACK=1`
+
+Commit `examples/CRISP/client/pnpm-lock.yaml` after dependency bumps
+(`pnpm install --ignore-workspace` in that directory) for reproducible installs.
+
 ## Publishing packages to npm
 
 In order to publish a new version of the CRISP packages to npm, you can use:
