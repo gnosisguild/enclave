@@ -208,6 +208,30 @@ impl Drop for EnvTimeoutVarsGuard {
     }
 }
 
+/// RAII guard that restores a single env var on scope exit.
+struct ScopedEnvVar {
+    name: &'static str,
+    original: Option<OsString>,
+}
+
+impl ScopedEnvVar {
+    fn set(name: &'static str, value: &str) -> Self {
+        let original = std::env::var_os(name);
+        std::env::set_var(name, value);
+        Self { name, original }
+    }
+}
+
+impl Drop for ScopedEnvVar {
+    fn drop(&mut self) {
+        if let Some(v) = &self.original {
+            std::env::set_var(self.name, v);
+        } else {
+            std::env::remove_var(self.name);
+        }
+    }
+}
+
 async fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> Result<()> {
     tokio::fs::create_dir_all(dst).await?;
     let mut entries = tokio::fs::read_dir(src).await?;
@@ -1159,15 +1183,15 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // Actor system setup
     let concurrent_jobs = benchmark_multithread_concurrent_jobs();
-    if benchmark_proof_aggregation_enabled()
-        && std::env::var("BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER").is_err()
-    {
+    let _fold_verifier_env_guard = (benchmark_proof_aggregation_enabled()
+        && std::env::var("BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER").is_err())
+    .then(|| {
         // In-process benchmark has no RPC; same default as pre-registry-fetch harness.
-        std::env::set_var(
+        ScopedEnvVar::set(
             "BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER",
             "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0",
-        );
-    }
+        )
+    });
     let slashing_manager_addr = benchmark_slashing_manager_address();
     let max_threadroom = Multithread::get_max_threads_minus(1);
     let pool_threads = concurrent_jobs.min(max_threadroom).max(1);
