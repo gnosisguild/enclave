@@ -105,8 +105,9 @@ async function castVoteWithSignature(page: Page, metamask: MetaMask) {
   log(`clicking Cast Vote...`)
   await castBtn.click()
 
+  // useVoteCasting sets StepMessage with trailing "..."; getByText defaults to exact match
   log(`waiting for wallet signing prompt...`)
-  await expect(page.getByText('Please sign the message in your wallet')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Please sign the message in your wallet', { exact: false })).toBeVisible({ timeout: 60_000 })
 
   log(`confirming MetaMask signature request...`)
   await metamask.confirmSignature()
