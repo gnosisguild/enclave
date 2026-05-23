@@ -353,8 +353,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         0,
         31337,
         ethers.keccak256(evidence1),
-        undefined,
-        evidence1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -426,8 +424,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         0,
         31337,
         ethers.keccak256(ev1),
-        undefined,
-        ev1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -448,8 +444,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         7, // C6ThresholdShareDecryption — different proofType
         31337,
         ethers.keccak256(ev2),
-        undefined,
-        ev2,
       );
       await slashingManager.proposeSlash(
         0,
@@ -567,8 +561,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         0,
         31337,
         ethers.keccak256(evExpel1),
-        undefined,
-        evExpel1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -586,8 +578,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         0,
         31337,
         ethers.keccak256(evExpel2),
-        undefined,
-        evExpel2,
       );
       await slashingManager.proposeSlash(
         0,
@@ -721,8 +711,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         0,
         31337,
         ethers.keccak256(evExpelOp1),
-        undefined,
-        evExpelOp1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -740,8 +728,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         0,
         31337,
         ethers.keccak256(evExpelOp2),
-        undefined,
-        evExpelOp2,
       );
       await slashingManager.proposeSlash(
         0,

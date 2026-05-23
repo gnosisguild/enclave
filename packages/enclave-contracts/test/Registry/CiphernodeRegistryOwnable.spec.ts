@@ -235,15 +235,17 @@ describe("CiphernodeRegistryOwnable", function () {
       await finalizeCommitteeAfterWindow(registry, 0);
 
       await expect(
-        registry.connect(notTheOwner).publishCommittee(0, data, dataHash, "0x", "0x"),
+        registry
+          .connect(notTheOwner)
+          .publishCommittee(0, data, dataHash, "0x", "0x"),
       )
         .to.emit(registry, "CommitteePublished")
         .withArgs(
           0,
           [
+            await operator3.getAddress(),
             await operator1.getAddress(),
             await operator2.getAddress(),
-            await operator3.getAddress(),
           ],
           data,
           dataHash,
@@ -300,14 +302,16 @@ describe("CiphernodeRegistryOwnable", function () {
       await registry.connect(operator3).submitTicket(0, 1);
       await finalizeCommitteeAfterWindow(registry, 0);
 
-      await expect(await registry.publishCommittee(0, data, dataHash, "0x", "0x"))
+      await expect(
+        await registry.publishCommittee(0, data, dataHash, "0x", "0x"),
+      )
         .to.emit(registry, "CommitteePublished")
         .withArgs(
           0,
           [
+            await operator3.getAddress(),
             await operator1.getAddress(),
             await operator2.getAddress(),
-            await operator3.getAddress(),
           ],
           data,
           dataHash,

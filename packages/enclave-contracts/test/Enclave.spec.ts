@@ -204,7 +204,6 @@ describe("Enclave", function () {
     };
   };
 
-
   describe("constructor / initialize()", function () {
     it("correctly sets owner", async function () {
       const { enclave, owner } = await loadFixture(setup);

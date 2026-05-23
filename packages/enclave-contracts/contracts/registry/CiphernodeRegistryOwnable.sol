@@ -30,6 +30,7 @@ import {
  * @notice Ownable implementation of the ciphernode registry with IMT-based membership tracking
  * @dev Manages ciphernode registration, committee selection, and integrates with bonding registry
  */
+// solhint-disable-next-line max-states-count
 contract CiphernodeRegistryOwnable is
     ICiphernodeRegistry,
     Ownable2StepUpgradeable
@@ -135,9 +136,9 @@ contract CiphernodeRegistryOwnable is
     uint256 public pendingDkgFoldAttestationVerifierAt;
 
     /// @notice DKG anchor commitments stored when the committee public key is published.
-    mapping(uint256 e3Id => uint256[]) internal dkgPartyIds;
-    mapping(uint256 e3Id => bytes32[]) internal dkgSkAggCommits;
-    mapping(uint256 e3Id => bytes32[]) internal dkgEsmAggCommits;
+    mapping(uint256 e3Id => uint256[] partyIds) internal dkgPartyIds;
+    mapping(uint256 e3Id => bytes32[] skAggCommits) internal dkgSkAggCommits;
+    mapping(uint256 e3Id => bytes32[] esmAggCommits) internal dkgEsmAggCommits;
 
     ////////////////////////////////////////////////////////////
     //                                                        //

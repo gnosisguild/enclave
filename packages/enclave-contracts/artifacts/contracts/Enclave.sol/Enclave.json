@@ -3159,9 +3159,5 @@
   },
   "immutableReferences": {},
   "inputSourceName": "project/contracts/Enclave.sol",
-<<<<<<< HEAD
-  "buildInfoId": "solc-0_8_28-c510d3f82db7eda6957be691c11709bfbc8fd9ed"
-=======
-  "buildInfoId": "solc-0_8_28-ce8ef221f0c6b7e9da5e81af1e5b728128db3d16"
->>>>>>> main
+  "buildInfoId": "solc-0_8_28-a76bd0705c32dbab3093dfaf9992a5e145a8528d"
 }

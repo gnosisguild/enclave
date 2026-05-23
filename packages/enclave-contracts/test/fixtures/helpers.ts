@@ -39,6 +39,7 @@ export const setupAndPublishCommittee = async (
   publicKey: string,
   operators: Signer[],
   committeeProof: string = "0x",
+  dkgAttestationBundle: string = "0x",
 ): Promise<void> => {
   for (const operator of operators) {
     await registry.connect(operator).submitTicket(e3Id, 1);
@@ -51,6 +52,7 @@ export const setupAndPublishCommittee = async (
     publicKey,
     pkCommitment,
     committeeProof,
+    dkgAttestationBundle,
   );
 };
 
