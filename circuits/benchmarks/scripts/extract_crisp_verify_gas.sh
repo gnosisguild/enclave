@@ -118,25 +118,23 @@ else
     "${SCRIPT_DIR}/ensure_circuit_preset_built.sh" "${ENSURE_ARGS[@]}"
     echo "  [gas] Build artifacts ready."
 
-    # `--check`: verify the committed Honk Solidity verifiers
-    # (DkgAggregatorVerifier.sol, DecryptionAggregatorVerifier.sol) match the
-    # current circuits' recursive VKs. Fails loudly on drift; benchmarks must
-    # not silently rewrite committed contracts. If this errors, run
-    # `pnpm generate:verifiers --write` and commit the diff before benchmarking.
-    echo "  [gas] Checking Honk Solidity verifiers are in sync with circuit VKs..."
+    # Align circuits/bin with PRESET_NAME, then verify preset artifacts.
+    # insecure: also diff committed Honk .sol (pinned to insecure-512).
+    # secure:   committed .sol stay insecure-only; gas replay deploys fresh verifiers from bin.
+    echo "  [gas] Verifying circuit preset '${PRESET_NAME}' (dist stamp + circuits/bin)..."
     if [ "$VERBOSE" = true ]; then
-        echo "  [gas] [verbose] Running: pnpm generate:verifiers --check --no-compile"
+        echo "  [gas] [verbose] Running: pnpm generate:verifiers --check --no-compile --preset ${PRESET_NAME}"
         (
           cd "$REPO_ROOT" && \
-          pnpm generate:verifiers --check --no-compile
+          pnpm generate:verifiers --check --no-compile --preset "$PRESET_NAME"
         )
     else
         (
           cd "$REPO_ROOT" && \
-          pnpm generate:verifiers --check --no-compile >/dev/null
+          pnpm generate:verifiers --check --no-compile --preset "$PRESET_NAME"
         )
     fi
-    echo "  [gas] Honk verifiers in sync."
+    echo "  [gas] Preset '${PRESET_NAME}' artifacts ready for integration + gas replay."
     require_preset_artifacts
 fi
 
@@ -173,6 +171,7 @@ else
     (
       cd "$ENCLAVE_CONTRACTS_DIR" && \
       BENCHMARK_RAW_DIR="$RAW_DIR" BENCHMARK_GAS_OUTPUT="$TMP_JSON_ENCLAVE" BENCHMARK_FOLDED_JSON="$TMP_JSON_FOLDED" \
+      BENCHMARK_PRESET="$PRESET_NAME" \
       pnpm hardhat run scripts/benchmarkGasFromRaw.ts --network hardhat
     ) 2>&1 | tee "$TMP_LOG_ENCLAVE"
     ENCLAVE_TEST_EXIT_CODE=${PIPESTATUS[0]}

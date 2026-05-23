@@ -37,7 +37,7 @@
 import { execFileSync, execSync } from 'child_process'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { basename, join, resolve } from 'path'
-import { ALL_GROUPS, CIRCUIT_GROUPS, type CircuitGroup } from './circuit-constants'
+import { ALL_GROUPS, ALL_PRESETS, CIRCUIT_GROUPS, type CircuitGroup } from './circuit-constants'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -93,6 +93,10 @@ interface GenerateOptions {
    * verifier contracts.
    */
   check?: boolean
+  /** BFV preset whose artifacts in `circuits/bin/` are used for generation/check. */
+  preset?: string
+  /** Override output directory (write mode only). Defaults to committed honk/ path. */
+  outputDir?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +112,10 @@ class VerifierGenerator {
   constructor(rootDir?: string, options: GenerateOptions = {}) {
     this.rootDir = rootDir ?? resolve(__dirname, '..')
     this.circuitsDir = join(this.rootDir, 'circuits', 'bin')
-    this.verifierDir = join(this.rootDir, 'packages', 'enclave-contracts', 'contracts', 'verifiers', 'bfv', 'honk')
+    this.verifierDir =
+      options.outputDir !== undefined
+        ? resolve(options.outputDir)
+        : join(this.rootDir, 'packages', 'enclave-contracts', 'contracts', 'verifiers', 'bfv', 'honk')
     this.options = {
       groups: ALL_GROUPS,
       clean: false,
@@ -124,13 +131,22 @@ class VerifierGenerator {
     this.checkTool('nargo --version', 'nargo')
     this.checkTool('bb --version', 'bb')
 
-    // Refuse to run unless `circuits/bin/` was last built for the canonical preset.
-    // This is the only on-disk witness of "which preset's VKs live under circuits/bin"
-    // (cf. `scripts/build-circuits.ts:writePresetStamp`). Skip the gate in --dry-run mode
-    // (no artifact reads will happen) and in --no-compile mode only if explicitly allowed
-    // by a future opt-out — today, even --no-compile must run against the canonical preset.
+    const targetPreset = this.targetPreset()
+
     if (!this.options.dryRun) {
-      this.assertCanonicalPresetBuilt()
+      this.assertPresetBuilt(targetPreset)
+      this.assertCircuitsBinActivePreset(targetPreset)
+    }
+
+    // Committed Honk `.sol` files are pinned to CANONICAL_PRESET only. Secure (and other)
+    // benchmark modes still need `circuits/bin/` aligned to their preset for integration + gas replay.
+    if (this.options.check && targetPreset !== CANONICAL_PRESET) {
+      console.log(
+        `\n✅ Preset '${targetPreset}' is built and active in circuits/bin.\n` +
+          `   Committed Honk verifiers in git are pinned to '${CANONICAL_PRESET}' only; skipping .sol diff.\n` +
+          `   Benchmark gas replay deploys fresh aggregator verifiers from circuits/bin at runtime.\n`,
+      )
+      return
     }
 
     const circuits = this.discoverCircuits()
@@ -485,34 +501,22 @@ class VerifierGenerator {
     }
   }
 
+  private targetPreset(): string {
+    return this.options.preset ?? CANONICAL_PRESET
+  }
+
   /**
-   * Refuse to run unless `circuits/bin/` was last built for `CANONICAL_PRESET`.
-   *
-   * The committed Honk Solidity verifiers correspond to one preset
-   * (`CANONICAL_PRESET`). The only on-disk record of "which preset built
-   * `circuits/bin/`" is the build stamp written by
-   * `scripts/build-circuits.ts:writePresetStamp` at
-   * `dist/circuits/<preset>/.build-stamp.json`. If the stamp for `CANONICAL_PRESET`
-   * is missing, the developer either never built it, or last built a different
-   * preset — either way, generating/checking against `circuits/bin/` would use
-   * the wrong VKs. Surface that loudly with a fix recipe instead of silently
-   * producing wrong verifier bytes.
+   * Refuse to run unless `dist/circuits/<preset>/.build-stamp.json` exists for the target preset.
    */
-  private assertCanonicalPresetBuilt(): void {
-    const stampPath = join(this.rootDir, 'dist', 'circuits', CANONICAL_PRESET, '.build-stamp.json')
+  private assertPresetBuilt(preset: string): void {
+    const stampPath = join(this.rootDir, 'dist', 'circuits', preset, '.build-stamp.json')
     if (!existsSync(stampPath)) {
       throw new Error(
-        `Canonical preset '${CANONICAL_PRESET}' is not built (missing ${stampPath}).\n` +
-          `   The committed Solidity Honk verifiers under\n` +
-          `   packages/enclave-contracts/contracts/verifiers/bfv/honk/ bake in the recursive VKs\n` +
-          `   of the '${CANONICAL_PRESET}' BFV preset. Generating/checking against any other preset\n` +
-          `   would produce different '.sol' bytes and is rejected by design.\n` +
+        `Preset '${preset}' is not built (missing ${stampPath}).\n` +
           `\n` +
           `   To fix, run from the repo root:\n` +
-          `     pnpm build:circuits --preset ${CANONICAL_PRESET}\n` +
-          `   then retry. If you intentionally want verifiers for a different preset (e.g. a\n` +
-          `   production deploy on 'secure-8192'), generate them locally for that deploy — do\n` +
-          `   NOT commit the result over the canonical files.`,
+          `     pnpm build:circuits --preset ${preset}\n` +
+          `   then retry.`,
       )
     }
     let stamp: { preset?: string } = {}
@@ -521,16 +525,49 @@ class VerifierGenerator {
     } catch (err: any) {
       throw new Error(`Failed to parse ${stampPath}: ${err.message}`)
     }
-    if (stamp.preset !== CANONICAL_PRESET) {
+    if (stamp.preset !== preset) {
       throw new Error(
-        `Build stamp at ${stampPath} reports preset '${stamp.preset ?? '(missing)'}', expected '${CANONICAL_PRESET}'.\n` +
-          `   The committed Solidity Honk verifiers correspond to '${CANONICAL_PRESET}' only.\n` +
+        `Build stamp at ${stampPath} reports preset '${stamp.preset ?? '(missing)'}', expected '${preset}'.\n` +
           `   Run:\n` +
-          `     pnpm build:circuits --preset ${CANONICAL_PRESET}\n` +
+          `     pnpm build:circuits --preset ${preset}\n` +
           `   then retry.`,
       )
     }
-    console.log(`   ✓ Canonical preset '${CANONICAL_PRESET}' build stamp present.\n`)
+    console.log(`   ✓ Preset '${preset}' build stamp present in dist/circuits.\n`)
+  }
+
+  /**
+   * Ensure `circuits/bin/` was last populated by `build:circuits` for the same preset.
+   * Without this, a secure benchmark could leave secure VKs in bin while `--check` diffs
+   * against committed insecure-512 `.sol` files.
+   */
+  private assertCircuitsBinActivePreset(preset: string): void {
+    const activePath = join(this.circuitsDir, '.active-preset.json')
+    if (!existsSync(activePath)) {
+      throw new Error(
+        `Missing ${activePath} (which preset last built circuits/bin is unknown).\n` +
+          `   If dist/circuits/${preset}/ is already built, hydrate bin in seconds:\n` +
+          `     pnpm build:circuits --preset ${preset} --skip-if-built --no-clean --no-clean-targets\n` +
+          `   Otherwise run a full compile:\n` +
+          `     pnpm build:circuits --preset ${preset}`,
+      )
+    }
+    let active: { preset?: string } = {}
+    try {
+      active = JSON.parse(readFileSync(activePath, 'utf-8'))
+    } catch (err: any) {
+      throw new Error(`Failed to parse ${activePath}: ${err.message}`)
+    }
+    if (active.preset !== preset) {
+      throw new Error(
+        `circuits/bin was last built for preset '${active.preset ?? '(missing)'}', but this run targets '${preset}'.\n` +
+          `   Fast fix (reuses dist/circuits/${preset}/, no full recompile):\n` +
+          `     pnpm build:circuits --preset ${preset} --skip-if-built --no-clean --no-clean-targets\n` +
+          `   Full compile only if dist is missing or stale:\n` +
+          `     pnpm build:circuits --preset ${preset}`,
+      )
+    }
+    console.log(`   ✓ circuits/bin active preset matches '${preset}'.\n`)
   }
 }
 
@@ -560,6 +597,24 @@ async function main() {
       options.check = true
     } else if (arg === '--write') {
       options.check = false
+    } else if (arg === '--preset') {
+      const value = args[++i]
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --preset requires a value (insecure-512 | secure-8192)')
+        process.exit(1)
+      }
+      if (!ALL_PRESETS.includes(value as (typeof ALL_PRESETS)[number])) {
+        console.error(`Error: unknown preset '${value}'. Expected one of: ${ALL_PRESETS.join(', ')}`)
+        process.exit(1)
+      }
+      options.preset = value
+    } else if (arg === '--output-dir') {
+      const value = args[++i]
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --output-dir requires a path')
+        process.exit(1)
+      }
+      options.outputDir = value
     } else if (arg === '--group') {
       const value = args[++i]
       if (!value || value.startsWith('--')) {
@@ -595,6 +650,10 @@ current circuit VKs is surfaced as a failure rather than a silent rewrite.
 Options:
   --check                Verify committed verifiers match current VKs (no writes).
                          Exits non-zero on drift. Used by test/benchmark/CI flows.
+  --preset <name>        BFV preset for circuits/bin (insecure-512 | secure-8192).
+                         Defaults to insecure-512. With --check and a non-insecure preset,
+                         only verifies dist/ + circuits/bin alignment (no .sol diff).
+  --output-dir <path>    Write generated verifiers here instead of the committed honk/ dir.
   --write                Write/overwrite committed verifiers (this is the default
                          when neither --check nor --write is passed).
   --circuits <list>      Circuit names (comma-separated). When omitted, generates all circuits.

@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { network } from "hardhat";
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -12,11 +13,103 @@ import {
   BFV_DKG_H,
   BFV_PK_SUB_CIRCUIT_VK_HASH_PATHS,
   BFV_THRESHOLD_T,
+  REPO_ROOT,
   bfvDecCommitteeHashIndices,
   bfvDkgCommitteeHashIndices,
   committeeHashFromLimbs,
   readVkRecursiveHash,
 } from "./utils";
+
+const CANONICAL_BFV_PRESET = "insecure-512";
+const COMMITTED_HONK_DIR = path.join(
+  REPO_ROOT,
+  "packages/enclave-contracts/contracts/verifiers/bfv/honk",
+);
+
+function readBenchmarkPreset(): string {
+  const fromEnv = process.env.BENCHMARK_PRESET?.trim();
+  if (fromEnv) return fromEnv;
+  const activePath = path.join(REPO_ROOT, "circuits/bin/.active-preset.json");
+  if (!fs.existsSync(activePath)) {
+    return CANONICAL_BFV_PRESET;
+  }
+  try {
+    const active = JSON.parse(fs.readFileSync(activePath, "utf8")) as {
+      preset?: string;
+    };
+    return active.preset ?? CANONICAL_BFV_PRESET;
+  } catch {
+    return CANONICAL_BFV_PRESET;
+  }
+}
+
+/**
+ * Committed Honk `.sol` files embed the insecure-512 aggregator VK. Secure benchmark
+ * proofs need verifiers generated from the active circuits/bin preset.
+ */
+function ensureHonkVerifierContractDir(preset: string): string {
+  if (preset === CANONICAL_BFV_PRESET) {
+    return COMMITTED_HONK_DIR;
+  }
+  const benchDir = path.join(COMMITTED_HONK_DIR, ".benchmark", preset);
+  fs.mkdirSync(benchDir, { recursive: true });
+  console.log(
+    `[benchmarkGasFromRaw] Generating ${preset} Honk verifiers into ${benchDir}...`,
+  );
+  execSync(
+    [
+      "pnpm generate:verifiers",
+      "--circuits dkg_aggregator,decryption_aggregator",
+      "--no-compile",
+      "--write",
+      `--preset ${preset}`,
+      `--output-dir ${benchDir}`,
+    ].join(" "),
+    { cwd: REPO_ROOT, stdio: "inherit" },
+  );
+  // Hardhat does not pick up freshly written .sol under honk/.benchmark/ until compile.
+  execSync("pnpm hardhat compile", {
+    cwd: path.join(REPO_ROOT, "packages/enclave-contracts"),
+    stdio: "inherit",
+  });
+  return benchDir;
+}
+
+/** Hardhat `project/` source path for a generated Honk verifier file. */
+function honkContractSource(honkDir: string, name: string): string {
+  const rel = path.relative(
+    path.join(REPO_ROOT, "packages/enclave-contracts"),
+    path.join(honkDir, `${name}.sol`),
+  );
+  return rel.split(path.sep).join("/");
+}
+
+async function deployHonkAggregator(
+  ethersLib: Awaited<ReturnType<typeof network.connect>>["ethers"],
+  honkDir: string,
+  contractName: "DkgAggregatorVerifier" | "DecryptionAggregatorVerifier",
+): Promise<string> {
+  const solSource = honkContractSource(honkDir, contractName);
+  const libKey = `project/${solSource}:ZKTranscriptLib`;
+  const libFactory = await ethersLib.getContractFactory(
+    `${solSource}:ZKTranscriptLib`,
+  );
+  const lib = await libFactory.deploy();
+  await lib.waitForDeployment();
+  const libAddress = await lib.getAddress();
+
+  const aggFactory = await ethersLib.getContractFactory(
+    `${solSource}:${contractName}`,
+    {
+      libraries: {
+        [libKey]: libAddress,
+      },
+    },
+  );
+  const agg = await aggFactory.deploy();
+  await agg.waitForDeployment();
+  return agg.getAddress();
+}
 
 function findRawJson(rawDir: string, fragment: string): any {
   const entries = fs.readdirSync(rawDir).filter((f) => f.endsWith(".json"));
@@ -112,10 +205,11 @@ async function main() {
       );
     } else {
       const folded = JSON.parse(raw);
-      dkgProofHex = folded?.dkg_aggregator?.proof_hex;
-      dkgPublicHex = folded?.dkg_aggregator?.public_inputs_hex;
-      decProofHex = folded?.decryption_aggregator?.proof_hex;
-      decPublicHex = folded?.decryption_aggregator?.public_inputs_hex;
+      const artifacts = folded?.folded_artifacts ?? folded;
+      dkgProofHex = artifacts?.dkg_aggregator?.proof_hex;
+      dkgPublicHex = artifacts?.dkg_aggregator?.public_inputs_hex;
+      decProofHex = artifacts?.decryption_aggregator?.proof_hex;
+      decPublicHex = artifacts?.decryption_aggregator?.public_inputs_hex;
     }
   } else {
     const dkgRaw = findRawJson(rawDir, "threshold_pk_aggregation");
@@ -188,38 +282,24 @@ async function main() {
 
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
-  const libFactory = await ethers.getContractFactory(
-    "contracts/verifiers/bfv/honk/DkgAggregatorVerifier.sol:ZKTranscriptLib",
-  );
-  const zkTranscriptLib = await libFactory.deploy();
-  await zkTranscriptLib.waitForDeployment();
-  const zkTranscriptLibAddress = await zkTranscriptLib.getAddress();
+  const benchmarkPreset = readBenchmarkPreset();
+  const honkDir = ensureHonkVerifierContractDir(benchmarkPreset);
+  if (benchmarkPreset !== CANONICAL_BFV_PRESET) {
+    console.log(
+      `[benchmarkGasFromRaw] Using preset ${benchmarkPreset} Honk verifiers (not committed insecure-512 .sol).`,
+    );
+  }
 
-  const dkgAggFactory = await ethers.getContractFactory(
+  const dkgAggAddress = await deployHonkAggregator(
+    ethers,
+    honkDir,
     "DkgAggregatorVerifier",
-    {
-      libraries: {
-        "project/contracts/verifiers/bfv/honk/DkgAggregatorVerifier.sol:ZKTranscriptLib":
-          zkTranscriptLibAddress,
-      },
-    },
   );
-  const dkgAgg = await dkgAggFactory.deploy();
-  await dkgAgg.waitForDeployment();
-  const dkgAggAddress = await dkgAgg.getAddress();
-
-  const decAggFactory = await ethers.getContractFactory(
+  const decAggAddress = await deployHonkAggregator(
+    ethers,
+    honkDir,
     "DecryptionAggregatorVerifier",
-    {
-      libraries: {
-        "project/contracts/verifiers/bfv/honk/DecryptionAggregatorVerifier.sol:ZKTranscriptLib":
-          zkTranscriptLibAddress,
-      },
-    },
   );
-  const decAgg = await decAggFactory.deploy();
-  await decAgg.waitForDeployment();
-  const decAggAddress = await decAgg.getAddress();
 
   const bfvPk = await (
     await ethers.getContractFactory("BfvPkVerifier")
@@ -323,6 +403,7 @@ async function main() {
       dec: Number(decGas),
     },
     source: "benchmark_raw_artifacts",
+    bfv_preset: benchmarkPreset,
   };
   fs.writeFileSync(outputPath, JSON.stringify(output, null, 2));
 }

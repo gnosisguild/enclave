@@ -179,18 +179,19 @@ EVM verifier `estimateGas` in `packages/enclave-contracts/scripts/benchmarkGasFr
 
 `extract_crisp_verify_gas.sh` (and `replay_folded_verify_gas.sh --build <preset>`) call
 `ensure_circuit_preset_built.sh`, which runs
-`pnpm build:circuits --skip-if-built --no-clean --no-clean-targets` by default (skips recompile when
-`dist/circuits/<preset>/.build-stamp.json` and marker artifacts match the current circuit sources).
-Then `pnpm generate:verifiers --check --no-compile` **verifies** the committed Honk Solidity
-verifiers (`DkgAggregatorVerifier.sol`, `DecryptionAggregatorVerifier.sol`) match the current
-circuits' recursive VKs. Benchmarks do **not** rewrite the committed verifiers — drift fails the run
-loudly. The committed verifiers are pinned to the **`insecure-512`** preset, so `--check` only runs
-after `dist/circuits/insecure-512/.build-stamp.json` confirms that preset was last built; the secure
-benchmark path (`--mode secure --build secure-8192`) builds and proves against `secure-8192`
-artifacts but does not regenerate or check the committed `.sol` files — those are locked to
-`insecure-512` (see [`scripts/README.md`](../../scripts/README.md#verifier-generator)). If you see
-`❌ Solidity verifier(s) drift from current circuit VKs` or
-`❌ Canonical preset 'insecure-512' is not built`, follow the fix recipe printed by the script.
+`pnpm build:circuits --skip-if-built --no-clean --no-clean-targets` by default. When
+`dist/circuits/<preset>/` is already built but `circuits/bin/` still reflects another preset (e.g.
+you ran insecure benchmarks after a secure build), the build script **hydrates** `circuits/bin` from
+`dist/` in seconds instead of recompiling (~50 minutes for `secure-8192`). You only pay the full
+compile once per preset until circuit sources change. Then
+`pnpm generate:verifiers --check --no-compile --preset <preset>` verifies that
+`dist/circuits/<preset>/` is built and `circuits/bin/.active-preset.json` matches the benchmark mode
+(`insecure-512` for `--mode insecure`, `secure-8192` for `--mode secure`). For **insecure** runs it
+also diffs the committed Honk Solidity verifiers (`DkgAggregatorVerifier.sol`,
+`DecryptionAggregatorVerifier.sol`) against the current insecure VKs. For **secure** runs it skips
+that `.sol` diff (committed verifiers stay pinned to `insecure-512` for production deploy); gas
+replay deploys fresh aggregator verifiers from `circuits/bin` at runtime. If you see preset mismatch
+or insecure drift errors, follow the fix recipe printed by the script.
 
 - **`--force-build`** on extract/replay/ensure: full rebuild (same as a fresh `build:circuits`).
 - **`--skip-build`** on extract/replay: skip circuit build and Honk generation (only re-run

@@ -87,12 +87,8 @@ if [ -n "$BUILD_PRESET" ]; then
             ENSURE_ARGS+=(--force-build)
         fi
         "${SCRIPT_DIR}/ensure_circuit_preset_built.sh" "${ENSURE_ARGS[@]}"
-        # `--check`: verify the committed Honk Solidity verifiers match the
-        # current circuits' recursive VKs. Fails loudly on drift; replays must
-        # not silently rewrite committed contracts. If this errors, run
-        # `pnpm generate:verifiers --write` and commit the diff.
-        echo "  [replay-gas] Checking Honk Solidity verifiers (pnpm generate:verifiers --check --no-compile)..."
-        (cd "$REPO_ROOT" && pnpm generate:verifiers --check --no-compile)
+        echo "  [replay-gas] Verifying preset '${BUILD_PRESET}' (dist stamp + circuits/bin)..."
+        (cd "$REPO_ROOT" && pnpm generate:verifiers --check --no-compile --preset "$BUILD_PRESET")
     fi
 fi
 
@@ -102,6 +98,7 @@ echo "  [replay-gas] Running Hardhat benchmarkGasFromRaw.ts (folded proofs)..."
     BENCHMARK_RAW_DIR="$RAW_DIR" \
     BENCHMARK_GAS_OUTPUT="$TMP_GAS_PARTIAL" \
     BENCHMARK_FOLDED_JSON="$TMP_FOLDED" \
+    BENCHMARK_PRESET="${BUILD_PRESET:-insecure-512}" \
     pnpm hardhat run scripts/benchmarkGasFromRaw.ts --network hardhat
 )
 

@@ -57,6 +57,8 @@ interface BuildOptions {
   clean?: boolean
   noCleanTargets?: boolean
   skipIfBuilt?: boolean
+  /** Copy dist/circuits/<preset>/ artifacts into circuits/bin without nargo compile. */
+  hydrateBinOnly?: boolean
   dryRun?: boolean
   preset?: CircuitPreset | 'all'
 }
@@ -177,13 +179,67 @@ class NoirCircuitBuilder {
     writeFileSync(this.presetStampPath(preset), JSON.stringify(stamp, null, 2) + '\n')
   }
 
-  /** Marker files required by `test_trbfv_actor` / gas extraction (dist + circuits/bin targets). */
-  private requiredPresetMarkers(preset: string): string[] {
+  /** Records which BFV preset last populated `circuits/bin/` (used by benchmark gas extraction). */
+  private writeActiveBinPresetStamp(preset: string, sourceHash: string): void {
+    const stamp: PresetBuildStamp = {
+      preset,
+      sourceHash,
+      builtAt: new Date().toISOString(),
+    }
+    writeFileSync(join(this.circuitsDir, '.active-preset.json'), JSON.stringify(stamp, null, 2) + '\n')
+  }
+
+  /**
+   * Point circuits/bin at a preset already archived under dist/circuits/<preset>/.
+   * Used when dist is fresh but bin still holds another preset (common after --mode insecure
+   * then --mode secure benchmark runs).
+   */
+  private hydrateBinFromDist(preset: string, sourceHash: string): void {
+    const distRoot = join(this.options.outputDir!, preset)
+    const circuits = this.discoverCircuits()
+    let copied = 0
+
+    for (const circuit of circuits) {
+      const packageName = this.getPackageName(circuit.path)
+      const targetDir = join(circuit.path, 'target')
+      mkdirSync(targetDir, { recursive: true })
+
+      const copyPair = (from: string, to: string) => {
+        if (!existsSync(from)) return
+        copyFileSync(from, to)
+        copied++
+      }
+
+      const defaultDir = join(distRoot, CIRCUIT_VARIANTS.DEFAULT, circuit.group, circuit.name)
+      copyPair(join(defaultDir, `${packageName}.json`), join(targetDir, `${packageName}.json`))
+      copyPair(join(defaultDir, `${packageName}.vk`), join(targetDir, `${packageName}.vk_recursive`))
+      copyPair(join(defaultDir, `${packageName}.vk_hash`), join(targetDir, `${packageName}.vk_recursive_hash`))
+
+      const evmDir = join(distRoot, CIRCUIT_VARIANTS.EVM, circuit.group, circuit.name)
+      copyPair(join(evmDir, `${packageName}.vk`), join(targetDir, `${packageName}.vk`))
+      copyPair(join(evmDir, `${packageName}.vk_hash`), join(targetDir, `${packageName}.vk_hash`))
+
+      const recursiveDir = join(distRoot, CIRCUIT_VARIANTS.RECURSIVE, circuit.group, circuit.name)
+      copyPair(join(recursiveDir, `${packageName}.vk`), join(targetDir, `${packageName}.vk_noir`))
+      copyPair(join(recursiveDir, `${packageName}.vk_hash`), join(targetDir, `${packageName}.vk_noir_hash`))
+    }
+
+    console.log(`   Copied ${copied} artifact file(s) into circuits/bin targets.`)
+    this.writeActiveBinPresetStamp(preset, sourceHash)
+  }
+
+  private requiredDistMarkers(preset: string): string[] {
     const dist = join(this.options.outputDir!, preset)
-    const bin = this.circuitsDir
     return [
       join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.AGGREGATION, 'dkg_aggregator', 'dkg_aggregator.json'),
       join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.AGGREGATION, 'decryption_aggregator', 'decryption_aggregator.json'),
+    ]
+  }
+
+  /** Marker files required by `test_trbfv_actor` / gas extraction under circuits/bin. */
+  private requiredBinMarkers(): string[] {
+    const bin = this.circuitsDir
+    return [
       join(bin, CIRCUIT_GROUPS.AGGREGATION, 'dkg_aggregator', 'target', 'dkg_aggregator.json'),
       join(bin, CIRCUIT_GROUPS.AGGREGATION, 'dkg_aggregator', 'target', 'dkg_aggregator.vk_recursive'),
       join(bin, CIRCUIT_GROUPS.AGGREGATION, 'decryption_aggregator', 'target', 'decryption_aggregator.json'),
@@ -193,10 +249,30 @@ class NoirCircuitBuilder {
     ]
   }
 
-  private isPresetUpToDate(preset: string, sourceHash: string): boolean {
+  private readActiveBinPreset(): PresetBuildStamp | null {
+    const activePath = join(this.circuitsDir, '.active-preset.json')
+    if (!existsSync(activePath)) return null
+    try {
+      return JSON.parse(readFileSync(activePath, 'utf-8')) as PresetBuildStamp
+    } catch {
+      return null
+    }
+  }
+
+  private isDistPresetUpToDate(preset: string, sourceHash: string): boolean {
     const stamp = this.readPresetStamp(preset)
     if (!stamp?.sourceHash || stamp.sourceHash !== sourceHash) return false
-    return this.requiredPresetMarkers(preset).every((path) => existsSync(path))
+    return this.requiredDistMarkers(preset).every((path) => existsSync(path))
+  }
+
+  private isBinReadyForPreset(preset: string, sourceHash: string): boolean {
+    const active = this.readActiveBinPreset()
+    if (!active || active.preset !== preset || active.sourceHash !== sourceHash) return false
+    return this.requiredBinMarkers().every((path) => existsSync(path))
+  }
+
+  private isPresetUpToDate(preset: string, sourceHash: string): boolean {
+    return this.isDistPresetUpToDate(preset, sourceHash) && this.isBinReadyForPreset(preset, sourceHash)
   }
 
   private logSkipIfBuiltBlocked(preset: string, sourceHash: string): void {
@@ -212,7 +288,7 @@ class NoirCircuitBuilder {
           `Run without --skip-if-built or \`pnpm build:circuits --preset ${preset}\` once to refresh.`,
       )
     }
-    const missing = this.requiredPresetMarkers(preset).filter((path) => !existsSync(path))
+    const missing = [...this.requiredDistMarkers(preset), ...this.requiredBinMarkers()].filter((path) => !existsSync(path))
     if (missing.length > 0) {
       console.log(`   ℹ️  --skip-if-built: missing ${missing.length} marker artifact(s), e.g. ${missing[0]}`)
     }
@@ -244,12 +320,33 @@ class NoirCircuitBuilder {
       const sourceHash = this.computeSourceHash(preset)
       result.sourceHash = sourceHash
 
+      if (this.options.hydrateBinOnly) {
+        if (!this.isDistPresetUpToDate(preset, sourceHash)) {
+          throw new Error(
+            `Cannot hydrate circuits/bin: dist/circuits/${preset} is missing or stale. ` + `Run: pnpm build:circuits --preset ${preset}`,
+          )
+        }
+        console.log(`   💧 Hydrating circuits/bin from dist/circuits/${preset} (no nargo compile)...`)
+        this.hydrateBinFromDist(preset, sourceHash)
+        console.log(`\n✅ Hydrated circuits/bin for preset: ${preset}`)
+        return result
+      }
+
       if (this.options.skipIfBuilt) {
         if (this.isPresetUpToDate(preset, sourceHash)) {
           console.log(
-            `   ⏭️  Skipping preset ${preset} (artifacts up to date; source_hash=${sourceHash}). ` +
+            `   ⏭️  Skipping preset ${preset} (dist + circuits/bin up to date; source_hash=${sourceHash}). ` +
               `Use a full rebuild without --skip-if-built to refresh.`,
           )
+          return result
+        }
+        if (this.isDistPresetUpToDate(preset, sourceHash)) {
+          console.log(
+            `   💧 dist/circuits/${preset} is current; hydrating circuits/bin from dist ` +
+              `(fast — avoids a full ~50m secure recompile when switching presets).`,
+          )
+          this.hydrateBinFromDist(preset, sourceHash)
+          console.log(`\n✅ Hydrated circuits/bin for preset: ${preset}`)
           return result
         }
         this.logSkipIfBuiltBlocked(preset, sourceHash)
@@ -280,6 +377,7 @@ class NoirCircuitBuilder {
       this.copyArtifacts(result.compiled, presetOutputDir, preset)
       if (result.errors.length === 0) {
         this.writePresetStamp(preset, sourceHash)
+        this.writeActiveBinPresetStamp(preset, sourceHash)
       }
       console.log(`\n✅ Built ${result.compiled.length} circuits for preset: ${preset}`)
       if (result.errors.length > 0) {
@@ -757,6 +855,7 @@ async function main() {
     else if (arg === '--no-clean') options.clean = false
     else if (arg === '--no-clean-targets') options.noCleanTargets = true
     else if (arg === '--skip-if-built') options.skipIfBuilt = true
+    else if (arg === '--hydrate-bin-only') options.hydrateBinOnly = true
     else if (arg === '--group') options.groups = args[++i]?.split(',') as CircuitGroup[]
     else if (arg === '--circuit') (options.circuits ??= []).push(args[++i])
     else if (arg === '-o' || arg === '--output') options.outputDir = resolve(args[++i])
@@ -800,7 +899,8 @@ Options:
   --dry-run           Show what would be built
   --no-clean          Don't clean output directory
   --no-clean-targets  Don't delete circuits/bin target dirs before compiling
-  --skip-if-built     Skip preset when dist stamp + marker artifacts match circuit sources
+  --skip-if-built     Skip preset when dist + circuits/bin match; hydrate bin from dist if only dist is current
+  --hydrate-bin-only  Copy dist/circuits/<preset>/ into circuits/bin (no nargo compile)
   -h, --help          Show help
 `)
 }
