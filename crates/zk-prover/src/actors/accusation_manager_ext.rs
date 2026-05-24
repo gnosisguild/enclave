@@ -10,6 +10,8 @@
 //! Listens for [`CommitteeFinalized`], reads `threshold_m` from [`E3Meta`],
 //! parses committee addresses, and starts the actor with full context.
 
+use std::collections::HashMap;
+
 use crate::AccusationManager;
 use alloy::primitives::Address;
 use alloy::signers::local::PrivateKeySigner;
@@ -17,18 +19,19 @@ use anyhow::Result;
 use async_trait::async_trait;
 use e3_events::{BusHandle, CommitteeFinalized, EnclaveEvent, EnclaveEventData, Event};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub struct AccusationManagerExtension {
     bus: BusHandle,
     signer: PrivateKeySigner,
     /// On-chain `SlashingManager` address (EIP-712 `verifyingContract` for vote sigs).
     slashing_manager: Address,
-    /// Registry-wide off-chain freshness window (seconds), read from
+    /// Per-chain off-chain freshness window (seconds), read from
     /// `CiphernodeRegistry.accusationVoteValidity()` at process startup.
-    /// Passed to every per-E3 actor; governance changes require a node restart
-    /// to take effect (same lifecycle contract as `slashing_manager`).
-    vote_validity_secs: u64,
+    /// Looked up by `e3_id.chain_id()` when each per-E3 actor starts;
+    /// governance changes require a node restart to take effect (same lifecycle
+    /// contract as `slashing_manager`).
+    vote_validity_secs_by_chain: HashMap<u64, u64>,
 }
 
 impl AccusationManagerExtension {
@@ -36,14 +39,27 @@ impl AccusationManagerExtension {
         bus: &BusHandle,
         signer: PrivateKeySigner,
         slashing_manager: Address,
-        vote_validity_secs: u64,
+        vote_validity_secs_by_chain: HashMap<u64, u64>,
     ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             signer: signer.clone(),
             slashing_manager,
-            vote_validity_secs,
+            vote_validity_secs_by_chain,
         })
+    }
+
+    fn vote_validity_secs_for(&self, chain_id: u64) -> u64 {
+        match self.vote_validity_secs_by_chain.get(&chain_id) {
+            Some(&secs) => secs,
+            None => {
+                warn!(
+                    chain_id,
+                    "no accusationVoteValidity configured for chain; accusation votes will not be stamped"
+                );
+                0
+            }
+        }
     }
 }
 
@@ -97,6 +113,8 @@ impl E3Extension for AccusationManagerExtension {
             threshold_m
         );
 
+        let vote_validity_secs = self.vote_validity_secs_for(e3_id.chain_id());
+
         let addr = AccusationManager::setup(
             &self.bus,
             e3_id,
@@ -104,7 +122,7 @@ impl E3Extension for AccusationManagerExtension {
             self.slashing_manager,
             committee_addresses,
             threshold_m,
-            self.vote_validity_secs,
+            vote_validity_secs,
             meta.params_preset,
         );
 

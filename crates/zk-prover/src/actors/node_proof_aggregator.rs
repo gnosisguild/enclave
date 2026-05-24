@@ -49,9 +49,9 @@ struct DkgProofCollectionState {
 pub struct NodeProofAggregator {
     bus: BusHandle,
     signer: PrivateKeySigner,
-    /// On-chain `DkgFoldAttestationVerifier` address (EIP-712 `verifyingContract`).
-    /// `None` is only valid when proof aggregation will never run for this node.
-    dkg_fold_attestation_verifier: Option<Address>,
+    /// Per-chain `DkgFoldAttestationVerifier` address (EIP-712 `verifyingContract`).
+    /// Looked up by `e3_id.chain_id()` when signing fold attestations.
+    dkg_fold_attestation_verifiers_by_chain: HashMap<u64, Option<Address>>,
     states: HashMap<E3id, DkgProofCollectionState>,
     fold_correlation: HashMap<CorrelationId, E3id>,
     pending_inner_proofs: HashMap<E3id, BTreeMap<usize, Proof>>,
@@ -61,12 +61,12 @@ impl NodeProofAggregator {
     pub fn new(
         bus: &BusHandle,
         signer: PrivateKeySigner,
-        dkg_fold_attestation_verifier: Option<Address>,
+        dkg_fold_attestation_verifiers_by_chain: HashMap<u64, Option<Address>>,
     ) -> Self {
         Self {
             bus: bus.clone(),
             signer,
-            dkg_fold_attestation_verifier,
+            dkg_fold_attestation_verifiers_by_chain,
             states: HashMap::new(),
             fold_correlation: HashMap::new(),
             pending_inner_proofs: HashMap::new(),
@@ -76,9 +76,9 @@ impl NodeProofAggregator {
     pub fn setup(
         bus: &BusHandle,
         signer: PrivateKeySigner,
-        dkg_fold_attestation_verifier: Option<Address>,
+        dkg_fold_attestation_verifiers_by_chain: HashMap<u64, Option<Address>>,
     ) -> Addr<Self> {
-        let addr = Self::new(bus, signer, dkg_fold_attestation_verifier).start();
+        let addr = Self::new(bus, signer, dkg_fold_attestation_verifiers_by_chain).start();
         bus.subscribe(EventType::ThresholdSharePending, addr.clone().into());
         bus.subscribe(EventType::DKGInnerProofReady, addr.clone().into());
         bus.subscribe(EventType::ComputeResponse, addr.clone().into());
@@ -343,7 +343,9 @@ impl NodeProofAggregator {
                         "NodeFold public party_id does not match sortition party_id"
                     );
                     None
-                } else if let Some(verifying_contract) = self.dkg_fold_attestation_verifier {
+                } else if let Some(verifying_contract) =
+                    self.dkg_fold_attestation_verifier_for(&e3_id)
+                {
                     let payload = DkgFoldAttestationPayload {
                         e3_id: e3_id.clone(),
                         verifying_contract,
@@ -503,6 +505,21 @@ impl Handler<TypedEvent<ComputeRequestError>> for NodeProofAggregator {
 }
 
 impl NodeProofAggregator {
+    fn dkg_fold_attestation_verifier_for(&self, e3_id: &E3id) -> Option<Address> {
+        let chain_id = e3_id.chain_id();
+        match self.dkg_fold_attestation_verifiers_by_chain.get(&chain_id) {
+            Some(Some(addr)) => Some(*addr),
+            Some(None) => None,
+            None => {
+                warn!(
+                    chain_id,
+                    "no dkgFoldAttestationVerifier configured for chain"
+                );
+                None
+            }
+        }
+    }
+
     fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) {
         let (msg, _ec) = msg.into_components();
         if let ComputeResponseKind::Zk(ZkResponse::NodeDkgFold(resp)) = msg.response {
@@ -581,7 +598,7 @@ mod tests {
     #[actix::test]
     async fn node_dkg_fold_compute_error_emits_none_aggregation_result() -> Result<()> {
         let (bus, _rng, _seed, _params, _crp, _errors, history) = get_common_setup(None)?;
-        let mut aggregator = NodeProofAggregator::new(&bus, test_signer(), None);
+        let mut aggregator = NodeProofAggregator::new(&bus, test_signer(), HashMap::new());
         let e3_id = E3id::new("42", 1);
         let correlation_id = CorrelationId::new();
 
@@ -663,7 +680,7 @@ mod tests {
     #[actix::test]
     async fn early_inner_proof_is_prebuffered_until_collection_starts() -> Result<()> {
         let (bus, _rng, _seed, _params, _crp, _errors, history) = get_common_setup(None)?;
-        let mut aggregator = NodeProofAggregator::new(&bus, test_signer(), None);
+        let mut aggregator = NodeProofAggregator::new(&bus, test_signer(), HashMap::new());
         let e3_id = E3id::new("43", 1);
         let early_proof = dummy_proof(10);
 

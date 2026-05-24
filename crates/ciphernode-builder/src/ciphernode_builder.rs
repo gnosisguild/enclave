@@ -241,25 +241,24 @@ impl CiphernodeBuilder {
             })
     }
 
-    /// Fetch `CiphernodeRegistry.dkgFoldAttestationVerifier()` at startup (EIP-712 verifying contract).
+    /// Fetch `CiphernodeRegistry.dkgFoldAttestationVerifier()` for one chain (EIP-712 verifying contract).
     async fn fetch_dkg_fold_attestation_verifier_from_registry(
         provider_cache: &mut ProviderCache<WriteEnabled>,
-        chains: &[ChainConfig],
+        chain: &ChainConfig,
     ) -> Result<Option<Address>> {
-        let Some(chain) = chains.iter().find(|c| c.enabled.unwrap_or(true)) else {
-            return Ok(None);
-        };
         let provider = provider_cache.ensure_read_provider(chain).await?;
         let registry = chain.contracts.ciphernode_registry.address()?;
         let verifier = fetch_dkg_fold_attestation_verifier(provider.provider(), registry).await?;
         if verifier.is_none() {
             tracing::warn!(
+                chain = %chain.name,
                 registry = %registry,
                 "CiphernodeRegistry.dkgFoldAttestationVerifier is not set on-chain; \
                  nodes will not sign DKG fold attestations when proof aggregation is enabled"
             );
         } else if let Some(addr) = verifier {
             info!(
+                chain = %chain.name,
                 registry = %registry,
                 verifier = %addr,
                 "loaded dkgFoldAttestationVerifier from CiphernodeRegistry"
@@ -268,11 +267,10 @@ impl CiphernodeBuilder {
         Ok(verifier)
     }
 
-    /// Fetch `CiphernodeRegistry.accusationVoteValidity()` at startup (off-chain
+    /// Fetch `CiphernodeRegistry.accusationVoteValidity()` for one chain (off-chain
     /// vote freshness window in seconds). Returns `0` when the registry has
-    /// disabled slashing (governance emergency stop) or when no chain is
-    /// configured (in-process benchmarks); the actor will then refuse to stamp
-    /// votes that would be rejected on chain.
+    /// disabled slashing (governance emergency stop). The actor will then refuse
+    /// to stamp votes that would be rejected on chain.
     ///
     /// The `u256` returned by the registry is clamped to `u64`. The contract
     /// has no upper bound but `u64::MAX` seconds is already ~5.8 × 10¹¹ years —
@@ -281,11 +279,8 @@ impl CiphernodeBuilder {
     /// comparison.
     async fn fetch_accusation_vote_validity_from_registry(
         provider_cache: &mut ProviderCache<WriteEnabled>,
-        chains: &[ChainConfig],
+        chain: &ChainConfig,
     ) -> Result<u64> {
-        let Some(chain) = chains.iter().find(|c| c.enabled.unwrap_or(true)) else {
-            return Ok(0);
-        };
         let provider = provider_cache.ensure_read_provider(chain).await?;
         let registry = chain.contracts.ciphernode_registry.address()?;
         let validity = fetch_accusation_vote_validity(provider.provider(), registry).await?;
@@ -293,6 +288,7 @@ impl CiphernodeBuilder {
             Some(v) => {
                 let clamped: u64 = v.try_into().unwrap_or(u64::MAX);
                 info!(
+                    chain = %chain.name,
                     registry = %registry,
                     accusation_vote_validity_secs = clamped,
                     "loaded accusationVoteValidity from CiphernodeRegistry"
@@ -301,6 +297,7 @@ impl CiphernodeBuilder {
             }
             None => {
                 tracing::warn!(
+                    chain = %chain.name,
                     registry = %registry,
                     "CiphernodeRegistry.accusationVoteValidity is 0; the off-chain \
                      accusation manager will not produce votes (governance-disabled \
@@ -585,37 +582,52 @@ impl CiphernodeBuilder {
 
         let needs_zk_actors =
             self.keyshare.is_some() || (self.pubkey_agg && self.keyshare.is_none());
-        let dkg_fold_verifier_addr = if needs_zk_actors {
+        let mut dkg_fold_verifier_by_chain: HashMap<u64, Option<Address>> = HashMap::new();
+        if needs_zk_actors {
             if !self.chains.is_empty() {
-                Self::fetch_dkg_fold_attestation_verifier_from_registry(
-                    &mut provider_cache,
-                    &self.chains,
-                )
-                .await?
+                for chain in self.chains.iter().filter(|c| c.enabled.unwrap_or(true)) {
+                    let provider = provider_cache.ensure_read_provider(chain).await?;
+                    let chain_id = provider.chain_id();
+                    validate_chain_id(chain, chain_id)?;
+                    let verifier = Self::fetch_dkg_fold_attestation_verifier_from_registry(
+                        &mut provider_cache,
+                        chain,
+                    )
+                    .await?;
+                    dkg_fold_verifier_by_chain.insert(chain_id, verifier);
+                }
             } else {
                 // In-process benchmark harness (no EVM chains): optional env override.
-                std::env::var("BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER")
+                if let Some(verifier) = std::env::var("BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER")
                     .ok()
                     .and_then(|s| s.parse().ok())
+                {
+                    dkg_fold_verifier_by_chain.insert(benchmark_default_chain_id(), Some(verifier));
+                }
+            }
+        }
+
+        // Off-chain freshness window for accusation votes — fetched per chain so
+        // AccusationManagerExtension can look up by `e3_id.chain_id()`. Benchmark
+        // harness falls back to the env var so deterministic builds don't require RPC.
+        let mut accusation_vote_validity_by_chain: HashMap<u64, u64> = HashMap::new();
+        if !self.chains.is_empty() {
+            for chain in self.chains.iter().filter(|c| c.enabled.unwrap_or(true)) {
+                let provider = provider_cache.ensure_read_provider(chain).await?;
+                let chain_id = provider.chain_id();
+                validate_chain_id(chain, chain_id)?;
+                let validity =
+                    Self::fetch_accusation_vote_validity_from_registry(&mut provider_cache, chain)
+                        .await?;
+                accusation_vote_validity_by_chain.insert(chain_id, validity);
             }
         } else {
-            None
-        };
-
-        // Off-chain freshness window for accusation votes — fetched alongside
-        // the verifier so AccusationManagerExtension (created below) has
-        // everything it needs without re-walking the chain. Benchmark harness
-        // falls back to the env var so deterministic builds don't require
-        // RPC access.
-        let accusation_vote_validity_secs = if !self.chains.is_empty() {
-            Self::fetch_accusation_vote_validity_from_registry(&mut provider_cache, &self.chains)
-                .await?
-        } else {
-            std::env::var("BENCHMARK_ACCUSATION_VOTE_VALIDITY_SECS")
+            let validity = std::env::var("BENCHMARK_ACCUSATION_VOTE_VALIDITY_SECS")
                 .ok()
                 .and_then(|s| s.parse::<u64>().ok())
-                .unwrap_or(0)
-        };
+                .unwrap_or(0);
+            accusation_vote_validity_by_chain.insert(benchmark_default_chain_id(), validity);
+        }
 
         // E3 specific setup
         let mut e3_builder = E3Router::builder(&bus, store.clone());
@@ -640,7 +652,7 @@ impl CiphernodeBuilder {
             ));
 
             info!("Setting up ZK actors");
-            setup_zk_actors(&bus, backend, signer, dkg_fold_verifier_addr);
+            setup_zk_actors(&bus, backend, signer, dkg_fold_verifier_by_chain.clone());
         }
 
         if self.pubkey_agg {
@@ -661,7 +673,7 @@ impl CiphernodeBuilder {
                     .ok_or_else(|| anyhow::anyhow!("ZK backend is required for aggregator"))?;
                 let signer = provider_cache.ensure_signer().await?;
                 info!("Setting up ZK actors for aggregator");
-                setup_zk_actors(&bus, backend, signer, dkg_fold_verifier_addr);
+                setup_zk_actors(&bus, backend, signer, dkg_fold_verifier_by_chain.clone());
             }
         }
 
@@ -678,14 +690,14 @@ impl CiphernodeBuilder {
             let signer = provider_cache.ensure_signer().await?;
             let slashing_manager_addr = self.resolve_slashing_manager()?;
             info!(
-                vote_validity_secs = accusation_vote_validity_secs,
+                chains = accusation_vote_validity_by_chain.len(),
                 "Setting up AccusationManagerExtension"
             );
             e3_builder = e3_builder.with(AccusationManagerExtension::create(
                 &bus,
                 signer,
                 slashing_manager_addr,
-                accusation_vote_validity_secs,
+                accusation_vote_validity_by_chain,
             ));
         }
 
@@ -783,6 +795,11 @@ impl CiphernodeBuilder {
         // return it
         addr
     }
+}
+
+/// Chain id used by in-process benchmark harnesses when no EVM chains are configured.
+fn benchmark_default_chain_id() -> u64 {
+    1
 }
 
 /// Validate chain ID matches expected configuration
