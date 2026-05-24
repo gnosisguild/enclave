@@ -567,10 +567,13 @@ Governance can change it with `setAccusationVoteValidity(uint256)`. Two notable 
 - **Shorter window**: tighter freshness — useful if stolen-signature replay becomes a concern, at
   the cost of giving on-chain submitters less slack to land the `proposeSlash` transaction after
   off-chain quorum reaches `M`.
-- **Zero**: effectively disables slashing submission. Every new vote's `deadline` collapses to
-  "now", which the on-chain check rejects immediately. This is the emergency stop — useful while
-  investigating a runaway accusation but should be restored quickly to keep the slashing path
-  operational.
+- **Zero**: practically disables slashing — `accusationVoteValidity = 0` is a zero-second window, so
+  every new vote's `deadline` is stamped as `now` (no slack beyond the current block time).
+  Off-chain nodes still gossip votes; `proposeSlash` succeeds only if `SlashingManager` sees at
+  least **M** agreeing `AccusationVote` signatures and passes `block.timestamp <= deadline`. That
+  comparison is inclusive, so a vote whose `deadline` equals the current block time can still land
+  if `proposeSlash` is included in the **same block** — zero is an emergency brake, not a guaranteed
+  hard stop. Restore a non-zero window quickly to keep the slashing path operational.
 
 In-flight ciphernodes do not pick up the new value until restart. After a non-trivial shortening
 (e.g. 30 min → 1 min) operators should coordinate a rolling restart, otherwise live nodes will keep

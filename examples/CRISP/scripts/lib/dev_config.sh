@@ -76,8 +76,8 @@ compile_enclave_dkg_circuits_if_needed() {
 
   echo "Building enclave DKG circuits (preset=${CRISP_BFV_PRESET})..."
   (
-    cd "${REPO_ROOT}"
-    pnpm build:circuits --preset "${CRISP_BFV_PRESET}" --skip-if-built
+    cd "${REPO_ROOT}" &&
+      pnpm build:circuits --preset "${CRISP_BFV_PRESET}" --skip-if-built
   )
 }
 

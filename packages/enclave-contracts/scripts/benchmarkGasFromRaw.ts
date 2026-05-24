@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { network } from "hardhat";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -26,7 +26,35 @@ const COMMITTED_HONK_DIR = path.join(
   "packages/enclave-contracts/contracts/verifiers/bfv/honk",
 );
 
-function readBenchmarkPreset(): string {
+function presetFromFoldedArtifact(artifact: unknown): string | undefined {
+  if (!artifact || typeof artifact !== "object") {
+    return undefined;
+  }
+  const doc = artifact as Record<string, unknown>;
+  const pick = (value: unknown): string | undefined => {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  };
+
+  const direct = pick(doc.preset) ?? pick(doc.bfv_preset_subdir);
+  if (direct) return direct;
+
+  const benchmarkConfig = doc.benchmark_config;
+  if (benchmarkConfig && typeof benchmarkConfig === "object") {
+    const cfg = benchmarkConfig as Record<string, unknown>;
+    const fromConfig = pick(cfg.bfv_preset_subdir) ?? pick(cfg.preset);
+    if (fromConfig) return fromConfig;
+  }
+
+  return undefined;
+}
+
+/** Prefer preset embedded in replayed folded/summary JSON, then env / active preset. */
+function readBenchmarkPreset(foldedArtifact?: unknown): string {
+  const fromArtifact = presetFromFoldedArtifact(foldedArtifact);
+  if (fromArtifact) return fromArtifact;
+
   const fromEnv = process.env.BENCHMARK_PRESET?.trim();
   if (fromEnv) return fromEnv;
   const activePath = path.join(REPO_ROOT, "circuits/bin/.active-preset.json");
@@ -56,19 +84,23 @@ function ensureHonkVerifierContractDir(preset: string): string {
   console.log(
     `[benchmarkGasFromRaw] Generating ${preset} Honk verifiers into ${benchDir}...`,
   );
-  execSync(
+  execFileSync(
+    "pnpm",
     [
-      "pnpm generate:verifiers",
-      "--circuits dkg_aggregator,decryption_aggregator",
+      "generate:verifiers",
+      "--circuits",
+      "dkg_aggregator,decryption_aggregator",
       "--no-compile",
       "--write",
-      `--preset ${preset}`,
-      `--output-dir ${benchDir}`,
-    ].join(" "),
+      "--preset",
+      preset,
+      "--output-dir",
+      benchDir,
+    ],
     { cwd: REPO_ROOT, stdio: "inherit" },
   );
   // Hardhat does not pick up freshly written .sol under honk/.benchmark/ until compile.
-  execSync("pnpm hardhat compile", {
+  execFileSync("pnpm", ["hardhat", "compile"], {
     cwd: path.join(REPO_ROOT, "packages/enclave-contracts"),
     stdio: "inherit",
   });
@@ -196,6 +228,7 @@ async function main() {
   let dkgPublicHex: string | undefined;
   let decProofHex: string | undefined;
   let decPublicHex: string | undefined;
+  let foldedDoc: unknown;
 
   if (foldedPath && fs.existsSync(foldedPath)) {
     const raw = fs.readFileSync(foldedPath, "utf8").trim();
@@ -204,12 +237,21 @@ async function main() {
         `[benchmarkGasFromRaw] ${foldedPath} is empty — integration test likely failed before exporting folded proofs`,
       );
     } else {
-      const folded = JSON.parse(raw);
-      const artifacts = folded?.folded_artifacts ?? folded;
-      dkgProofHex = artifacts?.dkg_aggregator?.proof_hex;
-      dkgPublicHex = artifacts?.dkg_aggregator?.public_inputs_hex;
-      decProofHex = artifacts?.decryption_aggregator?.proof_hex;
-      decPublicHex = artifacts?.decryption_aggregator?.public_inputs_hex;
+      foldedDoc = JSON.parse(raw);
+      const artifacts =
+        (foldedDoc as { folded_artifacts?: unknown }).folded_artifacts ??
+        foldedDoc;
+      const proofBundle = artifacts as {
+        dkg_aggregator?: { proof_hex?: string; public_inputs_hex?: string };
+        decryption_aggregator?: {
+          proof_hex?: string;
+          public_inputs_hex?: string;
+        };
+      };
+      dkgProofHex = proofBundle?.dkg_aggregator?.proof_hex;
+      dkgPublicHex = proofBundle?.dkg_aggregator?.public_inputs_hex;
+      decProofHex = proofBundle?.decryption_aggregator?.proof_hex;
+      decPublicHex = proofBundle?.decryption_aggregator?.public_inputs_hex;
     }
   } else {
     const dkgRaw = findRawJson(rawDir, "threshold_pk_aggregation");
@@ -282,7 +324,7 @@ async function main() {
 
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
-  const benchmarkPreset = readBenchmarkPreset();
+  const benchmarkPreset = readBenchmarkPreset(foldedDoc);
   const honkDir = ensureHonkVerifierContractDir(benchmarkPreset);
   if (benchmarkPreset !== CANONICAL_BFV_PRESET) {
     console.log(

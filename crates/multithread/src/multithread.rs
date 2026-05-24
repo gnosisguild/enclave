@@ -534,32 +534,24 @@ fn handle_trbfv_request(
     request: ComputeRequest,
     id: u8,
 ) -> (Result<ComputeResponse, ComputeRequestError>, Duration) {
-    // Hold one RNG lock for the whole TrBFV job so overlapping pool tasks do not interleave draws.
-    let mut rng_guard = rng.lock().expect("SharedRng mutex poisoned");
-    let rng_mut = &mut *rng_guard;
-
     match trbfv_req {
-        TrBFVRequest::GenPkShareAndSkSss(req) => {
-            timefunc(
-                "gen_pk_share_and_sk_sss",
-                id,
-                || match gen_pk_share_and_sk_sss(rng_mut, &cipher, req) {
-                    Ok(o) => Ok(ComputeResponse::trbfv(
-                        TrBFVResponse::GenPkShareAndSkSss(o),
-                        request.correlation_id,
-                        request.e3_id,
-                    )),
-                    Err(e) => Err(ComputeRequestError::new(
-                        ComputeRequestErrorKind::TrBFV(TrBFVError::GenPkShareAndSkSss(
-                            e.to_string(),
-                        )),
-                        request,
-                    )),
-                },
-            )
-        }
+        TrBFVRequest::GenPkShareAndSkSss(req) => timefunc("gen_pk_share_and_sk_sss", id, || {
+            let mut rng_guard = rng.lock().expect("SharedRng mutex poisoned");
+            match gen_pk_share_and_sk_sss(&mut *rng_guard, &cipher, req) {
+                Ok(o) => Ok(ComputeResponse::trbfv(
+                    TrBFVResponse::GenPkShareAndSkSss(o),
+                    request.correlation_id,
+                    request.e3_id,
+                )),
+                Err(e) => Err(ComputeRequestError::new(
+                    ComputeRequestErrorKind::TrBFV(TrBFVError::GenPkShareAndSkSss(e.to_string())),
+                    request,
+                )),
+            }
+        }),
         TrBFVRequest::GenEsiSss(req) => timefunc("gen_esi_sss", id, || {
-            match gen_esi_sss(rng_mut, &cipher, req) {
+            let mut rng_guard = rng.lock().expect("SharedRng mutex poisoned");
+            match gen_esi_sss(&mut *rng_guard, &cipher, req) {
                 Ok(o) => Ok(ComputeResponse::trbfv(
                     TrBFVResponse::GenEsiSss(o),
                     request.correlation_id,
