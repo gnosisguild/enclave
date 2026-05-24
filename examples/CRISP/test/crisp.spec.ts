@@ -115,7 +115,7 @@ async function reconnectWalletIfNeeded(page: Page, metamask: MetaMask) {
   }
 }
 
-async function castVoteWithSignature(page: Page, metamask: MetaMask, diagLog: string[]) {
+async function castVoteWithSignature(page: Page, metamask: MetaMask) {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       log(`clicking first vote card (attempt ${attempt})...`)
@@ -130,18 +130,6 @@ async function castVoteWithSignature(page: Page, metamask: MetaMask, diagLog: st
       await metamask.confirmSignature()
       return
     } catch (error) {
-      // [CRISP-DIAG] On failure, dump any console.error lines tagged with
-      // `[CRISP-DIAG]` so the CI log shows exactly which app-side branch
-      // fired (e.g. `!user`, `!roundState`, `signMessageAsync threw`).
-      // Without this dump, the only signal is a 60s Playwright timeout.
-      const diag = diagLog.filter((line) => line.includes('[CRISP-DIAG]'))
-      if (diag.length > 0) {
-        log(`--- [CRISP-DIAG] captured browser console (${diag.length} lines) ---`)
-        for (const line of diag) log(`  ${line}`)
-        log(`--- end [CRISP-DIAG] ---`)
-      } else {
-        log(`[CRISP-DIAG] no diagnostic console lines were captured before failure`)
-      }
       if (attempt === 3) throw error
       log(`signature attempt ${attempt} failed, retrying...`)
       await page.keyboard.press('Escape').catch(() => {})
@@ -178,16 +166,8 @@ async function connectWalletWithRetry(page: Page, maxAttempts = 3) {
 }
 
 test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) => {
-  // [CRISP-DIAG] Capture every browser console message so we can replay the
-  // diagnostic-tagged ones if `castVoteWithSignature` fails. Without this
-  // buffer the failure mode is a 60s Playwright timeout with no app-side
-  // breadcrumbs. Remove together with the `[CRISP-DIAG]` console.error calls
-  // in `useVoteCasting.ts` / `DailyPoll.tsx` once the cast-vote race is fixed.
-  const diagLog: string[] = []
   page.on('console', (msg: ConsoleMessage) => {
-    const text = msg.text()
-    console.log(text)
-    diagLog.push(text)
+    console.log(msg.text())
   })
 
   log('============================================')
@@ -231,7 +211,7 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
   await voteStatusReady.catch(() => {
     log('vote status response not observed (may have completed before listener)')
   })
-  await castVoteWithSignature(page, metamask, diagLog)
+  await castVoteWithSignature(page, metamask)
   const WAIT = E3_DURATION - DKG_DURATION + OUTPUT_DECRYPTION_WAIT
   log(`waiting ${WAIT}ms...`)
   await page.waitForTimeout(WAIT)
