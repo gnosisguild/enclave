@@ -25,8 +25,12 @@ library CommitteeHashLib {
         for (uint256 i = 0; i < n; ++i) {
             bytes20 a = bytes20(nodes[i]);
             uint256 offset = i * 20;
-            for (uint256 j = 0; j < 20; ++j) {
-                packed[offset + j] = a[j];
+            // Write 20-byte address in one word store; trailing 12 bytes are
+            // zeroed and either overwritten by the next address or ignored by
+            // `keccak256(packed)` because bytes length is exactly `20*n`.
+            // solhint-disable-next-line no-inline-assembly
+            assembly {
+                mstore(add(add(packed, 0x20), offset), shl(96, a))
             }
         }
         return keccak256(packed);

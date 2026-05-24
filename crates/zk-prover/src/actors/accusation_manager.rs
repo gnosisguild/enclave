@@ -332,12 +332,13 @@ impl AccusationManager {
 
     // ─── Signing / Verification ──────────────────────────────────────────
 
-    fn sign_accusation_digest(&self, accusation: &ProofFailureAccusation) -> Vec<u8> {
+    fn sign_accusation_digest(
+        &self,
+        accusation: &ProofFailureAccusation,
+    ) -> Result<Vec<u8>, alloy::signers::Error> {
         let digest = Self::accusation_digest(accusation);
-        self.signer
-            .sign_message_sync(&digest)
-            .map(|sig| sig.as_bytes().to_vec())
-            .unwrap_or_default()
+        let sig = self.signer.sign_message_sync(&digest)?;
+        Ok(sig.as_bytes().to_vec())
     }
 
     /// Structured digest for ECDSA signing of accusations.
@@ -662,7 +663,14 @@ impl AccusationManager {
             signed_payload: forwarded_payload,
             signature: ArcBytes::default(),
         };
-        accusation.signature = ArcBytes::from_bytes(&self.sign_accusation_digest(&accusation));
+        match self.sign_accusation_digest(&accusation) {
+            Ok(sig) => accusation.signature = ArcBytes::from_bytes(&sig),
+            Err(err) => {
+                error!("Failed to sign ProofFailureAccusation: {err}");
+                self.accused_proofs.remove(&key);
+                return;
+            }
+        }
 
         let accusation_id = Self::accusation_id(&accusation);
 

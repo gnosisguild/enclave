@@ -4,6 +4,43 @@
   "sourceName": "contracts/interfaces/ICiphernodeRegistry.sol",
   "abi": [
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "pending",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "provided",
+          "type": "uint256"
+        }
+      ],
+      "name": "AccusationVoteValidityMismatch",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "readyAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "nowAt",
+          "type": "uint256"
+        }
+      ],
+      "name": "AccusationVoteValidityTimelockActive",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "AccusationVoteValidityZeroRequiresTimelock",
+      "type": "error"
+    },
+    {
       "inputs": [],
       "name": "AttestationBindingCountMismatch",
       "type": "error"
@@ -113,6 +150,11 @@
     {
       "inputs": [],
       "name": "InvalidTicketNumber",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NoPendingAccusationVoteValidityUpdate",
       "type": "error"
     },
     {
@@ -248,6 +290,38 @@
       "inputs": [],
       "name": "ZeroAddress",
       "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "accusationVoteValidity",
+          "type": "uint256"
+        }
+      ],
+      "name": "AccusationVoteValidityProposalCancelled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "accusationVoteValidity",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "readyAt",
+          "type": "uint256"
+        }
+      ],
+      "name": "AccusationVoteValidityProposed",
+      "type": "event"
     },
     {
       "anonymous": false,
@@ -632,6 +706,19 @@
       "type": "event"
     },
     {
+      "inputs": [],
+      "name": "accusationVoteValidity",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "address",
@@ -640,6 +727,13 @@
         }
       ],
       "name": "addCiphernode",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "cancelAccusationVoteValidityProposal",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -666,6 +760,19 @@
         }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_accusationVoteValidity",
+          "type": "uint256"
+        }
+      ],
+      "name": "commitAccusationVoteValidity",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -1006,6 +1113,19 @@
       "inputs": [
         {
           "internalType": "uint256",
+          "name": "_accusationVoteValidity",
+          "type": "uint256"
+        }
+      ],
+      "name": "proposeAccusationVoteValidity",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
         },
@@ -1112,6 +1232,19 @@
     {
       "inputs": [
         {
+          "internalType": "uint256",
+          "name": "_accusationVoteValidity",
+          "type": "uint256"
+        }
+      ],
+      "name": "setAccusationVoteValidity",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "contract IBondingRegistry",
           "name": "_bondingRegistry",
           "type": "address"
@@ -1199,5 +1332,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-4a1ab4524682ea3571c5165bfb08d5f4cb6afec8"
+  "buildInfoId": "solc-0_8_28-a6902ac15e994e1c055eb02433db296d1823fdfc"
 }

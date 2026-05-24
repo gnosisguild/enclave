@@ -4,8 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Subscribes to `AccusationQuorumReached` events and submits `proposeSlash`
-//! transactions on the SlashingManager contract with committee attestation evidence.
+//! Subscribes to `AccusationQuorumReached` events and submits committee-attested
+//! slash proposals on the SlashingManager contract. Prefers party-attributed
+//! `proposeSlashByDkgParty` when DKG anchors resolve, and falls back to
+//! operator-attributed `proposeSlash` otherwise.
 
 use crate::error_decoder::format_evm_error;
 use crate::helpers::EthProvider;
@@ -193,7 +195,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
 }
 
 /// Encode `AccusationQuorumReached` into the attestation evidence format expected
-/// by `SlashingManager.proposeSlash()`:
+/// by both `SlashingManager.proposeSlash()` and `SlashingManager.proposeSlashByDkgParty()`:
 /// `abi.encode(uint256 proofType, address[] voters, bytes32[] dataHashes, uint256 deadline, bytes[] signatures)`
 ///
 /// Voters are sorted ascending by address to satisfy the contract's duplicate-prevention
@@ -258,10 +260,20 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
         }
     };
 
+    let party_id =
+        resolve_party_id_for_operator(provider.clone(), contract_address, e3_id, operator)
+            .await
+            .ok()
+            .flatten();
+
     send_tx_with_retry("proposeSlash", &[], || {
-        info!("proposeSlash() e3_id={:?} operator={:?}", e3_id, operator);
+        info!(
+            "proposeSlash() e3_id={:?} operator={:?} party_id={:?}",
+            e3_id, operator, party_id
+        );
         let proof = Bytes::from(proof_data.clone());
         let provider = provider.clone();
+        let party_id = party_id;
 
         async move {
             let from_address = provider.provider().default_signer_address();
@@ -271,12 +283,62 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
                 .pending()
                 .await?;
             let contract = ISlashingManager::new(contract_address, provider.provider());
-            let builder = contract
-                .proposeSlash(e3_id, operator, proof)
-                .nonce(current_nonce);
-            let receipt = builder.send().await?.get_receipt().await?;
+            let receipt = if let Some(pid) = party_id {
+                contract
+                    .proposeSlashByDkgParty(e3_id, pid, proof)
+                    .nonce(current_nonce)
+                    .send()
+                    .await?
+                    .get_receipt()
+                    .await?
+            } else {
+                contract
+                    .proposeSlash(e3_id, operator, proof)
+                    .nonce(current_nonce)
+                    .send()
+                    .await?
+                    .get_receipt()
+                    .await?
+            };
             Ok(receipt)
         }
     })
     .await
+}
+
+async fn resolve_party_id_for_operator<P: Provider + WalletProvider + Clone>(
+    provider: EthProvider<P>,
+    contract_address: Address,
+    e3_id: U256,
+    operator: Address,
+) -> Result<Option<U256>> {
+    sol! {
+        #[sol(rpc)]
+        interface IRegistryDkgView {
+            function getDkgAnchors(uint256 e3Id)
+                external
+                view
+                returns (uint256[] memory partyIds, bytes32[] memory, bytes32[] memory);
+            function canonicalCommitteeNodeAt(uint256 e3Id, uint256 partyId) external view returns (address);
+        }
+    }
+
+    let slashing = ISlashingManager::new(contract_address, provider.provider());
+    let registry = slashing.ciphernodeRegistry().call().await?;
+    if registry == Address::ZERO {
+        return Ok(None);
+    }
+
+    let registry_view = IRegistryDkgView::new(registry, provider.provider());
+    let anchors = registry_view.getDkgAnchors(e3_id).call().await?;
+    for pid in anchors.partyIds {
+        let node = registry_view
+            .canonicalCommitteeNodeAt(e3_id, pid)
+            .call()
+            .await?;
+        if node == operator {
+            return Ok(Some(pid));
+        }
+    }
+    Ok(None)
 }

@@ -79,7 +79,7 @@ pub fn encode_dkg_attestation_bundle(
 mod tests {
     use super::*;
     use alloy::primitives::keccak256;
-    use alloy::signers::{local::PrivateKeySigner, SignerSync};
+    use alloy::signers::local::PrivateKeySigner;
     use e3_events::{DkgFoldAggCommits, DkgFoldAttestationPayload, E3id};
 
     #[test]

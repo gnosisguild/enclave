@@ -47,8 +47,14 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
     function _loadBundle(
         bytes calldata proof,
         bytes calldata dkgAttestationBundle
-    ) private pure returns (BundleData memory data) {
-        (, data.publicInputs) = abi.decode(proof, (bytes, bytes32[]));
+    ) private view returns (BundleData memory data) {
+        try this.decodeProofPublicInputs(proof) returns (
+            bytes32[] memory publicInputs
+        ) {
+            data.publicInputs = publicInputs;
+        } catch {
+            revert ICiphernodeRegistry.InvalidFoldAttestation();
+        }
         data.h = _honestPartyCount(data.publicInputs);
         // Defense in depth: require the public-inputs `partyId` slots
         // (`publicInputs[2..2+h]`) to be strictly ascending. The zk circuit
@@ -62,19 +68,48 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
                 ICiphernodeRegistry.InvalidFoldAttestation()
             );
         }
-        (data.attestations, data.bindings) = abi.decode(
-            dkgAttestationBundle,
-            (
-                DkgFoldAttestationLib.Attestation[],
-                DkgFoldAttestationLib.PartySlotBinding[]
-            )
-        );
+        try this.decodeAttestationBundle(dkgAttestationBundle) returns (
+            DkgFoldAttestationLib.Attestation[] memory attestations,
+            DkgFoldAttestationLib.PartySlotBinding[] memory bindings
+        ) {
+            data.attestations = attestations;
+            data.bindings = bindings;
+        } catch {
+            revert ICiphernodeRegistry.InvalidFoldAttestation();
+        }
         if (
             data.attestations.length != data.bindings.length ||
             data.bindings.length != data.h
         ) {
             revert ICiphernodeRegistry.AttestationBindingCountMismatch();
         }
+    }
+
+    /// @notice Exposed only for guarded decode in `_loadBundle`.
+    function decodeProofPublicInputs(
+        bytes calldata proof
+    ) external pure returns (bytes32[] memory publicInputs) {
+        (, publicInputs) = abi.decode(proof, (bytes, bytes32[]));
+    }
+
+    /// @notice Exposed only for guarded decode in `_loadBundle`.
+    function decodeAttestationBundle(
+        bytes calldata dkgAttestationBundle
+    )
+        external
+        pure
+        returns (
+            DkgFoldAttestationLib.Attestation[] memory attestations,
+            DkgFoldAttestationLib.PartySlotBinding[] memory bindings
+        )
+    {
+        (attestations, bindings) = abi.decode(
+            dkgAttestationBundle,
+            (
+                DkgFoldAttestationLib.Attestation[],
+                DkgFoldAttestationLib.PartySlotBinding[]
+            )
+        );
     }
 
     function _fillAnchors(
@@ -124,6 +159,10 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
                 data.bindings[i].partyId > data.bindings[i - 1].partyId,
                 ICiphernodeRegistry.InvalidFoldAttestation()
             );
+            require(
+                data.attestations[i].partyId > data.attestations[i - 1].partyId,
+                ICiphernodeRegistry.InvalidFoldAttestation()
+            );
         }
 
         (uint256 slot, bytes32 sk, bytes32 esm) = _verifyBinding(
@@ -131,7 +170,8 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
             chainId,
             e3Id,
             data,
-            data.bindings[i]
+            data.bindings[i],
+            data.attestations[i]
         );
 
         partyIdsOut[slot] = data.bindings[i].partyId;
@@ -158,7 +198,8 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
         uint256 chainId,
         uint256 e3Id,
         BundleData memory data,
-        DkgFoldAttestationLib.PartySlotBinding memory binding
+        DkgFoldAttestationLib.PartySlotBinding memory binding,
+        DkgFoldAttestationLib.Attestation memory att
     ) private view returns (uint256 slot, bytes32 skCommit, bytes32 esmCommit) {
         // Canonical-slot binding: `binding.node` must equal the canonical
         // operator at index `partyId` of the finalized committee — i.e.
@@ -184,9 +225,9 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
             ICiphernodeRegistry.InvalidFoldAttestation()
         );
 
-        DkgFoldAttestationLib.Attestation memory att = _findAttestation(
-            data.attestations,
-            binding.partyId
+        require(
+            att.partyId == binding.partyId,
+            ICiphernodeRegistry.InvalidFoldAttestation()
         );
 
         address signer = DkgFoldAttestationLib.recoverSigner(
@@ -218,18 +259,6 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
         );
 
         return (slot, att.skAggCommit, att.esmAggCommit);
-    }
-
-    function _findAttestation(
-        DkgFoldAttestationLib.Attestation[] memory attestations,
-        uint256 partyId
-    ) private pure returns (DkgFoldAttestationLib.Attestation memory att) {
-        for (uint256 j = 0; j < attestations.length; j++) {
-            if (attestations[j].partyId == partyId) {
-                return attestations[j];
-            }
-        }
-        revert ICiphernodeRegistry.InvalidFoldAttestation();
     }
 
     function _partySlot(

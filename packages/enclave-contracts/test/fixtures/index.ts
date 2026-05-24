@@ -6,6 +6,7 @@
 
 export { VOTE_TYPEHASH, signAndEncodeAttestation } from "./attestation";
 export { connection, ethers, ignition, networkHelpers } from "./connection";
+export * from "./dkgAttestation";
 export * from "./constants";
 export * from "./helpers";
 export { setupOperatorForSortition } from "./operators";

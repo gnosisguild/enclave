@@ -7,6 +7,7 @@
 pragma solidity 0.8.28;
 
 import { IBondingRegistry } from "./IBondingRegistry.sol";
+import { ICiphernodeRegistry } from "./ICiphernodeRegistry.sol";
 import { IE3RefundManager } from "./IE3RefundManager.sol";
 
 /**
@@ -133,6 +134,9 @@ interface ISlashingManager {
 
     /// @notice Thrown when the operator is not a member of the committee for this E3
     error OperatorNotInCommittee();
+
+    /// @notice Thrown when a requested DKG `partyId` is not present in stored anchors for this E3
+    error PartyIdNotInDkgAnchors();
 
     /// @notice Thrown when the verifier address in signed evidence doesn't match the policy's current verifier
     error VerifierMismatch();
@@ -419,6 +423,15 @@ interface ISlashingManager {
         view
         returns (IBondingRegistry registry);
 
+    /**
+     * @notice Returns the ciphernode registry contract used for committee checks and DKG anchors
+     * @return registry Address of the ciphernode registry
+     */
+    function ciphernodeRegistry()
+        external
+        view
+        returns (ICiphernodeRegistry registry);
+
     // ======================
     // Admin Functions
     // ======================
@@ -500,6 +513,22 @@ interface ISlashingManager {
     function proposeSlash(
         uint256 e3Id,
         address operator,
+        bytes calldata proof
+    ) external returns (uint256 proposalId);
+
+    /**
+     * @notice Creates a new Lane A slash proposal by DKG `partyId` attribution.
+     * @dev Resolves `operator = topNodes[partyId]` and requires `partyId` to be present in
+     *      `CiphernodeRegistry.getDkgAnchors(e3Id).partyIds` before processing attestation evidence.
+     *      This provides an explicit on-chain chain from DKG fold row/slot attribution to operator.
+     * @param e3Id ID of the E3 computation this slash relates to
+     * @param partyId Canonical committee slot / DKG party identifier
+     * @param proof Attestation evidence: abi.encode(proofType, voters, dataHashes, deadline, signatures)
+     * @return proposalId Sequential ID of the created proposal
+     */
+    function proposeSlashByDkgParty(
+        uint256 e3Id,
+        uint256 partyId,
         bytes calldata proof
     ) external returns (uint256 proposalId);
 

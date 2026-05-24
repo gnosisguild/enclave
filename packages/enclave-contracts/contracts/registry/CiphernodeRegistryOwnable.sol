@@ -155,6 +155,14 @@ contract CiphernodeRegistryOwnable is
     ///      congestion while keeping stolen signatures from being replayed indefinitely.
     uint256 public constant DEFAULT_ACCUSATION_VOTE_VALIDITY = 30 minutes;
 
+    /// @notice Minimum delay between proposing and committing a zeroing vote-validity update.
+    /// @dev Mirrors verifier critical-change timelock posture for slash-disable behavior.
+    uint256 public constant ACCUSATION_VOTE_VALIDITY_TIMELOCK = 2 days;
+
+    /// @notice Pending vote-validity proposal awaiting commit. `pendingAt == 0` means none.
+    uint256 public pendingAccusationVoteValidity;
+    uint256 public pendingAccusationVoteValidityAt;
+
     /// @notice DKG anchor commitments stored when the committee public key is published.
     mapping(uint256 e3Id => uint256[] partyIds) internal dkgPartyIds;
     mapping(uint256 e3Id => bytes32[] skAggCommits) internal dkgSkAggCommits;
@@ -679,8 +687,58 @@ contract CiphernodeRegistryOwnable is
     function setAccusationVoteValidity(
         uint256 _accusationVoteValidity
     ) external onlyOwner {
+        require(
+            _accusationVoteValidity != 0,
+            AccusationVoteValidityZeroRequiresTimelock()
+        );
         accusationVoteValidity = _accusationVoteValidity;
         emit AccusationVoteValiditySet(_accusationVoteValidity);
+    }
+
+    /// @notice Propose a new accusation vote validity window (supports zero).
+    /// @dev Zeroing the window is slash-disable behavior and therefore timelocked.
+    function proposeAccusationVoteValidity(
+        uint256 _accusationVoteValidity
+    ) external onlyOwner {
+        pendingAccusationVoteValidity = _accusationVoteValidity;
+        pendingAccusationVoteValidityAt = block.timestamp;
+        emit AccusationVoteValidityProposed(
+            _accusationVoteValidity,
+            block.timestamp + ACCUSATION_VOTE_VALIDITY_TIMELOCK
+        );
+    }
+
+    /// @notice Commit a previously proposed accusation vote validity update.
+    /// @param _accusationVoteValidity Must match the pending proposal.
+    function commitAccusationVoteValidity(
+        uint256 _accusationVoteValidity
+    ) external onlyOwner {
+        uint256 pendingAt = pendingAccusationVoteValidityAt;
+        require(pendingAt != 0, NoPendingAccusationVoteValidityUpdate());
+        uint256 pending = pendingAccusationVoteValidity;
+        require(
+            pending == _accusationVoteValidity,
+            AccusationVoteValidityMismatch(pending, _accusationVoteValidity)
+        );
+        uint256 readyAt = pendingAt + ACCUSATION_VOTE_VALIDITY_TIMELOCK;
+        require(
+            block.timestamp >= readyAt,
+            AccusationVoteValidityTimelockActive(readyAt, block.timestamp)
+        );
+        accusationVoteValidity = _accusationVoteValidity;
+        pendingAccusationVoteValidity = 0;
+        pendingAccusationVoteValidityAt = 0;
+        emit AccusationVoteValiditySet(_accusationVoteValidity);
+    }
+
+    /// @notice Cancel a pending accusation vote validity proposal.
+    function cancelAccusationVoteValidityProposal() external onlyOwner {
+        uint256 pendingAt = pendingAccusationVoteValidityAt;
+        require(pendingAt != 0, NoPendingAccusationVoteValidityUpdate());
+        uint256 pending = pendingAccusationVoteValidity;
+        pendingAccusationVoteValidity = 0;
+        pendingAccusationVoteValidityAt = 0;
+        emit AccusationVoteValidityProposalCancelled(pending);
     }
 
     ////////////////////////////////////////////////////////////

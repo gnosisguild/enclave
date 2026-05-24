@@ -15,9 +15,10 @@ use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind,
     CorrelationId, DKGInnerProofReady, DKGRecursiveAggregationComplete, DkgFoldAttestationPayload,
-    E3id, EnclaveEvent, EnclaveEventData, EventContext, EventPublisher, EventSubscriber, EventType,
-    NodeDkgFoldRequest, Proof, Sequenced, ShareEncryptionProofRequest, SignedDkgFoldAttestation,
-    ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
+    E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EventContext, EventPublisher,
+    EventSubscriber, EventType, FailureReason, NodeDkgFoldRequest, Proof, Sequenced,
+    ShareEncryptionProofRequest, SignedDkgFoldAttestation, ThresholdSharePending, TypedEvent,
+    ZkRequest, ZkResponse,
 };
 use e3_fhe_params::build_pair_for_preset;
 use tracing::{error, info, warn};
@@ -388,19 +389,18 @@ impl NodeProofAggregator {
             error!(
                 e3_id = %e3_id,
                 party_id,
-                "NodeDkgFold succeeded but fold attestation missing — publishing without proof"
+                "NodeDkgFold succeeded but fold attestation missing — failing E3"
             );
             if let Err(err) = self.bus.publish(
-                DKGRecursiveAggregationComplete {
+                E3Failed {
                     e3_id: e3_id.clone(),
-                    party_id,
-                    aggregated_proof: None,
-                    fold_attestation: None,
+                    failed_at_stage: E3Stage::CommitteeFinalized,
+                    reason: FailureReason::DKGInvalidShares,
                 },
                 state.last_ec,
             ) {
                 error!(
-                    "NodeProofAggregator: failed to publish DKGRecursiveAggregationComplete for E3 {}: {err}",
+                    "NodeProofAggregator: failed to publish E3Failed for E3 {}: {err}",
                     e3_id
                 );
             }
@@ -537,22 +537,21 @@ impl NodeProofAggregator {
             );
             let state = self.states.remove(&e3_id);
             warn!(
-                "NodeProofAggregator: E3 {} NodeDkgFold failed — publishing DKGRecursiveAggregationComplete(None)",
+                "NodeProofAggregator: E3 {} NodeDkgFold failed — publishing E3Failed",
                 e3_id
             );
 
-            if let Some(state) = state {
+            if let Some(_state) = state {
                 if let Err(err) = self.bus.publish(
-                    DKGRecursiveAggregationComplete {
+                    E3Failed {
                         e3_id: e3_id.clone(),
-                        party_id: state.meta.party_id,
-                        aggregated_proof: None,
-                        fold_attestation: None,
+                        failed_at_stage: E3Stage::CommitteeFinalized,
+                        reason: FailureReason::DKGInvalidShares,
                     },
                     ec,
                 ) {
                     error!(
-                        "NodeProofAggregator: failed to publish DKGRecursiveAggregationComplete(None) for E3 {}: {err}",
+                        "NodeProofAggregator: failed to publish E3Failed for E3 {}: {err}",
                         e3_id
                     );
                 }
@@ -596,7 +595,7 @@ mod tests {
     }
 
     #[actix::test]
-    async fn node_dkg_fold_compute_error_emits_none_aggregation_result() -> Result<()> {
+    async fn node_dkg_fold_compute_error_emits_e3_failed() -> Result<()> {
         let (bus, _rng, _seed, _params, _crp, _errors, history) = get_common_setup(None)?;
         let mut aggregator = NodeProofAggregator::new(&bus, test_signer(), HashMap::new());
         let e3_id = E3id::new("42", 1);
@@ -666,10 +665,10 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::DKGRecursiveAggregationComplete(data)
+            EnclaveEventData::E3Failed(data)
                 if data.e3_id == e3_id
-                    && data.party_id == 7
-                    && data.aggregated_proof.is_none()
+                    && data.failed_at_stage == E3Stage::CommitteeFinalized
+                    && data.reason == FailureReason::DKGInvalidShares
         ));
         assert!(!aggregator.states.contains_key(&e3_id));
         assert!(aggregator.fold_correlation.is_empty());

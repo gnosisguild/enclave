@@ -202,6 +202,20 @@ interface ICiphernodeRegistry {
     /// @param accusationVoteValidity New validity window, in seconds.
     event AccusationVoteValiditySet(uint256 accusationVoteValidity);
 
+    /// @notice Emitted when the owner proposes a new accusation vote validity value.
+    /// @param accusationVoteValidity Pending validity window, in seconds.
+    /// @param readyAt Earliest timestamp when commit is allowed.
+    event AccusationVoteValidityProposed(
+        uint256 accusationVoteValidity,
+        uint256 readyAt
+    );
+
+    /// @notice Emitted when the owner cancels a pending accusation vote validity proposal.
+    /// @param accusationVoteValidity Pending value that was cancelled.
+    event AccusationVoteValidityProposalCancelled(
+        uint256 accusationVoteValidity
+    );
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                        Errors                          //
@@ -276,6 +290,19 @@ interface ICiphernodeRegistry {
     /// @notice `commitDkgFoldAttestationVerifier` was called with an address that does
     /// not match the pending proposal (prevents commit-time substitution).
     error VerifierMismatch(address pending, address provided);
+
+    /// @notice A vote-validity commit was attempted before timelock elapsed.
+    error AccusationVoteValidityTimelockActive(uint256 readyAt, uint256 nowAt);
+
+    /// @notice `commitAccusationVoteValidity` was called but no proposal is pending.
+    error NoPendingAccusationVoteValidityUpdate();
+
+    /// @notice `commitAccusationVoteValidity` was called with value that does not match pending.
+    error AccusationVoteValidityMismatch(uint256 pending, uint256 provided);
+
+    /// @notice Directly setting `accusationVoteValidity` to zero is disallowed.
+    ///         Use `proposeAccusationVoteValidity` + `commitAccusationVoteValidity`.
+    error AccusationVoteValidityZeroRequiresTimelock();
 
     /// @notice Node has already submitted a ticket for this E3
     error NodeAlreadySubmitted();
@@ -463,6 +490,28 @@ interface ICiphernodeRegistry {
     function setSortitionSubmissionWindow(
         uint256 _sortitionSubmissionWindow
     ) external;
+
+    /// @notice Returns registry-wide accusation vote validity window (seconds).
+    function accusationVoteValidity() external view returns (uint256);
+
+    /// @notice Sets nonzero accusation vote validity directly.
+    /// @dev Setting zero requires timelocked propose/commit flow.
+    function setAccusationVoteValidity(
+        uint256 _accusationVoteValidity
+    ) external;
+
+    /// @notice Propose accusation vote validity (supports zero).
+    function proposeAccusationVoteValidity(
+        uint256 _accusationVoteValidity
+    ) external;
+
+    /// @notice Commit accusation vote validity after timelock.
+    function commitAccusationVoteValidity(
+        uint256 _accusationVoteValidity
+    ) external;
+
+    /// @notice Cancel a pending accusation vote validity proposal.
+    function cancelAccusationVoteValidityProposal() external;
 
     /// @notice Submit a ticket for sortition
     /// @dev Validates ticket against node's balance at request block

@@ -352,6 +352,26 @@ contract SlashingManager is
         address operator,
         bytes calldata proof
     ) external returns (uint256 proposalId) {
+        return _proposeSlash(e3Id, operator, proof);
+    }
+
+    /// @inheritdoc ISlashingManager
+    /// @dev Additive attribution path: resolves `operator` from DKG anchors and
+    ///      canonical committee slot before reusing Lane A attestation validation.
+    function proposeSlashByDkgParty(
+        uint256 e3Id,
+        uint256 partyId,
+        bytes calldata proof
+    ) external returns (uint256 proposalId) {
+        address operator = _resolveDkgPartyOperator(e3Id, partyId);
+        return _proposeSlash(e3Id, operator, proof);
+    }
+
+    function _proposeSlash(
+        uint256 e3Id,
+        address operator,
+        bytes calldata proof
+    ) internal returns (uint256 proposalId) {
         require(operator != address(0), ZeroAddress());
         require(proof.length != 0, ProofRequired());
 
@@ -415,6 +435,27 @@ contract SlashingManager is
         if (policy.appealWindow == 0) {
             _executeSlash(proposalId, Lane.LaneA);
         }
+    }
+
+    /// @dev Resolve a slash target from DKG anchors:
+    ///      - `partyId` must be present in `getDkgAnchors(e3Id).partyIds`
+    ///      - operator is resolved as canonical committee slot `topNodes[partyId]`
+    function _resolveDkgPartyOperator(
+        uint256 e3Id,
+        uint256 partyId
+    ) internal view returns (address operator) {
+        (uint256[] memory partyIds, , ) = ciphernodeRegistry.getDkgAnchors(
+            e3Id
+        );
+        bool found = false;
+        for (uint256 i = 0; i < partyIds.length; i++) {
+            if (partyIds[i] == partyId) {
+                found = true;
+                break;
+            }
+        }
+        require(found, PartyIdNotInDkgAnchors());
+        return ciphernodeRegistry.canonicalCommitteeNodeAt(e3Id, partyId);
     }
 
     /// @inheritdoc ISlashingManager

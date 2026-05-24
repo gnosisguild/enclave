@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { expect } from "chai";
-import type { Signer } from "ethers";
 
 import {
   ADDRESS_TWO as AddressTwo,
+  buildMockAggregationPublishArgs,
   deployEnclaveSystem,
   ENCRYPTION_SCHEME_ID as encryptionSchemeId,
   ethers,
@@ -39,133 +39,6 @@ describe("Enclave", function () {
 
   const data = "0xda7a";
   const proof = "0x1337";
-
-  /** Public inputs layout for `DkgFoldAttestationVerifier` with `h` honest parties. */
-  const encodeMockDkgProofForAttestation = (
-    pkCommitment: string,
-    partyIds: number[],
-    skCommits: string[],
-    esmCommits: string[],
-  ): string => {
-    const h = partyIds.length;
-    const publicInputs: string[] = Array.from(
-      { length: 6 + 3 * h },
-      () => ethers.ZeroHash,
-    );
-    publicInputs[publicInputs.length - 1] = pkCommitment;
-    for (let i = 0; i < h; i++) {
-      publicInputs[2 + i] = ethers.zeroPadValue(
-        ethers.toBeHex(partyIds[i]),
-        32,
-      );
-      publicInputs[5 + h + i] = skCommits[i];
-      publicInputs[5 + 2 * h + i] = esmCommits[i];
-    }
-    return ethers.AbiCoder.defaultAbiCoder().encode(
-      ["bytes", "bytes32[]"],
-      ["0x", publicInputs],
-    );
-  };
-
-  const signFoldAttestation = async (
-    signer: Signer,
-    chainId: bigint,
-    verifyingContract: string,
-    e3Id: number,
-    partyId: number,
-    skAggCommit: string,
-    esmAggCommit: string,
-  ): Promise<string> => {
-    const domain = {
-      name: "EnclaveDkgFoldAttestation",
-      version: "1",
-      chainId,
-      verifyingContract,
-    };
-    const types = {
-      DkgFoldAttestation: [
-        { name: "e3Id", type: "uint256" },
-        { name: "partyId", type: "uint256" },
-        { name: "skAggCommit", type: "bytes32" },
-        { name: "esmAggCommit", type: "bytes32" },
-      ],
-    };
-    const value = { e3Id, partyId, skAggCommit, esmAggCommit };
-    return signer.signTypedData(domain, types, value);
-  };
-
-  /** Proof + attestation bundle for `publishCommittee` when proof aggregation is enabled. */
-  const buildMockAggregationPublishArgs = async (
-    operators: Signer[],
-    e3Id: number,
-    publicKey: string,
-    verifyingContract: string,
-  ): Promise<{ proof: string; bundle: string }> => {
-    const pkCommitment = ethers.keccak256(publicKey);
-    const h = operators.length;
-    const partyIds = Array.from({ length: h }, (_, i) => i);
-    const skCommits = partyIds.map((i) => ethers.id(`sk-${e3Id}-${i}`));
-    const esmCommits = partyIds.map((i) => ethers.id(`esm-${e3Id}-${i}`));
-    const proof = encodeMockDkgProofForAttestation(
-      pkCommitment,
-      partyIds,
-      skCommits,
-      esmCommits,
-    );
-
-    // `topNodes` is address-ascending on chain; bindings must map
-    // `partyId -> topNodes[partyId]`, so sort operators by address first.
-    const operatorWithAddrs = await Promise.all(
-      operators.map(async (op) => ({ op, addr: await op.getAddress() })),
-    );
-    operatorWithAddrs.sort((a, b) =>
-      a.addr.toLowerCase() < b.addr.toLowerCase()
-        ? -1
-        : a.addr.toLowerCase() > b.addr.toLowerCase()
-          ? 1
-          : 0,
-    );
-
-    const { chainId } = await ethers.provider.getNetwork();
-    const attestations: {
-      partyId: number;
-      skAggCommit: string;
-      esmAggCommit: string;
-      signature: string;
-    }[] = [];
-    const bindings: { partyId: number; node: string }[] = [];
-
-    for (let i = 0; i < h; i++) {
-      const operator = operatorWithAddrs[i]!.op;
-      const node = operatorWithAddrs[i]!.addr;
-      const partyId = partyIds[i]!;
-      attestations.push({
-        partyId,
-        skAggCommit: skCommits[i]!,
-        esmAggCommit: esmCommits[i]!,
-        signature: await signFoldAttestation(
-          operator,
-          chainId,
-          verifyingContract,
-          e3Id,
-          partyId,
-          skCommits[i]!,
-          esmCommits[i]!,
-        ),
-      });
-      bindings.push({ partyId, node });
-    }
-
-    const bundle = ethers.AbiCoder.defaultAbiCoder().encode(
-      [
-        "tuple(uint256 partyId, bytes32 skAggCommit, bytes32 esmAggCommit, bytes signature)[]",
-        "tuple(uint256 partyId, address node)[]",
-      ],
-      [attestations, bindings],
-    );
-
-    return { proof, bundle };
-  };
 
   const inputWindowDuration = 300;
 

@@ -69,3 +69,41 @@ pub fn extract_node_fold_agg_commits(
         },
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use e3_utils::ArcBytes;
+
+    #[test]
+    fn extracts_expected_fields_from_golden_layout_vector() {
+        // Golden layout vector: verifies positional extraction
+        // (party_id at index 0, sk/esm commits at tail).
+        let n = 3usize;
+        let h = 3usize;
+        let l = 2usize;
+        let field_count = node_fold_public_field_count(n, h, l);
+
+        let mut fields = vec![[0u8; 32]; field_count];
+        fields[0][31] = 2; // party_id = 2
+        fields[field_count - 2] = [0x11; 32];
+        fields[field_count - 1] = [0x22; 32];
+
+        let mut public_signals = Vec::with_capacity(field_count * 32);
+        for f in fields {
+            public_signals.extend_from_slice(&f);
+        }
+
+        let proof = Proof::new(
+            CircuitName::NodeFold,
+            ArcBytes::from_bytes(&[]),
+            ArcBytes::from_bytes(&public_signals),
+        );
+
+        let (party_id, commits) =
+            extract_node_fold_agg_commits(&proof, n, h, l).expect("extract should succeed");
+        assert_eq!(party_id, 2);
+        assert_eq!(commits.sk_agg_commit, [0x11; 32]);
+        assert_eq!(commits.esm_agg_commit, [0x22; 32]);
+    }
+}
