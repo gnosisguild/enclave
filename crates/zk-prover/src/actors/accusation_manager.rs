@@ -27,7 +27,8 @@
 //! | C7      | On-chain verification      | Not handled here (on-chain verifier)        |
 
 use std::collections::{HashMap, HashSet};
-use std::time::Duration;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use actix::{Actor, Addr, AsyncContext, Context, Handler, SpawnHandle};
 use alloy::primitives::{keccak256, Address, Bytes, U256};
@@ -40,19 +41,51 @@ use e3_events::{
     ComputeResponseKind, CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EventContext,
     EventPublisher, EventSubscriber, EventType, PartyProofsToVerify, ProofFailureAccusation,
     ProofType, ProofVerificationFailed, ProofVerificationPassed, Sequenced, SignedProofPayload,
-    SlashExecuted, TypedEvent, VerifyShareProofsRequest, ZkRequest, ZkResponse,
+    SlashExecuted, TypedEvent, VerifyShareProofsRequest, ZkRequest, ZkResponse, VOTE_DOMAIN_NAME,
+    VOTE_DOMAIN_VERSION, VOTE_TYPEHASH_STR,
 };
 use e3_utils::{ArcBytes, NotifySync};
 use tracing::{error, info, warn};
 
 /// How long to wait for votes before declaring the accusation inconclusive.
 const DEFAULT_VOTE_TIMEOUT: Duration = Duration::from_secs(300); // 5 minutes
+/// Default clock-skew allowance when validating peer-stamped accusation deadlines.
+#[cfg(test)]
+const DEFAULT_ACCUSATION_DEADLINE_SKEW_SECS: u64 = 30;
 
-/// An active accusation awaiting votes from committee members.
+/// Abstraction over wall-clock time so the deadline-stamping logic is
+/// deterministically testable. Production uses [`SystemClock`], which reads
+/// `SystemTime::now()`; tests can inject a mock clock that returns fixed
+/// timestamps.
+pub trait Clock: Send + Sync + 'static {
+    /// Current Unix time in seconds. Returns `0` if the platform clock is
+    /// pre-`UNIX_EPOCH` (a broken clock should not silently produce
+    /// signatures that look valid forever — the on-chain check will then
+    /// reject the resulting deadline immediately).
+    fn unix_now_secs(&self) -> u64;
+}
+
+/// Production clock backed by `SystemTime::now()`.
+pub struct SystemClock;
+
+impl Clock for SystemClock {
+    fn unix_now_secs(&self) -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    }
+}
+
+/// An active accusation awaiting agreement votes from committee members.
+///
+/// There is no `votes_against` field: a peer who finds the disputed proof
+/// passes simply stays silent rather than broadcasting a signed disagreement
+/// (see `AccusationVote` docstring for rationale). The accusation runs to
+/// quorum or to `vote_timeout`.
 struct PendingAccusation {
     accusation: ProofFailureAccusation,
     votes_for: Vec<AccusationVote>,
-    votes_against: Vec<AccusationVote>,
     /// Handle to the timeout future so it can be cancelled on early quorum.
     timeout_handle: Option<SpawnHandle>,
     /// The EventContext from when this accusation was created — used for timeout emission.
@@ -65,6 +98,13 @@ struct ReceivedProofData {
     data_hash: [u8; 32],
     /// `true` if our local verification passed, `false` if it failed.
     verification_passed: bool,
+    /// Raw `abi.encode(proof.data, proof.public_signals)` — preimage of
+    /// `data_hash`. Forwarded to the on-chain slashing contract so it can
+    /// recompute and verify the dataHash bound in voter signatures. Empty
+    /// only on paths where the raw bytes weren't available locally; those
+    /// paths can still slash, but they fall back to off-chain trust for
+    /// the evidence binding.
+    evidence: Bytes,
 }
 
 /// Tracks an in-flight ZK re-verification for a forwarded C3a/C3b proof.
@@ -73,6 +113,9 @@ struct PendingReVerification {
     data_hash: [u8; 32],
     accused: Address,
     proof_type: ProofType,
+    /// Evidence preimage bytes from the forwarded proof, used to populate
+    /// `ReceivedProofData.evidence` after ZK re-verification completes.
+    evidence: Bytes,
 }
 
 /// Manages the off-chain accusation quorum protocol.
@@ -107,6 +150,9 @@ pub struct AccusationManager {
     my_address: Address,
     signer: PrivateKeySigner,
 
+    /// On-chain `SlashingManager` address (EIP-712 `verifyingContract` for vote signatures).
+    slashing_manager: Address,
+
     /// All committee member addresses for this E3.
     committee: Vec<Address>,
     /// Quorum threshold — matches the cryptographic threshold M.
@@ -133,18 +179,65 @@ pub struct AccusationManager {
     /// Vote timeout duration.
     vote_timeout: Duration,
 
+    /// Registry-wide off-chain freshness window (seconds) applied when stamping
+    /// `AccusationVote.deadline`. Fetched once per process from
+    /// `CiphernodeRegistry.accusationVoteValidity()` so a governance change
+    /// requires a node restart to take effect — same lifecycle as the fold
+    /// attestation verifier.
+    vote_validity_secs: u64,
+    /// Clock-skew allowance when validating peer accusation deadlines.
+    accusation_deadline_skew_secs: u64,
+
+    /// Wall-clock source used to derive accusation deadlines. Production uses
+    /// [`SystemClock`]; tests can inject a deterministic mock.
+    clock: Arc<dyn Clock>,
+
     /// BFV preset for circuit artifact resolution.
     params_preset: e3_fhe_params::BfvPreset,
 }
 
 impl AccusationManager {
+    /// Construct an actor with the production [`SystemClock`]. Use
+    /// [`AccusationManager::new_with_clock`] in tests that need deterministic
+    /// timestamps.
     pub fn new(
         bus: &BusHandle,
         e3_id: E3id,
         signer: PrivateKeySigner,
+        slashing_manager: Address,
         committee: Vec<Address>,
         threshold_m: usize,
+        vote_validity_secs: u64,
+        accusation_deadline_skew_secs: u64,
         params_preset: e3_fhe_params::BfvPreset,
+    ) -> Self {
+        Self::new_with_clock(
+            bus,
+            e3_id,
+            signer,
+            slashing_manager,
+            committee,
+            threshold_m,
+            vote_validity_secs,
+            accusation_deadline_skew_secs,
+            params_preset,
+            Arc::new(SystemClock),
+        )
+    }
+
+    /// Construct an actor with an explicit [`Clock`]. Allows unit tests to
+    /// drive deadline computation without touching wall-clock time.
+    pub fn new_with_clock(
+        bus: &BusHandle,
+        e3_id: E3id,
+        signer: PrivateKeySigner,
+        slashing_manager: Address,
+        committee: Vec<Address>,
+        threshold_m: usize,
+        vote_validity_secs: u64,
+        accusation_deadline_skew_secs: u64,
+        params_preset: e3_fhe_params::BfvPreset,
+        clock: Arc<dyn Clock>,
     ) -> Self {
         let my_address = signer.address();
         Self {
@@ -152,6 +245,7 @@ impl AccusationManager {
             e3_id,
             my_address,
             signer,
+            slashing_manager,
             committee,
             threshold_m,
             pending: HashMap::new(),
@@ -160,6 +254,9 @@ impl AccusationManager {
             buffered_votes: HashMap::new(),
             pending_reverifications: HashMap::new(),
             vote_timeout: DEFAULT_VOTE_TIMEOUT,
+            vote_validity_secs,
+            accusation_deadline_skew_secs,
+            clock,
             params_preset,
         }
     }
@@ -168,11 +265,25 @@ impl AccusationManager {
         bus: &BusHandle,
         e3_id: E3id,
         signer: PrivateKeySigner,
+        slashing_manager: Address,
         committee: Vec<Address>,
         threshold_m: usize,
+        vote_validity_secs: u64,
+        accusation_deadline_skew_secs: u64,
         params_preset: e3_fhe_params::BfvPreset,
     ) -> Addr<Self> {
-        let addr = Self::new(bus, e3_id, signer, committee, threshold_m, params_preset).start();
+        let addr = Self::new(
+            bus,
+            e3_id,
+            signer,
+            slashing_manager,
+            committee,
+            threshold_m,
+            vote_validity_secs,
+            accusation_deadline_skew_secs,
+            params_preset,
+        )
+        .start();
         bus.subscribe(EventType::ProofVerificationFailed, addr.clone().into());
         bus.subscribe(EventType::ProofVerificationPassed, addr.clone().into());
         bus.subscribe(EventType::ProofFailureAccusation, addr.clone().into());
@@ -185,6 +296,48 @@ impl AccusationManager {
             addr.clone().into(),
         );
         addr
+    }
+
+    // ─── Deadline computation ────────────────────────────────────────────
+
+    /// Compute the on-chain vote-validity deadline (Unix seconds) the accuser
+    /// stamps on a fresh accusation. Voters then sign this exact value so the
+    /// aggregated evidence carries one shared deadline that `SlashingManager`
+    /// checks via `block.timestamp <= deadline`.
+    ///
+    /// `vote_validity_secs` is the registry-wide window fetched from
+    /// `CiphernodeRegistry.accusationVoteValidity()` at process startup —
+    /// governance can shorten or extend it; live nodes only pick up the new
+    /// value on restart.
+    ///
+    /// `saturating_add` guards against `u64` overflow in the unlikely event
+    /// governance sets the validity to a near-`u64::MAX` value.
+    fn compute_deadline(&self) -> u64 {
+        self.clock
+            .unix_now_secs()
+            .saturating_add(self.vote_validity_secs)
+    }
+
+    /// Validate a peer-provided accusation deadline against this node's local
+    /// vote-validity policy and wall clock.
+    ///
+    /// Accept iff:
+    /// - validity is enabled (`vote_validity_secs > 0`)
+    /// - deadline is strictly in the future
+    /// - deadline is not farther than `now + vote_validity_secs + skew`
+    fn is_peer_deadline_acceptable(
+        deadline: u64,
+        now: u64,
+        vote_validity_secs: u64,
+        skew_secs: u64,
+    ) -> bool {
+        if vote_validity_secs == 0 {
+            return false;
+        }
+        let max_deadline = now
+            .saturating_add(vote_validity_secs)
+            .saturating_add(skew_secs);
+        deadline > now && deadline <= max_deadline
     }
 
     // ─── Accusation ID computation ───────────────────────────────────────
@@ -212,22 +365,25 @@ impl AccusationManager {
 
     // ─── Signing / Verification ──────────────────────────────────────────
 
-    fn sign_accusation_digest(&self, accusation: &ProofFailureAccusation) -> Vec<u8> {
+    fn sign_accusation_digest(
+        &self,
+        accusation: &ProofFailureAccusation,
+    ) -> Result<Vec<u8>, alloy::signers::Error> {
         let digest = Self::accusation_digest(accusation);
-        self.signer
-            .sign_message_sync(&digest)
-            .map(|sig| sig.as_bytes().to_vec())
-            .unwrap_or_default()
+        let sig = self.signer.sign_message_sync(&digest)?;
+        Ok(sig.as_bytes().to_vec())
     }
 
     /// Structured digest for ECDSA signing of accusations.
     ///
-    /// Uses a typehash + `abi.encode` pattern matching `ProofPayload::digest()`:
+    /// Off-chain only — this digest never reaches the chain. Includes `deadline`
+    /// so peers can verify the accuser's chosen on-chain validity window has not
+    /// been tampered with in transit:
     /// ```text
     /// keccak256(abi.encode(
     ///     ACCUSATION_TYPEHASH,
     ///     chainId, e3Id, accuser, accused, proofType,
-    ///     dataHash
+    ///     dataHash, deadline
     /// ))
     /// ```
     fn accusation_digest(accusation: &ProofFailureAccusation) -> [u8; 32] {
@@ -237,7 +393,7 @@ impl AccusationManager {
             .try_into()
             .expect("E3id should be valid U256");
         let typehash: [u8; 32] = keccak256(
-            "ProofFailureAccusation(uint256 chainId,uint256 e3Id,address accuser,address accused,uint256 proofType,bytes32 dataHash)"
+            "ProofFailureAccusation(uint256 chainId,uint256 e3Id,address accuser,address accused,uint256 proofType,bytes32 dataHash,uint256 deadline)"
         ).into();
         let encoded = (
             typehash,
@@ -247,6 +403,7 @@ impl AccusationManager {
             accusation.accused,
             U256::from(accusation.proof_type as u8),
             accusation.data_hash,
+            U256::from(accusation.deadline),
         )
             .abi_encode();
         keccak256(&encoded).into()
@@ -266,53 +423,94 @@ impl AccusationManager {
         }
     }
 
-    fn sign_vote_digest(&self, vote: &AccusationVote) -> Vec<u8> {
-        let digest = Self::vote_digest(vote);
-        self.signer
-            .sign_message_sync(&digest)
-            .map(|sig| sig.as_bytes().to_vec())
-            .unwrap_or_default()
+    #[cfg_attr(test, allow(dead_code))]
+    fn sign_vote_digest(&self, vote: &AccusationVote) -> Result<Vec<u8>, alloy::signers::Error> {
+        let digest = Self::vote_digest(vote, self.slashing_manager);
+        // `sign_hash_sync` signs the raw 32-byte hash without EIP-191 wrapping,
+        // which is what EIP-712 requires (`digest` is already the
+        // `\x19\x01 || domainSeparator || structHash` hash).
+        let sig = self.signer.sign_hash_sync(&digest.into())?;
+        Ok(sig.as_bytes().to_vec())
     }
 
-    /// Structured digest for ECDSA signing of votes.
+    /// Canonical EIP-712 domain separator for vote signatures.
     ///
-    /// ```text
-    /// keccak256(abi.encode(
-    ///     VOTE_TYPEHASH,
-    ///     chainId, e3Id, accusationId, voter, agrees,
-    ///     dataHash
-    /// ))
-    /// ```
-    fn vote_digest(vote: &AccusationVote) -> [u8; 32] {
-        let e3_id_u256: U256 = vote
-            .e3_id
-            .clone()
-            .try_into()
-            .expect("E3id should be valid U256");
-        let typehash: [u8; 32] = keccak256(
-            "AccusationVote(uint256 chainId,uint256 e3Id,bytes32 accusationId,address voter,bool agrees,bytes32 dataHash)"
-        ).into();
+    /// Must match `SlashingManager`'s domain construction exactly. The `name`
+    /// literal is `EIP712_DOMAIN_NAME` in the Solidity contract (see
+    /// `packages/enclave-contracts/contracts/slashing/SlashingManager.sol`);
+    /// keep these two strings in lockstep — divergence silently breaks
+    /// `ECDSA.recover` on chain.
+    fn vote_domain_separator(chain_id: u64, verifying_contract: Address) -> [u8; 32] {
+        let domain_typehash: [u8; 32] = keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
+        )
+        .into();
+        let name_hash: [u8; 32] = keccak256(VOTE_DOMAIN_NAME).into();
+        let version_hash: [u8; 32] = keccak256(VOTE_DOMAIN_VERSION).into();
         let encoded = (
-            typehash,
-            U256::from(vote.e3_id.chain_id()),
-            e3_id_u256,
-            vote.accusation_id,
-            vote.voter,
-            vote.agrees,
-            vote.data_hash,
+            domain_typehash,
+            name_hash,
+            version_hash,
+            U256::from(chain_id),
+            verifying_contract,
         )
             .abi_encode();
         keccak256(&encoded).into()
     }
 
+    /// Canonical EIP-712 typed-data hash for a vote.
+    ///
+    /// `keccak256("\x19\x01" || domainSeparator || structHash)` where the struct
+    /// matches `SlashingManager.VOTE_TYPEHASH`:
+    /// `AccusationVote(uint256 e3Id,bytes32 accusationId,address voter,bytes32 dataHash,uint256 deadline)`.
+    ///
+    /// `AccusationVote` no longer carries an `agrees` field. The gossip wire
+    /// transmits only agreements; the on-chain verifier treats every submitted
+    /// signature as an affirmative vote. See the struct's docstring in
+    /// `e3_events::accusation_vote` for rationale.
+    ///
+    /// Exposed `pub` so the Anvil parity test in
+    /// `crates/zk-prover/tests/slashing_integration_tests.rs` can sign votes
+    /// through the **same** code path the production actor uses — if the
+    /// digest drifts from on-chain `_verifyVotes`, the parity test reverts on
+    /// chain immediately rather than allowing the actor to ship broken
+    /// signatures.
+    pub fn vote_digest(vote: &AccusationVote, verifying_contract: Address) -> [u8; 32] {
+        let e3_id_u256: U256 = vote
+            .e3_id
+            .clone()
+            .try_into()
+            .expect("E3id should be valid U256");
+        let typehash: [u8; 32] = keccak256(VOTE_TYPEHASH_STR).into();
+        let struct_hash: [u8; 32] = keccak256(
+            &(
+                typehash,
+                e3_id_u256,
+                vote.accusation_id,
+                vote.voter,
+                vote.data_hash,
+                U256::from(vote.deadline),
+            )
+                .abi_encode(),
+        )
+        .into();
+        let domain = Self::vote_domain_separator(vote.e3_id.chain_id(), verifying_contract);
+        let mut buf = Vec::with_capacity(2 + 32 + 32);
+        buf.push(0x19);
+        buf.push(0x01);
+        buf.extend_from_slice(&domain);
+        buf.extend_from_slice(&struct_hash);
+        keccak256(&buf).into()
+    }
+
     fn verify_vote_signature(&self, vote: &AccusationVote) -> bool {
-        let digest = Self::vote_digest(vote);
+        let digest = Self::vote_digest(vote, self.slashing_manager);
         let sig =
             match alloy::primitives::Signature::try_from(vote.signature.extract_bytes().as_ref()) {
                 Ok(s) => s,
                 Err(_) => return false,
             };
-        match sig.recover_address_from_msg(&digest) {
+        match sig.recover_address_from_prehash(&digest.into()) {
             Ok(addr) => addr == vote.voter,
             Err(_) => false,
         }
@@ -330,6 +528,10 @@ impl AccusationManager {
         ec: &EventContext<Sequenced>,
         ctx: &mut Context<Self>,
     ) {
+        if event.e3_id != self.e3_id {
+            return;
+        }
+
         let accused_address = if event.accused_address == Address::ZERO {
             if let Some(&addr) = self.committee.get(event.accused_party_id as usize) {
                 warn!(
@@ -348,12 +550,30 @@ impl AccusationManager {
             event.accused_address
         };
 
-        // Cache the failed verification result
+        if !self.committee.contains(&accused_address) {
+            warn!(
+                "Ignoring proof failure for {} — not on E3 {} committee",
+                accused_address, self.e3_id
+            );
+            return;
+        }
+
+        // Cache the failed verification result.
+        // Evidence preimage = `abi.encode(proof.data, public_signals)` — matches
+        // the on-chain `keccak256(evidence) == dataHash` check in SlashingManager.
+        let evidence = Bytes::from(
+            (
+                Bytes::copy_from_slice(&event.signed_payload.payload.proof.data),
+                Bytes::copy_from_slice(&event.signed_payload.payload.proof.public_signals),
+            )
+                .abi_encode(),
+        );
         self.received_data.insert(
             (accused_address, event.proof_type),
             ReceivedProofData {
                 data_hash: event.data_hash,
                 verification_passed: false,
+                evidence,
             },
         );
 
@@ -387,12 +607,29 @@ impl AccusationManager {
         ec: &EventContext<Sequenced>,
         ctx: &mut Context<Self>,
     ) {
-        // Cache as a failed verification for voting on future accusations
+        if data.e3_id != self.e3_id {
+            return;
+        }
+
+        if !self.committee.contains(&data.accused_address) {
+            warn!(
+                "Ignoring commitment violation for {} — not on E3 {} committee",
+                data.accused_address, self.e3_id
+            );
+            return;
+        }
+
+        // Cache as a failed verification for voting on future accusations.
+        // `data.evidence` carries the raw `abi.encode(proof.data, public_signals)`
+        // preimage of `data_hash`, populated by the consistency checker. Slashing
+        // via this path now binds voter signatures to evidence bytes on-chain
+        // just like the ProofVerificationFailed path.
         self.received_data.insert(
             (data.accused_address, data.proof_type),
             ReceivedProofData {
                 data_hash: data.data_hash,
                 verification_passed: false,
+                evidence: data.evidence.clone(),
             },
         );
 
@@ -423,6 +660,14 @@ impl AccusationManager {
         ec: &EventContext<Sequenced>,
         ctx: &mut Context<Self>,
     ) {
+        if !self.committee.contains(&accused_address) {
+            warn!(
+                "Refusing accusation against {} — not on E3 {} committee",
+                accused_address, self.e3_id
+            );
+            return;
+        }
+
         let key = (accused_address, proof_type);
 
         // Dedup: don't create multiple accusations for the same (accused, proof_type)
@@ -434,6 +679,22 @@ impl AccusationManager {
             return;
         }
 
+        // Governance-disabled validity window means no accusation voting should
+        // be produced by this node.
+        if self.vote_validity_secs == 0 {
+            warn!(
+                "Refusing accusation initiation for {:?} on E3 {}: vote_validity_secs is 0",
+                accused_address, self.e3_id
+            );
+            self.accused_proofs.remove(&key);
+            return;
+        }
+
+        // Pick the on-chain validity deadline once per accusation. Every voter
+        // (including ourselves below) signs the same value; otherwise the
+        // aggregated evidence cannot be encoded as a single `deadline`.
+        let deadline = self.compute_deadline();
+
         // Create the accusation
         let mut accusation = ProofFailureAccusation {
             e3_id: self.e3_id.clone(),
@@ -442,10 +703,18 @@ impl AccusationManager {
             accused_party_id,
             proof_type,
             data_hash,
+            deadline,
             signed_payload: forwarded_payload,
             signature: ArcBytes::default(),
         };
-        accusation.signature = ArcBytes::from_bytes(&self.sign_accusation_digest(&accusation));
+        match self.sign_accusation_digest(&accusation) {
+            Ok(sig) => accusation.signature = ArcBytes::from_bytes(&sig),
+            Err(err) => {
+                error!("Failed to sign ProofFailureAccusation: {err}");
+                self.accused_proofs.remove(&key);
+                return;
+            }
+        }
 
         let accusation_id = Self::accusation_id(&accusation);
 
@@ -460,16 +729,22 @@ impl AccusationManager {
             return;
         }
 
-        // Cast own vote (agrees: true)
+        // Cast our own agreement vote (we just observed the failure locally).
         let mut own_vote = AccusationVote {
             e3_id: self.e3_id.clone(),
             accusation_id,
             voter: self.my_address,
-            agrees: true,
             data_hash,
+            deadline,
             signature: ArcBytes::default(),
         };
-        own_vote.signature = ArcBytes::from_bytes(&self.sign_vote_digest(&own_vote));
+        match self.sign_vote_digest(&own_vote) {
+            Ok(sig) => own_vote.signature = ArcBytes::from_bytes(&sig),
+            Err(err) => {
+                error!("Failed to sign own AccusationVote: {err}");
+                return;
+            }
+        }
 
         if let Err(err) = self.bus.publish(own_vote.clone(), ec.clone()) {
             error!("Failed to broadcast own AccusationVote: {err}");
@@ -486,7 +761,6 @@ impl AccusationManager {
             PendingAccusation {
                 accusation,
                 votes_for: vec![own_vote],
-                votes_against: Vec::new(),
                 timeout_handle: Some(timeout_handle),
                 ec: ec.clone(),
             },
@@ -514,6 +788,29 @@ impl AccusationManager {
     ) {
         // Ignore accusations for other E3s
         if accusation.e3_id != self.e3_id {
+            return;
+        }
+
+        let now = self.clock.unix_now_secs();
+        if !Self::is_peer_deadline_acceptable(
+            accusation.deadline,
+            now,
+            self.vote_validity_secs,
+            self.accusation_deadline_skew_secs,
+        ) {
+            let max_deadline = now
+                .saturating_add(self.vote_validity_secs)
+                .saturating_add(self.accusation_deadline_skew_secs);
+            warn!(
+                "Ignoring accusation from {} — deadline {} outside local validity window \
+                 (now={}, vote_validity_secs={}, skew_secs={}, max_accepted_deadline={})",
+                accusation.accuser,
+                accusation.deadline,
+                now,
+                self.vote_validity_secs,
+                self.accusation_deadline_skew_secs,
+                max_deadline
+            );
             return;
         }
 
@@ -556,11 +853,25 @@ impl AccusationManager {
             return;
         }
 
-        // Determine our vote based on our local verification state
+        // Determine our position based on our local verification state.
+        //
+        // The gossip wire no longer carries disagreement: if our local check
+        // *passed*, we stay silent (no broadcast, no pending state). The
+        // accusation will then either reach quorum from other agreeing peers
+        // or time out as Inconclusive. Only the "we also saw it fail" branch
+        // and the "we don't have local data yet (C3a/C3b)" branch proceed
+        // below.
         let key = (accusation.accused, accusation.proof_type);
-        let (agrees, our_data_hash) = if let Some(received) = self.received_data.get(&key) {
-            // We have the data — did our verification also fail?
-            (!received.verification_passed, received.data_hash)
+        let our_data_hash = if let Some(received) = self.received_data.get(&key) {
+            if received.verification_passed {
+                info!(
+                    "Local verification of {:?} from {} passed — abstaining \
+                     (no disagreement vote on the wire)",
+                    accusation.proof_type, accusation.accused
+                );
+                return;
+            }
+            received.data_hash
         } else if let Some(ref forwarded) = accusation.signed_payload {
             // C3a/C3b case: we didn't receive this proof directly.
             // Validate the forwarded payload's ECDSA, then dispatch async ZK re-verification.
@@ -592,6 +903,12 @@ impl AccusationManager {
             }
 
             let data_hash = Self::compute_payload_hash(forwarded);
+            let evidence: Bytes = (
+                Bytes::copy_from_slice(&forwarded.payload.proof.data),
+                Bytes::copy_from_slice(&forwarded.payload.proof.public_signals),
+            )
+                .abi_encode()
+                .into();
             let accused_party_id = accusation.accused_party_id;
             let forwarded_clone = forwarded.clone();
 
@@ -612,7 +929,6 @@ impl AccusationManager {
                 PendingAccusation {
                     accusation,
                     votes_for: Vec::new(),
-                    votes_against: Vec::new(),
                     timeout_handle: Some(timeout_handle),
                     ec: ec.clone(),
                 },
@@ -634,6 +950,7 @@ impl AccusationManager {
                     data_hash,
                     accused: key.0,
                     proof_type: key.1,
+                    evidence,
                 },
             );
 
@@ -666,22 +983,28 @@ impl AccusationManager {
             return;
         };
 
-        // Cast vote
+        // We saw the proof fail locally — agree with the accusation. Adopt
+        // the accuser's deadline so every voter on this accusation signs the
+        // same on-chain validity window.
         let mut vote = AccusationVote {
             e3_id: self.e3_id.clone(),
             accusation_id,
             voter: self.my_address,
-            agrees,
             data_hash: our_data_hash,
+            deadline: accusation.deadline,
             signature: ArcBytes::default(),
         };
-        vote.signature = ArcBytes::from_bytes(&self.sign_vote_digest(&vote));
+        match self.sign_vote_digest(&vote) {
+            Ok(sig) => vote.signature = ArcBytes::from_bytes(&sig),
+            Err(err) => {
+                error!("Failed to sign AccusationVote: {err}");
+                return;
+            }
+        }
 
         info!(
-            "Voting {} on accusation against {} for {:?}",
-            if agrees { "AGREE" } else { "DISAGREE" },
-            accusation.accused,
-            accusation.proof_type
+            "Agreeing with accusation against {} for {:?}",
+            accusation.accused, accusation.proof_type
         );
 
         // Broadcast vote via gossip
@@ -697,12 +1020,7 @@ impl AccusationManager {
         // Record in pending
         let pending = PendingAccusation {
             accusation,
-            votes_for: if agrees {
-                vec![vote.clone()]
-            } else {
-                Vec::new()
-            },
-            votes_against: if agrees { Vec::new() } else { vec![vote] },
+            votes_for: vec![vote],
             timeout_handle: Some(timeout_handle),
             ec: ec.clone(),
         };
@@ -766,6 +1084,18 @@ impl AccusationManager {
             return;
         };
 
+        // Reject votes whose deadline disagrees with the accusation's chosen
+        // deadline. All voters must sign the same deadline so the aggregated
+        // evidence carries a single value for `SlashingManager`'s
+        // `block.timestamp <= deadline` check.
+        if vote.deadline != pending.accusation.deadline {
+            warn!(
+                "Ignoring vote from {} — deadline {} does not match accusation deadline {}",
+                vote.voter, vote.deadline, pending.accusation.deadline
+            );
+            return;
+        }
+
         // Reject votes from the accused party — they have a conflict of interest
         if vote.voter == pending.accusation.accused {
             warn!(
@@ -776,11 +1106,7 @@ impl AccusationManager {
         }
 
         // Dedup: don't count same voter twice
-        let already_voted = pending
-            .votes_for
-            .iter()
-            .chain(pending.votes_against.iter())
-            .any(|v| v.voter == vote.voter);
+        let already_voted = pending.votes_for.iter().any(|v| v.voter == vote.voter);
         if already_voted {
             return;
         }
@@ -799,22 +1125,26 @@ impl AccusationManager {
             return;
         }
 
-        if vote.agrees {
-            pending.votes_for.push(vote);
-        } else {
-            pending.votes_against.push(vote);
-        }
+        // Every received `AccusationVote` is an agreement (the gossip wire
+        // carries no disagreement). Append to the agreeing pile and re-check
+        // quorum.
+        pending.votes_for.push(vote);
 
-        // Check if quorum reached
         self.check_quorum(vote_accusation_id, ec, ctx);
     }
 
-    /// Evaluate whether we have enough votes to decide.
+    /// Evaluate whether we have enough agreeing votes to decide.
     ///
     /// Quorum logic:
-    /// - Need >= M agreeing votes → AccusedFaulted
-    /// - If impossible to reach M even with remaining voters → early exit
-    /// - data_hash comparison detects equivocation vs false accusation
+    /// - `>= M` agreeing votes → `AccusedFaulted` (or `Equivocation` if those
+    ///   votes disagree on `data_hash`, indicating the accused sent different
+    ///   bytes to different peers).
+    /// - Otherwise → keep waiting; the timeout handler decides
+    ///   `Inconclusive` if quorum never arrives.
+    ///
+    /// The gossip wire no longer carries disagreement, so there is no
+    /// fast-fail "quorum unreachable" branch — every silent peer might still
+    /// agree in flight. Silence beyond `vote_timeout` ⇒ `Inconclusive`.
     fn check_quorum(
         &mut self,
         accusation_id: [u8; 32],
@@ -826,77 +1156,32 @@ impl AccusationManager {
         };
 
         let agree_count = pending.votes_for.len();
-        let disagree_count = pending.votes_against.len();
-        let total_votes = agree_count + disagree_count;
-
-        // CASE A: Majority says proof is bad → accused is at fault
-        // But first check for equivocation: if agreeing voters saw different data,
-        // the accused sent different payloads to different nodes.
-        if agree_count >= self.threshold_m {
-            let agree_hashes: HashSet<[u8; 32]> =
-                pending.votes_for.iter().map(|v| v.data_hash).collect();
-            if agree_hashes.len() > 1 {
-                info!(
-                    "Equivocation detected at quorum: {} unique data hashes among {} agreeing voters for {} {:?}",
-                    agree_hashes.len(),
-                    agree_count,
-                    pending.accusation.accused,
-                    pending.accusation.proof_type
-                );
-                self.emit_quorum_reached(accusation_id, AccusationOutcome::Equivocation, ec, ctx);
-            } else {
-                info!(
-                    "Quorum reached: {} votes confirm {} sent bad {:?} proof — AccusedFaulted",
-                    agree_count, pending.accusation.accused, pending.accusation.proof_type
-                );
-                self.emit_quorum_reached(accusation_id, AccusationOutcome::AccusedFaulted, ec, ctx);
-            }
+        if agree_count < self.threshold_m {
+            // Not yet at quorum — wait for more agreement votes or for the
+            // timeout to fire.
             return;
         }
 
-        // Check if quorum is still possible.
-        // Exclude the accused — they cannot vote on their own accusation.
-        let effective_committee = if self.committee.contains(&pending.accusation.accused) {
-            self.committee.len().saturating_sub(1)
+        // Reached `M` — decide between AccusedFaulted and Equivocation by
+        // checking whether the agreeing voters all saw the same data_hash.
+        let agree_hashes: HashSet<[u8; 32]> =
+            pending.votes_for.iter().map(|v| v.data_hash).collect();
+        if agree_hashes.len() > 1 {
+            info!(
+                "Equivocation detected at quorum: {} unique data hashes among {} agreeing voters for {} {:?}",
+                agree_hashes.len(),
+                agree_count,
+                pending.accusation.accused,
+                pending.accusation.proof_type
+            );
+            self.emit_quorum_reached(accusation_id, AccusationOutcome::Equivocation, ec, ctx);
         } else {
-            self.committee.len()
-        };
-        let remaining = effective_committee.saturating_sub(total_votes);
-        if agree_count + remaining < self.threshold_m {
-            // Even if all remaining voters agree, can't reach quorum.
-            // Collect unique data hashes from actual votes only — do NOT include
-            // the accusation's data_hash because it is unverified (the accuser's
-            // own vote already carries their independently-observed hash).
-            let all_hashes: HashSet<[u8; 32]> = pending
-                .votes_for
-                .iter()
-                .chain(pending.votes_against.iter())
-                .map(|v| v.data_hash)
-                .collect();
-
-            if all_hashes.len() > 1 {
-                // Different nodes received different data → equivocation by the accused
-                info!(
-                    "Equivocation detected: {} unique data hashes for {} {:?}",
-                    all_hashes.len(),
-                    pending.accusation.accused,
-                    pending.accusation.proof_type
-                );
-                self.emit_quorum_reached(accusation_id, AccusationOutcome::Equivocation, ec, ctx);
-            } else if agree_count <= 1 && disagree_count > 0 {
-                // Same data, only accuser says bad, others say good → AccuserLied
-                info!(
-                    "Accuser {} appears to have lied about {} {:?}",
-                    pending.accusation.accuser,
-                    pending.accusation.accused,
-                    pending.accusation.proof_type
-                );
-                self.emit_quorum_reached(accusation_id, AccusationOutcome::AccuserLied, ec, ctx);
-            } else {
-                self.emit_quorum_reached(accusation_id, AccusationOutcome::Inconclusive, ec, ctx);
-            }
+            info!(
+                "Quorum reached: {} votes confirm {} sent bad {:?} proof — AccusedFaulted",
+                agree_count, pending.accusation.accused, pending.accusation.proof_type
+            );
+            self.emit_quorum_reached(accusation_id, AccusationOutcome::AccusedFaulted, ec, ctx);
         }
-        // Otherwise: still waiting for more votes — timeout will handle it
     }
 
     /// Called when the vote timeout expires for an accusation.
@@ -905,19 +1190,10 @@ impl AccusationManager {
             return; // Already resolved
         };
 
-        // Check for equivocation: if voters saw different data hashes,
-        // the accused sent different payloads to different nodes.
-        // Only use actual vote data_hashes — the accusation's data_hash is
-        // unverified and already represented by the accuser's own vote.
-        let all_hashes: HashSet<[u8; 32]> = pending
-            .votes_for
-            .iter()
-            .chain(pending.votes_against.iter())
-            .map(|v| v.data_hash)
-            .collect();
-
+        // All votes received are agreements (the wire carries no
+        // disagreement signal). At timeout, decide between AccusedFaulted,
+        // Equivocation, or Inconclusive purely from the agreeing pile.
         let outcome = if pending.votes_for.len() >= self.threshold_m {
-            // Check among agreeing voters first
             let agree_hashes: HashSet<[u8; 32]> =
                 pending.votes_for.iter().map(|v| v.data_hash).collect();
             if agree_hashes.len() > 1 {
@@ -925,22 +1201,26 @@ impl AccusationManager {
             } else {
                 AccusationOutcome::AccusedFaulted
             }
-        } else if all_hashes.len() > 1 {
-            // Not enough votes to convict, but divergent data → equivocation
-            AccusationOutcome::Equivocation
         } else {
+            // Not enough agreements to convict and no signed disagreements
+            // exist; whether that's silence or active disagreement is
+            // indistinguishable on the wire. Report Inconclusive.
             AccusationOutcome::Inconclusive
         };
 
         warn!(
-            "Accusation against {} for {:?} timed out with {} for / {} against — outcome: {:?}",
+            "Accusation against {} for {:?} timed out with {} agreeing votes — outcome: {:?}",
             pending.accusation.accused,
             pending.accusation.proof_type,
             pending.votes_for.len(),
-            pending.votes_against.len(),
             outcome
         );
 
+        let evidence = self
+            .received_data
+            .get(&(pending.accusation.accused, pending.accusation.proof_type))
+            .map(|d| d.evidence.clone())
+            .unwrap_or_default();
         if let Err(err) = self.bus.publish(
             AccusationQuorumReached {
                 e3_id: self.e3_id.clone(),
@@ -948,8 +1228,8 @@ impl AccusationManager {
                 accused: pending.accusation.accused,
                 proof_type: pending.accusation.proof_type,
                 votes_for: pending.votes_for,
-                votes_against: pending.votes_against,
                 outcome,
+                evidence,
             },
             pending.ec,
         ) {
@@ -974,14 +1254,18 @@ impl AccusationManager {
         }
 
         info!(
-            "Accusation quorum reached for {} {:?}: {} for, {} against — outcome: {}",
+            "Accusation quorum reached for {} {:?}: {} agreeing votes — outcome: {}",
             pending.accusation.accused,
             pending.accusation.proof_type,
             pending.votes_for.len(),
-            pending.votes_against.len(),
             outcome
         );
 
+        let evidence = self
+            .received_data
+            .get(&(pending.accusation.accused, pending.accusation.proof_type))
+            .map(|d| d.evidence.clone())
+            .unwrap_or_default();
         if let Err(err) = self.bus.publish(
             AccusationQuorumReached {
                 e3_id: self.e3_id.clone(),
@@ -989,8 +1273,8 @@ impl AccusationManager {
                 accused: pending.accusation.accused,
                 proof_type: pending.accusation.proof_type,
                 votes_for: pending.votes_for,
-                votes_against: pending.votes_against,
                 outcome,
+                evidence,
             },
             ec.clone(),
         ) {
@@ -1015,7 +1299,6 @@ impl AccusationManager {
             // Purge any votes from the expelled node in pending accusations
             for pending in self.pending.values_mut() {
                 pending.votes_for.retain(|v| v.voter != data.operator);
-                pending.votes_against.retain(|v| v.voter != data.operator);
             }
 
             // Purge from buffered votes
@@ -1033,12 +1316,14 @@ impl AccusationManager {
         proof_type: ProofType,
         data_hash: [u8; 32],
         passed: bool,
+        evidence: Bytes,
     ) {
         self.received_data.insert(
             (accused, proof_type),
             ReceivedProofData {
                 data_hash,
                 verification_passed: passed,
+                evidence,
             },
         );
     }
@@ -1085,39 +1370,55 @@ impl AccusationManager {
             }
         };
 
-        let agrees = !zk_passed; // ZK failed → proof is bad → agree with accusation
-
-        // Cache the result for future accusations
+        // Cache the result for future accusations regardless of outcome.
         self.cache_verification_result(
             reverif.accused,
             reverif.proof_type,
             reverif.data_hash,
             zk_passed,
+            reverif.evidence.clone(),
         );
 
-        // Get ec from the PendingAccusation
-        let ec = match self.pending.get(&reverif.accusation_id) {
-            Some(pending) => pending.ec.clone(),
+        // ZK re-verification passed ⇒ the proof is actually valid ⇒ we
+        // disagree with the accusation. The gossip wire carries no
+        // disagreement signal, so just abstain (no broadcast, no pending
+        // mutation). Other agreeing peers will or won't reach quorum
+        // independently.
+        if zk_passed {
+            info!(
+                "C3a/C3b re-verification passed for {:?} — abstaining from vote",
+                reverif.proof_type
+            );
+            return;
+        }
+
+        // ZK re-verification failed ⇒ we agree with the accusation.
+        let (ec, deadline) = match self.pending.get(&reverif.accusation_id) {
+            Some(pending) => (pending.ec.clone(), pending.accusation.deadline),
             None => {
                 // Accusation already resolved (timeout/quorum) before ZK finished
                 return;
             }
         };
 
-        // Cast vote
         let mut vote = AccusationVote {
             e3_id: self.e3_id.clone(),
             accusation_id: reverif.accusation_id,
             voter: self.my_address,
-            agrees,
             data_hash: reverif.data_hash,
+            deadline,
             signature: ArcBytes::default(),
         };
-        vote.signature = ArcBytes::from_bytes(&self.sign_vote_digest(&vote));
+        match self.sign_vote_digest(&vote) {
+            Ok(sig) => vote.signature = ArcBytes::from_bytes(&sig),
+            Err(err) => {
+                error!("Failed to sign C3a/C3b AccusationVote: {err}");
+                return;
+            }
+        }
 
         info!(
-            "C3a/C3b re-verification complete — voting {} on accusation against {:?}",
-            if agrees { "AGREE" } else { "DISAGREE" },
+            "C3a/C3b re-verification confirmed failure for {:?} — agreeing with accusation",
             reverif.proof_type
         );
 
@@ -1128,11 +1429,7 @@ impl AccusationManager {
 
         // Record in pending
         if let Some(pending) = self.pending.get_mut(&reverif.accusation_id) {
-            if agrees {
-                pending.votes_for.push(vote);
-            } else {
-                pending.votes_against.push(vote);
-            }
+            pending.votes_for.push(vote);
         }
 
         // Check quorum
@@ -1217,12 +1514,26 @@ impl Handler<TypedEvent<ProofVerificationPassed>> for AccusationManager {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let (data, _ec) = msg.into_components();
-        // Cache successful verification for voting on future accusations
+        if data.e3_id != self.e3_id {
+            return;
+        }
+        if !self.committee.contains(&data.address) {
+            return;
+        }
+        // Cache successful verification for voting on future accusations.
+        // Evidence preimage = `abi.encode(proof.data, public_signals)`.
+        let evidence: Bytes = (
+            Bytes::copy_from_slice(&data.proof_data),
+            Bytes::copy_from_slice(&data.public_signals),
+        )
+            .abi_encode()
+            .into();
         self.received_data.insert(
             (data.address, data.proof_type),
             ReceivedProofData {
                 data_hash: data.data_hash,
                 verification_passed: true,
+                evidence,
             },
         );
     }
@@ -1284,5 +1595,215 @@ impl Handler<TypedEvent<CommitmentConsistencyViolation>> for AccusationManager {
     ) -> Self::Result {
         let (data, ec) = msg.into_components();
         self.on_consistency_violation(data, &ec, ctx);
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Tests
+// ════════════════════════════════════════════════════════════════════════════
+//
+// These tests pin the actor's EIP-712 digest computation to the exact bytes
+// that off-chain test helpers (and ultimately the on-chain
+// `SlashingManager._verifyVotes`) expect. If anyone tweaks the typehash
+// string, the domain name, or the struct field layout on EITHER side without
+// updating the other, these tests fail before the broken signatures ever
+// reach the chain.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy::primitives::FixedBytes;
+    use alloy::signers::SignerSync;
+
+    /// Independent re-derivation of the EIP-712 vote digest, mirroring exactly
+    /// what `SlashingManager._verifyVotes` computes on chain. Kept here (and
+    /// not imported from a helper) so a regression in the actor's `vote_digest`
+    /// is caught by a byte-for-byte assertion against a hand-rolled reference.
+    fn reference_vote_digest(
+        chain_id: u64,
+        verifying_contract: Address,
+        e3_id: u64,
+        accusation_id: [u8; 32],
+        voter: Address,
+        data_hash: [u8; 32],
+        deadline: u64,
+    ) -> [u8; 32] {
+        let domain_typehash: [u8; 32] = keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
+        )
+        .into();
+        let name_hash: [u8; 32] = keccak256(VOTE_DOMAIN_NAME).into();
+        let version_hash: [u8; 32] = keccak256(VOTE_DOMAIN_VERSION).into();
+        let domain_separator: [u8; 32] = keccak256(
+            &(
+                domain_typehash,
+                name_hash,
+                version_hash,
+                U256::from(chain_id),
+                verifying_contract,
+            )
+                .abi_encode(),
+        )
+        .into();
+
+        let typehash: [u8; 32] = keccak256(VOTE_TYPEHASH_STR).into();
+        let struct_hash: [u8; 32] = keccak256(
+            &(
+                typehash,
+                U256::from(e3_id),
+                FixedBytes::<32>::from(accusation_id),
+                voter,
+                FixedBytes::<32>::from(data_hash),
+                U256::from(deadline),
+            )
+                .abi_encode(),
+        )
+        .into();
+
+        let mut buf = Vec::with_capacity(2 + 32 + 32);
+        buf.push(0x19);
+        buf.push(0x01);
+        buf.extend_from_slice(&domain_separator);
+        buf.extend_from_slice(&struct_hash);
+        keccak256(&buf).into()
+    }
+
+    /// The actor's `vote_digest` must equal the reference digest byte-for-byte.
+    /// If this fails, the actor's typehash / domain / struct layout has drifted
+    /// from what the on-chain verifier expects (or from the constants in
+    /// `e3_events::accusation_vote`).
+    #[test]
+    fn vote_digest_matches_reference() {
+        let chain_id = 31337u64;
+        let verifying_contract: Address = "0x9999999999999999999999999999999999999999"
+            .parse()
+            .unwrap();
+        let voter: Address = "0x2222222222222222222222222222222222222222"
+            .parse()
+            .unwrap();
+        let accusation_id = [0xab; 32];
+        let data_hash = [0xcd; 32];
+        let deadline: u64 = 1_700_000_000;
+
+        let vote = AccusationVote {
+            e3_id: E3id::new("42", chain_id),
+            accusation_id,
+            voter,
+            data_hash,
+            deadline,
+            signature: ArcBytes::default(),
+        };
+
+        let actor = AccusationManager::vote_digest(&vote, verifying_contract);
+        let reference = reference_vote_digest(
+            chain_id,
+            verifying_contract,
+            42,
+            accusation_id,
+            voter,
+            data_hash,
+            deadline,
+        );
+
+        assert_eq!(
+            actor, reference,
+            "AccusationManager::vote_digest drifted from the reference EIP-712 \
+             computation. Check VOTE_TYPEHASH_STR / VOTE_DOMAIN_NAME against \
+             SlashingManager.sol — these MUST stay byte-equal across crates."
+        );
+    }
+
+    /// Sign-and-recover round-trip using the actor's digest. Since
+    /// `vote_digest_matches_reference` already pins the digest bytes, signing
+    /// that digest and recovering via `recover_address_from_prehash` must
+    /// return the voter — i.e. the actor's signatures will be accepted by the
+    /// on-chain `ECDSA.recover` step.
+    #[test]
+    fn actor_signature_recovers_to_voter() {
+        let signer: PrivateKeySigner =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+                .parse()
+                .unwrap();
+        let voter = signer.address();
+        let verifying_contract: Address = "0x5555555555555555555555555555555555555555"
+            .parse()
+            .unwrap();
+        let chain_id = 31337u64;
+
+        let vote = AccusationVote {
+            e3_id: E3id::new("12345", chain_id),
+            accusation_id: [0x07; 32],
+            voter,
+            data_hash: [0x08; 32],
+            deadline: 1_700_000_000,
+            signature: ArcBytes::default(),
+        };
+
+        let digest = AccusationManager::vote_digest(&vote, verifying_contract);
+        let sig = signer
+            .sign_hash_sync(&FixedBytes::<32>::from(digest))
+            .unwrap();
+        let recovered = sig
+            .recover_address_from_prehash(&FixedBytes::<32>::from(digest))
+            .expect("recover");
+        assert_eq!(
+            recovered, voter,
+            "signing the actor's digest and recovering must yield the voter"
+        );
+    }
+
+    /// The accusation digest must include `deadline`. A malicious peer could
+    /// otherwise rewrite the deadline in transit without invalidating the
+    /// accuser's signature. Guard: changing only `deadline` must change the
+    /// digest.
+    #[test]
+    fn accusation_digest_binds_deadline() {
+        let make = |deadline: u64| ProofFailureAccusation {
+            e3_id: E3id::new("9", 31337),
+            accuser: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .parse()
+                .unwrap(),
+            accused: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                .parse()
+                .unwrap(),
+            accused_party_id: 1,
+            proof_type: ProofType::C1PkGeneration,
+            data_hash: [0x42; 32],
+            deadline,
+            signed_payload: None,
+            signature: ArcBytes::default(),
+        };
+        let a = AccusationManager::accusation_digest(&make(1_700_000_000));
+        let b = AccusationManager::accusation_digest(&make(1_700_000_001));
+        assert_ne!(a, b, "deadline must be part of the accusation digest");
+    }
+
+    #[test]
+    fn peer_deadline_acceptance_enforces_local_window() {
+        let now = 1_700_000_000u64;
+        let validity = 1_800u64;
+        let skew = DEFAULT_ACCUSATION_DEADLINE_SKEW_SECS;
+        let max_ok = now + validity + skew;
+
+        assert!(
+            !AccusationManager::is_peer_deadline_acceptable(now, now, validity, skew),
+            "deadline equal to now must be rejected"
+        );
+        assert!(
+            !AccusationManager::is_peer_deadline_acceptable(now - 1, now, validity, skew),
+            "expired deadline must be rejected"
+        );
+        assert!(
+            AccusationManager::is_peer_deadline_acceptable(max_ok, now, validity, skew),
+            "deadline at upper bound must be accepted"
+        );
+        assert!(
+            !AccusationManager::is_peer_deadline_acceptable(max_ok + 1, now, validity, skew),
+            "far-future deadline must be rejected"
+        );
+        assert!(
+            !AccusationManager::is_peer_deadline_acceptable(now + 10, now, 0, skew),
+            "vote_validity_secs=0 must reject peer accusations"
+        );
     }
 }

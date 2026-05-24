@@ -4,12 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { readDeploymentArgs, storeDeploymentArgs, updateE3Config } from '@enclave-e3/contracts/scripts'
+import { getDeploymentChain, readDeploymentArgs, storeDeploymentArgs, updateE3Config } from '@enclave-e3/contracts/scripts'
 import { Enclave__factory as EnclaveFactory } from '@enclave-e3/contracts/types'
+import { ensureTemplateCwd, ENCLAVE_CONFIG_FILE } from '../scripts/template-paths'
 import { MyProgram__factory as MyProgramFactory } from '../types/factories/contracts'
 import hre from 'hardhat'
-import path from 'path'
-import { fileURLToPath } from 'url'
 
 // Map contract names to config keys
 const contractMapping: Record<string, string> = {
@@ -20,15 +19,12 @@ const contractMapping: Record<string, string> = {
   MockUSDC: 'fee_token',
 }
 
-// Get __dirname equivalent in ES modules
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
 export const deployTemplate = async () => {
+  ensureTemplateCwd()
   const { ethers } = await hre.network.connect()
   const [owner] = await ethers.getSigners()
 
-  const chain = hre.globalOptions.network
+  const chain = getDeploymentChain(hre)
 
   const enclaveAddress = readDeploymentArgs('Enclave', chain)?.address
   if (!enclaveAddress) {
@@ -68,9 +64,14 @@ export const deployTemplate = async () => {
   const e3Program = await e3ProgramFactory.deploy(await enclave.getAddress(), await verifier.getAddress(), programId)
   await e3Program.waitForDeployment()
 
-  const tx = await enclave.enableE3Program(await e3Program.getAddress())
-
+  const programAddress = await e3Program.getAddress()
+  const tx = await enclave.enableE3Program(programAddress)
   await tx.wait()
+
+  const allowed = await enclave.e3Programs(programAddress)
+  if (!allowed) {
+    throw new Error(`MyProgram ${programAddress} was not enabled on Enclave ${enclaveAddress}`)
+  }
 
   console.log("E3 Program enabled for Enclave's template")
 
@@ -90,6 +91,5 @@ export const deployTemplate = async () => {
     chain,
   )
 
-  // this expects you to run it from CRISP's root
-  updateE3Config(chain, path.join(__dirname, '..', 'enclave.config.yaml'), contractMapping)
+  updateE3Config(chain, ENCLAVE_CONFIG_FILE, contractMapping)
 }

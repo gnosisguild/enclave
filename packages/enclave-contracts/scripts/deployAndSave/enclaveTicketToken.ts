@@ -9,7 +9,11 @@ import {
   EnclaveTicketToken,
   EnclaveTicketToken__factory as EnclaveTicketTokenFactory,
 } from "../../types";
-import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+import {
+  getDeploymentChain,
+  readDeploymentArgs,
+  storeDeploymentArgs,
+} from "../utils";
 
 /**
  * The arguments for the deployAndSaveEnclaveTicketToken function
@@ -36,7 +40,7 @@ export const deployAndSaveEnclaveTicketToken = async ({
 }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = hre.globalOptions.network;
+  const chain = getDeploymentChain(hre);
 
   const preDeployedArgs = readDeploymentArgs("EnclaveTicketToken", chain);
 

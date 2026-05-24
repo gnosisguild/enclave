@@ -20,6 +20,10 @@ pub struct Config {
     pub e3_program_address: String,
     pub ciphernode_registry_address: String,
     pub fee_token_address: String,
+    /// Eligibility token for CRISP rounds (`MockVotingToken` on localhost). Falls back to
+    /// `packages/crisp-contracts/deployed_contracts.json` when CLI init uses `0x0`.
+    #[serde(default)]
+    pub crisp_voting_token: Option<String>,
     pub chain_id: u64,
     pub cron_api_key: String,
     // E3 parameters
@@ -34,6 +38,17 @@ pub struct Config {
 }
 
 impl Config {
+    /// Base URL for outbound HTTP clients (program-server webhooks, CLI, cron).
+    ///
+    /// `0.0.0.0` / `::` are bind addresses only; connecting to them fails (e.g. macOS `EADDRNOTAVAIL`).
+    pub fn enclave_server_url_for_clients(&self) -> String {
+        Self::client_connectable_url(&self.enclave_server_url)
+    }
+
+    fn client_connectable_url(url: &str) -> String {
+        url.replace("0.0.0.0", "127.0.0.1").replace("[::]", "[::1]")
+    }
+
     pub fn from_env() -> Result<Self, ConfigError> {
         let server_env_path = std::path::Path::new("server/.env");
         if server_env_path.exists() {

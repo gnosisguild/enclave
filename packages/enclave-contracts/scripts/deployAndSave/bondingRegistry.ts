@@ -10,7 +10,11 @@ import {
   BondingRegistry__factory as BondingRegistryFactory,
 } from "../../types";
 import { getProxyAdmin, verifyProxyAdminOwner } from "../proxy";
-import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+import {
+  getDeploymentChain,
+  readDeploymentArgs,
+  storeDeploymentArgs,
+} from "../utils";
 
 /**
  * The arguments for the deployAndSaveBondingRegistry function
@@ -49,7 +53,7 @@ export const deployAndSaveBondingRegistry = async ({
 }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = hre.globalOptions.network;
+  const chain = getDeploymentChain(hre);
 
   const preDeployedArgs = readDeploymentArgs("BondingRegistry", chain);
 

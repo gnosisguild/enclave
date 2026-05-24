@@ -10,7 +10,11 @@ import {
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
 } from "../../types";
 import { getProxyAdmin, verifyProxyAdminOwner } from "../proxy";
-import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+import {
+  getDeploymentChain,
+  readDeploymentArgs,
+  storeDeploymentArgs,
+} from "../utils";
 
 /**
  * The arguments for the deployAndSaveCiphernodeRegistryOwnable function
@@ -37,7 +41,7 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
 }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = hre.globalOptions.network;
+  const chain = getDeploymentChain(hre);
 
   const preDeployedArgs = readDeploymentArgs(
     "CiphernodeRegistryOwnable",

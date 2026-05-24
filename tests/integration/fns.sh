@@ -5,6 +5,10 @@ set -euo pipefail  # Stricter error handling
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PLAINTEXT="4,0"
+
+# Set by test.sh via export_integration_flags
+PROOF_AGGREGATION_ENABLED="${PROOF_AGGREGATION_ENABLED:-false}"
+INTEGRATION_DKG_TIMEOUT="${INTEGRATION_DKG_TIMEOUT:-1300}"
 ID=$(date +%s)
 
 if [[ "$SCRIPT_DIR" != "$(pwd)" ]]; then 
@@ -101,7 +105,7 @@ waiton-files() {
   wait_for_committee_pubkey() {
     local e3_id="$1"
     local out_file="$2"
-    local timeout="${3:-1300}"
+    local timeout="${3:-$INTEGRATION_DKG_TIMEOUT}"
     local start_time=$(date +%s)
 
     while true; do

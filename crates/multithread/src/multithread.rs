@@ -71,8 +71,8 @@ use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
 use e3_zk_prover::{
     prove_decryption_aggregation_jobs, prove_dkg_aggregation, prove_node_dkg_fold, CircuitVariant,
-    DecryptionAggregationJob, DkgAggregationInput, NodeDkgFoldInput, Provable, ZkBackend, ZkError,
-    ZkProver,
+    DecryptionAggregationJob, DkgAggregationInput, NodeDkgFoldInput, NodeDkgFoldProveResult,
+    Provable, ZkBackend, ZkError, ZkProver,
 };
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
@@ -246,9 +246,10 @@ async fn handle_compute_request_event(
     let (msg, ctx) = msg.into_components();
     let request_snapshot = msg.clone();
 
+    let report_for_worker = report.clone();
     let pool_result = pool
         .spawn(job_name, TaskTimeouts::default(), move || {
-            handle_compute_request(rng, cipher, zk_prover, msg)
+            handle_compute_request(rng, cipher, zk_prover, msg, report_for_worker)
         })
         .await;
 
@@ -512,6 +513,7 @@ fn handle_compute_request(
     cipher: Arc<Cipher>,
     zk_prover: Option<Arc<ZkProver>>,
     request: ComputeRequest,
+    report: Option<Addr<MultithreadReport>>,
 ) -> (Result<ComputeResponse, ComputeRequestError>, Duration) {
     let id: u8 = rand::thread_rng().gen();
 
@@ -519,7 +521,9 @@ fn handle_compute_request(
         ComputeRequestKind::TrBFV(trbfv_req) => {
             handle_trbfv_request(rng, cipher, trbfv_req, request, id)
         }
-        ComputeRequestKind::Zk(zk_req) => handle_zk_request(cipher, zk_prover, zk_req, request, id),
+        ComputeRequestKind::Zk(zk_req) => {
+            handle_zk_request(cipher, zk_prover, zk_req, request, id, report)
+        }
     }
 }
 
@@ -531,27 +535,23 @@ fn handle_trbfv_request(
     id: u8,
 ) -> (Result<ComputeResponse, ComputeRequestError>, Duration) {
     match trbfv_req {
-        TrBFVRequest::GenPkShareAndSkSss(req) => {
-            timefunc(
-                "gen_pk_share_and_sk_sss",
-                id,
-                || match gen_pk_share_and_sk_sss(&rng, &cipher, req) {
-                    Ok(o) => Ok(ComputeResponse::trbfv(
-                        TrBFVResponse::GenPkShareAndSkSss(o),
-                        request.correlation_id,
-                        request.e3_id,
-                    )),
-                    Err(e) => Err(ComputeRequestError::new(
-                        ComputeRequestErrorKind::TrBFV(TrBFVError::GenPkShareAndSkSss(
-                            e.to_string(),
-                        )),
-                        request,
-                    )),
-                },
-            )
-        }
+        TrBFVRequest::GenPkShareAndSkSss(req) => timefunc("gen_pk_share_and_sk_sss", id, || {
+            let mut rng_guard = rng.lock().expect("SharedRng mutex poisoned");
+            match gen_pk_share_and_sk_sss(&mut *rng_guard, &cipher, req) {
+                Ok(o) => Ok(ComputeResponse::trbfv(
+                    TrBFVResponse::GenPkShareAndSkSss(o),
+                    request.correlation_id,
+                    request.e3_id,
+                )),
+                Err(e) => Err(ComputeRequestError::new(
+                    ComputeRequestErrorKind::TrBFV(TrBFVError::GenPkShareAndSkSss(e.to_string())),
+                    request,
+                )),
+            }
+        }),
         TrBFVRequest::GenEsiSss(req) => timefunc("gen_esi_sss", id, || {
-            match gen_esi_sss(&rng, &cipher, req) {
+            let mut rng_guard = rng.lock().expect("SharedRng mutex poisoned");
+            match gen_esi_sss(&mut *rng_guard, &cipher, req) {
                 Ok(o) => Ok(ComputeResponse::trbfv(
                     TrBFVResponse::GenEsiSss(o),
                     request.correlation_id,
@@ -626,6 +626,7 @@ fn handle_zk_request(
     zk_req: ZkRequest,
     request: ComputeRequest,
     id: u8,
+    report: Option<Addr<MultithreadReport>>,
 ) -> (Result<ComputeResponse, ComputeRequestError>, Duration) {
     let Some(prover) = zk_prover else {
         return (
@@ -677,7 +678,7 @@ fn handle_zk_request(
             })
         }
         ZkRequest::NodeDkgFold(req) => timefunc("zk_node_dkg_fold", id, || {
-            handle_node_dkg_fold_proof(&prover, req, request.clone())
+            handle_node_dkg_fold_proof(&prover, req, request.clone(), report.clone())
         }),
         ZkRequest::DkgAggregation(req) => timefunc("zk_dkg_aggregation", id, || {
             handle_dkg_aggregation_proof(&prover, req, request.clone())
@@ -692,6 +693,7 @@ fn handle_node_dkg_fold_proof(
     prover: &ZkProver,
     req: NodeDkgFoldRequest,
     request: ComputeRequest,
+    report: Option<Addr<MultithreadReport>>,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     let artifacts_dir = req.params_preset.artifacts_dir();
     let job_id = zk_bb_work_id(&request);
@@ -709,12 +711,23 @@ fn handle_node_dkg_fold_proof(
         c4b_proof: &req.c4b_proof,
         party_id: req.party_id,
     };
-    let proof = prove_node_dkg_fold(prover, &input, &job_id, &artifacts_dir).map_err(|e| {
+    let NodeDkgFoldProveResult {
+        proof,
+        step_timings,
+    } = prove_node_dkg_fold(prover, &input, &job_id, &artifacts_dir).map_err(|e| {
         ComputeRequestError::new(
             ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
             request.clone(),
         )
     })?;
+    if let Some(report) = report {
+        for step in step_timings {
+            report.do_send(TrackDuration::new(
+                format!("NodeDkgFold/{}", step.step),
+                Duration::from_secs_f64(step.seconds),
+            ));
+        }
+    }
     Ok(ComputeResponse::zk(
         ZkResponse::NodeDkgFold(NodeDkgFoldResponse { proof }),
         request.correlation_id,

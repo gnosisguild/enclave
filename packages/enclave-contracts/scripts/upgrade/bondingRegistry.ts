@@ -6,7 +6,7 @@
 import hre from "hardhat";
 
 import { upgradeAndSaveBondingRegistry } from "../deployAndSave/bondingRegistry";
-import { readDeploymentArgs } from "../utils";
+import { getDeploymentChain, readDeploymentArgs } from "../utils";
 
 /**
  * Upgrades the BondingRegistry contract implementation and saves the deployment arguments
@@ -16,7 +16,7 @@ export const upgradeBondingRegistry = async () => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const signerAddress = await signer.getAddress();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = getDeploymentChain(hre);
   console.log("Signer:", signerAddress);
 
   const preDeployedArgs = readDeploymentArgs("BondingRegistry", chain);

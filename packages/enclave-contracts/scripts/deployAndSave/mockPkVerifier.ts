@@ -9,7 +9,7 @@ import {
   MockPkVerifier,
   MockPkVerifier__factory as MockPkVerifierFactory,
 } from "../../types";
-import { storeDeploymentArgs } from "../utils";
+import { getDeploymentChain, storeDeploymentArgs } from "../utils";
 
 export const deployAndSaveMockPkVerifier = async (
   hre: HardhatRuntimeEnvironment,
@@ -18,7 +18,7 @@ export const deployAndSaveMockPkVerifier = async (
 }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = hre.globalOptions.network;
+  const chain = getDeploymentChain(hre);
 
   const pkVerifierFactory = await ethers.getContractFactory("MockPkVerifier");
   const pkVerifier = await pkVerifierFactory.deploy();

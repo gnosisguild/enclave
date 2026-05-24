@@ -15,7 +15,7 @@
     "dev:frontend": "./scripts/dev_frontend.sh",
     "dev:program": "./scripts/dev_program.sh",
     "dev:server": "./scripts/dev_server.sh",
-    "predev:all": "[ ! -f './contracts/ImageID.sol' ] && enclave program compile || true",
+    "predev:all": "[ ! -f './.enclave/generated/contracts/ImageID.sol' ] && enclave program compile || true",
     "test": "hardhat test",
     "test:integration": "./scripts/test_integration.sh"
   },

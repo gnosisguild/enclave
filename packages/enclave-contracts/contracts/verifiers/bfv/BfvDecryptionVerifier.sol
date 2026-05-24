@@ -156,7 +156,7 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
 
     function _verifyPlaintextHash(
         bytes32[] memory publicInputs,
-        bytes32 plaintextOutputHash
+        bytes32 expected
     ) internal view returns (bool) {
         uint256 offset = expectedPublicInputsLen - MESSAGE_COEFFS_COUNT;
         bytes memory plaintext = new bytes(MESSAGE_COEFFS_COUNT * 8);
@@ -166,6 +166,6 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
                 plaintext[i * 8 + j] = bytes1(uint8(coeff >> (j * 8)));
             }
         }
-        return keccak256(plaintext) == plaintextOutputHash;
+        return keccak256(plaintext) == expected;
     }
 }

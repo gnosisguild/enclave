@@ -156,6 +156,20 @@ interface ICiphernodeRegistry {
     /// @param enclave Address of the enclave contract.
     event EnclaveSet(address indexed enclave);
 
+    /// @notice Emitted when the owner proposes a new DKG fold-attestation verifier.
+    /// @dev The new verifier becomes active only after `commitDkgFoldAttestationVerifier`
+    ///      is called and at least `DKG_FOLD_VERIFIER_TIMELOCK` has elapsed.
+    event DkgFoldAttestationVerifierProposed(
+        address indexed verifier,
+        uint256 readyAt
+    );
+
+    /// @notice Emitted when the proposed DKG fold-attestation verifier becomes active.
+    event DkgFoldAttestationVerifierUpdated(address indexed verifier);
+
+    /// @notice Emitted when the owner cancels a pending verifier proposal.
+    event DkgFoldAttestationVerifierProposalCancelled(address indexed verifier);
+
     /// @notice This event MUST be emitted when a ciphernode is added to the registry.
     /// @param node Address of the ciphernode.
     /// @param index Index of the ciphernode in the registry.
@@ -183,6 +197,24 @@ interface ICiphernodeRegistry {
     /// @notice This event MUST be emitted any time the `sortitionSubmissionWindow` is set.
     /// @param sortitionSubmissionWindow The submission window for the E3 sortition in seconds.
     event SortitionSubmissionWindowSet(uint256 sortitionSubmissionWindow);
+
+    /// @notice Emitted whenever the registry-wide accusation vote validity window changes.
+    /// @param accusationVoteValidity New validity window, in seconds.
+    event AccusationVoteValiditySet(uint256 accusationVoteValidity);
+
+    /// @notice Emitted when the owner proposes a new accusation vote validity value.
+    /// @param accusationVoteValidity Pending validity window, in seconds.
+    /// @param readyAt Earliest timestamp when commit is allowed.
+    event AccusationVoteValidityProposed(
+        uint256 accusationVoteValidity,
+        uint256 readyAt
+    );
+
+    /// @notice Emitted when the owner cancels a pending accusation vote validity proposal.
+    /// @param accusationVoteValidity Pending value that was cancelled.
+    event AccusationVoteValidityProposalCancelled(
+        uint256 accusationVoteValidity
+    );
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -225,6 +257,52 @@ interface ICiphernodeRegistry {
 
     /// @notice Supplied DKG aggregator proof failed verification
     error InvalidDkgProof();
+
+    /// @notice Proof aggregation enabled but no fold attestation bundle was supplied
+    error FoldAttestationsRequired();
+
+    /// @notice `dkgFoldAttestationVerifier` is not configured on the registry
+    error FoldAttestationVerifierNotSet();
+
+    /// @notice Initial verifier set was attempted after one was already configured.
+    /// @dev Subsequent changes must go through `proposeDkgFoldAttestationVerifier` →
+    ///      `commitDkgFoldAttestationVerifier` (timelocked).
+    error FoldAttestationVerifierAlreadySet();
+
+    /// @notice Fold attestation bundle failed signature or public-input binding checks
+    error InvalidFoldAttestation();
+
+    /// @notice `partyId` from an attestation does not appear in the DKG proof public inputs
+    error PartyIdNotInProof();
+
+    /// @notice Attestation count does not match bindings or proof honest-set size
+    error AttestationBindingCountMismatch();
+
+    /// @notice `partyId` is out of bounds for the finalized committee's `topNodes`
+    error PartyIdOutOfBounds(uint256 partyId, uint256 committeeSize);
+
+    /// @notice A `setDkgFoldAttestationVerifier` commit was attempted before the timelock elapsed.
+    error VerifierUpdateTimelockActive(uint256 readyAt, uint256 nowAt);
+
+    /// @notice `commitDkgFoldAttestationVerifier` was called but no proposal is pending.
+    error NoPendingVerifierUpdate();
+
+    /// @notice `commitDkgFoldAttestationVerifier` was called with an address that does
+    /// not match the pending proposal (prevents commit-time substitution).
+    error VerifierMismatch(address pending, address provided);
+
+    /// @notice A vote-validity commit was attempted before timelock elapsed.
+    error AccusationVoteValidityTimelockActive(uint256 readyAt, uint256 nowAt);
+
+    /// @notice `commitAccusationVoteValidity` was called but no proposal is pending.
+    error NoPendingAccusationVoteValidityUpdate();
+
+    /// @notice `commitAccusationVoteValidity` was called with value that does not match pending.
+    error AccusationVoteValidityMismatch(uint256 pending, uint256 provided);
+
+    /// @notice Directly setting `accusationVoteValidity` to zero is disallowed.
+    ///         Use `proposeAccusationVoteValidity` + `commitAccusationVoteValidity`.
+    error AccusationVoteValidityZeroRequiresTimelock();
 
     /// @notice Node has already submitted a ticket for this E3
     error NodeAlreadySubmitted();
@@ -325,12 +403,32 @@ interface ICiphernodeRegistry {
     /// @param pkCommitment Hash-based aggregated PK commitment for the committee.
     /// @param proof DkgAggregator (EVM) proof ABI-encoded `(bytes rawProof, bytes32[] publicInputs)`,
     ///              or empty bytes when proof aggregation is disabled.
+    /// @param dkgAttestationBundle ABI-encoded
+    ///        `(DkgFoldAttestationLib.Attestation[] attestations, DkgFoldAttestationLib.PartySlotBinding[] bindings)`.
+    ///        Required (non-empty) when proof aggregation is enabled; ignored otherwise.
     function publishCommittee(
         uint256 e3Id,
         bytes calldata publicKey,
         bytes32 pkCommitment,
-        bytes calldata proof
+        bytes calldata proof,
+        bytes calldata dkgAttestationBundle
     ) external;
+
+    /// @notice Returns DKG anchor commitments stored at publication (empty if not yet published).
+    /// @param e3Id ID of the E3
+    /// @return partyIds Honest party ids (same order as stored sk/esm arrays)
+    /// @return skAggCommits Per-party secret-key aggregate commitments from NodeFold
+    /// @return esmAggCommits Per-party smudging-noise aggregate commitments from NodeFold
+    function getDkgAnchors(
+        uint256 e3Id
+    )
+        external
+        view
+        returns (
+            uint256[] memory partyIds,
+            bytes32[] memory skAggCommits,
+            bytes32[] memory esmAggCommits
+        );
 
     /// @notice This function should be called by the Enclave contract to get the public key of a committee.
     /// @dev This function MUST revert if no committee has been requested for the given E3.
@@ -393,6 +491,28 @@ interface ICiphernodeRegistry {
         uint256 _sortitionSubmissionWindow
     ) external;
 
+    /// @notice Returns registry-wide accusation vote validity window (seconds).
+    function accusationVoteValidity() external view returns (uint256);
+
+    /// @notice Sets nonzero accusation vote validity directly.
+    /// @dev Setting zero requires timelocked propose/commit flow.
+    function setAccusationVoteValidity(
+        uint256 _accusationVoteValidity
+    ) external;
+
+    /// @notice Propose accusation vote validity (supports zero).
+    function proposeAccusationVoteValidity(
+        uint256 _accusationVoteValidity
+    ) external;
+
+    /// @notice Commit accusation vote validity after timelock.
+    function commitAccusationVoteValidity(
+        uint256 _accusationVoteValidity
+    ) external;
+
+    /// @notice Cancel a pending accusation vote validity proposal.
+    function cancelAccusationVoteValidityProposal() external;
+
     /// @notice Submit a ticket for sortition
     /// @dev Validates ticket against node's balance at request block
     /// @param e3Id ID of the E3 computation
@@ -447,6 +567,22 @@ interface ICiphernodeRegistry {
         uint256 e3Id,
         address node
     ) external view returns (bool);
+
+    /// @notice Return the operator address at slot `partyId` in the finalized
+    ///         committee's `topNodes` (address-ascending order).
+    /// @dev Unlike `getCommitteeNodes`, this does NOT require the committee to
+    ///      be published yet — it works as soon as the committee is finalized,
+    ///      which is what `publishCommittee` callers need in order to bind a
+    ///      `partyId` to a specific operator before the public key is stored.
+    ///      Reverts `CommitteeNotFinalized` for non-finalized committees so the
+    ///      provisional, sortition-in-progress `topNodes` is never exposed.
+    /// @param e3Id ID of the E3 computation
+    /// @param partyId Index into `topNodes`
+    /// @return Operator address at `topNodes[partyId]`
+    function canonicalCommitteeNodeAt(
+        uint256 e3Id,
+        uint256 partyId
+    ) external view returns (address);
 
     /// @notice Get active (non-expelled) committee nodes for an E3
     /// @param e3Id ID of the E3 computation

@@ -6,7 +6,7 @@
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 
-import { cleanDeployments } from "../scripts/utils";
+import { cleanLocalDeployments } from "../scripts/utils";
 
 export const cleanDeploymentsTask = task(
   "utils:clean-deployments",
@@ -20,7 +20,7 @@ export const cleanDeploymentsTask = task(
   })
   .setAction(async () => ({
     default: ({ chain }) => {
-      cleanDeployments(chain);
+      cleanLocalDeployments(chain);
     },
   }))
   .build();

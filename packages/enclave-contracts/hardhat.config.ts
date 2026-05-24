@@ -29,7 +29,7 @@ import {
   publishPlaintext,
   requestCommittee,
 } from "./tasks/enclave";
-import { publishInput } from "./tasks/program";
+import { publishInput, setMockProgramEnclave } from "./tasks/program";
 import { cleanDeploymentsTask } from "./tasks/utils";
 
 dotenv.config();
@@ -102,6 +102,7 @@ const config: HardhatUserConfig = {
     publishCommittee,
     getPlaintextOutput,
     publishInput,
+    setMockProgramEnclave,
     enableE3,
     cleanDeploymentsTask,
     updateSubmissionWindow,

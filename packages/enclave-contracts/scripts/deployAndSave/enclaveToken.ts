@@ -9,7 +9,11 @@ import {
   EnclaveToken,
   EnclaveToken__factory as EnclaveTokenFactory,
 } from "../../types";
-import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+import {
+  getDeploymentChain,
+  readDeploymentArgs,
+  storeDeploymentArgs,
+} from "../utils";
 
 /**
  * The arguments for the deployAndSaveEnclaveToken function
@@ -57,7 +61,7 @@ export const deployAndSaveEnclaveToken = async ({
 }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = hre.globalOptions.network;
+  const chain = getDeploymentChain(hre);
 
   const preDeployedArgs = readDeploymentArgs("EnclaveToken", chain);
 

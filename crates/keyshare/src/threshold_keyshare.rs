@@ -436,6 +436,8 @@ pub struct ThresholdKeyshare {
     /// the AggregatingDecryptionKey transition. Tuple is `(own_sk_share, own_esi_shares)`.
     /// Each entry is bincode-encoded `Vec<Vec<u64>>` of shape `[L][N]`.
     pending_own_dkg_shares: Option<(SensitiveBytes, Vec<SensitiveBytes>)>,
+    /// Set when C4 verification completes before `PkGenerationProofSigned` is applied.
+    pending_keyshare_publish: bool,
 }
 
 impl ThresholdKeyshare {
@@ -452,7 +454,61 @@ impl ThresholdKeyshare {
             pending_share_decryption_data: None,
             pending_c4_verification_shares: None,
             pending_own_dkg_shares: None,
+            pending_keyshare_publish: false,
         }
+    }
+
+    fn store_signed_pk_generation_proof(
+        &mut self,
+        ec: &EventContext<Sequenced>,
+        signed: SignedProofPayload,
+    ) -> Result<()> {
+        self.state.try_mutate(ec, |mut s| {
+            match &mut s.state {
+                KeyshareState::AggregatingDecryptionKey(adk) => {
+                    adk.signed_pk_generation_proof = Some(signed.clone());
+                }
+                KeyshareState::ReadyForDecryption(rfd) => {
+                    rfd.signed_pk_generation_proof = Some(signed.clone());
+                }
+                KeyshareState::Decrypting(d) => {
+                    d.signed_pk_generation_proof = Some(signed.clone());
+                }
+                other => {
+                    warn!(
+                        "PkGenerationProofSigned in {:?} — C1 proof not stored (unexpected state)",
+                        other.variant_name()
+                    );
+                }
+            }
+            Ok(s)
+        })
+    }
+
+    fn keyshare_created_fields(
+        state: &KeyshareState,
+    ) -> Option<(&ArcBytes, &Option<SignedProofPayload>)> {
+        use KeyshareState as K;
+        match state {
+            K::ReadyForDecryption(s) => Some((&s.pk_share, &s.signed_pk_generation_proof)),
+            K::Decrypting(s) => Some((&s.pk_share, &s.signed_pk_generation_proof)),
+            _ => None,
+        }
+    }
+
+    fn try_finish_deferred_keyshare_publish(&mut self, ec: EventContext<Sequenced>) -> Result<()> {
+        if !self.pending_keyshare_publish {
+            return Ok(());
+        }
+        let state = self.state.try_get()?;
+        let Some((_, signed)) = Self::keyshare_created_fields(&state.state) else {
+            return Ok(());
+        };
+        if signed.is_none() {
+            return Ok(());
+        }
+        self.pending_keyshare_publish = false;
+        self.publish_keyshare_created(ec)
     }
 }
 
@@ -738,16 +794,8 @@ impl ThresholdKeyshare {
             msg.party_id, msg.e3_id
         );
 
-        // Store the signed proof in AggregatingDecryptionKey state
-        self.state.try_mutate(&ec, |s| {
-            let current: AggregatingDecryptionKey = s.clone().try_into()?;
-            s.new_state(KeyshareState::AggregatingDecryptionKey(
-                AggregatingDecryptionKey {
-                    signed_pk_generation_proof: Some(msg.signed_proof),
-                    ..current
-                },
-            ))
-        })?;
+        self.store_signed_pk_generation_proof(&ec, msg.signed_proof)?;
+        self.try_finish_deferred_keyshare_publish(ec)?;
 
         Ok(())
     }
@@ -2202,17 +2250,37 @@ impl ThresholdKeyshare {
         let e3_id = state.get_e3_id();
         let address = state.get_address().to_owned();
         let party_id = state.get_party_id();
-        let current: ReadyForDecryption = state.clone().try_into()?;
+        let Some((pk_share, signed_pk_generation_proof)) =
+            Self::keyshare_created_fields(&state.state)
+        else {
+            warn!(
+                "Deferring KeyshareCreated for party {} E3 {} — not in ReadyForDecryption/Decrypting ({})",
+                party_id,
+                e3_id,
+                state.state.variant_name()
+            );
+            self.pending_keyshare_publish = true;
+            return Ok(());
+        };
+
+        if signed_pk_generation_proof.is_none() {
+            warn!(
+                "Deferring KeyshareCreated for party {} E3 {} — C1 proof not stored yet (PkGenerationProofSigned race)",
+                party_id, e3_id
+            );
+            self.pending_keyshare_publish = true;
+            return Ok(());
+        }
 
         info!("Publishing Exchange #4 (KeyshareCreated) for E3 {}", e3_id);
 
         self.bus.publish(
             KeyshareCreated {
-                pubkey: current.pk_share,
+                pubkey: pk_share.clone(),
                 e3_id: e3_id.clone(),
                 node: address,
                 party_id,
-                signed_pk_generation_proof: current.signed_pk_generation_proof,
+                signed_pk_generation_proof: signed_pk_generation_proof.clone(),
             },
             ec,
         )?;
@@ -2732,6 +2800,7 @@ impl Handler<E3RequestComplete> for ThresholdKeyshare {
         self.pending_shares.clear();
         self.pending_share_decryption_data = None;
         self.pending_c4_verification_shares = None;
+        self.pending_keyshare_publish = false;
         self.notify_sync(ctx, Die);
     }
 }

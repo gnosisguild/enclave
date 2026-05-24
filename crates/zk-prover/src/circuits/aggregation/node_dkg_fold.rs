@@ -20,6 +20,7 @@ use alloy::primitives::Address;
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use e3_fhe_params::BfvPreset;
 use serde::Serialize;
+use std::time::Instant;
 
 fn proof_field_strings(proof: &Proof) -> Result<Vec<String>, ZkError> {
     bytes_to_field_strings(proof.data.as_ref())
@@ -140,13 +141,35 @@ pub struct NodeDkgFoldInput<'a> {
     pub party_id: u64,
 }
 
+/// Per-step prove wall time inside [`prove_node_dkg_fold`] (for benchmarks / audit reports).
+#[derive(Clone, Debug, Serialize)]
+pub struct FoldProveStepTiming {
+    pub step: String,
+    pub seconds: f64,
+}
+
+/// Output of [`prove_node_dkg_fold`] including sub-step timings.
+#[derive(Clone, Debug)]
+pub struct NodeDkgFoldProveResult {
+    pub proof: Proof,
+    pub step_timings: Vec<FoldProveStepTiming>,
+}
+
+fn push_step(timings: &mut Vec<FoldProveStepTiming>, step: &str, started: Instant) {
+    timings.push(FoldProveStepTiming {
+        step: step.to_string(),
+        seconds: started.elapsed().as_secs_f64(),
+    });
+}
+
 /// Run C2abFold → C3 folds → C3abFold → C4abFold → NodeFold; returns a [`CircuitName::NodeFold`] proof.
 pub fn prove_node_dkg_fold(
     prover: &ZkProver,
     input: &NodeDkgFoldInput,
     e3_id: &str,
     artifacts_dir: &str,
-) -> Result<Proof, ZkError> {
+) -> Result<NodeDkgFoldProveResult, ZkError> {
+    let mut step_timings = Vec::with_capacity(6);
     let c2a_vk = vk::load_vk_artifacts(
         &prover.circuits_dir(CircuitVariant::Recursive, artifacts_dir),
         CircuitName::SkShareComputation,
@@ -166,6 +189,7 @@ pub fn prove_node_dkg_fold(
         c2a_key_hash: c2a_vk.key_hash.clone(),
         c2b_key_hash: c2b_vk.key_hash.clone(),
     };
+    let t = Instant::now();
     let c2ab_proof = build_and_prove_recursive_bin(
         prover,
         CircuitName::C2abFold,
@@ -173,7 +197,9 @@ pub fn prove_node_dkg_fold(
         &format!("{e3_id}-c2ab"),
         artifacts_dir,
     )?;
+    push_step(&mut step_timings, "c2ab_fold", t);
 
+    let t = Instant::now();
     let c3a_folded = generate_sequential_c3_fold(
         prover,
         input.c3a_inner_proofs,
@@ -182,6 +208,9 @@ pub fn prove_node_dkg_fold(
         &format!("{e3_id}-c3a"),
         artifacts_dir,
     )?;
+    push_step(&mut step_timings, "c3a_fold", t);
+
+    let t = Instant::now();
     let c3b_folded = generate_sequential_c3_fold(
         prover,
         input.c3b_inner_proofs,
@@ -190,6 +219,7 @@ pub fn prove_node_dkg_fold(
         &format!("{e3_id}-c3b"),
         artifacts_dir,
     )?;
+    push_step(&mut step_timings, "c3b_fold", t);
 
     let c3_fold_vk = vk::load_vk_artifacts(
         &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
@@ -205,6 +235,7 @@ pub fn prove_node_dkg_fold(
         c3a_key_hash: c3_fold_vk.key_hash.clone(),
         c3b_key_hash: c3_fold_vk.key_hash.clone(),
     };
+    let t = Instant::now();
     let c3ab_proof = build_and_prove_recursive_bin(
         prover,
         CircuitName::C3abFold,
@@ -212,6 +243,7 @@ pub fn prove_node_dkg_fold(
         &format!("{e3_id}-c3ab"),
         artifacts_dir,
     )?;
+    push_step(&mut step_timings, "c3ab_fold", t);
 
     // C4a and C4b are both proofs of the same `DkgShareDecryption` circuit, so they share the
     // same VK. Load it once and clone into both witness slots.
@@ -229,6 +261,7 @@ pub fn prove_node_dkg_fold(
         c4a_key_hash: c4_vk.key_hash.clone(),
         c4b_key_hash: c4_vk.key_hash.clone(),
     };
+    let t = Instant::now();
     let c4ab_proof = build_and_prove_recursive_bin(
         prover,
         CircuitName::C4abFold,
@@ -236,6 +269,7 @@ pub fn prove_node_dkg_fold(
         &format!("{e3_id}-c4ab"),
         artifacts_dir,
     )?;
+    push_step(&mut step_timings, "c4ab_fold", t);
 
     let c0_vk = vk::load_vk_artifacts(
         &prover.circuits_dir(CircuitVariant::Recursive, artifacts_dir),
@@ -282,13 +316,20 @@ pub fn prove_node_dkg_fold(
         c4ab_key_hash: c4ab_fold_vk.key_hash,
     };
 
-    build_and_prove_recursive_bin(
+    let t = Instant::now();
+    let proof = build_and_prove_recursive_bin(
         prover,
         CircuitName::NodeFold,
         &nf,
         &format!("{e3_id}-nodefold"),
         artifacts_dir,
-    )
+    )?;
+    push_step(&mut step_timings, "node_fold", t);
+
+    Ok(NodeDkgFoldProveResult {
+        proof,
+        step_timings,
+    })
 }
 
 /// Inputs for [`prove_dkg_aggregation`].

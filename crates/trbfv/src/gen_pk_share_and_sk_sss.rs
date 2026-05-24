@@ -12,13 +12,14 @@ use crate::{
 };
 use anyhow::Result;
 use e3_crypto::{Cipher, SensitiveBytes};
-use e3_utils::{utility_types::ArcBytes, SharedRng};
+use e3_utils::utility_types::ArcBytes;
 use fhe::{
     bfv::SecretKey,
     mbfv::{CommonRandomPoly, PublicKeyShare},
     trbfv::{ShareManager, TRBFV},
 };
 use fhe_traits::Serialize as FheSerialize;
+use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use tracing::info;
@@ -105,8 +106,8 @@ struct InnerResponse {
     pub e_sm_raw: ArcBytes,
 }
 
-pub fn gen_pk_share_and_sk_sss(
-    rng: &SharedRng,
+pub fn gen_pk_share_and_sk_sss<R: RngCore + CryptoRng>(
+    rng: &mut R,
     cipher: &Cipher,
     req: GenPkShareAndSkSssRequest,
 ) -> Result<GenPkShareAndSkSssResponse> {
@@ -122,9 +123,8 @@ pub fn gen_pk_share_and_sk_sss(
         "gen_pk_share_and_sk_sss: n={}, t={}",
         num_ciphernodes, threshold
     );
-    let sk_share = { SecretKey::random(&params, &mut *rng.lock().unwrap()) };
-    let (pk0_share, _, _, eek) =
-        { PublicKeyShare::new_extended(&sk_share, crp.clone(), &mut *rng.lock().unwrap())? };
+    let sk_share = SecretKey::random(&params, rng);
+    let (pk0_share, _, _, eek) = PublicKeyShare::new_extended(&sk_share, crp.clone(), rng)?;
 
     let pk_share = PublicKeyShare::deserialize(&pk0_share.to_bytes(), &params, crp.clone())?;
 
@@ -132,11 +132,7 @@ pub fn gen_pk_share_and_sk_sss(
     let trbfv = TRBFV::new(num_ciphernodes as usize, threshold as usize, params.clone())?;
     let share_manager_for_esm =
         ShareManager::new(num_ciphernodes as usize, threshold as usize, params.clone());
-    let esi_coeffs = trbfv.generate_smudging_error(
-        req.num_ciphertexts,
-        req.lambda,
-        &mut *rng.lock().unwrap(),
-    )?;
+    let esi_coeffs = trbfv.generate_smudging_error(req.num_ciphertexts, req.lambda, rng)?;
     let e_sm_rns = share_manager_for_esm.bigints_to_poly(&esi_coeffs)?;
     let e_sm_raw = ArcBytes::from_bytes(&e_sm_rns.deref().to_bytes());
 
@@ -150,9 +146,8 @@ pub fn gen_pk_share_and_sk_sss(
     let sk_raw = ArcBytes::from_bytes(&sk_poly.to_bytes());
 
     info!("gen_pk_share_and_sk_sss:generate_secret_shares_from_poly...");
-    let sk_sss = SharedSecret::from({
-        share_manager.generate_secret_shares_from_poly(sk_poly, &mut *rng.lock().unwrap())?
-    });
+    let sk_sss =
+        SharedSecret::from({ share_manager.generate_secret_shares_from_poly(sk_poly, rng)? });
 
     (
         InnerResponse {

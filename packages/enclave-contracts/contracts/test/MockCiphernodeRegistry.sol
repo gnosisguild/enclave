@@ -15,6 +15,10 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 
     /// @notice Configurable threshold M per E3 for testing
     mapping(uint256 e3Id => uint32 threshold) private _thresholdM;
+    uint256 private _accusationVoteValidity = 30 minutes;
+    mapping(uint256 e3Id => uint256[] partyIds) private _dkgPartyIds;
+    mapping(uint256 e3Id => bytes32[] skAggCommits) private _dkgSkAggCommits;
+    mapping(uint256 e3Id => bytes32[] esmAggCommits) private _dkgEsmAggCommits;
 
     /// @notice Set committee members for an E3 (test helper)
     function setCommitteeNodes(
@@ -30,6 +34,27 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     /// @notice Set the threshold M for an E3 (test helper)
     function setThreshold(uint256 e3Id, uint32 m) external {
         _thresholdM[e3Id] = m;
+    }
+
+    /// @notice Set DKG anchors for an E3 (test helper)
+    function setDkgAnchors(
+        uint256 e3Id,
+        uint256[] calldata partyIds,
+        bytes32[] calldata skAggCommits,
+        bytes32[] calldata esmAggCommits
+    ) external {
+        delete _dkgPartyIds[e3Id];
+        delete _dkgSkAggCommits[e3Id];
+        delete _dkgEsmAggCommits[e3Id];
+        for (uint256 i = 0; i < partyIds.length; i++) {
+            _dkgPartyIds[e3Id].push(partyIds[i]);
+        }
+        for (uint256 i = 0; i < skAggCommits.length; i++) {
+            _dkgSkAggCommits[e3Id].push(skAggCommits[i]);
+        }
+        for (uint256 i = 0; i < esmAggCommits.length; i++) {
+            _dkgEsmAggCommits[e3Id].push(esmAggCommits[i]);
+        }
     }
 
     function requestCommittee(
@@ -70,6 +95,7 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         uint256,
         bytes calldata,
         bytes32,
+        bytes calldata,
         bytes calldata
     ) external pure {} // solhint-disable-line no-empty-blocks
 
@@ -81,6 +107,24 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 
     function getCommitteeHash(uint256 e3Id) external view returns (bytes32) {
         return keccak256(abi.encodePacked(_committeeNodes[e3Id]));
+    }
+
+    function getDkgAnchors(
+        uint256 e3Id
+    )
+        external
+        view
+        returns (
+            uint256[] memory partyIds,
+            bytes32[] memory skAggCommits,
+            bytes32[] memory esmAggCommits
+        )
+    {
+        return (
+            _dkgPartyIds[e3Id],
+            _dkgSkAggCommits[e3Id],
+            _dkgEsmAggCommits[e3Id]
+        );
     }
 
     function root() external pure returns (uint256) {
@@ -116,6 +160,23 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function sortitionSubmissionWindow() external pure returns (uint256) {
         return 0;
     }
+
+    function accusationVoteValidity() external view returns (uint256) {
+        return _accusationVoteValidity;
+    }
+
+    function setAccusationVoteValidity(uint256 v) external {
+        _accusationVoteValidity = v;
+    }
+
+    // solhint-disable-next-line no-empty-blocks
+    function proposeAccusationVoteValidity(uint256) external pure {}
+
+    // solhint-disable-next-line no-empty-blocks
+    function commitAccusationVoteValidity(uint256) external pure {}
+
+    // solhint-disable-next-line no-empty-blocks
+    function cancelAccusationVoteValidityProposal() external pure {}
 
     // solhint-disable-next-line no-empty-blocks
     function setSortitionSubmissionWindow(uint256) external pure {}
@@ -161,6 +222,18 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
             if (nodes[i] == node) return true;
         }
         return false;
+    }
+
+    function canonicalCommitteeNodeAt(
+        uint256 e3Id,
+        uint256 partyId
+    ) external view returns (address) {
+        address[] storage nodes = _committeeNodes[e3Id];
+        require(
+            partyId < nodes.length,
+            PartyIdOutOfBounds(partyId, nodes.length)
+        );
+        return nodes[partyId];
     }
 
     function getActiveCommitteeNodes(
@@ -214,6 +287,7 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         uint256,
         bytes calldata,
         bytes32,
+        bytes calldata,
         bytes calldata
     ) external pure {} // solhint-disable-line no-empty-blocks
 
@@ -226,6 +300,20 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
 
     function getCommitteeHash(uint256) external pure returns (bytes32) {
         return bytes32(0);
+    }
+
+    function getDkgAnchors(
+        uint256
+    )
+        external
+        pure
+        returns (
+            uint256[] memory partyIds,
+            bytes32[] memory skAggCommits,
+            bytes32[] memory esmAggCommits
+        )
+    {
+        return (partyIds, skAggCommits, esmAggCommits);
     }
 
     function root() external pure returns (uint256) {
@@ -253,6 +341,22 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
     function sortitionSubmissionWindow() external pure returns (uint256) {
         return 0;
     }
+
+    function accusationVoteValidity() external pure returns (uint256) {
+        return 30 minutes;
+    }
+
+    // solhint-disable-next-line no-empty-blocks
+    function setAccusationVoteValidity(uint256) external pure {}
+
+    // solhint-disable-next-line no-empty-blocks
+    function proposeAccusationVoteValidity(uint256) external pure {}
+
+    // solhint-disable-next-line no-empty-blocks
+    function commitAccusationVoteValidity(uint256) external pure {}
+
+    // solhint-disable-next-line no-empty-blocks
+    function cancelAccusationVoteValidityProposal() external pure {}
 
     // solhint-disable-next-line no-empty-blocks
     function setSortitionSubmissionWindow(uint256) external pure {}
@@ -287,6 +391,13 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
 
     function isCommitteeMember(uint256, address) external pure returns (bool) {
         return false;
+    }
+
+    function canonicalCommitteeNodeAt(
+        uint256,
+        uint256
+    ) external pure returns (address) {
+        return address(0);
     }
 
     function getActiveCommitteeNodes(

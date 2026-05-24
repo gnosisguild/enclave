@@ -3,8 +3,9 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { deployEnclave, readDeploymentArgs, updateE3Config } from '@enclave-e3/contracts/scripts'
+import { deployEnclave, updateE3Config } from '@enclave-e3/contracts/scripts'
 import { deployCRISPContracts } from './crisp'
+import { syncCrispEnvFromDeployments } from './syncCrispEnv'
 import path from 'path'
 
 import hre from 'hardhat'
@@ -28,37 +29,20 @@ const __dirname = path.dirname(__filename)
  * Deploys the Enclave and CRISP contracts
  */
 export const deploy = async () => {
-  const chain = hre.globalOptions.network
+  const chain = hre.globalOptions.network ?? 'localhost'
 
   const shouldDeployEnclave = Boolean(process.env.DEPLOY_ENCLAVE)
-  const shouldPrintEnv = Boolean(process.env.PRINT_ENV_VARS)
+  const withZkVerification = process.env.ENABLE_ZK_VERIFICATION === 'true'
 
-  // Mock BFV verifiers only: CRISP E2E uses E3_PROOF_AGGREGATION_ENABLED=false and does not
-  // ship compiled `*.vk_recursive_hash` artifacts required by BfvPkVerifier / BfvDecryptionVerifier.
   if (shouldDeployEnclave) {
-    await deployEnclave(true, false)
+    await deployEnclave(true, withZkVerification)
   }
   await deployCRISPContracts()
 
-  // this expects you to run it from CRISP's root
-  updateE3Config(chain, path.join(__dirname, '..', '..', '..', 'enclave.config.yaml'), contractMapping)
+  const enclaveConfigPath = path.join(__dirname, '..', '..', '..', 'enclave.config.yaml')
+  updateE3Config(chain, enclaveConfigPath, contractMapping)
 
-  if (shouldPrintEnv) {
-    const enclaveAddress = readDeploymentArgs('Enclave', chain)?.address
-    const tokenAddress = readDeploymentArgs('MockUSDC', chain)?.address
-    const programAddress = readDeploymentArgs('CRISPProgram', chain)?.address
-    const ciphernodeRegistryAddress = readDeploymentArgs('CiphernodeRegistryOwnable', chain)?.address
-
-    if (!enclaveAddress || !tokenAddress || !programAddress || !ciphernodeRegistryAddress) {
-      console.error('Error: Missing deployment addresses. Ensure all contracts are deployed.')
-      return
-    }
-
-    console.log('\nAdd these to your server .env')
-    console.log(
-      `ENCLAVE_ADDRESS=${enclaveAddress}\nFEE_TOKEN_ADDRESS=${tokenAddress}\nE3_PROGRAM_ADDRESS=${programAddress}\nCIPHERNODE_REGISTRY_ADDRESS=${ciphernodeRegistryAddress}`,
-    )
-  }
+  syncCrispEnvFromDeployments(chain)
 }
 
 deploy().catch((err) => {

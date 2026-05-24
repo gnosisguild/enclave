@@ -6,8 +6,8 @@ chains:
         address: "0x8f86403A4DE0BB5791fa46B8e795C547942fE4Cf"
         deploy_block: 32
       enclave:
-        address: "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0"
-        deploy_block: 17
+        address: "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+        deploy_block: 16
       ciphernode_registry:
         address: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
         deploy_block: 12
@@ -19,9 +19,18 @@ chains:
         deploy_block: 11
       fee_token:
         address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-        deploy_block: 7
+        deploy_block: 6
+      e3_program:
+        address: "0x0E801D84Fa97b50751Dbf25036d067dCf18858bF"
+        deploy_block: 51
 program:
   dev: true
+# Default profile: multithread uses (logical CPUs - 1) Rayon workers and the same concurrent job
+# limit. Reserve threads with `multithread_reserve_threads` (default 1 for Actix / libp2p).
+# Example override on a 16-core host:
+# node:
+#   multithread_reserve_threads: 1
+#   multithread_concurrent_jobs: 8
 nodes:
   cn1:
     address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"

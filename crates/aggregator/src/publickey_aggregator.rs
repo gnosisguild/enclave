@@ -4,9 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::committee::committee_addresses_from_nodes;
+use crate::committee::committee_addresses_in_party_order;
 use actix::prelude::*;
-use anyhow::Result;
+use alloy::primitives::Address;
+use anyhow::{anyhow, bail, ensure, Context as _, Result};
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, CircuitName, ComputeRequest, ComputeRequestError, ComputeResponse,
@@ -14,14 +15,16 @@ use e3_events::{
     DkgAggregationRequest, E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EventContext,
     FailureReason, KeyshareCreated, OrderedSet, PartyProofsToVerify, PkAggregationProofPending,
     PkAggregationProofRequest, PkAggregationProofSigned, Proof, ProofType, PublicKeyAggregated,
-    Seed, Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed,
-    SignedProofPayload, TypedEvent, VerificationKind, ZkRequest, ZkResponse,
+    Seed, Sequenced, ShareVerificationComplete, ShareVerificationDispatched,
+    SignedDkgFoldAttestation, SignedProofFailed, SignedProofPayload, TypedEvent, VerificationKind,
+    ZkRequest, ZkResponse,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_fhe_params::BfvPreset;
 use e3_utils::NotifySync;
 use e3_utils::{ArcBytes, MAILBOX_LIMIT};
+use e3_zk_prover::extract_node_fold_agg_commits;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use tracing::{error, info, warn};
@@ -29,6 +32,42 @@ use tracing::{error, info, warn};
 /// Public-signal key for the aggregated PK commitment in `CircuitName::PkAggregation` (C5).
 /// Must stay in lock-step with the Noir circuit's output ABI declaration.
 const C5_PK_COMMITMENT_FIELD: &str = "commitment";
+
+fn verify_dkg_fold_attestation(
+    e3_id: &E3id,
+    party_id: u64,
+    proof: &Proof,
+    attestation: &e3_events::SignedDkgFoldAttestation,
+    expected_node: &str,
+    committee_n: usize,
+    committee_h: usize,
+    n_moduli: usize,
+) -> Result<()> {
+    ensure!(
+        attestation.payload.e3_id == *e3_id,
+        "attestation e3_id mismatch"
+    );
+    ensure!(
+        attestation.payload.party_id == party_id,
+        "attestation party_id mismatch"
+    );
+    let expected: Address = expected_node
+        .parse()
+        .with_context(|| format!("invalid committee node address {expected_node}"))?;
+    ensure!(
+        attestation.verify_signer(&expected)?,
+        "fold attestation signer does not match committee node for party {party_id}"
+    );
+    let (extracted_party, commits) =
+        extract_node_fold_agg_commits(proof, committee_n, committee_h, n_moduli)
+            .map_err(|e| anyhow!("{e}"))?;
+    ensure!(extracted_party == party_id, "NodeFold party_id mismatch");
+    ensure!(
+        commits == attestation.payload.agg_commits,
+        "NodeFold commits do not match signed attestation"
+    );
+    Ok(())
+}
 
 /// Extract the hash-based aggregated PK commitment from the signed C5 proof.
 /// This is the last public signal of `CircuitName::PkAggregation`.
@@ -78,8 +117,13 @@ pub enum PublicKeyAggregatorState {
         public_key: ArcBytes,
         keyshare_bytes: Vec<ArcBytes>,
         nodes: OrderedSet<String>,
+        /// Registered node address per sortition `party_id` (for fold attestation checks).
+        party_nodes: HashMap<u64, String>,
         /// DKG recursive proofs per party (restart-critical).
         dkg_node_proofs: HashMap<u64, Option<Proof>>,
+        /// Per-party fold attestations collected with honest DKG folds.
+        #[serde(default)]
+        dkg_fold_attestations: HashMap<u64, SignedDkgFoldAttestation>,
         honest_party_ids: BTreeSet<u64>,
         dishonest_parties: BTreeSet<u64>,
         /// In-flight [`ZkRequest::DkgAggregation`], if any.
@@ -93,6 +137,9 @@ pub enum PublicKeyAggregatorState {
         public_key: ArcBytes,
         keyshares: OrderedSet<ArcBytes>,
         nodes: OrderedSet<String>,
+        /// Ascending `party_id` order (matches on-chain `topNodes` after finalize sort).
+        #[serde(default)]
+        committee_addresses: Vec<Address>,
     },
 }
 
@@ -103,6 +150,16 @@ impl PublicKeyAggregatorState {
             PublicKeyAggregatorState::Collecting { nodes, .. } if !nodes.is_empty() => Some(nodes),
             PublicKeyAggregatorState::GeneratingC5Proof { nodes, .. } => Some(nodes),
             PublicKeyAggregatorState::Complete { nodes, .. } => Some(nodes),
+            _ => None,
+        }
+    }
+
+    pub fn committee_addresses(&self) -> Option<&[Address]> {
+        match self {
+            PublicKeyAggregatorState::Complete {
+                committee_addresses,
+                ..
+            } if !committee_addresses.is_empty() => Some(committee_addresses.as_slice()),
             _ => None,
         }
     }
@@ -305,6 +362,7 @@ impl PublicKeyAggregator {
         };
 
         let mut dishonest_parties = msg.dishonest_parties.clone();
+        let committee_n = submission_order.len();
 
         // Filter out parties that failed C1 ZK verification. Keyed by the real
         // sortition party_id carried in `submission_order`, not arrival index.
@@ -428,6 +486,24 @@ impl PublicKeyAggregator {
             return Ok(());
         }
 
+        // C5 (PkAggregation) is compiled for a fixed committee size H; partial committees fail witness encoding.
+        if honest_keyshares.len() != committee_n {
+            error!(
+                "C5 requires all {committee_n} committee parties with valid C1 proofs; only {} honest after verification (dishonest: {:?})",
+                honest_keyshares.len(),
+                dishonest_parties
+            );
+            self.bus.publish(
+                E3Failed {
+                    e3_id: self.e3_id.clone(),
+                    failed_at_stage: E3Stage::CommitteeFinalized,
+                    reason: FailureReason::DKGInvalidShares,
+                },
+                ec,
+            )?;
+            return Ok(());
+        }
+
         // Synchronous aggregation
         info!(
             "Aggregating public key from {} honest shares...",
@@ -466,12 +542,19 @@ impl PublicKeyAggregator {
             ec.clone(),
         )?;
 
+        let party_nodes: HashMap<u64, String> = honest_entries
+            .iter()
+            .map(|(pid, node, _, _)| (*pid, node.clone()))
+            .collect();
+
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key: pubkey.clone(),
                 keyshare_bytes,
                 nodes: honest_nodes_set,
+                party_nodes,
                 dkg_node_proofs: HashMap::new(),
+                dkg_fold_attestations: HashMap::new(),
                 honest_party_ids: honest_party_ids.clone(),
                 dishonest_parties: dishonest_parties.clone(),
                 dkg_aggregation_correlation: None,
@@ -519,7 +602,9 @@ impl PublicKeyAggregator {
                 public_key,
                 keyshare_bytes,
                 nodes,
+                party_nodes,
                 dkg_node_proofs,
+                dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
                 dkg_aggregation_correlation,
@@ -533,7 +618,9 @@ impl PublicKeyAggregator {
                 public_key,
                 keyshare_bytes,
                 nodes,
+                party_nodes,
                 dkg_node_proofs,
+                dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
                 dkg_aggregation_correlation,
@@ -559,7 +646,10 @@ impl PublicKeyAggregator {
 
         let state = self.state.get();
         let Some(PublicKeyAggregatorState::GeneratingC5Proof {
-            dkg_node_proofs, ..
+            party_nodes,
+            dkg_node_proofs,
+            honest_party_ids,
+            ..
         }) = state.as_ref()
         else {
             info!(
@@ -577,6 +667,62 @@ impl PublicKeyAggregator {
             return Ok(());
         }
 
+        if honest_party_ids.contains(&msg.party_id) {
+            let Some(expected_node) = party_nodes.get(&msg.party_id) else {
+                warn!(
+                    party_id = msg.party_id,
+                    "DKG fold from party without registered node address — rejecting"
+                );
+                return Ok(());
+            };
+            // Proof aggregation OFF: nodes emit `DKGRecursiveAggregationComplete`
+            // with `proof=None` and `attestation=None`. Accept it so
+            // `try_publish_complete` can detect `all_proofs_are_none` and publish.
+            // Proof aggregation ON: both must be present and verified together.
+            match (&msg.aggregated_proof, &msg.fold_attestation) {
+                (None, None) => {
+                    // no-aggregation mode — skip attestation verification
+                }
+                (Some(proof), Some(attestation)) => {
+                    let meta = self.params_preset.metadata();
+                    let committee_n = party_nodes.len();
+                    let committee_h = committee_n;
+                    let n_moduli = meta.num_moduli as usize;
+                    if let Err(e) = verify_dkg_fold_attestation(
+                        &self.e3_id,
+                        msg.party_id,
+                        proof,
+                        attestation,
+                        expected_node,
+                        committee_n,
+                        committee_h,
+                        n_moduli,
+                    ) {
+                        warn!(
+                            party_id = msg.party_id,
+                            error = %e,
+                            "DKG fold attestation verification failed — rejecting"
+                        );
+                        return Ok(());
+                    }
+                }
+                (Some(_), None) => {
+                    warn!(
+                        party_id = msg.party_id,
+                        "DKG fold has proof but missing attestation — rejecting (attribution)"
+                    );
+                    return Ok(());
+                }
+                (None, Some(_)) => {
+                    warn!(
+                        party_id = msg.party_id,
+                        "DKG fold has attestation but missing proof — rejecting"
+                    );
+                    return Ok(());
+                }
+            }
+        }
+
         info!(
             "PublicKeyAggregator: buffered DKG proof from party {} (buffered={})",
             msg.party_id,
@@ -588,7 +734,9 @@ impl PublicKeyAggregator {
                 public_key,
                 keyshare_bytes,
                 nodes,
+                party_nodes,
                 mut dkg_node_proofs,
+                mut dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
                 dkg_aggregation_correlation,
@@ -600,11 +748,16 @@ impl PublicKeyAggregator {
                 return Ok(state);
             };
             dkg_node_proofs.insert(msg.party_id, msg.aggregated_proof);
+            if let Some(attestation) = msg.fold_attestation.clone() {
+                dkg_fold_attestations.insert(msg.party_id, attestation);
+            }
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key,
                 keyshare_bytes,
                 nodes,
+                party_nodes,
                 dkg_node_proofs,
+                dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
                 dkg_aggregation_correlation,
@@ -621,7 +774,7 @@ impl PublicKeyAggregator {
     fn try_dispatch_dkg_aggregation(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
         let state = self.state.get();
         let Some(PublicKeyAggregatorState::GeneratingC5Proof {
-            nodes,
+            party_nodes,
             dkg_node_proofs,
             honest_party_ids,
             c5_proof_pending,
@@ -680,7 +833,9 @@ impl PublicKeyAggregator {
                     public_key,
                     keyshare_bytes,
                     nodes,
+                    party_nodes,
                     dkg_node_proofs,
+                    dkg_fold_attestations,
                     honest_party_ids,
                     dishonest_parties,
                     dkg_aggregation_correlation: _,
@@ -696,7 +851,9 @@ impl PublicKeyAggregator {
                     public_key,
                     keyshare_bytes,
                     nodes,
+                    party_nodes,
                     dkg_node_proofs,
+                    dkg_fold_attestations,
                     honest_party_ids,
                     dishonest_parties,
                     dkg_aggregation_correlation: None,
@@ -737,13 +894,12 @@ impl PublicKeyAggregator {
             return Ok(());
         }
 
-        let committee_addresses = committee_addresses_from_nodes(nodes)?;
+        let committee_addresses = committee_addresses_in_party_order(&party_ids, party_nodes)?;
         #[cfg(debug_assertions)]
         {
-            let n_registered = committee_addresses.len();
             debug_assert_eq!(
                 party_ids.len(),
-                n_registered,
+                committee_addresses.len(),
                 "honest NodeFold count must equal registered committee size until expulsion enables H < N"
             );
         }
@@ -769,7 +925,9 @@ impl PublicKeyAggregator {
                 public_key,
                 keyshare_bytes,
                 nodes,
+                party_nodes,
                 dkg_node_proofs,
+                dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
                 dkg_aggregation_correlation: _,
@@ -784,7 +942,9 @@ impl PublicKeyAggregator {
                 public_key,
                 keyshare_bytes,
                 nodes,
+                party_nodes,
                 dkg_node_proofs,
+                dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
                 dkg_aggregation_correlation: Some(corr),
@@ -811,6 +971,9 @@ impl PublicKeyAggregator {
         let PublicKeyAggregatorState::GeneratingC5Proof {
             public_key,
             nodes,
+            party_nodes,
+            dkg_fold_attestations,
+            honest_party_ids,
             c5_proof_pending,
             dkg_aggregated_proof,
             dkg_aggregation_correlation: _,
@@ -867,12 +1030,29 @@ impl PublicKeyAggregator {
 
         let pk_commitment = extract_pk_commitment(c5_proof)?;
 
+        let party_ids: Vec<u64> = honest_party_ids.iter().copied().collect();
+        let committee_addresses = committee_addresses_in_party_order(&party_ids, &party_nodes)?;
+
+        let dkg_attestation_bundle = match dkg_aggregated_proof.as_ref() {
+            Some(_) => {
+                let bundle = e3_evm::encode_dkg_attestation_bundle(
+                    &honest_party_ids,
+                    &party_nodes,
+                    &dkg_fold_attestations,
+                )?;
+                Some(ArcBytes::from_bytes(&bundle))
+            }
+            None => None,
+        };
+
         let event = PublicKeyAggregated {
             pubkey: public_key.clone(),
             e3_id: self.e3_id.clone(),
             nodes: nodes.clone(),
+            committee_addresses: committee_addresses.clone(),
             pk_commitment,
             dkg_aggregator_proof: dkg_aggregated_proof.clone(),
+            dkg_attestation_bundle,
         };
         self.bus.publish(event, ec.clone())?;
 
@@ -881,6 +1061,7 @@ impl PublicKeyAggregator {
                 public_key,
                 keyshares: OrderedSet::new(),
                 nodes,
+                committee_addresses,
             })
         })?;
 
@@ -908,7 +1089,9 @@ impl PublicKeyAggregator {
                     public_key,
                     keyshare_bytes,
                     nodes,
+                    party_nodes,
                     dkg_node_proofs,
+                    dkg_fold_attestations,
                     honest_party_ids,
                     dishonest_parties,
                     dkg_aggregation_correlation,
@@ -924,7 +1107,9 @@ impl PublicKeyAggregator {
                         public_key,
                         keyshare_bytes,
                         nodes,
+                        party_nodes,
                         dkg_node_proofs,
+                        dkg_fold_attestations,
                         honest_party_ids,
                         dishonest_parties,
                         dkg_aggregation_correlation,
@@ -937,7 +1122,9 @@ impl PublicKeyAggregator {
                     public_key,
                     keyshare_bytes,
                     nodes,
+                    party_nodes,
                     dkg_node_proofs,
+                    dkg_fold_attestations,
                     honest_party_ids,
                     dishonest_parties,
                     dkg_aggregation_correlation: None,
@@ -989,7 +1176,9 @@ impl PublicKeyAggregator {
                 public_key,
                 keyshare_bytes,
                 nodes,
+                party_nodes,
                 dkg_node_proofs,
+                dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
                 dkg_aggregation_correlation: _,
@@ -1005,7 +1194,9 @@ impl PublicKeyAggregator {
                 public_key,
                 keyshare_bytes,
                 nodes,
+                party_nodes,
                 dkg_node_proofs,
+                dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
                 dkg_aggregation_correlation: None,
@@ -1321,7 +1512,9 @@ mod tests {
             public_key: ArcBytes::from_bytes(&[1, 2, 3]),
             keyshare_bytes: Vec::new(),
             nodes: OrderedSet::new(),
+            party_nodes: HashMap::new(),
             dkg_node_proofs: HashMap::new(),
+            dkg_fold_attestations: HashMap::new(),
             honest_party_ids: BTreeSet::new(),
             dishonest_parties: BTreeSet::new(),
             dkg_aggregation_correlation: Some(correlation_id),
@@ -1462,6 +1655,50 @@ mod tests {
         };
         assert!(dkg_aggregation_correlation.is_none());
         assert!(c5_proof_pending.is_none());
+
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn honest_dkg_fold_without_attestation_is_not_buffered() -> Result<()> {
+        let correlation_id = CorrelationId::new();
+        let mut initial_state = generating_c5_state(correlation_id);
+        let PublicKeyAggregatorState::GeneratingC5Proof {
+            ref mut party_nodes,
+            ref mut honest_party_ids,
+            ..
+        } = initial_state
+        else {
+            unreachable!();
+        };
+        honest_party_ids.insert(2);
+        party_nodes.insert(2, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8".to_string());
+
+        let (mut aggregator, _history, e3_id) = build_public_key_aggregator(initial_state).await?;
+        let ec = test_ctx(DKGRecursiveAggregationComplete {
+            e3_id: e3_id.clone(),
+            party_id: 2,
+            aggregated_proof: Some(dummy_proof(CircuitName::NodeFold)),
+            fold_attestation: None,
+        });
+
+        aggregator.handle_dkg_recursive_aggregation_complete(TypedEvent::new(
+            DKGRecursiveAggregationComplete {
+                e3_id: e3_id.clone(),
+                party_id: 2,
+                aggregated_proof: Some(dummy_proof(CircuitName::NodeFold)),
+                fold_attestation: None,
+            },
+            ec,
+        ))?;
+
+        let Some(PublicKeyAggregatorState::GeneratingC5Proof {
+            dkg_node_proofs, ..
+        }) = aggregator.state.get()
+        else {
+            panic!("expected GeneratingC5Proof state");
+        };
+        assert!(!dkg_node_proofs.contains_key(&2));
 
         Ok(())
     }

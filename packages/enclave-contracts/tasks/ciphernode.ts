@@ -7,6 +7,45 @@ import { ZeroAddress } from "ethers";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 
+/**
+ * Resolve the right impersonation RPC prefix for the connected provider.
+ * Anvil exposes `anvil_*`; Hardhat's in-process network exposes `hardhat_*`.
+ * Probes once via `anvil_impersonateAccount` and falls back to `hardhat_*`.
+ * Throws a clear error if neither is supported (e.g. a real RPC).
+ */
+async function resolveImpersonationRpc(
+  provider: { send: (method: string, params: unknown[]) => Promise<unknown> },
+  probeAddress: string,
+): Promise<{
+  impersonate: string;
+  setBalance: string;
+  stopImpersonating: string;
+}> {
+  try {
+    await provider.send("anvil_impersonateAccount", [probeAddress]);
+    await provider.send("anvil_stopImpersonatingAccount", [probeAddress]);
+    return {
+      impersonate: "anvil_impersonateAccount",
+      setBalance: "anvil_setBalance",
+      stopImpersonating: "anvil_stopImpersonatingAccount",
+    };
+  } catch {
+    try {
+      await provider.send("hardhat_impersonateAccount", [probeAddress]);
+      await provider.send("hardhat_stopImpersonatingAccount", [probeAddress]);
+      return {
+        impersonate: "hardhat_impersonateAccount",
+        setBalance: "hardhat_setBalance",
+        stopImpersonating: "hardhat_stopImpersonatingAccount",
+      };
+    } catch {
+      throw new Error(
+        "Provider does not support account impersonation. Run this task against an Anvil or Hardhat local node (e.g. `--network localhost` with `anvil` or `npx hardhat node`)",
+      );
+    }
+  }
+}
+
 export const ciphernodeAdd = task(
   "ciphernode:add",
   "Register a ciphernode to the bonding registry and ciphernode registry",
@@ -280,7 +319,7 @@ export const ciphernodeMintTokens = task(
 
 export const ciphernodeAdminAdd = task(
   "ciphernode:admin-add",
-  "Register a ciphernode using admin privileges (for testing/setup)",
+  "Register a ciphernode using admin privileges (for testing/setup). Requires a local node that supports account impersonation (Anvil or Hardhat).",
 )
   .addOption({
     name: "ciphernodeAddress",
@@ -312,6 +351,13 @@ export const ciphernodeAdminAdd = task(
     ) => {
       const connection = await hre.network.connect();
       const { ethers } = connection;
+      const provider = ethers.provider;
+
+      if (!provider) {
+        throw new Error(
+          "No provider on Hardhat network connection. Use --network localhost with Anvil running.",
+        );
+      }
 
       if (ciphernodeAddress === ZeroAddress) {
         throw new Error(
@@ -319,14 +365,10 @@ export const ciphernodeAdminAdd = task(
         );
       }
 
-      let adminWallet;
-      if (adminPrivateKey) {
-        adminWallet = new ethers.Wallet(adminPrivateKey, ethers.provider);
-      } else {
-        const anvilFirstKey =
-          "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-        adminWallet = new ethers.Wallet(anvilFirstKey, ethers.provider);
-      }
+      const [defaultSigner] = await ethers.getSigners();
+      const adminWallet = adminPrivateKey
+        ? new ethers.Wallet(adminPrivateKey, provider)
+        : defaultSigner;
 
       console.log(`Admin wallet: ${adminWallet.address}`);
       console.log(`Registering ciphernode: ${ciphernodeAddress}`);
@@ -334,24 +376,38 @@ export const ciphernodeAdminAdd = task(
       const { deployAndSaveBondingRegistry } = await import(
         "../scripts/deployAndSave/bondingRegistry"
       );
-      const { bondingRegistry } = await deployAndSaveBondingRegistry({ hre });
-
+      const { deployAndSaveEnclaveTicketToken } = await import(
+        "../scripts/deployAndSave/enclaveTicketToken"
+      );
       const { deployAndSaveEnclaveToken } = await import(
         "../scripts/deployAndSave/enclaveToken"
       );
-      const { enclaveToken } = await deployAndSaveEnclaveToken({ hre });
-
       const { deployAndSaveMockStableToken } = await import(
         "../scripts/deployAndSave/mockStableToken"
       );
-      const { mockStableToken: mockUSDC } = await deployAndSaveMockStableToken({
+      const { bondingRegistry } = await deployAndSaveBondingRegistry({ hre });
+      const { enclaveToken } = await deployAndSaveEnclaveToken({ hre });
+      const { enclaveTicketToken } = await deployAndSaveEnclaveTicketToken({
         hre,
       });
+      const { mockStableToken: mockUSDC } = await deployAndSaveMockStableToken({
+        hre,
+        initialSupply: 1_000_000,
+      });
+
+      const bondingRegistryAddress = await bondingRegistry.getAddress();
+      const registryCode = await provider.getCode(bondingRegistryAddress);
+      if (registryCode === "0x") {
+        throw new Error(
+          `BondingRegistry not deployed at ${bondingRegistryAddress}. ` +
+            "Run pnpm evm:deploy with Anvil on localhost:8545 first.",
+        );
+      }
 
       const enclaveTokenConnected = enclaveToken.connect(adminWallet);
       const mockUSDCConnected = mockUSDC.connect(adminWallet);
 
-      const ticketTokenAddress = await bondingRegistry.ticketToken();
+      const ticketTokenAddress = await enclaveTicketToken.getAddress();
 
       try {
         const licenseBondWei = ethers.parseEther(licenseBondAmount);
@@ -384,15 +440,15 @@ export const ciphernodeAdminAdd = task(
         console.log(
           "Step 3: Impersonating ciphernode for license operations...",
         );
-        await connection.provider.request({
-          method: "hardhat_impersonateAccount",
-          params: [ciphernodeAddress],
-        });
-
-        await connection.provider.request({
-          method: "hardhat_setBalance",
-          params: [ciphernodeAddress, "0x1000000000000000000000"],
-        });
+        const impersonationRpc = await resolveImpersonationRpc(
+          provider,
+          ciphernodeAddress,
+        );
+        await provider.send(impersonationRpc.impersonate, [ciphernodeAddress]);
+        await provider.send(impersonationRpc.setBalance, [
+          ciphernodeAddress,
+          "0x1000000000000000000000",
+        ]);
 
         const ciphernodeSigner = await ethers.getSigner(ciphernodeAddress);
         const enclaveTokenAsCiphernode = enclaveToken.connect(ciphernodeSigner);
@@ -416,10 +472,9 @@ export const ciphernodeAdminAdd = task(
           "Operator registered (automatically added to CiphernodeRegistry)",
         );
 
-        await connection.provider.request({
-          method: "hardhat_stopImpersonatingAccount",
-          params: [ciphernodeAddress],
-        });
+        await provider.send(impersonationRpc.stopImpersonating, [
+          ciphernodeAddress,
+        ]);
 
         console.log("Step 4: Adding ticket balance via admin...");
 
@@ -429,15 +484,11 @@ export const ciphernodeAdminAdd = task(
         );
         await approveUsdcTx.wait();
 
-        await connection.provider.request({
-          method: "hardhat_impersonateAccount",
-          params: [ciphernodeAddress],
-        });
-
-        await connection.provider.request({
-          method: "hardhat_setBalance",
-          params: [ciphernodeAddress, "0x1000000000000000000000"],
-        });
+        await provider.send(impersonationRpc.impersonate, [ciphernodeAddress]);
+        await provider.send(impersonationRpc.setBalance, [
+          ciphernodeAddress,
+          "0x1000000000000000000000",
+        ]);
 
         const ciphernodeSigner2 = await ethers.getSigner(ciphernodeAddress);
         const bondingRegistryAsCiphernode2 =
@@ -461,10 +512,9 @@ export const ciphernodeAdminAdd = task(
         await addTicketTx.wait();
         console.log(`Ticket balance added: ${ticketAmount} USDC worth`);
 
-        await connection.provider.request({
-          method: "hardhat_stopImpersonatingAccount",
-          params: [ciphernodeAddress],
-        });
+        await provider.send(impersonationRpc.stopImpersonating, [
+          ciphernodeAddress,
+        ]);
 
         const isRegistered =
           await bondingRegistry.isRegistered(ciphernodeAddress);

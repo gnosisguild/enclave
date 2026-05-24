@@ -5,12 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import hre from "hardhat";
 
+import { getDeploymentChain } from "./utils";
 import { verifyContracts } from "./verify";
 
 async function main() {
-  const { ethers } = await hre.network.connect();
-  const [signer] = await ethers.getSigners();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = getDeploymentChain(hre);
 
   verifyContracts(chain);
 }

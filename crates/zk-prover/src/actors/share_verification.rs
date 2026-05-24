@@ -90,6 +90,10 @@ struct PendingVerification {
     party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>>,
     /// Cached (proof_type, public_signals) per party — for commitment consistency checking.
     party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
+    /// Parallel to `party_public_signals` — raw `proof.data` per (party, proof_type).
+    /// Needed by `ProofVerificationPassed` so downstream actors can forward
+    /// evidence bytes to the slashing contract.
+    party_proof_data: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
     /// BFV preset for circuit artifact resolution.
     params_preset: e3_fhe_params::BfvPreset,
 }
@@ -120,6 +124,10 @@ struct PendingConsistencyCheck {
     party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>>,
     /// (proof_type, public_signals) per party — for consistency & ZK.
     party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
+    /// Parallel to `party_public_signals` — raw `proof.data` per (party, proof_type).
+    /// Needed by `ProofVerificationPassed` so downstream actors can forward
+    /// evidence bytes to the slashing contract.
+    party_proof_data: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
     /// Original ECDSA-passed share proofs for ZK dispatch.
     /// Populated for ShareProofs / ThresholdDecryptionProofs / PkGenerationProofs.
     ecdsa_passed_share_proofs: Vec<PartyProofsToVerify>,
@@ -295,6 +303,7 @@ impl ShareVerificationActor {
         // Compute proof hashes and public signals for ECDSA-passed parties
         let mut party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>> = HashMap::new();
         let mut party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>> = HashMap::new();
+        let mut party_raw_proof_data: HashMap<u64, Vec<(ProofType, ArcBytes)>> = HashMap::new();
         for party in &ecdsa_passed_parties {
             let hashes: Vec<(ProofType, [u8; 32])> = party
                 .signed_proofs()
@@ -318,8 +327,14 @@ impl ShareVerificationActor {
                     )
                 })
                 .collect();
+            let datas: Vec<(ProofType, ArcBytes)> = party
+                .signed_proofs()
+                .iter()
+                .map(|signed| (signed.payload.proof_type, signed.payload.proof.data.clone()))
+                .collect();
             party_proof_hashes.insert(party.party_id(), hashes);
             party_public_signals.insert(party.party_id(), signals);
+            party_raw_proof_data.insert(party.party_id(), datas);
         }
 
         // Build consistency check request
@@ -335,10 +350,15 @@ impl ShareVerificationActor {
                     .get(&party.party_id())
                     .cloned()
                     .unwrap_or_default();
+                let raw_datas = party_raw_proof_data
+                    .get(&party.party_id())
+                    .cloned()
+                    .unwrap_or_default();
                 let proofs = signals
                     .into_iter()
                     .zip(hashes)
-                    .map(|((pt, ps), (_, dh))| (pt, ps, dh))
+                    .zip(raw_datas)
+                    .map(|(((pt, ps), (_, dh)), (_, pd))| (pt, ps, dh, pd))
                     .collect();
                 PartyProofData {
                     party_id: party.party_id(),
@@ -361,6 +381,7 @@ impl ShareVerificationActor {
             party_addresses,
             party_proof_hashes,
             party_public_signals,
+            party_proof_data: party_raw_proof_data,
             ecdsa_passed_share_proofs: Vec::new(),
             ecdsa_passed_decryption_proofs: Vec::new(),
             params_preset,
@@ -504,6 +525,11 @@ impl ShareVerificationActor {
             .into_iter()
             .filter(|(pid, _)| dispatched_party_ids.contains(pid))
             .collect();
+        let party_proof_data: HashMap<u64, Vec<(ProofType, ArcBytes)>> = pending
+            .party_proof_data
+            .into_iter()
+            .filter(|(pid, _)| dispatched_party_ids.contains(pid))
+            .collect();
 
         // Store pending ZK verification state.
         // All prior dishonest parties (pre_dishonest + ECDSA + consistency) are
@@ -521,6 +547,7 @@ impl ShareVerificationActor {
                 party_addresses,
                 party_proof_hashes,
                 party_public_signals,
+                party_proof_data,
                 params_preset: pending.params_preset,
             },
         );
@@ -707,10 +734,15 @@ impl ShareVerificationActor {
                         .copied()
                         .unwrap_or_default();
                     let signals = pending.party_public_signals.get(&result.sender_party_id);
+                    let datas = pending.party_proof_data.get(&result.sender_party_id);
                     for (i, &(proof_type, data_hash)) in hashes.iter().enumerate() {
                         let public_signals = signals
                             .and_then(|s| s.get(i))
                             .map(|(_, ps)| ps.clone())
+                            .unwrap_or_default();
+                        let proof_data = datas
+                            .and_then(|d| d.get(i))
+                            .map(|(_, pd)| pd.clone())
                             .unwrap_or_default();
                         if let Err(err) = self.bus.publish(
                             ProofVerificationPassed {
@@ -720,6 +752,7 @@ impl ShareVerificationActor {
                                 proof_type,
                                 data_hash,
                                 public_signals,
+                                proof_data,
                             },
                             pending.ec.clone(),
                         ) {

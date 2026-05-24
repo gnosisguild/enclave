@@ -21,12 +21,16 @@ import {
     IERC165
 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { CommitteeHashLib } from "../lib/CommitteeHashLib.sol";
+import {
+    IDkgFoldAttestationVerifier
+} from "../interfaces/IDkgFoldAttestationVerifier.sol";
 
 /**
  * @title CiphernodeRegistryOwnable
  * @notice Ownable implementation of the ciphernode registry with IMT-based membership tracking
  * @dev Manages ciphernode registration, committee selection, and integrates with bonding registry
  */
+// solhint-disable-next-line max-states-count
 contract CiphernodeRegistryOwnable is
     ICiphernodeRegistry,
     Ownable2StepUpgradeable
@@ -117,6 +121,53 @@ contract CiphernodeRegistryOwnable is
     /// @notice Address of the slashing manager authorized to expel committee members
     ISlashingManager public slashingManager;
 
+    /// @notice Verifies per-node DKG fold attestations at publication (external contract).
+    IDkgFoldAttestationVerifier public dkgFoldAttestationVerifier;
+
+    /// @notice Minimum delay between proposing a verifier change and committing it.
+    /// @dev Treats `dkgFoldAttestationVerifier` as a critical admin key: a compromised
+    ///      owner cannot instantly swap it for a weak verifier that bypasses
+    ///      per-party attestation checks; the proposal is visible on-chain for
+    ///      this window and can be cancelled by the (recovered) legitimate owner.
+    uint256 public constant DKG_FOLD_VERIFIER_TIMELOCK = 2 days;
+
+    /// @notice Pending verifier proposal awaiting commit. `pendingAt == 0` means no proposal.
+    address public pendingDkgFoldAttestationVerifier;
+    uint256 public pendingDkgFoldAttestationVerifierAt;
+
+    /// @notice Registry-wide validity window (seconds) accusers stamp on accusation
+    ///         vote signatures. Ciphernodes fetch this on startup and add it to the
+    ///         current wall-clock when populating `AccusationVote.deadline`. The
+    ///         on-chain `SlashingManager._verifyAttestationEvidence` then enforces
+    ///         `block.timestamp <= deadline`, so this value bounds how long a leaked
+    ///         vote signature stays replayable.
+    ///
+    /// @dev Set with [`setAccusationVoteValidity`] by `owner()`. Defaults to the
+    ///      [`DEFAULT_ACCUSATION_VOTE_VALIDITY`] constant on initialize so newly-
+    ///      deployed registries are operational without an extra setter call.
+    ///      Setting to zero disables the off-chain freshness window (deadlines
+    ///      collapse to "now", effectively rejecting every vote on chain) — intentionally
+    ///      allowed so governance can hard-stop slashing in an emergency.
+    uint256 public accusationVoteValidity;
+
+    /// @notice Default value for `accusationVoteValidity` applied at `initialize`.
+    /// @dev 30 minutes covers gossip latency, vote-collection timeout, and mempool
+    ///      congestion while keeping stolen signatures from being replayed indefinitely.
+    uint256 public constant DEFAULT_ACCUSATION_VOTE_VALIDITY = 30 minutes;
+
+    /// @notice Minimum delay between proposing and committing a zeroing vote-validity update.
+    /// @dev Mirrors verifier critical-change timelock posture for slash-disable behavior.
+    uint256 public constant ACCUSATION_VOTE_VALIDITY_TIMELOCK = 2 days;
+
+    /// @notice Pending vote-validity proposal awaiting commit. `pendingAt == 0` means none.
+    uint256 public pendingAccusationVoteValidity;
+    uint256 public pendingAccusationVoteValidityAt;
+
+    /// @notice DKG anchor commitments stored when the committee public key is published.
+    mapping(uint256 e3Id => uint256[] partyIds) internal dkgPartyIds;
+    mapping(uint256 e3Id => bytes32[] skAggCommits) internal dkgSkAggCommits;
+    mapping(uint256 e3Id => bytes32[] esmAggCommits) internal dkgEsmAggCommits;
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                     Modifiers                          //
@@ -170,9 +221,17 @@ contract CiphernodeRegistryOwnable is
     ) public initializer {
         require(_owner != address(0), ZeroAddress());
 
+        // Hold ownership transiently as `msg.sender` so the internal call to
+        // `setSortitionSubmissionWindow` (which is `onlyOwner`) succeeds, then
+        // transfer to the final `_owner` before returning.
         __Ownable_init(msg.sender);
         ciphernodes._init(TREE_DEPTH);
         setSortitionSubmissionWindow(_submissionWindow);
+        // Seed the off-chain freshness window with a sensible default so new
+        // deployments don't immediately need a governance call before slashing
+        // becomes operational.
+        accusationVoteValidity = DEFAULT_ACCUSATION_VOTE_VALIDITY;
+        emit AccusationVoteValiditySet(DEFAULT_ACCUSATION_VOTE_VALIDITY);
         if (_owner != owner()) _transferOwnership(_owner);
     }
 
@@ -231,7 +290,8 @@ contract CiphernodeRegistryOwnable is
         uint256 e3Id,
         bytes calldata publicKey,
         bytes32 pkCommitment,
-        bytes calldata proof
+        bytes calldata proof,
+        bytes calldata dkgAttestationBundle
     ) external {
         Committee storage c = committees[e3Id];
 
@@ -249,19 +309,18 @@ contract CiphernodeRegistryOwnable is
 
         E3 memory e3 = enclave.getE3(e3Id);
         if (e3.proofAggregationEnabled) {
-            require(proof.length > 0, DkgProofRequired());
-            // Wrapper binds proof to full call context (chainId, this, e3Id, committeeRoot,
-            // sortedNodes, pkCommitment, committeeHash) and anchors recursive-aggregation VKs
-            // against immutables; reverts on mismatch with a typed error. Bind to the on-chain
-            // selected committee (`c.topNodes`), not caller-supplied `nodes`, so a wrong
-            // `nodes` input cannot pre-commit the prover to the attacker's set.
-            e3.pkVerifier.verify(
+            // Bind to the on-chain committee (c.topNodes), not caller-supplied
+            // nodes, so a wrong `nodes` input cannot pre-commit the prover to
+            // an attacker's set (C-08).
+            _verifyAndStoreDkgAnchors(
                 e3Id,
+                e3,
                 roots[e3Id],
                 c.topNodes,
                 pkCommitment,
                 committeeHash,
-                proof
+                proof,
+                dkgAttestationBundle
             );
         }
 
@@ -274,6 +333,149 @@ contract CiphernodeRegistryOwnable is
             pkCommitment,
             proof
         );
+    }
+
+    function _verifyAndStoreDkgAnchors(
+        uint256 e3Id,
+        E3 memory e3,
+        uint256 committeeRoot,
+        address[] memory sortedNodes,
+        bytes32 pkCommitment,
+        bytes32 committeeHash,
+        bytes calldata proof,
+        bytes calldata dkgAttestationBundle
+    ) internal {
+        require(proof.length > 0, DkgProofRequired());
+        // Reverts with a typed error on any mismatch; binds to the on-chain
+        // committee (sortedNodes = c.topNodes) per audit finding C-08.
+        e3.pkVerifier.verify(
+            e3Id,
+            committeeRoot,
+            sortedNodes,
+            pkCommitment,
+            committeeHash,
+            proof
+        );
+        _verifyAndStoreFoldAttestation(e3Id, proof, dkgAttestationBundle);
+    }
+
+    /// @dev Split out to avoid "stack too deep" in `_verifyAndStoreDkgAnchors`.
+    function _verifyAndStoreFoldAttestation(
+        uint256 e3Id,
+        bytes calldata proof,
+        bytes calldata dkgAttestationBundle
+    ) internal {
+        require(dkgAttestationBundle.length > 0, FoldAttestationsRequired());
+        require(
+            address(dkgFoldAttestationVerifier) != address(0),
+            FoldAttestationVerifierNotSet()
+        );
+
+        (
+            uint256[] memory partyIds,
+            bytes32[] memory skAgg,
+            bytes32[] memory esmAgg
+        ) = dkgFoldAttestationVerifier.verify(
+                address(this),
+                block.chainid,
+                e3Id,
+                proof,
+                dkgAttestationBundle
+            );
+
+        dkgPartyIds[e3Id] = partyIds;
+        dkgSkAggCommits[e3Id] = skAgg;
+        dkgEsmAggCommits[e3Id] = esmAgg;
+    }
+
+    /// @notice Propose a new DKG fold-attestation verifier. The change becomes active
+    ///         only after `DKG_FOLD_VERIFIER_TIMELOCK` has elapsed and `commitDkgFoldAttestationVerifier`
+    ///         is called. Replaces any pending proposal.
+    /// @dev First-time set is also subject to the timelock — operators must wait
+    ///      the same window before the verifier is active. For the deploy-time
+    ///      initial set, see `setInitialDkgFoldAttestationVerifier`.
+    ///
+    /// @dev **Node-operator requirement.** Ciphernodes fetch
+    ///      `dkgFoldAttestationVerifier()` from this registry **once at process
+    ///      startup** and use the returned address as the EIP-712 `verifyingContract`
+    ///      for every fold attestation they sign during the process lifetime.
+    ///      After a successful `commitDkgFoldAttestationVerifier`, signatures
+    ///      produced by long-running nodes will be rejected on-chain by the new
+    ///      verifier (different `verifyingContract` → different EIP-712 domain
+    ///      separator → `ECDSA.recover` returns the wrong address).
+    ///
+    ///      Operators MUST restart all ciphernodes within `DKG_FOLD_VERIFIER_TIMELOCK`
+    ///      after this function is called — the 2-day window is sized to give
+    ///      operators time to coordinate a rolling restart before the swap
+    ///      becomes effective. Nodes that miss the window will silently produce
+    ///      invalid fold attestations and be treated as dishonest by aggregators
+    ///      until they restart.
+    function proposeDkgFoldAttestationVerifier(
+        IDkgFoldAttestationVerifier verifier
+    ) external onlyOwner {
+        require(address(verifier) != address(0), ZeroAddress());
+        pendingDkgFoldAttestationVerifier = address(verifier);
+        pendingDkgFoldAttestationVerifierAt = block.timestamp;
+        emit DkgFoldAttestationVerifierProposed(
+            address(verifier),
+            block.timestamp + DKG_FOLD_VERIFIER_TIMELOCK
+        );
+    }
+
+    /// @notice Commit a previously proposed verifier change after the timelock elapses.
+    /// @param verifier Must match the pending proposal (prevents commit-time substitution).
+    function commitDkgFoldAttestationVerifier(
+        IDkgFoldAttestationVerifier verifier
+    ) external onlyOwner {
+        address pending = pendingDkgFoldAttestationVerifier;
+        require(pending != address(0), NoPendingVerifierUpdate());
+        require(
+            pending == address(verifier),
+            VerifierMismatch(pending, address(verifier))
+        );
+        uint256 readyAt = pendingDkgFoldAttestationVerifierAt +
+            DKG_FOLD_VERIFIER_TIMELOCK;
+        require(
+            block.timestamp >= readyAt,
+            VerifierUpdateTimelockActive(readyAt, block.timestamp)
+        );
+        dkgFoldAttestationVerifier = verifier;
+        pendingDkgFoldAttestationVerifier = address(0);
+        pendingDkgFoldAttestationVerifierAt = 0;
+        emit DkgFoldAttestationVerifierUpdated(address(verifier));
+    }
+
+    /// @notice Cancel a pending verifier proposal.
+    function cancelDkgFoldAttestationVerifierProposal() external onlyOwner {
+        address pending = pendingDkgFoldAttestationVerifier;
+        require(pending != address(0), NoPendingVerifierUpdate());
+        pendingDkgFoldAttestationVerifier = address(0);
+        pendingDkgFoldAttestationVerifierAt = 0;
+        emit DkgFoldAttestationVerifierProposalCancelled(pending);
+    }
+
+    /// @notice One-shot initial set, allowed only when no verifier has ever been configured.
+    /// @dev Lets deploy scripts wire the verifier without first waiting the timelock.
+    ///      Subsequent changes must go through `propose`/`commit`. Cannot be used to
+    ///      bypass the timelock for replacement — only for the very first set.
+    function setInitialDkgFoldAttestationVerifier(
+        IDkgFoldAttestationVerifier verifier
+    ) external onlyOwner {
+        require(
+            address(dkgFoldAttestationVerifier) == address(0),
+            FoldAttestationVerifierAlreadySet()
+        );
+        require(address(verifier) != address(0), ZeroAddress());
+        dkgFoldAttestationVerifier = verifier;
+        // Invalidate any stale pending proposal made before the initial set,
+        // so it cannot later be committed and silently bypass the timelock.
+        if (pendingDkgFoldAttestationVerifier != address(0)) {
+            address staleProposal = pendingDkgFoldAttestationVerifier;
+            pendingDkgFoldAttestationVerifier = address(0);
+            pendingDkgFoldAttestationVerifierAt = 0;
+            emit DkgFoldAttestationVerifierProposalCancelled(staleProposal);
+        }
+        emit DkgFoldAttestationVerifierUpdated(address(verifier));
     }
 
     /// @inheritdoc ICiphernodeRegistry
@@ -401,6 +603,8 @@ contract CiphernodeRegistryOwnable is
             return false;
         }
 
+        _sortTopNodesByAscendingAddress(c);
+
         c.stage = ICiphernodeRegistry.CommitteeStage.Finalized;
         c.activeCount = c.topNodes.length;
 
@@ -468,6 +672,73 @@ contract CiphernodeRegistryOwnable is
         );
         sortitionSubmissionWindow = _sortitionSubmissionWindow;
         emit SortitionSubmissionWindowSet(_sortitionSubmissionWindow);
+    }
+
+    /// @notice Update the registry-wide vote validity window used by accusers
+    ///         when stamping `AccusationVote.deadline`.
+    /// @dev Ciphernodes fetch this once at startup. After a change, in-flight
+    ///      ciphernode processes continue to use the previous value until
+    ///      restarted — operators should coordinate a restart if the new
+    ///      window is materially shorter than the old one, otherwise stale
+    ///      nodes will produce votes the on-chain verifier rejects.
+    /// @param _accusationVoteValidity New validity window in seconds.
+    ///        Zero is allowed and intentionally disables slashing submission
+    ///        until governance restores a nonzero value.
+    function setAccusationVoteValidity(
+        uint256 _accusationVoteValidity
+    ) external onlyOwner {
+        require(
+            _accusationVoteValidity != 0,
+            AccusationVoteValidityZeroRequiresTimelock()
+        );
+        accusationVoteValidity = _accusationVoteValidity;
+        emit AccusationVoteValiditySet(_accusationVoteValidity);
+    }
+
+    /// @notice Propose a new accusation vote validity window (supports zero).
+    /// @dev Zeroing the window is slash-disable behavior and therefore timelocked.
+    function proposeAccusationVoteValidity(
+        uint256 _accusationVoteValidity
+    ) external onlyOwner {
+        pendingAccusationVoteValidity = _accusationVoteValidity;
+        pendingAccusationVoteValidityAt = block.timestamp;
+        emit AccusationVoteValidityProposed(
+            _accusationVoteValidity,
+            block.timestamp + ACCUSATION_VOTE_VALIDITY_TIMELOCK
+        );
+    }
+
+    /// @notice Commit a previously proposed accusation vote validity update.
+    /// @param _accusationVoteValidity Must match the pending proposal.
+    function commitAccusationVoteValidity(
+        uint256 _accusationVoteValidity
+    ) external onlyOwner {
+        uint256 pendingAt = pendingAccusationVoteValidityAt;
+        require(pendingAt != 0, NoPendingAccusationVoteValidityUpdate());
+        uint256 pending = pendingAccusationVoteValidity;
+        require(
+            pending == _accusationVoteValidity,
+            AccusationVoteValidityMismatch(pending, _accusationVoteValidity)
+        );
+        uint256 readyAt = pendingAt + ACCUSATION_VOTE_VALIDITY_TIMELOCK;
+        require(
+            block.timestamp >= readyAt,
+            AccusationVoteValidityTimelockActive(readyAt, block.timestamp)
+        );
+        accusationVoteValidity = _accusationVoteValidity;
+        pendingAccusationVoteValidity = 0;
+        pendingAccusationVoteValidityAt = 0;
+        emit AccusationVoteValiditySet(_accusationVoteValidity);
+    }
+
+    /// @notice Cancel a pending accusation vote validity proposal.
+    function cancelAccusationVoteValidityProposal() external onlyOwner {
+        uint256 pendingAt = pendingAccusationVoteValidityAt;
+        require(pendingAt != 0, NoPendingAccusationVoteValidityUpdate());
+        uint256 pending = pendingAccusationVoteValidity;
+        pendingAccusationVoteValidity = 0;
+        pendingAccusationVoteValidityAt = 0;
+        emit AccusationVoteValidityProposalCancelled(pending);
     }
 
     ////////////////////////////////////////////////////////////
@@ -539,6 +810,26 @@ contract CiphernodeRegistryOwnable is
         Committee storage c = committees[e3Id];
         require(c.publicKey != bytes32(0), CommitteeNotPublished());
         committeeHash = c.committeeHash;
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function getDkgAnchors(
+        uint256 e3Id
+    )
+        external
+        view
+        returns (
+            uint256[] memory partyIds,
+            bytes32[] memory skAggCommits,
+            bytes32[] memory esmAggCommits
+        )
+    {
+        require(publicKeyHashes[e3Id] != bytes32(0), CommitteeNotPublished());
+        return (
+            dkgPartyIds[e3Id],
+            dkgSkAggCommits[e3Id],
+            dkgEsmAggCommits[e3Id]
+        );
     }
 
     /// @notice Returns the current size of the ciphernode IMT
@@ -623,6 +914,26 @@ contract CiphernodeRegistryOwnable is
         return
             committees[e3Id].memberStatus[node] !=
             ICiphernodeRegistry.MemberStatus.None;
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function canonicalCommitteeNodeAt(
+        uint256 e3Id,
+        uint256 partyId
+    ) external view returns (address) {
+        Committee storage c = committees[e3Id];
+        // Only expose `partyId -> node` for canonical (finalized) committees.
+        // Pre-finalization, `topNodes` is still being populated by sortition
+        // and is not the canonical mapping.
+        require(
+            c.stage == ICiphernodeRegistry.CommitteeStage.Finalized,
+            CommitteeNotFinalized()
+        );
+        require(
+            partyId < c.topNodes.length,
+            PartyIdOutOfBounds(partyId, c.topNodes.length)
+        );
+        return c.topNodes[partyId];
     }
 
     /// @inheritdoc ICiphernodeRegistry
@@ -732,6 +1043,27 @@ contract CiphernodeRegistryOwnable is
 
         require(availableTickets > 0, NodeNotEligible());
         require(ticketNumber <= availableTickets, InvalidTicketNumber());
+    }
+
+    /// @notice Sort `topNodes` by ascending address before committee finalization.
+    /// @dev Canonical address-ascending order so `CommitteeHashLib.hash(topNodes)`
+    ///      matches what off-chain aggregators independently compute over the same
+    ///      address set (Rust uses `BTreeSet<String>` which iterates lexicographically,
+    ///      equivalent to numeric address-ascending for hex-encoded addresses).
+    ///      This also defines `party_id` = position in the address-sorted committee.
+    /// @param c Committee storage reference
+    function _sortTopNodesByAscendingAddress(Committee storage c) internal {
+        uint256 len = c.topNodes.length;
+        for (uint256 i = 0; i < len; ++i) {
+            for (uint256 j = i + 1; j < len; ++j) {
+                address left = c.topNodes[i];
+                address right = c.topNodes[j];
+                if (right < left) {
+                    c.topNodes[i] = right;
+                    c.topNodes[j] = left;
+                }
+            }
+        }
     }
 
     /// @notice Inserts a node into the top-N list - Smallest scores

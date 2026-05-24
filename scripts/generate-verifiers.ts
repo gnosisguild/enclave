@@ -6,7 +6,19 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 /**
- * Generate Solidity verifier contracts from compiled Noir circuits.
+ * Generate (or verify) Solidity verifier contracts from compiled Noir circuits.
+ *
+ * The Honk Solidity verifiers are committed to git. To keep the committed
+ * files in sync with the recursive VKs, this script has two modes:
+ *
+ *   - `--check` (default for test/benchmark flows): regenerate in memory and
+ *     diff against the committed files. Exits non-zero on drift without
+ *     touching the working tree. Used by `prebuild.sh`, `extract_crisp_verify_gas.sh`,
+ *     `replay_folded_verify_gas.sh` so accidental drift fails loudly instead
+ *     of silently rewriting committed contracts mid-test.
+ *
+ *   - `--write` (default for manual runs): regenerate and overwrite the
+ *     committed `.sol` files. Use this when you intentionally bump circuits.
  *
  * Prerequisites:
  *   - `nargo` and `bb` (Barretenberg CLI) must be installed and in PATH
@@ -14,17 +26,18 @@
  *     will compile them automatically.
  *
  * Usage:
- *   pnpm generate:verifiers                  # All circuits (or --circuits from package.json)
- *   pnpm generate:verifiers --circuits pk,fold  # Specific circuits
- *   pnpm generate:verifiers --clean          # Remove existing verifiers first
- *   pnpm generate:verifiers --dry-run        # Show what would be generated
- *   pnpm generate:verifiers --no-compile     # Use artifacts from build:circuits (skips target cleanup)
+ *   pnpm generate:verifiers                       # Write all circuits (default)
+ *   pnpm generate:verifiers --check               # Verify committed verifiers match VKs (no writes)
+ *   pnpm generate:verifiers --circuits pk,fold    # Specific circuits
+ *   pnpm generate:verifiers --clean               # Remove existing verifiers first (write mode only)
+ *   pnpm generate:verifiers --dry-run             # Show what would be generated
+ *   pnpm generate:verifiers --no-compile          # Use artifacts from build:circuits (skips target cleanup)
  */
 
-import { execSync } from 'child_process'
+import { execFileSync, execSync } from 'child_process'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { basename, join, resolve } from 'path'
-import { ALL_GROUPS, CIRCUIT_GROUPS, type CircuitGroup } from './circuit-constants'
+import { ALL_GROUPS, ALL_PRESETS, CIRCUIT_GROUPS, type CircuitGroup } from './circuit-constants'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -36,6 +49,28 @@ const LICENSE_HEADER = `// SPDX-License-Identifier: LGPL-3.0-only
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 `
+
+/**
+ * Canonical BFV preset for the committed Honk Solidity verifiers.
+ *
+ * The on-chain `DkgAggregatorVerifier.sol` / `DecryptionAggregatorVerifier.sol` bake in the
+ * recursive VKs of `dkg_aggregator` / `decryption_aggregator`, which are
+ * **preset-dependent**: different BFV parameter sets compile to different VKs and therefore
+ * different `.sol` bytes. Exactly one preset can be "the committed one"; we pin `insecure-512`
+ * because that is the development/CI/benchmark default and the preset every committed verifier
+ * corresponds to.
+ *
+ * Both `--check` and `--write` refuse to run unless
+ * `dist/circuits/<CANONICAL_PRESET>/.build-stamp.json` exists and its `preset` field matches.
+ * This prevents silently producing/checking against the wrong preset's VKs — e.g. after
+ * `pnpm build:circuits --preset secure-8192`, where `circuits/bin/` holds secure artifacts that
+ * would generate different `.sol` bytes.
+ *
+ * If you need verifiers for a different preset (e.g. a production deploy on `secure-8192`),
+ * rebuild that preset locally and run the generator there; do **not** commit the result over
+ * the canonical files.
+ */
+const CANONICAL_PRESET = 'insecure-512'
 
 interface CircuitInfo {
   name: string
@@ -51,6 +86,17 @@ interface GenerateOptions {
   dryRun?: boolean
   compile?: boolean // compile circuits before generating verifiers
   noCleanTargets?: boolean // skip deleting nargo target dirs before generation
+  /**
+   * Check mode: generate verifiers into memory and diff against the committed
+   * files. Exit non-zero on any drift. No writes to the working tree.
+   * Used by test/benchmark/CI flows that must not silently mutate committed
+   * verifier contracts.
+   */
+  check?: boolean
+  /** BFV preset whose artifacts in `circuits/bin/` are used for generation/check. */
+  preset?: string
+  /** Override output directory (write mode only). Defaults to committed honk/ path. */
+  outputDir?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +112,10 @@ class VerifierGenerator {
   constructor(rootDir?: string, options: GenerateOptions = {}) {
     this.rootDir = rootDir ?? resolve(__dirname, '..')
     this.circuitsDir = join(this.rootDir, 'circuits', 'bin')
-    this.verifierDir = join(this.rootDir, 'packages', 'enclave-contracts', 'contracts', 'verifiers', 'bfv', 'honk')
+    this.verifierDir =
+      options.outputDir !== undefined
+        ? resolve(options.outputDir)
+        : join(this.rootDir, 'packages', 'enclave-contracts', 'contracts', 'verifiers', 'bfv', 'honk')
     this.options = {
       groups: ALL_GROUPS,
       clean: false,
@@ -76,10 +125,29 @@ class VerifierGenerator {
   }
 
   async generate(): Promise<void> {
-    console.log('🔮 Generating Solidity verifiers from Noir circuits...\n')
+    const mode = this.options.check ? 'Checking' : 'Generating'
+    console.log(`🔮 ${mode} Solidity verifiers from Noir circuits...\n`)
 
     this.checkTool('nargo --version', 'nargo')
     this.checkTool('bb --version', 'bb')
+
+    const targetPreset = this.targetPreset()
+
+    if (!this.options.dryRun) {
+      this.assertPresetBuilt(targetPreset)
+      this.assertCircuitsBinActivePreset(targetPreset)
+    }
+
+    // Committed Honk `.sol` files are pinned to CANONICAL_PRESET only. Secure (and other)
+    // benchmark modes still need `circuits/bin/` aligned to their preset for integration + gas replay.
+    if (this.options.check && targetPreset !== CANONICAL_PRESET) {
+      console.log(
+        `\n✅ Preset '${targetPreset}' is built and active in circuits/bin.\n` +
+          `   Committed Honk verifiers in git are pinned to '${CANONICAL_PRESET}' only; skipping .sol diff.\n` +
+          `   Benchmark gas replay deploys fresh aggregator verifiers from circuits/bin at runtime.\n`,
+      )
+      return
+    }
 
     const circuits = this.discoverCircuits()
     if (circuits.length === 0) {
@@ -100,12 +168,20 @@ class VerifierGenerator {
       this.cleanTargetDirs(circuits)
     }
 
-    // Prepare output directory
-    if (this.options.clean && existsSync(this.verifierDir)) {
-      rmSync(this.verifierDir, { recursive: true })
-      console.log('   🗑️  Cleaned existing verifier directory')
+    if (this.options.check && this.options.clean) {
+      throw new Error('--check and --clean are mutually exclusive (check must not mutate the working tree)')
     }
-    mkdirSync(this.verifierDir, { recursive: true })
+
+    // In write mode, prepare output directory.
+    if (!this.options.check) {
+      if (this.options.clean && existsSync(this.verifierDir)) {
+        rmSync(this.verifierDir, { recursive: true })
+        console.log('   🗑️  Cleaned existing verifier directory')
+      }
+      mkdirSync(this.verifierDir, { recursive: true })
+    } else if (!existsSync(this.verifierDir)) {
+      throw new Error(`--check requires the committed verifier directory to exist: ${this.verifierDir}`)
+    }
 
     // Pre-flight: two circuits with the same leaf name would silently overwrite each other's .sol.
     const seen = new Map<string, string>()
@@ -122,24 +198,63 @@ class VerifierGenerator {
       seen.set(contractFile, `${circuit.group}/${circuit.name}`)
     }
 
-    const generated: string[] = []
+    const processed: string[] = []
+    const drift: { circuit: string; file: string; reason: string }[] = []
     const errors: string[] = []
 
     for (const circuit of circuits) {
       try {
-        const solFile = this.generateVerifier(circuit)
-        generated.push(solFile)
+        const result = this.generateVerifier(circuit)
+        processed.push(result.outputPath)
+        if (this.options.check) {
+          if (!existsSync(result.outputPath)) {
+            drift.push({
+              circuit: `${circuit.group}/${circuit.name}`,
+              file: result.outputPath,
+              reason: 'committed file is missing',
+            })
+          } else {
+            const committed = readFileSync(result.outputPath, 'utf-8')
+            if (committed !== result.content) {
+              drift.push({
+                circuit: `${circuit.group}/${circuit.name}`,
+                file: result.outputPath,
+                reason: 'content differs from committed file',
+              })
+            }
+          }
+        }
       } catch (error: any) {
         errors.push(`${circuit.group}/${circuit.name}: ${error.message}`)
         console.error(`   ✗ ${circuit.group}/${circuit.name}: ${error.message}`)
       }
     }
 
-    console.log(`\n✅ Generated ${generated.length} Solidity verifier(s) in:`)
-    console.log(`   ${this.verifierDir}\n`)
-
-    for (const f of generated) {
-      console.log(`   • ${basename(f)}`)
+    if (this.options.check) {
+      if (drift.length > 0) {
+        console.error(`\n❌ ${drift.length} Solidity verifier(s) drift from current circuit VKs:`)
+        for (const d of drift) {
+          console.error(`   • ${d.circuit} (${basename(d.file)}): ${d.reason}`)
+        }
+        console.error(
+          `\n   The committed Honk verifiers under contracts/verifiers/bfv/honk are out of sync\n` +
+            `   with the circuits' recursive VKs. This usually means:\n` +
+            `     - You ran 'pnpm build:circuits' against a different Noir/bb version, or\n` +
+            `     - A circuit / VK changed without regenerating the committed Solidity files.\n` +
+            `\n   To fix:\n` +
+            `     1. Verify your Noir/bb versions match (see crates/zk-prover/versions.json).\n` +
+            `     2. Run 'pnpm build:circuits --preset insecure-512' (or the relevant preset).\n` +
+            `     3. Run 'pnpm generate:verifiers --write' (or omit --check) to refresh the\n` +
+            `        committed .sol files, then commit the diff.\n`,
+        )
+        process.exit(1)
+      }
+      console.log(`\n✅ Checked ${processed.length} Solidity verifier(s) — all in sync with current VKs.\n`)
+      for (const f of processed) console.log(`   • ${basename(f)}`)
+    } else {
+      console.log(`\n✅ Generated ${processed.length} Solidity verifier(s) in:`)
+      console.log(`   ${this.verifierDir}\n`)
+      for (const f of processed) console.log(`   • ${basename(f)}`)
     }
 
     if (errors.length > 0) {
@@ -192,7 +307,7 @@ class VerifierGenerator {
   // Generation pipeline  (compile → write_vk → write_solidity_verifier)
   // -------------------------------------------------------------------------
 
-  private generateVerifier(circuit: CircuitInfo): string {
+  private generateVerifier(circuit: CircuitInfo): { content: string; outputPath: string } {
     const { name, group, packageName } = circuit
 
     // 1. Compile if needed
@@ -204,13 +319,13 @@ class VerifierGenerator {
 
     // 3. Generate Solidity verifier
     const rawSolPath = join(targetDir, `${packageName}_verifier.sol`)
-    execSync(`bb write_solidity_verifier -k "${vkPath}" -o "${rawSolPath}"`, { stdio: 'pipe' })
+    execFileSync('bb', ['write_solidity_verifier', '-k', vkPath, '-o', rawSolPath], { stdio: 'pipe' })
 
     if (!existsSync(rawSolPath)) {
       throw new Error('bb write_solidity_verifier did not produce output')
     }
 
-    // 4. Post-process: rename contract, add license header, copy to output
+    // 4. Post-process: rename contract, add license header
     const contractName = this.toContractName(name)
     const outputFileName = `${contractName}.sol`
     const outputPath = join(this.verifierDir, outputFileName)
@@ -223,13 +338,40 @@ class VerifierGenerator {
     // Replace license header – bb produces Apache-2.0 by default
     solidity = solidity.replace(/\/\/\s*SPDX-License-Identifier:[^\n]*\n(\/\/[^\n]*\n)*/, LICENSE_HEADER)
 
-    writeFileSync(outputPath, solidity)
-
-    // Clean up intermediate file
+    // Clean up intermediate file (always — we don't keep the bb temp output around)
     rmSync(rawSolPath, { force: true })
 
-    console.log(`   ✓ ${group}/${name} → ${outputFileName}`)
-    return outputPath
+    // Normalize with prettier so the on-disk format matches what the rest of
+    // the repo's `pnpm prettier:write` produces. Without this, --check would
+    // always fail because bb emits a different whitespace style than
+    // prettier-plugin-solidity.
+    solidity = this.formatSolidity(solidity, outputPath)
+
+    // In check mode, do not touch the committed file.
+    if (!this.options.check) {
+      writeFileSync(outputPath, solidity)
+      console.log(`   ✓ ${group}/${name} → ${outputFileName}`)
+    } else {
+      console.log(`   • ${group}/${name} → ${outputFileName} (checking)`)
+    }
+
+    return { content: solidity, outputPath }
+  }
+
+  /**
+   * Format Solidity through prettier-plugin-solidity so output matches the
+   * project's standard formatting. Run from `packages/enclave-contracts` so
+   * prettier picks up the local `.prettierrc` and plugin resolution.
+   */
+  private formatSolidity(content: string, outputPath: string): string {
+    const contractsDir = join(this.rootDir, 'packages', 'enclave-contracts')
+    // Use prettier --stdin-filepath so plugin selection is by extension.
+    const result = execFileSync('pnpm', ['exec', 'prettier', '--stdin-filepath', outputPath], {
+      cwd: contractsDir,
+      input: content,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+    return result.toString('utf-8')
   }
 
   /**
@@ -278,7 +420,7 @@ class VerifierGenerator {
     }
 
     // Generate VK (EVM target for Solidity verifiers)
-    execSync(`bb write_vk -b "${jsonFile}" -o "${targetDir}" -t evm`, { stdio: 'pipe' })
+    execFileSync('bb', ['write_vk', '-b', jsonFile, '-o', targetDir, '-t', 'evm'], { stdio: 'pipe' })
 
     // bb writes to 'vk' by default, rename to <packageName>.vk
     if (existsSync(defaultVk) && !existsSync(vkFile)) {
@@ -358,6 +500,75 @@ class VerifierGenerator {
       throw new Error(`${name} is not installed or not in PATH`)
     }
   }
+
+  private targetPreset(): string {
+    return this.options.preset ?? CANONICAL_PRESET
+  }
+
+  /**
+   * Refuse to run unless `dist/circuits/<preset>/.build-stamp.json` exists for the target preset.
+   */
+  private assertPresetBuilt(preset: string): void {
+    const stampPath = join(this.rootDir, 'dist', 'circuits', preset, '.build-stamp.json')
+    if (!existsSync(stampPath)) {
+      throw new Error(
+        `Preset '${preset}' is not built (missing ${stampPath}).\n` +
+          `\n` +
+          `   To fix, run from the repo root:\n` +
+          `     pnpm build:circuits --preset ${preset}\n` +
+          `   then retry.`,
+      )
+    }
+    let stamp: { preset?: string } = {}
+    try {
+      stamp = JSON.parse(readFileSync(stampPath, 'utf-8'))
+    } catch (err: any) {
+      throw new Error(`Failed to parse ${stampPath}: ${err.message}`)
+    }
+    if (stamp.preset !== preset) {
+      throw new Error(
+        `Build stamp at ${stampPath} reports preset '${stamp.preset ?? '(missing)'}', expected '${preset}'.\n` +
+          `   Run:\n` +
+          `     pnpm build:circuits --preset ${preset}\n` +
+          `   then retry.`,
+      )
+    }
+    console.log(`   ✓ Preset '${preset}' build stamp present in dist/circuits.\n`)
+  }
+
+  /**
+   * Ensure `circuits/bin/` was last populated by `build:circuits` for the same preset.
+   * Without this, a secure benchmark could leave secure VKs in bin while `--check` diffs
+   * against committed insecure-512 `.sol` files.
+   */
+  private assertCircuitsBinActivePreset(preset: string): void {
+    const activePath = join(this.circuitsDir, '.active-preset.json')
+    if (!existsSync(activePath)) {
+      throw new Error(
+        `Missing ${activePath} (which preset last built circuits/bin is unknown).\n` +
+          `   If dist/circuits/${preset}/ is already built, hydrate bin in seconds:\n` +
+          `     pnpm build:circuits --preset ${preset} --skip-if-built --no-clean --no-clean-targets\n` +
+          `   Otherwise run a full compile:\n` +
+          `     pnpm build:circuits --preset ${preset}`,
+      )
+    }
+    let active: { preset?: string } = {}
+    try {
+      active = JSON.parse(readFileSync(activePath, 'utf-8'))
+    } catch (err: any) {
+      throw new Error(`Failed to parse ${activePath}: ${err.message}`)
+    }
+    if (active.preset !== preset) {
+      throw new Error(
+        `circuits/bin was last built for preset '${active.preset ?? '(missing)'}', but this run targets '${preset}'.\n` +
+          `   Fast fix (reuses dist/circuits/${preset}/, no full recompile):\n` +
+          `     pnpm build:circuits --preset ${preset} --skip-if-built --no-clean --no-clean-targets\n` +
+          `   Full compile only if dist is missing or stale:\n` +
+          `     pnpm build:circuits --preset ${preset}`,
+      )
+    }
+    console.log(`   ✓ circuits/bin active preset matches '${preset}'.\n`)
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -382,6 +593,28 @@ async function main() {
       options.noCleanTargets = true
     } else if (arg === '--no-clean-targets') {
       options.noCleanTargets = true
+    } else if (arg === '--check') {
+      options.check = true
+    } else if (arg === '--write') {
+      options.check = false
+    } else if (arg === '--preset') {
+      const value = args[++i]
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --preset requires a value (insecure-512 | secure-8192)')
+        process.exit(1)
+      }
+      if (!ALL_PRESETS.includes(value as (typeof ALL_PRESETS)[number])) {
+        console.error(`Error: unknown preset '${value}'. Expected one of: ${ALL_PRESETS.join(', ')}`)
+        process.exit(1)
+      }
+      options.preset = value
+    } else if (arg === '--output-dir') {
+      const value = args[++i]
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --output-dir requires a path')
+        process.exit(1)
+      }
+      options.outputDir = value
     } else if (arg === '--group') {
       const value = args[++i]
       if (!value || value.startsWith('--')) {
@@ -407,25 +640,45 @@ function showHelp() {
   console.log(`
 Usage: generate-verifiers [options]
 
-Generates Solidity verifier contracts from compiled Noir circuits
-and places them in packages/enclave-contracts/contracts/verifiers/bfv/honk/.
+Generates (or verifies) Solidity Honk verifier contracts from compiled Noir
+circuits and places them in packages/enclave-contracts/contracts/verifiers/bfv/honk/.
+
+The Solidity verifiers are committed to git. Test and benchmark flows run
+this script with --check so accidental drift between committed verifiers and
+current circuit VKs is surfaced as a failure rather than a silent rewrite.
 
 Options:
+  --check                Verify committed verifiers match current VKs (no writes).
+                         Exits non-zero on drift. Used by test/benchmark/CI flows.
+  --preset <name>        BFV preset for circuits/bin (insecure-512 | secure-8192).
+                         Defaults to insecure-512. With --check and a non-insecure preset,
+                         only verifies dist/ + circuits/bin alignment (no .sol diff).
+  --output-dir <path>    Write generated verifiers here instead of the committed honk/ dir.
+  --write                Write/overwrite committed verifiers (this is the default
+                         when neither --check nor --write is passed).
   --circuits <list>      Circuit names (comma-separated). When omitted, generates all circuits.
   --group <groups>       Circuit groups (comma-separated: dkg,threshold,recursive_aggregation)
-  --clean                Remove existing verifier directory before generating
+  --clean                Remove existing verifier directory before generating (write mode only).
   --no-compile           Don't compile circuits automatically (fail if not already compiled);
-                         also skips cleaning nargo target dirs (use after build:circuits)
-  --no-clean-targets     Don't delete nargo target dirs before generating verifiers
-  --dry-run              Show what would be generated without doing anything
-  -h, --help             Show this help message
+                         also skips cleaning nargo target dirs (use after build:circuits).
+  --no-clean-targets     Don't delete nargo target dirs before generating verifiers.
+  --dry-run              Show what would be generated without doing anything.
+  -h, --help             Show this help message.
 
 Examples:
-  pnpm generate:verifiers --circuits dkg_aggregator,decryption_aggregator
-  pnpm generate:verifiers --circuits dkg_aggregator --clean
+  pnpm generate:verifiers                                # Rewrite committed verifiers (manual)
+  pnpm generate:verifiers --check                        # Verify committed verifiers (CI/tests)
+  pnpm generate:verifiers --circuits dkg_aggregator      # Single circuit
+  pnpm generate:verifiers --check --no-compile           # Verify against existing artifacts only
 `)
 }
 
-if (require.main === module) main()
+if (require.main === module) {
+  main().catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`\n❌ ${msg}\n`)
+    process.exit(1)
+  })
+}
 
 export { VerifierGenerator, GenerateOptions, CircuitGroup, CIRCUIT_GROUPS }

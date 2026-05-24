@@ -83,6 +83,16 @@ const config: HardhatUserConfig = {
       type: 'edr-simulated',
       chainType: 'l1',
     },
+    localhost: {
+      accounts: {
+        mnemonic,
+      },
+      chainId: chainIds.hardhat,
+      url: 'http://localhost:8545',
+      type: 'http',
+      chainType: 'l1',
+      timeout: 60000,
+    },
     ganache: {
       accounts: {
         mnemonic,

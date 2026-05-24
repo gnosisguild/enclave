@@ -6,7 +6,11 @@
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
 import { MockUSDC, MockUSDC__factory as MockUSDCFactory } from "../../types";
-import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+import {
+  getDeploymentChain,
+  readDeploymentArgs,
+  storeDeploymentArgs,
+} from "../utils";
 
 /**
  * The arguments for the deployAndSaveMockStableToken function
@@ -29,7 +33,7 @@ export const deployAndSaveMockStableToken = async ({
 }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = hre.globalOptions.network;
+  const chain = getDeploymentChain(hre);
 
   const preDeployedArgs = readDeploymentArgs("MockUSDC", chain);
 

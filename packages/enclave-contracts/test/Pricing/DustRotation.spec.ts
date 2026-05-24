@@ -37,7 +37,7 @@ describe("Pricing — per-E3 dust rotation across consecutive E3s", function () 
     await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
     await registry.finalizeCommittee(e3Id);
     const pkCommitment = ethers.keccak256(publicKey);
-    await registry.publishCommittee(e3Id, publicKey, pkCommitment, "0x");
+    await registry.publishCommittee(e3Id, publicKey, pkCommitment, "0x", "0x");
   };
 
   const setup = async () => {
@@ -128,10 +128,11 @@ describe("Pricing — per-E3 dust rotation across consecutive E3s", function () 
       };
       await feeToken.approve(await enclave.getAddress(), ethers.MaxUint256);
       await enclave.request(req);
+      // topNodes are sorted by ascending address; operator3 < operator1 < operator2
       const nodes = [
+        await operator3.getAddress(),
         await operator1.getAddress(),
         await operator2.getAddress(),
-        await operator3.getAddress(),
       ];
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,

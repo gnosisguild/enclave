@@ -141,7 +141,7 @@ describe("BfvVkBindingIntegration", function () {
     const zkTranscriptLibAddress = await zkTranscriptLib.getAddress();
 
     const dkgAggFactory = await ethers.getContractFactory(
-      "DkgAggregatorVerifier",
+      "contracts/verifiers/bfv/honk/DkgAggregatorVerifier.sol:DkgAggregatorVerifier",
       {
         libraries: {
           "project/contracts/verifiers/bfv/honk/DkgAggregatorVerifier.sol:ZKTranscriptLib":
@@ -153,7 +153,7 @@ describe("BfvVkBindingIntegration", function () {
     await dkgAgg.waitForDeployment();
 
     const decAggFactory = await ethers.getContractFactory(
-      "DecryptionAggregatorVerifier",
+      "contracts/verifiers/bfv/honk/DecryptionAggregatorVerifier.sol:DecryptionAggregatorVerifier",
       {
         libraries: {
           "project/contracts/verifiers/bfv/honk/DecryptionAggregatorVerifier.sol:ZKTranscriptLib":
@@ -380,12 +380,15 @@ describe("BfvVkBindingIntegration", function () {
       await zkTranscriptLib.waitForDeployment();
 
       const dkgAgg = await (
-        await ethers.getContractFactory("DkgAggregatorVerifier", {
-          libraries: {
-            "project/contracts/verifiers/bfv/honk/DkgAggregatorVerifier.sol:ZKTranscriptLib":
-              await zkTranscriptLib.getAddress(),
+        await ethers.getContractFactory(
+          "contracts/verifiers/bfv/honk/DkgAggregatorVerifier.sol:DkgAggregatorVerifier",
+          {
+            libraries: {
+              "project/contracts/verifiers/bfv/honk/DkgAggregatorVerifier.sol:ZKTranscriptLib":
+                await zkTranscriptLib.getAddress(),
+            },
           },
-        })
+        )
       ).deploy();
       await dkgAgg.waitForDeployment();
 

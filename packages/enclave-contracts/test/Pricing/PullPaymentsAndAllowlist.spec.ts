@@ -32,7 +32,7 @@ describe("Enclave — pull payments + fee-token allow-list", function () {
     await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
     await registry.finalizeCommittee(e3Id);
     const pkCommitment = ethers.keccak256(publicKey);
-    await registry.publishCommittee(e3Id, publicKey, pkCommitment, "0x");
+    await registry.publishCommittee(e3Id, publicKey, pkCommitment, "0x", "0x");
   };
 
   // Two fixtures: one using vanilla USDC (allow-list tests),
@@ -182,11 +182,6 @@ describe("Enclave — pull payments + fee-token allow-list", function () {
       };
       await enclave.request(req2);
       const e3Id2 = 1;
-      const nodes = [
-        await ctx.operator1.getAddress(),
-        await ctx.operator2.getAddress(),
-        await ctx.operator3.getAddress(),
-      ];
       await setupAndPublishCommittee(
         ctx.ciphernodeRegistryContract,
         e3Id2,

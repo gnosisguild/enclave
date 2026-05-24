@@ -162,7 +162,13 @@ describe("Committee Expulsion & Fault Tolerance", function () {
 
       const publicKey = ethers.toUtf8Bytes("fake-public-key");
       const pkCommitment = ethers.keccak256(publicKey);
-      await registry.publishCommittee(e3Id, publicKey, pkCommitment, "0x");
+      await registry.publishCommittee(
+        e3Id,
+        publicKey,
+        pkCommitment,
+        "0x",
+        "0x",
+      );
     }
 
     return {
@@ -336,6 +342,9 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       ]);
 
       // Lane A: Slash op1 with attestation from [op2, op3] — active 3→2, still >= M=2
+      // Evidence is the preimage of dataHash; the contract enforces
+      // `keccak256(evidence) == dataHash` and equal dataHashes across voters.
+      const evidence1 = ethers.hexlify(ethers.toUtf8Bytes("data1"));
       const proof = await signAndEncodeAttestation(
         [operator2, operator3],
         0,
@@ -343,7 +352,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         0,
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("data1")),
+        evidence1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -406,6 +415,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       ]);
 
       // Slash operator1 once
+      const ev1 = ethers.hexlify(ethers.toUtf8Bytes("first"));
       const proof1 = await signAndEncodeAttestation(
         [operator2, operator3],
         0,
@@ -413,7 +423,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         0,
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("first")),
+        ev1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -425,6 +435,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       // Slash operator1 again for a different proof type to verify expulsion is idempotent.
       // Same (e3Id, operator, proofType) would revert DuplicateEvidence — that's correct.
       // Using proofType=7 (C6ThresholdShareDecryption) with REASON_PT_7 instead.
+      const ev2 = ethers.hexlify(ethers.toUtf8Bytes("second"));
       const proof2 = await signAndEncodeAttestation(
         [operator2, operator3],
         0,
@@ -432,7 +443,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         7, // C6ThresholdShareDecryption — different proofType
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("second")),
+        ev2,
       );
       await slashingManager.proposeSlash(
         0,
@@ -541,6 +552,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       expect((await registry.getCommitteeViability(0)).activeCount).to.equal(4);
 
       // Expel 2 out of 4 — still have 2 >= M=2
+      const evExpel1 = ethers.hexlify(ethers.toUtf8Bytes("expel1"));
       const proof1 = await signAndEncodeAttestation(
         [operator2, operator3],
         0,
@@ -548,7 +560,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         0,
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("expel1")),
+        evExpel1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -557,6 +569,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       );
       expect((await registry.getCommitteeViability(0)).activeCount).to.equal(3);
 
+      const evExpel2 = ethers.hexlify(ethers.toUtf8Bytes("expel2"));
       const proof2 = await signAndEncodeAttestation(
         [operator3, operator4],
         0,
@@ -564,7 +577,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         0,
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("expel2")),
+        evExpel2,
       );
       await slashingManager.proposeSlash(
         0,
@@ -689,6 +702,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       ]);
 
       // Expel operator1 — still viable (3 >= 2)
+      const evExpelOp1 = ethers.hexlify(ethers.toUtf8Bytes("expel-op1"));
       const proof1 = await signAndEncodeAttestation(
         [operator2, operator3],
         0,
@@ -696,7 +710,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         0,
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("expel-op1")),
+        evExpelOp1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -705,6 +719,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       );
 
       // Expel operator2 — still viable (2 >= 2)
+      const evExpelOp2 = ethers.hexlify(ethers.toUtf8Bytes("expel-op2"));
       const proof2 = await signAndEncodeAttestation(
         [operator3, operator4],
         0,
@@ -712,7 +727,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         0,
         31337,
-        ethers.keccak256(ethers.toUtf8Bytes("expel-op2")),
+        evExpelOp2,
       );
       await slashingManager.proposeSlash(
         0,
@@ -740,7 +755,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
             await slashingManager.getAddress(),
             0,
             31337,
-            ethers.keccak256(ethers.toUtf8Bytes("expel-op3")),
+            ethers.hexlify(ethers.toUtf8Bytes("expel-op3")),
           ),
         ),
       ).to.be.revertedWithCustomError(

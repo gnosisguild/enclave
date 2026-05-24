@@ -3,6 +3,11 @@
 # extract_crisp_verify_gas.sh - Runs CRISP verifier test with gas reporter and emits JSON.
 # Usage: ./extract_crisp_verify_gas.sh --output <json_file> [--mode insecure|secure] [--verbose]
 #        [--skip-build] [--force-build]
+#
+# Integration test env (also set by run_benchmarks.sh):
+#   BENCHMARK_PROOF_AGGREGATION=true|false  — recursive fold + folded Π_DKG/Π_dec (default: true)
+#   BENCHMARK_MULTITHREAD_JOBS=N            — Rayon concurrent ZK jobs (default: 1)
+#   BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER — EIP-712 verifying contract for fold attestations
 
 set -e
 
@@ -113,20 +118,23 @@ else
     "${SCRIPT_DIR}/ensure_circuit_preset_built.sh" "${ENSURE_ARGS[@]}"
     echo "  [gas] Build artifacts ready."
 
-    echo "  [gas] Regenerating Honk Solidity verifiers (dkg_aggregator, decryption_aggregator)..."
+    # Align circuits/bin with PRESET_NAME, then verify preset artifacts.
+    # insecure: also diff committed Honk .sol (pinned to insecure-512).
+    # secure:   committed .sol stay insecure-only; gas replay deploys fresh verifiers from bin.
+    echo "  [gas] Verifying circuit preset '${PRESET_NAME}' (dist stamp + circuits/bin)..."
     if [ "$VERBOSE" = true ]; then
-        echo "  [gas] [verbose] Running: pnpm generate:verifiers --no-compile"
+        echo "  [gas] [verbose] Running: pnpm generate:verifiers --check --no-compile --preset ${PRESET_NAME}"
         (
           cd "$REPO_ROOT" && \
-          pnpm generate:verifiers --no-compile
+          pnpm generate:verifiers --check --no-compile --preset "$PRESET_NAME"
         )
     else
         (
           cd "$REPO_ROOT" && \
-          pnpm generate:verifiers --no-compile >/dev/null
+          pnpm generate:verifiers --check --no-compile --preset "$PRESET_NAME"
         )
     fi
-    echo "  [gas] Honk verifiers ready."
+    echo "  [gas] Preset '${PRESET_NAME}' artifacts ready for integration + gas replay."
     require_preset_artifacts
 fi
 
@@ -139,21 +147,36 @@ echo "  [gas] Running CRISP verifier test for Pi_user gas..."
 CRISP_TEST_EXIT_CODE=${PIPESTATUS[0]}
 echo "  [gas] CRISP test completed (exit=${CRISP_TEST_EXIT_CODE})."
 require_preset_artifacts
-echo "  [gas] Running integration test (test_trbfv_actor) for folded proofs + timings..."
+BENCHMARK_PROOF_AGGREGATION="${BENCHMARK_PROOF_AGGREGATION:-true}"
+echo "  [gas] Running integration test (test_trbfv_actor); proof_aggregation=${BENCHMARK_PROOF_AGGREGATION}, multithread_jobs=${BENCHMARK_MULTITHREAD_JOBS:-1}, profile=release..."
 (
   cd "$REPO_ROOT" && \
-  BENCHMARK_MODE="$MODE" BENCHMARK_FOLDED_OUTPUT="$TMP_JSON_FOLDED" BENCHMARK_SUMMARY_OUTPUT="$TMP_JSON_SUMMARY" cargo test -p e3-tests test_trbfv_actor -- --nocapture
+  BENCHMARK_MODE="$MODE" \
+  BENCHMARK_PROOF_AGGREGATION="$BENCHMARK_PROOF_AGGREGATION" \
+  BENCHMARK_FOLDED_OUTPUT="$TMP_JSON_FOLDED" \
+  BENCHMARK_SUMMARY_OUTPUT="$TMP_JSON_SUMMARY" \
+  cargo test --release -p e3-tests test_trbfv_actor -- --nocapture
 ) 2>&1 | tee "$TMP_LOG_FOLDED"
 FOLDED_TEST_EXIT_CODE=${PIPESTATUS[0]}
 echo "  [gas] Integration export completed (exit=${FOLDED_TEST_EXIT_CODE})."
-echo "  [gas] Replaying folded artifacts on EVM verifiers for Pi_DKG/Pi_dec gas..."
-(
-  cd "$ENCLAVE_CONTRACTS_DIR" && \
-  BENCHMARK_RAW_DIR="$RAW_DIR" BENCHMARK_GAS_OUTPUT="$TMP_JSON_ENCLAVE" BENCHMARK_FOLDED_JSON="$TMP_JSON_FOLDED" \
-  pnpm hardhat run scripts/benchmarkGasFromRaw.ts --network hardhat
-) 2>&1 | tee "$TMP_LOG_ENCLAVE"
-ENCLAVE_TEST_EXIT_CODE=${PIPESTATUS[0]}
-echo "  [gas] EVM replay completed (exit=${ENCLAVE_TEST_EXIT_CODE})."
+ENCLAVE_TEST_EXIT_CODE=0
+if [ "$FOLDED_TEST_EXIT_CODE" -ne 0 ]; then
+    echo "  [gas] Skipping EVM replay: test_trbfv_actor failed (exit=${FOLDED_TEST_EXIT_CODE})."
+    echo '{}' >"$TMP_JSON_ENCLAVE"
+elif [ ! -s "$TMP_JSON_FOLDED" ] || ! jq -e '(.dkg_aggregator.proof_hex != "") and (.decryption_aggregator.proof_hex != "")' "$TMP_JSON_FOLDED" >/dev/null 2>&1; then
+    echo "  [gas] Skipping EVM replay: folded proof export missing or empty."
+    echo '{}' >"$TMP_JSON_ENCLAVE"
+else
+    echo "  [gas] Replaying folded artifacts on EVM verifiers for Pi_DKG/Pi_dec gas..."
+    (
+      cd "$ENCLAVE_CONTRACTS_DIR" && \
+      BENCHMARK_RAW_DIR="$RAW_DIR" BENCHMARK_GAS_OUTPUT="$TMP_JSON_ENCLAVE" BENCHMARK_FOLDED_JSON="$TMP_JSON_FOLDED" \
+      BENCHMARK_PRESET="$PRESET_NAME" \
+      pnpm hardhat run scripts/benchmarkGasFromRaw.ts --network hardhat
+    ) 2>&1 | tee "$TMP_LOG_ENCLAVE"
+    ENCLAVE_TEST_EXIT_CODE=${PIPESTATUS[0]}
+    echo "  [gas] EVM replay completed (exit=${ENCLAVE_TEST_EXIT_CODE})."
+fi
 set -e
 
 parse_marker() {
@@ -292,3 +315,10 @@ cat > "$OUTPUT_JSON" <<EOF
 }
 EOF
 echo "  [gas] Wrote gas/integration summary JSON: $OUTPUT_JSON"
+if [ "$FOLDED_TEST_EXIT_CODE" -ne 0 ]; then
+    echo "  [gas] ERROR: test_trbfv_actor failed — Pi_DKG/Pi_dec verify gas and integration timings will be incomplete."
+    echo "  [gas]        Re-run after a successful integration export (no Anvil required)."
+fi
+if [ "$CRISP_TEST_EXIT_CODE" -ne 0 ] || [ "$FOLDED_TEST_EXIT_CODE" -ne 0 ] || [ "$ENCLAVE_TEST_EXIT_CODE" -ne 0 ]; then
+    exit 1
+fi

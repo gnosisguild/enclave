@@ -34,6 +34,13 @@ pub struct ProofVerificationPassed {
     pub data_hash: [u8; 32],
     /// Raw public signals from the verified proof — for commitment consistency checks.
     pub public_signals: ArcBytes,
+    /// Raw proof bytes — needed only by paths that may later turn this proof into
+    /// slashing evidence (so the on-chain contract can recompute and verify the
+    /// dataHash bound in voter signatures). Empty when the emitter did not have
+    /// the raw bytes available; downstream consumers that need it will fail
+    /// gracefully if so.
+    #[serde(default)]
+    pub proof_data: ArcBytes,
 }
 
 impl Display for ProofVerificationPassed {

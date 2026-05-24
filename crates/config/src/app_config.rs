@@ -53,6 +53,16 @@ pub struct NodeDefinition {
     pub autowallet: bool,
     /// Optional dashboard port. When set, serves a monitoring web UI on this port.
     pub dashboard_port: Option<u16>,
+    /// Logical CPUs reserved for Actix, libp2p, and RPC (not used by the Rayon compute pool).
+    #[serde(default = "default_multithread_reserve_threads")]
+    pub multithread_reserve_threads: usize,
+    /// Max concurrent CPU-bound jobs (ZK proofs + TrBFV). When unset, defaults to all CPUs minus
+    /// `multithread_reserve_threads`. Override with env `E3_NODE__MULTITHREAD_CONCURRENT_JOBS`.
+    pub multithread_concurrent_jobs: Option<usize>,
+}
+
+fn default_multithread_reserve_threads() -> usize {
+    1
 }
 
 impl Default for NodeDefinition {
@@ -71,6 +81,8 @@ impl Default for NodeDefinition {
             autopassword: false,
             autowallet: false,
             dashboard_port: None,
+            multithread_reserve_threads: default_multithread_reserve_threads(),
+            multithread_concurrent_jobs: None,
         }
     }
 }
@@ -388,6 +400,17 @@ impl AppConfig {
     /// Get the optional dashboard port
     pub fn dashboard_port(&self) -> Option<u16> {
         self.node_def().dashboard_port
+    }
+
+    /// CPUs reserved for non-compute work (Actix, networking, RPC).
+    pub fn multithread_reserve_threads(&self) -> usize {
+        self.node_def().multithread_reserve_threads
+    }
+
+    /// Optional cap on concurrent ZK / TrBFV pool jobs. When `None`, the node uses all CPUs minus
+    /// [`Self::multithread_reserve_threads`].
+    pub fn multithread_concurrent_jobs(&self) -> Option<usize> {
+        self.node_def().multithread_concurrent_jobs
     }
 }
 
@@ -779,6 +802,25 @@ chains:
 
             Ok(())
         });
+    }
+
+    #[test]
+    fn test_multithread_config() -> Result<()> {
+        let config_str = r#"
+node:
+  multithread_reserve_threads: 2
+  multithread_concurrent_jobs: 4
+"#;
+        let unscoped: UnscopedAppConfig = serde_yaml::from_str(config_str)?;
+        let config = unscoped.into_scoped_with_defaults(
+            "_default",
+            &PathBuf::from("/default/data"),
+            &PathBuf::from("/default/config"),
+            &PathBuf::from("/my/cwd"),
+        )?;
+        assert_eq!(config.multithread_reserve_threads(), 2);
+        assert_eq!(config.multithread_concurrent_jobs(), Some(4));
+        Ok(())
     }
 
     #[test]

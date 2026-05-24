@@ -1,0 +1,180 @@
+{
+  "integration_test": "test_trbfv_actor",
+  "benchmark_config": {
+    "mode": "insecure",
+    "bfv_preset_subdir": "insecure-512",
+    "bfv_preset": "InsecureThreshold512",
+    "lambda": 2,
+    "proof_aggregation_enabled": false,
+    "multithread_concurrent_jobs": 13,
+    "committee_h": 3,
+    "committee_n": 3,
+    "committee_t": 1,
+    "nodes_spawned": 20,
+    "network_model": "in_process_bus",
+    "testmode_harness": true
+  },
+  "proof_aggregation_enabled": false,
+  "multithread": {
+    "rayon_threads": 13,
+    "max_simultaneous_rayon_tasks": 13,
+    "cores_available": 14
+  },
+  "operation_timings": [
+    {
+      "name": "CalculateDecryptionKey",
+      "avg_seconds": 0.119593152,
+      "runs": 3,
+      "total_seconds": 0.358779458
+    },
+    {
+      "name": "CalculateDecryptionShare",
+      "avg_seconds": 0.625714819,
+      "runs": 3,
+      "total_seconds": 1.877144457
+    },
+    {
+      "name": "CalculateThresholdDecryption",
+      "avg_seconds": 0.555039542,
+      "runs": 1,
+      "total_seconds": 0.555039542
+    },
+    {
+      "name": "GenEsiSss",
+      "avg_seconds": 0.126707139,
+      "runs": 3,
+      "total_seconds": 0.380121417
+    },
+    {
+      "name": "GenPkShareAndSkSss",
+      "avg_seconds": 0.256695819,
+      "runs": 3,
+      "total_seconds": 0.770087459
+    },
+    {
+      "name": "ZkDecryptedSharesAggregation",
+      "avg_seconds": 8.225412791,
+      "runs": 1,
+      "total_seconds": 8.225412791
+    },
+    {
+      "name": "ZkDkgShareDecryption",
+      "avg_seconds": 2.350571951,
+      "runs": 6,
+      "total_seconds": 14.103431707
+    },
+    {
+      "name": "ZkPkAggregation",
+      "avg_seconds": 1.971270875,
+      "runs": 1,
+      "total_seconds": 1.971270875
+    },
+    {
+      "name": "ZkPkBfv",
+      "avg_seconds": 0.429601166,
+      "runs": 3,
+      "total_seconds": 1.2888035
+    },
+    {
+      "name": "ZkPkGeneration",
+      "avg_seconds": 2.953823722,
+      "runs": 3,
+      "total_seconds": 8.861471166
+    },
+    {
+      "name": "ZkShareComputation",
+      "avg_seconds": 3.007209458,
+      "runs": 6,
+      "total_seconds": 18.04325675
+    },
+    {
+      "name": "ZkShareEncryption",
+      "avg_seconds": 5.763399979,
+      "runs": 24,
+      "total_seconds": 138.321599497
+    },
+    {
+      "name": "ZkThresholdShareDecryption",
+      "avg_seconds": 7.663020986,
+      "runs": 3,
+      "total_seconds": 22.989062958
+    },
+    {
+      "name": "ZkVerifyShareDecryptionProofs",
+      "avg_seconds": 0.102607666,
+      "runs": 3,
+      "total_seconds": 0.307823
+    },
+    {
+      "name": "ZkVerifyShareProofs",
+      "avg_seconds": 0.257090858,
+      "runs": 5,
+      "total_seconds": 1.285454293
+    }
+  ],
+  "operation_timings_total_seconds": 219.33875887,
+  "operation_timings_metric": "tracked_job_wall",
+  "phase_timings": [
+    {
+      "label": "Starting trbfv actor test",
+      "seconds": 0e-9,
+      "metric": "wall_clock"
+    },
+    {
+      "label": "Setup completed",
+      "seconds": 3.058201042,
+      "metric": "wall_clock"
+    },
+    {
+      "label": "Committee Setup Completed",
+      "seconds": 20.257082542,
+      "metric": "wall_clock"
+    },
+    {
+      "label": "Committee Finalization Complete",
+      "seconds": 0.005129541,
+      "metric": "wall_clock"
+    },
+    {
+      "label": "Aggregator P2: PkAggregation pending -> PublicKeyAggregated (wall)",
+      "seconds": 1.981342,
+      "metric": "wall_clock"
+    },
+    {
+      "label": "ThresholdShares -> PublicKeyAggregated",
+      "seconds": 22.251965458,
+      "metric": "wall_clock"
+    },
+    {
+      "label": "E3Request -> PublicKeyAggregated",
+      "seconds": 24.866107292,
+      "metric": "wall_clock"
+    },
+    {
+      "label": "Application CT Gen",
+      "seconds": 0.309383,
+      "metric": "wall_clock"
+    },
+    {
+      "label": "Running FHE Application",
+      "seconds": 0.003993125,
+      "metric": "wall_clock"
+    },
+    {
+      "label": "Aggregator P4: Aggregation pending -> PlaintextAggregated (wall)",
+      "seconds": 8.253253,
+      "metric": "wall_clock"
+    },
+    {
+      "label": "Ciphertext published -> PlaintextAggregated",
+      "seconds": 18.401028833,
+      "metric": "wall_clock"
+    },
+    {
+      "label": "Entire Test",
+      "seconds": 66.904175584,
+      "metric": "wall_clock"
+    }
+  ],
+  "folded_artifacts": null
+}

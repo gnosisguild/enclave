@@ -142,6 +142,30 @@ contract SlashingManager is
             "address voter,bytes32 dataHash,uint256 deadline)"
         );
 
+    /// @dev `keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")`.
+    ///      Exposed for off-chain signers that recompute the domain separator manually
+    ///      (e.g. `AccusationManager::vote_domain_separator` in the Rust prover crate).
+    bytes32 public constant EIP712_DOMAIN_TYPEHASH =
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
+
+    /// @dev EIP-712 domain `name`. Must match the literal passed to `EIP712(...)`
+    ///      in the constructor below; off-chain signers MUST hash this exact byte
+    ///      string for `recover` to match.
+    string public constant EIP712_DOMAIN_NAME = "EnclaveSlashing";
+
+    /// @dev EIP-712 domain `version`. Same alignment rule as `EIP712_DOMAIN_NAME`.
+    string public constant EIP712_DOMAIN_VERSION = "1";
+
+    /// @dev `keccak256(bytes(EIP712_DOMAIN_NAME))`.
+    bytes32 public constant DOMAIN_NAME_HASH =
+        keccak256(bytes(EIP712_DOMAIN_NAME));
+
+    /// @dev `keccak256(bytes(EIP712_DOMAIN_VERSION))`.
+    bytes32 public constant DOMAIN_VERSION_HASH =
+        keccak256(bytes(EIP712_DOMAIN_VERSION));
+
     // ======================
     // Modifiers
     // ======================
@@ -179,7 +203,7 @@ contract SlashingManager is
         address admin
     )
         AccessControlDefaultAdminRules(initialDelay, admin)
-        EIP712("EnclaveSlashing", "1")
+        EIP712(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION)
     {
         require(admin != address(0), ZeroAddress());
         _grantRole(GOVERNANCE_ROLE, admin);
@@ -320,14 +344,34 @@ contract SlashingManager is
     ///      Execution is atomic when `policy.appealWindow == 0`, otherwise deferred so
     ///      the accused can {fileAppeal}. Evidence format:
     ///      `abi.encode(uint256 proofType, address[] voters, bytes32[] dataHashes,
-    ///      uint256 deadline, bytes[] signatures)`. Voters sign the EIP-712
+    ///      bytes evidence, uint256 deadline, bytes[] signatures)`. Voters sign the EIP-712
     ///      `AccusationVote` against this contract's domain; all `dataHash` values
-    ///      must be identical or the call reverts with `EquivocationDetected`.
+    ///      must be identical and equal `keccak256(evidence)`.
     function proposeSlash(
         uint256 e3Id,
         address operator,
         bytes calldata proof
     ) external returns (uint256 proposalId) {
+        return _proposeSlash(e3Id, operator, proof);
+    }
+
+    /// @inheritdoc ISlashingManager
+    /// @dev Additive attribution path: resolves `operator` from DKG anchors and
+    ///      canonical committee slot before reusing Lane A attestation validation.
+    function proposeSlashByDkgParty(
+        uint256 e3Id,
+        uint256 partyId,
+        bytes calldata proof
+    ) external returns (uint256 proposalId) {
+        address operator = _resolveDkgPartyOperator(e3Id, partyId);
+        return _proposeSlash(e3Id, operator, proof);
+    }
+
+    function _proposeSlash(
+        uint256 e3Id,
+        address operator,
+        bytes calldata proof
+    ) internal returns (uint256 proposalId) {
         require(operator != address(0), ZeroAddress());
         require(proof.length != 0, ProofRequired());
 
@@ -391,6 +435,27 @@ contract SlashingManager is
         if (policy.appealWindow == 0) {
             _executeSlash(proposalId, Lane.LaneA);
         }
+    }
+
+    /// @dev Resolve a slash target from DKG anchors:
+    ///      - `partyId` must be present in `getDkgAnchors(e3Id).partyIds`
+    ///      - operator is resolved as canonical committee slot `topNodes[partyId]`
+    function _resolveDkgPartyOperator(
+        uint256 e3Id,
+        uint256 partyId
+    ) internal view returns (address operator) {
+        (uint256[] memory partyIds, , ) = ciphernodeRegistry.getDkgAnchors(
+            e3Id
+        );
+        bool found = false;
+        for (uint256 i = 0; i < partyIds.length; i++) {
+            if (partyIds[i] == partyId) {
+                found = true;
+                break;
+            }
+        }
+        require(found, PartyIdNotInDkgAnchors());
+        return ciphernodeRegistry.canonicalCommitteeNodeAt(e3Id, partyId);
     }
 
     /// @inheritdoc ISlashingManager
@@ -483,7 +548,8 @@ contract SlashingManager is
     /// @dev Verifies Lane A attestation evidence: decodes, checks quorum (>= M), verifies
     ///      each EIP-712 `AccusationVote` signature, confirms voters are active committee
     ///      members, enforces the shared `deadline`, and rejects equivocation (all
-    ///      `dataHash` values must match). Voters must be sorted ascending (no duplicates).
+    ///      `dataHash` values must match and bind to `keccak256(evidence)`).
+    ///      Voters must be sorted ascending (no duplicates).
     function _verifyAttestationEvidence(
         bytes calldata proof,
         uint256 e3Id,
@@ -493,11 +559,12 @@ contract SlashingManager is
             uint256 proofType,
             address[] memory voters,
             bytes32[] memory dataHashes,
+            bytes memory evidence,
             uint256 deadline,
             bytes[] memory signatures
         ) = abi.decode(
                 proof,
-                (uint256, address[], bytes32[], uint256, bytes[])
+                (uint256, address[], bytes32[], bytes, uint256, bytes[])
             );
 
         uint256 numVotes = voters.length;
@@ -525,6 +592,7 @@ contract SlashingManager is
         // one voter is signing inconsistent statements and the attestation must not be
         // accepted as a single fault witness.
         bytes32 sharedDataHash = dataHashes[0];
+        require(keccak256(evidence) == sharedDataHash, InvalidProof());
 
         // Verify each vote signature and membership
         address prevVoter = address(0);
@@ -685,13 +753,12 @@ contract SlashingManager is
 
         // Only the accused can appeal
         require(msg.sender == p.operator, Unauthorized());
+        // Already-executed slashes (Lane A with appealWindow == 0) cannot be appealed.
+        require(!p.executed, AlreadyExecuted());
         // Only within the appeal window
         require(block.timestamp < p.executableAt, AppealWindowExpired());
         // Only once
         require(!p.appealed, AlreadyAppealed());
-        // A slash that has already been atomically executed (Lane A with
-        // `appealWindow == 0`) has no appeal window and cannot be appealed.
-        require(!p.executed, AlreadyExecuted());
 
         p.appealed = true;
 

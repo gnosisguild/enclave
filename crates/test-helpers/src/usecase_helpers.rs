@@ -65,25 +65,31 @@ pub fn generate_shares_hash_map(
             pk_share,
             e_sm_raw,
             ..
-        } = gen_pk_share_and_sk_sss(
-            &rng,
-            &cipher,
-            GenPkShareAndSkSssRequest {
-                trbfv_config: trbfv_config.clone(),
-                crp: ArcBytes::from_bytes(&crp.to_bytes()),
-                lambda: 40,
-                num_ciphertexts: 1,
-            },
-        )?;
+        } = {
+            let mut rng_guard = rng.lock().unwrap();
+            gen_pk_share_and_sk_sss(
+                &mut *rng_guard,
+                &cipher,
+                GenPkShareAndSkSssRequest {
+                    trbfv_config: trbfv_config.clone(),
+                    crp: ArcBytes::from_bytes(&crp.to_bytes()),
+                    lambda: 40,
+                    num_ciphertexts: 1,
+                },
+            )
+        }?;
 
-        let GenEsiSssResponse { esi_sss } = gen_esi_sss(
-            &rng,
-            &cipher,
-            GenEsiSssRequest {
-                trbfv_config: trbfv_config.clone(),
-                e_sm_raw: e_sm_raw.clone(),
-            },
-        )?;
+        let GenEsiSssResponse { esi_sss } = {
+            let mut rng_guard = rng.lock().unwrap();
+            gen_esi_sss(
+                &mut *rng_guard,
+                &cipher,
+                GenEsiSssRequest {
+                    trbfv_config: trbfv_config.clone(),
+                    e_sm_raw: e_sm_raw.clone(),
+                },
+            )?
+        };
 
         // Decrypt locally stored secrets
         let decrypted_sk_sss: SharedSecret = sk_sss.decrypt(&cipher)?;

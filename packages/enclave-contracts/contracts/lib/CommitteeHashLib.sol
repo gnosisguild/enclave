@@ -14,10 +14,26 @@ pragma solidity 0.8.28;
 library CommitteeHashLib {
     uint256 private constant _LO_MASK = (uint256(1) << 128) - 1;
 
-    /// @notice `keccak256(abi.encodePacked(nodes))` for the ordered on-chain committee.
-    /// @dev Callers pass `storage` arrays via implicit copy to this `memory` parameter.
+    /// @notice `keccak256(concat(20-byte addresses))` for the ordered on-chain committee.
+    /// @dev Must match `e3_utils::committee_hash::hash_committee_addresses`, which packs
+    ///      each address as raw 20 bytes with no padding. NOTE: `abi.encodePacked(address[])`
+    ///      pads each element to 32 bytes (left-padded), which does NOT match the off-chain
+    ///      canonical encoding — so we build the 20*N byte buffer manually.
     function hash(address[] memory nodes) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(nodes));
+        uint256 n = nodes.length;
+        bytes memory packed = new bytes(n * 20);
+        for (uint256 i = 0; i < n; ++i) {
+            bytes20 a = bytes20(nodes[i]);
+            uint256 offset = i * 20;
+            // Write 20-byte address in one word store; trailing 12 bytes are
+            // zeroed and either overwritten by the next address or ignored by
+            // `keccak256(packed)` because bytes length is exactly `20*n`.
+            // solhint-disable-next-line no-inline-assembly
+            assembly {
+                mstore(add(add(packed, 0x20), offset), shl(96, a))
+            }
+        }
+        return keccak256(packed);
     }
 
     /// @notice High 128 bits of a committee hash (Noir public input `committee_hash_hi`).

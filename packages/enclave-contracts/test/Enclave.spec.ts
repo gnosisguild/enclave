@@ -7,15 +7,12 @@ import { expect } from "chai";
 
 import {
   ADDRESS_TWO as AddressTwo,
-  DATA as data,
+  buildMockAggregationPublishArgs,
   deployEnclaveSystem,
-  encodeMockDkgProof,
-  BFV_PARAMS_DEFAULT as encodedE3ProgramParams,
   ENCRYPTION_SCHEME_ID as encryptionSchemeId,
   ethers,
   makeRequest,
   networkHelpers,
-  PROOF as proof,
   setupAndPublishCommittee,
   DEFAULT_TIMEOUT_CONFIG as timeoutConfig,
 } from "./fixtures";
@@ -27,10 +24,32 @@ describe("Enclave", function () {
     "0x0000000000000000000000000000000000000000000000000000000000000002";
 
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+
+  const polynomial_degree = ethers.toBigInt(512);
+  const plaintext_modulus = ethers.toBigInt(10);
+  const moduli = [
+    ethers.toBigInt("0xffffee001"),
+    ethers.toBigInt("0xffffc4001"),
+  ];
+
+  const encodedE3ProgramParams = abiCoder.encode(
+    ["uint256", "uint256", "uint256[]"],
+    [polynomial_degree, plaintext_modulus, moduli],
+  );
+
+  const data = "0xda7a";
+  const proof = "0x1337";
+
   const inputWindowDuration = 300;
 
   const setup = async () => {
     const sys = await deployEnclaveSystem({ wireSlashingManager: false });
+    const dkgFoldAttestationVerifier = await ethers.deployContract(
+      "DkgFoldAttestationVerifier",
+    );
+    await sys.ciphernodeRegistry.setInitialDkgFoldAttestationVerifier(
+      await dkgFoldAttestationVerifier.getAddress(),
+    );
     return {
       owner: sys.owner,
       notTheOwner: sys.notTheOwner,
@@ -44,6 +63,7 @@ describe("Enclave", function () {
       ticketToken: sys.ticketToken,
       usdcToken: sys.usdcToken,
       slashingManager: sys.slashingManager,
+      dkgFoldAttestationVerifier,
       request: sys.request,
       mocks: {
         decryptionVerifier: sys.mocks.decryptionVerifier,
@@ -787,6 +807,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
         operator3,
+        dkgFoldAttestationVerifier,
       } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -796,13 +817,20 @@ describe("Enclave", function () {
         proofAggregationEnabled: true,
       });
 
-      const pkCommitment = ethers.keccak256(data);
+      const operators = [operator1, operator2, operator3];
+      const { proof, bundle } = await buildMockAggregationPublishArgs(
+        operators,
+        e3Id,
+        data,
+        await dkgFoldAttestationVerifier.getAddress(),
+      );
       await setupAndPublishCommittee(
         ciphernodeRegistryContract,
         e3Id,
         data,
-        [operator1, operator2, operator3],
-        encodeMockDkgProof(pkCommitment),
+        operators,
+        proof,
+        bundle,
       );
       await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);

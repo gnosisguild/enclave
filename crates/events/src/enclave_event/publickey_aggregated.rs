@@ -6,6 +6,7 @@
 
 use crate::{E3id, OrderedSet, Proof};
 use actix::Message;
+use alloy::primitives::Address;
 use derivative::Derivative;
 use e3_utils::ArcBytes;
 use serde::{Deserialize, Serialize};
@@ -19,6 +20,9 @@ pub struct PublicKeyAggregated {
     pub pubkey: ArcBytes, // TODO: ArcBytes ?
     pub e3_id: E3id,
     pub nodes: OrderedSet<String>,
+    /// Committee addresses in ascending `party_id` (score) order for hash binding.
+    #[serde(default)]
+    pub committee_addresses: Vec<Address>,
     /// Hash-based aggregated PK commitment (last public signal of the C5 proof).
     /// Passed as `pkCommitment` to `publishCommittee`.
     pub pk_commitment: [u8; 32],
@@ -26,6 +30,10 @@ pub struct PublicKeyAggregated {
     /// for on-chain verification. `None` when proof aggregation is disabled.
     #[serde(default)]
     pub dkg_aggregator_proof: Option<Proof>,
+    /// ABI-encoded `(Attestation[], PartySlotBinding[])` for on-chain fold attestation verify.
+    /// Required when `dkg_aggregator_proof` is present; `None` otherwise.
+    #[serde(default)]
+    pub dkg_attestation_bundle: Option<ArcBytes>,
 }
 
 impl Display for PublicKeyAggregated {

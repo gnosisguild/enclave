@@ -186,6 +186,9 @@ fn load_committee_addresses(ctx: &E3Context, e3_id: &E3id) -> Result<Vec<Address
     let Some(state) = state else {
         return Err(anyhow!(ERROR_TRBFV_PLAINTEXT_COMMITTEE_MISSING));
     };
+    if let Some(addrs) = state.committee_addresses() {
+        return Ok(addrs.to_vec());
+    }
     let nodes = state
         .committee_nodes()
         .ok_or_else(|| anyhow!(ERROR_TRBFV_PLAINTEXT_COMMITTEE_MISSING))?;
@@ -196,7 +199,12 @@ fn load_committee_addresses(ctx: &E3Context, e3_id: &E3id) -> Result<Vec<Address
 impl E3Extension for ThresholdPlaintextAggregatorExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         if let EnclaveEventData::PublicKeyAggregated(data) = evt.get_data() {
-            match committee_addresses_from_nodes(&data.nodes) {
+            let addrs = if !data.committee_addresses.is_empty() {
+                Ok(data.committee_addresses.clone())
+            } else {
+                committee_addresses_from_nodes(&data.nodes)
+            };
+            match addrs {
                 Ok(addrs) => {
                     let _ = ctx.set_dependency(COMMITTEE_ADDRESSES_KEY, addrs);
                 }

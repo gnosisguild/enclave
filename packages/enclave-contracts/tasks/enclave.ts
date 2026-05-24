@@ -385,6 +385,7 @@ export const publishCommittee = task(
         publicKey,
         pkCommitment,
         proof,
+        "0x",
       );
 
       console.log("Publishing committee... ", tx.hash);

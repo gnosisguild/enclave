@@ -110,6 +110,11 @@
     },
     {
       "inputs": [],
+      "name": "PartyIdNotInDkgAnchors",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "ProofIsValid",
       "type": "error"
     },
@@ -641,6 +646,19 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "ciphernodeRegistry",
+      "outputs": [
+        {
+          "internalType": "contract ICiphernodeRegistry",
+          "name": "registry",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "address",
@@ -972,6 +990,35 @@
           "type": "uint256"
         },
         {
+          "internalType": "uint256",
+          "name": "partyId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "proof",
+          "type": "bytes"
+        }
+      ],
+      "name": "proposeSlashByDkgParty",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "proposalId",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
           "internalType": "address",
           "name": "operator",
           "type": "address"
@@ -1186,5 +1233,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ISlashingManager.sol",
-  "buildInfoId": "solc-0_8_28-ce8ef221f0c6b7e9da5e81af1e5b728128db3d16"
+  "buildInfoId": "solc-0_8_28-834ec0837fe1c9299862cfab43bdd2eef32c6092"
 }

@@ -6,7 +6,7 @@
 # Usage (from repo root):
 #   ./circuits/benchmarks/scripts/replay_folded_verify_gas.sh \
 #     --summary /tmp/summary_secure.json \
-#     --gas-json ./circuits/benchmarks/results_secure/crisp_verify_gas.json \
+#     --gas-json ./circuits/benchmarks/results_secure_agg/crisp_verify_gas.json \
 #     --build secure-8192
 #
 # Use --build <preset> when Hardhat reverts with SumcheckFailed (verifier VKs must match the
@@ -87,8 +87,8 @@ if [ -n "$BUILD_PRESET" ]; then
             ENSURE_ARGS+=(--force-build)
         fi
         "${SCRIPT_DIR}/ensure_circuit_preset_built.sh" "${ENSURE_ARGS[@]}"
-        echo "  [replay-gas] Regenerating Honk Solidity verifiers (pnpm generate:verifiers --no-compile)..."
-        (cd "$REPO_ROOT" && pnpm generate:verifiers --no-compile)
+        echo "  [replay-gas] Verifying preset '${BUILD_PRESET}' (dist stamp + circuits/bin)..."
+        (cd "$REPO_ROOT" && pnpm generate:verifiers --check --no-compile --preset "$BUILD_PRESET")
     fi
 fi
 
@@ -98,6 +98,7 @@ echo "  [replay-gas] Running Hardhat benchmarkGasFromRaw.ts (folded proofs)..."
     BENCHMARK_RAW_DIR="$RAW_DIR" \
     BENCHMARK_GAS_OUTPUT="$TMP_GAS_PARTIAL" \
     BENCHMARK_FOLDED_JSON="$TMP_FOLDED" \
+    BENCHMARK_PRESET="${BUILD_PRESET:-insecure-512}" \
     pnpm hardhat run scripts/benchmarkGasFromRaw.ts --network hardhat
 )
 

@@ -9,6 +9,7 @@ mod backend;
 mod circuits;
 mod config;
 mod error;
+mod node_fold_public;
 mod prover;
 pub mod test_utils;
 mod traits;
@@ -25,13 +26,15 @@ pub use circuits::aggregation::c3_accumulator::generate_sequential_c3_fold;
 pub use circuits::aggregation::c6_accumulator::generate_sequential_c6_fold;
 pub use circuits::aggregation::node_dkg_fold::{
     prove_decryption_aggregation_jobs, prove_dkg_aggregation, prove_node_dkg_fold,
-    DecryptionAggregationJob, DkgAggregationInput, NodeDkgFoldInput,
+    DecryptionAggregationJob, DkgAggregationInput, FoldProveStepTiming, NodeDkgFoldInput,
+    NodeDkgFoldProveResult,
 };
 pub use circuits::aggregation::nodes_fold_accumulator::generate_sequential_nodes_fold;
 pub use config::{verify_checksum, BbTarget, CircuitInfo, VersionInfo, ZkConfig};
 pub use e3_events::CircuitVariant;
 pub use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 pub use error::ZkError;
+pub use node_fold_public::extract_node_fold_agg_commits;
 pub use prover::ZkProver;
 pub use traits::Provable;
 pub use witness::{input_map, CompiledCircuit, WitnessGenerator};

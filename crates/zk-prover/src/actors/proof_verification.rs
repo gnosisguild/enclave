@@ -15,10 +15,10 @@ use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, Recipient};
 use alloy::primitives::{keccak256, Address, Bytes};
 use alloy::sol_types::SolValue;
 use e3_events::{
-    BusHandle, CiphernodeSelected, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCreated, EncryptionKeyReceived, EventContext, EventPublisher, EventSubscriber,
-    EventType, Proof, ProofType, ProofVerificationFailed, ProofVerificationPassed, Sequenced,
-    SignedProofFailed, SignedProofPayload, TypedEvent,
+    BusHandle, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated,
+    EncryptionKeyReceived, EventContext, EventPublisher, EventSubscriber, EventType, Proof,
+    ProofType, ProofVerificationFailed, ProofVerificationPassed, Sequenced, SignedProofFailed,
+    SignedProofPayload, TypedEvent,
 };
 use e3_fhe_params::BfvPreset;
 use e3_utils::NotifySync;
@@ -272,6 +272,7 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
                         proof_type: ProofType::C0PkBfv,
                         data_hash,
                         public_signals: signed_payload.payload.proof.public_signals.clone(),
+                        proof_data: signed_payload.payload.proof.data.clone(),
                     },
                     ec,
                 ) {

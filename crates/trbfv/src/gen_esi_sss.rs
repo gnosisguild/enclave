@@ -11,8 +11,9 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
-use e3_utils::{utility_types::ArcBytes, SharedRng};
+use e3_utils::utility_types::ArcBytes;
 use fhe::trbfv::ShareManager;
+use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -68,8 +69,8 @@ struct InnerResponse {
 /// When implementing multiple ciphertext outputs decryptions, we are going to need multiple smudging noise polynomials,
 /// so we are generating a vector of smudging noise secret shares (esi_sss) instead of just one in anticipation of that change.
 /// We will also need to ensure that all of them are committed to the pk_generation circuit.
-pub fn gen_esi_sss(
-    rng: &SharedRng,
+pub fn gen_esi_sss<R: RngCore + CryptoRng>(
+    rng: &mut R,
     cipher: &Cipher,
     req: GenEsiSssRequest,
 ) -> Result<GenEsiSssResponse> {
@@ -89,7 +90,7 @@ pub fn gen_esi_sss(
 
     let esi_sss = vec![SharedSecret::from(
         share_manager
-            .generate_secret_shares_from_poly(e_sm_poly.into(), &mut *rng.lock().unwrap())
+            .generate_secret_shares_from_poly(e_sm_poly.into(), rng)
             .context("Failed to generate secret shares from poly")?,
     )];
 

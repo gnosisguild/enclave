@@ -55,3 +55,6 @@ ignition/deployments
 coverage.json
 package-lock.json
 pnpm-lock.yaml
+
+# Benchmark-generated Honk verifiers (secure-8192 etc.; not committed)
+contracts/verifiers/bfv/honk/.benchmark/

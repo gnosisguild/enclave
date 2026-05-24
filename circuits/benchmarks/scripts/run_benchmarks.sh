@@ -1,12 +1,16 @@
 #!/bin/bash
 
 # run_benchmarks.sh - Main orchestration script for benchmarking circuits
-# Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--bench-compile] [--clean] [--verbose]
+# Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|secure] [--circuit <path>]
+#   [--skip-compile] [--bench-compile] [--clean] [--verbose]
+#   [--proof-aggregation on|off] [--multithread-jobs N]
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BENCHMARKS_DIR="$(dirname "$SCRIPT_DIR")"
+# shellcheck source=benchmark_output_dir.sh
+source "${SCRIPT_DIR}/benchmark_output_dir.sh"
 CONFIG_FILE="${BENCHMARKS_DIR}/config.json"
 CLEAN_ARTIFACTS=false
 MODE_OVERRIDE=""
@@ -15,6 +19,8 @@ BENCH_COMPILE=false
 CIRCUIT_FILTER=""
 VERBOSE=false
 PRESET_ARTIFACTS_READY=false
+PROOF_AGGREGATION="${BENCHMARK_PROOF_AGGREGATION:-true}"
+MULTITHREAD_JOBS="${BENCHMARK_MULTITHREAD_JOBS:-}"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -51,13 +57,43 @@ while [[ $# -gt 0 ]]; do
             VERBOSE=true
             shift
             ;;
+        --proof-aggregation)
+            PROOF_AGGREGATION="$2"
+            shift 2
+            ;;
+        --no-proof-aggregation)
+            PROOF_AGGREGATION=false
+            shift
+            ;;
+        --multithread-jobs)
+            MULTITHREAD_JOBS="$2"
+            shift 2
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--bench-compile] [--clean] [--verbose]"
+            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--bench-compile] [--clean] [--verbose] [--proof-aggregation on|off] [--no-proof-aggregation] [--multithread-jobs N]"
             exit 1
             ;;
     esac
 done
+
+case "$(echo "$PROOF_AGGREGATION" | tr '[:upper:]' '[:lower:]')" in
+    0|false|no|off) export BENCHMARK_PROOF_AGGREGATION=false ;;
+    1|true|yes|on|"") export BENCHMARK_PROOF_AGGREGATION=true ;;
+    *)
+        echo "Error: --proof-aggregation must be on or off (got: $PROOF_AGGREGATION)"
+        exit 1
+        ;;
+esac
+if [ -n "$MULTITHREAD_JOBS" ]; then
+    if ! [[ "$MULTITHREAD_JOBS" =~ ^[1-9][0-9]*$ ]]; then
+        echo "Error: --multithread-jobs must be a positive integer (got: $MULTITHREAD_JOBS)"
+        exit 1
+    fi
+    export BENCHMARK_MULTITHREAD_JOBS="$MULTITHREAD_JOBS"
+elif [ -n "${BENCHMARK_MULTITHREAD_JOBS:-}" ]; then
+    echo "  Using BENCHMARK_MULTITHREAD_JOBS from environment: $BENCHMARK_MULTITHREAD_JOBS"
+fi
 
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "Error: Config file not found: $CONFIG_FILE"
@@ -102,8 +138,9 @@ REPO_ROOT="$(cd "${BENCHMARKS_DIR}/../.." && pwd)"
 # Circuits live under circuits/bin (bin_dir is relative to benchmarks dir, e.g. ../bin)
 CIRCUITS_BASE_DIR="$(cd "${BENCHMARKS_DIR}/${BIN_DIR}" && pwd)"
 
-# Create mode-specific output directory
-OUTPUT_DIR="${OUTPUT_DIR_BASE}_${MODE}"
+# results_<mode>_agg | results_<mode>_no_agg (see benchmark_output_dir.sh)
+BENCHMARK_OUTPUT_DIR_BASE="$OUTPUT_DIR_BASE"
+OUTPUT_DIR="$(benchmark_results_dir_basename "$MODE" "$BENCHMARK_PROOF_AGGREGATION")"
 mkdir -p "${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw"
 
 # For secure mode, patch lib to use secure configs (restored at end)
@@ -138,6 +175,10 @@ elif [ "$PRESET_ARTIFACTS_READY" = true ]; then
 fi
 if [ "$VERBOSE" = true ]; then
     echo "  Verbose Logging: Yes"
+fi
+echo "  Proof aggregation (integration): $BENCHMARK_PROOF_AGGREGATION"
+if [ -n "$BENCHMARK_MULTITHREAD_JOBS" ]; then
+    echo "  Multithread concurrent jobs: $BENCHMARK_MULTITHREAD_JOBS"
 fi
 echo "  Git Branch: $GIT_BRANCH"
 echo "  Git Commit: $GIT_COMMIT"
@@ -268,15 +309,44 @@ else
     echo "⚠️  Could not extract CRISP verify gas; report will show N/A for verify gas"
 fi
 
+# Persist CLI flags for report regeneration (see generate_report.sh → Run configuration).
+RUN_META_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/benchmark_run_meta.json"
+MT_JOBS_JSON="${BENCHMARK_MULTITHREAD_JOBS:-1}"
+jq -n \
+    --arg mode "$MODE" \
+    --arg preset "$([ "$MODE" = "secure" ] && echo "secure-8192" || echo "insecure-512")" \
+    --argjson proof_agg "$( [ "$BENCHMARK_PROOF_AGGREGATION" = "false" ] && echo false || echo true )" \
+    --argjson multithread_jobs "$MT_JOBS_JSON" \
+    --argjson verbose "$([ "$VERBOSE" = true ] && echo true || echo false)" \
+    '{
+      benchmark_mode: $mode,
+      bfv_preset_subdir: $preset,
+      proof_aggregation: $proof_agg,
+      multithread_jobs: $multithread_jobs,
+      verbose: $verbose,
+      nodes_spawned: 20,
+      committee_size_n: 3,
+      network_model: "in_process_bus",
+      testmode_harness: true
+    }' > "${RUN_META_FILE}"
+
 # Generate markdown report
 echo "Stage 2/3: Rendering markdown report from benchmarks + gas summary..."
 REPORT_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/report.md"
-"${SCRIPT_DIR}/generate_report.sh" \
-    --input-dir "${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw" \
-    --output "${REPORT_FILE}" \
-    --git-commit "$GIT_COMMIT" \
-    --git-branch "$GIT_BRANCH" \
+INTEGRATION_SNAPSHOT="${BENCHMARKS_DIR}/${OUTPUT_DIR}/integration_summary.json"
+REPORT_ARGS=(
+    --input-dir "${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw"
+    --output "${REPORT_FILE}"
+    --git-commit "$GIT_COMMIT"
+    --git-branch "$GIT_BRANCH"
     --gas-json "${GAS_JSON_FILE}"
+    --benchmark-mode "$MODE"
+    --run-meta "${RUN_META_FILE}"
+)
+if [ -f "${INTEGRATION_SNAPSHOT}" ]; then
+    REPORT_ARGS+=(--integration-summary "${INTEGRATION_SNAPSHOT}")
+fi
+"${SCRIPT_DIR}/generate_report.sh" "${REPORT_ARGS[@]}"
 
 INTEGRATION_SNAPSHOT="${BENCHMARKS_DIR}/${OUTPUT_DIR}/integration_summary.json"
 if [ -f "${GAS_JSON_FILE}" ] && jq -e '.integration_summary != null' "${GAS_JSON_FILE}" >/dev/null 2>&1; then
@@ -284,7 +354,7 @@ if [ -f "${GAS_JSON_FILE}" ] && jq -e '.integration_summary != null' "${GAS_JSON
     echo "✓ Wrote integration summary snapshot: ${INTEGRATION_SNAPSHOT}"
 fi
 
-if [ "${OUTPUT_DIR}" = "results_insecure" ] && [ -f "${INTEGRATION_SNAPSHOT}" ]; then
+if [ "${OUTPUT_DIR}" = "results_insecure_agg" ] && [ -f "${INTEGRATION_SNAPSHOT}" ]; then
     "${SCRIPT_DIR}/sync_bfv_vk_binding_fixture.sh" "${INTEGRATION_SNAPSHOT}"
 fi
 

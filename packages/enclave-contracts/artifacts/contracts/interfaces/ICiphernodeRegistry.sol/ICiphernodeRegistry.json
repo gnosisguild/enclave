@@ -4,6 +4,48 @@
   "sourceName": "contracts/interfaces/ICiphernodeRegistry.sol",
   "abi": [
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "pending",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "provided",
+          "type": "uint256"
+        }
+      ],
+      "name": "AccusationVoteValidityMismatch",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "readyAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "nowAt",
+          "type": "uint256"
+        }
+      ],
+      "name": "AccusationVoteValidityTimelockActive",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "AccusationVoteValidityZeroRequiresTimelock",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "AttestationBindingCountMismatch",
+      "type": "error"
+    },
+    {
       "inputs": [],
       "name": "BondingRegistryNotSet",
       "type": "error"
@@ -65,6 +107,21 @@
       "type": "error"
     },
     {
+      "inputs": [],
+      "name": "FoldAttestationVerifierAlreadySet",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "FoldAttestationVerifierNotSet",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "FoldAttestationsRequired",
+      "type": "error"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256",
@@ -87,7 +144,22 @@
     },
     {
       "inputs": [],
+      "name": "InvalidFoldAttestation",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "InvalidTicketNumber",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NoPendingAccusationVoteValidityUpdate",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NoPendingVerifierUpdate",
       "type": "error"
     },
     {
@@ -138,6 +210,27 @@
     },
     {
       "inputs": [],
+      "name": "PartyIdNotInProof",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "partyId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "committeeSize",
+          "type": "uint256"
+        }
+      ],
+      "name": "PartyIdOutOfBounds",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "PkCommitmentRequired",
       "type": "error"
     },
@@ -162,9 +255,86 @@
       "type": "error"
     },
     {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "pending",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "provided",
+          "type": "address"
+        }
+      ],
+      "name": "VerifierMismatch",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "readyAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "nowAt",
+          "type": "uint256"
+        }
+      ],
+      "name": "VerifierUpdateTimelockActive",
+      "type": "error"
+    },
+    {
       "inputs": [],
       "name": "ZeroAddress",
       "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "accusationVoteValidity",
+          "type": "uint256"
+        }
+      ],
+      "name": "AccusationVoteValidityProposalCancelled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "accusationVoteValidity",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "readyAt",
+          "type": "uint256"
+        }
+      ],
+      "name": "AccusationVoteValidityProposed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "accusationVoteValidity",
+          "type": "uint256"
+        }
+      ],
+      "name": "AccusationVoteValiditySet",
+      "type": "event"
     },
     {
       "anonymous": false,
@@ -414,6 +584,51 @@
         {
           "indexed": true,
           "internalType": "address",
+          "name": "verifier",
+          "type": "address"
+        }
+      ],
+      "name": "DkgFoldAttestationVerifierProposalCancelled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "verifier",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "readyAt",
+          "type": "uint256"
+        }
+      ],
+      "name": "DkgFoldAttestationVerifierProposed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "verifier",
+          "type": "address"
+        }
+      ],
+      "name": "DkgFoldAttestationVerifierUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
           "name": "enclave",
           "type": "address"
         }
@@ -491,6 +706,19 @@
       "type": "event"
     },
     {
+      "inputs": [],
+      "name": "accusationVoteValidity",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "address",
@@ -499,6 +727,50 @@
         }
       ],
       "name": "addCiphernode",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "cancelAccusationVoteValidityProposal",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "partyId",
+          "type": "uint256"
+        }
+      ],
+      "name": "canonicalCommitteeNodeAt",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_accusationVoteValidity",
+          "type": "uint256"
+        }
+      ],
+      "name": "commitAccusationVoteValidity",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -706,6 +978,35 @@
     {
       "inputs": [
         {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getDkgAnchors",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "partyIds",
+          "type": "uint256[]"
+        },
+        {
+          "internalType": "bytes32[]",
+          "name": "skAggCommits",
+          "type": "bytes32[]"
+        },
+        {
+          "internalType": "bytes32[]",
+          "name": "esmAggCommits",
+          "type": "bytes32[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "address",
           "name": "ciphernode",
           "type": "address"
@@ -812,6 +1113,19 @@
       "inputs": [
         {
           "internalType": "uint256",
+          "name": "_accusationVoteValidity",
+          "type": "uint256"
+        }
+      ],
+      "name": "proposeAccusationVoteValidity",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
         },
@@ -828,6 +1142,11 @@
         {
           "internalType": "bytes",
           "name": "proof",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
+          "name": "dkgAttestationBundle",
           "type": "bytes"
         }
       ],
@@ -908,6 +1227,19 @@
         }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_accusationVoteValidity",
+          "type": "uint256"
+        }
+      ],
+      "name": "setAccusationVoteValidity",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -1000,5 +1332,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-ce8ef221f0c6b7e9da5e81af1e5b728128db3d16"
+  "buildInfoId": "solc-0_8_28-a6902ac15e994e1c055eb02433db296d1823fdfc"
 }

@@ -48,11 +48,20 @@ describe("SlashingManager", function () {
     );
   }
 
-  async function setupPolicies(
-    slashingManager: SlashingManager,
-    _mockVerifier?: MockCircuitVerifier,
+  function buildProofPolicy(
+    overrides: Partial<{
+      ticketPenalty: bigint;
+      licensePenalty: bigint;
+      requiresProof: boolean;
+      proofVerifier: string;
+      banNode: boolean;
+      appealWindow: number;
+      enabled: boolean;
+      affectsCommittee: boolean;
+      failureReason: number;
+    }> = {},
   ) {
-    const proofPolicy = {
+    return {
       ticketPenalty: ethers.parseUnits("50", 6),
       licensePenalty: ethers.parseEther("100"),
       requiresProof: true,
@@ -62,7 +71,15 @@ describe("SlashingManager", function () {
       enabled: true,
       affectsCommittee: false,
       failureReason: 0,
+      ...overrides,
     };
+  }
+
+  async function setupPolicies(
+    slashingManager: SlashingManager,
+    _mockVerifier?: MockCircuitVerifier,
+  ) {
+    const proofPolicy = buildProofPolicy();
 
     const evidencePolicy = {
       ticketPenalty: ethers.parseUnits("20", 6),
@@ -76,17 +93,11 @@ describe("SlashingManager", function () {
       failureReason: 0,
     };
 
-    const banPolicy = {
+    const banPolicy = buildProofPolicy({
       ticketPenalty: ethers.parseUnits("100", 6),
       licensePenalty: ethers.parseEther("500"),
-      requiresProof: true,
-      proofVerifier: ethers.ZeroAddress,
       banNode: true,
-      appealWindow: 0,
-      enabled: true,
-      affectsCommittee: false,
-      failureReason: 0,
-    };
+    });
 
     await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
     await slashingManager.setSlashPolicy(REASON_INACTIVITY, evidencePolicy);
@@ -457,17 +468,7 @@ describe("SlashingManager", function () {
         mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
-      const proofPolicy = {
-        ticketPenalty: ethers.parseUnits("50", 6),
-        licensePenalty: ethers.parseEther("100"),
-        requiresProof: true,
-        proofVerifier: ethers.ZeroAddress,
-        banNode: false,
-        appealWindow: 0,
-        enabled: true,
-        affectsCommittee: false,
-        failureReason: 0,
-      };
+      const proofPolicy = buildProofPolicy();
       await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
 
       // Set up committee membership: operator must be a member, voters attest the operator is faulty
@@ -515,17 +516,7 @@ describe("SlashingManager", function () {
         mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
-      const proofPolicy = {
-        ticketPenalty: ethers.parseUnits("50", 6),
-        licensePenalty: ethers.parseEther("100"),
-        requiresProof: true,
-        proofVerifier: ethers.ZeroAddress,
-        banNode: false,
-        appealWindow: 0,
-        enabled: true,
-        affectsCommittee: false,
-        failureReason: 0,
-      };
+      const proofPolicy = buildProofPolicy();
       await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
 
       // Threshold is 2 but only 1 vote provided
@@ -565,17 +556,7 @@ describe("SlashingManager", function () {
         mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
-      const proofPolicy = {
-        ticketPenalty: ethers.parseUnits("50", 6),
-        licensePenalty: ethers.parseEther("100"),
-        requiresProof: true,
-        proofVerifier: ethers.ZeroAddress,
-        banNode: false,
-        appealWindow: 0,
-        enabled: true,
-        affectsCommittee: false,
-        failureReason: 0,
-      };
+      const proofPolicy = buildProofPolicy();
       await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
 
       const voter1Addr = await voter1.getAddress();
@@ -599,6 +580,8 @@ describe("SlashingManager", function () {
         ),
       );
       const deadline = ethers.MaxUint256;
+      const evidence = ethers.hexlify(ethers.toUtf8Bytes("invalid-signature"));
+      const evidenceHash = ethers.keccak256(evidence);
 
       // Sort voters ascending
       const sortedVoters = [voter1Addr, voter2Addr].sort((a, b) =>
@@ -628,10 +611,12 @@ describe("SlashingManager", function () {
       const dataHashes: string[] = [];
       const signatures: string[] = [];
 
+      // Keep `dataHash == keccak256(evidence)` so this test isolates
+      // signature forgery and reverts with InvalidVoteSignature.
       for (let i = 0; i < sortedVoters.length; i++) {
         const voterAddr = sortedVoters[i];
         voters.push(voterAddr);
-        dataHashes.push(ethers.ZeroHash);
+        dataHashes.push(evidenceHash);
 
         // For the second voter, use notTheOwner to sign (wrong signer)
         const signerToUse =
@@ -640,7 +625,7 @@ describe("SlashingManager", function () {
           e3Id: 0,
           accusationId,
           voter: voterAddr,
-          dataHash: ethers.ZeroHash,
+          dataHash: evidenceHash,
           deadline,
         };
         const signature = await signerToUse.signTypedData(domain, types, value);
@@ -648,8 +633,8 @@ describe("SlashingManager", function () {
       }
 
       const proof = abiCoder.encode(
-        ["uint256", "address[]", "bytes32[]", "uint256", "bytes[]"],
-        [0, voters, dataHashes, deadline, signatures],
+        ["uint256", "address[]", "bytes32[]", "bytes", "uint256", "bytes[]"],
+        [0, voters, dataHashes, evidence, deadline, signatures],
       );
 
       await expect(
@@ -669,17 +654,7 @@ describe("SlashingManager", function () {
         mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
-      const proofPolicy = {
-        ticketPenalty: ethers.parseUnits("50", 6),
-        licensePenalty: ethers.parseEther("100"),
-        requiresProof: true,
-        proofVerifier: ethers.ZeroAddress,
-        banNode: false,
-        appealWindow: 0,
-        enabled: true,
-        affectsCommittee: false,
-        failureReason: 0,
-      };
+      const proofPolicy = buildProofPolicy();
       await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
 
       // Only voter1 is a committee member, but voter2 also signs
@@ -701,6 +676,94 @@ describe("SlashingManager", function () {
           .connect(proposer)
           .proposeSlash(0, operatorAddress, proof),
       ).to.be.revertedWithCustomError(slashingManager, "VoterNotInCommittee");
+    });
+
+    it("should revert if evidence preimage does not match signed dataHash", async function () {
+      const {
+        slashingManager,
+        proposer,
+        operatorAddress,
+        voter1,
+        voter2,
+        mockCiphernodeRegistry,
+      } = await loadFixture(setup);
+
+      const proofPolicy = buildProofPolicy();
+      await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
+
+      const e3Id = 0;
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(e3Id, [
+        operatorAddress,
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(e3Id, 2);
+
+      const evidence = ethers.hexlify(
+        ethers.toUtf8Bytes("mismatched-preimage"),
+      );
+      const proof = await signAndEncodeAttestation(
+        [voter1, voter2],
+        e3Id,
+        operatorAddress,
+        await slashingManager.getAddress(),
+        0,
+        31337,
+        evidence,
+        ethers.MaxUint256,
+        ethers.ZeroHash, // deliberately mismatched vs keccak256(evidence)
+      );
+
+      await expect(
+        slashingManager
+          .connect(proposer)
+          .proposeSlash(e3Id, operatorAddress, proof),
+      ).to.be.revertedWithCustomError(slashingManager, "InvalidProof");
+    });
+
+    it("should revert if attestation deadline has expired", async function () {
+      const {
+        slashingManager,
+        proposer,
+        operatorAddress,
+        voter1,
+        voter2,
+        mockCiphernodeRegistry,
+      } = await loadFixture(setup);
+
+      const proofPolicy = buildProofPolicy();
+      await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
+
+      const e3Id = 0;
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(e3Id, [
+        operatorAddress,
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(e3Id, 2);
+
+      const latest = await ethers.provider.getBlock("latest");
+      const expiredDeadline = BigInt((latest?.timestamp ?? 0) - 1);
+      const proof = await signAndEncodeAttestation(
+        [voter1, voter2],
+        e3Id,
+        operatorAddress,
+        await slashingManager.getAddress(),
+        0,
+        31337,
+        ethers.ZeroHash,
+        expiredDeadline,
+      );
+
+      await expect(
+        slashingManager
+          .connect(proposer)
+          .proposeSlash(e3Id, operatorAddress, proof),
+      ).to.be.revertedWithCustomError(slashingManager, "SignatureExpired");
     });
 
     it("should revert if operator is zero address", async function () {
@@ -734,17 +797,7 @@ describe("SlashingManager", function () {
       const { slashingManager, proposer, operatorAddress } =
         await loadFixture(setup);
 
-      const proofPolicy = {
-        ticketPenalty: ethers.parseUnits("50", 6),
-        licensePenalty: ethers.parseEther("100"),
-        requiresProof: true,
-        proofVerifier: ethers.ZeroAddress,
-        banNode: false,
-        appealWindow: 0,
-        enabled: true,
-        affectsCommittee: false,
-        failureReason: 0,
-      };
+      const proofPolicy = buildProofPolicy();
       await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
 
       await expect(
@@ -764,17 +817,7 @@ describe("SlashingManager", function () {
         mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
-      const proofPolicy = {
-        ticketPenalty: ethers.parseUnits("50", 6),
-        licensePenalty: ethers.parseEther("100"),
-        requiresProof: true,
-        proofVerifier: ethers.ZeroAddress,
-        banNode: false,
-        appealWindow: 0,
-        enabled: true,
-        affectsCommittee: false,
-        failureReason: 0,
-      };
+      const proofPolicy = buildProofPolicy();
       await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
       const voter1Addr = await voter1.getAddress();
       const voter2Addr = await voter2.getAddress();
@@ -893,6 +936,95 @@ describe("SlashingManager", function () {
 
       // banNode=true → auto-executed → node is now banned
       expect(await slashingManager.isBanned(operatorAddress)).to.be.true;
+    });
+
+    it("should propose slash via DKG partyId attribution", async function () {
+      const {
+        slashingManager,
+        proposer,
+        operatorAddress,
+        voter1,
+        voter2,
+        mockCiphernodeRegistry,
+      } = await loadFixture(setup);
+
+      const proofPolicy = buildProofPolicy();
+      await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
+
+      const e3Id = 0;
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(e3Id, [
+        operatorAddress,
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(e3Id, 2);
+      await (mockCiphernodeRegistry as any).setDkgAnchors(
+        e3Id,
+        [0],
+        [ethers.id("sk-0")],
+        [ethers.id("esm-0")],
+      );
+
+      const proof = await signAndEncodeAttestation(
+        [voter1, voter2],
+        e3Id,
+        operatorAddress,
+        await slashingManager.getAddress(),
+      );
+
+      await expect(
+        (slashingManager as any)
+          .connect(proposer)
+          .proposeSlashByDkgParty(e3Id, 0, proof),
+      ).to.emit(slashingManager, "SlashProposed");
+    });
+
+    it("should revert if partyId is not in stored DKG anchors", async function () {
+      const {
+        slashingManager,
+        proposer,
+        operatorAddress,
+        voter1,
+        voter2,
+        mockCiphernodeRegistry,
+      } = await loadFixture(setup);
+
+      const proofPolicy = buildProofPolicy();
+      await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
+
+      const e3Id = 0;
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(e3Id, [
+        operatorAddress,
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(e3Id, 2);
+      await (mockCiphernodeRegistry as any).setDkgAnchors(
+        e3Id,
+        [1],
+        [ethers.id("sk-1")],
+        [ethers.id("esm-1")],
+      );
+
+      const proof = await signAndEncodeAttestation(
+        [voter1, voter2],
+        e3Id,
+        operatorAddress,
+        await slashingManager.getAddress(),
+      );
+
+      await expect(
+        (slashingManager as any)
+          .connect(proposer)
+          .proposeSlashByDkgParty(e3Id, 0, proof),
+      ).to.be.revertedWithCustomError(
+        slashingManager,
+        "PartyIdNotInDkgAnchors",
+      );
     });
   });
 
@@ -1188,10 +1320,12 @@ describe("SlashingManager", function () {
         .connect(proposer)
         .proposeSlash(0, operatorAddress, proof);
 
-      // Cannot appeal proof-verified slashes — appeal window is 0 so it's already expired
+      // Cannot appeal proof-verified slashes whose policy has appealWindow == 0:
+      // they auto-execute inside `proposeSlash`, so the proposal is already
+      // marked executed by the time the accused tries to file an appeal.
       await expect(
         slashingManager.connect(operator).fileAppeal(0, "Cannot appeal proof"),
-      ).to.be.revertedWithCustomError(slashingManager, "AppealWindowExpired");
+      ).to.be.revertedWithCustomError(slashingManager, "AlreadyExecuted");
     });
 
     it("should allow governance to resolve appeal (approve)", async function () {

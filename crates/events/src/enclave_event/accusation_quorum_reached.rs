@@ -6,7 +6,7 @@
 
 use crate::{AccusationVote, E3id, ProofType};
 use actix::Message;
-use alloy::primitives::Address;
+use alloy::primitives::{Address, Bytes};
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
@@ -15,7 +15,13 @@ use std::fmt::{self, Display};
 pub enum AccusationOutcome {
     /// >= M nodes agree the proof is bad → slash the accused.
     AccusedFaulted,
-    /// Only the accuser says bad, same data_hash as others → accuser lied.
+    /// **Deprecated.** Previously emitted when `votes_against >= M`. The
+    /// `AccusationVote` gossip wire no longer carries disagreement
+    /// signatures (a peer who finds the proof passes simply stays silent),
+    /// so this outcome is no longer produced by the off-chain quorum
+    /// protocol. Kept in the enum for serialized-event backwards
+    /// compatibility — downstream consumers should treat any historic
+    /// `AccuserLied` event the same as `Inconclusive`.
     AccuserLied,
     /// data_hashes differ between voters → accused sent different data to different nodes.
     Equivocation,
@@ -49,11 +55,23 @@ pub struct AccusationQuorumReached {
     /// Which proof type was disputed.
     pub proof_type: ProofType,
     /// Votes from nodes that agreed the proof is bad.
+    ///
+    /// There is no `votes_against` companion: the gossip protocol no longer
+    /// carries disagreement signatures, so silence is the only signal of
+    /// disagreement. See the `AccusationVote` docstring for the rationale.
     pub votes_for: Vec<AccusationVote>,
-    /// Votes from nodes that said the proof is fine.
-    pub votes_against: Vec<AccusationVote>,
     /// The quorum decision.
     pub outcome: AccusationOutcome,
+    /// Raw `abi.encode(proof.data, public_signals)` — preimage of every voter's
+    /// `data_hash`.
+    ///
+    /// Consumed by Lane A slash submission: on-chain verifier checks
+    /// `keccak256(evidence) == sharedDataHash`.
+    /// Empty when this node didn't have raw bytes locally (e.g.
+    /// consistency-violation path), in which case submitter should skip
+    /// submission because on-chain binding cannot be proven.
+    #[serde(default)]
+    pub evidence: Bytes,
 }
 
 impl Display for AccusationQuorumReached {

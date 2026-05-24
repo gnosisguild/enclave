@@ -158,7 +158,8 @@
     "compile:ts": "tsc",
     "coverage": "pnpm test --coverage",
     "deploy": "hardhat run scripts/run.ts",
-    "deploy:mocks": "export DEPLOY_MOCKS=true && pnpm clean:deployments && pnpm run deploy",
+    "deploy:mocks": "export DEPLOY_MOCKS=true && pnpm clean:deployments && hardhat run scripts/run.ts --network localhost",
+    "configure:slashing-policies": "hardhat run scripts/runConfigureSlashingPolicies.ts --network localhost",
     "deploy:verifiers": "hardhat run scripts/deployVerifiers.ts",
     "upgrade:enclave": "hardhat run scripts/upgrade/enclave.ts",
     "upgrade:bondingRegistry": "hardhat run scripts/upgrade/bondingRegistry.ts",
@@ -187,7 +188,8 @@
     "prerelease": "pnpm clean && pnpm compile && pnpm typechain",
     "release": "pnpm publish",
     "verify:contracts": "hardhat run scripts/runVerification.ts",
-    "updateSubmissionWindow": "hardhat ciphernode:window"
+    "updateSubmissionWindow": "hardhat ciphernode:window",
+    "utils:sync-integration-config": "hardhat run scripts/syncIntegrationConfig.ts --network localhost"
   },
   "dependencies": {
     "@openzeppelin/contracts-upgradeable": "^5.0.2",

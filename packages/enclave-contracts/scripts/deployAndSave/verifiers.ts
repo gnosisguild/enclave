@@ -8,7 +8,11 @@ import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+import {
+  getDeploymentChain,
+  readDeploymentArgs,
+  storeDeploymentArgs,
+} from "../utils";
 
 const BFV_HONK_VERIFIER_DIR = "contracts/verifiers/bfv/honk";
 const NPM_HONK_SOURCE_PREFIX =
@@ -112,7 +116,7 @@ export const deployAndSaveVerifier = async (
   zkTranscriptLibAddress: string,
 ): Promise<{ address: string }> => {
   const { ethers } = await hre.network.connect();
-  const chain = hre.globalOptions.network;
+  const chain = getDeploymentChain(hre);
 
   // Check if already deployed
   const existing = readDeploymentArgs(contractName, chain);
@@ -166,7 +170,7 @@ export const deployAndSaveAllVerifiers = async (
   hre: HardhatRuntimeEnvironment,
 ): Promise<VerifierDeployments> => {
   const contractNames = discoverVerifierContracts();
-  const chain = hre.globalOptions.network;
+  const chain = getDeploymentChain(hre);
   console.log(`   Deploying to network: ${chain}`);
 
   if (contractNames.length === 0) {

@@ -243,12 +243,41 @@ Circuits are built locally and stored in a git branch:
 
 ## Verifier Generator
 
-`generate-verifiers.ts` - Generates Solidity verifier contracts from compiled Noir circuits.
+`generate-verifiers.ts` - Generates (or verifies) Solidity Honk verifier contracts from compiled
+Noir circuits.
+
+The generated `.sol` files under `packages/enclave-contracts/contracts/verifiers/bfv/honk/` are
+**committed to git** and correspond to **exactly one BFV preset**: `insecure-512` (the development /
+CI / benchmark default). The Honk verifiers bake in the recursive VKs of `dkg_aggregator` /
+`decryption_aggregator`, which are preset-dependent — different BFV parameter sets compile to
+different VKs and therefore different `.sol` bytes. The committed files only match `insecure-512`.
+
+The generator enforces this: both `--check` and `--write` refuse to run unless
+`dist/circuits/insecure-512/.build-stamp.json` exists and reports `"preset": "insecure-512"`. The
+stamp is written by [`pnpm build:circuits --preset <preset>`](#circuit-builder) and is the only
+on-disk record of which preset built `circuits/bin/`. If a different preset was last built (or
+none), the generator refuses with a clear fix recipe instead of silently producing the wrong `.sol`.
+If you need verifiers for a different preset (e.g. a production deploy on `secure-8192`), generate
+them locally for that deploy — do **not** commit the result over the canonical files.
+
+The script has two modes:
+
+- **`--check` (used by test/benchmark/CI flows)** — regenerate in memory and diff against the
+  committed files. Exits non-zero on drift without touching the working tree. This is how
+  `tests/integration/lib/prebuild.sh`, `circuits/benchmarks/scripts/extract_crisp_verify_gas.sh`,
+  and `circuits/benchmarks/scripts/replay_folded_verify_gas.sh` invoke the script — so accidental
+  drift between committed verifiers and current circuit VKs surfaces as a failure rather than a
+  silent rewrite mid-test.
+- **`--write` (default for manual runs)** — regenerate and overwrite the committed files. Use this
+  when you intentionally bump the canonical-preset circuits or the Noir/bb toolchain.
 
 ### Usage
 
 ```bash
-# Generate verifiers for all circuits
+# Verify committed verifiers match current circuit VKs (CI/tests use this)
+pnpm generate:verifiers --check
+
+# Regenerate (default; equivalent to --write)
 pnpm generate:verifiers
 
 # Generate only for specific group
@@ -259,7 +288,7 @@ pnpm generate:verifiers --group threshold
 pnpm generate:verifiers --circuit pk
 pnpm generate:verifiers --circuit pk --circuit fold
 
-# Clean existing verifiers before generating
+# Clean existing verifier directory first (write mode only)
 pnpm generate:verifiers --clean
 
 # Preview what would be generated
@@ -281,16 +310,55 @@ Automates the full pipeline from Noir circuits to on-chain Solidity verifiers:
    - Renames contract from `HonkVerifier` to descriptive name (e.g., `DkgAggregatorVerifier`,
      `DecryptionAggregatorVerifier`)
    - Replaces Apache-2.0 license header with LGPL-3.0-only
-6. **Outputs** to `packages/enclave-contracts/contracts/verifiers/bfv/honk/`
+   - Runs `prettier-plugin-solidity` so on-disk format matches the rest of the repo (and so
+     `--check` doesn't trip on whitespace differences vs. raw `bb` output)
+6. **Outputs / verifies** at `packages/enclave-contracts/contracts/verifiers/bfv/honk/`:
+   - In `--write` mode: overwrites the committed `.sol` files.
+   - In `--check` mode: diffs the freshly generated content against the committed `.sol` and exits
+     non-zero on any drift, printing the offending files and a fix recipe.
+
+### When `--check` (or `--write`) fails
+
+There are two distinct failure modes — the error output tells you which one:
+
+**1. Canonical preset not built** — the generator refuses up front because
+`dist/circuits/insecure-512/.build-stamp.json` is missing or reports a different preset. The
+committed verifiers are pinned to `insecure-512`; nothing under `circuits/bin/` is trusted unless
+the build stamp confirms the canonical preset was last built.
+
+To fix:
+
+```bash
+pnpm build:circuits --preset insecure-512
+# then retry the original command
+```
+
+**2. Drift between committed verifiers and current circuit VKs** — the canonical preset is built but
+the bytes don't match. Typical causes:
+
+- You ran `pnpm build:circuits` against a different Noir/bb version than the one that produced the
+  committed verifiers (see `crates/zk-prover/versions.json` for the pinned versions).
+- A circuit was changed without regenerating the committed Solidity files.
+
+To fix:
+
+1. Verify your `nargo` / `bb` versions match `crates/zk-prover/versions.json`.
+2. Run `pnpm build:circuits --preset insecure-512`.
+3. Run `pnpm generate:verifiers --write`.
+4. Commit the resulting diff under `packages/enclave-contracts/contracts/verifiers/bfv/honk/`.
 
 ### Options
 
 The `generate:verifiers` script in package.json passes `--circuits` with the on-chain used list.
 
+- `--check` - Verify committed verifiers match current VKs (no writes). Exits non-zero on drift.
+- `--write` - Write/overwrite committed verifiers. Default when neither `--check` nor `--write` is
+  passed.
 - `--circuits <list>` - Circuit names, comma-separated. Omit to generate all.
 - `--group <groups>` - Circuit groups (comma-separated: dkg,threshold,recursive_aggregation)
-- `--clean` - Remove existing verifier directory before generating
+- `--clean` - Remove existing verifier directory before generating (write mode only)
 - `--no-compile` - Don't compile circuits automatically (fail if not already compiled)
+- `--no-clean-targets` - Don't delete nargo target dirs before generating verifiers
 - `--dry-run` - Show what would be generated without doing anything
 - `-h, --help` - Show help message
 

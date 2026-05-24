@@ -6,6 +6,7 @@ COPY packages/enclave-react ./packages/enclave-react
 COPY packages/enclave-sdk ./packages/enclave-sdk
 COPY packages/enclave-config ./packages/enclave-config
 COPY packages/enclave-contracts ./packages/enclave-contracts
+COPY package.json .
 COPY pnpm-workspace.yaml .
 COPY pnpm-lock.yaml .
 

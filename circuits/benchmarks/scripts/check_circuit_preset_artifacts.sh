@@ -40,11 +40,22 @@ for path in "${MARKERS[@]}"; do
     fi
 done
 
+ACTIVE="${BIN}/.active-preset.json"
+
 if [ ! -f "$STAMP" ]; then
     missing+=("$STAMP")
 elif ! jq -e --arg p "$PRESET" '.preset == $p' "$STAMP" >/dev/null 2>&1; then
     echo "Error: ${STAMP} is for a different preset (expected ${PRESET})." >&2
     echo "  Run: pnpm build:circuits --preset ${PRESET}" >&2
+    exit 1
+fi
+
+if [ ! -f "$ACTIVE" ]; then
+    missing+=("$ACTIVE")
+elif ! jq -e --arg p "$PRESET" '.preset == $p' "$ACTIVE" >/dev/null 2>&1; then
+    echo "Error: circuits/bin was last built for a different preset (see ${ACTIVE})." >&2
+    echo "  Fast fix (no full recompile if dist is ready):" >&2
+    echo "    pnpm build:circuits --preset ${PRESET} --skip-if-built --no-clean --no-clean-targets" >&2
     exit 1
 fi
 

@@ -6,6 +6,7 @@
 pragma solidity 0.8.28;
 
 import { IE3Program } from "../interfaces/IE3Program.sol";
+import { IEnclave } from "../interfaces/IEnclave.sol";
 
 contract MockE3Program is IE3Program {
     error InvalidParams(bytes e3ProgramParams, bytes computeProviderParams);
@@ -14,7 +15,18 @@ contract MockE3Program is IE3Program {
 
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
+    /// @notice Optional Enclave contract — when set, `publishInput` forwards
+    /// `data` to `enclave.publishCiphertextOutput`, which is what the integration
+    /// tests rely on to trigger the ciphernode decryption pipeline. A real E3
+    /// program would aggregate user inputs off-chain into a single ciphertext;
+    /// the mock short-circuits that step by treating the input as the ciphertext.
+    IEnclave public enclave;
+
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
+
+    function setEnclave(IEnclave _enclave) external {
+        enclave = _enclave;
+    }
 
     function validate(
         uint256 e3Id,
@@ -33,9 +45,18 @@ contract MockE3Program is IE3Program {
         return ENCRYPTION_SCHEME_ID;
     }
 
-    function publishInput(uint256, bytes memory data) external pure {
+    function publishInput(uint256 e3Id, bytes memory data) external {
         if (data.length == 3) {
             revert InvalidInput();
+        }
+        if (address(enclave) != address(0)) {
+            // Test-only: external call to Enclave with no reentrancy guard.
+            // Deliberate — this contract is only deployed in integration tests
+            // and `enclave` is set via `setEnclave` to the trusted Enclave
+            // proxy. Do not copy this pattern into a production E3 program.
+            // Pass `data` as the proof too so `MockE3Program.verify` (which
+            // requires `proof.length > 0`) returns true.
+            enclave.publishCiphertextOutput(e3Id, data, data);
         }
     }
 

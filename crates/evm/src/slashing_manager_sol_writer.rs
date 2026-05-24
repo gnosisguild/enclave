@@ -4,8 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Subscribes to `AccusationQuorumReached` events and submits `proposeSlash`
-//! transactions on the SlashingManager contract with committee attestation evidence.
+//! Subscribes to `AccusationQuorumReached` events and submits committee-attested
+//! slash proposals on the SlashingManager contract. Prefers party-attributed
+//! `proposeSlashByDkgParty` when DKG anchors resolve, and falls back to
+//! operator-attributed `proposeSlash` otherwise.
 
 use crate::error_decoder::format_evm_error;
 use crate::helpers::EthProvider;
@@ -160,13 +162,15 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<AccusationQuorumRea
                     }
                     Err(err) => {
                         let decoded = format_evm_error(&err);
-                        if rank > 0 {
+                        let benign = decoded.contains("OperatorNotInCommittee")
+                            || decoded.contains("VoterNotInCommittee")
+                            || decoded.contains("DuplicateEvidence");
+                        if rank > 0 || benign {
                             // Fallback submitters expect DuplicateEvidence reverts
                             // when the primary submitter has already landed the tx.
-                            warn!(
-                                "Fallback submitter (rank {rank}): slash submission failed \
-                                 (likely already submitted by primary): {decoded}"
-                            );
+                            // Operator/VoterNotInCommittee indicate a stale off-chain accusation
+                            // (e.g. cross-E3 race) — not a node-local fault.
+                            warn!("Slash submission skipped (rank {rank}): {decoded}");
                         } else {
                             bus.err(
                                 EType::Evm,
@@ -191,25 +195,47 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
 }
 
 /// Encode `AccusationQuorumReached` into the attestation evidence format expected
-/// by `SlashingManager.proposeSlash()`:
-/// `abi.encode(uint256 proofType, address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures)`
+/// by both `SlashingManager.proposeSlash()` and `SlashingManager.proposeSlashByDkgParty()`:
+/// `abi.encode(uint256 proofType, address[] voters, bytes32[] dataHashes, bytes evidence, uint256 deadline, bytes[] signatures)`
 ///
-/// Voters are sorted ascending by address to satisfy the contract's duplicate-prevention check.
-fn encode_attestation_evidence(data: &AccusationQuorumReached) -> Vec<u8> {
+/// Voters are sorted ascending by address to satisfy the contract's duplicate-prevention
+/// check. All `votes_for` share the same `deadline` (the accuser stamps one value at
+/// accusation time and `AccusationManager::on_vote_received` rejects votes whose
+/// deadline disagrees), so the encoder pulls it from the first vote. Returns `None`
+/// if `votes_for` is empty — the on-chain submitter must skip the submission in that
+/// case rather than send malformed calldata.
+pub fn encode_attestation_evidence(data: &AccusationQuorumReached) -> Option<Vec<u8>> {
+    if data.votes_for.is_empty() || data.evidence.is_empty() {
+        return None;
+    }
+
     // Collect and sort votes by voter address (ascending)
     let mut votes = data.votes_for.clone();
     votes.sort_by_key(|v| v.voter);
 
     let proof_type = U256::from(data.proof_type as u8);
     let voters: Vec<Address> = votes.iter().map(|v| v.voter).collect();
-    let agrees: Vec<bool> = votes.iter().map(|v| v.agrees).collect();
     let data_hashes: Vec<[u8; 32]> = votes.iter().map(|v| v.data_hash).collect();
+    let evidence = Bytes::from(data.evidence.clone());
+    // All voters signed the same deadline (enforced off-chain by AccusationManager);
+    // pick any one — the first vote suffices.
+    let deadline = U256::from(votes[0].deadline);
     let signatures: Vec<Bytes> = votes
         .iter()
         .map(|v| Bytes::from(v.signature.extract_bytes()))
         .collect();
 
-    (proof_type, voters, agrees, data_hashes, signatures).abi_encode()
+    Some(
+        (
+            proof_type,
+            voters,
+            data_hashes,
+            evidence,
+            deadline,
+            signatures,
+        )
+            .abi_encode_params(),
+    )
 }
 
 async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
@@ -220,12 +246,45 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
     let e3_id: U256 = data.e3_id.clone().try_into()?;
     let operator = data.accused;
 
-    let proof_data = encode_attestation_evidence(&data);
+    // Empty `votes_for` only reaches this point if upstream invariants broke
+    // — `check_quorum` requires `len >= threshold_m >= 1` before emitting
+    // `AccusedFaulted`/`Equivocation`. Refuse to submit malformed calldata
+    // and surface a structured warning so an operator can debug the upstream
+    // gossip/quorum path rather than seeing a generic ABI-decode revert
+    // on chain.
+    let proof_data = match encode_attestation_evidence(&data) {
+        Some(bytes) => bytes,
+        None => {
+            warn!(
+                e3_id = %data.e3_id,
+                accused = %operator,
+                outcome = %data.outcome,
+                "Refusing to submit proposeSlash: AccusationQuorumReached has empty \
+                 votes_for or empty evidence preimage — submission dropped"
+            );
+            return Err(anyhow::anyhow!(
+                "AccusationQuorumReached has empty votes_for or evidence; refused proposeSlash submission \
+                 (e3_id={}, accused={})",
+                data.e3_id,
+                operator
+            ));
+        }
+    };
+
+    let party_id =
+        resolve_party_id_for_operator(provider.clone(), contract_address, e3_id, operator)
+            .await
+            .ok()
+            .flatten();
 
     send_tx_with_retry("proposeSlash", &[], || {
-        info!("proposeSlash() e3_id={:?} operator={:?}", e3_id, operator);
+        info!(
+            "proposeSlash() e3_id={:?} operator={:?} party_id={:?}",
+            e3_id, operator, party_id
+        );
         let proof = Bytes::from(proof_data.clone());
         let provider = provider.clone();
+        let party_id = party_id;
 
         async move {
             let from_address = provider.provider().default_signer_address();
@@ -235,12 +294,62 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
                 .pending()
                 .await?;
             let contract = ISlashingManager::new(contract_address, provider.provider());
-            let builder = contract
-                .proposeSlash(e3_id, operator, proof)
-                .nonce(current_nonce);
-            let receipt = builder.send().await?.get_receipt().await?;
+            let receipt = if let Some(pid) = party_id {
+                contract
+                    .proposeSlashByDkgParty(e3_id, pid, proof)
+                    .nonce(current_nonce)
+                    .send()
+                    .await?
+                    .get_receipt()
+                    .await?
+            } else {
+                contract
+                    .proposeSlash(e3_id, operator, proof)
+                    .nonce(current_nonce)
+                    .send()
+                    .await?
+                    .get_receipt()
+                    .await?
+            };
             Ok(receipt)
         }
     })
     .await
+}
+
+async fn resolve_party_id_for_operator<P: Provider + WalletProvider + Clone>(
+    provider: EthProvider<P>,
+    contract_address: Address,
+    e3_id: U256,
+    operator: Address,
+) -> Result<Option<U256>> {
+    sol! {
+        #[sol(rpc)]
+        interface IRegistryDkgView {
+            function getDkgAnchors(uint256 e3Id)
+                external
+                view
+                returns (uint256[] memory partyIds, bytes32[] memory, bytes32[] memory);
+            function canonicalCommitteeNodeAt(uint256 e3Id, uint256 partyId) external view returns (address);
+        }
+    }
+
+    let slashing = ISlashingManager::new(contract_address, provider.provider());
+    let registry = slashing.ciphernodeRegistry().call().await?;
+    if registry == Address::ZERO {
+        return Ok(None);
+    }
+
+    let registry_view = IRegistryDkgView::new(registry, provider.provider());
+    let anchors = registry_view.getDkgAnchors(e3_id).call().await?;
+    for pid in anchors.partyIds {
+        let node = registry_view
+            .canonicalCommitteeNodeAt(e3_id, pid)
+            .call()
+            .await?;
+        if node == operator {
+            return Ok(Some(pid));
+        }
+    }
+    Ok(None)
 }

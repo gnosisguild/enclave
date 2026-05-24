@@ -17,7 +17,9 @@ use super::CLI_DB;
 use alloy::primitives::{Address, Bytes, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::SolValue;
+use anyhow::anyhow;
 use crisp::config::CONFIG;
+use crisp::deployments;
 use e3_fhe_params::build_bfv_params_from_set_arc;
 use e3_sdk::evm_helpers::contracts::{CommitteeSize, EnclaveContract, EnclaveRead, EnclaveWrite};
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
@@ -54,6 +56,90 @@ struct CTRequest {
     ct_bytes: Vec<u8>,
 }
 
+/// Seconds between `block.timestamp` and `inputWindow[0]` (covers approve + enable txs on Anvil).
+const INPUT_WINDOW_START_BUFFER_SECS: u64 = 60;
+
+const ZERO_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
+
+/// `InsufficientCiphernodes(uint256,uint256)` on CiphernodeRegistry.
+const INSUFFICIENT_CIPHERNODES_SELECTOR: &str = "0x44ec930f";
+
+fn format_request_e3_revert(err: impl std::fmt::Display) -> anyhow::Error {
+    let msg = err.to_string();
+    if msg.contains(INSUFFICIENT_CIPHERNODES_SELECTOR) {
+        return anyhow!(
+            "request_e3 reverted: InsufficientCiphernodes — the committee size needs N active \
+             operators (Micro N=3) but bondingRegistry.numActiveOperators() is 0. Register \
+             ciphernodes before init: run full `pnpm dev:up`, or from examples/CRISP run \
+             `pnpm ciphernode:add --ciphernode-address <addr> --network localhost` for at least \
+             three addresses in enclave.config.yaml (cn1–cn3)."
+        );
+    }
+    anyhow!(
+        "request_e3 reverted: {msg}. Common causes: stale E3_PROGRAM_ADDRESS in server/.env \
+         (must match deployed CRISPProgram), inputWindow start in the past, or no registered \
+         ciphernodes on the chain."
+    )
+}
+
+pub fn default_voting_token_hint() -> String {
+    deployments::localhost_mock_voting_token()
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| ZERO_ADDRESS.to_string())
+}
+
+fn resolve_voting_token(
+    token_address: &str,
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    let trimmed = token_address.trim();
+    if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case(ZERO_ADDRESS) {
+        return Ok(trimmed.to_string());
+    }
+    if let Some(ref configured) = CONFIG.crisp_voting_token {
+        let configured = configured.trim();
+        if !configured.is_empty() && !configured.eq_ignore_ascii_case(ZERO_ADDRESS) {
+            return Ok(configured.to_string());
+        }
+    }
+    if let Some(addr) = deployments::localhost_mock_voting_token()? {
+        info!("Using MockVotingToken from deployed_contracts.json: {addr}");
+        return Ok(addr);
+    }
+    Err(anyhow!(
+        "Voting token address is unset. After `pnpm dev:up`, copy `CRISP_VOTING_TOKEN` from deploy \
+         output into server/.env, or pass `--token-address <MockVotingToken>`."
+    )
+    .into())
+}
+
+async fn ensure_e3_program_deployed(
+    e3_program: Address,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if let Some(deployed) = deployments::localhost_crisp_program()? {
+        let deployed_addr: Address = deployed.parse()?;
+        if deployed_addr != e3_program {
+            return Err(anyhow!(
+                "E3_PROGRAM_ADDRESS in server/.env ({e3_program}) does not match deployed \
+                 CRISPProgram ({deployed_addr}). Re-run `pnpm dev:up` and update server/.env from \
+                 deploy output (PRINT_ENV_VARS=true)."
+            )
+            .into());
+        }
+    }
+
+    let provider = ProviderBuilder::new().connect(&CONFIG.http_rpc_url).await?;
+    let code = provider.get_code_at(e3_program).await?;
+    if code.is_empty() {
+        return Err(anyhow!(
+            "No contract bytecode at E3_PROGRAM_ADDRESS {e3_program}. Stale server/.env after \
+             redeploy is the usual cause — sync from packages/crisp-contracts/deployed_contracts.json."
+        )
+        .into());
+    }
+    Ok(())
+}
+
 pub async fn get_current_timestamp() -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
     let provider = ProviderBuilder::new().connect(&CONFIG.http_rpc_url).await?;
     let block = provider
@@ -79,11 +165,6 @@ pub async fn initialize_crisp_round(
     token_address: &str,
     balance_threshold: &str,
 ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
-    info!(
-        "Starting new CRISP round with token address: {} and balance threshold: {}",
-        token_address, balance_threshold
-    );
-
     let contract = EnclaveContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
@@ -91,6 +172,7 @@ pub async fn initialize_crisp_round(
     )
     .await?;
     let e3_program: Address = CONFIG.e3_program_address.parse()?;
+    ensure_e3_program_deployed(e3_program).await?;
 
     info!("Enabling E3 Program with address: {}", e3_program);
     match contract.is_e3_program_enabled(e3_program).await {
@@ -109,7 +191,14 @@ pub async fn initialize_crisp_round(
         Err(e) => info!("Error checking E3 Program enabled: {:?}", e),
     }
 
-    let token_address: Address = token_address.parse()?;
+    let token_address_str = resolve_voting_token(token_address)?;
+
+    info!(
+        "Starting new CRISP round with token address: {} and balance threshold: {}",
+        token_address_str, balance_threshold
+    );
+
+    let token_address: Address = token_address_str.parse()?;
     let balance_threshold = U256::from_str_radix(&balance_threshold, 10)?;
     // We default to two options for the main CRISP app
     let num_options = U256::from(2);
@@ -156,7 +245,7 @@ pub async fn initialize_crisp_round(
         current_timestamp
     );
     // Buffer so tx can mine before window opens; end = start + duration so voting window equals e3_duration
-    let window_start = current_timestamp + 20;
+    let window_start = current_timestamp + INPUT_WINDOW_START_BUFFER_SECS;
     let input_window: [U256; 2] = [
         U256::from(window_start),
         U256::from(window_start + CONFIG.e3_duration),
@@ -204,11 +293,18 @@ pub async fn initialize_crisp_round(
     // since there are multiple steps (fee quote, token approval) that could take time.
     let current_timestamp = get_current_timestamp().await?;
     // Buffer so tx can mine before window opens; end = start + duration so voting window equals e3_duration
-    let window_start = current_timestamp + 20;
+    let window_start = current_timestamp + INPUT_WINDOW_START_BUFFER_SECS;
     let input_window: [U256; 2] = [
         U256::from(window_start),
         U256::from(window_start + CONFIG.e3_duration),
     ];
+
+    info!(
+        "Requesting E3 with input_window [{}, {}] (buffer {}s)",
+        window_start,
+        window_start + CONFIG.e3_duration,
+        INPUT_WINDOW_START_BUFFER_SECS
+    );
 
     let (res, e3_id) = contract
         .request_e3(
@@ -220,7 +316,8 @@ pub async fn initialize_crisp_round(
             custom_params_bytes,
             proof_aggregation_enabled,
         )
-        .await?;
+        .await
+        .map_err(format_request_e3_revert)?;
     info!("E3 request sent. TxHash: {:?}", res.transaction_hash);
     let e3_id_u64 = u64::try_from(e3_id)?;
     info!("E3 ID: {}", e3_id_u64);
@@ -235,7 +332,10 @@ pub async fn participate_in_existing_round(
         .with_prompt("Enter CRISP round ID.")
         .interact_text()?;
 
-    let url = format!("{}/rounds/public-key", CONFIG.enclave_server_url);
+    let url = format!(
+        "{}/rounds/public-key",
+        CONFIG.enclave_server_url_for_clients()
+    );
     let resp = client
         .post(&url)
         .json(&PKRequest {
