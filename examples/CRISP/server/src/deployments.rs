@@ -43,10 +43,9 @@ pub fn localhost_mock_voting_token() -> Result<Option<String>> {
     if !path.exists() {
         return Ok(None);
     }
-    let raw = std::fs::read_to_string(&path)
-        .with_context(|| format!("read {}", path.display()))?;
-    let file: DeployedContractsFile = serde_json::from_str(&raw)
-        .with_context(|| format!("parse {}", path.display()))?;
+    let raw = std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    let file: DeployedContractsFile =
+        serde_json::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
     Ok(file
         .localhost
         .and_then(|c| c.mock_voting_token)
@@ -59,10 +58,9 @@ pub fn localhost_crisp_program() -> Result<Option<String>> {
     if !path.exists() {
         return Ok(None);
     }
-    let raw = std::fs::read_to_string(&path)
-        .with_context(|| format!("read {}", path.display()))?;
-    let file: DeployedContractsFile = serde_json::from_str(&raw)
-        .with_context(|| format!("parse {}", path.display()))?;
+    let raw = std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    let file: DeployedContractsFile =
+        serde_json::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
     Ok(file
         .localhost
         .and_then(|c| c.crisp_program)

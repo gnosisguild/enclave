@@ -29,8 +29,8 @@ const NO_EXPIRY = ethers.MaxUint256;
  * Helper to create signed committee attestation evidence for Lane A.
  *
  * Returns `abi.encode(uint256 proofType, address[] voters, bytes32[] dataHashes,
- *                     uint256 deadline, bytes[] signatures)` with voters sorted
- * ascending by address.
+ *                     bytes evidence, uint256 deadline, bytes[] signatures)` with
+ * voters sorted ascending by address.
  *
  * Each voter signs the EIP-712 `AccusationVote` struct against the
  * `EnclaveSlashing/1` domain anchored at `verifyingContract`. This binds the
@@ -43,9 +43,10 @@ const NO_EXPIRY = ethers.MaxUint256;
  * @param verifyingContract - Address of the SlashingManager (EIP-712 domain).
  * @param proofType    - Numeric proof type, mapped to a slash reason on-chain.
  * @param chainId      - Chain ID for the EIP-712 domain. Defaults to 31337 (hardhat).
- * @param dataHash     - Witness hash. All voters must sign the same `dataHash`
- *                       or `proposeSlash` reverts with `EquivocationDetected`.
+ * @param evidence     - Evidence preimage bytes. All voters sign
+ *                       `keccak256(evidence)` as `dataHash`.
  * @param deadline     - Optional unix expiry. Defaults to MaxUint256.
+ * @param dataHashOverride - Optional negative-test override for signed `dataHash`.
  */
 export async function signAndEncodeAttestation(
   voterSigners: Signer[],
@@ -54,8 +55,9 @@ export async function signAndEncodeAttestation(
   verifyingContract: string,
   proofType: number = 0,
   chainId: number = 31337,
-  dataHash: string = ethers.ZeroHash,
+  evidence: string = ethers.hexlify(ethers.toUtf8Bytes("lane-a-attestation")),
   deadline: bigint = NO_EXPIRY,
+  dataHashOverride?: string,
 ): Promise<string> {
   const accusationId = ethers.keccak256(
     ethers.solidityPacked(
@@ -98,6 +100,7 @@ export async function signAndEncodeAttestation(
   const voters: string[] = [];
   const dataHashes: string[] = [];
   const signatures: string[] = [];
+  const dataHash = dataHashOverride ?? ethers.keccak256(evidence);
 
   for (const { signer, address: voterAddress } of signersWithAddrs) {
     voters.push(voterAddress);
@@ -128,7 +131,7 @@ export async function signAndEncodeAttestation(
   void abiCoder;
 
   return ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint256", "address[]", "bytes32[]", "uint256", "bytes[]"],
-    [proofType, voters, dataHashes, deadline, signatures],
+    ["uint256", "address[]", "bytes32[]", "bytes", "uint256", "bytes[]"],
+    [proofType, voters, dataHashes, evidence, deadline, signatures],
   );
 }

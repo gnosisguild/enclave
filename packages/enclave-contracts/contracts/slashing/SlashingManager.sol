@@ -344,9 +344,9 @@ contract SlashingManager is
     ///      Execution is atomic when `policy.appealWindow == 0`, otherwise deferred so
     ///      the accused can {fileAppeal}. Evidence format:
     ///      `abi.encode(uint256 proofType, address[] voters, bytes32[] dataHashes,
-    ///      uint256 deadline, bytes[] signatures)`. Voters sign the EIP-712
+    ///      bytes evidence, uint256 deadline, bytes[] signatures)`. Voters sign the EIP-712
     ///      `AccusationVote` against this contract's domain; all `dataHash` values
-    ///      must be identical or the call reverts with `EquivocationDetected`.
+    ///      must be identical and equal `keccak256(evidence)`.
     function proposeSlash(
         uint256 e3Id,
         address operator,
@@ -548,7 +548,8 @@ contract SlashingManager is
     /// @dev Verifies Lane A attestation evidence: decodes, checks quorum (>= M), verifies
     ///      each EIP-712 `AccusationVote` signature, confirms voters are active committee
     ///      members, enforces the shared `deadline`, and rejects equivocation (all
-    ///      `dataHash` values must match). Voters must be sorted ascending (no duplicates).
+    ///      `dataHash` values must match and bind to `keccak256(evidence)`).
+    ///      Voters must be sorted ascending (no duplicates).
     function _verifyAttestationEvidence(
         bytes calldata proof,
         uint256 e3Id,
@@ -558,11 +559,12 @@ contract SlashingManager is
             uint256 proofType,
             address[] memory voters,
             bytes32[] memory dataHashes,
+            bytes memory evidence,
             uint256 deadline,
             bytes[] memory signatures
         ) = abi.decode(
                 proof,
-                (uint256, address[], bytes32[], uint256, bytes[])
+                (uint256, address[], bytes32[], bytes, uint256, bytes[])
             );
 
         uint256 numVotes = voters.length;
@@ -590,6 +592,7 @@ contract SlashingManager is
         // one voter is signing inconsistent statements and the attestation must not be
         // accepted as a single fault witness.
         bytes32 sharedDataHash = dataHashes[0];
+        require(keccak256(evidence) == sharedDataHash, InvalidProof());
 
         // Verify each vote signature and membership
         address prevVoter = address(0);

@@ -49,6 +49,9 @@ use tracing::{error, info, warn};
 
 /// How long to wait for votes before declaring the accusation inconclusive.
 const DEFAULT_VOTE_TIMEOUT: Duration = Duration::from_secs(300); // 5 minutes
+/// Default clock-skew allowance when validating peer-stamped accusation deadlines.
+#[cfg(test)]
+const DEFAULT_ACCUSATION_DEADLINE_SKEW_SECS: u64 = 30;
 
 /// Abstraction over wall-clock time so the deadline-stamping logic is
 /// deterministically testable. Production uses [`SystemClock`], which reads
@@ -182,6 +185,8 @@ pub struct AccusationManager {
     /// requires a node restart to take effect — same lifecycle as the fold
     /// attestation verifier.
     vote_validity_secs: u64,
+    /// Clock-skew allowance when validating peer accusation deadlines.
+    accusation_deadline_skew_secs: u64,
 
     /// Wall-clock source used to derive accusation deadlines. Production uses
     /// [`SystemClock`]; tests can inject a deterministic mock.
@@ -203,6 +208,7 @@ impl AccusationManager {
         committee: Vec<Address>,
         threshold_m: usize,
         vote_validity_secs: u64,
+        accusation_deadline_skew_secs: u64,
         params_preset: e3_fhe_params::BfvPreset,
     ) -> Self {
         Self::new_with_clock(
@@ -213,6 +219,7 @@ impl AccusationManager {
             committee,
             threshold_m,
             vote_validity_secs,
+            accusation_deadline_skew_secs,
             params_preset,
             Arc::new(SystemClock),
         )
@@ -228,6 +235,7 @@ impl AccusationManager {
         committee: Vec<Address>,
         threshold_m: usize,
         vote_validity_secs: u64,
+        accusation_deadline_skew_secs: u64,
         params_preset: e3_fhe_params::BfvPreset,
         clock: Arc<dyn Clock>,
     ) -> Self {
@@ -247,6 +255,7 @@ impl AccusationManager {
             pending_reverifications: HashMap::new(),
             vote_timeout: DEFAULT_VOTE_TIMEOUT,
             vote_validity_secs,
+            accusation_deadline_skew_secs,
             clock,
             params_preset,
         }
@@ -260,6 +269,7 @@ impl AccusationManager {
         committee: Vec<Address>,
         threshold_m: usize,
         vote_validity_secs: u64,
+        accusation_deadline_skew_secs: u64,
         params_preset: e3_fhe_params::BfvPreset,
     ) -> Addr<Self> {
         let addr = Self::new(
@@ -270,6 +280,7 @@ impl AccusationManager {
             committee,
             threshold_m,
             vote_validity_secs,
+            accusation_deadline_skew_secs,
             params_preset,
         )
         .start();
@@ -305,6 +316,28 @@ impl AccusationManager {
         self.clock
             .unix_now_secs()
             .saturating_add(self.vote_validity_secs)
+    }
+
+    /// Validate a peer-provided accusation deadline against this node's local
+    /// vote-validity policy and wall clock.
+    ///
+    /// Accept iff:
+    /// - validity is enabled (`vote_validity_secs > 0`)
+    /// - deadline is strictly in the future
+    /// - deadline is not farther than `now + vote_validity_secs + skew`
+    fn is_peer_deadline_acceptable(
+        deadline: u64,
+        now: u64,
+        vote_validity_secs: u64,
+        skew_secs: u64,
+    ) -> bool {
+        if vote_validity_secs == 0 {
+            return false;
+        }
+        let max_deadline = now
+            .saturating_add(vote_validity_secs)
+            .saturating_add(skew_secs);
+        deadline > now && deadline <= max_deadline
     }
 
     // ─── Accusation ID computation ───────────────────────────────────────
@@ -646,6 +679,17 @@ impl AccusationManager {
             return;
         }
 
+        // Governance-disabled validity window means no accusation voting should
+        // be produced by this node.
+        if self.vote_validity_secs == 0 {
+            warn!(
+                "Refusing accusation initiation for {:?} on E3 {}: vote_validity_secs is 0",
+                accused_address, self.e3_id
+            );
+            self.accused_proofs.remove(&key);
+            return;
+        }
+
         // Pick the on-chain validity deadline once per accusation. Every voter
         // (including ourselves below) signs the same value; otherwise the
         // aggregated evidence cannot be encoded as a single `deadline`.
@@ -744,6 +788,29 @@ impl AccusationManager {
     ) {
         // Ignore accusations for other E3s
         if accusation.e3_id != self.e3_id {
+            return;
+        }
+
+        let now = self.clock.unix_now_secs();
+        if !Self::is_peer_deadline_acceptable(
+            accusation.deadline,
+            now,
+            self.vote_validity_secs,
+            self.accusation_deadline_skew_secs,
+        ) {
+            let max_deadline = now
+                .saturating_add(self.vote_validity_secs)
+                .saturating_add(self.accusation_deadline_skew_secs);
+            warn!(
+                "Ignoring accusation from {} — deadline {} outside local validity window \
+                 (now={}, vote_validity_secs={}, skew_secs={}, max_accepted_deadline={})",
+                accusation.accuser,
+                accusation.deadline,
+                now,
+                self.vote_validity_secs,
+                self.accusation_deadline_skew_secs,
+                max_deadline
+            );
             return;
         }
 
@@ -1709,5 +1776,34 @@ mod tests {
         let a = AccusationManager::accusation_digest(&make(1_700_000_000));
         let b = AccusationManager::accusation_digest(&make(1_700_000_001));
         assert_ne!(a, b, "deadline must be part of the accusation digest");
+    }
+
+    #[test]
+    fn peer_deadline_acceptance_enforces_local_window() {
+        let now = 1_700_000_000u64;
+        let validity = 1_800u64;
+        let skew = DEFAULT_ACCUSATION_DEADLINE_SKEW_SECS;
+        let max_ok = now + validity + skew;
+
+        assert!(
+            !AccusationManager::is_peer_deadline_acceptable(now, now, validity, skew),
+            "deadline equal to now must be rejected"
+        );
+        assert!(
+            !AccusationManager::is_peer_deadline_acceptable(now - 1, now, validity, skew),
+            "expired deadline must be rejected"
+        );
+        assert!(
+            AccusationManager::is_peer_deadline_acceptable(max_ok, now, validity, skew),
+            "deadline at upper bound must be accepted"
+        );
+        assert!(
+            !AccusationManager::is_peer_deadline_acceptable(max_ok + 1, now, validity, skew),
+            "far-future deadline must be rejected"
+        );
+        assert!(
+            !AccusationManager::is_peer_deadline_acceptable(now + 10, now, 0, skew),
+            "vote_validity_secs=0 must reject peer accusations"
+        );
     }
 }

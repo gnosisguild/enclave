@@ -580,6 +580,8 @@ describe("SlashingManager", function () {
         ),
       );
       const deadline = ethers.MaxUint256;
+      const evidence = ethers.hexlify(ethers.toUtf8Bytes("invalid-signature"));
+      const evidenceHash = ethers.keccak256(evidence);
 
       // Sort voters ascending
       const sortedVoters = [voter1Addr, voter2Addr].sort((a, b) =>
@@ -609,12 +611,12 @@ describe("SlashingManager", function () {
       const dataHashes: string[] = [];
       const signatures: string[] = [];
 
-      // `dataHash` must equal `keccak256(evidence)` per the on-chain check.
-      // This case signs `ZeroHash` deliberately (mismatched vs real evidence).
+      // Keep `dataHash == keccak256(evidence)` so this test isolates
+      // signature forgery and reverts with InvalidVoteSignature.
       for (let i = 0; i < sortedVoters.length; i++) {
         const voterAddr = sortedVoters[i];
         voters.push(voterAddr);
-        dataHashes.push(ethers.ZeroHash);
+        dataHashes.push(evidenceHash);
 
         // For the second voter, use notTheOwner to sign (wrong signer)
         const signerToUse =
@@ -623,7 +625,7 @@ describe("SlashingManager", function () {
           e3Id: 0,
           accusationId,
           voter: voterAddr,
-          dataHash: ethers.ZeroHash,
+          dataHash: evidenceHash,
           deadline,
         };
         const signature = await signerToUse.signTypedData(domain, types, value);
@@ -631,8 +633,8 @@ describe("SlashingManager", function () {
       }
 
       const proof = abiCoder.encode(
-        ["uint256", "address[]", "bytes32[]", "uint256", "bytes[]"],
-        [0, voters, dataHashes, deadline, signatures],
+        ["uint256", "address[]", "bytes32[]", "bytes", "uint256", "bytes[]"],
+        [0, voters, dataHashes, evidence, deadline, signatures],
       );
 
       await expect(
@@ -674,6 +676,51 @@ describe("SlashingManager", function () {
           .connect(proposer)
           .proposeSlash(0, operatorAddress, proof),
       ).to.be.revertedWithCustomError(slashingManager, "VoterNotInCommittee");
+    });
+
+    it("should revert if evidence preimage does not match signed dataHash", async function () {
+      const {
+        slashingManager,
+        proposer,
+        operatorAddress,
+        voter1,
+        voter2,
+        mockCiphernodeRegistry,
+      } = await loadFixture(setup);
+
+      const proofPolicy = buildProofPolicy();
+      await slashingManager.setSlashPolicy(REASON_PT_0, proofPolicy);
+
+      const e3Id = 0;
+      const voter1Addr = await voter1.getAddress();
+      const voter2Addr = await voter2.getAddress();
+      await mockCiphernodeRegistry.setCommitteeNodes(e3Id, [
+        operatorAddress,
+        voter1Addr,
+        voter2Addr,
+      ]);
+      await mockCiphernodeRegistry.setThreshold(e3Id, 2);
+
+      const evidence = ethers.hexlify(
+        ethers.toUtf8Bytes("mismatched-preimage"),
+      );
+      const proof = await signAndEncodeAttestation(
+        [voter1, voter2],
+        e3Id,
+        operatorAddress,
+        await slashingManager.getAddress(),
+        0,
+        31337,
+        evidence,
+        ethers.MaxUint256,
+        ethers.ZeroHash, // deliberately mismatched vs keccak256(evidence)
+      );
+
+      await expect(
+        slashingManager
+          .connect(proposer)
+          .proposeSlash(e3Id, operatorAddress, proof),
+      ).to.be.revertedWithCustomError(slashingManager, "InvalidProof");
     });
 
     it("should revert if attestation deadline has expired", async function () {

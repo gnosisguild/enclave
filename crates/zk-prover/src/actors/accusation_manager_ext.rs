@@ -32,6 +32,8 @@ pub struct AccusationManagerExtension {
     /// governance changes require a node restart to take effect (same lifecycle
     /// contract as `slashing_manager`).
     vote_validity_secs_by_chain: HashMap<u64, u64>,
+    /// Clock-skew allowance for peer accusation deadlines.
+    accusation_deadline_skew_secs: u64,
 }
 
 impl AccusationManagerExtension {
@@ -40,12 +42,14 @@ impl AccusationManagerExtension {
         signer: PrivateKeySigner,
         slashing_manager: Address,
         vote_validity_secs_by_chain: HashMap<u64, u64>,
+        accusation_deadline_skew_secs: u64,
     ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             signer: signer.clone(),
             slashing_manager,
             vote_validity_secs_by_chain,
+            accusation_deadline_skew_secs,
         })
     }
 
@@ -123,6 +127,7 @@ impl E3Extension for AccusationManagerExtension {
             committee_addresses,
             threshold_m,
             vote_validity_secs,
+            self.accusation_deadline_skew_secs,
             meta.params_preset,
         );
 

@@ -495,19 +495,21 @@ interface ISlashingManager {
      *      cross-reason replay attacks.
      *      Evidence format:
      *        abi.encode(uint256 proofType,
-     *          address[] voters, bool[] agrees, bytes32[] dataHashes, bytes[] signatures)
+     *          address[] voters, bytes32[] dataHashes, bytes evidence, uint256 deadline, bytes[] signatures)
      *      Each voter must have signed: personal_sign(keccak256(abi.encode(VOTE_TYPEHASH,
-     *        block.chainid, e3Id, accusationId, voter, agrees, dataHash)))
+     *        e3Id, accusationId, voter, dataHash, deadline)))
      *      where accusationId = keccak256(abi.encodePacked(block.chainid, e3Id, operator, proofType))
      *      Verifications performed:
      *        1. Number of votes >= committee threshold M
      *        2. Voters are sorted ascending (prevents duplicates)
      *        3. Each voter is a committee member for this E3
      *        4. Each vote signature recovers to the declared voter
-     *        5. All votes agree the proof is invalid (agrees == true)
+     *        5. All votes carry the same `dataHash` (no equivocation)
+     *        6. `keccak256(evidence) == dataHash`
      * @param e3Id ID of the E3 computation this slash relates to
      * @param operator Address of the ciphernode operator to slash (must be non-zero)
-     * @param proof Attestation evidence: abi.encode(proofType, voters, agrees, dataHashes, signatures)
+     * @param proof Attestation evidence:
+     *              abi.encode(proofType, voters, dataHashes, evidence, deadline, signatures)
      * @return proposalId Sequential ID of the created proposal
      */
     function proposeSlash(

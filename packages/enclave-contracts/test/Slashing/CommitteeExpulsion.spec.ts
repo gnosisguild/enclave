@@ -352,7 +352,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         0,
         31337,
-        ethers.keccak256(evidence1),
+        evidence1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -423,7 +423,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         0,
         31337,
-        ethers.keccak256(ev1),
+        ev1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -443,7 +443,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         7, // C6ThresholdShareDecryption — different proofType
         31337,
-        ethers.keccak256(ev2),
+        ev2,
       );
       await slashingManager.proposeSlash(
         0,
@@ -560,7 +560,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         0,
         31337,
-        ethers.keccak256(evExpel1),
+        evExpel1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -577,7 +577,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         0,
         31337,
-        ethers.keccak256(evExpel2),
+        evExpel2,
       );
       await slashingManager.proposeSlash(
         0,
@@ -710,7 +710,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         0,
         31337,
-        ethers.keccak256(evExpelOp1),
+        evExpelOp1,
       );
       await slashingManager.proposeSlash(
         0,
@@ -727,7 +727,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         await slashingManager.getAddress(),
         0,
         31337,
-        ethers.keccak256(evExpelOp2),
+        evExpelOp2,
       );
       await slashingManager.proposeSlash(
         0,
@@ -755,7 +755,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
             await slashingManager.getAddress(),
             0,
             31337,
-            ethers.keccak256(ethers.toUtf8Bytes("expel-op3")),
+            ethers.hexlify(ethers.toUtf8Bytes("expel-op3")),
           ),
         ),
       ).to.be.revertedWithCustomError(

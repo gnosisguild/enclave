@@ -65,13 +65,11 @@ pub struct AccusationQuorumReached {
     /// Raw `abi.encode(proof.data, public_signals)` — preimage of every voter's
     /// `data_hash`.
     ///
-    /// **Off-chain audit metadata only.** The current Solidity
-    /// `SlashingManager.proposeSlash` no longer recomputes
-    /// `keccak256(evidence)` on chain (it equates voter `dataHash`es directly
-    /// for equivocation detection). The preimage is kept here so off-chain
-    /// observers can independently verify what every voter claimed to see
-    /// without re-fetching the proof from peers. Empty when this node didn't
-    /// have the raw bytes locally (e.g. consistency-violation path).
+    /// Consumed by Lane A slash submission: on-chain verifier checks
+    /// `keccak256(evidence) == sharedDataHash`.
+    /// Empty when this node didn't have raw bytes locally (e.g.
+    /// consistency-violation path), in which case submitter should skip
+    /// submission because on-chain binding cannot be proven.
     #[serde(default)]
     pub evidence: Bytes,
 }

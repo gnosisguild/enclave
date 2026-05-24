@@ -44,7 +44,7 @@ use e3_zk_prover::{
 use libp2p::PeerId;
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[derive(Clone, Debug)]
 enum EventSystemType {
@@ -685,19 +685,36 @@ impl CiphernodeBuilder {
             ))
         }
 
+        // Clock-skew allowance for peer accusation deadlines.
+        let accusation_deadline_skew_secs = match std::env::var("ACCUSATION_DEADLINE_SKEW_SECS") {
+            Ok(raw) => match raw.parse::<u64>() {
+                Ok(v) => v,
+                Err(err) => {
+                    warn!(
+                        value = %raw,
+                        error = %err,
+                        "invalid ACCUSATION_DEADLINE_SKEW_SECS; falling back to default"
+                    );
+                    30
+                }
+            },
+            Err(_) => 30,
+        };
+
         // AccusationManager extension — per-E3 fault attribution quorum
         {
             let signer = provider_cache.ensure_signer().await?;
             let slashing_manager_addr = self.resolve_slashing_manager()?;
             info!(
                 chains = accusation_vote_validity_by_chain.len(),
-                "Setting up AccusationManagerExtension"
+                accusation_deadline_skew_secs, "Setting up AccusationManagerExtension"
             );
             e3_builder = e3_builder.with(AccusationManagerExtension::create(
                 &bus,
                 signer,
                 slashing_manager_addr,
                 accusation_vote_validity_by_chain,
+                accusation_deadline_skew_secs,
             ));
         }
 

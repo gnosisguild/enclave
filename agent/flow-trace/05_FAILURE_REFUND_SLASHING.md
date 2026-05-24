@@ -331,13 +331,20 @@ ProofFailureAccusation arrives via P2P from another committee member
 │
 ├─ 1. Verify accuser is a committee member
 │
-├─ 2. Verify accuser's ECDSA signature on accusation digest
+├─ 2. Validate accusation deadline against local policy:
+│     - reject if deadline <= now (expired)
+│     - reject if deadline > now + accusationVoteValidity + skew
+│     - reject all peer accusations when accusationVoteValidity == 0
+│     - `skew` defaults to 30s and is configurable via
+│       `ACCUSATION_DEADLINE_SKEW_SECS` on the node process
 │
-├─ 3. Compute accusation_id:
+├─ 3. Verify accuser's ECDSA signature on accusation digest
+│
+├─ 4. Compute accusation_id:
 │     keccak256(abi.encodePacked(chainId, e3Id, accused, proofType))
 │     → Deterministic: all nodes compute same ID for same accusation
 │
-├─ 4. Determine own vote based on local verification cache:
+├─ 5. Determine own vote based on local verification cache:
 │     │
 │     ├─ Case A: We already FAILED verification for (accused, proof_type):
 │     │   → Vote agrees = true
@@ -351,7 +358,7 @@ ProofFailureAccusation arrives via P2P from another committee member
 │         │   → Vote after re-verification completes
 │         └─ For other proofs: vote agrees = false (no local evidence)
 │
-├─ 5. Create and SIGN vote:
+├─ 6. Create and SIGN vote:
 │     AccusationVote {
 │       e3_id, accusation_id, voter: my_address,
 │       agrees: <determined above>, data_hash,
@@ -359,7 +366,7 @@ ProofFailureAccusation arrives via P2P from another committee member
 │     }
 │     → Broadcast via P2P gossip
 │
-└─ 6. Check quorum immediately
+└─ 7. Check quorum immediately
 ```
 
 #### Step 3: Vote Digest & Accusation ID (Must Match Solidity)

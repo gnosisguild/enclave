@@ -196,7 +196,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
 
 /// Encode `AccusationQuorumReached` into the attestation evidence format expected
 /// by both `SlashingManager.proposeSlash()` and `SlashingManager.proposeSlashByDkgParty()`:
-/// `abi.encode(uint256 proofType, address[] voters, bytes32[] dataHashes, uint256 deadline, bytes[] signatures)`
+/// `abi.encode(uint256 proofType, address[] voters, bytes32[] dataHashes, bytes evidence, uint256 deadline, bytes[] signatures)`
 ///
 /// Voters are sorted ascending by address to satisfy the contract's duplicate-prevention
 /// check. All `votes_for` share the same `deadline` (the accuser stamps one value at
@@ -205,7 +205,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
 /// if `votes_for` is empty — the on-chain submitter must skip the submission in that
 /// case rather than send malformed calldata.
 pub fn encode_attestation_evidence(data: &AccusationQuorumReached) -> Option<Vec<u8>> {
-    if data.votes_for.is_empty() {
+    if data.votes_for.is_empty() || data.evidence.is_empty() {
         return None;
     }
 
@@ -216,6 +216,7 @@ pub fn encode_attestation_evidence(data: &AccusationQuorumReached) -> Option<Vec
     let proof_type = U256::from(data.proof_type as u8);
     let voters: Vec<Address> = votes.iter().map(|v| v.voter).collect();
     let data_hashes: Vec<[u8; 32]> = votes.iter().map(|v| v.data_hash).collect();
+    let evidence = Bytes::from(data.evidence.clone());
     // All voters signed the same deadline (enforced off-chain by AccusationManager);
     // pick any one — the first vote suffices.
     let deadline = U256::from(votes[0].deadline);
@@ -224,7 +225,17 @@ pub fn encode_attestation_evidence(data: &AccusationQuorumReached) -> Option<Vec
         .map(|v| Bytes::from(v.signature.extract_bytes()))
         .collect();
 
-    Some((proof_type, voters, data_hashes, deadline, signatures).abi_encode_params())
+    Some(
+        (
+            proof_type,
+            voters,
+            data_hashes,
+            evidence,
+            deadline,
+            signatures,
+        )
+            .abi_encode_params(),
+    )
 }
 
 async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
@@ -248,11 +259,11 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
                 e3_id = %data.e3_id,
                 accused = %operator,
                 outcome = %data.outcome,
-                "Refusing to submit proposeSlash: AccusationQuorumReached carries no \
-                 agreeing votes — upstream quorum invariant violated, dropping submission"
+                "Refusing to submit proposeSlash: AccusationQuorumReached has empty \
+                 votes_for or empty evidence preimage — submission dropped"
             );
             return Err(anyhow::anyhow!(
-                "AccusationQuorumReached has empty votes_for; refused proposeSlash submission \
+                "AccusationQuorumReached has empty votes_for or evidence; refused proposeSlash submission \
                  (e3_id={}, accused={})",
                 data.e3_id,
                 operator

@@ -522,7 +522,7 @@ differs the proof is rejected — and the plaintext is decoded from the proof's 
 When fault attribution leads to a slash, the off-chain accusation quorum produces a payload that
 [`SlashingManager.proposeSlash`](https://github.com/gnosisguild/enclave/blob/main/packages/enclave-contracts/contracts/slashing/SlashingManager.sol)
 decodes as
-`(uint256 proofType, address[] voters, bytes32[] dataHashes, uint256 deadline, bytes[] signatures)`.
+`(uint256 proofType, address[] voters, bytes32[] dataHashes, bytes evidence, uint256 deadline, bytes[] signatures)`.
 `_verifyAttestationEvidence` enforces:
 
 - ≥ `M` voters, sorted ascending, accused excluded, each producing a canonical EIP-712 typed-data
@@ -534,6 +534,7 @@ decodes as
   `VOTE_DOMAIN_VERSION` / `VOTE_TYPEHASH_STR`.
 - All `dataHashes[i]` equal a common `dataHash` (voters must agree on the same evidence, not just
   "something bad").
+- `keccak256(evidence) == dataHash` (explicit preimage binding on chain).
 - `block.timestamp <= deadline`. Every voter signs the same `deadline` value — the accuser stamps it
   at proposal time as `now + accusationVoteValidity` (a registry-wide governance knob, see the
   subsection below), and `AccusationManager::on_vote_received` rejects peers' votes whose deadline
