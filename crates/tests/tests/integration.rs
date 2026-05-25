@@ -1211,19 +1211,18 @@ async fn test_trbfv_actor() -> Result<()> {
             println!("Building collector {}!", addr);
             {
                 let mut b = CiphernodeBuilder::new(node_rng, cipher.clone())
-                    .testmode_with_history()
+                    .with_history_collector()
                     .with_shared_taskpool(&task_pool)
                     .with_multithread_concurrent_jobs(concurrent_jobs)
                     .with_shared_multithread_report(&multithread_report)
                     .with_trbfv()
                     .with_zkproof(zk_backend.clone())
-                    .testmode_with_signer(PrivateKeySigner::random())
+                    .with_signer(PrivateKeySigner::random())
                     .with_pubkey_aggregation()
                     .with_sortition_score()
                     .with_threshold_plaintext_aggregation()
-                    .testmode_with_forked_bus(bus.event_bus())
-                    .testmode_ignore_address_check()
-                    .testmode_with_slashing_manager(slashing_manager_addr)
+                    .with_forked_bus(bus.event_bus())
+                    .with_slashing_manager(slashing_manager_addr)
                     .with_logging();
                 b.build().await
             }
@@ -1234,19 +1233,18 @@ async fn test_trbfv_actor() -> Result<()> {
             println!("Building normal {}", &addr);
             {
                 let mut b = CiphernodeBuilder::new(node_rng, cipher.clone())
-                    .testmode_with_history()
+                    .with_history_collector()
                     .with_shared_taskpool(&task_pool)
                     .with_multithread_concurrent_jobs(concurrent_jobs)
                     .with_shared_multithread_report(&multithread_report)
                     .with_trbfv()
                     .with_zkproof(zk_backend.clone())
-                    .testmode_with_signer(PrivateKeySigner::random())
+                    .with_signer(PrivateKeySigner::random())
                     .with_pubkey_aggregation()
                     .with_sortition_score()
                     .with_threshold_plaintext_aggregation()
-                    .testmode_with_forked_bus(bus.event_bus())
-                    .testmode_ignore_address_check()
-                    .testmode_with_slashing_manager(slashing_manager_addr)
+                    .with_forked_bus(bus.event_bus())
+                    .with_slashing_manager(slashing_manager_addr)
                     .with_logging();
                 b.build().await
             }
@@ -2093,10 +2091,10 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
             .with_trbfv()
             .with_zkproof(zk_backend)
-            .testmode_with_signer(PrivateKeySigner::random())
-            .testmode_with_forked_bus(bus.event_bus())
-            .testmode_with_history()
-            .testmode_with_errors()
+            .with_signer(PrivateKeySigner::random())
+            .with_forked_bus(bus.event_bus())
+            .with_history_collector()
+            .with_error_collector()
             .with_pubkey_aggregation()
             .with_threshold_plaintext_aggregation()
             .with_sortition_score();
@@ -2314,10 +2312,10 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
             .with_trbfv()
             .with_zkproof(zk_backend)
-            .testmode_with_signer(PrivateKeySigner::random())
-            .testmode_with_forked_bus(bus.event_bus())
-            .testmode_with_history()
-            .testmode_with_errors()
+            .with_signer(PrivateKeySigner::random())
+            .with_forked_bus(bus.event_bus())
+            .with_history_collector()
+            .with_error_collector()
             .with_pubkey_aggregation()
             .with_threshold_plaintext_aggregation()
             .with_sortition_score();

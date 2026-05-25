@@ -46,7 +46,7 @@ pub fn committee_addresses_in_party_order(
 mod tests {
     use super::*;
     use alloy::primitives::address;
-    use e3_utils::committee_hash::hash_committee_addresses;
+    use e3_committee_hash::hash_committee_addresses;
 
     #[test]
     fn party_order_differs_from_address_sorted_set() {

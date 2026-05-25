@@ -422,7 +422,7 @@ pub fn prove_dkg_aggregation(
         .collect();
 
     let (committee_hash_hi, committee_hash_lo) =
-        e3_utils::committee_hash::committee_hash_field_hex(input.committee_addresses);
+        e3_committee_hash::committee_hash_field_hex(input.committee_addresses);
 
     let committee_members: Vec<String> = input
         .committee_addresses
@@ -521,7 +521,7 @@ pub fn prove_decryption_aggregation_jobs(
     }
 
     let (committee_hash_hi, committee_hash_lo) =
-        e3_utils::committee_hash::committee_hash_field_hex(committee_addresses);
+        e3_committee_hash::committee_hash_field_hex(committee_addresses);
 
     let committee_members: Vec<String> = committee_addresses
         .iter()

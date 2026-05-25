@@ -1035,7 +1035,7 @@ impl PublicKeyAggregator {
 
         let dkg_attestation_bundle = match dkg_aggregated_proof.as_ref() {
             Some(_) => {
-                let bundle = e3_evm::encode_dkg_attestation_bundle(
+                let bundle = e3_zk_prover::encode_dkg_attestation_bundle(
                     &honest_party_ids,
                     &party_nodes,
                     &dkg_fold_attestations,

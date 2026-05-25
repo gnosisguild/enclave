@@ -4,4 +4,4 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub use e3_utils::committee_hash::*;
+pub use e3_committee_hash::*;

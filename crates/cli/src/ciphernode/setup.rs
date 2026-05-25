@@ -4,12 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::config_setup as setup;
 use alloy::primitives::Address;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input};
 use e3_config::AppConfig;
 use e3_console::{log, Console};
-use e3_entrypoint::config::setup;
 use e3_utils::{colorize, Color};
 use std::path::PathBuf;
 use tracing::instrument;

@@ -44,9 +44,10 @@ pub mod proof_verification;
 pub mod share_verification;
 pub mod zk_actor;
 
-pub use accusation_manager::AccusationManager;
-pub use accusation_manager_ext::AccusationManagerExtension;
-pub use commitment_consistency_checker_ext::CommitmentConsistencyCheckerExtension;
+// Re-export accusation types from their canonical home in e3-slashing.
+pub use e3_slashing::AccusationManager;
+pub use e3_slashing::AccusationManagerExtension;
+pub use e3_slashing::CommitmentConsistencyCheckerExtension;
 pub use node_proof_aggregator::NodeProofAggregator;
 pub use proof_request::ProofRequestActor;
 pub use proof_verification::{

@@ -3051,6 +3051,7 @@ dependencies = [
  "async-trait",
  "bincode 1.3.3",
  "e3-bfv-client",
+ "e3-committee-hash",
  "e3-config",
  "e3-data",
  "e3-events",
@@ -3108,6 +3109,7 @@ dependencies = [
  "e3-multithread",
  "e3-net",
  "e3-request",
+ "e3-slashing",
  "e3-sortition",
  "e3-sync",
  "e3-test-helpers",
@@ -3156,6 +3158,7 @@ dependencies = [
  "opentelemetry-stdout",
  "opentelemetry_sdk",
  "petname",
+ "phf",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -3166,6 +3169,14 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "zeroize",
+]
+
+[[package]]
+name = "e3-committee-hash"
+version = "0.1.15"
+dependencies = [
+ "alloy",
+ "hex",
 ]
 
 [[package]]
@@ -3687,6 +3698,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-slashing"
+version = "0.1.15"
+dependencies = [
+ "actix",
+ "alloy",
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "e3-events",
+ "e3-fhe-params",
+ "e3-request",
+ "e3-utils",
+ "hex",
+ "serde",
+ "sha2",
+ "tracing",
+]
+
+[[package]]
 name = "e3-sortition"
 version = "0.1.15"
 dependencies = [
@@ -3856,6 +3886,7 @@ dependencies = [
  "alloy",
  "anyhow",
  "derivative",
+ "e3-committee-hash",
  "e3-utils-derive",
  "hex",
  "rand 0.8.5",
@@ -3935,6 +3966,7 @@ dependencies = [
  "bn254_blackbox_solver",
  "chrono",
  "directories 5.0.1",
+ "e3-committee-hash",
  "e3-config",
  "e3-data",
  "e3-events",
@@ -3942,6 +3974,7 @@ dependencies = [
  "e3-fhe-params",
  "e3-polynomial",
  "e3-request",
+ "e3-slashing",
  "e3-test-helpers",
  "e3-utils",
  "e3-zk-helpers",
