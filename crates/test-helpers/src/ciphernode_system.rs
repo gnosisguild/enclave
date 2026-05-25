@@ -8,7 +8,7 @@ use crate::simulate_libp2p_net;
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
-use e3_ciphernode_builder::CiphernodeHandle;
+use e3_ciphernode_builder::{CiphernodeHandle, NetInterfaceKind};
 use e3_events::Event;
 use e3_events::{EnclaveEvent, GetEvents, ResetHistory, TakeEvents};
 use std::time::Instant;
@@ -332,7 +332,7 @@ mod tests {
             history: Some(history),
             errors: Some(errors),
             peer_id: PeerId::random(),
-            channel_bridge: None,
+            net_interface: NetInterfaceKind::Libp2p,
         })
     }
 
