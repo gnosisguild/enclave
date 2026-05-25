@@ -84,6 +84,7 @@ fn generate_contract_deployments() -> std::io::Result<()> {
     let file = File::open(&deployments_path)?;
     let json: Value = from_reader(file)?;
 
+    let mut contract_count = 0u32;
     if let Some(networks) = json.as_object() {
         if let Some(sepolia_data) = networks.get("sepolia") {
             if let Some(contracts) = sepolia_data.as_object() {
@@ -96,10 +97,23 @@ fn generate_contract_deployments() -> std::io::Result<()> {
                             "    \"{}\" => ContractInfo {{\n        address: \"{}\",\n        deploy_block: {},\n    }},\n",
                             contract_name, address, deploy_block
                         ));
+                        contract_count += 1;
+                    } else {
+                        panic!(
+                            "Contract '{}' in deployed_contracts.json is missing 'address' or 'blockNumber'",
+                            contract_name
+                        );
                     }
                 }
             }
         }
+    }
+
+    if contract_count == 0 {
+        panic!(
+            "No contracts found in deployed_contracts.json — \
+             expected a 'sepolia' key with contract entries containing 'address' and 'blockNumber'"
+        );
     }
 
     contract_info.push_str("};\n");

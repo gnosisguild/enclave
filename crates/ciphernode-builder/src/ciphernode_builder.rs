@@ -229,8 +229,14 @@ impl CiphernodeBuilder {
             return Ok(addr);
         }
         self.chains
-            .first()
-            .and_then(|c| c.contracts.slashing_manager.as_ref())
+            .iter()
+            .filter(|c| c.enabled.unwrap_or(true))
+            .find_map(|c| c.contracts.slashing_manager.as_ref())
+            .or_else(|| {
+                self.chains
+                    .first()
+                    .and_then(|c| c.contracts.slashing_manager.as_ref())
+            })
             .map(|c| c.address())
             .transpose()?
             .ok_or_else(|| {

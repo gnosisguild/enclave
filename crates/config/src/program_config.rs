@@ -29,10 +29,14 @@ fn default_true() -> bool {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Risc0Config {
-    #[serde(default)]
+    #[serde(default = "default_risc0_dev_mode")]
     pub risc0_dev_mode: u8,
     #[serde(default)]
     pub boundless: Option<BoundlessConfig>,
+}
+
+fn default_risc0_dev_mode() -> u8 {
+    1
 }
 
 impl Default for Risc0Config {
