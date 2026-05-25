@@ -165,9 +165,10 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Fork all events from the given source bus. Events are broadcast on both the
-    /// source bus and a local bus created for this instance. Useful for tests and
-    /// monitoring subscribers that need an isolated event stream.
+    /// Fork events from the given source bus to a local bus. Events from the
+    /// source are forwarded to the local bus created for this instance.
+    /// Useful for tests and monitoring subscribers that need an isolated
+    /// event stream that mirrors the source.
     pub fn with_forked_bus(mut self, bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
         self.source_bus = Some(BusMode::Forked(bus.clone()));
         self

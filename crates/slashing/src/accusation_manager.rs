@@ -31,7 +31,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use actix::{Actor, Addr, AsyncContext, Context, Handler, SpawnHandle};
-use alloy::primitives::{keccak256, Address, Bytes, U256};
+use alloy::primitives::{keccak256, Address, Bytes, FixedBytes, U256};
 use alloy::signers::local::PrivateKeySigner;
 use alloy::signers::SignerSync;
 use alloy::sol_types::SolValue;
@@ -346,7 +346,7 @@ impl AccusationManager {
     /// This ensures that the same (e3_id, accused, proof_type) produces the
     /// same ID regardless of who the accuser is, enabling deduplication.
     ///
-    /// `keccak256(abi.encodePacked(chainId, e3Id, accused, proofType))`
+    /// `keccak256(abi.encodePacked(chainId, e3Id, accused, proofType, dataHash))`
     fn accusation_id(accusation: &ProofFailureAccusation) -> [u8; 32] {
         let e3_id_u256: U256 = accusation
             .e3_id
@@ -358,6 +358,7 @@ impl AccusationManager {
             e3_id_u256,
             accusation.accused,
             U256::from(accusation.proof_type as u8),
+            FixedBytes::from(accusation.data_hash),
         )
             .abi_encode_packed();
         keccak256(&msg).into()
@@ -726,6 +727,7 @@ impl AccusationManager {
         // Broadcast accusation via gossip
         if let Err(err) = self.bus.publish(accusation.clone(), ec.clone()) {
             error!("Failed to broadcast ProofFailureAccusation: {err}");
+            self.accused_proofs.remove(&key);
             return;
         }
 
@@ -742,6 +744,7 @@ impl AccusationManager {
             Ok(sig) => own_vote.signature = ArcBytes::from_bytes(&sig),
             Err(err) => {
                 error!("Failed to sign own AccusationVote: {err}");
+                self.accused_proofs.remove(&key);
                 return;
             }
         }
@@ -899,6 +902,26 @@ impl AccusationManager {
 
             if !forwarded_valid {
                 // Can't trust the forwarded proof — abstain
+                return;
+            }
+
+            // Bind the forwarded proof to the accusation: proof_type and
+            // data_hash must match, otherwise a malicious accuser could attach
+            // a different valid proof from the same party.
+            if forwarded.payload.proof_type != accusation.proof_type {
+                warn!(
+                    "Forwarded C3a/C3b proof_type {:?} != accusation proof_type {:?} — cannot verify",
+                    forwarded.payload.proof_type, accusation.proof_type
+                );
+                return;
+            }
+            let computed_hash = Self::compute_payload_hash(forwarded);
+            if computed_hash != accusation.data_hash {
+                warn!(
+                    "Forwarded C3a/C3b data_hash mismatch (len {} vs {}) — cannot verify",
+                    computed_hash.len(),
+                    accusation.data_hash.len()
+                );
                 return;
             }
 

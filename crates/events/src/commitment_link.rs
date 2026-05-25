@@ -49,8 +49,11 @@ pub trait CommitmentLink: Send + Sync {
 
     /// Return `true` when `source_values` are consistent with
     /// `target_public_signals`, without party context.
+    ///
+    /// Default returns `false`. Implementations should override either this
+    /// method or [`check_consistency`].
     fn check_signals(&self, _source_values: &[FieldValue], _target_public_signals: &[u8]) -> bool {
-        unimplemented!("override check_signals or check_consistency")
+        false
     }
 
     /// Return `true` when `source_values` are consistent with
