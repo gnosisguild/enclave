@@ -23,6 +23,7 @@ e3-fhe-params.workspace = true
 e3-keyshare.workspace = true
 e3-multithread.workspace = true
 e3-net.workspace = true
+e3-slashing.workspace = true
 e3-zk-prover.workspace = true
 e3-request.workspace = true
 e3-sortition.workspace = true

@@ -6,7 +6,6 @@
 
 mod bonding_registry_sol;
 mod ciphernode_registry_sol;
-mod dkg_attestation_bundle;
 mod enclave_sol_reader;
 mod enclave_sol_writer;
 pub mod error_decoder;
@@ -29,7 +28,6 @@ pub use ciphernode_registry_sol::{
     fetch_accusation_vote_validity, fetch_dkg_fold_attestation_verifier, CiphernodeRegistrySol,
     CiphernodeRegistrySolReader, CiphernodeRegistrySolWriter,
 };
-pub use dkg_attestation_bundle::encode_dkg_attestation_bundle;
 pub use enclave_sol_reader::EnclaveSolReader;
 pub use enclave_sol_writer::EnclaveSolWriter;
 pub use events::*;

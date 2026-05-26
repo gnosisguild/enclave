@@ -42,6 +42,7 @@ opentelemetry-otlp = { workspace = true }
 opentelemetry-stdout = { workspace = true }
 opentelemetry_sdk = { workspace = true }
 petname = { workspace = true }
+phf = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -52,3 +53,6 @@ tracing-opentelemetry = { workspace = true }
 tracing-subscriber = { workspace = true } 
 url = { workspace = true }
 zeroize = { workspace = true }
+
+[build-dependencies]
+serde_json = { workspace = true }

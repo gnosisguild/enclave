@@ -106,6 +106,11 @@ impl BusHandle<Enabled> {
         EventBus::<EnclaveEvent<Sequenced>>::history(&self.event_bus)
     }
 
+    /// Return a HistoryCollector that is subscribed only to EnclaveError events.
+    pub fn errors(&self) -> Addr<HistoryCollector<EnclaveEvent<Sequenced>>> {
+        EventBus::<EnclaveEvent<Sequenced>>::error(&self.event_bus)
+    }
+
     /// Access the sequencer to internally dispatch an event to
     pub fn sequencer(&self) -> &Addr<Sequencer> {
         &self.sequencer

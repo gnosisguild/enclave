@@ -48,6 +48,7 @@ COPY crates/bfv-client/Cargo.toml ./bfv-client/Cargo.toml
 COPY crates/cli/Cargo.toml ./cli/Cargo.toml
 COPY crates/ciphernode-builder/Cargo.toml ./ciphernode-builder/Cargo.toml
 COPY crates/compute-provider/Cargo.toml ./compute-provider/Cargo.toml
+COPY crates/committee-hash/Cargo.toml ./committee-hash/Cargo.toml
 COPY crates/config/Cargo.toml ./config/Cargo.toml
 COPY crates/console/Cargo.toml ./console/Cargo.toml
 COPY crates/crypto/Cargo.toml ./crypto/Cargo.toml
@@ -75,6 +76,7 @@ COPY crates/program-server/Cargo.toml ./program-server/Cargo.toml
 COPY crates/request/Cargo.toml ./request/Cargo.toml
 COPY crates/safe/Cargo.toml ./safe/Cargo.toml
 COPY crates/sdk/Cargo.toml ./sdk/Cargo.toml
+COPY crates/slashing/Cargo.toml ./slashing/Cargo.toml
 COPY crates/sortition/Cargo.toml ./sortition/Cargo.toml
 COPY crates/dashboard/Cargo.toml ./dashboard/Cargo.toml
 COPY crates/daemon-server/Cargo.toml ./daemon-server/Cargo.toml

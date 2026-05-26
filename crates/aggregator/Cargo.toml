@@ -24,6 +24,7 @@ e3-trbfv = { workspace = true }
 fhe-math = { workspace = true }
 num-bigint = { workspace = true }
 e3-bfv-client = { workspace = true }
+e3-committee-hash = { workspace = true }
 e3-request = { workspace = true }
 e3-sortition = {  workspace = true }
 e3-zk-helpers = { workspace = true }

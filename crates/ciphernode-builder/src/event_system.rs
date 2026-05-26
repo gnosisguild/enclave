@@ -16,8 +16,8 @@ use e3_data::{
 use e3_events::hlc_factory::HlcFactory;
 use e3_events::{
     AggregateConfig, BusHandle, Disabled, EnclaveEvent, EventBus, EventBusConfig, EventStore,
-    EventStoreQueryBy, EventStoreRouter, EventSubscriber, EventType, InsertBatch, SeqAgg,
-    Sequencer, SnapshotBuffer, StoreEventRequested, TsAgg, UpdateDestination,
+    EventStoreQueryBy, EventStoreRouter, EventSubscriber, EventType, InsertBatch, Sequencer,
+    SnapshotBuffer, StoreEventRequested, UpdateDestination,
 };
 use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;

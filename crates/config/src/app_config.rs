@@ -9,6 +9,7 @@ use crate::load_config::find_in_parent;
 use crate::load_config::resolve_config_path;
 use crate::paths_engine::PathsEngine;
 use crate::paths_engine::DEFAULT_CONFIG_NAME;
+use crate::program_config::{BoundlessConfig, ProgramConfig, Risc0Config};
 use crate::yaml::load_yaml_with_env;
 use alloy_primitives::Address;
 use anyhow::bail;
@@ -84,66 +85,6 @@ impl Default for NodeDefinition {
             multithread_reserve_threads: default_multithread_reserve_threads(),
             multithread_concurrent_jobs: None,
         }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct BoundlessConfig {
-    /// RPC URL for blockchain (e.g., Sepolia)
-    pub rpc_url: String,
-    /// Private key for submitting requests
-    pub private_key: String,
-    /// Pinata JWT for uploading programs/inputs
-    #[serde(default)]
-    pub pinata_jwt: Option<String>,
-    /// Pre-uploaded program URL (if program is already on IPFS)
-    #[serde(default)]
-    pub program_url: Option<String>,
-    /// Submit requests onchain (true) or offchain (false)
-    #[serde(default = "default_true")]
-    pub onchain: bool,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct Risc0Config {
-    /// Dev mode: 0 = production, 1 = dev mode (fake proofs)
-    #[serde(default)]
-    pub risc0_dev_mode: u8,
-    /// Boundless configuration
-    #[serde(default)]
-    pub boundless: Option<BoundlessConfig>,
-}
-
-impl Default for Risc0Config {
-    fn default() -> Self {
-        Risc0Config {
-            risc0_dev_mode: 1, // Default to dev mode for safety
-            boundless: None,
-        }
-    }
-}
-
-/// Configuration for the program runner
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct ProgramConfig {
-    risc0: Option<Risc0Config>,
-    dev: Option<bool>,
-}
-
-impl ProgramConfig {
-    pub fn risc0(&self) -> Option<&Risc0Config> {
-        self.risc0.as_ref()
-    }
-
-    pub fn dev(&self) -> bool {
-        if let Some(dev) = self.dev {
-            return dev;
-        }
-        false
     }
 }
 

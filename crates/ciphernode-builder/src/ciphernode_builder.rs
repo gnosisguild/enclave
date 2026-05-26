@@ -4,10 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{CiphernodeHandle, EventSystem, EvmSystemChainBuilder, ProviderCache, WriteEnabled};
+use crate::{
+    CiphernodeHandle, EventSystem, EvmSystemChainBuilder, NetInterfaceKind, ProviderCache,
+    WriteEnabled,
+};
 use actix::{Actor, Addr};
 use alloy::primitives::Address;
-use alloy::signers::local::PrivateKeySigner;
 use anyhow::Result;
 use derivative::Derivative;
 use e3_aggregator::ext::{PublicKeyAggregatorExtension, ThresholdPlaintextAggregatorExtension};
@@ -31,6 +33,7 @@ use e3_net::{
     NetRepositoryFactory,
 };
 use e3_request::E3Router;
+use e3_slashing::{AccusationManagerExtension, CommitmentConsistencyCheckerExtension};
 use e3_sortition::{
     CiphernodeSelector, CiphernodeSelectorFactory, EmitPersistedAggregatorState,
     FinalizedCommitteesRepositoryFactory, NodeStateRepositoryFactory, Sortition, SortitionBackend,
@@ -38,9 +41,7 @@ use e3_sortition::{
 };
 use e3_sync::sync;
 use e3_utils::SharedRng;
-use e3_zk_prover::{
-    setup_zk_actors, AccusationManagerExtension, CommitmentConsistencyCheckerExtension, ZkBackend,
-};
+use e3_zk_prover::{setup_zk_actors, ZkBackend};
 use libp2p::PeerId;
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
@@ -53,9 +54,10 @@ enum EventSystemType {
 }
 
 /// Build a ciphernode configuration.
-// NOTE: We could use a typestate pattern here to separate production and testing methods. I hummed
-// and hawed about it for quite a while and in the end felt it was too complex while we dont know
-// the exact configurations we will use yet
+///
+/// Follows a builder pattern. Production nodes are assembled via
+/// [`entrypoint::start`](e3_entrypoint::start); tests and benchmarks use the same
+/// builder with in-memory stores and forked buses.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct CiphernodeBuilder {
@@ -75,19 +77,16 @@ pub struct CiphernodeBuilder {
     rng: SharedRng,
     sortition_backend: SortitionBackend,
     source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
-    testmode_errors: bool,
-    testmode_history: bool,
     task_pool: Option<TaskPool>,
     threads: Option<usize>,
-    testmode_signer: Option<PrivateKeySigner>,
+    signer: Option<alloy::signers::local::PrivateKeySigner>,
     threshold_plaintext_agg: bool,
     zk_backend: Option<ZkBackend>,
-    /// Test/benchmark: EIP-712 verifying contract for accusation votes (no RPC required).
-    slashing_manager: Option<Address>,
     net_config: Option<NetConfig>,
-    ignore_address_check: bool,
     global_shared_store: bool,
     global_shared_eventstore: bool,
+    collect_history: bool,
+    collect_errors: bool,
 }
 
 // Simple Net Configuration
@@ -125,10 +124,6 @@ pub enum KeyshareKind {
 
 impl CiphernodeBuilder {
     /// Create a new ciphernode builder.
-    ///
-    /// - name - Unique name for the ciphernode
-    /// - rng - Arc Mutex wrapped random number generator
-    /// - cipher - Cipher for encryption and decryption of sensitive data
     pub fn new(rng: SharedRng, cipher: Arc<Cipher>) -> Self {
         Self {
             address: None,
@@ -146,18 +141,16 @@ impl CiphernodeBuilder {
             rng,
             sortition_backend: SortitionBackend::score(),
             source_bus: None,
-            testmode_errors: false,
-            testmode_history: false,
             task_pool: None,
             threads: None,
-            testmode_signer: None,
+            signer: None,
             threshold_plaintext_agg: false,
-            slashing_manager: None,
             net_config: None,
             zk_backend: None,
-            ignore_address_check: false,
             global_shared_store: false,
             global_shared_eventstore: false,
+            collect_history: false,
+            collect_errors: false,
         }
     }
 
@@ -167,9 +160,11 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Fork all events from the given source bus. Events will be both broadcast on the source bus
-    /// and a local bus created for this instance
-    pub fn testmode_with_forked_bus(mut self, bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
+    /// Fork events from the given source bus to a local bus. Events from the
+    /// source are forwarded to the local bus created for this instance.
+    /// Useful for tests and monitoring subscribers that need an isolated
+    /// event stream that mirrors the source.
+    pub fn with_forked_bus(mut self, bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
         self.source_bus = Some(BusMode::Forked(bus.clone()));
         self
     }
@@ -186,6 +181,20 @@ impl CiphernodeBuilder {
         self
     }
 
+    /// Subscribe a [`HistoryCollector`] to the event bus for inspecting all events.
+    /// Useful for tests, benchmarks, and debugging.
+    pub fn with_history_collector(mut self) -> Self {
+        self.collect_history = true;
+        self
+    }
+
+    /// Subscribe a [`HistoryCollector`] to only `EnclaveError` events.
+    /// Useful for tests and debugging.
+    pub fn with_error_collector(mut self) -> Self {
+        self.collect_errors = true;
+        self
+    }
+
     /// Add persistence information for storing events and data. Without persistence information
     /// the node will run in memory by default.
     pub fn with_persistence(mut self, log_path: &PathBuf, kv_path: &PathBuf) -> Self {
@@ -196,20 +205,6 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Attach a history collecting test module.
-    /// This is conspicuously named so we understand that this should only be used when testing
-    pub fn testmode_with_history(mut self) -> Self {
-        self.testmode_history = true;
-        self
-    }
-
-    /// Attach an error collecting test module
-    /// This is conspicuously named so we understand that this should only be used when testing
-    pub fn testmode_with_errors(mut self) -> Self {
-        self.testmode_errors = true;
-        self
-    }
-
     /// Use the node configuration on these specific chains. This will overwrite any previously
     /// given chains.
     pub fn with_chains(mut self, chains: &[ChainConfig]) -> Self {
@@ -217,20 +212,12 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Benchmark/test: set slashing manager address (EIP-712 verifyingContract for
-    /// accusation votes) without configuring EVM chains (no RPC).
-    pub fn testmode_with_slashing_manager(mut self, slashing_manager: Address) -> Self {
-        self.slashing_manager = Some(slashing_manager);
-        self
-    }
-
+    /// Resolve the slashing manager address from ChainConfig. All chains are
+    /// checked (enabled or not) since this is just config, not RPC-dependent.
     fn resolve_slashing_manager(&self) -> Result<Address> {
-        if let Some(addr) = self.slashing_manager {
-            return Ok(addr);
-        }
         self.chains
-            .first()
-            .and_then(|c| c.contracts.slashing_manager.as_ref())
+            .iter()
+            .find_map(|c| c.contracts.slashing_manager.as_ref())
             .map(|c| c.address())
             .transpose()?
             .ok_or_else(|| {
@@ -242,7 +229,7 @@ impl CiphernodeBuilder {
     }
 
     /// Fetch `CiphernodeRegistry.dkgFoldAttestationVerifier()` for one chain (EIP-712 verifying contract).
-    async fn fetch_dkg_fold_attestation_verifier_from_registry(
+    async fn fetch_fold_verifier(
         provider_cache: &mut ProviderCache<WriteEnabled>,
         chain: &ChainConfig,
     ) -> Result<Option<Address>> {
@@ -392,9 +379,9 @@ impl CiphernodeBuilder {
     }
 
     /// Pre-populate the signer cache with the given signer.
-    /// This is conspicuously named so we understand that this should only be used when testing.
-    pub fn testmode_with_signer(mut self, signer: PrivateKeySigner) -> Self {
-        self.testmode_signer = Some(signer);
+    /// The signer is used for EVM transactions and EIP-712 signatures.
+    pub fn with_signer(mut self, signer: alloy::signers::local::PrivateKeySigner) -> Self {
+        self.signer = Some(signer);
         self
     }
 
@@ -452,11 +439,6 @@ impl CiphernodeBuilder {
         self
     }
 
-    pub fn testmode_ignore_address_check(mut self) -> Self {
-        self.ignore_address_check = true;
-        self
-    }
-
     fn create_local_bus() -> Addr<EventBus<EnclaveEvent>> {
         EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start()
     }
@@ -467,7 +449,7 @@ impl CiphernodeBuilder {
         provider_cache: &mut ProviderCache,
     ) -> Result<AggregateConfig> {
         let mut chain_providers = Vec::new();
-        for chain in &self.chains {
+        for chain in self.chains.iter().filter(|c| c.enabled.unwrap_or(true)) {
             let provider = provider_cache.ensure_read_provider(chain).await?;
             chain_providers.push((chain.clone(), provider.chain_id()));
         }
@@ -477,275 +459,72 @@ impl CiphernodeBuilder {
     }
 
     pub async fn build(mut self) -> anyhow::Result<CiphernodeHandle> {
-        // Local bus for ciphernode events can either be forked from a bus or it can be directly
-        // attached to a source bus
-        let local_bus = match self.source_bus {
-            // Forked bus - pipe all events from the source to dest
-            Some(BusMode::Forked(ref bus)) => {
-                let local_bus = Self::create_local_bus();
-                info!("Setting up Event pipe");
-                EventBus::pipe(&bus, &local_bus);
-                local_bus
-            }
-            // Source bus - simply attach to the source bus
-            Some(BusMode::Source(ref bus)) => bus.clone(),
-            // Nothing specified
-            None => Self::create_local_bus(),
-        };
+        let local_bus = self.resolve_bus();
 
-        // History collector for taking historical events for analysis and testing
-        let history = if self.testmode_history {
+        // Optional event collectors for debugging / testing.
+        let history = if self.collect_history {
             info!("Setting up history collector");
             Some(EventBus::<EnclaveEvent>::history(&local_bus))
         } else {
             None
         };
-
-        // Error collector for taking historical events for analysis and testing
-        let errors = if self.testmode_errors {
+        let errors = if self.collect_errors {
             info!("Setting up error collector");
             Some(EventBus::<EnclaveEvent>::error(&local_bus))
         } else {
             None
         };
 
-        // Create provider cache early to use for chain validation
-        let mut provider_cache = if let Some(signer) = self.testmode_signer.take() {
+        // Create provider cache and aggregate config
+        let mut provider_cache = if let Some(signer) = self.signer.take() {
             ProviderCache::new().with_signer(signer)
         } else {
             ProviderCache::new()
         };
         let aggregate_config = self.create_aggregate_config(&mut provider_cache).await?;
 
-        // Get an event system instance.
-        let event_system =
-            if let EventSystemType::Persisted { kv_path, log_path } = self.event_system.clone() {
-                EventSystem::persisted(log_path, kv_path)
-                    .with_event_bus(local_bus)
-                    .with_aggregate_config(aggregate_config.clone())
-                    .with_global_shared_store(self.global_shared_store)
-                    .with_global_shared_eventstore(self.global_shared_eventstore)
-            } else {
-                if let Some(ref store) = self.in_mem_store {
-                    EventSystem::in_mem_from_store(store)
-                        .with_event_bus(local_bus)
-                        .with_aggregate_config(aggregate_config.clone())
-                        .with_global_shared_store(self.global_shared_store)
-                        .with_global_shared_eventstore(self.global_shared_eventstore)
-                } else {
-                    EventSystem::in_mem()
-                        .with_event_bus(local_bus)
-                        .with_aggregate_config(aggregate_config.clone())
-                        .with_global_shared_store(self.global_shared_store)
-                        .with_global_shared_eventstore(self.global_shared_eventstore)
-                }
-            };
+        // Build the event system (store + eventstore)
+        let event_system = self.create_event_system(local_bus, &aggregate_config);
         let store = event_system.store()?;
         let eventstore = event_system.eventstore_reader()?;
-        let cipher = &self.cipher;
         let repositories = Arc::new(store.repositories());
         let mut provider_cache =
-            provider_cache.with_write_support(Arc::clone(cipher), Arc::clone(&repositories));
+            provider_cache.with_write_support(Arc::clone(&self.cipher), Arc::clone(&repositories));
 
-        // We need to supply the Hlc to the bus handle in order to enable it
+        // Resolve node address and enable the bus
         let addr = provider_cache.ensure_signer().await?.address().to_string();
         let bus = event_system.handle()?.enable(&addr);
 
-        // Use the configured sortition backend directly
-        let default_backend = self.sortition_backend.clone();
+        // Setup sortition
+        let (sortition, ciphernode_selector) =
+            self.setup_sortition(&bus, &repositories, &addr).await?;
 
-        let ciphernode_selector =
-            CiphernodeSelector::attach(&bus, repositories.ciphernode_selector(), &addr).await?;
+        // Setup EVM contract event listeners
+        let evm_config = self.setup_evm_system(&mut provider_cache, &bus).await?;
 
-        let sortition = Sortition::attach(
-            &bus,
-            repositories.sortition(),
-            repositories.node_state(),
-            repositories.finalized_committees(),
-            default_backend,
-            ciphernode_selector.clone(),
-            &addr,
-        )
-        .await?;
+        // Fetch on-chain ZK/slashing configuration
+        let (dkg_fold_verifier_by_chain, accusation_vote_validity_by_chain) =
+            self.fetch_chain_configuration(&mut provider_cache).await?;
 
-        // Setup evm system
-        // TODO: gather an async handle from the event readers in thre following function
-        // that closes when they shutdown and join it with the network manager joinhandle externally
-        let evm_config = setup_evm_system(
-            &self.chains,
-            &mut provider_cache,
-            &bus,
-            &self.contract_components,
-            self.pubkey_agg,
-        )
-        .await?;
-
-        let needs_zk_actors =
-            self.keyshare.is_some() || (self.pubkey_agg && self.keyshare.is_none());
-        let mut dkg_fold_verifier_by_chain: HashMap<u64, Option<Address>> = HashMap::new();
-        if needs_zk_actors {
-            if !self.chains.is_empty() {
-                for chain in self.chains.iter().filter(|c| c.enabled.unwrap_or(true)) {
-                    let provider = provider_cache.ensure_read_provider(chain).await?;
-                    let chain_id = provider.chain_id();
-                    validate_chain_id(chain, chain_id)?;
-                    let verifier = Self::fetch_dkg_fold_attestation_verifier_from_registry(
-                        &mut provider_cache,
-                        chain,
-                    )
-                    .await?;
-                    dkg_fold_verifier_by_chain.insert(chain_id, verifier);
-                }
-            } else {
-                // In-process benchmark harness (no EVM chains): optional env override.
-                if let Some(verifier) = std::env::var("BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER")
-                    .ok()
-                    .and_then(|s| s.parse().ok())
-                {
-                    dkg_fold_verifier_by_chain.insert(benchmark_default_chain_id(), Some(verifier));
-                }
-            }
-        }
-
-        // Off-chain freshness window for accusation votes — fetched per chain so
-        // AccusationManagerExtension can look up by `e3_id.chain_id()`. Benchmark
-        // harness falls back to the env var so deterministic builds don't require RPC.
-        let mut accusation_vote_validity_by_chain: HashMap<u64, u64> = HashMap::new();
-        if !self.chains.is_empty() {
-            for chain in self.chains.iter().filter(|c| c.enabled.unwrap_or(true)) {
-                let provider = provider_cache.ensure_read_provider(chain).await?;
-                let chain_id = provider.chain_id();
-                validate_chain_id(chain, chain_id)?;
-                let validity =
-                    Self::fetch_accusation_vote_validity_from_registry(&mut provider_cache, chain)
-                        .await?;
-                accusation_vote_validity_by_chain.insert(chain_id, validity);
-            }
-        } else {
-            let validity = std::env::var("BENCHMARK_ACCUSATION_VOTE_VALIDITY_SECS")
-                .ok()
-                .and_then(|s| s.parse::<u64>().ok())
-                .unwrap_or(0);
-            accusation_vote_validity_by_chain.insert(benchmark_default_chain_id(), validity);
-        }
-
-        // E3 specific setup
-        let mut e3_builder = E3Router::builder(&bus, store.clone());
-
-        if let Some(KeyshareKind::Threshold) = self.keyshare {
-            let _ = self.ensure_multithread(&bus);
-            let backend = self
-                .zk_backend
-                .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("ZK backend is required for threshold keyshare"))?;
-
-            backend.ensure_installed().await?;
-
-            // Ensure signer is available before setting up extensions that need it
-            let signer = provider_cache.ensure_signer().await?;
-
-            info!("Setting up ThresholdKeyshareExtension");
-            e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
+        // Setup protocol extensions (keyshare, aggregation, ZK, accusation, commitment)
+        let e3_builder = self
+            .setup_extensions(
                 &bus,
-                &self.cipher,
+                store.clone(),
+                &mut provider_cache,
+                &sortition,
                 &addr,
-            ));
-
-            info!("Setting up ZK actors");
-            setup_zk_actors(&bus, backend, signer, dkg_fold_verifier_by_chain.clone());
-        }
-
-        if self.pubkey_agg {
-            info!("Setting up FheExtension");
-            e3_builder = e3_builder.with(FheExtension::create(&bus, &self.rng))
-        }
-
-        if self.pubkey_agg {
-            info!("Setting up PublicKeyAggregationExtension");
-            // Ensure multithread worker is available for C1 verification and C5 proof generation
-            let _ = self.ensure_multithread(&bus);
-            e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(&bus));
-
-            if self.keyshare.is_none() {
-                let backend = self
-                    .zk_backend
-                    .as_ref()
-                    .ok_or_else(|| anyhow::anyhow!("ZK backend is required for aggregator"))?;
-                let signer = provider_cache.ensure_signer().await?;
-                info!("Setting up ZK actors for aggregator");
-                setup_zk_actors(&bus, backend, signer, dkg_fold_verifier_by_chain.clone());
-            }
-        }
-
-        if self.threshold_plaintext_agg {
-            info!("Setting up ThresholdPlaintextAggregatorExtension");
-            let _ = self.ensure_multithread(&bus);
-            e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
-                &bus, &sortition,
-            ))
-        }
-
-        // Clock-skew allowance for peer accusation deadlines.
-        let accusation_deadline_skew_secs = match std::env::var("ACCUSATION_DEADLINE_SKEW_SECS") {
-            Ok(raw) => match raw.parse::<u64>() {
-                Ok(v) => v,
-                Err(err) => {
-                    warn!(
-                        value = %raw,
-                        error = %err,
-                        "invalid ACCUSATION_DEADLINE_SKEW_SECS; falling back to default"
-                    );
-                    30
-                }
-            },
-            Err(_) => 30,
-        };
-
-        // AccusationManager extension — per-E3 fault attribution quorum
-        {
-            let signer = provider_cache.ensure_signer().await?;
-            let slashing_manager_addr = self.resolve_slashing_manager()?;
-            info!(
-                chains = accusation_vote_validity_by_chain.len(),
-                accusation_deadline_skew_secs, "Setting up AccusationManagerExtension"
-            );
-            e3_builder = e3_builder.with(AccusationManagerExtension::create(
-                &bus,
-                signer,
-                slashing_manager_addr,
-                accusation_vote_validity_by_chain,
-                accusation_deadline_skew_secs,
-            ));
-        }
-
-        // CommitmentConsistencyChecker extension — per-E3 cross-circuit commitment validation
-        {
-            info!("Setting up CommitmentConsistencyCheckerExtension");
-            e3_builder = e3_builder.with(CommitmentConsistencyCheckerExtension::create(&bus));
-        }
-
-        info!("E3Router building...");
+                &dkg_fold_verifier_by_chain,
+                &accusation_vote_validity_by_chain,
+            )
+            .await?;
 
         e3_builder.build().await?;
         ciphernode_selector.do_send(EmitPersistedAggregatorState);
 
+        // Setup networking
         let topic = "enclave-gossip";
-        let (peer_id, interface, channel_bridge) = if let Some(net_config) = self.net_config {
-            // Setup real net interface
-            let repositories = store.repositories();
-            let keypair = setup_libp2p_keypair(repositories.libp2p_keypair(), &self.cipher).await?;
-            let peer_id = keypair.peer_id();
-            let interface =
-                setup_net_interface(topic, keypair, net_config.peers, net_config.quic_port)?;
-            (peer_id, interface, None)
-        } else {
-            // Setup test net interface with random PeerId
-            let (interface, channel_bridge) = create_channel_bridge();
-            let peer_id = PeerId::random();
-            let channel_bridge = Some(channel_bridge);
-            (peer_id, interface, channel_bridge)
-        };
-
+        let (peer_id, interface, net_kind) = self.setup_networking(&store, topic).await?;
         setup_net(topic, bus.clone(), eventstore.ts(), interface)?;
 
         // Run the sync routine
@@ -765,19 +544,260 @@ impl CiphernodeBuilder {
             history,
             errors,
             peer_id,
-            channel_bridge,
+            net_kind,
         ))
     }
 
+    // ── build() sub-functions ──────────────────────────────────────────
+
+    fn resolve_bus(&self) -> Addr<EventBus<EnclaveEvent>> {
+        match self.source_bus {
+            Some(BusMode::Forked(ref bus)) => {
+                let local_bus = Self::create_local_bus();
+                info!("Setting up Event pipe");
+                EventBus::pipe(bus, &local_bus);
+                local_bus
+            }
+            Some(BusMode::Source(ref bus)) => bus.clone(),
+            None => Self::create_local_bus(),
+        }
+    }
+
+    fn create_event_system(
+        &self,
+        bus: Addr<EventBus<EnclaveEvent>>,
+        aggregate_config: &AggregateConfig,
+    ) -> EventSystem {
+        let base = match self.event_system.clone() {
+            EventSystemType::Persisted { kv_path, log_path } => {
+                EventSystem::persisted(log_path, kv_path)
+            }
+            EventSystemType::InMem => {
+                if let Some(ref store) = self.in_mem_store {
+                    EventSystem::in_mem_from_store(store)
+                } else {
+                    EventSystem::in_mem()
+                }
+            }
+        };
+        base.with_event_bus(bus)
+            .with_aggregate_config(aggregate_config.clone())
+            .with_global_shared_store(self.global_shared_store)
+            .with_global_shared_eventstore(self.global_shared_eventstore)
+    }
+
+    async fn setup_sortition(
+        &self,
+        bus: &BusHandle,
+        repositories: &e3_data::Repositories,
+        addr: &str,
+    ) -> Result<(Addr<Sortition>, Addr<CiphernodeSelector>)> {
+        let ciphernode_selector =
+            CiphernodeSelector::attach(bus, repositories.ciphernode_selector(), addr).await?;
+        let sortition = Sortition::attach(
+            bus,
+            repositories.sortition(),
+            repositories.node_state(),
+            repositories.finalized_committees(),
+            self.sortition_backend.clone(),
+            ciphernode_selector.clone(),
+            addr,
+        )
+        .await?;
+        Ok((sortition, ciphernode_selector))
+    }
+
+    async fn setup_evm_system(
+        &self,
+        provider_cache: &mut ProviderCache<WriteEnabled>,
+        bus: &BusHandle,
+    ) -> Result<EvmEventConfig> {
+        setup_evm_system(
+            &self.chains,
+            provider_cache,
+            bus,
+            &self.contract_components,
+            self.pubkey_agg,
+        )
+        .await
+    }
+
+    /// Fetch DKG fold attestation verifier and accusation vote validity from on-chain
+    /// registries. Requires enabled chains with RPC configured.
+    async fn fetch_chain_configuration(
+        &self,
+        provider_cache: &mut ProviderCache<WriteEnabled>,
+    ) -> Result<(HashMap<u64, Option<Address>>, HashMap<u64, u64>)> {
+        let needs_zk = self.keyshare.is_some() || (self.pubkey_agg && self.keyshare.is_none());
+
+        let mut dkg_fold_verifier_by_chain: HashMap<u64, Option<Address>> = HashMap::new();
+        if needs_zk {
+            for chain in self.chains.iter().filter(|c| c.enabled.unwrap_or(true)) {
+                let provider = provider_cache.ensure_read_provider(chain).await?;
+                let chain_id = provider.chain_id();
+                validate_chain_id(chain, chain_id)?;
+                let verifier = Self::fetch_fold_verifier(provider_cache, chain).await?;
+                dkg_fold_verifier_by_chain.insert(chain_id, verifier);
+            }
+            // For disabled chains with a statically-configured verifier address (e.g. benchmark),
+            // populate from config so ZK actors can function without an RPC connection.
+            for chain in self.chains.iter().filter(|c| !c.enabled.unwrap_or(true)) {
+                let Some(chain_id) = chain.chain_id else {
+                    continue;
+                };
+                if let Some(ref contract) = chain.contracts.dkg_fold_attestation_verifier {
+                    if let Ok(addr) = contract.address() {
+                        dkg_fold_verifier_by_chain
+                            .entry(chain_id)
+                            .or_insert(Some(addr));
+                    }
+                }
+            }
+        }
+
+        let mut accusation_vote_validity_by_chain: HashMap<u64, u64> = HashMap::new();
+        if !self.chains.is_empty() {
+            for chain in self.chains.iter().filter(|c| c.enabled.unwrap_or(true)) {
+                let provider = provider_cache.ensure_read_provider(chain).await?;
+                let chain_id = provider.chain_id();
+                validate_chain_id(chain, chain_id)?;
+                let validity =
+                    Self::fetch_accusation_vote_validity_from_registry(provider_cache, chain)
+                        .await?;
+                accusation_vote_validity_by_chain.insert(chain_id, validity);
+            }
+        }
+
+        Ok((
+            dkg_fold_verifier_by_chain,
+            accusation_vote_validity_by_chain,
+        ))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn setup_extensions(
+        &mut self,
+        bus: &BusHandle,
+        store: e3_data::DataStore,
+        provider_cache: &mut ProviderCache<WriteEnabled>,
+        sortition: &Addr<Sortition>,
+        addr: &str,
+        dkg_fold_verifier_by_chain: &HashMap<u64, Option<Address>>,
+        accusation_vote_validity_by_chain: &HashMap<u64, u64>,
+    ) -> Result<e3_request::E3RouterBuilder> {
+        let mut e3_builder = E3Router::builder(bus, store.clone());
+
+        // ── Threshold keyshare + ZK actors ──
+        if let Some(KeyshareKind::Threshold) = self.keyshare {
+            let _ = self.ensure_multithread(bus);
+            let backend = self
+                .zk_backend
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("ZK backend is required for threshold keyshare"))?;
+            backend.ensure_installed().await?;
+            let _signer = provider_cache.ensure_signer().await?;
+
+            info!("Setting up ThresholdKeyshareExtension");
+            e3_builder =
+                e3_builder.with(ThresholdKeyshareExtension::create(bus, &self.cipher, addr));
+
+            info!("Setting up ZK actors");
+            setup_zk_actors(bus, backend, _signer, dkg_fold_verifier_by_chain.clone());
+        }
+
+        // ── Public key aggregation ──
+        if self.pubkey_agg {
+            info!("Setting up FheExtension");
+            e3_builder = e3_builder.with(FheExtension::create(bus, &self.rng));
+
+            info!("Setting up PublicKeyAggregationExtension");
+            let _ = self.ensure_multithread(bus);
+            e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(bus));
+
+            if self.keyshare.is_none() {
+                let backend = self
+                    .zk_backend
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("ZK backend is required for aggregator"))?;
+                let signer = provider_cache.ensure_signer().await?;
+                info!("Setting up ZK actors for aggregator");
+                setup_zk_actors(bus, backend, signer, dkg_fold_verifier_by_chain.clone());
+            }
+        }
+
+        // ── Threshold plaintext aggregation ──
+        if self.threshold_plaintext_agg {
+            info!("Setting up ThresholdPlaintextAggregatorExtension");
+            let _ = self.ensure_multithread(bus);
+            e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
+                bus, sortition,
+            ));
+        }
+
+        // ── Accusation manager ──
+        {
+            let accusation_deadline_skew_secs = parse_env_u64("ACCUSATION_DEADLINE_SKEW_SECS", 30);
+            let signer = provider_cache.ensure_signer().await?;
+            let slashing_manager_addr = self.resolve_slashing_manager()?;
+            info!(
+                chains = accusation_vote_validity_by_chain.len(),
+                accusation_deadline_skew_secs, "Setting up AccusationManagerExtension"
+            );
+            e3_builder = e3_builder.with(AccusationManagerExtension::create(
+                bus,
+                signer,
+                slashing_manager_addr,
+                accusation_vote_validity_by_chain.clone(),
+                accusation_deadline_skew_secs,
+            ));
+        }
+
+        // ── Commitment consistency checker ──
+        {
+            info!("Setting up CommitmentConsistencyCheckerExtension");
+            e3_builder = e3_builder.with(CommitmentConsistencyCheckerExtension::create(
+                bus,
+                |preset| e3_zk_prover::default_links(preset),
+            ));
+        }
+
+        Ok(e3_builder)
+    }
+
+    async fn setup_networking(
+        &self,
+        store: &e3_data::DataStore,
+        topic: &str,
+    ) -> Result<(PeerId, e3_net::NetInterfaceHandle, NetInterfaceKind)> {
+        if let Some(ref net_config) = self.net_config {
+            let repositories = store.repositories();
+            let keypair = setup_libp2p_keypair(repositories.libp2p_keypair(), &self.cipher).await?;
+            let peer_id = keypair.peer_id();
+            let interface = setup_net_interface(
+                topic,
+                keypair,
+                net_config.peers.clone(),
+                net_config.quic_port,
+            )?;
+            Ok((peer_id, interface, NetInterfaceKind::Libp2p))
+        } else {
+            let (interface, channel_bridge) = create_channel_bridge();
+            let peer_id = PeerId::random();
+            Ok((
+                peer_id,
+                interface,
+                NetInterfaceKind::ChannelBridge(channel_bridge),
+            ))
+        }
+    }
+
     fn ensure_multithread(&mut self, bus: &BusHandle) -> Addr<Multithread> {
-        // If we have it cached return it
         if let Some(cached) = self.multithread_cache.clone() {
             return cached;
         }
 
         info!("Setting up multithread actor...");
 
-        // Setup threadpool if not set
         let task_pool = self.task_pool.clone().unwrap_or_else(|| {
             let pool_threads = self.threads.unwrap_or(1);
             let concurrent_jobs = self.multithread_concurrent_jobs.unwrap_or(1);
@@ -785,7 +805,6 @@ impl CiphernodeBuilder {
             Multithread::create_taskpool(pool_threads, concurrent_jobs)
         });
 
-        // Create it with or without ZK prover
         let addr = if let Some(ref backend) = self.zk_backend {
             info!("Multithread actor with ZK prover");
             Multithread::attach_with_zk(
@@ -806,17 +825,28 @@ impl CiphernodeBuilder {
             )
         };
 
-        // Set the cache
         self.multithread_cache = Some(addr.clone());
-
-        // return it
         addr
     }
 }
 
-/// Chain id used by in-process benchmark harnesses when no EVM chains are configured.
-fn benchmark_default_chain_id() -> u64 {
-    1
+/// Parse a `u64` env var, returning `default_val` on any error.
+fn parse_env_u64(name: &str, default_val: u64) -> u64 {
+    match std::env::var(name) {
+        Ok(raw) => match raw.parse::<u64>() {
+            Ok(v) => v,
+            Err(err) => {
+                warn!(
+                    value = %raw,
+                    error = %err,
+                    "invalid {}; falling back to default ({})",
+                    name, default_val
+                );
+                default_val
+            }
+        },
+        Err(_) => default_val,
+    }
 }
 
 /// Validate chain ID matches expected configuration

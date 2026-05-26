@@ -8,6 +8,7 @@ mod actors;
 mod backend;
 mod circuits;
 mod config;
+mod dkg_attestation_bundle;
 mod error;
 mod node_fold_public;
 mod prover;
@@ -15,10 +16,11 @@ pub mod test_utils;
 mod traits;
 mod witness;
 
+pub use actors::commitment_links::default_links;
 pub use actors::{
-    setup_zk_actors, AccusationManager, AccusationManagerExtension,
-    CommitmentConsistencyCheckerExtension, ProofRequestActor, ProofVerificationActor,
-    ShareVerificationActor, ZkActors, ZkVerificationRequest, ZkVerificationResponse,
+    setup_zk_actors, CommitmentConsistencyCheckerExtension, ProofRequestActor,
+    ProofVerificationActor, ShareVerificationActor, ZkActors, ZkVerificationRequest,
+    ZkVerificationResponse,
 };
 
 pub use backend::{SetupStatus, ZkBackend};
@@ -31,6 +33,7 @@ pub use circuits::aggregation::node_dkg_fold::{
 };
 pub use circuits::aggregation::nodes_fold_accumulator::generate_sequential_nodes_fold;
 pub use config::{verify_checksum, BbTarget, CircuitInfo, VersionInfo, ZkConfig};
+pub use dkg_attestation_bundle::encode_dkg_attestation_bundle;
 pub use e3_events::CircuitVariant;
 pub use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 pub use error::ZkError;

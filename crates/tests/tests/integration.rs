@@ -1183,20 +1183,40 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // Actor system setup
     let concurrent_jobs = benchmark_multithread_concurrent_jobs();
-    let _fold_verifier_env_guard = (benchmark_proof_aggregation_enabled()
-        && std::env::var("BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER").is_err())
-    .then(|| {
-        // In-process benchmark has no RPC; same default as pre-registry-fetch harness.
-        ScopedEnvVar::set(
-            "BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER",
-            "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0",
-        )
-    });
     let slashing_manager_addr = benchmark_slashing_manager_address();
     let max_threadroom = Multithread::get_max_threads_minus(1);
     let pool_threads = concurrent_jobs.min(max_threadroom).max(1);
     let task_pool = Multithread::create_taskpool(pool_threads, concurrent_jobs);
     let multithread_report = MultithreadReport::new(pool_threads, concurrent_jobs).start();
+
+    // Minimal chain config for in-process benchmarks (no RPC needed).
+    // Provides slashing_manager address for EIP-712 accusation vote signatures.
+    let bench_chain_config = e3_config::chain_config::ChainConfig {
+        enabled: Some(false),
+        name: "bench".into(),
+        rpc_url: "http://localhost:8545".into(),
+        rpc_auth: Default::default(),
+        contracts: e3_config::ContractAddresses {
+            enclave: e3_config::Contract::AddressOnly(
+                "0x0000000000000000000000000000000000000000".into(),
+            ),
+            ciphernode_registry: e3_config::Contract::AddressOnly(
+                "0x0000000000000000000000000000000000000000".into(),
+            ),
+            bonding_registry: e3_config::Contract::AddressOnly(
+                "0x0000000000000000000000000000000000000000".into(),
+            ),
+            e3_program: None,
+            fee_token: None,
+            slashing_manager: Some(e3_config::Contract::AddressOnly(
+                slashing_manager_addr.to_string(),
+            )),
+            dkg_fold_attestation_verifier: benchmark_dkg_fold_attestation_verifier_address()
+                .map(|a| e3_config::Contract::AddressOnly(a.to_string())),
+        },
+        finalization_ms: None,
+        chain_id: Some(1),
+    };
 
     // Setup ZK backend for proof generation/verification
     let (zk_backend, _zk_temp) = setup_test_zk_backend(benchmark_params.preset_subdir).await?;
@@ -1211,19 +1231,18 @@ async fn test_trbfv_actor() -> Result<()> {
             println!("Building collector {}!", addr);
             {
                 let mut b = CiphernodeBuilder::new(node_rng, cipher.clone())
-                    .testmode_with_history()
+                    .with_history_collector()
                     .with_shared_taskpool(&task_pool)
                     .with_multithread_concurrent_jobs(concurrent_jobs)
                     .with_shared_multithread_report(&multithread_report)
                     .with_trbfv()
                     .with_zkproof(zk_backend.clone())
-                    .testmode_with_signer(PrivateKeySigner::random())
+                    .with_signer(PrivateKeySigner::random())
                     .with_pubkey_aggregation()
                     .with_sortition_score()
                     .with_threshold_plaintext_aggregation()
-                    .testmode_with_forked_bus(bus.event_bus())
-                    .testmode_ignore_address_check()
-                    .testmode_with_slashing_manager(slashing_manager_addr)
+                    .with_forked_bus(bus.event_bus())
+                    .with_chains(&[bench_chain_config.clone()])
                     .with_logging();
                 b.build().await
             }
@@ -1234,19 +1253,18 @@ async fn test_trbfv_actor() -> Result<()> {
             println!("Building normal {}", &addr);
             {
                 let mut b = CiphernodeBuilder::new(node_rng, cipher.clone())
-                    .testmode_with_history()
+                    .with_history_collector()
                     .with_shared_taskpool(&task_pool)
                     .with_multithread_concurrent_jobs(concurrent_jobs)
                     .with_shared_multithread_report(&multithread_report)
                     .with_trbfv()
                     .with_zkproof(zk_backend.clone())
-                    .testmode_with_signer(PrivateKeySigner::random())
+                    .with_signer(PrivateKeySigner::random())
                     .with_pubkey_aggregation()
                     .with_sortition_score()
                     .with_threshold_plaintext_aggregation()
-                    .testmode_with_forked_bus(bus.event_bus())
-                    .testmode_ignore_address_check()
-                    .testmode_with_slashing_manager(slashing_manager_addr)
+                    .with_forked_bus(bus.event_bus())
+                    .with_chains(&[bench_chain_config.clone()])
                     .with_logging();
                 b.build().await
             }
@@ -2093,10 +2111,10 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
             .with_trbfv()
             .with_zkproof(zk_backend)
-            .testmode_with_signer(PrivateKeySigner::random())
-            .testmode_with_forked_bus(bus.event_bus())
-            .testmode_with_history()
-            .testmode_with_errors()
+            .with_signer(PrivateKeySigner::random())
+            .with_forked_bus(bus.event_bus())
+            .with_history_collector()
+            .with_error_collector()
             .with_pubkey_aggregation()
             .with_threshold_plaintext_aggregation()
             .with_sortition_score();
@@ -2314,10 +2332,10 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
             .with_trbfv()
             .with_zkproof(zk_backend)
-            .testmode_with_signer(PrivateKeySigner::random())
-            .testmode_with_forked_bus(bus.event_bus())
-            .testmode_with_history()
-            .testmode_with_errors()
+            .with_signer(PrivateKeySigner::random())
+            .with_forked_bus(bus.event_bus())
+            .with_history_collector()
+            .with_error_collector()
             .with_pubkey_aggregation()
             .with_threshold_plaintext_aggregation()
             .with_sortition_score();
