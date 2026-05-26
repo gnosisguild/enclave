@@ -82,10 +82,6 @@ pub struct CiphernodeBuilder {
     signer: Option<alloy::signers::local::PrivateKeySigner>,
     threshold_plaintext_agg: bool,
     zk_backend: Option<ZkBackend>,
-    /// Explicit slashing manager address (EIP-712 verifyingContract for accusation votes).
-    /// When set, this overrides the address from ChainConfig. Useful for in-process
-    /// benchmarks that have no EVM chains configured.
-    slashing_manager: Option<Address>,
     net_config: Option<NetConfig>,
     global_shared_store: bool,
     global_shared_eventstore: bool,
@@ -149,7 +145,6 @@ impl CiphernodeBuilder {
             threads: None,
             signer: None,
             threshold_plaintext_agg: false,
-            slashing_manager: None,
             net_config: None,
             zk_backend: None,
             global_shared_store: false,
@@ -217,27 +212,12 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Set the slashing manager address (EIP-712 verifyingContract for accusation votes).
-    /// When set, this overrides the slashing_manager from ChainConfig. Required for
-    /// in-process benchmarks that have no EVM chains configured.
-    pub fn with_slashing_manager(mut self, slashing_manager: Address) -> Self {
-        self.slashing_manager = Some(slashing_manager);
-        self
-    }
-
+    /// Resolve the slashing manager address from ChainConfig. All chains are
+    /// checked (enabled or not) since this is just config, not RPC-dependent.
     fn resolve_slashing_manager(&self) -> Result<Address> {
-        if let Some(addr) = self.slashing_manager {
-            return Ok(addr);
-        }
         self.chains
             .iter()
-            .filter(|c| c.enabled.unwrap_or(true))
             .find_map(|c| c.contracts.slashing_manager.as_ref())
-            .or_else(|| {
-                self.chains
-                    .first()
-                    .and_then(|c| c.contracts.slashing_manager.as_ref())
-            })
             .map(|c| c.address())
             .transpose()?
             .ok_or_else(|| {
@@ -249,7 +229,7 @@ impl CiphernodeBuilder {
     }
 
     /// Fetch `CiphernodeRegistry.dkgFoldAttestationVerifier()` for one chain (EIP-712 verifying contract).
-    async fn fetch_dkg_fold_attestation_verifier_from_registry(
+    async fn fetch_fold_verifier(
         provider_cache: &mut ProviderCache<WriteEnabled>,
         chain: &ChainConfig,
     ) -> Result<Option<Address>> {
@@ -643,8 +623,7 @@ impl CiphernodeBuilder {
     }
 
     /// Fetch DKG fold attestation verifier and accusation vote validity from on-chain
-    /// registries. When no EVM chains are configured (in-process benchmarks), returns
-    /// empty maps — the benchmark harness provides these values via explicit config.
+    /// registries. Requires enabled chains with RPC configured.
     async fn fetch_chain_configuration(
         &self,
         provider_cache: &mut ProviderCache<WriteEnabled>,
@@ -652,14 +631,12 @@ impl CiphernodeBuilder {
         let needs_zk = self.keyshare.is_some() || (self.pubkey_agg && self.keyshare.is_none());
 
         let mut dkg_fold_verifier_by_chain: HashMap<u64, Option<Address>> = HashMap::new();
-        if needs_zk && !self.chains.is_empty() {
+        if needs_zk {
             for chain in self.chains.iter().filter(|c| c.enabled.unwrap_or(true)) {
                 let provider = provider_cache.ensure_read_provider(chain).await?;
                 let chain_id = provider.chain_id();
                 validate_chain_id(chain, chain_id)?;
-                let verifier =
-                    Self::fetch_dkg_fold_attestation_verifier_from_registry(provider_cache, chain)
-                        .await?;
+                let verifier = Self::fetch_fold_verifier(provider_cache, chain).await?;
                 dkg_fold_verifier_by_chain.insert(chain_id, verifier);
             }
         }

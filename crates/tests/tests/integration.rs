@@ -1183,20 +1183,38 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // Actor system setup
     let concurrent_jobs = benchmark_multithread_concurrent_jobs();
-    let _fold_verifier_env_guard = (benchmark_proof_aggregation_enabled()
-        && std::env::var("BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER").is_err())
-    .then(|| {
-        // In-process benchmark has no RPC; same default as pre-registry-fetch harness.
-        ScopedEnvVar::set(
-            "BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER",
-            "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0",
-        )
-    });
     let slashing_manager_addr = benchmark_slashing_manager_address();
     let max_threadroom = Multithread::get_max_threads_minus(1);
     let pool_threads = concurrent_jobs.min(max_threadroom).max(1);
     let task_pool = Multithread::create_taskpool(pool_threads, concurrent_jobs);
     let multithread_report = MultithreadReport::new(pool_threads, concurrent_jobs).start();
+
+    // Minimal chain config for in-process benchmarks (no RPC needed).
+    // Provides slashing_manager address for EIP-712 accusation vote signatures.
+    let bench_chain_config = e3_config::chain_config::ChainConfig {
+        enabled: Some(false),
+        name: "bench".into(),
+        rpc_url: "http://localhost:8545".into(),
+        rpc_auth: Default::default(),
+        contracts: e3_config::ContractAddresses {
+            enclave: e3_config::Contract::AddressOnly(
+                "0x0000000000000000000000000000000000000000".into(),
+            ),
+            ciphernode_registry: e3_config::Contract::AddressOnly(
+                "0x0000000000000000000000000000000000000000".into(),
+            ),
+            bonding_registry: e3_config::Contract::AddressOnly(
+                "0x0000000000000000000000000000000000000000".into(),
+            ),
+            e3_program: None,
+            fee_token: None,
+            slashing_manager: Some(e3_config::Contract::AddressOnly(
+                slashing_manager_addr.to_string(),
+            )),
+        },
+        finalization_ms: None,
+        chain_id: Some(1),
+    };
 
     // Setup ZK backend for proof generation/verification
     let (zk_backend, _zk_temp) = setup_test_zk_backend(benchmark_params.preset_subdir).await?;
@@ -1222,7 +1240,7 @@ async fn test_trbfv_actor() -> Result<()> {
                     .with_sortition_score()
                     .with_threshold_plaintext_aggregation()
                     .with_forked_bus(bus.event_bus())
-                    .with_slashing_manager(slashing_manager_addr)
+                    .with_chains(&[bench_chain_config.clone()])
                     .with_logging();
                 b.build().await
             }
@@ -1244,7 +1262,7 @@ async fn test_trbfv_actor() -> Result<()> {
                     .with_sortition_score()
                     .with_threshold_plaintext_aggregation()
                     .with_forked_bus(bus.event_bus())
-                    .with_slashing_manager(slashing_manager_addr)
+                    .with_chains(&[bench_chain_config.clone()])
                     .with_logging();
                 b.build().await
             }

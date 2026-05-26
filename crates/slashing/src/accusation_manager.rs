@@ -31,7 +31,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use actix::{Actor, Addr, AsyncContext, Context, Handler, SpawnHandle};
-use alloy::primitives::{keccak256, Address, Bytes, FixedBytes, U256};
+use alloy::primitives::{keccak256, Address, Bytes, U256};
 use alloy::signers::local::PrivateKeySigner;
 use alloy::signers::SignerSync;
 use alloy::sol_types::SolValue;
@@ -346,7 +346,9 @@ impl AccusationManager {
     /// This ensures that the same (e3_id, accused, proof_type) produces the
     /// same ID regardless of who the accuser is, enabling deduplication.
     ///
-    /// `keccak256(abi.encodePacked(chainId, e3Id, accused, proofType, dataHash))`
+    /// `keccak256(abi.encodePacked(chainId, e3Id, accused, proofType))`
+    ///
+    /// Matches `SlashingManager.sol` which computes the same ID on-chain.
     fn accusation_id(accusation: &ProofFailureAccusation) -> [u8; 32] {
         let e3_id_u256: U256 = accusation
             .e3_id
@@ -358,7 +360,6 @@ impl AccusationManager {
             e3_id_u256,
             accusation.accused,
             U256::from(accusation.proof_type as u8),
-            FixedBytes::from(accusation.data_hash),
         )
             .abi_encode_packed();
         keccak256(&msg).into()
