@@ -1211,6 +1211,8 @@ async fn test_trbfv_actor() -> Result<()> {
             slashing_manager: Some(e3_config::Contract::AddressOnly(
                 slashing_manager_addr.to_string(),
             )),
+            dkg_fold_attestation_verifier: benchmark_dkg_fold_attestation_verifier_address()
+                .map(|a| e3_config::Contract::AddressOnly(a.to_string())),
         },
         finalization_ms: None,
         chain_id: Some(1),

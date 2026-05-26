@@ -1650,7 +1650,7 @@ async fn test_onchain_duplicate_evidence_reverts() {
 async fn test_onchain_actor_signed_vote_accepted() {
     use e3_events::{AccusationOutcome, AccusationQuorumReached, AccusationVote, ProofType};
     use e3_evm::encode_attestation_evidence;
-    use e3_zk_prover::AccusationManager;
+    use e3_slashing::AccusationManager;
 
     if !find_anvil().await {
         println!("skipping: anvil not found on PATH");

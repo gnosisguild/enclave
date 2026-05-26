@@ -449,7 +449,7 @@ impl CiphernodeBuilder {
         provider_cache: &mut ProviderCache,
     ) -> Result<AggregateConfig> {
         let mut chain_providers = Vec::new();
-        for chain in &self.chains {
+        for chain in self.chains.iter().filter(|c| c.enabled.unwrap_or(true)) {
             let provider = provider_cache.ensure_read_provider(chain).await?;
             chain_providers.push((chain.clone(), provider.chain_id()));
         }
@@ -638,6 +638,20 @@ impl CiphernodeBuilder {
                 validate_chain_id(chain, chain_id)?;
                 let verifier = Self::fetch_fold_verifier(provider_cache, chain).await?;
                 dkg_fold_verifier_by_chain.insert(chain_id, verifier);
+            }
+            // For disabled chains with a statically-configured verifier address (e.g. benchmark),
+            // populate from config so ZK actors can function without an RPC connection.
+            for chain in self.chains.iter().filter(|c| !c.enabled.unwrap_or(true)) {
+                let Some(chain_id) = chain.chain_id else {
+                    continue;
+                };
+                if let Some(ref contract) = chain.contracts.dkg_fold_attestation_verifier {
+                    if let Ok(addr) = contract.address() {
+                        dkg_fold_verifier_by_chain
+                            .entry(chain_id)
+                            .or_insert(Some(addr));
+                    }
+                }
             }
         }
 
