@@ -122,6 +122,8 @@ format_parity_matrices_for_committee() {
     done
   }
 
+  trap '_restore_swapped_parity_live' ERR
+
   for variant in insecure secure; do
     live="$NOIR_LIB/src/configs/committee/$committee/parity_${variant}.nr"
     fresh="$tmp/$committee/parity_${variant}.nr"
@@ -134,9 +136,10 @@ format_parity_matrices_for_committee() {
     swapped_backup+=("$backup")
   done
 
-  ((${#swapped_live[@]} == 0)) && return 0
-
-  trap '_restore_swapped_parity_live' ERR
+  if ((${#swapped_live[@]} == 0)); then
+    trap - ERR
+    return 0
+  fi
 
   if ! (cd "$NOIR_LIB" && nargo fmt) >/dev/null; then
     _restore_swapped_parity_live

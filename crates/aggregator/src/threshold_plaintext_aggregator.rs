@@ -191,9 +191,9 @@ pub struct ThresholdPlaintextAggregator {
     /// Full registered committee (`topNodes`, length `N`) for decryption-aggregator
     /// `committee_hash_*` inputs. Same value as `PublicKeyAggregated.committee_addresses`.
     committee_addresses: Vec<Address>,
-    /// Honest subset of the committee (length `H ≤ N`) that participates in decryption.
-    /// Drives share-collection gating and node membership checks (sender must be honest).
-    /// Same value as `PublicKeyAggregated.honest_committee_addresses`.
+    /// Canonical honest subset from DKG (length `H ≤ N`, from
+    /// `PublicKeyAggregated.honest_committee_addresses`). Drives share-collection
+    /// gating (expects one share from each H party) and sender checks after sortition.
     honest_committee_addresses: Vec<Address>,
 }
 
@@ -207,7 +207,7 @@ pub struct ThresholdPlaintextAggregatorParams {
     /// Used for `committee_hash_*` payload binding to on-chain `topNodes`.
     pub committee_addresses: Vec<Address>,
     /// Honest committee from `PublicKeyAggregated.honest_committee_addresses`
-    /// (length `H`). Used for decryption-share collection roster.
+    /// (length `H`). Roster for decryption-share collection and sender gating.
     pub honest_committee_addresses: Vec<Address>,
 }
 
@@ -234,12 +234,14 @@ impl ThresholdPlaintextAggregator {
         }
     }
 
-    /// Honest parties in [`PublicKeyAggregated`] (H). Decryption shares are only expected
-    /// from this subset of the full sortition committee.
+    /// Length of the canonical honest subset (`H`), not on-chain committee size `N`.
+    /// Share collection waits for one decryption share from each address in
+    /// `honest_committee_addresses` (sortition membership is checked separately).
     fn aggregated_committee_n(&self) -> u64 {
         self.honest_committee_addresses.len() as u64
     }
 
+    /// True when `node` is in `PublicKeyAggregated.honest_committee_addresses`.
     fn node_in_aggregated_pk_committee(&self, node: &str) -> bool {
         Address::from_str(node)
             .ok()
@@ -256,7 +258,7 @@ impl ThresholdPlaintextAggregator {
         let required_shares = self.aggregated_committee_n();
         ensure!(
             required_shares > 0,
-            "aggregated committee addresses must not be empty before collecting decryption shares"
+            "honest committee addresses must not be empty before collecting decryption shares"
         );
         self.state.try_mutate(ec, |state| {
             info!("Adding share for party_id={}", party_id);
@@ -285,7 +287,7 @@ impl ThresholdPlaintextAggregator {
             }
 
             info!(
-                "Changing state to VerifyingC6 because received all {required_shares} aggregated-committee shares..."
+                "Changing state to VerifyingC6 because received all {required_shares} honest-committee shares..."
             );
 
             Ok(ThresholdPlaintextAggregatorState::VerifyingC6(
@@ -321,7 +323,7 @@ impl ThresholdPlaintextAggregator {
 
             if required_shares < current.threshold_m {
                 warn!(
-                    "ThresholdPlaintextAggregator: aggregated committee size ({required_shares}) < threshold_m ({}) after expulsion",
+                    "ThresholdPlaintextAggregator: honest committee size H ({required_shares}) < threshold_m ({}) after expulsion",
                     current.threshold_m
                 );
                 return Ok(ThresholdPlaintextAggregatorState::Collecting(Collecting {
@@ -481,8 +483,8 @@ impl ThresholdPlaintextAggregator {
         // Publish ComputeRequest before transitioning state so a publish
         // failure leaves us in VerifyingC6 (retryable) rather than
         // Computing (no retry path).
-        // TrBFV scheme size stays N; only the share roster is restricted to the H parties in
-        // `PublicKeyAggregated` (see `node_in_aggregated_pk_committee`).
+        // TrBFV scheme size stays N (`threshold_n`); only the share roster is restricted to the
+        // H canonical honest parties in `PublicKeyAggregated` (see `node_in_aggregated_pk_committee`).
         let trbfv_config =
             TrBFVConfig::new(state.params.clone(), state.threshold_n, state.threshold_m);
 
@@ -1073,7 +1075,7 @@ impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
                 };
                 if !self.node_in_aggregated_pk_committee(&msg.node) {
                     trace!(
-                        "Node {} not in PublicKeyAggregated committee — ignoring decryption share",
+                        "Node {} not in PublicKeyAggregated honest subset — ignoring decryption share",
                         &msg.node
                     );
                     return Ok(());

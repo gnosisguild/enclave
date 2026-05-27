@@ -567,20 +567,24 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 │   │     → Anyone can encrypt with this key
 │   │     → Only M+1 committee members can decrypt together
 │   │
-│   ├─ 2. Compute commitment:
-│   │     pk_hash = compute_pk_commitment(aggregate_pk)
+│   ├─ 2. Build C5 proof request (H canonical honest keyshares):
+│   │     proof_request.keyshare_bytes = [pk_share for each H party]
+│   │     proof_request.aggregated_pk_bytes = aggregate_pk
+│   │     proof_request.committee_n = committee_h = H  // C5 circuit sized for H, not N
+│   │     (per-share compute_pk_commitment already checked against C1; aggregate
+│   │      commitment is proved as a C5 public output, not pre-published here)
 │   │
 │   ├─ 3. REQUEST C5 PROOF:
 │   │     Publish PkAggregationProofPending {
-│   │       proof_request: PkAggregationProofRequest,  // H keyshares; C5 uses H not N
+│   │       proof_request,              // H keyshares + aggregate_pk (see step 2)
 │   │       public_key: aggregate_pk,
-│   │       public_key_hash: pk_hash
+│   │       nodes: honest_nodes         // H canonical subset
 │   │     }
 │   │
 │   ├─ 4. C5 PROOF GENERATION (ProofRequestActor):
 │   │     ├─ Dispatches ComputeRequest::zk(ZkRequest::PkAggregation {...})
 │   │     │   → Circuit: PkAggregation (C5)
-│   │     │   → Proves aggregate PK was correctly computed from all pk_shares
+│   │     │   → Proves aggregate PK was correctly computed from the H canonical honest keyshares
 │   │     ├─ ZkActor generates proof via bb binary
 │   │     ├─ Signs proof
 │   │     └─ Publishes PkAggregationProofSigned {
@@ -957,7 +961,8 @@ EnclaveSolReader decodes CiphertextOutputPublished event
 │      │                            │                   │ by C6                        │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
 │ C5   │ PK Aggregation             │ Aggregation       │ Aggregate PK correctly       │
-│      │                            │                   │ computed from all pk_shares  │
+│      │                            │                   │ computed from H canonical    │
+│      │                            │                   │ honest keyshares (not all N) │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
 │ C6   │ Threshold Share Decryption │ Decryption        │ Decryption share correctly   │
 │      │ (T5)                       │                   │ derived from sk + ciphertext;│

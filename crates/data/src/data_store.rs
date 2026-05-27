@@ -127,24 +127,8 @@ impl DataStore {
     }
 
     /// Changes the scope for the data store.
-    /// Note that if the scope does not start with a slash one is appended.
-    /// ```
-    /// use e3_data::DataStore;
-    /// use e3_data::InMemStore;
-    /// use actix::Actor;
-    /// use anyhow::Result;
-    ///
-    /// #[actix::main]
-    /// async fn main() -> Result<()>{  
-    ///   let addr = InMemStore::new(false).start();
-    ///   let store = DataStore::from(&addr);
-    ///   assert_eq!(store.base("//foo")
-    ///     .scope("bar")
-    ///     .scope("/baz")
-    ///     .get_scope()?, "//foo/bar/baz");
-    ///   Ok(())
-    /// }
-    /// ```
+    /// Non-leading segments get a `/` separator; leading `/` on a segment is preserved.
+    /// Example: `base("//foo").scope("bar").scope("/baz")` → `"//foo/bar/baz"`.
     pub fn scope<K: IntoKey>(&self, key: K) -> Self {
         let mut scope = self.scope.clone();
         let encoded_key = key.into_key();
@@ -256,5 +240,22 @@ impl From<&Addr<InMemStore>> for DataStore {
             scope: vec![],
             flush: addr.clone().recipient(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix::Actor;
+
+    #[test]
+    fn scope_normalizes_slashes() {
+        actix::System::new().block_on(async {
+            let addr = InMemStore::new(false).start();
+            let store = DataStore::from(&addr);
+            let scoped = store.base("//foo").scope("bar").scope("/baz");
+            let scope = scoped.get_scope().expect("scope");
+            assert_eq!(scope, "//foo/bar/baz");
+        });
     }
 }
