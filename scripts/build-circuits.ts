@@ -247,22 +247,43 @@ class NoirCircuitBuilder {
    */
   private patchUtilsTs(committee: CircuitCommittee): void {
     if (this.options.skipUtilsPatch) return
-    const { h, t } = COMMITTEE_PARAMS[committee]
+    const { h, t, n } = COMMITTEE_PARAMS[committee]
     const path = join(this.rootDir, 'packages', 'enclave-contracts', 'scripts', 'utils.ts')
     if (!existsSync(path)) return // optional in minimal checkouts
     const before = readFileSync(path, 'utf-8')
+    const cap = committee.charAt(0).toUpperCase() + committee.slice(1)
+    const generatedDoc = `/**
+ * <generated-committee-doc>
+ * Default insecure-512 / ${committee} committee layout for BFV aggregator verifiers.
+ * Must match \`lib::configs::default::{H, T}\` in compiled circuits.
+ * ${cap} committee: N=${n}, T=${t}, H=${h}.
+ * </generated-committee-doc>
+ */`
+    const docPattern = /\/\*\*\s*\n \* <generated-committee-doc>[\s\S]*?<\/generated-committee-doc>\s*\n \*\//
+
     let after = before
       .replace(/export const BFV_DKG_H = \d+/, `export const BFV_DKG_H = ${h}`)
       .replace(/export const BFV_THRESHOLD_T = \d+/, `export const BFV_THRESHOLD_T = ${t}`)
-    // Refresh the doc block so the committee name in the comment matches the values.
-    after = after.replace(
-      /(Default insecure-512 \/) (micro|small|medium) (committee layout for BFV aggregator verifiers\.[\s\S]*?Must match `lib::configs::default::\{H, T\}` in compiled circuits\.[\s\S]*?\n \* )(Micro|Small|Medium)( committee: N=\d+, T=\d+, H=\d+\.)/,
-      (_m, p1, _oldName, p3, _oldCap, _oldNums) => {
-        const cap = committee.charAt(0).toUpperCase() + committee.slice(1)
-        const { n } = COMMITTEE_PARAMS[committee]
-        return `${p1} ${committee} ${p3}${cap} committee: N=${n}, T=${t}, H=${h}.`
-      },
-    )
+
+    if (!after.includes(`export const BFV_DKG_H = ${h}`)) {
+      throw new Error(`patchUtilsTs: could not update BFV_DKG_H in ${path} (expected export const BFV_DKG_H = <number>)`)
+    }
+    if (!after.includes(`export const BFV_THRESHOLD_T = ${t}`)) {
+      throw new Error(`patchUtilsTs: could not update BFV_THRESHOLD_T in ${path} (expected export const BFV_THRESHOLD_T = <number>)`)
+    }
+
+    if (!docPattern.test(before)) {
+      throw new Error(
+        `patchUtilsTs: ${path} is missing the <generated-committee-doc> sentinel block; ` +
+          `add the sentinel comment (see scripts/build-circuits.ts) so committee docs stay in sync`,
+      )
+    }
+    const afterDoc = after.replace(docPattern, generatedDoc)
+    if (afterDoc === after) {
+      console.warn(`   ⚠️  patchUtilsTs: <generated-committee-doc> block in ${path} did not change (committee=${committee})`)
+    }
+    after = afterDoc
+
     if (after !== before) {
       writeFileSync(path, after)
       console.log(`   📋 Patched utils.ts: BFV_DKG_H=${h}, BFV_THRESHOLD_T=${t} (committee: ${committee})`)

@@ -200,8 +200,11 @@ fi
 GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 
+load_committee_by_name "$OUTPUT_COMMITTEE" "$REPO_ROOT"
+
 echo "Configuration:"
 echo "  Mode: $MODE"
+echo "  Committee: $OUTPUT_COMMITTEE (N=$COMMITTEE_N, T=$COMMITTEE_T, H=$COMMITTEE_H)"
 if [ -n "$CIRCUIT_FILTER" ]; then
     echo "  Circuit: $CIRCUIT_FILTER (single)"
 fi
@@ -235,10 +238,7 @@ if [ "$SKIP_COMPILE" = false ]; then
     else
         PRESET_NAME="insecure-512"
     fi
-    ENSURE_ARGS=("$PRESET_NAME")
-    if [ -n "$COMMITTEE_OVERRIDE" ]; then
-        ENSURE_ARGS+=(--committee "$COMMITTEE_OVERRIDE")
-    fi
+    ENSURE_ARGS=("$PRESET_NAME" --committee "$OUTPUT_COMMITTEE")
     if [ "$VERBOSE" = true ]; then
         ENSURE_ARGS+=(--verbose)
     fi
@@ -312,7 +312,7 @@ for CIRCUIT in $RUN_CIRCUITS; do
         
         # Generate Prover.toml (and configs.nr) via zk_cli so nargo execute has witness
         echo "  Generating Prover.toml..."
-        if ! "${SCRIPT_DIR}/generate_prover_toml.sh" "$CIRCUIT" "$MODE" "$REPO_ROOT" 2>&1; then
+        if ! BENCHMARK_COMMITTEE="$OUTPUT_COMMITTEE" "${SCRIPT_DIR}/generate_prover_toml.sh" "$CIRCUIT" "$MODE" "$REPO_ROOT" 2>&1; then
             echo "⚠️  Prover.toml generation failed for $CIRCUIT, skipping benchmark"
             echo ""
             continue
@@ -341,9 +341,13 @@ echo "Stage 1/3: Running gas extraction pipeline (CRISP test + integration + EVM
 GAS_JSON_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/crisp_verify_gas.json"
 # Remove any previous gas artifact so failures cannot leak stale values.
 rm -f "${GAS_JSON_FILE}"
-EXTRACT_ARGS=(--output "${GAS_JSON_FILE}" --mode "$MODE")
+EXTRACT_ARGS=(--output "${GAS_JSON_FILE}" --mode "$MODE" --committee "$OUTPUT_COMMITTEE")
 if [ "$VERBOSE" = true ]; then
     EXTRACT_ARGS+=(--verbose)
+fi
+# Benches already validated preset+committee artifacts; gas stage only checks + runs tests.
+if [ "$SKIP_COMPILE" = true ] || [ "$PRESET_ARTIFACTS_READY" = true ]; then
+    EXTRACT_ARGS+=(--skip-build)
 fi
 if "${SCRIPT_DIR}/extract_crisp_verify_gas.sh" "${EXTRACT_ARGS[@]}"; then
     echo "✓ CRISP verify gas extracted: ${GAS_JSON_FILE}"
@@ -354,24 +358,28 @@ fi
 # Persist CLI flags for report regeneration (see generate_report.sh → Run configuration).
 RUN_META_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/benchmark_run_meta.json"
 MT_JOBS_JSON="${BENCHMARK_MULTITHREAD_JOBS:-1}"
-# shellcheck source=load_default_committee.sh
-source "${SCRIPT_DIR}/load_default_committee.sh"
-load_default_committee "${REPO_ROOT}/circuits/lib/src/configs/default/mod.nr" "${REPO_ROOT}"
+load_committee_by_name "$OUTPUT_COMMITTEE" "$REPO_ROOT"
 jq -n \
     --arg mode "$MODE" \
     --arg preset "$([ "$MODE" = "secure" ] && echo "secure-8192" || echo "insecure-512")" \
+    --arg committee "$OUTPUT_COMMITTEE" \
     --argjson proof_agg "$( [ "$BENCHMARK_PROOF_AGGREGATION" = "false" ] && echo false || echo true )" \
     --argjson multithread_jobs "$MT_JOBS_JSON" \
     --argjson verbose "$([ "$VERBOSE" = true ] && echo true || echo false)" \
     --argjson committee_size_n "$COMMITTEE_N" \
+    --argjson committee_size_h "$COMMITTEE_H" \
+    --argjson committee_threshold_t "$COMMITTEE_T" \
     '{
       benchmark_mode: $mode,
       bfv_preset_subdir: $preset,
+      committee: $committee,
       proof_aggregation: $proof_agg,
       multithread_jobs: $multithread_jobs,
       verbose: $verbose,
       nodes_spawned: 20,
       committee_size_n: $committee_size_n,
+      committee_size_h: $committee_size_h,
+      committee_threshold_t: $committee_threshold_t,
       network_model: "in_process_bus",
       testmode_harness: true
     }' > "${RUN_META_FILE}"

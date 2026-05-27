@@ -174,6 +174,10 @@ impl Computation for Bounds {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
+        let committee = crate::ciphernodes_committee::canonical_committee_for_circuit(committee)
+            .map_err(|e| CircuitsErrors::Other(e.to_string()))?;
+        let committee_n = committee.n;
+
         let n = BigInt::from(threshold_params.degree());
         let ctx = threshold_params.ctx_at_level(0)?;
 
@@ -188,7 +192,7 @@ impl Computation for Bounds {
 
         let smudging_config = SmudgingBoundCalculatorConfig::new(
             threshold_params.clone(),
-            committee.n,
+            committee_n,
             sd.z as usize,
             preset.metadata().lambda,
         );
@@ -359,7 +363,34 @@ impl Computation for Inputs {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CiphernodesCommittee;
     use e3_fhe_params::BfvPreset;
+
+    #[test]
+    fn bounds_compute_rejects_non_canonical_committee_h() {
+        let preset = BfvPreset::InsecureThreshold512;
+        let bad = CiphernodesCommittee {
+            n: 3,
+            h: 8,
+            threshold: 1,
+        };
+        let err = Bounds::compute(preset, &bad).unwrap_err();
+        assert!(
+            format!("{err:?}").contains("committee.h=8"),
+            "expected h mismatch error, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn bounds_compute_rejects_unknown_threshold_pair() {
+        let preset = BfvPreset::InsecureThreshold512;
+        let bad = CiphernodesCommittee {
+            n: 5,
+            h: 5,
+            threshold: 1,
+        };
+        assert!(Bounds::compute(preset, &bad).is_err());
+    }
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {

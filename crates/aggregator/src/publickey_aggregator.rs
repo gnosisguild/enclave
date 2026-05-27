@@ -24,6 +24,7 @@ use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_fhe_params::BfvPreset;
 use e3_utils::NotifySync;
 use e3_utils::{ArcBytes, MAILBOX_LIMIT};
+use e3_zk_helpers::cap_honest_party_ids;
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_prover::extract_node_fold_agg_commits;
 use std::collections::{BTreeSet, HashMap};
@@ -164,6 +165,9 @@ pub enum PublicKeyAggregatorState {
         /// Ascending `party_id` order (matches on-chain `topNodes` after finalize sort).
         #[serde(default)]
         committee_addresses: Vec<Address>,
+        /// Honest subset (H entries) for decryption-share gating after restart.
+        #[serde(default)]
+        honest_committee_addresses: Vec<Address>,
     },
 }
 
@@ -184,6 +188,18 @@ impl PublicKeyAggregatorState {
                 committee_addresses,
                 ..
             } if !committee_addresses.is_empty() => Some(committee_addresses.as_slice()),
+            _ => None,
+        }
+    }
+
+    pub fn honest_committee_addresses(&self) -> Option<&[Address]> {
+        match self {
+            PublicKeyAggregatorState::Complete {
+                honest_committee_addresses,
+                ..
+            } if !honest_committee_addresses.is_empty() => {
+                Some(honest_committee_addresses.as_slice())
+            }
             _ => None,
         }
     }
@@ -523,13 +539,15 @@ impl PublicKeyAggregator {
         // canonical honest set; the remainder stay in the full committee
         // (so committee_hash still covers all N) but their keyshares are not consumed
         // by C5 and they are not asked to publish a NodeFold proof.
-        if honest_entries.len() > circuit_h {
+        let pre_cap_len = honest_entries.len();
+        let honest_party_ids =
+            cap_honest_party_ids(circuit_h, honest_entries.iter().map(|(pid, _, _, _)| *pid));
+        if pre_cap_len > circuit_h {
             info!(
-                "Capping honest set from {} to circuit_h={circuit_h} for E3 {} (extras remain in full committee)",
-                honest_entries.len(),
+                "Capping honest set from {pre_cap_len} to circuit_h={circuit_h} for E3 {} (extras remain in full committee)",
                 self.e3_id
             );
-            honest_entries.truncate(circuit_h);
+            honest_entries.retain(|(pid, _, _, _)| honest_party_ids.contains(pid));
         }
 
         let (honest_keyshares, honest_nodes): (Vec<ArcBytes>, Vec<String>) = honest_entries
@@ -537,8 +555,11 @@ impl PublicKeyAggregator {
             .map(|(_, node, ks, _)| (ks.clone(), node.clone()))
             .unzip();
 
-        let honest_party_ids: BTreeSet<u64> =
-            honest_entries.iter().map(|(pid, _, _, _)| *pid).collect();
+        debug_assert_eq!(
+            honest_party_ids.len(),
+            honest_keyshares.len(),
+            "honest roster and keyshare payload lengths must match"
+        );
 
         // Defensive: should hold after truncation above; guard against future refactors.
         if honest_keyshares.len() <= threshold_m {
@@ -1164,7 +1185,7 @@ impl PublicKeyAggregator {
             e3_id: self.e3_id.clone(),
             nodes: nodes.clone(),
             committee_addresses: committee_addresses.clone(),
-            honest_committee_addresses,
+            honest_committee_addresses: honest_committee_addresses.clone(),
             pk_commitment,
             dkg_aggregator_proof: dkg_aggregated_proof.clone(),
             dkg_attestation_bundle,
@@ -1177,6 +1198,7 @@ impl PublicKeyAggregator {
                 keyshares: OrderedSet::new(),
                 nodes,
                 committee_addresses,
+                honest_committee_addresses,
             })
         })?;
 

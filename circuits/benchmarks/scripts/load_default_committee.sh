@@ -8,6 +8,34 @@
 #
 # Sets: COMMITTEE_NAME, COMMITTEE_N, COMMITTEE_T, COMMITTEE_H
 
+_load_committee_nt_h() {
+    local repo_root="$1"
+    local committee_file="${repo_root}/circuits/lib/src/configs/committee/${COMMITTEE_NAME}/mod.nr"
+    if [ ! -f "$committee_file" ]; then
+        echo "Error: committee config not found: $committee_file" >&2
+        return 1
+    fi
+
+    COMMITTEE_N=$(rg -N "N_PARTIES: u32 = " "$committee_file" | sed -E 's/.*= ([0-9]+);/\1/' | head -1)
+    COMMITTEE_T=$(rg -N "T: u32 = " "$committee_file" | sed -E 's/.*= ([0-9]+);/\1/' | head -1)
+    COMMITTEE_H=$(rg -N "H: u32 = " "$committee_file" | sed -E 's/.*= ([0-9]+);/\1/' | head -1)
+
+    if [ -z "$COMMITTEE_N" ] || [ -z "$COMMITTEE_T" ] || [ -z "$COMMITTEE_H" ]; then
+        echo "Error: failed to parse N/T/H from $committee_file" >&2
+        return 1
+    fi
+
+    export COMMITTEE_NAME COMMITTEE_N COMMITTEE_T COMMITTEE_H
+}
+
+# Load N/T/H for an explicit committee name (independent of on-disk active selection).
+load_committee_by_name() {
+    local name="$1"
+    local repo_root="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+    COMMITTEE_NAME="$name"
+    _load_committee_nt_h "$repo_root"
+}
+
 load_default_committee() {
     # First positional arg is legacy (path to default/mod.nr) and is ignored — committee is
     # now plumbed through active.nr / the stamp, not default/mod.nr. Kept so existing callers
@@ -45,23 +73,5 @@ PY
     fi
     [ -z "$COMMITTEE_NAME" ] && COMMITTEE_NAME="micro"
 
-    # Per-committee modules now live in committee/<name>/mod.nr (directory layout, not flat
-    # <name>.nr files). The N/T/H constants are still simple `pub global` lines so the
-    # extraction regex below works unchanged.
-    local committee_file="${repo_root}/circuits/lib/src/configs/committee/${COMMITTEE_NAME}/mod.nr"
-    if [ ! -f "$committee_file" ]; then
-        echo "Error: committee config not found: $committee_file" >&2
-        return 1
-    fi
-
-    COMMITTEE_N=$(rg -N "N_PARTIES: u32 = " "$committee_file" | sed -E 's/.*= ([0-9]+);/\1/' | head -1)
-    COMMITTEE_T=$(rg -N "T: u32 = " "$committee_file" | sed -E 's/.*= ([0-9]+);/\1/' | head -1)
-    COMMITTEE_H=$(rg -N "H: u32 = " "$committee_file" | sed -E 's/.*= ([0-9]+);/\1/' | head -1)
-
-    if [ -z "$COMMITTEE_N" ] || [ -z "$COMMITTEE_T" ] || [ -z "$COMMITTEE_H" ]; then
-        echo "Error: failed to parse N/T/H from $committee_file" >&2
-        return 1
-    fi
-
-    export COMMITTEE_NAME COMMITTEE_N COMMITTEE_T COMMITTEE_H
+    _load_committee_nt_h "$repo_root"
 }

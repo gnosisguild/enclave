@@ -17,6 +17,7 @@ set -e
 SUMMARY_JSON=""
 GAS_JSON=""
 BUILD_PRESET=""
+COMMITTEE=""
 FORCE_BUILD=false
 SKIP_BUILD=false
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,6 +30,17 @@ while [[ $# -gt 0 ]]; do
         --gas-json) GAS_JSON="$2"; shift 2 ;;
         --build)
             BUILD_PRESET="$2"
+            shift 2
+            ;;
+        --committee)
+            COMMITTEE="$2"
+            case "$COMMITTEE" in
+                micro|small|medium) ;;
+                *)
+                    echo "Error: --committee must be micro|small|medium (got: $COMMITTEE)"
+                    exit 1
+                    ;;
+            esac
             shift 2
             ;;
         --force-build)
@@ -83,6 +95,9 @@ if [ -n "$BUILD_PRESET" ]; then
         "${SCRIPT_DIR}/check_circuit_preset_artifacts.sh" "$BUILD_PRESET"
     else
         ENSURE_ARGS=("$BUILD_PRESET")
+        if [ -n "$COMMITTEE" ]; then
+            ENSURE_ARGS+=(--committee "$COMMITTEE")
+        fi
         if [ "$FORCE_BUILD" = true ]; then
             ENSURE_ARGS+=(--force-build)
         fi

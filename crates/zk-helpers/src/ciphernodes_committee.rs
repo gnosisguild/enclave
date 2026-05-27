@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::collections::BTreeSet;
 use std::fmt;
 use std::str::FromStr;
 
@@ -89,6 +90,36 @@ impl CiphernodesCommitteeSize {
     }
 }
 
+/// Validate `(T, N, H)` against the canonical committee table used by compiled Noir circuits.
+///
+/// Returns the canonical row on success. Callers must pass the same `(threshold_m, threshold_n,
+/// h)` the active `committee/*/mod.nr` was built with — smudging bounds and C1 public IO depend on
+/// `N_PARTIES` (= `n`), not BFV preset degree.
+pub fn canonical_committee_for_circuit(
+    committee: &CiphernodesCommittee,
+) -> Result<CiphernodesCommittee, anyhow::Error> {
+    let expected =
+        CiphernodesCommitteeSize::from_threshold(committee.threshold, committee.n)?.values();
+    if committee.h != expected.h {
+        anyhow::bail!(
+            "committee.h={} does not match canonical h={} for (T={}, N={})",
+            committee.h,
+            expected.h,
+            committee.threshold,
+            committee.n
+        );
+    }
+    if committee.n != expected.n || committee.threshold != expected.threshold {
+        anyhow::bail!(
+            "committee (T={}, N={}, H={}) is not a canonical committee size",
+            committee.threshold,
+            committee.n,
+            committee.h
+        );
+    }
+    Ok(expected)
+}
+
 impl FromStr for CiphernodesCommitteeSize {
     type Err = anyhow::Error;
 
@@ -106,5 +137,93 @@ impl FromStr for CiphernodesCommitteeSize {
 impl fmt::Display for CiphernodesCommitteeSize {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+/// Select the canonical honest roster of size at most `committee_h`: ascending `party_id`,
+/// truncated to the lowest `H` when the candidate set is larger.
+///
+/// Used by the public-key aggregator (C5 / NodeFold) and threshold keyshare (C4) so both sides
+/// agree on which parties occupy the circuit's `H` slots when `H < N`.
+pub fn cap_honest_party_ids(
+    committee_h: usize,
+    party_ids: impl IntoIterator<Item = u64>,
+) -> BTreeSet<u64> {
+    let mut ids: Vec<u64> = party_ids.into_iter().collect();
+    ids.sort_unstable();
+    ids.dedup();
+    if ids.len() > committee_h {
+        ids.truncate(committee_h);
+    }
+    ids.into_iter().collect()
+}
+
+/// Merge external honest `party_id`s with `own_party_id`, then [`cap_honest_party_ids`].
+pub fn canonical_honest_party_ids_with_own(
+    committee_h: usize,
+    external_honest_party_ids: impl IntoIterator<Item = u64>,
+    own_party_id: u64,
+) -> BTreeSet<u64> {
+    cap_honest_party_ids(
+        committee_h,
+        external_honest_party_ids
+            .into_iter()
+            .chain(std::iter::once(own_party_id)),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn canonical_committee_for_circuit_accepts_medium_row() {
+        let committee = CiphernodesCommitteeSize::Medium.values();
+        assert_eq!(
+            canonical_committee_for_circuit(&committee).unwrap(),
+            committee
+        );
+    }
+
+    #[test]
+    fn cap_honest_party_ids_keeps_lowest_h() {
+        let capped = cap_honest_party_ids(8, 0..10);
+        assert_eq!(capped, BTreeSet::from([0, 1, 2, 3, 4, 5, 6, 7]));
+    }
+
+    #[test]
+    fn cap_honest_party_ids_noop_when_at_most_h() {
+        let capped = cap_honest_party_ids(8, [2u64, 0, 1]);
+        assert_eq!(capped, BTreeSet::from([0, 1, 2]));
+    }
+
+    #[test]
+    fn canonical_with_own_matches_global_lowest_h_when_own_is_high() {
+        // Medium-style: N=10, H=8, all external 0..8 honest, own=9.
+        let external: Vec<u64> = (0..9).collect();
+        let canonical = canonical_honest_party_ids_with_own(8, external, 9);
+        assert_eq!(canonical, BTreeSet::from([0, 1, 2, 3, 4, 5, 6, 7]));
+        assert!(!canonical.contains(&9));
+    }
+
+    #[test]
+    fn canonical_with_own_includes_own_when_in_lowest_h() {
+        let external: Vec<u64> = (0..9).collect();
+        let canonical = canonical_honest_party_ids_with_own(8, external, 7);
+        assert_eq!(canonical, BTreeSet::from([0, 1, 2, 3, 4, 5, 6, 7]));
+        assert!(canonical.contains(&7));
+    }
+
+    #[test]
+    fn old_keyshare_cap_rule_diverges_from_canonical() {
+        let external: Vec<u64> = (0..9).collect();
+        let committee_h = 8usize;
+        let own = 9u64;
+        let mut old_external = external.clone();
+        old_external.truncate(committee_h.saturating_sub(1));
+        let mut old = BTreeSet::from_iter(old_external);
+        old.insert(own);
+        let canonical = canonical_honest_party_ids_with_own(committee_h, external, own);
+        assert_ne!(old, canonical);
     }
 }

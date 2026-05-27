@@ -32,7 +32,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=load_default_committee.sh
 source "${SCRIPT_DIR}/load_default_committee.sh"
 DEFAULT_MOD_NR="${REPO_ROOT}/circuits/lib/src/configs/default/mod.nr"
-load_default_committee "$DEFAULT_MOD_NR" "$REPO_ROOT"
+# Generate Prover.toml using the benchmark run's committee (set by run_benchmarks.sh when invoked
+# from the suite; otherwise falls back to the on-disk active committee).
+if [ -z "${BENCHMARK_COMMITTEE:-}" ]; then
+    load_default_committee "$DEFAULT_MOD_NR" "$REPO_ROOT"
+else
+    load_committee_by_name "$BENCHMARK_COMMITTEE" "$REPO_ROOT"
+fi
 
 if [ -z "$COMMITTEE_NAME" ]; then
     echo "Error: COMMITTEE_NAME not set by load_default_committee.sh"

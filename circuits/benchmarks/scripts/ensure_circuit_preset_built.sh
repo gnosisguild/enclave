@@ -10,7 +10,7 @@
 set -e
 
 PRESET=""
-COMMITTEE="micro"
+COMMITTEE=""
 FORCE_BUILD=false
 VERBOSE=false
 
@@ -80,6 +80,13 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+
+if [ -z "$COMMITTEE" ]; then
+    # shellcheck source=load_default_committee.sh
+    source "${SCRIPT_DIR}/load_default_committee.sh"
+    load_default_committee "" "$REPO_ROOT"
+    COMMITTEE="$COMMITTEE_NAME"
+fi
 
 BUILD_ARGS=(--preset "$PRESET" --committee "$COMMITTEE")
 if [ "$FORCE_BUILD" = true ]; then

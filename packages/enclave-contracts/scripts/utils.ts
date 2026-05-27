@@ -80,9 +80,11 @@ function resolveRepoRoot(): string {
 export const REPO_ROOT = resolveRepoRoot();
 
 /**
+ * <generated-committee-doc>
  * Default insecure-512 / micro committee layout for BFV aggregator verifiers.
  * Must match `lib::configs::default::{H, T}` in compiled circuits.
  * Micro committee: N=3, T=1, H=3.
+ * </generated-committee-doc>
  */
 export const BFV_DKG_H = 3;
 export const BFV_THRESHOLD_T = 1;
