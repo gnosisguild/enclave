@@ -4,12 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-/// Currently defaults to just small committee size.
-/// In the future, we will add more committee sizes.
+//! Small committee size: N=5, T=2, H=5 (all parties expected honest during DKG).
+//! Parity matrices are auto-generated; switch with `pnpm build:circuits --committee small`.
 
-/// Number of parties.
 pub global N_PARTIES: u32 = 5;
-/// Threshold.
 pub global T: u32 = 2;
-/// Number of honest parties.
 pub global H: u32 = 5;
+
+pub mod parity_insecure;
+pub mod parity_secure;

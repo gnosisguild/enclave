@@ -402,30 +402,10 @@ artifact_size_pair_from_gas() {
 }
 
 load_protocol_params() {
-    local default_mod="${REPO_ROOT}/circuits/lib/src/configs/default/mod.nr"
-    local committee_name
-    committee_name=$(python3 - "$default_mod" <<'PY'
-import re, sys
-p = sys.argv[1]
-try:
-    txt = open(p, "r", encoding="utf-8").read()
-except Exception:
-    print("")
-    raise SystemExit(0)
-m = re.search(r"committee::([a-zA-Z0-9_]+)::\{H,\s*N_PARTIES,\s*T\}", txt)
-print(m.group(1) if m else "")
-PY
-)
-    [ -z "$committee_name" ] && committee_name="micro"
-    local committee_file="${REPO_ROOT}/circuits/lib/src/configs/committee/${committee_name}.nr"
-    local n t h
-    n=$(rg -N "N_PARTIES: u32 = " "$committee_file" | sed -E 's/.*= ([0-9]+);/\1/' | head -1)
-    t=$(rg -N "T: u32 = " "$committee_file" | sed -E 's/.*= ([0-9]+);/\1/' | head -1)
-    h=$(rg -N "H: u32 = " "$committee_file" | sed -E 's/.*= ([0-9]+);/\1/' | head -1)
-    [ -z "$n" ] && n="N/A"
-    [ -z "$t" ] && t="N/A"
-    [ -z "$h" ] && h="N/A"
-    echo "$h|$n|$t"
+    # shellcheck source=load_default_committee.sh
+    source "${SCRIPT_DIR}/load_default_committee.sh"
+    load_default_committee "${REPO_ROOT}/circuits/lib/src/configs/default/mod.nr" "${REPO_ROOT}"
+    echo "${COMMITTEE_H}|${COMMITTEE_N}|${COMMITTEE_T}"
 }
 
 load_system_info_from_raw() {

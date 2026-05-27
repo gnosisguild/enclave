@@ -64,15 +64,8 @@ enum DkgInputTypeArg {
 }
 
 fn parse_committee(s: &str) -> Result<CiphernodesCommitteeSize> {
-    match s.trim().to_lowercase().as_str() {
-        "micro" => Ok(CiphernodesCommitteeSize::Micro),
-        "small" => Ok(CiphernodesCommitteeSize::Small),
-        "medium" => Ok(CiphernodesCommitteeSize::Medium),
-        "large" => Ok(CiphernodesCommitteeSize::Large),
-        _ => Err(anyhow!(
-            "unknown committee: {s}. Use \"micro\", \"small\", \"medium\", or \"large\""
-        )),
-    }
+    use std::str::FromStr;
+    CiphernodesCommitteeSize::from_str(s.trim())
 }
 
 fn parse_input_type(s: &str) -> Result<DkgInputTypeArg> {
@@ -182,7 +175,7 @@ struct Cli {
     /// Select the witness family when sample generation depends on it.
     #[arg(long)]
     inputs: Option<String>,
-    /// Committee size: "micro" or "small".
+    /// Committee size: micro, small, medium, or large (must match circuits lib default).
     #[arg(long, default_value = "micro")]
     committee: String,
     /// Output directory for generated artifacts.

@@ -49,6 +49,7 @@ use num_bigint::BigUint;
 use rand::rngs::OsRng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
+use std::collections::HashSet;
 use std::ffi::OsString;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
@@ -162,6 +163,79 @@ fn benchmark_dkg_fold_attestation_verifier_address() -> Option<Address> {
         .or_else(|| "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0".parse().ok())
 }
 
+/// Monorepo root (`crates/tests` → `../..`).
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+}
+
+/// Whether `setup_test_zk_backend` copies from `dist/circuits/<preset>/` (same marker as below).
+fn uses_dist_preset_artifacts(preset_subdir: &str) -> bool {
+    repo_root()
+        .join("dist/circuits")
+        .join(preset_subdir)
+        .join("recursive/dkg/pk/pk.json")
+        .exists()
+}
+
+/// Preset stamp for committee/metadata — aligned with `setup_test_zk_backend` artifact source:
+/// dist tree when present, otherwise `circuits/bin/.active-preset.json`.
+fn resolve_preset_stamp_path(preset_subdir: &str) -> PathBuf {
+    let dist_preset = repo_root().join("dist/circuits").join(preset_subdir);
+    if uses_dist_preset_artifacts(preset_subdir) {
+        dist_preset.join(".build-stamp.json")
+    } else {
+        repo_root()
+            .join("circuits")
+            .join("bin")
+            .join(".active-preset.json")
+    }
+}
+
+/// Reads the active committee from the preset stamp that matches the circuit artifacts in use.
+/// Uses `resolve_preset_stamp_path` so committee metadata stays aligned with
+/// `setup_test_zk_backend` (dist vs `circuits/bin`).
+///
+/// Falls back to `Micro` (and warns) when the stamp is missing or pre-dates the `committee`
+/// field — same default as the build script, so a freshly cloned repo's micro circuits work
+/// out of the box.
+fn active_committee(preset_subdir: &str) -> e3_zk_helpers::CiphernodesCommitteeSize {
+    use std::str::FromStr;
+    let stamp_path = resolve_preset_stamp_path(preset_subdir);
+    let fallback = e3_zk_helpers::CiphernodesCommitteeSize::Micro;
+
+    let Ok(raw) = std::fs::read_to_string(&stamp_path) else {
+        eprintln!(
+            "⚠️  {} not found; defaulting to {fallback}. \
+             Run `pnpm build:circuits --committee <name>` to make this deterministic.",
+            stamp_path.display(),
+        );
+        return fallback;
+    };
+    let Ok(stamp) = serde_json::from_str::<serde_json::Value>(&raw) else {
+        eprintln!(
+            "⚠️  {} is not valid JSON; defaulting to {fallback}.",
+            stamp_path.display()
+        );
+        return fallback;
+    };
+    let Some(active) = stamp.get("committee").and_then(|v| v.as_str()) else {
+        eprintln!(
+            "⚠️  {} has no `committee` field (older build); defaulting to {fallback}.",
+            stamp_path.display(),
+        );
+        return fallback;
+    };
+    e3_zk_helpers::CiphernodesCommitteeSize::from_str(active).unwrap_or_else(|e| {
+        panic!(
+            "{} has unknown committee=\"{active}\": {e}. \
+             Expected micro|small|medium|large.",
+            stamp_path.display()
+        )
+    })
+}
+
 /// Slashing manager address for benchmarks (no live RPC; used as EIP-712
 /// `verifyingContract` for accusation vote signatures).
 fn benchmark_slashing_manager_address() -> Address {
@@ -267,9 +341,7 @@ async fn setup_test_zk_backend(
     let bb_binary = noir_dir.join("bin").join("bb");
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..");
+    let repo_root = repo_root();
     let dist_preset = repo_root.join("dist/circuits").join(preset_subdir);
 
     if let Some(bb) = find_bb().await {
@@ -285,7 +357,6 @@ async fn setup_test_zk_backend(
         compile_error!("Integration tests require unix symlink support");
 
         let preset_out = circuits_dir.join(preset_subdir);
-        let dist_marker = dist_preset.join("recursive/dkg/pk/pk.json");
         let circuits_bin_marker = repo_root.join("circuits/bin/dkg/target/pk.json");
         // `circuits/bin` is preset-agnostic on disk — only `dist/circuits/<preset>/.build-stamp.json`
         // (written by `pnpm build:circuits --preset <preset>`) records which preset the
@@ -294,7 +365,7 @@ async fn setup_test_zk_backend(
         // produce invalid proofs.
         let preset_build_stamp = dist_preset.join(".build-stamp.json");
 
-        if dist_marker.exists() {
+        if uses_dist_preset_artifacts(preset_subdir) {
             copy_dir_recursive(&dist_preset, &preset_out).await?;
         } else if !circuits_bin_marker.exists() || !preset_build_stamp.exists() {
             // Either no local build exists, or the local build cannot be proven to match
@@ -1162,8 +1233,14 @@ async fn test_trbfv_actor() -> Result<()> {
     let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));
 
     // round information
-    let threshold_m = 1;
-    let threshold_n = 3;
+    // Committee comes from the build stamp — the test always runs against whatever the circuits
+    // in `circuits/bin/` were compiled for, so switching committee is a single
+    // `pnpm build:circuits --committee <name>` away with no env var to remember.
+    let committee_size = active_committee(benchmark_params.preset_subdir);
+    let benchmark_committee = committee_size.values();
+    let threshold_m = benchmark_committee.threshold;
+    let threshold_n = benchmark_committee.n;
+    let committee_h = benchmark_committee.h;
     let esi_per_ct = 1;
 
     // Statistical security parameter λ used for smudging bound / error_size.
@@ -1384,53 +1461,47 @@ async fn test_trbfv_actor() -> Result<()> {
     // Node 0 is a non-committee observer. It only sees bus-global events and the forwardable
     // gossip events from the active aggregator flow.
     let shares_to_pubkey_agg_timer = Instant::now();
-    const KS3: [&str; 3] = ["KeyshareCreated"; 3];
-    const DKG3: [&str; 3] = ["DKGRecursiveAggregationComplete"; 3];
-    const ACTIVE_AGGREGATOR_C1_C5: [&str; 9] = [
+    // KeyshareCreated is gossiped by each committee member (N). The aggregator folds H honest
+    // keyshares into PublicKeyAggregated; DKGRecursiveAggregationComplete is one per member (N).
+    let ks_n: Vec<&'static str> = vec!["KeyshareCreated"; threshold_n];
+    let dkg_n: Vec<&'static str> = vec!["DKGRecursiveAggregationComplete"; threshold_n];
+    let mut active_aggregator_c1_c5: Vec<&'static str> = vec![
         "ShareVerificationDispatched",
         "CommitmentConsistencyCheckRequested",
         "CommitmentConsistencyCheckComplete",
-        "ProofVerificationPassed",
-        "ProofVerificationPassed",
-        "ProofVerificationPassed",
+    ];
+    // C1 verification dispatches ALL N submitted keyshare proofs (the protocol needs to know
+    // who's dishonest before it can pick the H honest set), so N ProofVerificationPassed events
+    // fire. The aggregator subsequently truncates to H for C5 input only.
+    active_aggregator_c1_c5.extend(std::iter::repeat("ProofVerificationPassed").take(threshold_n));
+    active_aggregator_c1_c5.extend_from_slice(&[
         "ShareVerificationComplete",
         "PkAggregationProofPending",
         "PkAggregationProofSigned",
-    ];
+    ]);
 
     let mut expected_events: Vec<&'static str> = vec!["AggregatorChanged"];
     if proof_aggregation_enabled {
-        expected_events.extend_from_slice(&KS3);
-        expected_events.extend_from_slice(&DKG3);
+        expected_events.extend_from_slice(&ks_n);
+        expected_events.extend_from_slice(&dkg_n);
     } else {
-        expected_events.extend_from_slice(&DKG3);
-        expected_events.extend_from_slice(&KS3);
+        expected_events.extend_from_slice(&dkg_n);
+        expected_events.extend_from_slice(&ks_n);
     }
     expected_events.push("PublicKeyAggregated");
-    // KeyshareCreated and DKGRecursiveAggregationComplete are gossiped independently
-    // by different committee members, so at a non-committee observer they can interleave
-    // in any order. Assert the multiset matches and the boundary events are in place,
-    // rather than a strict sequence.
+    // Gossip can duplicate KeyshareCreated; wait until PublicKeyAggregated rather than a fixed take count.
     let h = nodes
-        .take_history_with_timeouts(
+        .take_history_until_last_event(
             0,
-            expected_events.len(),
+            "PublicKeyAggregated",
             Some(pubkey_flow_timeout),
             Some(pubkey_flow_timeout),
         )
         .await
-        .map_err(|e| anyhow::anyhow!("FAILURE on node 0: {expected_events:?} : {e}"))?;
+        .map_err(|e| anyhow::anyhow!("FAILURE on node 0 pubkey flow: {e}"))?;
     let actual_types = h.event_types();
-    println!("node 0 >> {:?} =~ {:?}", actual_types, expected_events);
-    let mut actual_sorted = actual_types.clone();
-    let mut expected_sorted: Vec<String> =
-        expected_events.iter().map(|s| (*s).to_string()).collect();
-    actual_sorted.sort();
-    expected_sorted.sort();
-    assert_eq!(
-        actual_sorted, expected_sorted,
-        "node 0 event multiset mismatch"
-    );
+    println!("node 0 >> {:?}", actual_types);
+
     assert_eq!(
         actual_types.first().map(String::as_str),
         Some("AggregatorChanged"),
@@ -1442,6 +1513,44 @@ async fn test_trbfv_actor() -> Result<()> {
         "node 0: last event must be PublicKeyAggregated"
     );
 
+    let dkg_parties: HashSet<u64> = h
+        .iter()
+        .filter_map(|e| match e.get_data() {
+            EnclaveEventData::DKGRecursiveAggregationComplete(d) => Some(d.party_id),
+            _ => None,
+        })
+        .collect();
+    let ks_parties: HashSet<u64> = h
+        .iter()
+        .filter_map(|e| match e.get_data() {
+            EnclaveEventData::KeyshareCreated(d) => Some(d.party_id),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        dkg_parties.len(),
+        threshold_n,
+        "node 0: expected one DKGRecursiveAggregationComplete per committee member (N={threshold_n}), got parties {dkg_parties:?}"
+    );
+    assert_eq!(
+        ks_parties.len(),
+        threshold_n,
+        "node 0: expected KeyshareCreated from each committee member (N={threshold_n}), got parties {ks_parties:?}"
+    );
+    let pk_agg = h
+        .iter()
+        .rev()
+        .find_map(|e| match e.get_data() {
+            EnclaveEventData::PublicKeyAggregated(d) => Some(d),
+            _ => None,
+        })
+        .expect("PublicKeyAggregated in history");
+    assert_eq!(
+        pk_agg.nodes.len(),
+        committee_h,
+        "PublicKeyAggregated must list H={committee_h} honest nodes"
+    );
+
     let active_aggregator_history = nodes.get_history(active_aggregator_index).await?;
     let active_aggregator_pubkey_history_len = active_aggregator_history.len();
     let mut expected_active_aggregator_pubkey_events = vec![
@@ -1450,14 +1559,14 @@ async fn test_trbfv_actor() -> Result<()> {
         "AggregatorChanged",
     ];
     if proof_aggregation_enabled {
-        expected_active_aggregator_pubkey_events.extend_from_slice(&KS3);
+        expected_active_aggregator_pubkey_events.extend_from_slice(&ks_n);
     } else {
-        expected_active_aggregator_pubkey_events.extend_from_slice(&DKG3);
-        expected_active_aggregator_pubkey_events.extend_from_slice(&KS3);
+        expected_active_aggregator_pubkey_events.extend_from_slice(&dkg_n);
+        expected_active_aggregator_pubkey_events.extend_from_slice(&ks_n);
     }
-    expected_active_aggregator_pubkey_events.extend_from_slice(&ACTIVE_AGGREGATOR_C1_C5);
+    expected_active_aggregator_pubkey_events.extend_from_slice(&active_aggregator_c1_c5);
     if proof_aggregation_enabled {
-        expected_active_aggregator_pubkey_events.extend_from_slice(&DKG3);
+        expected_active_aggregator_pubkey_events.extend_from_slice(&dkg_n);
     }
     expected_active_aggregator_pubkey_events.push("PublicKeyAggregated");
 
@@ -1577,62 +1686,137 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // The collector only sees the shared ciphertext event, gossiped decryption shares, and the
     // final gossiped plaintext output.
-    const DS3: [&str; 3] = ["DecryptionshareCreated"; 3];
+    // Only the H honest parties decrypt and gossip a share; the (N - H) extras stay in the
+    // full committee but do not participate in decryption.
+    let ds_n: Vec<&'static str> = vec!["DecryptionshareCreated"; committee_h];
     let mut expected_events: Vec<&'static str> = vec!["CiphertextOutputPublished"];
-    expected_events.extend_from_slice(&DS3);
+    expected_events.extend_from_slice(&ds_n);
     expected_events.push("PlaintextAggregated");
 
     println!(
         "[bench-progress] waiting for PlaintextAggregated flow on observer node (expected events: {})",
         expected_events.len()
     );
-    let h = expect_node_events_with_timeouts(
-        &nodes,
-        0,
-        &expected_events,
-        plaintext_flow_timeout,
-        plaintext_flow_timeout,
-    )
-    .await?;
+    // Gossip can duplicate DecryptionshareCreated on the collector path (same as KeyshareCreated
+    // in the pubkey flow); wait until `PlaintextAggregated` rather than a fixed take count, then
+    // assert the multiset matches with duplicates removed.
+    let h = nodes
+        .take_history_until_last_event(
+            0,
+            "PlaintextAggregated",
+            Some(plaintext_flow_timeout),
+            Some(plaintext_flow_timeout),
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("FAILURE on node 0 plaintext flow: {e}"))?;
+    let actual_types = h.event_types();
+    println!("node 0 >> {:?}", actual_types);
+    assert_eq!(
+        actual_types.first().map(String::as_str),
+        Some("CiphertextOutputPublished"),
+        "collector: first plaintext-flow event must be CiphertextOutputPublished"
+    );
+    assert_eq!(
+        actual_types.last().map(String::as_str),
+        Some("PlaintextAggregated"),
+        "collector: last plaintext-flow event must be PlaintextAggregated"
+    );
+    let unique_ds_parties: HashSet<u64> = h
+        .iter()
+        .filter_map(|e| match e.get_data() {
+            EnclaveEventData::DecryptionshareCreated(d) => Some(d.party_id),
+            _ => None,
+        })
+        .collect();
+    // All N committee members that received share material attempt decryption and gossip; the
+    // aggregator consumes only H. So the number of distinct senders observed at the collector
+    // sits in [H, N].
+    assert!(
+        unique_ds_parties.len() >= committee_h && unique_ds_parties.len() <= threshold_n,
+        "collector: expected DecryptionshareCreated from {committee_h}..={threshold_n} distinct parties, got {} parties {unique_ds_parties:?}",
+        unique_ds_parties.len()
+    );
     println!("[bench-progress] PlaintextAggregated observed on collector path");
 
     let active_aggregator_history = nodes.get_history(active_aggregator_index).await?;
-    const C6_VERIFY_PREFIX: [&str; 19] = [
-        "CiphertextOutputPublished",
-        "DecryptionshareCreated",
-        "DecryptionshareCreated",
-        "DecryptionshareCreated",
-        "ShareVerificationDispatched",
-        "CommitmentConsistencyCheckRequested",
-        "CommitmentConsistencyCheckComplete",
-        "ComputeRequest",
-        "ComputeResponse",
-        "ProofVerificationPassed",
-        "ProofVerificationPassed",
-        "ProofVerificationPassed",
-        "ProofVerificationPassed",
-        "ProofVerificationPassed",
-        "ProofVerificationPassed",
-        "ProofVerificationPassed",
-        "ProofVerificationPassed",
-        "ProofVerificationPassed",
-        "ShareVerificationComplete",
-    ];
     let active_aggregator_plaintext_events = project_history(
         &active_aggregator_history[active_aggregator_pubkey_history_len..],
         |data| plaintext_aggregator_marker(data, &e3_id),
     );
+
+    // C6 head layout:
+    //   CiphertextOutputPublished, DecryptionshareCreated × K, ShareVerificationDispatched,
+    //   CommitmentConsistencyCheckRequested, CommitmentConsistencyCheckComplete
+    // where K is in [H, N] plus possible gossip duplicates — every committee member that received
+    // share material gossips one, the aggregator selects H. Locate boundaries by name rather than
+    // by fixed offset.
     assert_eq!(
-        &active_aggregator_plaintext_events[..C6_VERIFY_PREFIX.len()],
-        C6_VERIFY_PREFIX,
-        "Unexpected active aggregator C6 verification prefix"
+        active_aggregator_plaintext_events.first().copied(),
+        Some("CiphertextOutputPublished"),
+        "active aggregator: first plaintext-flow event must be CiphertextOutputPublished"
+    );
+    let svd_index = active_aggregator_plaintext_events
+        .iter()
+        .position(|e| *e == "ShareVerificationDispatched")
+        .expect("ShareVerificationDispatched should be present in plaintext flow");
+    let pre_svd = &active_aggregator_plaintext_events[1..svd_index];
+    assert!(
+        pre_svd.iter().all(|e| *e == "DecryptionshareCreated"),
+        "active aggregator: only DecryptionshareCreated allowed between CiphertextOutputPublished and ShareVerificationDispatched, got {pre_svd:?}"
+    );
+    let unique_ds_parties_agg: HashSet<u64> = active_aggregator_history
+        [active_aggregator_pubkey_history_len..]
+        .iter()
+        .take_while(|e| {
+            !matches!(
+                e.get_data(),
+                EnclaveEventData::ShareVerificationDispatched(_)
+            )
+        })
+        .filter_map(|e| match e.get_data() {
+            EnclaveEventData::DecryptionshareCreated(d) if d.e3_id == e3_id => Some(d.party_id),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        unique_ds_parties_agg.len() >= committee_h && unique_ds_parties_agg.len() <= threshold_n,
+        "active aggregator: expected DecryptionshareCreated from {committee_h}..={threshold_n} distinct parties before ShareVerificationDispatched, got {} parties {unique_ds_parties_agg:?}",
+        unique_ds_parties_agg.len()
+    );
+    assert_eq!(
+        &active_aggregator_plaintext_events[svd_index..svd_index + 3],
+        &[
+            "ShareVerificationDispatched",
+            "CommitmentConsistencyCheckRequested",
+            "CommitmentConsistencyCheckComplete",
+        ][..],
+        "Unexpected active aggregator C6 head after ShareVerificationDispatched"
+    );
+    let c6_head_end = svd_index + 3;
+
+    let aggregation_pending_index = active_aggregator_plaintext_events
+        .iter()
+        .position(|event| *event == "AggregationProofPending")
+        .expect("AggregationProofPending should be present");
+    let c6_body = &active_aggregator_plaintext_events[c6_head_end..aggregation_pending_index];
+    assert_eq!(
+        count_projected_events(c6_body, "ShareVerificationComplete"),
+        1,
+        "expected one C6 ShareVerificationComplete before aggregation"
+    );
+    assert!(
+        count_projected_events(c6_body, "ProofVerificationPassed") >= committee_h,
+        "expected >= {committee_h} C6 ProofVerificationPassed events before aggregation"
+    );
+    let c6_compute_requests = count_projected_events(c6_body, "ComputeRequest");
+    let c6_compute_responses = count_projected_events(c6_body, "ComputeResponse");
+    assert!(
+        c6_compute_requests >= 1 && c6_compute_requests == c6_compute_responses,
+        "expected paired C6-phase ComputeRequest/ComputeResponse (got {c6_compute_requests} requests, {c6_compute_responses} responses)"
     );
 
-    let completion_events = &active_aggregator_plaintext_events[C6_VERIFY_PREFIX.len()..];
-
-    let mut expected_plaintext_completion = vec![
-        "ComputeRequest",
-        "ComputeResponse",
+    let aggregation_flow = &active_aggregator_plaintext_events[aggregation_pending_index..];
+    let mut expected_aggregation_flow = vec![
         "AggregationProofPending",
         "ComputeRequest",
         "ComputeResponse",
@@ -1640,47 +1824,39 @@ async fn test_trbfv_actor() -> Result<()> {
     ];
     if proof_aggregation_enabled {
         // `DecryptionAggregation`: one compute pair (C6 fold + C7 checked inside the worker).
-        expected_plaintext_completion.push("ComputeRequest");
-        expected_plaintext_completion.push("ComputeResponse");
+        expected_aggregation_flow.push("ComputeRequest");
+        expected_aggregation_flow.push("ComputeResponse");
     }
-    expected_plaintext_completion.push("PlaintextAggregated");
+    expected_aggregation_flow.push("PlaintextAggregated");
 
     assert_eq!(
-        completion_events,
-        expected_plaintext_completion.as_slice(),
-        "Unexpected active aggregator plaintext completion flow"
+        aggregation_flow,
+        expected_aggregation_flow.as_slice(),
+        "Unexpected active aggregator C7/aggregation flow"
     );
     assert_eq!(
-        count_projected_events(completion_events, "AggregationProofPending"),
+        count_projected_events(aggregation_flow, "AggregationProofSigned"),
         1
     );
     assert_eq!(
-        count_projected_events(completion_events, "AggregationProofSigned"),
+        count_projected_events(aggregation_flow, "PlaintextAggregated"),
         1
     );
-    assert_eq!(
-        count_projected_events(completion_events, "PlaintextAggregated"),
-        1
-    );
-    let aggregation_pending_index = completion_events
-        .iter()
-        .position(|event| *event == "AggregationProofPending")
-        .expect("AggregationProofPending should be present");
-    let aggregation_signed_index = completion_events
+    let aggregation_signed_index = aggregation_flow
         .iter()
         .position(|event| *event == "AggregationProofSigned")
         .expect("AggregationProofSigned should be present");
-    let plaintext_aggregated_index = completion_events
+    let plaintext_aggregated_index = aggregation_flow
         .iter()
         .position(|event| *event == "PlaintextAggregated")
         .expect("PlaintextAggregated should be present");
     assert!(
-        aggregation_pending_index < aggregation_signed_index,
-        "AggregationProofPending must precede AggregationProofSigned"
+        aggregation_signed_index < plaintext_aggregated_index,
+        "AggregationProofSigned must precede PlaintextAggregated"
     );
     assert_eq!(
         plaintext_aggregated_index,
-        completion_events.len() - 1,
+        aggregation_flow.len() - 1,
         "PlaintextAggregated must be the last active aggregator completion event"
     );
 
@@ -1884,7 +2060,7 @@ async fn test_trbfv_actor() -> Result<()> {
             benchmark_params.lambda,
             proof_aggregation_enabled,
             concurrent_jobs,
-            threshold_n, // micro committee: H == N_PARTIES
+            committee_h,
             threshold_n,
             threshold_m,
             20usize,
@@ -2454,7 +2630,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
             pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
             e3_id: E3id::new("1234", 1),
             nodes: OrderedSet::from(eth_addrs.clone()),
-            committee_addresses: actual_pubkey_agg_1.committee_addresses,
+            committee_addresses: actual_pubkey_agg_1.committee_addresses.clone(),
+            honest_committee_addresses: actual_pubkey_agg_1.honest_committee_addresses.clone(),
             pk_commitment: actual_pubkey_agg_1.pk_commitment,
             dkg_aggregator_proof: None,
             dkg_attestation_bundle: None,
@@ -2497,7 +2674,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
             pubkey: ArcBytes::from_bytes(&test_pubkey.to_bytes()),
             e3_id: E3id::new("1234", 2),
             nodes: OrderedSet::from(eth_addrs.clone()),
-            committee_addresses: actual_pubkey_agg_2.committee_addresses,
+            committee_addresses: actual_pubkey_agg_2.committee_addresses.clone(),
+            honest_committee_addresses: actual_pubkey_agg_2.honest_committee_addresses.clone(),
             pk_commitment: actual_pubkey_agg_2.pk_commitment,
             dkg_aggregator_proof: None,
             dkg_attestation_bundle: None,

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # extract_crisp_verify_gas.sh - Runs CRISP verifier test with gas reporter and emits JSON.
-# Usage: ./extract_crisp_verify_gas.sh --output <json_file> [--mode insecure|secure] [--verbose]
-#        [--skip-build] [--force-build]
+# Usage: ./extract_crisp_verify_gas.sh --output <json_file> [--mode insecure|secure]
+#        [--committee micro|small|medium] [--verbose] [--skip-build] [--force-build]
 #
 # Integration test env (also set by run_benchmarks.sh):
 #   BENCHMARK_PROOF_AGGREGATION=true|false  — recursive fold + folded Π_DKG/Π_dec (default: true)
@@ -13,6 +13,7 @@ set -e
 
 OUTPUT_JSON=""
 MODE="insecure"
+COMMITTEE=""
 VERBOSE=false
 SKIP_BUILD=false
 FORCE_BUILD=false
@@ -25,6 +26,17 @@ while [[ $# -gt 0 ]]; do
             ;;
         --mode)
             MODE="$2"
+            shift 2
+            ;;
+        --committee)
+            COMMITTEE="$2"
+            case "$COMMITTEE" in
+                micro|small|medium) ;;
+                *)
+                    echo "Error: --committee must be micro|small|medium (got: $COMMITTEE)"
+                    exit 1
+                    ;;
+            esac
             shift 2
             ;;
         --verbose|-v)
@@ -41,14 +53,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 --output <json_file> [--mode insecure|secure] [--verbose] [--skip-build] [--force-build]"
+            echo "Usage: $0 --output <json_file> [--mode insecure|secure] [--committee micro|small|medium] [--verbose] [--skip-build] [--force-build]"
             exit 1
             ;;
     esac
 done
 
 if [ -z "$OUTPUT_JSON" ]; then
-    echo "Usage: $0 --output <json_file> [--mode insecure|secure] [--verbose] [--skip-build] [--force-build]"
+    echo "Usage: $0 --output <json_file> [--mode insecure|secure] [--committee micro|small|medium] [--verbose] [--skip-build] [--force-build]"
     exit 1
 fi
 if [ "$SKIP_BUILD" = true ] && [ "$FORCE_BUILD" = true ]; then
@@ -62,6 +74,12 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+# shellcheck source=load_default_committee.sh
+source "${SCRIPT_DIR}/load_default_committee.sh"
+if [ -z "$COMMITTEE" ]; then
+    load_default_committee "" "$REPO_ROOT"
+    COMMITTEE="$COMMITTEE_NAME"
+fi
 CRISP_CONTRACTS_DIR="${REPO_ROOT}/examples/CRISP/packages/crisp-contracts"
 TMP_LOG_CRISP="$(mktemp)"
 TMP_LOG_FOLDED="$(mktemp)"
@@ -108,7 +126,7 @@ if [ "$SKIP_BUILD" = true ]; then
     echo "  [gas] Skipping circuit build and Honk verifier generation (--skip-build)."
     require_preset_artifacts
 else
-    ENSURE_ARGS=("$PRESET_NAME")
+    ENSURE_ARGS=("$PRESET_NAME" --committee "$COMMITTEE")
     if [ "$FORCE_BUILD" = true ]; then
         ENSURE_ARGS+=(--force-build)
     fi

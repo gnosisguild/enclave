@@ -34,6 +34,7 @@ struct NodeDkgFoldMeta {
     sk_share_encryption_requests: Vec<ShareEncryptionProofRequest>,
     e_sm_share_encryption_requests: Vec<ShareEncryptionProofRequest>,
     committee_n: usize,
+    committee_h: usize,
     n_moduli: usize,
     params_preset: e3_fhe_params::BfvPreset,
 }
@@ -118,20 +119,29 @@ impl NodeProofAggregator {
         let e_sm_enc_count = msg.e_sm_share_encryption_requests.len();
         let total_expected = 4 + sk_enc_count + e_sm_enc_count + 2;
 
-        let (committee_n, n_moduli) = match build_pair_for_preset(msg.proof_request.params_preset) {
-            Ok((threshold_params, _)) => {
-                let n = msg.proof_request.committee_size.values().n as usize;
-                (n, threshold_params.moduli().len())
-            }
-            Err(e) => {
-                self.pending_inner_proofs.remove(&e3_id);
-                error!(
-                    "NodeProofAggregator: build_pair_for_preset failed for E3 {}: {e}",
-                    e3_id
-                );
-                return;
-            }
-        };
+        let committee = msg.proof_request.committee_size.values();
+        let (committee_n, committee_h, n_moduli) =
+            match build_pair_for_preset(msg.proof_request.params_preset) {
+                Ok((threshold_params, _)) => {
+                    (committee.n, committee.h, threshold_params.moduli().len())
+                }
+                Err(e) => {
+                    self.pending_inner_proofs.remove(&e3_id);
+                    error!(
+                        "NodeProofAggregator: build_pair_for_preset failed for E3 {}: {e}",
+                        e3_id
+                    );
+                    let _ = self.bus.publish(
+                        E3Failed {
+                            e3_id: e3_id.clone(),
+                            failed_at_stage: E3Stage::CommitteeFinalized,
+                            reason: FailureReason::DKGInvalidShares,
+                        },
+                        ec.clone(),
+                    );
+                    return;
+                }
+            };
 
         let meta = NodeDkgFoldMeta {
             party_id: msg.full_share.party_id,
@@ -141,6 +151,7 @@ impl NodeProofAggregator {
             sk_share_encryption_requests: msg.sk_share_encryption_requests.clone(),
             e_sm_share_encryption_requests: msg.e_sm_share_encryption_requests.clone(),
             committee_n,
+            committee_h,
             n_moduli,
             params_preset: msg.proof_request.params_preset,
         };
@@ -326,7 +337,7 @@ impl NodeProofAggregator {
 
         let party_id = state.meta.party_id;
         let committee_n = state.meta.committee_n;
-        let committee_h = committee_n;
+        let committee_h = state.meta.committee_h;
         let n_moduli = state.meta.n_moduli;
 
         let fold_attestation = match extract_node_fold_agg_commits(
@@ -612,6 +623,7 @@ mod tests {
                     sk_share_encryption_requests: Vec::new(),
                     e_sm_share_encryption_requests: Vec::new(),
                     committee_n: 0,
+                    committee_h: 0,
                     n_moduli: 0,
                     params_preset: e3_fhe_params::BfvPreset::InsecureThreshold512,
                 },
@@ -716,6 +728,7 @@ mod tests {
                 sk_share_encryption_requests: Vec::new(),
                 e_sm_share_encryption_requests: Vec::new(),
                 committee_n: 0,
+                committee_h: 0,
                 n_moduli: 0,
                 params_preset: e3_fhe_params::BfvPreset::InsecureThreshold512,
             },

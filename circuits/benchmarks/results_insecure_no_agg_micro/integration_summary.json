@@ -1,10 +1,10 @@
 {
   "integration_test": "test_trbfv_actor",
   "benchmark_config": {
-    "mode": "secure",
-    "bfv_preset_subdir": "secure-8192",
-    "bfv_preset": "SecureThreshold8192",
-    "lambda": 60,
+    "mode": "insecure",
+    "bfv_preset_subdir": "insecure-512",
+    "bfv_preset": "InsecureThreshold512",
+    "lambda": 2,
     "proof_aggregation_enabled": false,
     "multithread_concurrent_jobs": 13,
     "committee_h": 3,
@@ -23,96 +23,96 @@
   "operation_timings": [
     {
       "name": "CalculateDecryptionKey",
-      "avg_seconds": 0.036104014,
+      "avg_seconds": 0.004193153,
       "runs": 3,
-      "total_seconds": 0.108312043
+      "total_seconds": 0.012579459
     },
     {
       "name": "CalculateDecryptionShare",
-      "avg_seconds": 0.155666888,
+      "avg_seconds": 0.020384319,
       "runs": 3,
-      "total_seconds": 0.467000666
+      "total_seconds": 0.061152958
     },
     {
       "name": "CalculateThresholdDecryption",
-      "avg_seconds": 0.234273375,
+      "avg_seconds": 0.019784084,
       "runs": 1,
-      "total_seconds": 0.234273375
+      "total_seconds": 0.019784084
     },
     {
       "name": "GenEsiSss",
-      "avg_seconds": 0.088555027,
+      "avg_seconds": 0.006832208,
       "runs": 3,
-      "total_seconds": 0.265665083
+      "total_seconds": 0.020496625
     },
     {
       "name": "GenPkShareAndSkSss",
-      "avg_seconds": 0.120120347,
+      "avg_seconds": 0.010738166,
       "runs": 3,
-      "total_seconds": 0.360361042
+      "total_seconds": 0.032214499
     },
     {
       "name": "ZkDecryptedSharesAggregation",
-      "avg_seconds": 2.90879575,
+      "avg_seconds": 1.581275625,
       "runs": 1,
-      "total_seconds": 2.90879575
+      "total_seconds": 1.581275625
     },
     {
       "name": "ZkDkgShareDecryption",
-      "avg_seconds": 20.727147222,
+      "avg_seconds": 1.348800493,
       "runs": 6,
-      "total_seconds": 124.362883334
+      "total_seconds": 8.092802958
     },
     {
       "name": "ZkPkAggregation",
-      "avg_seconds": 11.371170708,
+      "avg_seconds": 0.704008084,
       "runs": 1,
-      "total_seconds": 11.371170708
+      "total_seconds": 0.704008084
     },
     {
       "name": "ZkPkBfv",
-      "avg_seconds": 3.53991425,
+      "avg_seconds": 0.222331778,
       "runs": 3,
-      "total_seconds": 10.61974275
+      "total_seconds": 0.666995335
     },
     {
       "name": "ZkPkGeneration",
-      "avg_seconds": 96.487730153,
+      "avg_seconds": 2.461834375,
       "runs": 3,
-      "total_seconds": 289.463190459
+      "total_seconds": 7.385503126
     },
     {
       "name": "ZkShareComputation",
-      "avg_seconds": 50.543073166,
+      "avg_seconds": 2.481999513,
       "runs": 6,
-      "total_seconds": 303.258439
+      "total_seconds": 14.891997083
     },
     {
       "name": "ZkShareEncryption",
-      "avg_seconds": 115.255456694,
-      "runs": 36,
-      "total_seconds": 4149.196440999
+      "avg_seconds": 4.130910402,
+      "runs": 24,
+      "total_seconds": 99.141849665
     },
     {
       "name": "ZkThresholdShareDecryption",
-      "avg_seconds": 102.677723166,
+      "avg_seconds": 3.425231986,
       "runs": 3,
-      "total_seconds": 308.0331695
+      "total_seconds": 10.275695958
     },
     {
       "name": "ZkVerifyShareDecryptionProofs",
-      "avg_seconds": 0.103283111,
+      "avg_seconds": 0.102147833,
       "runs": 3,
-      "total_seconds": 0.309849333
+      "total_seconds": 0.306443501
     },
     {
       "name": "ZkVerifyShareProofs",
-      "avg_seconds": 0.313393508,
+      "avg_seconds": 0.272140033,
       "runs": 5,
-      "total_seconds": 1.566967541
+      "total_seconds": 1.360700167
     }
   ],
-  "operation_timings_total_seconds": 5202.526261583,
+  "operation_timings_total_seconds": 144.553499127,
   "operation_timings_metric": "tracked_job_wall",
   "phase_timings": [
     {
@@ -122,57 +122,57 @@
     },
     {
       "label": "Setup completed",
-      "seconds": 2.6577995,
+      "seconds": 2.701572083,
       "metric": "wall_clock"
     },
     {
       "label": "Committee Setup Completed",
-      "seconds": 20.181663416,
+      "seconds": 20.090864792,
       "metric": "wall_clock"
     },
     {
       "label": "Committee Finalization Complete",
-      "seconds": 0.001112875,
+      "seconds": 0.001990708,
       "metric": "wall_clock"
     },
     {
       "label": "Aggregator P2: PkAggregation pending -> PublicKeyAggregated (wall)",
-      "seconds": 11.43493,
+      "seconds": 0.706576,
       "metric": "wall_clock"
     },
     {
       "label": "ThresholdShares -> PublicKeyAggregated",
-      "seconds": 461.185495792,
+      "seconds": 13.62430675,
       "metric": "wall_clock"
     },
     {
       "label": "E3Request -> PublicKeyAggregated",
-      "seconds": 461.7008915,
+      "seconds": 14.129209875,
       "metric": "wall_clock"
     },
     {
       "label": "Application CT Gen",
-      "seconds": 0.357493625,
+      "seconds": 0.009638083,
       "metric": "wall_clock"
     },
     {
       "label": "Running FHE Application",
-      "seconds": 0.000820875,
+      "seconds": 0.000051333,
       "metric": "wall_clock"
     },
     {
       "label": "Aggregator P4: Aggregation pending -> PlaintextAggregated (wall)",
-      "seconds": 3.068546,
+      "seconds": 1.588489,
       "metric": "wall_clock"
     },
     {
       "label": "Ciphertext published -> PlaintextAggregated",
-      "seconds": 144.435938625,
+      "seconds": 5.418986167,
       "metric": "wall_clock"
     },
     {
       "label": "Entire Test",
-      "seconds": 629.335317291,
+      "seconds": 42.353041667,
       "metric": "wall_clock"
     }
   ],

@@ -212,6 +212,57 @@ pub async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, TempDir) {
     (backend, temp)
 }
 
+/// Reads `circuits/bin/.active-preset.json` (written by `scripts/build-circuits.ts`) and
+/// returns the `committee` field, normalised to lower-case (e.g. `"micro"`, `"medium"`).
+/// Returns `None` when the stamp is absent or malformed — callers must treat that as a
+/// "circuits not built yet" condition rather than as a specific committee.
+pub fn active_bin_committee() -> Option<String> {
+    let path = circuits_build_root().join(".active-preset.json");
+    let raw = std::fs::read_to_string(&path).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    v.get("committee")?.as_str().map(|s| s.to_lowercase())
+}
+
+/// Returns `true` when the compiled `pk_aggregation` (C5) circuit was built for the **micro**
+/// committee (H=3): `expected_threshold_pk_commitments` array length == 3.
+///
+/// Tests that hard-code `CiphernodesCommitteeSize::Micro` samples should call this and skip
+/// when it returns `false` — the Micro samples will not satisfy the compiled circuit's ABI.
+///
+/// Prefers `.active-preset.json` (cheap stamp check) and falls back to ABI introspection of
+/// `pk_aggregation.json` for older builds that pre-date the stamp's `committee` field.
+pub fn circuits_compiled_for_micro() -> bool {
+    if let Some(committee) = active_bin_committee() {
+        return committee == "micro";
+    }
+
+    let path = circuits_build_root()
+        .join("threshold")
+        .join("pk_aggregation")
+        .join("target")
+        .join("pk_aggregation.json");
+    let Ok(raw) = std::fs::read_to_string(&path) else {
+        return false; // artifact absent → can't tell, assume not micro
+    };
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) else {
+        return false;
+    };
+    // `expected_threshold_pk_commitments` is the H-length array in C5's ABI.
+    v["abi"]["parameters"]
+        .as_array()
+        .and_then(|ps| {
+            ps.iter()
+                .find(|p| {
+                    p.get("name")
+                        == Some(&serde_json::Value::String(
+                            "expected_threshold_pk_commitments".into(),
+                        ))
+                })
+                .and_then(|p| p.get("type")?.get("length")?.as_u64())
+        })
+        .is_some_and(|len| len == 3) // micro H == 3
+}
+
 /// Lightweight backend for tests that need to override config (e.g. inject bad checksums).
 pub fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
     let noir_dir = temp_path.join("noir");

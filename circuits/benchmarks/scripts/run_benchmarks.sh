@@ -14,6 +14,7 @@ source "${SCRIPT_DIR}/benchmark_output_dir.sh"
 CONFIG_FILE="${BENCHMARKS_DIR}/config.json"
 CLEAN_ARTIFACTS=false
 MODE_OVERRIDE=""
+COMMITTEE_OVERRIDE=""
 SKIP_COMPILE=false
 BENCH_COMPILE=false
 CIRCUIT_FILTER=""
@@ -35,6 +36,17 @@ while [[ $# -gt 0 ]]; do
                 echo "Error: Mode must be 'insecure' or 'secure'"
                 exit 1
             fi
+            shift 2
+            ;;
+        --committee)
+            COMMITTEE_OVERRIDE="$2"
+            case "$COMMITTEE_OVERRIDE" in
+                micro|small|medium) ;;
+                *)
+                    echo "Error: --committee must be micro|small|medium (got: $COMMITTEE_OVERRIDE)"
+                    exit 1
+                    ;;
+            esac
             shift 2
             ;;
         --circuit)
@@ -71,7 +83,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--bench-compile] [--clean] [--verbose] [--proof-aggregation on|off] [--no-proof-aggregation] [--multithread-jobs N]"
+            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--committee micro|small|medium] [--circuit <path>] [--skip-compile] [--bench-compile] [--clean] [--verbose] [--proof-aggregation on|off] [--no-proof-aggregation] [--multithread-jobs N]"
             exit 1
             ;;
     esac
@@ -138,9 +150,36 @@ REPO_ROOT="$(cd "${BENCHMARKS_DIR}/../.." && pwd)"
 # Circuits live under circuits/bin (bin_dir is relative to benchmarks dir, e.g. ../bin)
 CIRCUITS_BASE_DIR="$(cd "${BENCHMARKS_DIR}/${BIN_DIR}" && pwd)"
 
-# results_<mode>_agg | results_<mode>_no_agg (see benchmark_output_dir.sh)
+# Resolve the committee for the output dir name. Explicit --committee wins; otherwise we
+# read what's currently on disk (the build step below will respect that selection). Sourced
+# here so OUTPUT_DIR can include the committee axis (`results_<mode>_<agg|no_agg>_<name>`).
+# shellcheck source=load_default_committee.sh
+source "${SCRIPT_DIR}/load_default_committee.sh"
+
+assert_skip_compile_committee_matches_disk() {
+    load_default_committee "" "$REPO_ROOT"
+    if [ "$COMMITTEE_NAME" != "$OUTPUT_COMMITTEE" ]; then
+        echo "Error: --skip-compile with --committee $OUTPUT_COMMITTEE but on-disk circuits are built for committee '$COMMITTEE_NAME'."
+        echo "  Rebuild: pnpm build:circuits --committee $OUTPUT_COMMITTEE"
+        echo "  Or omit --committee to benchmark the on-disk selection."
+        exit 1
+    fi
+}
+
+if [ -n "$COMMITTEE_OVERRIDE" ]; then
+    OUTPUT_COMMITTEE="$COMMITTEE_OVERRIDE"
+else
+    load_default_committee "" "$REPO_ROOT"
+    OUTPUT_COMMITTEE="$COMMITTEE_NAME"
+fi
+
+if [ "$SKIP_COMPILE" = true ] && [ -n "$COMMITTEE_OVERRIDE" ]; then
+    assert_skip_compile_committee_matches_disk
+fi
+
+# results_<mode>_<agg|no_agg>_<committee> (see benchmark_output_dir.sh)
 BENCHMARK_OUTPUT_DIR_BASE="$OUTPUT_DIR_BASE"
-OUTPUT_DIR="$(benchmark_results_dir_basename "$MODE" "$BENCHMARK_PROOF_AGGREGATION")"
+OUTPUT_DIR="$(benchmark_results_dir_basename "$MODE" "$BENCHMARK_PROOF_AGGREGATION" "$OUTPUT_COMMITTEE")"
 mkdir -p "${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw"
 
 # For secure mode, patch lib to use secure configs (restored at end)
@@ -161,8 +200,11 @@ fi
 GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 
+load_committee_by_name "$OUTPUT_COMMITTEE" "$REPO_ROOT"
+
 echo "Configuration:"
 echo "  Mode: $MODE"
+echo "  Committee: $OUTPUT_COMMITTEE (N=$COMMITTEE_N, T=$COMMITTEE_T, H=$COMMITTEE_H)"
 if [ -n "$CIRCUIT_FILTER" ]; then
     echo "  Circuit: $CIRCUIT_FILTER (single)"
 fi
@@ -196,7 +238,7 @@ if [ "$SKIP_COMPILE" = false ]; then
     else
         PRESET_NAME="insecure-512"
     fi
-    ENSURE_ARGS=("$PRESET_NAME")
+    ENSURE_ARGS=("$PRESET_NAME" --committee "$OUTPUT_COMMITTEE")
     if [ "$VERBOSE" = true ]; then
         ENSURE_ARGS+=(--verbose)
     fi
@@ -270,7 +312,7 @@ for CIRCUIT in $RUN_CIRCUITS; do
         
         # Generate Prover.toml (and configs.nr) via zk_cli so nargo execute has witness
         echo "  Generating Prover.toml..."
-        if ! "${SCRIPT_DIR}/generate_prover_toml.sh" "$CIRCUIT" "$MODE" "$REPO_ROOT" 2>&1; then
+        if ! BENCHMARK_COMMITTEE="$OUTPUT_COMMITTEE" "${SCRIPT_DIR}/generate_prover_toml.sh" "$CIRCUIT" "$MODE" "$REPO_ROOT" 2>&1; then
             echo "⚠️  Prover.toml generation failed for $CIRCUIT, skipping benchmark"
             echo ""
             continue
@@ -299,9 +341,13 @@ echo "Stage 1/3: Running gas extraction pipeline (CRISP test + integration + EVM
 GAS_JSON_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/crisp_verify_gas.json"
 # Remove any previous gas artifact so failures cannot leak stale values.
 rm -f "${GAS_JSON_FILE}"
-EXTRACT_ARGS=(--output "${GAS_JSON_FILE}" --mode "$MODE")
+EXTRACT_ARGS=(--output "${GAS_JSON_FILE}" --mode "$MODE" --committee "$OUTPUT_COMMITTEE")
 if [ "$VERBOSE" = true ]; then
     EXTRACT_ARGS+=(--verbose)
+fi
+# Benches already validated preset+committee artifacts; gas stage only checks + runs tests.
+if [ "$SKIP_COMPILE" = true ] || [ "$PRESET_ARTIFACTS_READY" = true ]; then
+    EXTRACT_ARGS+=(--skip-build)
 fi
 if "${SCRIPT_DIR}/extract_crisp_verify_gas.sh" "${EXTRACT_ARGS[@]}"; then
     echo "✓ CRISP verify gas extracted: ${GAS_JSON_FILE}"
@@ -312,20 +358,28 @@ fi
 # Persist CLI flags for report regeneration (see generate_report.sh → Run configuration).
 RUN_META_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/benchmark_run_meta.json"
 MT_JOBS_JSON="${BENCHMARK_MULTITHREAD_JOBS:-1}"
+load_committee_by_name "$OUTPUT_COMMITTEE" "$REPO_ROOT"
 jq -n \
     --arg mode "$MODE" \
     --arg preset "$([ "$MODE" = "secure" ] && echo "secure-8192" || echo "insecure-512")" \
+    --arg committee "$OUTPUT_COMMITTEE" \
     --argjson proof_agg "$( [ "$BENCHMARK_PROOF_AGGREGATION" = "false" ] && echo false || echo true )" \
     --argjson multithread_jobs "$MT_JOBS_JSON" \
     --argjson verbose "$([ "$VERBOSE" = true ] && echo true || echo false)" \
+    --argjson committee_size_n "$COMMITTEE_N" \
+    --argjson committee_size_h "$COMMITTEE_H" \
+    --argjson committee_threshold_t "$COMMITTEE_T" \
     '{
       benchmark_mode: $mode,
       bfv_preset_subdir: $preset,
+      committee: $committee,
       proof_aggregation: $proof_agg,
       multithread_jobs: $multithread_jobs,
       verbose: $verbose,
       nodes_spawned: 20,
-      committee_size_n: 3,
+      committee_size_n: $committee_size_n,
+      committee_size_h: $committee_size_h,
+      committee_threshold_t: $committee_threshold_t,
       network_model: "in_process_bus",
       testmode_harness: true
     }' > "${RUN_META_FILE}"

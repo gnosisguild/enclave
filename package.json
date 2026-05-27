@@ -25,6 +25,7 @@
     "check:license": "./scripts/check-license-headers.sh",
     "check:size": "./scripts/check-size.sh",
     "check:pnpm": "./scripts/check-pnpm.sh",
+    "check:committee": "./scripts/check-committee.sh",
     "test": "pnpm evm:test && pnpm rust:test && pnpm sdk:test && pnpm noir:test",
     "test:integration": "cd ./tests/integration && ./test.sh",
     "coverage": "pnpm evm:coverage",

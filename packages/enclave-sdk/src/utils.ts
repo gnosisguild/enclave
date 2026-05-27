@@ -76,9 +76,9 @@ export const DEFAULT_COMPUTE_PROVIDER_PARAMS: ComputeProviderParams = {
   batch_size: 2,
 }
 
-// Default E3 configuration
+// Default E3 configuration (`committeeSize` is `IEnclave.CommitteeSize`, not circuit N_PARTIES).
 export const DEFAULT_E3_CONFIG = {
-  committeeSize: 0, // Micro
+  committeeSize: 0, // CommitteeSize.Micro
   duration: 1800, // 30 minutes in seconds
   payment_amount: '0', // 0 ETH in wei
 } as const

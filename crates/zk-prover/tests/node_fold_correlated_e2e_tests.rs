@@ -17,7 +17,8 @@ mod node_fold_witness;
 use std::path::PathBuf;
 
 use common::{
-    find_bb, setup_compiled_circuit, setup_recursive_aggregation_fold_circuit, setup_test_prover,
+    find_bb, require_micro_circuits, setup_compiled_circuit,
+    setup_recursive_aggregation_fold_circuit, setup_test_prover,
 };
 use e3_events::{CircuitName, Proof};
 use e3_fhe_params::BfvPreset;
@@ -133,6 +134,10 @@ async fn node_fold_correlated_sparse_self_slot_proves_and_verifies() {
         println!("skipping: bb not found");
         return;
     };
+
+    if require_micro_circuits().is_none() {
+        return;
+    }
 
     let gate = recursive_aggregation_compiled_json_path(CircuitName::NodeFold);
     if !gate.exists() {

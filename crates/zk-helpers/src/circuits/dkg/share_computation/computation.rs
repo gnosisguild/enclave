@@ -150,7 +150,7 @@ impl Computation for Bounds {
     type Data = ShareComputationCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _data: &Self::Data) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let defaults = preset
@@ -159,12 +159,11 @@ impl Computation for Bounds {
         let num_ciphertexts = defaults.z;
         let lambda = defaults.lambda;
 
-        // Use search_defaults.n (same as C1/PkGeneration) so the smudging bound and
-        // resulting bit width match C1's PK_GENERATION_BIT_E_SM. This ensures
-        // C1.e_sm_commitment == C2b.expected_secret_commitment for the same e_sm.
+        // Use the same committee size as C1 (pk_generation) so smudging bounds and
+        // bit widths match PK_GENERATION_BIT_E_SM / SHARE_COMPUTATION_E_SM_BIT_SECRET.
         let e_sm_config = SmudgingBoundCalculatorConfig::new(
             threshold_params,
-            defaults.n as usize,
+            data.n_parties as usize,
             num_ciphertexts as usize,
             lambda as usize,
         );

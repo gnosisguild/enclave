@@ -38,7 +38,7 @@ use e3_trbfv::{
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_helpers::{canonical_honest_party_ids_with_own, CiphernodesCommitteeSize};
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
 use ndarray::Array2;
@@ -1212,6 +1212,17 @@ impl ThresholdKeyshare {
                     .map_err(|e| anyhow!("Failed to deserialize BFV public key: {:?}", e))
             })
             .collect::<Result<_>>()?;
+        // Share-encryption fan-out targets every registered party (`N`); `own_idx` is then
+        // skipped in `encrypt_all_extended_for_share_indices`, producing N-1 ciphertexts.
+        // The C3a/C3b NodeFold slots are sized for `N`, so any drift between the collected
+        // encryption-key roster and the configured committee would corrupt the fold witness.
+        if recipient_pks.len() != derived_committee_size.values().n as usize {
+            bail!(
+                        "share-encryption recipients ({}) do not match committee N ({}); C3 fan-out would mis-size the NodeFold slots",
+                        recipient_pks.len(),
+                        derived_committee_size.values().n
+                    );
+        }
         let recipient_party_ids: Vec<u64> = encryption_keys.iter().map(|k| k.party_id).collect();
         let recipient_share_indices: Vec<usize> = recipient_party_ids
             .iter()
@@ -1775,7 +1786,7 @@ impl ThresholdKeyshare {
 
         // Validate per-party dimensions and exclude mismatched parties.
         let mut dimension_excluded: Vec<u64> = Vec::new();
-        let honest_shares: Vec<_> = honest_shares
+        let mut honest_shares: Vec<_> = honest_shares
             .into_iter()
             .filter(|ts| {
                 if ts.esi_sss.len() != expected_num_esi {
@@ -1854,10 +1865,24 @@ impl ThresholdKeyshare {
             }
         }
 
-        // Honest party IDs include self (signing/aggregation treats own party as honest).
-        let mut honest_party_ids: BTreeSet<u64> =
-            honest_shares.iter().map(|s| s.party_id).collect();
-        honest_party_ids.insert(own_party_id);
+        // Noir C4 is parameterized by `H` (honest-set size), not full committee `N`.
+        // Use the same lowest-`H` roster rule as the public-key aggregator (C5 / NodeFold).
+        let committee = CiphernodesCommitteeSize::from_threshold(
+            state.threshold_m as usize,
+            state.threshold_n as usize,
+        )?;
+        let committee_h = committee.values().h;
+        let external_party_ids: Vec<u64> = honest_shares.iter().map(|s| s.party_id).collect();
+        if external_party_ids.len().saturating_add(1) > committee_h {
+            warn!(
+                "Capping honest roster to committee H={committee_h} for E3 {} (had {} external honest shares)",
+                e3_id,
+                external_party_ids.len()
+            );
+        }
+        let honest_party_ids =
+            canonical_honest_party_ids_with_own(committee_h, external_party_ids, own_party_id);
+        honest_shares.retain(|s| honest_party_ids.contains(&s.party_id));
 
         debug_assert!(
             honest_shares
@@ -1866,23 +1891,36 @@ impl ThresholdKeyshare {
             "honest_shares must be strictly ascending by party_id"
         );
 
-        // Position of own party within sorted {own} ∪ external honest set.
-        let own_plaintext_idx = honest_shares
-            .iter()
-            .position(|ts| ts.party_id > own_party_id)
-            .unwrap_or(honest_shares.len());
+        let canonical_sorted: Vec<u64> = honest_party_ids.iter().copied().collect();
+        let own_in_canonical = honest_party_ids.contains(&own_party_id);
+        let own_plaintext_idx = if let Some(idx) =
+            canonical_sorted.iter().position(|&pid| pid == own_party_id)
+        {
+            idx
+        } else {
+            warn!(
+                "Party {own_party_id} is outside the canonical honest roster (H={committee_h}, roster={honest_party_ids:?}) for E3 {e3_id}; \
+                 NodeFold/C5 on the aggregator will not include this party"
+            );
+            canonical_sorted.len().saturating_sub(1)
+        };
+        let num_honest = honest_party_ids.len();
+        let external_for_c4: &[&Arc<ThresholdShare>] = if own_in_canonical {
+            &honest_shares
+        } else {
+            &honest_shares[..num_honest.saturating_sub(1).min(honest_shares.len())]
+        };
 
-        let num_honest = honest_shares.len() + 1;
         info!(
-            "Decrypting shares from {} honest parties (incl. self) for E3 {}",
-            num_honest, e3_id
+            "Decrypting shares from {} honest parties (canonical roster size H={}) for E3 {}",
+            num_honest, committee_h, e3_id
         );
 
         // External ciphertexts for C4: own slot omitted from wire (rides as `own_share_raw`).
         // C4a: sk_sss external ciphertexts [(H-1) * L]
         let num_moduli_sk = expected_num_moduli_sk;
         let mut sk_ciphertexts_raw = Vec::new();
-        for ts in &honest_shares {
+        for ts in external_for_c4 {
             let idx = if ts.sk_sss.len() == 1 { 0 } else { party_id };
             let share = ts
                 .sk_sss
@@ -1897,7 +1935,7 @@ impl ThresholdKeyshare {
         let num_esi = expected_num_esi;
         let num_moduli_esi = expected_num_moduli_esi;
         let mut esi_ciphertexts_raw: Vec<Vec<ArcBytes>> = vec![Vec::new(); num_esi];
-        for ts in &honest_shares {
+        for ts in external_for_c4 {
             for (esi_idx, esi_shares) in ts.esi_sss.iter().enumerate() {
                 let idx = if esi_shares.len() == 1 { 0 } else { party_id };
                 let share = esi_shares
@@ -1910,7 +1948,7 @@ impl ThresholdKeyshare {
         }
 
         // Decrypt our share row from each external honest sender using BFV.
-        let mut sk_sss_collected: Vec<ShamirShare> = honest_shares
+        let mut sk_sss_collected: Vec<ShamirShare> = external_for_c4
             .iter()
             .map(|ts| {
                 let idx = if ts.sk_sss.len() == 1 { 0 } else { party_id };
@@ -1922,12 +1960,16 @@ impl ThresholdKeyshare {
             })
             .collect::<Result<_>>()?;
 
-        // Splice own sk share at the sorted-party position.
+        // Splice own sk share at the sorted-party position (when in the canonical roster).
         let own_sk_shamir = vec_of_rows_to_shamir_share(&own_sk_rows, degree)?;
-        sk_sss_collected.insert(own_plaintext_idx, own_sk_shamir);
+        if own_in_canonical {
+            sk_sss_collected.insert(own_plaintext_idx, own_sk_shamir);
+        } else {
+            sk_sss_collected.push(own_sk_shamir);
+        }
 
         // Decrypt per-party ESI shares: shape [external_party][esm_idx]
-        let mut per_party_esi: Vec<Vec<ShamirShare>> = honest_shares
+        let mut per_party_esi: Vec<Vec<ShamirShare>> = external_for_c4
             .iter()
             .map(|ts| {
                 ts.esi_sss
@@ -1948,7 +1990,11 @@ impl ThresholdKeyshare {
             .iter()
             .map(|rows| vec_of_rows_to_shamir_share(rows, degree))
             .collect::<Result<_>>()?;
-        per_party_esi.insert(own_plaintext_idx, own_esi_shamirs);
+        if own_in_canonical {
+            per_party_esi.insert(own_plaintext_idx, own_esi_shamirs);
+        } else {
+            per_party_esi.push(own_esi_shamirs);
+        }
 
         // Transpose to [esm_idx][party] — CalculateDecryptionKey aggregates per smudging noise
         let esi_sss_collected: Vec<Vec<ShamirShare>> = (0..num_esi)
