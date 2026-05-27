@@ -40,7 +40,7 @@
     "directory": "packages/enclave-sdk"
   },
   "scripts": {
-    "compile:circuits": "pnpm -C ../.. build:circuits --preset insecure-512 --committee micro --group threshold --circuit user_data_encryption --circuit user_data_encryption_ct0 --circuit user_data_encryption_ct1 --skip-vk --skip-checksums --no-clean-targets",
+    "compile:circuits": "bash scripts/compile-circuits.sh",
     "prebuild": "pnpm -C ../enclave-contracts build && pnpm -C ../../ wasm:build && pnpm compile:circuits",
     "build": "tsup",
     "dev": "tsup --watch",

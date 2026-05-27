@@ -51,10 +51,10 @@ pnpm build:circuits --preset insecure-512 --committee micro
 committee changes. The values are deterministic functions of the committee's `(N, T)` and the
 preset's threshold `QIS`, so any pair compiles and proves correctly.
 
-**Skipping the build step:** `pnpm check:committee` runs in the pre-push hook and fails the push
-if `active.nr`, `utils.ts`, `.active-preset.json`, or any committed `parity_*.nr` disagree with
-what `build:circuits --committee <active>` would produce. Always use `pnpm build:circuits
---committee` to switch; manual edits to those files will trip the check.
+**Skipping the build step:** `pnpm check:committee` runs in the pre-push hook and fails the push if
+`active.nr`, `utils.ts`, `.active-preset.json`, or any committed `parity_*.nr` disagree with what
+`build:circuits --committee <active>` would produce. Always use `pnpm build:circuits --committee` to
+switch; manual edits to those files will trip the check.
 
 ### Proof aggregation and folding (integration)
 
