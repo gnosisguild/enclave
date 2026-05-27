@@ -1,7 +1,7 @@
 {
-  "benchmark_mode": "secure",
-  "bfv_preset_subdir": "secure-8192",
-  "proof_aggregation": false,
+  "benchmark_mode": "insecure",
+  "bfv_preset_subdir": "insecure-512",
+  "proof_aggregation": true,
   "multithread_jobs": 13,
   "verbose": true,
   "nodes_spawned": 20,
