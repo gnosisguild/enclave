@@ -224,11 +224,13 @@ class NoirCircuitBuilder {
    * prover would compute at witness time.
    */
   private regenerateParityMatrices(committee: CircuitCommittee): void {
+    const libDir = join(this.rootDir, 'circuits', 'lib')
     try {
       execSync(`cargo run --quiet --release --bin generate_parity_matrices -- --committee ${committee}`, {
         cwd: this.rootDir,
         stdio: ['ignore', 'pipe', 'inherit'],
       })
+      execSync('nargo fmt', { cwd: libDir, stdio: ['ignore', 'pipe', 'inherit'] })
       console.log(`   📋 Regenerated parity_{insecure,secure}.nr for committee: ${committee}`)
     } catch (err: any) {
       throw new Error(

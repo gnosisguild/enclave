@@ -93,29 +93,66 @@ fi
 
 # 6. Parity matrices for every committee must match what `generate_parity_matrices` would
 #    write right now. Hand-edits to parity_*.nr would slip past every other check, so verify
-#    them by regenerating into a tempdir and diffing. Skipped when the binary is unavailable
-#    (fresh clone before `cargo build`); the build step will re-emit them anyway.
+#    them by regenerating into a tempdir and diffing. On-disk files are kept `nargo fmt`-clean
+#    (see `scripts/lint-circuits.sh`), so we format the generator output before comparing.
+#    Skipped when the binary is unavailable (fresh clone before `cargo build`); the build step
+#    will re-emit them anyway.
 GEN_BIN="target/release/generate_parity_matrices"
-if [[ -x "$GEN_BIN" ]]; then
-  TMP=$(mktemp -d)
-  trap 'rm -rf "$TMP"' EXIT
-  # Mirror the committee dir layout so the bin can write into <tmp>/<committee>/.
-  for c in micro small medium; do
-    if [[ -d "circuits/lib/src/configs/committee/$c" ]]; then
-      mkdir -p "$TMP/$c"
-    fi
+NOIR_LIB="circuits/lib"
+format_parity_matrices_for_committee() {
+  local committee="$1"
+  local tmp="$2"
+  local variant live fresh backup formatted
+
+  for variant in insecure secure; do
+    live="$NOIR_LIB/src/configs/committee/$committee/parity_${variant}.nr"
+    fresh="$tmp/$committee/parity_${variant}.nr"
+    [[ -f "$live" && -f "$fresh" ]] || continue
+    backup="$tmp/$committee/parity_${variant}.live.bak"
+    formatted="$tmp/$committee/parity_${variant}.formatted.nr"
+    cp "$live" "$backup"
+    cp "$fresh" "$live"
   done
-  for c in micro small medium; do
-    [[ -d "$TMP/$c" ]] || continue
-    "$GEN_BIN" --committee "$c" --output-root "$TMP" >/dev/null
-    for variant in insecure secure; do
-      live="circuits/lib/src/configs/committee/$c/parity_${variant}.nr"
-      fresh="$TMP/$c/parity_${variant}.nr"
-      if [[ -f "$live" && -f "$fresh" ]] && ! diff -q "$live" "$fresh" >/dev/null; then
-        fail "$live drift vs generator output. Run: pnpm build:circuits --committee $c"
+
+  (cd "$NOIR_LIB" && nargo fmt) >/dev/null
+
+  for variant in insecure secure; do
+    live="$NOIR_LIB/src/configs/committee/$committee/parity_${variant}.nr"
+    fresh="$tmp/$committee/parity_${variant}.nr"
+    backup="$tmp/$committee/parity_${variant}.live.bak"
+    formatted="$tmp/$committee/parity_${variant}.formatted.nr"
+    [[ -f "$backup" ]] || continue
+    cp "$live" "$formatted"
+    cp "$backup" "$live"
+    cp "$formatted" "$fresh"
+  done
+}
+
+if [[ -x "$GEN_BIN" ]]; then
+  if ! command -v nargo >/dev/null 2>&1; then
+    echo "  (skipping parity-matrix drift check: nargo not found. Install nargo to enable formatted parity comparison.)" >&2
+  else
+    TMP=$(mktemp -d)
+    trap 'rm -rf "$TMP"' EXIT
+    # Mirror the committee dir layout so the bin can write into <tmp>/<committee>/.
+    for c in micro small medium; do
+      if [[ -d "circuits/lib/src/configs/committee/$c" ]]; then
+        mkdir -p "$TMP/$c"
       fi
     done
-  done
+    for c in micro small medium; do
+      [[ -d "$TMP/$c" ]] || continue
+      "$GEN_BIN" --committee "$c" --output-root "$TMP" >/dev/null
+      format_parity_matrices_for_committee "$c" "$TMP"
+      for variant in insecure secure; do
+        live="circuits/lib/src/configs/committee/$c/parity_${variant}.nr"
+        fresh="$TMP/$c/parity_${variant}.nr"
+        if [[ -f "$live" && -f "$fresh" ]] && ! diff -q "$live" "$fresh" >/dev/null; then
+          fail "$live drift vs generator output. Run: pnpm build:circuits --committee $c"
+        fi
+      done
+    done
+  fi
 else
   echo "  (skipping parity-matrix drift check: $GEN_BIN not built. Run \`cargo build -p e3-zk-helpers --bin generate_parity_matrices --release\` to enable.)" >&2
 fi
