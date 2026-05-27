@@ -71,15 +71,28 @@ User runs: enclave ciphernode license bond --amount 50000
 │     │  │         amount                                       │
 │     │  │       )                                              │
 │     │  │       → ENCL tokens move from operator → contract    │
-│     │  │    3. operators[msg.sender].licenseBond += amount    │
-│     │  │    4. _updateOperatorStatus(msg.sender)              │
+│     │  │    3. Record LicenseBondSource {                     │
+│     │  │         amount, withdrawalAddress: msg.sender,        │
+│     │  │         sourceId: 0, sequence                         │
+│     │  │       }                                               │
+│     │  │    4. operators[msg.sender].licenseBond += amount    │
+│     │  │    5. _updateOperatorStatus(msg.sender)              │
 │     │  │       → May activate if all conditions now met       │
-│     │  │    5. Emit LicenseBondUpdated(msg.sender, newBond)   │
+│     │  │    6. Emit LicenseBondSourceAdded and                │
+│     │  │       LicenseBondUpdated(msg.sender, newBond)        │
 │     │  │  }                                                   │
 │     │  └──────────────────────────────────────────────────────┘
 │     │
 └─ OUTPUT: "Transaction hash: 0x..."
 ```
+
+### Delegated / locked ENCL bonding
+
+`BondingRegistry.bondLicenseFor(operator, amount, withdrawalAddress, sourceId)` lets a funder supply
+ENCL while crediting another operator. `InterfoldVestingEscrow` uses this path so locked allocations
+can run nodes without first transferring unrestricted ENCL to the beneficiary. Each ENCL bond source
+keeps its own withdrawal address and LIFO sequence. The legacy `bondLicense(amount)` path is
+equivalent to `bondLicenseFor(msg.sender, amount, msg.sender, 0)`.
 
 ### Activation check after bonding:
 
@@ -187,23 +200,16 @@ User runs: enclave ciphernode license unbond --amount 10000
 │     │  │    2. require(operators[msg.sender].licenseBond       │
 │     │  │              >= amount)                               │
 │     │  │    3. operators[msg.sender].licenseBond -= amount     │
-│     │  │    4. _exits.queueLicensesForExit(                   │
-│     │  │         msg.sender, exitDelay, amount                 │
+│     │  │    4. _queueLicenseExitFromSources(                  │
+│     │  │         msg.sender, amount                            │
 │     │  │       )                                               │
-│     │  │       │                                               │
-│     │  │       │  ┌─ ExitQueueLib ─────────────────────────┐  │
-│     │  │       │  │  Creates ExitTranche {                 │  │
-│     │  │       │  │    unlockTimestamp: now + exitDelay,    │  │
-│     │  │       │  │    ticketAmount: 0,                    │  │
-│     │  │       │  │    licenseAmount: 10000                │  │
-│     │  │       │  │  }                                     │  │
-│     │  │       │  │  Merges into last tranche if same      │  │
-│     │  │       │  │  unlock time, else appends new tranche │  │
-│     │  │       │  │  Updates pendingTotals                 │  │
-│     │  │       │  └────────────────────────────────────────┘  │
+│     │  │       → Pops active LicenseBondSource entries LIFO    │
+│     │  │       → Queues PendingLicenseBondSource entries       │
+│     │  │         preserving withdrawalAddress + sourceId       │
 │     │  │    5. _updateOperatorStatus(msg.sender)               │
 │     │  │       → May DEACTIVATE if bond drops below threshold  │
-│     │  │    6. Emit LicenseBondUpdated(msg.sender, newBond)    │
+│     │  │    6. Emit LicenseBondSourceQueuedForExit and         │
+│     │  │       LicenseBondUpdated(msg.sender, newBond)         │
 │     │  │  }                                                    │
 │     │  └───────────────────────────────────────────────────────┘
 │
@@ -268,9 +274,9 @@ User runs: enclave ciphernode license claim [--max-ticket 50] [--max-license 100
 │     │  ┌─── ON-CHAIN ─────────────────────────────────────────┐
 │     │  │                                                       │
 │     │  │  claimExits(maxTicket, maxLicense) {                  │
-│     │  │    1. (ticketAmount, licenseAmount) =                 │
+│     │  │    1. (ticketAmount, _) =                             │
 │     │  │       _exits.claimAssets(                             │
-│     │  │         msg.sender, maxTicket, maxLicense             │
+│     │  │         msg.sender, maxTicket, 0                      │
 │     │  │       )                                               │
 │     │  │       │                                               │
 │     │  │       │  ┌─ ExitQueueLib.claimAssets() ───────────┐  │
@@ -278,7 +284,7 @@ User runs: enclave ciphernode license claim [--max-ticket 50] [--max-license 100
 │     │  │       │  │  for each tranche where                │  │
 │     │  │       │  │    block.timestamp >= unlockTimestamp:  │  │
 │     │  │       │  │      take min(wanted, available)       │  │
-│     │  │       │  │      from ticketAmount & licenseAmount  │  │
+│     │  │       │  │      from ticketAmount                  │  │
 │     │  │       │  │  Skip locked tranches (future unlock)  │  │
 │     │  │       │  │  Clean up empty tranches               │  │
 │     │  │       │  │  Update pendingTotals                  │  │
@@ -294,15 +300,16 @@ User runs: enclave ciphernode license claim [--max-ticket 50] [--max-license 100
 │     │  │       │  │  underlying.safeTransfer(to, amount)    │  │
 │     │  │       │  └────────────────────────────────────────┘  │
 │     │  │                                                       │
-│     │  │    3. if licenseAmount > 0:                           │
-│     │  │       licenseToken.safeTransfer(                      │
-│     │  │         msg.sender, licenseAmount                     │
+│     │  │    3. licenseAmount = _claimLicenseExits(             │
+│     │  │         msg.sender, maxLicense                        │
 │     │  │       )                                               │
-│     │  │       → ENCL tokens returned to operator              │
+│     │  │       → Each ENCL source pays its withdrawalAddress   │
+│     │  │       → Receiver callback gets (operator, amount,     │
+│     │  │         sourceId) when supported                      │
 │     │  │  }                                                    │
 │     │  └───────────────────────────────────────────────────────┘
 │
-└─ Operator receives back their USDC and/or ENCL tokens
+└─ Operator receives back USDC; ENCL goes to each source's withdrawal address
 ```
 
 ---
@@ -346,7 +353,7 @@ active = registered
                               CLAIM EXITS
                               ───────────
                    After exitDelay seconds:
-                   ENCL → returned from ExitQueue
+                   ENCL → returned to source withdrawal address
                    USDC → paid out from ETK.payableBalance
 ```
 

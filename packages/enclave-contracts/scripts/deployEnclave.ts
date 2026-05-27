@@ -17,11 +17,13 @@ import { deployAndSaveE3RefundManager } from "./deployAndSave/e3RefundManager";
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";
 import { deployAndSaveEnclaveTicketToken } from "./deployAndSave/enclaveTicketToken";
 import { deployAndSaveEnclaveToken } from "./deployAndSave/enclaveToken";
+import { deployAndSaveInterfoldVestingEscrow } from "./deployAndSave/interfoldVestingEscrow";
 import { deployAndSaveMockStableToken } from "./deployAndSave/mockStableToken";
 import { deployAndSavePoseidonT3 } from "./deployAndSave/poseidonT3";
 import { deployAndSaveSlashingManager } from "./deployAndSave/slashingManager";
 import { deployAndSaveAllVerifiers } from "./deployAndSave/verifiers";
 import { deployMocks } from "./deployMocks";
+import { isLocalDeploymentChain, readDeploymentArgs } from "./utils";
 
 // BFV parameter presets — hardcoded from crates/fhe-params/src/constants.rs
 // to avoid a cyclic dependency on @enclave-e3/sdk.
@@ -71,6 +73,56 @@ const DEFAULT_TIMEOUT_CONFIG = {
   decryptionWindow: 3600,
 };
 
+function parseRequiredUint64(value: string, label: string): bigint {
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`${label} must be a base-10 unix timestamp`);
+  }
+  const parsed = BigInt(value);
+  const maxUint64 = (1n << 64n) - 1n;
+  if (parsed > maxUint64) {
+    throw new Error(`${label} must fit in uint64`);
+  }
+  return parsed;
+}
+
+function resolveInterfoldTgeTimestamp(
+  networkName: string,
+  latestBlockTimestamp: number,
+): string {
+  const configured = process.env.INTERFOLD_TGE_TIMESTAMP;
+  if (configured?.trim()) {
+    return parseRequiredUint64(
+      configured.trim(),
+      "INTERFOLD_TGE_TIMESTAMP",
+    ).toString();
+  }
+
+  if (!isLocalDeploymentChain(networkName)) {
+    throw new Error(
+      "INTERFOLD_TGE_TIMESTAMP must be set for non-local InterfoldVestingEscrow deployment",
+    );
+  }
+
+  const preDeployedTgeTimestamp = readDeploymentArgs(
+    "InterfoldVestingEscrow",
+    networkName,
+  )?.constructorArgs?.tgeTimestamp;
+  if (typeof preDeployedTgeTimestamp === "string") {
+    console.warn(
+      "[WARN] INTERFOLD_TGE_TIMESTAMP not set; reusing saved local InterfoldVestingEscrow TGE timestamp.",
+    );
+    return parseRequiredUint64(
+      preDeployedTgeTimestamp,
+      "saved InterfoldVestingEscrow tgeTimestamp",
+    ).toString();
+  }
+
+  console.warn(
+    "[WARN] INTERFOLD_TGE_TIMESTAMP not set; using latest local block timestamp for InterfoldVestingEscrow.",
+  );
+  return latestBlockTimestamp.toString();
+}
+
 /** Circuit names required for BFV ZK verification in this script */
 const DKG_AGGREGATOR_VERIFIER = "DkgAggregatorVerifier";
 const DECRYPTION_AGGREGATOR_VERIFIER = "DecryptionAggregatorVerifier";
@@ -91,6 +143,14 @@ export const deployEnclave = async (
   const [owner] = await ethers.getSigners();
 
   const ownerAddress = await owner.getAddress();
+  const latestBlock = await ethers.provider.getBlock("latest");
+  if (!latestBlock) {
+    throw new Error("Could not read latest block for local TGE timestamp");
+  }
+  const interfoldTgeTimestamp = resolveInterfoldTgeTimestamp(
+    networkName,
+    latestBlock.timestamp,
+  );
 
   const encodedInsecure = encodeBfvParams(BFV_PARAMS.insecure512);
   const encodedSecure = encodeBfvParams(BFV_PARAMS.secure8192);
@@ -205,6 +265,33 @@ export const deployEnclave = async (
   });
   const bondingRegistryAddress = await bondingRegistry.getAddress();
   console.log("BondingRegistry deployed to:", bondingRegistryAddress);
+
+  console.log(
+    "Deploying InterfoldVestingEscrow with TGE timestamp:",
+    interfoldTgeTimestamp,
+  );
+  const { interfoldVestingEscrow } = await deployAndSaveInterfoldVestingEscrow({
+    token: enclaveTokenAddress,
+    bondingRegistry: bondingRegistryAddress,
+    tgeTimestamp: interfoldTgeTimestamp,
+    owner: ownerAddress,
+    hre,
+  });
+  const interfoldVestingEscrowAddress =
+    await interfoldVestingEscrow.getAddress();
+  console.log(
+    "InterfoldVestingEscrow deployed to:",
+    interfoldVestingEscrowAddress,
+  );
+
+  console.log(
+    "Whitelisting BondingRegistry and InterfoldVestingEscrow in ENCL...",
+  );
+  const whitelistTx = await enclaveToken.whitelistContracts(
+    bondingRegistryAddress,
+    interfoldVestingEscrowAddress,
+  );
+  await whitelistTx.wait();
 
   console.log("Deploying Enclave...");
   const { enclave } = await deployAndSaveEnclave({
@@ -496,6 +583,7 @@ export const deployEnclave = async (
     EnclaveTicketToken: ${enclaveTicketTokenAddress}
     SlashingManager: ${slashingManagerAddress}
     BondingRegistry: ${bondingRegistryAddress}
+    InterfoldVestingEscrow: ${interfoldVestingEscrowAddress}
     CiphernodeRegistry: ${ciphernodeRegistryAddress}
     E3RefundManager: ${e3RefundManagerAddress}
     Enclave: ${enclaveAddress}

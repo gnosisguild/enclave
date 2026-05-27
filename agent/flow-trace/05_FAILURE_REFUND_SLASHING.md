@@ -664,15 +664,16 @@ _executeSlash(proposalId):
 │     │
 │     │  ┌─── BondingRegistry.slashLicenseBond() ───────────────┐
 │     │  │                                                       │
-│     │  │  1. Slash from ACTIVE bond first:                     │
-│     │  │     slashFromActive = min(amount, licenseBond)        │
-│     │  │     operators[op].licenseBond -= slashFromActive      │
+│     │  │  1. Compute active + pending ENCL source total        │
 │     │  │                                                       │
-│     │  │  2. Remaining from EXIT QUEUE:                        │
-│     │  │     _exits.slashPendingAssets(                        │
-│     │  │       operator, 0, remaining,                         │
-│     │  │       includeLockedAssets=true                        │
-│     │  │     )                                                 │
+│     │  │  2. _slashLicenseSourcesLifo(operator, amount):       │
+│     │  │     Compare newest active source sequence with        │
+│     │  │     newest pending-exit source sequence               │
+│     │  │     Slash the newest source first                     │
+│     │  │     → Active slash decrements operators[op].licenseBond│
+│     │  │     → Pending slash decrements pending license totals │
+│     │  │     → Receiver callback gets (operator, amount,       │
+│     │  │       sourceId) when supported                        │
 │     │  │                                                       │
 │     │  │  3. slashedLicenseBond += totalSlashed                │
 │     │  │  4. _updateOperatorStatus(operator)                   │

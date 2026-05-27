@@ -1179,28 +1179,40 @@ describe("BondingRegistry", function () {
      * `_takeAssetsFromQueue` during a slash.
      */
     it("H-21: queueAssetsForExit reverts after MAX_ACTIVE_TRANCHES live tranches", async function () {
-      const { bondingRegistry, licenseToken, operator1 } =
-        await loadFixture(setup);
+      const {
+        bondingRegistry,
+        licenseToken,
+        ticketToken,
+        usdcToken,
+        operator1,
+      } = await loadFixture(setup);
 
-      // Bond a large enough amount to do many tiny unbonds.
-      const big = ethers.parseEther("10000");
+      // Register and fund tickets so the generic ExitQueueLib ticket path is
+      // exercised directly. ENCL exits now use source-aware withdrawal logic.
+      const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
-        .approve(await bondingRegistry.getAddress(), big);
-      await bondingRegistry.connect(operator1).bondLicense(big);
+        .approve(await bondingRegistry.getAddress(), bondAmount);
+      await bondingRegistry.connect(operator1).bondLicense(bondAmount);
       await bondingRegistry.connect(operator1).registerOperator();
 
+      const ticketAmount = ethers.parseUnits("10000", 6);
+      await usdcToken
+        .connect(operator1)
+        .approve(await ticketToken.getAddress(), ticketAmount);
+      await bondingRegistry.connect(operator1).addTicketBalance(ticketAmount);
+
       // Fill the queue with 64 distinct-timestamp tranches.
-      const step = ethers.parseEther("1");
+      const step = ethers.parseUnits("1", 6);
       for (let i = 0; i < 64; i++) {
-        await bondingRegistry.connect(operator1).unbondLicense(step);
+        await bondingRegistry.connect(operator1).removeTicketBalance(step);
         // Ensure next unlock timestamp differs (no merge).
         await time.increase(1);
       }
 
       // The 65th must revert.
       await expect(
-        bondingRegistry.connect(operator1).unbondLicense(step),
+        bondingRegistry.connect(operator1).removeTicketBalance(step),
       ).to.be.revertedWithCustomError(bondingRegistry, "TooManyTranches");
     });
 

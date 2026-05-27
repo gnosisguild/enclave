@@ -53,7 +53,9 @@ User runs: enclave ciphernode deactivate --license 20000
     │  │  unbondLicense(20000):                                  │
     │  │    1. require(amount != 0, sufficient bonded ENCL)      │
     │  │    2. operators[op].licenseBond -= 20000                │
-    │  │    3. _exits.queueLicensesForExit(op, exitDelay, 20000)│
+    │  │    3. _queueLicenseExitFromSources(op, 20000)          │
+    │  │       → Queues source-aware ENCL exits preserving       │
+    │  │         withdrawalAddress + sourceId                    │
     │  │    4. _updateOperatorStatus(operator)                   │
     │  │       → If licenseBond <                                │
     │  │         (licenseRequiredBond * licenseActiveBps / 10000)│
@@ -72,8 +74,8 @@ User runs: enclave ciphernode deactivate --tickets 50 --license 20000
 │
 ├─ Calls removeTicketBalance(50) first
 └─ Then calls unbondLicense(20000)
-   → Both queued in ExitQueue with same exitDelay
-   → May merge into single tranche if same unlock time
+  → Tickets are queued in ExitQueueLib
+  → ENCL is queued in source-aware pending license exits
 ```
 
 ---
@@ -109,8 +111,9 @@ User runs: enclave ciphernode deregister
     │  │       _exits.queueAssetsForExit(                        │
     │  │         op, exitDelay,                                   │
     │  │         fullTicketBalance,  // tickets                   │
-    │  │         licenseBondAmount   // license                   │
+    │  │         0                   // license handled below     │
     │  │       )                                                  │
+    │  │       _queueLicenseExitFromSources(op, licenseBondAmount)│
     │  │                                                         │
     │  │    8. Remove from Merkle tree:                          │
     │  │       registry.removeCiphernode(msg.sender)             │
@@ -234,7 +237,8 @@ Time ─────────────────────────
 │                  │  (configured)       │                  │
 │ Assets queued    │                    │ Assets claimable │
 │ ETK burned       │  Cannot cancel     │ USDC returned    │
-│ ENCL locked      │  Can be slashed!   │ ENCL returned    │
+│ ENCL locked      │  Can be slashed!   │ ENCL returned to │
+│                  │                    │ withdrawal addr  │
 │                  │                    │                  │
 
 IMPORTANT: Even during the exit delay, slashing can still
