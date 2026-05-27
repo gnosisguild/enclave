@@ -20,9 +20,15 @@ pub struct PublicKeyAggregated {
     pub pubkey: ArcBytes, // TODO: ArcBytes ?
     pub e3_id: E3id,
     pub nodes: OrderedSet<String>,
-    /// Committee addresses in ascending `party_id` (score) order for hash binding.
+    /// Full registered committee (`topNodes`) addresses in ascending `party_id` (score) order.
+    /// Length `N`. Used by `DecryptionAggregator` for `committee_hash_*` public-input binding.
     #[serde(default)]
     pub committee_addresses: Vec<Address>,
+    /// Honest subset of the committee (size `H ≤ N`) in ascending `party_id` order.
+    /// These are the parties whose C1/NodeFold proofs were accepted; downstream actors
+    /// must gate decryption-share collection on this set rather than full `topNodes`.
+    #[serde(default)]
+    pub honest_committee_addresses: Vec<Address>,
     /// Hash-based aggregated PK commitment (last public signal of the C5 proof).
     /// Passed as `pkCommitment` to `publishCommittee`.
     pub pk_commitment: [u8; 32],

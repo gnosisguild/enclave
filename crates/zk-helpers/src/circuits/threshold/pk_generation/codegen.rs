@@ -28,7 +28,7 @@ impl CircuitCodegen for PkGenerationCircuit {
 
     fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
         let inputs = Inputs::compute(preset, data)?;
-        let configs = Configs::compute(preset, &())?;
+        let configs = Configs::compute(preset, &data.committee)?;
 
         let toml = generate_toml(inputs)?;
         let configs = generate_configs(preset, &configs)?;
@@ -191,7 +191,9 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &()).unwrap();
+        use crate::ciphernodes_committee::CiphernodesCommitteeSize;
+        let committee = CiphernodesCommitteeSize::Medium.values();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &committee).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
         assert!(configs_content.contains(

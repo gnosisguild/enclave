@@ -1212,6 +1212,17 @@ impl ThresholdKeyshare {
                     .map_err(|e| anyhow!("Failed to deserialize BFV public key: {:?}", e))
             })
             .collect::<Result<_>>()?;
+        // Share-encryption fan-out targets every registered party (`N`); `own_idx` is then
+        // skipped in `encrypt_all_extended_for_share_indices`, producing N-1 ciphertexts.
+        // The C3a/C3b NodeFold slots are sized for `N`, so any drift between the collected
+        // encryption-key roster and the configured committee would corrupt the fold witness.
+        debug_assert_eq!(
+            recipient_pks.len(),
+            derived_committee_size.values().n as usize,
+            "share-encryption recipients ({}) do not match committee N ({}); C3 fan-out would mis-size the NodeFold slots",
+            recipient_pks.len(),
+            derived_committee_size.values().n,
+        );
         let recipient_party_ids: Vec<u64> = encryption_keys.iter().map(|k| k.party_id).collect();
         let recipient_share_indices: Vec<usize> = recipient_party_ids
             .iter()
@@ -1775,7 +1786,7 @@ impl ThresholdKeyshare {
 
         // Validate per-party dimensions and exclude mismatched parties.
         let mut dimension_excluded: Vec<u64> = Vec::new();
-        let honest_shares: Vec<_> = honest_shares
+        let mut honest_shares: Vec<_> = honest_shares
             .into_iter()
             .filter(|ts| {
                 if ts.esi_sss.len() != expected_num_esi {
@@ -1852,6 +1863,24 @@ impl ThresholdKeyshare {
                 )?;
                 return Ok(());
             }
+        }
+
+        // Noir C4 is parameterized by `H` (honest-set size), not full committee `N`.
+        let committee = CiphernodesCommitteeSize::from_threshold(
+            state.threshold_m as usize,
+            state.threshold_n as usize,
+        )?;
+        let committee_h = committee.values().h;
+        let max_external_honest = committee_h.saturating_sub(1);
+        if honest_shares.len() > max_external_honest {
+            warn!(
+                "Capping external honest shares from {} to {} (committee H={}) for E3 {}",
+                honest_shares.len(),
+                max_external_honest,
+                committee_h,
+                e3_id
+            );
+            honest_shares.truncate(max_external_honest);
         }
 
         // Honest party IDs include self (signing/aggregation treats own party as honest).

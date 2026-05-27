@@ -7,6 +7,21 @@
 mod helpers;
 pub use helpers::*;
 
+/// Call at the top of any setup function that hard-codes `CiphernodesCommitteeSize::Micro`.
+/// Returns `None` (causing the test to skip) when the compiled circuits were built for a
+/// non-micro committee — the Micro-sized samples would not satisfy the circuit ABI.
+pub fn require_micro_circuits() -> Option<()> {
+    if circuits_compiled_for_micro() {
+        Some(())
+    } else {
+        println!(
+            "skipping: circuits not compiled for micro committee. \
+             Rebuild with `pnpm build:circuits --committee micro` to run this test."
+        );
+        None
+    }
+}
+
 use std::path::PathBuf;
 
 use num_bigint::{BigInt, Sign};

@@ -14,6 +14,7 @@ source "${SCRIPT_DIR}/benchmark_output_dir.sh"
 CONFIG_FILE="${BENCHMARKS_DIR}/config.json"
 CLEAN_ARTIFACTS=false
 MODE_OVERRIDE=""
+COMMITTEE_OVERRIDE=""
 SKIP_COMPILE=false
 BENCH_COMPILE=false
 CIRCUIT_FILTER=""
@@ -35,6 +36,17 @@ while [[ $# -gt 0 ]]; do
                 echo "Error: Mode must be 'insecure' or 'secure'"
                 exit 1
             fi
+            shift 2
+            ;;
+        --committee)
+            COMMITTEE_OVERRIDE="$2"
+            case "$COMMITTEE_OVERRIDE" in
+                micro|small|medium) ;;
+                *)
+                    echo "Error: --committee must be micro|small|medium (got: $COMMITTEE_OVERRIDE)"
+                    exit 1
+                    ;;
+            esac
             shift 2
             ;;
         --circuit)
@@ -71,7 +83,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--bench-compile] [--clean] [--verbose] [--proof-aggregation on|off] [--no-proof-aggregation] [--multithread-jobs N]"
+            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--committee micro|small|medium] [--circuit <path>] [--skip-compile] [--bench-compile] [--clean] [--verbose] [--proof-aggregation on|off] [--no-proof-aggregation] [--multithread-jobs N]"
             exit 1
             ;;
     esac
@@ -138,9 +150,21 @@ REPO_ROOT="$(cd "${BENCHMARKS_DIR}/../.." && pwd)"
 # Circuits live under circuits/bin (bin_dir is relative to benchmarks dir, e.g. ../bin)
 CIRCUITS_BASE_DIR="$(cd "${BENCHMARKS_DIR}/${BIN_DIR}" && pwd)"
 
-# results_<mode>_agg | results_<mode>_no_agg (see benchmark_output_dir.sh)
+# Resolve the committee for the output dir name. Explicit --committee wins; otherwise we
+# read what's currently on disk (the build step below will respect that selection). Sourced
+# here so OUTPUT_DIR can include the committee axis (`results_<mode>_<agg|no_agg>_<name>`).
+# shellcheck source=load_default_committee.sh
+source "${SCRIPT_DIR}/load_default_committee.sh"
+if [ -n "$COMMITTEE_OVERRIDE" ]; then
+    OUTPUT_COMMITTEE="$COMMITTEE_OVERRIDE"
+else
+    load_default_committee "" "$REPO_ROOT"
+    OUTPUT_COMMITTEE="$COMMITTEE_NAME"
+fi
+
+# results_<mode>_<agg|no_agg>_<committee> (see benchmark_output_dir.sh)
 BENCHMARK_OUTPUT_DIR_BASE="$OUTPUT_DIR_BASE"
-OUTPUT_DIR="$(benchmark_results_dir_basename "$MODE" "$BENCHMARK_PROOF_AGGREGATION")"
+OUTPUT_DIR="$(benchmark_results_dir_basename "$MODE" "$BENCHMARK_PROOF_AGGREGATION" "$OUTPUT_COMMITTEE")"
 mkdir -p "${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw"
 
 # For secure mode, patch lib to use secure configs (restored at end)
@@ -197,6 +221,9 @@ if [ "$SKIP_COMPILE" = false ]; then
         PRESET_NAME="insecure-512"
     fi
     ENSURE_ARGS=("$PRESET_NAME")
+    if [ -n "$COMMITTEE_OVERRIDE" ]; then
+        ENSURE_ARGS+=(--committee "$COMMITTEE_OVERRIDE")
+    fi
     if [ "$VERBOSE" = true ]; then
         ENSURE_ARGS+=(--verbose)
     fi
@@ -312,12 +339,16 @@ fi
 # Persist CLI flags for report regeneration (see generate_report.sh → Run configuration).
 RUN_META_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/benchmark_run_meta.json"
 MT_JOBS_JSON="${BENCHMARK_MULTITHREAD_JOBS:-1}"
+# shellcheck source=load_default_committee.sh
+source "${SCRIPT_DIR}/load_default_committee.sh"
+load_default_committee "${REPO_ROOT}/circuits/lib/src/configs/default/mod.nr" "${REPO_ROOT}"
 jq -n \
     --arg mode "$MODE" \
     --arg preset "$([ "$MODE" = "secure" ] && echo "secure-8192" || echo "insecure-512")" \
     --argjson proof_agg "$( [ "$BENCHMARK_PROOF_AGGREGATION" = "false" ] && echo false || echo true )" \
     --argjson multithread_jobs "$MT_JOBS_JSON" \
     --argjson verbose "$([ "$VERBOSE" = true ] && echo true || echo false)" \
+    --argjson committee_size_n "$COMMITTEE_N" \
     '{
       benchmark_mode: $mode,
       bfv_preset_subdir: $preset,
@@ -325,7 +356,7 @@ jq -n \
       multithread_jobs: $multithread_jobs,
       verbose: $verbose,
       nodes_spawned: 20,
-      committee_size_n: 3,
+      committee_size_n: $committee_size_n,
       network_model: "in_process_bus",
       testmode_harness: true
     }' > "${RUN_META_FILE}"

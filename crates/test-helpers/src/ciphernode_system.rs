@@ -237,6 +237,49 @@ impl CiphernodeSystem {
         );
         Ok(CiphernodeHistory(history.events))
     }
+
+    /// Collect events until one whose [`EnclaveEvent::event_type`] equals `last_event_type`
+    /// (inclusive). Use when the pubkey flow ends with `PublicKeyAggregated` but a fixed
+    /// `take_history` count can stop too early while gossip duplicates inflate the multiset.
+    pub async fn take_history_until_last_event(
+        &self,
+        index: usize,
+        last_event_type: &str,
+        total_to: Option<Duration>,
+        event_to: Option<Duration>,
+    ) -> Result<CiphernodeHistory> {
+        let start = Instant::now();
+        let total_to = total_to.unwrap_or(Duration::from_secs(u64::MAX));
+        let event_to = event_to.unwrap_or(Duration::from_secs(u64::MAX));
+        let mut collected = Vec::new();
+
+        loop {
+            if start.elapsed() > total_to {
+                bail!(
+                    "take_history_until_last_event({last_event_type}) timed out after {:?}; got {} events: {:?}",
+                    start.elapsed(),
+                    collected.len(),
+                    CiphernodeHistory(collected.clone()).event_types()
+                );
+            }
+            let batch = self
+                .take_history_with_timeouts(index, 1, Some(event_to), Some(event_to))
+                .await?;
+            for event in batch.0 {
+                let is_last = event.event_type() == last_event_type;
+                collected.push(event);
+                if is_last {
+                    info!(
+                        "take_history_until_last_event({last_event_type}) took {:?} ({} events)",
+                        start.elapsed(),
+                        collected.len()
+                    );
+                    return Ok(CiphernodeHistory(collected));
+                }
+            }
+        }
+    }
+
     pub async fn flush_all_history(&self, millis: u64) -> Result<()> {
         let nodes = &self.0;
         for node in nodes.iter() {

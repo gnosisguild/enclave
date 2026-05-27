@@ -337,6 +337,11 @@ async fn setup_c3_fold_with_inner_share_encryption() -> Option<(
     ))
 }
 
+/// Expected C3 fold slot count when circuits are compiled for the micro committee (N=3, T=1).
+const MICRO_C3_FOLD_SLOTS: usize = 2;
+/// Expected C6 fold slot count when circuits are compiled for the micro committee (N=3, T=1).
+const MICRO_C6_FOLD_SLOTS: usize = 2;
+
 #[tokio::test]
 async fn c3_fold_sequential_proves_and_verifies() {
     let Some((_backend, _temp, prover, circuit, sample_a, sample_b, preset)) =
@@ -345,6 +350,16 @@ async fn c3_fold_sequential_proves_and_verifies() {
         println!("skipping: bb not found or prerequisites missing");
         return;
     };
+
+    let total_slots = c3_fold_total_slots_from_compiled_json();
+    if total_slots != MICRO_C3_FOLD_SLOTS {
+        println!(
+            "skipping c3_fold_sequential_proves_and_verifies: circuits compiled for \
+             non-micro committee (total_slots={total_slots}, expected {MICRO_C3_FOLD_SLOTS}). \
+             Rebuild with `pnpm build:circuits --committee micro` to run this test."
+        );
+        return;
+    }
 
     let artifacts_dir = preset.artifacts_dir();
     let inner_e3_a = "e3-c3fold-inner-0";
@@ -374,13 +389,6 @@ async fn c3_fold_sequential_proves_and_verifies() {
         )
         .expect("inner ShareEncryption proof 1");
     assert_eq!(inner_b.circuit, CircuitName::ShareEncryption);
-
-    let total_slots = c3_fold_total_slots_from_compiled_json();
-    assert!(
-        total_slots >= 2,
-        "need at least 2 C3 slots for two-fold test (compiled total_slots={})",
-        total_slots
-    );
 
     let inners = [inner_a, inner_b];
     let folded = generate_sequential_c3_fold(
@@ -455,6 +463,15 @@ async fn c6_fold_sequential_proves_and_verifies() {
         return;
     };
 
+    let total_slots = c6_fold_total_slots_from_compiled_json();
+    if total_slots != MICRO_C6_FOLD_SLOTS {
+        println!(
+            "skipping c6_fold_sequential_proves_and_verifies: circuits compiled for \
+             non-micro committee (total_slots={total_slots}, expected {MICRO_C6_FOLD_SLOTS}). \
+             Rebuild with `pnpm build:circuits --committee micro` to run this test."
+        );
+        return;
+    }
     let artifacts_dir = preset.artifacts_dir();
     let inner_e3_a = "e3-c6fold-inner-0";
     let inner_e3_b = "e3-c6fold-inner-1";
@@ -483,13 +500,6 @@ async fn c6_fold_sequential_proves_and_verifies() {
         )
         .expect("inner ThresholdShareDecryption proof 1");
     assert_eq!(inner_b.circuit, CircuitName::ThresholdShareDecryption);
-
-    let total_slots = c6_fold_total_slots_from_compiled_json();
-    assert!(
-        total_slots >= 2,
-        "need at least 2 C6 slots for two-fold test (compiled total_slots={})",
-        total_slots
-    );
 
     let inners = [inner_a, inner_b];
     let folded = generate_sequential_c6_fold(

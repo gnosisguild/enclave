@@ -10,11 +10,16 @@
 set -e
 
 PRESET=""
+COMMITTEE=""
 FORCE_BUILD=false
 VERBOSE=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --committee)
+            COMMITTEE="$2"
+            shift 2
+            ;;
         --force-build)
             FORCE_BUILD=true
             shift
@@ -25,7 +30,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -*)
             echo "Unknown option: $1"
-            echo "Usage: $0 <preset> [--force-build] [--verbose]"
+            echo "Usage: $0 <preset> [--committee <name>] [--force-build] [--verbose]"
             exit 1
             ;;
         *)
@@ -53,11 +58,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 BUILD_ARGS=(--preset "$PRESET")
+if [ -n "$COMMITTEE" ]; then
+    BUILD_ARGS+=(--committee "$COMMITTEE")
+fi
 if [ "$FORCE_BUILD" = true ]; then
-    echo "  [circuits] Full rebuild: pnpm build:circuits --preset ${PRESET}"
+    echo "  [circuits] Full rebuild: pnpm build:circuits ${BUILD_ARGS[*]}"
 else
+    # Committee changes invalidate the source hash, so --skip-if-built still recompiles
+    # when the committee changed since the last build.
     BUILD_ARGS+=(--skip-if-built --no-clean --no-clean-targets)
-    echo "  [circuits] Ensuring preset ${PRESET} (skip-if-built; use --force-build to recompile)..."
+    echo "  [circuits] Ensuring (${PRESET}${COMMITTEE:+, committee=$COMMITTEE}) (skip-if-built; use --force-build to recompile)..."
 fi
 
 if [ "$VERBOSE" = true ]; then

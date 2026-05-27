@@ -4,6 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::fmt;
+use std::str::FromStr;
+
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
@@ -48,6 +51,17 @@ impl CiphernodesCommitteeSize {
         }
     }
 
+    /// Lower-case name as written into `circuits/bin/.active-preset.json` and the
+    /// `--committee` flag of `scripts/build-circuits.ts`. Use this for stamp/env cross-checks.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Micro => "micro",
+            Self::Small => "small",
+            Self::Medium => "medium",
+            Self::Large => "large",
+        }
+    }
+
     /// Returns `(num_parties, num_honest_parties, threshold)` for this size.
     pub fn values(self) -> CiphernodesCommittee {
         match self {
@@ -72,5 +86,25 @@ impl CiphernodesCommitteeSize {
                 threshold: 7,
             },
         }
+    }
+}
+
+impl FromStr for CiphernodesCommitteeSize {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_str() {
+            "micro" => Ok(Self::Micro),
+            "small" => Ok(Self::Small),
+            "medium" => Ok(Self::Medium),
+            "large" => Ok(Self::Large),
+            _ => bail!("Unknown committee size '{s}'. Expected micro|small|medium|large"),
+        }
+    }
+}
+
+impl fmt::Display for CiphernodesCommitteeSize {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }

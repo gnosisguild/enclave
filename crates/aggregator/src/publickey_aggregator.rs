@@ -24,10 +24,23 @@ use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_fhe_params::BfvPreset;
 use e3_utils::NotifySync;
 use e3_utils::{ArcBytes, MAILBOX_LIMIT};
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_prover::extract_node_fold_agg_commits;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use tracing::{error, info, warn};
+
+/// Circuit honest-party count `H` for the committee `(threshold_m, threshold_n)`.
+fn committee_h_for(threshold_m: usize, threshold_n: usize) -> Result<usize> {
+    Ok(
+        CiphernodesCommitteeSize::from_threshold(threshold_m, threshold_n)
+            .with_context(|| {
+                format!("unknown committee for threshold_m={threshold_m} threshold_n={threshold_n}")
+            })?
+            .values()
+            .h,
+    )
+}
 
 /// Public-signal key for the aggregated PK commitment in `CircuitName::PkAggregation` (C5).
 /// Must stay in lock-step with the Noir circuit's output ABI declaration.
@@ -108,6 +121,9 @@ pub enum PublicKeyAggregatorState {
         /// Insertion-ordered (party_id, node, keyshare) triples from Collecting.
         submission_order: Vec<(u64, String, ArcBytes)>,
         threshold_m: usize,
+        /// On-chain committee size N (for `committee_h` lookup).
+        #[serde(default)]
+        threshold_n: usize,
         /// C1 proofs in the same insertion order as `submission_order`.
         c1_proofs: Vec<Option<SignedProofPayload>>,
         /// Real party_ids that submitted no C1 proof — treated as dishonest.
@@ -117,7 +133,9 @@ pub enum PublicKeyAggregatorState {
         public_key: ArcBytes,
         keyshare_bytes: Vec<ArcBytes>,
         nodes: OrderedSet<String>,
-        /// Registered node address per sortition `party_id` (for fold attestation checks).
+        /// Registered node address per sortition `party_id` for the **full** committee
+        /// (all `N` parties that submitted a keyshare, honest or not). Honest-only lookups
+        /// must intersect with `honest_party_ids`.
         party_nodes: HashMap<u64, String>,
         /// DKG recursive proofs per party (restart-critical).
         dkg_node_proofs: HashMap<u64, Option<Proof>>,
@@ -126,6 +144,12 @@ pub enum PublicKeyAggregatorState {
         dkg_fold_attestations: HashMap<u64, SignedDkgFoldAttestation>,
         honest_party_ids: BTreeSet<u64>,
         dishonest_parties: BTreeSet<u64>,
+        /// Circuit committee size N (NodeFold / DKG public IO layout).
+        #[serde(default)]
+        circuit_committee_n: usize,
+        /// Circuit honest-party count H (NodeFold / DKG public IO layout).
+        #[serde(default)]
+        circuit_committee_h: usize,
         /// In-flight [`ZkRequest::DkgAggregation`], if any.
         dkg_aggregation_correlation: Option<CorrelationId>,
         /// Result from [`ZkResponse::DkgAggregation`] (replaces pairwise `FoldProofs`).
@@ -234,28 +258,38 @@ impl PublicKeyAggregator {
                 return Err(anyhow::anyhow!("Can only add keyshare in Collecting state"));
             };
 
+            if submission_order
+                .iter()
+                .any(|(pid, _, _)| *pid == party_id)
+            {
+                return Ok(state);
+            }
+
             keyshares.insert(keyshare.clone());
             c1_proofs.push(c1_proof);
             nodes.insert(node.clone());
             info!(
-                "add_keyshare: node={} party_id={} (arrival slot={})",
-                node,
-                party_id,
+                "add_keyshare: node={node} party_id={party_id} (arrival slot={})",
                 submission_order.len()
             );
             submission_order.push((party_id, node, keyshare));
             let n = *threshold_n;
             let m = *threshold_m;
+            let committee_h = committee_h_for(m, n)?;
+            let unique_parties = submission_order.len();
             info!(
-                "PublicKeyAggregator got keyshares {}/{}",
-                keyshares.len(),
-                n
+                "PublicKeyAggregator got keyshares {unique_parties}/{n} distinct parties (committee_h={committee_h})"
             );
-            if keyshares.len() == n {
-                info!("All keyshares collected, transitioning to VerifyingC1...");
+            // Collect all N committee keyshares before C1. C5 then requires exactly H honest
+            // proofs afterward (micro had N=H so waiting for H was equivalent).
+            if unique_parties >= n {
+                info!(
+                    "Collected keyshares from {unique_parties} distinct parties (>= committee_n={n}), transitioning to VerifyingC1..."
+                );
                 return Ok(PublicKeyAggregatorState::VerifyingC1 {
                     submission_order: std::mem::take(submission_order),
                     threshold_m: m,
+                    threshold_n: n,
                     c1_proofs: std::mem::take(c1_proofs),
                     no_proof_parties: Vec::new(),
                 });
@@ -349,6 +383,7 @@ impl PublicKeyAggregator {
         let PublicKeyAggregatorState::VerifyingC1 {
             submission_order,
             threshold_m,
+            threshold_n,
             c1_proofs,
             ..
         } = self
@@ -362,7 +397,12 @@ impl PublicKeyAggregator {
         };
 
         let mut dishonest_parties = msg.dishonest_parties.clone();
-        let committee_n = submission_order.len();
+        let collected = submission_order.len();
+        let circuit_h = committee_h_for(threshold_m, threshold_n)?;
+
+        // Retain full N committee roster (party_id → node address) for the DKG aggregator
+        // `committee_members` input, which must cover all `topNodes` regardless of honesty.
+        let full_submission_order: Vec<(u64, String, ArcBytes)> = submission_order.clone();
 
         // Filter out parties that failed C1 ZK verification. Keyed by the real
         // sortition party_id carried in `submission_order`, not arrival index.
@@ -453,11 +493,6 @@ impl PublicKeyAggregator {
         // and by the circuit's slot indexing in `dkg_aggregator.nr`.
         honest_entries.sort_by_key(|(pid, _, _, _)| *pid);
 
-        let (honest_keyshares, honest_nodes): (Vec<ArcBytes>, Vec<String>) = honest_entries
-            .iter()
-            .map(|(_, node, ks, _)| (ks.clone(), node.clone()))
-            .unzip();
-
         if !dishonest_parties.is_empty() {
             warn!(
                 "Total dishonest parties (ZK + commitment): {:?}",
@@ -465,15 +500,12 @@ impl PublicKeyAggregator {
             );
         }
 
-        let honest_party_ids: BTreeSet<u64> =
-            honest_entries.iter().map(|(pid, _, _, _)| *pid).collect();
-
-        // Need at least threshold + 1 honest parties for aggregation
-        if honest_keyshares.len() <= threshold_m {
+        // Fail closed when fewer than H parties cleared C1 — C5 cannot be witnessed.
+        if honest_entries.len() < circuit_h {
             error!(
-                "Not enough honest parties after filtering: {} (need > {})",
-                honest_keyshares.len(),
-                threshold_m
+                "C5 requires {circuit_h} honest parties with valid C1 proofs; only {} honest after verification (collected {collected}, dishonest: {:?})",
+                honest_entries.len(),
+                dishonest_parties
             );
             self.bus.publish(
                 E3Failed {
@@ -486,12 +518,34 @@ impl PublicKeyAggregator {
             return Ok(());
         }
 
-        // C5 (PkAggregation) is compiled for a fixed committee size H; partial committees fail witness encoding.
-        if honest_keyshares.len() != committee_n {
+        // The C5 PkAggregation circuit is parameterised by a fixed honest-party count H.
+        // When more than H parties cleared C1, select the H lowest party_ids as the
+        // canonical honest set; the remainder stay in the full committee
+        // (so committee_hash still covers all N) but their keyshares are not consumed
+        // by C5 and they are not asked to publish a NodeFold proof.
+        if honest_entries.len() > circuit_h {
+            info!(
+                "Capping honest set from {} to circuit_h={circuit_h} for E3 {} (extras remain in full committee)",
+                honest_entries.len(),
+                self.e3_id
+            );
+            honest_entries.truncate(circuit_h);
+        }
+
+        let (honest_keyshares, honest_nodes): (Vec<ArcBytes>, Vec<String>) = honest_entries
+            .iter()
+            .map(|(_, node, ks, _)| (ks.clone(), node.clone()))
+            .unzip();
+
+        let honest_party_ids: BTreeSet<u64> =
+            honest_entries.iter().map(|(pid, _, _, _)| *pid).collect();
+
+        // Defensive: should hold after truncation above; guard against future refactors.
+        if honest_keyshares.len() <= threshold_m {
             error!(
-                "C5 requires all {committee_n} committee parties with valid C1 proofs; only {} honest after verification (dishonest: {:?})",
+                "Not enough honest parties after filtering: {} (need > {})",
                 honest_keyshares.len(),
-                dishonest_parties
+                threshold_m
             );
             self.bus.publish(
                 E3Failed {
@@ -542,11 +596,19 @@ impl PublicKeyAggregator {
             ec.clone(),
         )?;
 
-        let party_nodes: HashMap<u64, String> = honest_entries
+        // `party_nodes` covers the FULL registered committee (all N keyshare submitters),
+        // not just the H honest set. The DKG aggregator circuit binds `committee_members`
+        // to on-chain `topNodes` which always carries the full committee — so we must keep
+        // the dishonest addresses available here to build the N-sized address vector.
+        // `submission_order` here is the unfiltered list captured pre–C1 verification
+        // (the original `VerifyingC1.submission_order`); `honest_entries` is the H subset.
+        let party_nodes: HashMap<u64, String> = full_submission_order
             .iter()
-            .map(|(pid, node, _, _)| (*pid, node.clone()))
+            .map(|(pid, node, _)| (*pid, node.clone()))
             .collect();
 
+        let circuit_committee_n = threshold_n;
+        let circuit_committee_h = circuit_h;
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                 public_key: pubkey.clone(),
@@ -557,6 +619,8 @@ impl PublicKeyAggregator {
                 dkg_fold_attestations: HashMap::new(),
                 honest_party_ids: honest_party_ids.clone(),
                 dishonest_parties: dishonest_parties.clone(),
+                circuit_committee_n,
+                circuit_committee_h,
                 dkg_aggregation_correlation: None,
                 dkg_aggregated_proof: None,
                 c5_proof_pending: None,
@@ -607,6 +671,8 @@ impl PublicKeyAggregator {
                 dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
+                circuit_committee_n,
+                circuit_committee_h,
                 dkg_aggregation_correlation,
                 dkg_aggregated_proof,
                 ..
@@ -623,6 +689,8 @@ impl PublicKeyAggregator {
                 dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
+                circuit_committee_n,
+                circuit_committee_h,
                 dkg_aggregation_correlation,
                 dkg_aggregated_proof,
                 c5_proof_pending: Some(c5_proof),
@@ -649,6 +717,8 @@ impl PublicKeyAggregator {
             party_nodes,
             dkg_node_proofs,
             honest_party_ids,
+            circuit_committee_n,
+            circuit_committee_h,
             ..
         }) = state.as_ref()
         else {
@@ -685,9 +755,16 @@ impl PublicKeyAggregator {
                 }
                 (Some(proof), Some(attestation)) => {
                     let meta = self.params_preset.metadata();
-                    let committee_n = party_nodes.len();
-                    let committee_h = committee_n;
+                    let committee_n = *circuit_committee_n;
+                    let committee_h = *circuit_committee_h;
                     let n_moduli = meta.num_moduli as usize;
+                    if committee_n == 0 || committee_h == 0 {
+                        warn!(
+                            party_id = msg.party_id,
+                            "DKG fold attestation verify skipped — circuit committee dims unset"
+                        );
+                        return Ok(());
+                    }
                     if let Err(e) = verify_dkg_fold_attestation(
                         &self.e3_id,
                         msg.party_id,
@@ -739,6 +816,8 @@ impl PublicKeyAggregator {
                 mut dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
+                circuit_committee_n,
+                circuit_committee_h,
                 dkg_aggregation_correlation,
                 dkg_aggregated_proof,
                 c5_proof_pending,
@@ -760,6 +839,8 @@ impl PublicKeyAggregator {
                 dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
+                circuit_committee_n,
+                circuit_committee_h,
                 dkg_aggregation_correlation,
                 dkg_aggregated_proof,
                 c5_proof_pending,
@@ -780,6 +861,8 @@ impl PublicKeyAggregator {
             c5_proof_pending,
             dkg_aggregation_correlation,
             dkg_aggregated_proof,
+            circuit_committee_n,
+            circuit_committee_h,
             ..
         }) = state.as_ref()
         else {
@@ -838,6 +921,8 @@ impl PublicKeyAggregator {
                     dkg_fold_attestations,
                     honest_party_ids,
                     dishonest_parties,
+                    circuit_committee_n,
+                    circuit_committee_h,
                     dkg_aggregation_correlation: _,
                     dkg_aggregated_proof,
                     c5_proof_pending: _,
@@ -856,6 +941,8 @@ impl PublicKeyAggregator {
                     dkg_fold_attestations,
                     honest_party_ids,
                     dishonest_parties,
+                    circuit_committee_n,
+                    circuit_committee_h,
                     dkg_aggregation_correlation: None,
                     dkg_aggregated_proof,
                     c5_proof_pending: None,
@@ -894,13 +981,25 @@ impl PublicKeyAggregator {
             return Ok(());
         }
 
-        let committee_addresses = committee_addresses_in_party_order(&party_ids, party_nodes)?;
+        // Build the FULL committee address vector (length N) in ascending party_id order.
+        // The DKG aggregator circuit's `committee_members: [Field; N_PARTIES]` is the
+        // committee-hash preimage; passing only the H honest subset would silently
+        // hash a shorter array and diverge from on-chain `keccak(topNodes)`.
+        let mut full_committee_party_ids: Vec<u64> = party_nodes.keys().copied().collect();
+        full_committee_party_ids.sort();
+        let committee_addresses =
+            committee_addresses_in_party_order(&full_committee_party_ids, party_nodes)?;
         #[cfg(debug_assertions)]
         {
             debug_assert_eq!(
-                party_ids.len(),
                 committee_addresses.len(),
-                "honest NodeFold count must equal registered committee size until expulsion enables H < N"
+                *circuit_committee_n,
+                "DkgAggregator committee_addresses must have N entries (full topNodes)"
+            );
+            debug_assert_eq!(
+                party_ids.len(),
+                *circuit_committee_h,
+                "DkgAggregator party_ids must have H entries (honest set)"
             );
         }
 
@@ -930,6 +1029,8 @@ impl PublicKeyAggregator {
                 dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
+                circuit_committee_n,
+                circuit_committee_h,
                 dkg_aggregation_correlation: _,
                 dkg_aggregated_proof,
                 c5_proof_pending,
@@ -947,6 +1048,8 @@ impl PublicKeyAggregator {
                 dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
+                circuit_committee_n,
+                circuit_committee_h,
                 dkg_aggregation_correlation: Some(corr),
                 dkg_aggregated_proof,
                 c5_proof_pending,
@@ -1030,8 +1133,16 @@ impl PublicKeyAggregator {
 
         let pk_commitment = extract_pk_commitment(c5_proof)?;
 
-        let party_ids: Vec<u64> = honest_party_ids.iter().copied().collect();
-        let committee_addresses = committee_addresses_in_party_order(&party_ids, &party_nodes)?;
+        // Full committee (N entries) — used by on-chain `committee_hash` binding.
+        let mut full_committee_party_ids: Vec<u64> = party_nodes.keys().copied().collect();
+        full_committee_party_ids.sort();
+        let committee_addresses =
+            committee_addresses_in_party_order(&full_committee_party_ids, &party_nodes)?;
+
+        // Honest subset (H entries) — used by downstream actors for share-collection gating.
+        let honest_party_ids_vec: Vec<u64> = honest_party_ids.iter().copied().collect();
+        let honest_committee_addresses =
+            committee_addresses_in_party_order(&honest_party_ids_vec, &party_nodes)?;
 
         let dkg_attestation_bundle = match dkg_aggregated_proof.as_ref() {
             Some(_) => {
@@ -1050,6 +1161,7 @@ impl PublicKeyAggregator {
             e3_id: self.e3_id.clone(),
             nodes: nodes.clone(),
             committee_addresses: committee_addresses.clone(),
+            honest_committee_addresses,
             pk_commitment,
             dkg_aggregator_proof: dkg_aggregated_proof.clone(),
             dkg_attestation_bundle,
@@ -1094,6 +1206,8 @@ impl PublicKeyAggregator {
                     dkg_fold_attestations,
                     honest_party_ids,
                     dishonest_parties,
+                    circuit_committee_n,
+                    circuit_committee_h,
                     dkg_aggregation_correlation,
                     dkg_aggregated_proof,
                     c5_proof_pending,
@@ -1112,6 +1226,8 @@ impl PublicKeyAggregator {
                         dkg_fold_attestations,
                         honest_party_ids,
                         dishonest_parties,
+                        circuit_committee_n,
+                        circuit_committee_h,
                         dkg_aggregation_correlation,
                         dkg_aggregated_proof,
                         c5_proof_pending,
@@ -1127,6 +1243,8 @@ impl PublicKeyAggregator {
                     dkg_fold_attestations,
                     honest_party_ids,
                     dishonest_parties,
+                    circuit_committee_n,
+                    circuit_committee_h,
                     dkg_aggregation_correlation: None,
                     dkg_aggregated_proof: Some(resp.proof.clone()),
                     c5_proof_pending,
@@ -1181,6 +1299,8 @@ impl PublicKeyAggregator {
                 dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
+                circuit_committee_n,
+                circuit_committee_h,
                 dkg_aggregation_correlation: _,
                 dkg_aggregated_proof,
                 c5_proof_pending: _,
@@ -1199,6 +1319,8 @@ impl PublicKeyAggregator {
                 dkg_fold_attestations,
                 honest_party_ids,
                 dishonest_parties,
+                circuit_committee_n,
+                circuit_committee_h,
                 dkg_aggregation_correlation: None,
                 dkg_aggregated_proof,
                 c5_proof_pending: None,
@@ -1258,10 +1380,12 @@ impl PublicKeyAggregator {
 
             if keyshares.len() == *threshold_n && *threshold_n > 0 {
                 let m = *threshold_m;
+                let n = *threshold_n;
                 info!("PublicKeyAggregator: enough keyshares after expulsion, transitioning to VerifyingC1");
                 return Ok(PublicKeyAggregatorState::VerifyingC1 {
                     submission_order: std::mem::take(submission_order),
                     threshold_m: m,
+                    threshold_n: n,
                     c1_proofs: std::mem::take(c1_proofs),
                     no_proof_parties: Vec::new(),
                 });
@@ -1517,6 +1641,8 @@ mod tests {
             dkg_fold_attestations: HashMap::new(),
             honest_party_ids: BTreeSet::new(),
             dishonest_parties: BTreeSet::new(),
+            circuit_committee_n: 3,
+            circuit_committee_h: 3,
             dkg_aggregation_correlation: Some(correlation_id),
             dkg_aggregated_proof: None,
             c5_proof_pending: Some(dummy_proof(CircuitName::PkAggregation)),
