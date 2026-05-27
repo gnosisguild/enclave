@@ -22,7 +22,7 @@ const ENCLAVE_REWARDS_DISTRIBUTED = eventAbi(enclaveAbi as any, 'RewardsDistribu
 // has drifted from this package's ABI on the live deployment, so we don't use it).
 const ENCLAVE_E3_STAGE_CHANGED = eventAbi(enclaveAbi as any, 'E3StageChanged')
 const REGISTRY_COMMITTEE_REQUESTED = eventAbi(ciphernodeRegistryAbi as any, 'CommitteeRequested')
-const REGISTRY_COMMITTEE_FINALIZED = eventAbi(ciphernodeRegistryAbi as any, 'CommitteeFinalized')
+const REGISTRY_COMMITTEE_FINALIZED = eventAbi(ciphernodeRegistryAbi as any, 'SortitionCommitteeFinalized')
 
 // CRISP votes are NOT published through Enclave (its IEnclave.InputPublished
 // event is declared but never emitted). Each E3 program records its own inputs.
