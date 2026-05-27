@@ -205,6 +205,9 @@ fn load_committee_addresses(ctx: &E3Context, e3_id: &E3id) -> Result<Vec<Address
 
 fn load_honest_committee_addresses(ctx: &E3Context, e3_id: &E3id) -> Result<Vec<Address>> {
     if let Some(addrs) = ctx.get_dependency(HONEST_COMMITTEE_ADDRESSES_KEY) {
+        if addrs.is_empty() {
+            return Err(anyhow!(ERROR_TRBFV_PLAINTEXT_HONEST_COMMITTEE_MISSING));
+        }
         return Ok(addrs.clone());
     }
     let repo = ctx.repositories().publickey(e3_id);
@@ -213,7 +216,9 @@ fn load_honest_committee_addresses(ctx: &E3Context, e3_id: &E3id) -> Result<Vec<
         return Err(anyhow!(ERROR_TRBFV_PLAINTEXT_HONEST_COMMITTEE_MISSING));
     };
     if let Some(addrs) = state.honest_committee_addresses() {
-        return Ok(addrs.to_vec());
+        if addrs.is_empty() {
+            return Err(anyhow!(ERROR_TRBFV_PLAINTEXT_HONEST_COMMITTEE_MISSING));
+        }
     }
     Err(anyhow!(ERROR_TRBFV_PLAINTEXT_HONEST_COMMITTEE_MISSING))
 }
