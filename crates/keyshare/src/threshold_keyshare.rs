@@ -1216,13 +1216,13 @@ impl ThresholdKeyshare {
         // skipped in `encrypt_all_extended_for_share_indices`, producing N-1 ciphertexts.
         // The C3a/C3b NodeFold slots are sized for `N`, so any drift between the collected
         // encryption-key roster and the configured committee would corrupt the fold witness.
-        debug_assert_eq!(
-            recipient_pks.len(),
-            derived_committee_size.values().n as usize,
-            "share-encryption recipients ({}) do not match committee N ({}); C3 fan-out would mis-size the NodeFold slots",
-            recipient_pks.len(),
-            derived_committee_size.values().n,
-        );
+        if recipient_pks.len() != derived_committee_size.values().n as usize {
+            bail!(
+                        "share-encryption recipients ({}) do not match committee N ({}); C3 fan-out would mis-size the NodeFold slots",
+                        recipient_pks.len(),
+                        derived_committee_size.values().n
+                    );
+        }
         let recipient_party_ids: Vec<u64> = encryption_keys.iter().map(|k| k.party_id).collect();
         let recipient_share_indices: Vec<usize> = recipient_party_ids
             .iter()

@@ -254,7 +254,8 @@ impl CiphernodeSystem {
         let mut collected = Vec::new();
 
         loop {
-            if start.elapsed() > total_to {
+            let remaining = total_to.saturating_sub(start.elapsed());
+            if remaining.is_zero() {
                 bail!(
                     "take_history_until_last_event({last_event_type}) timed out after {:?}; got {} events: {:?}",
                     start.elapsed(),
@@ -262,8 +263,9 @@ impl CiphernodeSystem {
                     CiphernodeHistory(collected.clone()).event_types()
                 );
             }
+            let call_to = event_to.min(remaining);
             let batch = self
-                .take_history_with_timeouts(index, 1, Some(event_to), Some(event_to))
+                .take_history_with_timeouts(index, 1, Some(call_to), Some(call_to))
                 .await?;
             for event in batch.0 {
                 let is_last = event.event_type() == last_event_type;

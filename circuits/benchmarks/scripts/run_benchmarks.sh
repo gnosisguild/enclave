@@ -155,11 +155,26 @@ CIRCUITS_BASE_DIR="$(cd "${BENCHMARKS_DIR}/${BIN_DIR}" && pwd)"
 # here so OUTPUT_DIR can include the committee axis (`results_<mode>_<agg|no_agg>_<name>`).
 # shellcheck source=load_default_committee.sh
 source "${SCRIPT_DIR}/load_default_committee.sh"
+
+assert_skip_compile_committee_matches_disk() {
+    load_default_committee "" "$REPO_ROOT"
+    if [ "$COMMITTEE_NAME" != "$OUTPUT_COMMITTEE" ]; then
+        echo "Error: --skip-compile with --committee $OUTPUT_COMMITTEE but on-disk circuits are built for committee '$COMMITTEE_NAME'."
+        echo "  Rebuild: pnpm build:circuits --committee $OUTPUT_COMMITTEE"
+        echo "  Or omit --committee to benchmark the on-disk selection."
+        exit 1
+    fi
+}
+
 if [ -n "$COMMITTEE_OVERRIDE" ]; then
     OUTPUT_COMMITTEE="$COMMITTEE_OVERRIDE"
 else
     load_default_committee "" "$REPO_ROOT"
     OUTPUT_COMMITTEE="$COMMITTEE_NAME"
+fi
+
+if [ "$SKIP_COMPILE" = true ] && [ -n "$COMMITTEE_OVERRIDE" ]; then
+    assert_skip_compile_committee_matches_disk
 fi
 
 # results_<mode>_<agg|no_agg>_<committee> (see benchmark_output_dir.sh)

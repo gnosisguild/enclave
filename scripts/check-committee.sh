@@ -28,6 +28,8 @@ ACTIVE_NR="circuits/lib/src/configs/committee/active.nr"
 STAMP="circuits/bin/.active-preset.json"
 UTILS_TS="packages/enclave-contracts/scripts/utils.ts"
 COMMITTEE_RS="crates/zk-helpers/src/ciphernodes_committee.rs"
+RAN_STAMP_CHECK=false
+RAN_PARITY_CHECK=false
 
 fail() {
   echo "❌ check:committee: $*" >&2
@@ -55,15 +57,17 @@ if [[ -z "${UTILS_H:-}" || -z "${UTILS_T:-}" ]]; then
   fail "could not parse BFV_DKG_H / BFV_THRESHOLD_T from $UTILS_TS"
 fi
 
-# 3. Expected (H, T) for the active committee — pulled straight from the Rust enum so
-#    any future committee added there is automatically covered here.
-case "$ACTIVE_COMMITTEE" in
-  micro)  EXPECTED_H=3; EXPECTED_T=1 ;;
-  small)  EXPECTED_H=5; EXPECTED_T=2 ;;
-  medium) EXPECTED_H=8; EXPECTED_T=4 ;;
-  large)  EXPECTED_H=15; EXPECTED_T=7 ;;
-  *) fail "unknown committee '$ACTIVE_COMMITTEE' in $ACTIVE_NR" ;;
-esac
+# 3. Expected (H, T) for the active committee — parsed from the leaf `mod.nr` (same source
+#    as `load_default_committee.sh`; avoids duplicating numbers in this script).
+COMMITTEE_MOD="circuits/lib/src/configs/committee/${ACTIVE_COMMITTEE}/mod.nr"
+if [[ ! -f "$COMMITTEE_MOD" ]]; then
+  fail "missing $COMMITTEE_MOD (no Noir module for committee '$ACTIVE_COMMITTEE')"
+fi
+EXPECTED_H=$(grep -E 'pub global H: u32 = [0-9]+' "$COMMITTEE_MOD" | sed -E 's/.*= ([0-9]+);/\1/' | head -n1)
+EXPECTED_T=$(grep -E 'pub global T: u32 = [0-9]+' "$COMMITTEE_MOD" | sed -E 's/.*= ([0-9]+);/\1/' | head -n1)
+if [[ -z "${EXPECTED_H:-}" || -z "${EXPECTED_T:-}" ]]; then
+  fail "could not parse H / T from $COMMITTEE_MOD"
+fi
 
 if [[ "$UTILS_H" != "$EXPECTED_H" || "$UTILS_T" != "$EXPECTED_T" ]]; then
   fail "drift: $ACTIVE_NR says committee=$ACTIVE_COMMITTEE (expects H=$EXPECTED_H, T=$EXPECTED_T) \
@@ -76,9 +80,12 @@ if [[ -f "$STAMP" ]]; then
   # Older stamps (written before build-circuits.ts learned about committees) lack the field;
   # treat that as "no cross-check" rather than failing the whole script.
   STAMP_COMMITTEE=$(grep -oE '"committee"\s*:\s*"[a-z]+"' "$STAMP" 2>/dev/null | grep -oE '"[a-z]+"$' | tr -d '"' || true)
-  if [[ -n "${STAMP_COMMITTEE:-}" && "$STAMP_COMMITTEE" != "$ACTIVE_COMMITTEE" ]]; then
-    fail "drift: $ACTIVE_NR says committee=$ACTIVE_COMMITTEE but $STAMP says committee=$STAMP_COMMITTEE. \
+  if [[ -n "${STAMP_COMMITTEE:-}" ]]; then
+    RAN_STAMP_CHECK=true
+    if [[ "$STAMP_COMMITTEE" != "$ACTIVE_COMMITTEE" ]]; then
+      fail "drift: $ACTIVE_NR says committee=$ACTIVE_COMMITTEE but $STAMP says committee=$STAMP_COMMITTEE. \
 Either rebuild circuits with the current selection or revert active.nr to match the stamp."
+    fi
   fi
 fi
 
@@ -103,6 +110,17 @@ format_parity_matrices_for_committee() {
   local committee="$1"
   local tmp="$2"
   local variant live fresh backup formatted
+  local -a swapped_live=()
+  local -a swapped_backup=()
+
+  _restore_swapped_parity_live() {
+    local i
+    for i in "${!swapped_live[@]}"; do
+      if [[ -f "${swapped_backup[$i]}" ]]; then
+        cp "${swapped_backup[$i]}" "${swapped_live[$i]}"
+      fi
+    done
+  }
 
   for variant in insecure secure; do
     live="$NOIR_LIB/src/configs/committee/$committee/parity_${variant}.nr"
@@ -112,9 +130,19 @@ format_parity_matrices_for_committee() {
     formatted="$tmp/$committee/parity_${variant}.formatted.nr"
     cp "$live" "$backup"
     cp "$fresh" "$live"
+    swapped_live+=("$live")
+    swapped_backup+=("$backup")
   done
 
-  (cd "$NOIR_LIB" && nargo fmt) >/dev/null
+  ((${#swapped_live[@]} == 0)) && return 0
+
+  trap '_restore_swapped_parity_live' ERR
+
+  if ! (cd "$NOIR_LIB" && nargo fmt) >/dev/null; then
+    _restore_swapped_parity_live
+    trap - ERR
+    return 1
+  fi
 
   for variant in insecure secure; do
     live="$NOIR_LIB/src/configs/committee/$committee/parity_${variant}.nr"
@@ -126,12 +154,15 @@ format_parity_matrices_for_committee() {
     cp "$backup" "$live"
     cp "$formatted" "$fresh"
   done
+
+  trap - ERR
 }
 
 if [[ -x "$GEN_BIN" ]]; then
   if ! command -v nargo >/dev/null 2>&1; then
     echo "  (skipping parity-matrix drift check: nargo not found. Install nargo to enable formatted parity comparison.)" >&2
   else
+    RAN_PARITY_CHECK=true
     TMP=$(mktemp -d)
     trap 'rm -rf "$TMP"' EXIT
     # Mirror the committee dir layout so the bin can write into <tmp>/<committee>/.
@@ -157,4 +188,4 @@ else
   echo "  (skipping parity-matrix drift check: $GEN_BIN not built. Run \`cargo build -p e3-zk-helpers --bin generate_parity_matrices --release\` to enable.)" >&2
 fi
 
-echo "✓ check:committee: $ACTIVE_COMMITTEE (H=$EXPECTED_H, T=$EXPECTED_T) consistent across active.nr, utils.ts${STAMP:+, .active-preset.json}${GEN_BIN:+, parity_*.nr}"
+echo "✓ check:committee: $ACTIVE_COMMITTEE (H=$EXPECTED_H, T=$EXPECTED_T) consistent across active.nr, utils.ts$([ "$RAN_STAMP_CHECK" = true ] && echo ', .active-preset.json')$([ "$RAN_PARITY_CHECK" = true ] && echo ', parity_*.nr')"

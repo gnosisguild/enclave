@@ -163,22 +163,46 @@ fn benchmark_dkg_fold_attestation_verifier_address() -> Option<Address> {
         .or_else(|| "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0".parse().ok())
 }
 
-/// Reads the active committee directly from `circuits/bin/.active-preset.json` — the stamp
-/// `scripts/build-circuits.ts` writes for every build. The test must run against the committee
-/// the circuits in `circuits/bin/` were compiled for; deriving from the stamp removes the need
-/// for an env var and prevents drift entirely.
+/// Monorepo root (`crates/tests` → `../..`).
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+}
+
+/// Whether `setup_test_zk_backend` copies from `dist/circuits/<preset>/` (same marker as below).
+fn uses_dist_preset_artifacts(preset_subdir: &str) -> bool {
+    repo_root()
+        .join("dist/circuits")
+        .join(preset_subdir)
+        .join("recursive/dkg/pk/pk.json")
+        .exists()
+}
+
+/// Preset stamp for committee/metadata — aligned with `setup_test_zk_backend` artifact source:
+/// dist tree when present, otherwise `circuits/bin/.active-preset.json`.
+fn resolve_preset_stamp_path(preset_subdir: &str) -> PathBuf {
+    let dist_preset = repo_root().join("dist/circuits").join(preset_subdir);
+    if uses_dist_preset_artifacts(preset_subdir) {
+        dist_preset.join(".build-stamp.json")
+    } else {
+        repo_root()
+            .join("circuits")
+            .join("bin")
+            .join(".active-preset.json")
+    }
+}
+
+/// Reads the active committee from the preset stamp that matches the circuit artifacts in use.
+/// Uses `resolve_preset_stamp_path` so committee metadata stays aligned with
+/// `setup_test_zk_backend` (dist vs `circuits/bin`).
 ///
 /// Falls back to `Micro` (and warns) when the stamp is missing or pre-dates the `committee`
 /// field — same default as the build script, so a freshly cloned repo's micro circuits work
 /// out of the box.
-fn active_committee() -> e3_zk_helpers::CiphernodesCommitteeSize {
+fn active_committee(preset_subdir: &str) -> e3_zk_helpers::CiphernodesCommitteeSize {
     use std::str::FromStr;
-    let stamp_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("circuits")
-        .join("bin")
-        .join(".active-preset.json");
+    let stamp_path = resolve_preset_stamp_path(preset_subdir);
     let fallback = e3_zk_helpers::CiphernodesCommitteeSize::Micro;
 
     let Ok(raw) = std::fs::read_to_string(&stamp_path) else {
@@ -317,9 +341,7 @@ async fn setup_test_zk_backend(
     let bb_binary = noir_dir.join("bin").join("bb");
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..");
+    let repo_root = repo_root();
     let dist_preset = repo_root.join("dist/circuits").join(preset_subdir);
 
     if let Some(bb) = find_bb().await {
@@ -335,7 +357,6 @@ async fn setup_test_zk_backend(
         compile_error!("Integration tests require unix symlink support");
 
         let preset_out = circuits_dir.join(preset_subdir);
-        let dist_marker = dist_preset.join("recursive/dkg/pk/pk.json");
         let circuits_bin_marker = repo_root.join("circuits/bin/dkg/target/pk.json");
         // `circuits/bin` is preset-agnostic on disk — only `dist/circuits/<preset>/.build-stamp.json`
         // (written by `pnpm build:circuits --preset <preset>`) records which preset the
@@ -344,7 +365,7 @@ async fn setup_test_zk_backend(
         // produce invalid proofs.
         let preset_build_stamp = dist_preset.join(".build-stamp.json");
 
-        if dist_marker.exists() {
+        if uses_dist_preset_artifacts(preset_subdir) {
             copy_dir_recursive(&dist_preset, &preset_out).await?;
         } else if !circuits_bin_marker.exists() || !preset_build_stamp.exists() {
             // Either no local build exists, or the local build cannot be proven to match
@@ -1215,7 +1236,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // Committee comes from the build stamp — the test always runs against whatever the circuits
     // in `circuits/bin/` were compiled for, so switching committee is a single
     // `pnpm build:circuits --committee <name>` away with no env var to remember.
-    let committee_size = active_committee();
+    let committee_size = active_committee(benchmark_params.preset_subdir);
     let benchmark_committee = committee_size.values();
     let threshold_m = benchmark_committee.threshold;
     let threshold_n = benchmark_committee.n;

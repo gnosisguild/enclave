@@ -137,17 +137,20 @@ class VerifierGenerator {
   constructor(rootDir?: string, options: GenerateOptions = {}) {
     this.rootDir = rootDir ?? resolve(__dirname, '..')
     this.circuitsDir = join(this.rootDir, 'circuits', 'bin')
-    const honkBase = join(this.rootDir, 'packages', 'enclave-contracts', 'contracts', 'verifiers', 'bfv', 'honk')
-    // Non-canonical committees go under honk/<committee>/ so canonical-committee verifiers
-    // committed to git aren't clobbered. `--output-dir` always wins.
-    const defaultVerifierDir = options.committee && options.committee !== CANONICAL_COMMITTEE ? join(honkBase, options.committee) : honkBase
-    this.verifierDir = options.outputDir !== undefined ? resolve(options.outputDir) : defaultVerifierDir
     this.options = {
       groups: ALL_GROUPS,
       clean: false,
       compile: true,
       ...options,
     }
+    this.verifierDir = options.outputDir !== undefined ? resolve(options.outputDir) : this.defaultVerifierDir(this.targetCommittee())
+  }
+
+  private defaultVerifierDir(committee: CircuitCommittee): string {
+    const honkBase = join(this.rootDir, 'packages', 'enclave-contracts', 'contracts', 'verifiers', 'bfv', 'honk')
+    // Non-canonical committees go under honk/<committee>/ so canonical-committee verifiers
+    // committed to git aren't clobbered.
+    return committee !== CANONICAL_COMMITTEE ? join(honkBase, committee) : honkBase
   }
 
   /** Reads `.active-preset.json::committee` or falls back to the canonical committee. */

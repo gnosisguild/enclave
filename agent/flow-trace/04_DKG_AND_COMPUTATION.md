@@ -548,11 +548,19 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 │
   ├─ Only the active aggregator's buffer flushes into PublicKeyAggregator
   │
-  ├─ When threshold_n keyshares collected:
+  ├─ When N distinct keyshares collected (committee size from on-chain `threshold_n`):
 │   │
-│   ├─ 1. Aggregate public key shares:
+│   ├─ C1 verification runs over all N submitters; parties failing C1 are marked dishonest
+│   │
+│   ├─ Honest-set selection (compile-time H from `committee::active`, may be < N):
+│   │     • Require at least H parties with valid C1 proofs; otherwise E3Failed
+│   │     • If more than H parties pass C1, keep the H lowest `party_id`s as the canonical
+│   │       honest set (extras remain in the full committee roster for `committee_hash`
+│   │       binding but do not receive NodeFold / C5 inputs)
+│   │
+│   ├─ 1. Aggregate public key shares (H honest keyshares):
 │   │     aggregate_pk = Fhe::get_aggregate_public_key(
-│   │       [pk_share_1, pk_share_2, ..., pk_share_N]
+│   │       [pk_share for each of the H canonical honest parties]
 │   │     )
 │   │     → Uses PublicKeyShare::aggregate()
 │   │     → Produces the COLLECTIVE public key
@@ -564,7 +572,7 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 │   │
 │   ├─ 3. REQUEST C5 PROOF:
 │   │     Publish PkAggregationProofPending {
-│   │       proof_request: PkAggregationProofRequest,
+│   │       proof_request: PkAggregationProofRequest,  // H keyshares; C5 uses H not N
 │   │       public_key: aggregate_pk,
 │   │       public_key_hash: pk_hash
 │   │     }
@@ -593,6 +601,8 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 │   │
 │   └─ 6. Publish PublicKeyAggregated {
 │         e3_id, pubkey: aggregate_pk, pk_commitment, nodes,
+│         committee_addresses,          // length N — full on-chain topNodes binding
+│         honest_committee_addresses,  // length H — canonical honest subset
 │         dkg_aggregator_proof
 │       }
 │

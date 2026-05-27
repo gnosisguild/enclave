@@ -57,5 +57,11 @@ PY
     COMMITTEE_N=$(rg -N "N_PARTIES: u32 = " "$committee_file" | sed -E 's/.*= ([0-9]+);/\1/' | head -1)
     COMMITTEE_T=$(rg -N "T: u32 = " "$committee_file" | sed -E 's/.*= ([0-9]+);/\1/' | head -1)
     COMMITTEE_H=$(rg -N "H: u32 = " "$committee_file" | sed -E 's/.*= ([0-9]+);/\1/' | head -1)
+
+    if [ -z "$COMMITTEE_N" ] || [ -z "$COMMITTEE_T" ] || [ -z "$COMMITTEE_H" ]; then
+        echo "Error: failed to parse N/T/H from $committee_file" >&2
+        return 1
+    fi
+
     export COMMITTEE_NAME COMMITTEE_N COMMITTEE_T COMMITTEE_H
 }

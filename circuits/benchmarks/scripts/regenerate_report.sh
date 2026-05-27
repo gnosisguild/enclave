@@ -56,6 +56,13 @@ if [ "$MODE" != "insecure" ] && [ "$MODE" != "secure" ]; then
 fi
 
 if [ -n "$COMMITTEE_OVERRIDE" ]; then
+    case "$COMMITTEE_OVERRIDE" in
+        micro|small|medium) ;;
+        *)
+            echo "Error: --committee must be one of micro|small|medium"
+            exit 1
+            ;;
+    esac
     OUTPUT_COMMITTEE="$COMMITTEE_OVERRIDE"
 else
     load_default_committee "" "$REPO_ROOT"

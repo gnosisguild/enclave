@@ -108,10 +108,9 @@ class NoirCircuitBuilder {
 
     if (this.options.preset !== 'all' && this.options.committee) {
       if (!isPresetCommitteeSupported(this.options.preset as CircuitPreset, this.options.committee)) {
-        console.warn(
-          `   ⚠️  (${this.options.preset}, ${this.options.committee}) is not in SUPPORTED_PRESET_COMMITTEE_PAIRS. ` +
-            `Parity matrices for this combo are stubbed with zeros and proofs WILL FAIL. ` +
-            `See circuits/lib/src/configs/committee/${this.options.committee}/parity_*.nr.`,
+        throw new Error(
+          `Unsupported preset/committee pair (${this.options.preset}, ${this.options.committee}). ` +
+            `This combination currently emits stub parity matrices and invalid proofs.`,
         )
       }
     }
@@ -420,6 +419,19 @@ class NoirCircuitBuilder {
     }
   }
 
+  /**
+   * Writes preset + committee selection to the persistent Noir/TS config files so they stay
+   * aligned with `circuits/bin/.active-preset.json` even on hydrate-only or skip-if-built paths.
+   */
+  private syncPresetAndCommittee(modNrPath: string, preset: CircuitPreset, committee?: CircuitCommittee): void {
+    this.setNoirConfigPreset(modNrPath, preset)
+    if (committee) {
+      this.setNoirCommittee(committee)
+      this.regenerateParityMatrices(committee)
+      this.patchUtilsTs(committee)
+    }
+  }
+
   private async buildForPreset(preset: CircuitPreset, modNrPath?: string): Promise<BuildResult> {
     const result: BuildResult = { success: true, compiled: [], errors: [] }
     const presetOutputDir = join(this.options.outputDir!, preset)
@@ -445,6 +457,10 @@ class NoirCircuitBuilder {
 
       const sourceHash = this.computeSourceHash(preset)
       result.sourceHash = sourceHash
+
+      if (modNrPath) {
+        this.syncPresetAndCommittee(modNrPath, preset, this.options.committee)
+      }
 
       if (this.options.hydrateBinOnly) {
         if (!this.isDistPresetUpToDate(preset, sourceHash)) {
@@ -476,15 +492,6 @@ class NoirCircuitBuilder {
           return result
         }
         this.logSkipIfBuiltBlocked(preset, sourceHash)
-      }
-
-      if (modNrPath) {
-        this.setNoirConfigPreset(modNrPath, preset)
-        if (this.options.committee) {
-          this.setNoirCommittee(this.options.committee)
-          this.regenerateParityMatrices(this.options.committee)
-          this.patchUtilsTs(this.options.committee)
-        }
       }
 
       if (!this.options.noCleanTargets) {

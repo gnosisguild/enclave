@@ -131,6 +131,14 @@ impl NodeProofAggregator {
                         "NodeProofAggregator: build_pair_for_preset failed for E3 {}: {e}",
                         e3_id
                     );
+                    let _ = self.bus.publish(
+                        E3Failed {
+                            e3_id: e3_id.clone(),
+                            failed_at_stage: E3Stage::CommitteeFinalized,
+                            reason: FailureReason::DKGInvalidShares,
+                        },
+                        ec.clone(),
+                    );
                     return;
                 }
             };

@@ -34,6 +34,11 @@ source "${SCRIPT_DIR}/load_default_committee.sh"
 DEFAULT_MOD_NR="${REPO_ROOT}/circuits/lib/src/configs/default/mod.nr"
 load_default_committee "$DEFAULT_MOD_NR" "$REPO_ROOT"
 
+if [ -z "$COMMITTEE_NAME" ]; then
+    echo "Error: COMMITTEE_NAME not set by load_default_committee.sh"
+    exit 1
+fi
+
 OUTPUT_DIR="${REPO_ROOT}/circuits/bin/${CIRCUIT_PATH}"
 
 # Map circuit path to zk_cli --circuit and optional --inputs
