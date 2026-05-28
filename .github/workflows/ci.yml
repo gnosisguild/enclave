@@ -1129,6 +1129,9 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
+      - name: Install protoc
+        run: sudo apt-get update -y && sudo apt-get install -y protobuf-compiler
+
       - name: Install node dependencies
         run: pnpm install --frozen-lockfile
 
