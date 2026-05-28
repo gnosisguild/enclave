@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -13,7 +13,23 @@ import { SDKError } from '../utils'
 /** Matches `IEnclave.CommitteeSize.Micro` and `DEFAULT_E3_CONFIG.committeeSize`. */
 export const SDK_CIRCUIT_COMMITTEE = 'micro'
 
-const ACTIVE_PRESET_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../circuits/bin/.active-preset.json')
+function findActivePath(): string {
+  // Walk up from the bundle file (depth varies: dist/ vs dist/crypto/ etc.)
+  // until we find the package root (directory containing package.json), then
+  // go up two more levels to the monorepo root where circuits/bin lives.
+  let dir = dirname(fileURLToPath(import.meta.url))
+  while (true) {
+    if (existsSync(resolve(dir, 'package.json'))) {
+      return resolve(dir, '../../circuits/bin/.active-preset.json')
+    }
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  throw new SDKError('Could not locate SDK package root', 'SDK_CIRCUIT_STAMP_MISSING')
+}
+
+const ACTIVE_PRESET_PATH = findActivePath()
 
 let checked = false
 
