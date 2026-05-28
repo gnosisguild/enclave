@@ -968,6 +968,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Install protoc
+        run: sudo apt-get update -y && sudo apt-get install -y protobuf-compiler
       - name: Build support scripts
         run: cd templates/default && cargo build --locked --bin e3-support-scripts-dev
       - name: Verify build artifacts
@@ -1015,6 +1017,9 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           targets: wasm32-unknown-unknown
+
+      - name: Install protoc
+        run: sudo apt-get update -y && sudo apt-get install -y protobuf-compiler
 
       - name: Install node dependencies
         run: pnpm install --frozen-lockfile
@@ -1071,6 +1076,9 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           targets: wasm32-unknown-unknown
+
+      - name: Install protoc
+        run: sudo apt-get update -y && sudo apt-get install -y protobuf-compiler
 
       - name: Install node dependencies
         run: pnpm install --frozen-lockfile

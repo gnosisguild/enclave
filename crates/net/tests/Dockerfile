@@ -1,10 +1,11 @@
 # syntax=docker/dockerfile:1-labs
-FROM rust:1.86 AS builder
+FROM rust:1.91 AS builder
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     jq \
+    protobuf-compiler \
     software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
