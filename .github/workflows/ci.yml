@@ -1036,6 +1036,7 @@ jobs:
             packages/enclave-contracts/cache
             packages/enclave-contracts/types
             crates/wasm/dist
+            circuits/bin/.active-preset.json
             circuits/bin/recursive_aggregation/wrapper/threshold/target
             circuits/bin/threshold/target
           retention-days: 1
@@ -1156,6 +1157,7 @@ jobs:
           ls -la templates/default/target/debug/e3-support-scripts-dev || echo "support scripts not found"
           ls -la packages/enclave-contracts/dist || echo "SDK dist not found"
           ls -la crates/wasm/dist || echo "WASM dist not found"
+          ls -la circuits/bin/.active-preset.json || echo "circuit preset stamp not found"
           echo "Support scripts permissions:"
           ls -la templates/default/target/debug/e3-support-scripts-dev
 
