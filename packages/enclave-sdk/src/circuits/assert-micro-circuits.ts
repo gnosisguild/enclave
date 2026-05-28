@@ -4,16 +4,43 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 
 import { SDKError } from '../utils'
 
 /** Matches `IEnclave.CommitteeSize.Micro` and `DEFAULT_E3_CONFIG.committeeSize`. */
 export const SDK_CIRCUIT_COMMITTEE = 'micro'
 
-const ACTIVE_PRESET_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../circuits/bin/.active-preset.json')
+const ACTIVE_PRESET_RELATIVE_PATH = 'circuits/bin/.active-preset.json'
+
+function findActivePresetPath(startDir: string): string | undefined {
+  let currentDir = resolve(startDir)
+
+  while (true) {
+    const activePresetPath = join(currentDir, ACTIVE_PRESET_RELATIVE_PATH)
+
+    if (existsSync(activePresetPath)) return activePresetPath
+
+    if (existsSync(join(currentDir, 'pnpm-workspace.yaml')) && existsSync(join(currentDir, 'circuits'))) {
+      return activePresetPath
+    }
+
+    const parentDir = dirname(currentDir)
+    if (parentDir === currentDir) return undefined
+
+    currentDir = parentDir
+  }
+}
+
+function resolveActivePresetPath(): string {
+  const currentWorkingDir = typeof process !== 'undefined' && typeof process.cwd === 'function' ? process.cwd() : undefined
+
+  return (
+    (currentWorkingDir ? findActivePresetPath(currentWorkingDir) : undefined) ??
+    resolve(currentWorkingDir ?? '.', ACTIVE_PRESET_RELATIVE_PATH)
+  )
+}
 
 let checked = false
 
@@ -24,14 +51,15 @@ let checked = false
  */
 export function assertSdkMicroCircuits(): void {
   if (checked) return
-  checked = true
+
+  const activePresetPath = resolveActivePresetPath()
 
   let raw: string
   try {
-    raw = readFileSync(ACTIVE_PRESET_PATH, 'utf-8')
+    raw = readFileSync(activePresetPath, 'utf-8')
   } catch {
     throw new SDKError(
-      `Missing ${ACTIVE_PRESET_PATH}. Run \`pnpm -C packages/enclave-sdk compile:circuits\` first.`,
+      `Missing ${activePresetPath}. Run \`pnpm -C packages/enclave-sdk compile:circuits\` first.`,
       'SDK_CIRCUIT_STAMP_MISSING',
     )
   }
@@ -41,7 +69,7 @@ export function assertSdkMicroCircuits(): void {
     committee = JSON.parse(raw)?.committee as string | undefined
   } catch {
     throw new SDKError(
-      `Invalid JSON in ${ACTIVE_PRESET_PATH}. Rebuild with \`pnpm -C packages/enclave-sdk compile:circuits\`.`,
+      `Invalid JSON in ${activePresetPath}. Rebuild with \`pnpm -C packages/enclave-sdk compile:circuits\`.`,
       'SDK_CIRCUIT_STAMP_INVALID',
     )
   }
@@ -54,4 +82,6 @@ export function assertSdkMicroCircuits(): void {
       'SDK_CIRCUIT_COMMITTEE_MISMATCH',
     )
   }
+
+  checked = true
 }
