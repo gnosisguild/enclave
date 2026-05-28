@@ -20,9 +20,6 @@ chains:
       fee_token:
         address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
         deploy_block: 5
-      e3_program:
-        address: "0x2bdCC0de6bE1f7D2ee689a0342D76F52E8EFABa3"
-        deploy_block: 62
 program:
   dev: true
 # Default profile: multithread uses (logical CPUs - 1) Rayon workers and the same concurrent job
