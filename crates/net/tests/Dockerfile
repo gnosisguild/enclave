@@ -6,7 +6,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     jq \
     protobuf-compiler \
-    software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -L https://github.com/ethereum/solidity/releases/download/v0.8.27/solc-static-linux -o /usr/local/bin/solc \
