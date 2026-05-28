@@ -1029,6 +1029,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sdk-artifacts
+          include-hidden-files: true
           path: |
             packages/enclave-sdk/dist
             packages/enclave-contracts/dist
@@ -1036,10 +1037,11 @@ jobs:
             packages/enclave-contracts/cache
             packages/enclave-contracts/types
             crates/wasm/dist
+            circuits/bin/.active-preset.json
             circuits/bin/recursive_aggregation/wrapper/threshold/target
             circuits/bin/threshold/target
           retention-days: 1
-          if-no-files-found: warn
+          if-no-files-found: error
 
   build_crisp_sdk:
     needs: [detect_changes]
@@ -1156,6 +1158,7 @@ jobs:
           ls -la templates/default/target/debug/e3-support-scripts-dev || echo "support scripts not found"
           ls -la packages/enclave-contracts/dist || echo "SDK dist not found"
           ls -la crates/wasm/dist || echo "WASM dist not found"
+          test -f circuits/bin/.active-preset.json || (echo "ERROR: circuit preset stamp not found" && exit 1)
           echo "Support scripts permissions:"
           ls -la templates/default/target/debug/e3-support-scripts-dev
 
