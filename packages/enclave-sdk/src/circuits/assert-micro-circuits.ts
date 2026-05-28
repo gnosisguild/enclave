@@ -13,13 +13,20 @@ import { SDKError } from '../utils'
 /** Matches `IEnclave.CommitteeSize.Micro` and `DEFAULT_E3_CONFIG.committeeSize`. */
 export const SDK_CIRCUIT_COMMITTEE = 'micro'
 
-function findActivePath(): string {
+function findActivePath(): string | null {
   // Walk up from the bundle file (depth varies: dist/ vs dist/crypto/ etc.)
-  // until we find the package root (directory containing package.json), then
-  // go up two more levels to the monorepo root where circuits/bin lives.
+  // until we find the package root (directory containing package.json).
   let dir = dirname(fileURLToPath(import.meta.url))
   while (true) {
     if (existsSync(resolve(dir, 'package.json'))) {
+      // Bundled preset shipped inside the package takes priority (future use).
+      const bundled = resolve(dir, '.active-preset.json')
+      if (existsSync(bundled)) return bundled
+
+      // When installed under node_modules the monorepo root is not available;
+      // skip the check rather than resolving into an unrelated project tree.
+      if (dir.includes('node_modules')) return null
+
       return resolve(dir, '../../circuits/bin/.active-preset.json')
     }
     const parent = dirname(dir)
@@ -41,6 +48,8 @@ let checked = false
 export function assertSdkMicroCircuits(): void {
   if (checked) return
   checked = true
+
+  if (ACTIVE_PRESET_PATH === null) return
 
   let raw: string
   try {
