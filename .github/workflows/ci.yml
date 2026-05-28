@@ -1029,6 +1029,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sdk-artifacts
+          include-hidden-files: true
           path: |
             packages/enclave-sdk/dist
             packages/enclave-contracts/dist
