@@ -14,25 +14,26 @@ import { SDKError } from '../utils'
 export const SDK_CIRCUIT_COMMITTEE = 'micro'
 
 function findActivePath(): string | null {
-  // Walk up from the bundle file (depth varies: dist/ vs dist/crypto/ etc.)
-  // until we find the package root (directory containing package.json).
+  if (!import.meta.url) return null
+
   let dir = dirname(fileURLToPath(import.meta.url))
+
   while (true) {
     if (existsSync(resolve(dir, 'package.json'))) {
-      // Bundled preset shipped inside the package takes priority (future use).
       const bundled = resolve(dir, '.active-preset.json')
       if (existsSync(bundled)) return bundled
 
-      // When installed under node_modules the monorepo root is not available;
-      // skip the check rather than resolving into an unrelated project tree.
       if (dir.includes('node_modules')) return null
 
       return resolve(dir, '../../circuits/bin/.active-preset.json')
     }
+
     const parent = dirname(dir)
     if (parent === dir) break
+
     dir = parent
   }
+
   throw new SDKError('Could not locate SDK package root', 'SDK_CIRCUIT_STAMP_MISSING')
 }
 
@@ -48,16 +49,17 @@ let checked = false
 export function assertSdkMicroCircuits(): void {
   if (checked) return
 
-  const activePresetPath = resolveActivePresetPath()
-
-  if (ACTIVE_PRESET_PATH === null) return
+  if (ACTIVE_PRESET_PATH === null) {
+    checked = true
+    return
+  }
 
   let raw: string
   try {
-    raw = readFileSync(activePresetPath, 'utf-8')
+    raw = readFileSync(ACTIVE_PRESET_PATH, 'utf-8')
   } catch {
     throw new SDKError(
-      `Missing ${activePresetPath}. Run \`pnpm -C packages/enclave-sdk compile:circuits\` first.`,
+      `Missing ${ACTIVE_PRESET_PATH}. Run \`pnpm -C packages/enclave-sdk compile:circuits\` first.`,
       'SDK_CIRCUIT_STAMP_MISSING',
     )
   }
@@ -67,7 +69,7 @@ export function assertSdkMicroCircuits(): void {
     committee = JSON.parse(raw)?.committee as string | undefined
   } catch {
     throw new SDKError(
-      `Invalid JSON in ${activePresetPath}. Rebuild with \`pnpm -C packages/enclave-sdk compile:circuits\`.`,
+      `Invalid JSON in ${ACTIVE_PRESET_PATH}. Rebuild with \`pnpm -C packages/enclave-sdk compile:circuits\`.`,
       'SDK_CIRCUIT_STAMP_INVALID',
     )
   }
