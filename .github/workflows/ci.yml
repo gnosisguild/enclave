@@ -143,7 +143,7 @@ jobs:
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum \
           && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+          && sudo apt-get install -y solc protobuf-compiler
 
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
@@ -196,7 +196,7 @@ jobs:
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum \
           && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+          && sudo apt-get install -y solc protobuf-compiler
 
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
@@ -234,7 +234,7 @@ jobs:
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum \
           && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+          && sudo apt-get install -y solc protobuf-compiler
 
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
@@ -440,7 +440,7 @@ jobs:
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum \
           && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+          && sudo apt-get install -y solc protobuf-compiler
 
       - name: 'Install the dependencies'
         run: 'pnpm install --frozen-lockfile'
@@ -573,7 +573,7 @@ jobs:
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum \
           && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+          && sudo apt-get install -y solc protobuf-compiler
 
       - name: Build enclave CLI
         run: cargo install --locked --path crates/cli --bin enclave
@@ -635,7 +635,7 @@ jobs:
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum \
           && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+          && sudo apt-get install -y solc protobuf-compiler
 
       - name: Install Nargo
         if: matrix.test-suite == 'test:circuits'
@@ -721,7 +721,7 @@ jobs:
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum \
           && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+          && sudo apt-get install -y solc protobuf-compiler
 
       - name: Install yq
         run: |
@@ -896,7 +896,7 @@ jobs:
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum \
           && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+          && sudo apt-get install -y solc protobuf-compiler
 
       - name: Install Barretenberg (bb)
         if: steps.cache-bb.outputs.cache-hit != 'true'
