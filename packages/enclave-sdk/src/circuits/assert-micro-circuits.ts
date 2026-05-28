@@ -5,42 +5,38 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { SDKError } from '../utils'
 
 /** Matches `IEnclave.CommitteeSize.Micro` and `DEFAULT_E3_CONFIG.committeeSize`. */
 export const SDK_CIRCUIT_COMMITTEE = 'micro'
 
-const ACTIVE_PRESET_RELATIVE_PATH = 'circuits/bin/.active-preset.json'
-
-function findActivePresetPath(startDir: string): string | undefined {
-  let currentDir = resolve(startDir)
-
+function findActivePath(): string | null {
+  // Walk up from the bundle file (depth varies: dist/ vs dist/crypto/ etc.)
+  // until we find the package root (directory containing package.json).
+  let dir = dirname(fileURLToPath(import.meta.url))
   while (true) {
-    const activePresetPath = join(currentDir, ACTIVE_PRESET_RELATIVE_PATH)
+    if (existsSync(resolve(dir, 'package.json'))) {
+      // Bundled preset shipped inside the package takes priority (future use).
+      const bundled = resolve(dir, '.active-preset.json')
+      if (existsSync(bundled)) return bundled
 
-    if (existsSync(activePresetPath)) return activePresetPath
+      // When installed under node_modules the monorepo root is not available;
+      // skip the check rather than resolving into an unrelated project tree.
+      if (dir.includes('node_modules')) return null
 
-    if (existsSync(join(currentDir, 'pnpm-workspace.yaml')) && existsSync(join(currentDir, 'circuits'))) {
-      return activePresetPath
+      return resolve(dir, '../../circuits/bin/.active-preset.json')
     }
-
-    const parentDir = dirname(currentDir)
-    if (parentDir === currentDir) return undefined
-
-    currentDir = parentDir
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
   }
+  throw new SDKError('Could not locate SDK package root', 'SDK_CIRCUIT_STAMP_MISSING')
 }
 
-function resolveActivePresetPath(): string {
-  const currentWorkingDir = typeof process !== 'undefined' && typeof process.cwd === 'function' ? process.cwd() : undefined
-
-  return (
-    (currentWorkingDir ? findActivePresetPath(currentWorkingDir) : undefined) ??
-    resolve(currentWorkingDir ?? '.', ACTIVE_PRESET_RELATIVE_PATH)
-  )
-}
+const ACTIVE_PRESET_PATH = findActivePath()
 
 let checked = false
 
@@ -53,6 +49,8 @@ export function assertSdkMicroCircuits(): void {
   if (checked) return
 
   const activePresetPath = resolveActivePresetPath()
+
+  if (ACTIVE_PRESET_PATH === null) return
 
   let raw: string
   try {
