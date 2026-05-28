@@ -12,7 +12,7 @@ import { useVoteManagementContext } from '@/context/voteManagement'
 import { EditorialShell } from '@/design/Editorial'
 import { debounce } from '@/utils/methods'
 
-const HistoricPoll: React.FC = () => {
+const AllPolls: React.FC = () => {
   const { votingRound, pastPolls, getPastPolls, isLoading } = useVoteManagementContext()
   const [visiblePolls, setVisiblePolls] = useState<PollResult[]>([])
   const [page, setPage] = useState<number>(0)
@@ -71,14 +71,14 @@ const HistoricPoll: React.FC = () => {
       <section className='pad-section col' style={{ flex: 1, gap: 28 }}>
         <div className='col' style={{ gap: 12 }}>
           <div className='mono muted'>Archive</div>
-          <h1 className='h1'>Past polls</h1>
+          <h1 className='h1'>All polls</h1>
         </div>
         {isLoading && (
           <div className='flex justify-center'>
             <LoadingAnimation isLoading={isLoading} />
           </div>
         )}
-        {!pastPolls.length && !isLoading && <p className='lede'>There are no historic polls.</p>}
+        {!pastPolls.length && !isLoading && <p className='lede'>There are no polls yet.</p>}
         {visiblePolls.length > 0 && (
           <div className='grid w-full grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-3'>
             {visiblePolls.map((pollResult: PollResult, index: number) => {
@@ -104,4 +104,4 @@ const HistoricPoll: React.FC = () => {
   )
 }
 
-export default HistoricPoll
+export default AllPolls
