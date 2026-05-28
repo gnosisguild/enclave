@@ -12,7 +12,8 @@ use fhe::{
     bfv::{self, BfvParameters, SecretKey},
     trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig},
 };
-use fhe_math::rq::Poly;
+use fhe_math::rq::{Ntt, Poly, PowerBasis, RepresentationTag};
+use fhe_traits::Serialize as FheSerialize;
 use fhe_traits::{DeserializeWithContext, Serialize};
 use num_bigint::BigUint;
 use petname::Petnames;
@@ -42,15 +43,22 @@ pub fn deserialize_secret_key(bytes: &[u8], params: &Arc<BfvParameters>) -> Resu
     Ok(SecretKey::new(data.coeffs.to_vec(), params))
 }
 
-pub fn try_poly_from_bytes(bytes: &[u8], params: &BfvParameters) -> Result<Poly> {
-    Ok(Poly::from_bytes(bytes, params.ctx_at_level(0)?)?)
+pub fn try_poly_from_bytes(bytes: &[u8], params: &BfvParameters) -> Result<Poly<PowerBasis>> {
+    Ok(Poly::<PowerBasis>::from_bytes(
+        bytes,
+        params.context_at_level(0)?,
+    )?)
+}
+
+pub fn try_poly_ntt_from_bytes(bytes: &[u8], params: &BfvParameters) -> Result<Poly<Ntt>> {
+    Ok(Poly::<Ntt>::from_bytes(bytes, params.context_at_level(0)?)?)
 }
 
 pub fn try_poly_from_sensitive_bytes(
     bytes: SensitiveBytes,
     params: Arc<BfvParameters>,
     cipher: &Cipher,
-) -> Result<Poly> {
+) -> Result<Poly<PowerBasis>> {
     try_poly_from_bytes(&bytes.access(cipher)?, &params)
 }
 
@@ -58,7 +66,7 @@ pub fn try_polys_from_sensitive_bytes_vec(
     bytes_vec: Vec<SensitiveBytes>,
     params: Arc<BfvParameters>,
     cipher: &Cipher,
-) -> Result<Vec<Poly>> {
+) -> Result<Vec<Poly<PowerBasis>>> {
     bytes_vec
         .into_iter()
         .map(|s| try_poly_from_sensitive_bytes(s, params.clone(), cipher))
@@ -76,7 +84,7 @@ pub fn calculate_error_size(
     Ok(calculator.calculate_sm_bound()?)
 }
 
-pub fn stringify_poly(name: &str, poly: &Poly) -> String {
+pub fn stringify_poly<R: RepresentationTag>(name: &str, poly: &Poly<R>) -> String {
     format!("{}=Poly({})", name, hash_to_petname(hash_poly(poly)))
 }
 
@@ -118,7 +126,7 @@ pub fn hash_to_colored_petname(hash: u64) -> String {
     format!("{}  {}  {}", hash_to_bg_color(hash), petname, reset_color())
 }
 
-fn hash_poly(poly: &Poly) -> u64 {
+fn hash_poly<R: RepresentationTag>(poly: &Poly<R>) -> u64 {
     hash_bytes(&poly.to_bytes())
 }
 

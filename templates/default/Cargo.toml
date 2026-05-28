@@ -7,11 +7,11 @@ members = [
 
 [workspace.dependencies]
 e3-user-program = { path = "./program" }
-fhe = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
+fhe = { git = "https://github.com/gnosisguild/fhe.rs", branch = "upstream-merge-conflicts" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "upstream-merge-conflicts" }
 e3-program-server = { path = "../../crates/program-server" }
 e3-bfv-client = { path = "../../crates/bfv-client" }
 e3-fhe-params = { path = "../../crates/fhe-params" }
 e3-compute-provider = { path = "../../crates/compute-provider" }
-rand = "0.8.5"
+rand = "0.9"
 anyhow = "1.0.86"

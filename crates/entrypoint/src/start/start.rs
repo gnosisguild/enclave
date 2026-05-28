@@ -10,13 +10,13 @@ use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_zk_prover::ZkBackend;
 use rand::SeedableRng;
-use rand_chacha::rand_core::OsRng;
+use rand_chacha::ChaCha20Rng;
 use std::sync::{Arc, Mutex};
 use tracing::{info, instrument};
 
 #[instrument(name = "app", skip_all)]
 pub async fn execute(config: &AppConfig) -> Result<CiphernodeHandle> {
-    let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
+    let rng = Arc::new(Mutex::new(ChaCha20Rng::from_os_rng()));
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
     let backend = ZkBackend::new(config.bb_binary(), config.circuits_dir(), config.work_dir());
 

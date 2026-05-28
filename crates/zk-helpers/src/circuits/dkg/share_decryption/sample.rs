@@ -19,7 +19,6 @@ use fhe::bfv::{PublicKey, SecretKey};
 use fhe::trbfv::{ShareManager, TRBFV};
 use fhe_traits::FheEncoder;
 use fhe_traits::FheEncrypter;
-use rand::thread_rng;
 
 impl ShareDecryptionCircuitData {
     /// Generates sample data for the share-decryption circuit (decrypts a sum of honest ciphertexts under DKG secret key).
@@ -35,7 +34,7 @@ impl ShareDecryptionCircuitData {
             .search_defaults()
             .ok_or_else(|| CircuitsErrors::Sample("Preset has no search defaults".into()))?;
 
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
 
         let dkg_secret_key = SecretKey::random(&dkg_params, &mut rng);
         let dkg_public_key = PublicKey::new(&dkg_secret_key, &mut rng);

@@ -12,7 +12,7 @@ use aes_gcm::{
 };
 use anyhow::{anyhow, Result};
 use argon2::{Algorithm, Argon2, Params, Version};
-use rand::{rngs::OsRng, RngCore};
+use rand::RngCore;
 use tracing::trace;
 use zeroize::{Zeroize, Zeroizing};
 
@@ -61,7 +61,7 @@ fn encrypt_data(derived_key: &Zeroizing<Vec<u8>>, data: &mut Vec<u8>) -> Result<
 
     // Generate a random nonce for AES-GCM
     let mut nonce_bytes = [0u8; AES_NONCE_LEN];
-    OsRng.fill_bytes(&mut nonce_bytes);
+    rand::rng().fill_bytes(&mut nonce_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
 
     // Create AES-GCM cipher

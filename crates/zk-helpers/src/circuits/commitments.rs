@@ -692,15 +692,16 @@ mod tests {
         use fhe::bfv::SecretKey;
         use fhe::mbfv::PublicKeyShare;
         use fhe_traits::Serialize;
-        use rand::rngs::OsRng;
+        use rand::Rng;
 
         let preset = BfvPreset::InsecureThreshold512;
         let (params, _) = build_pair_for_preset(preset).unwrap();
         let crp = create_deterministic_crp_from_default_seed(&params);
 
+        let mut rng = rand::rng();
         // Generate a real keyshare
-        let sk = SecretKey::random(&params, &mut OsRng);
-        let pk_share = PublicKeyShare::new(&sk, crp.clone(), &mut OsRng).unwrap();
+        let sk = SecretKey::random(&params, &mut rng);
+        let pk_share = PublicKeyShare::new(&sk, crp.clone(), &mut rng).unwrap();
         let ks_bytes = pk_share.to_bytes();
 
         // Compute commitment via the helper

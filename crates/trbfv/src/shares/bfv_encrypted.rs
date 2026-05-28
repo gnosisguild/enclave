@@ -8,7 +8,7 @@ use anyhow::{bail, Context, Result};
 use derivative::Derivative;
 use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
-use fhe_math::rq::Poly;
+use fhe_math::rq::{Ntt, Poly};
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
     Serialize as FheSerialize,
@@ -43,11 +43,11 @@ pub struct BfvEncryptionWitness {
     /// The BFV ciphertext produced.
     pub ciphertext: Ciphertext,
     /// Encryption randomness u (RNS form).
-    pub u_rns: Poly,
+    pub u_rns: Poly<Ntt>,
     /// Encryption error e0 (RNS form).
-    pub e0_rns: Poly,
+    pub e0_rns: Poly<Ntt>,
     /// Encryption error e1 (RNS form).
-    pub e1_rns: Poly,
+    pub e1_rns: Poly<Ntt>,
 }
 
 /// Debug helper for Vec<ArcBytes>
@@ -349,12 +349,12 @@ impl Default for BfvEncryptedShares {
 mod tests {
     use super::*;
     use e3_fhe_params::{BfvParamSet, BfvPreset};
-    use rand::rngs::OsRng;
+    use rand::Rng;
 
     #[test]
     fn test_encrypt_decrypt_share() {
         let params = BfvParamSet::from(BfvPreset::InsecureDkg512).build_arc();
-        let mut rng = OsRng;
+        let mut rng = rand::rng();
 
         // Generate key pair
         let sk = SecretKey::random(&params, &mut rng);
@@ -385,7 +385,7 @@ mod tests {
     #[test]
     fn test_secret_key_serialization() {
         let params = BfvParamSet::from(BfvPreset::InsecureDkg512).build_arc();
-        let mut rng = OsRng;
+        let mut rng = rand::rng();
 
         // Generate a secret key
         let sk = SecretKey::random(&params, &mut rng);
@@ -404,7 +404,7 @@ mod tests {
     #[test]
     fn test_encrypt_all_extended_for_share_indices_uses_real_share_rows() {
         let params = BfvParamSet::from(BfvPreset::InsecureDkg512).build_arc();
-        let mut rng = OsRng;
+        let mut rng = rand::rng();
 
         let _sk_one = SecretKey::random(&params, &mut rng);
         let pk_one = PublicKey::new(&_sk_one, &mut rng);

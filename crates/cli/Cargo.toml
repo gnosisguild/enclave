@@ -42,6 +42,7 @@ opentelemetry-otlp = { workspace = true }
 opentelemetry-stdout = { workspace = true }
 opentelemetry_sdk = { workspace = true }
 petname = { workspace = true }
+rand08 = { package = "rand", version = "=0.8.5", features = ["std", "std_rng"] }
 phf = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
