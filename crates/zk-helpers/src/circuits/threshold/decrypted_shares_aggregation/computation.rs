@@ -215,8 +215,7 @@ impl Computation for Inputs {
         let max_msg_non_zero_coeffs = configs.max_msg_non_zero_coeffs;
         let moduli = ctx.moduli();
 
-        // Copy to PowerBasis for coefficient extraction
-        let d_share_polys: Vec<Poly<PowerBasis>> = data.d_share_polys.iter().cloned().collect();
+        let d_share_polys: Vec<Poly<PowerBasis>> = data.d_share_polys.clone();
 
         if d_share_polys.len() < threshold + 1 {
             return Err(CircuitsErrors::Other(format!(

@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 /// This module defines event payloads that will dcrypt a ciphertext with a threshold quorum of decryption shares
-use crate::{helpers::try_poly_from_bytes, PartyId, TrBFVConfig};
+use crate::{helpers::try_poly_pb_from_bytes, PartyId, TrBFVConfig};
 use anyhow::*;
 use e3_bfv_client::{decode_plaintext_to_vec_u64, encode_vec_u64_to_bytes};
 use e3_utils::utility_types::ArcBytes;
@@ -76,7 +76,7 @@ impl TryFrom<CalculateThresholdDecryptionRequest> for InnerRequest {
         for (party_id, vec_of_bytes) in ordered_polys {
             let polys: Vec<Poly<PowerBasis>> = vec_of_bytes
                 .iter()
-                .map(|bytes| try_poly_from_bytes(&bytes, &params))
+                .map(|bytes| try_poly_pb_from_bytes(&bytes, &params))
                 .collect::<Result<Vec<_>>>()?;
 
             d_share_polys.push(polys);

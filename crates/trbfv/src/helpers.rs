@@ -43,7 +43,7 @@ pub fn deserialize_secret_key(bytes: &[u8], params: &Arc<BfvParameters>) -> Resu
     Ok(SecretKey::new(data.coeffs.to_vec(), params))
 }
 
-pub fn try_poly_from_bytes(bytes: &[u8], params: &BfvParameters) -> Result<Poly<PowerBasis>> {
+pub fn try_poly_pb_from_bytes(bytes: &[u8], params: &BfvParameters) -> Result<Poly<PowerBasis>> {
     Ok(Poly::<PowerBasis>::from_bytes(
         bytes,
         params.context_at_level(0)?,
@@ -59,7 +59,7 @@ pub fn try_poly_from_sensitive_bytes(
     params: Arc<BfvParameters>,
     cipher: &Cipher,
 ) -> Result<Poly<PowerBasis>> {
-    try_poly_from_bytes(&bytes.access(cipher)?, &params)
+    try_poly_pb_from_bytes(&bytes.access(cipher)?, &params)
 }
 
 pub fn try_polys_from_sensitive_bytes_vec(

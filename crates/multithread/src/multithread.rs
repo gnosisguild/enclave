@@ -48,9 +48,9 @@ use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
 use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::helpers::deserialize_secret_key;
-use e3_trbfv::helpers::try_poly_from_bytes;
 use e3_trbfv::helpers::try_poly_from_sensitive_bytes;
 use e3_trbfv::helpers::try_poly_ntt_from_bytes;
+use e3_trbfv::helpers::try_poly_pb_from_bytes;
 use e3_trbfv::shares::SharedSecret;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::SharedRng;
@@ -448,7 +448,7 @@ fn handle_threshold_share_decryption_proof(
         let e = CrtPolynomial::from_fhe_polynomial(&e_poly);
 
         // Deserialize d_share → Poly → CrtPolynomial
-        let d_share_poly = try_poly_from_bytes(&req.d_share_bytes[i], &threshold_params)
+        let d_share_poly = try_poly_pb_from_bytes(&req.d_share_bytes[i], &threshold_params)
             .map_err(|e| make_zk_error(&request, format!("d_share[{}] deserialize: {}", i, e)))?;
         let d_share = CrtPolynomial::from_fhe_polynomial(&d_share_poly);
 
@@ -841,7 +841,7 @@ fn handle_share_computation_proof(
         .map_err(|e| make_zk_error(&request, format!("secret_sss_raw decrypt: {}", e)))?;
 
     // 3. Deserialize secret polynomial
-    let secret_poly = try_poly_from_bytes(&secret_bytes, &threshold_params)
+    let secret_poly = try_poly_pb_from_bytes(&secret_bytes, &threshold_params)
         .map_err(|e| make_zk_error(&request, format!("secret_raw: {}", e)))?;
     let mut secret = CrtPolynomial::from_fhe_polynomial(&secret_poly);
     if req.dkg_input_type == DkgInputType::SecretKey {
@@ -935,13 +935,13 @@ fn handle_pk_generation_proof(
     let pk0_share_poly = try_poly_ntt_from_bytes(&req.pk0_share, &params)
         .map_err(|e| make_zk_error(&request, format!("pk0_share: {}", e)))?;
 
-    let sk_poly = try_poly_from_bytes(&sk_bytes, &params)
+    let sk_poly = try_poly_pb_from_bytes(&sk_bytes, &params)
         .map_err(|e| make_zk_error(&request, format!("sk: {}", e)))?;
 
     let eek_poly = try_poly_ntt_from_bytes(&eek_bytes, &params)
         .map_err(|e| make_zk_error(&request, format!("eek: {}", e)))?;
 
-    let e_sm_poly = try_poly_from_bytes(&e_sm_bytes, &params)
+    let e_sm_poly = try_poly_pb_from_bytes(&e_sm_bytes, &params)
         .map_err(|e| make_zk_error(&request, format!("e_sm: {}", e)))?;
 
     // 3. Convert Poly → CrtPolynomial
@@ -1489,7 +1489,7 @@ fn handle_decrypted_shares_aggregation_proof(
         let d_share_polys: Vec<fhe_math::rq::Poly<PowerBasis>> = req
             .d_share_polys
             .iter()
-            .map(|(_, shares)| try_poly_from_bytes(&shares[i], &threshold_params))
+            .map(|(_, shares)| try_poly_pb_from_bytes(&shares[i], &threshold_params))
             .collect::<std::result::Result<_, _>>()
             .map_err(|e| {
                 make_zk_error(&request, format!("d_share_polys[{}] deserialize: {}", i, e))
