@@ -345,6 +345,71 @@ describe("EnclaveToken", function () {
       await token.connect(alice).transfer(bobAddress, claimAmount);
     });
 
+    it("reuses fully unlocked schedule slots at the schedule cap", async function () {
+      const { token, admin, alice } = await loadFixture(
+        deployWithUnlockedTransfers,
+      );
+      const aliceAddress = await alice.getAddress();
+      const now = BigInt(await time.latest());
+      const unlockedAmount = ethers.parseEther("1");
+      const activeAmount = ethers.parseEther("2");
+
+      await token
+        .connect(admin)
+        .mintAllocation(
+          aliceAddress,
+          unlockedAmount * 64n + activeAmount,
+          "Schedule capacity",
+        );
+
+      for (let i = 0; i < 64; i++) {
+        await token.connect(admin).createLockSchedule({
+          account: aliceAddress,
+          amount: unlockedAmount,
+          tokenHoldUntil: now,
+          tokenUnlockStart: now,
+          tokenUnlockEnd: now,
+          serviceStart: 0n,
+          serviceCliff: 0n,
+          serviceEnd: 0n,
+          group: GROUP_PRE_SEED,
+        });
+      }
+
+      expect(await token.lockScheduleCount(aliceAddress)).to.equal(64n);
+      expect(await token.lockedFloorOf(aliceAddress)).to.equal(0n);
+
+      await expect(
+        token.connect(admin).createLockSchedule({
+          account: aliceAddress,
+          amount: activeAmount,
+          tokenHoldUntil: now + DAY,
+          tokenUnlockStart: now + DAY,
+          tokenUnlockEnd: now + 2n * DAY,
+          serviceStart: 0n,
+          serviceCliff: 0n,
+          serviceEnd: 0n,
+          group: GROUP_PRE_SEED,
+        }),
+      )
+        .to.emit(token, "LockScheduleCreated")
+        .withArgs(
+          aliceAddress,
+          0n,
+          GROUP_PRE_SEED,
+          activeAmount,
+          now + DAY,
+          now + DAY,
+          now + 2n * DAY,
+          0n,
+          0n,
+          0n,
+        );
+
+      expect(await token.lockScheduleCount(aliceAddress)).to.equal(64n);
+      expect(await token.lockedFloorOf(aliceAddress)).to.equal(activeAmount);
+    });
+
     it("rejects claim-source transfers when the recipient has no active profile", async function () {
       const { token, admin, alice, claimSource } = await loadFixture(
         deployWithUnlockedTransfers,
@@ -364,6 +429,45 @@ describe("EnclaveToken", function () {
       )
         .to.be.revertedWithCustomError(token, "ClaimLockProfileMissing")
         .withArgs(await alice.getAddress());
+    });
+
+    it("does not create claim locks for BondingRegistry exit payouts", async function () {
+      const signers = await ethers.getSigners();
+      const [, beneficiary] = signers;
+      const beneficiaryAddress = await beneficiary.getAddress();
+      const sys = await deployEnclaveSystem({
+        useMockCiphernodeRegistry: true,
+        setupOperators: 0,
+        mintUsdcTo: [],
+      });
+      const { bondingRegistry, licenseToken } = sys;
+      const bondingRegistryAddress = await bondingRegistry.getAddress();
+      const bondAmount = ethers.parseEther("100");
+      const unbondAmount = ethers.parseEther("25");
+
+      await licenseToken.setBondingRegistry(bondingRegistryAddress);
+      await licenseToken.setClaimSource(bondingRegistryAddress, true);
+      await licenseToken.mintAllocation(
+        beneficiaryAddress,
+        bondAmount,
+        "License bond",
+      );
+      await licenseToken
+        .connect(beneficiary)
+        .approve(bondingRegistryAddress, bondAmount);
+
+      await bondingRegistry.connect(beneficiary).bondLicense(bondAmount);
+      await bondingRegistry.connect(beneficiary).unbondLicense(unbondAmount);
+
+      await time.increase(SEVEN_DAYS + 1);
+      await bondingRegistry.connect(beneficiary).claimExits(0, unbondAmount);
+
+      expect(await licenseToken.lockScheduleCount(beneficiaryAddress)).to.equal(
+        0n,
+      );
+      expect(await licenseToken.balanceOf(beneficiaryAddress)).to.equal(
+        unbondAmount,
+      );
     });
 
     it("does not let admins create schedules beyond current controlled balance", async function () {

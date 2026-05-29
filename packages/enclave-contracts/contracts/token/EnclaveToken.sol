@@ -543,7 +543,11 @@ contract EnclaveToken is
         super._update(from, to, value);
 
         if (from != address(0) && to != address(0)) {
-            if (approvedClaimSources[from] && value != 0) {
+            if (
+                approvedClaimSources[from] &&
+                value != 0 &&
+                from != address(bondingRegistry)
+            ) {
                 _addClaimLock(to, value);
             }
             _enforceLockedFloor(from);
@@ -591,8 +595,7 @@ contract EnclaveToken is
         }
         if (amount > type(uint128).max) revert InvalidLockSchedule();
 
-        if (block.timestamp > type(uint64).max) revert InvalidLockSchedule();
-        uint64 currentTimestamp = uint64(block.timestamp);
+        uint64 currentTimestamp = _currentTimestamp();
 
         uint256 holdUntil = uint256(currentTimestamp) + profile.holdDuration;
         uint256 unlockEnd = holdUntil + profile.unlockDuration;
@@ -622,12 +625,17 @@ contract EnclaveToken is
     ) internal returns (uint256 scheduleId) {
         LockSchedule[] storage schedules = _lockSchedules[account];
         uint256 len = schedules.length;
-        if (len >= MAX_LOCK_SCHEDULES) revert MaxLockSchedulesExceeded();
+        if (len < MAX_LOCK_SCHEDULES) {
+            schedules.push(schedule);
+            scheduleId = len;
+        } else {
+            scheduleId = _reclaimUnlockedScheduleSlot(schedules);
+            schedules[scheduleId] = schedule;
+        }
 
-        schedules.push(schedule);
         emit LockScheduleCreated(
             account,
-            len,
+            scheduleId,
             schedule.group,
             uint256(schedule.amount),
             schedule.tokenHoldUntil,
@@ -637,7 +645,18 @@ contract EnclaveToken is
             schedule.serviceCliff,
             schedule.serviceEnd
         );
-        return len;
+    }
+
+    function _reclaimUnlockedScheduleSlot(
+        LockSchedule[] storage schedules
+    ) internal view returns (uint256 scheduleId) {
+        uint64 currentTimestamp = _currentTimestamp();
+        uint256 len = schedules.length;
+        for (uint256 i = 0; i < len; i++) {
+            if (_lockedAmount(schedules[i], currentTimestamp) == 0) return i;
+        }
+
+        revert MaxLockSchedulesExceeded();
     }
 
     function _setClaimLockProfile(
@@ -669,6 +688,11 @@ contract EnclaveToken is
         uint64 configuredTgeTimestamp = tgeTimestamp;
         if (configuredTgeTimestamp == 0) revert TgeTimestampUnset();
         return configuredTgeTimestamp;
+    }
+
+    function _currentTimestamp() internal view returns (uint64) {
+        if (block.timestamp > type(uint64).max) revert InvalidLockSchedule();
+        return uint64(block.timestamp);
     }
 
     function _validateLockSchedule(
