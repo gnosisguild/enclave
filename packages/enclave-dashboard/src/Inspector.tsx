@@ -38,13 +38,13 @@ function ExplorerLink({ value, href }: { value: string; href: string }) {
 const TxLink = ({ hash }: { hash: string }) => <ExplorerLink value={hash} href={explorerTx(hash)} />
 const AddrLink = ({ address }: { address: string }) => <ExplorerLink value={address} href={explorerAddress(address)} />
 
-function InspStatusBadge({ stageIdx }: { stageIdx: number }) {
+function InspStatusBadge({ stageIdx, label }: { stageIdx: number; label?: string }) {
   const s = STAGES[stageIdx]
   const variant = stageIdx >= 6 ? 'published' : stageIdx === 3 ? 'open' : 'working'
   return (
     <span className={`stage-badge stage-badge--${variant}`}>
       <span className='stage-badge__dot' />
-      <span>{s.label}</span>
+      <span>{label ?? s.label}</span>
     </span>
   )
 }
@@ -236,8 +236,13 @@ export default function Inspector({
 
   // Section status derived from the E3's current UI stage index (see STAGES order).
   // The final stage (Published, index 6) is terminal: reaching it = complete.
+  // When `noBallots` is set the chain stayed in KeyPublished (currentStage=4) but
+  // nothing was ever submitted, so post-input sections aren't actually "in progress".
   const lastStage = STAGES.length - 1
   const stageStatus = (targetStage: number) => {
+    if (e3.noBallots && targetStage >= 4) {
+      return targetStage === 4 ? { kind: 'pending', label: 'No ballots' } : { kind: 'pending', label: 'Skipped' }
+    }
     if (e3.currentStage > targetStage) return { kind: 'done', label: 'Done' }
     if (e3.currentStage === targetStage) {
       return targetStage >= lastStage ? { kind: 'done', label: 'Complete' } : { kind: 'live', label: 'In progress' }
@@ -300,7 +305,7 @@ export default function Inspector({
           <div className='insp-stat'>
             <div className='insp-stat__label'>Status</div>
             <div className='insp-stat__value'>
-              <InspStatusBadge stageIdx={e3.currentStage} />
+              <InspStatusBadge stageIdx={e3.currentStage} label={e3.noBallots ? 'Complete · no ballots' : undefined} />
             </div>
           </div>
           <div className='insp-stat'>

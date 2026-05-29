@@ -76,14 +76,22 @@ export function solidityStageToUiIdx(stage: number, inputWindow: [bigint, bigint
   }
 }
 
-// Whether an E3 is genuinely still active right now. An E3 that's Complete or
-// Failed isn't active; neither is one that blew past its expected deadline
-// (input window close + compute + decryption windows) without completing —
-// even if the chain hasn't formally marked it Failed yet.
-export function isE3Active(stage: number, inputWindowClose: bigint): boolean {
+// Whether an E3 is genuinely still active right now. An E3 isn't active when:
+//   - it's already Complete or Failed on-chain,
+//   - it blew past its expected deadline (input close + compute + decryption windows)
+//     without completing (chain hasn't formally marked it Failed yet), or
+//   - for input-tracked programs (CRISP), its input window has closed without
+//     a single ballot being submitted. The chain doesn't transition the stage
+//     because there's nothing to compute; functionally it's a terminal no-op.
+export function isE3Active(stage: number, inputWindowClose: bigint, opts: { e3Program?: string; ballotCount?: number } = {}): boolean {
   if (stage === E3Stage.Complete || stage === E3Stage.Failed) return false
   if (inputWindowClose > 0n) {
     const now = BigInt(Math.floor(Date.now() / 1000))
+    if (now >= inputWindowClose) {
+      // Input window has closed. For programs whose inputs we can observe, if
+      // none arrived the round is effectively done.
+      if (opts.e3Program && isCrispE3(opts.e3Program) && (opts.ballotCount ?? 0) === 0) return false
+    }
     const deadline = inputWindowClose + BigInt(TIMEOUTS.computeWindow + TIMEOUTS.decryptionWindow)
     if (now > deadline) return false
   }
@@ -110,7 +118,10 @@ export type E3FullDetails = E3Summary & {
   committeePublicKey: `0x${string}`
   ciphertextOutput: `0x${string}`
   plaintextOutput: `0x${string}`
-  requestedAt?: number // unix seconds (block time of the request)
+  requestedAt?: number // unix seconds (block.timestamp of the request)
+  // Block number of the E3Requested log (distinct from `requestBlock` which on
+  // this contract version is actually a Unix timestamp, not a block number).
+  requestEventBlock?: bigint
   // From CiphernodeRegistry:
   committeeThreshold: [number, number] // [M, N]
   committeeMembers: `0x${string}`[]
@@ -286,9 +297,11 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
     }).catch(() => 0n) as Promise<bigint>,
   ])
 
-  // Every event for this E3 happens at or after its request block, so scan from
-  // there instead of DEPLOY_BLOCK — bounds the work per poll tick.
-  const fromBlock = e3.requestBlock > DEPLOY_BLOCK ? (e3.requestBlock as bigint) : DEPLOY_BLOCK
+  // `e3.requestBlock` is misnamed: on this contract version it stores
+  // `block.timestamp` (EIP-6372 timestamp clock), not a block number. Using it
+  // as fromBlock would push the scan range past chain head and silently miss
+  // every event. Scan from the deploy block instead.
+  const fromBlock = DEPLOY_BLOCK
 
   // 2. Find the E3Requested tx for this id (for the inspector header).
   const requestLogs = await getLogsChunked<any>(
@@ -391,15 +404,14 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
   const shownBallots = inputs.slice(0, 6)
   if (inputs.length > 6) shownBallots.push(inputs[inputs.length - 1])
   const ts = await blockTimestamps(
-    [
-      e3.requestBlock,
-      finLog?.blockNumber,
-      pubLog?.blockNumber,
-      resultLog?.blockNumber,
-      ...shownBallots.map((l: any) => l.blockNumber),
-    ].filter((b): b is bigint => typeof b === 'bigint'),
+    [finLog?.blockNumber, pubLog?.blockNumber, resultLog?.blockNumber, ...shownBallots.map((l: any) => l.blockNumber)].filter(
+      (b): b is bigint => typeof b === 'bigint',
+    ),
   )
   const at = (bn?: bigint) => (bn != null ? ts.get(bn.toString()) : undefined)
+  // `e3.requestBlock` already IS a Unix timestamp on this contract version (the
+  // field is misnamed — see fromBlock comment above), so we don't go to chain.
+  const requestedAtTs = e3.requestBlock > 0n ? Number(e3.requestBlock) : undefined
 
   return {
     id: e3Id,
@@ -407,7 +419,8 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
     requester: e3.requester,
     requestBlock: e3.requestBlock,
     requestTxHash,
-    requestedAt: at(e3.requestBlock),
+    requestedAt: requestedAtTs,
+    requestEventBlock: requestLog?.blockNumber,
     inputWindow: [e3.inputWindow[0], e3.inputWindow[1]] as [bigint, bigint],
     committeeSize: Number(e3.committeeSize),
     stage,

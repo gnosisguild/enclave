@@ -67,7 +67,10 @@ function historyResult(s: E3Summary, detail: E3FullDetails | undefined, meta: Re
   }
   if (s.stage === E3Stage.Complete) return 'Completed'
   if (s.stage === E3Stage.Failed) return 'Failed'
-  if (isE3Active(s.stage, s.inputWindow[1])) return 'In progress'
+  if (isE3Active(s.stage, s.inputWindow[1], { e3Program: s.e3Program, ballotCount: s.ballotCount })) return 'In progress'
+  // Past the input window without inputs (and not flagged Complete/Failed on chain)
+  // — distinguish from generic "Expired" so empty rounds are obvious in history.
+  if (s.ballotCount === 0) return 'No ballots'
   return 'Expired'
 }
 
@@ -123,6 +126,11 @@ export type InspectorDetail = {
   compute: { status: string; note: string }
   decryption: { status: string; note: string; threshold: number; committeeSize: number }
   publication: { status: string; note: string; resultTx?: string }
+  // True when the input window has closed without a single ballot being submitted.
+  // The chain stage still reports KeyPublished (no transition is triggered without
+  // inputs), so without this flag the compute/decryption sections look "in progress"
+  // when in fact nothing is happening.
+  noBallots: boolean
   events: InspectorEvent[]
 }
 
@@ -145,6 +153,8 @@ export function adaptInspectorDetail(detail: E3FullDetails | null): InspectorDet
   const inputsReceived = detail.inputsTracked ? detail.ballotCount.toLocaleString() : '—'
   const sharesRequired = detail.committeeThreshold[0] || 0
   const committeeSize = detail.committeeThreshold[1] || detail.committeeMembers.length
+  // Past the input window with zero ballots — see `noBallots` on InspectorDetail.
+  const noBallots = detail.inputsTracked && detail.ballotCount === 0 && detail.uiStageIdx >= 4
 
   return {
     id: formatE3Id(detail.id),
@@ -153,8 +163,8 @@ export function adaptInspectorDetail(detail: E3FullDetails | null): InspectorDet
     requestedBy: detail.requester,
     requestedByLabel: 'Requester',
     requestedTx: detail.requestTxHash,
-    requestedAt: detail.requestedAt ? fmtUtcFromUnix(detail.requestedAt) : `block #${detail.requestBlock.toString()}`,
-    requestedBlock: Number(detail.requestBlock),
+    requestedAt: detail.requestedAt ? fmtUtcFromUnix(detail.requestedAt) : '—',
+    requestedBlock: detail.requestEventBlock != null ? Number(detail.requestEventBlock) : 0,
     currentStage: detail.uiStageIdx,
     summary: isCrisp ? meta.question : `Encrypted execution ${formatE3Id(detail.id)}`,
 
@@ -188,9 +198,10 @@ export function adaptInspectorDetail(detail: E3FullDetails | null): InspectorDet
     },
 
     compute: {
-      status: detail.uiStageIdx >= 4 ? 'active' : 'pending',
-      note:
-        detail.uiStageIdx < 4
+      status: noBallots ? 'idle' : detail.uiStageIdx >= 4 ? 'active' : 'pending',
+      note: noBallots
+        ? 'The input window closed without any ballots being submitted. There is nothing to compute over.'
+        : detail.uiStageIdx < 4
           ? 'Compute begins automatically when the input window closes.'
           : "The program's FHE computation runs over the encrypted inputs, without decrypting any individual input.",
     },
@@ -213,6 +224,7 @@ export function adaptInspectorDetail(detail: E3FullDetails | null): InspectorDet
       resultTx: detail.resultTxHash,
     },
 
+    noBallots,
     events: buildEventLog(detail),
   }
 }
@@ -226,7 +238,7 @@ function buildEventLog(d: E3FullDetails): InspectorEvent[] {
   const evs: InspectorEvent[] = []
   evs.push({
     t: d.requestedAt ? fmtClock(d.requestedAt) : '—',
-    block: Number(d.requestBlock),
+    block: d.requestEventBlock != null ? Number(d.requestEventBlock) : '—',
     name: 'E3Requested',
     stage: 'Requested',
     tx: shortHash(d.requestTxHash),
