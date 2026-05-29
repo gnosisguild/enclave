@@ -23,13 +23,13 @@ function formatRemaining(closesTs: number): string {
   return `${secs}s remaining`
 }
 
-function StageBadge({ stageIdx }: { stageIdx: number }) {
+function StageBadge({ stageIdx, label }: { stageIdx: number; label?: string }) {
   const s = STAGES[stageIdx]
   const variant = stageIdx >= 6 ? 'published' : stageIdx === 3 ? 'open' : 'working'
   return (
     <span className={`stage-badge stage-badge--${variant}`}>
       <span className='stage-badge__dot' />
-      <span>{s.label}</span>
+      <span>{label ?? s.label}</span>
     </span>
   )
 }
@@ -138,8 +138,11 @@ export default function PollCard({
   const isPublished = pollState === 'published'
   const isOpen = pollState === 'open'
   const isComputing = pollState === 'computing'
-  // Live countdown only meaningful while the input window is open.
-  const timeValue = stageId === 'input' ? formatRemaining(poll.closesTs) : status.label
+  const isIdle = pollState === 'idle' // input window closed with no ballots
+  // Live countdown only meaningful while the input window is open. For idle
+  // (window closed with no ballots) override the canned "In progress" copy.
+  const timeValue = stageId === 'input' ? formatRemaining(poll.closesTs) : isIdle ? 'Closed · no ballots' : status.label
+  const statusSub = isIdle ? 'No encrypted ballots were submitted before close' : status.sub
 
   return (
     <section className='poll-card' aria-label="Today's CRISP poll">
@@ -172,7 +175,7 @@ export default function PollCard({
               <span>{liveMode ? 'Pause demo' : 'Watch the lifecycle'}</span>
             </button>
           )}
-          <StageBadge stageIdx={safeStageIdx} />
+          <StageBadge stageIdx={safeStageIdx} label={isIdle ? 'No ballots' : undefined} />
         </header>
 
         <h1 className='poll-card__question'>{poll.question}</h1>
@@ -182,7 +185,7 @@ export default function PollCard({
           <div>
             <div className='poll-card__timing-label'>Time</div>
             <div className='poll-card__timing-value'>{timeValue}</div>
-            <div className='poll-card__timing-sub'>{status.sub}</div>
+            <div className='poll-card__timing-sub'>{statusSub}</div>
           </div>
           <div>
             <div className='poll-card__timing-label'>Opened</div>
@@ -200,9 +203,11 @@ export default function PollCard({
               <span className='poll-card__cta-note'>
                 {isOpen
                   ? "Voting is open. Ballots are encrypted on the voter's device and submitted to the network."
-                  : isComputing
-                    ? 'Voting has closed. The committee is now tallying the encrypted ballots.'
-                    : 'Voting has not opened yet for this poll.'}
+                  : isIdle
+                    ? 'Voting has closed without any ballots submitted.'
+                    : isComputing
+                      ? 'Voting has closed. The committee is now tallying the encrypted ballots.'
+                      : 'Voting has not opened yet for this poll.'}
               </span>
               <a
                 className='link-inline'
