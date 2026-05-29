@@ -300,8 +300,8 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
   // `e3.requestBlock` is misnamed: on this contract version it stores
   // `block.timestamp` (EIP-6372 timestamp clock), not a block number. Using it
   // as fromBlock would push the scan range past chain head and silently miss
-  // every event. Scan from the deploy block instead.
-  const fromBlock = DEPLOY_BLOCK
+  // every event. The first pass scans from DEPLOY_BLOCK; once we've found the
+  // E3Requested log we tighten subsequent scans to its block number.
 
   // 2. Find the E3Requested tx for this id (for the inspector header).
   const requestLogs = await getLogsChunked<any>(
@@ -309,11 +309,14 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
       address: CONTRACTS.Enclave,
       event: ENCLAVE_E3_REQUESTED,
     },
-    fromBlock,
+    DEPLOY_BLOCK,
     head,
   )
   const requestLog = requestLogs.find((l: any) => l.args.e3Id === e3Id)
   const requestTxHash = (requestLog?.transactionHash ?? ('0x' as `0x${string}`)) as `0x${string}`
+  // Nothing for this E3 can exist on chain before its E3Requested block, so
+  // tighten the later scans (committee, inputs, result) to start there.
+  const fromBlock: bigint = requestLog?.blockNumber ?? DEPLOY_BLOCK
 
   // 3. Committee data: requested (threshold/seed) + finalized (members) from the
   // registry; the key-publish moment from the Enclave E3StageChanged → KeyPublished

@@ -100,7 +100,8 @@ export type InspectorDetail = {
   requestedByLabel: string
   requestedTx: string
   requestedAt: string
-  requestedBlock: number
+
+  requestedBlock: number | null
   currentStage: number
   summary: string
   committee: { size: number; threshold: number; selectionSeed: string; drawnAt: string }
@@ -164,7 +165,7 @@ export function adaptInspectorDetail(detail: E3FullDetails | null): InspectorDet
     requestedByLabel: 'Requester',
     requestedTx: detail.requestTxHash,
     requestedAt: detail.requestedAt ? fmtUtcFromUnix(detail.requestedAt) : '—',
-    requestedBlock: detail.requestEventBlock != null ? Number(detail.requestEventBlock) : 0,
+    requestedBlock: detail.requestEventBlock != null ? Number(detail.requestEventBlock) : null,
     currentStage: detail.uiStageIdx,
     summary: isCrisp ? meta.question : `Encrypted execution ${formatE3Id(detail.id)}`,
 

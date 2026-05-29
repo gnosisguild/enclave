@@ -334,7 +334,7 @@ export default function Inspector({
             items={[
               ['Requested at', <Mono>{e3.requestedAt}</Mono>],
               ['Request tx', <TxLink hash={e3.requestedTx} />],
-              ['Block', <Mono>#{e3.requestedBlock.toLocaleString()}</Mono>],
+              ['Block', <Mono>{e3.requestedBlock != null ? `#${e3.requestedBlock.toLocaleString()}` : '—'}</Mono>],
               ['Requested by', <AddrLink address={e3.requestedBy} />],
               ['Program', <Mono>{e3.program}</Mono>],
               ['Program address', <AddrLink address={e3.programAddr} />],
