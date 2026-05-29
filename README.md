@@ -203,7 +203,7 @@ pnpm test:integration --no-prebuild
 
 ## Minimum Rust version
 
-This workspace's minimum supported rustc version is 1.86.0.
+This workspace's minimum supported rustc version is 1.91.1.
 
 ## Architecture
 

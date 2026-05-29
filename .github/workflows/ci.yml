@@ -16,7 +16,7 @@ env:
   SUPPORT_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support
   CIPHERNODE_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ciphernode
   NODE_VERSION: 22
-  RUST_TOOLCHAIN: 1.86.0
+  RUST_TOOLCHAIN: 1.91.1
   NOIR_TOOLCHAIN: v1.0.0-beta.16
   BB_VERSION: 3.0.0-nightly.20260102
   HARDHAT_VAR_MNEMONIC: 'test test test test test test test test test test test junk'
@@ -1030,6 +1030,15 @@ jobs:
       - name: Build the sdk
         run: pnpm sdk:build
 
+      - name: Install Chrome for WASM browser smoke tests
+        uses: browser-actions/setup-chrome@v1
+
+      - name: WASM browser smoke test (e3-wasm)
+        run: |
+          cd crates/wasm
+          pnpm build
+          pnpm test:browser
+
       - name: Run the tests
         run: pnpm sdk:test
 
@@ -1089,6 +1098,15 @@ jobs:
       - name: Build the sdk
         working-directory: ./examples/CRISP
         run: pnpm build:sdk
+
+      - name: Install Chrome for WASM browser smoke tests
+        uses: browser-actions/setup-chrome@v1
+
+      - name: WASM browser smoke test (crisp-zk-inputs)
+        working-directory: ./examples/CRISP
+        run: |
+          pnpm -C packages/crisp-zk-inputs build
+          pnpm -C packages/crisp-zk-inputs test:browser
 
       - name: Upload SDK artifacts
         uses: actions/upload-artifact@v4

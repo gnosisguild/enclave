@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-msrv = "1.86.0"
+msrv = "1.91.1"
 members = ["app", "host", "methods", "types"]
 exclude = ["methods/guest"]
 
@@ -52,4 +52,3 @@ dotenvy = { version = "=0.15.7" }
 [profile.release]
 debug = 1
 lto = true
-

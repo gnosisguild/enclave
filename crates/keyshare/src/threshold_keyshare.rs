@@ -42,7 +42,8 @@ use e3_zk_helpers::{canonical_honest_party_ids_with_own, CiphernodesCommitteeSiz
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
 use ndarray::Array2;
-use rand::Rng;
+use rand::rngs::OsRng;
+use rand_core::UnwrapErr;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     mem,
@@ -902,7 +903,8 @@ impl ThresholdKeyshare {
         let _ = self.ensure_encryption_key_collector(address.clone());
 
         let params = BfvParamSet::from(self.share_enc_preset.clone()).build_arc();
-        let mut rng = rand::rng();
+        // OS RNG for BFV keygen (not thread-local `rand::rng()` / ThreadRng).
+        let mut rng = UnwrapErr(OsRng);
         let sk_bfv = SecretKey::random(&params, &mut rng);
         let pk_bfv = PublicKey::new(&sk_bfv, &mut rng);
 
@@ -1291,7 +1293,7 @@ impl ThresholdKeyshare {
 
         // BFV-encrypt shares to all recipients except own slot (own share is bound via C2,
         // consumed locally by C4). Returns per-row randomness for C3 proofs.
-        let mut rng = rand::rng();
+        let mut rng = UnwrapErr(OsRng);
         let (encrypted_sk_sss, sk_witnesses) =
             BfvEncryptedShares::encrypt_all_extended_for_share_indices(
                 &decrypted_sk_sss,
