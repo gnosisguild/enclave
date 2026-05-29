@@ -24,7 +24,6 @@ import { ExitQueueLib } from "../lib/ExitQueueLib.sol";
 
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
-import { ILicenseBondReceiver } from "../interfaces/ILicenseBondReceiver.sol";
 import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
 import { EnclaveTicketToken } from "../token/EnclaveTicketToken.sol";
 
@@ -118,10 +117,6 @@ contract BondingRegistry is
     /// @dev Default 8000 = 80%. Allows operators to unbond up to 20% while remaining active
     uint256 public licenseActiveBps;
 
-    /// @notice Maximum number of live ENCL license bond sources per operator.
-    /// @dev Bounds LIFO slashing and claim loops for delegated/locked-token bonds.
-    uint256 public constant MAX_LICENSE_BOND_SOURCES = 64;
-
     /// @notice Number of currently active operators
     uint256 public numActiveOperators;
 
@@ -139,51 +134,8 @@ contract BondingRegistry is
         bool active;
     }
 
-    /// @notice Active ENCL bond source credited to an operator.
-    /// @param amount Remaining active amount from this source
-    /// @param withdrawalAddress Address that receives this source after exit
-    /// @param sourceId Optional external id passed to withdrawal receivers
-    /// @param sequence Monotonic sequence used for LIFO slashing
-    struct LicenseBondSource {
-        uint256 amount;
-        address withdrawalAddress;
-        bytes32 sourceId;
-        uint64 sequence;
-    }
-
-    /// @notice Pending ENCL bond source waiting through the exit delay.
-    /// @param unlockTimestamp Timestamp when this source becomes claimable
-    /// @param amount Remaining pending amount from this source
-    /// @param withdrawalAddress Address that receives this source after exit
-    /// @param sourceId Optional external id passed to withdrawal receivers
-    /// @param sequence Original active-source sequence used for LIFO slashing
-    struct PendingLicenseBondSource {
-        uint64 unlockTimestamp;
-        uint256 amount;
-        address withdrawalAddress;
-        bytes32 sourceId;
-        uint64 sequence;
-    }
-
     /// @notice Maps operator address to their state data
     mapping(address operator => Operator data) internal operators;
-
-    /// @dev Active ENCL bond sources per operator. The tail is the newest source.
-    mapping(address operator => LicenseBondSource[] sources)
-        private _licenseSources;
-
-    /// @dev Pending ENCL exit sources per operator. The head is used for claim scans.
-    mapping(address operator => PendingLicenseBondSource[] sources)
-        private _pendingLicenseSources;
-
-    /// @dev Claim head for pending ENCL exits.
-    mapping(address operator => uint256 headIndex) private _pendingLicenseHead;
-
-    /// @dev Aggregate pending ENCL exits per operator.
-    mapping(address operator => uint256 amount) private _pendingLicenseTotals;
-
-    /// @dev Next ENCL bond source sequence per operator. Starts at 1.
-    mapping(address operator => uint64 sequence) private _nextLicenseSequence;
 
     /// @notice Total slashed ticket balance available for treasury withdrawal
     uint256 public slashedTicketBalance;
@@ -297,6 +249,12 @@ contract BondingRegistry is
     }
 
     /// @inheritdoc IBondingRegistry
+    function totalBonded(address account) external view returns (uint256) {
+        (, uint256 pendingLicense) = _exits.getPendingAmounts(account);
+        return operators[account].licenseBond + pendingLicense;
+    }
+
+    /// @inheritdoc IBondingRegistry
     function availableTickets(
         address operator
     ) external view returns (uint256) {
@@ -324,8 +282,7 @@ contract BondingRegistry is
     function pendingExits(
         address operator
     ) external view returns (uint256 ticket, uint256 license) {
-        (ticket, ) = _exits.getPendingAmounts(operator);
-        license = _pendingLicenseTotals[operator];
+        (ticket, license) = _exits.getPendingAmounts(operator);
     }
 
     /// @notice Preview how much an operator can currently claim
@@ -335,8 +292,7 @@ contract BondingRegistry is
     function previewClaimable(
         address operator
     ) external view returns (uint256 ticket, uint256 license) {
-        (ticket, ) = _exits.previewClaimableAmounts(operator);
-        license = _previewClaimableLicense(operator);
+        (ticket, license) = _exits.previewClaimableAmounts(operator);
     }
 
     /// @inheritdoc IBondingRegistry
@@ -432,10 +388,12 @@ contract BondingRegistry is
         }
 
         if (ticketOut != 0 || licenseOut != 0) {
-            _exits.queueAssetsForExit(msg.sender, exitDelay, ticketOut, 0);
-            if (licenseOut != 0) {
-                _queueLicenseExitFromSources(msg.sender, licenseOut);
-            }
+            _exits.queueAssetsForExit(
+                msg.sender,
+                exitDelay,
+                ticketOut,
+                licenseOut
+            );
         }
 
         // CiphernodeRegistry already emits an event when a ciphernode is removed
@@ -492,35 +450,13 @@ contract BondingRegistry is
     function bondLicense(
         uint256 amount
     ) external nonReentrant noExitInProgress(msg.sender) {
-        _bondLicenseFrom(
-            msg.sender,
-            msg.sender,
-            msg.sender,
-            amount,
-            bytes32(0)
-        );
-    }
-
-    /// @inheritdoc IBondingRegistry
-    function bondLicenseFor(
-        address operator,
-        uint256 amount,
-        address withdrawalAddress,
-        bytes32 sourceId
-    ) external nonReentrant noExitInProgress(operator) {
-        _bondLicenseFrom(
-            msg.sender,
-            operator,
-            withdrawalAddress,
-            amount,
-            sourceId
-        );
+        _bondLicense(msg.sender, amount);
     }
 
     /// @inheritdoc IBondingRegistry
     function unbondLicense(
         uint256 amount
-    ) external noExitInProgress(msg.sender) {
+    ) external nonReentrant noExitInProgress(msg.sender) {
         require(amount != 0, ZeroAmount());
         require(
             operators[msg.sender].licenseBond >= amount,
@@ -528,7 +464,7 @@ contract BondingRegistry is
         );
 
         operators[msg.sender].licenseBond -= amount;
-        _queueLicenseExitFromSources(msg.sender, amount);
+        _exits.queueLicensesForExit(msg.sender, exitDelay, amount);
 
         emit LicenseBondUpdated(
             msg.sender,
@@ -549,15 +485,17 @@ contract BondingRegistry is
         uint256 maxTicketAmount,
         uint256 maxLicenseAmount
     ) external nonReentrant {
-        (uint256 ticketClaim, ) = _exits.claimAssets(
+        (uint256 ticketClaim, uint256 licenseClaim) = _exits.claimAssets(
             msg.sender,
             maxTicketAmount,
-            0
+            maxLicenseAmount
         );
-        uint256 licenseClaim = _claimLicenseExits(msg.sender, maxLicenseAmount);
         require(ticketClaim > 0 || licenseClaim > 0, ExitNotReady());
 
         if (ticketClaim > 0) ticketToken.payout(msg.sender, ticketClaim);
+        if (licenseClaim > 0) {
+            _safeTransferLicenseWithDeltaCheck(msg.sender, licenseClaim);
+        }
     }
 
     // ======================
@@ -627,7 +565,7 @@ contract BondingRegistry is
         require(requestedSlashAmount != 0, ZeroAmount());
 
         Operator storage operatorData = operators[operator];
-        uint256 pendingLicenseBalance = _pendingLicenseTotals[operator];
+        (, uint256 pendingLicenseBalance) = _exits.getPendingAmounts(operator);
         uint256 totalAvailableBalance = operatorData.licenseBond +
             pendingLicenseBalance;
         uint256 actualSlashAmount = Math.min(
@@ -637,7 +575,27 @@ contract BondingRegistry is
 
         if (actualSlashAmount == 0) return;
 
-        _slashLicenseSourcesLifo(operator, actualSlashAmount);
+        uint256 activeSlashAmount = Math.min(
+            actualSlashAmount,
+            operatorData.licenseBond
+        );
+        if (activeSlashAmount != 0) {
+            operatorData.licenseBond -= activeSlashAmount;
+        }
+
+        uint256 remainingSlashAmount = actualSlashAmount - activeSlashAmount;
+        if (remainingSlashAmount != 0) {
+            (, uint256 pendingSlashed) = _exits.slashPendingAssets(
+                operator,
+                0,
+                remainingSlashAmount,
+                true
+            );
+            require(
+                pendingSlashed == remainingSlashAmount,
+                InsufficientBalance()
+            );
+        }
 
         slashedLicenseBond += actualSlashAmount;
         emit LicenseBondUpdated(
@@ -861,444 +819,26 @@ contract BondingRegistry is
     // Internal Functions
     // ======================
 
-    function _bondLicenseFrom(
-        address funder,
-        address operator,
-        address withdrawalAddress,
-        uint256 amount,
-        bytes32 sourceId
-    ) internal {
+    function _bondLicense(address operator, uint256 amount) internal {
         require(operator != address(0), ZeroAddress());
-        require(withdrawalAddress != address(0), ZeroAddress());
         require(amount != 0, ZeroAmount());
-        require(
-            _liveLicenseSourceCount(operator) < MAX_LICENSE_BOND_SOURCES,
-            MaxLicenseBondSources()
-        );
+
+        operators[operator].licenseBond += amount;
 
         uint256 balanceBefore = licenseToken.balanceOf(address(this));
-        licenseToken.safeTransferFrom(funder, address(this), amount);
+        licenseToken.safeTransferFrom(operator, address(this), amount);
         uint256 actualReceived = licenseToken.balanceOf(address(this)) -
             balanceBefore;
-        require(actualReceived != 0, ZeroAmount());
+        require(actualReceived == amount, InvalidAmount());
 
-        uint64 sequence = _nextLicenseSequence[operator];
-        if (sequence == 0) sequence = 1;
-        _nextLicenseSequence[operator] = sequence + 1;
-
-        _licenseSources[operator].push(
-            LicenseBondSource({
-                amount: actualReceived,
-                withdrawalAddress: withdrawalAddress,
-                sourceId: sourceId,
-                sequence: sequence
-            })
-        );
-
-        operators[operator].licenseBond += actualReceived;
-
-        emit LicenseBondSourceAdded(
-            operator,
-            funder,
-            withdrawalAddress,
-            actualReceived,
-            sourceId,
-            sequence
-        );
         emit LicenseBondUpdated(
             operator,
-            int256(actualReceived),
+            int256(amount),
             operators[operator].licenseBond,
             REASON_BOND
         );
 
         _updateOperatorStatus(operator);
-    }
-
-    function _queueLicenseExitFromSources(
-        address operator,
-        uint256 amount
-    ) internal {
-        if (amount == 0) return;
-
-        uint64 currentTimestamp = uint64(block.timestamp);
-        require(
-            currentTimestamp <= (type(uint64).max - exitDelay),
-            ExitQueueLib.TimestampOverflow()
-        );
-        uint64 unlockTimestamp = currentTimestamp + exitDelay;
-        uint256 remaining = amount;
-        LicenseBondSource[] storage sources = _licenseSources[operator];
-
-        while (remaining != 0) {
-            uint256 len = sources.length;
-            require(len != 0, InsufficientBalance());
-
-            LicenseBondSource storage source = sources[len - 1];
-            uint256 amountToQueue = remaining < source.amount
-                ? remaining
-                : source.amount;
-
-            if (amountToQueue != source.amount) {
-                require(
-                    _liveLicenseSourceCount(operator) <
-                        MAX_LICENSE_BOND_SOURCES,
-                    MaxLicenseBondSources()
-                );
-            }
-
-            source.amount -= amountToQueue;
-            remaining -= amountToQueue;
-
-            _pendingLicenseSources[operator].push(
-                PendingLicenseBondSource({
-                    unlockTimestamp: unlockTimestamp,
-                    amount: amountToQueue,
-                    withdrawalAddress: source.withdrawalAddress,
-                    sourceId: source.sourceId,
-                    sequence: source.sequence
-                })
-            );
-            _pendingLicenseTotals[operator] += amountToQueue;
-
-            emit LicenseBondSourceQueuedForExit(
-                operator,
-                source.withdrawalAddress,
-                amountToQueue,
-                unlockTimestamp,
-                source.sourceId,
-                source.sequence
-            );
-
-            if (source.amount == 0) sources.pop();
-        }
-    }
-
-    function _claimLicenseExits(
-        address operator,
-        uint256 maxLicenseAmount
-    ) internal returns (uint256 claimedAmount) {
-        if (maxLicenseAmount == 0) return 0;
-
-        PendingLicenseBondSource[] storage sources = _pendingLicenseSources[
-            operator
-        ];
-        uint256 head = _pendingLicenseHead[operator];
-        uint256 len = sources.length;
-        uint256 remaining = maxLicenseAmount;
-
-        for (uint256 i = head; i < len && remaining != 0; i++) {
-            PendingLicenseBondSource storage source = sources[i];
-            if (source.amount == 0) {
-                if (i == head) head++;
-                continue;
-            }
-            if (block.timestamp < source.unlockTimestamp) continue;
-
-            uint256 amountToClaim = remaining < source.amount
-                ? remaining
-                : source.amount;
-
-            source.amount -= amountToClaim;
-            remaining -= amountToClaim;
-            claimedAmount += amountToClaim;
-            _pendingLicenseTotals[operator] -= amountToClaim;
-
-            _safeTransferLicenseWithDeltaCheck(
-                source.withdrawalAddress,
-                amountToClaim
-            );
-            emit LicenseBondSourceClaimed(
-                operator,
-                source.withdrawalAddress,
-                amountToClaim,
-                source.sourceId
-            );
-            _notifyLicenseBondReturned(
-                source.withdrawalAddress,
-                operator,
-                amountToClaim,
-                source.sourceId
-            );
-
-            if (source.amount == 0 && i == head) head++;
-        }
-
-        _pendingLicenseHead[operator] = head;
-    }
-
-    function _previewClaimableLicense(
-        address operator
-    ) internal view returns (uint256 claimableAmount) {
-        PendingLicenseBondSource[] storage sources = _pendingLicenseSources[
-            operator
-        ];
-        uint256 head = _pendingLicenseHead[operator];
-        uint256 len = sources.length;
-
-        for (uint256 i = head; i < len; i++) {
-            PendingLicenseBondSource storage source = sources[i];
-            if (block.timestamp >= source.unlockTimestamp) {
-                claimableAmount += source.amount;
-            }
-        }
-    }
-
-    function _slashLicenseSourcesLifo(
-        address operator,
-        uint256 amount
-    ) internal {
-        uint256 remaining = amount;
-
-        while (remaining != 0) {
-            (
-                bool hasPending,
-                uint256 pendingIndex,
-                uint64 pendingSequence
-            ) = _latestPendingLicenseSource(operator);
-            LicenseBondSource[] storage activeSources = _licenseSources[
-                operator
-            ];
-            bool hasActive = activeSources.length != 0;
-            uint64 activeSequence = hasActive
-                ? activeSources[activeSources.length - 1].sequence
-                : 0;
-
-            require(hasPending || hasActive, InsufficientBalance());
-
-            if (
-                hasPending && (!hasActive || pendingSequence >= activeSequence)
-            ) {
-                uint256 slashed = _slashPendingLicenseSource(
-                    operator,
-                    pendingIndex,
-                    remaining
-                );
-                remaining -= slashed;
-            } else {
-                uint256 slashed = _slashActiveLicenseSource(
-                    operator,
-                    remaining
-                );
-                remaining -= slashed;
-            }
-        }
-    }
-
-    function _slashActiveLicenseSource(
-        address operator,
-        uint256 maxAmount
-    ) internal returns (uint256 slashedAmount) {
-        LicenseBondSource[] storage sources = _licenseSources[operator];
-        uint256 sourceIndex = sources.length - 1;
-        LicenseBondSource storage source = sources[sourceIndex];
-        slashedAmount = maxAmount < source.amount ? maxAmount : source.amount;
-
-        source.amount -= slashedAmount;
-        operators[operator].licenseBond -= slashedAmount;
-
-        emit LicenseBondSourceSlashed(
-            operator,
-            source.withdrawalAddress,
-            slashedAmount,
-            source.sourceId,
-            source.sequence
-        );
-        _notifyLicenseBondSlashed(
-            source.withdrawalAddress,
-            operator,
-            slashedAmount,
-            source.sourceId
-        );
-
-        if (source.amount == 0) sources.pop();
-    }
-
-    function _slashPendingLicenseSource(
-        address operator,
-        uint256 sourceIndex,
-        uint256 maxAmount
-    ) internal returns (uint256 slashedAmount) {
-        PendingLicenseBondSource storage source = _pendingLicenseSources[
-            operator
-        ][sourceIndex];
-        slashedAmount = maxAmount < source.amount ? maxAmount : source.amount;
-
-        source.amount -= slashedAmount;
-        _pendingLicenseTotals[operator] -= slashedAmount;
-
-        emit LicenseBondSourceSlashed(
-            operator,
-            source.withdrawalAddress,
-            slashedAmount,
-            source.sourceId,
-            source.sequence
-        );
-        _notifyLicenseBondSlashed(
-            source.withdrawalAddress,
-            operator,
-            slashedAmount,
-            source.sourceId
-        );
-
-        if (
-            source.amount == 0 && sourceIndex == _pendingLicenseHead[operator]
-        ) {
-            _advancePendingLicenseHead(operator);
-        }
-    }
-
-    function _latestPendingLicenseSource(
-        address operator
-    ) internal view returns (bool found, uint256 index, uint64 sequence) {
-        PendingLicenseBondSource[] storage sources = _pendingLicenseSources[
-            operator
-        ];
-        uint256 head = _pendingLicenseHead[operator];
-        uint256 len = sources.length;
-
-        for (uint256 i = len; i > head; i--) {
-            PendingLicenseBondSource storage source = sources[i - 1];
-            if (source.amount != 0) {
-                return (true, i - 1, source.sequence);
-            }
-        }
-
-        return (false, 0, 0);
-    }
-
-    function _advancePendingLicenseHead(address operator) internal {
-        PendingLicenseBondSource[] storage sources = _pendingLicenseSources[
-            operator
-        ];
-        uint256 head = _pendingLicenseHead[operator];
-        uint256 len = sources.length;
-
-        while (head < len && sources[head].amount == 0) {
-            head++;
-        }
-
-        _pendingLicenseHead[operator] = head;
-    }
-
-    function _liveLicenseSourceCount(
-        address operator
-    ) internal view returns (uint256) {
-        return
-            _licenseSources[operator].length +
-            (_pendingLicenseSources[operator].length -
-                _pendingLicenseHead[operator]);
-    }
-
-    function _notifyLicenseBondReturned(
-        address receiver,
-        address operator,
-        uint256 amount,
-        bytes32 sourceId
-    ) internal {
-        _notifyLicenseBondReceiver(
-            receiver,
-            operator,
-            amount,
-            sourceId,
-            ILicenseBondReceiver.onLicenseBondReturned.selector
-        );
-    }
-
-    function _notifyLicenseBondSlashed(
-        address receiver,
-        address operator,
-        uint256 amount,
-        bytes32 sourceId
-    ) internal {
-        _notifyLicenseBondReceiver(
-            receiver,
-            operator,
-            amount,
-            sourceId,
-            ILicenseBondReceiver.onLicenseBondSlashed.selector
-        );
-    }
-
-    function _notifyLicenseBondReceiver(
-        address receiver,
-        address operator,
-        uint256 amount,
-        bytes32 sourceId,
-        bytes4 selector
-    ) internal {
-        if (sourceId == bytes32(0) || receiver.code.length == 0) return;
-
-        try
-            IERC165(receiver).supportsInterface(
-                type(ILicenseBondReceiver).interfaceId
-            )
-        returns (bool supported) {
-            if (!supported) return;
-        } catch {
-            emit LicenseBondReceiverCallbackFailed(
-                receiver,
-                operator,
-                amount,
-                sourceId,
-                selector
-            );
-            return;
-        }
-
-        if (selector == ILicenseBondReceiver.onLicenseBondReturned.selector) {
-            try
-                ILicenseBondReceiver(receiver).onLicenseBondReturned(
-                    operator,
-                    amount,
-                    sourceId
-                )
-            returns (bytes4 returnedSelector) {
-                if (returnedSelector != selector) {
-                    emit LicenseBondReceiverCallbackFailed(
-                        receiver,
-                        operator,
-                        amount,
-                        sourceId,
-                        selector
-                    );
-                }
-            } catch {
-                emit LicenseBondReceiverCallbackFailed(
-                    receiver,
-                    operator,
-                    amount,
-                    sourceId,
-                    selector
-                );
-            }
-        } else {
-            try
-                ILicenseBondReceiver(receiver).onLicenseBondSlashed(
-                    operator,
-                    amount,
-                    sourceId
-                )
-            returns (bytes4 returnedSelector) {
-                if (returnedSelector != selector) {
-                    emit LicenseBondReceiverCallbackFailed(
-                        receiver,
-                        operator,
-                        amount,
-                        sourceId,
-                        selector
-                    );
-                }
-            } catch {
-                emit LicenseBondReceiverCallbackFailed(
-                    receiver,
-                    operator,
-                    amount,
-                    sourceId,
-                    selector
-                );
-            }
-        }
     }
 
     /// @dev Updates operator's active status based on current conditions
@@ -1369,5 +909,5 @@ contract BondingRegistry is
 
     /// @dev Reserved storage slots for future upgrades.
     // solhint-disable-next-line var-name-mixedcase
-    uint256[45] private __gap;
+    uint256[50] private __gap;
 }

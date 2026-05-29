@@ -46,9 +46,6 @@ interface IBondingRegistry {
     ///         {MAX_AUTHORIZED_DISTRIBUTORS}.
     error MaxAuthorizedDistributors();
 
-    /// @notice Thrown when an operator would exceed the live ENCL bond source cap.
-    error MaxLicenseBondSources();
-
     /// @notice Thrown when {renounceOwnership} is called.
     error RenounceOwnershipDisabled();
 
@@ -82,88 +79,6 @@ interface IBondingRegistry {
         int256 delta,
         uint256 newBond,
         bytes32 indexed reason
-    );
-
-    /**
-     * @notice Emitted when a license bond source is recorded for an operator.
-     * @param operator Address whose operator bond was credited
-     * @param funder Address that supplied the license tokens
-     * @param withdrawalAddress Address that receives this source if it exits
-     * @param amount Amount credited from this source
-     * @param sourceId Optional external source id for withdrawal receivers
-     * @param sequence Monotonic source sequence used for LIFO slashing
-     */
-    event LicenseBondSourceAdded(
-        address indexed operator,
-        address indexed funder,
-        address indexed withdrawalAddress,
-        uint256 amount,
-        bytes32 sourceId,
-        uint64 sequence
-    );
-
-    /**
-     * @notice Emitted when a license bond source is queued for delayed exit.
-     * @param operator Address whose bond source was queued
-     * @param withdrawalAddress Address that will receive this source after unlock
-     * @param amount Amount queued from this source
-     * @param unlockTimestamp Timestamp when this source becomes claimable
-     * @param sourceId Optional external source id for withdrawal receivers
-     * @param sequence Original source sequence used for LIFO slashing
-     */
-    event LicenseBondSourceQueuedForExit(
-        address indexed operator,
-        address indexed withdrawalAddress,
-        uint256 amount,
-        uint64 unlockTimestamp,
-        bytes32 sourceId,
-        uint64 sequence
-    );
-
-    /**
-     * @notice Emitted when a queued license bond source is paid to its withdrawal address.
-     * @param operator Address whose source was claimed
-     * @param withdrawalAddress Address that received license tokens
-     * @param amount Amount paid
-     * @param sourceId Optional external source id for withdrawal receivers
-     */
-    event LicenseBondSourceClaimed(
-        address indexed operator,
-        address indexed withdrawalAddress,
-        uint256 amount,
-        bytes32 sourceId
-    );
-
-    /**
-     * @notice Emitted when a license bond source is slashed.
-     * @param operator Address whose source was slashed
-     * @param withdrawalAddress Withdrawal address attached to the source
-     * @param amount Amount slashed
-     * @param sourceId Optional external source id for withdrawal receivers
-     * @param sequence Original source sequence used for LIFO slashing
-     */
-    event LicenseBondSourceSlashed(
-        address indexed operator,
-        address indexed withdrawalAddress,
-        uint256 amount,
-        bytes32 sourceId,
-        uint64 sequence
-    );
-
-    /**
-     * @notice Emitted when a withdrawal receiver callback fails.
-     * @param receiver Address that rejected or failed the callback
-     * @param operator Operator associated with the bond source
-     * @param amount Amount involved in the callback
-     * @param sourceId Optional external source id for withdrawal receivers
-     * @param selector Callback selector that failed
-     */
-    event LicenseBondReceiverCallbackFailed(
-        address indexed receiver,
-        address indexed operator,
-        uint256 amount,
-        bytes32 sourceId,
-        bytes4 selector
     );
 
     /**
@@ -297,6 +212,14 @@ interface IBondingRegistry {
      * @return Current license bond
      */
     function getLicenseBond(address operator) external view returns (uint256);
+
+    /**
+     * @notice Get ENCL that still counts toward an account's locked-floor collateral.
+     * @dev Includes active license bond plus pending ENCL exits that remain slashable/not returned.
+     * @param account Account/operator whose ENCL bond credit is queried
+     * @return Active plus pending license-bond amount
+     */
+    function totalBonded(address account) external view returns (uint256);
 
     /**
      * @notice Get current ticket price
@@ -448,21 +371,6 @@ interface IBondingRegistry {
      * @dev Requires approval for license token transfer
      */
     function bondLicense(uint256 amount) external;
-
-    /**
-     * @notice Bond license tokens supplied by the caller while crediting an operator.
-     * @param operator Address whose operator bond should be credited
-     * @param amount Amount of license tokens to pull from the caller
-     * @param withdrawalAddress Address that receives this source after unbond/decommission
-     * @param sourceId Optional external id passed back to withdrawal receivers
-     * @dev Requires caller approval for license token transfer.
-     */
-    function bondLicenseFor(
-        address operator,
-        uint256 amount,
-        address withdrawalAddress,
-        bytes32 sourceId
-    ) external;
 
     /**
      * @notice Unbond license tokens

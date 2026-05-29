@@ -57,8 +57,9 @@ Be sure to configure your desired network in `hardhat.config.ts` before
 deploying.
 
 For non-local networks, set `INTERFOLD_TGE_TIMESTAMP` to the agreed ENCL TGE
-Unix timestamp before deploying. Local mock deployments default this timestamp
-to the latest local block timestamp.
+Unix timestamp before deploying. The deployment script configures this on
+`EnclaveToken` for token-level lock schedules. Local mock deployments default
+this timestamp to the latest local block timestamp.
 
 ## Localhost deployment
 

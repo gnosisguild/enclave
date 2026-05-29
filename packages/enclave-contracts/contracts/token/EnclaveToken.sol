@@ -20,6 +20,8 @@ import {
     AccessControl
 } from "@openzeppelin/contracts/access/AccessControl.sol";
 
+import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
+
 /**
  * @title EnclaveToken
  * @notice The governance and utility token for the Enclave protocol
@@ -30,9 +32,16 @@ import {
  *      - MINTER_ROLE can call {mintAllocation} / {batchMintAllocations} up to MAX_SUPPLY.
  *      - WHITELIST_ROLE can manage the transfer whitelist independently from minting so
  *        the same account is not required to control both surfaces.
+ *      - LOCK_MANAGER_ROLE can configure token-level lock schedules, CCA claim sources,
+ *        buyer claim profiles, and the bonding registry used for locked-floor accounting.
  *
  *      Transfer restrictions are a one-way switch: once {disableTransferRestrictions} is called
  *      they cannot be re-enabled.
+ *
+ *      Token-level locks are pooled per account. For every non-mint/non-burn transfer, the sender
+ *      must satisfy: balanceOf(sender) + BondingRegistry.totalBonded(sender) >= lockedFloorOf(sender).
+ *      This lets locked holders use same-account ENCL as operator bond collateral while preserving
+ *      the explicit product constraint that all ENCL in the same wallet is pooled for locks/slashing.
  *
  *      Voting uses {block.timestamp} (EIP-6372 "mode=timestamp") so timepoints align with other
  *      Enclave contracts.
@@ -65,9 +74,33 @@ contract EnclaveToken is
     /// @notice Thrown when a transfer is attempted while restrictions are active and neither party is whitelisted
     error TransferNotAllowed();
 
+    /// @notice Thrown when lock schedule parameters are internally inconsistent.
+    error InvalidLockSchedule();
+
+    /// @notice Thrown when an account already has the maximum supported number of lock schedules.
+    error MaxLockSchedulesExceeded();
+
+    /// @notice Thrown when a locked account attempts to move below its current locked floor.
+    error LockedBalanceInvariant(
+        address account,
+        uint256 balance,
+        uint256 bonded,
+        uint256 lockedFloor
+    );
+
+    /// @notice Thrown when a claim source sends locked CCA tokens to an account without an active profile.
+    error ClaimLockProfileMissing(address account);
+
+    /// @notice Thrown when a schedule requests the default TGE timestamp before it has been configured.
+    error TgeTimestampUnset();
+
     /// @notice Maximum supply of the token: 1.2 billion tokens with 18 decimals
     /// @dev Hard cap on total token supply that cannot be exceeded through minting
     uint256 public constant MAX_SUPPLY = 1_200_000_000e18;
+
+    /// @notice Maximum lock schedules retained for a single account.
+    /// @dev Bounds the per-transfer loop in {lockedFloorOf}.
+    uint256 public constant MAX_LOCK_SCHEDULES = 64;
 
     /// @notice Role identifier for accounts authorized to mint new tokens
     /// @dev Keccak256 hash of "MINTER_ROLE" used in AccessControl
@@ -77,8 +110,77 @@ contract EnclaveToken is
     /// @dev Separated from MINTER_ROLE so mint authority does not also control transferability.
     bytes32 public constant WHITELIST_ROLE = keccak256("WHITELIST_ROLE");
 
+    /// @notice Role identifier for accounts authorized to manage token-level locks.
+    bytes32 public constant LOCK_MANAGER_ROLE = keccak256("LOCK_MANAGER_ROLE");
+
+    /// @notice Token-lock schedule recorded against one account.
+    /// @param amount Original amount subject to this schedule.
+    /// @param tokenHoldUntil Absolute timestamp before which no amount is transferable.
+    /// @param tokenUnlockStart Absolute linear token unlock start timestamp.
+    /// @param tokenUnlockEnd Absolute linear token unlock end timestamp.
+    /// @param serviceStart Optional service vesting start timestamp.
+    /// @param serviceCliff Optional service vesting cliff timestamp.
+    /// @param serviceEnd Optional service vesting end timestamp.
+    /// @param group Schedule group marker for indexers and operations.
+    struct LockSchedule {
+        uint128 amount;
+        uint64 tokenHoldUntil;
+        uint64 tokenUnlockStart;
+        uint64 tokenUnlockEnd;
+        uint64 serviceStart;
+        uint64 serviceCliff;
+        uint64 serviceEnd;
+        bytes32 group;
+    }
+
+    /// @notice Input used to create an absolute lock schedule.
+    /// @param account Account whose wallet-level locked floor increases.
+    /// @param amount Amount subject to the schedule.
+    /// @param tokenHoldUntil Absolute timestamp before which no amount is transferable.
+    /// @param tokenUnlockStart Absolute linear unlock start. Zero resolves to {tgeTimestamp}.
+    /// @param tokenUnlockEnd Absolute linear unlock end.
+    /// @param serviceStart Optional service vesting start timestamp.
+    /// @param serviceCliff Optional service vesting cliff timestamp.
+    /// @param serviceEnd Optional service vesting end timestamp.
+    /// @param group Schedule group marker for indexers and operations.
+    struct LockScheduleInput {
+        address account;
+        uint256 amount;
+        uint64 tokenHoldUntil;
+        uint64 tokenUnlockStart;
+        uint64 tokenUnlockEnd;
+        uint64 serviceStart;
+        uint64 serviceCliff;
+        uint64 serviceEnd;
+        bytes32 group;
+    }
+
+    /// @notice Relative lock profile applied to transfers from approved CCA claim sources.
+    /// @param active Whether the account can receive locked claim-source transfers.
+    /// @param holdDuration Seconds after claim before any amount is transferable.
+    /// @param unlockDuration Optional linear unlock duration after the hold ends. Zero is a cliff unlock.
+    /// @param group Schedule group marker, e.g. REG_S_CCA or REG_D_CCA.
+    struct ClaimLockProfile {
+        bool active;
+        uint64 holdDuration;
+        uint64 unlockDuration;
+        bytes32 group;
+    }
+
+    /// @notice Input used to batch update CCA claim lock profiles.
+    struct ClaimLockProfileInput {
+        address account;
+        ClaimLockProfile profile;
+    }
+
     /// @notice Tracks the cumulative amount of tokens minted since deployment
     uint256 public totalMinted;
+
+    /// @notice Optional default TGE timestamp used when lock schedule inputs pass tokenUnlockStart = 0.
+    uint64 public tgeTimestamp;
+
+    /// @notice Registry queried for ENCL that still counts toward an account's locked floor.
+    IBondingRegistry public bondingRegistry;
 
     /// @notice Mapping of addresses permitted to transfer tokens when restrictions are active
     /// @dev When transfersRestricted is true, only whitelisted addresses can send or receive tokens
@@ -87,6 +189,16 @@ contract EnclaveToken is
     /// @notice Indicates whether token transfers are currently restricted
     /// @dev When true, only whitelisted addresses can transfer tokens
     bool public transfersRestricted;
+
+    /// @notice Approved CCA/auction claim sources whose outbound ENCL creates wallet-level locks.
+    mapping(address source => bool approved) public approvedClaimSources;
+
+    /// @notice Relative CCA claim lock profile for each buyer/recipient.
+    mapping(address account => ClaimLockProfile profile)
+        public claimLockProfiles;
+
+    /// @dev Lock schedules by account. The array length is bounded by {MAX_LOCK_SCHEDULES}.
+    mapping(address account => LockSchedule[] schedules) private _lockSchedules;
 
     /// @notice Emitted when tokens are minted as part of a named allocation
     /// @param recipient Address receiving the minted tokens
@@ -107,11 +219,46 @@ contract EnclaveToken is
     /// @param whitelisted New whitelist status (true = whitelisted, false = not whitelisted)
     event TransferWhitelistUpdated(address indexed account, bool whitelisted);
 
+    /// @notice Emitted when the default TGE timestamp changes.
+    event TgeTimestampUpdated(uint64 previous, uint64 next);
+
+    /// @notice Emitted when the bonding registry used for locked-floor accounting changes.
+    event BondingRegistryUpdated(
+        address indexed previous,
+        address indexed next
+    );
+
+    /// @notice Emitted when a lock schedule is created for an account.
+    event LockScheduleCreated(
+        address indexed account,
+        uint256 indexed scheduleId,
+        bytes32 indexed group,
+        uint256 amount,
+        uint64 tokenHoldUntil,
+        uint64 tokenUnlockStart,
+        uint64 tokenUnlockEnd,
+        uint64 serviceStart,
+        uint64 serviceCliff,
+        uint64 serviceEnd
+    );
+
+    /// @notice Emitted when a CCA/auction claim source is approved or revoked.
+    event ClaimSourceUpdated(address indexed source, bool approved);
+
+    /// @notice Emitted when a relative CCA claim lock profile changes.
+    event ClaimLockProfileUpdated(
+        address indexed account,
+        bool active,
+        uint64 holdDuration,
+        uint64 unlockDuration,
+        bytes32 indexed group
+    );
+
     /**
      * @notice Initializes the Enclave token with name "Enclave" and symbol "ENCL"
      * @dev Sets up the token with voting and permit functionality. Grants admin, minter, and
      *      whitelist roles to the owner; enables transfer restrictions; whitelists the owner.
-     * @param initialOwner_ Address that will own the contract and receive admin, minter and whitelist roles.
+     * @param initialOwner_ Address that will own the contract and receive admin, minter, whitelist, and lock roles.
      */
     constructor(
         address initialOwner_
@@ -120,6 +267,7 @@ contract EnclaveToken is
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner_);
         _grantRole(MINTER_ROLE, initialOwner_);
         _grantRole(WHITELIST_ROLE, initialOwner_);
+        _grantRole(LOCK_MANAGER_ROLE, initialOwner_);
 
         // Initialise state variables.
         transfersRestricted = true;
@@ -222,20 +370,153 @@ contract EnclaveToken is
      * @notice Whitelists key protocol contracts to allow them to transfer tokens during restricted periods
      * @dev Only callable by accounts holding WHITELIST_ROLE. Zero addresses are safely ignored.
      * @param bondingManager Address of the BondingManager contract (zero address skipped)
-     * @param vestingEscrow Address of the VestingEscrow contract (zero address skipped)
+     * @param claimSource Address of a claim source contract (zero address skipped)
      */
     function whitelistContracts(
         address bondingManager,
-        address vestingEscrow
+        address claimSource
     ) external onlyRole(WHITELIST_ROLE) {
         if (bondingManager != address(0)) {
             transferWhitelisted[bondingManager] = true;
             emit TransferWhitelistUpdated(bondingManager, true);
         }
-        if (vestingEscrow != address(0)) {
-            transferWhitelisted[vestingEscrow] = true;
-            emit TransferWhitelistUpdated(vestingEscrow, true);
+        if (claimSource != address(0)) {
+            transferWhitelisted[claimSource] = true;
+            emit TransferWhitelistUpdated(claimSource, true);
         }
+    }
+
+    /// @notice Sets the default TGE timestamp used by schedule inputs with tokenUnlockStart = 0.
+    /// @dev Existing schedules store resolved timestamps and are not changed by this setter.
+    function setTgeTimestamp(
+        uint64 newTgeTimestamp
+    ) external onlyRole(LOCK_MANAGER_ROLE) {
+        if (newTgeTimestamp == 0) revert InvalidLockSchedule();
+        uint64 previous = tgeTimestamp;
+        tgeTimestamp = newTgeTimestamp;
+        emit TgeTimestampUpdated(previous, newTgeTimestamp);
+    }
+
+    /// @notice Sets the bonding registry queried by locked-floor transfer checks.
+    /// @dev Passing zero disables bonded-credit accounting. Non-zero values must be deployed code.
+    function setBondingRegistry(
+        IBondingRegistry newBondingRegistry
+    ) external onlyRole(LOCK_MANAGER_ROLE) {
+        address newRegistryAddress = address(newBondingRegistry);
+        if (
+            newRegistryAddress != address(0) &&
+            newRegistryAddress.code.length == 0
+        ) revert ZeroAddress();
+
+        address previous = address(bondingRegistry);
+        bondingRegistry = newBondingRegistry;
+        emit BondingRegistryUpdated(previous, newRegistryAddress);
+    }
+
+    /// @notice Creates a wallet-level lock schedule for an account.
+    function createLockSchedule(
+        LockScheduleInput calldata input
+    ) external onlyRole(LOCK_MANAGER_ROLE) returns (uint256 scheduleId) {
+        scheduleId = _addLockSchedule(input);
+        _enforceLockedFloor(input.account);
+    }
+
+    /// @notice Creates many wallet-level lock schedules.
+    function batchCreateLockSchedules(
+        LockScheduleInput[] calldata inputs
+    )
+        external
+        onlyRole(LOCK_MANAGER_ROLE)
+        returns (uint256[] memory scheduleIds)
+    {
+        uint256 len = inputs.length;
+        scheduleIds = new uint256[](len);
+
+        for (uint256 i = 0; i < len; i++) {
+            scheduleIds[i] = _addLockSchedule(inputs[i]);
+            _enforceLockedFloor(inputs[i].account);
+        }
+    }
+
+    /// @notice Approves or revokes a CCA/auction claim source.
+    function setClaimSource(
+        address source,
+        bool approved
+    ) external onlyRole(LOCK_MANAGER_ROLE) {
+        if (source == address(0)) revert ZeroAddress();
+        approvedClaimSources[source] = approved;
+        emit ClaimSourceUpdated(source, approved);
+    }
+
+    /// @notice Sets the relative claim lock profile for a buyer/recipient.
+    function setClaimLockProfile(
+        address account,
+        ClaimLockProfile calldata profile
+    ) external onlyRole(LOCK_MANAGER_ROLE) {
+        _setClaimLockProfile(account, profile);
+    }
+
+    /// @notice Batch sets relative claim lock profiles.
+    function batchSetClaimLockProfiles(
+        ClaimLockProfileInput[] calldata inputs
+    ) external onlyRole(LOCK_MANAGER_ROLE) {
+        uint256 len = inputs.length;
+        for (uint256 i = 0; i < len; i++) {
+            _setClaimLockProfile(inputs[i].account, inputs[i].profile);
+        }
+    }
+
+    /// @notice Number of lock schedules recorded for an account.
+    function lockScheduleCount(
+        address account
+    ) external view returns (uint256) {
+        return _lockSchedules[account].length;
+    }
+
+    /// @notice Returns a lock schedule by account and index.
+    function lockScheduleOf(
+        address account,
+        uint256 scheduleId
+    ) external view returns (LockSchedule memory) {
+        return _lockSchedules[account][scheduleId];
+    }
+
+    /// @notice Current amount that must remain controlled by an account's wallet plus bonded ENCL.
+    function lockedFloorOf(address account) public view returns (uint256) {
+        return lockedFloorAt(account, uint64(block.timestamp));
+    }
+
+    /// @notice Amount that must remain controlled by an account at a given timestamp.
+    function lockedFloorAt(
+        address account,
+        uint64 timestamp
+    ) public view returns (uint256 lockedFloor) {
+        LockSchedule[] storage schedules = _lockSchedules[account];
+        uint256 len = schedules.length;
+        for (uint256 i = 0; i < len; i++) {
+            lockedFloor += _lockedAmount(schedules[i], timestamp);
+        }
+    }
+
+    /// @notice ENCL bonded by an account that still counts toward its locked floor.
+    function totalBondedOf(address account) public view returns (uint256) {
+        IBondingRegistry registry = bondingRegistry;
+        if (address(registry) == address(0)) return 0;
+        return registry.totalBonded(account);
+    }
+
+    /// @notice Current wallet balance that can be transferred without violating the locked floor.
+    function transferableBalanceOf(
+        address account
+    ) external view returns (uint256) {
+        uint256 balance = balanceOf(account);
+        uint256 bonded = totalBondedOf(account);
+        uint256 lockedFloor = lockedFloorOf(account);
+        uint256 controlled = balance + bonded;
+        if (controlled <= lockedFloor) return 0;
+
+        uint256 transferable = controlled - lockedFloor;
+        return transferable < balance ? transferable : balance;
     }
 
     /**
@@ -260,6 +541,218 @@ contract EnclaveToken is
             }
         }
         super._update(from, to, value);
+
+        if (from != address(0) && to != address(0)) {
+            if (approvedClaimSources[from] && value != 0) {
+                _addClaimLock(to, value);
+            }
+            _enforceLockedFloor(from);
+        }
+    }
+
+    function _addLockSchedule(
+        LockScheduleInput calldata input
+    ) internal returns (uint256 scheduleId) {
+        if (input.account == address(0)) revert ZeroAddress();
+        if (input.amount == 0) revert ZeroAmount();
+        if (input.amount > type(uint128).max) revert InvalidLockSchedule();
+
+        uint64 tokenUnlockStart = _resolveTokenUnlockStart(
+            input.tokenUnlockStart
+        );
+        _validateLockSchedule(
+            tokenUnlockStart,
+            input.tokenUnlockEnd,
+            input.serviceStart,
+            input.serviceCliff,
+            input.serviceEnd
+        );
+
+        scheduleId = _pushLockSchedule(
+            input.account,
+            LockSchedule({
+                amount: uint128(input.amount),
+                tokenHoldUntil: input.tokenHoldUntil,
+                tokenUnlockStart: tokenUnlockStart,
+                tokenUnlockEnd: input.tokenUnlockEnd,
+                serviceStart: input.serviceStart,
+                serviceCliff: input.serviceCliff,
+                serviceEnd: input.serviceEnd,
+                group: input.group
+            })
+        );
+    }
+
+    function _addClaimLock(address account, uint256 amount) internal {
+        ClaimLockProfile memory profile = claimLockProfiles[account];
+        if (!profile.active) revert ClaimLockProfileMissing(account);
+        if (profile.holdDuration == 0 && profile.unlockDuration == 0) {
+            revert InvalidLockSchedule();
+        }
+        if (amount > type(uint128).max) revert InvalidLockSchedule();
+
+        if (block.timestamp > type(uint64).max) revert InvalidLockSchedule();
+        uint64 currentTimestamp = uint64(block.timestamp);
+
+        uint256 holdUntil = uint256(currentTimestamp) + profile.holdDuration;
+        uint256 unlockEnd = holdUntil + profile.unlockDuration;
+        if (unlockEnd > type(uint64).max) revert InvalidLockSchedule();
+
+        uint64 tokenHoldUntil = uint64(holdUntil);
+        uint64 tokenUnlockEnd = uint64(unlockEnd);
+
+        _pushLockSchedule(
+            account,
+            LockSchedule({
+                amount: uint128(amount),
+                tokenHoldUntil: tokenHoldUntil,
+                tokenUnlockStart: tokenHoldUntil,
+                tokenUnlockEnd: tokenUnlockEnd,
+                serviceStart: 0,
+                serviceCliff: 0,
+                serviceEnd: 0,
+                group: profile.group
+            })
+        );
+    }
+
+    function _pushLockSchedule(
+        address account,
+        LockSchedule memory schedule
+    ) internal returns (uint256 scheduleId) {
+        LockSchedule[] storage schedules = _lockSchedules[account];
+        uint256 len = schedules.length;
+        if (len >= MAX_LOCK_SCHEDULES) revert MaxLockSchedulesExceeded();
+
+        schedules.push(schedule);
+        emit LockScheduleCreated(
+            account,
+            len,
+            schedule.group,
+            uint256(schedule.amount),
+            schedule.tokenHoldUntil,
+            schedule.tokenUnlockStart,
+            schedule.tokenUnlockEnd,
+            schedule.serviceStart,
+            schedule.serviceCliff,
+            schedule.serviceEnd
+        );
+        return len;
+    }
+
+    function _setClaimLockProfile(
+        address account,
+        ClaimLockProfile calldata profile
+    ) internal {
+        if (account == address(0)) revert ZeroAddress();
+        if (
+            profile.active &&
+            profile.holdDuration == 0 &&
+            profile.unlockDuration == 0
+        ) revert InvalidLockSchedule();
+
+        claimLockProfiles[account] = profile;
+        emit ClaimLockProfileUpdated(
+            account,
+            profile.active,
+            profile.holdDuration,
+            profile.unlockDuration,
+            profile.group
+        );
+    }
+
+    function _resolveTokenUnlockStart(
+        uint64 tokenUnlockStart
+    ) internal view returns (uint64) {
+        if (tokenUnlockStart != 0) return tokenUnlockStart;
+
+        uint64 configuredTgeTimestamp = tgeTimestamp;
+        if (configuredTgeTimestamp == 0) revert TgeTimestampUnset();
+        return configuredTgeTimestamp;
+    }
+
+    function _validateLockSchedule(
+        uint64 tokenUnlockStart,
+        uint64 tokenUnlockEnd,
+        uint64 serviceStart,
+        uint64 serviceCliff,
+        uint64 serviceEnd
+    ) internal pure {
+        if (tokenUnlockStart > tokenUnlockEnd) revert InvalidLockSchedule();
+
+        bool hasServiceCurve = serviceStart != 0 ||
+            serviceCliff != 0 ||
+            serviceEnd != 0;
+        if (!hasServiceCurve) return;
+
+        if (
+            serviceStart == 0 ||
+            serviceEnd <= serviceStart ||
+            serviceCliff < serviceStart ||
+            serviceCliff > serviceEnd
+        ) revert InvalidLockSchedule();
+    }
+
+    function _lockedAmount(
+        LockSchedule storage schedule,
+        uint64 timestamp
+    ) internal view returns (uint256) {
+        uint256 amount = uint256(schedule.amount);
+        uint256 tokenUnlocked = _tokenUnlockedAmount(schedule, timestamp);
+        uint256 serviceVested = _serviceVestedAmount(schedule, timestamp);
+        uint256 released = tokenUnlocked < serviceVested
+            ? tokenUnlocked
+            : serviceVested;
+        return amount - released;
+    }
+
+    function _tokenUnlockedAmount(
+        LockSchedule storage schedule,
+        uint64 timestamp
+    ) internal view returns (uint256) {
+        uint256 amount = uint256(schedule.amount);
+        if (timestamp < schedule.tokenHoldUntil) return 0;
+        if (schedule.tokenUnlockStart == schedule.tokenUnlockEnd) return amount;
+        if (timestamp <= schedule.tokenUnlockStart) return 0;
+        if (timestamp >= schedule.tokenUnlockEnd) return amount;
+
+        uint256 elapsed = uint256(timestamp - schedule.tokenUnlockStart);
+        uint256 duration = uint256(
+            schedule.tokenUnlockEnd - schedule.tokenUnlockStart
+        );
+        return (amount * elapsed) / duration;
+    }
+
+    function _serviceVestedAmount(
+        LockSchedule storage schedule,
+        uint64 timestamp
+    ) internal view returns (uint256) {
+        uint256 amount = uint256(schedule.amount);
+        if (schedule.serviceStart == 0 && schedule.serviceEnd == 0) {
+            return amount;
+        }
+        if (timestamp < schedule.serviceCliff) return 0;
+        if (timestamp >= schedule.serviceEnd) return amount;
+
+        uint256 elapsed = uint256(timestamp - schedule.serviceStart);
+        uint256 duration = uint256(schedule.serviceEnd - schedule.serviceStart);
+        return (amount * elapsed) / duration;
+    }
+
+    function _enforceLockedFloor(address account) internal view {
+        uint256 lockedFloor = lockedFloorOf(account);
+        if (lockedFloor == 0) return;
+
+        uint256 balance = balanceOf(account);
+        uint256 bonded = totalBondedOf(account);
+        if (balance + bonded < lockedFloor) {
+            revert LockedBalanceInvariant(
+                account,
+                balance,
+                bonded,
+                lockedFloor
+            );
+        }
     }
 
     /**
@@ -323,11 +816,13 @@ contract EnclaveToken is
             _revokeRole(DEFAULT_ADMIN_ROLE, previousOwner);
             _revokeRole(MINTER_ROLE, previousOwner);
             _revokeRole(WHITELIST_ROLE, previousOwner);
+            _revokeRole(LOCK_MANAGER_ROLE, previousOwner);
         }
         if (newOwner != address(0)) {
             _grantRole(DEFAULT_ADMIN_ROLE, newOwner);
             _grantRole(MINTER_ROLE, newOwner);
             _grantRole(WHITELIST_ROLE, newOwner);
+            _grantRole(LOCK_MANAGER_ROLE, newOwner);
         }
     }
 }

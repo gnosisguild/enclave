@@ -672,6 +672,9 @@ _executeSlash(proposalId):
 │     │  │     Slash the newest source first                     │
 │     │  │     → Active slash decrements operators[op].licenseBond│
 │     │  │     → Pending slash decrements pending license totals │
+│     │  │     → totalBonded(op) drops immediately; if op has   │
+│     │  │       token-level locks, same-wallet ENCL may become │
+│     │  │       encumbered until the locked floor decays/top-up │
 │     │  │     → Receiver callback gets (operator, amount,       │
 │     │  │       sourceId) when supported                        │
 │     │  │                                                       │

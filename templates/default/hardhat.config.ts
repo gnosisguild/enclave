@@ -124,7 +124,6 @@ const config: HardhatUserConfig = {
       '@enclave-e3/contracts/contracts/E3RefundManager.sol',
       '@enclave-e3/contracts/contracts/token/EnclaveToken.sol',
       '@enclave-e3/contracts/contracts/token/EnclaveTicketToken.sol',
-      '@enclave-e3/contracts/contracts/token/InterfoldVestingEscrow.sol',
       '@enclave-e3/contracts/contracts/verifiers/bfv/BfvDecryptionVerifier.sol',
       '@enclave-e3/contracts/contracts/verifiers/bfv/BfvPkVerifier.sol',
       '@enclave-e3/contracts/contracts/verifiers/bfv/honk/DkgAggregatorVerifier.sol',

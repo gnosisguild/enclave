@@ -129,6 +129,9 @@ describe("BondingRegistry", function () {
       expect(
         await bondingRegistry.getLicenseBond(await operator1.getAddress()),
       ).to.equal(bondAmount);
+      expect(
+        await bondingRegistry.totalBonded(await operator1.getAddress()),
+      ).to.equal(bondAmount);
     });
 
     it("reverts if amount is zero", async function () {
@@ -249,6 +252,43 @@ describe("BondingRegistry", function () {
         await operator1.getAddress(),
       );
       expect(licensePending).to.equal(unbondAmount);
+      expect(
+        await bondingRegistry.totalBonded(await operator1.getAddress()),
+      ).to.equal(bondAmount);
+    });
+
+    it("slashes active and pending license bond from totalBonded", async function () {
+      const { bondingRegistry, licenseToken, operator1, notTheOwner } =
+        await loadFixture(setup);
+      const operatorAddress = await operator1.getAddress();
+      const slashReason = ethers.encodeBytes32String("TEST_SLASH");
+
+      const bondAmount = ethers.parseEther("1000");
+      const unbondAmount = ethers.parseEther("300");
+      const slashAmount = ethers.parseEther("800");
+
+      await bondingRegistry.setSlashingManager(await notTheOwner.getAddress());
+      await licenseToken
+        .connect(operator1)
+        .approve(await bondingRegistry.getAddress(), bondAmount);
+      await bondingRegistry.connect(operator1).bondLicense(bondAmount);
+      await bondingRegistry.connect(operator1).unbondLicense(unbondAmount);
+
+      await expect(
+        bondingRegistry
+          .connect(notTheOwner)
+          .slashLicenseBond(operatorAddress, slashAmount, slashReason),
+      )
+        .to.emit(bondingRegistry, "LicenseBondUpdated")
+        .withArgs(operatorAddress, -slashAmount, 0, slashReason);
+
+      const [, pendingLicense] =
+        await bondingRegistry.pendingExits(operatorAddress);
+      expect(pendingLicense).to.equal(bondAmount - slashAmount);
+      expect(await bondingRegistry.totalBonded(operatorAddress)).to.equal(
+        bondAmount - slashAmount,
+      );
+      expect(await bondingRegistry.slashedLicenseBond()).to.equal(slashAmount);
     });
   });
 
@@ -1188,7 +1228,7 @@ describe("BondingRegistry", function () {
       } = await loadFixture(setup);
 
       // Register and fund tickets so the generic ExitQueueLib ticket path is
-      // exercised directly. ENCL exits now use source-aware withdrawal logic.
+      // exercised directly alongside ENCL exits.
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)

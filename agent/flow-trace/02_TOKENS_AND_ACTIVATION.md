@@ -19,8 +19,12 @@ Before a node can register, it must stake two types of collateral:
 │                                                           │
 │  MAX_SUPPLY: 1,200,000,000 (1.2B with 18 decimals)       │
 │  Roles: MINTER_ROLE can mint via mintAllocation()         │
+│         LOCK_MANAGER_ROLE manages token-level locks       │
 │  Transfer restrictions: when transfersRestricted=true,    │
 │    only whitelisted addresses can transfer                │
+│  Lock invariant for normal transfers:                     │
+│    balanceOf(account) + totalBonded(account)              │
+│      >= lockedFloorOf(account)                            │
 │  Used as: LICENSE BOND token                              │
 └───────────────────────────────────────────────────────────┘
 
@@ -65,34 +69,32 @@ User runs: enclave ciphernode license bond --amount 50000
 │     │  │                                                      │
 │     │  │  bondLicense(uint256 amount) {                       │
 │     │  │    1. require(amount > 0)                            │
-│     │  │    2. licenseToken.safeTransferFrom(                 │
+│     │  │    2. operators[msg.sender].licenseBond += amount    │
+│     │  │       → totalBonded(msg.sender) now includes amount  │
+│     │  │    3. licenseToken.safeTransferFrom(                 │
 │     │  │         msg.sender,   // from operator               │
 │     │  │         address(this), // to BondingRegistry         │
 │     │  │         amount                                       │
 │     │  │       )                                              │
+│     │  │       → ENCL _update can see the pre-recorded bond   │
+│     │  │         and enforce locked-floor accounting          │
 │     │  │       → ENCL tokens move from operator → contract    │
-│     │  │    3. Record LicenseBondSource {                     │
-│     │  │         amount, withdrawalAddress: msg.sender,        │
-│     │  │         sourceId: 0, sequence                         │
-│     │  │       }                                               │
-│     │  │    4. operators[msg.sender].licenseBond += amount    │
-│     │  │    5. _updateOperatorStatus(msg.sender)              │
+│     │  │    4. _updateOperatorStatus(msg.sender)              │
 │     │  │       → May activate if all conditions now met       │
-│     │  │    6. Emit LicenseBondSourceAdded and                │
-│     │  │       LicenseBondUpdated(msg.sender, newBond)        │
+│     │  │    5. Emit LicenseBondUpdated(msg.sender, newBond)   │
 │     │  │  }                                                   │
 │     │  └──────────────────────────────────────────────────────┘
 │     │
 └─ OUTPUT: "Transaction hash: 0x..."
 ```
 
-### Delegated / locked ENCL bonding
+### Locked ENCL bonding
 
-`BondingRegistry.bondLicenseFor(operator, amount, withdrawalAddress, sourceId)` lets a funder supply
-ENCL while crediting another operator. `InterfoldVestingEscrow` uses this path so locked allocations
-can run nodes without first transferring unrestricted ENCL to the beneficiary. Each ENCL bond source
-keeps its own withdrawal address and LIFO sequence. The legacy `bondLicense(amount)` path is
-equivalent to `bondLicenseFor(msg.sender, amount, msg.sender, 0)`.
+`BondingRegistry.totalBonded(account)` returns active ENCL license bond plus pending ENCL exits that
+remain slashable/not returned. `EnclaveToken` uses this view for pooled wallet-level locks, so
+locked ENCL can be self-bonded by the same account without becoming transferable. Delegated
+source-aware bonding is not part of the pooled-lock model; license bonds are credited to
+`msg.sender` through `bondLicense(amount)`.
 
 ### Activation check after bonding:
 
@@ -200,16 +202,14 @@ User runs: enclave ciphernode license unbond --amount 10000
 │     │  │    2. require(operators[msg.sender].licenseBond       │
 │     │  │              >= amount)                               │
 │     │  │    3. operators[msg.sender].licenseBond -= amount     │
-│     │  │    4. _queueLicenseExitFromSources(                  │
-│     │  │         msg.sender, amount                            │
+│     │  │    4. _exits.queueLicensesForExit(                   │
+│     │  │         msg.sender, exitDelay, amount                 │
 │     │  │       )                                               │
-│     │  │       → Pops active LicenseBondSource entries LIFO    │
-│     │  │       → Queues PendingLicenseBondSource entries       │
-│     │  │         preserving withdrawalAddress + sourceId       │
+│     │  │       → Pending ENCL still counts in totalBonded()    │
+│     │  │         until claimed or slashed                      │
 │     │  │    5. _updateOperatorStatus(msg.sender)               │
 │     │  │       → May DEACTIVATE if bond drops below threshold  │
-│     │  │    6. Emit LicenseBondSourceQueuedForExit and         │
-│     │  │       LicenseBondUpdated(msg.sender, newBond)         │
+│     │  │    6. Emit LicenseBondUpdated(msg.sender, newBond)    │
 │     │  │  }                                                    │
 │     │  └───────────────────────────────────────────────────────┘
 │
@@ -306,6 +306,8 @@ User runs: enclave ciphernode license claim [--max-ticket 50] [--max-license 100
 │     │  │       → Each ENCL source pays its withdrawalAddress   │
 │     │  │       → Receiver callback gets (operator, amount,     │
 │     │  │         sourceId) when supported                      │
+│     │  │       → Pending ENCL is removed from totalBonded()    │
+│     │  │         as returned ENCL reaches the wallet           │
 │     │  │  }                                                    │
 │     │  └───────────────────────────────────────────────────────┘
 │
