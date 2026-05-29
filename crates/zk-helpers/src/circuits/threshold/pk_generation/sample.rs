@@ -19,7 +19,6 @@ use fhe::{
     bfv::SecretKey,
     trbfv::{ShareManager, TRBFV},
 };
-use rand::thread_rng;
 use std::ops::Deref;
 
 impl PkGenerationCircuitData {
@@ -31,7 +30,7 @@ impl PkGenerationCircuitData {
             CircuitsErrors::Sample(format!("Failed to build pair for preset: {:?}", e))
         })?;
 
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
 
         let secret_key = SecretKey::random(&threshold_params, &mut rng);
         let crp = create_deterministic_crp_from_default_seed(&threshold_params);

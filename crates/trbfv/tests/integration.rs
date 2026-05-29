@@ -62,22 +62,19 @@ async fn test_trbfv_isolation() -> Result<()> {
         &generated.bfv_secret_keys,
         &cipher,
         &trbfv_config,
+        &generated.bfv_params,
     )?;
     // Create the inputs
     let num_votes_per_voter = 3;
     let num_voters = 30;
     let (inputs, numbers) = e3_test_helpers::application::generate_ciphertexts(
         &pubkey,
-        params_raw.clone(),
         num_voters,
         num_votes_per_voter,
     );
 
-    let outputs = e3_test_helpers::application::run_application(
-        &inputs,
-        params_raw.clone(),
-        num_votes_per_voter,
-    );
+    let outputs =
+        e3_test_helpers::application::run_application(&inputs, &pubkey, num_votes_per_voter);
 
     // Encrypt the plaintext
     let ciphertexts = outputs

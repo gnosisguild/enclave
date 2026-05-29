@@ -49,8 +49,8 @@ serde = { version = "=1.0.228", features = ["derive", "std"] }
 serde_json = "=1.0.141"
 fhe = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
-fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git" }
+fhe-math = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
 tokio = { version = "=1.46.1", features = ["full"] }
-rand = { version = "=0.8.5" }
+rand = { version = "0.9" }
 tracing-subscriber = { version = "=0.3.19", features = ["env-filter"] }

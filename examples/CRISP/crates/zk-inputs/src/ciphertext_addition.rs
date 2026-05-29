@@ -48,12 +48,12 @@ impl CiphertextAdditionWitness {
         let moduli = params.moduli();
 
         let mut crt_polynomials = [
-            CrtPolynomial::from_fhe_polynomial(&prev_ct.c[0]),
-            CrtPolynomial::from_fhe_polynomial(&prev_ct.c[1]),
-            CrtPolynomial::from_fhe_polynomial(&ct.c[0]),
-            CrtPolynomial::from_fhe_polynomial(&ct.c[1]),
-            CrtPolynomial::from_fhe_polynomial(&sum_ct.c[0]),
-            CrtPolynomial::from_fhe_polynomial(&sum_ct.c[1]),
+            CrtPolynomial::from_fhe_polynomial(&prev_ct[0]),
+            CrtPolynomial::from_fhe_polynomial(&prev_ct[1]),
+            CrtPolynomial::from_fhe_polynomial(&ct[0]),
+            CrtPolynomial::from_fhe_polynomial(&ct[1]),
+            CrtPolynomial::from_fhe_polynomial(&sum_ct[0]),
+            CrtPolynomial::from_fhe_polynomial(&sum_ct[1]),
         ];
 
         // fhe-math stores coefficients in ascending degree (c_0, c_1, …). But here we want

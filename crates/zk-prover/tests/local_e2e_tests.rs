@@ -847,7 +847,7 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
 
     let committee = CiphernodesCommitteeSize::Micro.values();
     let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
-    let ctx = threshold_params.ctx_at_level(0).unwrap();
+    let ctx = threshold_params.context_at_level(0).unwrap();
     let moduli = threshold_params.moduli();
 
     let dkg_out = DkgShareDecryptionCircuit::compute(preset, &dkg_sample).unwrap();
@@ -855,7 +855,8 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
 
     let sk_poly = agg_sk
         .to_fhe_polynomial(&ctx, moduli)
-        .expect("agg_sk -> Poly");
+        .expect("agg_sk -> Poly")
+        .into_ntt();
     let es_poly = c6_sample
         .e
         .to_fhe_polynomial(&ctx, moduli)

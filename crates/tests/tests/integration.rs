@@ -1651,7 +1651,6 @@ async fn test_trbfv_actor() -> Result<()> {
     let num_voters = 30;
     let (inputs, numbers) = e3_test_helpers::application::generate_ciphertexts(
         &pubkey,
-        params_raw.clone(),
         num_voters,
         num_votes_per_voter,
     );
@@ -1659,11 +1658,8 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let running_app_timer = Instant::now();
     println!("Running application to generate outputs...");
-    let outputs = e3_test_helpers::application::run_application(
-        &inputs,
-        params_raw.clone(),
-        num_votes_per_voter,
-    );
+    let outputs =
+        e3_test_helpers::application::run_application(&inputs, &pubkey, num_votes_per_voter);
     report.push(("Running FHE Application", running_app_timer.elapsed()));
 
     let publishing_ct_timer = Instant::now();

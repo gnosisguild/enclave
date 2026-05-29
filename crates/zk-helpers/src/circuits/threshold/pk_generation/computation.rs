@@ -179,7 +179,7 @@ impl Computation for Bounds {
         let committee_n = committee.n;
 
         let n = BigInt::from(threshold_params.degree());
-        let ctx = threshold_params.ctx_at_level(0)?;
+        let ctx = threshold_params.context_at_level(0)?;
 
         let cbd_bound = (threshold_params.variance() * 2) as u64;
 
@@ -209,10 +209,10 @@ impl Computation for Bounds {
         let mut pk_bound_max = BigInt::from(0);
 
         for (i, qi) in ctx.moduli_operators().iter().enumerate() {
-            let qi_bigint = BigInt::from(qi.modulus());
+            let qi_bigint = BigInt::from(**qi);
             let qi_bound = (&qi_bigint - 1u32) / 2u32;
 
-            moduli.push(qi.modulus());
+            moduli.push(**qi);
 
             r2_bounds[i] = qi_bound.clone();
 

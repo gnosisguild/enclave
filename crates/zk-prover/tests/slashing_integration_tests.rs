@@ -520,6 +520,7 @@ fn sign_vote_with_deadline(
 fn encode_attestation_evidence(
     proof_type: u8,
     mut votes: Vec<(Address, FixedBytes<32>, Bytes)>,
+    evidence: Bytes,
     deadline: U256,
 ) -> Bytes {
     votes.sort_by_key(|(addr, _, _)| *addr);
@@ -530,7 +531,14 @@ fn encode_attestation_evidence(
 
     // `abi_encode_params` matches Solidity `abi.encode(a,b,...)`; `abi_encode` adds an extra
     // outer offset word that breaks `abi.decode(proof, (uint256))` in `proposeSlash`.
-    (U256::from(proof_type), voters, data_hashes, deadline, sigs)
+    (
+        U256::from(proof_type),
+        voters,
+        data_hashes,
+        evidence,
+        deadline,
+        sigs,
+    )
         .abi_encode_params()
         .into()
 }
@@ -676,6 +684,8 @@ fn test_vote_signing_roundtrip() {
 /// First ABI word of attestation evidence must be `proofType` (SlashingManager decodes only that).
 #[test]
 fn test_evidence_leading_word_is_proof_type() {
+    let raw_evidence = Bytes::from(vec![0u8; 32]);
+    let dh: FixedBytes<32> = keccak256(&raw_evidence).into();
     let evidence = encode_attestation_evidence(
         0,
         vec![
@@ -683,17 +693,18 @@ fn test_evidence_leading_word_is_proof_type() {
                 "0x1111111111111111111111111111111111111111"
                     .parse()
                     .unwrap(),
-                FixedBytes::from([1u8; 32]),
+                dh,
                 Bytes::from(vec![0u8; 65]),
             ),
             (
                 "0x2222222222222222222222222222222222222222"
                     .parse()
                     .unwrap(),
-                FixedBytes::from([2u8; 32]),
+                dh,
                 Bytes::from(vec![0u8; 65]),
             ),
         ],
+        raw_evidence,
         VOTE_NO_EXPIRY,
     );
     let leading = U256::from_be_slice(&evidence[..32]);
@@ -720,7 +731,8 @@ fn test_attestation_evidence_encoding() {
 
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator, proof_type);
 
-    let data_hash = FixedBytes::from([0xab; 32]);
+    let raw_evidence = Bytes::from(vec![0xab; 32]);
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
     let (voter1, sig1) = sign_vote(
         &signer1,
         chain_id,
@@ -741,15 +753,23 @@ fn test_attestation_evidence_encoding() {
     let evidence = encode_attestation_evidence(
         proof_type,
         vec![(voter1, data_hash, sig1), (voter2, data_hash, sig2)],
+        raw_evidence.clone(),
         VOTE_NO_EXPIRY,
     );
 
-    // Decode and verify structure: (uint256, address[], bytes32[], uint256, bytes[])
-    type AttestationTuple = (U256, Vec<Address>, Vec<FixedBytes<32>>, U256, Vec<Bytes>);
+    // Decode and verify structure: (uint256, address[], bytes32[], bytes, uint256, bytes[])
+    type AttestationTuple = (
+        U256,
+        Vec<Address>,
+        Vec<FixedBytes<32>>,
+        Bytes,
+        U256,
+        Vec<Bytes>,
+    );
     let decoded =
         AttestationTuple::abi_decode_params(&evidence).expect("evidence should ABI-decode");
 
-    let (dec_proof_type, dec_voters, dec_hashes, dec_deadline, dec_sigs) = decoded;
+    let (dec_proof_type, dec_voters, dec_hashes, dec_evidence, dec_deadline, dec_sigs) = decoded;
     assert_eq!(dec_proof_type, U256::from(proof_type), "proofType mismatch");
     assert_eq!(dec_voters.len(), 2, "should have 2 voters");
     assert!(
@@ -757,6 +777,7 @@ fn test_attestation_evidence_encoding() {
         "voters should be sorted ascending"
     );
     assert_eq!(dec_hashes.len(), 2, "should have 2 data hashes");
+    assert_eq!(dec_evidence, raw_evidence, "evidence bytes mismatch");
     assert_eq!(dec_deadline, VOTE_NO_EXPIRY, "deadline mismatch");
     assert_eq!(dec_sigs.len(), 2, "should have 2 signatures");
     assert!(
@@ -928,7 +949,8 @@ async fn test_onchain_valid_attestation_executes_slash() {
 
     // All 3 voters sign accusation votes
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
-    let data_hash = FixedBytes::from([0xaa; 32]);
+    let raw_evidence = Bytes::from(vec![0xaa; 32]);
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
 
     let (v1, s1) = sign_vote(
         &voter_signer1,
@@ -962,6 +984,7 @@ async fn test_onchain_valid_attestation_executes_slash() {
             (v2, data_hash, s2),
             (v3, data_hash, s3),
         ],
+        raw_evidence,
         VOTE_NO_EXPIRY,
     );
 
@@ -1096,7 +1119,8 @@ async fn test_onchain_insufficient_attestations_reverts() {
 
     // Only 1 vote (below threshold M=2)
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
-    let data_hash = FixedBytes::from([0xbb; 32]);
+    let raw_evidence = Bytes::from(vec![0xbb; 32]);
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
 
     let (v1, s1) = sign_vote(
         &voter_signer1,
@@ -1107,8 +1131,12 @@ async fn test_onchain_insufficient_attestations_reverts() {
         data_hash,
     );
 
-    let evidence =
-        encode_attestation_evidence(proof_type, vec![(v1, data_hash, s1)], VOTE_NO_EXPIRY);
+    let evidence = encode_attestation_evidence(
+        proof_type,
+        vec![(v1, data_hash, s1)],
+        raw_evidence,
+        VOTE_NO_EXPIRY,
+    );
 
     let result = slashing_mgr
         .proposeSlash(U256::from(e3_id), operator_addr, evidence)
@@ -1210,7 +1238,8 @@ async fn test_onchain_voter_not_in_committee_reverts() {
 
     // Outsider signs a vote (valid signature, but not a committee member)
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
-    let data_hash = FixedBytes::from([0xcc; 32]);
+    let raw_evidence = Bytes::from(vec![0xcc; 32]);
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
 
     let (v_out, s_out) = sign_vote(
         &outsider_signer,
@@ -1221,8 +1250,12 @@ async fn test_onchain_voter_not_in_committee_reverts() {
         data_hash,
     );
 
-    let evidence =
-        encode_attestation_evidence(proof_type, vec![(v_out, data_hash, s_out)], VOTE_NO_EXPIRY);
+    let evidence = encode_attestation_evidence(
+        proof_type,
+        vec![(v_out, data_hash, s_out)],
+        raw_evidence,
+        VOTE_NO_EXPIRY,
+    );
 
     let result = slashing_mgr
         .proposeSlash(U256::from(e3_id), operator_addr, evidence)
@@ -1324,7 +1357,8 @@ async fn test_onchain_invalid_vote_signature_reverts() {
 
     // Impersonator signs the vote with their key, but we claim it's from victim_signer
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
-    let data_hash = FixedBytes::from([0xdd; 32]);
+    let raw_evidence = Bytes::from(vec![0xdd; 32]);
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
 
     // Sign using impersonator's key but construct the digest for victim_signer's address
     let digest = compute_vote_digest(
@@ -1345,6 +1379,7 @@ async fn test_onchain_invalid_vote_signature_reverts() {
         U256::from(proof_type),
         vec![victim_signer.address()],
         vec![data_hash],
+        raw_evidence,
         VOTE_NO_EXPIRY,
         vec![Bytes::from(bad_sig.as_bytes().to_vec())],
     )
@@ -1452,7 +1487,8 @@ async fn test_onchain_duplicate_voter_reverts() {
 
     // Create TWO votes from the same voter (duplicate addresses)
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
-    let data_hash = FixedBytes::from([0xee; 32]);
+    let raw_evidence = Bytes::from(vec![0xee; 32]);
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
 
     let (voter, sig) = sign_vote(
         &voter_signer,
@@ -1469,6 +1505,7 @@ async fn test_onchain_duplicate_voter_reverts() {
         U256::from(proof_type),
         vec![voter, voter],
         vec![data_hash, data_hash],
+        raw_evidence,
         VOTE_NO_EXPIRY,
         vec![sig.clone(), sig],
     )
@@ -1577,7 +1614,8 @@ async fn test_onchain_duplicate_evidence_reverts() {
         .unwrap();
 
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
-    let data_hash = FixedBytes::from([0xff; 32]);
+    let raw_evidence = Bytes::from(vec![0xff; 32]);
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
 
     let (v1, s1) = sign_vote(
         &voter_signer1,
@@ -1599,6 +1637,7 @@ async fn test_onchain_duplicate_evidence_reverts() {
     let evidence = encode_attestation_evidence(
         proof_type,
         vec![(v1, data_hash, s1), (v2, data_hash, s2)],
+        raw_evidence,
         VOTE_NO_EXPIRY,
     );
 
@@ -1735,7 +1774,9 @@ async fn test_onchain_actor_signed_vote_accepted() {
         .await
         .unwrap();
 
-    let data_hash = FixedBytes::from([0xee; 32]);
+    // evidence bytes whose keccak256 becomes the data_hash voters sign
+    let raw_evidence_bytes: Bytes = Bytes::from(vec![0xee; 32]);
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence_bytes).into();
 
     // Pick a deadline far in the future so the on-chain check passes
     // regardless of Anvil's block.timestamp at submission time.
@@ -1782,7 +1823,7 @@ async fn test_onchain_actor_signed_vote_accepted() {
         proof_type: ProofType::C0PkBfv,
         votes_for,
         outcome: AccusationOutcome::AccusedFaulted,
-        evidence: Bytes::new(), // audit metadata only; not on chain
+        evidence: raw_evidence_bytes.into(),
     };
     let evidence = encode_attestation_evidence(&quorum)
         .expect("encode_attestation_evidence must produce bytes for nonempty votes_for");

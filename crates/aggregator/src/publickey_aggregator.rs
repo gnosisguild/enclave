@@ -7,7 +7,7 @@
 use crate::committee::committee_addresses_in_party_order;
 use actix::prelude::*;
 use alloy::primitives::Address;
-use anyhow::{anyhow, bail, ensure, Context as _, Result};
+use anyhow::{anyhow, ensure, Context as _, Result};
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, CircuitName, ComputeRequest, ComputeRequestError, ComputeResponse,

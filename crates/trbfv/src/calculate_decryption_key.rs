@@ -13,7 +13,7 @@ use anyhow::Result;
 use anyhow::*;
 use e3_crypto::{Cipher, SensitiveBytes};
 use fhe::trbfv::ShareManager;
-use fhe_math::rq::Poly;
+use fhe_math::rq::{Poly, PowerBasis};
 use fhe_traits::Serialize;
 use ndarray::Array2;
 use tracing::info;
@@ -69,8 +69,8 @@ pub struct CalculateDecryptionKeyResponse {
 }
 
 struct InnerResponse {
-    pub sk_poly_sum: Poly,
-    pub es_poly_sum: Vec<Poly>,
+    pub sk_poly_sum: Poly<PowerBasis>,
+    pub es_poly_sum: Vec<Poly<PowerBasis>>,
 }
 
 impl TryFrom<(&Cipher, InnerResponse)> for CalculateDecryptionKeyResponse {

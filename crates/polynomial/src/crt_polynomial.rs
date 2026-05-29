@@ -8,11 +8,11 @@
 
 use std::sync::Arc;
 
+use crate::fhe_poly::ToPowerBasisPoly;
 use crate::polynomial::Polynomial;
 use crate::utils::reduce;
 use fhe_math::rq::traits::TryConvertFrom;
-use fhe_math::rq::{Context, Poly, Representation};
-use ndarray::Array2;
+use fhe_math::rq::{Context, Poly, PowerBasis};
 use num_bigint::BigInt;
 use num_traits::{ToPrimitive, Zero};
 #[cfg(feature = "serde")]
@@ -84,12 +84,8 @@ impl CrtPolynomial {
     /// # Arguments
     ///
     /// * `p` - An fhe-math polynomial (any representation).
-    pub fn from_fhe_polynomial(p: &Poly) -> Self {
-        let mut p = p.clone();
-
-        if *p.representation() != Representation::PowerBasis {
-            p.change_representation(Representation::PowerBasis);
-        }
+    pub fn from_fhe_polynomial(p: &impl ToPowerBasisPoly) -> Self {
+        let p = p.to_power_basis_poly();
 
         let limbs = p
             .coefficients()
@@ -100,7 +96,7 @@ impl CrtPolynomial {
         Self { limbs }
     }
 
-    /// Builds an fhe-math `Poly` in PowerBasis representation (inverse of [`Self::from_fhe_polynomial`]).
+    /// Builds an fhe-math `Poly<PowerBasis>` (inverse of [`Self::from_fhe_polynomial`]).
     ///
     /// Coefficients are reduced to `[0, q_i)` per limb using `moduli[i]` before packing the RNS buffer.
     /// `ctx` must match the TRBFV/BFV context: `ctx.q.len()` equals limb count, and each limb has
@@ -108,13 +104,13 @@ impl CrtPolynomial {
     ///
     /// # Errors
     ///
-    /// Returns [`fhe_math::Error`] if limb counts or coefficient lengths disagree with `ctx`, ndarray
-    /// layout fails, a coefficient does not fit `u64`, or `Poly::try_convert_from` fails.
+    /// Returns [`fhe_math::Error`] if limb counts or coefficient lengths disagree with `ctx`,
+    /// a coefficient does not fit `u64`, or `Poly::try_convert_from` fails.
     pub fn to_fhe_polynomial(
         &self,
         ctx: &Arc<Context>,
         moduli: &[u64],
-    ) -> Result<Poly, fhe_math::Error> {
+    ) -> Result<Poly<PowerBasis>, fhe_math::Error> {
         let degree = ctx.degree;
         let l = ctx.q.len();
         if self.limbs.len() != l {
@@ -145,10 +141,7 @@ impl CrtPolynomial {
                 data.push(u);
             }
         }
-        let arr = Array2::from_shape_vec((l, degree), data).map_err(|e| {
-            fhe_math::Error::Default(format!("CrtPolynomial::to_fhe_polynomial: ndarray {e}"))
-        })?;
-        Poly::try_convert_from(arr, ctx, false, Representation::PowerBasis)
+        Poly::<PowerBasis>::try_convert_from(data, ctx, false)
     }
 
     /// Reverses the coefficient order of every limb in-place.

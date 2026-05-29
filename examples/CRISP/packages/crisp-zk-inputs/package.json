@@ -26,10 +26,12 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && node scripts/build.js"
+    "build": "rm -rf dist && node scripts/build.js",
+    "test:browser": "node scripts/browser-smoke.mjs"
   },
   "devDependencies": {
     "execa": "^8.0.1",
+    "playwright": "1.52.0",
     "replace-in-file": "^7.2.0",
     "wasm-pack": "^0.13.1"
   }

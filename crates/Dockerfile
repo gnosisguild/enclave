@@ -17,7 +17,7 @@ RUN corepack enable
 RUN cd packages/enclave-contracts && pnpm install && pnpm compile:contracts
 
 # Build stage
-FROM rust:1.86 AS ciphernode-builder
+FROM rust:1.91 AS ciphernode-builder
 
 # Force incremental 
 ENV CARGO_INCREMENTAL=1
@@ -25,7 +25,7 @@ ENV RUSTC_FORCE_INCREMENTAL=1
 ENV CARGO_BUILD_JOBS=8
 
 # Install deps
-RUN apt-get update && apt-get install -y --no-install-recommends jq
+RUN apt-get update && apt-get install -y --no-install-recommends jq protobuf-compiler
 RUN wget https://github.com/argotorg/solidity/releases/download/v0.8.27/solc-static-linux \
     && chmod +x solc-static-linux \
     && mv solc-static-linux /usr/local/bin/solc \

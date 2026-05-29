@@ -47,7 +47,7 @@
         "proxyAdminAddress": "0x9bd03768a7DCc129555dE410FF8E85528A4F88b5",
         "implementationAddress": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
       },
-      "blockNumber": 11,
+      "blockNumber": 10,
       "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
     },
     "BondingRegistry": {
@@ -113,7 +113,7 @@
       "address": "0x5eb3Bc0a489C5A8288765d2336659EbCA68FCd00"
     },
     "MockDecryptionVerifier": {
-      "blockNumber": 53,
+      "blockNumber": 52,
       "address": "0x36C02dA8a0983159322a80FFE9F24b1acfF8B570"
     },
     "MockPkVerifier": {
