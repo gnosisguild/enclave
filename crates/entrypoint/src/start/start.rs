@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use e3_ciphernode_builder::{CiphernodeBuilder, CiphernodeHandle};
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
@@ -16,7 +16,9 @@ use tracing::{info, instrument};
 
 #[instrument(name = "app", skip_all)]
 pub async fn execute(config: &AppConfig) -> Result<CiphernodeHandle> {
-    let rng = Arc::new(Mutex::new(ChaCha20Rng::from_os_rng()));
+    let rng = Arc::new(Mutex::new(
+        ChaCha20Rng::try_from_os_rng().context("failed to seed ChaCha20 RNG from OS")?,
+    ));
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
     let backend = ZkBackend::new(config.bb_binary(), config.circuits_dir(), config.work_dir());
 
