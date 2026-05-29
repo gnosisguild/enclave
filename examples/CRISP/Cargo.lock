@@ -2810,7 +2810,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.2.0"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=upstream-merge-conflicts#5ec6adac2e9891b22fb79978ee2856cb4d5b32f0"
+source = "git+https://github.com/gnosisguild/fhe.rs#a92478b39625f4c18b91a5033928b35d8a0090cf"
 dependencies = [
  "bincode",
  "doc-comment",
@@ -2836,7 +2836,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.2.0"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=upstream-merge-conflicts#5ec6adac2e9891b22fb79978ee2856cb4d5b32f0"
+source = "git+https://github.com/gnosisguild/fhe.rs#a92478b39625f4c18b91a5033928b35d8a0090cf"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -2861,7 +2861,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.1"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=upstream-merge-conflicts#5ec6adac2e9891b22fb79978ee2856cb4d5b32f0"
+source = "git+https://github.com/gnosisguild/fhe.rs#a92478b39625f4c18b91a5033928b35d8a0090cf"
 dependencies = [
  "rand 0.9.2",
 ]
@@ -2869,7 +2869,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.1"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=upstream-merge-conflicts#5ec6adac2e9891b22fb79978ee2856cb4d5b32f0"
+source = "git+https://github.com/gnosisguild/fhe.rs#a92478b39625f4c18b91a5033928b35d8a0090cf"
 dependencies = [
  "num-bigint-dig",
  "num-traits",
