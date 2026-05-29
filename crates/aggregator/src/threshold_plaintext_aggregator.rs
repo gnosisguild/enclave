@@ -588,7 +588,8 @@ impl ThresholdPlaintextAggregator {
                 mismatched.insert(*party_id);
                 continue;
             };
-            let Ok(poly) = e3_trbfv::helpers::try_poly_from_bytes(share_bytes, &threshold_params)
+            let Ok(poly) =
+                e3_trbfv::helpers::try_poly_pb_from_bytes(share_bytes, &threshold_params)
             else {
                 warn!(
                     "Could not deserialize share for party {} — marking as mismatched",

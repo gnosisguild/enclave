@@ -47,7 +47,11 @@
         "proxyAdminAddress": "0x9bd03768a7DCc129555dE410FF8E85528A4F88b5",
         "implementationAddress": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
       },
+<<<<<<< HEAD
       "blockNumber": 12,
+=======
+      "blockNumber": 10,
+>>>>>>> main
       "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
     },
     "BondingRegistry": {
@@ -109,7 +113,23 @@
       "address": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE"
     },
     "MockComputeProvider": {
+<<<<<<< HEAD
       "blockNumber": 56,
+=======
+      "blockNumber": 51,
+      "address": "0x5eb3Bc0a489C5A8288765d2336659EbCA68FCd00"
+    },
+    "MockDecryptionVerifier": {
+      "blockNumber": 52,
+      "address": "0x36C02dA8a0983159322a80FFE9F24b1acfF8B570"
+    },
+    "MockPkVerifier": {
+      "blockNumber": 54,
+      "address": "0x809d550fca64d94Bd9F66E60752A544199cfAC3D"
+    },
+    "MockE3Program": {
+      "blockNumber": 55,
+>>>>>>> main
       "address": "0x4c5859f0F772848b2D91F1D83E2Fe57935348029"
     },
     "MockDecryptionVerifier": {

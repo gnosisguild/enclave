@@ -28,7 +28,7 @@ use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::reduce;
 use e3_polynomial::{CrtPolynomial, Polynomial};
-use fhe_math::rq::{Poly, Representation};
+use fhe_math::rq::{Poly, PowerBasis};
 use num_bigint::{BigInt, BigUint};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
@@ -136,11 +136,11 @@ impl Computation for Bits {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let ctx = threshold_params
-            .ctx_at_level(0)
-            .map_err(|e| CircuitsErrors::Other(format!("ctx_at_level: {:?}", e)))?;
+            .context_at_level(0)
+            .map_err(|e| CircuitsErrors::Other(format!("context_at_level: {:?}", e)))?;
         let mut d_native_bit = 0u32;
         for qi in ctx.moduli_operators() {
-            let q = BigInt::from(qi.modulus());
+            let q = BigInt::from(**qi);
             d_native_bit = d_native_bit.max(calculate_bit_width(q - 1));
         }
         Ok(Bits {
@@ -207,24 +207,15 @@ impl Computation for Inputs {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let ctx = threshold_params
-            .ctx_at_level(0)
-            .map_err(|e| CircuitsErrors::Other(format!("ctx_at_level: {:?}", e)))?;
+            .context_at_level(0)
+            .map_err(|e| CircuitsErrors::Other(format!("context_at_level: {:?}", e)))?;
         let num_moduli = ctx.moduli().len();
         let degree = ctx.degree;
         let threshold = data.committee.threshold;
         let max_msg_non_zero_coeffs = configs.max_msg_non_zero_coeffs;
         let moduli = ctx.moduli();
 
-        // Copy to PowerBasis for coefficient extraction
-        let d_share_polys: Vec<Poly> = data
-            .d_share_polys
-            .iter()
-            .map(|p| {
-                let mut copy = p.clone();
-                copy.change_representation(Representation::PowerBasis);
-                copy
-            })
-            .collect();
+        let d_share_polys: Vec<Poly<PowerBasis>> = data.d_share_polys.clone();
 
         if d_share_polys.len() < threshold + 1 {
             return Err(CircuitsErrors::Other(format!(

@@ -29,8 +29,8 @@ pub fn bfv_ciphertext_to_greco(
 ) -> Result<(CrtPolynomial, CrtPolynomial), CrtPolynomialError> {
     let moduli = params.moduli();
 
-    let ct0is = fhe_poly_to_crt_centered(&ciphertext.c[0], moduli)?;
-    let ct1is = fhe_poly_to_crt_centered(&ciphertext.c[1], moduli)?;
+    let ct0is = fhe_poly_to_crt_centered(&ciphertext[0], moduli)?;
+    let ct1is = fhe_poly_to_crt_centered(&ciphertext[1], moduli)?;
 
     Ok((ct0is, ct1is))
 }
@@ -53,8 +53,8 @@ pub fn bfv_public_key_to_greco(
     public_key: &PublicKey,
 ) -> Result<(CrtPolynomial, CrtPolynomial), CrtPolynomialError> {
     let moduli = params.moduli();
-    let mut pk0is = CrtPolynomial::from_fhe_polynomial(&public_key.c.c[0]);
-    let mut pk1is = CrtPolynomial::from_fhe_polynomial(&public_key.c.c[1]);
+    let mut pk0is = CrtPolynomial::from_fhe_polynomial(&public_key.c[0]);
+    let mut pk1is = CrtPolynomial::from_fhe_polynomial(&public_key.c[1]);
     pk0is.reverse();
     pk1is.reverse();
     pk0is.center(moduli)?;

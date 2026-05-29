@@ -13,7 +13,6 @@ serde = { workspace = true, optional = true, features = ["rc"] }
 bincode = { workspace = true, optional = true }
 thiserror = { workspace = true }
 fhe-math = { workspace = true }
-ndarray = { workspace = true }
 
 [dev-dependencies]
 criterion = "0.5"

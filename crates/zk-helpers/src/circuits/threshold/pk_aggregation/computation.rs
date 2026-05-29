@@ -161,8 +161,8 @@ impl Computation for Inputs {
         // pk1 is the same (common random polynomial a) for all parties
         let mut pk1: Vec<CrtPolynomial> = (0..data.committee.h).map(|_| data.a.clone()).collect();
         // Extract pk0_agg and pk1_agg from aggregated public key (c[1] = a)
-        let mut pk0_agg = CrtPolynomial::from_fhe_polynomial(&data.public_key.c.c[0]);
-        let mut pk1_agg = CrtPolynomial::from_fhe_polynomial(&data.public_key.c.c[1]);
+        let mut pk0_agg = CrtPolynomial::from_fhe_polynomial(&data.public_key.c[0]);
+        let mut pk1_agg = CrtPolynomial::from_fhe_polynomial(&data.public_key.c[1]);
 
         // Compute expected_threshold_pk_commitments for each honest party
         // Each commitment is computed from pk0[i] and pk1[i] for party i

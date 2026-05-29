@@ -135,7 +135,15 @@ function SiteFooter() {
 // Fixed presentation density (the live tweak panel was removed).
 const DENSITY = 'comfortable'
 
-const pollStateForStage = (uiStageIdx: number) => (uiStageIdx >= 6 ? 'published' : uiStageIdx >= 4 ? 'computing' : 'open')
+// Derive the poll-card state from the UI stage + ballot count. Specifically,
+// when the input window has closed (uiStageIdx >= 4) but no ballots ever arrived,
+// the committee isn't actually tallying anything — surface that as a distinct
+// "idle" state instead of falsely claiming a tally is in progress.
+const pollStateForStage = (uiStageIdx: number, ballotCount: number): string => {
+  if (uiStageIdx >= 6) return 'published'
+  if (uiStageIdx >= 4) return ballotCount === 0 ? 'idle' : 'computing'
+  return 'open'
+}
 
 // Synthetic poll used only for the "Watch the lifecycle" demo when nothing is live.
 const DEMO_POLL: Poll = {
@@ -155,7 +163,7 @@ export default function App() {
   const [pollState, setPollState] = useState('open')
   const [stageIdx, setStageIdx] = useState(3)
 
-  const [, setNowTick] = useState(0)
+  const [nowTick, setNowTick] = useState(0)
   const [liveMode, setLiveMode] = useState(false)
   // Demo autoplay step, persisted so pausing/resuming continues where it left off.
   const liveStepRef = useRef(0)
@@ -189,8 +197,17 @@ export default function App() {
   // (archived). Card data comes straight from the list summary — no per-poll fetch.
   const crispReady = crispPolls.status === 'ready'
   const polls = useMemo(() => crispPolls.data ?? [], [crispPolls.data])
-  const activePolls = useMemo<E3Summary[]>(() => polls.filter((p) => isE3Active(p.stage, p.inputWindow[1])), [polls])
-  const pastPolls = useMemo<E3Summary[]>(() => polls.filter((p) => !isE3Active(p.stage, p.inputWindow[1])), [polls])
+  // `nowTick` is in the deps so isE3Active (which reads Date.now()) re-evaluates
+  // each second-tick and polls move from active → past as their windows close,
+  // rather than waiting for the next 15s on-chain refresh.
+  const activePolls = useMemo<E3Summary[]>(
+    () => polls.filter((p) => isE3Active(p.stage, p.inputWindow[1], { e3Program: p.e3Program, ballotCount: p.ballotCount })),
+    [polls, nowTick],
+  )
+  const pastPolls = useMemo<E3Summary[]>(
+    () => polls.filter((p) => !isE3Active(p.stage, p.inputWindow[1], { e3Program: p.e3Program, ballotCount: p.ballotCount })),
+    [polls, nowTick],
+  )
   const liveHistory = useMemo(() => adaptHistoryEntries(pastPolls, detailsCache), [pastPolls, detailsCache])
 
   // Inspector tab state.
@@ -298,7 +315,7 @@ export default function App() {
                   <Fragment key={s.id.toString()}>
                     <PollCard
                       poll={poll}
-                      pollState={pollStateForStage(stageIdx)}
+                      pollState={pollStateForStage(stageIdx, s.ballotCount)}
                       currentStageIdx={stageIdx}
                       ballotCount={s.ballotCount}
                       onNavigate={setView}

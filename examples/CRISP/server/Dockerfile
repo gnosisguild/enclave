@@ -1,5 +1,5 @@
 ############### stage 0: base-dev ###############
-ARG RUST_VERSION=1.88.0
+ARG RUST_VERSION=1.91.1
 ARG SKIP_SOLIDITY=0
 
 FROM rust:${RUST_VERSION}-slim-bullseye AS base-dev
@@ -8,7 +8,7 @@ ENV CARGO_HOME=/usr/local/cargo
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    jq pkg-config libssl-dev curl wget ca-certificates && \
+    jq pkg-config libssl-dev curl wget ca-certificates protobuf-compiler && \
     rm -rf /var/lib/apt/lists/*
 
 RUN wget https://github.com/argotorg/solidity/releases/download/v0.8.27/solc-static-linux \

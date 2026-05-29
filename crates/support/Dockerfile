@@ -1,4 +1,4 @@
-ARG RUST_VERSION=1.86.0
+ARG RUST_VERSION=1.91.1
 ARG RISC0_VERSION=3.0.3
 ARG RISC0_TOOLCHAIN=1.88.0
 ARG SKIP_SOLIDITY=0
@@ -14,7 +14,8 @@ RUN apt-get update && \
     libssl-dev \
     curl \
     sudo \
-    ca-certificates && \
+    ca-certificates \
+    protobuf-compiler && \
     rm -rf /var/lib/apt/lists/*
     
 # Create user

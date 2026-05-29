@@ -44,13 +44,13 @@ export const publicClient = createPublicClient({
 })
 
 export const CONTRACTS = {
-  Enclave: envStr('VITE_ENCLAVE_ADDRESS', '0xB47B267876B60a06138Bc9dfCee7aa3E26907CCB') as Address,
-  CiphernodeRegistry: envStr('VITE_CIPHERNODE_REGISTRY_ADDRESS', '0x497Feea9abB72229aab1584c22b5416ff128926B') as Address,
-  CRISPProgram: envStr('VITE_CRISP_PROGRAM_ADDRESS', '0xba3B07aBFd0B8cad68aa1E946CC7AF5C1B1c8B5D') as Address,
+  Enclave: envStr('VITE_ENCLAVE_ADDRESS', '0x670eFE043d1D340148037b4b76c4F9dfED294309') as Address,
+  CiphernodeRegistry: envStr('VITE_CIPHERNODE_REGISTRY_ADDRESS', '0x4D707127F72a216EA116AF0B4262dD7382F84259') as Address,
+  CRISPProgram: envStr('VITE_CRISP_PROGRAM_ADDRESS', '0xbCc418F4dd1266Cc6070b1e2AC728ef56De946e7') as Address,
 }
 
 // First block to scan from — lower bound for getLogs (the Enclave deploy block).
-export const DEPLOY_BLOCK = BigInt(envStr('VITE_DEPLOY_BLOCK', '10697349'))
+export const DEPLOY_BLOCK = BigInt(envStr('VITE_DEPLOY_BLOCK', '10939869'))
 
 // E3 timeout windows (seconds), matching the deployment's timeoutConfig. Used to
 // decide whether an E3 is still genuinely active vs. expired without completing.

@@ -147,13 +147,25 @@ button {
 }
 
 /* ── Main shell ─────────────────────────────────────────────────────────── */
+/* Make the page a column flex container that fills at least the viewport so the
+   footer pins to the bottom when content is short (e.g. no live E3s). */
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
 .main {
+  flex: 1 0 auto;
+  width: 100%;
   max-width: var(--maxw);
   margin: 0 auto;
   padding: 56px 32px 96px;
   display: flex;
   flex-direction: column;
   gap: 56px;
+}
+.site-foot {
+  flex-shrink: 0;
 }
 .page--compact .main {
   gap: 36px;

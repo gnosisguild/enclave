@@ -18,7 +18,6 @@ use fhe::bfv::Plaintext;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe::trbfv::{ShareManager, TRBFV};
 use fhe_traits::FheEncoder;
-use rand::thread_rng;
 
 impl ShareEncryptionCircuitData {
     /// Generates sample data for the share-encryption circuit (encrypts a share row under DKG pk).
@@ -33,7 +32,7 @@ impl ShareEncryptionCircuitData {
             CircuitsErrors::Sample(format!("Failed to build pair for preset: {:?}", e))
         })?;
 
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
 
         let dkg_secret_key = SecretKey::random(&dkg_params, &mut rng);
         let dkg_public_key = PublicKey::new(&dkg_secret_key, &mut rng);
@@ -131,12 +130,14 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(sample.public_key.c.c.len(), 2);
+        assert_eq!(sample.public_key.c.len(), 2);
         assert_eq!(
-            sample.plaintext.value.len(),
+            crate::math::plaintext_poly_u64(&sample.plaintext)
+                .unwrap()
+                .len(),
             BfvPreset::InsecureThreshold512.metadata().degree
         );
-        assert_eq!(sample.ciphertext.c.len(), 2);
+        assert_eq!(sample.ciphertext.len(), 2);
         assert_eq!(
             sample.u_rns.coefficients().len(),
             BfvPreset::InsecureThreshold512.metadata().degree
@@ -164,8 +165,8 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(sample.public_key.c.c.len(), 2);
-        assert_eq!(sample.ciphertext.c.len(), 2);
+        assert_eq!(sample.public_key.c.len(), 2);
+        assert_eq!(sample.ciphertext.len(), 2);
         assert_eq!(
             sample.u_rns.coefficients().len(),
             BfvPreset::InsecureThreshold512.metadata().degree

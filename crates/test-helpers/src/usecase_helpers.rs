@@ -26,7 +26,7 @@ use fhe::{
     mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
 };
 use fhe_traits::Serialize;
-use rand::rngs::OsRng;
+use rand::Rng;
 
 // The following functions are designed to aid testing our usecases
 
@@ -35,6 +35,9 @@ pub struct GeneratedShares {
     pub shares: HashMap<u64, ThresholdShare>,
     /// BFV secret keys for each party (for decryption in tests)
     pub bfv_secret_keys: Vec<SecretKey>,
+    /// The Arc<BfvParameters> used to create the secret keys and encrypt shares.
+    /// Must be reused when decrypting (try_decrypt uses Arc::ptr_eq).
+    pub bfv_params: Arc<BfvParameters>,
 }
 
 pub fn generate_shares_hash_map(
@@ -47,7 +50,7 @@ pub fn generate_shares_hash_map(
 
     // First, generate BFV encryption keys for all parties
     let bfv_params = BfvParamSet::from(BfvPreset::InsecureDkg512).build_arc();
-    let mut bfv_rng = OsRng;
+    let mut bfv_rng = rand::rng();
     let mut bfv_secret_keys = Vec::with_capacity(threshold_n);
     let mut bfv_public_keys = Vec::with_capacity(threshold_n);
 
@@ -126,6 +129,7 @@ pub fn generate_shares_hash_map(
     Ok(GeneratedShares {
         shares: shares_hash_map,
         bfv_secret_keys,
+        bfv_params,
     })
 }
 
@@ -152,9 +156,9 @@ pub fn get_decryption_keys(
     bfv_secret_keys: &[SecretKey],
     cipher: &Cipher,
     trbfv_config: &TrBFVConfig,
+    bfv_params: &Arc<BfvParameters>,
 ) -> Result<HashMap<usize, (Vec<SensitiveBytes>, SensitiveBytes)>> {
     let threshold_n = trbfv_config.num_parties() as usize;
-    let bfv_params = BfvParamSet::from(BfvPreset::InsecureDkg512).build_arc();
     let degree = bfv_params.degree();
 
     // Individualize based on node - each party decrypts their share from each sender

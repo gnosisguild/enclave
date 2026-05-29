@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    helpers::try_poly_from_bytes,
+    helpers::try_poly_pb_from_bytes,
     shares::{Encrypted, SharedSecret},
     TrBFVConfig,
 };
@@ -83,7 +83,7 @@ pub fn gen_esi_sss<R: RngCore + CryptoRng>(
     let e_sm_raw = req.e_sm_raw;
 
     info!("gen_esi_sss:mapping...");
-    let e_sm_poly = try_poly_from_bytes(&e_sm_raw, &params)?;
+    let e_sm_poly = try_poly_pb_from_bytes(&e_sm_raw, &params)?;
     let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
 
     info!("gen_esi_sss:generate_secret_shares_from_poly...");

@@ -32,7 +32,7 @@ use libp2p_mock::Libp2pMock;
 pub use plaintext_writer::*;
 pub use public_key_writer::*;
 use rand::Rng;
-use rand_chacha::rand_core::SeedableRng;
+use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::sync::Arc;
 pub use utils::*;
@@ -208,7 +208,7 @@ pub async fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
 /// NOTE: THESE ARE NOT ACTUAL ADDRESSES JUST RANDOM DATA
 pub fn create_random_eth_addrs(how_many: u32) -> Vec<String> {
     (0..how_many)
-        .map(|_| Address::from_slice(&rand::thread_rng().gen::<[u8; 20]>()).to_string())
+        .map(|_| Address::from_slice(&rand::rng().random::<[u8; 20]>()).to_string())
         .collect()
 }
 
