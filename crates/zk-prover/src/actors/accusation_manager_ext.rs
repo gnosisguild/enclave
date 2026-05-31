@@ -5,4 +5,3 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 //! Re-exported from `e3-slashing` — the canonical implementation lives there.
-pub use e3_slashing::accusation_manager_ext::*;

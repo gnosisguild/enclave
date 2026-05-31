@@ -41,6 +41,9 @@ impl EventLog for InMemEventLog {
         self.log.push(event.to_owned());
         Ok(self.log.len() as u64)
     }
+    fn head(&self) -> u64 {
+        self.log.len() as u64
+    }
 }
 
 #[cfg(test)]

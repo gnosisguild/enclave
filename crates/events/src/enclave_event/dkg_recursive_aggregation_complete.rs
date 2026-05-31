@@ -21,7 +21,6 @@ pub struct DKGRecursiveAggregationComplete {
     pub party_id: u64,
     pub aggregated_proof: Option<Proof>,
     /// Binds the fold to the operator's registered address via `sk_agg` / `esm_agg` commits.
-    #[serde(default)]
     pub fold_attestation: Option<SignedDkgFoldAttestation>,
 }
 

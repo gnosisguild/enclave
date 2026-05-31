@@ -22,23 +22,19 @@ pub struct PublicKeyAggregated {
     pub nodes: OrderedSet<String>,
     /// Full registered committee (`topNodes`) addresses in ascending `party_id` (score) order.
     /// Length `N`. Used by `DecryptionAggregator` for `committee_hash_*` public-input binding.
-    #[serde(default)]
     pub committee_addresses: Vec<Address>,
     /// Honest subset of the committee (size `H ≤ N`) in ascending `party_id` order.
     /// These are the parties whose C1/NodeFold proofs were accepted; downstream actors
     /// must gate decryption-share collection on this set rather than full `topNodes`.
-    #[serde(default)]
     pub honest_committee_addresses: Vec<Address>,
     /// Hash-based aggregated PK commitment (last public signal of the C5 proof).
     /// Passed as `pkCommitment` to `publishCommittee`.
     pub pk_commitment: [u8; 32],
     /// EVM DKG recursive proof (`CircuitName::DkgAggregator`) carrying node folds + C5
     /// for on-chain verification. `None` when proof aggregation is disabled.
-    #[serde(default)]
     pub dkg_aggregator_proof: Option<Proof>,
     /// ABI-encoded `(Attestation[], PartySlotBinding[])` for on-chain fold attestation verify.
     /// Required when `dkg_aggregator_proof` is present; `None` otherwise.
-    #[serde(default)]
     pub dkg_attestation_bundle: Option<ArcBytes>,
 }
 

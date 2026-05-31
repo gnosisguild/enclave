@@ -39,7 +39,6 @@ pub struct ProofVerificationPassed {
     /// dataHash bound in voter signatures). Empty when the emitter did not have
     /// the raw bytes available; downstream consumers that need it will fail
     /// gracefully if so.
-    #[serde(default)]
     pub proof_data: ArcBytes,
 }
 

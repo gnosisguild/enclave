@@ -21,7 +21,6 @@ pub struct PlaintextAggregated {
     /// proof aggregation is disabled. On-chain publication currently only supports a
     /// single-output plaintext, in which case the first proof is forwarded to
     /// `publishPlaintextOutput`.
-    #[serde(default)]
     pub decryption_aggregator_proofs: Vec<Proof>,
 }
 

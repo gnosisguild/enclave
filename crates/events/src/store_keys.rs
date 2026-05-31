@@ -41,6 +41,10 @@ impl StoreKeys {
         String::from("//router")
     }
 
+    pub fn e3_lifecycle() -> String {
+        String::from("//e3_lifecycle")
+    }
+
     pub fn sortition() -> String {
         String::from("//sortition")
     }
@@ -67,6 +71,13 @@ impl StoreKeys {
 
     pub fn node_state() -> String {
         String::from("//node_state")
+    }
+
+    /// Global on-disk schema version marker. Written once on first boot and
+    /// checked on every subsequent boot to reject incompatible upgrades and
+    /// downgrades loudly instead of silently loading garbage (H19/H20).
+    pub fn schema_version() -> String {
+        String::from("//schema_version")
     }
 
     pub fn finalized_committees() -> String {

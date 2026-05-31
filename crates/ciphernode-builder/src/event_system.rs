@@ -16,8 +16,8 @@ use e3_data::{
 use e3_events::hlc_factory::HlcFactory;
 use e3_events::{
     AggregateConfig, BusHandle, Disabled, EnclaveEvent, EventBus, EventBusConfig, EventStore,
-    EventStoreQueryBy, EventStoreRouter, EventSubscriber, EventType, InsertBatch, Sequencer,
-    SnapshotBuffer, StoreEventRequested, UpdateDestination,
+    EventStoreRouter, EventSubscriber, EventType, InsertBatch, Sequencer, SnapshotBuffer,
+    StoreEventRequested, UpdateDestination,
 };
 use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;
@@ -417,6 +417,7 @@ mod tests {
     use e3_events::CorrelationId;
     use e3_events::EnclaveEventData;
 
+    use e3_events::EventStoreQueryBy;
     use e3_events::EventStoreQueryResponse;
     use e3_events::EventType;
     use e3_events::TestEvent;

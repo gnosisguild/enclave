@@ -14,7 +14,7 @@ use anyhow::*;
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_utils::utility_types::ArcBytes;
 use fhe::{bfv::Ciphertext, trbfv::ShareManager};
-use fhe_math::rq::{Ntt, Poly, PowerBasis};
+use fhe_math::rq::{Poly, PowerBasis};
 use fhe_traits::DeserializeParametrized;
 use fhe_traits::Serialize;
 use tracing::info;

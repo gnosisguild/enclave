@@ -35,12 +35,7 @@ pub struct ThresholdSharePending {
     pub recipient_party_ids: Vec<u64>,
     /// When true, wrapper/fold proofs are generated for DKG proof aggregation.
     /// When false, proof aggregation is skipped (only raw C1-C4 proofs generated).
-    #[serde(default = "default_true")]
     pub proof_aggregation_enabled: bool,
-}
-
-fn default_true() -> bool {
-    true
 }
 
 impl Display for ThresholdSharePending {

@@ -22,7 +22,6 @@ pub struct KeyshareCreated {
     /// Real sortition-assigned party id. Required (no `serde(default)`): a missing value
     /// would silently default to 0 and mis-route shares.
     pub party_id: u64,
-    #[serde(default)]
     pub signed_pk_generation_proof: Option<SignedProofPayload>,
 }
 

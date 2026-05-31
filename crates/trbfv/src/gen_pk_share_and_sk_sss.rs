@@ -146,8 +146,7 @@ pub fn gen_pk_share_and_sk_sss<R: RngCore + CryptoRng>(
     let sk_raw = ArcBytes::from_bytes(&sk_poly.to_bytes());
 
     info!("gen_pk_share_and_sk_sss:generate_secret_shares_from_poly...");
-    let sk_sss =
-        SharedSecret::from({ share_manager.generate_secret_shares_from_poly(sk_poly, rng)? });
+    let sk_sss = SharedSecret::from(share_manager.generate_secret_shares_from_poly(sk_poly, rng)?);
 
     (
         InnerResponse {

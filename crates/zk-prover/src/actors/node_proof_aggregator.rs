@@ -16,36 +16,14 @@ use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind,
     CorrelationId, DKGInnerProofReady, DKGRecursiveAggregationComplete, DkgFoldAttestationPayload,
     E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EventContext, EventPublisher,
-    EventSubscriber, EventType, FailureReason, NodeDkgFoldRequest, Proof, Sequenced,
-    ShareEncryptionProofRequest, SignedDkgFoldAttestation, ThresholdSharePending, TypedEvent,
-    ZkRequest, ZkResponse,
+    EventSubscriber, EventType, FailureReason, Proof, Sequenced, SignedDkgFoldAttestation,
+    ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::build_pair_for_preset;
 use tracing::{error, info, warn};
 
+use crate::domain::node_dkg_fold::{DkgProofCollectionState, NodeDkgFoldMeta};
 use crate::node_fold_public::extract_node_fold_agg_commits;
-
-/// Metadata from [`ThresholdSharePending`] for slot indices and sizing.
-struct NodeDkgFoldMeta {
-    party_id: u64,
-    total_expected: usize,
-    sk_enc_count: usize,
-    e_sm_enc_count: usize,
-    sk_share_encryption_requests: Vec<ShareEncryptionProofRequest>,
-    e_sm_share_encryption_requests: Vec<ShareEncryptionProofRequest>,
-    committee_n: usize,
-    committee_h: usize,
-    n_moduli: usize,
-    params_preset: e3_fhe_params::BfvPreset,
-}
-
-/// Per-E3 collection state: buffer proofs by `seq` until the monolithic fold can run.
-struct DkgProofCollectionState {
-    meta: NodeDkgFoldMeta,
-    buffer: BTreeMap<usize, Proof>,
-    fold_correlation: Option<CorrelationId>,
-    last_ec: EventContext<Sequenced>,
-}
 
 /// Actor that collects DKG inner proofs and dispatches a single [`ZkRequest::NodeDkgFold`].
 pub struct NodeProofAggregator {
@@ -117,7 +95,7 @@ impl NodeProofAggregator {
 
         let sk_enc_count = msg.sk_share_encryption_requests.len();
         let e_sm_enc_count = msg.e_sm_share_encryption_requests.len();
-        let total_expected = 4 + sk_enc_count + e_sm_enc_count + 2;
+        let total_expected = NodeDkgFoldMeta::total_expected_for(sk_enc_count, e_sm_enc_count);
 
         let committee = msg.proof_request.committee_size.values();
         let (committee_n, committee_h, n_moduli) =
@@ -219,12 +197,7 @@ impl NodeProofAggregator {
 
         self.states.insert(
             e3_id.clone(),
-            DkgProofCollectionState {
-                meta,
-                buffer: std::mem::take(&mut buffer),
-                fold_correlation: None,
-                last_ec: ec,
-            },
+            DkgProofCollectionState::new(meta, std::mem::take(&mut buffer), ec),
         );
 
         self.try_dispatch_node_dkg_fold(&e3_id);
@@ -235,69 +208,14 @@ impl NodeProofAggregator {
             Some(s) => s,
             None => return,
         };
-        let n = state.meta.total_expected;
-        if state.buffer.len() != n || !(0..n).all(|i| state.buffer.contains_key(&i)) {
+        if !state.is_ready() {
             return;
         }
 
-        let meta = &state.meta;
-        let c3_total_slots = meta.committee_n * meta.n_moduli;
-        let slots_a: Vec<u32> = meta
-            .sk_share_encryption_requests
-            .iter()
-            .map(|r| r.c3_slot_index(meta.n_moduli))
-            .collect();
-        let slots_b: Vec<u32> = meta
-            .e_sm_share_encryption_requests
-            .iter()
-            .map(|r| r.c3_slot_index(meta.n_moduli))
-            .collect();
-
-        let sk = meta.sk_enc_count;
-        let esm = meta.e_sm_enc_count;
-        let buf = &state.buffer;
-        let get = |seq: usize| {
-            buf.get(&seq)
-                .cloned()
-                .expect("buffer contains all seq indices")
-        };
-
-        let c0_proof = get(0);
-        let c1_proof = get(1);
-        let c2a_proof = get(2);
-        let c2b_proof = get(3);
-        let mut c3a_inner_proofs = Vec::with_capacity(sk);
-        for s in 0..sk {
-            c3a_inner_proofs.push(get(4 + s));
-        }
-        let mut c3b_inner_proofs = Vec::with_capacity(esm);
-        for s in 0..esm {
-            c3b_inner_proofs.push(get(4 + sk + s));
-        }
-        let c4a_seq = 4 + sk + esm;
-        let c4a_proof = get(c4a_seq);
-        let c4b_proof = get(c4a_seq + 1);
-
+        let req = state.build_fold_request();
         let corr = CorrelationId::new();
         let ec = state.last_ec.clone();
-        let party_id = meta.party_id;
-        let preset = meta.params_preset;
-
-        let req = NodeDkgFoldRequest {
-            c0_proof,
-            c1_proof,
-            c2a_proof,
-            c2b_proof,
-            c3a_inner_proofs,
-            c3b_inner_proofs,
-            c4a_proof,
-            c4b_proof,
-            c3_slot_indices_a: slots_a,
-            c3_slot_indices_b: slots_b,
-            c3_total_slots,
-            party_id,
-            params_preset: preset,
-        };
+        let party_id = state.meta.party_id;
 
         state.fold_correlation = Some(corr);
         self.fold_correlation.insert(corr, e3_id.clone());
@@ -577,7 +495,7 @@ mod tests {
     use anyhow::Result;
     use e3_events::{
         CircuitName, ComputeRequestErrorKind, ComputeRequestKind, Event, HistoryCollector,
-        TakeEvents, Unsequenced, ZkError,
+        NodeDkgFoldRequest, TakeEvents, Unsequenced, ZkError,
     };
     use e3_test_helpers::get_common_setup;
 

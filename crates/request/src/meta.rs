@@ -65,7 +65,7 @@ impl E3Extension for E3MetaExtension {
             proof_aggregation_enabled,
         };
         ctx.repositories().meta(&e3_id).write(&meta);
-        let _ = ctx.set_dependency(META_KEY, meta);
+        ctx.set_dependency(META_KEY, meta);
     }
 
     async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()> {

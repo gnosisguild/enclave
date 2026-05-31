@@ -177,6 +177,8 @@ pub trait EventLog: Unpin + 'static {
     fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64>;
     /// Read all events starting from the given sequence number (inclusive)
     fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>>;
+    /// The 1-indexed sequence number of the last appended event, or `0` if the log is empty.
+    fn head(&self) -> u64;
 }
 
 /// EventContext allows consumers to extract infrastructure metadata from event objects
