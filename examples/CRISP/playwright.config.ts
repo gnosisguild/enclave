@@ -12,6 +12,11 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     actionTimeout: 75 * 1000,
+    // bb.js fetches the public Aztec CRS over HTTPS from the page. On CI the
+    // runner's browser rejects the served cert as expired
+    // (ERR_CERT_DATE_INVALID) even though it succeeds locally. The CRS is
+    // public, integrity-checked data, so ignore cert errors for the e2e run.
+    ignoreHTTPSErrors: true,
   },
   retries: 0,
   fullyParallel: true,
@@ -27,6 +32,11 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         headless: true,
+        // ignoreHTTPSErrors alone can miss cross-origin sub-resource fetches
+        // (the CRS download); the Chromium flag covers all cert errors.
+        launchOptions: {
+          args: ['--ignore-certificate-errors'],
+        },
       },
     },
   ],
