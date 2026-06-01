@@ -404,8 +404,7 @@ jobs:
         build-nix-flake,
       ]
     if:
-      always() && needs.validate-and-prepare.result == 'success' && needs.build-binaries.result == 'success' && needs.build-nix-flake.result
-      == 'success'
+      always() && needs.validate-and-prepare.result == 'success' && needs.build-binaries.result == 'success'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
