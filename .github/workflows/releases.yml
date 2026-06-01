@@ -16,6 +16,7 @@ env:
   SUPPORT_DOCKERFILE_PATH: crates/support/Dockerfile
   CIPHERNODE_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ciphernode
   SUPPORT_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support
+  NOIR_TOOLCHAIN: v1.0.0-beta.16
   MNEMONIC: 'test test test test test test test test test test test junk'
   INFURA_API_KEY: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
   ETHERSCAN_API_KEY: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
@@ -148,7 +149,6 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
-            - uses: cachix/install-nix-action@v4
       - uses: cachix/cachix-action@v15
         with:
           name: enclave
@@ -291,6 +291,14 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+
+      # `pnpm build:ts` builds the SDK, whose prebuild compiles the threshold
+      # circuits via `nargo` (packages/enclave-sdk/scripts/compile-circuits.sh).
+      # Without nargo on PATH the build fails with "nargo is not installed".
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
