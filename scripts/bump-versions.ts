@@ -315,11 +315,11 @@ class VersionBumper {
         cwd: this.rootDir,
         stdio: 'pipe',
       })
-      execSync('cargo update', {
+      execSync('cargo update --workspace', {
         cwd: `${this.rootDir}/examples/CRISP`,
         stdio: 'pipe',
       })
-      execSync('cargo update', {
+      execSync('cargo update --workspace', {
         cwd: `${this.rootDir}/templates/default`,
         stdio: 'pipe',
       })
