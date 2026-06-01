@@ -674,13 +674,6 @@ jobs:
 
       - name: Run ${{ matrix.test-suite }}
         working-directory: ./examples/CRISP
-        env:
-          # bb.js downloads the public Aztec CRS over TLS during the SDK suite
-          # (initSRSChonk in vote.ts). Some runners reject the served cert as
-          # expired ("CERT_HAS_EXPIRED") even though it succeeds locally. The CRS
-          # is public, integrity-checked data, so skip TLS verification for this
-          # suite only; all other suites keep verification on.
-          NODE_TLS_REJECT_UNAUTHORIZED: ${{ matrix.test-suite == 'test:sdk' && '0' || '1' }}
         run: ${{ matrix.command }}
 
   crisp_e2e:
@@ -1047,12 +1040,6 @@ jobs:
           pnpm test:browser
 
       - name: Run the tests
-        env:
-          # bb.js fetches the public Aztec CRS over TLS (initSRS); some runners
-          # reject the served cert as expired ("CERT_HAS_EXPIRED") even though it
-          # succeeds locally. The CRS is public, integrity-checked data, so skip
-          # TLS verification for the SDK test run only.
-          NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: pnpm sdk:test
 
       - name: Upload SDK artifacts
