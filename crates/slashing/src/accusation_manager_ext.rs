@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 
-use crate::accusation_manager::AccusationManager;
+use crate::actors::accusation_manager::AccusationManager;
 use alloy::primitives::Address;
 use alloy::signers::local::PrivateKeySigner;
 use anyhow::Result;

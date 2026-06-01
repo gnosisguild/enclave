@@ -36,12 +36,7 @@ pub struct E3Requested {
     /// When true, ciphernodes generate wrapper/fold proofs for DKG proof
     /// aggregation (public verifiability). When false, wrapper/fold proofs
     /// are skipped to reduce latency. C5 and C7 proofs are always generated.
-    #[serde(default = "default_proof_aggregation")]
     pub proof_aggregation_enabled: bool,
-}
-
-fn default_proof_aggregation() -> bool {
-    true
 }
 
 impl Default for E3Requested {

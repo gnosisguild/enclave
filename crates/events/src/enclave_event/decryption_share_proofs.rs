@@ -12,7 +12,6 @@
 //! `DecryptionKeyShared` (Exchange #3) directly.
 
 use crate::{DkgShareDecryptionProofRequest, E3id};
-use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
 
 /// ThresholdKeyshare → ProofRequestActor: generate and sign C4 proofs.

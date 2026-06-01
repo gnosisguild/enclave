@@ -16,13 +16,12 @@ use alloy::primitives::Address;
 use anyhow::Result;
 use e3_ciphernode_builder::{CiphernodeHandle, EventSystem};
 use e3_events::{
-    BusHandle, CiphernodeAdded, Enabled, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
-    EventContextAccessors, EventPublisher, EventType, HistoryCollector, Seed, Sequenced, Subscribe,
+    BusHandle, CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
+    EventPublisher, EventType, HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_fhe_params::{build_bfv_params_arc, create_deterministic_crp_from_default_seed};
-use e3_net::{DocumentPublisher, NetEventTranslator};
 use e3_utils::SharedRng;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::mbfv::CommonRandomPoly;
@@ -160,38 +159,6 @@ pub fn get_common_setup(
         .handle()?
         .enable("cn1");
     Ok((handle, rng, seed, params, crpoly, errors, history))
-}
-
-/// Actor that pipes events between buses, filtering for broadcastable events
-/// and transforming document-publisher events to simulate network receipt
-/// (e.g. setting `external: true` on `DecryptionKeyShared`).
-struct SimulatedNetPipe {
-    dest: BusHandle<Enabled>,
-}
-
-impl Actor for SimulatedNetPipe {
-    type Context = actix::Context<Self>;
-}
-
-impl Handler<EnclaveEvent<Sequenced>> for SimulatedNetPipe {
-    type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
-        let should_forward = NetEventTranslator::is_forwardable_event(&msg)
-            || DocumentPublisher::is_document_publisher_event(&msg);
-
-        if should_forward {
-            let source = msg.source();
-            let (mut data, ts) = msg.split();
-
-            // Simulate network receive: in production, DocumentPublisher
-            // sets external=true when reconstructing events from the network.
-            if let EnclaveEventData::DecryptionKeyShared(ref mut dks) = data {
-                dks.external = true;
-            }
-
-            let _ = self.dest.publish_from_remote(data, ts, None, source);
-        }
-    }
 }
 
 /// Simulate libp2p by taking output net commands and converting them to net events sending them to

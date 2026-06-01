@@ -1,0 +1,220 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
+use e3_events::{E3Stage, E3id, EnclaveEvent, EnclaveEventData, Event};
+use std::collections::HashSet;
+
+/// The completion action a router should perform *after* running extension hooks and
+/// forwarding an event to the request's context.
+#[derive(Debug, PartialEq, Eq)]
+pub enum PostForward {
+    /// Publish an `E3RequestComplete` event to the bus: the request has finished.
+    PublishComplete,
+    /// Tear down the context for this request and mark it as completed.
+    Teardown,
+    /// No completion action is required.
+    None,
+}
+
+/// The decision the router makes when an event arrives, computed without performing any
+/// actix message passing, persistence, or context mutation.
+#[derive(Debug, PartialEq, Eq)]
+pub enum RoutingDecision {
+    /// A shutdown event: broadcast it immediately to every active context.
+    Broadcast,
+    /// The event carries no `e3_id` and should be ignored.
+    Ignore,
+    /// The event targets a request that has already completed; this is an error.
+    AlreadyCompleted(E3id),
+    /// Process the event for the given request, applying `post_forward` after forwarding.
+    Process {
+        e3_id: E3id,
+        post_forward: PostForward,
+    },
+}
+
+/// Pure routing logic for the E3 request router.
+///
+/// Classifies an incoming [`EnclaveEvent`] into a [`RoutingDecision`] based purely on the
+/// event data and the set of already-completed requests. This contains no actix, persistence
+/// or I/O concerns so it can be unit tested in isolation; the actor executes the decision.
+pub struct RequestRouter;
+
+impl RequestRouter {
+    /// Decide how an incoming event should be routed given the set of completed requests.
+    pub fn route(msg: &EnclaveEvent, completed: &HashSet<E3id>) -> RoutingDecision {
+        // If we are shutting down then broadcast to every context and bail on anything else.
+        if let EnclaveEventData::Shutdown(_) = msg.get_data() {
+            return RoutingDecision::Broadcast;
+        }
+
+        // Only process events with e3_ids.
+        let Some(e3_id) = msg.get_e3_id() else {
+            return RoutingDecision::Ignore;
+        };
+
+        // If this e3 round has already been completed then this event is unexpected.
+        if completed.contains(&e3_id) {
+            return RoutingDecision::AlreadyCompleted(e3_id);
+        }
+
+        let post_forward = match msg.get_data() {
+            // Receiving the PlaintextAggregated event means the request is complete and we can
+            // notify everyone. This might change as we consider other completion factors.
+            EnclaveEventData::PlaintextAggregated(_) => PostForward::PublishComplete,
+            EnclaveEventData::E3StageChanged(data)
+                if matches!(data.new_stage, E3Stage::Complete) =>
+            {
+                PostForward::PublishComplete
+            }
+            // NOTE: E3Stage::Failed does NOT trigger E3RequestComplete. Failed rounds need the
+            // accusation/slashing lifecycle to complete before the context is torn down.
+            EnclaveEventData::E3RequestComplete(_) => PostForward::Teardown,
+            _ => PostForward::None,
+        };
+
+        RoutingDecision::Process {
+            e3_id,
+            post_forward,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use e3_events::{
+        E3RequestComplete, E3Stage, E3StageChanged, EnclaveEvent, PlaintextAggregated, Sequenced,
+        Shutdown,
+    };
+
+    fn e3id() -> E3id {
+        E3id::new("1", 1)
+    }
+
+    fn with_e3_id(label: &str, id: E3id) -> EnclaveEvent {
+        EnclaveEvent::<Sequenced>::test_event(label)
+            .e3_id(id)
+            .seq(1)
+            .build()
+    }
+
+    fn from_data(data: impl Into<EnclaveEventData>) -> EnclaveEvent {
+        EnclaveEvent::<Sequenced>::test_event("x")
+            .data(data)
+            .seq(1)
+            .build()
+    }
+
+    #[test]
+    fn shutdown_broadcasts() {
+        let msg = from_data(Shutdown);
+        assert_eq!(
+            RequestRouter::route(&msg, &HashSet::new()),
+            RoutingDecision::Broadcast
+        );
+    }
+
+    #[test]
+    fn event_without_e3_id_is_ignored() {
+        let msg = EnclaveEvent::<Sequenced>::test_event("no-id")
+            .seq(1)
+            .build();
+        assert_eq!(
+            RequestRouter::route(&msg, &HashSet::new()),
+            RoutingDecision::Ignore
+        );
+    }
+
+    #[test]
+    fn completed_request_is_an_error() {
+        let id = e3id();
+        let mut completed = HashSet::new();
+        completed.insert(id.clone());
+        let msg = with_e3_id("late", id.clone());
+        assert_eq!(
+            RequestRouter::route(&msg, &completed),
+            RoutingDecision::AlreadyCompleted(id)
+        );
+    }
+
+    #[test]
+    fn plaintext_aggregated_publishes_complete() {
+        let id = e3id();
+        let msg = from_data(PlaintextAggregated {
+            e3_id: id.clone(),
+            decrypted_output: vec![],
+            decryption_aggregator_proofs: vec![],
+        });
+        assert_eq!(
+            RequestRouter::route(&msg, &HashSet::new()),
+            RoutingDecision::Process {
+                e3_id: id,
+                post_forward: PostForward::PublishComplete,
+            }
+        );
+    }
+
+    #[test]
+    fn stage_changed_to_complete_publishes_complete() {
+        let id = e3id();
+        let msg = from_data(E3StageChanged {
+            e3_id: id.clone(),
+            previous_stage: E3Stage::CiphertextReady,
+            new_stage: E3Stage::Complete,
+        });
+        assert_eq!(
+            RequestRouter::route(&msg, &HashSet::new()),
+            RoutingDecision::Process {
+                e3_id: id,
+                post_forward: PostForward::PublishComplete,
+            }
+        );
+    }
+
+    #[test]
+    fn stage_changed_to_failed_does_not_complete() {
+        let id = e3id();
+        let msg = from_data(E3StageChanged {
+            e3_id: id.clone(),
+            previous_stage: E3Stage::CiphertextReady,
+            new_stage: E3Stage::Failed,
+        });
+        assert_eq!(
+            RequestRouter::route(&msg, &HashSet::new()),
+            RoutingDecision::Process {
+                e3_id: id,
+                post_forward: PostForward::None,
+            }
+        );
+    }
+
+    #[test]
+    fn e3_request_complete_without_e3_id_is_ignored() {
+        // EnclaveEventData::get_e3_id() returns None for E3RequestComplete, so such an event
+        // never reaches the Teardown arm: it is ignored. This mirrors the original router's
+        // `let Some(e3_id) = ... else { return Ok(()) }` guard exactly.
+        let id = e3id();
+        let msg = from_data(E3RequestComplete { e3_id: id });
+        assert_eq!(
+            RequestRouter::route(&msg, &HashSet::new()),
+            RoutingDecision::Ignore
+        );
+    }
+
+    #[test]
+    fn generic_event_with_e3_id_has_no_completion() {
+        let id = e3id();
+        let msg = with_e3_id("generic", id.clone());
+        assert_eq!(
+            RequestRouter::route(&msg, &HashSet::new()),
+            RoutingDecision::Process {
+                e3_id: id,
+                post_forward: PostForward::None,
+            }
+        );
+    }
+}

@@ -92,7 +92,7 @@ impl DataStore {
     }
 
     /// Get the scope as a string
-    pub fn get_scope(&self) -> Result<Cow<str>> {
+    pub fn get_scope(&self) -> Result<Cow<'_, str>> {
         Ok(String::from_utf8_lossy(&self.scope))
     }
 

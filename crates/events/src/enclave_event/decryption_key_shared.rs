@@ -7,7 +7,6 @@
 use crate::{E3id, SignedProofPayload};
 use actix::Message;
 use derivative::Derivative;
-use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 

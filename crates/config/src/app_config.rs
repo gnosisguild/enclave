@@ -9,7 +9,7 @@ use crate::load_config::find_in_parent;
 use crate::load_config::resolve_config_path;
 use crate::paths_engine::PathsEngine;
 use crate::paths_engine::DEFAULT_CONFIG_NAME;
-use crate::program_config::{BoundlessConfig, ProgramConfig, Risc0Config};
+use crate::program_config::ProgramConfig;
 use crate::yaml::load_yaml_with_env;
 use alloy_primitives::Address;
 use anyhow::bail;
@@ -499,6 +499,7 @@ pub fn combine_unique<T: Eq + std::hash::Hash + Clone + Ord>(a: &[T], b: &[T]) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::program_config::Risc0Config;
     use crate::rpc::RpcAuth;
     use figment::Jail;
 

@@ -6,9 +6,9 @@
 
 use std::sync::Arc;
 
-use crate::committee::committee_addresses_from_nodes;
-use crate::decryptionshare_created_buffer::DecryptionshareCreatedBuffer;
-use crate::keyshare_created_filter_buffer::KeyshareCreatedFilterBuffer;
+use crate::actors::DecryptionshareCreatedBuffer;
+use crate::actors::KeyshareCreatedFilterBuffer;
+use crate::domain::committee::committee_addresses_from_nodes;
 use crate::{
     PublicKeyAggregator, PublicKeyAggregatorParams, PublicKeyAggregatorState,
     PublicKeyRepositoryFactory, ThresholdPlaintextAggregator, ThresholdPlaintextAggregatorParams,
@@ -157,8 +157,7 @@ fn create_publickey_aggregator(
             },
             sync_state,
         )
-        .start()
-        .into(),
+        .start(),
     )
     .start()
     .into()
@@ -234,7 +233,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
             };
             match addrs {
                 Ok(addrs) => {
-                    let _ = ctx.set_dependency(COMMITTEE_ADDRESSES_KEY, addrs);
+                    ctx.set_dependency(COMMITTEE_ADDRESSES_KEY, addrs);
                     if data.honest_committee_addresses.is_empty() {
                         self.bus.err(
                             EType::PlaintextAggregation,
@@ -242,7 +241,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                         );
                         return;
                     }
-                    let _ = ctx.set_dependency(
+                    ctx.set_dependency(
                         HONEST_COMMITTEE_ADDRESSES_KEY,
                         data.honest_committee_addresses.clone(),
                     );
@@ -267,7 +266,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
             return;
         };
 
-        let Some(ref meta) = ctx.get_dependency(META_KEY) else {
+        let Some(meta) = ctx.get_dependency(META_KEY) else {
             self.bus.err(
                 EType::PlaintextAggregation,
                 anyhow!(ERROR_TRBFV_PLAINTEXT_META_MISSING),

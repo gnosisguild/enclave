@@ -5,18 +5,19 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    correlator::Correlator,
-    direct_responder::{ChannelType, DirectResponder},
-    events::{IncomingResponse, OutgoingRequest, ProtocolResponse},
-    net_interface_handle::NetInterfaceHandle,
-};
-use crate::{
     dialer::dial_peers,
     events::{
         GossipData, IncomingRequest, NetCommand, NetEvent, OutgoingRequestFailed,
         OutgoingRequestSucceeded, PeerTarget, PutOrStoreError,
     },
     ContentHash,
+};
+use crate::{
+    direct_responder::{ChannelType, DirectResponder},
+    domain::{correlator::Correlator, peer_failure_tracker::PeerFailureTracker},
+    events::{IncomingResponse, OutgoingRequest, ProtocolResponse},
+    keypair::Libp2pKeypair,
+    net_interface_handle::NetInterfaceHandle,
 };
 use anyhow::{bail, Context, Result};
 use e3_events::CorrelationId;
@@ -26,7 +27,7 @@ use libp2p::{
     futures::StreamExt,
     gossipsub,
     identify::{Behaviour as IdentifyBehaviour, Config as IdentifyConfig},
-    identity::{ed25519, Keypair},
+    identity::Keypair,
     kad::{
         self,
         store::{MemoryStore, MemoryStoreConfig, RecordStore},
@@ -39,11 +40,10 @@ use libp2p::{
         ProtocolSupport,
     },
     swarm::{dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent},
-    Multiaddr, PeerId, StreamProtocol, Swarm,
+    Multiaddr, StreamProtocol, Swarm,
 };
 use rand::prelude::IteratorRandom;
 use std::{
-    collections::HashMap,
     io::Error,
     sync::Arc,
     time::{Duration, Instant},
@@ -62,7 +62,6 @@ const MAX_GOSSIP_MSG_SIZE_KB: usize = 10240; // 10MB — prod params C6 proofs a
 const MAX_CONSECUTIVE_DIAL_FAILURES: u32 = 40;
 const EVENT_CHANNEL_SIZE: usize = 1000;
 const CMD_CHANNEL_SIZE: usize = 1000;
-const PEER_FAILURE_TTL: Duration = Duration::from_secs(300);
 
 /// Returns true if the multiaddr contains a loopback IP (127.0.0.0/8 or ::1).
 /// Loopback addresses are only meaningful on the local machine and must not be
@@ -244,33 +243,6 @@ impl Libp2pNetInterface {
     }
 }
 
-pub struct Libp2pKeypair {
-    keypair: libp2p::identity::Keypair,
-}
-
-impl Libp2pKeypair {
-    pub fn new(keypair: libp2p::identity::Keypair) -> Self {
-        Self { keypair }
-    }
-
-    pub fn generate() -> Self {
-        let id = libp2p::identity::Keypair::generate_ed25519();
-        Self::new(id)
-    }
-
-    pub fn try_from_bytes(bytes: &mut [u8]) -> Result<Self> {
-        let keypair: libp2p::identity::Keypair =
-            ed25519::Keypair::try_from_bytes(bytes)?.try_into()?;
-        Ok(Self { keypair })
-    }
-
-    pub fn into_keypair(self) -> libp2p::identity::Keypair {
-        self.keypair
-    }
-    pub fn peer_id(&self) -> PeerId {
-        self.keypair.public().to_peer_id()
-    }
-}
 /// Create the libp2p behaviour
 fn create_behaviour(
     key: &Keypair,
@@ -969,42 +941,6 @@ fn handle_response(swarm: &mut Swarm<NodeBehaviour>, responder: DirectResponder)
         .send_response(channel, response)
         .map_err(|payload| anyhow::anyhow!("Failed to send response: {:?}", payload))?;
     Ok(())
-}
-
-/// Tracks consecutive connection failures per peer to detect and evict stale peers.
-/// Entries are automatically cleaned up after PEER_FAILURE_TTL to prevent unbounded growth.
-struct PeerFailureTracker {
-    failures: HashMap<PeerId, (u32, Instant)>,
-}
-
-impl PeerFailureTracker {
-    fn new() -> Self {
-        Self {
-            failures: HashMap::new(),
-        }
-    }
-
-    /// Record a failure for the given peer and return the new consecutive failure count.
-    fn record_failure(&mut self, peer_id: &PeerId) -> u32 {
-        self.cleanup_stale();
-        let now = Instant::now();
-        let entry = self.failures.entry(*peer_id).or_insert((0, now));
-        entry.0 += 1;
-        entry.1 = now;
-        entry.0
-    }
-
-    /// Reset the failure count for a peer (e.g. on successful connection or after eviction).
-    fn reset(&mut self, peer_id: &PeerId) {
-        self.failures.remove(peer_id);
-    }
-
-    /// Remove entries older than PEER_FAILURE_TTL to prevent unbounded growth
-    fn cleanup_stale(&mut self) {
-        let now = Instant::now();
-        self.failures
-            .retain(|_, (_, last_seen)| now.duration_since(*last_seen) < PEER_FAILURE_TTL);
-    }
 }
 
 #[cfg(test)]
