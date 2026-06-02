@@ -12,7 +12,9 @@
 //! CLI command. Production deployments should use a proper deployment artifact
 //! file instead of this compile-time approach.
 
-use alloy::primitives::Address;
+use alloy::hex::FromHex;
+use alloy::primitives::{Address, FixedBytes};
+use alloy::signers::local::PrivateKeySigner;
 use anyhow::{anyhow, bail, Result};
 use e3_config::load_config;
 use e3_config::AppConfig;
@@ -49,8 +51,17 @@ pub fn validate_eth_address(address: &String) -> Result<()> {
     }
 }
 
+/// Derive the node's Ethereum address from its private key. Mirrors the
+/// derivation in `e3_entrypoint::wallet::set` so the value written to the
+/// config matches the address stored in the keystore.
+pub fn derive_address(private_key: &str) -> Result<Address> {
+    let bytes = FixedBytes::<32>::from_hex(private_key)
+        .map_err(|e| anyhow!("Invalid private key: {}", e))?;
+    Ok(PrivateKeySigner::from_bytes(&bytes)?.address())
+}
+
 #[instrument(name = "app", skip_all)]
-pub fn execute(rpc_url: &str, config_dir: &PathBuf) -> Result<AppConfig> {
+pub fn execute(rpc_url: &str, address: &Address, config_dir: &PathBuf) -> Result<AppConfig> {
     fs::create_dir_all(config_dir)?;
 
     let config_path = config_dir.join("enclave.config.yaml");
@@ -61,6 +72,7 @@ pub fn execute(rpc_url: &str, config_dir: &PathBuf) -> Result<AppConfig> {
 node:
   peers:
     - "{}"
+  address: "{}"
 chains:
   - name: "devnet"
     rpc_url: "{}"
@@ -79,6 +91,7 @@ chains:
         deploy_block: {}
 "#,
         BOOTSTRAP_PEER,
+        address,
         rpc_url,
         get_contract_info("Enclave")?.address,
         get_contract_info("Enclave")?.deploy_block,

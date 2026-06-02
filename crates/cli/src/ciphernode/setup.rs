@@ -59,8 +59,12 @@ pub async fn execute(
         .interact_text()?
         .into();
 
+    // Derive the node address from the private key so it can be written into
+    // the generated config (the loader reads it from `node.address`).
+    let node_address = setup::derive_address(&private_key)?;
+
     // Execute
-    let config = setup::execute(&rpc_url, &config_dir)?;
+    let config = setup::execute(&rpc_url, &node_address, &config_dir)?;
 
     e3_entrypoint::password::set::preflight(&config).await?;
     e3_entrypoint::password::set::execute(&config, pw).await?;
