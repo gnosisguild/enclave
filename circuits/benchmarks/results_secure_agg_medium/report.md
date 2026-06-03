@@ -1,9 +1,9 @@
 # Enclave ZK Circuit Benchmarks
 
-**Generated:** 2026-06-03 11:53:20 UTC
+**Generated:** 2026-06-03 18:04:01 UTC
 
-**Git Branch:** `main`  
-**Git Commit:** `a9ed545dc11fd260d1f1f1516c8d7caffe2f1e02`
+**Git Branch:** `bench/medium-3mod`  
+**Git Commit:** `80a221f2152a8cf4cc4d65d0905c555d18da1f02`
 
 **Committee Size:** `H=8`, `N=10`, `T=4`
 
@@ -72,35 +72,35 @@ Single-circuit `bb prove` on the benchmark oracle witness (not the integration a
 
 | Circuit              | Constraints | Prove (s) | Verify (ms) | Proof (KB) |
 | -------------------- | ----------- | --------- | ----------- | ---------- |
-| C0                   | 287764      | 1.49      | 23.95       | 15.88      |
-| C1                   | 1394755     | 5.42      | 26.12       | 15.88      |
-| C2a                  | 3212793     | 10.98     | 28.18       | 15.88      |
-| C2b                  | 3972121     | 11.71     | 26.37       | 15.88      |
-| C3a                  | 3563521     | 11.60     | 26.37       | 15.88      |
-| C3b                  | 3563521     | 11.60     | 26.37       | 15.88      |
-| C4a                  | 2077731     | 6.29      | 26.02       | 15.88      |
-| C4b                  | 2077731     | 6.29      | 26.02       | 15.88      |
-| C5                   | 4050492     | 12.12     | 29.21       | 15.88      |
-| user_data_encryption | 1169783     | 5.22      | 26.55       | 15.88      |
-| C6                   | 2002335     | 6.36      | 25.29       | 15.88      |
-| C7                   | 146290      | 0.80      | 27.17       | 15.88      |
+| C0                   | 287764      | 1.42      | 24.34       | 15.88      |
+| C1                   | 2432076     | 9.28      | 25.01       | 15.88      |
+| C2a                  | 4813061     | 17.97     | 24.23       | 15.88      |
+| C2b                  | 6255714     | 20.59     | 24.25       | 15.88      |
+| C3a                  | 3563517     | 10.72     | 24.68       | 15.88      |
+| C3b                  | 3563517     | 10.72     | 24.68       | 15.88      |
+| C4a                  | 3115129     | 10.19     | 25.03       | 15.88      |
+| C4b                  | 3115129     | 10.19     | 25.03       | 15.88      |
+| C5                   | 6073618     | 20.41     | 25.71       | 15.88      |
+| user_data_encryption | 1688723     | 5.74      | 25.35       | 15.88      |
+| C6                   | 3001845     | 10.24     | 25.30       | 15.88      |
+| C7                   | 191104      | 0.86      | 26.53       | 15.88      |
 
 ### Artifacts
 
 | Artifact | Proof size | Public input size | Verify gas | Calldata gas | Total gas |
 | -------- | ---------- | ----------------- | ---------- | ------------ | --------- |
-| Π_DKG    | 10.69 KB   | 0.94 KB           | 3154355    | 181908       | 3336263   |
-| Π_user   | 15.88 KB   | 0.12 KB           | 2973013    | 193324       | 3166337   |
-| Π_dec    | 10.69 KB   | 3.75 KB           | 3658609    | 190896       | 3849505   |
+| Π_DKG    | 10.69 KB   | 0.94 KB           | 3154367    | 181920       | 3336287   |
+| Π_user   | 15.88 KB   | 0.12 KB           | 2972929    | 193348       | 3166277   |
+| Π_dec    | 10.69 KB   | 3.75 KB           | 3658402    | 190692       | 3849094   |
 
 ### Role / Phase / Activity
 
 | Role            | Phase | Activity                                  | Metric         | Duration  | Proof size | Bandwidth |
 | --------------- | ----- | ----------------------------------------- | -------------- | --------- | ---------- | --------- |
-| Each ciphernode | P1    | one-time DKG participation (test harness) | wall_clock     | 4482.84 s | 127.00 KB  | 129.69 KB |
+| Each ciphernode | P1    | one-time DKG participation (test harness) | wall_clock     | 4482.84 s | 127.00 KB  | 130.81 KB |
 | Aggregator      | P2    | C5 + Π_DKG fold (aggregator span)         | wall_clock     | 1001.54 s | 10.69 KB   | 11.62 KB  |
-| User            | P3    | per user input                            | isolated_nargo | 8.52 s    | 15.88 KB   | 16.00 KB  |
-| Each ciphernode | P4    | per computation output (C6)               | isolated_nargo | 6.36 s    | 15.88 KB   | 16.00 KB  |
+| User            | P3    | per user input                            | isolated_nargo | 10.95 s   | 15.88 KB   | 16.00 KB  |
+| Each ciphernode | P4    | per computation output (C6)               | isolated_nargo | 10.24 s   | 15.88 KB   | 16.00 KB  |
 | Aggregator      | P4    | C7 + Π_dec fold (full publish→aggregate)  | wall_clock     | 269.96 s  | 10.69 KB   | 14.44 KB  |
 | Aggregator      | P4    | C7 + fold only (pending→plaintext span)   | wall_clock     | 87.48 s   | 10.69 KB   | 14.44 KB  |
 

@@ -38,15 +38,15 @@ pub mod secure_8192 {
 
     /// Threshold BFV parameters
     pub mod threshold {
-        pub const PLAINTEXT_MODULUS: u64 = 129;
-        pub const MODULI: &[u64] = &[0x10000000010dc001, 0x1000000000dac001];
-        pub const ERROR1_VARIANCE: &str = "4326914048779023023775413607683413333";
+        pub const PLAINTEXT_MODULUS: u64 = 1000000;
+        pub const MODULI: &[u64] = &[0x0800000000db4001, 0x0800000000d54001, 0x0800000000cbc001];
+        pub const ERROR1_VARIANCE: &str = "4645988583027213154486607973468408647079253333";
     }
 
     /// DKG parameters
     pub mod dkg {
-        pub const PLAINTEXT_MODULUS: u64 = 1152921504624525313;
-        pub const MODULI: &[u64] = &[0x24c2230d75cdc001, 0x260dfc1463740001];
+        pub const PLAINTEXT_MODULUS: u64 = 576460752317792257;
+        pub const MODULI: &[u64] = &[0x2000000000104001, 0x200000000013c001];
         pub const ERROR1_VARIANCE: &str = "10";
     }
 }
@@ -58,8 +58,8 @@ pub mod search_defaults {
     pub const B: u128 = 20;
     pub const B_CHI: u128 = 1;
     pub const SEARCH_N: u128 = 10;
-    pub const SEARCH_K: u128 = 129;
-    pub const SEARCH_Z: u128 = 129;
+    pub const SEARCH_K: u128 = 1000000;
+    pub const SEARCH_Z: u128 = 1000000;
 }
 
 /// Default values for BFV parameters
@@ -72,5 +72,5 @@ pub mod defaults {
     /// Default insecure security parameter (λ).
     pub const DEFAULT_INSECURE_LAMBDA: usize = 2;
     /// Default secure security parameter (λ).
-    pub const DEFAULT_SECURE_LAMBDA: usize = 40;
+    pub const DEFAULT_SECURE_LAMBDA: usize = 55;
 }
