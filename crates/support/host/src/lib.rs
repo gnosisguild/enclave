@@ -103,41 +103,47 @@ fn env_opt_secs(key: &str) -> Option<u64> {
 }
 
 /// Build the OfferParams from environment variables, using sensible defaults.
-///
-/// Pricing is tuned for FHE ciphertext summation (moderate cycle count):
-/// - min_price starts low (0.00005 ETH ≈ $0.13) so early bids stay cheap
-/// - max_price caps at 0.002 ETH ($5) to prevent runaway costs
-/// - 10 min timeout gives provers time to discover the request
-/// - 5 min lock_timeout is ample for FHE sum execution
-/// - 1 min ramp_up starts the reverse Dutch auction quickly
-/// - 2 ZKC collateral is low to attract provers without excessive lockup
-fn build_offer() -> OfferParams {
-    let min_price = env_opt_f64("BOUNDLESS_MIN_PRICE_ETH")
-        .map(|v| parse_ether(&format!("{}", v)).unwrap())
-        .unwrap_or_else(|| parse_ether("0.00005").unwrap());
-    let max_price = env_opt_f64("BOUNDLESS_MAX_PRICE_ETH")
-        .map(|v| parse_ether(&format!("{}", v)).unwrap())
-        .unwrap_or_else(|| parse_ether("0.002").unwrap());
+fn build_offer() -> Result<OfferParams> {
+    let min_price = if let Some(v) = env_opt_f64("BOUNDLESS_MIN_PRICE_ETH") {
+        if v.is_sign_negative() || v.is_nan() {
+            anyhow::bail!("BOUNDLESS_MIN_PRICE_ETH must be a non-negative number, got: {}", v);
+        }
+        parse_ether(&format!("{}", v)).context("Invalid BOUNDLESS_MIN_PRICE_ETH")?
+    } else {
+        parse_ether("0.001").context("Invalid default min_price")?
+    };
+    let max_price = if let Some(v) = env_opt_f64("BOUNDLESS_MAX_PRICE_ETH") {
+        if v.is_sign_negative() || v.is_nan() {
+            anyhow::bail!("BOUNDLESS_MAX_PRICE_ETH must be a non-negative number, got: {}", v);
+        }
+        parse_ether(&format!("{}", v)).context("Invalid BOUNDLESS_MAX_PRICE_ETH")?
+    } else {
+        parse_ether("0.03").context("Invalid default max_price")?
+    };
     let timeout = env_opt_secs("BOUNDLESS_TIMEOUT_SECS")
         .map(|v| v as u32)
-        .unwrap_or(10 * 60);
+        .unwrap_or(20 * 60);
     let lock_timeout = env_opt_secs("BOUNDLESS_LOCK_TIMEOUT_SECS")
         .map(|v| v as u32)
-        .unwrap_or(5 * 60);
+        .unwrap_or(10 * 60);
     let ramp_up = env_opt_secs("BOUNDLESS_RAMP_UP_SECS")
         .map(|v| v as u32)
-        .unwrap_or(1 * 60);
-    let zkc = env_opt_f64("BOUNDLESS_LOCK_COLLATERAL_ZKC").unwrap_or(2.0);
-    let collateral: alloy_primitives::U256 = parse_units(&format!("{}", zkc), 18).unwrap().into();
+        .unwrap_or(2 * 60);
+    let zkc = env_opt_f64("BOUNDLESS_LOCK_COLLATERAL_ZKC").unwrap_or(5.0);
+    if zkc.is_sign_negative() || zkc.is_nan() {
+        anyhow::bail!("BOUNDLESS_LOCK_COLLATERAL_ZKC must be a non-negative number, got: {}", zkc);
+    }
+    let collateral: alloy_primitives::U256 =
+        parse_units(&format!("{}", zkc), 18).context("Invalid BOUNDLESS_LOCK_COLLATERAL_ZKC")?.into();
 
-    OfferParams::builder()
+    Ok(OfferParams::builder()
         .min_price(min_price)
         .max_price(max_price)
         .timeout(timeout)
         .lock_timeout(lock_timeout)
         .ramp_up_period(ramp_up)
         .lock_collateral(collateral)
-        .into()
+        .into())
 }
 
 async fn boundless_prove(input: &ComputeInput) -> BoundlessOutput {
@@ -207,7 +213,7 @@ async fn boundless_prove_inner(input: &ComputeInput) -> Result<BoundlessOutput> 
             .with_program_url(parsed_url)
             .context("Failed to create new request")?
             .with_stdin(input_bytes)
-            .with_offer(build_offer())
+            .with_offer(build_offer()?)
     } else {
         println!(
             "Warning: Uploading {}MB program at runtime",
@@ -217,7 +223,7 @@ async fn boundless_prove_inner(input: &ComputeInput) -> Result<BoundlessOutput> 
             .new_request()
             .with_program(PROGRAM_ELF)
             .with_stdin(input_bytes)
-            .with_offer(build_offer())
+            .with_offer(build_offer()?)
     };
 
     let onchain =

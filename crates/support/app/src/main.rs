@@ -33,10 +33,7 @@ async fn call_webhook(callback_url: &str, payload: &WebhookPayload) -> anyhow::R
         status_label, ciphertext_len, proof_len
     );
 
-    let json_payload = serde_json::to_string_pretty(payload)?;
-    println!("Sending webhook payload:");
-    println!("{}", json_payload);
-    println!("callback_url: {}", callback_url);
+    println!("Sending webhook to: {}", callback_url);
 
     let response = reqwest::Client::new()
         .post(callback_url)
