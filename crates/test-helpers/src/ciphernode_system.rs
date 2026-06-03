@@ -8,7 +8,7 @@ use crate::simulate_libp2p_net;
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
-use e3_ciphernode_builder::{CiphernodeHandle, NetInterfaceKind};
+use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::Event;
 use e3_events::{EnclaveEvent, GetEvents, ResetHistory, TakeEvents};
 use std::time::Instant;
@@ -353,7 +353,7 @@ impl Deref for CiphernodeHistory {
 mod tests {
     use super::*;
     use actix::prelude::*;
-    use e3_ciphernode_builder::EventSystem;
+    use e3_ciphernode_builder::{EventSystem, NetInterfaceKind};
     use e3_data::InMemStore;
     use e3_events::{EventBus, EventBusConfig};
     use libp2p::PeerId;

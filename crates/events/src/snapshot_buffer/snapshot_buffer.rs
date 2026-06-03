@@ -200,7 +200,7 @@ mod tests {
     use crate::snapshot_buffer::timelock_queue::Tick;
     use crate::{
         AggregateConfig, AggregateId, E3id, EnclaveEvent, EventContext, EventContextAccessors,
-        EventContextSeq, EventId, EventSource, Insert, InsertBatch, Sequenced, SyncEnded,
+        EventContextSeq, EventId, EventSource, Insert, InsertBatch, Sequenced, Shutdown, SyncEnded,
         TestEvent,
     };
     use actix::Actor;
@@ -331,6 +331,57 @@ mod tests {
         assert_eq!(1, batches.len());
         let InsertBatch(inserts) = batches.first().unwrap();
         assert_eq!(5, inserts.len()); // Have 5 inserts as sequence,block and ts get written
+
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_shutdown_force_flushes_open_batches() -> Result<()> {
+        // An open, debounced batch whose timelock has NOT fired must still be
+        // committed when a Shutdown event arrives, instead of being lost in the
+        // durability window (H2/GF-5).
+        let mut delays = HashMap::new();
+        // Large delays so batches would never flush via the timelock here.
+        delays.insert(AggregateId::new(0), Duration::from_micros(1_000_000));
+        delays.insert(AggregateId::new(7), Duration::from_micros(1_000_000));
+
+        let config = &AggregateConfig::new(delays);
+        let store = mock_store::MockStore::default().start();
+        let clock = Arc::new(MockClock::new(1000));
+        let (buffer, timelock) =
+            SnapshotBuffer::with_clock(config, store.clone(), clock.clone(), None)?;
+
+        // Turn the buffer on (opens a batch for seq=1).
+        buffer
+            .send(EnclaveEvent::from_data_ec(
+                SyncEnded::new().into(),
+                create_ec(0, 1),
+            ))
+            .await?;
+
+        // Open another batch for aggregate 7 at seq=2 (creates seq/block/ts inserts).
+        buffer.send(create_event(&create_ec(7, 2))).await?;
+
+        // Neither timelock has expired, so a Tick flushes nothing.
+        timelock.send(Tick).await?;
+        let batches = store.send(GetEvts).await?;
+        assert_eq!(
+            0,
+            batches.len(),
+            "batches should still be open before shutdown"
+        );
+
+        // Shutdown arrives: every open batch must be force-flushed.
+        buffer
+            .send(EnclaveEvent::from_data_ec(Shutdown.into(), create_ec(7, 3)))
+            .await?;
+
+        let batches = store.send(GetEvts).await?;
+        assert_eq!(
+            2,
+            batches.len(),
+            "shutdown should force-flush both open batches"
+        );
 
         Ok(())
     }

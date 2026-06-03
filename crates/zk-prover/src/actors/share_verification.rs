@@ -30,7 +30,6 @@ use e3_events::{
     BusHandle, CommitmentConsistencyCheckComplete, CommitmentConsistencyCheckRequested,
     ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind, CorrelationId, E3id,
     EnclaveEvent, EnclaveEventData, EventContext, EventPublisher, EventSubscriber, EventType,
-    PartyProofData, PartyProofsToVerify, PartyShareDecryptionProofsToVerify,
     PartyVerificationResult, ProofType, ProofVerificationFailed, ProofVerificationPassed,
     Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed,
     SignedProofPayload, TypedEvent, VerificationKind, VerifyShareDecryptionProofsRequest,
@@ -40,121 +39,10 @@ use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
 
-/// Trait for party types whose signed proofs can be ECDSA-validated and ZK-verified.
-trait VerifiableParty: Clone {
-    fn party_id(&self) -> u64;
-    fn signed_proofs(&self) -> Vec<SignedProofPayload>;
-}
-
-impl VerifiableParty for PartyProofsToVerify {
-    fn party_id(&self) -> u64 {
-        self.sender_party_id
-    }
-    fn signed_proofs(&self) -> Vec<SignedProofPayload> {
-        self.signed_proofs.clone()
-    }
-}
-
-impl VerifiableParty for PartyShareDecryptionProofsToVerify {
-    fn party_id(&self) -> u64 {
-        self.sender_party_id
-    }
-    fn signed_proofs(&self) -> Vec<SignedProofPayload> {
-        std::iter::once(self.signed_sk_decryption_proof.clone())
-            .chain(self.signed_e_sm_decryption_proofs.iter().cloned())
-            .collect()
-    }
-}
-
-/// ECDSA validation result for a single party.
-struct EcdsaPartyResult {
-    passed: bool,
-    /// The pair (signed_payload, recovered_address) of the first failing proof, if any.
-    failed_payload: Option<(SignedProofPayload, Option<Address>)>,
-}
-
-/// Pending verification state — stored while ZK verification is in flight.
-struct PendingVerification {
-    e3_id: E3id,
-    kind: VerificationKind,
-    ec: EventContext<Sequenced>,
-    /// Parties that failed ECDSA (dishonest before ZK runs).
-    ecdsa_dishonest: HashSet<u64>,
-    /// Pre-dishonest parties from the dispatch (missing/incomplete proofs).
-    pre_dishonest: BTreeSet<u64>,
-    /// Party IDs dispatched for ZK verification (for cross-checking results).
-    dispatched_party_ids: HashSet<u64>,
-    /// Recovered address for each party (from ECDSA step).
-    party_addresses: HashMap<u64, Address>,
-    /// Cached (proof_type, data_hash) per party — for emitting ProofVerificationPassed.
-    party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>>,
-    /// Cached (proof_type, public_signals) per party — for commitment consistency checking.
-    party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
-    /// Parallel to `party_public_signals` — raw `proof.data` per (party, proof_type).
-    /// Needed by `ProofVerificationPassed` so downstream actors can forward
-    /// evidence bytes to the slashing contract.
-    party_proof_data: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
-    /// BFV preset for circuit artifact resolution.
-    params_preset: e3_fhe_params::BfvPreset,
-}
-
-/// Pending consistency check — stored between ECDSA pass and ZK dispatch.
-///
-/// After ECDSA validation, the actor publishes
-/// [`CommitmentConsistencyCheckRequested`] and waits for the checker's
-/// response. This struct buffers the ECDSA results and the original party
-/// proofs so that ZK verification can be dispatched once the consistency
-/// check completes.
-///
-/// Several fields overlap with [`PendingVerification`] (e3_id, kind, ec,
-/// party_addresses, party_proof_hashes, party_public_signals). When the
-/// consistency check completes, they are transferred to a new
-/// `PendingVerification` entry for the ZK phase.
-struct PendingConsistencyCheck {
-    e3_id: E3id,
-    kind: VerificationKind,
-    ec: EventContext<Sequenced>,
-    /// Parties that failed ECDSA (dishonest before consistency runs).
-    ecdsa_dishonest: HashSet<u64>,
-    /// Pre-dishonest parties from the dispatch (missing/incomplete proofs).
-    pre_dishonest: BTreeSet<u64>,
-    /// Recovered address per ECDSA-passed party.
-    party_addresses: HashMap<u64, Address>,
-    /// (proof_type, data_hash) per party — for ProofVerificationPassed after ZK.
-    party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>>,
-    /// (proof_type, public_signals) per party — for consistency & ZK.
-    party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
-    /// Parallel to `party_public_signals` — raw `proof.data` per (party, proof_type).
-    /// Needed by `ProofVerificationPassed` so downstream actors can forward
-    /// evidence bytes to the slashing contract.
-    party_proof_data: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
-    /// Original ECDSA-passed share proofs for ZK dispatch.
-    /// Populated for ShareProofs / ThresholdDecryptionProofs / PkGenerationProofs.
-    ecdsa_passed_share_proofs: Vec<PartyProofsToVerify>,
-    /// Original ECDSA-passed decryption proofs for ZK dispatch.
-    /// Populated for DecryptionProofs.
-    ecdsa_passed_decryption_proofs: Vec<PartyShareDecryptionProofsToVerify>,
-    /// BFV preset for circuit artifact resolution.
-    params_preset: e3_fhe_params::BfvPreset,
-}
-
-/// Filter out inconsistent parties and collect dispatched party IDs.
-/// Returns `None` if all parties were filtered out (nothing to verify).
-fn filter_consistent<P>(
-    proofs: Vec<P>,
-    inconsistent: &BTreeSet<u64>,
-    party_id_of: impl Fn(&P) -> u64,
-) -> Option<(Vec<P>, HashSet<u64>)> {
-    let passed: Vec<P> = proofs
-        .into_iter()
-        .filter(|p| !inconsistent.contains(&party_id_of(p)))
-        .collect();
-    if passed.is_empty() {
-        return None;
-    }
-    let ids = passed.iter().map(|p| party_id_of(p)).collect();
-    Some((passed, ids))
-}
+use crate::domain::share_verification::{
+    filter_consistent, label_for, PendingConsistencyCheck, PendingVerification, ShareVerifier,
+    VerifiableParty, ZkPartyEmission,
+};
 
 /// Actor that handles C1/C2/C3/C4/C6 share proof verification.
 ///
@@ -256,137 +144,48 @@ impl ShareVerificationActor {
         store_passed_proofs: impl FnOnce(&mut PendingConsistencyCheck, Vec<P>),
     ) {
         let e3_id_str = e3_id.to_string();
-        let label = match &kind {
-            VerificationKind::ShareProofs => "C2/C3",
-            VerificationKind::ThresholdDecryptionProofs => "C6",
-            VerificationKind::PkGenerationProofs => "C1",
-            VerificationKind::DecryptionProofs => "C4",
-        };
-        let mut ecdsa_dishonest = HashSet::new();
-        let mut ecdsa_passed_parties = Vec::new();
-        let mut party_addresses: HashMap<u64, Address> = HashMap::new();
+        let label = label_for(&kind);
 
-        for party in &party_proofs {
-            let proofs = party.signed_proofs();
-            let result =
-                self.ecdsa_validate_signed_proofs(party.party_id(), &proofs, &e3_id_str, label);
-            if result.passed {
-                ecdsa_passed_parties.push(party.clone());
-            } else {
-                ecdsa_dishonest.insert(party.party_id());
-                if let Some((ref signed, addr)) = result.failed_payload {
-                    self.emit_signed_proof_failed(&e3_id, signed, addr, party.party_id(), &ec);
-                }
-            }
+        // Pure ECDSA validation + proof-commitment preparation lives in the
+        // domain service; the actor only emits failures, stores pending state,
+        // and publishes the consistency-check request.
+        let outcome = ShareVerifier::validate_and_prepare(&party_proofs, &e3_id_str, label);
+
+        for failure in &outcome.failures {
+            self.emit_signed_proof_failed(
+                &e3_id,
+                &failure.signed,
+                failure.recovered,
+                failure.party_id,
+                &ec,
+            );
         }
 
-        // Store recovered addresses for passed parties
-        for party in &party_proofs {
-            if !ecdsa_dishonest.contains(&party.party_id()) {
-                let proofs = party.signed_proofs();
-                if let Some(first_signed) = proofs.first() {
-                    if let Ok(addr) = first_signed.recover_address() {
-                        party_addresses.insert(party.party_id(), addr);
-                    }
-                }
-            }
-        }
-
-        if ecdsa_passed_parties.is_empty() {
+        if outcome.ecdsa_passed_parties.is_empty() {
             // All parties failed ECDSA — publish result immediately
             let mut all_dishonest: BTreeSet<u64> = pre_dishonest;
-            all_dishonest.extend(ecdsa_dishonest);
+            all_dishonest.extend(outcome.ecdsa_dishonest);
             self.publish_complete(e3_id, kind, all_dishonest, ec);
             return;
         }
 
-        // Compute proof hashes and public signals for ECDSA-passed parties
-        let mut party_proof_hashes: HashMap<u64, Vec<(ProofType, [u8; 32])>> = HashMap::new();
-        let mut party_public_signals: HashMap<u64, Vec<(ProofType, ArcBytes)>> = HashMap::new();
-        let mut party_raw_proof_data: HashMap<u64, Vec<(ProofType, ArcBytes)>> = HashMap::new();
-        for party in &ecdsa_passed_parties {
-            let hashes: Vec<(ProofType, [u8; 32])> = party
-                .signed_proofs()
-                .iter()
-                .map(|signed| {
-                    let msg = (
-                        Bytes::copy_from_slice(&signed.payload.proof.data),
-                        Bytes::copy_from_slice(&signed.payload.proof.public_signals),
-                    )
-                        .abi_encode();
-                    (signed.payload.proof_type, keccak256(&msg).into())
-                })
-                .collect();
-            let signals: Vec<(ProofType, ArcBytes)> = party
-                .signed_proofs()
-                .iter()
-                .map(|signed| {
-                    (
-                        signed.payload.proof_type,
-                        signed.payload.proof.public_signals.clone(),
-                    )
-                })
-                .collect();
-            let datas: Vec<(ProofType, ArcBytes)> = party
-                .signed_proofs()
-                .iter()
-                .map(|signed| (signed.payload.proof_type, signed.payload.proof.data.clone()))
-                .collect();
-            party_proof_hashes.insert(party.party_id(), hashes);
-            party_public_signals.insert(party.party_id(), signals);
-            party_raw_proof_data.insert(party.party_id(), datas);
-        }
-
-        // Build consistency check request
-        let correlation_id = CorrelationId::new();
-        let party_proof_data: Vec<PartyProofData> = ecdsa_passed_parties
-            .iter()
-            .map(|party| {
-                let signals = party_public_signals
-                    .get(&party.party_id())
-                    .cloned()
-                    .unwrap_or_default();
-                let hashes = party_proof_hashes
-                    .get(&party.party_id())
-                    .cloned()
-                    .unwrap_or_default();
-                let raw_datas = party_raw_proof_data
-                    .get(&party.party_id())
-                    .cloned()
-                    .unwrap_or_default();
-                let proofs = signals
-                    .into_iter()
-                    .zip(hashes)
-                    .zip(raw_datas)
-                    .map(|(((pt, ps), (_, dh)), (_, pd))| (pt, ps, dh, pd))
-                    .collect();
-                PartyProofData {
-                    party_id: party.party_id(),
-                    address: party_addresses
-                        .get(&party.party_id())
-                        .copied()
-                        .unwrap_or_default(),
-                    proofs,
-                }
-            })
-            .collect();
-
         // Store pending consistency check with the original party proofs
+        let correlation_id = CorrelationId::new();
         let mut pending = PendingConsistencyCheck {
             e3_id: e3_id.clone(),
             kind: kind.clone(),
             ec: ec.clone(),
-            ecdsa_dishonest,
+            ecdsa_dishonest: outcome.ecdsa_dishonest,
             pre_dishonest,
-            party_addresses,
-            party_proof_hashes,
-            party_public_signals,
-            party_proof_data: party_raw_proof_data,
+            party_addresses: outcome.party_addresses,
+            party_proof_hashes: outcome.party_proof_hashes,
+            party_public_signals: outcome.party_public_signals,
+            party_proof_data: outcome.party_proof_data,
             ecdsa_passed_share_proofs: Vec::new(),
             ecdsa_passed_decryption_proofs: Vec::new(),
             params_preset,
         };
-        store_passed_proofs(&mut pending, ecdsa_passed_parties);
+        store_passed_proofs(&mut pending, outcome.ecdsa_passed_parties);
         self.pending_consistency.insert(correlation_id, pending);
 
         // Publish consistency check request
@@ -395,7 +194,7 @@ impl ShareVerificationActor {
                 e3_id: e3_id.clone(),
                 kind: kind.clone(),
                 correlation_id,
-                party_proofs: party_proof_data,
+                party_proofs: outcome.consistency_party_data,
             },
             ec.clone(),
         ) {
@@ -430,12 +229,7 @@ impl ShareVerificationActor {
             return; // Not our correlation ID
         };
 
-        let label = match &pending.kind {
-            VerificationKind::ShareProofs => "C2/C3",
-            VerificationKind::ThresholdDecryptionProofs => "C6",
-            VerificationKind::PkGenerationProofs => "C1",
-            VerificationKind::DecryptionProofs => "C4",
-        };
+        let label = label_for(&pending.kind);
 
         if !data.inconsistent_parties.is_empty() {
             warn!(
@@ -571,84 +365,6 @@ impl ShareVerificationActor {
         }
     }
 
-    /// Validate ECDSA properties for a set of signed proofs from one party:
-    /// 1. e3_id match
-    /// 2. Signature recovery (valid ECDSA)
-    /// 3. Signer consistency (all proofs from same address)
-    /// 4. Circuit name matches expected ProofType circuits
-    fn ecdsa_validate_signed_proofs(
-        &self,
-        sender_party_id: u64,
-        signed_proofs: &[SignedProofPayload],
-        e3_id_str: &str,
-        label: &str,
-    ) -> EcdsaPartyResult {
-        let mut expected_addr: Option<Address> = None;
-
-        for signed in signed_proofs {
-            // 1. e3_id match
-            if signed.payload.e3_id.to_string() != e3_id_str {
-                info!(
-                    "{} proof from party {} has wrong e3_id ({} vs {})",
-                    label, sender_party_id, signed.payload.e3_id, e3_id_str
-                );
-                return EcdsaPartyResult {
-                    passed: false,
-                    failed_payload: Some((signed.clone(), expected_addr)),
-                };
-            }
-
-            // 2. Signature recovery
-            match signed.recover_address() {
-                Ok(addr) => {
-                    // 3. Signer consistency
-                    match &expected_addr {
-                        Some(ea) if *ea != addr => {
-                            info!(
-                                "{} inconsistent signer for party {}",
-                                label, sender_party_id
-                            );
-                            return EcdsaPartyResult {
-                                passed: false,
-                                failed_payload: Some((signed.clone(), Some(addr))),
-                            };
-                        }
-                        None => expected_addr = Some(addr),
-                        _ => {}
-                    }
-                }
-                Err(e) => {
-                    info!(
-                        "{} signature recovery failed for party {} ({:?}): {}",
-                        label, sender_party_id, signed.payload.proof_type, e
-                    );
-                    return EcdsaPartyResult {
-                        passed: false,
-                        failed_payload: Some((signed.clone(), expected_addr)),
-                    };
-                }
-            }
-
-            // 4. Circuit name validation
-            let expected_circuits = signed.payload.proof_type.circuit_names();
-            if !expected_circuits.contains(&signed.payload.proof.circuit) {
-                info!(
-                    "{} circuit mismatch for party {}: expected {:?}, got {:?}",
-                    label, sender_party_id, expected_circuits, signed.payload.proof.circuit
-                );
-                return EcdsaPartyResult {
-                    passed: false,
-                    failed_payload: Some((signed.clone(), expected_addr)),
-                };
-            }
-        }
-
-        EcdsaPartyResult {
-            passed: true,
-            failed_payload: None,
-        }
-    }
-
     /// Handle ZK verification response from multithread.
     fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) {
         let (msg, _ec) = msg.into_components();
@@ -679,91 +395,67 @@ impl ShareVerificationActor {
             }
         };
 
-        let mut all_dishonest: BTreeSet<u64> = pending.pre_dishonest;
-        all_dishonest.extend(&pending.ecdsa_dishonest);
+        // Pure tally (dishonest accounting + emission decisions) lives in the
+        // domain service; the actor performs the resulting bus publishes.
+        let tally = ShareVerifier::tally_zk_results(
+            pending.pre_dishonest,
+            &pending.ecdsa_dishonest,
+            &pending.dispatched_party_ids,
+            &zk_results,
+        );
 
-        // Cross-check: every dispatched party must appear in results.
-        // If any party is missing from the ZK response, treat as dishonest (defense-in-depth).
-        let returned_party_ids: HashSet<u64> =
-            zk_results.iter().map(|r| r.sender_party_id).collect();
-        for &dispatched_pid in &pending.dispatched_party_ids {
-            if !returned_party_ids.contains(&dispatched_pid) {
-                warn!(
-                    "Party {} was dispatched for ZK verification but missing from results — treating as dishonest",
-                    dispatched_pid
-                );
-                all_dishonest.insert(dispatched_pid);
-            }
-        }
-
-        for result in &zk_results {
-            // Ignore results for parties we never dispatched (defense-in-depth)
-            if !pending
-                .dispatched_party_ids
-                .contains(&result.sender_party_id)
-            {
-                warn!(
-                    "ZK result for party {} was not dispatched — ignoring",
-                    result.sender_party_id
-                );
-                continue;
-            }
-            if !result.all_verified {
-                all_dishonest.insert(result.sender_party_id);
-
-                // Emit SignedProofFailed for ZK failure
-                if let Some(ref signed) = result.failed_signed_payload {
-                    let addr = pending
-                        .party_addresses
-                        .get(&result.sender_party_id)
-                        .copied();
+        for emission in tally.emissions {
+            match emission {
+                ZkPartyEmission::Failed { party_id, signed } => {
+                    let addr = pending.party_addresses.get(&party_id).copied();
                     self.emit_signed_proof_failed(
                         &pending.e3_id,
-                        signed,
+                        &signed,
                         addr,
-                        result.sender_party_id,
+                        party_id,
                         &pending.ec,
                     );
                 }
-            } else {
-                // Emit ProofVerificationPassed for each proof type from this party
-                if let Some(hashes) = pending.party_proof_hashes.get(&result.sender_party_id) {
-                    let addr = pending
-                        .party_addresses
-                        .get(&result.sender_party_id)
-                        .copied()
-                        .unwrap_or_default();
-                    let signals = pending.party_public_signals.get(&result.sender_party_id);
-                    let datas = pending.party_proof_data.get(&result.sender_party_id);
-                    for (i, &(proof_type, data_hash)) in hashes.iter().enumerate() {
-                        let public_signals = signals
-                            .and_then(|s| s.get(i))
-                            .map(|(_, ps)| ps.clone())
+                ZkPartyEmission::Passed { party_id } => {
+                    // Emit ProofVerificationPassed for each proof type from this party
+                    if let Some(hashes) = pending.party_proof_hashes.get(&party_id) {
+                        let addr = pending
+                            .party_addresses
+                            .get(&party_id)
+                            .copied()
                             .unwrap_or_default();
-                        let proof_data = datas
-                            .and_then(|d| d.get(i))
-                            .map(|(_, pd)| pd.clone())
-                            .unwrap_or_default();
-                        if let Err(err) = self.bus.publish(
-                            ProofVerificationPassed {
-                                e3_id: pending.e3_id.clone(),
-                                party_id: result.sender_party_id,
-                                address: addr,
-                                proof_type,
-                                data_hash,
-                                public_signals,
-                                proof_data,
-                            },
-                            pending.ec.clone(),
-                        ) {
-                            error!("Failed to publish ProofVerificationPassed: {err}");
+                        let signals = pending.party_public_signals.get(&party_id);
+                        let datas = pending.party_proof_data.get(&party_id);
+                        for (i, &(proof_type, data_hash)) in hashes.iter().enumerate() {
+                            let public_signals = signals
+                                .and_then(|s| s.get(i))
+                                .map(|(_, ps)| ps.clone())
+                                .unwrap_or_default();
+                            let proof_data = datas
+                                .and_then(|d| d.get(i))
+                                .map(|(_, pd)| pd.clone())
+                                .unwrap_or_default();
+                            if let Err(err) = self.bus.publish(
+                                ProofVerificationPassed {
+                                    e3_id: pending.e3_id.clone(),
+                                    party_id,
+                                    address: addr,
+                                    proof_type,
+                                    data_hash,
+                                    public_signals,
+                                    proof_data,
+                                },
+                                pending.ec.clone(),
+                            ) {
+                                error!("Failed to publish ProofVerificationPassed: {err}");
+                            }
                         }
                     }
                 }
             }
         }
 
-        self.publish_complete(pending.e3_id, pending.kind, all_dishonest, pending.ec);
+        self.publish_complete(pending.e3_id, pending.kind, tally.dishonest, pending.ec);
     }
 
     fn emit_signed_proof_failed(

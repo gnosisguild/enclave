@@ -48,6 +48,12 @@ impl EventLog for CommitLogEventLog {
         // Convert 1-indexed sequence to 0-indexed offset
         let mut current_offset = from.saturating_sub(1);
         let mut events = Vec::new();
+        // Sequence number of the first message that failed to deserialize, if any.
+        // A deserialize failure is only tolerable when it is the *tail* of the log
+        // (a torn write from a crash mid-append). If a corrupt entry is followed by
+        // a valid one it is mid-log corruption and replaying past it would silently
+        // diverge actor state, so we halt loudly instead of skipping.
+        let mut corrupt_at: Option<u64> = None;
 
         loop {
             let message_buf = match self
@@ -60,12 +66,29 @@ impl EventLog for CommitLogEventLog {
 
             let mut count = 0;
             for msg in message_buf.iter() {
-                if let Ok(event) = bincode::deserialize::<EnclaveEvent<Unsequenced>>(msg.payload())
-                {
-                    // Convert 0-indexed offset back to 1-indexed sequence number
-                    events.push((msg.offset() + 1, event));
-                } else {
-                    error!("Error deserializing event in read_from... skipping");
+                let seq = msg.offset() + 1;
+                match bincode::deserialize::<EnclaveEvent<Unsequenced>>(msg.payload()) {
+                    Ok(event) => {
+                        if let Some(bad_seq) = corrupt_at {
+                            // We already saw a corrupt entry and now found a valid one
+                            // after it: the corruption is NOT at the tail.
+                            panic!(
+                                "Non-tail corruption in event log: entry at seq {bad_seq} failed \
+                                 to deserialize but is followed by a valid entry at seq {seq}. \
+                                 Replaying past it would silently drop an event. Halting; operator \
+                                 recovery required."
+                            );
+                        }
+                        // Convert 0-indexed offset back to 1-indexed sequence number
+                        events.push((seq, event));
+                    }
+                    Err(_) => {
+                        // Defer the decision: tolerate only if nothing valid follows.
+                        error!("Error deserializing event in read_from at seq {seq}");
+                        if corrupt_at.is_none() {
+                            corrupt_at = Some(seq);
+                        }
+                    }
                 }
                 current_offset = msg.offset() + 1; // Next offset to read from
                 count += 1;
@@ -78,6 +101,11 @@ impl EventLog for CommitLogEventLog {
         }
 
         Box::new(events.into_iter())
+    }
+
+    fn head(&self) -> u64 {
+        // `last_offset` is 0-indexed; convert to a 1-indexed sequence number.
+        self.log.last_offset().map(|o| o + 1).unwrap_or(0)
     }
 }
 
@@ -152,6 +180,37 @@ mod tests {
 
         // Ensure if last message is corrupt we don't end up in an infinite loop
         let _: Vec<_> = log.read_from(1).collect();
+    }
+
+    #[test]
+    #[should_panic(expected = "Non-tail corruption")]
+    fn test_read_from_non_tail_corruption_halts() {
+        let dir = tempdir().unwrap();
+        let mut log = CommitLogEventLog::new(&dir.path().to_path_buf()).unwrap();
+
+        for i in 0..10 {
+            let e = event_from(TestEvent::new("before", i));
+            log.append(&e).unwrap();
+        }
+        // Corrupt entry in the MIDDLE of the log...
+        log.append_bytes(b"I am a bad event!").unwrap();
+        // ...followed by a valid entry, making the corruption non-tail.
+        for i in 0..10 {
+            let e = event_from(TestEvent::new("after", i));
+            log.append(&e).unwrap();
+        }
+
+        let _: Vec<_> = log.read_from(1).collect();
+    }
+
+    #[test]
+    fn test_head_reports_last_sequence() {
+        let dir = tempdir().unwrap();
+        let mut log = CommitLogEventLog::new(&dir.path().to_path_buf()).unwrap();
+        assert_eq!(log.head(), 0);
+        log.append(&event_from(TestEvent::new("one", 1))).unwrap();
+        log.append(&event_from(TestEvent::new("two", 2))).unwrap();
+        assert_eq!(log.head(), 2);
     }
 
     #[test]

@@ -227,6 +227,49 @@ On restart:
 
 ---
 
+## Rust-Side: E3 Lifecycle Coordinator (durable stage tracking)
+
+The node is choreographed — each subsystem reacts to bus events independently — so there is no
+single component that _drives_ the protocol. The `E3LifecycleCoordinator` (in `e3-request`) is an
+**additive, durable observer** that gives the node a single source of truth for "what stage is each
+E3 at?". It never emits protocol events and never drives subsystems; it only records stage and
+supports restart-resume and shutdown awareness.
+
+```
+E3LifecycleCoordinator::attach(bus, store)   (wired in ciphernode_builder.build())
+│
+├─ Loads persisted stage map from Repository(StoreKeys::e3_lifecycle())
+│   → on restart, every in-flight E3's last known stage is rehydrated
+│
+├─ Subscribes to lifecycle-bearing events:
+│     E3Requested              → Requested
+│     CommitteePublished       → CommitteeFinalized
+│     CommitteeFinalized       → CommitteeFinalized
+│     PublicKeyAggregated      → KeyPublished
+│     CiphertextOutputPublished→ CiphertextReady
+│     PlaintextAggregated      → Complete
+│     PlaintextOutputPublished → Complete
+│     E3RequestComplete        → Complete
+│     E3Failed                 → Failed (terminal)
+│     E3StageChanged           → new_stage (authoritative)
+│
+├─ Pure E3LifecycleService.observe(event) → LifecycleDecision:
+│     • Advance is MONOTONIC (forward-only by stage rank)
+│     • Out-of-order earlier-stage events are logged (Regressed) and ignored
+│     • Once Complete/Failed, the stage is frozen (Terminal)
+│   On Advanced/Terminal the snapshot is persisted (set on Persistable)
+│
+└─ On Shutdown event:
+      logs the set of still-active (non-terminal) E3s and their stages,
+      persists the final snapshot, then stops.
+```
+
+The coordinator is safe by construction during EventStore replay: observing a replayed lifecycle
+event simply re-derives the same monotonic stage, so the restored map is identical whether built
+live or from replay.
+
+---
+
 ## Exit Queue Timing
 
 ```

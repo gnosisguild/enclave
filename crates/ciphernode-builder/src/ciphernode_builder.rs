@@ -32,6 +32,7 @@ use e3_net::{
     create_channel_bridge, setup_libp2p_keypair, setup_net, setup_net_interface,
     NetRepositoryFactory,
 };
+use e3_request::E3LifecycleCoordinator;
 use e3_request::E3Router;
 use e3_slashing::{AccusationManagerExtension, CommitmentConsistencyCheckerExtension};
 use e3_sortition::{
@@ -498,6 +499,10 @@ impl CiphernodeBuilder {
         // Setup sortition
         let (sortition, ciphernode_selector) =
             self.setup_sortition(&bus, &repositories, &addr).await?;
+
+        // Setup the durable E3 lifecycle coordinator (additive observer that
+        // tracks each E3's stage for restart-resume awareness and shutdown).
+        E3LifecycleCoordinator::attach(&bus, store.clone()).await?;
 
         // Setup EVM contract event listeners
         let evm_config = self.setup_evm_system(&mut provider_cache, &bus).await?;

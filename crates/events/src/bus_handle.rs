@@ -13,7 +13,7 @@ use tracing::error;
 
 use crate::{
     event_context::EventContext,
-    hlc::{Hlc, HlcMethods},
+    hlc::{Hlc, HlcMethods, HlcTimestamp},
     hlc_factory::HlcFactory,
     sequencer::Sequencer,
     traits::{
@@ -125,6 +125,15 @@ impl BusHandle<Enabled> {
     pub fn ts(&self) -> Result<u128> {
         let ts = self.hlc.tick()?;
         Ok(ts.into())
+    }
+
+    /// Seed the HLC physical-time floor from a persisted, packed HLC timestamp
+    /// so freshly-`tick`ed events after a restart never sort before durable
+    /// history (H15). Pass the highest timestamp recovered from persisted
+    /// aggregate state; only the physical-time component is used.
+    pub fn seed_clock(&self, packed_ts: u128) {
+        let ts = HlcTimestamp::from(packed_ts);
+        self.hlc.seed_physical_floor(ts.ts);
     }
 
     /// Pipe events from this handle to the other handle only when the predicate returns true

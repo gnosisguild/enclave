@@ -24,6 +24,8 @@ use e3_fhe_params::BfvPreset;
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
 
+use crate::domain::proof_verification::validate_external_key;
+
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct ZkVerificationRequest {
@@ -83,65 +85,29 @@ impl ProofVerificationActor {
         ctx: &Context<Self>,
     ) {
         let (msg, ec) = msg.into_components();
-        let Some(ref proof) = msg.key.proof else {
-            error!(
-                "External key from party {} is missing C0 proof - rejecting",
-                msg.key.party_id
-            );
-            return;
-        };
-
-        let signed = match &msg.key.signed_payload {
-            Some(signed) => signed.clone(),
-            None => {
-                error!(
-                    "Key from party {} has no signed payload - rejecting (signed proofs are required)",
-                    msg.key.party_id
-                );
+        let validated = match validate_external_key(
+            msg.key.party_id,
+            msg.key.proof.as_ref(),
+            msg.key.signed_payload.as_ref(),
+        ) {
+            Ok(validated) => validated,
+            Err(reason) => {
+                error!("{reason}");
                 return;
             }
         };
-
-        let recovered_address = match signed.recover_address() {
-            Ok(addr) => {
-                info!(
-                    "Recovered address {} for key from party {}",
-                    addr, msg.key.party_id
-                );
-                addr
-            }
-            Err(err) => {
-                error!(
-                    "Invalid signature on key from party {} - rejecting: {err}",
-                    msg.key.party_id
-                );
-                return;
-            }
-        };
-
-        // Validate circuit name matches expected ProofType circuits
-        let expected_circuits = signed.payload.proof_type.circuit_names();
-        if !expected_circuits.contains(&signed.payload.proof.circuit) {
-            error!(
-                "Circuit name mismatch for key from party {}: expected {:?}, got {:?}",
-                msg.key.party_id, expected_circuits, signed.payload.proof.circuit
-            );
-            return;
-        }
-        if *proof != signed.payload.proof {
-            error!(
-                "Proof mismatch for key from party {}: key.proof differs from signed_payload.payload.proof — rejecting",
-                msg.key.party_id
-            );
-            return;
-        }
+        let proof = msg
+            .key
+            .proof
+            .clone()
+            .expect("proof present after validation");
 
         // Store the signed payload so we can reference it in the verification response
         self.pending.insert(
             (msg.e3_id.clone(), msg.key.party_id),
             PendingVerification {
-                signed_payload: signed,
-                recovered_signer: recovered_address,
+                signed_payload: validated.signed_payload,
+                recovered_signer: validated.recovered_signer,
             },
         );
 

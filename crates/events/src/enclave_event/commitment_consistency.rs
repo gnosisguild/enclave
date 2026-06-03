@@ -85,6 +85,5 @@ pub struct CommitmentConsistencyViolation {
     /// Raw `abi.encode(proof.data, public_signals)` — preimage of `data_hash`.
     /// Forwarded to `SlashingManager.proposeSlash` so the on-chain contract can
     /// verify `keccak256(evidence) == dataHash` bound in voter signatures.
-    #[serde(default)]
     pub evidence: Bytes,
 }

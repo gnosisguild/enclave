@@ -70,7 +70,6 @@ pub struct AccusationQuorumReached {
     /// Empty when this node didn't have raw bytes locally (e.g.
     /// consistency-violation path), in which case submitter should skip
     /// submission because on-chain binding cannot be proven.
-    #[serde(default)]
     pub evidence: Bytes,
 }
 

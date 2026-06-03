@@ -9,6 +9,7 @@ mod backend;
 mod circuits;
 mod config;
 mod dkg_attestation_bundle;
+mod domain;
 mod error;
 mod node_fold_public;
 mod prover;

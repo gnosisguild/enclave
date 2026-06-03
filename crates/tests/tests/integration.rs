@@ -1825,8 +1825,15 @@ async fn test_trbfv_actor() -> Result<()> {
     }
     expected_aggregation_flow.push("PlaintextAggregated");
 
+    // Filter out late-arriving DecryptionshareCreated gossip events that can interleave
+    // with the aggregation phase when using larger committees.
+    let aggregation_flow_filtered: Vec<&str> = aggregation_flow
+        .iter()
+        .copied()
+        .filter(|e| *e != "DecryptionshareCreated")
+        .collect();
     assert_eq!(
-        aggregation_flow,
+        aggregation_flow_filtered.as_slice(),
         expected_aggregation_flow.as_slice(),
         "Unexpected active aggregator C7/aggregation flow"
     );

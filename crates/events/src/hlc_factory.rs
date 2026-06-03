@@ -93,6 +93,16 @@ impl HlcFactory {
             Ok(g) => g.is_ready(),
         }
     }
+
+    /// Seed the underlying clock's physical-time floor (H15). No-op until the
+    /// HLC has been enabled. See `Hlc::seed_physical_floor`.
+    pub fn seed_physical_floor(&self, ts: u64) {
+        if let Ok(guard) = self.hlc.lock() {
+            if let HlcState::Ready(hlc) = &*guard {
+                hlc.seed_physical_floor(ts);
+            }
+        }
+    }
 }
 
 impl HlcMethods for HlcFactory {

@@ -19,7 +19,6 @@ pub struct DecryptionshareCreated {
     pub e3_id: E3id,
     pub node: String,
     /// C6 raw proofs (signed): one per ciphertext index, used for ShareVerification.
-    #[serde(default)]
     pub signed_decryption_proofs: Vec<SignedProofPayload>,
 }
 

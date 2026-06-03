@@ -45,8 +45,6 @@ pub mod share_verification;
 pub mod zk_actor;
 
 // Re-export accusation types from their canonical home in e3-slashing.
-pub use e3_slashing::AccusationManager;
-pub use e3_slashing::AccusationManagerExtension;
 pub use e3_slashing::CommitmentConsistencyCheckerExtension;
 pub use node_proof_aggregator::NodeProofAggregator;
 pub use proof_request::ProofRequestActor;

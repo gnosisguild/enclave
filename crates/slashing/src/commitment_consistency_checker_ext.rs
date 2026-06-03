@@ -11,7 +11,7 @@
 //! listens for [`CommitteeFinalized`], creates the actor, and registers it
 //! in the [`E3Context`] so it receives routed events.
 
-use crate::commitment_consistency_checker::CommitmentConsistencyChecker;
+use crate::actors::commitment_consistency_checker::CommitmentConsistencyChecker;
 use anyhow::Result;
 use async_trait::async_trait;
 use e3_events::{BusHandle, CommitmentLink, EnclaveEvent, EnclaveEventData, Event};
