@@ -22,22 +22,22 @@ pub struct BoundlessConfig {
     #[serde(default = "default_true")]
     pub onchain: bool,
     // --- Offer params (all optional, fall back to defaults in build_offer_params) ---
-    /// Minimum price in ETH (default: 0.001)
+    /// Minimum price in ETH (default: 0.00005)
     #[serde(default)]
     pub min_price_eth: Option<f64>,
-    /// Maximum price in ETH (default: 0.03)
+    /// Maximum price in ETH (default: 0.002)
     #[serde(default)]
     pub max_price_eth: Option<f64>,
-    /// Total timeout in seconds (default: 1200 = 20 min)
+    /// Total timeout in seconds (default: 600 = 10 min)
     #[serde(default)]
     pub timeout_secs: Option<u64>,
-    /// Lock timeout in seconds (default: 600 = 10 min)
+    /// Lock timeout in seconds (default: 300 = 5 min)
     #[serde(default)]
     pub lock_timeout_secs: Option<u64>,
-    /// Ramp-up period in seconds (default: 120 = 2 min)
+    /// Ramp-up period in seconds (default: 60 = 1 min)
     #[serde(default)]
     pub ramp_up_secs: Option<u64>,
-    /// Lock collateral in ZKC (default: 5.0)
+    /// Lock collateral in ZKC (default: 2.0)
     #[serde(default)]
     pub lock_collateral_zkc: Option<f64>,
 }

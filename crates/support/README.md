@@ -212,14 +212,14 @@ rewards distributed.
 
 All parameters are configurable via environment variables (or `enclave.config.yaml`). Defaults:
 
-| Parameter    | Env Var                         | Default | Description                  |
-| ------------ | ------------------------------- | ------- | ---------------------------- |
-| Min price    | `BOUNDLESS_MIN_PRICE_ETH`       | `0.001` | Starting price in ETH        |
-| Max price    | `BOUNDLESS_MAX_PRICE_ETH`       | `0.03`  | Maximum price in ETH         |
-| Timeout      | `BOUNDLESS_TIMEOUT_SECS`        | `1200`  | Total request lifetime (sec) |
-| Lock timeout | `BOUNDLESS_LOCK_TIMEOUT_SECS`   | `600`   | Prover lock duration (sec)   |
-| Ramp-up      | `BOUNDLESS_RAMP_UP_SECS`        | `120`   | Price ramp-up period (sec)   |
-| Collateral   | `BOUNDLESS_LOCK_COLLATERAL_ZKC` | `5.0`   | ZKC locked per request       |
+| Parameter    | Env Var                         | Default   | Description                  |
+| ------------ | ------------------------------- | --------- | ---------------------------- |
+| Min price    | `BOUNDLESS_MIN_PRICE_ETH`       | `0.00005` | Starting price in ETH        |
+| Max price    | `BOUNDLESS_MAX_PRICE_ETH`       | `0.002`   | Maximum price in ETH         |
+| Timeout      | `BOUNDLESS_TIMEOUT_SECS`        | `600`     | Total request lifetime (sec) |
+| Lock timeout | `BOUNDLESS_LOCK_TIMEOUT_SECS`   | `300`     | Prover lock duration (sec)   |
+| Ramp-up      | `BOUNDLESS_RAMP_UP_SECS`        | `60`      | Price ramp-up period (sec)   |
+| Collateral   | `BOUNDLESS_LOCK_COLLATERAL_ZKC` | `2.0`     | ZKC locked per request       |
 
 These can also be set in `enclave.config.yaml` under `program.risc0.boundless`:
 
