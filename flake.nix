@@ -133,10 +133,10 @@
               inherit name;
               value = fheHash;
             }) [
-              "fhe-0.1.0-beta.7"
-              "fhe-math-0.1.0-beta.7"
-              "fhe-traits-0.1.0-beta.7"
-              "fhe-util-0.1.0-beta.7"
+              "fhe-0.2.0"
+              "fhe-math-0.2.0"
+              "fhe-traits-0.1.1"
+              "fhe-util-0.1.1"
             ]
             ++ map (name: {
               inherit name;
