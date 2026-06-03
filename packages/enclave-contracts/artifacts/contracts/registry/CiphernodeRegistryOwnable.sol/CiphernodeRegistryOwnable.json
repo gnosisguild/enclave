@@ -1981,9 +1981,5 @@
   },
   "immutableReferences": {},
   "inputSourceName": "project/contracts/registry/CiphernodeRegistryOwnable.sol",
-<<<<<<< HEAD
-  "buildInfoId": "solc-0_8_28-ba3c388c5eb55d5d111498c7ff48b24b6af6cd6c"
-=======
-  "buildInfoId": "solc-0_8_28-58b894a0ac77a2d784be77b69288a062b8f6f518"
->>>>>>> main
+  "buildInfoId": "solc-0_8_28-9fd399eef134d64177ea2204432fda87672507cf"
 }

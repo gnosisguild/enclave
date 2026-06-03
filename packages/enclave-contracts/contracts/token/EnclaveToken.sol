@@ -27,16 +27,25 @@ import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
  * @notice The governance and utility token for the Enclave protocol
  * @dev ERC20 token with voting capabilities, permit functionality, and controlled minting.
  *
+ *      Lifecycle — Virtual → Live (TGE):
+ *      The token starts in {TokenMode.Virtual}. Once the configured {tgeEarliest}
+ *      timestamp has passed, LOCK_MANAGER_ROLE calls {tge} to transition to
+ *      {TokenMode.Live}. At that point {tgeTimestamp} is set to block.timestamp and
+ *      all TGE-anchored lock schedules (those with tokenUnlockStart = 0) can be
+ *      created and resolve.
+ *
  *      Roles:
- *      - DEFAULT_ADMIN_ROLE manages role assignments and can {disableTransferRestrictions}.
+ *      - DEFAULT_ADMIN_ROLE manages role assignments and can {disableTransferRestrictions}
+ *        (only after TGE — requires {TokenMode.Live}).
  *      - MINTER_ROLE can call {mintAllocation} / {batchMintAllocations} up to MAX_SUPPLY.
  *      - WHITELIST_ROLE can manage the transfer whitelist independently from minting so
  *        the same account is not required to control both surfaces.
  *      - LOCK_MANAGER_ROLE can configure token-level lock schedules, CCA claim sources,
- *        buyer claim profiles, and the bonding registry used for locked-floor accounting.
+ *        buyer claim profiles, the bonding registry, and the TGE transition.
  *
  *      Transfer restrictions are a one-way switch: once {disableTransferRestrictions} is called
- *      they cannot be re-enabled.
+ *      they cannot be re-enabled. The TGE transition ({TokenMode.Virtual} → {TokenMode.Live})
+ *      is also one-way.
  *
  *      Token-level locks are pooled per account. For every non-mint/non-burn transfer, the sender
  *      must satisfy: balanceOf(sender) + BondingRegistry.totalBonded(sender) >= lockedFloorOf(sender).
@@ -93,6 +102,23 @@ contract EnclaveToken is
 
     /// @notice Thrown when a schedule requests the default TGE timestamp before it has been configured.
     error TgeTimestampUnset();
+
+    /// @notice Thrown when {tge} is called before the earliest allowed timestamp.
+    error TgeTooEarly(uint64 current, uint64 earliest);
+
+    /// @notice Thrown when {tge} is called but the token is already live.
+    error TgeAlreadyLive();
+
+    /// @notice Thrown when an operation requires the token to be in Live mode.
+    error TokenNotLive();
+
+    /// @notice Token lifecycle mode.
+    /// @dev Virtual: pre-TGE phase. Live: TGE has occurred, {tgeTimestamp} is set,
+    ///      and TGE-anchored lock schedules can be created and resolved.
+    enum TokenMode {
+        Virtual,
+        Live
+    }
 
     /// @notice Maximum supply of the token: 1.2 billion tokens with 18 decimals
     /// @dev Hard cap on total token supply that cannot be exceeded through minting
@@ -179,6 +205,12 @@ contract EnclaveToken is
     /// @notice Optional default TGE timestamp used when lock schedule inputs pass tokenUnlockStart = 0.
     uint64 public tgeTimestamp;
 
+    /// @notice Current token lifecycle mode. Starts as {TokenMode.Virtual}.
+    TokenMode public mode;
+
+    /// @notice Earliest timestamp at which {tge} may be called.
+    uint64 public tgeEarliest;
+
     /// @notice Registry queried for ENCL that still counts toward an account's locked floor.
     IBondingRegistry public bondingRegistry;
 
@@ -196,6 +228,11 @@ contract EnclaveToken is
     /// @notice Relative CCA claim lock profile for each buyer/recipient.
     mapping(address account => ClaimLockProfile profile)
         public claimLockProfiles;
+
+    /// @notice Recipients that do NOT receive a claim-lock schedule when they
+    ///         receive tokens from an approved claim source. Used for CCA sweeps,
+    ///         treasury returns, and other system recipients that are not buyers.
+    mapping(address account => bool exempt) public claimLockExemptRecipients;
 
     /// @dev Lock schedules by account. The array length is bounded by {MAX_LOCK_SCHEDULES}.
     mapping(address account => LockSchedule[] schedules) private _lockSchedules;
@@ -254,6 +291,15 @@ contract EnclaveToken is
         bytes32 indexed group
     );
 
+    /// @notice Emitted when the token transitions from Virtual to Live mode.
+    event TgeTriggered(uint64 timestamp);
+
+    /// @notice Emitted when the earliest TGE timestamp is updated.
+    event TgeEarliestUpdated(uint64 previous, uint64 next);
+
+    /// @notice Emitted when a claim-lock exemption is set or cleared.
+    event ClaimLockExemptionUpdated(address indexed account, bool exempt);
+
     /**
      * @notice Initializes the Enclave token with name "Enclave" and symbol "ENCL"
      * @dev Sets up the token with voting and permit functionality. Grants admin, minter, and
@@ -270,6 +316,7 @@ contract EnclaveToken is
         _grantRole(LOCK_MANAGER_ROLE, initialOwner_);
 
         // Initialise state variables.
+        mode = TokenMode.Virtual;
         transfersRestricted = true;
         transferWhitelisted[initialOwner_] = true;
 
@@ -339,13 +386,14 @@ contract EnclaveToken is
     /**
      * @notice Permanently disables transfer restrictions.
      * @dev Once disabled, restrictions cannot be re-enabled (one-way switch).
-     *      Only callable by DEFAULT_ADMIN_ROLE. Idempotent: a no-op when already disabled
-     *      so deployment/setup scripts can call it unconditionally.
+     *      Only callable by DEFAULT_ADMIN_ROLE, and only after the token is Live
+     *      ({tge} has been called). Idempotent: a no-op when already disabled.
      */
     function disableTransferRestrictions()
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
+        if (mode != TokenMode.Live) revert TokenNotLive();
         if (!transfersRestricted) return;
         transfersRestricted = false;
         emit TransferRestrictionUpdated(false);
@@ -387,10 +435,13 @@ contract EnclaveToken is
     }
 
     /// @notice Sets the default TGE timestamp used by schedule inputs with tokenUnlockStart = 0.
-    /// @dev Existing schedules store resolved timestamps and are not changed by this setter.
+    /// @dev Only callable in Live mode. Before TGE, {tge} sets the timestamp atomically with the
+    ///      mode transition. This setter exists for administrative correction after TGE.
+    ///      Existing schedules store resolved timestamps and are not changed by this setter.
     function setTgeTimestamp(
         uint64 newTgeTimestamp
     ) external onlyRole(LOCK_MANAGER_ROLE) {
+        if (mode != TokenMode.Live) revert TokenNotLive();
         if (newTgeTimestamp == 0) revert InvalidLockSchedule();
         uint64 previous = tgeTimestamp;
         tgeTimestamp = newTgeTimestamp;
@@ -411,6 +462,40 @@ contract EnclaveToken is
         address previous = address(bondingRegistry);
         bondingRegistry = newBondingRegistry;
         emit BondingRegistryUpdated(previous, newRegistryAddress);
+    }
+
+    /// @notice Sets the earliest timestamp at which {tge} may be called.
+    /// @dev Must be set before {tge} is called. Value is a Unix timestamp in seconds.
+    function setTgeEarliest(
+        uint64 newTgeEarliest
+    ) external onlyRole(LOCK_MANAGER_ROLE) {
+        if (newTgeEarliest == 0) revert InvalidLockSchedule();
+        if (mode == TokenMode.Live) revert TgeAlreadyLive();
+        uint64 previous = tgeEarliest;
+        tgeEarliest = newTgeEarliest;
+        emit TgeEarliestUpdated(previous, newTgeEarliest);
+    }
+
+    /// @notice Transitions the token from Virtual to Live mode.
+    /// @dev One-way switch. Requires {tgeEarliest} to be set and the current
+    ///      block timestamp to be >= {tgeEarliest}. After TGE, the pooled-token
+    ///      lock enforcement (balance + bonded >= lockedFloor) becomes active
+    ///      and ALL schedules that reference the default TGE timestamp resolve.
+    function tge() external onlyRole(LOCK_MANAGER_ROLE) {
+        if (mode == TokenMode.Live) revert TgeAlreadyLive();
+        uint64 earliest = tgeEarliest;
+        if (earliest == 0) revert TgeTimestampUnset();
+        uint64 current = _currentTimestamp();
+        if (current < earliest) revert TgeTooEarly(current, earliest);
+
+        mode = TokenMode.Live;
+        tgeTimestamp = current;
+        emit TgeTriggered(current);
+    }
+
+    /// @notice Returns true when the token is in Live (post-TGE) mode.
+    function isLive() external view returns (bool) {
+        return mode == TokenMode.Live;
     }
 
     /// @notice Creates a wallet-level lock schedule for an account.
@@ -464,6 +549,18 @@ contract EnclaveToken is
         for (uint256 i = 0; i < len; i++) {
             _setClaimLockProfile(inputs[i].account, inputs[i].profile);
         }
+    }
+
+    /// @notice Marks an address as exempt from automatic claim-lock schedule creation.
+    /// @dev Used for CCA sweep/treasury recipients that receive tokens from an approved
+    ///      claim source but are not buyers. Exempt recipients skip {_addClaimLock}.
+    function setClaimLockExemption(
+        address account,
+        bool exempt
+    ) external onlyRole(LOCK_MANAGER_ROLE) {
+        if (account == address(0)) revert ZeroAddress();
+        claimLockExemptRecipients[account] = exempt;
+        emit ClaimLockExemptionUpdated(account, exempt);
     }
 
     /// @notice Number of lock schedules recorded for an account.
@@ -546,7 +643,7 @@ contract EnclaveToken is
             if (
                 approvedClaimSources[from] &&
                 value != 0 &&
-                from != address(bondingRegistry)
+                !claimLockExemptRecipients[to]
             ) {
                 _addClaimLock(to, value);
             }
