@@ -110,7 +110,7 @@ fn build_offer() -> Result<OfferParams> {
         }
         parse_ether(&format!("{}", v)).context("Invalid BOUNDLESS_MIN_PRICE_ETH")?
     } else {
-        parse_ether("0.001").context("Invalid default min_price")?
+        parse_ether("0.00005").context("Invalid default min_price")?
     };
     let max_price = if let Some(v) = env_opt_f64("BOUNDLESS_MAX_PRICE_ETH") {
         if v.is_sign_negative() || v.is_nan() {
@@ -118,18 +118,18 @@ fn build_offer() -> Result<OfferParams> {
         }
         parse_ether(&format!("{}", v)).context("Invalid BOUNDLESS_MAX_PRICE_ETH")?
     } else {
-        parse_ether("0.03").context("Invalid default max_price")?
+        parse_ether("0.002").context("Invalid default max_price")?
     };
     let timeout = env_opt_secs("BOUNDLESS_TIMEOUT_SECS")
         .map(|v| v as u32)
-        .unwrap_or(20 * 60);
+        .unwrap_or(10 * 60);
     let lock_timeout = env_opt_secs("BOUNDLESS_LOCK_TIMEOUT_SECS")
         .map(|v| v as u32)
-        .unwrap_or(10 * 60);
+        .unwrap_or(5 * 60);
     let ramp_up = env_opt_secs("BOUNDLESS_RAMP_UP_SECS")
         .map(|v| v as u32)
-        .unwrap_or(2 * 60);
-    let zkc = env_opt_f64("BOUNDLESS_LOCK_COLLATERAL_ZKC").unwrap_or(5.0);
+        .unwrap_or(1 * 60);
+    let zkc = env_opt_f64("BOUNDLESS_LOCK_COLLATERAL_ZKC").unwrap_or(2.0);
     if zkc.is_sign_negative() || zkc.is_nan() {
         anyhow::bail!("BOUNDLESS_LOCK_COLLATERAL_ZKC must be a non-negative number, got: {}", zkc);
     }
