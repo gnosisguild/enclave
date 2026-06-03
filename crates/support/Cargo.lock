@@ -1352,12 +1352,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d902e3d592a523def97af8f317b08ce16b7ab854c1985a0c671e6f15cebc236"
 
 [[package]]
-name = "arrayref"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76a2e8124351fda1ef8aaaa3bbd7ebbcb486bbcd4225aca0aa0d84bb2db8fecb"
-
-[[package]]
 name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2001,17 +1995,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bigint-poly"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/bigint-poly#9eca04d2aa473c5ead1e5a13adc8ad11bf250e4a"
-dependencies = [
- "num-bigint",
- "num-traits",
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "bincode"
 version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2097,19 +2080,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46502ad458c9a52b69d4d4d32775c788b7a1b85e8bc9d482d92250fc0e3f8efe"
 dependencies = [
  "digest 0.10.7",
-]
-
-[[package]]
-name = "blake3"
-version = "1.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3888aaa89e4b2a40fca9848e400f6a658a5a3978de7be858e209cafa8be9a4a0"
-dependencies = [
- "arrayref",
- "arrayvec",
- "cc",
- "cfg-if",
- "constant_time_eq",
 ]
 
 [[package]]
@@ -2514,12 +2484,6 @@ dependencies = [
  "quote",
  "unicode-xid",
 ]
-
-[[package]]
-name = "constant_time_eq"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
 
 [[package]]
 name = "cookie"
@@ -2987,22 +2951,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
-name = "e3-bfv-client"
-version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80#7a361de36d7ccd8f421b874008895cc07f246b80"
-dependencies = [
- "anyhow",
- "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80)",
- "e3-greco-helpers",
- "fhe",
- "fhe-traits",
- "rand 0.8.5",
- "thiserror 1.0.69",
- "zkfhe-greco",
- "zkfhe-shared",
-]
-
-[[package]]
 name = "e3-compute-provider"
 version = "0.1.5"
 source = "git+https://github.com/gnosisguild/enclave?rev=632766e4ed1ceeccdeb023a56f16413a33be6f46#632766e4ed1ceeccdeb023a56f16413a33be6f46"
@@ -3021,57 +2969,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-compute-provider"
-version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80#7a361de36d7ccd8f421b874008895cc07f246b80"
-dependencies = [
- "ark-bn254 0.4.0",
- "ark-ff 0.4.2",
- "e3-bfv-client",
- "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80)",
- "hex",
- "lean-imt",
- "light-poseidon",
- "num-bigint",
- "num-traits",
- "rayon",
- "serde",
- "sha3",
- "zk-kit-imt",
-]
-
-[[package]]
 name = "e3-fhe-params"
 version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80#7a361de36d7ccd8f421b874008895cc07f246b80"
+source = "git+https://github.com/gnosisguild/enclave?rev=dbdaaee1db9d868adacc03f75bb2ac85024359ae#dbdaaee1db9d868adacc03f75bb2ac85024359ae"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
  "fhe",
  "num-bigint",
  "thiserror 1.0.69",
- "zkfhe-shared",
-]
-
-[[package]]
-name = "e3-fhe-params"
-version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave?rev=dbdaaee1db9d868adacc03f75bb2ac85024359ae#dbdaaee1db9d868adacc03f75bb2ac85024359ae"
-dependencies = [
- "fhe",
- "num-bigint",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "e3-greco-helpers"
-version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80#7a361de36d7ccd8f421b874008895cc07f246b80"
-dependencies = [
- "fhe",
- "fhe-math",
- "num-bigint",
- "zkfhe-shared",
 ]
 
 [[package]]
@@ -3080,7 +2986,7 @@ version = "0.1.0"
 dependencies = [
  "actix-web",
  "anyhow",
- "e3-compute-provider 0.1.5",
+ "e3-compute-provider",
  "e3-support-host",
  "e3-support-types",
  "env_logger",
@@ -3103,8 +3009,8 @@ dependencies = [
  "boundless-market",
  "bytemuck",
  "dotenvy",
- "e3-compute-provider 0.1.5",
- "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=dbdaaee1db9d868adacc03f75bb2ac85024359ae)",
+ "e3-compute-provider",
+ "e3-fhe-params",
  "e3-user-program",
  "fhe",
  "fhe-traits",
@@ -3125,6 +3031,7 @@ name = "e3-support-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "derivative",
  "hex",
  "serde",
  "serde_json",
@@ -3134,8 +3041,8 @@ dependencies = [
 name = "e3-user-program"
 version = "0.1.0"
 dependencies = [
- "e3-compute-provider 0.1.7",
- "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=dbdaaee1db9d868adacc03f75bb2ac85024359ae)",
+ "e3-compute-provider",
+ "e3-fhe-params",
  "fhe",
  "fhe-traits",
 ]
@@ -4890,7 +4797,6 @@ dependencies = [
  "num-integer",
  "num-traits",
  "rand 0.8.5",
- "serde",
 ]
 
 [[package]]
@@ -8293,49 +8199,6 @@ checksum = "76a40d2f9afd345a14a304ad2ced6dbff4c17a0e5c533a3bd5f64fd04dcb2531"
 dependencies = [
  "hex",
  "tiny-keccak",
-]
-
-[[package]]
-name = "zkfhe-greco"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#6b424983347a4aa04c9725941f71ca6a4bed863e"
-dependencies = [
- "anyhow",
- "bigint-poly",
- "blake3",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "itertools 0.14.0",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "rayon",
- "serde",
- "serde_json",
- "tempfile",
- "toml",
- "zkfhe-shared",
-]
-
-[[package]]
-name = "zkfhe-shared"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#6b424983347a4aa04c9725941f71ca6a4bed863e"
-dependencies = [
- "anyhow",
- "bigint-poly",
- "chrono",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "toml",
 ]
 
 [[package]]
