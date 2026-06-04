@@ -21,7 +21,6 @@ pub struct E3Meta {
     pub seed: Seed,
     pub params_preset: BfvPreset,
     pub params: ArcBytes,
-    pub esi_per_ct: usize,
     pub error_size: ArcBytes,
     pub proof_aggregation_enabled: bool,
 }
@@ -47,7 +46,6 @@ impl E3Extension for E3MetaExtension {
             e3_id,
             params_preset,
             params,
-            esi_per_ct,
             error_size,
             proof_aggregation_enabled,
             ..
@@ -60,7 +58,6 @@ impl E3Extension for E3MetaExtension {
             seed,
             params_preset,
             params,
-            esi_per_ct,
             error_size,
             proof_aggregation_enabled,
         };

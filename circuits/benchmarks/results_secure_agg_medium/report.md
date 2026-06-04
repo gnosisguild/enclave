@@ -1,11 +1,11 @@
 # Enclave ZK Circuit Benchmarks
 
-**Generated:** 2026-06-04 11:57:41 UTC
+**Generated:** 2026-06-03 21:00:47 UTC
 
-**Git Branch:** `main`  
-**Git Commit:** `334123af5e1f043fd91d5b4928c461bda17951e4`
+**Git Branch:** `bench/medium-3mod`  
+**Git Commit:** `80a221f2152a8cf4cc4d65d0905c555d18da1f02`
 
-**Committee Size:** `H=3`, `N=3`, `T=1`
+**Committee Size:** `H=8`, `N=10`, `T=4`
 
 ## Run configuration
 
@@ -18,7 +18,7 @@ Settings for this benchmark run (integration test + Nargo circuit benches on the
 | Benchmark mode                                        | `secure`                                     |
 | BFV preset (artifacts)                                | `secure-8192`                                |
 | BFV preset (enum)                                     | `SecureThreshold8192`                        |
-| λ (smudging / error)                                  | 50                                           |
+| λ (smudging / error)                                  | 55                                           |
 | Nodes spawned (builder)                               | 20                                           |
 | Network model                                         | `in_process_bus`                             |
 | Testmode harness                                      | true                                         |
@@ -72,40 +72,40 @@ Single-circuit `bb prove` on the benchmark oracle witness (not the integration a
 
 | Circuit              | Constraints | Prove (s) | Verify (ms) | Proof (KB) |
 | -------------------- | ----------- | --------- | ----------- | ---------- |
-| C0                   | 287764      | 1.42      | 27.90       | 15.88      |
-| C1                   | 2430707     | 9.34      | 25.96       | 15.88      |
-| C2a                  | 1446348     | 5.13      | 24.04       | 15.88      |
-| C2b                  | 2889001     | 9.68      | 24.89       | 15.88      |
-| C3a                  | 3475239     | 10.75     | 24.47       | 15.88      |
-| C3b                  | 3475239     | 10.75     | 24.47       | 15.88      |
-| C4a                  | 1961956     | 5.82      | 24.93       | 15.88      |
-| C4b                  | 1961956     | 5.82      | 24.93       | 15.88      |
-| C5                   | 3719555     | 10.89     | 25.11       | 15.88      |
-| user_data_encryption | 1688676     | 5.75      | 25.31       | 15.88      |
-| C6                   | 2977263     | 10.22     | 25.89       | 15.88      |
-| C7                   | 109424      | 0.51      | 26.84       | 15.88      |
+| C0                   | 287764      | 1.42      | 24.34       | 15.88      |
+| C1                   | 2432076     | 9.28      | 25.01       | 15.88      |
+| C2a                  | 4813061     | 17.97     | 24.23       | 15.88      |
+| C2b                  | 6255714     | 20.59     | 24.25       | 15.88      |
+| C3a                  | 3563517     | 10.72     | 24.68       | 15.88      |
+| C3b                  | 3563517     | 10.72     | 24.68       | 15.88      |
+| C4a                  | 3115129     | 10.19     | 25.03       | 15.88      |
+| C4b                  | 3115129     | 10.19     | 25.03       | 15.88      |
+| C5                   | 6073618     | 20.41     | 25.71       | 15.88      |
+| user_data_encryption | 1688723     | 5.74      | 25.35       | 15.88      |
+| C6                   | 3001845     | 10.24     | 25.30       | 15.88      |
+| C7                   | 191104      | 0.86      | 26.53       | 15.88      |
 
 ### Artifacts
 
 | Artifact | Proof size | Public input size | Verify gas | Calldata gas | Total gas |
 | -------- | ---------- | ----------------- | ---------- | ------------ | --------- |
-| Π_DKG    | 10.69 KB   | 0.47 KB           | 3125343    | 176196       | 3301539   |
-| Π_user   | 15.88 KB   | 0.12 KB           | 2972977    | 193336       | 3166313   |
-| Π_dec    | 10.69 KB   | 3.47 KB           | 3640899    | 187176       | 3828075   |
+| Π_DKG    | 10.69 KB   | 0.94 KB           | 3154367    | 181920       | 3336287   |
+| Π_user   | 15.88 KB   | 0.12 KB           | 2972929    | 193348       | 3166277   |
+| Π_dec    | 10.69 KB   | 3.75 KB           | 3658402    | 190692       | 3849094   |
 
 ### Role / Phase / Activity
 
-| Role            | Phase | Activity                                  | Metric         | Duration | Proof size | Bandwidth |
-| --------------- | ----- | ----------------------------------------- | -------------- | -------- | ---------- | --------- |
-| Each ciphernode | P1    | one-time DKG participation (test harness) | wall_clock     | 603.10 s | 127.00 KB  | 128.56 KB |
-| Aggregator      | P2    | C5 + Π_DKG fold (aggregator span)         | wall_clock     | 163.13 s | 10.69 KB   | 11.16 KB  |
-| User            | P3    | per user input                            | isolated_nargo | 11.01 s  | 15.88 KB   | 16.00 KB  |
-| Each ciphernode | P4    | per computation output (C6)               | isolated_nargo | 10.22 s  | 15.88 KB   | 16.00 KB  |
-| Aggregator      | P4    | C7 + Π_dec fold (full publish→aggregate)  | wall_clock     | 176.86 s | 10.69 KB   | 14.16 KB  |
-| Aggregator      | P4    | C7 + fold only (pending→plaintext span)   | wall_clock     | 50.75 s  | 10.69 KB   | 14.16 KB  |
+| Role            | Phase | Activity                                  | Metric         | Duration  | Proof size | Bandwidth |
+| --------------- | ----- | ----------------------------------------- | -------------- | --------- | ---------- | --------- |
+| Each ciphernode | P1    | one-time DKG participation (test harness) | wall_clock     | 6558.88 s | 127.00 KB  | 130.81 KB |
+| Aggregator      | P2    | C5 + Π_DKG fold (aggregator span)         | wall_clock     | 1380.96 s | 10.69 KB   | 11.62 KB  |
+| User            | P3    | per user input                            | isolated_nargo | 10.95 s   | 15.88 KB   | 16.00 KB  |
+| Each ciphernode | P4    | per computation output (C6)               | isolated_nargo | 10.24 s   | 15.88 KB   | 16.00 KB  |
+| Aggregator      | P4    | C7 + Π_dec fold (full publish→aggregate)  | wall_clock     | 382.94 s  | 10.69 KB   | 14.44 KB  |
+| Aggregator      | P4    | C7 + fold only (pending→plaintext span)   | wall_clock     | 92.61 s   | 10.69 KB   | 14.44 KB  |
 
-_P2 **tracked_job_wall** sum (ZkDkgAggregation + ZkPkAggregation, parallelizable): **44.37 s** — not
-comparable to P2 wall_clock row above._
+_P2 **tracked_job_wall** sum (ZkDkgAggregation + ZkPkAggregation, parallelizable): **155.61 s** —
+not comparable to P2 wall_clock row above._
 
 ## Integration test (`test_trbfv_actor`)
 
@@ -114,79 +114,79 @@ comparable to P2 wall_clock row above._
 | Phase                                                              | Metric       | Duration (s) |
 | ------------------------------------------------------------------ | ------------ | ------------ |
 | Starting trbfv actor test                                          | `wall_clock` | 0.00         |
-| Setup completed                                                    | `wall_clock` | 2.98         |
+| Setup completed                                                    | `wall_clock` | 2.78         |
 | Committee Setup Completed                                          | `wall_clock` | 20.09        |
 | Committee Finalization Complete                                    | `wall_clock` | 0.00         |
-| Aggregator P2: PkAggregation pending -> PublicKeyAggregated (wall) | `wall_clock` | 163.13       |
-| ThresholdShares -> PublicKeyAggregated                             | `wall_clock` | 603.10       |
-| E3Request -> PublicKeyAggregated                                   | `wall_clock` | 603.69       |
-| Application CT Gen                                                 | `wall_clock` | 0.30         |
+| Aggregator P2: PkAggregation pending -> PublicKeyAggregated (wall) | `wall_clock` | 1380.96      |
+| ThresholdShares -> PublicKeyAggregated                             | `wall_clock` | 6558.88      |
+| E3Request -> PublicKeyAggregated                                   | `wall_clock` | 6559.39      |
+| Application CT Gen                                                 | `wall_clock` | 0.28         |
 | Running FHE Application                                            | `wall_clock` | 0.00         |
-| Aggregator P4: Aggregation pending -> PlaintextAggregated (wall)   | `wall_clock` | 50.75        |
-| Ciphertext published -> PlaintextAggregated                        | `wall_clock` | 176.86       |
-| Entire Test                                                        | `wall_clock` | 803.94       |
+| Aggregator P4: Aggregation pending -> PlaintextAggregated (wall)   | `wall_clock` | 92.61        |
+| Ciphertext published -> PlaintextAggregated                        | `wall_clock` | 382.94       |
+| Entire Test                                                        | `wall_clock` | 6965.49      |
 
 ### Multithread job timings (`tracked_job_wall`)
 
 | Name                          | Avg (s) | Runs | Total (s) |
 | ----------------------------- | ------- | ---- | --------- |
-| CalculateDecryptionKey        | 0.06    | 3    | 0.18      |
-| CalculateDecryptionShare      | 0.17    | 3    | 0.50      |
-| CalculateThresholdDecryption  | 0.24    | 1    | 0.24      |
-| GenEsiSss                     | 0.06    | 3    | 0.19      |
-| GenPkShareAndSkSss            | 0.11    | 3    | 0.33      |
-| NodeDkgFold/c2ab_fold         | 7.29    | 3    | 21.86     |
-| NodeDkgFold/c3a_fold          | 59.07   | 3    | 177.22    |
-| NodeDkgFold/c3ab_fold         | 7.22    | 3    | 21.66     |
-| NodeDkgFold/c3b_fold          | 49.74   | 3    | 149.22    |
-| NodeDkgFold/c4ab_fold         | 8.28    | 3    | 24.83     |
-| NodeDkgFold/node_fold         | 14.94   | 3    | 44.83     |
-| ZkDecryptedSharesAggregation  | 2.79    | 1    | 2.79      |
-| ZkDecryptionAggregation       | 47.82   | 1    | 47.82     |
-| ZkDkgAggregation              | 19.61   | 1    | 19.61     |
-| ZkDkgShareDecryption          | 23.11   | 6    | 138.65    |
-| ZkNodeDkgFold                 | 146.54  | 3    | 439.63    |
-| ZkPkAggregation               | 24.75   | 1    | 24.75     |
-| ZkPkBfv                       | 3.83    | 3    | 11.48     |
-| ZkPkGeneration                | 54.05   | 3    | 162.15    |
-| ZkShareComputation            | 51.34   | 6    | 308.06    |
-| ZkShareEncryption             | 119.19  | 36   | 4290.86   |
-| ZkThresholdShareDecryption    | 91.27   | 3    | 273.80    |
-| ZkVerifyShareDecryptionProofs | 0.12    | 3    | 0.36      |
-| ZkVerifyShareProofs           | 0.32    | 5    | 1.59      |
+| CalculateDecryptionKey        | 0.05    | 10   | 0.46      |
+| CalculateDecryptionShare      | 0.16    | 10   | 1.58      |
+| CalculateThresholdDecryption  | 0.25    | 1    | 0.25      |
+| GenEsiSss                     | 0.36    | 10   | 3.65      |
+| GenPkShareAndSkSss            | 0.26    | 10   | 2.60      |
+| NodeDkgFold/c2ab_fold         | 25.92   | 10   | 259.25    |
+| NodeDkgFold/c3a_fold          | 674.19  | 10   | 6741.94   |
+| NodeDkgFold/c3ab_fold         | 20.81   | 10   | 208.08    |
+| NodeDkgFold/c3b_fold          | 639.78  | 10   | 6397.83   |
+| NodeDkgFold/c4ab_fold         | 20.69   | 10   | 206.88    |
+| NodeDkgFold/node_fold         | 39.74   | 10   | 397.38    |
+| ZkDecryptedSharesAggregation  | 4.73    | 1    | 4.73      |
+| ZkDecryptionAggregation       | 87.50   | 1    | 87.50     |
+| ZkDkgAggregation              | 41.30   | 1    | 41.30     |
+| ZkDkgShareDecryption          | 90.86   | 20   | 1817.28   |
+| ZkNodeDkgFold                 | 1421.14 | 10   | 14211.40  |
+| ZkPkAggregation               | 114.31  | 1    | 114.31    |
+| ZkPkBfv                       | 10.21   | 10   | 102.12    |
+| ZkPkGeneration                | 121.56  | 10   | 1215.57   |
+| ZkShareComputation            | 96.21   | 20   | 1924.15   |
+| ZkShareEncryption             | 106.26  | 540  | 57380.53  |
+| ZkThresholdShareDecryption    | 192.97  | 10   | 1929.69   |
+| ZkVerifyShareDecryptionProofs | 0.51    | 10   | 5.13      |
+| ZkVerifyShareProofs           | 2.06    | 12   | 24.67     |
 
-Sum of tracked job wall time: **6162.60 s** — **not** end-to-end latency (jobs run in parallel up to
-`BENCHMARK_MULTITHREAD_JOBS`).
+Sum of tracked job wall time: **93078.28 s** — **not** end-to-end latency (jobs run in parallel up
+to `BENCHMARK_MULTITHREAD_JOBS`).
 
 ### NodeDkgFold sub-steps (`tracked_job_wall`, per fold prove)
 
 | Step      | Avg (s) | Runs | Total (s) |
 | --------- | ------- | ---- | --------- |
-| c2ab_fold | 7.29    | 3    | 21.86     |
-| c3a_fold  | 59.07   | 3    | 177.22    |
-| c3ab_fold | 7.22    | 3    | 21.66     |
-| c3b_fold  | 49.74   | 3    | 149.22    |
-| c4ab_fold | 8.28    | 3    | 24.83     |
-| node_fold | 14.94   | 3    | 44.83     |
+| c2ab_fold | 25.92   | 10   | 259.25    |
+| c3a_fold  | 674.19  | 10   | 6741.94   |
+| c3ab_fold | 20.81   | 10   | 208.08    |
+| c3b_fold  | 639.78  | 10   | 6397.83   |
+| c4ab_fold | 20.69   | 10   | 206.88    |
+| node_fold | 39.74   | 10   | 397.38    |
 
 ### Aggregation jobs (`tracked_job_wall`)
 
 | Operation                    | Avg (s) | Runs | Total (s) |
 | ---------------------------- | ------- | ---- | --------- |
-| ZkDecryptedSharesAggregation | 2.79    | 1    | 2.79      |
-| ZkDecryptionAggregation      | 47.82   | 1    | 47.82     |
-| ZkDkgAggregation             | 19.61   | 1    | 19.61     |
-| ZkNodeDkgFold                | 146.54  | 3    | 439.63    |
-| ZkPkAggregation              | 24.75   | 1    | 24.75     |
+| ZkDecryptedSharesAggregation | 4.73    | 1    | 4.73      |
+| ZkDecryptionAggregation      | 87.50   | 1    | 87.50     |
+| ZkDkgAggregation             | 41.30   | 1    | 41.30     |
+| ZkNodeDkgFold                | 1421.14 | 10   | 14211.40  |
+| ZkPkAggregation              | 114.31  | 1    | 114.31    |
 
-Sum of aggregation job tracked time: **534.60 s** (parallel CPU work; not P1/P2 wall clock).
+Sum of aggregation job tracked time: **14459.24 s** (parallel CPU work; not P1/P2 wall clock).
 
 ### Folded on-chain artifacts (exported for Π_DKG / Π_dec gas)
 
 | Artifact              | Proof (bytes) | Public inputs (bytes) |
 | --------------------- | ------------- | --------------------- |
-| dkg_aggregator        | 10944         | 480                   |
-| decryption_aggregator | 10944         | 3552                  |
+| dkg_aggregator        | 10944         | 960                   |
+| decryption_aggregator | 10944         | 3840                  |
 
 ## Raw circuit benchmark JSON (Nargo)
 

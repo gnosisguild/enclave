@@ -1059,7 +1059,7 @@ Options:
   --group <groups>    Circuit groups (comma-separated: dkg,threshold)
   --circuit <name>    Build specific circuit(s)
   --preset <preset>   Parameter preset: insecure-512 (default), secure-8192, or all
-  --committee <name>  Committee size: micro (default), small, medium
+  --committee <name>  Committee size: micro (default), small, medium, large
   --skip-utils-patch  Don't rewrite BFV_DKG_H/T in packages/enclave-contracts/scripts/utils.ts
   --skip-vk           Skip verification key generation
   --skip-checksums    Skip checksum generation
