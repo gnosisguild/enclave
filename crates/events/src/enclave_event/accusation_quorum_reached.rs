@@ -15,14 +15,6 @@ use std::fmt::{self, Display};
 pub enum AccusationOutcome {
     /// >= M nodes agree the proof is bad → slash the accused.
     AccusedFaulted,
-    /// **Deprecated.** Previously emitted when `votes_against >= M`. The
-    /// `AccusationVote` gossip wire no longer carries disagreement
-    /// signatures (a peer who finds the proof passes simply stays silent),
-    /// so this outcome is no longer produced by the off-chain quorum
-    /// protocol. Kept in the enum for serialized-event backwards
-    /// compatibility — downstream consumers should treat any historic
-    /// `AccuserLied` event the same as `Inconclusive`.
-    AccuserLied,
     /// data_hashes differ between voters → accused sent different data to different nodes.
     Equivocation,
     /// Vote timeout expired or not enough votes → proceed with E3 timeout.
@@ -33,7 +25,6 @@ impl Display for AccusationOutcome {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AccusationOutcome::AccusedFaulted => write!(f, "AccusedFaulted"),
-            AccusationOutcome::AccuserLied => write!(f, "AccuserLied"),
             AccusationOutcome::Equivocation => write!(f, "Equivocation"),
             AccusationOutcome::Inconclusive => write!(f, "Inconclusive"),
         }

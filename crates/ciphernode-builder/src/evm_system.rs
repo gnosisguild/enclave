@@ -77,13 +77,15 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
             // The event is defined here
             move |msg| {
                 // Extract config
-                let deploy_block = msg.get_evm_config(chain_id)?.deploy_block();
+                let chain_config = msg.get_evm_config(chain_id)?;
+                let deploy_block = chain_config.deploy_block();
+                let confirmations = chain_config.confirmations();
 
                 // Pass next to the router
                 let router = configure_router(next, route_factories);
 
                 // Extract filters from the router
-                let filters = filters_from_router(&router, deploy_block);
+                let filters = filters_from_router(&router, deploy_block, confirmations);
 
                 // Setup and start the read interface and the router
                 EvmReadInterface::setup_with_factory(
@@ -117,6 +119,7 @@ fn configure_router(
     router
 }
 
-fn filters_from_router(router: &EvmRouter, deploy_block: u64) -> Filters {
+fn filters_from_router(router: &EvmRouter, deploy_block: u64, confirmations: u64) -> Filters {
     Filters::from_routing_table(router.get_routing_table(), deploy_block)
+        .with_confirmations(confirmations)
 }

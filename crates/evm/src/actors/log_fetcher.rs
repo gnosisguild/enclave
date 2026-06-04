@@ -151,11 +151,15 @@ pub(crate) async fn backfill_to_head<L: LogProvider>(
     next: &EvmEventProcessor,
     timestamp_tracker: &mut TimestampTracker,
     last_block: &mut u64,
+    confirmations: u64,
 ) -> Result<(), anyhow::Error> {
-    let current_head = provider
+    let raw_head = provider
         .fetch_block_number()
         .await
         .map_err(|e| anyhow!("Failed to get block number for gap backfill: {}", e))?;
+    // Clamp to the confirmed head so we never ingest logs that a reorg of depth
+    // `confirmations` could still orphan. `confirmations == 0` is a no-op.
+    let current_head = crate::domain::reorg::confirmed_head(raw_head, confirmations);
 
     let gap_start = *last_block + 1;
     if gap_start > current_head {
@@ -424,7 +428,7 @@ mod tests {
         let filter = Filter::new();
         let mut last_block = 100u64;
 
-        let result = backfill_to_head(&mock, &filter, 1, &next, &mut ts, &mut last_block).await;
+        let result = backfill_to_head(&mock, &filter, 1, &next, &mut ts, &mut last_block, 0).await;
 
         assert!(result.is_ok());
         assert_eq!(last_block, 100);
@@ -440,7 +444,7 @@ mod tests {
         let filter = Filter::new();
         let mut last_block = 100u64;
 
-        let result = backfill_to_head(&mock, &filter, 1, &next, &mut ts, &mut last_block).await;
+        let result = backfill_to_head(&mock, &filter, 1, &next, &mut ts, &mut last_block, 0).await;
 
         assert!(result.is_ok());
         assert_eq!(last_block, 200);
@@ -478,7 +482,7 @@ mod tests {
         let filter = Filter::new();
         let mut last_block = 100u64;
 
-        let result = backfill_to_head(&mock, &filter, 1, &next, &mut ts, &mut last_block).await;
+        let result = backfill_to_head(&mock, &filter, 1, &next, &mut ts, &mut last_block, 0).await;
 
         // Should fail because chunk 3 exhausted retries
         assert!(result.is_err());
@@ -488,8 +492,25 @@ mod tests {
         // On retry: gap_start = 20101, head still 25000 → single chunk succeeds
         mock.push_logs(vec![make_test_log(22000)]);
 
-        let result = backfill_to_head(&mock, &filter, 1, &next, &mut ts, &mut last_block).await;
+        let result = backfill_to_head(&mock, &filter, 1, &next, &mut ts, &mut last_block, 0).await;
         assert!(result.is_ok());
         assert_eq!(last_block, 25000);
+    }
+
+    #[actix::test]
+    async fn test_backfill_clamps_to_confirmed_head() {
+        // Head at 200, but require 12 confirmations => only ingest up to 188.
+        let mock = MockLogProvider::new(200);
+        mock.push_logs(vec![make_test_log(150)]);
+        let (next, _rx) = setup_collector();
+        let mut ts = TimestampTracker::new();
+        let filter = Filter::new();
+        let mut last_block = 100u64;
+
+        let result = backfill_to_head(&mock, &filter, 1, &next, &mut ts, &mut last_block, 12).await;
+
+        assert!(result.is_ok());
+        // Advanced only to the confirmed head, not the raw head of 200.
+        assert_eq!(last_block, 188);
     }
 }

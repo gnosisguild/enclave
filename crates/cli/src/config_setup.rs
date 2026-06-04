@@ -113,6 +113,7 @@ chains:
 #[cfg(test)]
 mod tests {
     use super::{execute, validate_eth_address, BOOTSTRAP_PEER};
+    use alloy::primitives::Address;
     use anyhow::Result;
     use std::fs;
 
@@ -125,7 +126,7 @@ mod tests {
         ));
         let _ = fs::remove_dir_all(&dir);
 
-        let config = execute("ws://localhost:8545", &dir)?;
+        let config = execute("ws://localhost:8545", &Address::ZERO, &dir)?;
 
         // The loader must actually read the prepopulated peer from `node.peers`.
         assert_eq!(config.peers(), vec![BOOTSTRAP_PEER.to_string()]);

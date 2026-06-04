@@ -5,10 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::domain::{
-    decide_schema_version, CollectOutcome, HistoricalEvmCollector, ReplayDecision,
-    SchemaVersionDecision, SnapshotMeta, SyncPlanner, SCHEMA_VERSION,
+    CollectOutcome, HistoricalEvmCollector, ReplayDecision, SnapshotMeta, SyncPlanner,
 };
-use crate::SyncRepositoryFactory;
 use actix::{Message, Recipient};
 use anyhow::{bail, Result};
 use e3_data::Repositories;
@@ -32,11 +30,6 @@ pub async fn sync(
 ) -> Result<()> {
     // 0. start listening early for net ready
     let net_ready = bus.wait_for(EventType::NetReady);
-
-    // 0b. Verify the on-disk schema version is compatible with this binary
-    //     before touching any persisted state, so an incompatible upgrade or
-    //     downgrade halts loudly instead of silently loading garbage (H19/H20).
-    check_schema_version(repositories).await?;
 
     // 1. Load snapsshot metadata
     info!("Loading snapshot metadata...");
@@ -86,8 +79,26 @@ pub async fn sync(
     }
     info!("Events replayed.");
 
-    // TODO: Detect open loops - incase we crashed in the middle of a request we need to play the
-    // request event again once effects are on
+    // Loose ends after a crash:
+    //
+    // Terminal E3 work that *completed while this node was down* is recovered by the
+    // historical EVM re-fetch in step 5 below: the terminal on-chain events
+    // (PlaintextOutputPublished / E3Failed / committee completion) are re-delivered once
+    // effects are enabled, which re-drives the Sortition release path and frees any tickets
+    // the node was still holding. So "an E3 finished while we were offline" needs no special
+    // handling here — it is reconciled by replaying the canonical chain state.
+    //
+    // What is intentionally NOT auto-re-driven here is this node's *own* in-flight request
+    // work (e.g. a keyshare we had started computing but not yet published when we crashed).
+    // Blindly re-publishing the originating request event is a no-op: the event bus dedups by
+    // EventId (payload hash), so the replayed event is dropped. Forcibly minting a fresh
+    // EventId to force re-execution is unsafe on a value-bearing protocol (it can double-emit
+    // or race the canonical chain state) and is therefore deliberately left out.
+    //
+    // Detection of such loose ends is exposed offline and non-destructively via
+    // `enclave node validate`, which cross-checks the persisted committee slots against
+    // terminal events in the log and reports orphaned tickets. See
+    // `crates/entrypoint/src/validate.rs`.
 
     // 5. Load the historical evm events to memory from all chains
     info!("Loading historical blockchain events...");
@@ -148,26 +159,6 @@ pub async fn sync(
     // normal live operations
 
     Ok(())
-}
-
-/// Verify the on-disk schema version against this binary and either stamp a
-/// fresh marker (first boot) or halt loudly on an incompatible upgrade or
-/// downgrade (H19/H20). Uses a synchronous write so the marker is durable
-/// before any further state is loaded.
-async fn check_schema_version(repositories: &Repositories) -> Result<()> {
-    let repo = repositories.schema_version();
-    let persisted = repo.read().await?;
-    match decide_schema_version(persisted, SCHEMA_VERSION) {
-        SchemaVersionDecision::Proceed => Ok(()),
-        SchemaVersionDecision::WriteCurrent => {
-            info!("Stamping on-disk schema version {SCHEMA_VERSION}.");
-            repo.write_sync(&SCHEMA_VERSION).await?;
-            Ok(())
-        }
-        SchemaVersionDecision::Halt(reason) => {
-            bail!("Schema version check failed: {reason}");
-        }
-    }
 }
 
 pub async fn collect_historical_evm_events(

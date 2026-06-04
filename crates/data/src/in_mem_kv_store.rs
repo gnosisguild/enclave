@@ -74,13 +74,13 @@ impl InMemKvStore {
         self.log.clone()
     }
 
-    /// Serializes the store to the legacy bincode `BTreeMap` dump format.
+    /// Serializes the store to the bincode `BTreeMap` dump format.
     pub fn dump(&self) -> Result<Vec<u8>> {
         let map: BTreeMap<Vec<u8>, Vec<u8>> = self.db.entries().into_iter().collect();
         bincode::serialize(&map).context("Error serializing in-memory store")
     }
 
-    /// Reconstructs a store from a legacy bincode `BTreeMap` dump.
+    /// Reconstructs a store from a bincode `BTreeMap` dump.
     pub fn from_dump(bytes: &[u8], capture: bool) -> Result<Self> {
         let map: BTreeMap<Vec<u8>, Vec<u8>> =
             bincode::deserialize(bytes).context("Error deserializing in-memory store")?;
@@ -164,9 +164,8 @@ mod tests {
     }
 
     #[test]
-    fn dump_format_matches_legacy_btreemap() {
-        // The dump must be byte-identical to a bincode-encoded BTreeMap so that
-        // dumps written by older nodes remain readable.
+    fn dump_format_is_bincode_btreemap() {
+        // The dump is a bincode-encoded BTreeMap of the store's entries.
         let mut store = InMemKvStore::new(false);
         store.insert(b"alpha".to_vec(), b"1".to_vec(), None);
         store.insert(b"beta".to_vec(), b"2".to_vec(), None);

@@ -29,6 +29,10 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
     owo();
     launch_socket_server(config.ctrl_port());
 
+    // Cross-host fence: ensure only one instance runs against this data directory.
+    // Held for the lifetime of this function (the running process); released on exit.
+    let _fence = e3_entrypoint::fence::ProcessFence::acquire(&config.db_file(), &config.name())?;
+
     if let Some(dashboard_port) = config.dashboard_port() {
         let ctrl_port = config.ctrl_port();
         let node_name = config.name();

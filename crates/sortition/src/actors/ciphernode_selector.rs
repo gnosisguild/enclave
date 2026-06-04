@@ -44,6 +44,11 @@ pub struct CiphernodeSelectorState {
     pub e3_cache: HashMap<E3id, E3Meta>,
     pub committees: HashMap<E3id, Committee>,
     pub expelled: HashMap<E3id, Vec<u64>>,
+    /// Party ids the local node presumes unresponsive for failover purposes.
+    /// Treated identically to `expelled` when computing the active aggregator,
+    /// but populated by local liveness signals rather than on-chain expulsion.
+    /// Empty by default, so behaviour is unchanged unless a standby is promoted.
+    pub unresponsive: HashMap<E3id, Vec<u64>>,
     pub is_aggregator: HashMap<E3id, bool>,
 }
 
@@ -115,7 +120,8 @@ impl CiphernodeSelector {
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("Missing finalized committee for {}", e3_id))?;
         let expelled = state.expelled.get(e3_id).cloned().unwrap_or_default();
-        let is_aggregator = committee.is_active_aggregator(&self.address, &expelled);
+        let unresponsive = state.unresponsive.get(e3_id).cloned().unwrap_or_default();
+        let is_aggregator = committee.effective_aggregator(&self.address, &expelled, &unresponsive);
         let previous = state.is_aggregator.get(e3_id).copied();
 
         self.state.try_mutate(ec, |mut selector_state| {
@@ -247,6 +253,7 @@ impl Handler<TypedEvent<E3RequestComplete>> for CiphernodeSelector {
                     state.e3_cache.remove(&msg.e3_id);
                     state.committees.remove(&msg.e3_id);
                     state.expelled.remove(&msg.e3_id);
+                    state.unresponsive.remove(&msg.e3_id);
                     state.is_aggregator.remove(&msg.e3_id);
                     Ok(state)
                 })
