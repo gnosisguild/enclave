@@ -4,6 +4,10 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/lib/dev_config.sh"
+load_template_dev_config
+
 SIGNAL_FILE=/tmp/enclave_ciphernodes_ready
 
 cleanup() {
@@ -45,6 +49,8 @@ enclave wallet set --name cn5 --private-key "$PRIVATE_KEY_CN5"
 
 echo "Setting up ZK prover..."
 enclave noir setup
+
+sync_enclave_circuit_artifacts
 
 # Deploy before starting nodes so enclave.config.yaml addresses match the chain.
 echo "Deploying protocol + MyProgram..."

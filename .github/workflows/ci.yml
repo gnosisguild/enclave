@@ -777,6 +777,9 @@ jobs:
         with:
           toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
+      - name: Build enclave circuits
+        run: pnpm build:circuits --preset insecure-512 --committee micro --skip-if-built
+
       - name: Setup ZK prover
         run: |
           enclave noir setup
@@ -1183,6 +1186,14 @@ jobs:
         run: |
           chmod +x ~/.cargo/bin/enclave
           chmod +x templates/default/target/debug/e3-support-scripts-dev
+
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: ${{ env.NOIR_TOOLCHAIN }}
+
+      - name: Build enclave circuits
+        run: pnpm build:circuits --preset insecure-512 --committee micro --skip-if-built
 
       - name: Setup ZK prover
         run: |
