@@ -41,6 +41,7 @@ use e3_events::{
     VOTE_TYPEHASH_STR,
 };
 use e3_utils::ArcBytes;
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use tracing::{error, info, warn};
 
 use crate::actors::accusation_manager::Clock;
@@ -135,6 +136,9 @@ pub(crate) struct AccusationVoting {
     committee: Vec<Address>,
     /// Quorum threshold — matches the cryptographic threshold M.
     threshold_m: usize,
+    /// Original committee N fixed at construction for ZK circuit resolution.
+    /// Do not derive from [`Self::committee`] after [`Self::on_slash_executed`] shrinks the roster.
+    committee_n: usize,
 
     /// Active accusations keyed by accusation_id.
     pending: HashMap<[u8; 32], PendingAccusation>,
@@ -180,6 +184,7 @@ impl AccusationVoting {
         clock: Arc<dyn Clock>,
     ) -> Self {
         let my_address = signer.address();
+        let committee_n = committee.len();
         Self {
             e3_id,
             my_address,
@@ -187,6 +192,7 @@ impl AccusationVoting {
             slashing_manager,
             committee,
             threshold_m,
+            committee_n,
             pending: HashMap::new(),
             accused_proofs: HashSet::new(),
             received_data: HashMap::new(),
@@ -841,6 +847,17 @@ impl AccusationVoting {
             let accused_party_id = accusation.accused_party_id;
             let forwarded_clone = forwarded.clone();
 
+            let committee_size = match CiphernodesCommitteeSize::from_threshold(
+                self.threshold_m,
+                self.committee_n,
+            ) {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!("Cannot derive committee size for ZK re-verification: {e}");
+                    return;
+                }
+            };
+
             // Create PendingAccusation without our vote — it arrives after ZK completes.
             actions.push(VoteAction::StartTimeout(accusation_id));
             self.pending.insert(
@@ -875,16 +892,6 @@ impl AccusationVoting {
             let party_proof = PartyProofsToVerify {
                 sender_party_id: accused_party_id,
                 signed_proofs: vec![forwarded_clone],
-            };
-            let committee_size = match e3_zk_helpers::CiphernodesCommitteeSize::from_threshold(
-                self.threshold_m,
-                self.committee.len(),
-            ) {
-                Ok(c) => c,
-                Err(e) => {
-                    warn!("Cannot derive committee size for ZK re-verification: {e}");
-                    return;
-                }
             };
             let request = ComputeRequest::zk(
                 ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
@@ -1625,5 +1632,30 @@ mod tests {
         let (quorum, _ec) = v.on_vote_timeout(id).expect("timeout emits a decision");
         assert_eq!(quorum.outcome, AccusationOutcome::Inconclusive);
         assert!(v.on_vote_timeout(id).is_none(), "second timeout is a no-op");
+    }
+
+    /// After a slash shrinks the live roster, ZK re-verification must still use the
+    /// canonical circuit committee size cached at construction.
+    #[test]
+    fn committee_size_unchanged_after_slash() {
+        let me = signer(1);
+        let committee: Vec<Address> = (1..=10u8).map(|b| signer(b).address()).collect();
+        let mut v = voting_with(&me, committee.clone(), 4);
+
+        let slashed = committee[9];
+        v.on_slash_executed(SlashExecuted {
+            e3_id: v.e3_id.clone(),
+            proposal_id: 1,
+            operator: slashed,
+            reason: [0u8; 32],
+            ticket_amount: 0,
+            license_amount: 0,
+        });
+        assert_eq!(v.committee.len(), 9);
+        assert!(CiphernodesCommitteeSize::from_threshold(4, v.committee.len()).is_err());
+        assert_eq!(
+            CiphernodesCommitteeSize::from_threshold(v.threshold_m, v.committee_n).unwrap(),
+            CiphernodesCommitteeSize::Medium
+        );
     }
 }
