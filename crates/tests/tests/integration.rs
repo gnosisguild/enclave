@@ -170,21 +170,25 @@ fn repo_root() -> PathBuf {
         .join("..")
 }
 
-/// Whether `setup_test_zk_backend` copies from `dist/circuits/<preset>/` (same marker as below).
-fn uses_dist_preset_artifacts(preset_subdir: &str) -> bool {
+/// Whether `setup_test_zk_backend` copies from `dist/circuits/<preset>/<committee>/`.
+/// Under the new per-committee layout artifacts live under `{preset}/{committee}/recursive/...`.
+fn uses_dist_preset_artifacts(preset_subdir: &str, committee_str: &str) -> bool {
     repo_root()
         .join("dist/circuits")
         .join(preset_subdir)
+        .join(committee_str)
         .join("recursive/dkg/pk/pk.json")
         .exists()
 }
 
-/// Preset stamp for committee/metadata — aligned with `setup_test_zk_backend` artifact source:
-/// dist tree when present, otherwise `circuits/bin/.active-preset.json`.
-fn resolve_preset_stamp_path(preset_subdir: &str) -> PathBuf {
-    let dist_preset = repo_root().join("dist/circuits").join(preset_subdir);
-    if uses_dist_preset_artifacts(preset_subdir) {
-        dist_preset.join(".build-stamp.json")
+/// Preset stamp path — under the new layout each `{preset}/{committee}` dir has its own stamp.
+fn resolve_preset_stamp_path(preset_subdir: &str, committee_str: &str) -> PathBuf {
+    if uses_dist_preset_artifacts(preset_subdir, committee_str) {
+        repo_root()
+            .join("dist/circuits")
+            .join(preset_subdir)
+            .join(committee_str)
+            .join(".build-stamp.json")
     } else {
         repo_root()
             .join("circuits")
@@ -193,16 +197,22 @@ fn resolve_preset_stamp_path(preset_subdir: &str) -> PathBuf {
     }
 }
 
-/// Reads the active committee from the preset stamp that matches the circuit artifacts in use.
-/// Uses `resolve_preset_stamp_path` so committee metadata stays aligned with
-/// `setup_test_zk_backend` (dist vs `circuits/bin`).
+/// Reads the active committee from `circuits/bin/.active-preset.json`, which is written by every
+/// `pnpm build:circuits` invocation and is the canonical source for the new per-committee layout.
 ///
 /// Falls back to `Micro` (and warns) when the stamp is missing or pre-dates the `committee`
 /// field — same default as the build script, so a freshly cloned repo's micro circuits work
 /// out of the box.
-fn active_committee(preset_subdir: &str) -> e3_zk_helpers::CiphernodesCommitteeSize {
+fn active_committee(_preset_subdir: &str) -> e3_zk_helpers::CiphernodesCommitteeSize {
     use std::str::FromStr;
-    let stamp_path = resolve_preset_stamp_path(preset_subdir);
+    // `circuits/bin/.active-preset.json` is written by every build and hydrate. It is the
+    // authoritative source under the new per-committee layout because the per-committee dist
+    // stamp is nested under `dist/circuits/{preset}/{committee}/`, which requires already
+    // knowing the committee to locate.
+    let stamp_path = repo_root()
+        .join("circuits")
+        .join("bin")
+        .join(".active-preset.json");
     let fallback = e3_zk_helpers::CiphernodesCommitteeSize::Micro;
 
     let Ok(raw) = std::fs::read_to_string(&stamp_path) else {
@@ -342,7 +352,14 @@ async fn setup_test_zk_backend(
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
     let repo_root = repo_root();
-    let dist_preset = repo_root.join("dist/circuits").join(preset_subdir);
+    // Derive committee before constructing any paths — it determines the subdirectory under
+    // `dist/circuits/{preset}/{committee}/` in the new per-committee layout.
+    let committee = active_committee(preset_subdir);
+    let committee_str = committee.as_str();
+    let dist_preset = repo_root
+        .join("dist/circuits")
+        .join(preset_subdir)
+        .join(committee_str);
 
     if let Some(bb) = find_bb().await {
         tokio::fs::create_dir_all(bb_binary.parent().unwrap())
@@ -356,26 +373,25 @@ async fn setup_test_zk_backend(
         #[cfg(not(unix))]
         compile_error!("Integration tests require unix symlink support");
 
-        let preset_out = circuits_dir.join(preset_subdir);
+        let preset_out = circuits_dir.join(preset_subdir).join(committee_str);
         let circuits_bin_marker = repo_root.join("circuits/bin/dkg/target/pk.json");
-        // `circuits/bin` is preset-agnostic on disk — only `dist/circuits/<preset>/.build-stamp.json`
-        // (written by `pnpm build:circuits --preset <preset>`) records which preset the
-        // most recent local build targeted. Without it we cannot tell whether `circuits/bin`
-        // matches `preset_subdir`, and copying the wrong preset's artifacts would silently
-        // produce invalid proofs.
-        let preset_build_stamp = dist_preset.join(".build-stamp.json");
+        // `circuits/bin` is preset-agnostic on disk — only `.active-preset.json` records which
+        // preset+committee the most recent local build targeted. Without it we cannot tell
+        // whether `circuits/bin` matches `preset_subdir`, and copying wrong artifacts would
+        // silently produce invalid proofs.
+        let preset_build_stamp = resolve_preset_stamp_path(preset_subdir, committee_str);
 
-        if uses_dist_preset_artifacts(preset_subdir) {
+        if uses_dist_preset_artifacts(preset_subdir, committee_str) {
             copy_dir_recursive(&dist_preset, &preset_out).await?;
         } else if !circuits_bin_marker.exists() || !preset_build_stamp.exists() {
             // Either no local build exists, or the local build cannot be proven to match
             // the requested preset; download the pinned release tarball instead.
             println!(
-                "No verifiable local circuit fixtures for preset `{}` \
-                 (need either dist/circuits/{}/recursive/dkg/pk/pk.json \
-                 or circuits/bin + dist/circuits/{}/.build-stamp.json); \
+                "No verifiable local circuit fixtures for preset `{}/{}` \
+                 (need either dist/circuits/{}/{}/recursive/dkg/pk/pk.json \
+                 or circuits/bin + circuits/bin/.active-preset.json); \
                  downloading release circuits via ensure_installed()...",
-                preset_subdir, preset_subdir, preset_subdir
+                preset_subdir, committee_str, preset_subdir, committee_str
             );
             let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
             backend
@@ -480,7 +496,7 @@ async fn setup_test_zk_backend(
             }
 
             // ── recursive/ variant (inner/base proofs, uses .vk_noir) ──────────
-            let preset_dir = circuits_dir.join(preset_subdir);
+            let preset_dir = circuits_dir.join(preset_subdir).join(committee_str);
 
             let rv = preset_dir.join("recursive");
 
