@@ -6,20 +6,13 @@
 
 //! Pure translation of `CiphernodeRegistry.sol` logs into `EnclaveEventData`.
 
+use crate::contracts::ICiphernodeRegistry;
 use alloy::{
     primitives::{LogData, B256},
-    sol,
     sol_types::SolEvent,
 };
 use e3_events::{CommitteeFinalized, E3id, EnclaveEventData, Seed};
 use tracing::{error, info, trace};
-
-sol!(
-    #[sol(rpc)]
-    #[derive(Debug)]
-    ICiphernodeRegistry,
-    "../../packages/enclave-contracts/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json"
-);
 
 struct CiphernodeAddedWithChainId(pub ICiphernodeRegistry::CiphernodeAdded, pub u64);
 

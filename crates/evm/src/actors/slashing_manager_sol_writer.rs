@@ -9,6 +9,7 @@
 //! `proposeSlashByDkgParty` when DKG anchors resolve, and falls back to
 //! operator-attributed `proposeSlash` otherwise.
 
+use crate::contracts::{ICiphernodeRegistry, ISlashingManager};
 use crate::domain::attestation_evidence::encode_attestation_evidence;
 use crate::domain::error_decoder::format_evm_error;
 use crate::domain::slash_submission::{should_submit_slash, submission_delay, submission_rank};
@@ -20,7 +21,6 @@ use alloy::{
     primitives::{Address, Bytes, U256},
     providers::{Provider, WalletProvider},
     rpc::types::TransactionReceipt,
-    sol,
 };
 use anyhow::Result;
 use e3_events::prelude::*;
@@ -32,12 +32,6 @@ use e3_events::Shutdown;
 use e3_events::{AccusationQuorumReached, EType};
 use e3_utils::NotifySync;
 use tracing::{info, warn};
-
-sol!(
-    #[sol(rpc)]
-    ISlashingManager,
-    "../../packages/enclave-contracts/artifacts/contracts/interfaces/ISlashingManager.sol/ISlashingManager.json"
-);
 
 /// Submits `AccusationQuorumReached` events as slash proposals on-chain.
 pub struct SlashingManagerSolWriter<P> {
@@ -261,24 +255,13 @@ async fn resolve_party_id_for_operator<P: Provider + WalletProvider + Clone>(
     e3_id: U256,
     operator: Address,
 ) -> Result<Option<U256>> {
-    sol! {
-        #[sol(rpc)]
-        interface IRegistryDkgView {
-            function getDkgAnchors(uint256 e3Id)
-                external
-                view
-                returns (uint256[] memory partyIds, bytes32[] memory, bytes32[] memory);
-            function canonicalCommitteeNodeAt(uint256 e3Id, uint256 partyId) external view returns (address);
-        }
-    }
-
     let slashing = ISlashingManager::new(contract_address, provider.provider());
     let registry = slashing.ciphernodeRegistry().call().await?;
     if registry == Address::ZERO {
         return Ok(None);
     }
 
-    let registry_view = IRegistryDkgView::new(registry, provider.provider());
+    let registry_view = ICiphernodeRegistry::new(registry, provider.provider());
     let anchors = registry_view.getDkgAnchors(e3_id).call().await?;
     for pid in anchors.partyIds {
         let node = registry_view

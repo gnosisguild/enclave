@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::contracts::IEnclave;
 use crate::domain::error_decoder::format_evm_error;
 use crate::domain::plaintext_publication::validate_plaintext_output;
 use crate::helpers::{encode_zk_proof, EthProvider};
@@ -12,7 +13,6 @@ use actix::prelude::*;
 use alloy::{
     primitives::Address,
     providers::{Provider, WalletProvider},
-    sol,
 };
 use alloy::{
     primitives::{Bytes, U256},
@@ -32,12 +32,6 @@ use e3_utils::NotifySync;
 use e3_utils::MAILBOX_LIMIT;
 use std::collections::{HashMap, HashSet};
 use tracing::info;
-
-sol!(
-    #[sol(rpc)]
-    IEnclave,
-    "../../packages/enclave-contracts/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json"
-);
 
 /// Consumes events from the event bus and calls EVM methods on the Enclave.sol contract
 pub struct EnclaveSolWriter<P> {

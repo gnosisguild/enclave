@@ -403,8 +403,7 @@ jobs:
         download-circuits,
         build-nix-flake,
       ]
-    if:
-      always() && needs.validate-and-prepare.result == 'success' && needs.build-binaries.result == 'success'
+    if: always() && needs.validate-and-prepare.result == 'success' && needs.build-binaries.result == 'success'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
