@@ -13,6 +13,7 @@
 //! - [`messages`] holds the actix message and event types exchanged between them.
 
 mod actors;
+mod contracts;
 mod domain;
 mod messages;
 mod repo;
