@@ -27,6 +27,13 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
     tokio::pin!(shutdown);
 
     owo();
+
+    // Cross-host fence: ensure only one instance runs against this data directory.
+    // Acquired *before* binding the control port or spawning background work so a second
+    // instance fails fast instead of racing on the shared data directory.
+    // Held for the lifetime of this function (the running process); released on exit.
+    let _fence = e3_entrypoint::fence::ProcessFence::acquire(&config.db_file(), &config.name())?;
+
     launch_socket_server(config.ctrl_port());
 
     if let Some(dashboard_port) = config.dashboard_port() {

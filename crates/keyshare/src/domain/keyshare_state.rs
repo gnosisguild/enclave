@@ -196,6 +196,12 @@ pub struct ThresholdKeyshareState {
     pub honest_parties: Option<BTreeSet<u64>>,
     pub dkg_started_at_unix_secs: Option<u64>,
     pub proof_aggregation_enabled: bool,
+    /// Set once `KeyshareCreated` has actually been published from an authorized
+    /// path (after C4 honest-set verification, the no-C4-proofs path, or the
+    /// sole-honest fast path). `ReadyForDecryption` is entered *before* that
+    /// authorization, so resume-after-crash must only re-publish when this is set;
+    /// otherwise it could emit a keyshare that never passed C4 filtering.
+    pub keyshare_published: bool,
 }
 
 impl ThresholdKeyshareState {
@@ -223,6 +229,7 @@ impl ThresholdKeyshareState {
             honest_parties: None,
             dkg_started_at_unix_secs: Some(now_unix_secs()),
             proof_aggregation_enabled,
+            keyshare_published: false,
         }
     }
 

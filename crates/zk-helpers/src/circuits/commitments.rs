@@ -692,8 +692,6 @@ mod tests {
         use fhe::bfv::SecretKey;
         use fhe::mbfv::PublicKeyShare;
         use fhe_traits::Serialize;
-        use rand::Rng;
-
         let preset = BfvPreset::InsecureThreshold512;
         let (params, _) = build_pair_for_preset(preset).unwrap();
         let crp = create_deterministic_crp_from_default_seed(&params);

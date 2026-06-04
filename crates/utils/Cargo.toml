@@ -11,7 +11,6 @@ actix.workspace = true
 alloy.workspace = true
 anyhow.workspace = true
 derivative.workspace = true
-e3-committee-hash.workspace = true
 rand.workspace = true
 hex.workspace = true
 regex.workspace = true

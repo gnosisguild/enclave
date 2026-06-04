@@ -421,9 +421,6 @@ check_quorum(accusation_id):
 │   ├─ Multiple data_hashes across ALL votes?
 │   │   └─ YES → AccusationOutcome::Equivocation (SLASHABLE)
 │   │
-│   ├─ Only accuser says bad, others disagree?
-│   │   └─ AccusationOutcome::AccuserLied (NOT slashable)
-│   │
 │   └─ Otherwise → AccusationOutcome::Inconclusive (NOT slashable)
 │
 └─ CASE C: Still waiting for more votes

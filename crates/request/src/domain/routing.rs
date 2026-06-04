@@ -46,8 +46,16 @@ pub struct RequestRouter;
 impl RequestRouter {
     /// Decide how an incoming event should be routed given the set of completed requests.
     pub fn route(msg: &EnclaveEvent, completed: &HashSet<E3id>) -> RoutingDecision {
-        // If we are shutting down then broadcast to every context and bail on anything else.
-        if let EnclaveEventData::Shutdown(_) = msg.get_data() {
+        // Broadcast non-E3-scoped lifecycle signals to every active context:
+        //   * `Shutdown` so children can tear themselves down, and
+        //   * `EffectsEnabled` so a hydrated request can re-drive its own in-flight work
+        //     once side effects are switched on at the end of boot sync.
+        // Both carry no `e3_id`, so without this they would be `Ignore`d and never reach the
+        // per-E3 child actors.
+        if matches!(
+            msg.get_data(),
+            EnclaveEventData::Shutdown(_) | EnclaveEventData::EffectsEnabled(_)
+        ) {
             return RoutingDecision::Broadcast;
         }
 
@@ -112,6 +120,17 @@ mod tests {
     #[test]
     fn shutdown_broadcasts() {
         let msg = from_data(Shutdown);
+        assert_eq!(
+            RequestRouter::route(&msg, &HashSet::new()),
+            RoutingDecision::Broadcast
+        );
+    }
+
+    #[test]
+    fn effects_enabled_broadcasts() {
+        // EffectsEnabled has no e3_id but must reach every hydrated context so each can
+        // re-drive its own in-flight work after a restart.
+        let msg = from_data(e3_events::EffectsEnabled::new());
         assert_eq!(
             RequestRouter::route(&msg, &HashSet::new()),
             RoutingDecision::Broadcast

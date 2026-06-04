@@ -1290,6 +1290,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .map(|a| e3_config::Contract::AddressOnly(a.to_string())),
         },
         finalization_ms: None,
+        reorg_confirmations: None,
         chain_id: Some(1),
     };
 

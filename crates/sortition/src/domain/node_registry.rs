@@ -241,6 +241,43 @@ impl NodeRegistry {
             "E3 completed/failed - decremented active jobs for committee"
         );
     }
+
+    /// Enumerate every committee that still holds active jobs (i.e. has not been
+    /// released by a completion/failure event).
+    ///
+    /// These are the node's "open loops": E3s it is still accounted as busy on.
+    /// On a clean shutdown/restart this set should only contain genuinely
+    /// in-flight E3s. If it contains an E3 that has already reached a terminal
+    /// stage on-chain, the corresponding active-job slot is orphaned and should
+    /// be released (see `enclave node validate`). The returned `committee_key`
+    /// matches [`committee_key`] so callers can correlate it with an `E3id`.
+    pub fn open_committees(store: &HashMap<u64, NodeStateStore>) -> Vec<OpenCommittee> {
+        let mut out = Vec::new();
+        for (chain_id, chain_state) in store {
+            for (key, members) in &chain_state.e3_committees {
+                out.push(OpenCommittee {
+                    chain_id: *chain_id,
+                    committee_key: key.clone(),
+                    members: members.clone(),
+                });
+            }
+        }
+        out
+    }
+}
+
+/// A committee that still holds active-job slots in a [`NodeStateStore`].
+///
+/// Produced by [`NodeRegistry::open_committees`]. `committee_key` is the same
+/// `"{chain_id}:{e3_id}"` string used internally (see [`committee_key`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OpenCommittee {
+    /// Chain the committee belongs to.
+    pub chain_id: u64,
+    /// Canonical committee key (`"{chain_id}:{e3_id}"`).
+    pub committee_key: String,
+    /// Addresses of the committee members holding the open slot.
+    pub members: Vec<String>,
 }
 
 #[cfg(test)]
@@ -332,5 +369,32 @@ mod tests {
         assert_eq!(with_tickets.len(), 1);
         assert_eq!(with_tickets[0].0, "active");
         assert_eq!(with_tickets[0].1, 3);
+    }
+
+    #[test]
+    fn open_committees_lists_only_unreleased() {
+        let mut store = HashMap::new();
+        let a = e3(1, "1");
+        let b = e3(1, "2");
+        NodeRegistry::record_committee_published(&mut store, &a, &["0xabc".into()]);
+        NodeRegistry::record_committee_published(&mut store, &b, &["0xabc".into(), "0xdef".into()]);
+
+        let open = NodeRegistry::open_committees(&store);
+        assert_eq!(open.len(), 2);
+
+        // Releasing one removes it from the open set.
+        NodeRegistry::release_committee_jobs(&mut store, &a, "test");
+        let open = NodeRegistry::open_committees(&store);
+        assert_eq!(open.len(), 1);
+        assert_eq!(open[0].committee_key, committee_key(&b));
+        assert_eq!(open[0].chain_id, 1);
+        assert_eq!(
+            open[0].members,
+            vec!["0xabc".to_string(), "0xdef".to_string()]
+        );
+
+        // Fully drained -> empty.
+        NodeRegistry::release_committee_jobs(&mut store, &b, "test");
+        assert!(NodeRegistry::open_committees(&store).is_empty());
     }
 }

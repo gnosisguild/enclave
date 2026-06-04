@@ -22,6 +22,7 @@ pub(crate) mod enclave_events;
 pub(crate) mod historical_order_fixer;
 pub(crate) mod log_timestamp;
 pub(crate) mod plaintext_publication;
+pub(crate) mod reorg;
 pub(crate) mod slash_submission;
 pub(crate) mod slashing_events;
 

@@ -86,8 +86,31 @@ pub async fn sync(
     }
     info!("Events replayed.");
 
-    // TODO: Detect open loops - incase we crashed in the middle of a request we need to play the
-    // request event again once effects are on
+    // Loose ends after a crash:
+    //
+    // Terminal E3 work that *completed while this node was down* is recovered by the
+    // historical EVM re-fetch in step 5 below: the terminal on-chain events
+    // (PlaintextOutputPublished / E3Failed / committee completion) are re-delivered once
+    // effects are enabled, which re-drives the Sortition release path and frees any tickets
+    // the node was still holding. So "an E3 finished while we were offline" needs no special
+    // handling here — it is reconciled by replaying the canonical chain state.
+    //
+    // What is intentionally NOT auto-re-driven *here in sync* is this node's *own* in-flight
+    // request work by replaying the originating request events. Blindly re-publishing the
+    // originating request event is a no-op: the event bus dedups by EventId (payload hash), so
+    // the replayed event is dropped. Forcibly minting a fresh EventId to force re-execution is
+    // unsafe on a value-bearing protocol (it can double-emit or race the canonical chain state)
+    // and is therefore deliberately left out of the sync path.
+    //
+    // Note: this is *not* a global absence of restart recovery. Actors that hold determined,
+    // idempotent in-flight results re-drive themselves when `EffectsEnabled` is broadcast at the
+    // end of this sync (e.g. `ThresholdKeyshare::resume_in_flight_work` re-publishes a computed
+    // keyshare / decryption share). What sync deliberately avoids is replaying *request* events.
+    //
+    // Detection of loose ends that cannot be locally re-driven is exposed offline and
+    // non-destructively via `enclave node validate`, which cross-checks the persisted committee
+    // slots against terminal events in the log and reports orphaned tickets. See
+    // `crates/entrypoint/src/validate.rs`.
 
     // 5. Load the historical evm events to memory from all chains
     info!("Loading historical blockchain events...");
