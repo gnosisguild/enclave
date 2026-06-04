@@ -72,7 +72,12 @@ export const CIRCUIT_COMMITTEES = {
 
 export type CircuitCommittee = (typeof CIRCUIT_COMMITTEES)[keyof typeof CIRCUIT_COMMITTEES]
 
-export const ALL_COMMITTEES: CircuitCommittee[] = [CIRCUIT_COMMITTEES.MICRO, CIRCUIT_COMMITTEES.SMALL, CIRCUIT_COMMITTEES.MEDIUM, CIRCUIT_COMMITTEES.LARGE]
+export const ALL_COMMITTEES: CircuitCommittee[] = [
+  CIRCUIT_COMMITTEES.MICRO,
+  CIRCUIT_COMMITTEES.SMALL,
+  CIRCUIT_COMMITTEES.MEDIUM,
+  CIRCUIT_COMMITTEES.LARGE,
+]
 
 /**
  * `(N, T, H)` per committee. Mirrors `circuits/lib/src/configs/committee/{name}/mod.nr`
