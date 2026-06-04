@@ -211,6 +211,20 @@ fn check_sequence_integrity(agg: AggregateId, seqs: &[u64]) -> CheckResult {
     if seqs.is_empty() {
         return CheckResult::pass(name, format!("aggregate {}: no events", agg.to_usize()));
     }
+    // Per-aggregate sequences are 1-indexed (the commit log returns `offset + 1`),
+    // so a healthy log's first event is seq 1. A higher first seq means the head of
+    // the log was truncated — catch it explicitly, since an internal-gap scan alone
+    // treats e.g. [5, 6, 7] as healthy.
+    if seqs[0] != 1 {
+        return CheckResult::fail(
+            name,
+            format!(
+                "aggregate {}: first event starts at seq {} instead of 1 (log truncated at head)",
+                agg.to_usize(),
+                seqs[0]
+            ),
+        );
+    }
     match detect_sequence_gaps(seqs) {
         SequenceCheck::Ok { first, last, count } => CheckResult::pass(
             name,
@@ -444,10 +458,12 @@ async fn read_all_events(
         since = next;
     }
     // The store may interleave aggregates depending on the query; keep only this
-    // aggregate's events and order them by sequence for the integrity check.
+    // aggregate's events and order them by sequence for the integrity check. Do not
+    // deduplicate by seq — repeated sequence numbers are exactly the corruption the
+    // integrity check must surface (pagination advances strictly past the last seq,
+    // so it never produces legitimate duplicates).
     all.retain(|e| e.aggregate_id() == aggregate);
     all.sort_by_key(|e| e.seq());
-    all.dedup_by_key(|e| e.seq());
     Ok(all)
 }
 

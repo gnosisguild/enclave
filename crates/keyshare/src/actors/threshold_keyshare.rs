@@ -1519,8 +1519,16 @@ impl ThresholdKeyshare {
                 party_id,
                 signed_pk_generation_proof: signed_pk_generation_proof.clone(),
             },
-            ec,
+            ec.clone(),
         )?;
+
+        // Record that publishing was authorized and has occurred, so resume-after-crash
+        // may safely re-publish (idempotent at the aggregator) without ever emitting a
+        // keyshare for a state that had not yet passed C4 honest-set filtering.
+        self.state.try_mutate(&ec, |mut s| {
+            s.keyshare_published = true;
+            Ok(s)
+        })?;
 
         Ok(())
     }
@@ -1617,8 +1625,11 @@ impl ThresholdKeyshare {
         };
         match &state.state {
             // We have produced our public-key share but may have crashed before (or while)
-            // publishing KeyshareCreated. Re-publishing is idempotent at the aggregator.
-            KeyshareState::ReadyForDecryption(_) => {
+            // publishing KeyshareCreated. Re-publishing is idempotent at the aggregator, but
+            // ReadyForDecryption is entered *before* C4 honest-set verification authorizes the
+            // publish, so only re-drive when a prior authorized publish was recorded. An
+            // un-published ReadyForDecryption is a loose end surfaced by `enclave node validate`.
+            KeyshareState::ReadyForDecryption(_) if state.keyshare_published => {
                 info!(
                     e3_id = %state.e3_id,
                     "Resuming in-flight work: re-publishing KeyshareCreated"

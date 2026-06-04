@@ -25,6 +25,11 @@ pub enum NodeCommands {
 pub async fn execute(out: Console, command: NodeCommands, config: &AppConfig) -> Result<()> {
     match command {
         NodeCommands::Validate => {
+            // Offline-only contract: hold the same cross-host fence `start` uses so the
+            // validator cannot read state out from under a live node or race a concurrent
+            // `enclave start`. Released when this scope ends.
+            let _fence =
+                e3_entrypoint::fence::ProcessFence::acquire(&config.db_file(), &config.name())?;
             let report = validate_node(config).await?;
             log!(out, "{}", report.render());
             if report.has_failure() {

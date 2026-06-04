@@ -88,16 +88,21 @@ pub async fn sync(
     // the node was still holding. So "an E3 finished while we were offline" needs no special
     // handling here — it is reconciled by replaying the canonical chain state.
     //
-    // What is intentionally NOT auto-re-driven here is this node's *own* in-flight request
-    // work (e.g. a keyshare we had started computing but not yet published when we crashed).
-    // Blindly re-publishing the originating request event is a no-op: the event bus dedups by
-    // EventId (payload hash), so the replayed event is dropped. Forcibly minting a fresh
-    // EventId to force re-execution is unsafe on a value-bearing protocol (it can double-emit
-    // or race the canonical chain state) and is therefore deliberately left out.
+    // What is intentionally NOT auto-re-driven *here in sync* is this node's *own* in-flight
+    // request work by replaying the originating request events. Blindly re-publishing the
+    // originating request event is a no-op: the event bus dedups by EventId (payload hash), so
+    // the replayed event is dropped. Forcibly minting a fresh EventId to force re-execution is
+    // unsafe on a value-bearing protocol (it can double-emit or race the canonical chain state)
+    // and is therefore deliberately left out of the sync path.
     //
-    // Detection of such loose ends is exposed offline and non-destructively via
-    // `enclave node validate`, which cross-checks the persisted committee slots against
-    // terminal events in the log and reports orphaned tickets. See
+    // Note: this is *not* a global absence of restart recovery. Actors that hold determined,
+    // idempotent in-flight results re-drive themselves when `EffectsEnabled` is broadcast at the
+    // end of this sync (e.g. `ThresholdKeyshare::resume_in_flight_work` re-publishes a computed
+    // keyshare / decryption share). What sync deliberately avoids is replaying *request* events.
+    //
+    // Detection of loose ends that cannot be locally re-driven is exposed offline and
+    // non-destructively via `enclave node validate`, which cross-checks the persisted committee
+    // slots against terminal events in the log and reports orphaned tickets. See
     // `crates/entrypoint/src/validate.rs`.
 
     // 5. Load the historical evm events to memory from all chains
