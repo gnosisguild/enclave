@@ -366,9 +366,19 @@ fn handle_pk_aggregation_proof(
     // `verify_honk_proof_non_zk`. The EVM-facing proof for on-chain is `CircuitName::DkgAggregator`.
     let circuit = PkAggregationCircuit;
     let bb_work_id = zk_bb_work_id(&request);
-    let committee = CiphernodesCommitteeSize::from_n_h(req.committee_n, req.committee_h)
-        .map_err(|e| make_zk_error(&request, format!("unknown committee (n={}, h={}): {e}", req.committee_n, req.committee_h)))?;
-    let artifacts_dir = req.params_preset.artifacts_dir_for_committee(committee.as_str());
+    let committee =
+        CiphernodesCommitteeSize::from_n_h(req.committee_n, req.committee_h).map_err(|e| {
+            make_zk_error(
+                &request,
+                format!(
+                    "unknown committee (n={}, h={}): {e}",
+                    req.committee_n, req.committee_h
+                ),
+            )
+        })?;
+    let artifacts_dir = req
+        .params_preset
+        .artifacts_dir_for_committee(committee.as_str());
     let proof = circuit
         .prove_with_variant(
             prover,
@@ -892,7 +902,9 @@ fn handle_share_computation_proof(
 
     let bb_work = zk_bb_work_id(&request);
     let inner_job_id = format!("{bb_work}_c2_inner");
-    let artifacts_dir = req.params_preset.artifacts_dir_for_committee(req.committee_size.as_str());
+    let artifacts_dir = req
+        .params_preset
+        .artifacts_dir_for_committee(req.committee_size.as_str());
 
     // 7. Inner C2 proof (sk_share_computation or e_sm_share_computation)
     let circuit = ShareComputationCircuit;
@@ -976,7 +988,9 @@ fn handle_pk_generation_proof(
     // 5. Generate proof via Provable trait
     let circuit = PkGenerationCircuit;
     let bb_work = zk_bb_work_id(&request);
-    let artifacts_dir = req.params_preset.artifacts_dir_for_committee(req.committee_size.as_str());
+    let artifacts_dir = req
+        .params_preset
+        .artifacts_dir_for_committee(req.committee_size.as_str());
 
     let proof = circuit
         .prove(
@@ -1114,7 +1128,9 @@ fn handle_share_encryption_proof(
     // 6. Generate proof (preset = threshold preset; Inputs::compute derives DKG internally)
     let circuit = ShareEncryptionCircuit;
     let bb_work = zk_bb_work_id(&request);
-    let artifacts_dir = req.params_preset.artifacts_dir_for_committee(req.committee_size.as_str());
+    let artifacts_dir = req
+        .params_preset
+        .artifacts_dir_for_committee(req.committee_size.as_str());
     let proof = circuit
         .prove(
             prover,

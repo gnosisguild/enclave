@@ -84,7 +84,10 @@ impl E3Extension for PublicKeyAggregatorExtension {
             seed,
         )));
 
-        let committee_size = match CiphernodesCommitteeSize::from_threshold(threshold_m, threshold_n) {
+        let committee_size = match CiphernodesCommitteeSize::from_threshold(
+            threshold_m,
+            threshold_n,
+        ) {
             Ok(c) => c,
             Err(e) => {
                 self.bus.err(
@@ -138,8 +141,15 @@ impl E3Extension for PublicKeyAggregatorExtension {
             return Ok(());
         };
         let committee_size =
-            CiphernodesCommitteeSize::from_threshold(meta.threshold_m, meta.threshold_n)
-                .map_err(|e| anyhow!("Unknown committee size (threshold_m={}, threshold_n={}): {e}", meta.threshold_m, meta.threshold_n))?;
+            CiphernodesCommitteeSize::from_threshold(meta.threshold_m, meta.threshold_n).map_err(
+                |e| {
+                    anyhow!(
+                        "Unknown committee size (threshold_m={}, threshold_n={}): {e}",
+                        meta.threshold_m,
+                        meta.threshold_n
+                    )
+                },
+            )?;
         let value = create_publickey_aggregator(
             fhe.clone(),
             self.bus.clone(),
@@ -390,7 +400,13 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                     meta.threshold_m,
                     meta.threshold_n,
                 )
-                .map_err(|e| anyhow!("Unknown committee size (threshold_m={}, threshold_n={}): {e}", meta.threshold_m, meta.threshold_n))?,
+                .map_err(|e| {
+                    anyhow!(
+                        "Unknown committee size (threshold_m={}, threshold_n={}): {e}",
+                        meta.threshold_m,
+                        meta.threshold_n
+                    )
+                })?,
                 proof_aggregation_enabled: meta.proof_aggregation_enabled,
                 committee_addresses,
                 honest_committee_addresses,

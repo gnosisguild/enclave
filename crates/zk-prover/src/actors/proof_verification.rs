@@ -168,7 +168,8 @@ impl Handler<EnclaveEvent> for ProofVerificationActor {
             EnclaveEventData::CiphernodeSelected(data) => {
                 match CiphernodesCommitteeSize::from_threshold(data.threshold_m, data.threshold_n) {
                     Ok(committee) => {
-                        self.presets.insert(data.e3_id.clone(), (data.params_preset, committee));
+                        self.presets
+                            .insert(data.e3_id.clone(), (data.params_preset, committee));
                     }
                     Err(e) => {
                         error!(
