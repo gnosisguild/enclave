@@ -6,20 +6,13 @@
 
 //! Pure translation of `BondingRegistry.sol` logs into `EnclaveEventData`.
 
+use crate::contracts::IBondingRegistry;
 use alloy::{
     primitives::{LogData, B256},
-    sol,
     sol_types::SolEvent,
 };
 use e3_events::EnclaveEventData;
 use tracing::{error, trace};
-
-sol!(
-    #[sol(rpc)]
-    #[derive(Debug)]
-    IBondingRegistry,
-    "../../packages/enclave-contracts/artifacts/contracts/interfaces/IBondingRegistry.sol/IBondingRegistry.json"
-);
 
 struct TicketBalanceUpdatedWithChainId(pub IBondingRegistry::TicketBalanceUpdated, pub u64);
 

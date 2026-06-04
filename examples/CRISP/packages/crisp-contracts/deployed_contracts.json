@@ -287,7 +287,7 @@
         "enclave": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
         "verifierAddress": "0xCD8a1C3ba11CF5ECfa6267617243239504a98d90",
         "honkVerifierAddress": "0x2bdCC0de6bE1f7D2ee689a0342D76F52E8EFABa3",
-        "imageId": "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
+        "imageId": "0x0ad904cfaec1eeefa9b89a11020086ec51454423db1fee3b1ab614fff97368d6"
       }
     },
     "MockVotingToken": {

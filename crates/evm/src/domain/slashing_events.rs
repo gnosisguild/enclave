@@ -6,19 +6,13 @@
 
 //! Pure translation of `SlashingManager.sol` logs into `EnclaveEventData`.
 
+use crate::contracts::ISlashingManager;
 use alloy::{
     primitives::{LogData, B256, U256},
-    sol,
     sol_types::SolEvent,
 };
 use e3_events::{E3id, EnclaveEventData};
 use tracing::{error, info, trace};
-
-sol!(
-    #[sol(rpc)]
-    ISlashingManager,
-    "../../packages/enclave-contracts/artifacts/contracts/interfaces/ISlashingManager.sol/ISlashingManager.json"
-);
 
 /// Convert a U256 to u128, returning None if the value overflows.
 fn safe_u256_to_u128(val: U256) -> Option<u128> {
