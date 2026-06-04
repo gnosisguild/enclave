@@ -742,7 +742,7 @@ Options:
   --preset <name>        BFV preset for circuits/bin (insecure-512 | secure-8192).
                          Defaults to insecure-512. With --check and a non-insecure preset,
                          only verifies dist/ + circuits/bin alignment (no .sol diff).
-  --committee <name>     Committee size (micro | small | medium). When omitted, read from
+  --committee <name>     Committee size (micro | small | medium | large). When omitted, read from
                          circuits/bin/.active-preset.json. Non-canonical committees write
                          to honk/<committee>/ so committed canonical files are not clobbered.
   --output-dir <path>    Write generated verifiers here instead of the committed honk/ dir.

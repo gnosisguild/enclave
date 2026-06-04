@@ -10,5 +10,6 @@
 
 pub mod committee;
 pub mod committee_hash;
+pub mod failover;
 pub mod publickey_aggregation;
 pub mod threshold_plaintext_aggregation;

@@ -1241,8 +1241,6 @@ async fn test_trbfv_actor() -> Result<()> {
     let threshold_m = benchmark_committee.threshold;
     let threshold_n = benchmark_committee.n;
     let committee_h = benchmark_committee.h;
-    let esi_per_ct = 1;
-
     // Statistical security parameter λ used for smudging bound / error_size.
     // Comes from the selected BFV preset metadata to avoid mixing parameter families.
     let lambda = benchmark_params.lambda;
@@ -1292,6 +1290,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .map(|a| e3_config::Contract::AddressOnly(a.to_string())),
         },
         finalization_ms: None,
+        reorg_confirmations: None,
         chain_id: Some(1),
     };
 
@@ -1406,7 +1405,6 @@ async fn test_trbfv_actor() -> Result<()> {
         threshold_n,
         seed: seed.clone(),
         error_size,
-        esi_per_ct: esi_per_ct as usize,
         params_preset: benchmark_params.bfv_preset,
         params,
         proof_aggregation_enabled,

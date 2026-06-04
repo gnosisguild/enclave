@@ -10,6 +10,10 @@ use crate::constants::{
     defaults::DEFAULT_INSECURE_LAMBDA,
     defaults::DEFAULT_SECURE_LAMBDA,
     insecure_512,
+    insecure_search_defaults::{
+        B as INSECURE_B, B_CHI as INSECURE_B_CHI, SEARCH_K as INSECURE_SEARCH_K,
+        SEARCH_N as INSECURE_SEARCH_N, SEARCH_Z as INSECURE_SEARCH_Z,
+    },
     search_defaults::{B, B_CHI, SEARCH_K, SEARCH_N, SEARCH_Z},
     secure_8192,
 };
@@ -392,12 +396,12 @@ impl BfvPreset {
     pub fn search_defaults(&self) -> Option<PresetSearchDefaults> {
         match self {
             BfvPreset::InsecureThreshold512 => Some(PresetSearchDefaults {
-                n: SEARCH_N,
-                k: SEARCH_K,
-                z: SEARCH_Z,
+                n: INSECURE_SEARCH_N,
+                k: INSECURE_SEARCH_K,
+                z: INSECURE_SEARCH_Z,
                 lambda: DEFAULT_INSECURE_LAMBDA as u32,
-                b: B,
-                b_chi: B_CHI,
+                b: INSECURE_B,
+                b_chi: INSECURE_B_CHI,
             }),
             BfvPreset::SecureThreshold8192 => Some(PresetSearchDefaults {
                 n: SEARCH_N,
@@ -533,9 +537,9 @@ mod tests {
     fn test_search_defaults() {
         let preset = BfvPreset::InsecureThreshold512;
         let defaults = preset.search_defaults().unwrap();
-        assert_eq!(defaults.n, SEARCH_N);
-        assert_eq!(defaults.k, SEARCH_K);
-        assert_eq!(defaults.z, SEARCH_Z);
+        assert_eq!(defaults.n, INSECURE_SEARCH_N);
+        assert_eq!(defaults.k, INSECURE_SEARCH_K);
+        assert_eq!(defaults.z, INSECURE_SEARCH_Z);
         assert_eq!(defaults.lambda, DEFAULT_INSECURE_LAMBDA as u32);
 
         let preset = BfvPreset::SecureThreshold8192;

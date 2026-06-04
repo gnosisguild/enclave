@@ -9,6 +9,7 @@ use crate::config::{self, ConfigCommands};
 use crate::events::{self, EventsCommands};
 use crate::helpers::telemetry::{setup_simple_tracing, setup_tracing};
 use crate::net::{self, NetCommands};
+use crate::node::{self, NodeCommands as NodeStateCommands};
 use crate::nodes::{self, NodeCommands};
 use crate::noir::NoirCommands;
 use crate::password::PasswordCommands;
@@ -184,6 +185,7 @@ impl Cli {
             Commands::Noir { command } => noir::execute(out, command, &config).await?,
             Commands::Net { command } => net::execute(&out, command, &config).await?,
             Commands::Events { command } => events::execute(out, command, &config).await?,
+            Commands::Node { command } => node::execute(out, command, &config).await?,
             Commands::Rev => rev::execute(out).await?,
             Commands::Config { command } => config::execute(out, command, &config).await?,
         }
@@ -294,6 +296,12 @@ pub enum Commands {
     Nodes {
         #[command(subcommand)]
         command: NodeCommands,
+    },
+
+    /// Single-node maintenance commands (validate on-disk state, etc.)
+    Node {
+        #[command(subcommand)]
+        command: NodeStateCommands,
     },
 
     /// Manage net configuration

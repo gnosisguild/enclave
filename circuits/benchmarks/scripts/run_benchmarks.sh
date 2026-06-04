@@ -384,10 +384,17 @@ jq -n \
       testmode_harness: true
     }' > "${RUN_META_FILE}"
 
+# Extract integration summary from the fresh gas JSON before rendering the report so
+# generate_report.sh always sees up-to-date lambda / timings (not a stale on-disk snapshot).
+INTEGRATION_SNAPSHOT="${BENCHMARKS_DIR}/${OUTPUT_DIR}/integration_summary.json"
+if [ -f "${GAS_JSON_FILE}" ] && jq -e '.integration_summary != null' "${GAS_JSON_FILE}" >/dev/null 2>&1; then
+    jq '.integration_summary' "${GAS_JSON_FILE}" > "${INTEGRATION_SNAPSHOT}"
+    echo "✓ Wrote integration summary snapshot: ${INTEGRATION_SNAPSHOT}"
+fi
+
 # Generate markdown report
 echo "Stage 2/3: Rendering markdown report from benchmarks + gas summary..."
 REPORT_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/report.md"
-INTEGRATION_SNAPSHOT="${BENCHMARKS_DIR}/${OUTPUT_DIR}/integration_summary.json"
 REPORT_ARGS=(
     --input-dir "${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw"
     --output "${REPORT_FILE}"
@@ -401,12 +408,6 @@ if [ -f "${INTEGRATION_SNAPSHOT}" ]; then
     REPORT_ARGS+=(--integration-summary "${INTEGRATION_SNAPSHOT}")
 fi
 "${SCRIPT_DIR}/generate_report.sh" "${REPORT_ARGS[@]}"
-
-INTEGRATION_SNAPSHOT="${BENCHMARKS_DIR}/${OUTPUT_DIR}/integration_summary.json"
-if [ -f "${GAS_JSON_FILE}" ] && jq -e '.integration_summary != null' "${GAS_JSON_FILE}" >/dev/null 2>&1; then
-    jq '.integration_summary' "${GAS_JSON_FILE}" > "${INTEGRATION_SNAPSHOT}"
-    echo "✓ Wrote integration summary snapshot: ${INTEGRATION_SNAPSHOT}"
-fi
 
 if [ "${OUTPUT_DIR}" = "results_insecure_agg" ] && [ -f "${INTEGRATION_SNAPSHOT}" ]; then
     "${SCRIPT_DIR}/sync_bfv_vk_binding_fixture.sh" "${INTEGRATION_SNAPSHOT}"

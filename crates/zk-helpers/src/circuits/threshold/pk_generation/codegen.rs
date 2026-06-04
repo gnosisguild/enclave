@@ -148,8 +148,6 @@ mod tests {
     use crate::codegen::write_artifacts;
     use crate::threshold::pk_generation::computation::{Bits, Bounds};
     use crate::threshold::pk_generation::PkGenerationCircuitData;
-    use crate::CiphernodesCommitteeSize;
-
     use e3_fhe_params::BfvPreset;
     use tempfile::TempDir;
 

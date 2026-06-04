@@ -25,8 +25,6 @@ pub struct E3Requested {
     /// The error size for the FHE computation. This can be calculated for the E3 program based on
     /// the size of the ciphertext and the depth of the program [tbd add link]
     pub error_size: ArcBytes,
-    /// The number of smudging noise per ciphertext.
-    pub esi_per_ct: usize,
     /// The threshold BFV preset selected on-chain. The DKG counterpart is
     /// derived automatically via `BfvPreset::dkg_counterpart()`.
     pub params_preset: BfvPreset,
@@ -44,7 +42,6 @@ impl Default for E3Requested {
         E3Requested {
             e3_id: E3id::new("99", 0),
             error_size: ArcBytes::from_bytes(&[]),
-            esi_per_ct: 0,
             params_preset: BfvPreset::InsecureThreshold512,
             params: ArcBytes::from_bytes(&[]),
             seed: Seed([0u8; 32]),
