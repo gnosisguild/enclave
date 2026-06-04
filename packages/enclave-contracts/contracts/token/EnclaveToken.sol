@@ -183,11 +183,15 @@ contract EnclaveToken is
 
     /// @notice Relative lock profile applied to transfers from approved CCA claim sources.
     /// @param active Whether the account can receive locked claim-source transfers.
-    /// @param holdDuration Seconds after claim before any amount is transferable.
+    /// @param lockStart Absolute timestamp (e.g. CCA auction end) that anchors the
+    ///        hold and unlock durations. All buyers in the same route share the same
+    ///        lock start regardless of when they claim.
+    /// @param holdDuration Seconds after {lockStart} before any amount is transferable.
     /// @param unlockDuration Optional linear unlock duration after the hold ends. Zero is a cliff unlock.
     /// @param group Schedule group marker, e.g. REG_S_CCA or REG_D_CCA.
     struct ClaimLockProfile {
         bool active;
+        uint64 lockStart;
         uint64 holdDuration;
         uint64 unlockDuration;
         bytes32 group;
@@ -286,6 +290,7 @@ contract EnclaveToken is
     event ClaimLockProfileUpdated(
         address indexed account,
         bool active,
+        uint64 lockStart,
         uint64 holdDuration,
         uint64 unlockDuration,
         bytes32 indexed group
@@ -695,9 +700,7 @@ contract EnclaveToken is
         }
         if (amount > type(uint128).max) revert InvalidLockSchedule();
 
-        uint64 currentTimestamp = _currentTimestamp();
-
-        uint256 holdUntil = uint256(currentTimestamp) + profile.holdDuration;
+        uint256 holdUntil = uint256(profile.lockStart) + profile.holdDuration;
         uint256 unlockEnd = holdUntil + profile.unlockDuration;
         if (unlockEnd > type(uint64).max) revert InvalidLockSchedule();
 
@@ -764,16 +767,17 @@ contract EnclaveToken is
         ClaimLockProfile calldata profile
     ) internal {
         if (account == address(0)) revert ZeroAddress();
-        if (
-            profile.active &&
-            profile.holdDuration == 0 &&
-            profile.unlockDuration == 0
-        ) revert InvalidLockSchedule();
+        if (profile.active) {
+            if (profile.lockStart == 0) revert InvalidLockSchedule();
+            if (profile.holdDuration == 0 && profile.unlockDuration == 0)
+                revert InvalidLockSchedule();
+        }
 
         claimLockProfiles[account] = profile;
         emit ClaimLockProfileUpdated(
             account,
             profile.active,
+            profile.lockStart,
             profile.holdDuration,
             profile.unlockDuration,
             profile.group

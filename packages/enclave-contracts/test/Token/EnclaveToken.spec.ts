@@ -325,10 +325,12 @@ describe("EnclaveToken", function () {
       const bobAddress = await bob.getAddress();
       const claimSourceAddress = await claimSource.getAddress();
       const claimAmount = ethers.parseEther("500");
+      const now = BigInt(await time.latest());
 
       await token.connect(admin).setClaimSource(claimSourceAddress, true);
       await token.connect(admin).setClaimLockProfile(aliceAddress, {
         active: true,
+        lockStart: now,
         holdDuration: 40n * DAY,
         unlockDuration: 0n,
         group: GROUP_CCA_REG_S,
