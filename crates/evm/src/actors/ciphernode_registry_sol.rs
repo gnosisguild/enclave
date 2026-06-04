@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::actors::evm_parser::EvmParser;
+use crate::contracts::ICiphernodeRegistry;
 use crate::domain::ciphernode_registry_events::extractor;
 use crate::domain::error_decoder::{decode_error_from_str, format_evm_error};
 use crate::helpers::{encode_zk_proof, send_tx_with_retry, EthProvider};
@@ -14,7 +15,6 @@ use alloy::{
     primitives::{Address, Bytes, B256, U256},
     providers::{Provider, WalletProvider},
     rpc::types::TransactionReceipt,
-    sol,
 };
 use anyhow::Result;
 use e3_events::{
@@ -25,13 +25,6 @@ use e3_events::{
 use e3_utils::{ArcBytes, NotifySync, MAILBOX_LIMIT};
 use std::collections::{HashMap, HashSet};
 use tracing::{error, info};
-
-sol!(
-    #[sol(rpc)]
-    #[derive(Debug)]
-    ICiphernodeRegistry,
-    "../../packages/enclave-contracts/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json"
-);
 
 /// Connects to CiphernodeRegistry.sol converting EVM events to EnclaveEvents
 pub struct CiphernodeRegistrySolReader;
@@ -539,14 +532,7 @@ pub async fn fetch_dkg_fold_attestation_verifier<P: Provider + Clone>(
     provider: &P,
     registry_address: Address,
 ) -> Result<Option<Address>> {
-    sol! {
-        #[sol(rpc)]
-        interface ICiphernodeRegistryDkgFoldView {
-            function dkgFoldAttestationVerifier() external view returns (address);
-        }
-    }
-
-    let contract = ICiphernodeRegistryDkgFoldView::new(registry_address, provider);
+    let contract = ICiphernodeRegistry::new(registry_address, provider);
     let verifier = contract.dkgFoldAttestationVerifier().call().await?;
     if verifier == Address::ZERO {
         Ok(None)
@@ -566,14 +552,7 @@ pub async fn fetch_accusation_vote_validity<P: Provider + Clone>(
     provider: &P,
     registry_address: Address,
 ) -> Result<Option<U256>> {
-    sol! {
-        #[sol(rpc)]
-        interface ICiphernodeRegistryAccusationVoteView {
-            function accusationVoteValidity() external view returns (uint256);
-        }
-    }
-
-    let contract = ICiphernodeRegistryAccusationVoteView::new(registry_address, provider);
+    let contract = ICiphernodeRegistry::new(registry_address, provider);
     let validity = contract.accusationVoteValidity().call().await?;
     if validity.is_zero() {
         Ok(None)

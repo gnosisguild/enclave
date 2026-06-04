@@ -6,8 +6,9 @@
 
 //! Pure translation of `Enclave.sol` logs into `EnclaveEventData`.
 
+use crate::contracts::IEnclave;
 use alloy::primitives::{LogData, B256};
-use alloy::{sol, sol_types::SolEvent};
+use alloy::sol_types::SolEvent;
 use e3_events::E3id;
 use e3_events::EnclaveEventData;
 use e3_events::{E3Failed, E3Stage, E3StageChanged, FailureReason};
@@ -17,12 +18,6 @@ use e3_utils::ArcBytes;
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use num_bigint::BigUint;
 use tracing::{error, info, trace, warn};
-
-sol!(
-    #[sol(rpc)]
-    IEnclave,
-    "../../packages/enclave-contracts/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json"
-);
 
 struct E3RequestedWithChainId(pub IEnclave::E3Requested, pub u64);
 

@@ -6,28 +6,8 @@
 
 //! Pure decoding of raw EVM revert data into human-readable contract errors.
 
-use alloy::sol;
+use crate::contracts::{ICiphernodeRegistry, IEnclave, ISlashingManager};
 use alloy::sol_types::SolInterface;
-
-sol!(
-    #[derive(Debug)]
-    #[sol(ignore_unlinked)]
-    Enclave,
-    "../../packages/enclave-contracts/artifacts/contracts/Enclave.sol/Enclave.json"
-);
-
-sol!(
-    #[derive(Debug)]
-    #[sol(ignore_unlinked)]
-    CiphernodeRegistryOwnable,
-    "../../packages/enclave-contracts/artifacts/contracts/registry/CiphernodeRegistryOwnable.sol/CiphernodeRegistryOwnable.json"
-);
-
-sol!(
-    #[derive(Debug)]
-    SlashingManager,
-    "../../packages/enclave-contracts/artifacts/contracts/interfaces/ISlashingManager.sol/ISlashingManager.json"
-);
 
 /// Try to decode raw revert data into a human-readable error string.
 pub fn decode_error(data: &[u8]) -> Option<String> {
@@ -35,13 +15,13 @@ pub fn decode_error(data: &[u8]) -> Option<String> {
         return None;
     }
 
-    if let Ok(err) = Enclave::EnclaveErrors::abi_decode(data) {
+    if let Ok(err) = IEnclave::IEnclaveErrors::abi_decode(data) {
         return Some(format!("{err:?}"));
     }
-    if let Ok(err) = CiphernodeRegistryOwnable::CiphernodeRegistryOwnableErrors::abi_decode(data) {
+    if let Ok(err) = ICiphernodeRegistry::ICiphernodeRegistryErrors::abi_decode(data) {
         return Some(format!("{err:?}"));
     }
-    if let Ok(err) = SlashingManager::SlashingManagerErrors::abi_decode(data) {
+    if let Ok(err) = ISlashingManager::ISlashingManagerErrors::abi_decode(data) {
         return Some(format!("{err:?}"));
     }
 
@@ -94,7 +74,7 @@ mod tests {
     #[test]
     fn test_decode_known_errors() {
         // CiphertextOutputNotPublished(uint256 e3Id) with e3Id = 1
-        let mut data = Enclave::CiphertextOutputNotPublished::SELECTOR.to_vec();
+        let mut data = IEnclave::CiphertextOutputNotPublished::SELECTOR.to_vec();
         data.extend_from_slice(&[0u8; 31]);
         data.push(1); // e3Id = 1
         let decoded = decode_error(&data).unwrap();
@@ -107,7 +87,7 @@ mod tests {
     #[test]
     fn test_decode_parameterless_error() {
         // CommitteeNotRequested()
-        let data = CiphernodeRegistryOwnable::CommitteeNotRequested::SELECTOR.to_vec();
+        let data = ICiphernodeRegistry::CommitteeNotRequested::SELECTOR.to_vec();
         let decoded = decode_error(&data).unwrap();
         assert!(decoded.contains("CommitteeNotRequested"), "got: {decoded}");
     }
@@ -115,7 +95,7 @@ mod tests {
     #[test]
     fn test_decode_from_error_string() {
         // Simulate an alloy error string containing hex revert data
-        let selector = hex::encode(Enclave::CiphertextOutputNotPublished::SELECTOR);
+        let selector = hex::encode(IEnclave::CiphertextOutputNotPublished::SELECTOR);
         let param = "0000000000000000000000000000000000000000000000000000000000000001";
         let error_str = format!(
             "server returned an error response: error code 3: execution reverted, data: \"0x{selector}{param}\""
@@ -142,7 +122,7 @@ mod tests {
     fn test_short_selector_found_despite_longer_hex() {
         // Error string contains a tx hash (32 bytes) AND a short 4-byte selector.
         // The decoder must find the selector even though the tx hash is longer.
-        let selector = hex::encode(CiphernodeRegistryOwnable::CommitteeNotRequested::SELECTOR);
+        let selector = hex::encode(ICiphernodeRegistry::CommitteeNotRequested::SELECTOR);
         let tx_hash = "aabbccddee11223344556677889900aabbccddee11223344556677889900aabb";
         let error_str = format!("tx 0x{tx_hash} reverted with data: 0x{selector}");
         let decoded = decode_error_from_str(&error_str).unwrap();
