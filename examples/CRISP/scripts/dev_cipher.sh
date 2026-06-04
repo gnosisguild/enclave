@@ -2,6 +2,8 @@
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/dev_config.sh"
 READYFILE=$1
 
 # nuke past installations as we are adding these nodes to the contract
@@ -21,11 +23,12 @@ enclave wallet set --name cn3 --private-key "$PRIVATE_KEY_CN3"
 enclave wallet set --name cn4 --private-key "$PRIVATE_KEY_CN4"
 enclave wallet set --name cn5 --private-key "$PRIVATE_KEY_CN5"
 
+load_crisp_dev_config
+
 echo "Setting up ZK prover..."
 enclave noir setup
 
-echo "Staging per-committee circuit artifacts..."
-"${SCRIPT_DIR}/stage_enclave_circuits.sh"
+sync_enclave_circuit_artifacts
 
 # using & instead of -d so that wait works below
 enclave nodes up -v &

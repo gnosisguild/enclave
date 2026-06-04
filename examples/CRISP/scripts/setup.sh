@@ -16,7 +16,7 @@ echo "pnpm install"
 (cd "${REPO_ROOT}" && pnpm build:ts)
 echo "sdk"
 (pnpm build:sdk)
-compile_enclave_dkg_circuits_if_needed
+build_enclave_circuits_at_setup
 echo "evm"
 (cd "${REPO_ROOT}/packages/enclave-contracts" && pnpm compile:contracts)
 (pnpm compile:contracts)
