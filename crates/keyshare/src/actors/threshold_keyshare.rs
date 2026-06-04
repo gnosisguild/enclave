@@ -22,7 +22,6 @@ use e3_events::{
 };
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_trbfv::{
     calculate_decryption_key::CalculateDecryptionKeyResponse,
     calculate_decryption_share::{
@@ -35,6 +34,7 @@ use e3_trbfv::{
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use fhe_traits::Serialize;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},

@@ -21,8 +21,8 @@ use e3_events::{
     E3id, EventContext, PartyProofData, PartyProofsToVerify, PartyShareDecryptionProofsToVerify,
     PartyVerificationResult, ProofType, Sequenced, SignedProofPayload, VerificationKind,
 };
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_utils::utility_types::ArcBytes;
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use tracing::{info, warn};
 
 /// Trait for party types whose signed proofs can be ECDSA-validated and ZK-verified.
