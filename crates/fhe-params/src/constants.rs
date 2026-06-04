@@ -52,14 +52,26 @@ pub mod secure_8192 {
 }
 
 /// Common search defaults shared across presets
-/// These are for the SecureThreshold8192 preset.
-/// The InsecureThreshold512 preset has been generated manually.
+/// Search defaults for the SecureThreshold8192 preset (production scale).
+/// The InsecureThreshold512 preset uses its own smaller values (see `insecure_search_defaults`)
+/// so that the smudging bounds baked into the insecure circuit configs remain valid.
 pub mod search_defaults {
     pub const B: u128 = 20;
     pub const B_CHI: u128 = 1;
     pub const SEARCH_N: u128 = 20;
     pub const SEARCH_K: u128 = 1000000;
     pub const SEARCH_Z: u128 = 1000000;
+}
+
+/// Search defaults for the InsecureThreshold512 preset (test-only, small scale).
+/// These match the parameters used when `circuits/lib/src/configs/insecure/` was generated,
+/// so the compiled `E_SM_BIT_SECRET` / `SHARE_ENCRYPTION_*` bounds remain consistent at runtime.
+pub mod insecure_search_defaults {
+    pub const B: u128 = 20;
+    pub const B_CHI: u128 = 1;
+    pub const SEARCH_N: u128 = 7;
+    pub const SEARCH_K: u128 = 131072;
+    pub const SEARCH_Z: u128 = 1024;
 }
 
 /// Default values for BFV parameters
