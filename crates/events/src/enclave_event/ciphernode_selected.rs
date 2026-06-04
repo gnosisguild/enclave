@@ -19,7 +19,6 @@ pub struct CiphernodeSelected {
     pub threshold_n: usize,
     pub seed: Seed,
     pub error_size: ArcBytes,
-    pub esi_per_ct: usize,
     pub params_preset: BfvPreset,
     pub params: ArcBytes,
     pub party_id: u64,
@@ -30,7 +29,6 @@ impl Default for CiphernodeSelected {
         CiphernodeSelected {
             e3_id: E3id::new("0", 0),
             error_size: ArcBytes::from_bytes(&[]),
-            esi_per_ct: 0,
             params_preset: BfvPreset::InsecureThreshold512,
             params: ArcBytes::from_bytes(&[]),
             party_id: 0,
