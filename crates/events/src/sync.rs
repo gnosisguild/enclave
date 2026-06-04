@@ -14,14 +14,32 @@ type DeployBlock = u64;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EvmEventConfigChain {
     deploy_block: DeployBlock,
+    /// Number of block confirmations required before a log is ingested. `0`
+    /// preserves reading to the chain head; a positive value gates ingestion to
+    /// make the append-only log reorg-safe by construction.
+    confirmations: u64,
 }
 
 impl EvmEventConfigChain {
     pub fn new(deploy_block: DeployBlock) -> Self {
-        Self { deploy_block }
+        Self {
+            deploy_block,
+            confirmations: 0,
+        }
     }
+
+    /// Builder: set the required confirmation depth for reorg safety.
+    pub fn with_confirmations(mut self, confirmations: u64) -> Self {
+        self.confirmations = confirmations;
+        self
+    }
+
     pub fn deploy_block(&self) -> u64 {
         self.deploy_block
+    }
+
+    pub fn confirmations(&self) -> u64 {
+        self.confirmations
     }
 }
 

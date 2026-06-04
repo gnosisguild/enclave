@@ -50,6 +50,10 @@ pub struct Filters {
     historical: Filter,
     current: Filter,
     start_block: u64,
+    /// Number of confirmations required before a log is ingested. `0` (default)
+    /// reads to the chain head exactly as before; a positive value clamps the
+    /// historical and backfill heads to make ingestion reorg-safe.
+    confirmations: u64,
 }
 
 impl Filters {
@@ -65,7 +69,19 @@ impl Filters {
             historical,
             current,
             start_block,
+            confirmations: 0,
         }
+    }
+
+    /// Builder: require `confirmations` block confirmations before ingestion.
+    pub fn with_confirmations(mut self, confirmations: u64) -> Self {
+        self.confirmations = confirmations;
+        self
+    }
+
+    /// The configured confirmation depth (0 = read to head).
+    pub fn confirmations(&self) -> u64 {
+        self.confirmations
     }
 
     pub fn from_routing_table<T>(table: &HashMap<Address, T>, start_block: u64) -> Self {
@@ -282,7 +298,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
     // ── Phase 1: Historical sync (must succeed, fatal on failure) ──
 
     let latest_block = match provider.provider().get_block_number().await {
-        Ok(bn) => bn,
+        Ok(bn) => crate::domain::reorg::confirmed_head(bn, filters.confirmations()),
         Err(e) => {
             error!(chain_id, error = %e, "Failed to get latest block number");
             bus.err(EType::Evm, anyhow!(e));
@@ -335,6 +351,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
             &next,
             &mut timestamp_tracker,
             &mut last_block,
+            filters.confirmations(),
         )
         .await
         {

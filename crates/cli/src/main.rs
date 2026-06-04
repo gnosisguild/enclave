@@ -21,6 +21,7 @@ pub mod helpers;
 mod init;
 mod net;
 mod net_get_peer_id;
+mod node;
 mod nodes;
 mod nodes_daemon;
 mod nodes_down;
