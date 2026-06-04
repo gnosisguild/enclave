@@ -146,6 +146,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const ticketTokenAddress = await bondingRegistry.ticketToken();
       const ticketAmount = ethers.parseUnits("100", 6);
 
+      // Token is already Live from deployEnclaveSystem fixture
       await enclToken.disableTransferRestrictions();
       await enclToken.mintAllocation(
         operatorAddress,

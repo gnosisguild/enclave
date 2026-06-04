@@ -466,6 +466,8 @@ export async function deployEnclaveSystem(
   }
 
   // ── Operators ─────────────────────────────────────────────────────────────
+  await licenseToken.setTgeEarliest(1);
+  await licenseToken.tge();
   await licenseToken.disableTransferRestrictions();
   if (operators.length > 0) {
     for (const operator of operators) {

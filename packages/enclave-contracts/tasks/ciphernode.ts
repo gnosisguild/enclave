@@ -304,6 +304,11 @@ export const ciphernodeMintTokens = task(
           await enclaveTokenContract.transfersRestricted();
         if (transfersRestricted) {
           console.log("Allowing EnclaveToken to be transferrable...");
+          const isLive = await enclaveTokenContract.isLive();
+          if (!isLive) {
+            await (await enclaveTokenContract.setTgeEarliest(1)).wait();
+            await (await enclaveTokenContract.tge()).wait();
+          }
           const transferEnabledTx =
             await enclaveTokenContract.disableTransferRestrictions();
           await transferEnabledTx.wait();

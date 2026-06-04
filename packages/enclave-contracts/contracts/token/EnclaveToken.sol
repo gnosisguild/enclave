@@ -435,13 +435,13 @@ contract EnclaveToken is
     }
 
     /// @notice Sets the default TGE timestamp used by schedule inputs with tokenUnlockStart = 0.
-    /// @dev Only callable in Live mode. Before TGE, {tge} sets the timestamp atomically with the
-    ///      mode transition. This setter exists for administrative correction after TGE.
+    /// @dev Callable in both Virtual and Live mode. Before TGE this allows pre-configuring
+    ///      the timestamp that schedules will resolve against. After TGE, {tge} sets the
+    ///      timestamp to block.timestamp; this setter exists for administrative correction.
     ///      Existing schedules store resolved timestamps and are not changed by this setter.
     function setTgeTimestamp(
         uint64 newTgeTimestamp
     ) external onlyRole(LOCK_MANAGER_ROLE) {
-        if (mode != TokenMode.Live) revert TokenNotLive();
         if (newTgeTimestamp == 0) revert InvalidLockSchedule();
         uint64 previous = tgeTimestamp;
         tgeTimestamp = newTgeTimestamp;
@@ -478,9 +478,9 @@ contract EnclaveToken is
 
     /// @notice Transitions the token from Virtual to Live mode.
     /// @dev One-way switch. Requires {tgeEarliest} to be set and the current
-    ///      block timestamp to be >= {tgeEarliest}. After TGE, the pooled-token
-    ///      lock enforcement (balance + bonded >= lockedFloor) becomes active
-    ///      and ALL schedules that reference the default TGE timestamp resolve.
+    ///      block timestamp to be >= {tgeEarliest}. Sets {tgeTimestamp} to
+    ///      block.timestamp unless a future timestamp was pre-configured via
+    ///      {setTgeTimestamp} during Virtual mode.
     function tge() external onlyRole(LOCK_MANAGER_ROLE) {
         if (mode == TokenMode.Live) revert TgeAlreadyLive();
         uint64 earliest = tgeEarliest;
@@ -489,7 +489,9 @@ contract EnclaveToken is
         if (current < earliest) revert TgeTooEarly(current, earliest);
 
         mode = TokenMode.Live;
-        tgeTimestamp = current;
+        if (tgeTimestamp == 0) {
+            tgeTimestamp = current;
+        }
         emit TgeTriggered(current);
     }
 
@@ -643,6 +645,7 @@ contract EnclaveToken is
             if (
                 approvedClaimSources[from] &&
                 value != 0 &&
+                from != address(bondingRegistry) &&
                 !claimLockExemptRecipients[to]
             ) {
                 _addClaimLock(to, value);

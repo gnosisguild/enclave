@@ -44,6 +44,8 @@ describe("EnclaveToken", function () {
 
   async function deployWithUnlockedTransfers() {
     const fixture = await deploy();
+    await fixture.token.connect(fixture.admin).setTgeEarliest(1);
+    await fixture.token.connect(fixture.admin).tge();
     await fixture.token.connect(fixture.admin).disableTransferRestrictions();
     return fixture;
   }
@@ -142,6 +144,8 @@ describe("EnclaveToken", function () {
 
     it("disableTransferRestrictions is one-way (idempotent no-op on second call)", async function () {
       const { token, admin } = await loadFixture(deploy);
+      await token.connect(admin).setTgeEarliest(1);
+      await token.connect(admin).tge();
       await expect(token.connect(admin).disableTransferRestrictions())
         .to.emit(token, "TransferRestrictionUpdated")
         .withArgs(false);
@@ -222,6 +226,8 @@ describe("EnclaveToken", function () {
       const tge = now + DAY;
       const totalAmount = ethers.parseEther("100");
 
+      await token.connect(admin).setTgeEarliest(1);
+      await token.connect(admin).tge();
       await token.connect(admin).setTgeTimestamp(tge);
       await token
         .connect(admin)
