@@ -57,12 +57,7 @@ impl E3RequestedWithChainId {
         let params_arc = BfvParamSet::from(params_preset).build_arc();
         let params_bytes = encode_bfv_params(&params_arc);
 
-        // TODO: These should be delivered from the e3_program contract
-        // For now, using defaults that match the test configuration:
-        // - lambda = 2 (INSECURE, for testing only. Production should use lambda = 80)
-        // - esi_per_ct = 3 (number of ciphertexts per encryption slot)
-        let lambda = 2;
-        let esi_per_ct = 3;
+        let lambda = params_preset.metadata().lambda;
 
         let error_size = match calculate_error_size(params_arc, threshold_n, threshold_m, lambda) {
             Ok(size) => {
@@ -92,7 +87,6 @@ impl E3RequestedWithChainId {
             threshold_n,
             seed: self.0.e3.seed.into(),
             error_size,
-            esi_per_ct,
             e3_id: E3id::new(self.0.e3Id.to_string(), self.1),
             proof_aggregation_enabled: self.0.e3.proofAggregationEnabled,
         })

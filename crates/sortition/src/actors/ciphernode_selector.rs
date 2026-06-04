@@ -33,7 +33,6 @@ fn e3_meta_from(req: &E3Requested) -> E3Meta {
         threshold_m: req.threshold_m,
         params_preset: req.params_preset,
         params: req.params.clone(),
-        esi_per_ct: req.esi_per_ct,
         error_size: req.error_size.clone(),
         proof_aggregation_enabled: req.proof_aggregation_enabled,
     }
@@ -310,7 +309,6 @@ impl Handler<TypedEvent<CommitteeFinalized>> for CiphernodeSelector {
                             e3_id: msg.e3_id.clone(),
                             threshold_m: e3_meta.threshold_m,
                             threshold_n: e3_meta.threshold_n,
-                            esi_per_ct: e3_meta.esi_per_ct,
                             error_size: e3_meta.error_size.clone(),
                             params_preset: e3_meta.params_preset,
                             params: e3_meta.params.clone(),
