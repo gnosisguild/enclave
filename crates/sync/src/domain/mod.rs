@@ -5,9 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 mod historical_evm_collector;
+mod schema_version;
 mod snapshot_meta;
 mod sync_planner;
 
+pub use schema_version::{decide_schema_version, SchemaVersionDecision, SCHEMA_VERSION};
 pub use snapshot_meta::{AggregateState, SnapshotMeta};
 
 pub(crate) use historical_evm_collector::{CollectOutcome, HistoricalEvmCollector};

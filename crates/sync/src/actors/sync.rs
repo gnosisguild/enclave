@@ -5,8 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::domain::{
-    CollectOutcome, HistoricalEvmCollector, ReplayDecision, SnapshotMeta, SyncPlanner,
+    decide_schema_version, CollectOutcome, HistoricalEvmCollector, ReplayDecision,
+    SchemaVersionDecision, SnapshotMeta, SyncPlanner, SCHEMA_VERSION,
 };
+use crate::SyncRepositoryFactory;
 use actix::{Message, Recipient};
 use anyhow::{bail, Result};
 use e3_data::Repositories;
@@ -30,6 +32,11 @@ pub async fn sync(
 ) -> Result<()> {
     // 0. start listening early for net ready
     let net_ready = bus.wait_for(EventType::NetReady);
+
+    // 0b. Verify the on-disk schema version is compatible with this binary
+    //     before touching any persisted state, so an incompatible upgrade or
+    //     downgrade halts loudly instead of silently loading garbage (H19/H20).
+    check_schema_version(repositories).await?;
 
     // 1. Load snapsshot metadata
     info!("Loading snapshot metadata...");
@@ -164,6 +171,26 @@ pub async fn sync(
     // normal live operations
 
     Ok(())
+}
+
+/// Verify the on-disk schema version against this binary and either stamp a
+/// fresh marker (first boot) or halt loudly on an incompatible upgrade or
+/// downgrade (H19/H20). Uses a synchronous write so the marker is durable
+/// before any further state is loaded.
+async fn check_schema_version(repositories: &Repositories) -> Result<()> {
+    let repo = repositories.schema_version();
+    let persisted = repo.read().await?;
+    match decide_schema_version(persisted, SCHEMA_VERSION) {
+        SchemaVersionDecision::Proceed => Ok(()),
+        SchemaVersionDecision::WriteCurrent => {
+            info!("Stamping on-disk schema version {SCHEMA_VERSION}.");
+            repo.write_sync(&SCHEMA_VERSION).await?;
+            Ok(())
+        }
+        SchemaVersionDecision::Halt(reason) => {
+            bail!("Schema version check failed: {reason}");
+        }
+    }
 }
 
 pub async fn collect_historical_evm_events(
