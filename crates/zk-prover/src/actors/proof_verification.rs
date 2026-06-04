@@ -22,6 +22,7 @@ use e3_events::{
 };
 use e3_fhe_params::BfvPreset;
 use e3_utils::NotifySync;
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use tracing::{error, info, warn};
 
 use crate::domain::proof_verification::validate_external_key;
@@ -55,8 +56,8 @@ pub struct ProofVerificationActor {
     bus: BusHandle,
     verifier: Recipient<TypedEvent<ZkVerificationRequest>>,
     pending: HashMap<(E3id, u64), PendingVerification>,
-    /// Tracks `BfvPreset` per E3 so we can derive `artifacts_dir` for proof verification.
-    presets: HashMap<E3id, BfvPreset>,
+    /// Tracks preset + committee per E3 so we can derive `artifacts_dir` for proof verification.
+    presets: HashMap<E3id, (BfvPreset, CiphernodesCommitteeSize)>,
 }
 
 impl ProofVerificationActor {
@@ -111,7 +112,7 @@ impl ProofVerificationActor {
             },
         );
 
-        let Some(preset) = self.presets.get(&msg.e3_id).copied() else {
+        let Some((preset, committee)) = self.presets.get(&msg.e3_id).copied() else {
             error!(
                 "No BfvPreset known for e3_id={} — cannot determine circuit artifacts directory. \
                  This can happen if CiphernodeSelected was missed (e.g. after restart). Rejecting key from party {}.",
@@ -119,7 +120,7 @@ impl ProofVerificationActor {
             );
             return;
         };
-        let artifacts_dir = preset.artifacts_dir();
+        let artifacts_dir = preset.artifacts_dir_for_committee(committee.as_str());
 
         let request = TypedEvent::new(
             ZkVerificationRequest {
@@ -165,7 +166,11 @@ impl Handler<EnclaveEvent> for ProofVerificationActor {
         let (msg, ec) = msg.into_components();
         match msg {
             EnclaveEventData::CiphernodeSelected(data) => {
-                self.presets.insert(data.e3_id.clone(), data.params_preset);
+                let committee =
+                    CiphernodesCommitteeSize::from_threshold(data.threshold_m, data.threshold_n)
+                        .unwrap_or(CiphernodesCommitteeSize::Micro);
+                self.presets
+                    .insert(data.e3_id.clone(), (data.params_preset, committee));
             }
             EnclaveEventData::EncryptionKeyReceived(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))

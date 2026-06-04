@@ -68,6 +68,7 @@ pub struct NodeDkgFoldRequest {
     pub c3_total_slots: usize,
     pub party_id: u64,
     pub params_preset: BfvPreset,
+    pub committee_size: CiphernodesCommitteeSize,
 }
 
 /// Cross-node DKG aggregation (NodesFold + C5 + DkgAggregator).
@@ -79,6 +80,7 @@ pub struct DkgAggregationRequest {
     /// Ordered committee addresses (`topNodes`) for `committee_hash_*` public inputs.
     pub committee_addresses: Vec<Address>,
     pub params_preset: BfvPreset,
+    pub committee_size: CiphernodesCommitteeSize,
 }
 
 /// Decryption aggregation: sequential C6 fold + DecryptionAggregator per job.
@@ -89,6 +91,7 @@ pub struct DecryptionAggregationRequest {
     /// Ordered committee addresses (`topNodes`) for `committee_hash_*` public inputs.
     pub committee_addresses: Vec<Address>,
     pub params_preset: BfvPreset,
+    pub committee_size: CiphernodesCommitteeSize,
 }
 
 /// Request to generate a proof for public key aggregation (C5).

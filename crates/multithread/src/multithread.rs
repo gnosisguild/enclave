@@ -696,7 +696,9 @@ fn handle_node_dkg_fold_proof(
     request: ComputeRequest,
     report: Option<Addr<MultithreadReport>>,
 ) -> Result<ComputeResponse, ComputeRequestError> {
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir = req
+        .params_preset
+        .artifacts_dir_for_committee(req.committee_size.as_str());
     let job_id = zk_bb_work_id(&request);
     let input = NodeDkgFoldInput {
         c0_proof: &req.c0_proof,
@@ -748,7 +750,14 @@ fn handle_dkg_aggregation_proof(
         party_ids: &req.party_ids,
         committee_addresses: &req.committee_addresses,
     };
-    let proof = prove_dkg_aggregation(prover, &input, &job_id, req.params_preset).map_err(|e| {
+    let proof = prove_dkg_aggregation(
+        prover,
+        &input,
+        &job_id,
+        req.params_preset,
+        req.committee_size,
+    )
+    .map_err(|e| {
         ComputeRequestError::new(
             ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
             request.clone(),
@@ -783,6 +792,7 @@ fn handle_decryption_aggregation_proof(
         &req.committee_addresses,
         &job_id,
         req.params_preset,
+        req.committee_size,
     )
     .map_err(|e| {
         ComputeRequestError::new(

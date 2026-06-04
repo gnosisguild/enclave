@@ -26,6 +26,7 @@ use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_fhe_params::BfvPreset;
 use e3_utils::NotifySync;
 use e3_utils::{ArcBytes, MAILBOX_LIMIT};
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{error, info, warn};
@@ -41,6 +42,7 @@ pub struct PublicKeyAggregator {
     e3_id: E3id,
     state: Persistable<PublicKeyAggregatorState>,
     params_preset: BfvPreset,
+    committee_size: CiphernodesCommitteeSize,
     /// DKG recursive aggregation events received before entering GeneratingC5Proof.
     early_dkg_proofs: Vec<TypedEvent<DKGRecursiveAggregationComplete>>,
 }
@@ -50,6 +52,7 @@ pub struct PublicKeyAggregatorParams {
     pub bus: BusHandle,
     pub e3_id: E3id,
     pub params_preset: BfvPreset,
+    pub committee_size: CiphernodesCommitteeSize,
 }
 
 /// Aggregate PublicKey for a committee of nodes. This actor listens for KeyshareCreated events
@@ -66,6 +69,7 @@ impl PublicKeyAggregator {
             e3_id: params.e3_id,
             state,
             params_preset: params.params_preset,
+            committee_size: params.committee_size,
             early_dkg_proofs: Vec::new(),
         }
     }
@@ -724,6 +728,7 @@ impl PublicKeyAggregator {
                     party_ids,
                     committee_addresses,
                     params_preset: self.params_preset,
+                    committee_size: self.committee_size,
                 }),
                 corr,
                 self.e3_id.clone(),
@@ -1329,6 +1334,7 @@ mod tests {
                 bus,
                 e3_id: e3_id.clone(),
                 params_preset: BfvPreset::InsecureThreshold512,
+                committee_size: CiphernodesCommitteeSize::Micro,
             },
             test_state(initial_state),
         );
@@ -1357,6 +1363,7 @@ mod tests {
                     .parse()
                     .expect("test address")],
                 params_preset: BfvPreset::InsecureThreshold512,
+                committee_size: CiphernodesCommitteeSize::Micro,
             }),
             correlation_id,
             e3_id.clone(),

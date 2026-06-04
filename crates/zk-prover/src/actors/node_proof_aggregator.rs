@@ -132,6 +132,7 @@ impl NodeProofAggregator {
             committee_h,
             n_moduli,
             params_preset: msg.proof_request.params_preset,
+            committee_size: msg.proof_request.committee_size,
         };
 
         info!(
@@ -498,6 +499,7 @@ mod tests {
         NodeDkgFoldRequest, TakeEvents, Unsequenced, ZkError,
     };
     use e3_test_helpers::get_common_setup;
+    use e3_zk_helpers::CiphernodesCommitteeSize;
 
     fn test_ctx(data: impl Into<EnclaveEventData>) -> EventContext<Sequenced> {
         EventContext::<Unsequenced>::from(data.into()).sequence(0)
@@ -544,6 +546,7 @@ mod tests {
                     committee_h: 0,
                     n_moduli: 0,
                     params_preset: e3_fhe_params::BfvPreset::InsecureThreshold512,
+                    committee_size: CiphernodesCommitteeSize::Micro,
                 },
                 buffer: BTreeMap::new(),
                 fold_correlation: Some(correlation_id),
@@ -574,6 +577,7 @@ mod tests {
                 c3_total_slots: 0,
                 party_id: 7,
                 params_preset: e3_fhe_params::BfvPreset::InsecureThreshold512,
+                committee_size: CiphernodesCommitteeSize::Micro,
             }),
             correlation_id,
             e3_id.clone(),
@@ -649,6 +653,7 @@ mod tests {
                 committee_h: 0,
                 n_moduli: 0,
                 params_preset: e3_fhe_params::BfvPreset::InsecureThreshold512,
+                committee_size: CiphernodesCommitteeSize::Micro,
             },
             test_ctx(DKGRecursiveAggregationComplete {
                 e3_id: e3_id.clone(),
