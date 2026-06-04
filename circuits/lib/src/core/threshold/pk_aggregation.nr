@@ -114,9 +114,7 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> PkAggregation<N, H, L,
             // Single divisibility check replaces two reduce_mod calls + equality assert:
             // saves ~37 gates per position (~48 gates -> ~12 gates for assert_zero_mod).
             mod_q_l.assert_zero_mod(
-                sum_shifted + offset
-                    - pk_agg[basis_idx].coefficients[coeff_idx]
-                    - h_half_qi,
+                sum_shifted + offset - pk_agg[basis_idx].coefficients[coeff_idx] - h_half_qi,
             );
         }
     }
