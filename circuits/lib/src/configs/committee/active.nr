@@ -16,13 +16,13 @@
 // committee module), not from `configs::default`.
 
 /// Number of registered parties (matches on-chain `topNodes` length).
-pub global N_PARTIES: u32 = crate::configs::committee::medium::N_PARTIES;
+pub global N_PARTIES: u32 = crate::configs::committee::micro::N_PARTIES;
 /// Secret-sharing reconstruction threshold.
-pub global T: u32 = crate::configs::committee::medium::T;
+pub global T: u32 = crate::configs::committee::micro::T;
 /// Honest-party count expected during the DKG (`H <= N_PARTIES`).
-pub global H: u32 = crate::configs::committee::medium::H;
+pub global H: u32 = crate::configs::committee::micro::H;
 
 /// Parity matrices for the secret-sharing scheme, sized for the active committee.
 /// `configs::{insecure,secure}::dkg` re-exports the relevant one as `PARITY_MATRIX`.
-pub use crate::configs::committee::medium::parity_insecure::PARITY_MATRIX as PARITY_MATRIX_INSECURE;
-pub use crate::configs::committee::medium::parity_secure::PARITY_MATRIX as PARITY_MATRIX_SECURE;
+pub use crate::configs::committee::micro::parity_insecure::PARITY_MATRIX as PARITY_MATRIX_INSECURE;
+pub use crate::configs::committee::micro::parity_secure::PARITY_MATRIX as PARITY_MATRIX_SECURE;
