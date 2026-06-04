@@ -556,16 +556,17 @@ class VerifierGenerator {
   }
 
   /**
-   * Refuse to run unless `dist/circuits/<preset>/.build-stamp.json` exists for the target preset.
+   * Refuse to run unless `dist/circuits/<preset>/<committee>/.build-stamp.json` exists.
    */
   private assertPresetBuilt(preset: string): void {
-    const stampPath = join(this.rootDir, 'dist', 'circuits', preset, '.build-stamp.json')
+    const committee = this.targetCommittee()
+    const stampPath = join(this.rootDir, 'dist', 'circuits', preset, committee, '.build-stamp.json')
     if (!existsSync(stampPath)) {
       throw new Error(
         `Preset '${preset}' is not built (missing ${stampPath}).\n` +
           `\n` +
           `   To fix, run from the repo root:\n` +
-          `     pnpm build:circuits --preset ${preset}\n` +
+          `     pnpm build:circuits --preset ${preset} --committee ${committee}\n` +
           `   then retry.`,
       )
     }
@@ -579,11 +580,11 @@ class VerifierGenerator {
       throw new Error(
         `Build stamp at ${stampPath} reports preset '${stamp.preset ?? '(missing)'}', expected '${preset}'.\n` +
           `   Run:\n` +
-          `     pnpm build:circuits --preset ${preset}\n` +
+          `     pnpm build:circuits --preset ${preset} --committee ${committee}\n` +
           `   then retry.`,
       )
     }
-    console.log(`   ✓ Preset '${preset}' build stamp present in dist/circuits.\n`)
+    console.log(`   ✓ Preset '${preset}/${committee}' build stamp present in dist/circuits.\n`)
   }
 
   /**
