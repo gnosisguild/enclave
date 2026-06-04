@@ -105,6 +105,10 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> PkAggregation<N, H, L,
 
         let half_qi: Field = (q_l - 1) / 2;
         let h_half_qi: Field = H as Field * half_qi;
+        // Offset keeps (sum_shifted - expected_unred + offset) non-negative in the integer
+        // sense (not Field-wrapped). sum_shifted in [0, H*q_l), expected_unred in
+        // [(H-1)*q_l/2, (H+1)*q_l/2) -> delta + H*q_l >= (H-1)*q_l/2 >= 0; max quotient <= H+2.
+        let offset: Field = H as Field * q_l;
 
         for coeff_idx in 0..N {
             let mut sum_shifted: Field = 0;
@@ -112,11 +116,13 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> PkAggregation<N, H, L,
                 sum_shifted =
                     sum_shifted + pk[party_idx][basis_idx].coefficients[coeff_idx] + half_qi;
             }
-            let sum_reduced = mod_q_l.reduce_mod(sum_shifted);
-
-            let expected =
-                mod_q_l.reduce_mod(pk_agg[basis_idx].coefficients[coeff_idx] + h_half_qi);
-            assert(sum_reduced == expected, "pk0 aggregation mismatch");
+            // Single divisibility check replaces two reduce_mod calls + equality assert:
+            // saves ~37 gates per position (~48 gates -> ~12 gates for assert_zero_mod).
+            mod_q_l.assert_zero_mod(
+                sum_shifted + offset
+                    - pk_agg[basis_idx].coefficients[coeff_idx]
+                    - h_half_qi,
+            );
         }
     }
 
