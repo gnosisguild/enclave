@@ -79,7 +79,8 @@ pub fn setup_zk_actors(
     let verifier = zk_actor.clone().recipient();
 
     let proof_request = ProofRequestActor::setup(bus, signer.clone());
-    let proof_verification = ProofVerificationActor::setup(bus, verifier);
+    let proof_verification =
+        ProofVerificationActor::setup(bus, verifier, backend.circuits_dir.clone());
     let share_verification = ShareVerificationActor::setup(bus);
     let node_proof_aggregator =
         NodeProofAggregator::setup(bus, signer, dkg_fold_attestation_verifiers_by_chain);

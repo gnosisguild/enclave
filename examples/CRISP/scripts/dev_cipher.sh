@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 READYFILE=$1
 
 # nuke past installations as we are adding these nodes to the contract
@@ -22,6 +23,9 @@ enclave wallet set --name cn5 --private-key "$PRIVATE_KEY_CN5"
 
 echo "Setting up ZK prover..."
 enclave noir setup
+
+echo "Staging per-committee circuit artifacts..."
+"${SCRIPT_DIR}/stage_enclave_circuits.sh"
 
 # using & instead of -d so that wait works below
 enclave nodes up -v &

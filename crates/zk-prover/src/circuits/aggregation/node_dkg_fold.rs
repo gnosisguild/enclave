@@ -368,7 +368,7 @@ pub fn prove_dkg_aggregation(
     preset: BfvPreset,
     committee: CiphernodesCommitteeSize,
 ) -> Result<Proof, ZkError> {
-    let artifacts_dir = preset.artifacts_dir_for_committee(committee.as_str());
+    let artifacts_dir = prover.resolve_artifacts_dir(preset, committee.as_str());
     let artifacts_dir = artifacts_dir.as_str();
     if input.node_fold_proofs.len() != input.party_ids.len() {
         return Err(ZkError::InvalidInput(
@@ -499,7 +499,7 @@ pub fn prove_decryption_aggregation_jobs(
     preset: BfvPreset,
     committee: CiphernodesCommitteeSize,
 ) -> Result<Vec<Proof>, ZkError> {
-    let artifacts_dir = preset.artifacts_dir_for_committee(committee.as_str());
+    let artifacts_dir = prover.resolve_artifacts_dir(preset, committee.as_str());
     let artifacts_dir = artifacts_dir.as_str();
     // VKs and the compiled circuit are job-independent: load once, reuse per ciphertext.
     let c6_fold_vk = vk::load_vk_artifacts(

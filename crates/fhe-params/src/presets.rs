@@ -18,6 +18,7 @@ use crate::constants::{
     secure_8192,
 };
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::sync::Arc;
 use thiserror::Error as ThisError;
 
@@ -401,6 +402,37 @@ impl BfvPreset {
         format!("{}/{}", self.artifacts_dir(), committee.as_ref())
     }
 
+    /// Resolve the artifact directory to use at runtime.
+    ///
+    /// Prefers the per-committee layout (`{preset}/{committee}`) when present. Falls back to the
+    /// legacy release layout (`{preset}/…`) from `enclave noir setup` until a circuits release
+    /// ships per-committee trees.
+    pub fn resolve_artifacts_dir_for_committee<C: AsRef<str>>(
+        &self,
+        committee: C,
+        circuits_base: &Path,
+    ) -> String {
+        let per_committee = self.artifacts_dir_for_committee(committee.as_ref());
+        let legacy = self.artifacts_dir();
+        if Self::artifacts_tree_has_pk_bfv(circuits_base, &per_committee) {
+            per_committee
+        } else if Self::artifacts_tree_has_pk_bfv(circuits_base, &legacy) {
+            legacy
+        } else {
+            per_committee
+        }
+    }
+
+    fn artifacts_tree_has_pk_bfv(circuits_base: &Path, artifacts_dir: &str) -> bool {
+        ["recursive", "default"].iter().any(|variant| {
+            circuits_base
+                .join(artifacts_dir)
+                .join(variant)
+                .join("dkg/pk/pk.json")
+                .exists()
+        })
+    }
+
     pub fn search_defaults(&self) -> Option<PresetSearchDefaults> {
         match self {
             BfvPreset::InsecureThreshold512 => Some(PresetSearchDefaults {
@@ -574,5 +606,22 @@ mod tests {
             "secure-8192"
         );
         assert_eq!(BfvPreset::SecureDkg8192.artifacts_dir(), "secure-8192");
+    }
+
+    #[test]
+    fn resolve_artifacts_dir_falls_back_to_legacy_layout() {
+        let temp =
+            std::env::temp_dir().join(format!("enclave-artifacts-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp);
+        let legacy = temp.join("insecure-512/recursive/dkg/pk");
+        std::fs::create_dir_all(&legacy).unwrap();
+        std::fs::write(legacy.join("pk.json"), b"{}").unwrap();
+
+        let preset = BfvPreset::InsecureDkg512;
+        assert_eq!(
+            preset.resolve_artifacts_dir_for_committee("micro", &temp),
+            "insecure-512"
+        );
+        let _ = std::fs::remove_dir_all(&temp);
     }
 }

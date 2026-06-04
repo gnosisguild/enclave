@@ -9,6 +9,7 @@
 //! on-chain fault attribution.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, Recipient};
@@ -58,23 +59,30 @@ pub struct ProofVerificationActor {
     pending: HashMap<(E3id, u64), PendingVerification>,
     /// Tracks preset + committee per E3 so we can derive `artifacts_dir` for proof verification.
     presets: HashMap<E3id, (BfvPreset, CiphernodesCommitteeSize)>,
+    circuits_base: PathBuf,
 }
 
 impl ProofVerificationActor {
-    pub fn new(bus: &BusHandle, verifier: Recipient<TypedEvent<ZkVerificationRequest>>) -> Self {
+    pub fn new(
+        bus: &BusHandle,
+        verifier: Recipient<TypedEvent<ZkVerificationRequest>>,
+        circuits_base: PathBuf,
+    ) -> Self {
         Self {
             bus: bus.clone(),
             verifier,
             pending: HashMap::new(),
             presets: HashMap::new(),
+            circuits_base,
         }
     }
 
     pub fn setup(
         bus: &BusHandle,
         verifier: Recipient<TypedEvent<ZkVerificationRequest>>,
+        circuits_base: PathBuf,
     ) -> Addr<Self> {
-        let addr = Self::new(bus, verifier).start();
+        let addr = Self::new(bus, verifier, circuits_base).start();
         bus.subscribe(EventType::CiphernodeSelected, addr.clone().into());
         bus.subscribe(EventType::EncryptionKeyReceived, addr.clone().into());
         addr
@@ -120,7 +128,8 @@ impl ProofVerificationActor {
             );
             return;
         };
-        let artifacts_dir = preset.artifacts_dir_for_committee(committee.as_str());
+        let artifacts_dir =
+            preset.resolve_artifacts_dir_for_committee(committee.as_str(), &self.circuits_base);
 
         let request = TypedEvent::new(
             ZkVerificationRequest {

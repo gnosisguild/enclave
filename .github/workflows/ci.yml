@@ -772,6 +772,11 @@ jobs:
         run: |
           chmod +x ~/.cargo/bin/enclave
 
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: ${{ env.NOIR_TOOLCHAIN }}
+
       - name: Setup ZK prover
         run: |
           enclave noir setup
