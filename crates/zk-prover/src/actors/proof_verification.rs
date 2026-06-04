@@ -166,11 +166,19 @@ impl Handler<EnclaveEvent> for ProofVerificationActor {
         let (msg, ec) = msg.into_components();
         match msg {
             EnclaveEventData::CiphernodeSelected(data) => {
-                let committee =
-                    CiphernodesCommitteeSize::from_threshold(data.threshold_m, data.threshold_n)
-                        .unwrap_or(CiphernodesCommitteeSize::Micro);
-                self.presets
-                    .insert(data.e3_id.clone(), (data.params_preset, committee));
+                match CiphernodesCommitteeSize::from_threshold(data.threshold_m, data.threshold_n) {
+                    Ok(committee) => {
+                        self.presets.insert(data.e3_id.clone(), (data.params_preset, committee));
+                    }
+                    Err(e) => {
+                        error!(
+                            "ProofVerificationActor: unrecognised committee for E3 {} \
+                             (threshold_m={}, threshold_n={}): {e} — skipping preset registration, \
+                             proof verification will be rejected if a key arrives",
+                            data.e3_id, data.threshold_m, data.threshold_n
+                        );
+                    }
+                }
             }
             EnclaveEventData::EncryptionKeyReceived(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))

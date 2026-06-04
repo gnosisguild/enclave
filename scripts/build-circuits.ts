@@ -340,8 +340,8 @@ class NoirCircuitBuilder {
    * Used when dist is fresh but bin still holds another preset (common after --mode insecure
    * then --mode secure benchmark runs).
    */
-  private hydrateBinFromDist(preset: string, sourceHash: string): void {
-    const distRoot = join(this.options.outputDir!, preset)
+  private hydrateBinFromDist(preset: string, committee: string, sourceHash: string): void {
+    const distRoot = join(this.options.outputDir!, preset, committee)
     const circuits = this.discoverCircuits()
     let copied = 0
 
@@ -374,8 +374,8 @@ class NoirCircuitBuilder {
     this.writeActiveBinPresetStamp(preset, sourceHash)
   }
 
-  private requiredDistMarkers(preset: string): string[] {
-    const dist = join(this.options.outputDir!, preset)
+  private requiredDistMarkers(preset: string, committee: string): string[] {
+    const dist = join(this.options.outputDir!, preset, committee)
     return [
       join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.AGGREGATION, 'dkg_aggregator', 'dkg_aggregator.json'),
       join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.AGGREGATION, 'decryption_aggregator', 'decryption_aggregator.json'),
@@ -408,7 +408,7 @@ class NoirCircuitBuilder {
   private isDistPresetUpToDate(preset: string, committee: string, sourceHash: string): boolean {
     const stamp = this.readPresetStamp(preset, committee)
     if (!stamp?.sourceHash || stamp.sourceHash !== sourceHash) return false
-    return this.requiredDistMarkers(preset).every((path) => existsSync(path))
+    return this.requiredDistMarkers(preset, committee).every((path) => existsSync(path))
   }
 
   private isBinReadyForPreset(preset: string, committee: string, sourceHash: string): boolean {
@@ -435,7 +435,7 @@ class NoirCircuitBuilder {
           `Run without --skip-if-built or \`pnpm build:circuits --preset ${preset}\` once to refresh.`,
       )
     }
-    const missing = [...this.requiredDistMarkers(preset), ...this.requiredBinMarkers()].filter((path) => !existsSync(path))
+    const missing = [...this.requiredDistMarkers(preset, committee), ...this.requiredBinMarkers()].filter((path) => !existsSync(path))
     if (missing.length > 0) {
       console.log(`   ℹ️  --skip-if-built: missing ${missing.length} marker artifact(s), e.g. ${missing[0]}`)
     }
@@ -492,7 +492,7 @@ class NoirCircuitBuilder {
           )
         }
         console.log(`   💧 Hydrating circuits/bin from dist/circuits/${preset}/${committee} (no nargo compile)...`)
-        this.hydrateBinFromDist(preset, sourceHash)
+        this.hydrateBinFromDist(preset, committee, sourceHash)
         console.log(`\n✅ Hydrated circuits/bin for preset: ${preset}/${committee}`)
         return result
       }
@@ -510,7 +510,7 @@ class NoirCircuitBuilder {
             `   💧 dist/circuits/${preset}/${committee} is current; hydrating circuits/bin from dist ` +
               `(fast — avoids a full ~50m secure recompile when switching presets).`,
           )
-          this.hydrateBinFromDist(preset, sourceHash)
+          this.hydrateBinFromDist(preset, committee, sourceHash)
           console.log(`\n✅ Hydrated circuits/bin for preset: ${preset}/${committee}`)
           return result
         }
