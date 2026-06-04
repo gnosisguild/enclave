@@ -243,7 +243,7 @@ if [ "$SKIP_COMPILE" = false ]; then
         ENSURE_ARGS+=(--verbose)
     fi
     "${SCRIPT_DIR}/ensure_circuit_preset_built.sh" "${ENSURE_ARGS[@]}"
-    if "${SCRIPT_DIR}/check_circuit_preset_artifacts.sh" "$PRESET_NAME"; then
+    if "${SCRIPT_DIR}/check_circuit_preset_artifacts.sh" "$PRESET_NAME" --committee "$OUTPUT_COMMITTEE"; then
         PRESET_ARTIFACTS_READY=true
     fi
     echo "Preflight build complete."

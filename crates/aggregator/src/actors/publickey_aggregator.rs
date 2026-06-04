@@ -138,6 +138,7 @@ impl PublicKeyAggregator {
                 decryption_proofs: vec![],
                 pre_dishonest: no_proof_parties.into_iter().collect(),
                 params_preset: self.params_preset,
+                committee_size: self.committee_size,
             },
             ec,
         )?;

@@ -21,6 +21,7 @@ use e3_events::{
     E3id, EventContext, PartyProofData, PartyProofsToVerify, PartyShareDecryptionProofsToVerify,
     PartyVerificationResult, ProofType, Sequenced, SignedProofPayload, VerificationKind,
 };
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_utils::utility_types::ArcBytes;
 use tracing::{info, warn};
 
@@ -100,6 +101,8 @@ pub(crate) struct PendingVerification {
     pub(crate) party_proof_data: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
     /// BFV preset for circuit artifact resolution.
     pub(crate) params_preset: e3_fhe_params::BfvPreset,
+    /// Committee size for per-committee circuit artifact resolution.
+    pub(crate) committee_size: CiphernodesCommitteeSize,
 }
 
 /// Pending consistency check — stored between ECDSA pass and ZK dispatch.
@@ -125,6 +128,8 @@ pub(crate) struct PendingConsistencyCheck {
     pub(crate) ecdsa_passed_decryption_proofs: Vec<PartyShareDecryptionProofsToVerify>,
     /// BFV preset for circuit artifact resolution.
     pub(crate) params_preset: e3_fhe_params::BfvPreset,
+    /// Committee size for per-committee circuit artifact resolution.
+    pub(crate) committee_size: CiphernodesCommitteeSize,
 }
 
 /// Filter out inconsistent parties and collect dispatched party IDs.

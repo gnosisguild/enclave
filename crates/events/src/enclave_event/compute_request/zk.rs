@@ -200,6 +200,8 @@ pub struct DkgShareDecryptionProofRequest {
     pub dkg_input_type: DkgInputType,
     /// BFV preset for parameter resolution.
     pub params_preset: BfvPreset,
+    /// Committee size for circuit artifact resolution.
+    pub committee_size: CiphernodesCommitteeSize,
 }
 
 /// Request to generate a proof for BFV public key generation (C0).
@@ -210,6 +212,7 @@ pub struct PkBfvProofRequest {
     #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub pk_bfv: ArcBytes,
     pub params_preset: BfvPreset,
+    pub committee_size: CiphernodesCommitteeSize,
 }
 
 /// Request to generate a proof for PK share generation (C1).
@@ -232,10 +235,15 @@ pub struct PkGenerationProofRequest {
 }
 
 impl PkBfvProofRequest {
-    pub fn new(pk_bfv: impl Into<ArcBytes>, params_preset: BfvPreset) -> Self {
+    pub fn new(
+        pk_bfv: impl Into<ArcBytes>,
+        params_preset: BfvPreset,
+        committee_size: CiphernodesCommitteeSize,
+    ) -> Self {
         Self {
             pk_bfv: pk_bfv.into(),
             params_preset,
+            committee_size,
         }
     }
 }
@@ -332,6 +340,8 @@ pub struct ThresholdShareDecryptionProofRequest {
     pub d_share_bytes: Vec<ArcBytes>,
     /// BFV preset for parameter resolution.
     pub params_preset: BfvPreset,
+    /// Committee size for per-committee circuit artifact resolution.
+    pub committee_size: CiphernodesCommitteeSize,
 }
 
 /// Response containing generated proofs for threshold share decryption (C6).
@@ -417,6 +427,8 @@ pub struct VerifyShareProofsRequest {
     pub party_proofs: Vec<PartyProofsToVerify>,
     /// BFV preset for parameter resolution (determines circuit artifact directory).
     pub params_preset: BfvPreset,
+    /// Committee size for per-committee circuit artifact resolution.
+    pub committee_size: CiphernodesCommitteeSize,
 }
 
 /// All signed proofs from a single sender to verify.
@@ -459,6 +471,8 @@ pub struct VerifyShareDecryptionProofsRequest {
     pub party_proofs: Vec<PartyShareDecryptionProofsToVerify>,
     /// BFV preset for parameter resolution (determines circuit artifact directory).
     pub params_preset: BfvPreset,
+    /// Committee size for per-committee circuit artifact resolution.
+    pub committee_size: CiphernodesCommitteeSize,
 }
 
 /// C4 proofs from a single sender to verify.
@@ -493,8 +507,10 @@ pub struct DecryptedSharesAggregationProofRequest {
     pub params_preset: BfvPreset,
     /// Threshold required for decryption.
     pub threshold_m: u64,
-    /// Committee size.
+    /// Committee size (N).
     pub threshold_n: u64,
+    /// Committee size for per-committee circuit artifact resolution.
+    pub committee_size: CiphernodesCommitteeSize,
 }
 
 /// Response containing generated proofs for decrypted shares aggregation (C7).

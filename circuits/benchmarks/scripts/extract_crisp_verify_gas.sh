@@ -117,7 +117,7 @@ else
 fi
 
 require_preset_artifacts() {
-    if ! "${SCRIPT_DIR}/check_circuit_preset_artifacts.sh" "$PRESET_NAME"; then
+    if ! "${SCRIPT_DIR}/check_circuit_preset_artifacts.sh" "$PRESET_NAME" --committee "$COMMITTEE"; then
         exit 1
     fi
 }

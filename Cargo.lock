@@ -3721,6 +3721,7 @@ dependencies = [
  "e3-fhe-params",
  "e3-request",
  "e3-utils",
+ "e3-zk-helpers",
  "hex",
  "serde",
  "sha2",

@@ -212,6 +212,7 @@ impl ThresholdPlaintextAggregator {
                 decryption_proofs: vec![],
                 pre_dishonest: BTreeSet::new(),
                 params_preset: self.params_preset,
+                committee_size: self.committee_size,
             },
             ec,
         )?;
@@ -370,6 +371,7 @@ impl ThresholdPlaintextAggregator {
                     params_preset: self.params_preset,
                     threshold_m,
                     threshold_n,
+                    committee_size: self.committee_size,
                 },
                 plaintext,
                 shares,

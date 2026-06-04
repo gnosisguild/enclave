@@ -14,6 +14,7 @@
 //! when verification finishes, carrying the set of dishonest party IDs.
 
 use crate::{E3id, PartyProofsToVerify, PartyShareDecryptionProofsToVerify};
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -44,6 +45,8 @@ pub struct ShareVerificationDispatched {
     pub pre_dishonest: BTreeSet<u64>,
     /// BFV preset for circuit artifact resolution.
     pub params_preset: e3_fhe_params::BfvPreset,
+    /// Committee size for per-committee circuit artifact resolution.
+    pub committee_size: CiphernodesCommitteeSize,
 }
 
 /// ShareVerificationActor → ThresholdKeyshare: verification results.

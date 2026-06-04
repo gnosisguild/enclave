@@ -439,7 +439,9 @@ fn handle_threshold_share_decryption_proof(
     }
     let mut proofs = Vec::with_capacity(num_indices);
     let bb_work_base = zk_bb_work_id(&request);
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir = req
+        .params_preset
+        .artifacts_dir_for_committee(req.committee_size.as_str());
 
     for i in 0..num_indices {
         // Deserialize ciphertext
@@ -1039,7 +1041,9 @@ fn handle_pk_bfv_proof(
         .params_preset
         .threshold_counterpart()
         .unwrap_or_else(|| BfvPreset::InsecureThreshold512);
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir = req
+        .params_preset
+        .artifacts_dir_for_committee(req.committee_size.as_str());
     // But here we have to pass the InsecureThreshold512 preset because the underlaying witness generator
     // builds both params, but will only use the DKG one
     let proof = circuit
@@ -1275,7 +1279,9 @@ fn handle_dkg_share_decryption_proof(
 
     let circuit = ShareDecryptionCircuit;
     let bb_work = zk_bb_work_id(&request);
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir = req
+        .params_preset
+        .artifacts_dir_for_committee(req.committee_size.as_str());
     let proof = circuit
         .prove(
             prover,
@@ -1318,7 +1324,9 @@ fn handle_verify_share_proofs(
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     let e3_id_str = request.e3_id.to_string();
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir = req
+        .params_preset
+        .artifacts_dir_for_committee(req.committee_size.as_str());
 
     // ECDSA validation (signature recovery, signer consistency, e3_id match)
     // is handled by ShareVerificationActor before dispatching to multithread.
@@ -1390,7 +1398,9 @@ fn handle_verify_share_decryption_proofs(
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     let e3_id_str = request.e3_id.to_string();
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir = req
+        .params_preset
+        .artifacts_dir_for_committee(req.committee_size.as_str());
 
     // ECDSA validation (signature recovery, signer consistency, e3_id match)
     // is handled by ShareVerificationActor before dispatching to multithread.
@@ -1554,7 +1564,9 @@ fn handle_decrypted_shares_aggregation_proof(
 
         let circuit = DecryptedSharesAggregationCircuit;
         let idx_work_id = format!("{}_c7_{}", zk_bb_work_id(&request), i);
-        let artifacts_dir = req.params_preset.artifacts_dir();
+        let artifacts_dir = req
+            .params_preset
+            .artifacts_dir_for_committee(req.committee_size.as_str());
         let proof = circuit
             .prove_with_variant(
                 prover,

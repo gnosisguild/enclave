@@ -876,10 +876,21 @@ impl AccusationVoting {
                 sender_party_id: accused_party_id,
                 signed_proofs: vec![forwarded_clone],
             };
+            let committee_size = match e3_zk_helpers::CiphernodesCommitteeSize::from_threshold(
+                self.threshold_m,
+                self.committee.len(),
+            ) {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!("Cannot derive committee size for ZK re-verification: {e}");
+                    return;
+                }
+            };
             let request = ComputeRequest::zk(
                 ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
                     party_proofs: vec![party_proof],
                     params_preset: self.params_preset,
+                    committee_size,
                 }),
                 correlation_id,
                 self.e3_id.clone(),
