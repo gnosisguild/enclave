@@ -19,6 +19,49 @@ use walkdir::WalkDir;
 
 use super::ZkBackend;
 
+/// Known committee subdirectories in per-committee circuit release layouts (v0.2.0+).
+const COMMITTEE_SUBDIRS: &[&str] = &["micro", "small", "medium", "large"];
+
+/// Circuit artifact variant directories at `{preset}/{committee?}/{variant}/...`.
+const CIRCUIT_VARIANT_DIRS: &[&str] = &["default", "evm", "recursive"];
+
+/// Resolve a manifest-relative path against on-disk circuit layouts.
+///
+/// Older releases used `{preset}/{variant}/...`. v0.2.0+ archives use
+/// `{preset}/{committee}/{variant}/...` while `checksums.json` may still list the
+/// legacy flat paths — try committee-prefixed candidates before failing.
+fn resolve_circuit_manifest_path(circuits_dir: &Path, rel_path: &str) -> Option<PathBuf> {
+    let direct = circuits_dir.join(rel_path);
+    if direct.exists() {
+        return Some(direct);
+    }
+
+    let mut parts = rel_path.split('/');
+    let preset = parts.next()?;
+    let next = parts.next()?;
+    if COMMITTEE_SUBDIRS.contains(&next) {
+        return None;
+    }
+    if !CIRCUIT_VARIANT_DIRS.contains(&next) {
+        return None;
+    }
+    let suffix = parts.collect::<Vec<_>>().join("/");
+    let suffix = if suffix.is_empty() {
+        String::new()
+    } else {
+        format!("/{suffix}")
+    };
+
+    for committee in COMMITTEE_SUBDIRS {
+        let candidate = circuits_dir.join(format!("{preset}/{committee}/{next}{suffix}"));
+        if candidate.exists() {
+            return Some(candidate);
+        }
+    }
+
+    None
+}
+
 impl ZkBackend {
     pub async fn download_bb(&self) -> Result<(), ZkError> {
         if self.using_custom_bb {
@@ -154,10 +197,8 @@ impl ZkBackend {
         let mut circuit_infos = HashMap::new();
 
         for (rel_path, expected_hash) in &manifest.files {
-            let file_path = self.circuits_dir.join(rel_path);
-            if !file_path.exists() {
-                return Err(ZkError::CircuitNotFound(rel_path.clone()));
-            }
+            let file_path = resolve_circuit_manifest_path(&self.circuits_dir, rel_path)
+                .ok_or_else(|| ZkError::CircuitNotFound(rel_path.clone()))?;
 
             let data = fs::read(&file_path).await?;
             verify_checksum(rel_path, &data, Some(expected_hash))?;
@@ -243,4 +284,77 @@ async fn download_with_progress(url: &str, message: &str) -> Result<Vec<u8>, ZkE
 
     pb.finish_with_message("download complete");
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn write_file(root: &Path, rel: &str, contents: &[u8]) {
+        let path = root.join(rel);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(path, contents).unwrap();
+    }
+
+    #[test]
+    fn resolve_circuit_manifest_path_prefers_direct_layout() {
+        let temp = TempDir::new().unwrap();
+        let circuits_dir = temp.path();
+        write_file(circuits_dir, "insecure-512/default/dkg/pk/pk.json", b"flat");
+
+        let resolved =
+            resolve_circuit_manifest_path(circuits_dir, "insecure-512/default/dkg/pk/pk.json")
+                .unwrap();
+
+        assert_eq!(
+            resolved,
+            circuits_dir.join("insecure-512/default/dkg/pk/pk.json")
+        );
+    }
+
+    #[test]
+    fn resolve_circuit_manifest_path_falls_back_to_committee_layout() {
+        let temp = TempDir::new().unwrap();
+        let circuits_dir = temp.path();
+        write_file(
+            circuits_dir,
+            "insecure-512/micro/default/dkg/pk/pk.json",
+            b"micro",
+        );
+
+        let resolved =
+            resolve_circuit_manifest_path(circuits_dir, "insecure-512/default/dkg/pk/pk.json")
+                .unwrap();
+
+        assert_eq!(
+            resolved,
+            circuits_dir.join("insecure-512/micro/default/dkg/pk/pk.json")
+        );
+    }
+
+    #[test]
+    fn resolve_circuit_manifest_path_accepts_committee_scoped_layout() {
+        let temp = TempDir::new().unwrap();
+        let circuits_dir = temp.path();
+        write_file(
+            circuits_dir,
+            "insecure-512/micro/default/dkg/pk/pk.json",
+            b"micro",
+        );
+
+        let resolved = resolve_circuit_manifest_path(
+            circuits_dir,
+            "insecure-512/micro/default/dkg/pk/pk.json",
+        )
+        .unwrap();
+
+        assert_eq!(
+            resolved,
+            circuits_dir.join("insecure-512/micro/default/dkg/pk/pk.json")
+        );
+    }
 }

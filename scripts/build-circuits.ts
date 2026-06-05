@@ -34,6 +34,7 @@ interface CompiledCircuit {
   name: string
   group: CircuitGroup
   preset: string
+  committee: CircuitCommittee
   artifacts: {
     json?: string
     vk?: string
@@ -524,7 +525,7 @@ class NoirCircuitBuilder {
 
       for (const circuit of circuits) {
         try {
-          result.compiled.push(this.buildCircuit(circuit, preset))
+          result.compiled.push(this.buildCircuit(circuit, preset, committee))
         } catch (error: any) {
           result.errors.push(`${preset}/${committee}/${circuit.name}: ${error.message}`)
           result.success = false
@@ -637,12 +638,13 @@ class NoirCircuitBuilder {
     return dirs
   }
 
-  private buildCircuit(circuit: CircuitInfo, preset: string): CompiledCircuit {
+  private buildCircuit(circuit: CircuitInfo, preset: string, committee: CircuitCommittee): CompiledCircuit {
     const packageName = this.getPackageName(circuit.path)
     const result: CompiledCircuit = {
       name: circuit.name,
       group: circuit.group,
       preset,
+      committee,
       artifacts: {},
       checksums: {},
     }
@@ -848,7 +850,7 @@ class NoirCircuitBuilder {
 
       // evm/ variant checksums (only for circuits that have an evm VK)
       if (c.checksums.vk && c.artifacts.vk) {
-        const evmPrefix = `${c.preset}/${CIRCUIT_VARIANTS.EVM}/${c.group}/${c.name}`
+        const evmPrefix = `${c.preset}/${c.committee}/${CIRCUIT_VARIANTS.EVM}/${c.group}/${c.name}`
         if (c.checksums.json && c.artifacts.json) {
           const f = `${evmPrefix}/${basename(c.artifacts.json)}`
           checksums[f] = c.checksums.json
@@ -865,7 +867,7 @@ class NoirCircuitBuilder {
       }
 
       // default/ variant checksums
-      const defaultPrefix = `${c.preset}/${CIRCUIT_VARIANTS.DEFAULT}/${c.group}/${c.name}`
+      const defaultPrefix = `${c.preset}/${c.committee}/${CIRCUIT_VARIANTS.DEFAULT}/${c.group}/${c.name}`
       if (c.checksums.json && c.artifacts.json) {
         const f = `${defaultPrefix}/${basename(c.artifacts.json)}`
         checksums[f] = c.checksums.json
@@ -885,7 +887,7 @@ class NoirCircuitBuilder {
       }
       // recursive/ variant checksums (noir-recursive VKs for inner proofs)
       if (c.checksums.vkNoir && c.artifacts.vkNoir) {
-        const recursivePrefix = `${c.preset}/${CIRCUIT_VARIANTS.RECURSIVE}/${c.group}/${c.name}`
+        const recursivePrefix = `${c.preset}/${c.committee}/${CIRCUIT_VARIANTS.RECURSIVE}/${c.group}/${c.name}`
         if (c.checksums.json && c.artifacts.json) {
           const f = `${recursivePrefix}/${basename(c.artifacts.json)}`
           checksums[f] = c.checksums.json
