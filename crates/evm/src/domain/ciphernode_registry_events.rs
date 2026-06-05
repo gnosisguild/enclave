@@ -170,10 +170,10 @@ impl From<CommitteeMemberExpelledWithChainId> for EnclaveEventData {
 
 pub(crate) fn extractor(
     data: &LogData,
-    topic: Option<&B256>,
+    topics: &[B256],
     chain_id: u64,
 ) -> Option<EnclaveEventData> {
-    match topic {
+    match topics.first() {
         Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {
             let Ok(event) = ICiphernodeRegistry::CiphernodeAdded::decode_log_data(data) else {
                 error!("Error parsing event CiphernodeAdded after topic was matched!");
@@ -234,9 +234,9 @@ pub(crate) fn extractor(
                 event, chain_id,
             )))
         }
-        _topic => {
+        _ => {
             trace!(
-                topic=?_topic,
+                topic=?topics.first(),
                 "Unknown event was received by CiphernodeRegistry.sol parser but was ignored"
             );
             None
@@ -260,7 +260,7 @@ mod tests {
         let log_data = event.encode_log_data();
         let out = extractor(
             &log_data,
-            Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH),
+            &[ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH],
             10,
         );
         match out {
@@ -294,6 +294,6 @@ mod tests {
     #[test]
     fn test_extractor_ignores_unknown_topic() {
         let log_data = LogData::default();
-        assert!(extractor(&log_data, Some(&B256::ZERO), 1).is_none());
+        assert!(extractor(&log_data, &[B256::ZERO], 1).is_none());
     }
 }

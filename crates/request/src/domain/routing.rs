@@ -212,15 +212,17 @@ mod tests {
     }
 
     #[test]
-    fn e3_request_complete_without_e3_id_is_ignored() {
-        // EnclaveEventData::get_e3_id() returns None for E3RequestComplete, so such an event
-        // never reaches the Teardown arm: it is ignored. This mirrors the original router's
-        // `let Some(e3_id) = ... else { return Ok(()) }` guard exactly.
+    fn e3_request_complete_triggers_teardown() {
+        // EnclaveEventData::get_e3_id() now returns Some(e3_id) for E3RequestComplete,
+        // so the event reaches the Teardown arm of the router.
         let id = e3id();
-        let msg = from_data(E3RequestComplete { e3_id: id });
+        let msg = from_data(E3RequestComplete { e3_id: id.clone() });
         assert_eq!(
             RequestRouter::route(&msg, &HashSet::new()),
-            RoutingDecision::Ignore
+            RoutingDecision::Process {
+                e3_id: id,
+                post_forward: PostForward::Teardown,
+            }
         );
     }
 

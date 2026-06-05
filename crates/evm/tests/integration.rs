@@ -32,10 +32,10 @@ sol!(
 
 fn test_event_extractor(
     data: &LogData,
-    topic: Option<&FixedBytes<32>>,
+    topics: &[FixedBytes<32>],
     _chain_id: u64,
 ) -> Option<EnclaveEventData> {
-    match topic {
+    match topics.first() {
         Some(&EmitLogs::ValueChanged::SIGNATURE_HASH) => {
             let Ok(event) = EmitLogs::ValueChanged::decode_log_data(data) else {
                 return None;

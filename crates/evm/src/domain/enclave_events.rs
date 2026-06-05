@@ -186,10 +186,11 @@ impl From<E3StageChangedWithChainId> for EnclaveEventData {
 
 pub(crate) fn extractor(
     data: &LogData,
-    topic: Option<&B256>,
+    topics: &[B256],
     chain_id: u64,
 ) -> Option<EnclaveEventData> {
-    match topic {
+    let topic0 = topics.first();
+    match topic0 {
         Some(&IEnclave::E3Requested::SIGNATURE_HASH) => {
             let Ok(event) = IEnclave::E3Requested::decode_log_data(data) else {
                 error!("Error parsing event E3Requested after topic matched!");
@@ -211,10 +212,17 @@ pub(crate) fn extractor(
             }
         }
         Some(&IEnclave::CiphertextOutputPublished::SIGNATURE_HASH) => {
-            let Ok(event) = IEnclave::CiphertextOutputPublished::decode_log_data(data) else {
+            let Ok(mut event) = IEnclave::CiphertextOutputPublished::decode_log_data(data) else {
                 error!("Error parsing event CiphertextOutputPublished after topic matched!");
                 return None;
             };
+            // e3Id is indexed → extract from topics[1], not log data
+            if let Some(e3_id_topic) = topics.get(1) {
+                event.e3Id = alloy::primitives::U256::from_be_bytes(e3_id_topic.0);
+            } else {
+                error!("CiphertextOutputPublished missing indexed e3Id in topics!");
+                return None;
+            }
             Some(EnclaveEventData::from(
                 CiphertextOutputPublishedWithChainId(event, chain_id),
             ))
@@ -231,10 +239,17 @@ pub(crate) fn extractor(
             Some(EnclaveEventData::from(E3FailedWithChainId(event, chain_id)))
         }
         Some(&IEnclave::E3StageChanged::SIGNATURE_HASH) => {
-            let Ok(event) = IEnclave::E3StageChanged::decode_log_data(data) else {
+            let Ok(mut event) = IEnclave::E3StageChanged::decode_log_data(data) else {
                 error!("Error parsing event E3StageChanged after topic matched!");
                 return None;
             };
+            // e3Id is indexed → extract from topics[1], not log data
+            if let Some(e3_id_topic) = topics.get(1) {
+                event.e3Id = alloy::primitives::U256::from_be_bytes(e3_id_topic.0);
+            } else {
+                error!("E3StageChanged missing indexed e3Id in topics!");
+                return None;
+            }
             trace!(
                 "E3StageChanged event received: e3_id={}, {:?} -> {:?}",
                 event.e3Id,
@@ -245,9 +260,9 @@ pub(crate) fn extractor(
                 event, chain_id,
             )))
         }
-        _topic => {
+        _ => {
             trace!(
-                topic=?_topic,
+                topic=?topic0,
                 "Unknown event received by Enclave.sol parser but was ignored"
             );
             None
@@ -286,9 +301,12 @@ mod tests {
             newStage: 6,      // Failed
         };
         let log_data = event.encode_log_data();
+        // e3Id is indexed → it must be in topics[1] (not in log data)
+        let e3_id_bytes: [u8; 32] = U256::from(42u64).to_be_bytes();
+        let e3_id_topic = B256::from(e3_id_bytes);
         let out = extractor(
             &log_data,
-            Some(&IEnclave::E3StageChanged::SIGNATURE_HASH),
+            &[IEnclave::E3StageChanged::SIGNATURE_HASH, e3_id_topic],
             7,
         );
         match out {
@@ -304,7 +322,7 @@ mod tests {
     #[test]
     fn test_extractor_ignores_unknown_topic() {
         let log_data = LogData::default();
-        assert!(extractor(&log_data, Some(&B256::ZERO), 1).is_none());
-        assert!(extractor(&log_data, None, 1).is_none());
+        assert!(extractor(&log_data, &[B256::ZERO], 1).is_none());
+        assert!(extractor(&log_data, &[], 1).is_none());
     }
 }
