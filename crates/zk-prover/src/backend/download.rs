@@ -339,13 +339,9 @@ mod tests {
         );
         let hash = sha256_hex(contents);
 
-        let data = read_manifest_file(
-            circuits_dir,
-            "insecure-512/default/dkg/pk/pk.json",
-            &hash,
-        )
-        .await
-        .unwrap();
+        let data = read_manifest_file(circuits_dir, "insecure-512/default/dkg/pk/pk.json", &hash)
+            .await
+            .unwrap();
 
         assert_eq!(data, contents);
     }
