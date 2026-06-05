@@ -23,37 +23,41 @@ die() { echo "[run_service] ERROR: $*" >&2; exit 1; }
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 wait_for_port() {
-    local host="${1:-localhost}" port="$2" label="${3:-$port}" max="${4:-120}"
-    local attempt=1
+    local host port label max
+    host="${1:-localhost}"
+    port="$2"
+    label="${3:-$port}"
+    max="${4:-120}"
+    local attempt=0
     echo "[run_service] Waiting for $label ($host:$port)..."
-    while [ $attempt -le $max ]; do
-        if curl -s "http://$host:$port" >/dev/null 2>&1; then
+    while (( attempt <= max )); do
+        if curl -s "http://${host}:${port}" >/dev/null 2>&1; then
             echo "[run_service] $label is ready"
             return 0
         fi
         sleep 1
-        attempt=$((attempt + 1))
+        (( attempt++ ))
     done
     die "$label did not start after ${max}s"
 }
 
 wait_for_file() {
-    local file="$1" label="${2:-$file}" max="${3:-120}"
-    local attempt=1
+    local file label max
+    file="$1"
+    label="${2:-$file}"
+    max="${3:-120}"
+    local attempt=0
     echo "[run_service] Waiting for $label..."
-    while [ $attempt -le $max ]; do
+    while (( attempt <= max )); do
         if [ -f "$file" ]; then
             echo "[run_service] $label found"
             return 0
         fi
         sleep 1
-        attempt=$((attempt + 1))
+        (( attempt++ ))
     done
     die "$label did not appear after ${max}s"
 }
-
-# Clean stale deploy signal so nodes don't start prematurely
-rm -f "$SIGNAL_FILE"
 
 case "$SERVICE" in
   anvil)
@@ -65,6 +69,8 @@ case "$SERVICE" in
     ;;
 
   deploy)
+    # Clean stale signal from a previous run so nodes don't start prematurely
+    rm -f "$SIGNAL_FILE"
     exec bash "${REPO_ROOT}/deploy/local/setup_nodes.sh"
     ;;
 
