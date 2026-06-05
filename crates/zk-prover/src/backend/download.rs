@@ -25,25 +25,20 @@ const COMMITTEE_SUBDIRS: &[&str] = &["micro", "small", "medium", "large"];
 /// Circuit artifact variant directories at `{preset}/{committee?}/{variant}/...`.
 const CIRCUIT_VARIANT_DIRS: &[&str] = &["default", "evm", "recursive"];
 
-/// Resolve a manifest-relative path against on-disk circuit layouts.
-///
-/// Older releases used `{preset}/{variant}/...`. v0.2.0+ archives use
-/// `{preset}/{committee}/{variant}/...` while `checksums.json` may still list the
-/// legacy flat paths — try committee-prefixed candidates before failing.
-fn resolve_circuit_manifest_path(circuits_dir: &Path, rel_path: &str) -> Option<PathBuf> {
+/// Collect candidate on-disk paths for a manifest entry (legacy flat + per-committee layouts).
+fn circuit_manifest_candidates(circuits_dir: &Path, rel_path: &str) -> Vec<PathBuf> {
     let direct = circuits_dir.join(rel_path);
-    if direct.exists() {
-        return Some(direct);
-    }
+    let mut candidates = vec![direct.clone()];
 
     let mut parts = rel_path.split('/');
-    let preset = parts.next()?;
-    let next = parts.next()?;
-    if COMMITTEE_SUBDIRS.contains(&next) {
-        return None;
-    }
-    if !CIRCUIT_VARIANT_DIRS.contains(&next) {
-        return None;
+    let Some(preset) = parts.next() else {
+        return candidates;
+    };
+    let Some(next) = parts.next() else {
+        return candidates;
+    };
+    if COMMITTEE_SUBDIRS.contains(&next) || !CIRCUIT_VARIANT_DIRS.contains(&next) {
+        return candidates;
     }
     let suffix = parts.collect::<Vec<_>>().join("/");
     let suffix = if suffix.is_empty() {
@@ -53,13 +48,44 @@ fn resolve_circuit_manifest_path(circuits_dir: &Path, rel_path: &str) -> Option<
     };
 
     for committee in COMMITTEE_SUBDIRS {
-        let candidate = circuits_dir.join(format!("{preset}/{committee}/{next}{suffix}"));
-        if candidate.exists() {
-            return Some(candidate);
+        candidates.push(circuits_dir.join(format!("{preset}/{committee}/{next}{suffix}")));
+    }
+
+    candidates
+}
+
+/// Resolve a manifest path to file bytes, matching `expected_hash` when multiple committee
+/// copies exist (v0.2.0 flat checksums vs per-committee tarball layout).
+async fn read_manifest_file(
+    circuits_dir: &Path,
+    rel_path: &str,
+    expected_hash: &str,
+) -> Result<Vec<u8>, ZkError> {
+    let mut last_mismatch: Option<(PathBuf, String)> = None;
+
+    for candidate in circuit_manifest_candidates(circuits_dir, rel_path) {
+        if !candidate.exists() {
+            continue;
+        }
+        let data = fs::read(&candidate).await?;
+        match verify_checksum(rel_path, &data, Some(expected_hash)) {
+            Ok(()) => return Ok(data),
+            Err(ZkError::ChecksumMismatch { actual, .. }) => {
+                last_mismatch = Some((candidate, actual));
+            }
+            Err(e) => return Err(e),
         }
     }
 
-    None
+    if let Some((path, actual)) = last_mismatch {
+        return Err(ZkError::ChecksumMismatch {
+            file: rel_path.to_string(),
+            expected: expected_hash.to_string(),
+            actual,
+        });
+    }
+
+    Err(ZkError::CircuitNotFound(rel_path.to_string()))
 }
 
 impl ZkBackend {
@@ -197,11 +223,7 @@ impl ZkBackend {
         let mut circuit_infos = HashMap::new();
 
         for (rel_path, expected_hash) in &manifest.files {
-            let file_path = resolve_circuit_manifest_path(&self.circuits_dir, rel_path)
-                .ok_or_else(|| ZkError::CircuitNotFound(rel_path.clone()))?;
-
-            let data = fs::read(&file_path).await?;
-            verify_checksum(rel_path, &data, Some(expected_hash))?;
+            read_manifest_file(&self.circuits_dir, rel_path, expected_hash).await?;
 
             circuit_infos.insert(
                 rel_path.clone(),
@@ -289,6 +311,7 @@ async fn download_with_progress(url: &str, message: &str) -> Result<Vec<u8>, ZkE
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sha2::{Digest, Sha256};
     use std::fs;
     use tempfile::TempDir;
 
@@ -300,61 +323,82 @@ mod tests {
         fs::write(path, contents).unwrap();
     }
 
-    #[test]
-    fn resolve_circuit_manifest_path_prefers_direct_layout() {
-        let temp = TempDir::new().unwrap();
-        let circuits_dir = temp.path();
-        write_file(circuits_dir, "insecure-512/default/dkg/pk/pk.json", b"flat");
-
-        let resolved =
-            resolve_circuit_manifest_path(circuits_dir, "insecure-512/default/dkg/pk/pk.json")
-                .unwrap();
-
-        assert_eq!(
-            resolved,
-            circuits_dir.join("insecure-512/default/dkg/pk/pk.json")
-        );
+    fn sha256_hex(data: &[u8]) -> String {
+        hex::encode(Sha256::digest(data))
     }
 
-    #[test]
-    fn resolve_circuit_manifest_path_falls_back_to_committee_layout() {
+    #[tokio::test]
+    async fn read_manifest_file_prefers_direct_layout() {
         let temp = TempDir::new().unwrap();
         let circuits_dir = temp.path();
+        let contents = b"flat";
         write_file(
             circuits_dir,
-            "insecure-512/micro/default/dkg/pk/pk.json",
-            b"micro",
+            "insecure-512/default/dkg/pk/pk.json",
+            contents,
         );
+        let hash = sha256_hex(contents);
 
-        let resolved =
-            resolve_circuit_manifest_path(circuits_dir, "insecure-512/default/dkg/pk/pk.json")
-                .unwrap();
-
-        assert_eq!(
-            resolved,
-            circuits_dir.join("insecure-512/micro/default/dkg/pk/pk.json")
-        );
-    }
-
-    #[test]
-    fn resolve_circuit_manifest_path_accepts_committee_scoped_layout() {
-        let temp = TempDir::new().unwrap();
-        let circuits_dir = temp.path();
-        write_file(
+        let data = read_manifest_file(
             circuits_dir,
-            "insecure-512/micro/default/dkg/pk/pk.json",
-            b"micro",
-        );
-
-        let resolved = resolve_circuit_manifest_path(
-            circuits_dir,
-            "insecure-512/micro/default/dkg/pk/pk.json",
+            "insecure-512/default/dkg/pk/pk.json",
+            &hash,
         )
+        .await
         .unwrap();
 
-        assert_eq!(
-            resolved,
-            circuits_dir.join("insecure-512/micro/default/dkg/pk/pk.json")
+        assert_eq!(data, contents);
+    }
+
+    #[tokio::test]
+    async fn read_manifest_file_picks_committee_matching_checksum() {
+        let temp = TempDir::new().unwrap();
+        let circuits_dir = temp.path();
+        let micro = b"micro";
+        let large = b"large";
+        write_file(
+            circuits_dir,
+            "insecure-512/micro/default/dkg/pk/pk.json",
+            micro,
         );
+        write_file(
+            circuits_dir,
+            "insecure-512/large/default/dkg/pk/pk.json",
+            large,
+        );
+        let large_hash = sha256_hex(large);
+
+        let data = read_manifest_file(
+            circuits_dir,
+            "insecure-512/default/dkg/pk/pk.json",
+            &large_hash,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(data, large);
+    }
+
+    #[tokio::test]
+    async fn read_manifest_file_accepts_committee_scoped_manifest_path() {
+        let temp = TempDir::new().unwrap();
+        let circuits_dir = temp.path();
+        let contents = b"micro";
+        write_file(
+            circuits_dir,
+            "insecure-512/micro/default/dkg/pk/pk.json",
+            contents,
+        );
+        let hash = sha256_hex(contents);
+
+        let data = read_manifest_file(
+            circuits_dir,
+            "insecure-512/micro/default/dkg/pk/pk.json",
+            &hash,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(data, contents);
     }
 }
