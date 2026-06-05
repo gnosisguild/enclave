@@ -92,6 +92,7 @@ impl ToString for ComputeRequest {
                 ZkRequest::ThresholdShareDecryption(_) => "ZkThresholdShareDecryption",
                 ZkRequest::DecryptedSharesAggregation(_) => "ZkDecryptedSharesAggregation",
                 ZkRequest::NodeDkgFold(_) => "ZkNodeDkgFold",
+                ZkRequest::NodesFoldStep(_) => "ZkNodesFoldStep",
                 ZkRequest::DkgAggregation(_) => "ZkDkgAggregation",
                 ZkRequest::DecryptionAggregation(_) => "ZkDecryptionAggregation",
             },

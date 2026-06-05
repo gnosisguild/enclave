@@ -369,6 +369,8 @@ pub fn prove_node_dkg_fold(
 /// Inputs for [`prove_dkg_aggregation`].
 pub struct DkgAggregationInput<'a> {
     pub node_fold_proofs: &'a [Proof],
+    /// Pre-computed nodes_fold accumulator. When `Some`, the sequential fold is skipped.
+    pub nodes_fold_proof: Option<&'a Proof>,
     pub c5_proof: &'a Proof,
     /// Honest party ids in the same order as `node_fold_proofs` (e.g. sorted ascending).
     pub party_ids: &'a [u64],
@@ -430,15 +432,19 @@ pub fn prove_dkg_aggregation(
             "DkgAggregator honest-set H must equal registered committee size until expulsion enables H < N"
         );
     }
-    let slot_indices: Vec<u32> = (0u32..h as u32).collect();
-    let nodes_fold_proof = generate_sequential_nodes_fold(
-        prover,
-        input.node_fold_proofs,
-        &slot_indices,
-        h,
-        &format!("{e3_id}-nodesfold"),
-        artifacts_dir,
-    )?;
+    let nodes_fold_proof = if let Some(precomputed) = input.nodes_fold_proof {
+        precomputed.clone()
+    } else {
+        let slot_indices: Vec<u32> = (0u32..h as u32).collect();
+        generate_sequential_nodes_fold(
+            prover,
+            input.node_fold_proofs,
+            &slot_indices,
+            h,
+            &format!("{e3_id}-nodesfold"),
+            artifacts_dir,
+        )?
+    };
 
     let nodes_fold_vk = vk::load_vk_artifacts(
         &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),

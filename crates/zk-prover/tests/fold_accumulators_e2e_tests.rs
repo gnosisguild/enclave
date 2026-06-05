@@ -196,6 +196,7 @@ async fn recursive_aggregation_default_artifacts_staged() {
     let base = backend
         .circuits_dir
         .join("insecure-512")
+        .join("micro")
         .join("default")
         .join(CircuitName::C3Fold.dir_path());
     let pkg = CircuitName::C3Fold.as_str();
@@ -232,6 +233,7 @@ async fn recursive_aggregation_c6_fold_kernel_artifacts_staged() {
     let base = backend
         .circuits_dir
         .join("insecure-512")
+        .join("micro")
         .join("default")
         .join(CircuitName::C6FoldKernel.dir_path());
     let pkg = CircuitName::C6FoldKernel.as_str();
@@ -269,7 +271,11 @@ async fn node_fold_pipeline_recursive_aggregation_artifacts_staged() {
         setup_recursive_aggregation_fold_circuit(&backend, c).await;
     }
 
-    let preset_base = backend.circuits_dir.join("insecure-512").join("default");
+    let preset_base = backend
+        .circuits_dir
+        .join("insecure-512")
+        .join("micro")
+        .join("default");
     for &c in NODE_FOLD_PIPELINE {
         let base = preset_base.join(c.dir_path());
         let pkg = c.as_str();
@@ -361,7 +367,7 @@ async fn c3_fold_sequential_proves_and_verifies() {
         return;
     }
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir = preset.artifacts_dir_for_committee("micro");
     let inner_e3_a = "e3-c3fold-inner-0";
     let inner_e3_b = "e3-c3fold-inner-1";
     let fold_e3 = "e3-c3fold-step";
@@ -472,7 +478,7 @@ async fn c6_fold_sequential_proves_and_verifies() {
         );
         return;
     }
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir = preset.artifacts_dir_for_committee("micro");
     let inner_e3_a = "e3-c6fold-inner-0";
     let inner_e3_b = "e3-c6fold-inner-1";
     let fold_e3 = "e3-c6fold-step";

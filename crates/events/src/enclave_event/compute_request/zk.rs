@@ -38,6 +38,8 @@ pub enum ZkRequest {
     DecryptedSharesAggregation(DecryptedSharesAggregationProofRequest),
     /// Per-node DKG recursive fold (C2abFold → … → NodeFold).
     NodeDkgFold(NodeDkgFoldRequest),
+    /// Single step of the streaming cross-node nodes_fold accumulation.
+    NodesFoldStep(NodesFoldStepRequest),
     /// Cross-node DKG aggregator (NodesFold + C5 + DkgAggregator).
     DkgAggregation(DkgAggregationRequest),
     /// Phase-7 decryption aggregator (C6Fold + C7 + DecryptionAggregator).
@@ -71,10 +73,30 @@ pub struct NodeDkgFoldRequest {
     pub committee_size: CiphernodesCommitteeSize,
 }
 
+/// Single step of the streaming cross-node nodes_fold accumulation.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct NodesFoldStepRequest {
+    /// The `node_fold` proof for this slot.
+    pub inner_proof: Proof,
+    /// The prior accumulator proof, or `None` for the first step.
+    pub prior_accumulator: Option<Proof>,
+    /// Slot index for this honest party (position in ascending `party_id` order).
+    pub slot_index: u32,
+    /// Total honest-party count H.
+    pub total_slots: usize,
+    /// E3 identifier used for job namespacing.
+    pub e3_id: String,
+    pub params_preset: BfvPreset,
+    pub committee_size: CiphernodesCommitteeSize,
+}
+
 /// Cross-node DKG aggregation (NodesFold + C5 + DkgAggregator).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DkgAggregationRequest {
     pub node_fold_proofs: Vec<Proof>,
+    /// Pre-computed nodes_fold accumulator proof. When present the prover skips the
+    /// sequential fold and uses this directly as input to the DkgAggregator circuit.
+    pub nodes_fold_proof: Option<Proof>,
     pub c5_proof: Proof,
     pub party_ids: Vec<u64>,
     /// Ordered committee addresses (`topNodes`) for `committee_hash_*` public inputs.
@@ -293,6 +315,8 @@ pub enum ZkResponse {
     DecryptedSharesAggregation(DecryptedSharesAggregationProofResponse),
     /// Output of [`ZkRequest::NodeDkgFold`].
     NodeDkgFold(NodeDkgFoldResponse),
+    /// Output of [`ZkRequest::NodesFoldStep`].
+    NodesFoldStep(NodesFoldStepResponse),
     /// Output of [`ZkRequest::DkgAggregation`].
     DkgAggregation(DkgAggregationResponse),
     /// Output of [`ZkRequest::DecryptionAggregation`].
@@ -303,6 +327,12 @@ pub enum ZkResponse {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct NodeDkgFoldResponse {
     pub proof: Proof,
+}
+
+/// Response from [`ZkRequest::NodesFoldStep`].
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct NodesFoldStepResponse {
+    pub accumulator_proof: Proof,
 }
 
 /// Response from [`ZkRequest::DkgAggregation`].
