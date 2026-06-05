@@ -70,6 +70,7 @@ use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncrypti
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_prover::{
     prove_decryption_aggregation_jobs, prove_dkg_aggregation, prove_node_dkg_fold, CircuitVariant,
     DecryptionAggregationJob, DkgAggregationInput, NodeDkgFoldInput, NodeDkgFoldProveResult,
@@ -365,7 +366,17 @@ fn handle_pk_aggregation_proof(
     // `verify_honk_proof_non_zk`. The EVM-facing proof for on-chain is `CircuitName::DkgAggregator`.
     let circuit = PkAggregationCircuit;
     let bb_work_id = zk_bb_work_id(&request);
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let committee =
+        CiphernodesCommitteeSize::from_n_h(req.committee_n, req.committee_h).map_err(|e| {
+            make_zk_error(
+                &request,
+                format!(
+                    "unknown committee (n={}, h={}): {e}",
+                    req.committee_n, req.committee_h
+                ),
+            )
+        })?;
+    let artifacts_dir = prover.resolve_artifacts_dir(req.params_preset, committee.as_str());
     let proof = circuit
         .prove_with_variant(
             prover,
@@ -426,7 +437,8 @@ fn handle_threshold_share_decryption_proof(
     }
     let mut proofs = Vec::with_capacity(num_indices);
     let bb_work_base = zk_bb_work_id(&request);
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir =
+        prover.resolve_artifacts_dir(req.params_preset, req.committee_size.as_str());
 
     for i in 0..num_indices {
         // Deserialize ciphertext
@@ -696,7 +708,8 @@ fn handle_node_dkg_fold_proof(
     request: ComputeRequest,
     report: Option<Addr<MultithreadReport>>,
 ) -> Result<ComputeResponse, ComputeRequestError> {
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir =
+        prover.resolve_artifacts_dir(req.params_preset, req.committee_size.as_str());
     let job_id = zk_bb_work_id(&request);
     let input = NodeDkgFoldInput {
         c0_proof: &req.c0_proof,
@@ -748,7 +761,14 @@ fn handle_dkg_aggregation_proof(
         party_ids: &req.party_ids,
         committee_addresses: &req.committee_addresses,
     };
-    let proof = prove_dkg_aggregation(prover, &input, &job_id, req.params_preset).map_err(|e| {
+    let proof = prove_dkg_aggregation(
+        prover,
+        &input,
+        &job_id,
+        req.params_preset,
+        req.committee_size,
+    )
+    .map_err(|e| {
         ComputeRequestError::new(
             ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
             request.clone(),
@@ -783,6 +803,7 @@ fn handle_decryption_aggregation_proof(
         &req.committee_addresses,
         &job_id,
         req.params_preset,
+        req.committee_size,
     )
     .map_err(|e| {
         ComputeRequestError::new(
@@ -879,7 +900,8 @@ fn handle_share_computation_proof(
 
     let bb_work = zk_bb_work_id(&request);
     let inner_job_id = format!("{bb_work}_c2_inner");
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir =
+        prover.resolve_artifacts_dir(req.params_preset, req.committee_size.as_str());
 
     // 7. Inner C2 proof (sk_share_computation or e_sm_share_computation)
     let circuit = ShareComputationCircuit;
@@ -963,7 +985,8 @@ fn handle_pk_generation_proof(
     // 5. Generate proof via Provable trait
     let circuit = PkGenerationCircuit;
     let bb_work = zk_bb_work_id(&request);
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir =
+        prover.resolve_artifacts_dir(req.params_preset, req.committee_size.as_str());
 
     let proof = circuit
         .prove(
@@ -1012,7 +1035,8 @@ fn handle_pk_bfv_proof(
         .params_preset
         .threshold_counterpart()
         .unwrap_or_else(|| BfvPreset::InsecureThreshold512);
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir =
+        prover.resolve_artifacts_dir(req.params_preset, req.committee_size.as_str());
     // But here we have to pass the InsecureThreshold512 preset because the underlaying witness generator
     // builds both params, but will only use the DKG one
     let proof = circuit
@@ -1101,7 +1125,8 @@ fn handle_share_encryption_proof(
     // 6. Generate proof (preset = threshold preset; Inputs::compute derives DKG internally)
     let circuit = ShareEncryptionCircuit;
     let bb_work = zk_bb_work_id(&request);
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir =
+        prover.resolve_artifacts_dir(req.params_preset, req.committee_size.as_str());
     let proof = circuit
         .prove(
             prover,
@@ -1246,7 +1271,8 @@ fn handle_dkg_share_decryption_proof(
 
     let circuit = ShareDecryptionCircuit;
     let bb_work = zk_bb_work_id(&request);
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir =
+        prover.resolve_artifacts_dir(req.params_preset, req.committee_size.as_str());
     let proof = circuit
         .prove(
             prover,
@@ -1289,7 +1315,8 @@ fn handle_verify_share_proofs(
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     let e3_id_str = request.e3_id.to_string();
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir =
+        prover.resolve_artifacts_dir(req.params_preset, req.committee_size.as_str());
 
     // ECDSA validation (signature recovery, signer consistency, e3_id match)
     // is handled by ShareVerificationActor before dispatching to multithread.
@@ -1361,7 +1388,8 @@ fn handle_verify_share_decryption_proofs(
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     let e3_id_str = request.e3_id.to_string();
-    let artifacts_dir = req.params_preset.artifacts_dir();
+    let artifacts_dir =
+        prover.resolve_artifacts_dir(req.params_preset, req.committee_size.as_str());
 
     // ECDSA validation (signature recovery, signer consistency, e3_id match)
     // is handled by ShareVerificationActor before dispatching to multithread.
@@ -1525,7 +1553,9 @@ fn handle_decrypted_shares_aggregation_proof(
 
         let circuit = DecryptedSharesAggregationCircuit;
         let idx_work_id = format!("{}_c7_{}", zk_bb_work_id(&request), i);
-        let artifacts_dir = req.params_preset.artifacts_dir();
+        let artifacts_dir = req
+            .params_preset
+            .artifacts_dir_for_committee(req.committee_size.as_str());
         let proof = circuit
             .prove_with_variant(
                 prover,

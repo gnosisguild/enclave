@@ -95,6 +95,7 @@ impl ShareVerificationActor {
         );
 
         let params_preset = msg.params_preset;
+        let committee_size = msg.committee_size;
         match msg.kind {
             VerificationKind::ShareProofs
             | VerificationKind::ThresholdDecryptionProofs
@@ -107,6 +108,7 @@ impl ShareVerificationActor {
                     msg.pre_dishonest,
                     ec,
                     params_preset,
+                    committee_size,
                     |pending, passed| {
                         pending.ecdsa_passed_share_proofs = passed;
                     },
@@ -120,6 +122,7 @@ impl ShareVerificationActor {
                     msg.pre_dishonest,
                     ec,
                     params_preset,
+                    committee_size,
                     |pending, passed| {
                         pending.ecdsa_passed_decryption_proofs = passed;
                     },
@@ -141,6 +144,7 @@ impl ShareVerificationActor {
         pre_dishonest: BTreeSet<u64>,
         ec: EventContext<Sequenced>,
         params_preset: e3_fhe_params::BfvPreset,
+        committee_size: e3_zk_helpers::CiphernodesCommitteeSize,
         store_passed_proofs: impl FnOnce(&mut PendingConsistencyCheck, Vec<P>),
     ) {
         let e3_id_str = e3_id.to_string();
@@ -184,6 +188,7 @@ impl ShareVerificationActor {
             ecdsa_passed_share_proofs: Vec::new(),
             ecdsa_passed_decryption_proofs: Vec::new(),
             params_preset,
+            committee_size,
         };
         store_passed_proofs(&mut pending, outcome.ecdsa_passed_parties);
         self.pending_consistency.insert(correlation_id, pending);
@@ -271,6 +276,7 @@ impl ShareVerificationActor {
                     ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
                         party_proofs: passed,
                         params_preset: pending.params_preset,
+                        committee_size: pending.committee_size,
                     }),
                     zk_correlation_id,
                     pending.e3_id.clone(),
@@ -295,6 +301,7 @@ impl ShareVerificationActor {
                     ZkRequest::VerifyShareDecryptionProofs(VerifyShareDecryptionProofsRequest {
                         party_proofs: passed,
                         params_preset: pending.params_preset,
+                        committee_size: pending.committee_size,
                     }),
                     zk_correlation_id,
                     pending.e3_id.clone(),
@@ -343,6 +350,7 @@ impl ShareVerificationActor {
                 party_public_signals,
                 party_proof_data,
                 params_preset: pending.params_preset,
+                committee_size: pending.committee_size,
             },
         );
 

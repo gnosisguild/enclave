@@ -12,6 +12,7 @@
     "deploy:dev": "hardhat run scripts/deploy-local.ts",
     "dev:all": "./scripts/dev_all.sh",
     "dev:ciphernodes": "./scripts/dev_ciphernodes.sh",
+    "dev:setup": "bash ./scripts/setup.sh",
     "dev:evm": "hardhat node",
     "dev:frontend": "./scripts/dev_frontend.sh",
     "dev:program": "./scripts/dev_program.sh",

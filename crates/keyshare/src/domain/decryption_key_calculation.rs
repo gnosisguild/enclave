@@ -339,6 +339,7 @@ pub(crate) fn build_decryption_key_plan(
         own_share_raw: current.own_sk_share_raw.clone(),
         dkg_input_type: DkgInputType::SecretKey,
         params_preset: threshold_preset,
+        committee_size: committee,
     };
 
     let esm_requests: Vec<DkgShareDecryptionProofRequest> = esi_ciphertexts_raw
@@ -353,6 +354,7 @@ pub(crate) fn build_decryption_key_plan(
             own_share_raw: current.own_esi_shares_raw[esi_idx].clone(),
             dkg_input_type: DkgInputType::SmudgingNoise,
             params_preset: threshold_preset,
+            committee_size: committee,
         })
         .collect();
 

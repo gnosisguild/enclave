@@ -33,6 +33,7 @@ use e3_trbfv::{
 };
 use e3_utils::NotifySync;
 use e3_utils::{utility_types::ArcBytes, MAILBOX_LIMIT};
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use tracing::{debug, info, trace, warn};
 
 /// Env var overriding the decryption-share collection timeout (seconds).
@@ -77,6 +78,7 @@ pub struct ThresholdPlaintextAggregator {
     sortition: Addr<Sortition>,
     e3_id: E3id,
     params_preset: BfvPreset,
+    committee_size: CiphernodesCommitteeSize,
     proof_aggregation_enabled: bool,
     state: Persistable<ThresholdPlaintextAggregatorState>,
     /// Honest parties' C6 inner proofs (sorted by party id) for [`ZkRequest::DecryptionAggregation`].
@@ -110,6 +112,7 @@ pub struct ThresholdPlaintextAggregatorParams {
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
     pub params_preset: BfvPreset,
+    pub committee_size: CiphernodesCommitteeSize,
     pub proof_aggregation_enabled: bool,
     /// Full committee from `PublicKeyAggregated.committee_addresses` (length `N`).
     /// Used for `committee_hash_*` payload binding to on-chain `topNodes`.
@@ -129,6 +132,7 @@ impl ThresholdPlaintextAggregator {
             sortition: params.sortition,
             e3_id: params.e3_id,
             params_preset: params.params_preset,
+            committee_size: params.committee_size,
             proof_aggregation_enabled: params.proof_aggregation_enabled,
             state,
             honest_c6_proofs_for_agg: None,
@@ -208,6 +212,7 @@ impl ThresholdPlaintextAggregator {
                 decryption_proofs: vec![],
                 pre_dishonest: BTreeSet::new(),
                 params_preset: self.params_preset,
+                committee_size: self.committee_size,
             },
             ec,
         )?;
@@ -366,6 +371,7 @@ impl ThresholdPlaintextAggregator {
                     params_preset: self.params_preset,
                     threshold_m,
                     threshold_n,
+                    committee_size: self.committee_size,
                 },
                 plaintext,
                 shares,
@@ -508,6 +514,7 @@ impl ThresholdPlaintextAggregator {
                     jobs,
                     committee_addresses: self.committee_addresses.clone(),
                     params_preset: self.params_preset,
+                    committee_size: self.committee_size,
                 }),
                 corr,
                 self.e3_id.clone(),
@@ -1099,6 +1106,7 @@ mod tests {
                 sortition: start_sortition(&bus),
                 e3_id: e3_id.clone(),
                 params_preset: BfvPreset::InsecureThreshold512,
+                committee_size: CiphernodesCommitteeSize::Micro,
                 proof_aggregation_enabled,
                 committee_addresses: vec![test_committee_address()],
                 honest_committee_addresses: vec![test_committee_address()],
@@ -1238,6 +1246,7 @@ mod tests {
                 jobs: Vec::new(),
                 committee_addresses: vec![test_committee_address()],
                 params_preset: BfvPreset::InsecureThreshold512,
+                committee_size: CiphernodesCommitteeSize::Micro,
             }),
             correlation_id,
             e3_id.clone(),

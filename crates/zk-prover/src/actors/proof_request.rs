@@ -110,6 +110,7 @@ impl ProofRequestActor {
             ZkRequest::PkBfv(PkBfvProofRequest::new(
                 msg.key.pk_bfv.clone(),
                 msg.params_preset,
+                msg.committee_size,
             )),
             correlation_id,
             msg.e3_id,
@@ -1249,6 +1250,7 @@ mod tests {
                     ZkRequest::PkBfv(PkBfvProofRequest::new(
                         ArcBytes::from_bytes(&[1]),
                         e3_fhe_params::BfvPreset::InsecureThreshold512,
+                        e3_zk_helpers::CiphernodesCommitteeSize::Micro,
                     )),
                     correlation_id,
                     e3_id.clone(),

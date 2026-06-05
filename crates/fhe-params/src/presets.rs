@@ -18,6 +18,7 @@ use crate::constants::{
     secure_8192,
 };
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::sync::Arc;
 use thiserror::Error as ThisError;
 
@@ -386,11 +387,19 @@ impl BfvPreset {
         self.metadata().security
     }
 
-    /// Returns the directory name for circuit artifacts (e.g. `"insecure-512"`, `"secure-8192"`).
+    /// Returns the base directory name for circuit artifacts (e.g. `"insecure-512"`, `"secure-8192"`).
     /// Threshold and DKG presets at the same degree share the same compiled circuits.
     pub fn artifacts_dir(&self) -> String {
         let meta = self.metadata();
         format!("{}-{}", meta.security.as_config_str(), meta.degree)
+    }
+
+    /// Returns the per-committee artifact directory: `"{preset}/{committee}"`.
+    ///
+    /// Use this at runtime so each committee size resolves to its own compiled artifacts
+    /// (e.g. `"secure-8192/medium"`, `"insecure-512/micro"`).
+    pub fn artifacts_dir_for_committee<C: AsRef<str>>(&self, committee: C) -> String {
+        format!("{}/{}", self.artifacts_dir(), committee.as_ref())
     }
 
     pub fn search_defaults(&self) -> Option<PresetSearchDefaults> {

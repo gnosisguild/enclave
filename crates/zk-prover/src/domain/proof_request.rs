@@ -386,6 +386,7 @@ mod tests {
             own_share_raw: sensitive(),
             dkg_input_type: DkgInputType::SecretKey,
             params_preset: BfvPreset::default(),
+            committee_size: CiphernodesCommitteeSize::Medium,
         }
     }
 

@@ -68,17 +68,32 @@ apply_crisp_dev_config_to_server_env() {
   _set_env_kv "$server_env" "E3_PROOF_AGGREGATION_ENABLED" "$CRISP_PROOF_AGGREGATION_ENABLED"
 }
 
-compile_enclave_dkg_circuits_if_needed() {
-  if [[ "$CRISP_PROOF_AGGREGATION_ENABLED" != "true" ]]; then
-    echo "Skipping enclave DKG circuit build (CRISP_PROOF_AGGREGATION_ENABLED=false in crisp.dev.env)"
+build_enclave_circuits_at_setup() {
+  local committee="${CRISP_COMMITTEE:-micro}"
+  echo "Building enclave circuits (preset=${CRISP_BFV_PRESET}, committee=${committee})..."
+  (
+    cd "${REPO_ROOT}" &&
+      pnpm build:circuits \
+        --preset "${CRISP_BFV_PRESET}" \
+        --committee "${committee}" \
+        --skip-if-built
+  )
+}
+
+sync_enclave_circuit_artifacts() {
+  local committee="${CRISP_COMMITTEE:-micro}"
+  local src="${REPO_ROOT}/dist/circuits/${CRISP_BFV_PRESET}/${committee}"
+  local dst="${CRISP_ROOT}/.enclave/noir/circuits/${CRISP_BFV_PRESET}/${committee}"
+
+  if [[ ! -f "${src}/recursive/dkg/pk/pk.json" ]]; then
+    echo "No built circuits at ${src}; run pnpm dev:setup first. Using enclave noir setup release layout."
     return 0
   fi
 
-  echo "Building enclave DKG circuits (preset=${CRISP_BFV_PRESET})..."
-  (
-    cd "${REPO_ROOT}" &&
-      pnpm build:circuits --preset "${CRISP_BFV_PRESET}" --skip-if-built
-  )
+  echo "Syncing circuits ${CRISP_BFV_PRESET}/${committee} → ${dst}"
+  mkdir -p "$(dirname "${dst}")"
+  rm -rf "${dst}"
+  cp -R "${src}" "$(dirname "${dst}")/"
 }
 
 print_crisp_dev_config_summary() {
