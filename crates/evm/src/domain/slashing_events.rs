@@ -25,10 +25,10 @@ fn safe_u256_to_u128(val: U256) -> Option<u128> {
 
 pub(crate) fn extractor(
     data: &LogData,
-    topic: Option<&B256>,
+    topics: &[B256],
     chain_id: u64,
 ) -> Option<EnclaveEventData> {
-    match topic {
+    match topics.first() {
         Some(&ISlashingManager::SlashExecuted::SIGNATURE_HASH) => {
             let Ok(event) = ISlashingManager::SlashExecuted::decode_log_data(data) else {
                 error!("Error parsing event SlashExecuted after topic was matched!");
@@ -74,9 +74,9 @@ pub(crate) fn extractor(
                 },
             }))
         }
-        _topic => {
+        _ => {
             trace!(
-                topic=?_topic,
+                topic=?topics.first(),
                 "Unknown event was received by SlashingManager.sol parser but was ignored"
             );
             None
@@ -103,7 +103,7 @@ mod tests {
     #[test]
     fn test_extractor_ignores_unknown_topic() {
         let log_data = LogData::default();
-        assert!(extractor(&log_data, Some(&B256::ZERO), 1).is_none());
-        assert!(extractor(&log_data, None, 1).is_none());
+        assert!(extractor(&log_data, &[B256::ZERO], 1).is_none());
+        assert!(extractor(&log_data, &[], 1).is_none());
     }
 }

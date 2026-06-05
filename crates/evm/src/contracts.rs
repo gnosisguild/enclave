@@ -55,7 +55,7 @@ sol! {
         event E3Requested(uint256 e3Id, E3 e3, address indexed e3Program);
         event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
         event E3Failed(uint256 e3Id, uint8 failedAtStage, uint8 reason);
-        event E3StageChanged(uint256 e3Id, uint8 previousStage, uint8 newStage);
+        event E3StageChanged(uint256 indexed e3Id, uint8 previousStage, uint8 newStage);
 
         // ── Errors (only those our called functions can revert with) ────────
         error CiphertextOutputNotPublished(uint256 e3Id);

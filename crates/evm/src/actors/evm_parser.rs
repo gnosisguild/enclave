@@ -13,7 +13,7 @@ use tracing::debug;
 use crate::domain::log_timestamp::from_log_chain_id_to_ts;
 use crate::messages::{EnclaveEvmEvent, EvmEvent, EvmEventProcessor, EvmLog};
 
-pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
+pub type ExtractorFn<E> = fn(&LogData, &[B256], u64) -> Option<E>;
 
 pub struct EvmParser {
     next: EvmEventProcessor,
@@ -49,7 +49,7 @@ impl Handler<EnclaveEvmEvent> for EvmParser {
                 debug!("processing event({})", msg.get_id());
                 let extractor = self.extractor;
 
-                if let Some(event) = extractor(log.data(), log.topic0(), chain_id) {
+                if let Some(event) = extractor(log.data(), log.topics(), chain_id) {
                     let err = "Log should always have metadata because we listen to non-pending blocks. If you are seeing this it is likely because there is an issue with how we are subscribing to blocks";
                     let block = log.block_number.expect(err);
                     let log_index = log.log_index.expect(err);
