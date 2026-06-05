@@ -128,8 +128,7 @@ impl ProofVerificationActor {
             );
             return;
         };
-        let artifacts_dir =
-            preset.resolve_artifacts_dir_for_committee(committee.as_str(), &self.circuits_base);
+        let artifacts_dir = preset.artifacts_dir_for_committee(committee.as_str());
 
         let request = TypedEvent::new(
             ZkVerificationRequest {

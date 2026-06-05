@@ -48,7 +48,7 @@ impl ZkProver {
     }
 
     pub fn resolve_artifacts_dir(&self, preset: BfvPreset, committee: &str) -> String {
-        preset.resolve_artifacts_dir_for_committee(committee, &self.circuits_dir)
+        preset.artifacts_dir_for_committee(committee)
     }
 
     pub fn work_dir(&self) -> &PathBuf {
