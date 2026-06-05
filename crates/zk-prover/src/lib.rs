@@ -32,7 +32,9 @@ pub use circuits::aggregation::node_dkg_fold::{
     DecryptionAggregationJob, DkgAggregationInput, FoldProveStepTiming, NodeDkgFoldInput,
     NodeDkgFoldProveResult,
 };
-pub use circuits::aggregation::nodes_fold_accumulator::generate_sequential_nodes_fold;
+pub use circuits::aggregation::nodes_fold_accumulator::{
+    generate_nodes_fold_step, generate_sequential_nodes_fold,
+};
 pub use config::{verify_checksum, BbTarget, CircuitInfo, VersionInfo, ZkConfig};
 pub use dkg_attestation_bundle::encode_dkg_attestation_bundle;
 pub use e3_events::CircuitVariant;

@@ -29,10 +29,10 @@ use e3_events::{
     DecryptionAggregationResponse, DkgAggregationRequest, DkgAggregationResponse,
     DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, EnclaveEvent,
     EnclaveEventData, EventPublisher, EventSubscriber, EventType, NodeDkgFoldRequest,
-    NodeDkgFoldResponse, PartyVerificationResult, PkAggregationProofRequest,
-    PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest,
-    PkGenerationProofResponse, Proof, ShareComputationProofRequest, ShareComputationProofResponse,
-    ShareEncryptionProofRequest, ShareEncryptionProofResponse,
+    NodeDkgFoldResponse, NodesFoldStepRequest, NodesFoldStepResponse, PartyVerificationResult,
+    PkAggregationProofRequest, PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse,
+    PkGenerationProofRequest, PkGenerationProofResponse, Proof, ShareComputationProofRequest,
+    ShareComputationProofResponse, ShareEncryptionProofRequest, ShareEncryptionProofResponse,
     ThresholdShareDecryptionProofRequest, ThresholdShareDecryptionProofResponse, TypedEvent,
     VerifyShareDecryptionProofsRequest, VerifyShareDecryptionProofsResponse,
     VerifyShareProofsRequest, VerifyShareProofsResponse, ZkError as ZkEventError, ZkRequest,
@@ -72,9 +72,9 @@ use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::CiphernodesCommittee;
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_prover::{
-    prove_decryption_aggregation_jobs, prove_dkg_aggregation, prove_node_dkg_fold, CircuitVariant,
-    DecryptionAggregationJob, DkgAggregationInput, NodeDkgFoldInput, NodeDkgFoldProveResult,
-    Provable, ZkBackend, ZkError, ZkProver,
+    generate_nodes_fold_step, prove_decryption_aggregation_jobs, prove_dkg_aggregation,
+    prove_node_dkg_fold, CircuitVariant, DecryptionAggregationJob, DkgAggregationInput,
+    NodeDkgFoldInput, NodeDkgFoldProveResult, Provable, ZkBackend, ZkError, ZkProver,
 };
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
@@ -693,6 +693,9 @@ fn handle_zk_request(
         ZkRequest::NodeDkgFold(req) => timefunc("zk_node_dkg_fold", id, || {
             handle_node_dkg_fold_proof(&prover, req, request.clone(), report.clone())
         }),
+        ZkRequest::NodesFoldStep(req) => timefunc("zk_nodes_fold_step", id, || {
+            handle_nodes_fold_step_proof(&prover, req, request.clone())
+        }),
         ZkRequest::DkgAggregation(req) => timefunc("zk_dkg_aggregation", id, || {
             handle_dkg_aggregation_proof(&prover, req, request.clone())
         }),
@@ -749,6 +752,35 @@ fn handle_node_dkg_fold_proof(
     ))
 }
 
+fn handle_nodes_fold_step_proof(
+    prover: &ZkProver,
+    req: NodesFoldStepRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    let artifacts_dir =
+        prover.resolve_artifacts_dir(req.params_preset, req.committee_size.as_str());
+    let accumulator_proof = generate_nodes_fold_step(
+        prover,
+        &req.inner_proof,
+        req.prior_accumulator.as_ref(),
+        req.slot_index,
+        req.total_slots,
+        &format!("{}-nodesfold-step-{}", req.e3_id, req.slot_index),
+        artifacts_dir.as_str(),
+    )
+    .map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+            request.clone(),
+        )
+    })?;
+    Ok(ComputeResponse::zk(
+        ZkResponse::NodesFoldStep(NodesFoldStepResponse { accumulator_proof }),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
 fn handle_dkg_aggregation_proof(
     prover: &ZkProver,
     req: DkgAggregationRequest,
@@ -757,6 +789,7 @@ fn handle_dkg_aggregation_proof(
     let job_id = zk_bb_work_id(&request);
     let input = DkgAggregationInput {
         node_fold_proofs: &req.node_fold_proofs,
+        nodes_fold_proof: req.nodes_fold_proof.as_ref(),
         c5_proof: &req.c5_proof,
         party_ids: &req.party_ids,
         committee_addresses: &req.committee_addresses,
