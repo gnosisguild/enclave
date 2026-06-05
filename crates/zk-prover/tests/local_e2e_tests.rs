@@ -478,7 +478,7 @@ macro_rules! e2e_proof_tests {
                         return;
                     };
 
-                    let artifacts_dir = preset.artifacts_dir();
+                    let artifacts_dir = preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
                     let proof = circuit
                         .prove_with_variant(&prover, &preset, &sample, e3_id, $variant, &artifacts_dir)
                         .expect("proof generation should succeed");
@@ -523,7 +523,8 @@ async fn test_pk_generation_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("proof generation should succeed");
@@ -571,7 +572,8 @@ async fn test_pk_bfv_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("proof generation should succeed");
@@ -610,7 +612,8 @@ async fn test_share_computation_sk_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("inner sk_share_computation proof should succeed");
@@ -643,7 +646,8 @@ async fn test_share_computation_e_sm_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("inner e_sm_share_computation proof should succeed");
@@ -676,7 +680,8 @@ async fn test_pk_aggregation_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove_with_variant(
             &prover,
@@ -727,7 +732,8 @@ async fn test_threshold_share_decryption_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove_with_variant(
             &prover,
@@ -770,7 +776,8 @@ async fn test_c4_sk_commitment_is_c6_expected_sk_input_e2e() {
 
     let e3_id_c4 = "c4-e2e";
     let e3_id_c6 = "c6-e2e";
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
 
     let c4_proof = DkgShareDecryptionCircuit
         .prove_with_variant(
@@ -874,7 +881,8 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
 
     let e3_id_c4 = "c4-align";
     let e3_id_c6 = "c6-align";
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
 
     let c4_proof = DkgShareDecryptionCircuit
         .prove_with_variant(
@@ -945,7 +953,8 @@ async fn test_decrypted_shares_aggregation_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove_with_variant(
             &prover,

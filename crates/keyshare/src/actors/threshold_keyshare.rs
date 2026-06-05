@@ -34,6 +34,7 @@ use e3_trbfv::{
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use fhe_traits::Serialize;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
@@ -599,11 +600,16 @@ impl ThresholdKeyshare {
             ))
         })?;
 
+        let committee_size = CiphernodesCommitteeSize::from_threshold(
+            state.threshold_m as usize,
+            state.threshold_n as usize,
+        )?;
         self.bus.publish(
             EncryptionKeyPending {
                 e3_id,
                 key: Arc::new(EncryptionKey::new(state.party_id, pk_bfv_bytes)),
                 params_preset: self.share_enc_preset,
+                committee_size,
             },
             ec,
         )?;
@@ -1070,6 +1076,10 @@ impl ThresholdKeyshare {
             pre_dishonest.len()
         );
 
+        let committee_size = CiphernodesCommitteeSize::from_threshold(
+            state.threshold_m as usize,
+            state.threshold_n as usize,
+        )?;
         self.bus.publish(
             ShareVerificationDispatched {
                 e3_id: e3_id.clone(),
@@ -1078,6 +1088,7 @@ impl ThresholdKeyshare {
                 decryption_proofs: Vec::new(),
                 pre_dishonest,
                 params_preset: self.share_enc_preset,
+                committee_size,
             },
             ec,
         )?;
@@ -1467,6 +1478,10 @@ impl ThresholdKeyshare {
             pre_dishonest.len()
         );
 
+        let committee_size = CiphernodesCommitteeSize::from_threshold(
+            state.threshold_m as usize,
+            state.threshold_n as usize,
+        )?;
         self.bus.publish(
             ShareVerificationDispatched {
                 e3_id: e3_id.clone(),
@@ -1475,6 +1490,7 @@ impl ThresholdKeyshare {
                 decryption_proofs: party_proofs,
                 pre_dishonest,
                 params_preset: self.share_enc_preset,
+                committee_size,
             },
             ec,
         )?;
@@ -1688,6 +1704,11 @@ impl ThresholdKeyshare {
 
         info!("Publishing ShareDecryptionProofPending for C6 proof generation...");
 
+        let committee_size = CiphernodesCommitteeSize::from_threshold(
+            state.threshold_m as usize,
+            state.threshold_n as usize,
+        )?;
+
         // Publish pending event before transitioning state so a publish
         // failure leaves us in Decrypting (retryable) rather than
         // GeneratingDecryptionProof (no retry path).
@@ -1704,6 +1725,7 @@ impl ThresholdKeyshare {
                     es_poly_sum: decrypting.es_poly_sum,
                     d_share_bytes: d_share_poly.clone(),
                     params_preset: threshold_preset,
+                    committee_size,
                 },
             },
             ec.clone(),

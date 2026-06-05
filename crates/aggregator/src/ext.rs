@@ -26,6 +26,7 @@ use e3_fhe::Fhe;
 use e3_fhe_params::BfvPreset;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, TypedKey, META_KEY};
 use e3_sortition::Sortition;
+use e3_zk_helpers::CiphernodesCommitteeSize;
 
 /// Full finalized committee (`PublicKeyAggregated.committee_addresses`, length `N`)
 /// for `committee_hash_*` binding in downstream ZK requests.
@@ -83,12 +84,26 @@ impl E3Extension for PublicKeyAggregatorExtension {
             seed,
         )));
 
+        let committee_size = match CiphernodesCommitteeSize::from_threshold(
+            threshold_m,
+            threshold_n,
+        ) {
+            Ok(c) => c,
+            Err(e) => {
+                self.bus.err(
+                    EType::PublickeyAggregation,
+                    anyhow!("Unknown committee size for E3 {e3_id} (threshold_m={threshold_m}, threshold_n={threshold_n}): {e}"),
+                );
+                return;
+            }
+        };
         let value = create_publickey_aggregator(
             fhe.clone(),
             self.bus.clone(),
             e3_id,
             sync_state,
             params_preset,
+            committee_size,
         );
 
         ctx.set_event_recipient("publickey", Some(value));
@@ -125,12 +140,23 @@ impl E3Extension for PublicKeyAggregatorExtension {
 
             return Ok(());
         };
+        let committee_size =
+            CiphernodesCommitteeSize::from_threshold(meta.threshold_m, meta.threshold_n).map_err(
+                |e| {
+                    anyhow!(
+                        "Unknown committee size (threshold_m={}, threshold_n={}): {e}",
+                        meta.threshold_m,
+                        meta.threshold_n
+                    )
+                },
+            )?;
         let value = create_publickey_aggregator(
             fhe.clone(),
             self.bus.clone(),
             ctx.e3_id.clone(),
             sync_state,
             meta.params_preset,
+            committee_size,
         );
 
         // send to context
@@ -146,6 +172,7 @@ fn create_publickey_aggregator(
     e3_id: E3id,
     sync_state: Persistable<PublicKeyAggregatorState>,
     params_preset: BfvPreset,
+    committee_size: CiphernodesCommitteeSize,
 ) -> Recipient<EnclaveEvent> {
     KeyshareCreatedFilterBuffer::new(
         PublicKeyAggregator::new(
@@ -154,6 +181,7 @@ fn create_publickey_aggregator(
                 bus,
                 e3_id,
                 params_preset,
+                committee_size,
             },
             sync_state,
         )
@@ -215,9 +243,7 @@ fn load_honest_committee_addresses(ctx: &E3Context, e3_id: &E3id) -> Result<Vec<
         return Err(anyhow!(ERROR_TRBFV_PLAINTEXT_HONEST_COMMITTEE_MISSING));
     };
     if let Some(addrs) = state.honest_committee_addresses() {
-        if addrs.is_empty() {
-            return Err(anyhow!(ERROR_TRBFV_PLAINTEXT_HONEST_COMMITTEE_MISSING));
-        }
+        return Ok(addrs.to_vec());
     }
     Err(anyhow!(ERROR_TRBFV_PLAINTEXT_HONEST_COMMITTEE_MISSING))
 }
@@ -309,6 +335,19 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                             sortition: self.sortition.clone(),
                             e3_id: e3_id.clone(),
                             params_preset: meta.params_preset,
+                            committee_size: match CiphernodesCommitteeSize::from_threshold(
+                                meta.threshold_m,
+                                meta.threshold_n,
+                            ) {
+                                Ok(c) => c,
+                                Err(e) => {
+                                    self.bus.err(
+                                        EType::PlaintextAggregation,
+                                        anyhow!("Unknown committee size for E3 {e3_id} (threshold_m={}, threshold_n={}): {e}", meta.threshold_m, meta.threshold_n),
+                                    );
+                                    return;
+                                }
+                            },
                             proof_aggregation_enabled: meta.proof_aggregation_enabled,
                             committee_addresses,
                             honest_committee_addresses,
@@ -355,6 +394,17 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
                 params_preset: meta.params_preset,
+                committee_size: CiphernodesCommitteeSize::from_threshold(
+                    meta.threshold_m,
+                    meta.threshold_n,
+                )
+                .map_err(|e| {
+                    anyhow!(
+                        "Unknown committee size (threshold_m={}, threshold_n={}): {e}",
+                        meta.threshold_m,
+                        meta.threshold_n
+                    )
+                })?,
                 proof_aggregation_enabled: meta.proof_aggregation_enabled,
                 committee_addresses,
                 honest_committee_addresses,

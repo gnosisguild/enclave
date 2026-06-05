@@ -7,6 +7,7 @@
 use crate::{E3id, EncryptionKey};
 use actix::Message;
 use e3_fhe_params::BfvPreset;
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 use std::sync::Arc;
@@ -20,6 +21,7 @@ pub struct EncryptionKeyPending {
     pub e3_id: E3id,
     pub key: Arc<EncryptionKey>,
     pub params_preset: BfvPreset,
+    pub committee_size: CiphernodesCommitteeSize,
 }
 
 impl Display for EncryptionKeyPending {

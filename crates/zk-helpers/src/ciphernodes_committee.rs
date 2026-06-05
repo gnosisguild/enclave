@@ -52,6 +52,17 @@ impl CiphernodesCommitteeSize {
         }
     }
 
+    /// Derives the committee size from total parties (N) and honest count (H).
+    pub fn from_n_h(n: usize, h: usize) -> Result<Self> {
+        match (n, h) {
+            (3, 3) => Ok(Self::Micro),
+            (5, 5) => Ok(Self::Small),
+            (10, 8) => Ok(Self::Medium),
+            (20, 15) => Ok(Self::Large),
+            _ => bail!("Unknown committee size for (n={n}, h={h})"),
+        }
+    }
+
     /// Lower-case name as written into `circuits/bin/.active-preset.json` and the
     /// `--committee` flag of `scripts/build-circuits.ts`. Use this for stamp/env cross-checks.
     pub fn as_str(self) -> &'static str {
