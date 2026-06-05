@@ -15,6 +15,7 @@ use crate::compute_threshold_pk_commitment;
 use crate::crt_polynomial_to_toml_json;
 use crate::threshold::pk_aggregation::circuit::PkAggregationCircuit;
 use crate::threshold::pk_aggregation::circuit::PkAggregationCircuitData;
+use crate::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
@@ -158,12 +159,10 @@ impl Computation for Inputs {
 
         let mut pk0: Vec<CrtPolynomial> = data.pk0_shares.clone();
         let mut pk0_agg = CrtPolynomial::from_fhe_polynomial(&data.public_key.c[0]);
-        let mut crp = data.a.clone();
+        let crp = deterministic_crp_crt_polynomial(&threshold_params)?;
 
         pk0_agg.reverse();
         pk0_agg.center(threshold_params.moduli())?;
-        crp.reverse();
-        crp.center(threshold_params.moduli())?;
 
         let mut expected_threshold_pk_commitments = Vec::new();
 
