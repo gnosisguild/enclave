@@ -39,10 +39,6 @@ impl ZkProver {
         }
     }
 
-    pub fn circuits_base(&self) -> &PathBuf {
-        &self.circuits_dir
-    }
-
     pub fn circuits_dir(&self, variant: CircuitVariant, artifacts_dir: &str) -> PathBuf {
         self.circuits_dir.join(artifacts_dir).join(variant.as_str())
     }
