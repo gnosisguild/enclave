@@ -21,6 +21,40 @@ SERVICE="${1:-}"
 
 die() { echo "[run_service] ERROR: $*" >&2; exit 1; }
 
+# ── Helpers ─────────────────────────────────────────────────────────────────
+wait_for_port() {
+    local host="${1:-localhost}" port="$2" label="${3:-$port}" max="${4:-120}"
+    local attempt=1
+    echo "[run_service] Waiting for $label ($host:$port)..."
+    while [ $attempt -le $max ]; do
+        if curl -s "http://$host:$port" >/dev/null 2>&1; then
+            echo "[run_service] $label is ready"
+            return 0
+        fi
+        sleep 1
+        attempt=$((attempt + 1))
+    done
+    die "$label did not start after ${max}s"
+}
+
+wait_for_file() {
+    local file="$1" label="${2:-$file}" max="${3:-120}"
+    local attempt=1
+    echo "[run_service] Waiting for $label..."
+    while [ $attempt -le $max ]; do
+        if [ -f "$file" ]; then
+            echo "[run_service] $label found"
+            return 0
+        fi
+        sleep 1
+        attempt=$((attempt + 1))
+    done
+    die "$label did not appear after ${max}s"
+}
+
+# Clean stale deploy signal so nodes don't start prematurely
+rm -f "$SIGNAL_FILE"
+
 case "$SERVICE" in
   anvil)
     exec anvil \
@@ -35,34 +69,29 @@ case "$SERVICE" in
     ;;
 
   cn1|cn2|cn3|cn4|cn5)
-    echo "[run_service] Waiting for deploy to finish..."
     cd "${CRISP_ROOT}"
-    while [ ! -f "${SIGNAL_FILE}" ]; do sleep 1; done
+    wait_for_file "${SIGNAL_FILE}" "deploy signal file"
     echo "[run_service] Deploy done. Starting ${SERVICE} directly..."
     exec enclave --name "${SERVICE}" start -v
     ;;
 
   program)
-    echo "[run_service] Waiting for Anvil (port 8545)..."
-    while ! curl -s http://localhost:8545 >/dev/null 2>&1; do sleep 1; done
+    wait_for_port localhost 8545 "Anvil"
     echo "[run_service] Anvil ready. Starting program server..."
     cd "${CRISP_ROOT}"
     exec bash scripts/dev_program.sh
     ;;
 
   server)
-    echo "[run_service] Waiting for Program Server (port 13151)..."
-    while ! curl -s http://localhost:13151 >/dev/null 2>&1; do sleep 1; done
+    wait_for_port localhost 13151 "Program Server"
     echo "[run_service] Program server ready. Starting server..."
     cd "${CRISP_ROOT}"
     exec bash scripts/dev_server.sh
     ;;
 
   client)
-    echo "[run_service] Waiting for Server (port 4000) and deploy signal..."
-    while ! curl -s http://localhost:4000 >/dev/null 2>&1 || [ ! -f "${SIGNAL_FILE}" ]; do
-      sleep 1
-    done
+    wait_for_port localhost 4000 "Server"
+    wait_for_file "${SIGNAL_FILE}" "deploy signal file"
     echo "[run_service] Ready. Starting client..."
     cd "${CRISP_ROOT}"
     exec bash scripts/dev_client.sh

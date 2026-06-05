@@ -76,7 +76,7 @@ check_deps() {
     step "Checking dependencies..."
     local missing=()
 
-    for cmd in cargo pnpm anvil; do
+    for cmd in pnpm anvil; do
         if ! command_exists "$cmd"; then
             missing+=("$cmd")
         fi
@@ -87,7 +87,13 @@ check_deps() {
         err "Please install them and re-run."
         exit 1
     fi
-    ok "All core dependencies found (cargo, pnpm, anvil)"
+    ok "Core dependencies found (pnpm, anvil)"
+
+    # cargo is only needed if we have to install the enclave CLI.
+    # check_deps runs before install_enclave, so only warn here.
+    if ! command_exists cargo; then
+        warn "cargo not found — enclave CLI must be pre-installed (e.g. 'which enclave')"
+    fi
 
     if ! command_exists tmux; then
         warn "tmux not found — will print VS Code task instructions instead."
@@ -103,6 +109,11 @@ install_enclave() {
     if command_exists enclave; then
         info "enclave CLI already installed ($(which enclave))"
         return 0
+    fi
+    if ! command_exists cargo; then
+        err "enclave CLI not found and cargo is not available to install it."
+        err "Install Rust (https://rustup.rs) or pre-install the enclave binary."
+        exit 1
     fi
     step "Installing enclave CLI..."
     cd "$REPO_ROOT"
@@ -173,7 +184,10 @@ launch_tmux() {
     wait_for_port localhost 8545 "Anvil" 60
     deploy_contracts
     setup_nodes
-
+    # Create the signal file that run_service.sh expects (used by VS Code tasks).
+    # This keeps tmux mode compatible with the VS Code runner if someone switches.
+    touch /tmp/crisp-dev-daemon-ready
+    ok "Signal file created: /tmp/crisp-dev-daemon-ready"
     # ── Start the swarm daemon (no nodes yet — we start each individually)
     step "Starting swarm daemon (detached, all nodes excluded)..."
     enclave nodes up --detach --exclude cn1,cn2,cn3,cn4,cn5
@@ -240,11 +254,15 @@ launch_vscode_instructions() {
     echo -e "${YELLOW}║${NC}  ${YELLOW}1.${NC} Ctrl+Shift+P → \"Tasks: Run Task\"                         ${YELLOW}║${NC}"
     echo -e "${YELLOW}║${NC}  ${YELLOW}2.${NC} Run tasks in this order:                                   ${YELLOW}║${NC}"
     echo -e "${YELLOW}║${NC}     a) CRISP: Anvil                                           ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${NC}     b) CRISP: Deploy Contracts                                ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${NC}     c) CRISP: Ciphernodes                                     ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${NC}     d) CRISP: Program Server                                  ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${NC}     e) CRISP: Server                                          ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${NC}     f) CRISP: Client                                          ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC}     b) CRISP: Deploy + Setup                                  ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC}     c) CRISP: cn1                                             ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC}     d) CRISP: cn2                                             ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC}     e) CRISP: cn3                                             ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC}     f) CRISP: cn4                                             ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC}     g) CRISP: cn5                                             ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC}     h) CRISP: Program Server                                  ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC}     i) CRISP: Server                                          ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC}     j) CRISP: Client                                          ${YELLOW}║${NC}"
     echo -e "${YELLOW}║${NC}                                                              ${YELLOW}║${NC}"
     echo -e "${YELLOW}║${NC}  Each task opens in a new terminal tab.                       ${YELLOW}║${NC}"
     echo -e "${YELLOW}║${NC}  Rename tabs with F2 for clarity.                             ${YELLOW}║${NC}"

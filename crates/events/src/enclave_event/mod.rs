@@ -544,6 +544,7 @@ impl EnclaveEventData {
             EnclaveEventData::ProofVerificationPassed(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::KeyshareCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3Requested(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::E3RequestComplete(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::PublicKeyAggregated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::CiphertextOutputPublished(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::DecryptionKeyShared(ref data) => Some(data.e3_id.clone()),
