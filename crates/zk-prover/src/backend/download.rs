@@ -54,13 +54,13 @@ fn circuit_manifest_candidates(circuits_dir: &Path, rel_path: &str) -> Vec<PathB
     candidates
 }
 
-/// Resolve a manifest path to file bytes, matching `expected_hash` when multiple committee
+/// Resolve a manifest path to an on-disk file, matching `expected_hash` when multiple committee
 /// copies exist (v0.2.0 flat checksums vs per-committee tarball layout).
-async fn read_manifest_file(
+async fn locate_manifest_artifact(
     circuits_dir: &Path,
     rel_path: &str,
     expected_hash: &str,
-) -> Result<Vec<u8>, ZkError> {
+) -> Result<PathBuf, ZkError> {
     let mut last_mismatch: Option<(PathBuf, String)> = None;
 
     for candidate in circuit_manifest_candidates(circuits_dir, rel_path) {
@@ -69,7 +69,7 @@ async fn read_manifest_file(
         }
         let data = fs::read(&candidate).await?;
         match verify_checksum(rel_path, &data, Some(expected_hash)) {
-            Ok(()) => return Ok(data),
+            Ok(()) => return Ok(candidate),
             Err(ZkError::ChecksumMismatch { actual, .. }) => {
                 last_mismatch = Some((candidate, actual));
             }
@@ -77,7 +77,7 @@ async fn read_manifest_file(
         }
     }
 
-    if let Some((path, actual)) = last_mismatch {
+    if let Some((_path, actual)) = last_mismatch {
         return Err(ZkError::ChecksumMismatch {
             file: rel_path.to_string(),
             expected: expected_hash.to_string(),
@@ -88,7 +88,25 @@ async fn read_manifest_file(
     Err(ZkError::CircuitNotFound(rel_path.to_string()))
 }
 
+async fn read_manifest_file(
+    circuits_dir: &Path,
+    rel_path: &str,
+    expected_hash: &str,
+) -> Result<Vec<u8>, ZkError> {
+    let path = locate_manifest_artifact(circuits_dir, rel_path, expected_hash).await?;
+    fs::read(&path).await.map_err(ZkError::from)
+}
+
 impl ZkBackend {
+    /// Resolve a `checksums.json` entry to an on-disk path (legacy flat or per-committee layout).
+    pub async fn locate_manifest_artifact(
+        &self,
+        rel_path: &str,
+        expected_hash: &str,
+    ) -> Result<PathBuf, ZkError> {
+        locate_manifest_artifact(&self.circuits_dir, rel_path, expected_hash).await
+    }
+
     pub async fn download_bb(&self) -> Result<(), ZkError> {
         if self.using_custom_bb {
             println!("IGNORING DOWNLOAD BECAUSE WE ARE USING A CUSTOM BB");
