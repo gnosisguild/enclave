@@ -75,9 +75,8 @@ pub struct Bounds {
 pub struct Inputs {
     pub expected_threshold_pk_commitments: Vec<BigInt>,
     pub pk0: Vec<CrtPolynomial>,
-    pub pk1: Vec<CrtPolynomial>,
     pub pk0_agg: CrtPolynomial,
-    pub pk1_agg: CrtPolynomial,
+    pub crp: CrtPolynomial,
 }
 
 impl Computation for Configs {
@@ -158,30 +157,21 @@ impl Computation for Inputs {
         let bit_pk = compute_modulus_bit(&threshold_params);
 
         let mut pk0: Vec<CrtPolynomial> = data.pk0_shares.clone();
-        // pk1 is the same (common random polynomial a) for all parties
-        let mut pk1: Vec<CrtPolynomial> = (0..data.committee.h).map(|_| data.a.clone()).collect();
-        // Extract pk0_agg and pk1_agg from aggregated public key (c[1] = a)
         let mut pk0_agg = CrtPolynomial::from_fhe_polynomial(&data.public_key.c[0]);
-        let mut pk1_agg = CrtPolynomial::from_fhe_polynomial(&data.public_key.c[1]);
-
-        // Compute expected_threshold_pk_commitments for each honest party
-        // Each commitment is computed from pk0[i] and pk1[i] for party i
-        let mut expected_threshold_pk_commitments = Vec::new();
+        let mut crp = data.a.clone();
 
         pk0_agg.reverse();
         pk0_agg.center(threshold_params.moduli())?;
-        pk1_agg.reverse();
-        pk1_agg.center(threshold_params.moduli())?;
+        crp.reverse();
+        crp.center(threshold_params.moduli())?;
+
+        let mut expected_threshold_pk_commitments = Vec::new();
 
         for party_index in 0..data.committee.h {
             pk0[party_index].reverse();
             pk0[party_index].center(threshold_params.moduli())?;
 
-            pk1[party_index].reverse();
-            pk1[party_index].center(threshold_params.moduli())?;
-
-            let commitment =
-                compute_threshold_pk_commitment(&pk0[party_index], &pk1[party_index], bit_pk);
+            let commitment = compute_threshold_pk_commitment(&pk0[party_index], bit_pk);
 
             expected_threshold_pk_commitments.push(commitment);
         }
@@ -189,9 +179,8 @@ impl Computation for Inputs {
         Ok(Inputs {
             expected_threshold_pk_commitments,
             pk0,
-            pk1,
             pk0_agg,
-            pk1_agg,
+            crp,
         })
     }
 
@@ -201,22 +190,14 @@ impl Computation for Inputs {
             .iter()
             .map(|p| crt_polynomial_to_toml_json(p))
             .collect();
-        let pk1: Vec<Vec<serde_json::Value>> = self
-            .pk1
-            .iter()
-            .map(|p| crt_polynomial_to_toml_json(p))
-            .collect();
         let pk0_agg = crt_polynomial_to_toml_json(&self.pk0_agg);
-        let pk1_agg = crt_polynomial_to_toml_json(&self.pk1_agg);
         let expected_threshold_pk_commitments =
             bigint_1d_to_json_values(&self.expected_threshold_pk_commitments);
 
         let json = serde_json::json!({
             "expected_threshold_pk_commitments": expected_threshold_pk_commitments,
             "pk0": pk0,
-            "pk1": pk1,
             "pk0_agg": pk0_agg,
-            "pk1_agg": pk1_agg,
         });
 
         Ok(json)
