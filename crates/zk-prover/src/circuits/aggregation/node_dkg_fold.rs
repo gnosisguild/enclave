@@ -163,7 +163,10 @@ fn push_step(timings: &mut Vec<FoldProveStepTiming>, step: &str, started: Instan
     });
 }
 
-/// Run C2abFold → C3 folds → C3abFold → C4abFold → NodeFold; returns a [`CircuitName::NodeFold`] proof.
+/// Run C2abFold || (C3a fold || C3b fold) → C3abFold → C4abFold → NodeFold; returns a [`CircuitName::NodeFold`] proof.
+///
+/// C2abFold and the two C3 fold chains are mutually independent and run concurrently via
+/// `rayon::join`. C3a and C3b are also independent of each other and run as a nested join.
 pub fn prove_node_dkg_fold(
     prover: &ZkProver,
     input: &NodeDkgFoldInput,
@@ -190,37 +193,67 @@ pub fn prove_node_dkg_fold(
         c2a_key_hash: c2a_vk.key_hash.clone(),
         c2b_key_hash: c2b_vk.key_hash.clone(),
     };
-    let t = Instant::now();
-    let c2ab_proof = build_and_prove_recursive_bin(
-        prover,
-        CircuitName::C2abFold,
-        &c2ab,
-        &format!("{e3_id}-c2ab"),
-        artifacts_dir,
-    )?;
-    push_step(&mut step_timings, "c2ab_fold", t);
 
-    let t = Instant::now();
-    let c3a_folded = generate_sequential_c3_fold(
-        prover,
-        input.c3a_inner_proofs,
-        input.c3_slot_indices_a,
-        input.c3_total_slots,
-        &format!("{e3_id}-c3a"),
-        artifacts_dir,
-    )?;
-    push_step(&mut step_timings, "c3a_fold", t);
+    // c2ab_fold is independent of the c3 chains; c3a and c3b are independent of each other.
+    // Run all three concurrently: c2ab || (c3a || c3b).
+    let ((c2ab_result, c2ab_elapsed), ((c3a_result, c3a_elapsed), (c3b_result, c3b_elapsed))) =
+        rayon::join(
+            || {
+                let t = Instant::now();
+                let r = build_and_prove_recursive_bin(
+                    prover,
+                    CircuitName::C2abFold,
+                    &c2ab,
+                    &format!("{e3_id}-c2ab"),
+                    artifacts_dir,
+                );
+                (r, t.elapsed())
+            },
+            || {
+                rayon::join(
+                    || {
+                        let t = Instant::now();
+                        let r = generate_sequential_c3_fold(
+                            prover,
+                            input.c3a_inner_proofs,
+                            input.c3_slot_indices_a,
+                            input.c3_total_slots,
+                            &format!("{e3_id}-c3a"),
+                            artifacts_dir,
+                        );
+                        (r, t.elapsed())
+                    },
+                    || {
+                        let t = Instant::now();
+                        let r = generate_sequential_c3_fold(
+                            prover,
+                            input.c3b_inner_proofs,
+                            input.c3_slot_indices_b,
+                            input.c3_total_slots,
+                            &format!("{e3_id}-c3b"),
+                            artifacts_dir,
+                        );
+                        (r, t.elapsed())
+                    },
+                )
+            },
+        );
 
-    let t = Instant::now();
-    let c3b_folded = generate_sequential_c3_fold(
-        prover,
-        input.c3b_inner_proofs,
-        input.c3_slot_indices_b,
-        input.c3_total_slots,
-        &format!("{e3_id}-c3b"),
-        artifacts_dir,
-    )?;
-    push_step(&mut step_timings, "c3b_fold", t);
+    let c2ab_proof = c2ab_result?;
+    step_timings.push(FoldProveStepTiming {
+        step: "c2ab_fold".to_string(),
+        seconds: c2ab_elapsed.as_secs_f64(),
+    });
+    let c3a_folded = c3a_result?;
+    step_timings.push(FoldProveStepTiming {
+        step: "c3a_fold".to_string(),
+        seconds: c3a_elapsed.as_secs_f64(),
+    });
+    let c3b_folded = c3b_result?;
+    step_timings.push(FoldProveStepTiming {
+        step: "c3b_fold".to_string(),
+        seconds: c3b_elapsed.as_secs_f64(),
+    });
 
     let c3_fold_vk = vk::load_vk_artifacts(
         &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),

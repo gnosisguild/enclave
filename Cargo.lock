@@ -4009,6 +4009,7 @@ dependencies = [
  "num-traits",
  "paste",
  "rand 0.9.2",
+ "rayon",
  "reqwest",
  "serde",
  "serde_json",

@@ -29,7 +29,6 @@ use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
-use e3_zk_helpers::circuits::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;
 use e3_zk_helpers::circuits::{
     commitments::{
         compute_aggregated_shares_commitment, compute_dkg_pk_commitment,
@@ -540,11 +539,8 @@ async fn test_pk_generation_commitment_consistency() {
         &computation_output.inputs.sk,
         computation_output.bits.sk_bit,
     );
-    let (threshold_params, _) = build_pair_for_preset(preset).expect("preset pair");
-    let a = deterministic_crp_crt_polynomial(&threshold_params).expect("crp polynomial");
     let pk_commitment_expected = compute_threshold_pk_commitment(
         &computation_output.inputs.pk0is,
-        &a,
         computation_output.bits.pk_bit,
     );
 
@@ -711,7 +707,7 @@ async fn test_pk_aggregation_commitment_consistency() {
 
     let expected_final_commitment = compute_pk_aggregation_commitment(
         &computation_output.inputs.pk0_agg,
-        &computation_output.inputs.pk1_agg,
+        &computation_output.inputs.crp,
         computation_output.bits.pk_bit,
     );
     let final_commitment_from_proof = extract_field_from_end(&proof.public_signals, 0);

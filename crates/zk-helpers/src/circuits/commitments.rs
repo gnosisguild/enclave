@@ -197,25 +197,20 @@ pub fn compute_dkg_pk_commitment(pk0: &CrtPolynomial, pk1: &CrtPolynomial, bit_p
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
-/// Compute a commitment to the threshold public key polynomials by flattening them and hashing.
+/// Compute a commitment to the threshold public key by flattening pk0 and hashing.
 ///
-/// This matches the Noir `compute_threshold_pk_commitment` function exactly.
+/// This matches the Noir `compute_threshold_pk_commitment` function exactly,
+/// which hashes only pk0 with domain separator DS_PK_GENERATION.
 ///
 /// # Arguments
-/// * `pk0` - First component of the thershold public key (CRT limbs)
-/// * `pk1` - Second component of the thershold public key (CRT limbs)
+/// * `pk0` - First component of the threshold public key (CRT limbs)
 /// * `bit_pk` - The bit width for public key coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_threshold_pk_commitment(
-    pk0: &CrtPolynomial,
-    pk1: &CrtPolynomial,
-    bit_pk: u32,
-) -> BigInt {
+pub fn compute_threshold_pk_commitment(pk0: &CrtPolynomial, bit_pk: u32) -> BigInt {
     let mut payload = Vec::new();
     payload = flatten(payload, &pk0.limbs, bit_pk);
-    payload = flatten(payload, &pk1.limbs, bit_pk);
 
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
@@ -252,12 +247,7 @@ pub fn compute_pk_commitment_from_keyshare_bytes(
     pk0.center(moduli)
         .map_err(|e| crate::CircuitsErrors::Other(format!("pk0 center: {}", e)))?;
 
-    let mut pk1 = CrtPolynomial::from_fhe_polynomial(&crp.poly());
-    pk1.reverse();
-    pk1.center(moduli)
-        .map_err(|e| crate::CircuitsErrors::Other(format!("pk1 center: {}", e)))?;
-
-    let commitment = compute_threshold_pk_commitment(&pk0, &pk1, bit_pk);
+    let commitment = compute_threshold_pk_commitment(&pk0, bit_pk);
     let (_, be_bytes) = commitment.to_bytes_be();
     let mut padded = [0u8; 32];
     let start = 32usize.saturating_sub(be_bytes.len());
@@ -711,10 +701,7 @@ mod tests {
         let mut pk0 = CrtPolynomial::from_fhe_polynomial(&pk_share.p0_share());
         pk0.reverse();
         pk0.center(params.moduli()).unwrap();
-        let mut pk1 = CrtPolynomial::from_fhe_polynomial(&crp.poly());
-        pk1.reverse();
-        pk1.center(params.moduli()).unwrap();
-        let expected = compute_threshold_pk_commitment(&pk0, &pk1, bit_pk);
+        let expected = compute_threshold_pk_commitment(&pk0, bit_pk);
         let (_, be_bytes) = expected.to_bytes_be();
         let mut expected_padded = [0u8; 32];
         let start = 32usize.saturating_sub(be_bytes.len());
