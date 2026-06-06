@@ -1729,10 +1729,7 @@ mod tests {
                     &fhe.crp,
                 )?;
                 submission_order.push((party_id, node, ks_bytes));
-                c1_proofs.push(Some(c1_proof_with_pk_commitment(
-                    e3_id,
-                    commitment,
-                )));
+                c1_proofs.push(Some(c1_proof_with_pk_commitment(e3_id, commitment)));
             } else {
                 submission_order.push((party_id, node, ArcBytes::from_bytes(&[party_id as u8])));
                 c1_proofs.push(None);
