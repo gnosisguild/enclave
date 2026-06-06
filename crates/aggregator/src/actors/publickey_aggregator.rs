@@ -300,12 +300,10 @@ impl PublicKeyAggregator {
                     keyshare_bytes: keyshare_bytes.clone(),
                     aggregated_pk_bytes: pubkey.clone(),
                     params_preset: self.params_preset,
-                    // C5 aggregates the H honest keyshares only; the circuit witness and prover
-                    // path use `committee_h` (see pk_aggregation/computation.rs). N is not needed
-                    // here — set both fields to H so downstream validation stays consistent.
-                    committee_n: committee_h,
+                    // C5 witness uses `committee_h` keyshares; artifact lookup needs canonical (N, H, T).
+                    committee_n: threshold_n,
                     committee_h,
-                    committee_threshold: 0,
+                    committee_threshold: threshold_m,
                 },
                 public_key: pubkey.clone(),
                 nodes: honest_nodes_set.clone(),
@@ -1595,7 +1593,8 @@ mod tests {
     use super::*;
     use e3_data::{AutoPersist, DataStore, InMemStore, Repository};
     use e3_events::{
-        CircuitName, ComputeRequestErrorKind, HistoryCollector, TakeEvents, Unsequenced, ZkError,
+        CircuitName, ComputeRequestErrorKind, HistoryCollector, ProofPayload, ProofType,
+        TakeEvents, Unsequenced, ZkError,
     };
     use e3_test_helpers::get_common_setup;
     use std::collections::BTreeSet;
@@ -1650,6 +1649,18 @@ mod tests {
         Addr<HistoryCollector<EnclaveEvent>>,
         E3id,
     )> {
+        build_public_key_aggregator_with_committee(initial_state, CiphernodesCommitteeSize::Micro)
+            .await
+    }
+
+    async fn build_public_key_aggregator_with_committee(
+        initial_state: PublicKeyAggregatorState,
+        committee_size: CiphernodesCommitteeSize,
+    ) -> Result<(
+        PublicKeyAggregator,
+        Addr<HistoryCollector<EnclaveEvent>>,
+        E3id,
+    )> {
         let (bus, rng, _seed, params, crp, _errors, history) =
             get_common_setup(Some(BfvPreset::InsecureThreshold512.into()))?;
         let e3_id = E3id::new("42", 1);
@@ -1660,12 +1671,83 @@ mod tests {
                 bus,
                 e3_id: e3_id.clone(),
                 params_preset: BfvPreset::InsecureThreshold512,
-                committee_size: CiphernodesCommitteeSize::Micro,
+                committee_size,
             },
             test_state(initial_state),
         );
 
         Ok((aggregator, history, e3_id))
+    }
+
+    fn c1_proof_with_pk_commitment(e3_id: &E3id, pk_commitment: [u8; 32]) -> SignedProofPayload {
+        let mut signals = vec![0u8; 96];
+        signals[32..64].copy_from_slice(&pk_commitment);
+        SignedProofPayload {
+            payload: ProofPayload {
+                e3_id: e3_id.clone(),
+                proof_type: ProofType::C1PkGeneration,
+                proof: Proof::new(
+                    CircuitName::PkGeneration,
+                    ArcBytes::from_bytes(&[1]),
+                    ArcBytes::from_bytes(&signals),
+                ),
+            },
+            signature: ArcBytes::from_bytes(&[0u8; 65]),
+        }
+    }
+
+    fn verifying_c1_non_square_state(
+        fhe: &Fhe,
+        e3_id: &E3id,
+    ) -> Result<(PublicKeyAggregatorState, usize, usize, usize)> {
+        use fhe::bfv::SecretKey;
+        use fhe::mbfv::PublicKeyShare;
+        use fhe_traits::Serialize;
+
+        let committee = CiphernodesCommitteeSize::Medium.values();
+        let threshold_n = committee.n;
+        let threshold_m = committee.threshold;
+        let circuit_h = committee.h;
+        assert_ne!(
+            threshold_n, circuit_h,
+            "test requires a non-square committee (N != H)"
+        );
+
+        let mut submission_order = Vec::with_capacity(threshold_n);
+        let mut c1_proofs = Vec::with_capacity(threshold_n);
+        let mut rng = rand::rng();
+
+        for party_id in 0..threshold_n as u64 {
+            let node = format!("0x{:040x}", party_id + 1);
+            if party_id < circuit_h as u64 {
+                let sk = SecretKey::random(&fhe.params, &mut rng);
+                let pk_share = PublicKeyShare::new(&sk, fhe.crp.clone(), &mut rng)?;
+                let ks_bytes = ArcBytes::from_bytes(&pk_share.to_bytes());
+                let commitment = e3_zk_helpers::compute_pk_commitment_from_keyshare_bytes(
+                    &ks_bytes,
+                    &fhe.params,
+                    &fhe.crp,
+                )?;
+                submission_order.push((party_id, node, ks_bytes));
+                c1_proofs.push(Some(c1_proof_with_pk_commitment(e3_id, commitment)));
+            } else {
+                submission_order.push((party_id, node, ArcBytes::from_bytes(&[party_id as u8])));
+                c1_proofs.push(None);
+            }
+        }
+
+        Ok((
+            PublicKeyAggregatorState::VerifyingC1 {
+                submission_order,
+                threshold_m,
+                threshold_n,
+                c1_proofs,
+                no_proof_parties: vec![],
+            },
+            threshold_n,
+            threshold_m,
+            circuit_h,
+        ))
     }
 
     async fn next_event(history: &Addr<HistoryCollector<EnclaveEvent>>) -> Result<EnclaveEvent> {
@@ -1821,6 +1903,54 @@ mod tests {
             panic!("expected GeneratingC5Proof state");
         };
         assert!(!dkg_node_proofs.contains_key(&2));
+
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn pk_aggregation_proof_pending_carries_canonical_committee_dims() -> Result<()> {
+        let (bus, rng, _seed, params, crp, _errors, history) =
+            get_common_setup(Some(BfvPreset::InsecureThreshold512.into()))?;
+        let e3_id = E3id::new("42", 1);
+        let fhe = Arc::new(Fhe::new(params, crp, rng));
+        let (initial_state, threshold_n, threshold_m, circuit_h) =
+            verifying_c1_non_square_state(&fhe, &e3_id)?;
+
+        let mut aggregator = PublicKeyAggregator::new(
+            PublicKeyAggregatorParams {
+                fhe,
+                bus,
+                e3_id: e3_id.clone(),
+                params_preset: BfvPreset::InsecureThreshold512,
+                committee_size: CiphernodesCommitteeSize::Medium,
+            },
+            test_state(initial_state),
+        );
+
+        let dishonest: BTreeSet<u64> = (circuit_h as u64..threshold_n as u64).collect();
+        aggregator.handle_c1_verification_complete(TypedEvent::new(
+            ShareVerificationComplete {
+                e3_id: e3_id.clone(),
+                kind: VerificationKind::PkGenerationProofs,
+                dishonest_parties: dishonest,
+            },
+            test_ctx(ShareVerificationComplete {
+                e3_id: e3_id.clone(),
+                kind: VerificationKind::PkGenerationProofs,
+                dishonest_parties: BTreeSet::new(),
+            }),
+        ))?;
+
+        let event = next_event(&history).await?;
+        assert!(matches!(
+            event.into_data(),
+            EnclaveEventData::PkAggregationProofPending(data)
+                if data.e3_id == e3_id
+                    && data.proof_request.committee_n == threshold_n
+                    && data.proof_request.committee_h == circuit_h
+                    && data.proof_request.committee_threshold == threshold_m
+                    && data.proof_request.keyshare_bytes.len() == circuit_h
+        ));
 
         Ok(())
     }

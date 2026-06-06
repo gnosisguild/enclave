@@ -36,3 +36,6 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 e3-test-helpers = { workspace = true }
+fhe = { workspace = true }
+fhe-traits = { workspace = true }
+rand = { workspace = true }
