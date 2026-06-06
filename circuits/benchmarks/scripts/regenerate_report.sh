@@ -39,7 +39,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--mode insecure|secure] [--committee micro|small|medium] [--proof-aggregation on|off] [--no-proof-aggregation]"
+            echo "Usage: $0 [--mode insecure|secure] [--committee micro|small|medium|large] [--proof-aggregation on|off] [--no-proof-aggregation]"
             exit 1
             ;;
     esac
@@ -57,9 +57,9 @@ fi
 
 if [ -n "$COMMITTEE_OVERRIDE" ]; then
     case "$COMMITTEE_OVERRIDE" in
-        micro|small|medium) ;;
+        micro|small|medium|large) ;;
         *)
-            echo "Error: --committee must be one of micro|small|medium"
+            echo "Error: --committee must be one of micro|small|medium|large"
             exit 1
             ;;
     esac
