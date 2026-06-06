@@ -121,6 +121,14 @@ fn select_benchmark_params() -> BenchmarkParams {
     }
 }
 
+/// Registered ciphernodes (excluding the observer collector) for benchmark sortition.
+///
+/// Production registers enough nodes to fill `N + buffer`; the harness must register at least
+/// `threshold_n` so party ids `0..N-1` all exist during encryption-key collection.
+fn benchmark_participant_node_count(threshold_m: usize, threshold_n: usize) -> usize {
+    threshold_n + calculate_buffer_size(threshold_m, threshold_n)
+}
+
 /// Whether `test_trbfv_actor` runs the full recursive fold + aggregator path (default: on).
 ///
 /// Set `BENCHMARK_PROOF_AGGREGATION=false` for a baseline run without node folds / folded Π_DKG.
@@ -1257,8 +1265,10 @@ async fn test_trbfv_actor() -> Result<()> {
     let threshold_m = benchmark_committee.threshold;
     let threshold_n = benchmark_committee.n;
     let committee_h = benchmark_committee.h;
-    // Statistical security parameter λ used for smudging bound / error_size.
-    // Comes from the selected BFV preset metadata to avoid mixing parameter families.
+    let participant_count = benchmark_participant_node_count(threshold_m, threshold_n);
+    let nodes_spawned = participant_count + 1; // +1 non-registered observer collector
+                                               // Statistical security parameter λ used for smudging bound / error_size.
+                                               // Comes from the selected BFV preset metadata to avoid mixing parameter families.
     let lambda = benchmark_params.lambda;
 
     let seed = create_seed_from_u64(123);
@@ -1316,7 +1326,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let nodes = CiphernodeSystemBuilder::new()
         // All nodes run the same binary under the aggregator-committee model.
         // Node 0 stays an observer only because it is excluded from sortition registration.
-        // Adding 20 total nodes: 3 for committee + 3 buffer = 6 selected, 14 unselected
+        // Participant count scales with active committee (N + sortition buffer).
         .add_group(1, || async {
             let node_rng = next_benchmark_node_rng(BENCHMARK_NODE_RNG_BASE);
             let addr = rand_eth_addr(&node_rng);
@@ -1339,28 +1349,31 @@ async fn test_trbfv_actor() -> Result<()> {
                 b.build().await
             }
         })
-        .add_group(19, || async {
-            let node_rng = next_benchmark_node_rng(BENCHMARK_NODE_RNG_BASE);
-            let addr = rand_eth_addr(&node_rng);
-            println!("Building normal {}", &addr);
-            {
-                let mut b = CiphernodeBuilder::new(node_rng, cipher.clone())
-                    .with_history_collector()
-                    .with_shared_taskpool(&task_pool)
-                    .with_multithread_concurrent_jobs(concurrent_jobs)
-                    .with_shared_multithread_report(&multithread_report)
-                    .with_trbfv()
-                    .with_zkproof(zk_backend.clone())
-                    .with_signer(PrivateKeySigner::random())
-                    .with_pubkey_aggregation()
-                    .with_sortition_score()
-                    .with_threshold_plaintext_aggregation()
-                    .with_forked_bus(bus.event_bus())
-                    .with_chains(&[bench_chain_config.clone()])
-                    .with_logging();
-                b.build().await
-            }
-        })
+        .add_group(
+            u32::try_from(participant_count).expect("benchmark participant count fits in u32"),
+            || async {
+                let node_rng = next_benchmark_node_rng(BENCHMARK_NODE_RNG_BASE);
+                let addr = rand_eth_addr(&node_rng);
+                println!("Building normal {}", &addr);
+                {
+                    let mut b = CiphernodeBuilder::new(node_rng, cipher.clone())
+                        .with_history_collector()
+                        .with_shared_taskpool(&task_pool)
+                        .with_multithread_concurrent_jobs(concurrent_jobs)
+                        .with_shared_multithread_report(&multithread_report)
+                        .with_trbfv()
+                        .with_zkproof(zk_backend.clone())
+                        .with_signer(PrivateKeySigner::random())
+                        .with_pubkey_aggregation()
+                        .with_sortition_score()
+                        .with_threshold_plaintext_aggregation()
+                        .with_forked_bus(bus.event_bus())
+                        .with_chains(&[bench_chain_config.clone()])
+                        .with_logging();
+                    b.build().await
+                }
+            },
+        )
         .simulate_libp2p()
         .build()
         .await?;
@@ -1370,7 +1383,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let committee_setup = Instant::now();
     let chain_id = 1u64;
 
-    // Only register nodes 1-19 in sortition (exclude collector at index 0).
+    // Only register nodes 1..=participant_count in sortition (exclude collector at index 0).
     // This ensures the collector is never selected, making the test deterministic.
     // The collector node will observe events as a non-participant.
     let collector_addr = nodes.get(0).unwrap().address();
@@ -1380,9 +1393,16 @@ async fn test_trbfv_actor() -> Result<()> {
         .map(|n| n.address())
         .collect();
 
+    anyhow::ensure!(
+        eth_addrs.len() >= threshold_n,
+        "benchmark harness: need at least {threshold_n} registered nodes for committee N, got {}",
+        eth_addrs.len()
+    );
+
     println!(
-        "Test setup: {} registered nodes, {} threshold, collector (observer): {}",
+        "Test setup: {} registered nodes (pool target {}), committee N={}, collector (observer): {}",
         eth_addrs.len(),
+        participant_count,
         threshold_n,
         collector_addr
     );
@@ -1397,8 +1417,7 @@ async fn test_trbfv_actor() -> Result<()> {
     ///////////////////////////////////////////////////////////////////////////////////
     // 2. Trigger E3Requested
     //
-    //   - m=1.
-    //   - n=3
+    //   - threshold_m / threshold_n / committee_h from active committee stamp
     //   - lambda -> calculate_error_size uses the selected BFV preset metadata
     //   - error_size -> calculate using calculate_error_size
     //   - esi_per_ciphertext = 1
@@ -2080,7 +2099,7 @@ async fn test_trbfv_actor() -> Result<()> {
             committee_h,
             threshold_n,
             threshold_m,
-            20usize,
+            nodes_spawned,
         );
 
         let summary_json = format!(
