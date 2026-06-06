@@ -300,12 +300,10 @@ impl PublicKeyAggregator {
                     keyshare_bytes: keyshare_bytes.clone(),
                     aggregated_pk_bytes: pubkey.clone(),
                     params_preset: self.params_preset,
-                    // C5 aggregates the H honest keyshares only; the circuit witness and prover
-                    // path use `committee_h` (see pk_aggregation/computation.rs). N is not needed
-                    // here — set both fields to H so downstream validation stays consistent.
-                    committee_n: committee_h,
+                    // C5 witness uses `committee_h` keyshares; artifact lookup needs canonical (N, H, T).
+                    committee_n: threshold_n,
                     committee_h,
-                    committee_threshold: 0,
+                    committee_threshold: threshold_m,
                 },
                 public_key: pubkey.clone(),
                 nodes: honest_nodes_set.clone(),
