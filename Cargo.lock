@@ -3076,9 +3076,12 @@ dependencies = [
  "e3-utils",
  "e3-zk-helpers",
  "e3-zk-prover",
+ "fhe",
  "fhe-math",
+ "fhe-traits",
  "futures",
  "num-bigint",
+ "rand 0.9.2",
  "serde",
  "tracing",
 ]
