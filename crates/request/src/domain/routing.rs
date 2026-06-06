@@ -66,6 +66,16 @@ impl RequestRouter {
 
         // If this e3 round has already been completed then this event is unexpected.
         if completed.contains(&e3_id) {
+            // Plaintext Aggregated Triggers E3RequestComplete which tears down the per-E3 context
+            // and mark it as completed, but the E3StageChanged(Complete) that arrives from the EVM
+            // after local teardown is expected and should be ignored rather than treated as an error.
+            if matches!(
+                msg.get_data(),
+                EnclaveEventData::E3StageChanged(data)
+                    if matches!(data.new_stage, E3Stage::Complete)
+            ) {
+                return RoutingDecision::Ignore;
+            }
             return RoutingDecision::AlreadyCompleted(e3_id);
         }
 
@@ -154,6 +164,43 @@ mod tests {
         let mut completed = HashSet::new();
         completed.insert(id.clone());
         let msg = with_e3_id("late", id.clone());
+        assert_eq!(
+            RequestRouter::route(&msg, &completed),
+            RoutingDecision::AlreadyCompleted(id)
+        );
+    }
+
+    #[test]
+    fn stage_changed_to_complete_ignored_when_already_completed() {
+        // E3StageChanged(Complete) arriving from the EVM after local teardown is expected —
+        // the on-chain confirmation lags behind local completion. It should be silently
+        // ignored, not treated as an error.
+        let id = e3id();
+        let mut completed = HashSet::new();
+        completed.insert(id.clone());
+        let msg = from_data(E3StageChanged {
+            e3_id: id.clone(),
+            previous_stage: E3Stage::CiphertextReady,
+            new_stage: E3Stage::Complete,
+        });
+        assert_eq!(
+            RequestRouter::route(&msg, &completed),
+            RoutingDecision::Ignore
+        );
+    }
+
+    #[test]
+    fn stage_changed_to_failed_still_errors_when_completed() {
+        // E3StageChanged(Failed) after completion IS unexpected and should still error,
+        // because the failed path goes through accusation/slashing, not simple completion.
+        let id = e3id();
+        let mut completed = HashSet::new();
+        completed.insert(id.clone());
+        let msg = from_data(E3StageChanged {
+            e3_id: id.clone(),
+            previous_stage: E3Stage::CiphertextReady,
+            new_stage: E3Stage::Failed,
+        });
         assert_eq!(
             RequestRouter::route(&msg, &completed),
             RoutingDecision::AlreadyCompleted(id)

@@ -36,7 +36,7 @@ wait_for_port() {
             return 0
         fi
         sleep 1
-        (( attempt++ ))
+        (( attempt += 1 ))
     done
     die "$label did not start after ${max}s"
 }
@@ -54,7 +54,7 @@ wait_for_file() {
             return 0
         fi
         sleep 1
-        (( attempt++ ))
+        (( attempt += 1 ))
     done
     die "$label did not appear after ${max}s"
 }
