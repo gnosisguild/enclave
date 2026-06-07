@@ -243,6 +243,8 @@ impl ZkProver {
             e3_id
         );
 
+        let _ = fs::remove_dir_all(&job_dir);
+
         Ok(Proof::new(
             circuit,
             ArcBytes::from_bytes(&proof_data),
@@ -392,6 +394,8 @@ impl ZkProver {
                 stdout
             );
         }
+
+        let _ = fs::remove_dir_all(&job_dir);
 
         Ok(output.status.success())
     }

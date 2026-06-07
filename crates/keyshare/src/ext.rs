@@ -18,6 +18,7 @@ use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 
 use crate::KeyshareState;
 use std::sync::Arc;
+
 pub struct ThresholdKeyshareExtension {
     bus: BusHandle,
     cipher: Arc<Cipher>,
