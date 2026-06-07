@@ -112,7 +112,6 @@ fn generate_c3_fold_kernel_genesis_proof(
         job_id,
         artifacts_dir,
     )?;
-    let _ = prover.cleanup(job_id);
     Ok(proof)
 }
 

@@ -143,7 +143,6 @@ fn generate_nodes_fold_kernel_genesis_proof(
         job_id,
         artifacts_dir,
     )?;
-    let _ = prover.cleanup(job_id);
     Ok(proof)
 }
 
