@@ -94,18 +94,27 @@ fn select_benchmark_params() -> BenchmarkParams {
         "insecure-512"
     };
 
-    let collection_timeout_secs = if is_secure_mode {
-        Some((1800, 7200, 7200))
+    let committee = active_committee(preset_subdir);
+    let is_large_committee = committee == e3_zk_helpers::CiphernodesCommitteeSize::Large;
+
+    let collection_timeout_secs = if is_secure_mode && is_large_committee {
+        Some((7_200, 46_000, 46_000)) // Large: threshold/dec kept > pubkey_flow
+    } else if is_secure_mode {
+        Some((1_800, 7_200, 7_200))
     } else {
         None
     };
 
-    let pubkey_flow_timeout = if is_secure_mode {
+    let pubkey_flow_timeout = if is_secure_mode && is_large_committee {
+        Duration::from_secs(45_000) // Large: conservative upper bound
+    } else if is_secure_mode {
         Duration::from_secs(15_000)
     } else {
         Duration::from_secs(5_000)
     };
-    let plaintext_flow_timeout = if is_secure_mode {
+    let plaintext_flow_timeout = if is_secure_mode && is_large_committee {
+        Duration::from_secs(6_000) // Large: medium actual (366s) × 4 + margin; smaller than DKG
+    } else if is_secure_mode {
         Duration::from_secs(3_000)
     } else {
         Duration::from_secs(1_000)
