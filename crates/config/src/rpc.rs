@@ -159,16 +159,15 @@ impl RPC {
 
 #[derive(Debug, Hash, Eq, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(tag = "type", content = "credentials")]
+#[derive(Default)]
 pub enum RpcAuth {
+    #[default]
     None,
-    Basic { username: String, password: String },
+    Basic {
+        username: String,
+        password: String,
+    },
     Bearer(String),
-}
-
-impl Default for RpcAuth {
-    fn default() -> Self {
-        RpcAuth::None
-    }
 }
 
 #[cfg(test)]

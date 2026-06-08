@@ -127,10 +127,12 @@ pub trait EventPublisher<E: Event> {
     fn naked_dispatch(&self, event: E);
 }
 
-/// Trait for dispatching errors to an inner event bus
+/// Trait for dispatching errors to an inner event bus.
+///
+/// Uses a concrete [`anyhow::Error`] so the trait is object-safe (`Box<dyn ErrorDispatcher<_>>`).
 pub trait ErrorDispatcher<E: ErrorEvent> {
     /// Dispatch the error to the event bus.
-    fn err(&self, err_type: E::ErrType, error: impl Into<E::FromError>);
+    fn err(&self, err_type: E::ErrType, error: anyhow::Error);
 }
 
 /// Trait to subscribe to events

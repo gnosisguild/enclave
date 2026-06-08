@@ -47,6 +47,16 @@ impl<K, V> Clone for Hamt<K, V> {
     }
 }
 
+impl<K, V> Default for Hamt<K, V>
+where
+    K: Hash + Eq + Clone + Send + Sync,
+    V: Clone + Send + Sync,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<K, V> Hamt<K, V>
 where
     K: Hash + Eq + Clone + Send + Sync,

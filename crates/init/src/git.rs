@@ -37,8 +37,7 @@ pub async fn shallow_clone(
         return Err(anyhow::anyhow!(
             "Git clone failed with exit code: {}",
             status.code().unwrap_or(-1)
-        )
-        .into());
+        ));
     }
 
     Ok(())
@@ -139,7 +138,7 @@ pub async fn get_commit_hash(path: impl AsRef<Path>) -> Result<String> {
     let path = path.as_ref();
 
     let output = Command::new("git")
-        .args(&["rev-parse", "HEAD"])
+        .args(["rev-parse", "HEAD"])
         .current_dir(path)
         .output()
         .await

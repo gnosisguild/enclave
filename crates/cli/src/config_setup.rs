@@ -34,17 +34,18 @@ include!(concat!(env!("OUT_DIR"), "/contract_deployments.rs"));
 const BOOTSTRAP_PEER: &str = "/dnsaddr/bootstrap.enclave.gg";
 
 fn get_contract_info(name: &str) -> Result<&ContractInfo> {
-    Ok(CONTRACT_DEPLOYMENTS
+    CONTRACT_DEPLOYMENTS
         .get(name)
-        .ok_or(anyhow!("Could not get contract info"))?)
+        .ok_or(anyhow!("Could not get contract info"))
 }
 
-pub fn validate_rpc_url(url: &String) -> Result<()> {
+pub fn validate_rpc_url(url: &str) -> Result<()> {
     RPC::from_url(url)?;
     Ok(())
 }
 
-pub fn validate_eth_address(address: &String) -> Result<()> {
+#[allow(dead_code)]
+pub fn validate_eth_address(address: &str) -> Result<()> {
     match Address::parse_checksummed(address, None) {
         Ok(_) => Ok(()),
         Err(e) => bail!("Invalid Ethereum address: {}", e),
@@ -137,16 +138,10 @@ mod tests {
 
     #[test]
     fn eth_address_validation() -> Result<()> {
-        assert!(
-            validate_eth_address(&"0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".to_string()).is_ok()
-        );
-        assert!(
-            validate_eth_address(&"d8dA6BF26964aF9D7eEd9e03E53415D37aA96045".to_string()).is_err()
-        );
-        assert!(validate_eth_address(&"0x1234567890abcdef".to_string()).is_err());
-        assert!(
-            validate_eth_address(&"0x0000000000000000000000000000000000000000".to_string()).is_ok()
-        );
+        assert!(validate_eth_address("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045").is_ok());
+        assert!(validate_eth_address("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").is_err());
+        assert!(validate_eth_address("0x1234567890abcdef").is_err());
+        assert!(validate_eth_address("0x0000000000000000000000000000000000000000").is_ok());
         Ok(())
     }
 }

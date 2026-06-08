@@ -34,7 +34,7 @@ pub async fn execute(
         None => Input::<String>::with_theme(&ColorfulTheme::default())
             .with_prompt("Enter WebSocket devnet RPC URL")
             .default("wss://ethereum-sepolia-rpc.publicnode.com".to_string())
-            .validate_with(setup::validate_rpc_url)
+            .validate_with(|url: &String| setup::validate_rpc_url(url))
             .interact_text()?,
     };
 

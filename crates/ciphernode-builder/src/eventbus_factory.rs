@@ -105,5 +105,5 @@ pub fn get_enclave_bus_handle() -> anyhow::Result<BusHandle<Disabled>> {
     let system = EventSystem::new().with_event_bus(bus);
     system.store()?; // Ensure store is initialized before returning to avoid potentially dropping
                      // events.
-    Ok(system.handle()?)
+    system.handle()
 }

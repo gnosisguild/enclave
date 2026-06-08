@@ -47,6 +47,7 @@ impl Actor for BatchRouter {
 }
 
 impl BatchRouter {
+    #[allow(dead_code)]
     pub fn new(
         config: &AggregateConfig,
         timelock_queue: impl Into<Recipient<StartTimelock>>,
@@ -175,17 +176,17 @@ impl Handler<EnclaveEvent<Sequenced>> for BatchRouter {
             self.db.clone(),
             vec![
                 Insert::new_with_context(
-                    &StoreKeys::aggregate_seq(agg_id),
+                    StoreKeys::aggregate_seq(agg_id),
                     encode_u64(ec.seq()),
                     ec.clone(),
                 ),
                 Insert::new_with_context(
-                    &StoreKeys::aggregate_block(agg_id),
+                    StoreKeys::aggregate_block(agg_id),
                     encode_u64(highest_block),
                     ec.clone(),
                 ),
                 Insert::new_with_context(
-                    &StoreKeys::aggregate_ts(agg_id),
+                    StoreKeys::aggregate_ts(agg_id),
                     encode_u128(ec.ts()),
                     ec.clone(),
                 ),

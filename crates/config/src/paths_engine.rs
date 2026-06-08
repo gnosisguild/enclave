@@ -50,6 +50,7 @@ pub const DEFAULT_LOG_NAME: &str = "log";
 // the config file. Otherwise locate config in the default app configuration folder and data in
 // the default app data folder.
 impl PathsEngine {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &str,
         cwd: &PathBuf,
@@ -155,7 +156,7 @@ impl PathsEngine {
             return root_dir.join("config");
         }
 
-        return self.default_config_dir.clone();
+        self.default_config_dir.clone()
     }
 
     fn get_data_dir(&self) -> PathBuf {
@@ -167,7 +168,7 @@ impl PathsEngine {
             return root_dir.join("data");
         }
 
-        return self.default_data_dir.clone();
+        self.default_data_dir.clone()
     }
 
     fn get_root_dir(&self) -> Option<PathBuf> {

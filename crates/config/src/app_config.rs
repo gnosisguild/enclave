@@ -137,8 +137,8 @@ impl BBPath {
 
     /// Check the environment variable and if found use that otherwise use the given path
     pub fn check(default_path: PathBuf) -> Result<Self> {
-        let bb_path = if let Some(bb_path) = env::var("E3_CUSTOM_BB").ok() {
-            BBPath::Custom(bb_path.try_into()?)
+        let bb_path = if let Ok(bb_path) = env::var("E3_CUSTOM_BB") {
+            BBPath::Custom(bb_path.into())
         } else {
             BBPath::Default(default_path)
         };
@@ -171,11 +171,11 @@ impl AppConfig {
 
         let config_dir_override = (node.config_dir != PathBuf::new())
             .then_some(&node.config_dir)
-            .or_else(|| config.config_dir.as_ref());
+            .or(config.config_dir.as_ref());
 
         let data_dir_override = (node.data_dir != PathBuf::new())
             .then_some(&node.data_dir)
-            .or_else(|| config.data_dir.as_ref());
+            .or(config.data_dir.as_ref());
 
         let paths = PathsEngine::new(
             name,
@@ -255,10 +255,9 @@ impl AppConfig {
     fn node_def(&self) -> &NodeDefinition {
         // NOTE: on creation an invariant we have is that our node name is an extant key in our
         // nodes datastructure so expect here is ok and we dont have to clone the NodeDefinition
-        self.nodes.get(&self.name).expect(&format!(
-            "Could not find node definition for node '{}'.",
-            &self.name
-        ))
+        self.nodes
+            .get(&self.name)
+            .unwrap_or_else(|| panic!("Could not find node definition for node '{}'.", &self.name))
     }
 
     /// Use the in-memory store
@@ -311,7 +310,7 @@ impl AppConfig {
 
     /// Get the node's address
     pub fn address(&self) -> Option<Address> {
-        self.node_def().address.clone()
+        self.node_def().address
     }
 
     /// Get a collection containing all the node definitions from the configuration
@@ -355,7 +354,7 @@ impl AppConfig {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct UnscopedAppConfig {
     /// The chains config
@@ -382,32 +381,16 @@ pub struct UnscopedAppConfig {
     custom_bb: Option<PathBuf>,
 }
 
-impl Default for UnscopedAppConfig {
-    fn default() -> Self {
-        Self {
-            chains: vec![],
-            config_dir: None,
-            data_dir: None,
-            node: NodeDefinition::default(),
-            found_config_file: None,
-            otel: None,
-            nodes: HashMap::new(),
-            program: None,
-            custom_bb: None,
-        }
-    }
-}
-
 impl UnscopedAppConfig {
     /// Convert to a scoped configuration using local OS based default configuration
     pub fn into_scoped(self, name: &str) -> Result<AppConfig> {
-        Ok(AppConfig::try_from_unscoped(
+        AppConfig::try_from_unscoped(
             name,
             self,
             &OsDirs::data_dir(),
             &OsDirs::config_dir(),
             &env::current_dir()?,
-        )?)
+        )
     }
 
     /// Convert to a scoped configuration passing in some injected configuration
@@ -418,13 +401,7 @@ impl UnscopedAppConfig {
         default_config_dir: &PathBuf,
         cwd: &PathBuf,
     ) -> Result<AppConfig> {
-        Ok(AppConfig::try_from_unscoped(
-            name,
-            self,
-            default_data_dir,
-            default_config_dir,
-            cwd,
-        )?)
+        AppConfig::try_from_unscoped(name, self, default_data_dir, default_config_dir, cwd)
     }
 }
 
@@ -466,10 +443,10 @@ pub fn load_config(
             .extract()
             .context("Could not parse configuration")?;
 
-    Ok(config.into_scoped(name).context(format!(
+    config.into_scoped(name).context(format!(
         "Could not apply scope '{}' to configuration.",
         name
-    ))?)
+    ))
 }
 
 pub struct OsDirs;
@@ -649,7 +626,7 @@ nodes:
         Jail::expect_with(|jail| {
             let home = format!("{}", jail.directory().to_string_lossy());
             jail.set_env("HOME", &home);
-            jail.set_env("XDG_CONFIG_HOME", &format!("{}/.config", home));
+            jail.set_env("XDG_CONFIG_HOME", format!("{}/.config", home));
 
             let expected_config_dir = OsDirs::config_dir();
             let filename = expected_config_dir.join("enclave.config.yaml");
@@ -770,7 +747,7 @@ node:
         Jail::expect_with(|jail| {
             let home = format!("{}", jail.directory().to_string_lossy());
             jail.set_env("HOME", &home);
-            jail.set_env("XDG_CONFIG_HOME", &format!("{}/.config", home));
+            jail.set_env("XDG_CONFIG_HOME", format!("{}/.config", home));
             jail.set_env("TEST_RPC_URL_PORT", "8545");
             jail.set_env("TEST_USERNAME", "envUser");
             jail.set_env("TEST_PASSWORD", "envPassword");

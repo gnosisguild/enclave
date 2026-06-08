@@ -31,7 +31,7 @@ impl CommitLogEventLog {
     fn append_bytes(&mut self, bytes: &[u8]) -> Result<u64> {
         let offset = self
             .log
-            .append_msg(&bytes)
+            .append_msg(bytes)
             .context("Failed to append to event log")?;
         // Return 1-indexed sequence number
         Ok(offset + 1)
@@ -44,6 +44,7 @@ impl EventLog for CommitLogEventLog {
         self.append_bytes(&bytes)
     }
 
+    #[allow(clippy::while_let_loop)]
     fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>> {
         // Convert 1-indexed sequence to 0-indexed offset
         let mut current_offset = from.saturating_sub(1);
@@ -399,7 +400,7 @@ mod tests {
 
     fn event_from(data: impl Into<EnclaveEventData>) -> EnclaveEvent<Unsequenced> {
         EnclaveEvent::<Unsequenced>::new_with_timestamp(
-            data.into().into(),
+            data.into(),
             None,
             123,
             None,

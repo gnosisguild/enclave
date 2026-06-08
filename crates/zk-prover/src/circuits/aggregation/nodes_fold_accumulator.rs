@@ -153,6 +153,7 @@ fn parse_nodes_fold_public_field_strings(proof: &Proof) -> Result<Vec<String>, Z
     parse_acc_public_field_strings_flat(proof, CircuitName::NodesFold, NODES_FOLD_PREFIX_LEN)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn generate_nodes_fold_step_with_vks(
     prover: &ZkProver,
     inner: &Proof,

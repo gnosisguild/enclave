@@ -16,6 +16,12 @@ pub struct EffectsEnabled {
     correlation_id: CorrelationId,
 }
 
+impl Default for EffectsEnabled {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EffectsEnabled {
     pub fn new() -> Self {
         Self {

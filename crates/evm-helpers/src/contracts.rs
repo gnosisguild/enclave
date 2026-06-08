@@ -181,6 +181,7 @@ pub trait EnclaveRead {
 
 /// Trait for write operations on the Enclave contract
 #[async_trait]
+#[allow(clippy::too_many_arguments)]
 pub trait EnclaveWrite {
     /// Request a new E3
     async fn request_e3(

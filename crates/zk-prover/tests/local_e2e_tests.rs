@@ -56,7 +56,6 @@ use e3_zk_helpers::threshold::{
     },
 };
 use e3_zk_helpers::CiphernodesCommitteeSize;
-use e3_zk_helpers::Computation;
 use e3_zk_helpers::{
     compute_pk_aggregation_commitment, compute_share_computation_sk_commitment,
     compute_threshold_pk_commitment,
@@ -77,8 +76,8 @@ fn aggregate_dkg_decrypted_shares_to_crt(
         let mut coeffs = vec![num_bigint::BigInt::from(0u64); n];
         for coeff_idx in 0..n {
             let mut sum = Fr::zero();
-            for party in 0..h {
-                let bytes = bigint_to_field_bytes32(&decrypted_shares[party][mod_idx][coeff_idx]);
+            for share in decrypted_shares.iter().take(h) {
+                let bytes = bigint_to_field_bytes32(&share[mod_idx][coeff_idx]);
                 sum += Fr::from_be_bytes_mod_order(&bytes);
             }
             coeffs[coeff_idx] = fr_to_bigint(sum);
@@ -132,7 +131,7 @@ fn fr_to_bigint(f: Fr) -> num_bigint::BigInt {
 fn public_signals_to_fields(signals: &[u8]) -> Vec<Fr> {
     signals
         .chunks(32)
-        .map(|chunk| Fr::from_be_bytes_mod_order(chunk))
+        .map(Fr::from_be_bytes_mod_order)
         .collect()
 }
 
@@ -857,12 +856,12 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
     let agg_sk = aggregate_dkg_decrypted_shares_to_crt(&dkg_out.inputs.decrypted_shares);
 
     let sk_poly = agg_sk
-        .to_fhe_polynomial(&ctx, moduli)
+        .to_fhe_polynomial(ctx, moduli)
         .expect("agg_sk -> Poly")
         .into_ntt();
     let es_poly = c6_sample
         .e
-        .to_fhe_polynomial(&ctx, moduli)
+        .to_fhe_polynomial(ctx, moduli)
         .expect("e -> Poly");
 
     let trbfv =

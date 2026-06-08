@@ -125,8 +125,8 @@ impl ZkBackend {
             .config
             .bb_download_url
             .replace("{version}", version)
-            .replace("{os}", &os)
-            .replace("{arch}", &arch);
+            .replace("{os}", os)
+            .replace("{arch}", arch);
 
         info!("downloading Barretenberg from: {}", url);
 

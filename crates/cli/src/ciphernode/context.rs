@@ -26,6 +26,7 @@ mod bonding_registry_contract {
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 mod enclave_ticket_token_contract {
     use super::sol;
 

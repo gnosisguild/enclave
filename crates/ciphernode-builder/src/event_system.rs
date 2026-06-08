@@ -96,6 +96,12 @@ pub struct EventSystem {
     global_shared_eventstore: bool,
 }
 
+impl Default for EventSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EventSystem {
     /// Create a new in memory EventSystem with default settings
     pub fn new() -> Self {
@@ -620,7 +626,7 @@ mod tests {
 
         assert_eq!(
             datastore
-                .scope(&StoreKeys::aggregate_seq(AggregateId::new(0)))
+                .scope(StoreKeys::aggregate_seq(AggregateId::new(0)))
                 .read::<u64>()
                 .await?,
             Some(2)

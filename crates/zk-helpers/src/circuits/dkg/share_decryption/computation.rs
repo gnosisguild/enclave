@@ -113,11 +113,11 @@ impl Computation for Configs {
         let (_, dkg_params) = build_pair_for_preset(preset)
             .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
-        let n = dkg_params.degree() as usize;
+        let n = dkg_params.degree();
         let l = dkg_params.moduli().len();
         let h = data.honest_ciphertexts.len();
 
-        let bounds = Bounds::compute(preset, &data)?;
+        let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
 
         Ok(Configs {
@@ -197,16 +197,13 @@ impl Computation for Inputs {
                             threshold_l
                         )));
                     }
-                    for mod_idx in 0..threshold_l {
-                        let decrypted_pt = data
-                            .secret_key
-                            .try_decrypt(&party_cts[mod_idx])
-                            .map_err(|e| {
-                                CircuitsErrors::Other(format!(
-                                    "failed to decrypt honest ciphertext at modulus {}: {:?}",
-                                    mod_idx, e
-                                ))
-                            })?;
+                    for (mod_idx, ct) in party_cts.iter().enumerate().take(threshold_l) {
+                        let decrypted_pt = data.secret_key.try_decrypt(ct).map_err(|e| {
+                            CircuitsErrors::Other(format!(
+                                "failed to decrypt honest ciphertext at modulus {}: {:?}",
+                                mod_idx, e
+                            ))
+                        })?;
                         let share_coeffs = plaintext_poly_u64(&decrypted_pt)?;
                         // Reverse to match C3's reversed commitment convention.
                         let mut reversed_coeffs = share_coeffs.clone();

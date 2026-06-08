@@ -316,6 +316,7 @@ impl ZkProver {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn verify_proof_impl(
         &self,
         circuit: CircuitName,

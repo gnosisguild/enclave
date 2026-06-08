@@ -149,6 +149,7 @@ fn parse_c6_fold_public_field_strings(proof: &Proof) -> Result<Vec<String>, ZkEr
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn generate_c6_fold_step_with_vks(
     prover: &ZkProver,
     inner: &Proof,

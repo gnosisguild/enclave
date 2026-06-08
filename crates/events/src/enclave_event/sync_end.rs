@@ -16,6 +16,12 @@ pub struct SyncEnded {
     correlation_id: CorrelationId,
 }
 
+impl Default for SyncEnded {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SyncEnded {
     pub fn new() -> Self {
         Self {

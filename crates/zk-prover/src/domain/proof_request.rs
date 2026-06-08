@@ -192,6 +192,7 @@ impl PendingDecryptionProofs {
 #[derive(Clone, Debug)]
 pub(crate) struct PendingPkAggregationProof {
     pub(crate) ec: EventContext<Sequenced>,
+    #[allow(dead_code)]
     pub(crate) request: PkAggregationProofRequest,
 }
 

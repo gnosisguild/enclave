@@ -44,6 +44,12 @@ pub struct InMemoryStore {
     data: HashMap<String, Vec<u8>>,
 }
 
+impl Default for InMemoryStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InMemoryStore {
     pub fn new() -> Self {
         Self {

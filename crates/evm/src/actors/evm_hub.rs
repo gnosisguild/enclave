@@ -19,8 +19,7 @@ impl EvmHub {
     }
 
     pub fn setup(nexts: Vec<EvmEventProcessor>) -> Addr<Self> {
-        let addr = Self::new(nexts).start();
-        addr
+        Self::new(nexts).start()
     }
 }
 

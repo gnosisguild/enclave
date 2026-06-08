@@ -41,9 +41,7 @@ impl E3RequestedWithChainId {
         let threshold_n = committee.n;
 
         // Map on-chain ParamSet enum to BfvPreset
-        let param_set_value: u8 = self.0.e3.paramSet.try_into().map_err(|_| {
-            anyhow::anyhow!("ParamSet enum value too large: {}", self.0.e3.paramSet)
-        })?;
+        let param_set_value = self.0.e3.paramSet;
         let params_preset = BfvPreset::from_on_chain_param_set(param_set_value).ok_or_else(|| {
             anyhow::anyhow!(
                 "Unknown ParamSet enum value {} — this node's binary does not recognize this BFV \
@@ -101,7 +99,7 @@ impl From<CiphertextOutputPublishedWithChainId> for e3_events::CiphertextOutputP
             e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
             // XXX: Ciphertext is an array of bytes this needs to be coordinated with enclave
             // contract
-            ciphertext_output: vec![ArcBytes::from_bytes(&value.0.ciphertextOutput.to_vec())],
+            ciphertext_output: vec![ArcBytes::from_bytes(value.0.ciphertextOutput.as_ref())],
         }
     }
 }

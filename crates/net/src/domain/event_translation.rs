@@ -37,16 +37,16 @@ impl EventTranslationService {
     /// Function to determine which events are allowed to be automatically broadcast to the
     /// network. Static so the same rule can be reused elsewhere (e.g. sync responses).
     pub fn is_forwardable_event(event: &EnclaveEvent) -> bool {
-        match event.get_data() {
-            EnclaveEventData::DecryptionshareCreated(_) => true,
-            EnclaveEventData::DKGRecursiveAggregationComplete(_) => true,
-            EnclaveEventData::KeyshareCreated(_) => true,
-            EnclaveEventData::PlaintextAggregated(_) => true,
-            EnclaveEventData::PublicKeyAggregated(_) => true,
-            EnclaveEventData::ProofFailureAccusation(_) => true,
-            EnclaveEventData::AccusationVote(_) => true,
-            _ => false,
-        }
+        matches!(
+            event.get_data(),
+            EnclaveEventData::DecryptionshareCreated(_)
+                | EnclaveEventData::DKGRecursiveAggregationComplete(_)
+                | EnclaveEventData::KeyshareCreated(_)
+                | EnclaveEventData::PlaintextAggregated(_)
+                | EnclaveEventData::PublicKeyAggregated(_)
+                | EnclaveEventData::ProofFailureAccusation(_)
+                | EnclaveEventData::AccusationVote(_)
+        )
     }
 
     /// Decide whether a local event should be gossiped.

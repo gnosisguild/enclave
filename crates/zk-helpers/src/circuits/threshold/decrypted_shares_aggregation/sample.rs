@@ -113,8 +113,8 @@ impl DecryptedSharesAggregationCircuitData {
 
                 let sk_sss_collected = Vec::with_capacity(num_parties);
                 let es_sss_collected = Vec::with_capacity(num_parties);
-                let sk_poly_sum = Poly::<PowerBasis>::zero(&ctx);
-                let es_poly_sum = Poly::<PowerBasis>::zero(&ctx);
+                let sk_poly_sum = Poly::<PowerBasis>::zero(ctx);
+                let es_poly_sum = Poly::<PowerBasis>::zero(ctx);
 
                 Ok(Party {
                     pk_share,

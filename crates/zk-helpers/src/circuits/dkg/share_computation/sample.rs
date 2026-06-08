@@ -87,7 +87,7 @@ impl ShareComputationCircuitData {
             }
             DkgInputType::SmudgingNoise => {
                 let esi_coeffs = trbfv
-                    .generate_smudging_error(committee.n as usize, sd.lambda as usize, &mut rng)
+                    .generate_smudging_error(committee.n, sd.lambda as usize, &mut rng)
                     .map_err(|e| {
                         CircuitsErrors::Sample(format!(
                             "Failed to generate smudging error: {:?}",

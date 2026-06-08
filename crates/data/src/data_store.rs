@@ -132,7 +132,7 @@ impl DataStore {
     pub fn scope<K: IntoKey>(&self, key: K) -> Self {
         let mut scope = self.scope.clone();
         let encoded_key = key.into_key();
-        if !encoded_key.starts_with(&[b'/']) {
+        if !encoded_key.starts_with(b"/") {
             scope.extend("/".into_key());
         }
         scope.extend(encoded_key);

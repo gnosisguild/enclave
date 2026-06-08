@@ -18,7 +18,6 @@ use crate::constants::{
     secure_8192,
 };
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 use std::sync::Arc;
 use thiserror::Error as ThisError;
 

@@ -44,12 +44,12 @@ impl Handler<EnclaveEvent> for PlaintextWriter {
                 return;
             };
 
-            let output = decode_bytes_to_vec_u64(&decrypted).unwrap();
+            let output = decode_bytes_to_vec_u64(decrypted).unwrap();
 
             info!(path = ?&self.path, "Writing Plaintext To Path");
             let contents: Vec<String> = output.iter().map(|&num| num.to_string()).collect();
 
-            write_file_with_dirs(&self.path, format!("{}", contents.join(",")).as_bytes()).unwrap();
+            write_file_with_dirs(&self.path, contents.join(",").to_string().as_bytes()).unwrap();
         }
     }
 }

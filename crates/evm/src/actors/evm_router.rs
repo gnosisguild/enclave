@@ -18,6 +18,12 @@ pub struct EvmRouter {
     fallback: Option<EvmEventProcessor>,
 }
 
+impl Default for EvmRouter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EvmRouter {
     pub fn new() -> Self {
         Self {

@@ -6,6 +6,7 @@
 
 use e3_config::BBPath;
 use e3_events::CircuitName;
+#[allow(unused_imports)]
 pub use e3_test_helpers::{find_anvil, find_bb};
 use e3_zk_prover::{ZkBackend, ZkConfig};
 use std::{env, path::PathBuf};

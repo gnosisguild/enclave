@@ -80,7 +80,7 @@ pub fn compute_public_key_commitment(
 ) -> Result<[u8; 32], ZkHelpersUtilsError> {
     use crate::commitments::compute_pk_aggregation_commitment;
 
-    let (pk0is, pk1is) = bfv_public_key_to_greco(&params, &public_key).map_err(|e| {
+    let (pk0is, pk1is) = bfv_public_key_to_greco(params, public_key).map_err(|e| {
         ZkHelpersUtilsError::ConversionError(format!(
             "Failed to convert public key to greco: {}",
             e
@@ -125,7 +125,7 @@ pub fn compute_ciphertext_commitment(
 ) -> Result<[u8; 32], ZkHelpersUtilsError> {
     use crate::commitments::compute_ciphertext_commitment;
 
-    let (ct0is, ct1is) = bfv_ciphertext_to_greco(&params, &ciphertext).map_err(|e| {
+    let (ct0is, ct1is) = bfv_ciphertext_to_greco(params, ciphertext).map_err(|e| {
         ZkHelpersUtilsError::ConversionError(format!(
             "Failed to convert ciphertext to greco: {}",
             e

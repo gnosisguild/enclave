@@ -246,6 +246,12 @@ impl<E: Event> Handler<E> for EventFilter<E> {
 #[rtype(result = "Vec<E>")]
 pub struct GetEvents<E: Event>(PhantomData<E>);
 
+impl<E: Event> Default for GetEvents<E> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<E: Event> GetEvents<E> {
     pub fn new() -> Self {
         Self(PhantomData)
@@ -291,6 +297,12 @@ pub struct ResetHistory;
 #[derive(Message)]
 #[rtype(result = "Vec<E::Data>")]
 pub struct GetErrors<E: ErrorEvent>(PhantomData<E>);
+
+impl<E: ErrorEvent> Default for GetErrors<E> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl<E: ErrorEvent> GetErrors<E> {
     pub fn new() -> Self {
@@ -354,6 +366,12 @@ pub struct HistoryCollector<E: Event> {
     history: Vec<E>,
     tx: mpsc::UnboundedSender<E>,
     waiter: Addr<HistoryCollectorWaiter<E>>,
+}
+
+impl<E: Event> Default for HistoryCollector<E> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<E: Event> HistoryCollector<E> {

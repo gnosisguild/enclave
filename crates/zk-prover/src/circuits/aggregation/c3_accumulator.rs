@@ -154,6 +154,7 @@ fn parse_c3_fold_public_field_strings(proof: &Proof) -> Result<Vec<String>, ZkEr
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn generate_c3_fold_step_with_vks(
     prover: &ZkProver,
     inner: &Proof,

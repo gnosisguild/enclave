@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+#![allow(clippy::result_large_err)]
+
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -124,8 +126,8 @@ impl Multithread {
         let total_threads = thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(1);
-        let threads_to_use = std::cmp::max(1, total_threads.saturating_sub(amount));
-        threads_to_use
+
+        std::cmp::max(1, total_threads.saturating_sub(amount))
     }
 
     pub fn attach(
@@ -210,9 +212,8 @@ impl Handler<EnclaveEvent> for Multithread {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         let (data, ec) = msg.into_components();
-        match data {
-            EnclaveEventData::ComputeRequest(data) => ctx.notify(TypedEvent::new(data, ec)),
-            _ => (),
+        if let EnclaveEventData::ComputeRequest(data) = data {
+            ctx.notify(TypedEvent::new(data, ec))
         }
     }
 }
@@ -309,7 +310,7 @@ fn handle_pk_aggregation_proof(
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     // 1. Build threshold BFV parameters from preset
-    let (threshold_params, _dkg_params) = build_pair_for_preset(req.params_preset.clone())
+    let (threshold_params, _dkg_params) = build_pair_for_preset(req.params_preset)
         .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
 
     // 2. Create deterministic CRP
@@ -408,7 +409,7 @@ fn handle_threshold_share_decryption_proof(
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     // 1. Build threshold BFV parameters from preset
-    let (threshold_params, _dkg_params) = build_pair_for_preset(req.params_preset.clone())
+    let (threshold_params, _dkg_params) = build_pair_for_preset(req.params_preset)
         .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
 
     // 2. Deserialize aggregated PublicKey
@@ -881,7 +882,7 @@ fn handle_share_computation_proof(
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     // 1. Build BFV threshold parameters
-    let (threshold_params, _dkg_params) = build_pair_for_preset(req.params_preset.clone())
+    let (threshold_params, _dkg_params) = build_pair_for_preset(req.params_preset)
         .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
 
     // 2. Decrypt sensitive witness fields
@@ -912,7 +913,7 @@ fn handle_share_computation_proof(
     let secret_sss: Vec<Array2<BigInt>> = shared_secret
         .moduli_data()
         .iter()
-        .map(|arr| arr.mapv(|v| BigInt::from(v)))
+        .map(|arr| arr.mapv(BigInt::from))
         .collect();
 
     // 5. Compute parity matrix
@@ -970,7 +971,7 @@ fn handle_pk_generation_proof(
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     // 1. Build BFV parameters from the threshold preset
-    let params = BfvParamSet::from(req.params_preset.clone()).build_arc();
+    let params = BfvParamSet::from(req.params_preset).build_arc();
 
     // 2. Decrypt sensitive witness fields
     let sk_bytes = req
@@ -1050,7 +1051,7 @@ fn handle_pk_bfv_proof(
 ) -> Result<ComputeResponse, ComputeRequestError> {
     // NOTE: req.params_preset is expected to contain a DKG preset (e.g., InsecureDkg512)
     // because the proof is for the DKG circuit. This preset is converted to BFV parameters.
-    let params = BfvParamSet::from(req.params_preset.clone()).build_arc();
+    let params = BfvParamSet::from(req.params_preset).build_arc();
     let pk_bfv = PublicKey::from_bytes(&req.pk_bfv, &params).map_err(|e| {
         ComputeRequestError::new(
             ComputeRequestErrorKind::Zk(ZkEventError::InvalidParams(format!(
@@ -1067,7 +1068,7 @@ fn handle_pk_bfv_proof(
     let preset_counterpart = req
         .params_preset
         .threshold_counterpart()
-        .unwrap_or_else(|| BfvPreset::InsecureThreshold512);
+        .unwrap_or(BfvPreset::InsecureThreshold512);
     let artifacts_dir =
         prover.resolve_artifacts_dir(req.params_preset, req.committee_size.as_str());
     // But here we have to pass the InsecureThreshold512 preset because the underlaying witness generator
@@ -1510,7 +1511,7 @@ fn handle_decrypted_shares_aggregation_proof(
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     // 1. Build threshold BFV parameters from preset
-    let (threshold_params, _dkg_params) = build_pair_for_preset(req.params_preset.clone())
+    let (threshold_params, _dkg_params) = build_pair_for_preset(req.params_preset)
         .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
 
     // 2. Sort d_share_polys by party ID — the Noir circuit requires

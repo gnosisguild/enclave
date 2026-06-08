@@ -75,13 +75,13 @@ impl DocumentPublisher {
     /// This is needed to create simulation libp2p event routers
     pub fn is_document_publisher_event(event: &EnclaveEvent) -> bool {
         // Add a list of events with paylods for the DHT
-        match event.get_data() {
-            EnclaveEventData::PublishDocumentRequested(_) => true,
-            EnclaveEventData::ThresholdShareCreated(_) => true,
-            EnclaveEventData::EncryptionKeyCreated(_) => true,
-            EnclaveEventData::DecryptionKeyShared(_) => true,
-            _ => false,
-        }
+        matches!(
+            event.get_data(),
+            EnclaveEventData::PublishDocumentRequested(_)
+                | EnclaveEventData::ThresholdShareCreated(_)
+                | EnclaveEventData::EncryptionKeyCreated(_)
+                | EnclaveEventData::DecryptionKeyShared(_)
+        )
     }
 
     /// Setup the DocumentPublisher and start listening for GossipEvents
@@ -805,7 +805,7 @@ mod tests {
         // 2. Dispatch a NetEvent from the Libp2pNetInterface signaling that a document was published
         net_evt_tx.send(NetEvent::GossipData(
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
-                key: ContentHash::from_content(&b"wrong document".to_vec()),
+                key: ContentHash::from_content(b"wrong document".as_ref()),
                 meta: DocumentMeta::new(
                     E3id::new("1111", 1),
                     DocumentKind::TrBFV,

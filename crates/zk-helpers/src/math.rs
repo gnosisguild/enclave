@@ -20,8 +20,7 @@ use num_traits::{ToPrimitive, Zero};
 
 /// Encoded plaintext coefficients in poly encoding (u64 limb values).
 pub fn plaintext_poly_u64(pt: &Plaintext) -> Result<Vec<u64>, CircuitsErrors> {
-    Vec::<u64>::try_decode(pt, Encoding::poly())
-        .map_err(|e| CircuitsErrors::Fhe(fhe::Error::from(e)))
+    Vec::<u64>::try_decode(pt, Encoding::poly()).map_err(CircuitsErrors::Fhe)
 }
 
 /// Copy an `Array2<u64>` into workspace `ndarray` with `BigInt` coefficients.

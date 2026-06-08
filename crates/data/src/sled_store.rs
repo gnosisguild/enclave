@@ -8,8 +8,8 @@ use crate::SledDb;
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::Result;
 use e3_events::{
-    prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData,
-    EnclaveUnsequencedErrorDispatcher, EventType, Flush,
+    prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData, ErrorDispatcher, EventType,
+    Flush, Unsequenced,
 };
 use e3_events::{Get, Insert, InsertBatch, InsertSync, Remove};
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
@@ -18,7 +18,7 @@ use tracing::{error, info};
 
 pub struct SledStore {
     db: Option<SledDb>,
-    bus: Box<dyn EnclaveUnsequencedErrorDispatcher>, // TODO: fix to work with trap
+    bus: Box<dyn ErrorDispatcher<EnclaveEvent<Unsequenced>>>,
 }
 
 impl Actor for SledStore {
@@ -55,9 +55,8 @@ impl Handler<Insert> for SledStore {
 
     fn handle(&mut self, event: Insert, _: &mut Self::Context) -> Self::Result {
         if let Some(ref mut db) = &mut self.db {
-            match db.insert(event) {
-                Err(err) => self.bus.err(EType::Data, err),
-                _ => (),
+            if let Err(err) = db.insert(event) {
+                self.bus.err(EType::Data, err)
             }
         }
     }
@@ -68,9 +67,8 @@ impl Handler<InsertBatch> for SledStore {
 
     fn handle(&mut self, event: InsertBatch, _: &mut Self::Context) -> Self::Result {
         if let Some(ref mut db) = &mut self.db {
-            match db.insert_batch(event.commands()) {
-                Err(err) => self.bus.err(EType::Data, err),
-                _ => (),
+            if let Err(err) = db.insert_batch(event.commands()) {
+                self.bus.err(EType::Data, err)
             }
         }
     }
@@ -93,9 +91,8 @@ impl Handler<Remove> for SledStore {
 
     fn handle(&mut self, event: Remove, _: &mut Self::Context) -> Self::Result {
         if let Some(ref mut db) = &mut self.db {
-            match db.remove(event) {
-                Err(err) => self.bus.err(EType::Data, err),
-                _ => (),
+            if let Err(err) = db.remove(event) {
+                self.bus.err(EType::Data, err)
             }
         }
     }
@@ -106,13 +103,13 @@ impl Handler<Get> for SledStore {
 
     fn handle(&mut self, event: Get, _: &mut Self::Context) -> Self::Result {
         if let Some(ref mut db) = &mut self.db {
-            return match db.get(event) {
+            match db.get(event) {
                 Ok(v) => v,
                 Err(err) => {
                     self.bus.err(EType::Data, err);
                     None
                 }
-            };
+            }
         } else {
             error!("Attempt to get data from dropped db");
             None
@@ -124,9 +121,8 @@ impl Handler<Flush> for SledStore {
     type Result = ();
     fn handle(&mut self, _: Flush, _: &mut Self::Context) -> Self::Result {
         if let Some(ref db) = self.db {
-            match db.flush() {
-                Err(err) => self.bus.err(EType::Data, err),
-                _ => (),
+            if let Err(err) = db.flush() {
+                self.bus.err(EType::Data, err)
             }
         }
     }

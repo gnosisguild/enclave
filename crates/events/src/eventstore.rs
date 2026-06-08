@@ -29,7 +29,7 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         event: EnclaveEvent<Unsequenced>,
     ) -> Result<Option<EnclaveEvent<Sequenced>>> {
         let ts = event.ts();
-        if let Some(_) = self.index.get(ts)? {
+        if self.index.get(ts)?.is_some() {
             warn!("Event already stored at timestamp {ts}! This might happen when recovering from a snapshot. Skipping storage");
             self.storage_errors += 1;
             if self.storage_errors > MAX_STORAGE_ERRORS {

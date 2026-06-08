@@ -37,6 +37,7 @@ impl QueryAggregator {
         self.pending.insert(sub_query_id, aggregate_id);
     }
 
+    #[allow(dead_code)]
     fn pending_aggregates(&self) -> Vec<&AggregateId> {
         self.pending.values().collect()
     }
@@ -141,7 +142,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
 
         let mut aggregator = QueryAggregator::new(parent_id, sender);
         for (aggregate_id, _, sub_query_id, _) in &sub_queries {
-            aggregator.add_pending(*sub_query_id, aggregate_id.clone());
+            aggregator.add_pending(*sub_query_id, *aggregate_id);
         }
         let aggregator_addr = aggregator.start();
 
@@ -186,7 +187,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
 
         let mut aggregator = QueryAggregator::new(parent_id, sender);
         for (aggregate_id, _, sub_query_id, _) in &sub_queries {
-            aggregator.add_pending(*sub_query_id, aggregate_id.clone());
+            aggregator.add_pending(*sub_query_id, *aggregate_id);
         }
         let aggregator_addr = aggregator.start();
 

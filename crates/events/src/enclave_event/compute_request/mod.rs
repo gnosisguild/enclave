@@ -68,9 +68,9 @@ impl ComputeRequest {
     }
 }
 
-impl ToString for ComputeRequest {
-    fn to_string(&self) -> String {
-        match &self.request {
+impl fmt::Display for ComputeRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match &self.request {
             ComputeRequestKind::TrBFV(req) => match req {
                 e3_trbfv::TrBFVRequest::GenEsiSss(_) => "GenEsiSss",
                 e3_trbfv::TrBFVRequest::GenPkShareAndSkSss(_) => "GenPkShareAndSkSss",
@@ -96,8 +96,8 @@ impl ToString for ComputeRequest {
                 ZkRequest::DkgAggregation(_) => "ZkDkgAggregation",
                 ZkRequest::DecryptionAggregation(_) => "ZkDecryptionAggregation",
             },
-        }
-        .to_string()
+        };
+        write!(f, "{}", s)
     }
 }
 

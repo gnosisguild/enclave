@@ -85,6 +85,7 @@ impl CheckResult {
             detail: detail.into(),
         }
     }
+    #[allow(dead_code)]
     fn warn(name: &str, detail: impl Into<String>) -> Self {
         Self {
             name: name.into(),

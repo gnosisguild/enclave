@@ -59,15 +59,11 @@ impl DocumentMeta {
     }
 
     pub fn matches(&self, id: &PartyId) -> bool {
-        if self.filter.len() == 0 {
+        if self.filter.is_empty() {
             return true; // No filters then always match
         }
 
-        if self.filter.iter().any(|f| f.matches(id)) {
-            return true;
-        }
-
-        return false;
+        self.filter.iter().any(|f| f.matches(id))
     }
 }
 
@@ -114,11 +110,11 @@ mod tests {
             vec![Filter::Range(Some(100), Some(200)), Filter::Item(77)],
             Some(Utc::now()),
         );
-        assert_eq!(meta.matches(&21), false);
-        assert_eq!(meta.matches(&77), true);
-        assert_eq!(meta.matches(&90), false);
-        assert_eq!(meta.matches(&140), true);
-        assert_eq!(meta.matches(&230), false);
+        assert!(!meta.matches(&21));
+        assert!(meta.matches(&77));
+        assert!(!meta.matches(&90));
+        assert!(meta.matches(&140));
+        assert!(!meta.matches(&230));
     }
     #[test]
     fn test_meta_no_filters() {
@@ -128,10 +124,10 @@ mod tests {
             vec![],
             Some(Utc::now()),
         );
-        assert_eq!(meta.matches(&21), true);
-        assert_eq!(meta.matches(&77), true);
-        assert_eq!(meta.matches(&90), true);
-        assert_eq!(meta.matches(&140), true);
-        assert_eq!(meta.matches(&230), true);
+        assert!(meta.matches(&21));
+        assert!(meta.matches(&77));
+        assert!(meta.matches(&90));
+        assert!(meta.matches(&140));
+        assert!(meta.matches(&230));
     }
 }

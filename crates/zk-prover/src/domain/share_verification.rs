@@ -100,8 +100,10 @@ pub(crate) struct PendingVerification {
     /// Parallel to `party_public_signals` — raw `proof.data` per (party, proof_type).
     pub(crate) party_proof_data: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
     /// BFV preset for circuit artifact resolution.
+    #[allow(dead_code)]
     pub(crate) params_preset: e3_fhe_params::BfvPreset,
     /// Committee size for per-committee circuit artifact resolution.
+    #[allow(dead_code)]
     pub(crate) committee_size: CiphernodesCommitteeSize,
 }
 
@@ -146,7 +148,7 @@ pub(crate) fn filter_consistent<P>(
     if passed.is_empty() {
         return None;
     }
-    let ids = passed.iter().map(|p| party_id_of(p)).collect();
+    let ids = passed.iter().map(party_id_of).collect();
     Some((passed, ids))
 }
 

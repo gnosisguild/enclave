@@ -82,7 +82,7 @@ pub async fn ps() -> Result<()> {
         vec![]
     };
 
-    print_table(&vec!["PROCESS", "STATUS"], &rows);
+    print_table(&["PROCESS", "STATUS"], &rows);
 
     Ok(())
 }
@@ -98,7 +98,7 @@ pub async fn is_ready() -> Result<bool> {
 pub async fn start_daemon(
     verbose: u8,
     maybe_config_string: &Option<String>,
-    exclude: &Vec<String>,
+    exclude: &[String],
 ) -> Result<()> {
     if is_ready().await? {
         tracing::warn!("Daemon is already running");
@@ -119,7 +119,7 @@ pub async fn start_daemon(
         args.push(format!("-{}", "v".repeat(verbose as usize))); // -vvv
     }
 
-    if exclude.len() > 0 {
+    if !exclude.is_empty() {
         args.push("--exclude".to_string());
         args.push(exclude.join(","));
     }

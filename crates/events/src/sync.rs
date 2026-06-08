@@ -49,6 +49,12 @@ pub struct EvmEventConfig {
     config: BTreeMap<ChainId, EvmEventConfigChain>, // Need BTreeMap because of Hash
 }
 
+impl Default for EvmEventConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EvmEventConfig {
     pub fn new() -> Self {
         Self {
@@ -63,7 +69,7 @@ impl EvmEventConfig {
     }
 
     pub fn get(&self, chain_id: &ChainId) -> Option<&EvmEventConfigChain> {
-        self.config.get(&chain_id)
+        self.config.get(chain_id)
     }
 
     pub fn insert(&mut self, key: ChainId, value: EvmEventConfigChain) {
