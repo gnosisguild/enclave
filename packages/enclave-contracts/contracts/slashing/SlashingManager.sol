@@ -706,10 +706,11 @@ contract SlashingManager is
         // Self-call for try/catch atomicity — on failure, funds stay in BondingRegistry.
         if (actualTicketSlashed > 0) {
             // NOTE: catch must not be empty — solc >=0.8.28 optimizer bug.
-            // solhint-disable-next-line no-empty-blocks
+            // solhint-disable no-empty-blocks
             try
                 this.escrowSlashedFundsToRefund(p.e3Id, actualTicketSlashed)
             {} catch {
+                // solhint-enable no-empty-blocks
                 emit RoutingFailed(p.e3Id, actualTicketSlashed);
             }
         }

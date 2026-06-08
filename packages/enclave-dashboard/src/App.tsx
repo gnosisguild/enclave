@@ -163,7 +163,7 @@ export default function App() {
   const [pollState, setPollState] = useState('open')
   const [stageIdx, setStageIdx] = useState(3)
 
-  const [nowTick, setNowTick] = useState(0)
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const [liveMode, setLiveMode] = useState(false)
   // Demo autoplay step, persisted so pausing/resuming continues where it left off.
   const liveStepRef = useRef(0)
@@ -197,16 +197,16 @@ export default function App() {
   // (archived). Card data comes straight from the list summary — no per-poll fetch.
   const crispReady = crispPolls.status === 'ready'
   const polls = useMemo(() => crispPolls.data ?? [], [crispPolls.data])
-  // `nowTick` is in the deps so isE3Active (which reads Date.now()) re-evaluates
-  // each second-tick and polls move from active → past as their windows close,
-  // rather than waiting for the next 15s on-chain refresh.
+  // `nowMs` updates each second so isE3Active re-evaluates and polls move from
+  // active → past as their windows close, rather than waiting for the next 15s
+  // on-chain refresh.
   const activePolls = useMemo<E3Summary[]>(
-    () => polls.filter((p) => isE3Active(p.stage, p.inputWindow[1], { e3Program: p.e3Program, ballotCount: p.ballotCount })),
-    [polls, nowTick],
+    () => polls.filter((p) => isE3Active(p.stage, p.inputWindow[1], { e3Program: p.e3Program, ballotCount: p.ballotCount, nowMs })),
+    [polls, nowMs],
   )
   const pastPolls = useMemo<E3Summary[]>(
-    () => polls.filter((p) => !isE3Active(p.stage, p.inputWindow[1], { e3Program: p.e3Program, ballotCount: p.ballotCount })),
-    [polls, nowTick],
+    () => polls.filter((p) => !isE3Active(p.stage, p.inputWindow[1], { e3Program: p.e3Program, ballotCount: p.ballotCount, nowMs })),
+    [polls, nowMs],
   )
   const liveHistory = useMemo(() => adaptHistoryEntries(pastPolls, detailsCache), [pastPolls, detailsCache])
 
@@ -224,7 +224,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    const id = setInterval(() => setNowTick((n) => n + 1), 1000)
+    const id = setInterval(() => setNowMs(Date.now()), 1000)
     return () => clearInterval(id)
   }, [])
 

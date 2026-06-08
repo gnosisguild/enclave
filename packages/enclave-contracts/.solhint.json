@@ -5,9 +5,11 @@
     "compiler-version": ["error", ">=0.8.27"],
     "func-visibility": ["error", { "ignoreConstructors": true }],
     "max-line-length": ["error", 120],
-    "named-parameters-mapping": "warn",
+    "max-states-count": ["warn", 16],
+    "named-parameters-mapping": "off",
     "no-console": "off",
     "not-rely-on-time": "off",
+    "reason-string": "off",
     "gas-custom-errors": "off",
     "one-contract-per-file": "off"
   }
