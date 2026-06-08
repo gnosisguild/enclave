@@ -249,7 +249,7 @@ impl Computation for Bounds {
         let k1_up_bound: BigInt = ptxt_up_bound.clone();
 
         // Calculate bounds for each CRT basis
-        let moduli: Vec<u64> = ctx.moduli_operators().into_iter().map(|q| **q).collect();
+        let moduli: Vec<u64> = ctx.moduli_operators().iter().map(|q| **q).collect();
         let k0is = compute_k0is(&moduli, threshold_params.plaintext())?;
 
         let mut pk_bounds: Vec<BigInt> = Vec::new();
@@ -259,7 +259,7 @@ impl Computation for Bounds {
         let mut p1_bounds: Vec<BigInt> = Vec::new();
         let mut p2_bounds: Vec<BigInt> = Vec::new();
 
-        for (i, qi) in ctx.moduli_operators().into_iter().enumerate() {
+        for (i, qi) in ctx.moduli_operators().iter().enumerate() {
             let qi_bigint = BigInt::from(**qi);
             let qi_bound = (&qi_bigint - BigInt::from(1)) / BigInt::from(2);
 
@@ -394,13 +394,13 @@ impl Computation for Inputs {
         pk1.reverse();
         e0.reverse();
 
-        ct0.center(&moduli)?;
-        ct1.center(&moduli)?;
+        ct0.center(moduli)?;
+        ct1.center(moduli)?;
 
-        pk0.center(&moduli)?;
-        pk1.center(&moduli)?;
+        pk0.center(moduli)?;
+        pk1.center(moduli)?;
 
-        e0.center(&moduli)?;
+        e0.center(moduli)?;
 
         let CrtPolynomial { limbs: ct0_limbs } = ct0;
         let CrtPolynomial { limbs: ct1_limbs } = ct1;
@@ -539,7 +539,7 @@ impl Computation for Inputs {
             e0: e0_mod_q,
             e1,
             u,
-            k1: k1,
+            k1,
             ciphertext: ct.to_bytes(),
         })
     }

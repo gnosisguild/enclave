@@ -114,7 +114,7 @@ async fn evm_reader() -> Result<()> {
     let history_collector = bus.history();
 
     let chain_id = provider.chain_id();
-    let contract_address = contract.address().clone();
+    let contract_address = *contract.address();
     let sync = FakeSyncActor::setup(&bus);
     EvmSystemChainBuilder::new(&bus, &provider)
         .with_contract(contract_address, move |upstream| {
@@ -177,7 +177,7 @@ async fn ensure_historical_events() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.provider()).await?;
-    let contract_address = contract.address().clone();
+    let contract_address = *contract.address();
     let chain_id = provider.chain_id();
     let system = EventSystem::new().with_fresh_bus();
     let bus = system.handle()?.enable("test");

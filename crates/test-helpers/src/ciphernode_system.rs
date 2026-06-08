@@ -12,7 +12,6 @@ use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::Event;
 use e3_events::{EnclaveEvent, GetEvents, ResetHistory, TakeEvents};
 use std::time::Instant;
-use std::u64;
 use std::{future::Future, ops::Deref, pin::Pin, time::Duration};
 use tokio::time::timeout;
 use tracing::info;
@@ -41,6 +40,12 @@ pub struct CiphernodeSystemBuilder<'a> {
     groups: Vec<(u32, SetupFn<'a>)>,
     thens: Vec<ThenFn<'a>>,
     simulate: bool,
+}
+
+impl<'a> Default for CiphernodeSystemBuilder<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<'a> CiphernodeSystemBuilder<'a> {
@@ -91,7 +96,7 @@ impl<'a> CiphernodeSystemBuilder<'a> {
 
         for then_fn in self.thens {
             for node in nodes.iter() {
-                then_fn(&node).await?;
+                then_fn(node).await?;
             }
         }
 

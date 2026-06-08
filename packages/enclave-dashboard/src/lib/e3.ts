@@ -83,10 +83,14 @@ export function solidityStageToUiIdx(stage: number, inputWindow: [bigint, bigint
 //   - for input-tracked programs (CRISP), its input window has closed without
 //     a single ballot being submitted. The chain doesn't transition the stage
 //     because there's nothing to compute; functionally it's a terminal no-op.
-export function isE3Active(stage: number, inputWindowClose: bigint, opts: { e3Program?: string; ballotCount?: number } = {}): boolean {
+export function isE3Active(
+  stage: number,
+  inputWindowClose: bigint,
+  opts: { e3Program?: string; ballotCount?: number; nowMs?: number } = {},
+): boolean {
   if (stage === E3Stage.Complete || stage === E3Stage.Failed) return false
   if (inputWindowClose > 0n) {
-    const now = BigInt(Math.floor(Date.now() / 1000))
+    const now = BigInt(Math.floor((opts.nowMs ?? Date.now()) / 1000))
     if (now >= inputWindowClose) {
       // Input window has closed. For programs whose inputs we can observe, if
       // none arrived the round is effectively done.

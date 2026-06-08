@@ -14,6 +14,12 @@ use std::fmt::{self, Display};
 #[rtype(result = "()")]
 pub struct SyncEffect;
 
+impl Default for SyncEffect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SyncEffect {
     pub fn new() -> Self {
         Self {}

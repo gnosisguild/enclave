@@ -24,10 +24,7 @@ struct SetDependencies {
 
 impl SetDependencies {
     pub fn new(router: Addr<BatchRouter>, timelock: Addr<TimelockQueue>) -> Self {
-        Self {
-            router: router.into(),
-            timelock,
-        }
+        Self { router, timelock }
     }
 }
 
@@ -48,6 +45,12 @@ pub struct SnapshotBuffer {
     router: Option<Addr<BatchRouter>>,
     timelock: Option<Recipient<StartTimelock>>,
     tickable: Option<Recipient<Tick>>,
+}
+
+impl Default for SnapshotBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SnapshotBuffer {
@@ -158,8 +161,6 @@ impl Handler<UpdateDestination> for SnapshotBuffer {
 
 #[cfg(test)]
 mod mock_store {
-    use std::mem::replace;
-
     use crate::InsertBatch;
     use actix::{Actor, Handler, Message};
 
@@ -187,7 +188,7 @@ mod mock_store {
     impl Handler<GetEvts> for MockStore {
         type Result = Vec<InsertBatch>;
         fn handle(&mut self, _: GetEvts, _: &mut Self::Context) -> Self::Result {
-            replace(&mut self.evts, Vec::new())
+            std::mem::take(&mut self.evts)
         }
     }
 }
@@ -259,16 +260,18 @@ mod tests {
         let ec = create_ec(23, 10);
         let enclave_10 = create_event(&ec);
 
-        let mut inserts_10 = vec![];
-        inserts_10.push(Insert::new_with_context("one", b"one".to_vec(), ec.clone()));
-        inserts_10.push(Insert::new_with_context("two", b"two".to_vec(), ec.clone()));
+        let inserts_10 = [
+            Insert::new_with_context("one", b"one".to_vec(), ec.clone()),
+            Insert::new_with_context("two", b"two".to_vec(), ec.clone()),
+        ];
 
         let ec = create_ec(1, 11);
         let enclave_11 = create_event(&ec);
 
-        let mut inserts_11 = vec![];
-        inserts_11.push(Insert::new_with_context("one", b"one".to_vec(), ec.clone()));
-        inserts_11.push(Insert::new_with_context("two", b"two".to_vec(), ec.clone()));
+        let inserts_11 = [
+            Insert::new_with_context("one", b"one".to_vec(), ec.clone()),
+            Insert::new_with_context("two", b"two".to_vec(), ec.clone()),
+        ];
 
         let ec = create_ec(0, 12);
         let enclave_12 = create_event(&ec);

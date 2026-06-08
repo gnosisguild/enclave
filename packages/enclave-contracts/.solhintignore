@@ -4,3 +4,6 @@
 
 # auto-generated verifier contracts (BB/Barretenberg)
 contracts/verifiers/**/*.sol
+
+# test helpers / mocks
+contracts/test/**/*.sol

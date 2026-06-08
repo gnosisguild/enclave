@@ -8,7 +8,6 @@ use std::collections::HashMap;
 
 use actix::{Message, Recipient};
 
-use crate::traits::EventContextAccessors;
 use crate::{AggregateId, CorrelationId, EnclaveEvent, EventSource, Sequenced, Unsequenced};
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -57,6 +57,7 @@ impl DocumentPublishingService {
     }
 
     /// Return our party id for a published document if (and only if) we are interested in it.
+    #[allow(dead_code)]
     pub fn interested_party(
         &self,
         notification: &DocumentPublishedNotification,
@@ -76,7 +77,7 @@ impl DocumentPublishingService {
     ) -> Option<PartyId> {
         let party_id = ids.get(&notification.meta.e3_id)?;
         if notification.meta.matches(party_id) {
-            Some(party_id.clone())
+            Some(*party_id)
         } else {
             None
         }

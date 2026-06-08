@@ -95,18 +95,18 @@ impl TryFrom<Vec<u8>> for FetchEventsSince {
     }
 }
 
-pub async fn fetch_events_since<E: Debug>(
+pub async fn fetch_events_since<E>(
     requester: &DirectRequester<WithPeer>,
     request: FetchEventsSince,
 ) -> Result<EventBatch<E>>
 where
-    E: TryFrom<Vec<u8>> + Send + Sync + 'static,
+    E: Debug + TryFrom<Vec<u8>> + Send + Sync + 'static,
     EventBatch<E>: TryFrom<Vec<u8>>,
 {
     requester.request(request).await
 }
 
-pub async fn fetch_all_batched_events<E: Debug>(
+pub async fn fetch_all_batched_events<E>(
     requester: DirectRequester<WithoutPeer>,
     peer: PeerTarget,
     aggregate_id: AggregateId,
@@ -114,7 +114,7 @@ pub async fn fetch_all_batched_events<E: Debug>(
     batch_size: usize,
 ) -> Result<Vec<E>>
 where
-    E: TryFrom<Vec<u8>> + Send + Sync + 'static,
+    E: Debug + TryFrom<Vec<u8>> + Send + Sync + 'static,
     EventBatch<E>: TryFrom<Vec<u8>>,
 {
     let requester = requester.to(peer);

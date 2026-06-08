@@ -136,6 +136,7 @@ impl ShareVerificationActor {
     /// After ECDSA validation, publishes [`CommitmentConsistencyCheckRequested`]
     /// and stores a [`PendingConsistencyCheck`]. ZK verification is deferred
     /// until the consistency check response arrives.
+    #[allow(clippy::too_many_arguments)]
     fn verify_proofs<P: VerifiableParty>(
         &mut self,
         e3_id: E3id,

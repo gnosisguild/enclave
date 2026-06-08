@@ -107,7 +107,7 @@ impl CRISPContract<CRISPWriteProvider> {
     pub async fn publish_input(&self, e3_id: U256, data: Bytes) -> Result<TransactionReceipt> {
         let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
         let receipt = contract
-            .publishInput(e3_id, data.into())
+            .publishInput(e3_id, data)
             .send()
             .await?
             .get_receipt()

@@ -216,7 +216,6 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
         );
         let proof = Bytes::from(proof_data.clone());
         let provider = provider.clone();
-        let party_id = party_id;
 
         async move {
             let from_address = provider.provider().default_signer_address();

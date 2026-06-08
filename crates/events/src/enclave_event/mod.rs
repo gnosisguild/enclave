@@ -175,6 +175,7 @@ macro_rules! impl_event_types {
             }
 
             /// Parse an EventType from a string
+            #[allow(clippy::should_implement_trait)]
             pub fn from_str(s: &str) -> Option<Self> {
                 match s {
                     "*" => Some(EventType::All),
@@ -701,7 +702,7 @@ impl TryFrom<EnclaveEvent<Sequenced>> for EnclaveError {
         if let EnclaveEventData::EnclaveError(data) = value.payload.clone() {
             Ok(data)
         } else {
-            return Err(anyhow::anyhow!("Not an enclave error {:?}", value));
+            Err(anyhow::anyhow!("Not an enclave error {:?}", value))
         }
     }
 }
@@ -745,7 +746,7 @@ impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
         block: Option<u64>,
         source: EventSource,
     ) -> Self {
-        let payload: EnclaveEventData = data.into();
+        let payload: EnclaveEventData = data;
         let id = EventId::hash(&payload);
         let aggregate_id = payload.get_aggregate_id();
         EnclaveEvent {

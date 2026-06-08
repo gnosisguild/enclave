@@ -189,7 +189,7 @@ struct HlcInner {
 
 impl Default for Hlc {
     fn default() -> Self {
-        let random_id: u32 = rand::thread_rng().gen();
+        let random_id: u32 = rand::rng().random();
         Self::new(random_id)
     }
 }
@@ -215,6 +215,7 @@ impl Hlc {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(node: &str) -> Self {
         let mut h = DefaultHasher::new();
         node.hash(&mut h);
@@ -436,10 +437,10 @@ mod tests {
           #[test]
           fn ordering_antisymmetric(a in arb_timestamp(), b in arb_timestamp()) {
               if a < b {
-                  prop_assert!(!(b < a));
+                  prop_assert!((b >= a));
               }
               if a > b {
-                  prop_assert!(!(b > a));
+                  prop_assert!((b <= a));
               }
           }
 

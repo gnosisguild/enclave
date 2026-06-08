@@ -85,6 +85,7 @@ fn clear_terminal() {
 }
 
 /// Print a summary of what will be generated (circuit, preset, inputs, output, artifacts).
+#[allow(clippy::too_many_arguments)]
 fn print_generation_info(
     circuit: &str,
     preset: BfvPreset,
@@ -289,7 +290,7 @@ fn main() -> Result<()> {
         preset,
         committee_size,
         show_input_type,
-        dkg_input_type.clone(),
+        dkg_input_type,
         &args.output,
         write_prover_toml,
         no_configs,

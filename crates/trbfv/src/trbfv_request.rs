@@ -53,9 +53,7 @@ pub enum TrBFVError {
 
 impl std::error::Error for TrBFVError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            _ => None,
-        }
+        None
     }
 }
 

@@ -70,7 +70,7 @@ impl E3Extension for FheExtension {
             return;
         };
         ctx.repositories().fhe(&e3_id).write(&snapshot);
-        let _ = ctx.set_dependency(FHE_KEY, fhe);
+        ctx.set_dependency(FHE_KEY, fhe);
     }
 
     async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()> {

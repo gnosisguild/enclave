@@ -260,7 +260,7 @@ impl Computation for Bounds {
         };
 
         // Calculate bounds for each CRT basis
-        let moduli: Vec<u64> = ctx.moduli_operators().into_iter().map(|q| **q).collect();
+        let moduli: Vec<u64> = ctx.moduli_operators().iter().map(|q| **q).collect();
         let k0is = compute_k0is(&moduli, dkg_params.plaintext())?;
 
         let mut pk_bounds: Vec<BigInt> = Vec::new();
@@ -270,7 +270,7 @@ impl Computation for Bounds {
         let mut p1_bounds: Vec<BigInt> = Vec::new();
         let mut p2_bounds: Vec<BigInt> = Vec::new();
 
-        for (i, qi) in ctx.moduli_operators().into_iter().enumerate() {
+        for (i, qi) in ctx.moduli_operators().iter().enumerate() {
             let qi_bigint = BigInt::from(**qi);
             let qi_bound = (&qi_bigint - BigInt::from(1)) / BigInt::from(2);
 

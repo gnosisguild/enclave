@@ -257,7 +257,7 @@ impl Computation for Inputs {
             secret_crt,
             y,
             expected_secret_commitment,
-            dkg_input_type: data.dkg_input_type.clone(),
+            dkg_input_type: data.dkg_input_type,
         })
     }
 

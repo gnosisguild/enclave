@@ -89,7 +89,7 @@ fn c3_fold_total_slots_from_compiled_json() -> usize {
         })
         .expect("c3_fold.json: abi.parameters.acc_public_inputs.length") as usize;
     assert!(
-        len >= 4 && (len - 4) % 3 == 0,
+        len >= 4 && (len - 4).is_multiple_of(3),
         "unexpected acc_public_inputs length {} (expected 4 + 3 * slots)",
         len
     );
@@ -119,7 +119,7 @@ fn c6_fold_total_slots_from_compiled_json() -> usize {
         })
         .expect("c6_fold.json: abi.parameters.acc_public_inputs.length") as usize;
     assert!(
-        len >= 4 && (len - 4) % 4 == 0,
+        len >= 4 && (len - 4).is_multiple_of(4),
         "unexpected acc_public_inputs length {} (expected 4 + 4 * slots)",
         len
     );

@@ -14,19 +14,15 @@ use e3_config::BBPath;
 use e3_crypto::Cipher;
 use e3_events::{
     hlc::HlcTimestamp, prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized,
-    ComputeRequestKind, ComputeResponseKind, ConfigurationUpdated, E3Requested, E3id,
-    EffectsEnabled, EnclaveEvent, EnclaveEventData, EventType, GetEvents, HistoryCollector,
-    OperatorActivationChanged, OrderedSet, PkAggregationProofPending, PkAggregationProofRequest,
-    PlaintextAggregated, ProofType, Seed, TakeEvents, TicketBalanceUpdated, VerificationKind,
-    ZkRequest, ZkResponse,
+    ComputeRequestKind, ComputeResponseKind, ConfigurationUpdated, E3Requested, E3id, EnclaveEvent,
+    EnclaveEventData, OperatorActivationChanged, PlaintextAggregated, ProofType, Seed, TakeEvents,
+    TicketBalanceUpdated, VerificationKind, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::DEFAULT_BFV_PRESET;
-use e3_fhe_params::{build_pair_for_preset, create_deterministic_crp_from_default_seed};
 use e3_fhe_params::{encode_bfv_params, BfvParamSet, BfvPreset};
 use e3_multithread::{Multithread, MultithreadReport, ToReport};
 use e3_net::events::{GossipData, NetEvent};
 use e3_net::NetEventTranslator;
-use e3_polynomial::CrtPolynomial;
 use e3_sortition::{calculate_buffer_size, RegisteredNode, ScoreSortition, Ticket};
 use e3_test_helpers::ciphernode_system::{
     CiphernodeHistory, CiphernodeSystem, CiphernodeSystemBuilder,
@@ -38,15 +34,11 @@ use e3_trbfv::helpers::calculate_error_size;
 use e3_trbfv::{TrBFVRequest, TrBFVResponse};
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::{colorize, rand_eth_addr, Color};
-use e3_zk_helpers::{compute_modulus_bit, compute_threshold_pk_commitment};
 use e3_zk_prover::test_utils::get_tempdir;
-use e3_zk_prover::{ProofRequestActor, VersionInfo, ZkBackend};
+use e3_zk_prover::{VersionInfo, ZkBackend};
 use fhe::bfv::PublicKey;
-use fhe::bfv::SecretKey;
-use fhe::mbfv::{AggregateIter, PublicKeyShare};
 use fhe_traits::{DeserializeParametrized, Serialize};
 use num_bigint::BigUint;
-use rand::rngs::OsRng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::collections::HashSet;
@@ -142,14 +134,13 @@ fn benchmark_participant_node_count(threshold_m: usize, threshold_n: usize) -> u
 ///
 /// Set `BENCHMARK_PROOF_AGGREGATION=false` for a baseline run without node folds / folded Π_DKG.
 fn benchmark_proof_aggregation_enabled() -> bool {
-    match std::env::var("BENCHMARK_PROOF_AGGREGATION")
-        .unwrap_or_else(|_| "true".into())
-        .to_ascii_lowercase()
-        .as_str()
-    {
-        "0" | "false" | "no" | "off" => false,
-        _ => true,
-    }
+    !matches!(
+        std::env::var("BENCHMARK_PROOF_AGGREGATION")
+            .unwrap_or_else(|_| "true".into())
+            .to_ascii_lowercase()
+            .as_str(),
+        "0" | "false" | "no" | "off"
+    )
 }
 
 /// Rayon multithread pool concurrency for benchmark runs (`BENCHMARK_MULTITHREAD_JOBS`, default 1).
@@ -310,12 +301,14 @@ impl Drop for EnvTimeoutVarsGuard {
 }
 
 /// RAII guard that restores a single env var on scope exit.
+#[allow(dead_code)]
 struct ScopedEnvVar {
     name: &'static str,
     original: Option<OsString>,
 }
 
 impl ScopedEnvVar {
+    #[allow(dead_code)]
     fn set(name: &'static str, value: &str) -> Self {
         let original = std::env::var_os(name);
         std::env::set_var(name, value);
@@ -759,9 +752,11 @@ async fn setup_test_zk_backend(
         // `CiphernodeBuilder` calls `ensure_installed()`, which deletes `circuits_dir` and downloads
         // the release tarball whenever `version.json` does not record the pinned bb/circuits
         // versions. That would wipe the fixture tree we just copied from `circuits/bin/`.
-        let mut version_info = VersionInfo::default();
-        version_info.bb_version = Some(backend.config.required_bb_version.clone());
-        version_info.circuits_version = Some(backend.config.required_circuits_version.clone());
+        let version_info = VersionInfo {
+            bb_version: Some(backend.config.required_bb_version.clone()),
+            circuits_version: Some(backend.config.required_circuits_version.clone()),
+            ..Default::default()
+        };
         version_info
             .save(&backend.version_file())
             .await
@@ -913,6 +908,7 @@ fn find_node_index_by_address(nodes: &CiphernodeSystem, address: &str) -> Result
     bail!("Could not find node index for address {address}");
 }
 
+#[allow(dead_code)]
 async fn expect_node_events_with_timeouts(
     nodes: &CiphernodeSystem,
     index: usize,
@@ -1341,7 +1337,7 @@ async fn test_trbfv_actor() -> Result<()> {
             let addr = rand_eth_addr(&node_rng);
             println!("Building collector {}!", addr);
             {
-                let mut b = CiphernodeBuilder::new(node_rng, cipher.clone())
+                let b = CiphernodeBuilder::new(node_rng, cipher.clone())
                     .with_history_collector()
                     .with_shared_taskpool(&task_pool)
                     .with_multithread_concurrent_jobs(concurrent_jobs)
@@ -1353,7 +1349,7 @@ async fn test_trbfv_actor() -> Result<()> {
                     .with_sortition_score()
                     .with_threshold_plaintext_aggregation()
                     .with_forked_bus(bus.event_bus())
-                    .with_chains(&[bench_chain_config.clone()])
+                    .with_chains(std::slice::from_ref(&bench_chain_config))
                     .with_logging();
                 b.build().await
             }
@@ -1365,7 +1361,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 let addr = rand_eth_addr(&node_rng);
                 println!("Building normal {}", &addr);
                 {
-                    let mut b = CiphernodeBuilder::new(node_rng, cipher.clone())
+                    let b = CiphernodeBuilder::new(node_rng, cipher.clone())
                         .with_history_collector()
                         .with_shared_taskpool(&task_pool)
                         .with_multithread_concurrent_jobs(concurrent_jobs)
@@ -1377,7 +1373,7 @@ async fn test_trbfv_actor() -> Result<()> {
                         .with_sortition_score()
                         .with_threshold_plaintext_aggregation()
                         .with_forked_bus(bus.event_bus())
-                        .with_chains(&[bench_chain_config.clone()])
+                        .with_chains(std::slice::from_ref(&bench_chain_config))
                         .with_logging();
                     b.build().await
                 }
@@ -1395,7 +1391,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // Only register nodes 1..=participant_count in sortition (exclude collector at index 0).
     // This ensures the collector is never selected, making the test deterministic.
     // The collector node will observe events as a non-participant.
-    let collector_addr = nodes.get(0).unwrap().address();
+    let collector_addr = nodes.first().unwrap().address();
     let eth_addrs: Vec<String> = nodes
         .iter()
         .skip(1) // Skip the collector node
@@ -1447,7 +1443,7 @@ async fn test_trbfv_actor() -> Result<()> {
         e3_id: e3_id.clone(),
         threshold_m,
         threshold_n,
-        seed: seed.clone(),
+        seed,
         error_size,
         params_preset: benchmark_params.bfv_preset,
         params,
@@ -1515,7 +1511,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // C1 verification dispatches ALL N submitted keyshare proofs (the protocol needs to know
     // who's dishonest before it can pick the H honest set), so N ProofVerificationPassed events
     // fire. The aggregator subsequently truncates to H for C5 input only.
-    active_aggregator_c1_c5.extend(std::iter::repeat("ProofVerificationPassed").take(threshold_n));
+    active_aggregator_c1_c5.extend(std::iter::repeat_n("ProofVerificationPassed", threshold_n));
     active_aggregator_c1_c5.extend_from_slice(&[
         "ShareVerificationComplete",
         "PkAggregationProofPending",
@@ -1997,14 +1993,11 @@ async fn test_trbfv_actor() -> Result<()> {
         .map(|a| decode_bytes_to_vec_u64(&a.extract_bytes()).expect("error decoding bytes"))
         .collect::<Vec<Vec<u64>>>();
 
-    let results: Vec<u64> = results
-        .into_iter()
-        .map(|r| r.first().unwrap().clone())
-        .collect();
+    let results: Vec<u64> = results.into_iter().map(|r| *r.first().unwrap()).collect();
 
     // Show summation result (mod plaintext modulus)
     let plaintext_modulus = params_raw.clone().plaintext();
-    let mut expected_result = vec![0u64; 3];
+    let mut expected_result = [0u64; 3];
     for vals in &numbers {
         for j in 0..num_votes_per_voter {
             expected_result[j] = (expected_result[j] + vals[j]) % plaintext_modulus;
@@ -2271,7 +2264,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
         e3_id: E3id::new("1235", 1),
         threshold_m: 3,
         threshold_n: 3,
-        seed: seed.clone(),
+        seed,
         params: ArcBytes::from_bytes(&[1, 2, 3, 4]),
         ..E3Requested::default()
     };
@@ -2324,7 +2317,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         bus: &BusHandle,
         rng: &e3_utils::SharedRng,
         logging: bool,
-        addr: &str,
+        _addr: &str,
         store: Option<actix::Addr<InMemStore>>,
         cipher: &Arc<Cipher>,
         zk_backend: ZkBackend,
@@ -2364,7 +2357,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         for addr in &eth_addrs {
             println!("Setting up eth addr: {}", addr);
             let tuple =
-                setup_local_ciphernode(&bus, &rng, true, addr, None, cipher, zk_backend.clone())
+                setup_local_ciphernode(bus, rng, true, addr, None, cipher, zk_backend.clone())
                     .await?;
             result.push(tuple);
         }
@@ -2394,7 +2387,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             e3_id: e3_id.clone(),
             threshold_m: 2,
             threshold_n: 2,
-            seed: seed.clone(),
+            seed,
             params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
             ..E3Requested::default()
         })?;
@@ -2402,7 +2395,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         bus.publish_without_context(CommitteeFinalized {
             e3_id: e3_id.clone(),
             committee: eth_addrs.clone(),
-            scores: compute_committee_scores(&eth_addrs, &e3_id, seed.clone()),
+            scores: compute_committee_scores(&eth_addrs, &e3_id, seed),
             chain_id: 1,
         })?;
 
@@ -2545,7 +2538,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         bus: &BusHandle,
         rng: &e3_utils::SharedRng,
         logging: bool,
-        addr: &str,
+        _addr: &str,
         store: Option<actix::Addr<e3_data::InMemStore>>,
         cipher: &Arc<Cipher>,
         zk_backend: ZkBackend,
@@ -2585,7 +2578,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         for addr in &eth_addrs {
             println!("Setting up eth addr: {}", addr);
             let tuple =
-                setup_local_ciphernode(&bus, &rng, true, addr, None, cipher, zk_backend.clone())
+                setup_local_ciphernode(bus, rng, true, addr, None, cipher, zk_backend.clone())
                     .await?;
             result.push(tuple);
         }
@@ -2599,7 +2592,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         rng: &e3_utils::SharedRng,
         addr: &str,
     ) -> Result<PkSkShareTuple> {
-        let sk = SecretKey::random(&params, &mut *rng.lock().unwrap());
+        let sk = SecretKey::random(params, &mut *rng.lock().unwrap());
         let pk = PublicKeyShare::new(&sk, crp.clone(), &mut *rng.lock().unwrap())?;
         Ok((pk, sk, addr.to_owned()))
     }
@@ -2617,12 +2610,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         Ok(result)
     }
 
-    fn aggregate_public_key(shares: &Vec<PkSkShareTuple>) -> Result<PublicKey> {
-        Ok(shares
-            .clone()
-            .into_iter()
-            .map(|(pk, _, _)| pk)
-            .aggregate()?)
+    fn aggregate_public_key(shares: &[PkSkShareTuple]) -> Result<PublicKey> {
+        Ok(shares.iter().map(|(pk, _, _)| pk.clone()).aggregate()?)
     }
 
     // Setup
@@ -2643,7 +2632,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         e3_id: E3id::new("1234", 1),
         threshold_m: 2,
         threshold_n: 5,
-        seed: seed.clone(),
+        seed,
         params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         ..E3Requested::default()
     })?;
@@ -2651,7 +2640,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     bus.publish_without_context(CommitteeFinalized {
         e3_id: E3id::new("1234", 1),
         committee: eth_addrs.clone(),
-        scores: compute_committee_scores(&eth_addrs, &E3id::new("1234", 1), seed.clone()),
+        scores: compute_committee_scores(&eth_addrs, &E3id::new("1234", 1), seed),
         chain_id: 1,
     })?;
 
@@ -2689,7 +2678,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         e3_id: E3id::new("1234", 2),
         threshold_m: 2,
         threshold_n: 5,
-        seed: seed.clone(),
+        seed,
         params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         ..E3Requested::default()
     })?;
@@ -2697,7 +2686,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     bus.publish_without_context(CommitteeFinalized {
         e3_id: E3id::new("1234", 2),
         committee: eth_addrs.clone(),
-        scores: compute_committee_scores(&eth_addrs, &E3id::new("1234", 2), seed.clone()),
+        scores: compute_committee_scores(&eth_addrs, &E3id::new("1234", 2), seed),
         chain_id: 2,
     })?;
 

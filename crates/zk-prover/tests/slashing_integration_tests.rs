@@ -179,7 +179,7 @@ async fn deploy_contract(
 /// Create a test ProofPayload with the given parameters.
 fn test_proof_payload(e3_id: u64, chain_id: u64) -> ProofPayload {
     ProofPayload {
-        e3_id: E3id::new(&e3_id.to_string(), chain_id),
+        e3_id: E3id::new(e3_id.to_string(), chain_id),
         proof_type: ProofType::C0PkBfv,
         proof: Proof::new(
             CircuitName::PkBfv,
@@ -220,11 +220,11 @@ fn test_proof_payload_digest_matches_manual_computation() {
     );
     let expected_encoded = (
         typehash,
-        U256::from(42u64),                    // chainId
-        U256::from(1u64),                     // e3Id
-        U256::from(0u8),                      // proofType (C0PkBfv = 0)
-        keccak256(&[0xde, 0xad, 0xbe, 0xef]), // keccak256(zkProof)
-        keccak256(&[0u8; 32]),                // keccak256(publicSignals)
+        U256::from(42u64),                   // chainId
+        U256::from(1u64),                    // e3Id
+        U256::from(0u8),                     // proofType (C0PkBfv = 0)
+        keccak256([0xde, 0xad, 0xbe, 0xef]), // keccak256(zkProof)
+        keccak256([0u8; 32]),                // keccak256(publicSignals)
     )
         .abi_encode();
     let expected_digest: [u8; 32] = keccak256(&expected_encoded).into();
@@ -350,13 +350,13 @@ fn test_digest_matches_solidity_encoding() {
     solidity_encoded.extend_from_slice(&U256::from(31337u64).to_be_bytes::<32>()); // uint256 chainId
     solidity_encoded.extend_from_slice(&U256::from(42u64).to_be_bytes::<32>()); // uint256 e3Id
     solidity_encoded.extend_from_slice(&U256::from(0u8).to_be_bytes::<32>()); // uint256 proofType
-    solidity_encoded.extend_from_slice(keccak256(&[0xde, 0xad, 0xbe, 0xef]).as_ref()); // keccak256(zkProof)
+    solidity_encoded.extend_from_slice(keccak256([0xde, 0xad, 0xbe, 0xef]).as_ref()); // keccak256(zkProof)
 
     // For publicInputs = [bytes32(0)]:
     // Solidity: keccak256(abi.encodePacked(publicInputs)) = keccak256(bytes32(0))
     // Rust: keccak256(public_signals) = keccak256([0u8; 32])
     // These must be the same!
-    let sol_public_inputs_hash = keccak256(&[0u8; 32]);
+    let sol_public_inputs_hash = keccak256([0u8; 32]);
     solidity_encoded.extend_from_slice(sol_public_inputs_hash.as_ref()); // keccak256(publicSignals)
 
     let solidity_digest: [u8; 32] = keccak256(&solidity_encoded).into();
@@ -385,7 +385,7 @@ const VOTE_NO_EXPIRY: U256 = U256::MAX;
 
 /// Lane A policy key: `keccak256(abi.encodePacked(proofType))` (must match `SlashingManager.proposeSlash`).
 fn reason_for_proof_type(proof_type: u8) -> FixedBytes<32> {
-    keccak256(&U256::from(proof_type).abi_encode_packed()).into()
+    keccak256(U256::from(proof_type).abi_encode_packed())
 }
 
 /// Custom error selectors from `SlashingManager` (Anvil returns selector, not name).
@@ -408,7 +408,7 @@ fn compute_accusation_id(
     proof_type: u8,
 ) -> FixedBytes<32> {
     keccak256(
-        &(
+        (
             U256::from(chain_id),
             U256::from(e3_id),
             operator,
@@ -424,7 +424,7 @@ fn compute_vote_domain_separator(chain_id: u64, verifying_contract: Address) -> 
     let name_hash = keccak256(VOTE_DOMAIN_NAME.as_bytes());
     let version_hash = keccak256(VOTE_DOMAIN_VERSION.as_bytes());
     keccak256(
-        &(
+        (
             domain_typehash,
             name_hash,
             version_hash,
@@ -448,7 +448,7 @@ fn compute_vote_digest(
 ) -> FixedBytes<32> {
     let typehash = keccak256(VOTE_TYPEHASH_STR);
     let struct_hash = keccak256(
-        &(
+        (
             typehash,
             U256::from(e3_id),
             accusation_id,
@@ -601,7 +601,7 @@ fn test_vote_digest_manual_computation() {
     // Manual EIP-712 computation
     let typehash = keccak256(VOTE_TYPEHASH_STR);
     let struct_hash: FixedBytes<32> = keccak256(
-        &(
+        (
             typehash,
             U256::from(e3_id),
             accusation_id,
@@ -685,7 +685,7 @@ fn test_vote_signing_roundtrip() {
 #[test]
 fn test_evidence_leading_word_is_proof_type() {
     let raw_evidence = Bytes::from(vec![0u8; 32]);
-    let dh: FixedBytes<32> = keccak256(&raw_evidence).into();
+    let dh: FixedBytes<32> = keccak256(&raw_evidence);
     let evidence = encode_attestation_evidence(
         0,
         vec![
@@ -709,7 +709,7 @@ fn test_evidence_leading_word_is_proof_type() {
     );
     let leading = U256::from_be_slice(&evidence[..32]);
     assert_eq!(leading, U256::ZERO, "leading word must be proofType");
-    let derived_reason: FixedBytes<32> = keccak256(&leading.abi_encode_packed()).into();
+    let derived_reason: FixedBytes<32> = keccak256(leading.abi_encode_packed());
     assert_eq!(derived_reason, reason_for_proof_type(0));
 }
 
@@ -732,7 +732,7 @@ fn test_attestation_evidence_encoding() {
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator, proof_type);
 
     let raw_evidence = Bytes::from(vec![0xab; 32]);
-    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence);
     let (voter1, sig1) = sign_vote(
         &signer1,
         chain_id,
@@ -950,7 +950,7 @@ async fn test_onchain_valid_attestation_executes_slash() {
     // All 3 voters sign accusation votes
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
     let raw_evidence = Bytes::from(vec![0xaa; 32]);
-    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence);
 
     let (v1, s1) = sign_vote(
         &voter_signer1,
@@ -1120,7 +1120,7 @@ async fn test_onchain_insufficient_attestations_reverts() {
     // Only 1 vote (below threshold M=2)
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
     let raw_evidence = Bytes::from(vec![0xbb; 32]);
-    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence);
 
     let (v1, s1) = sign_vote(
         &voter_signer1,
@@ -1239,7 +1239,7 @@ async fn test_onchain_voter_not_in_committee_reverts() {
     // Outsider signs a vote (valid signature, but not a committee member)
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
     let raw_evidence = Bytes::from(vec![0xcc; 32]);
-    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence);
 
     let (v_out, s_out) = sign_vote(
         &outsider_signer,
@@ -1358,7 +1358,7 @@ async fn test_onchain_invalid_vote_signature_reverts() {
     // Impersonator signs the vote with their key, but we claim it's from victim_signer
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
     let raw_evidence = Bytes::from(vec![0xdd; 32]);
-    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence);
 
     // Sign using impersonator's key but construct the digest for victim_signer's address
     let digest = compute_vote_digest(
@@ -1488,7 +1488,7 @@ async fn test_onchain_duplicate_voter_reverts() {
     // Create TWO votes from the same voter (duplicate addresses)
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
     let raw_evidence = Bytes::from(vec![0xee; 32]);
-    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence);
 
     let (voter, sig) = sign_vote(
         &voter_signer,
@@ -1615,7 +1615,7 @@ async fn test_onchain_duplicate_evidence_reverts() {
 
     let accusation_id = compute_accusation_id(chain_id, e3_id, operator_addr, proof_type);
     let raw_evidence = Bytes::from(vec![0xff; 32]);
-    let data_hash: FixedBytes<32> = keccak256(&raw_evidence).into();
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence);
 
     let (v1, s1) = sign_vote(
         &voter_signer1,
@@ -1776,7 +1776,7 @@ async fn test_onchain_actor_signed_vote_accepted() {
 
     // evidence bytes whose keccak256 becomes the data_hash voters sign
     let raw_evidence_bytes: Bytes = Bytes::from(vec![0xee; 32]);
-    let data_hash: FixedBytes<32> = keccak256(&raw_evidence_bytes).into();
+    let data_hash: FixedBytes<32> = keccak256(&raw_evidence_bytes);
 
     // Pick a deadline far in the future so the on-chain check passes
     // regardless of Anvil's block.timestamp at submission time.
@@ -1823,7 +1823,7 @@ async fn test_onchain_actor_signed_vote_accepted() {
         proof_type: ProofType::C0PkBfv,
         votes_for,
         outcome: AccusationOutcome::AccusedFaulted,
-        evidence: raw_evidence_bytes.into(),
+        evidence: raw_evidence_bytes,
     };
     let evidence = encode_attestation_evidence(&quorum)
         .expect("encode_attestation_evidence must produce bytes for nonempty votes_for");

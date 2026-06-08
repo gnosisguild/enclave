@@ -18,7 +18,7 @@ use eyre::Result;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::Serialize;
 use helpers::setup_two_contracts;
-use rand::thread_rng;
+use rand::rng;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -42,7 +42,7 @@ sol!(
 #[tokio::test]
 async fn test_indexer() -> Result<()> {
     const E3_ID: u64 = 10;
-    const THRESHOLD: u64 = 10;
+    const _THRESHOLD: u64 = 10;
     const INDEXER_DELAY_MS: u64 = 30;
 
     let param_set = DEFAULT_BFV_PRESET.into();
@@ -94,9 +94,9 @@ async fn test_indexer() -> Result<()> {
         .await;
 
     let indexer_listening = indexer.clone();
-    let _ = tokio::spawn(async move { indexer_listening.listen().await });
+    tokio::spawn(async move { indexer_listening.listen().await });
 
-    let mut rng = thread_rng();
+    let mut rng = rng();
     let sk = SecretKey::random(&params, &mut rng);
     let pk = PublicKey::new(&sk, &mut rng);
 
@@ -170,15 +170,16 @@ async fn test_indexer() -> Result<()> {
 
     sleep(Duration::from_millis(INDEXER_DELAY_MS)).await;
 
-    let messages_from_second_contract = captured_messages.lock().unwrap();
-    assert_eq!(
-        messages_from_second_contract
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>(),
-        vec!["Hello from contract2!".to_string()]
-    );
-    drop(messages_from_second_contract);
+    {
+        let messages_from_second_contract = captured_messages.lock().unwrap();
+        assert_eq!(
+            messages_from_second_contract
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>(),
+            vec!["Hello from contract2!".to_string()]
+        );
+    }
 
     enclave_contract
         .emitCiphertextOutputPublished(

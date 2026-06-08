@@ -126,6 +126,7 @@ pub fn create_crp_bytes_params(
     (crp.to_bytes(), params)
 }
 
+#[allow(clippy::type_complexity)]
 pub fn get_common_setup(
     param_set: Option<BfvParamSet>,
 ) -> Result<(
@@ -219,14 +220,14 @@ pub fn encrypt_ciphertext(
     let mut rng = ChaCha20Rng::seed_from_u64(42);
     let plaintext: Vec<_> = raw_plaintext
         .into_iter()
-        .map(|raw| Ok(Plaintext::try_encode(&raw, Encoding::poly(), &params)?))
+        .map(|raw| Ok(Plaintext::try_encode(&raw, Encoding::poly(), params)?))
         .collect::<Result<_>>()?;
 
     let ciphertext = plaintext
         .iter()
         .map(|pt| {
             pubkey
-                .try_encrypt(&pt, &mut rng)
+                .try_encrypt(pt, &mut rng)
                 .map_err(|e| anyhow::anyhow!("{e}"))
         })
         .collect::<Result<Vec<Ciphertext>>>()?;

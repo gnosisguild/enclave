@@ -35,7 +35,7 @@ impl Contract {
     pub fn deploy_block(&self) -> Option<u64> {
         use Contract::*;
         match self {
-            Full { deploy_block, .. } => deploy_block.clone(),
+            Full { deploy_block, .. } => *deploy_block,
             AddressOnly(_) => None,
         }
     }

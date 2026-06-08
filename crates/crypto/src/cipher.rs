@@ -51,7 +51,7 @@ fn argon2_derive_key(
     )
     .map_err(|_| anyhow!("Could not create params"))?;
     Argon2::new(ARGON2_ALGORITHM, ARGON2_VERSION, params)
-        .hash_password_into(&password_bytes, &salt, &mut derived_key)
+        .hash_password_into(password_bytes, salt, &mut derived_key)
         .map_err(|_| anyhow!("Key derivation error"))?;
     Ok(derived_key)
 }
@@ -65,7 +65,7 @@ fn encrypt_data(derived_key: &Zeroizing<Vec<u8>>, data: &mut Vec<u8>) -> Result<
     let nonce = Nonce::from_slice(&nonce_bytes);
 
     // Create AES-GCM cipher
-    let cipher = Aes256Gcm::new_from_slice(&derived_key)
+    let cipher = Aes256Gcm::new_from_slice(derived_key)
         .map_err(|e| anyhow!("Failed to create cipher: {:?}", e))?;
 
     // Encrypt the data
@@ -95,7 +95,7 @@ fn decrypt_data(derived_key: &Zeroizing<Vec<u8>>, encrypted_data: &[u8]) -> Resu
     let ciphertext = &encrypted_data[AES_HEADER_LEN..];
 
     // Create cipher and decrypt
-    let cipher = Aes256Gcm::new_from_slice(&derived_key)
+    let cipher = Aes256Gcm::new_from_slice(derived_key)
         .map_err(|e| anyhow!("Failed to create cipher: {:?}", e))?;
     let plaintext = cipher
         .decrypt(nonce, ciphertext)
@@ -121,15 +121,15 @@ impl Cipher {
     }
 
     pub async fn from_password(value: &str) -> Result<Self> {
-        Ok(Self::new(InMemPasswordManager::from_str(value)).await?)
+        Self::new(InMemPasswordManager::from_str(value)).await
     }
 
     pub async fn from_env(value: &str) -> Result<Self> {
-        Ok(Self::new(EnvPasswordManager::new(value)?).await?)
+        Self::new(EnvPasswordManager::new(value)?).await
     }
 
     pub async fn from_file(value: impl AsRef<Path>) -> Result<Self> {
-        Ok(Self::new(FilePasswordManager::new(value)).await?)
+        Self::new(FilePasswordManager::new(value)).await
     }
 
     /// Encrypt the given data and zeroize the data after encryption

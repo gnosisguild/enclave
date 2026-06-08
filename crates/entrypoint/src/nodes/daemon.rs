@@ -39,7 +39,7 @@ impl LaunchCommand {
         format!("/ip4/{}/udp/{}/quic-v1", self.ip, self.quic_port)
     }
 
-    pub fn add_peers(&mut self, nodes: &Vec<LaunchCommand>) {
+    pub fn add_peers(&mut self, nodes: &[LaunchCommand]) {
         let peers: Vec<String> = nodes
             .iter()
             .filter(|n| n.name != self.name)

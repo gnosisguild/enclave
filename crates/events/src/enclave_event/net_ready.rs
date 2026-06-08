@@ -16,6 +16,12 @@ pub struct NetReady {
     correlation_id: CorrelationId,
 }
 
+impl Default for NetReady {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NetReady {
     pub fn new() -> Self {
         Self {

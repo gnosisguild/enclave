@@ -63,7 +63,7 @@ fn trace_error(r: Result<()>) {
 pub async fn dial_peers(
     cmd_tx: &mpsc::Sender<NetCommand>,
     event_tx: &broadcast::Sender<NetEvent>,
-    peers: &Vec<String>,
+    peers: &[String],
 ) -> Result<usize> {
     let futures: Vec<_> = peers
         .iter()
@@ -117,7 +117,7 @@ async fn wait_for_connection(
                         warn!("DialError!");
                         return match error.as_ref() {
                             // If we are dialing ourself then we should just fail
-                            DialError::NoAddresses { .. } => {
+                            DialError::NoAddresses => {
                                 warn!("DialError received. Returning RetryError::Failure");
                                 Err(RetryError::Failure(error.clone().into()))
                             }
@@ -137,7 +137,7 @@ async fn wait_for_connection(
                             );
                             return match error.as_ref() {
                                 // If we are dialing ourself then we should just fail
-                                DialError::NoAddresses { .. } => {
+                                DialError::NoAddresses => {
                                     Err(RetryError::Failure(error.clone().into()))
                                 }
                                 // Try again otherwise

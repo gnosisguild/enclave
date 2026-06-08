@@ -76,7 +76,7 @@ impl TryFrom<CalculateThresholdDecryptionRequest> for InnerRequest {
         for (party_id, vec_of_bytes) in ordered_polys {
             let polys: Vec<Poly<PowerBasis>> = vec_of_bytes
                 .iter()
-                .map(|bytes| try_poly_pb_from_bytes(&bytes, &params))
+                .map(|bytes| try_poly_pb_from_bytes(bytes, &params))
                 .collect::<Result<Vec<_>>>()?;
 
             d_share_polys.push(polys);

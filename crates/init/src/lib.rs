@@ -60,7 +60,7 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
         })
         .await?;
 
-    spinner.complete_task(&format!(
+    spinner.complete_task(format!(
         "Template downloaded with commit hash '{}'\n",
         commit_hash
     ));
@@ -101,7 +101,7 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
             copy::copy_with_filters(
                 &src,
                 &cwd,
-                &vec![
+                &[
                     Filter::new(
                         "**/package.json",
                         r#""@enclave-e3/contracts":\s*"[^"]*""#,
@@ -160,14 +160,14 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
             copy::copy_with_filters(
                 &PathBuf::from(TEMP_DIR).join("crates/support-scripts/ctl"),
                 &cwd.join(".enclave/support/ctl"),
-                &vec![],
+                &[],
             )
             .await?;
 
             copy::copy_with_filters(
                 &PathBuf::from(TEMP_DIR).join("crates/support-scripts/dev"),
                 &cwd.join(".enclave/support/dev"),
-                &vec![],
+                &[],
             )
             .await
         })
@@ -259,7 +259,7 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
 
     spinner
         .run("", || async {
-            let npm = PkgMan::new(pkgman::PkgManKind::PNPM)?.with_cwd(&cwd);
+            let npm = PkgMan::new(pkgman::PkgManKind::PNPM)?.with_cwd(cwd.clone());
             let mut args = vec!["install"];
             if !verbose {
                 args.push("--silent");

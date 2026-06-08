@@ -96,6 +96,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 
+#[allow(dead_code)]
 fn select_environment() -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
     let selections = &["CRISP: Voting Protocol (ETH)", "More Coming Soon!"];
     Ok(FuzzySelect::with_theme(&ColorfulTheme::default())

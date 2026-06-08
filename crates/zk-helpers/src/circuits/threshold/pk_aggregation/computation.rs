@@ -43,7 +43,7 @@ impl CircuitComputation for PkAggregationCircuit {
     fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &())?;
-        let inputs = Inputs::compute(preset, &data)?;
+        let inputs = Inputs::compute(preset, data)?;
 
         Ok(PkAggregationComputationOutput {
             bounds,
@@ -166,11 +166,11 @@ impl Computation for Inputs {
 
         let mut expected_threshold_pk_commitments = Vec::new();
 
-        for party_index in 0..data.committee.h {
-            pk0[party_index].reverse();
-            pk0[party_index].center(threshold_params.moduli())?;
+        for pk in pk0.iter_mut().take(data.committee.h) {
+            pk.reverse();
+            pk.center(threshold_params.moduli())?;
 
-            let commitment = compute_threshold_pk_commitment(&pk0[party_index], bit_pk);
+            let commitment = compute_threshold_pk_commitment(pk, bit_pk);
 
             expected_threshold_pk_commitments.push(commitment);
         }
@@ -184,11 +184,8 @@ impl Computation for Inputs {
     }
 
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
-        let pk0: Vec<Vec<serde_json::Value>> = self
-            .pk0
-            .iter()
-            .map(|p| crt_polynomial_to_toml_json(p))
-            .collect();
+        let pk0: Vec<Vec<serde_json::Value>> =
+            self.pk0.iter().map(crt_polynomial_to_toml_json).collect();
         let pk0_agg = crt_polynomial_to_toml_json(&self.pk0_agg);
         let expected_threshold_pk_commitments =
             bigint_1d_to_json_values(&self.expected_threshold_pk_commitments);

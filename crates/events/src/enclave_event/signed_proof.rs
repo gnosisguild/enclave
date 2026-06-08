@@ -204,7 +204,7 @@ impl SignedProofPayload {
             .map_err(|e| anyhow!("Invalid signature: {e}"))?;
 
         let digest = self.payload.digest()?;
-        sig.recover_address_from_msg(&digest)
+        sig.recover_address_from_msg(digest)
             .map_err(|e| anyhow!("Failed to recover address: {e}"))
     }
 

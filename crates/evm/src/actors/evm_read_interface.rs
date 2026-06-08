@@ -396,7 +396,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
             Ok(subscription) => {
                 backoff.reset();
                 consecutive_failures = 0;
-                let sub_id: B256 = subscription.local_id().clone();
+                let sub_id: B256 = *subscription.local_id();
                 let mut stream = subscription.into_stream();
                 info!(chain_id, "Live event subscription active");
 
@@ -443,10 +443,10 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
                     };
                     current_provider = p;
                     consecutive_failures = 0;
-                } else if consecutive_failures > 0 {
-                    if sleep_or_shutdown(backoff.next_delay(), &mut shutdown).await {
-                        return;
-                    }
+                } else if consecutive_failures > 0
+                    && sleep_or_shutdown(backoff.next_delay(), &mut shutdown).await
+                {
+                    return;
                 }
             }
             Err(e) => {

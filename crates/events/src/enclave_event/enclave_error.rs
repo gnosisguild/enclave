@@ -71,7 +71,7 @@ impl FromError for EnclaveError {
 
 /// Function to run a closure that returns a result. If result is an Err variant it is trapped and
 /// sent to the bus as an ErrorEvent
-pub fn trap<F>(err_type: EType, bus: &impl ErrorDispatcher<EnclaveEvent<Unsequenced>>, runner: F)
+pub fn trap<F>(err_type: EType, bus: &dyn ErrorDispatcher<EnclaveEvent<Unsequenced>>, runner: F)
 where
     F: FnOnce() -> anyhow::Result<()>,
 {
@@ -104,6 +104,12 @@ where
 // A struct that panics on errors
 pub struct PanicDispatcher;
 
+impl Default for PanicDispatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PanicDispatcher {
     pub fn new() -> Self {
         Self {}
@@ -111,27 +117,41 @@ impl PanicDispatcher {
 }
 
 impl ErrorDispatcher<EnclaveEvent<Unsequenced>> for PanicDispatcher {
-    fn err(&self, _: EType, error: impl Into<anyhow::Error>) {
+    fn err(&self, _: EType, error: anyhow::Error) {
         panic!("{}", major_issue("Failure!", error));
     }
 }
 
 // A struct that warns on errors
 pub struct WarningDispatcher;
+
+impl Default for WarningDispatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WarningDispatcher {
     pub fn new() -> Self {
         Self {}
     }
 }
 impl ErrorDispatcher<EnclaveEvent<Unsequenced>> for WarningDispatcher {
-    fn err(&self, err_type: EType, error: impl Into<anyhow::Error>) {
-        tracing::warn!("{:?} Failure! {}", err_type, error.into());
+    fn err(&self, err_type: EType, error: anyhow::Error) {
+        tracing::warn!("{:?} Failure! {}", err_type, error);
     }
 }
 
 // A struct that logs errors on errors
 // Avoid using this over BusHandle
 pub struct LogErrorDispatcher;
+
+impl Default for LogErrorDispatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LogErrorDispatcher {
     pub fn new() -> Self {
         Self {}
@@ -139,7 +159,7 @@ impl LogErrorDispatcher {
 }
 
 impl ErrorDispatcher<EnclaveEvent<Unsequenced>> for LogErrorDispatcher {
-    fn err(&self, err_type: EType, error: impl Into<anyhow::Error>) {
-        tracing::error!("{:?} Failure! {}", err_type, error.into());
+    fn err(&self, err_type: EType, error: anyhow::Error) {
+        tracing::error!("{:?} Failure! {}", err_type, error);
     }
 }

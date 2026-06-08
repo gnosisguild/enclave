@@ -762,7 +762,7 @@ impl CiphernodeBuilder {
             info!("Setting up CommitmentConsistencyCheckerExtension");
             e3_builder = e3_builder.with(CommitmentConsistencyCheckerExtension::create(
                 bus,
-                |preset| e3_zk_prover::default_links(preset),
+                e3_zk_prover::default_links,
             ));
         }
 
@@ -881,7 +881,7 @@ fn create_aggregate_delays(
 ) -> Result<HashMap<AggregateId, Duration>> {
     let mut delays = HashMap::new();
 
-    for (chain, actual_chain_id) in chain_providers.into_iter().cloned() {
+    for (chain, actual_chain_id) in chain_providers.iter().cloned() {
         // Validate chain_id if specified in configuration
         validate_chain_id(&chain, actual_chain_id)?;
 
@@ -894,7 +894,7 @@ fn create_aggregate_delays(
 }
 
 async fn setup_evm_system(
-    chains: &Vec<ChainConfig>,
+    chains: &[ChainConfig],
     provider_cache: &mut ProviderCache<WriteEnabled>,
     bus: &BusHandle,
     contract_components: &ContractComponents,
@@ -910,13 +910,13 @@ async fn setup_evm_system(
         let provider_factory =
             ProviderConfig::new(rpc_url, chain.rpc_auth.clone()).into_read_provider_factory();
 
-        let mut system = EvmSystemChainBuilder::new(&bus, &provider);
+        let mut system = EvmSystemChainBuilder::new(bus, &provider);
         system.with_provider_factory(provider_factory);
 
         if contract_components.enclave {
             let write_provider = provider_cache.ensure_write_provider(chain).await?;
             let contract = &chain.contracts.enclave;
-            EnclaveSolWriter::attach(&bus, write_provider.clone(), contract.address()?);
+            EnclaveSolWriter::attach(bus, write_provider.clone(), contract.address()?);
             system.with_contract(contract.address()?, move |next| {
                 EnclaveSolReader::setup(&next).recipient()
             });
@@ -947,12 +947,12 @@ async fn setup_evm_system(
             // TODO: Should we not let this pass and just use '?'?
             // Above if we include enclave in the config and we don't have a wallet it will fail
             match provider_cache
-                    .ensure_write_provider(&chain)
+                    .ensure_write_provider(chain)
                     .await
                 {
                     Ok(write_provider) => {
                         CiphernodeRegistrySol::attach_writer(
-                            &bus,
+                            bus,
                             write_provider.clone(),
                             contract.address()?,
                         );
@@ -960,7 +960,7 @@ async fn setup_evm_system(
 
                         if pubkey_agg {
                             info!("Attaching CommitteeFinalizer for score sortition");
-                            CommitteeFinalizer::attach(&bus);
+                            CommitteeFinalizer::attach(bus);
                         }
                     }
                     Err(e) => error!(
@@ -985,10 +985,10 @@ async fn setup_evm_system(
             });
 
             // Writer: submit proposeSlash transactions
-            match provider_cache.ensure_write_provider(&chain).await {
+            match provider_cache.ensure_write_provider(chain).await {
                 Ok(write_provider) => {
                     match SlashingManagerSolWriter::attach(
-                        &bus,
+                        bus,
                         write_provider.clone(),
                         contract_addr,
                     )

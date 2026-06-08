@@ -49,7 +49,7 @@ pub fn resolve_config_path<P: Into<PathBuf>>(
     }
 
     // search from cwd
-    if let Some(found) = find_in_parent(&cwd.into(), default_filename) {
+    if let Some(found) = find_in_parent(&cwd, default_filename) {
         return found;
     }
 

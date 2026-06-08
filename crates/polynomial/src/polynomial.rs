@@ -53,8 +53,6 @@ pub enum PolynomialError {
 }
 
 /// A polynomial with coefficients stored as `BigInt` for arbitrary precision arithmetic.
-
-///
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Polynomial {
@@ -79,12 +77,10 @@ impl fmt::Display for Polynomial {
                 if coeff < &BigInt::zero() {
                     write!(f, "-")?;
                 }
+            } else if coeff > &BigInt::zero() {
+                write!(f, " + ")?;
             } else {
-                if coeff > &BigInt::zero() {
-                    write!(f, " + ")?;
-                } else {
-                    write!(f, " - ")?;
-                }
+                write!(f, " - ")?;
             }
             first = false;
 

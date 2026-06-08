@@ -62,6 +62,7 @@ library EnclavePricing {
             (uint256(2500) << 192) |
             (uint256(5000) << 208) |
             (uint256(2500) << 224);
+        // solhint-disable-next-line no-inline-assembly
         assembly {
             sstore(24, 100000) // keyGenFixedPerNode      = 0.10 USDC
             sstore(25, 50000) // keyGenPerEncryptionProof = 0.05 USDC
@@ -220,7 +221,7 @@ library EnclavePricing {
         uint256 computeWindow,
         uint256 decryptionWindow,
         uint256 maxDuration,
-        uint256 quotedFee
+        uint256 quotedFee // solhint-disable-line no-unused-vars
     ) external pure {
         if (inputWindow[0] < nowTs)
             revert IEnclave.InvalidInputDeadlineStart(inputWindow[0]);

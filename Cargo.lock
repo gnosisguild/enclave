@@ -3288,6 +3288,7 @@ name = "e3-data"
 version = "0.2.0"
 dependencies = [
  "actix",
+ "alloy-primitives",
  "anyhow",
  "async-trait",
  "bincode 1.3.3",

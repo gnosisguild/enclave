@@ -24,11 +24,6 @@ use crate::{
     EventType, HistoryCollector, Sequenced, Subscribe, Unsequenced, Unsubscribe,
 };
 
-// TODO: this wont work with trap need to fix
-pub trait EnclaveUnsequencedErrorDispatcher {
-    fn err(&self, err_type: EType, error: anyhow::Error);
-}
-
 /// Typestate marker indicating the BusHandle has not yet been enabled with an HLC clock.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Disabled;
@@ -220,15 +215,6 @@ impl BusHandle<Enabled> {
 }
 
 impl<S> ErrorDispatcher<EnclaveEvent<Unsequenced>> for BusHandle<S> {
-    fn err(&self, err_type: EType, error: impl Into<anyhow::Error>) {
-        match self.event_from_error(err_type, error, self.get_ctx()) {
-            Ok(evt) => self.sequencer.do_send(evt),
-            Err(e) => error!("{e}"),
-        }
-    }
-}
-
-impl<S> EnclaveUnsequencedErrorDispatcher for BusHandle<S> {
     fn err(&self, err_type: EType, error: anyhow::Error) {
         match self.event_from_error(err_type, error, self.get_ctx()) {
             Ok(evt) => self.sequencer.do_send(evt),
@@ -295,7 +281,7 @@ impl<S> EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle<S> {
         event_types: &[EventType],
         recipient: Recipient<EnclaveEvent<Sequenced>>,
     ) {
-        for event_type in event_types.into_iter() {
+        for event_type in event_types.iter() {
             self.event_bus
                 .do_send(Subscribe::new(*event_type, recipient.clone()));
         }
@@ -333,14 +319,61 @@ impl<S> EventContextManager for BusHandle<S> {
     }
 }
 
+/// Actor for piping between BusHandles.
+pub struct BusHandlePipe<F>
+where
+    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
+{
+    handle: BusHandle<Enabled>,
+    predicate: F,
+}
+
+impl<F> BusHandlePipe<F>
+where
+    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
+{
+    /// Create a new BusHandlePipe only forwarding events to the wrapped handle when the predicate
+    /// function returns true
+    pub fn new(handle: BusHandle<Enabled>, predicate: F) -> Self {
+        Self { handle, predicate }
+    }
+}
+
+impl<F> Actor for BusHandlePipe<F>
+where
+    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
+{
+    type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
+}
+
+impl<F> Handler<EnclaveEvent<Sequenced>> for BusHandlePipe<F>
+where
+    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
+{
+    type Result = ();
+    fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
+        if (self.predicate)(&msg) {
+            let source = msg.source();
+            let block = msg.block();
+            let (data, ts) = msg.split();
+            if let Err(e) = self.handle.publish_from_remote(data, ts, block, source) {
+                error!("{e}");
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use actix::{Actor, Handler, Message};
     use e3_ciphernode_builder::EventSystem;
     // NOTE: We cannot pull from crate as the features will be missing as they are not default.
     use e3_events::{
-        hlc::Hlc, prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventPublisher,
-        EventSource, EventType, TestEvent,
+        hlc::Hlc, prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventPublisher, EventType,
+        TestEvent,
     };
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::time::sleep;
@@ -370,8 +403,10 @@ mod tests {
             type Result = ();
             fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
                 let ts = msg.ts();
+                let block = msg.block();
+                let source = msg.source();
                 self.dest
-                    .publish_from_remote(msg.into_data(), ts, None, EventSource::Local)
+                    .publish_from_remote(msg.into_data(), ts, block, source)
                     .unwrap()
             }
         }
@@ -482,51 +517,5 @@ mod tests {
         }
 
         Ok(())
-    }
-}
-
-/// Actor for piping between BusHandles.
-pub struct BusHandlePipe<F>
-where
-    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
-{
-    handle: BusHandle<Enabled>,
-    predicate: F,
-}
-
-impl<F> BusHandlePipe<F>
-where
-    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
-{
-    /// Create a new BusHandlePipe only forwarding events to the wrapped handle when the predicate
-    /// function returns true
-    pub fn new(handle: BusHandle<Enabled>, predicate: F) -> Self {
-        Self { handle, predicate }
-    }
-}
-
-impl<F> Actor for BusHandlePipe<F>
-where
-    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
-{
-    type Context = actix::Context<Self>;
-    fn started(&mut self, ctx: &mut Self::Context) {
-        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
-    }
-}
-
-impl<F> Handler<EnclaveEvent<Sequenced>> for BusHandlePipe<F>
-where
-    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
-{
-    type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
-        if (self.predicate)(&msg) {
-            let source = msg.source();
-            let (data, ts) = msg.split();
-            let _ = self.handle.publish_from_remote(data, ts, None, source);
-            // TODO: check if this is fine
-            // to erase block data
-        }
     }
 }

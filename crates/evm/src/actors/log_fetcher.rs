@@ -72,7 +72,7 @@ pub(crate) async fn fetch_logs_chunked<L: LogProvider>(
     }
 
     let total_blocks = to_block - from_block + 1;
-    let total_chunks = (total_blocks + GET_LOGS_CHUNK_SIZE - 1) / GET_LOGS_CHUNK_SIZE;
+    let total_chunks = total_blocks.div_ceil(GET_LOGS_CHUNK_SIZE);
 
     info!(
         chain_id,
