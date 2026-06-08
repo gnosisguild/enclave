@@ -73,6 +73,7 @@ pub struct VoteStatusResponse {
     pub round_status: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RoundCount {
     pub round_count: u64,

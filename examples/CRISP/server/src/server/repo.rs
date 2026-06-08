@@ -88,7 +88,7 @@ impl<S: DataStore> CurrentRoundRepository<S> {
     }
 
     fn current_round_key(&self) -> String {
-        format!("_e3:current_round")
+        "_e3:current_round".to_string()
     }
 }
 
@@ -307,6 +307,7 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(e3_crisp.ciphertext_inputs)
     }
 
+    #[allow(dead_code)]
     pub async fn set_ciphertext_output(&mut self, data: Vec<u8>) -> Result<()> {
         self.get_e3_repo().set_ciphertext_output(data).await?;
         Ok(())
@@ -331,16 +332,13 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub async fn remove_voter_address(&mut self, address: &str) -> Result<()> {
         let key = self.crisp_key();
         self.store
             .modify(&key, |e3_obj: Option<E3Crisp>| {
                 e3_obj.map(|mut e| {
-                    e.has_voted = e
-                        .has_voted
-                        .into_iter()
-                        .filter(|item| item != address)
-                        .collect();
+                    e.has_voted.retain(|item| item != address);
                     e
                 })
             })
@@ -349,6 +347,7 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub async fn is_finished(&self) -> Result<bool> {
         let e3 = self.get_crisp().await?;
         Ok(e3.status == "Finished")

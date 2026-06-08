@@ -162,8 +162,7 @@ pub async fn register_e3_requested(
                         "[e3_id={}] No eligible token holders found for token address {}.",
                         e3_id,
                         token_address
-                    )
-                    .into());
+                    ));
                 }
 
                 // save the e3 details
@@ -280,12 +279,11 @@ async fn handle_e3_input_deadline_expiration(
                 "Computation request returned unexpected E3 ID: expected {}, got {}",
                 e3_id,
                 id
-            )
-            .into());
+            ));
         }
 
         if status != "processing" {
-            return Err(eyre::eyre!("Computation request failed with status: {}", status).into());
+            return Err(eyre::eyre!("Computation request failed with status: {}", status));
         }
 
         info!("[e3_id={}] Request Computation for E3", e3_id);
