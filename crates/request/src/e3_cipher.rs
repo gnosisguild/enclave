@@ -19,7 +19,9 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_crypto::Cipher;
 use e3_data::{Repositories, RepositoriesFactory, Repository};
-use e3_events::{E3id, EnclaveEvent, EnclaveEventData, Event, StoreKeys};
+use e3_events::{
+    E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, Event, FailureReason, StoreKeys,
+};
 use std::sync::Arc;
 use tracing::{debug, info};
 
@@ -96,15 +98,25 @@ impl E3Extension for E3CipherExtension {
                     return;
                 }
                 let repo = ctx.repositories().e3_cipher(&data.e3_id);
-                // Failure here means we cannot guarantee forward secrecy for this round.
-                // Continuing without a per-E3 cipher would silently fall back to the master
-                // cipher and break the security invariant, so we treat it as non-recoverable.
-                let cipher = self
-                    .create_and_store(&repo, &data.e3_id)
-                    .unwrap_or_else(|e| {
-                        panic!("failed to create E3 cipher for {}: {e}", data.e3_id)
-                    });
-                ctx.set_dependency(E3_CIPHER_KEY, cipher);
+                match self.create_and_store(&repo, &data.e3_id) {
+                    Ok(cipher) => ctx.set_dependency(E3_CIPHER_KEY, cipher),
+                    Err(e) => {
+                        tracing::error!(
+                            e3_id = %data.e3_id,
+                            "failed to create E3 cipher: {e}; aborting round to preserve forward secrecy"
+                        );
+                        let fail_evt = EnclaveEvent::new_stored_event(
+                            EnclaveEventData::from(E3Failed {
+                                e3_id: data.e3_id.clone(),
+                                failed_at_stage: E3Stage::Requested,
+                                reason: FailureReason::None,
+                            }),
+                            0,
+                            0,
+                        );
+                        ctx.forward_message_now(&fail_evt);
+                    }
+                }
             }
             // Purge the E3 key on completion.
             EnclaveEventData::E3RequestComplete(data) => {
