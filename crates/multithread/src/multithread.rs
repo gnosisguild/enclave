@@ -102,20 +102,24 @@ type E3CipherCache = Arc<Mutex<HashMap<E3id, Arc<Cipher>>>>;
 /// cipher** by `E3CipherExtension`. Here we load it (caching the result), decrypt it under the
 /// master cipher and return the per-E3 `Cipher`.
 ///
-/// If no per-E3 key exists for this round (e.g. it was already purged, or the request predates
-/// the forward-secrecy scheme) we fall back to the master cipher. A genuinely mismatched cipher
-/// then surfaces downstream as a "Could not decrypt data" error, which is the correct outcome.
+/// `Ok(None)` from the store (no key stored) is the only case that falls back to the master
+/// cipher — that covers rounds with no per-E3 key (e.g. requests predating the forward-secrecy
+/// scheme). Once a key blob *exists*, a read or unwrap failure means this round is no longer
+/// recoverable (corrupt entry, or the wrong master key after a restart), so we fail fast rather
+/// than silently continuing under the wrong cipher assumption.
 async fn resolve_e3_cipher(
     store: &DataStore,
     master: &Arc<Cipher>,
     cache: &E3CipherCache,
     e3_id: &E3id,
-) -> Arc<Cipher> {
+) -> Result<Arc<Cipher>> {
     if let Some(found) = cache.lock().unwrap().get(e3_id).cloned() {
-        return found;
+        return Ok(found);
     }
 
-    let scoped = store.scope(StoreKeys::e3_key(e3_id));
+    // `base` (absolute location), matching `E3CipherExtension`'s writer, so resolution is
+    // independent of whatever scope this store handle currently carries.
+    let scoped = store.base(StoreKeys::e3_key(e3_id));
     let resolved = match scoped.read::<Vec<u8>>().await {
         Ok(Some(encrypted_key)) => match master
             .decrypt_data(&encrypted_key)
@@ -123,17 +127,17 @@ async fn resolve_e3_cipher(
         {
             Ok(cipher) => Arc::new(cipher),
             Err(e) => {
-                error!(e3_id = %e3_id, "failed to decrypt per-E3 cipher key, falling back to master: {e}");
-                return master.clone();
+                error!(e3_id = %e3_id, "failed to decrypt per-E3 cipher key: {e}");
+                anyhow::bail!("failed to unwrap per-E3 cipher for {e3_id}");
             }
         },
         Ok(None) => {
             // No per-E3 key stored for this round — use the master cipher.
-            return master.clone();
+            return Ok(master.clone());
         }
         Err(e) => {
-            error!(e3_id = %e3_id, "failed to read per-E3 cipher key, falling back to master: {e}");
-            return master.clone();
+            error!(e3_id = %e3_id, "failed to read per-E3 cipher key: {e}");
+            anyhow::bail!("failed to load per-E3 cipher for {e3_id}");
         }
     };
 
@@ -141,7 +145,7 @@ async fn resolve_e3_cipher(
         .lock()
         .unwrap()
         .insert(e3_id.clone(), resolved.clone());
-    resolved
+    Ok(resolved)
 }
 
 /// Multithread actor
@@ -345,6 +349,25 @@ impl Handler<TypedEvent<ComputeRequest>> for Multithread {
     }
 }
 
+/// Build the variant-matched [`ComputeRequestErrorKind`] for a failed request, tagging it with
+/// `msg`. Shared by the cipher-resolution and task-pool failure paths.
+fn compute_error_kind(request: &ComputeRequestKind, msg: String) -> ComputeRequestErrorKind {
+    match request {
+        ComputeRequestKind::Zk(_) => {
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(msg))
+        }
+        ComputeRequestKind::TrBFV(trbfv_req) => ComputeRequestErrorKind::TrBFV(match trbfv_req {
+            TrBFVRequest::GenPkShareAndSkSss(_) => TrBFVError::GenPkShareAndSkSss(msg),
+            TrBFVRequest::GenEsiSss(_) => TrBFVError::GenEsiSss(msg),
+            TrBFVRequest::CalculateDecryptionKey(_) => TrBFVError::CalculateDecryptionKey(msg),
+            TrBFVRequest::CalculateDecryptionShare(_) => TrBFVError::CalculateDecryptionShare(msg),
+            TrBFVRequest::CalculateThresholdDecryption(_) => {
+                TrBFVError::CalculateThresholdDecryption(msg)
+            }
+        }),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn handle_compute_request_event(
     msg: TypedEvent<ComputeRequest>,
@@ -363,8 +386,23 @@ async fn handle_compute_request_event(
     let request_snapshot = msg.clone();
 
     // Resolve the per-E3 forward-secrecy cipher for this round; all `SensitiveBytes` in the
-    // request were encrypted with it by the producing keyshare actor.
-    let cipher = resolve_e3_cipher(&store, &master_cipher, &cache, &msg.e3_id).await;
+    // request were encrypted with it by the producing keyshare actor. An unrecoverable resolve
+    // failure aborts the request rather than proceeding under the wrong cipher assumption.
+    let cipher = match resolve_e3_cipher(&store, &master_cipher, &cache, &msg.e3_id).await {
+        Ok(cipher) => cipher,
+        Err(resolve_err) => {
+            error!(
+                "Could not resolve per-E3 cipher for compute request '{}': {resolve_err}",
+                msg_string
+            );
+            let error_kind = compute_error_kind(
+                &request_snapshot.request,
+                format!("Cipher error: {resolve_err}"),
+            );
+            bus.publish(ComputeRequestError::new(error_kind, request_snapshot), ctx)?;
+            return Ok(());
+        }
+    };
 
     let report_for_worker = report.clone();
     let pool_result = pool
@@ -380,27 +418,8 @@ async fn handle_compute_request_event(
                 "Task pool error for compute request '{}': {pool_err}",
                 msg_string
             );
-            let error_kind = match &request_snapshot.request {
-                ComputeRequestKind::Zk(_) => ComputeRequestErrorKind::Zk(
-                    ZkEventError::ProofGenerationFailed(format!("Pool error: {pool_err}")),
-                ),
-                ComputeRequestKind::TrBFV(ref trbfv_req) => {
-                    let msg = format!("Pool error: {pool_err}");
-                    ComputeRequestErrorKind::TrBFV(match trbfv_req {
-                        TrBFVRequest::GenPkShareAndSkSss(_) => TrBFVError::GenPkShareAndSkSss(msg),
-                        TrBFVRequest::GenEsiSss(_) => TrBFVError::GenEsiSss(msg),
-                        TrBFVRequest::CalculateDecryptionKey(_) => {
-                            TrBFVError::CalculateDecryptionKey(msg)
-                        }
-                        TrBFVRequest::CalculateDecryptionShare(_) => {
-                            TrBFVError::CalculateDecryptionShare(msg)
-                        }
-                        TrBFVRequest::CalculateThresholdDecryption(_) => {
-                            TrBFVError::CalculateThresholdDecryption(msg)
-                        }
-                    })
-                }
-            };
+            let error_kind =
+                compute_error_kind(&request_snapshot.request, format!("Pool error: {pool_err}"));
             bus.publish(ComputeRequestError::new(error_kind, request_snapshot), ctx)?;
             return Ok(());
         }

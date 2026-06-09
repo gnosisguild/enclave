@@ -39,7 +39,11 @@ pub trait E3CipherRepositoryFactory {
 
 impl E3CipherRepositoryFactory for Repositories {
     fn e3_cipher(&self, e3_id: &E3id) -> Repository<Vec<u8>> {
-        Repository::new(self.store.scope(StoreKeys::e3_key(e3_id)))
+        // `base` (absolute), not `scope` (relative): the per-E3 key must live at a fixed,
+        // node-global location so that the shared `Multithread` actor — which holds the root
+        // store, not this per-E3 context scope — resolves the exact same key. The e3_id is
+        // already in the key, so it stays unique per round.
+        Repository::new(self.store.base(StoreKeys::e3_key(e3_id)))
     }
 }
 
@@ -192,6 +196,42 @@ mod tests {
             cipher.key_bytes().as_slice(),
             loaded.key_bytes().as_slice(),
             "loaded key must match the one that was stored"
+        );
+    }
+
+    // Regression: the per-E3 key must resolve to the SAME absolute location whether accessed
+    // through a per-E3 context-scoped store (as `E3CipherExtension` does) or through the root
+    // store (as the shared `Multithread` actor does). A relative `scope` here would write under
+    // the context scope and the root reader would miss it — surfacing as "Could not decrypt data"
+    // during key generation.
+    #[actix::test]
+    async fn e3_cipher_key_resolves_at_same_location_across_scopes() {
+        use e3_data::RepositoriesFactory;
+
+        let ext = E3CipherExtension::create(&master());
+        let root = test_repos();
+        let id = e3id();
+
+        // Writer side: a deeply scoped store, mimicking the router's per-E3 context scope.
+        let scoped_repos: Repositories = root
+            .store
+            .scope(StoreKeys::router())
+            .scope(StoreKeys::context(&id))
+            .repositories();
+        let stored = ext
+            .create_and_store(&scoped_repos.e3_cipher(&id), &id)
+            .unwrap();
+
+        // Reader side: the root store (what Multithread holds) must find the same key.
+        let loaded = ext
+            .load(&root.e3_cipher(&id), &id)
+            .await
+            .unwrap()
+            .expect("root reader must resolve the key written through the scoped store");
+        assert_eq!(
+            stored.key_bytes().as_slice(),
+            loaded.key_bytes().as_slice(),
+            "key must be identical regardless of the store scope it is accessed through"
         );
     }
 
