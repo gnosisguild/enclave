@@ -66,14 +66,21 @@ impl RequestRouter {
 
         // If this e3 round has already been completed then this event is unexpected.
         if completed.contains(&e3_id) {
-            // Plaintext Aggregated Triggers E3RequestComplete which tears down the per-E3 context
-            // and mark it as completed, but the E3StageChanged(Complete) that arrives from the EVM
-            // after local teardown is expected and should be ignored rather than treated as an error.
-            if matches!(
-                msg.get_data(),
+            // On-chain confirmation events that lag behind local teardown are expected and
+            // should be silently ignored rather than treated as an error.
+            let is_late_terminal = match msg.get_data() {
+                // E3StageChanged(Complete) always lags local PlaintextAggregated completion.
                 EnclaveEventData::E3StageChanged(data)
-                    if matches!(data.new_stage, E3Stage::Complete)
-            ) {
+                    if matches!(data.new_stage, E3Stage::Complete | E3Stage::Failed) =>
+                {
+                    true
+                }
+                // E3Failed from on-chain markE3Failed may arrive after a local timeout already
+                // cleaned up the context.
+                EnclaveEventData::E3Failed(data) if data.reason.is_timeout() => true,
+                _ => false,
+            };
+            if is_late_terminal {
                 return RoutingDecision::Ignore;
             }
             return RoutingDecision::AlreadyCompleted(e3_id);
@@ -88,8 +95,12 @@ impl RequestRouter {
             {
                 PostForward::PublishComplete
             }
-            // NOTE: E3Stage::Failed does NOT trigger E3RequestComplete. Failed rounds need the
-            // accusation/slashing lifecycle to complete before the context is torn down.
+            // Timeout failures have no accusation/slashing lifecycle, so the context can be
+            // torn down immediately. Misbehaviour failures (DKGInvalidShares, etc.) still need
+            // the accusation/slashing lifecycle to complete before teardown.
+            EnclaveEventData::E3Failed(data) if data.reason.is_timeout() => {
+                PostForward::PublishComplete
+            }
             EnclaveEventData::E3RequestComplete(_) => PostForward::Teardown,
             _ => PostForward::None,
         };
@@ -105,8 +116,8 @@ impl RequestRouter {
 mod tests {
     use super::*;
     use e3_events::{
-        E3RequestComplete, E3Stage, E3StageChanged, EnclaveEvent, PlaintextAggregated, Sequenced,
-        Shutdown,
+        E3Failed, E3RequestComplete, E3Stage, E3StageChanged, EnclaveEvent, FailureReason,
+        PlaintextAggregated, Sequenced, Shutdown,
     };
 
     fn e3id() -> E3id {
@@ -190,9 +201,9 @@ mod tests {
     }
 
     #[test]
-    fn stage_changed_to_failed_still_errors_when_completed() {
-        // E3StageChanged(Failed) after completion IS unexpected and should still error,
-        // because the failed path goes through accusation/slashing, not simple completion.
+    fn stage_changed_to_failed_ignored_when_completed() {
+        // E3StageChanged(Failed) from the EVM can arrive after a local timeout already cleaned up
+        // the context. Treat it as a silent no-op, the same way we handle E3StageChanged(Complete).
         let id = e3id();
         let mut completed = HashSet::new();
         completed.insert(id.clone());
@@ -203,7 +214,7 @@ mod tests {
         });
         assert_eq!(
             RequestRouter::route(&msg, &completed),
-            RoutingDecision::AlreadyCompleted(id)
+            RoutingDecision::Ignore
         );
     }
 
@@ -283,6 +294,111 @@ mod tests {
                 e3_id: id,
                 post_forward: PostForward::None,
             }
+        );
+    }
+
+    // --- timeout-triggered E3Failed tests ---
+
+    fn e3_failed(id: E3id, reason: FailureReason) -> EnclaveEvent {
+        from_data(E3Failed {
+            e3_id: id,
+            failed_at_stage: E3Stage::CommitteeFinalized,
+            reason,
+        })
+    }
+
+    #[test]
+    fn e3_failed_dkg_timeout_publishes_complete() {
+        let id = e3id();
+        let msg = e3_failed(id.clone(), FailureReason::DKGTimeout);
+        assert_eq!(
+            RequestRouter::route(&msg, &HashSet::new()),
+            RoutingDecision::Process {
+                e3_id: id,
+                post_forward: PostForward::PublishComplete,
+            }
+        );
+    }
+
+    #[test]
+    fn e3_failed_committee_formation_timeout_publishes_complete() {
+        let id = e3id();
+        let msg = e3_failed(id.clone(), FailureReason::CommitteeFormationTimeout);
+        assert_eq!(
+            RequestRouter::route(&msg, &HashSet::new()),
+            RoutingDecision::Process {
+                e3_id: id,
+                post_forward: PostForward::PublishComplete,
+            }
+        );
+    }
+
+    #[test]
+    fn e3_failed_compute_timeout_publishes_complete() {
+        let id = e3id();
+        let msg = e3_failed(id.clone(), FailureReason::ComputeTimeout);
+        assert_eq!(
+            RequestRouter::route(&msg, &HashSet::new()),
+            RoutingDecision::Process {
+                e3_id: id,
+                post_forward: PostForward::PublishComplete,
+            }
+        );
+    }
+
+    #[test]
+    fn e3_failed_decryption_timeout_publishes_complete() {
+        let id = e3id();
+        let msg = e3_failed(id.clone(), FailureReason::DecryptionTimeout);
+        assert_eq!(
+            RequestRouter::route(&msg, &HashSet::new()),
+            RoutingDecision::Process {
+                e3_id: id,
+                post_forward: PostForward::PublishComplete,
+            }
+        );
+    }
+
+    #[test]
+    fn e3_failed_invalid_shares_does_not_complete() {
+        // Slashable failures must NOT trigger E3RequestComplete — the accusation/slashing
+        // lifecycle must be allowed to finish first.
+        let id = e3id();
+        let msg = e3_failed(id.clone(), FailureReason::DKGInvalidShares);
+        assert_eq!(
+            RequestRouter::route(&msg, &HashSet::new()),
+            RoutingDecision::Process {
+                e3_id: id,
+                post_forward: PostForward::None,
+            }
+        );
+    }
+
+    #[test]
+    fn e3_failed_timeout_ignored_when_already_completed() {
+        let id = e3id();
+        let mut completed = HashSet::new();
+        completed.insert(id.clone());
+        let msg = e3_failed(id.clone(), FailureReason::DKGTimeout);
+        assert_eq!(
+            RequestRouter::route(&msg, &completed),
+            RoutingDecision::Ignore
+        );
+    }
+
+    #[test]
+    fn stage_changed_to_failed_ignored_when_already_completed() {
+        let id = e3id();
+        let mut completed = HashSet::new();
+        completed.insert(id.clone());
+        let msg = from_data(E3StageChanged {
+            e3_id: id.clone(),
+            previous_stage: E3Stage::CommitteeFinalized,
+            new_stage: E3Stage::Failed,
+        });
+        assert_eq!(
+            RequestRouter::route(&msg, &completed),
+            RoutingDecision::Ignore
         );
     }
 }

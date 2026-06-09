@@ -47,6 +47,21 @@ pub struct E3Failed {
     pub reason: FailureReason,
 }
 
+impl FailureReason {
+    /// Returns true when the failure was caused purely by a deadline expiring rather
+    /// than by a node acting maliciously. Timeout failures have no associated
+    /// accusation/slashing lifecycle, so their E3 context can be torn down immediately.
+    pub fn is_timeout(&self) -> bool {
+        matches!(
+            self,
+            Self::CommitteeFormationTimeout
+                | Self::DKGTimeout
+                | Self::ComputeTimeout
+                | Self::DecryptionTimeout
+        )
+    }
+}
+
 impl Display for E3Failed {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

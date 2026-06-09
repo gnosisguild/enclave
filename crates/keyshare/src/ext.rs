@@ -14,14 +14,17 @@ use async_trait::async_trait;
 use e3_crypto::Cipher;
 use e3_data::{AutoPersist, RepositoriesFactory};
 use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
-use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
+use e3_request::{E3Context, E3ContextSnapshot, E3Extension, E3_CIPHER_KEY, META_KEY};
 
 use crate::KeyshareState;
 use std::sync::Arc;
 
 pub struct ThresholdKeyshareExtension {
     bus: BusHandle,
-    cipher: Arc<Cipher>,
+    /// Fallback cipher used when no per-E3 cipher is present in the context.
+    /// Normally `E3CipherExtension` is registered first and provides a per-E3
+    /// cipher; this field exists for backward compatibility and testing.
+    master_cipher: Arc<Cipher>,
     address: String,
 }
 
@@ -29,9 +32,15 @@ impl ThresholdKeyshareExtension {
     pub fn create(bus: &BusHandle, cipher: &Arc<Cipher>, address: &str) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
-            cipher: cipher.to_owned(),
+            master_cipher: cipher.to_owned(),
             address: address.to_owned(),
         })
+    }
+
+    /// Return the per-E3 cipher if available, otherwise fall back to the master cipher.
+    fn resolve_cipher<'a>(&'a self, ctx: &'a E3Context) -> &'a Arc<Cipher> {
+        ctx.get_dependency(E3_CIPHER_KEY)
+            .unwrap_or(&self.master_cipher)
     }
 }
 
@@ -57,6 +66,7 @@ impl E3Extension for ThresholdKeyshareExtension {
                 .err(EType::KeyGeneration, anyhow!(ERROR_KEYSHARE_META_MISSING));
             return;
         };
+        let cipher = self.resolve_cipher(ctx).clone();
         let repo = ctx.repositories().threshold_keyshare(&e3_id);
         let container = repo.send(Some(ThresholdKeyshareState::new(
             e3_id.clone(),
@@ -75,7 +85,7 @@ impl E3Extension for ThresholdKeyshareExtension {
             Some(
                 ThresholdKeyshare::new(ThresholdKeyshareParams {
                     bus: self.bus.clone(),
-                    cipher: self.cipher.clone(),
+                    cipher,
                     state: container,
                     share_enc_preset: meta
                         .params_preset
@@ -114,10 +124,12 @@ impl E3Extension for ThresholdKeyshareExtension {
             .dkg_counterpart()
             .unwrap_or(meta.params_preset);
 
+        let cipher = self.resolve_cipher(ctx).clone();
+
         // Construct from snapshot
         let value = ThresholdKeyshare::new(ThresholdKeyshareParams {
             bus: self.bus.clone(),
-            cipher: self.cipher.clone(),
+            cipher,
             state,
             share_enc_preset,
         })

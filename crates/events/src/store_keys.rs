@@ -49,6 +49,10 @@ impl StoreKeys {
         String::from("//sortition")
     }
 
+    pub fn e3_key(e3_id: &E3id) -> String {
+        format!("//e3_keys/{e3_id}")
+    }
+
     pub fn eth_private_key() -> String {
         String::from("//eth_private_key")
     }

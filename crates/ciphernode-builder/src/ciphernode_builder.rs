@@ -32,6 +32,7 @@ use e3_net::{
     create_channel_bridge, setup_libp2p_keypair, setup_net, setup_net_interface,
     NetRepositoryFactory,
 };
+use e3_request::E3CipherExtension;
 use e3_request::E3LifecycleCoordinator;
 use e3_request::E3Router;
 use e3_slashing::{AccusationManagerExtension, CommitmentConsistencyCheckerExtension};
@@ -691,6 +692,10 @@ impl CiphernodeBuilder {
         accusation_vote_validity_by_chain: &HashMap<u64, u64>,
     ) -> Result<e3_request::E3RouterBuilder> {
         let mut e3_builder = E3Router::builder(bus, store.clone());
+
+        // ── Per-E3 forward-secrecy cipher (must be first so later extensions can consume it) ──
+        info!("Setting up E3CipherExtension (forward secrecy)");
+        e3_builder = e3_builder.with(E3CipherExtension::create(&self.cipher));
 
         // ── Threshold keyshare + ZK actors ──
         if let Some(KeyshareKind::Threshold) = self.keyshare {
