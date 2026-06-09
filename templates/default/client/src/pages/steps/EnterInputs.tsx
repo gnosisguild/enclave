@@ -104,7 +104,7 @@ const EnterInputs: React.FC = () => {
                 type='number'
                 value={input1}
                 onChange={(e) => setInput1(e.target.value)}
-                className='focus:ring-interfold-500 w-full rounded-md border border-slate-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2'
+                className='w-full rounded-md border border-slate-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-interfold-500'
                 placeholder='Enter first number'
                 required
               />
@@ -118,7 +118,7 @@ const EnterInputs: React.FC = () => {
                 type='number'
                 value={input2}
                 onChange={(e) => setInput2(e.target.value)}
-                className='focus:ring-interfold-500 w-full rounded-md border border-slate-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2'
+                className='w-full rounded-md border border-slate-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-interfold-500'
                 placeholder='Enter second number'
                 required
               />
@@ -126,7 +126,7 @@ const EnterInputs: React.FC = () => {
           </div>
 
           {input1 && input2 && (
-            <div className='border-interfold-200 bg-interfold-50 rounded-lg border p-4'>
+            <div className='rounded-lg border border-interfold-200 bg-interfold-50 p-4'>
               <p className='text-sm text-slate-600'>
                 <strong>Ready to compute:</strong> {input1} + {input2} = ?
               </p>
@@ -137,7 +137,7 @@ const EnterInputs: React.FC = () => {
         <button
           type='submit'
           disabled={!input1 || !input2 || !e3State.isCommitteePublished || !e3State.publicKey || !walletClient || !address}
-          className='bg-interfold-400 hover:bg-interfold-300 w-full rounded-lg px-6 py-3 font-semibold text-slate-800 transition-all duration-200 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500'
+          className='w-full rounded-lg bg-interfold-400 px-6 py-3 font-semibold text-slate-800 transition-all duration-200 hover:bg-interfold-300 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500'
         >
           {!e3State.isCommitteePublished || !e3State.publicKey
             ? 'Waiting for Committee Key...'

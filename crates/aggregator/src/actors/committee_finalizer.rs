@@ -7,8 +7,8 @@
 use actix::prelude::*;
 use e3_events::{
     prelude::*, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, E3Failed,
-    E3RequestComplete, E3Stage, E3StageChanged, EType, EffectsEnabled, InterfoldEvent,
-    InterfoldEventData, EventType, Shutdown, TicketGenerated, TypedEvent,
+    E3RequestComplete, E3Stage, E3StageChanged, EType, EffectsEnabled, EventType, InterfoldEvent,
+    InterfoldEventData, Shutdown, TicketGenerated, TypedEvent,
 };
 use e3_events::{E3id, EventContext, Sequenced};
 use e3_utils::{NotifySync, MAILBOX_LIMIT};

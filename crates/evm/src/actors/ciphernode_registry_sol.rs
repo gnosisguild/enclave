@@ -9,7 +9,7 @@ use crate::contracts::ICiphernodeRegistry;
 use crate::domain::ciphernode_registry_events::extractor;
 use crate::domain::error_decoder::{decode_error_from_str, format_evm_error};
 use crate::helpers::{encode_zk_proof, send_tx_with_retry, EthProvider};
-use crate::messages::{InterfoldEvmEvent, EvmEventProcessor};
+use crate::messages::{EvmEventProcessor, InterfoldEvmEvent};
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, B256, U256},
@@ -19,7 +19,7 @@ use alloy::{
 use anyhow::Result;
 use e3_events::{
     prelude::*, AggregatorChanged, BusHandle, CommitteeFinalizeRequested, E3RequestComplete, E3id,
-    EType, EffectsEnabled, InterfoldEvent, InterfoldEventData, EventSubscriber, EventType, Proof,
+    EType, EffectsEnabled, EventSubscriber, EventType, InterfoldEvent, InterfoldEventData, Proof,
     PublicKeyAggregated, Shutdown, TicketGenerated, TicketId,
 };
 use e3_utils::{ArcBytes, NotifySync, MAILBOX_LIMIT};

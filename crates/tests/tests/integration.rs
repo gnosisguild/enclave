@@ -14,9 +14,9 @@ use e3_config::BBPath;
 use e3_crypto::Cipher;
 use e3_events::{
     hlc::HlcTimestamp, prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized,
-    ComputeRequestKind, ComputeResponseKind, ConfigurationUpdated, E3Requested, E3id, InterfoldEvent,
-    InterfoldEventData, OperatorActivationChanged, PlaintextAggregated, ProofType, Seed, TakeEvents,
-    TicketBalanceUpdated, VerificationKind, ZkRequest, ZkResponse,
+    ComputeRequestKind, ComputeResponseKind, ConfigurationUpdated, E3Requested, E3id,
+    InterfoldEvent, InterfoldEventData, OperatorActivationChanged, PlaintextAggregated, ProofType,
+    Seed, TakeEvents, TicketBalanceUpdated, VerificationKind, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_fhe_params::{encode_bfv_params, BfvParamSet, BfvPreset};
@@ -969,10 +969,14 @@ fn publickey_aggregator_marker(data: &InterfoldEventData, e3_id: &E3id) -> Optio
         InterfoldEventData::CiphernodeSelected(data) if data.e3_id == *e3_id => {
             Some("CiphernodeSelected")
         }
-        InterfoldEventData::AggregatorChanged(data) if data.e3_id == *e3_id && data.is_aggregator => {
+        InterfoldEventData::AggregatorChanged(data)
+            if data.e3_id == *e3_id && data.is_aggregator =>
+        {
             Some("AggregatorChanged")
         }
-        InterfoldEventData::KeyshareCreated(data) if data.e3_id == *e3_id => Some("KeyshareCreated"),
+        InterfoldEventData::KeyshareCreated(data) if data.e3_id == *e3_id => {
+            Some("KeyshareCreated")
+        }
         InterfoldEventData::ShareVerificationDispatched(data)
             if data.e3_id == *e3_id && data.kind == VerificationKind::PkGenerationProofs =>
         {
@@ -2433,7 +2437,8 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 
     let bus = EventSystem::in_mem()
         .with_event_bus(
-            EventBus::<e3_events::InterfoldEvent>::new(EventBusConfig { deduplicate: true }).start(),
+            EventBus::<e3_events::InterfoldEvent>::new(EventBusConfig { deduplicate: true })
+                .start(),
         )
         .handle()?
         .enable("cn2");

@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use bloom::{BloomFilter, ASMS};
-use e3_events::{prelude::*, InterfoldEvent, InterfoldEventData, Event, Unsequenced};
+use e3_events::{prelude::*, Event, InterfoldEvent, InterfoldEventData, Unsequenced};
 use tracing::{trace, warn};
 
 use crate::events::GossipData;

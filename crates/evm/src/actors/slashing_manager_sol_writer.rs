@@ -25,9 +25,9 @@ use alloy::{
 use anyhow::Result;
 use e3_events::prelude::*;
 use e3_events::BusHandle;
+use e3_events::EventType;
 use e3_events::InterfoldEvent;
 use e3_events::InterfoldEventData;
-use e3_events::EventType;
 use e3_events::Shutdown;
 use e3_events::{AccusationQuorumReached, EType};
 use e3_utils::NotifySync;

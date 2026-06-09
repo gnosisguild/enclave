@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_events::{InterfoldEvent, EvmEventConfig, HistoricalEvmEventsReceived, Unsequenced};
+use e3_events::{EvmEventConfig, HistoricalEvmEventsReceived, InterfoldEvent, Unsequenced};
 use std::collections::HashSet;
 
 /// Outcome of recording one batch of historical EVM events.

@@ -11,7 +11,7 @@ use e3_utils::MAILBOX_LIMIT;
 use tracing::debug;
 
 use crate::domain::log_timestamp::from_log_chain_id_to_ts;
-use crate::messages::{InterfoldEvmEvent, EvmEvent, EvmEventProcessor, EvmLog};
+use crate::messages::{EvmEvent, EvmEventProcessor, EvmLog, InterfoldEvmEvent};
 
 pub type ExtractorFn<E> = fn(&LogData, &[B256], u64) -> Option<E>;
 

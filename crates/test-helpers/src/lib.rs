@@ -16,8 +16,8 @@ use alloy::primitives::Address;
 use anyhow::Result;
 use e3_ciphernode_builder::{CiphernodeHandle, EventSystem};
 use e3_events::{
-    BusHandle, CiphernodeAdded, InterfoldEvent, InterfoldEventData, EventBus, EventBusConfig,
-    EventPublisher, EventType, HistoryCollector, Seed, Subscribe,
+    BusHandle, CiphernodeAdded, EventBus, EventBusConfig, EventPublisher, EventType,
+    HistoryCollector, InterfoldEvent, InterfoldEventData, Seed, Subscribe,
 };
 use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::DEFAULT_BFV_PRESET;

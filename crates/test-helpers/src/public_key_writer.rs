@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
 use e3_events::{
-    prelude::*, BusHandle, InterfoldEvent, InterfoldEventData, EventSubscriber, EventType,
+    prelude::*, BusHandle, EventSubscriber, EventType, InterfoldEvent, InterfoldEventData,
 };
 use e3_utils::MAILBOX_LIMIT;
 use tracing::info;

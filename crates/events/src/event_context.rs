@@ -9,7 +9,7 @@ use std::{fmt, ops::Deref};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    E3id, InterfoldEventData, EventContextAccessors, EventContextSeq, EventId, SeqState, Sequenced,
+    E3id, EventContextAccessors, EventContextSeq, EventId, InterfoldEventData, SeqState, Sequenced,
     Unsequenced,
 };
 

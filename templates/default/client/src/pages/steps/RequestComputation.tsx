@@ -160,7 +160,7 @@ const RequestComputation: React.FC = () => {
               </div>
 
               {e3State.isCommitteePublished && e3State.publicKey ? (
-                <div className='border-interfold-200 bg-interfold-50 rounded-lg border p-4'>
+                <div className='rounded-lg border border-interfold-200 bg-interfold-50 p-4'>
                   <p className='text-sm text-slate-600'>
                     <strong>🔑 Committee Published Public Key!</strong>
                     <br />
@@ -212,7 +212,7 @@ const RequestComputation: React.FC = () => {
         <button
           onClick={handleRequestComputation}
           disabled={isRequesting || e3State.isRequested}
-          className='bg-interfold-400 hover:bg-interfold-300 w-full rounded-lg px-6 py-3 font-semibold text-slate-800 transition-all duration-200 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500'
+          className='w-full rounded-lg bg-interfold-400 px-6 py-3 font-semibold text-slate-800 transition-all duration-200 hover:bg-interfold-300 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500'
         >
           {isRequesting
             ? 'Submitting to Blockchain...'

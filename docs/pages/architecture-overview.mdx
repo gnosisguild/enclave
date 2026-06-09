@@ -125,9 +125,9 @@ Every E3 transitions through a well-defined state machine managed by the Interfo
 | **Failed**             | Timeout or fault detected; refund process initiated             |
 
 Timeout deadlines are configured per-deployment via `E3TimeoutConfig` (DKG window, compute window,
-decryption window) on the Interfold contract. The committee formation window is managed separately by
-the CiphernodeRegistry. If any deadline passes without the expected action, the E3 can be marked as
-failed and the refund manager distributes funds to honest participants.
+decryption window) on the Interfold contract. The committee formation window is managed separately
+by the CiphernodeRegistry. If any deadline passes without the expected action, the E3 can be marked
+as failed and the refund manager distributes funds to honest participants.
 
 Current Sepolia timeout configuration:
 

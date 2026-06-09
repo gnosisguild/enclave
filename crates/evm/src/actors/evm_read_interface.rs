@@ -10,7 +10,7 @@ use crate::actors::log_fetcher::{
 use crate::domain::backoff::Backoff;
 use crate::helpers::{EthProvider, ProviderFactory};
 use crate::messages::HistoricalSyncComplete;
-use crate::messages::{InterfoldEvmEvent, EvmEventProcessor};
+use crate::messages::{EvmEventProcessor, InterfoldEvmEvent};
 use actix::prelude::*;
 use alloy::eips::BlockNumberOrTag;
 use alloy::primitives::B256;
@@ -19,7 +19,7 @@ use alloy::rpc::types::Filter;
 use alloy_primitives::Address;
 use anyhow::anyhow;
 use e3_events::{
-    BusHandle, EType, InterfoldEvent, InterfoldEventData, ErrorDispatcher, Event, EventId,
+    BusHandle, EType, ErrorDispatcher, Event, EventId, InterfoldEvent, InterfoldEventData,
 };
 use e3_events::{EventSubscriber, EventType};
 use e3_utils::{retry_with_backoff, RetryError, MAILBOX_LIMIT};

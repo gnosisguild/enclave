@@ -5,16 +5,16 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::domain::chain_sync_state::SyncStatus;
-use crate::messages::InterfoldEvmEvent;
 use crate::messages::HistoricalSyncComplete;
+use crate::messages::InterfoldEvmEvent;
 use actix::{Actor, Handler};
 use actix::{Addr, Recipient};
 use anyhow::Context;
 use anyhow::Result;
 use e3_events::EType;
 use e3_events::{
-    trap, BusHandle, InterfoldEvent, InterfoldEventData, EventSubscriber, EventType,
-    HistoricalEvmEventsReceived, HistoricalEvmSyncStart, SyncEnded, Unsequenced,
+    trap, BusHandle, EventSubscriber, EventType, HistoricalEvmEventsReceived,
+    HistoricalEvmSyncStart, InterfoldEvent, InterfoldEventData, SyncEnded, Unsequenced,
 };
 use e3_events::{Event, EventPublisher};
 use e3_utils::MAILBOX_LIMIT;

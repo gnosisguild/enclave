@@ -15,11 +15,12 @@ use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse,
     ComputeResponseKind, CorrelationId, DKGRecursiveAggregationComplete, Die,
-    DkgAggregationRequest, E3Failed, E3Stage, E3id, InterfoldEvent, InterfoldEventData, EventContext,
-    FailureReason, KeyshareCreated, NodesFoldStepRequest, OrderedSet, PkAggregationProofPending,
-    PkAggregationProofRequest, PkAggregationProofSigned, Proof, ProofType, PublicKeyAggregated,
-    Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed,
-    SignedProofPayload, TypedEvent, VerificationKind, ZkRequest, ZkResponse,
+    DkgAggregationRequest, E3Failed, E3Stage, E3id, EventContext, FailureReason, InterfoldEvent,
+    InterfoldEventData, KeyshareCreated, NodesFoldStepRequest, OrderedSet,
+    PkAggregationProofPending, PkAggregationProofRequest, PkAggregationProofSigned, Proof,
+    ProofType, PublicKeyAggregated, Sequenced, ShareVerificationComplete,
+    ShareVerificationDispatched, SignedProofFailed, SignedProofPayload, TypedEvent,
+    VerificationKind, ZkRequest, ZkResponse,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -1750,7 +1751,9 @@ mod tests {
         ))
     }
 
-    async fn next_event(history: &Addr<HistoryCollector<InterfoldEvent>>) -> Result<InterfoldEvent> {
+    async fn next_event(
+        history: &Addr<HistoryCollector<InterfoldEvent>>,
+    ) -> Result<InterfoldEvent> {
         let mut result = history.send(TakeEvents::<InterfoldEvent>::new(1)).await?;
         assert!(!result.timed_out, "timed out waiting for an event");
         Ok(result.events.pop().expect("expected one event"))

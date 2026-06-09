@@ -13,10 +13,10 @@ use actix::{Message, Recipient};
 use anyhow::{bail, Result};
 use e3_data::Repositories;
 use e3_events::{
-    AggregateConfig, BusHandle, CorrelationId, EffectsEnabled, InterfoldEvent, InterfoldEventData,
-    Event, EventPublisher, EventStoreQueryBy, EventStoreQueryResponse, EventSubscriber, EventType,
-    EvmEventConfig, HistoricalEvmEventsReceived, HistoricalEvmSyncStart, HistoricalNetSyncStart,
-    SeqAgg, SyncEnded, Unsequenced,
+    AggregateConfig, BusHandle, CorrelationId, EffectsEnabled, Event, EventPublisher,
+    EventStoreQueryBy, EventStoreQueryResponse, EventSubscriber, EventType, EvmEventConfig,
+    HistoricalEvmEventsReceived, HistoricalEvmSyncStart, HistoricalNetSyncStart, InterfoldEvent,
+    InterfoldEventData, SeqAgg, SyncEnded, Unsequenced,
 };
 use e3_utils::actix::channel as actix_toolbox;
 use std::time::Duration;
@@ -255,8 +255,9 @@ mod tests {
     use crate::domain::SyncPlanner;
     use e3_ciphernode_builder::EventSystem;
     use e3_events::{
-        EffectsEnabled, InterfoldEvent, InterfoldEventData, Event, EventPublisher, EventSubscriber,
-        EventType, EvmEventConfig, HistoricalEvmSyncStart, SyncEnded, TakeEvents, Unsequenced,
+        EffectsEnabled, Event, EventPublisher, EventSubscriber, EventType, EvmEventConfig,
+        HistoricalEvmSyncStart, InterfoldEvent, InterfoldEventData, SyncEnded, TakeEvents,
+        Unsequenced,
     };
 
     fn make_historical_evm_sync_start() -> HistoricalEvmSyncStart {
@@ -369,7 +370,11 @@ mod tests {
                 }
                 impl Handler<InterfoldEvent> for Counter {
                     type Result = ();
-                    fn handle(&mut self, msg: InterfoldEvent, _: &mut Self::Context) -> Self::Result {
+                    fn handle(
+                        &mut self,
+                        msg: InterfoldEvent,
+                        _: &mut Self::Context,
+                    ) -> Self::Result {
                         if matches!(msg.get_data(), InterfoldEventData::TestEvent(_)) {
                             self.0.fetch_add(1, Ordering::SeqCst);
                         }

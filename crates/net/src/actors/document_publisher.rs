@@ -18,9 +18,9 @@ use actix::prelude::*;
 use anyhow::Result;
 use e3_events::{
     prelude::*, trap, trap_fut, BusHandle, CiphernodeSelected, CorrelationId, DecryptionKeyShared,
-    DocumentReceived, E3RequestComplete, E3id, EType, InterfoldEvent, InterfoldEventData,
-    EncryptionKeyCreated, EventSource, EventType, PartyId, PublishDocumentRequested,
-    ThresholdShareCreated, TypedEvent,
+    DocumentReceived, E3RequestComplete, E3id, EType, EncryptionKeyCreated, EventSource, EventType,
+    InterfoldEvent, InterfoldEventData, PartyId, PublishDocumentRequested, ThresholdShareCreated,
+    TypedEvent,
 };
 use e3_utils::ArcBytes;
 use e3_utils::NotifySync;
@@ -551,8 +551,8 @@ mod tests {
     use chrono::Utc;
     use e3_ciphernode_builder::EventSystem;
     use e3_events::{
-        BusHandle, CiphernodeSelected, DocumentKind, DocumentMeta, E3id, InterfoldError,
-        InterfoldEvent, GetEvents, HistoryCollector, PublishDocumentRequested, TakeEvents,
+        BusHandle, CiphernodeSelected, DocumentKind, DocumentMeta, E3id, GetEvents,
+        HistoryCollector, InterfoldError, InterfoldEvent, PublishDocumentRequested, TakeEvents,
     };
     use libp2p::kad::{GetRecordError, PutRecordError, RecordKey};
     use std::time::Instant;
@@ -855,12 +855,13 @@ mod tests {
 
         // Check event was dispatched
         let events = history.send(GetEvents::new()).await?;
-        let Some(InterfoldEventData::DocumentReceived(DocumentReceived { value: doc, .. })) = events
-            .iter()
-            // Filter out the error
-            .filter(|e| e.event_type() != "InterfoldError")
-            .last()
-            .map(|e| e.get_data())
+        let Some(InterfoldEventData::DocumentReceived(DocumentReceived { value: doc, .. })) =
+            events
+                .iter()
+                // Filter out the error
+                .filter(|e| e.event_type() != "InterfoldError")
+                .last()
+                .map(|e| e.get_data())
         else {
             bail!("No event sent");
         };

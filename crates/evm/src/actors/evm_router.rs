@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::messages::{InterfoldEvmEvent, EvmEventProcessor, EvmLog};
+use crate::messages::{EvmEventProcessor, EvmLog, InterfoldEvmEvent};
 use actix::{Actor, Handler};
 use alloy_primitives::Address;
 use e3_utils::MAILBOX_LIMIT;

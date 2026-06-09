@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{EffectsEnabled, InterfoldEvent, InterfoldEventData, Event, HistoricalEvmSyncStart};
+use crate::{EffectsEnabled, Event, HistoricalEvmSyncStart, InterfoldEvent, InterfoldEventData};
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use e3_utils::{actix::oneshot_runner::OneShotRunner, MAILBOX_LIMIT};
 

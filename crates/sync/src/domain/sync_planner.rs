@@ -5,7 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use e3_events::{
-    AggregateId, E3id, InterfoldEvent, InterfoldEventData, Event, EventContextAccessors, Unsequenced,
+    AggregateId, E3id, Event, EventContextAccessors, InterfoldEvent, InterfoldEventData,
+    Unsequenced,
 };
 use std::collections::BTreeMap;
 
@@ -103,8 +104,8 @@ impl SyncPlanner {
 mod tests {
     use super::*;
     use e3_events::{
-        E3Failed, E3RequestComplete, E3Stage, E3id, EffectsEnabled, InterfoldEvent, EvmEventConfig,
-        FailureReason, HistoricalEvmSyncStart, SyncEnded, Unsequenced,
+        E3Failed, E3RequestComplete, E3Stage, E3id, EffectsEnabled, EvmEventConfig, FailureReason,
+        HistoricalEvmSyncStart, InterfoldEvent, SyncEnded, Unsequenced,
     };
 
     fn make_historical_evm_sync_start() -> HistoricalEvmSyncStart {

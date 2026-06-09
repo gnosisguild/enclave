@@ -17,7 +17,7 @@ use alloy::primitives::Address;
 use alloy::signers::local::PrivateKeySigner;
 use anyhow::Result;
 use async_trait::async_trait;
-use e3_events::{BusHandle, CommitteeFinalized, InterfoldEvent, InterfoldEventData, Event};
+use e3_events::{BusHandle, CommitteeFinalized, Event, InterfoldEvent, InterfoldEventData};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use tracing::{error, info, warn};
 

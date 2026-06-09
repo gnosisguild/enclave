@@ -8,7 +8,7 @@ use crate::{
     events::{EventStoreQueryResponse, StoreEventRequested},
     AggregateId, EventContextAccessors, EventLog, SequenceIndex,
 };
-use crate::{CorrelationId, Die, InterfoldEvent, EventStoreQueryBy, Seq, SeqAgg, Ts, TsAgg};
+use crate::{CorrelationId, Die, EventStoreQueryBy, InterfoldEvent, Seq, SeqAgg, Ts, TsAgg};
 use actix::{Actor, ActorContext, Addr, AsyncContext, Context, Handler, Recipient};
 use anyhow::Result;
 use e3_utils::MAILBOX_LIMIT_LARGE;

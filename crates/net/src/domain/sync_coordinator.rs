@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_events::{prelude::*, InterfoldEvent, EventSource, Unsequenced};
+use e3_events::{prelude::*, EventSource, InterfoldEvent, Unsequenced};
 
 use crate::domain::{
     event_translation::EventTranslationService,

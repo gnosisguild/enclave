@@ -31,7 +31,7 @@ const ConnectWallet: React.FC = () => {
             homomorphic encryption (FHE), zero-knowledge proofs, and distributed key cryptography. Connect your wallet to experience
             privacy-preserving computation.
           </p>
-          <div className='border-interfold-200 bg-interfold-50 rounded-lg border p-4'>
+          <div className='rounded-lg border border-interfold-200 bg-interfold-50 p-4'>
             <p className='text-sm text-slate-600'>
               <strong>How it works:</strong> You'll request an E3 computation → Ciphernode committee is selected → Committee publishes
               shared public key → You encrypt and submit inputs → Secure computation executes → Only verified outputs are decrypted by the

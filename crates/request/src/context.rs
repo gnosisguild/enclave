@@ -112,7 +112,10 @@ impl E3Context {
         self.checkpoint();
     }
 
-    pub fn get_event_recipient(&self, key: impl Into<String>) -> Option<&Recipient<InterfoldEvent>> {
+    pub fn get_event_recipient(
+        &self,
+        key: impl Into<String>,
+    ) -> Option<&Recipient<InterfoldEvent>> {
         self.recipients
             .get(&key.into())
             .and_then(|opt| opt.as_ref())

@@ -10,7 +10,7 @@ use anyhow::Context;
 use anyhow::Result;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::Event;
-use e3_events::{InterfoldEvent, GetEvents, ResetHistory, TakeEvents};
+use e3_events::{GetEvents, InterfoldEvent, ResetHistory, TakeEvents};
 use std::time::Instant;
 use std::{future::Future, ops::Deref, pin::Pin, time::Duration};
 use tokio::time::timeout;

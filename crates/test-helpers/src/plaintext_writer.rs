@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
 use e3_bfv_client::decode_bytes_to_vec_u64;
-use e3_events::{prelude::*, BusHandle, InterfoldEvent, InterfoldEventData, EventType};
+use e3_events::{prelude::*, BusHandle, EventType, InterfoldEvent, InterfoldEventData};
 use e3_utils::MAILBOX_LIMIT;
 use tracing::{error, info};
 

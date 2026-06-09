@@ -16,7 +16,8 @@ use async_trait::async_trait;
 use e3_evm_helpers::{
     block_listener::BlockListener,
     contracts::{
-        InterfoldContract, InterfoldContractFactory, InterfoldRead, ProviderType, ReadOnly, ReadWrite,
+        InterfoldContract, InterfoldContractFactory, InterfoldRead, ProviderType, ReadOnly,
+        ReadWrite,
     },
     event_listener::EventListener,
     events::{CiphertextOutputPublished, CommitteePublished, PlaintextOutputPublished},

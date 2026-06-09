@@ -9,8 +9,8 @@ use super::{
     AggregateConfig, UpdateDestination,
 };
 use crate::{
-    AggregateId, InterfoldEvent, EventContextAccessors, EventContextSeq, EventType, Insert,
-    InsertBatch, Sequenced, StoreKeys,
+    AggregateId, EventContextAccessors, EventContextSeq, EventType, Insert, InsertBatch,
+    InterfoldEvent, Sequenced, StoreKeys,
 };
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use e3_utils::MAILBOX_LIMIT;

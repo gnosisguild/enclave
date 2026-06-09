@@ -13,7 +13,7 @@ use e3_bfv_client::compute_pk_commitment;
 use e3_evm_helpers::contracts::ReadOnly;
 use e3_fhe_params::build_bfv_params_from_set_arc;
 use e3_fhe_params::DEFAULT_BFV_PRESET;
-use e3_indexer::{DataStore, InterfoldIndexer, InMemoryStore};
+use e3_indexer::{DataStore, InMemoryStore, InterfoldIndexer};
 use eyre::Result;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::Serialize;
@@ -60,7 +60,10 @@ async fn test_indexer() -> Result<()> {
     let indexer = Arc::new(
         InterfoldIndexer::<InMemoryStore, ReadOnly>::from_endpoint_address_in_mem(
             &endpoint.to_string(),
-            &[&interfold_address.to_string(), &emit_logs_address.to_string()],
+            &[
+                &interfold_address.to_string(),
+                &emit_logs_address.to_string(),
+            ],
         )
         .await?,
     );

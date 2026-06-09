@@ -21,7 +21,7 @@ use e3_events::{
     CommitteeMemberExpelled, ComputeRequest, ComputeRequestError, ComputeResponse,
     ComputeResponseKind, CorrelationId, DecryptedSharesAggregationProofRequest,
     DecryptionAggregationRequest, DecryptionshareCreated, Die, E3Failed, E3Stage, E3id, EType,
-    InterfoldEvent, InterfoldEventData, EventContext, FailureReason, PlaintextAggregated, Proof,
+    EventContext, FailureReason, InterfoldEvent, InterfoldEventData, PlaintextAggregated, Proof,
     Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload,
     TypedEvent, VerificationKind, ZkRequest, ZkResponse,
 };
@@ -771,7 +771,9 @@ impl Handler<InterfoldEvent> for ThresholdPlaintextAggregator {
     fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            InterfoldEventData::DecryptionshareCreated(data) => ctx.notify(TypedEvent::new(data, ec)),
+            InterfoldEventData::DecryptionshareCreated(data) => {
+                ctx.notify(TypedEvent::new(data, ec))
+            }
             InterfoldEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
             InterfoldEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
@@ -1117,7 +1119,9 @@ mod tests {
         Ok((aggregator, history, e3_id))
     }
 
-    async fn next_event(history: &Addr<HistoryCollector<InterfoldEvent>>) -> Result<InterfoldEvent> {
+    async fn next_event(
+        history: &Addr<HistoryCollector<InterfoldEvent>>,
+    ) -> Result<InterfoldEvent> {
         let mut result = history.send(TakeEvents::<InterfoldEvent>::new(1)).await?;
         assert!(!result.timed_out, "timed out waiting for an event");
         Ok(result.events.pop().expect("expected one event"))

@@ -34,8 +34,8 @@
 
 use actix::{Actor, Addr, Context, Handler};
 use e3_events::{
-    BusHandle, CommitmentConsistencyCheckRequested, CommitmentLink, E3id, InterfoldEvent,
-    InterfoldEventData, EventPublisher, EventSubscriber, EventType, ProofVerificationPassed,
+    BusHandle, CommitmentConsistencyCheckRequested, CommitmentLink, E3id, EventPublisher,
+    EventSubscriber, EventType, InterfoldEvent, InterfoldEventData, ProofVerificationPassed,
     TypedEvent,
 };
 use e3_utils::NotifySync;

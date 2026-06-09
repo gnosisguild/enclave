@@ -15,8 +15,8 @@ use e3_events::Sequenced;
 use e3_events::TypedEvent;
 use e3_events::{
     prelude::*, trap, AggregatorChanged, BusHandle, CiphernodeSelected, Committee,
-    CommitteeFinalized, CommitteeMemberExpelled, E3Requested, E3id, EType, InterfoldEvent,
-    InterfoldEventData, EventType, Shutdown, TicketGenerated, TicketId,
+    CommitteeFinalized, CommitteeMemberExpelled, E3Requested, E3id, EType, EventType,
+    InterfoldEvent, InterfoldEventData, Shutdown, TicketGenerated, TicketId,
 };
 use e3_request::E3Meta;
 use e3_utils::NotifySync;
@@ -149,7 +149,9 @@ impl Handler<InterfoldEvent> for CiphernodeSelector {
     fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            InterfoldEventData::E3Requested(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
+            InterfoldEventData::E3Requested(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             InterfoldEventData::E3RequestComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }

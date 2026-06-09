@@ -13,8 +13,8 @@ use e3_events::{
     CommitteeMemberExpelled, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
     DecryptionKeyShared, DecryptionShareProofSigned, DecryptionShareProofsPending, Die,
     DkgProofSigned, DkgShareDecryptionProofRequest, E3Failed, E3RequestComplete, E3Stage, EType,
-    InterfoldEvent, InterfoldEventData, EncryptionKey, EncryptionKeyCollectionFailed,
-    EncryptionKeyCreated, EncryptionKeyPending, EventContext, FailureReason, KeyshareCreated,
+    EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending,
+    EventContext, FailureReason, InterfoldEvent, InterfoldEventData, KeyshareCreated,
     PartyProofsToVerify, PartyShareDecryptionProofsToVerify, PkGenerationProofSigned, ProofType,
     Sequenced, ShareDecryptionProofPending, ShareVerificationComplete, ShareVerificationDispatched,
     SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated,
@@ -2169,8 +2169,8 @@ mod tests {
     use e3_crypto::Cipher;
     use e3_data::{AutoPersist, DataStore, InMemStore, Persistable, Repository};
     use e3_events::{
-        hlc_factory::HlcFactory, BusHandle, E3Stage, E3id, InterfoldEvent, InterfoldEventData,
-        EventBus, EventBusConfig, FailureReason, HistoryCollector, Sequencer, StoreEventRequested,
+        hlc_factory::HlcFactory, BusHandle, E3Stage, E3id, EventBus, EventBusConfig, FailureReason,
+        HistoryCollector, InterfoldEvent, InterfoldEventData, Sequencer, StoreEventRequested,
         StoreEventResponse, TakeEvents,
     };
     use e3_fhe_params::DEFAULT_BFV_PRESET;
@@ -2197,7 +2197,8 @@ mod tests {
     }
 
     fn test_bus() -> (BusHandle, Addr<HistoryCollector<InterfoldEvent>>) {
-        let event_bus = EventBus::<InterfoldEvent>::new(EventBusConfig { deduplicate: true }).start();
+        let event_bus =
+            EventBus::<InterfoldEvent>::new(EventBusConfig { deduplicate: true }).start();
         let store = TestEventStore::default().start();
         let sequencer = Sequencer::new(&event_bus, store.recipient()).start();
         let bus = BusHandle::new(event_bus, sequencer, HlcFactory::new()).enable("test-keyshare");
@@ -2228,7 +2229,9 @@ mod tests {
         Ok((actor, history, E3id::new("42", 1)))
     }
 
-    async fn next_event(history: &Addr<HistoryCollector<InterfoldEvent>>) -> Result<InterfoldEvent> {
+    async fn next_event(
+        history: &Addr<HistoryCollector<InterfoldEvent>>,
+    ) -> Result<InterfoldEvent> {
         let mut result = history.send(TakeEvents::<InterfoldEvent>::new(1)).await?;
         assert!(!result.timed_out, "timed out waiting for an event");
         Ok(result.events.pop().expect("expected one event"))
@@ -2238,7 +2241,9 @@ mod tests {
         history: &Addr<HistoryCollector<InterfoldEvent>>,
         count: usize,
     ) -> Result<Vec<InterfoldEvent>> {
-        let result = history.send(TakeEvents::<InterfoldEvent>::new(count)).await?;
+        let result = history
+            .send(TakeEvents::<InterfoldEvent>::new(count))
+            .await?;
         assert!(!result.timed_out, "timed out waiting for events");
         assert_eq!(result.events.len(), count, "expected {count} events");
         Ok(result.events)

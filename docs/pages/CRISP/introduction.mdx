@@ -61,11 +61,11 @@ endpoints to deliver the following capabilities:
 
 ### Coordination Server
 
-The [server](https://github.com/gnosisguild/interfold/tree/main/examples/CRISP/server) is a Rust-based
-coordination service that manages the E3 lifecycle and drives the same SDK from a privileged wallet.
-It acts as a relayer and facilitator, handling blockchain interactions on behalf of clients.
-However, clients can bypass the server entirely and interact directly with the blockchain if they
-prefer.
+The [server](https://github.com/gnosisguild/interfold/tree/main/examples/CRISP/server) is a
+Rust-based coordination service that manages the E3 lifecycle and drives the same SDK from a
+privileged wallet. It acts as a relayer and facilitator, handling blockchain interactions on behalf
+of clients. However, clients can bypass the server entirely and interact directly with the
+blockchain if they prefer.
 
 The server's key responsibilities include:
 
@@ -77,10 +77,10 @@ The server's key responsibilities include:
 
 ### FHE Program
 
-The [FHE program](https://github.com/gnosisguild/interfold/tree/main/examples/CRISP/program) is a Rust
-guest program that runs inside the RISC Zero zkVM to perform homomorphic addition on encrypted votes
-(BFV ciphertexts). It computes the encrypted tally without decrypting individual votes, ensuring
-voter privacy throughout the process.
+The [FHE program](https://github.com/gnosisguild/interfold/tree/main/examples/CRISP/program) is a
+Rust guest program that runs inside the RISC Zero zkVM to perform homomorphic addition on encrypted
+votes (BFV ciphertexts). It computes the encrypted tally without decrypting individual votes,
+ensuring voter privacy throughout the process.
 
 The program decodes BFV parameters and ciphertexts, then sums all encrypted votes homomorphically to
 produce a single encrypted ciphertext containing the total. RISC Zero generates zero-knowledge
@@ -126,8 +126,9 @@ valid public key.
 
 ### JavaScript SDK
 
-The [CRISP SDK](https://github.com/gnosisguild/interfold/tree/main/examples/CRISP/packages/crisp-sdk)
-is a TypeScript library that abstracts away the complex cryptographic operations required for vote
+The
+[CRISP SDK](https://github.com/gnosisguild/interfold/tree/main/examples/CRISP/packages/crisp-sdk) is
+a TypeScript library that abstracts away the complex cryptographic operations required for vote
 submission and proof generation. It fetches round details from the coordination server, queries
 token balances at snapshot blocks to verify eligibility, and generates Merkle proofs demonstrating
 voter inclusion in the eligibility tree.

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::messages::{InterfoldEvmEvent, EvmEventProcessor, EvmLog};
+use crate::messages::{EvmEventProcessor, EvmLog, InterfoldEvmEvent};
 use alloy::providers::Provider;
 use alloy::rpc::types::{Filter, Log};
 use anyhow::anyhow;
@@ -315,7 +315,10 @@ mod tests {
         }
     }
 
-    fn setup_collector() -> (EvmEventProcessor, mpsc::UnboundedReceiver<InterfoldEvmEvent>) {
+    fn setup_collector() -> (
+        EvmEventProcessor,
+        mpsc::UnboundedReceiver<InterfoldEvmEvent>,
+    ) {
         let (tx, rx) = mpsc::unbounded_channel();
         let addr = TestCollector { tx }.start();
         (addr.recipient(), rx)

@@ -179,7 +179,9 @@ Monitor progress by watching for events:
 ```typescript
 sdk.onInterfoldEvent(InterfoldEventType.E3_REQUESTED, (e) => console.log('E3 requested'))
 sdk.onInterfoldEvent(RegistryEventType.COMMITTEE_PUBLISHED, (e) => console.log('Committee ready'))
-sdk.onInterfoldEvent(InterfoldEventType.CIPHERTEXT_OUTPUT_PUBLISHED, (e) => console.log('Output ready'))
+sdk.onInterfoldEvent(InterfoldEventType.CIPHERTEXT_OUTPUT_PUBLISHED, (e) =>
+  console.log('Output ready'),
+)
 sdk.onInterfoldEvent(InterfoldEventType.PLAINTEXT_OUTPUT_PUBLISHED, (e) =>
   console.log('Result:', e.data),
 )

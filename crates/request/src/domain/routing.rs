@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_events::{E3Stage, E3id, InterfoldEvent, InterfoldEventData, Event};
+use e3_events::{E3Stage, E3id, Event, InterfoldEvent, InterfoldEventData};
 use std::collections::HashSet;
 
 /// The completion action a router should perform *after* running extension hooks and

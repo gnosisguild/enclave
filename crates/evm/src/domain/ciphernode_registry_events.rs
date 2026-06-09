@@ -230,9 +230,9 @@ pub(crate) fn extractor(
                 "CommitteeMemberExpelled event received: e3_id={}, node={}, reason={:?}, active_count_after={}",
                 event.e3Id, event.node, event.reason, event.activeCountAfter
             );
-            Some(InterfoldEventData::from(CommitteeMemberExpelledWithChainId(
-                event, chain_id,
-            )))
+            Some(InterfoldEventData::from(
+                CommitteeMemberExpelledWithChainId(event, chain_id),
+            ))
         }
         _ => {
             trace!(

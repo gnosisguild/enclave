@@ -18,7 +18,7 @@ use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     prelude::*, trap, CiphernodeAdded, CiphernodeRemoved, Committee, CommitteeFinalized,
     CommitteeMemberExpelled, CommitteePublished, ConfigurationUpdated, E3Failed, E3Requested,
-    E3Stage, E3StageChanged, EType, InterfoldEvent, EventContext, EventType,
+    E3Stage, E3StageChanged, EType, EventContext, EventType, InterfoldEvent,
     OperatorActivationChanged, PlaintextOutputPublished, Seed, Sequenced, TicketBalanceUpdated,
     TypedEvent,
 };
@@ -261,7 +261,9 @@ impl Handler<InterfoldEvent> for Sortition {
     fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            InterfoldEventData::E3Requested(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
+            InterfoldEventData::E3Requested(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             InterfoldEventData::CiphernodeAdded(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }

@@ -121,7 +121,7 @@ const EncryptSubmit: React.FC = () => {
               </div>
               <button
                 onClick={handleReset}
-                className='bg-interfold-400 hover:bg-interfold-300 w-full rounded-lg px-6 py-3 font-semibold text-slate-800 transition-all duration-200 hover:shadow-md'
+                className='w-full rounded-lg bg-interfold-400 px-6 py-3 font-semibold text-slate-800 transition-all duration-200 hover:bg-interfold-300 hover:shadow-md'
               >
                 Start New Computation
               </button>

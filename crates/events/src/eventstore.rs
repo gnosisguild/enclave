@@ -6,8 +6,8 @@
 
 use crate::{
     events::{StoreEventRequested, StoreEventResponse},
-    InterfoldEvent, EventContextAccessors, EventLog, EventStoreFilter, EventStoreQueryBy,
-    EventStoreQueryResponse, Seq, SequenceIndex, Sequenced, Ts, Unsequenced,
+    EventContextAccessors, EventLog, EventStoreFilter, EventStoreQueryBy, EventStoreQueryResponse,
+    InterfoldEvent, Seq, SequenceIndex, Sequenced, Ts, Unsequenced,
 };
 use actix::{Actor, Handler};
 use anyhow::{bail, Result};

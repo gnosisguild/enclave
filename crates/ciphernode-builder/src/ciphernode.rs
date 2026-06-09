@@ -7,7 +7,7 @@
 use actix::Addr;
 use anyhow::Result;
 use e3_data::{DataStore, InMemStore, StoreAddr};
-use e3_events::{BusHandle, InterfoldEvent, HistoryCollector};
+use e3_events::{BusHandle, HistoryCollector, InterfoldEvent};
 use e3_net::NetChannelBridge;
 use libp2p::PeerId;
 

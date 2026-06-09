@@ -44,9 +44,9 @@ use alloy::primitives::{Address, Bytes};
 use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
     AccusationVote, BusHandle, CommitmentConsistencyViolation, ComputeRequestError,
-    ComputeResponse, E3id, InterfoldEvent, InterfoldEventData, EventPublisher, EventSubscriber,
-    EventType, ProofFailureAccusation, ProofType, ProofVerificationFailed, ProofVerificationPassed,
-    TypedEvent,
+    ComputeResponse, E3id, EventPublisher, EventSubscriber, EventType, InterfoldEvent,
+    InterfoldEventData, ProofFailureAccusation, ProofType, ProofVerificationFailed,
+    ProofVerificationPassed, TypedEvent,
 };
 use e3_utils::NotifySync;
 use tracing::error;

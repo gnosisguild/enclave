@@ -7,7 +7,7 @@
 //! Pure reordering service that holds a `HistoricalSyncComplete` marker back
 //! until the event it references has been observed.
 
-use crate::messages::{InterfoldEvmEvent, HistoricalSyncComplete};
+use crate::messages::{HistoricalSyncComplete, InterfoldEvmEvent};
 use bloom::{BloomFilter, ASMS};
 use e3_events::CorrelationId;
 use tracing::debug;

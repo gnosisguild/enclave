@@ -7,7 +7,7 @@
 use actix::{Actor, Addr, Handler};
 use e3_utils::MAILBOX_LIMIT;
 
-use crate::messages::{InterfoldEvmEvent, EvmEventProcessor};
+use crate::messages::{EvmEventProcessor, InterfoldEvmEvent};
 
 pub struct EvmHub {
     nexts: Vec<EvmEventProcessor>,

@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use actix::{Message, Recipient};
 
-use crate::{AggregateId, CorrelationId, InterfoldEvent, EventSource, Sequenced, Unsequenced};
+use crate::{AggregateId, CorrelationId, EventSource, InterfoldEvent, Sequenced, Unsequenced};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EventStoreFilter {

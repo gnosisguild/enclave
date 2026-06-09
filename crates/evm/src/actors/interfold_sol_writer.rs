@@ -21,9 +21,9 @@ use alloy::{
 use anyhow::Result;
 use e3_events::BusHandle;
 use e3_events::E3RequestComplete;
+use e3_events::EventType;
 use e3_events::InterfoldEvent;
 use e3_events::InterfoldEventData;
-use e3_events::EventType;
 use e3_events::Shutdown;
 use e3_events::{prelude::*, AggregatorChanged, EffectsEnabled};
 use e3_events::{E3Stage, E3StageChanged};
@@ -93,7 +93,9 @@ impl<P: Provider + WalletProvider + Clone + 'static> Actor for InterfoldSolWrite
     }
 }
 
-impl<P: Provider + WalletProvider + Clone + 'static> Handler<InterfoldEvent> for InterfoldSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<InterfoldEvent>
+    for InterfoldSolWriter<P>
+{
     type Result = ();
 
     fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {

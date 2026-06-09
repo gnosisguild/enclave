@@ -12,7 +12,7 @@ use std::{fmt::Display, future::Future};
 
 use crate::{
     event_context::{AggregateId, EventContext},
-    InterfoldEvent, EventId, EventSource, EventType, Sequenced, Unsequenced,
+    EventId, EventSource, EventType, InterfoldEvent, Sequenced, Unsequenced,
 };
 
 /// Trait that must be implemented by events used with EventBus

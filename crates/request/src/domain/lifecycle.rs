@@ -72,12 +72,16 @@ fn implied(event: &InterfoldEventData) -> Option<(E3id, E3Stage)> {
         InterfoldEventData::CommitteeFinalized(d) => {
             Some((d.e3_id.clone(), E3Stage::CommitteeFinalized))
         }
-        InterfoldEventData::PublicKeyAggregated(d) => Some((d.e3_id.clone(), E3Stage::KeyPublished)),
+        InterfoldEventData::PublicKeyAggregated(d) => {
+            Some((d.e3_id.clone(), E3Stage::KeyPublished))
+        }
         InterfoldEventData::CiphertextOutputPublished(d) => {
             Some((d.e3_id.clone(), E3Stage::CiphertextReady))
         }
         InterfoldEventData::PlaintextAggregated(d) => Some((d.e3_id.clone(), E3Stage::Complete)),
-        InterfoldEventData::PlaintextOutputPublished(d) => Some((d.e3_id.clone(), E3Stage::Complete)),
+        InterfoldEventData::PlaintextOutputPublished(d) => {
+            Some((d.e3_id.clone(), E3Stage::Complete))
+        }
         InterfoldEventData::E3RequestComplete(d) => Some((d.e3_id.clone(), E3Stage::Complete)),
         InterfoldEventData::E3Failed(d) => Some((d.e3_id.clone(), E3Stage::Failed)),
         // `E3StageChanged` carries the authoritative stage directly.

@@ -6,7 +6,7 @@
 
 use crate::{
     events::{StoreEventRequested, StoreEventResponse},
-    InterfoldEvent, EventBus, Sequenced, Unsequenced,
+    EventBus, InterfoldEvent, Sequenced, Unsequenced,
 };
 use actix::{Actor, Addr, AsyncContext, Handler, Recipient};
 use e3_utils::MAILBOX_LIMIT;
@@ -43,7 +43,11 @@ impl Actor for Sequencer {
 
 impl Handler<InterfoldEvent<Unsequenced>> for Sequencer {
     type Result = ();
-    fn handle(&mut self, msg: InterfoldEvent<Unsequenced>, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: InterfoldEvent<Unsequenced>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
         self.eventstore
             .do_send(StoreEventRequested::new(msg, ctx.address()));
     }
@@ -59,7 +63,7 @@ impl Handler<StoreEventResponse> for Sequencer {
 #[cfg(test)]
 mod tests {
     use e3_ciphernode_builder::EventSystem;
-    use e3_events::{InterfoldEvent, EventPublisher, GetEvents, TakeEvents, TestEvent};
+    use e3_events::{EventPublisher, GetEvents, InterfoldEvent, TakeEvents, TestEvent};
 
     #[actix::test]
     async fn it_adds_seqence_numbers_to_events() -> anyhow::Result<()> {

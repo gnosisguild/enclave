@@ -234,7 +234,9 @@ pub(crate) fn extractor(
                 "E3Failed event received: e3_id={}, stage={:?}, reason={:?}",
                 event.e3Id, event.failedAtStage, event.reason
             );
-            Some(InterfoldEventData::from(E3FailedWithChainId(event, chain_id)))
+            Some(InterfoldEventData::from(E3FailedWithChainId(
+                event, chain_id,
+            )))
         }
         Some(&IInterfold::E3StageChanged::SIGNATURE_HASH) => {
             let Ok(mut event) = IInterfold::E3StageChanged::decode_log_data(data) else {

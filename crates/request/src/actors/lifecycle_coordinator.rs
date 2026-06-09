@@ -22,7 +22,7 @@ use actix::{Actor, ActorContext, Addr, Context, Handler};
 use anyhow::Result;
 use e3_data::{AutoPersist, DataStore, Persistable, RepositoriesFactory, Repository};
 use e3_events::prelude::*;
-use e3_events::{BusHandle, E3Stage, E3id, InterfoldEvent, InterfoldEventData, EventType};
+use e3_events::{BusHandle, E3Stage, E3id, EventType, InterfoldEvent, InterfoldEventData};
 use e3_utils::MAILBOX_LIMIT;
 use std::collections::HashMap;
 use tracing::{info, warn};

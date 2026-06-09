@@ -476,8 +476,8 @@ worth the surface area until a multi-chain deployment makes the trade-off concre
 
 The two on-chain Honk verifiers consumed by `publishCommittee` and the decryption flow
 (`DkgAggregatorVerifier.sol`, `DecryptionAggregatorVerifier.sol`, both under
-`packages/interfold-contracts/contracts/verifiers/bfv/honk/`) are **generated** from the recursive VKs
-of `recursive_aggregation/dkg_aggregator` and `recursive_aggregation/decryption_aggregator` via
+`packages/interfold-contracts/contracts/verifiers/bfv/honk/`) are **generated** from the recursive
+VKs of `recursive_aggregation/dkg_aggregator` and `recursive_aggregation/decryption_aggregator` via
 `bb write_solidity_verifier`. They are committed to git so production deploys are reproducible, but
 they must stay in lockstep with the circuits' recursive VKs — a verifier whose baked-in VK doesn't
 match the circuit will silently reject every proof.
@@ -502,8 +502,8 @@ The repo enforces sync with two modes of `pnpm generate:verifiers`:
   you intentionally bump the canonical-preset circuits or the Noir/bb toolchain, then commit the
   diff.
 
-The version pinning lives in `crates/zk-prover/versions.json` (consumed by `interfold noir setup` and
-by the integration test prebuild). If `--check` fails after a clean
+The version pinning lives in `crates/zk-prover/versions.json` (consumed by `interfold noir setup`
+and by the integration test prebuild). If `--check` fails after a clean
 `pnpm build:circuits --preset insecure-512`, your local toolchain is out of sync with that pin. See
 [`scripts/README.md`](https://github.com/gnosisguild/interfold/blob/main/scripts/README.md#verifier-generator)
 for the full contract.

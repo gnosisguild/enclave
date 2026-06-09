@@ -20,8 +20,8 @@ use crate::{
         ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventContextAccessors,
         EventFactory, EventPublisher, EventSubscriber,
     },
-    EType, InterfoldEvent, InterfoldEventData, ErrorEvent, EventBus, EventContextManager, EventSource,
-    EventType, HistoryCollector, Sequenced, Subscribe, Unsequenced, Unsubscribe,
+    EType, ErrorEvent, EventBus, EventContextManager, EventSource, EventType, HistoryCollector,
+    InterfoldEvent, InterfoldEventData, Sequenced, Subscribe, Unsequenced, Unsubscribe,
 };
 
 /// Typestate marker indicating the BusHandle has not yet been enabled with an HLC clock.
@@ -372,8 +372,8 @@ mod tests {
     use e3_ciphernode_builder::EventSystem;
     // NOTE: We cannot pull from crate as the features will be missing as they are not default.
     use e3_events::{
-        hlc::Hlc, prelude::*, BusHandle, InterfoldEvent, InterfoldEventData, EventPublisher, EventType,
-        TestEvent,
+        hlc::Hlc, prelude::*, BusHandle, EventPublisher, EventType, InterfoldEvent,
+        InterfoldEventData, TestEvent,
     };
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::time::sleep;

@@ -61,8 +61,8 @@ interfoldup install
 interfold ciphernode setup
 ```
 
-This creates `~/.config/interfold/interfold.config.yaml`. You'll be prompted for a password to encrypt
-sensitive data.
+This creates `~/.config/interfold/interfold.config.yaml`. You'll be prompted for a password to
+encrypt sensitive data.
 
 ### Set Up Credentials
 
@@ -128,8 +128,8 @@ interfold nodes down        # Stop all nodes
 
 ### CLI Commands Reference
 
-| Command                        | Description                                         |
-| ------------------------------ | --------------------------------------------------- |
+| Command                          | Description                                         |
+| -------------------------------- | --------------------------------------------------- |
 | `interfold start`                | Start the node in foreground                        |
 | `interfold start -v`             | Start with INFO logging (`-vv`=DEBUG, `-vvv`=TRACE) |
 | `interfold nodes up`             | Start all configured nodes                          |
@@ -246,13 +246,13 @@ docker logs -f ciphernode
 
 ### Node Configuration
 
-| Field          | Description                         | Default                  |
-| -------------- | ----------------------------------- | ------------------------ |
-| `address`      | Your Ethereum address               | Required                 |
-| `quic_port`    | UDP port for QUIC/libp2p networking | `9091`                   |
-| `peers`        | Bootstrap peer multiaddresses       | `[]`                     |
-| `autopassword` | Auto-generate password if missing   | `false`                  |
-| `autowallet`   | Auto-load wallet from environment   | `false`                  |
+| Field          | Description                         | Default                    |
+| -------------- | ----------------------------------- | -------------------------- |
+| `address`      | Your Ethereum address               | Required                   |
+| `quic_port`    | UDP port for QUIC/libp2p networking | `9091`                     |
+| `peers`        | Bootstrap peer multiaddresses       | `[]`                       |
+| `autopassword` | Auto-generate password if missing   | `false`                    |
+| `autowallet`   | Auto-load wallet from environment   | `false`                    |
 | `data_dir`     | Override data directory             | `~/.local/share/interfold` |
 | `config_dir`   | Override config directory           | `~/.config/interfold`      |
 
@@ -270,7 +270,7 @@ Each chain requires these contract addresses:
 
 | Contract              | Description                             | Required for ciphernode |
 | --------------------- | --------------------------------------- | ----------------------- |
-| `interfold`             | Main Interfold coordinator contract     | Yes                     |
+| `interfold`           | Main Interfold coordinator contract     | Yes                     |
 | `ciphernode_registry` | Tracks registered operators             | Yes                     |
 | `bonding_registry`    | Manages bonds and tickets               | Yes                     |
 | `slashing_manager`    | Manages slashing penalties              | Yes                     |
@@ -323,8 +323,8 @@ peers:
 
 ## Data Directories
 
-| Directory                      | Contents                          |
-| ------------------------------ | --------------------------------- |
+| Directory                        | Contents                          |
+| -------------------------------- | --------------------------------- |
 | `~/.config/interfold/`           | Configuration files, network keys |
 | `~/.local/share/interfold/`      | Databases, job data, keystores    |
 | `~/.local/share/interfold/jobs/` | Per-E3 secret shares and state    |

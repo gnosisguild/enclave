@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::domain::historical_order_fixer::HistoricalOrderFixer;
-use crate::messages::{InterfoldEvmEvent, EvmEventProcessor};
+use crate::messages::{EvmEventProcessor, InterfoldEvmEvent};
 use actix::{Actor, Addr, Handler};
 use e3_utils::MAILBOX_LIMIT;
 use tracing::debug;
@@ -50,7 +50,7 @@ impl Handler<InterfoldEvmEvent> for FixHistoricalOrder {
 mod tests {
     use std::time::Duration;
 
-    use crate::messages::{InterfoldEvmEvent, EvmLog, HistoricalSyncComplete};
+    use crate::messages::{EvmLog, HistoricalSyncComplete, InterfoldEvmEvent};
 
     use super::*;
     use actix::prelude::*;

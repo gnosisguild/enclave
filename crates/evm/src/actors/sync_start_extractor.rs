@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Addr, Handler, Recipient};
-use e3_events::{InterfoldEvent, InterfoldEventData, Event, HistoricalEvmSyncStart};
+use e3_events::{Event, HistoricalEvmSyncStart, InterfoldEvent, InterfoldEventData};
 use e3_utils::MAILBOX_LIMIT;
 
 pub struct SyncStartExtractor {

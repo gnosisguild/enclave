@@ -47,7 +47,9 @@ impl KeyshareCreatedFilterBuffer {
                     {
                         self.dest.do_send(event);
                     }
-                    InterfoldEventData::CommitteeMemberExpelled(data) if data.party_id.is_none() => {
+                    InterfoldEventData::CommitteeMemberExpelled(data)
+                        if data.party_id.is_none() =>
+                    {
                         self.dest.do_send(event);
                     }
                     InterfoldEventData::E3RequestComplete(_) | InterfoldEventData::Shutdown(_) => {
