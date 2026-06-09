@@ -22,9 +22,9 @@ User runs: interfold ciphernode deactivate --tickets 50
     │  ┌─── ON-CHAIN (BondingRegistry.sol) ─────────────────────┐
     │  │                                                         │
     │  │  removeTicketBalance(50):                               │
-    │  │    1. require(amount != 0, registered, sufficient ETK)  │
+    │  │    1. require(amount != 0, registered, sufficient ITK)  │
     │  │    2. ticketToken.burnTickets(operator, amount)         │
-    │  │       → ETK destroyed, underlying becomes claimable      │
+    │  │       → ITK destroyed, underlying becomes claimable      │
     │  │    3. _exits.queueTicketsForExit(                       │
     │  │         operator, exitDelay, amount                      │
     │  │       )                                                  │
@@ -51,7 +51,7 @@ User runs: interfold ciphernode deactivate --license 20000
     │  ┌─── ON-CHAIN ───────────────────────────────────────────┐
     │  │                                                         │
     │  │  unbondLicense(20000):                                  │
-    │  │    1. require(amount != 0, sufficient bonded ENCL)      │
+    │  │    1. require(amount != 0, sufficient bonded INTF)      │
     │  │    2. operators[op].licenseBond -= 20000                │
     │  │    3. _exits.queueLicensesForExit(op, exitDelay, 20000)│
     │  │    4. _updateOperatorStatus(operator)                   │
@@ -276,8 +276,8 @@ Time ─────────────────────────
 │ or deactivate()  │   EXIT DELAY       │                  │
 │                  │  (configured)       │                  │
 │ Assets queued    │                    │ Assets claimable │
-│ ETK burned       │  Cannot cancel     │ USDC returned    │
-│ ENCL locked      │  Can be slashed!   │ ENCL returned    │
+│ ITK burned       │  Cannot cancel     │ USDC returned    │
+│ INTF locked      │  Can be slashed!   │ INTF returned    │
 │                  │                    │                  │
 
 IMPORTANT: Even during the exit delay, slashing can still

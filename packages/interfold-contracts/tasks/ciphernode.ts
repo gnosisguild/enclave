@@ -53,7 +53,7 @@ export const ciphernodeAdd = task(
   .addOption({
     name: "licenseBondAmount",
     description:
-      "amount of ENCL to bond (in wei, e.g., 1000000000000000000000 for 1000 ENCL)",
+      "amount of INTF to bond (in wei, e.g., 1000000000000000000000 for 1000 INTF)",
     defaultValue: "1000000000000000000000",
   })
   .addOption({
@@ -99,7 +99,7 @@ export const ciphernodeAdd = task(
         const enclBalance = await licenseToken.balanceOf(signer.address);
         const usdcBalance = await usdcToken.balanceOf(signer.address);
 
-        console.log(`ENCL balance: ${ethers.formatEther(enclBalance)}`);
+        console.log(`INTF balance: ${ethers.formatEther(enclBalance)}`);
         console.log(`USDC balance: ${ethers.formatUnits(usdcBalance, 6)}`);
 
         const licenseBondAmountBigInt = BigInt(licenseBondAmount);
@@ -107,7 +107,7 @@ export const ciphernodeAdd = task(
 
         if (enclBalance < licenseBondAmountBigInt) {
           throw new Error(
-            `Insufficient ENCL balance. Need: ${ethers.formatEther(licenseBondAmountBigInt)}, Have: ${ethers.formatEther(enclBalance)}`,
+            `Insufficient INTF balance. Need: ${ethers.formatEther(licenseBondAmountBigInt)}, Have: ${ethers.formatEther(enclBalance)}`,
           );
         }
 
@@ -117,13 +117,13 @@ export const ciphernodeAdd = task(
           );
         }
 
-        console.log("Step 2: Approving ENCL for license bond...");
+        console.log("Step 2: Approving INTF for license bond...");
         const approveTx = await licenseToken.approve(
           await bondingRegistry.getAddress(),
           licenseBondAmountBigInt,
         );
         await approveTx.wait();
-        console.log("ENCL approved");
+        console.log("INTF approved");
 
         console.log("Step 3: Bonding license...");
         const bondTx = await bondingRegistryConnected.bondLicense(
@@ -131,7 +131,7 @@ export const ciphernodeAdd = task(
         );
         await bondTx.wait();
         console.log(
-          `Licensed bonded: ${ethers.formatEther(licenseBondAmountBigInt)} ENCL`,
+          `Licensed bonded: ${ethers.formatEther(licenseBondAmountBigInt)} INTF`,
         );
 
         console.log("Step 4: Registering as operator...");
@@ -174,7 +174,7 @@ export const ciphernodeAdd = task(
         console.log(`Ciphernode: ${signer.address}`);
         console.log(`Registered: ${isRegistered}`);
         console.log(`Active: ${isActive}`);
-        console.log(`License Bond: ${ethers.formatEther(licenseBond)} ENCL`);
+        console.log(`License Bond: ${ethers.formatEther(licenseBond)} INTF`);
         console.log(
           `Ticket Balance: ${ethers.formatUnits(ticketBalance, 6)} USDC worth`,
         );
@@ -226,7 +226,7 @@ export const ciphernodeRemove = task(
 
 export const ciphernodeMintTokens = task(
   "ciphernode:mint-tokens",
-  "Mint ENCL and USDC tokens for a ciphernode (for testing)",
+  "Mint INTF and USDC tokens for a ciphernode (for testing)",
 )
   .addOption({
     name: "ciphernodeAddress",
@@ -236,7 +236,7 @@ export const ciphernodeMintTokens = task(
   .addOption({
     name: "enclAmount",
     description:
-      "amount of ENCL to mint (in ether units, e.g., 2000 for 2000 ENCL)",
+      "amount of INTF to mint (in ether units, e.g., 2000 for 2000 INTF)",
     defaultValue: "2000",
   })
   .addOption({
@@ -275,14 +275,14 @@ export const ciphernodeMintTokens = task(
       try {
         console.log(`Minting tokens for: ${ciphernodeAddress}`);
 
-        console.log(`Minting ${enclAmount} ENCL...`);
+        console.log(`Minting ${enclAmount} INTF...`);
         const enclTx = await interfoldTokenContract.mintAllocation(
           ciphernodeAddress,
           ethers.parseEther(enclAmount),
           "Ciphernode allocation",
         );
         await enclTx.wait();
-        console.log(`${enclAmount} ENCL minted`);
+        console.log(`${enclAmount} INTF minted`);
 
         console.log(`Minting ${usdcAmount} USDC...`);
         const usdcTx = await mockUSDCContract.mint(
@@ -297,7 +297,7 @@ export const ciphernodeMintTokens = task(
         const usdcBalance = await mockUSDCContract.balanceOf(ciphernodeAddress);
 
         console.log("\n=== Token Balances ===");
-        console.log(`ENCL: ${ethers.formatEther(enclBalance)}`);
+        console.log(`INTF: ${ethers.formatEther(enclBalance)}`);
         console.log(`USDC: ${ethers.formatUnits(usdcBalance, 6)}`);
 
         const transfersRestricted =
@@ -335,7 +335,7 @@ export const ciphernodeAdminAdd = task(
   .addOption({
     name: "licenseBondAmount",
     description:
-      "amount of ENCL to bond (in ether units, e.g., 1000 for 1000 ENCL)",
+      "amount of INTF to bond (in ether units, e.g., 1000 for 1000 INTF)",
     defaultValue: "1000",
   })
   .addOption({
@@ -413,7 +413,7 @@ export const ciphernodeAdminAdd = task(
         const licenseBondWei = ethers.parseEther(licenseBondAmount);
         const ticketAmountWei = ethers.parseUnits(ticketAmount, 6);
 
-        console.log("Step 1: Minting and transferring ENCL to ciphernode...");
+        console.log("Step 1: Minting and transferring INTF to ciphernode...");
 
         const enclTx = await interfoldTokenConnected.mintAllocation(
           adminWallet.address,
@@ -427,7 +427,7 @@ export const ciphernodeAdminAdd = task(
           licenseBondWei,
         );
         await transferTx.wait();
-        console.log(`${licenseBondAmount} ENCL transferred to ciphernode`);
+        console.log(`${licenseBondAmount} INTF transferred to ciphernode`);
 
         console.log("Step 2: Minting USDC to admin...");
         const usdcTx = await mockUSDCConnected.mint(
@@ -465,7 +465,7 @@ export const ciphernodeAdminAdd = task(
         const bondTx =
           await bondingRegistryAsCiphernode.bondLicense(licenseBondWei);
         await bondTx.wait();
-        console.log(`License bonded: ${licenseBondAmount} ENCL`);
+        console.log(`License bonded: ${licenseBondAmount} INTF`);
 
         const registerTx = await bondingRegistryAsCiphernode.registerOperator();
         await registerTx.wait();
@@ -529,7 +529,7 @@ export const ciphernodeAdminAdd = task(
         console.log(`Ciphernode: ${ciphernodeAddress}`);
         console.log(`Registered: ${isRegistered}`);
         console.log(`Active: ${isActive}`);
-        console.log(`License Bond: ${ethers.formatEther(licenseBond)} ENCL`);
+        console.log(`License Bond: ${ethers.formatEther(licenseBond)} INTF`);
         console.log(
           `Ticket Balance: ${ethers.formatUnits(ticketBalance, 6)} USDC worth`,
         );

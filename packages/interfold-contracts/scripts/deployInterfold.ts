@@ -146,7 +146,7 @@ export const deployInterfold = async (
     );
   }
 
-  console.log("Deploying ENCL token...");
+  console.log("Deploying INTF token...");
   const { interfoldToken } = await deployAndSaveInterfoldToken({
     owner: ownerAddress,
     hre,
@@ -495,7 +495,7 @@ export const deployInterfold = async (
     Deployment Complete!
     ============================================
     MockFeeToken: ${feeTokenAddress}
-    InterfoldToken (ENCL): ${interfoldTokenAddress}
+    InterfoldToken (INTF): ${interfoldTokenAddress}
     InterfoldTicketToken: ${interfoldTicketTokenAddress}
     SlashingManager: ${slashingManagerAddress}
     BondingRegistry: ${bondingRegistryAddress}

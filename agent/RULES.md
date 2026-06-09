@@ -46,7 +46,7 @@ Read the relevant flow-trace file **before** modifying code in any of these area
 | Area                                                                                 | File to read                        |
 | ------------------------------------------------------------------------------------ | ----------------------------------- |
 | CLI commands (`setup`, `register`, `activate`, `status`), on-chain registration, IMT | `01_REGISTRATION.md`                |
-| ENCL bonding, USDC tickets, activation thresholds, exit queue                        | `02_TOKENS_AND_ACTIVATION.md`       |
+| INTF bonding, USDC tickets, activation thresholds, exit queue                        | `02_TOKENS_AND_ACTIVATION.md`       |
 | E3 requests, fee payment, committee selection, sortition, ticket submission          | `03_E3_REQUEST_AND_COMMITTEE.md`    |
 | DKG, BFV keygen, ZK proofs (C0–C7), Shamir shares, key aggregation, decryption       | `04_DKG_AND_COMPUTATION.md`         |
 | Timeouts, `markE3Failed`, refunds, accusations, slashing (Lane A/B)                  | `05_FAILURE_REFUND_SLASHING.md`     |

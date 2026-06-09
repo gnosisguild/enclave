@@ -639,7 +639,7 @@ describe("BondingRegistry", function () {
       const initialUSDCBalance = await usdcToken.balanceOf(
         await operator1.getAddress(),
       );
-      const initialENCLBalance = await licenseToken.balanceOf(
+      const initialINTFBalance = await licenseToken.balanceOf(
         await operator1.getAddress(),
       );
 
@@ -652,7 +652,7 @@ describe("BondingRegistry", function () {
       );
       expect(
         await licenseToken.balanceOf(await operator1.getAddress()),
-      ).to.equal(initialENCLBalance + bondAmount);
+      ).to.equal(initialINTFBalance + bondAmount);
     });
 
     it("reverts if exit not ready", async function () {
@@ -705,7 +705,7 @@ describe("BondingRegistry", function () {
       const initialUSDCBalance = await usdcToken.balanceOf(
         await operator1.getAddress(),
       );
-      const initialENCLBalance = await licenseToken.balanceOf(
+      const initialINTFBalance = await licenseToken.balanceOf(
         await operator1.getAddress(),
       );
 
@@ -718,7 +718,7 @@ describe("BondingRegistry", function () {
       );
       expect(
         await licenseToken.balanceOf(await operator1.getAddress()),
-      ).to.equal(initialENCLBalance + partialLicense);
+      ).to.equal(initialINTFBalance + partialLicense);
 
       const [remainingTickets, remainingLicense] =
         await bondingRegistry.pendingExits(await operator1.getAddress());
@@ -1014,7 +1014,7 @@ describe("BondingRegistry", function () {
       const initialUSDCBalance = await usdcToken.balanceOf(
         await operator1.getAddress(),
       );
-      const initialENCLBalance = await licenseToken.balanceOf(
+      const initialINTFBalance = await licenseToken.balanceOf(
         await operator1.getAddress(),
       );
 
@@ -1027,7 +1027,7 @@ describe("BondingRegistry", function () {
       );
       expect(
         await licenseToken.balanceOf(await operator1.getAddress()),
-      ).to.equal(initialENCLBalance + bondAmount);
+      ).to.equal(initialINTFBalance + bondAmount);
 
       await licenseToken
         .connect(operator1)

@@ -635,7 +635,7 @@ _executeSlash(proposalId):
 │     │  │     activeBalance = ticketToken.balanceOf(operator)   │
 │     │  │     slashFromActive = min(amount, activeBalance)      │
 │     │  │     ticketToken.burnTickets(operator, slashFromActive)│
-│     │  │     → Burns ETK, underlying stays as payableBalance   │
+│     │  │     → Burns ITK, underlying stays as payableBalance   │
 │     │  │                                                       │
 │     │  │  2. Remaining from EXIT QUEUE:                        │
 │     │  │     remaining = amount - slashFromActive              │
@@ -894,7 +894,7 @@ Case 4: E3 completes successfully with escrowed slashed funds
 ```
 SlashPolicy {
   ticketPenalty:    uint256   // tickets to slash (in base units)
-  licensePenalty:   uint256   // ENCL to slash
+  licensePenalty:   uint256   // INTF to slash
   requiresProof:   bool      // Lane A (true) or Lane B (false)
   proofVerifier:    address   // verifier address (Lane A: used in policy lookup)
   banNode:          bool      // permanently ban operator
@@ -1021,7 +1021,7 @@ FALLBACK: TREASURY WITHDRAWAL
     → licenseToken.safeTransfer(treasury, licenseAmount)
   Effect: slashedTicketBalance decremented
 
-License bond slashes always go to treasury (no escrow routing for ENCL).
+License bond slashes always go to treasury (no escrow routing for INTF).
 ```
 
 ---

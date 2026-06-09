@@ -6,8 +6,8 @@
 | ------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `Interfold.sol`                 | Main protocol coordinator — handles E3 requests, param sets, fee routing, and output publication |
 | `CiphernodeRegistryOwnable.sol` | Ciphernode registration and committee selection                                                  |
-| `BondingRegistry.sol`           | ENCL token bonding for ciphernodes; tracks bond amounts and manages bond lifecycle               |
-| `InterfoldToken.sol`            | ENCL governance/utility token                                                                    |
+| `BondingRegistry.sol`           | INTF token bonding for ciphernodes; tracks bond amounts and manages bond lifecycle               |
+| `InterfoldToken.sol`            | INTF governance/utility token                                                                    |
 | `InterfoldTicketToken.sol`      | USDC-backed tickets used by ciphernodes for sortition entry                                      |
 | `SlashingManager.sol`           | Fault attribution and slashing for dishonest ciphernodes (accusation → quorum → slash)           |
 | `E3RefundManager.sol`           | Issues refunds to requesters when an E3 fails                                                    |
@@ -112,7 +112,7 @@ pnpm ciphernode:add --network [network]
 
 Options:
 
-- `--license-bond-amount`: Amount of ENCL to bond (default: 1000 ENCL)
+- `--license-bond-amount`: Amount of INTF to bond (default: 1000 INTF)
 - `--ticket-amount`: Amount of USDC for tickets (default: 1000 USDC)
 
 For testing/development, you can also use the admin task to register any
