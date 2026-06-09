@@ -109,6 +109,10 @@ impl AllThresholdSharesCollected {
 pub struct ThresholdKeyshareParams {
     pub bus: BusHandle,
     pub cipher: Arc<Cipher>,
+    /// The cipher used by the shared `Multithread` compute actor. `SensitiveBytes` produced by
+    /// multithread workers (e.g. `sk_sss`, `esi_sss`, `e_sm_raw`) are encrypted with this key
+    /// and must be decrypted with it. Normally the master cipher; never the per-E3 cipher.
+    pub multithread_cipher: Arc<Cipher>,
     pub state: Persistable<ThresholdKeyshareState>,
     pub share_enc_preset: BfvPreset,
 }
@@ -116,6 +120,7 @@ pub struct ThresholdKeyshareParams {
 pub struct ThresholdKeyshare {
     bus: BusHandle,
     cipher: Arc<Cipher>,
+    multithread_cipher: Arc<Cipher>,
     decryption_key_collector: Option<Addr<ThresholdShareCollector>>,
     encryption_key_collector: Option<Addr<EncryptionKeyCollector>>,
     decryption_key_shared_collector: Option<Addr<DecryptionKeySharedCollector>>,
@@ -144,6 +149,7 @@ impl ThresholdKeyshare {
         Self {
             bus: params.bus,
             cipher: params.cipher,
+            multithread_cipher: params.multithread_cipher,
             decryption_key_collector: None,
             encryption_key_collector: None,
             decryption_key_shared_collector: None,
@@ -873,11 +879,13 @@ impl ThresholdKeyshare {
             bail!("Invalid state - expected GeneratingThresholdShare with all data");
         };
 
-        // Decrypt our shares from local storage
-        let decrypted_sk_sss: SharedSecret = sk_sss.decrypt(&self.cipher)?;
+        // Decrypt our shares from local storage.
+        // sk_sss and esi_sss are produced by the Multithread compute actor and therefore
+        // encrypted with the multithread cipher (master), not the per-E3 cipher.
+        let decrypted_sk_sss: SharedSecret = sk_sss.decrypt(&self.multithread_cipher)?;
         let decrypted_esi_sss: Vec<SharedSecret> = esi_sss
             .into_iter()
-            .map(|s| s.decrypt(&self.cipher))
+            .map(|s| s.decrypt(&self.multithread_cipher))
             .collect::<Result<_>>()?;
 
         let plan = build_shares_generated_plan(
@@ -2217,9 +2225,11 @@ mod tests {
         E3id,
     )> {
         let (bus, history) = test_bus();
+        let cipher = Arc::new(Cipher::from_password("test-password").await?);
         let actor = ThresholdKeyshare::new(ThresholdKeyshareParams {
             bus,
-            cipher: Arc::new(Cipher::from_password("test-password").await?),
+            cipher: cipher.clone(),
+            multithread_cipher: cipher,
             state: test_state(),
             share_enc_preset: DEFAULT_BFV_PRESET,
         })
@@ -2327,5 +2337,87 @@ mod tests {
         ));
 
         Ok(())
+    }
+
+    // ── cipher boundary tests ────────────────────────────────────────────────
+    //
+    // These tests guard the contract that SensitiveBytes produced by the shared
+    // Multithread compute actor (encrypted with the master/multithread cipher) must
+    // be decrypted with `multithread_cipher`, not the per-E3 `cipher`.  Without this
+    // boundary, a cipher mismatch causes silent "Could not decrypt data" errors during
+    // key generation.
+
+    #[test]
+    fn multithread_cipher_decrypts_sk_sss_encrypted_by_master() {
+        use e3_trbfv::shares::{Encrypted, SharedSecret};
+        use ndarray::Array2;
+
+        let master = Arc::new(Cipher::from_key_bytes(vec![0xBBu8; 32]).unwrap());
+        let per_e3 = Arc::new(Cipher::from_key_bytes(vec![0xAAu8; 32]).unwrap());
+
+        // Simulate what Multithread produces: SharedSecret encrypted with master.
+        let secret = SharedSecret::new(vec![Array2::zeros((2, 4))]);
+        let encrypted = Encrypted::new(secret.clone(), &master).unwrap();
+
+        // multithread_cipher (master) must decrypt it.
+        assert!(
+            encrypted.clone().decrypt(&master).is_ok(),
+            "master cipher must decrypt sk_sss produced by Multithread"
+        );
+
+        // per-E3 cipher must NOT decrypt it — this is the regression guard.
+        assert!(
+            encrypted.decrypt(&per_e3).is_err(),
+            "per-E3 cipher must not decrypt sk_sss produced by Multithread"
+        );
+    }
+
+    #[test]
+    fn multithread_cipher_decrypts_esi_sss_encrypted_by_master() {
+        use e3_trbfv::shares::{Encrypted, SharedSecret};
+        use ndarray::Array2;
+
+        let master = Arc::new(Cipher::from_key_bytes(vec![0xBBu8; 32]).unwrap());
+        let per_e3 = Arc::new(Cipher::from_key_bytes(vec![0xAAu8; 32]).unwrap());
+
+        let secret = SharedSecret::new(vec![Array2::zeros((2, 4))]);
+        let esi_sss: Vec<Encrypted<SharedSecret>> = vec![
+            Encrypted::new(secret.clone(), &master).unwrap(),
+            Encrypted::new(secret.clone(), &master).unwrap(),
+        ];
+
+        for enc in esi_sss {
+            assert!(
+                enc.clone().decrypt(&master).is_ok(),
+                "master cipher must decrypt each esi_sss entry"
+            );
+            assert!(
+                enc.decrypt(&per_e3).is_err(),
+                "per-E3 cipher must not decrypt esi_sss produced by Multithread"
+            );
+        }
+    }
+
+    #[test]
+    fn per_e3_cipher_decrypts_own_shares_encrypted_by_actor() {
+        // own_sk_share_raw and own_esi_shares_raw are encrypted by ThresholdKeyshare
+        // itself (via build_shares_generated_plan) with the per-E3 cipher.
+        // They must NOT be decryptable with the master cipher.
+        use e3_crypto::SensitiveBytes;
+
+        let master = Arc::new(Cipher::from_key_bytes(vec![0xBBu8; 32]).unwrap());
+        let per_e3 = Arc::new(Cipher::from_key_bytes(vec![0xAAu8; 32]).unwrap());
+
+        let plaintext = b"own share data";
+        let own_share = SensitiveBytes::new(plaintext.to_vec(), &per_e3).unwrap();
+
+        assert!(
+            own_share.clone().access(&per_e3).is_ok(),
+            "per-E3 cipher must decrypt own share data"
+        );
+        assert!(
+            own_share.access(&master).is_err(),
+            "master cipher must not decrypt own share data (encrypted by actor with per-E3 key)"
+        );
     }
 }

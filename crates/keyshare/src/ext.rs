@@ -86,6 +86,7 @@ impl E3Extension for ThresholdKeyshareExtension {
                 ThresholdKeyshare::new(ThresholdKeyshareParams {
                     bus: self.bus.clone(),
                     cipher,
+                    multithread_cipher: self.master_cipher.clone(),
                     state: container,
                     share_enc_preset: meta
                         .params_preset
@@ -130,6 +131,7 @@ impl E3Extension for ThresholdKeyshareExtension {
         let value = ThresholdKeyshare::new(ThresholdKeyshareParams {
             bus: self.bus.clone(),
             cipher,
+            multithread_cipher: self.master_cipher.clone(),
             state,
             share_enc_preset,
         })
