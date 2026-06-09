@@ -108,7 +108,7 @@ contract InterfoldToken is
     event TransferWhitelistUpdated(address indexed account, bool whitelisted);
 
     /**
-     * @notice Initializes the Interfold token with name "Interfold" and symbol "ENCL"
+     * @notice Initializes the Interfold token with name "Interfold" and symbol "INTF"
      * @dev Sets up the token with voting and permit functionality. Grants admin, minter, and
      *      whitelist roles to the owner; enables transfer restrictions; whitelists the owner.
      * @param initialOwner_ Address that will own the contract and receive admin, minter and whitelist roles.
@@ -116,7 +116,7 @@ contract InterfoldToken is
     constructor(
         address initialOwner_
     )
-        ERC20("Interfold", "ENCL")
+        ERC20("Interfold", "INTF")
         ERC20Permit("Interfold")
         Ownable(initialOwner_)
     {
