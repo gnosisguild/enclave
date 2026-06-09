@@ -8,7 +8,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-import { readDeploymentArgs } from '@enclave-e3/contracts/scripts'
+import { readDeploymentArgs } from '@interfold/contracts/scripts'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -71,14 +71,14 @@ function deploymentAddress(contractName: string, chain: string): string | undefi
  * syncs E3_PROOF_AGGREGATION_ENABLED from crisp.dev.env.
  */
 export function syncCrispEnvFromDeployments(chain: string): void {
-  const enclaveAddress = deploymentAddress('Enclave', chain)
+  const interfoldAddress = deploymentAddress('Interfold', chain)
   const feeTokenAddress = deploymentAddress('MockUSDC', chain)
   const programAddress = deploymentAddress('CRISPProgram', chain)
   const registryAddress = deploymentAddress('CiphernodeRegistryOwnable', chain)
   const votingTokenAddress = deploymentAddress('MockVotingToken', chain)
 
   const missing: string[] = []
-  if (!enclaveAddress) missing.push('Enclave')
+  if (!interfoldAddress) missing.push('Interfold')
   if (!feeTokenAddress) missing.push('MockUSDC')
   if (!programAddress) missing.push('CRISPProgram')
   if (!registryAddress) missing.push('CiphernodeRegistryOwnable')
@@ -101,7 +101,7 @@ export function syncCrispEnvFromDeployments(chain: string): void {
   ensureEnvFile(clientEnv, path.join(CRISP_ROOT, 'client', '.env.example'))
 
   const serverUpdates: Record<string, string> = {
-    ENCLAVE_ADDRESS: enclaveAddress!,
+    INTERFOLD_ADDRESS: interfoldAddress!,
     FEE_TOKEN_ADDRESS: feeTokenAddress!,
     E3_PROGRAM_ADDRESS: programAddress!,
     CIPHERNODE_REGISTRY_ADDRESS: registryAddress!,

@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use e3_events::{
-    AggregateId, E3id, EnclaveEvent, EnclaveEventData, Event, EventContextAccessors, Unsequenced,
+    AggregateId, E3id, InterfoldEvent, InterfoldEventData, Event, EventContextAccessors, Unsequenced,
 };
 use std::collections::BTreeMap;
 
@@ -30,7 +30,7 @@ pub struct SyncPlanner;
 
 impl SyncPlanner {
     /// Decide whether an event should be replayed to listeners during EventStore replay.
-    pub fn classify_replay(event: &EnclaveEvent) -> ReplayDecision {
+    pub fn classify_replay(event: &InterfoldEvent) -> ReplayDecision {
         if Self::is_infrastructure_event(event) {
             ReplayDecision::SkipInfrastructure
         } else {
@@ -40,13 +40,13 @@ impl SyncPlanner {
 
     /// True for events the sync flow re-publishes itself (steps 5/8/10) and therefore must not
     /// replay from the EventStore.
-    pub fn is_infrastructure_event(event: &EnclaveEvent) -> bool {
+    pub fn is_infrastructure_event(event: &InterfoldEvent) -> bool {
         matches!(
             event.get_data(),
-            EnclaveEventData::SyncEnded(_)
-                | EnclaveEventData::EffectsEnabled(_)
-                | EnclaveEventData::HistoricalEvmSyncStart(_)
-                | EnclaveEventData::HistoricalNetSyncStart(_)
+            InterfoldEventData::SyncEnded(_)
+                | InterfoldEventData::EffectsEnabled(_)
+                | InterfoldEventData::HistoricalEvmSyncStart(_)
+                | InterfoldEventData::HistoricalNetSyncStart(_)
         )
     }
 
@@ -58,7 +58,7 @@ impl SyncPlanner {
     /// events get NEW HLC timestamps from a fresh-on-restart HLC, which would be later than what
     /// ciphernodes stored and cause the sync query to return 0 events.
     pub fn net_sync_cursor(
-        historical_evm_events: &[EnclaveEvent<Unsequenced>],
+        historical_evm_events: &[InterfoldEvent<Unsequenced>],
         snapshot_net_config: &BTreeMap<AggregateId, u128>,
     ) -> BTreeMap<AggregateId, u128> {
         Self::find_net_hlc(historical_evm_events)
@@ -71,19 +71,19 @@ impl SyncPlanner {
     }
 
     /// Sort historical events (evm + libp2p combined) by their HLC timestamp.
-    pub fn sort_by_timestamp(events: &mut [EnclaveEvent<Unsequenced>]) {
+    pub fn sort_by_timestamp(events: &mut [InterfoldEvent<Unsequenced>]) {
         events.sort_by_key(|event| event.ts());
     }
 
     /// For every still-open aggregate, find the latest HLC timestamp observed in the events.
     /// Aggregates whose E3 has completed or failed are excluded.
-    pub fn find_net_hlc(events: &[EnclaveEvent<Unsequenced>]) -> BTreeMap<AggregateId, u128> {
+    pub fn find_net_hlc(events: &[InterfoldEvent<Unsequenced>]) -> BTreeMap<AggregateId, u128> {
         // find all E3s that are closed
         let e3s: Vec<E3id> = events
             .iter()
             .filter_map(|e| match e.get_data() {
-                EnclaveEventData::E3Failed(d) => Some(d.e3_id.clone()),
-                EnclaveEventData::E3RequestComplete(d) => Some(d.e3_id.clone()),
+                InterfoldEventData::E3Failed(d) => Some(d.e3_id.clone()),
+                InterfoldEventData::E3RequestComplete(d) => Some(d.e3_id.clone()),
                 _ => None,
             })
             .collect();
@@ -103,7 +103,7 @@ impl SyncPlanner {
 mod tests {
     use super::*;
     use e3_events::{
-        E3Failed, E3RequestComplete, E3Stage, E3id, EffectsEnabled, EnclaveEvent, EvmEventConfig,
+        E3Failed, E3RequestComplete, E3Stage, E3id, EffectsEnabled, InterfoldEvent, EvmEventConfig,
         FailureReason, HistoricalEvmSyncStart, SyncEnded, Unsequenced,
     };
 
@@ -116,19 +116,19 @@ mod tests {
 
     #[test]
     fn infrastructure_events_are_detected() {
-        let sync_ended = EnclaveEvent::<Unsequenced>::test_event("sync")
+        let sync_ended = InterfoldEvent::<Unsequenced>::test_event("sync")
             .data(SyncEnded::new())
             .seq(1)
             .build();
-        let effects_enabled = EnclaveEvent::<Unsequenced>::test_event("fx")
+        let effects_enabled = InterfoldEvent::<Unsequenced>::test_event("fx")
             .data(EffectsEnabled::new())
             .seq(2)
             .build();
-        let evm_sync_start = EnclaveEvent::<Unsequenced>::test_event("evm")
+        let evm_sync_start = InterfoldEvent::<Unsequenced>::test_event("evm")
             .data(make_historical_evm_sync_start())
             .seq(3)
             .build();
-        let test_event = EnclaveEvent::<Unsequenced>::test_event("hello")
+        let test_event = InterfoldEvent::<Unsequenced>::test_event("hello")
             .id(42)
             .seq(4)
             .build();
@@ -141,11 +141,11 @@ mod tests {
 
     #[test]
     fn classify_replay_skips_infrastructure_and_replays_the_rest() {
-        let sync_ended = EnclaveEvent::<Unsequenced>::test_event("sync")
+        let sync_ended = InterfoldEvent::<Unsequenced>::test_event("sync")
             .data(SyncEnded::new())
             .seq(1)
             .build();
-        let test_event = EnclaveEvent::<Unsequenced>::test_event("hello")
+        let test_event = InterfoldEvent::<Unsequenced>::test_event("hello")
             .id(42)
             .seq(2)
             .build();
@@ -169,25 +169,25 @@ mod tests {
 
         let events = vec![
             // closed e3s -> should be filtered out
-            EnclaveEvent::<Unsequenced>::test_event("a")
+            InterfoldEvent::<Unsequenced>::test_event("a")
                 .e3_id(closed_1.clone())
                 .ts(1000)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("a")
+            InterfoldEvent::<Unsequenced>::test_event("a")
                 .e3_id(closed_1.clone())
                 .ts(2000)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("complete")
+            InterfoldEvent::<Unsequenced>::test_event("complete")
                 .data(E3RequestComplete {
                     e3_id: closed_1.clone(),
                 })
                 .ts(3000)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("b")
+            InterfoldEvent::<Unsequenced>::test_event("b")
                 .e3_id(closed_2.clone())
                 .ts(1500)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("failed")
+            InterfoldEvent::<Unsequenced>::test_event("failed")
                 .data(E3Failed {
                     e3_id: closed_2.clone(),
                     failed_at_stage: E3Stage::CommitteeFinalized,
@@ -196,23 +196,23 @@ mod tests {
                 .ts(2500)
                 .build(),
             // open e3s -> should be kept
-            EnclaveEvent::<Unsequenced>::test_event("c")
+            InterfoldEvent::<Unsequenced>::test_event("c")
                 .e3_id(open_1.clone())
                 .ts(4000)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("c")
+            InterfoldEvent::<Unsequenced>::test_event("c")
                 .e3_id(open_1.clone())
                 .ts(5000)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("d")
+            InterfoldEvent::<Unsequenced>::test_event("d")
                 .e3_id(open_2.clone())
                 .ts(6000)
                 .build(),
             // no e3_id -> aggregate 0, always kept
-            EnclaveEvent::<Unsequenced>::test_event("e")
+            InterfoldEvent::<Unsequenced>::test_event("e")
                 .ts(7000)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("e")
+            InterfoldEvent::<Unsequenced>::test_event("e")
                 .ts(8000)
                 .build(),
         ];
@@ -237,11 +237,11 @@ mod tests {
     fn net_sync_cursor_remaps_open_aggregates_to_snapshot_timestamps() {
         let open = E3id::new("3", 3);
         let events = vec![
-            EnclaveEvent::<Unsequenced>::test_event("c")
+            InterfoldEvent::<Unsequenced>::test_event("c")
                 .e3_id(open.clone())
                 .ts(5000)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("e")
+            InterfoldEvent::<Unsequenced>::test_event("e")
                 .ts(8000)
                 .build(),
         ];
@@ -261,13 +261,13 @@ mod tests {
     #[test]
     fn sort_by_timestamp_orders_ascending() {
         let mut events = vec![
-            EnclaveEvent::<Unsequenced>::test_event("c")
+            InterfoldEvent::<Unsequenced>::test_event("c")
                 .ts(5000)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("a")
+            InterfoldEvent::<Unsequenced>::test_event("a")
                 .ts(1000)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("b")
+            InterfoldEvent::<Unsequenced>::test_event("b")
                 .ts(3000)
                 .build(),
         ];

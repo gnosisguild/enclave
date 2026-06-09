@@ -25,19 +25,19 @@ else
   pnpm evm:deploy
 fi
 
-(cd "$ROOT_DIR/packages/enclave-contracts" && pnpm utils:sync-integration-config)
+(cd "$ROOT_DIR/packages/interfold-contracts" && pnpm utils:sync-integration-config)
 
-enclave_wallet_set cn1 "$PRIVATE_KEY_CN1"
-enclave_wallet_set cn2 "$PRIVATE_KEY_CN2"
-enclave_wallet_set cn3 "$PRIVATE_KEY_CN3"
-enclave_wallet_set cn4 "$PRIVATE_KEY_CN4"
-enclave_wallet_set cn5 "$PRIVATE_KEY_CN5"
+interfold_wallet_set cn1 "$PRIVATE_KEY_CN1"
+interfold_wallet_set cn2 "$PRIVATE_KEY_CN2"
+interfold_wallet_set cn3 "$PRIVATE_KEY_CN3"
+interfold_wallet_set cn4 "$PRIVATE_KEY_CN4"
+interfold_wallet_set cn5 "$PRIVATE_KEY_CN5"
 
 heading "Setup ZK prover"
-$ENCLAVE_BIN noir setup
+$INTERFOLD_BIN noir setup
 
 # start swarm
-enclave_nodes_up
+interfold_nodes_up
 
 waiton-files "$ROOT_DIR/target/debug/fake_encrypt"
 
@@ -90,12 +90,12 @@ if [[ -z "$ACTIVE_AGG" ]]; then
 fi
 
 # kill active aggregator
-enclave_nodes_stop "$ACTIVE_AGG"
+interfold_nodes_stop "$ACTIVE_AGG"
 
 sleep 15
 
 # relaunch the active aggregator
-enclave_nodes_start "$ACTIVE_AGG"
+interfold_nodes_start "$ACTIVE_AGG"
 
 sleep 5
 

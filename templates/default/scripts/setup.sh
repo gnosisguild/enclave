@@ -13,23 +13,23 @@ echo "Installing dependencies..."
 pnpm install --frozen-lockfile
 
 echo "Compiling guest program..."
-if [[ ! -f './.enclave/generated/contracts/ImageID.sol' ]]; then
-  enclave program compile
+if [[ ! -f './.interfold/generated/contracts/ImageID.sol' ]]; then
+  interfold program compile
 fi
 
-build_enclave_circuits_at_setup
+build_interfold_circuits_at_setup
 
 echo "Compiling contracts..."
 pnpm compile
 
-if [[ ! -f ~/.cargo/bin/enclave ]]; then
-  echo "Building and installing enclave CLI..."
-  (cd "${ENCLAVE_REPO_ROOT}" && cargo build --locked -p e3-cli && cargo install --locked --path crates/cli)
+if [[ ! -f ~/.cargo/bin/interfold ]]; then
+  echo "Building and installing interfold CLI..."
+  (cd "${INTERFOLD_REPO_ROOT}" && cargo build --locked -p e3-cli && cargo install --locked --path crates/cli)
 else
-  echo "enclave CLI already installed, skipping build"
+  echo "interfold CLI already installed, skipping build"
 fi
 
-echo "Running enclave noir setup..."
-enclave noir setup
+echo "Running interfold noir setup..."
+interfold noir setup
 
 echo "Template setup complete."

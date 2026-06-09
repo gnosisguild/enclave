@@ -10,7 +10,7 @@ use e3_ciphernode_builder::global_eventstore_cache::EventStoreReader;
 use e3_config::AppConfig;
 use e3_console::{log, Console};
 use e3_entrypoint::helpers::datastore::get_eventstore_reader;
-use e3_events::{compute_seq_cursor, CorrelationId, EnclaveEvent, SeqAgg, SeqCursor};
+use e3_events::{compute_seq_cursor, CorrelationId, InterfoldEvent, SeqAgg, SeqCursor};
 use e3_events::{AggregateId, EventStoreQueryBy, EventStoreQueryResponse};
 use e3_utils::actix::channel as actix_toolbox;
 use std::collections::HashMap;
@@ -62,7 +62,7 @@ async fn fetch_events(
     aggregate: Option<usize>,
     since: Option<u64>,
     limit: Option<u64>,
-) -> Result<(Vec<EnclaveEvent>, SeqCursor)> {
+) -> Result<(Vec<InterfoldEvent>, SeqCursor)> {
     let aggregate = aggregate.unwrap_or(0);
     let since = since.unwrap_or(0);
     let limit = limit.unwrap_or(10);
@@ -82,7 +82,7 @@ async fn fetch_events(
     Ok((events, next))
 }
 
-fn print_events(out: Console, events: Vec<EnclaveEvent>) -> Result<()> {
+fn print_events(out: Console, events: Vec<InterfoldEvent>) -> Result<()> {
     for event in events {
         log!(out, "{}", serde_json::to_string(&event)?);
     }

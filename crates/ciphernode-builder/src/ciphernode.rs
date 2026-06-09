@@ -7,7 +7,7 @@
 use actix::Addr;
 use anyhow::Result;
 use e3_data::{DataStore, InMemStore, StoreAddr};
-use e3_events::{BusHandle, EnclaveEvent, HistoryCollector};
+use e3_events::{BusHandle, InterfoldEvent, HistoryCollector};
 use e3_net::NetChannelBridge;
 use libp2p::PeerId;
 
@@ -41,10 +41,10 @@ pub struct CiphernodeHandle {
     pub bus: BusHandle,
     /// Optional event history collector. Populated when the builder is configured
     /// with [`CiphernodeBuilder::with_history_collector`].
-    pub history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
+    pub history: Option<Addr<HistoryCollector<InterfoldEvent>>>,
     /// Optional error event collector. Populated when the builder is configured
     /// with [`CiphernodeBuilder::with_error_collector`].
-    pub errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
+    pub errors: Option<Addr<HistoryCollector<InterfoldEvent>>>,
     pub peer_id: PeerId,
     pub net_interface: NetInterfaceKind,
 }
@@ -62,8 +62,8 @@ impl CiphernodeHandle {
         address: String,
         store: DataStore,
         bus: BusHandle,
-        history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
-        errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
+        history: Option<Addr<HistoryCollector<InterfoldEvent>>>,
+        errors: Option<Addr<HistoryCollector<InterfoldEvent>>>,
         peer_id: PeerId,
         net_interface: NetInterfaceKind,
     ) -> Self {
@@ -82,11 +82,11 @@ impl CiphernodeHandle {
         &self.bus
     }
 
-    pub fn history(&self) -> Option<Addr<HistoryCollector<EnclaveEvent>>> {
+    pub fn history(&self) -> Option<Addr<HistoryCollector<InterfoldEvent>>> {
         self.history.clone()
     }
 
-    pub fn errors(&self) -> Option<Addr<HistoryCollector<EnclaveEvent>>> {
+    pub fn errors(&self) -> Option<Addr<HistoryCollector<InterfoldEvent>>> {
         self.errors.clone()
     }
 

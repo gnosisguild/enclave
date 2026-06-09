@@ -21,7 +21,7 @@ Anyone can call `markE3Failed()` when a deadline is missed:
 > missing feature.
 
 ```
-Anyone calls: Enclave.markE3Failed(e3Id)
+Anyone calls: Interfold.markE3Failed(e3Id)
 │
 ├─ Revert if stage == None, Complete, or Failed
 │
@@ -56,7 +56,7 @@ Anyone calls: Enclave.markE3Failed(e3Id)
 
 ```
 CiphernodeRegistry or SlashingManager calls:
-  Enclave.onE3Failed(e3Id, reason)
+  Interfold.onE3Failed(e3Id, reason)
 │
 ├─ require(caller == ciphernodeRegistry || caller == slashingManager)
 ├─ _e3Stages[e3Id] = Failed
@@ -75,13 +75,13 @@ Specific triggers:
 
 ### Step 1: Process Failure
 
-Runtime note: `processE3Failure()` is a permissionless cleanup path. The Rust `EnclaveSolWriter` may
-auto-submit it from any effects-enabled node on the same chain, and it must not depend on
+Runtime note: `processE3Failure()` is a permissionless cleanup path. The Rust `InterfoldSolWriter`
+may auto-submit it from any effects-enabled node on the same chain, and it must not depend on
 active-aggregator designation because failures can happen before committee finalization or while the
 current aggregator is offline.
 
 ```
-Anyone calls: Enclave.processE3Failure(e3Id)
+Anyone calls: Interfold.processE3Failure(e3Id)
 │
 ├─ require(stage == Failed)
 ├─ require(e3Payments[e3Id] > 0) → payment exists
@@ -175,7 +175,7 @@ REQUESTER claims:
   E3RefundManager.claimRequesterRefund(e3Id)
 │
 ├─ require(distribution calculated)
-├─ require(msg.sender == requester from Enclave)
+├─ require(msg.sender == requester from Interfold)
 ├─ require(!already claimed)
 ├─ requesterAmount includes BOTH:
 │   • Base refund (from work-value BPS allocation)
@@ -697,7 +697,7 @@ _executeSlash(proposalId):
 │     │  └───────────────────────────────────────────────────────┘
 │     │
 │     └─ If activeCount < thresholdM AND proposal.failureReason > 0:
-│         try enclave.onE3Failed(e3Id, proposal.failureReason)
+│         try interfold.onE3Failed(e3Id, proposal.failureReason)
 │         → Committee can no longer meet threshold
 │         → E3 is irrecoverably failed
 │         catch: emit RoutingFailed (E3 may already be failed)
@@ -729,7 +729,7 @@ _executeSlash(proposalId):
 │     │  │  │         burnTickets() during slashTicketBalance     │
 │     │  │  │                                                    │
 │     │  │  │  Step B: Update escrow accounting                  │
-│     │  │  │    enclave.escrowSlashedFunds(e3Id, amount)         │
+│     │  │  │    interfold.escrowSlashedFunds(e3Id, amount)         │
 │     │  │  │    → e3RefundManager.escrowSlashedFunds(e3Id, amt)  │
 │     │  │  │      │                                             │
 │     │  │  │      ├─ If refund distribution NOT yet calculated:  │
@@ -815,7 +815,7 @@ Design rationale:
 ```
 distributeSlashedFundsOnSuccess(e3Id, activeNodes, paymentToken):
 │
-├─ Called by Enclave._distributeRewards() when E3 completes successfully
+├─ Called by Interfold._distributeRewards() when E3 completes successfully
 │
 ├─ escrowed = _pendingSlashedFunds[e3Id]
 │   if escrowed == 0: return (nothing to distribute)
@@ -1101,7 +1101,7 @@ Applied audit findings: **C-05, H-05, H-06, H-07, H-09, H-10, H-24, M-14, M-15, 
 
 ### EIP-712 domain (H-10, M-24)
 
-- SlashingManager declares `EIP712("EnclaveSlashing", "1")` so accusation signatures are bound to
+- SlashingManager declares `EIP712("InterfoldSlashing", "1")` so accusation signatures are bound to
   `verifyingContract` _and_ `chainId`. Signatures produced against a different deployment or chain
   are rejected with `InvalidSigner()`. Cross-deployment / cross-chain replay is blocked.
 
@@ -1142,4 +1142,4 @@ Applied audit findings: **C-05, H-05, H-06, H-07, H-09, H-10, H-24, M-14, M-15, 
 ### Upgrade posture
 
 - `SlashingManager` is **non-upgradeable** by design (transparent proxy removed). Migrations require
-  redeployment + GOVERNANCE_ROLE rotation on `BondingRegistry`/`Enclave`.
+  redeployment + GOVERNANCE_ROLE rotation on `BondingRegistry`/`Interfold`.

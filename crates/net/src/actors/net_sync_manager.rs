@@ -7,10 +7,10 @@
 use actix::{Actor, Addr, AsyncContext, Handler, Message, Recipient, ResponseFuture};
 use anyhow::{bail, Context, Result};
 use e3_events::{
-    prelude::*, trap, trap_fut, AggregateId, BusHandle, CorrelationId, EType, EnclaveEvent,
-    EnclaveEventData, EventSource, EventStoreFilter, EventStoreQueryBy, EventStoreQueryResponse,
-    EventType, HistoricalNetSyncEventsReceived, HistoricalNetSyncStart, NetReady, TsAgg,
-    TypedEvent, Unsequenced,
+    prelude::*, trap, trap_fut, AggregateId, BusHandle, CorrelationId, EType, EventSource,
+    EventStoreFilter, EventStoreQueryBy, EventStoreQueryResponse, EventType,
+    HistoricalNetSyncEventsReceived, HistoricalNetSyncStart, InterfoldEvent, InterfoldEventData,
+    NetReady, TsAgg, TypedEvent, Unsequenced,
 };
 use e3_utils::MAILBOX_LIMIT;
 use serde::{Deserialize, Serialize};
@@ -51,7 +51,7 @@ const SYNC_RECOVERY_MAX_ATTEMPTS: usize = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncResponseValue {
-    pub events: Vec<EnclaveEvent<Unsequenced>>,
+    pub events: Vec<InterfoldEvent<Unsequenced>>,
     pub ts: u128,
 }
 
@@ -77,7 +77,7 @@ pub struct SyncRequestSucceeded {
 }
 
 pub struct NetSyncManager {
-    /// Enclave EventBus
+    /// Interfold EventBus
     bus: BusHandle,
     /// NetCommand sender to forward commands to the Libp2pNetInterface
     tx: mpsc::Sender<NetCommand>,
@@ -164,7 +164,7 @@ impl NetSyncManager {
     }
 
     /// Re-gossip the node's own forwardable artifacts returned by the re-broadcast query.
-    fn handle_rebroadcast_response(&mut self, events: Vec<EnclaveEvent>) {
+    fn handle_rebroadcast_response(&mut self, events: Vec<InterfoldEvent>) {
         let mut count = 0usize;
         for event in events {
             if !EventTranslationService::is_forwardable_event(&event) {
@@ -263,12 +263,12 @@ impl Actor for NetSyncManager {
 }
 
 /// Event broadcast from event bus
-impl Handler<EnclaveEvent> for NetSyncManager {
+impl Handler<InterfoldEvent> for NetSyncManager {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         // We are making a sync request of another node
-        if let EnclaveEventData::HistoricalNetSyncStart(data) = msg {
+        if let InterfoldEventData::HistoricalNetSyncStart(data) = msg {
             // Capture the snapshot-cursor map so we can bound the post-restart re-broadcast of our
             // own forwardable artifacts to the in-flight window (H3/H11).
             self.rebroadcast_since = Some(data.since.clone().into_iter().collect());
@@ -423,13 +423,13 @@ async fn fetch_historical_events_for_aggregate(
     net_events: &Arc<broadcast::Receiver<NetEvent>>,
     aggregate_id: AggregateId,
     since: u128,
-) -> Result<Vec<EnclaveEvent<Unsequenced>>> {
+) -> Result<Vec<InterfoldEvent<Unsequenced>>> {
     let requester = DirectRequester::builder(net_cmds.clone(), net_events.clone())
         .max_retries(SYNC_FETCH_MAX_RETRIES)
         .retry_timeout(SYNC_FETCH_RETRY_TIMEOUT)
         .build();
 
-    fetch_all_batched_events::<EnclaveEvent<Unsequenced>>(
+    fetch_all_batched_events::<InterfoldEvent<Unsequenced>>(
         requester,
         PeerTarget::Random,
         aggregate_id,
@@ -483,7 +483,7 @@ async fn handle_sync_request_event(
     }
     info!("handle_sync_request_event: ready to sync");
 
-    let mut all_events: Vec<EnclaveEvent<Unsequenced>> = Vec::new();
+    let mut all_events: Vec<InterfoldEvent<Unsequenced>> = Vec::new();
     let mut latest_timestamp: u128 = 0;
     let mut failed_aggregates: Vec<AggregateId> = Vec::new();
 
@@ -501,12 +501,12 @@ async fn handle_sync_request_event(
                     events.len(),
                     aggregate_id
                 );
-                for enclave_event in events {
-                    let ts = enclave_event.ts();
+                for interfold_event in events {
+                    let ts = interfold_event.ts();
                     if ts > latest_timestamp {
                         latest_timestamp = ts;
                     }
-                    all_events.push(enclave_event);
+                    all_events.push(interfold_event);
                 }
             }
             Err(e) => {
@@ -578,12 +578,12 @@ async fn handle_sync_request_event(
                             events.len(),
                             aggregate_id
                         );
-                        for enclave_event in events {
-                            let ts = enclave_event.ts();
+                        for interfold_event in events {
+                            let ts = interfold_event.ts();
                             if ts > latest_timestamp {
                                 latest_timestamp = ts;
                             }
-                            all_events.push(enclave_event);
+                            all_events.push(interfold_event);
                         }
                     }
                     Err(e) => {
@@ -632,7 +632,9 @@ mod tests {
     use crate::events::NetCommand;
     use actix::{Actor, Context as ActixContext, Handler};
     use e3_ciphernode_builder::EventSystem;
-    use e3_events::{E3id, EnclaveEvent, EventSource, PlaintextAggregated, TestEvent, Unsequenced};
+    use e3_events::{
+        E3id, EventSource, InterfoldEvent, PlaintextAggregated, TestEvent, Unsequenced,
+    };
     use e3_utils::ArcBytes;
     use tokio::sync::{broadcast, mpsc};
 
@@ -647,8 +649,8 @@ mod tests {
         fn handle(&mut self, _: EventStoreQueryBy<TsAgg>, _: &mut Self::Context) {}
     }
 
-    fn local_forwardable_event(e3: &str) -> EnclaveEvent {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(
+    fn local_forwardable_event(e3: &str) -> InterfoldEvent {
+        InterfoldEvent::<Unsequenced>::new_with_timestamp(
             PlaintextAggregated {
                 e3_id: E3id::new(e3, 1),
                 decrypted_output: vec![ArcBytes::from_bytes(&[1, 2, 3, 4])],
@@ -663,8 +665,8 @@ mod tests {
         .into_sequenced(1)
     }
 
-    fn local_non_forwardable_event() -> EnclaveEvent {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(
+    fn local_non_forwardable_event() -> InterfoldEvent {
+        InterfoldEvent::<Unsequenced>::new_with_timestamp(
             TestEvent::new("not-forwardable", 1).into(),
             None,
             11,
@@ -696,10 +698,10 @@ mod tests {
             panic!("expected GossipPublish, got {cmd:?}");
         };
         assert_eq!(topic, "my-topic");
-        let event: EnclaveEvent<Unsequenced> = data.try_into().unwrap();
+        let event: InterfoldEvent<Unsequenced> = data.try_into().unwrap();
         assert!(matches!(
             event.get_data(),
-            EnclaveEventData::PlaintextAggregated(_)
+            InterfoldEventData::PlaintextAggregated(_)
         ));
 
         // The non-forwardable event must not have produced a second command.

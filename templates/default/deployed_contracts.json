@@ -11,14 +11,14 @@
       "blockNumber": 5,
       "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
     },
-    "EnclaveToken": {
+    "InterfoldToken": {
       "constructorArgs": {
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
       },
       "blockNumber": 6,
       "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
     },
-    "EnclaveTicketToken": {
+    "InterfoldTicketToken": {
       "constructorArgs": {
         "baseToken": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
         "registry": "0x0000000000000000000000000000000000000001",
@@ -72,7 +72,7 @@
       "blockNumber": 12,
       "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
     },
-    "Enclave": {
+    "Interfold": {
       "constructorArgs": {
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
         "registry": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
@@ -95,7 +95,7 @@
     "E3RefundManager": {
       "constructorArgs": {
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "enclave": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+        "interfold": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
         "treasury": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
       },
       "proxyRecords": {

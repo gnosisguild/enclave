@@ -46,7 +46,7 @@ CiphernodeSelected event arrives at ThresholdKeyshare
 │   │
 │   └─ Collector timeouts are derived from the DKG stage budget:
 │         ├─ shared base window from `E3_DKG_WINDOW_SECS` (default 7200s,
-│         │  matching current production `Enclave` deployment config)
+│         │  matching current production `Interfold` deployment config)
 │         ├─ EncryptionKeyCollector cutoff at 10% of the DKG window
 │         ├─ ThresholdShareCollector cutoff at 60% of the DKG window
 │         └─ per-collector env vars still override these derived defaults
@@ -608,7 +608,7 @@ ThresholdKeyshare receives AllThresholdSharesCollected
 │   │     ├─ ComputeRequestError now emits
 │   │     │   E3Failed { failed_at_stage: CommitteeFinalized, reason: DKGInvalidShares }
 │   │     └─ A mixed Some/None honest NodeFold-proof set is treated as the same terminal DKG
-│   │         failure instead of only surfacing as EnclaveError telemetry
+│   │         failure instead of only surfacing as InterfoldError telemetry
 │   │
 │   └─ 6. Publish PublicKeyAggregated {
 │         e3_id, pubkey: aggregate_pk, pk_commitment, nodes,
@@ -644,9 +644,9 @@ ThresholdKeyshare receives AllThresholdSharesCollected
         │  │         • M-35: revert on failure (no `bool false`) │
         │  │    5. c.publicKey = pkCommitment                    │
         │  │       publicKeyHashes[e3Id] = pkCommitment          │
-        │  │    6. enclave.onCommitteePublished(e3Id, pkCommitment) │
+        │  │    6. interfold.onCommitteePublished(e3Id, pkCommitment) │
         │  │       │                                             │
-        │  │       │  ┌─ Enclave.sol ────────────────────────┐  │
+        │  │       │  ┌─ Interfold.sol ────────────────────────┐  │
         │  │       │  │  onCommitteePublished(e3Id, pk) {   │  │
         │  │       │  │    require(stage==CommitteeFinalized) │  │
         │  │       │  │    e3.committeePublicKey = pk         │  │
@@ -688,9 +688,9 @@ Data providers submit encrypted inputs:
 ```
 Compute provider runs computation on encrypted data:
 │
-└─ Enclave.publishCiphertextOutput(e3Id, ciphertextOutput, proof)
+└─ Interfold.publishCiphertextOutput(e3Id, ciphertextOutput, proof)
     │
-    │  ┌─── ON-CHAIN (Enclave.sol) ─────────────────────────────┐
+    │  ┌─── ON-CHAIN (Interfold.sol) ─────────────────────────────┐
     │  │                                                         │
     │  │  publishCiphertextOutput(e3Id, output, proof) {         │
     │  │    1. require(stage == KeyPublished)                    │
@@ -716,7 +716,7 @@ Compute provider runs computation on encrypted data:
 ## Phase 4: Decryption Share Generation (Each Committee Member, with C6 Proof)
 
 ```
-EnclaveSolReader decodes CiphertextOutputPublished event
+InterfoldSolReader decodes CiphertextOutputPublished event
 │
 └─ ThresholdKeyshare receives CiphertextOutputPublished:
     │
@@ -864,13 +864,13 @@ EnclaveSolReader decodes CiphertextOutputPublished event
 │         e3_id, decrypted_output, decryption_aggregator_proofs
 │       }
 │
-└─ EnclaveSolWriter receives PlaintextAggregated:
+└─ InterfoldSolWriter receives PlaintextAggregated:
   ├─ Requires EffectsEnabled
   ├─ Requires active_aggregators[e3_id] == true
   ├─ Reads chain state to confirm plaintextOutput is still empty
   └─ Calls contract.publishPlaintextOutput(e3Id, output, proof)
         │
-        │  ┌─── ON-CHAIN (Enclave.sol) ─────────────────────────┐
+        │  ┌─── ON-CHAIN (Interfold.sol) ─────────────────────────┐
         │  │                                                     │
         │  │  publishPlaintextOutput(e3Id, output, proof) {      │
         │  │    1. require(stage == CiphertextReady)             │
@@ -921,9 +921,9 @@ EnclaveSolReader decodes CiphertextOutputPublished event
         │  │                                                     │
         │  │  // Funds are NOT pushed at publish-time.           │
         │  │  // Recipients must call:                           │
-        │  │  //   - enclave.claimReward(e3Id) or                │
-        │  │  //     enclave.claimRewards(e3Ids[])               │
-        │  │  //   - enclave.treasuryClaim(token)                │
+        │  │  //   - interfold.claimReward(e3Id) or                │
+        │  │  //     interfold.claimRewards(e3Ids[])               │
+        │  │  //   - interfold.treasuryClaim(token)                │
         │  │  // emitting RewardClaimed / TreasuryClaimed.       │
         │  └─────────────────────────────────────────────────────┘
 ```

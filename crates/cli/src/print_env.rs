@@ -13,12 +13,12 @@ pub fn extract_env_vars_vite(config: &AppConfig, chain: &str) -> String {
 
     // Extract from first enabled chain (or first chain if none specified)
     if let Some(chain) = config.chains().iter().find(|c| c.name == chain) {
-        let enclave_addr = &chain.contracts.enclave;
+        let interfold_addr = &chain.contracts.interfold;
         let registry_addr = &chain.contracts.ciphernode_registry;
         let bonding_registry_addr = &chain.contracts.bonding_registry;
         env_vars.push(format!(
-            "VITE_ENCLAVE_ADDRESS={}",
-            enclave_addr.address_str()
+            "VITE_INTERFOLD_ADDRESS={}",
+            interfold_addr.address_str()
         ));
         env_vars.push(format!(
             "VITE_REGISTRY_ADDRESS={}",
@@ -51,10 +51,13 @@ pub fn extract_env_vars(config: &AppConfig, chain: &str) -> String {
 
     // Extract from first enabled chain (or first chain if none specified)
     if let Some(chain) = config.chains().iter().find(|c| c.name == chain) {
-        let enclave_addr = &chain.contracts.enclave;
+        let interfold_addr = &chain.contracts.interfold;
         let registry_addr = &chain.contracts.ciphernode_registry;
         let bonding_registry_addr = &chain.contracts.bonding_registry;
-        env_vars.push(format!("ENCLAVE_ADDRESS={}", enclave_addr.address_str()));
+        env_vars.push(format!(
+            "INTERFOLD_ADDRESS={}",
+            interfold_addr.address_str()
+        ));
         env_vars.push(format!("RPC_URL={}", chain.rpc_url));
         env_vars.push(format!("REGISTRY_ADDRESS={}", registry_addr.address_str()));
         env_vars.push(format!(

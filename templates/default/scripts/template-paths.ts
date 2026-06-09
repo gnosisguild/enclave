@@ -11,9 +11,9 @@ const scriptsDir = path.dirname(fileURLToPath(import.meta.url))
 export const TEMPLATE_ROOT = path.resolve(scriptsDir, '..')
 
 export const DEPLOYMENTS_FILE = path.join(TEMPLATE_ROOT, 'deployed_contracts.json')
-export const ENCLAVE_CONFIG_FILE = path.join(TEMPLATE_ROOT, 'enclave.config.yaml')
+export const INTERFOLD_CONFIG_FILE = path.join(TEMPLATE_ROOT, 'interfold.config.yaml')
 
-/** Pin cwd so `@enclave-e3/contracts` deployment helpers write only under the template. */
+/** Pin cwd so `@interfold/contracts` deployment helpers write only under the template. */
 export function ensureTemplateCwd(): void {
   if (process.cwd() !== TEMPLATE_ROOT) {
     process.chdir(TEMPLATE_ROOT)

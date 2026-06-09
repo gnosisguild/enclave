@@ -9,7 +9,7 @@ use crate::domain::slashing_events::extractor;
 use crate::messages::EvmEventProcessor;
 use actix::{Actor, Addr};
 
-/// Connects to SlashingManager.sol converting EVM events to EnclaveEvents
+/// Connects to SlashingManager.sol converting EVM events to InterfoldEvents
 pub struct SlashingManagerSolReader;
 
 impl SlashingManagerSolReader {

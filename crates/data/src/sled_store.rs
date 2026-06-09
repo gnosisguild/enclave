@@ -8,8 +8,8 @@ use crate::SledDb;
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::Result;
 use e3_events::{
-    prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData, ErrorDispatcher, EventType,
-    Flush, Unsequenced,
+    prelude::*, BusHandle, EType, ErrorDispatcher, EventType, Flush, InterfoldEvent,
+    InterfoldEventData, Unsequenced,
 };
 use e3_events::{Get, Insert, InsertBatch, InsertSync, Remove};
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
@@ -18,7 +18,7 @@ use tracing::{error, info};
 
 pub struct SledStore {
     db: Option<SledDb>,
-    bus: Box<dyn ErrorDispatcher<EnclaveEvent<Unsequenced>>>,
+    bus: Box<dyn ErrorDispatcher<InterfoldEvent<Unsequenced>>>,
 }
 
 impl Actor for SledStore {
@@ -128,10 +128,10 @@ impl Handler<Flush> for SledStore {
     }
 }
 
-impl Handler<EnclaveEvent> for SledStore {
+impl Handler<InterfoldEvent> for SledStore {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        if let EnclaveEventData::Shutdown(_) = msg.get_data() {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
+        if let InterfoldEventData::Shutdown(_) = msg.get_data() {
             self.notify_sync(ctx, Flush); // Flush all pending writes
             let _db = self.db.take(); // db will be dropped
             ctx.stop()

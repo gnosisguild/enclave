@@ -8,7 +8,7 @@ use actix::Actor;
 use anyhow::Result;
 use e3_ciphernode_builder::global_eventstore_cache::{get_shared_eventstore, EventStoreReader};
 use e3_ciphernode_builder::global_store_cache::get_cached_store;
-use e3_ciphernode_builder::{get_enclave_bus_handle, EventSystem};
+use e3_ciphernode_builder::{get_interfold_bus_handle, EventSystem};
 use e3_config::AppConfig;
 use e3_data::{DataStore, InMemStore, SledDb, SledStore};
 use e3_data::{Repositories, RepositoriesFactory};
@@ -40,7 +40,7 @@ pub fn get_repositories(config: &AppConfig) -> Result<Repositories> {
     }
 
     // We are probably in a standalone command so setup a fresh data store
-    let bus = get_enclave_bus_handle()?;
+    let bus = get_interfold_bus_handle()?;
     let store = setup_datastore(config, &bus)?;
     Ok(store.repositories())
 }

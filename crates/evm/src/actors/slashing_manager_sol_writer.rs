@@ -25,8 +25,8 @@ use alloy::{
 use anyhow::Result;
 use e3_events::prelude::*;
 use e3_events::BusHandle;
-use e3_events::EnclaveEvent;
-use e3_events::EnclaveEventData;
+use e3_events::InterfoldEvent;
+use e3_events::InterfoldEventData;
 use e3_events::EventType;
 use e3_events::Shutdown;
 use e3_events::{AccusationQuorumReached, EType};
@@ -71,14 +71,14 @@ impl<P: Provider + WalletProvider + Clone + 'static> Actor for SlashingManagerSo
     type Context = actix::Context<Self>;
 }
 
-impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<InterfoldEvent>
     for SlashingManagerSolWriter<P>
 {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
-            EnclaveEventData::AccusationQuorumReached(data) => {
+            InterfoldEventData::AccusationQuorumReached(data) => {
                 // Only submit if:
                 // 1. This is the right chain
                 // 2. The quorum decided the accused is at fault OR equivocated
@@ -99,7 +99,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
                     ctx.notify(data);
                 }
             }
-            EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
+            InterfoldEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }

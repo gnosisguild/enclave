@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_events::{EnclaveEvent, EvmEventConfig, HistoricalEvmEventsReceived, Unsequenced};
+use e3_events::{InterfoldEvent, EvmEventConfig, HistoricalEvmEventsReceived, Unsequenced};
 use std::collections::HashSet;
 
 /// Outcome of recording one batch of historical EVM events.
@@ -26,7 +26,7 @@ pub enum CollectOutcome {
 pub struct HistoricalEvmCollector {
     expected: HashSet<u64>,
     received: HashSet<u64>,
-    results: Vec<EnclaveEvent<Unsequenced>>,
+    results: Vec<InterfoldEvent<Unsequenced>>,
 }
 
 impl HistoricalEvmCollector {
@@ -63,7 +63,7 @@ impl HistoricalEvmCollector {
     }
 
     /// Consume the collector and return the accumulated events.
-    pub fn into_events(self) -> Vec<EnclaveEvent<Unsequenced>> {
+    pub fn into_events(self) -> Vec<InterfoldEvent<Unsequenced>> {
         self.results
     }
 }
@@ -85,7 +85,7 @@ mod tests {
     fn batch(chain_id: u64, count: usize) -> HistoricalEvmEventsReceived {
         let events = (0..count)
             .map(|i| {
-                EnclaveEvent::<Unsequenced>::test_event("evt")
+                InterfoldEvent::<Unsequenced>::test_event("evt")
                     .ts(i as u128)
                     .build()
             })

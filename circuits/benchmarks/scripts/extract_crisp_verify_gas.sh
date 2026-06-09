@@ -83,13 +83,13 @@ fi
 CRISP_CONTRACTS_DIR="${REPO_ROOT}/examples/CRISP/packages/crisp-contracts"
 TMP_LOG_CRISP="$(mktemp)"
 TMP_LOG_FOLDED="$(mktemp)"
-TMP_LOG_ENCLAVE="$(mktemp)"
-TMP_JSON_ENCLAVE="$(mktemp)"
+TMP_LOG_INTERFOLD="$(mktemp)"
+TMP_JSON_INTERFOLD="$(mktemp)"
 TMP_JSON_FOLDED="$(mktemp)"
 TMP_JSON_SUMMARY="$(mktemp)"
 
 cleanup_tmp_files() {
-    rm -f "$TMP_LOG_CRISP" "$TMP_LOG_FOLDED" "$TMP_LOG_ENCLAVE" "$TMP_JSON_ENCLAVE" "$TMP_JSON_FOLDED" "$TMP_JSON_SUMMARY"
+    rm -f "$TMP_LOG_CRISP" "$TMP_LOG_FOLDED" "$TMP_LOG_INTERFOLD" "$TMP_JSON_INTERFOLD" "$TMP_JSON_FOLDED" "$TMP_JSON_SUMMARY"
 }
 trap cleanup_tmp_files EXIT
 
@@ -104,7 +104,7 @@ EOF
     exit 0
 fi
 
-ENCLAVE_CONTRACTS_DIR="${REPO_ROOT}/packages/enclave-contracts"
+INTERFOLD_CONTRACTS_DIR="${REPO_ROOT}/packages/interfold-contracts"
 OUTPUT_DIR="$(cd "$(dirname "$OUTPUT_JSON")" && pwd)"
 RAW_DIR="${OUTPUT_DIR}/raw"
 
@@ -177,23 +177,23 @@ echo "  [gas] Running integration test (test_trbfv_actor); proof_aggregation=${B
 ) 2>&1 | tee "$TMP_LOG_FOLDED"
 FOLDED_TEST_EXIT_CODE=${PIPESTATUS[0]}
 echo "  [gas] Integration export completed (exit=${FOLDED_TEST_EXIT_CODE})."
-ENCLAVE_TEST_EXIT_CODE=0
+INTERFOLD_TEST_EXIT_CODE=0
 if [ "$FOLDED_TEST_EXIT_CODE" -ne 0 ]; then
     echo "  [gas] Skipping EVM replay: test_trbfv_actor failed (exit=${FOLDED_TEST_EXIT_CODE})."
-    echo '{}' >"$TMP_JSON_ENCLAVE"
+    echo '{}' >"$TMP_JSON_INTERFOLD"
 elif [ ! -s "$TMP_JSON_FOLDED" ] || ! jq -e '(.dkg_aggregator.proof_hex != "") and (.decryption_aggregator.proof_hex != "")' "$TMP_JSON_FOLDED" >/dev/null 2>&1; then
     echo "  [gas] Skipping EVM replay: folded proof export missing or empty."
-    echo '{}' >"$TMP_JSON_ENCLAVE"
+    echo '{}' >"$TMP_JSON_INTERFOLD"
 else
     echo "  [gas] Replaying folded artifacts on EVM verifiers for Pi_DKG/Pi_dec gas..."
     (
-      cd "$ENCLAVE_CONTRACTS_DIR" && \
-      BENCHMARK_RAW_DIR="$RAW_DIR" BENCHMARK_GAS_OUTPUT="$TMP_JSON_ENCLAVE" BENCHMARK_FOLDED_JSON="$TMP_JSON_FOLDED" \
+      cd "$INTERFOLD_CONTRACTS_DIR" && \
+      BENCHMARK_RAW_DIR="$RAW_DIR" BENCHMARK_GAS_OUTPUT="$TMP_JSON_INTERFOLD" BENCHMARK_FOLDED_JSON="$TMP_JSON_FOLDED" \
       BENCHMARK_PRESET="$PRESET_NAME" \
       pnpm hardhat run scripts/benchmarkGasFromRaw.ts --network hardhat
-    ) 2>&1 | tee "$TMP_LOG_ENCLAVE"
-    ENCLAVE_TEST_EXIT_CODE=${PIPESTATUS[0]}
-    echo "  [gas] EVM replay completed (exit=${ENCLAVE_TEST_EXIT_CODE})."
+    ) 2>&1 | tee "$TMP_LOG_INTERFOLD"
+    INTERFOLD_TEST_EXIT_CODE=${PIPESTATUS[0]}
+    echo "  [gas] EVM replay completed (exit=${INTERFOLD_TEST_EXIT_CODE})."
 fi
 set -e
 
@@ -248,8 +248,8 @@ PY
 }
 
 USER_VERIFY_GAS=$(parse_marker "crisp_user_verify" "$TMP_LOG_CRISP")
-DKG_VERIFY_GAS=$(jq -r '.verify_gas.dkg // empty' "$TMP_JSON_ENCLAVE" 2>/dev/null || true)
-DEC_VERIFY_GAS=$(jq -r '.verify_gas.dec // empty' "$TMP_JSON_ENCLAVE" 2>/dev/null || true)
+DKG_VERIFY_GAS=$(jq -r '.verify_gas.dkg // empty' "$TMP_JSON_INTERFOLD" 2>/dev/null || true)
+DEC_VERIFY_GAS=$(jq -r '.verify_gas.dec // empty' "$TMP_JSON_INTERFOLD" 2>/dev/null || true)
 
 DKG_PROOF_HEX=$(jq -r '.dkg_aggregator.proof_hex // empty' "$TMP_JSON_FOLDED" 2>/dev/null || true)
 DKG_PUBLIC_HEX=$(jq -r '.dkg_aggregator.public_inputs_hex // empty' "$TMP_JSON_FOLDED" 2>/dev/null || true)
@@ -328,7 +328,7 @@ cat > "$OUTPUT_JSON" <<EOF
   "test_exit_code": {
     "crisp": ${CRISP_TEST_EXIT_CODE},
     "folded_export": ${FOLDED_TEST_EXIT_CODE},
-    "enclave_contracts": ${ENCLAVE_TEST_EXIT_CODE}
+    "interfold_contracts": ${INTERFOLD_TEST_EXIT_CODE}
   }
 }
 EOF
@@ -337,6 +337,6 @@ if [ "$FOLDED_TEST_EXIT_CODE" -ne 0 ]; then
     echo "  [gas] ERROR: test_trbfv_actor failed — Pi_DKG/Pi_dec verify gas and integration timings will be incomplete."
     echo "  [gas]        Re-run after a successful integration export (no Anvil required)."
 fi
-if [ "$CRISP_TEST_EXIT_CODE" -ne 0 ] || [ "$FOLDED_TEST_EXIT_CODE" -ne 0 ] || [ "$ENCLAVE_TEST_EXIT_CODE" -ne 0 ]; then
+if [ "$CRISP_TEST_EXIT_CODE" -ne 0 ] || [ "$FOLDED_TEST_EXIT_CODE" -ne 0 ] || [ "$INTERFOLD_TEST_EXIT_CODE" -ne 0 ]; then
     exit 1
 fi

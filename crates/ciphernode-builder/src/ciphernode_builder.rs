@@ -18,11 +18,12 @@ use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{InMemStore, RepositoriesFactory};
 use e3_events::{
-    AggregateConfig, AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig,
+    AggregateConfig, AggregateId, BusHandle, EventBus, EventBusConfig, EvmEventConfig,
+    InterfoldEvent,
 };
 use e3_evm::{
     fetch_accusation_vote_validity, fetch_dkg_fold_attestation_verifier, BondingRegistrySolReader,
-    CiphernodeRegistrySol, CiphernodeRegistrySolReader, EnclaveSolReader, EnclaveSolWriter,
+    CiphernodeRegistrySol, CiphernodeRegistrySolReader, InterfoldSolReader, InterfoldSolWriter,
     ProviderConfig, SlashingManagerSolReader, SlashingManagerSolWriter,
 };
 use e3_fhe::ext::FheExtension;
@@ -77,7 +78,7 @@ pub struct CiphernodeBuilder {
     pubkey_agg: bool,
     rng: SharedRng,
     sortition_backend: SortitionBackend,
-    source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
+    source_bus: Option<BusMode<Addr<EventBus<InterfoldEvent>>>>,
     task_pool: Option<TaskPool>,
     threads: Option<usize>,
     signer: Option<alloy::signers::local::PrivateKeySigner>,
@@ -105,8 +106,8 @@ impl NetConfig {
 
 #[derive(Default, Debug)]
 pub struct ContractComponents {
-    enclave_reader: bool,
-    enclave: bool,
+    interfold_reader: bool,
+    interfold: bool,
     ciphernode_registry: bool,
     bonding_registry: bool,
     slashing_manager: bool,
@@ -156,7 +157,7 @@ impl CiphernodeBuilder {
     }
 
     /// Use the given bus for all events. No new bus is created.
-    pub fn with_source_bus(mut self, bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
+    pub fn with_source_bus(mut self, bus: &Addr<EventBus<InterfoldEvent>>) -> Self {
         self.source_bus = Some(BusMode::Source(bus.clone()));
         self
     }
@@ -165,7 +166,7 @@ impl CiphernodeBuilder {
     /// source are forwarded to the local bus created for this instance.
     /// Useful for tests and monitoring subscribers that need an isolated
     /// event stream that mirrors the source.
-    pub fn with_forked_bus(mut self, bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
+    pub fn with_forked_bus(mut self, bus: &Addr<EventBus<InterfoldEvent>>) -> Self {
         self.source_bus = Some(BusMode::Forked(bus.clone()));
         self
     }
@@ -189,7 +190,7 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Subscribe a [`HistoryCollector`] to only `EnclaveError` events.
+    /// Subscribe a [`HistoryCollector`] to only `InterfoldError` events.
     /// Useful for tests and debugging.
     pub fn with_error_collector(mut self) -> Self {
         self.collect_errors = true;
@@ -392,15 +393,15 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Setup an Enclave contract reader for every evm chain provided
-    pub fn with_contract_enclave_reader(mut self) -> Self {
-        self.contract_components.enclave_reader = true;
+    /// Setup an Interfold contract reader for every evm chain provided
+    pub fn with_contract_interfold_reader(mut self) -> Self {
+        self.contract_components.interfold_reader = true;
         self
     }
 
-    /// Setup an Enclave contract reader and writer for every evm chain provided
-    pub fn with_contract_enclave_full(mut self) -> Self {
-        self.contract_components.enclave = true;
+    /// Setup an Interfold contract reader and writer for every evm chain provided
+    pub fn with_contract_interfold_full(mut self) -> Self {
+        self.contract_components.interfold = true;
         self
     }
 
@@ -440,8 +441,8 @@ impl CiphernodeBuilder {
         self
     }
 
-    fn create_local_bus() -> Addr<EventBus<EnclaveEvent>> {
-        EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start()
+    fn create_local_bus() -> Addr<EventBus<InterfoldEvent>> {
+        EventBus::<InterfoldEvent>::new(EventBusConfig { deduplicate: true }).start()
     }
 
     /// Create aggregate configuration from configured chains
@@ -465,13 +466,13 @@ impl CiphernodeBuilder {
         // Optional event collectors for debugging / testing.
         let history = if self.collect_history {
             info!("Setting up history collector");
-            Some(EventBus::<EnclaveEvent>::history(&local_bus))
+            Some(EventBus::<InterfoldEvent>::history(&local_bus))
         } else {
             None
         };
         let errors = if self.collect_errors {
             info!("Setting up error collector");
-            Some(EventBus::<EnclaveEvent>::error(&local_bus))
+            Some(EventBus::<InterfoldEvent>::error(&local_bus))
         } else {
             None
         };
@@ -528,7 +529,7 @@ impl CiphernodeBuilder {
         ciphernode_selector.do_send(EmitPersistedAggregatorState);
 
         // Setup networking
-        let topic = "enclave-gossip";
+        let topic = "interfold-gossip";
         let (peer_id, interface, net_kind) = self.setup_networking(&store, topic).await?;
         setup_net(topic, bus.clone(), eventstore.ts(), interface)?;
 
@@ -555,7 +556,7 @@ impl CiphernodeBuilder {
 
     // ── build() sub-functions ──────────────────────────────────────────
 
-    fn resolve_bus(&self) -> Addr<EventBus<EnclaveEvent>> {
+    fn resolve_bus(&self) -> Addr<EventBus<InterfoldEvent>> {
         match self.source_bus {
             Some(BusMode::Forked(ref bus)) => {
                 let local_bus = Self::create_local_bus();
@@ -570,7 +571,7 @@ impl CiphernodeBuilder {
 
     fn create_event_system(
         &self,
-        bus: Addr<EventBus<EnclaveEvent>>,
+        bus: Addr<EventBus<InterfoldEvent>>,
         aggregate_config: &AggregateConfig,
     ) -> EventSystem {
         let base = match self.event_system.clone() {
@@ -913,20 +914,20 @@ async fn setup_evm_system(
         let mut system = EvmSystemChainBuilder::new(bus, &provider);
         system.with_provider_factory(provider_factory);
 
-        if contract_components.enclave {
+        if contract_components.interfold {
             let write_provider = provider_cache.ensure_write_provider(chain).await?;
-            let contract = &chain.contracts.enclave;
-            EnclaveSolWriter::attach(bus, write_provider.clone(), contract.address()?);
+            let contract = &chain.contracts.interfold;
+            InterfoldSolWriter::attach(bus, write_provider.clone(), contract.address()?);
             system.with_contract(contract.address()?, move |next| {
-                EnclaveSolReader::setup(&next).recipient()
+                InterfoldSolReader::setup(&next).recipient()
             });
         }
 
-        if contract_components.enclave_reader {
-            let contract = &chain.contracts.enclave;
+        if contract_components.interfold_reader {
+            let contract = &chain.contracts.interfold;
 
             system.with_contract(contract.address()?, move |next| {
-                EnclaveSolReader::setup(&next).recipient()
+                InterfoldSolReader::setup(&next).recipient()
             });
         }
 
@@ -945,7 +946,7 @@ async fn setup_evm_system(
             });
 
             // TODO: Should we not let this pass and just use '?'?
-            // Above if we include enclave in the config and we don't have a wallet it will fail
+            // Above if we include interfold in the config and we don't have a wallet it will fail
             match provider_cache
                     .ensure_write_provider(chain)
                     .await

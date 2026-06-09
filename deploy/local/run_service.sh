@@ -78,7 +78,7 @@ case "$SERVICE" in
     cd "${CRISP_ROOT}"
     wait_for_file "${SIGNAL_FILE}" "deploy signal file"
     echo "[run_service] Deploy done. Starting ${SERVICE} directly..."
-    exec enclave --name "${SERVICE}" start -v
+    exec interfold --name "${SERVICE}" start -v
     ;;
 
   program)

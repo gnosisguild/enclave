@@ -313,7 +313,7 @@ emit_audit_warnings() {
 
 EOF
     else
-        echo "On-chain verify gas: **complete** (CRISP Π_user + Enclave Π_DKG / Π_dec replay)." >> "$OUTPUT_FILE"
+        echo "On-chain verify gas: **complete** (CRISP Π_user + Interfold Π_DKG / Π_dec replay)." >> "$OUTPUT_FILE"
         echo "" >> "$OUTPUT_FILE"
     fi
     if [ -z "$INTEGRATION_BLOB" ]; then
@@ -588,7 +588,7 @@ IFS='|' read -r PROTOCOL_H PROTOCOL_N PROTOCOL_T <<< "$(load_protocol_params)"
 INTEGRATION_BLOB="$(integration_blob_from_inputs || true)"
 
 cat > "$OUTPUT_FILE" <<EOF
-# Enclave ZK Circuit Benchmarks
+# Interfold ZK Circuit Benchmarks
 
 **Generated:** ${TIMESTAMP}
 

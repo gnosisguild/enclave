@@ -15,7 +15,7 @@ use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse,
     ComputeResponseKind, CorrelationId, DKGRecursiveAggregationComplete, Die,
-    DkgAggregationRequest, E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EventContext,
+    DkgAggregationRequest, E3Failed, E3Stage, E3id, InterfoldEvent, InterfoldEventData, EventContext,
     FailureReason, KeyshareCreated, NodesFoldStepRequest, OrderedSet, PkAggregationProofPending,
     PkAggregationProofRequest, PkAggregationProofSigned, Proof, ProofType, PublicKeyAggregated,
     Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed,
@@ -1388,31 +1388,31 @@ impl Actor for PublicKeyAggregator {
     }
 }
 
-impl Handler<EnclaveEvent> for PublicKeyAggregator {
+impl Handler<InterfoldEvent> for PublicKeyAggregator {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            EnclaveEventData::KeyshareCreated(data) => {
+            InterfoldEventData::KeyshareCreated(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ShareVerificationComplete(data) => {
+            InterfoldEventData::ShareVerificationComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::PkAggregationProofSigned(data) => {
+            InterfoldEventData::PkAggregationProofSigned(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::DKGRecursiveAggregationComplete(data) => {
+            InterfoldEventData::DKGRecursiveAggregationComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeResponse(data) => {
+            InterfoldEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeRequestError(data) => {
+            InterfoldEventData::ComputeRequestError(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
-            EnclaveEventData::CommitteeMemberExpelled(data) => {
+            InterfoldEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
+            InterfoldEventData::CommitteeMemberExpelled(data) => {
                 // Only process raw events from chain (party_id not yet resolved).
                 if data.party_id.is_some() {
                     return;
@@ -1599,7 +1599,7 @@ mod tests {
     use e3_test_helpers::get_common_setup;
     use std::collections::BTreeSet;
 
-    fn test_ctx(data: impl Into<EnclaveEventData>) -> EventContext<Sequenced> {
+    fn test_ctx(data: impl Into<InterfoldEventData>) -> EventContext<Sequenced> {
         EventContext::<Unsequenced>::from(data.into()).sequence(0)
     }
 
@@ -1646,7 +1646,7 @@ mod tests {
         initial_state: PublicKeyAggregatorState,
     ) -> Result<(
         PublicKeyAggregator,
-        Addr<HistoryCollector<EnclaveEvent>>,
+        Addr<HistoryCollector<InterfoldEvent>>,
         E3id,
     )> {
         build_public_key_aggregator_with_committee(initial_state, CiphernodesCommitteeSize::Micro)
@@ -1658,7 +1658,7 @@ mod tests {
         committee_size: CiphernodesCommitteeSize,
     ) -> Result<(
         PublicKeyAggregator,
-        Addr<HistoryCollector<EnclaveEvent>>,
+        Addr<HistoryCollector<InterfoldEvent>>,
         E3id,
     )> {
         let (bus, rng, _seed, params, crp, _errors, history) =
@@ -1750,8 +1750,8 @@ mod tests {
         ))
     }
 
-    async fn next_event(history: &Addr<HistoryCollector<EnclaveEvent>>) -> Result<EnclaveEvent> {
-        let mut result = history.send(TakeEvents::<EnclaveEvent>::new(1)).await?;
+    async fn next_event(history: &Addr<HistoryCollector<InterfoldEvent>>) -> Result<InterfoldEvent> {
+        let mut result = history.send(TakeEvents::<InterfoldEvent>::new(1)).await?;
         assert!(!result.timed_out, "timed out waiting for an event");
         Ok(result.events.pop().expect("expected one event"))
     }
@@ -1793,7 +1793,7 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
                     && data.reason == FailureReason::DKGInvalidShares
@@ -1843,7 +1843,7 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
                     && data.reason == FailureReason::DKGInvalidShares
@@ -1944,7 +1944,7 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::PkAggregationProofPending(data)
+            InterfoldEventData::PkAggregationProofPending(data)
                 if data.e3_id == e3_id
                     && data.proof_request.committee_n == threshold_n
                     && data.proof_request.committee_h == circuit_h

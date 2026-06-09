@@ -105,7 +105,7 @@ pub async fn start_daemon(
         return Ok(());
     }
 
-    let enclave_bin = env::current_exe()?.display().to_string();
+    let interfold_bin = env::current_exe()?.display().to_string();
 
     let mut args = vec![];
     args.push("nodes".to_string());
@@ -125,7 +125,7 @@ pub async fn start_daemon(
     }
 
     // Start and forget
-    spawn_process(&enclave_bin, args).await?;
+    spawn_process(&interfold_bin, args).await?;
 
     tracing::info!("Daemon started successfully");
 

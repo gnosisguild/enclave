@@ -121,7 +121,7 @@ sol! {
 
     #[derive(Debug)]
     #[sol(rpc)]
-    contract Enclave {
+    contract Interfold {
         uint256 public nexte3Id = 0;
         mapping(address e3Program => bool allowed) public e3Programs;
         function request(E3RequestParams calldata requestParams) external returns (uint256 e3Id, E3 memory e3);
@@ -139,9 +139,9 @@ sol! {
     }
 }
 
-/// Trait for read-only operations on the Enclave contract
+/// Trait for read-only operations on the Interfold contract
 #[async_trait]
-pub trait EnclaveRead {
+pub trait InterfoldRead {
     /// Get the next E3 ID
     async fn get_e3_id(&self) -> Result<U256>;
 
@@ -179,10 +179,10 @@ pub trait EnclaveRead {
     async fn get_param_set_registry(&self, param_set: u8) -> Result<Bytes>;
 }
 
-/// Trait for write operations on the Enclave contract
+/// Trait for write operations on the Interfold contract
 #[async_trait]
 #[allow(clippy::too_many_arguments)]
-pub trait EnclaveWrite {
+pub trait InterfoldWrite {
     /// Request a new E3
     async fn request_e3(
         &self,
@@ -224,25 +224,25 @@ pub trait ProviderType: Clone + Send + Sync + 'static {
 #[derive(Clone)]
 pub struct ReadOnly;
 impl ProviderType for ReadOnly {
-    type Provider = EnclaveReadOnlyProvider;
+    type Provider = InterfoldReadOnlyProvider;
 }
 /// Marker type for read-write provider
 #[derive(Clone)]
 pub struct ReadWrite;
 impl ProviderType for ReadWrite {
-    type Provider = EnclaveWriteProvider;
+    type Provider = InterfoldWriteProvider;
 }
 
-/// Generic Enclave contract
+/// Generic Interfold contract
 #[derive(Clone)]
-pub struct EnclaveContract<T: ProviderType> {
+pub struct InterfoldContract<T: ProviderType> {
     pub provider: Arc<T::Provider>,
     pub contract_address: Address,
     pub wallet_address: Option<Address>,
     _marker: PhantomData<T>,
 }
 
-impl<R: ProviderType> EnclaveContract<R> {
+impl<R: ProviderType> InterfoldContract<R> {
     pub fn address(&self) -> &Address {
         &self.contract_address
     }
@@ -251,27 +251,27 @@ impl<R: ProviderType> EnclaveContract<R> {
     }
 }
 
-impl EnclaveContract<ReadWrite> {
+impl InterfoldContract<ReadWrite> {
     pub async fn new(
         http_rpc_url: &str,
         private_key: &str,
         contract_address: &str,
-    ) -> Result<EnclaveContract<ReadWrite>> {
-        EnclaveContractFactory::create_write(http_rpc_url, contract_address, private_key).await
+    ) -> Result<InterfoldContract<ReadWrite>> {
+        InterfoldContractFactory::create_write(http_rpc_url, contract_address, private_key).await
     }
 }
 
-impl EnclaveContract<ReadOnly> {
+impl InterfoldContract<ReadOnly> {
     pub async fn read_only(
         http_rpc_url: &str,
         contract_address: &str,
-    ) -> Result<EnclaveContract<ReadOnly>> {
-        EnclaveContractFactory::create_read(http_rpc_url, contract_address).await
+    ) -> Result<InterfoldContract<ReadOnly>> {
+        InterfoldContractFactory::create_read(http_rpc_url, contract_address).await
     }
 }
 
 /// Type alias for read-only provider
-pub type EnclaveReadOnlyProvider = FillProvider<
+pub type InterfoldReadOnlyProvider = FillProvider<
     JoinFill<
         Identity,
         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
@@ -280,7 +280,7 @@ pub type EnclaveReadOnlyProvider = FillProvider<
 >;
 
 /// Type alias for read-write provider
-pub type EnclaveWriteProvider = FillProvider<
+pub type InterfoldWriteProvider = FillProvider<
     JoinFill<
         JoinFill<
             Identity,
@@ -293,19 +293,19 @@ pub type EnclaveWriteProvider = FillProvider<
 >;
 
 /// Type aliases for the two contract variants
-pub type EnclaveReadContract = EnclaveContract<ReadOnly>;
-pub type EnclaveWriteContract = EnclaveContract<ReadWrite>;
+pub type InterfoldReadContract = InterfoldContract<ReadOnly>;
+pub type InterfoldWriteContract = InterfoldContract<ReadWrite>;
 
 // Factory for creating contract instances
-pub struct EnclaveContractFactory;
+pub struct InterfoldContractFactory;
 
-impl EnclaveContractFactory {
+impl InterfoldContractFactory {
     /// Create a write-capable contract
     pub async fn create_write(
         rpc_url: &str,
         contract_address: &str,
         private_key: &str,
-    ) -> Result<EnclaveContract<ReadWrite>> {
+    ) -> Result<InterfoldContract<ReadWrite>> {
         let contract_address = contract_address.parse()?;
 
         let signer: PrivateKeySigner = private_key.parse()?;
@@ -316,7 +316,7 @@ impl EnclaveContractFactory {
             .connect(rpc_url)
             .await?;
 
-        Ok(EnclaveContract::<ReadWrite> {
+        Ok(InterfoldContract::<ReadWrite> {
             provider: Arc::new(provider),
             contract_address,
             wallet_address: Some(wallet_address),
@@ -328,12 +328,12 @@ impl EnclaveContractFactory {
     pub async fn create_read(
         rpc_url: &str,
         contract_address: &str,
-    ) -> Result<EnclaveContract<ReadOnly>> {
+    ) -> Result<InterfoldContract<ReadOnly>> {
         let contract_address = contract_address.parse()?;
 
         let provider = ProviderBuilder::new().connect(rpc_url).await?;
 
-        Ok(EnclaveContract::<ReadOnly> {
+        Ok(InterfoldContract::<ReadOnly> {
             provider: Arc::new(provider),
             contract_address,
             wallet_address: None,
@@ -342,20 +342,20 @@ impl EnclaveContractFactory {
     }
 }
 
-// Implement EnclaveRead for any EnclaveContract regardless of provider type
+// Implement InterfoldRead for any InterfoldContract regardless of provider type
 #[async_trait]
-impl<T: Send + Sync> EnclaveRead for EnclaveContract<T>
+impl<T: Send + Sync> InterfoldRead for InterfoldContract<T>
 where
     T: ProviderType,
 {
     async fn get_e3_id(&self) -> Result<U256> {
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let e3_id = contract.nexte3Id().call().await?;
         Ok(e3_id)
     }
 
     async fn get_e3(&self, e3_id: U256) -> Result<E3> {
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let e3_return = contract.getE3(e3_id).call().await?;
         Ok(e3_return)
     }
@@ -366,7 +366,7 @@ where
     }
 
     async fn is_e3_program_enabled(&self, e3_program: Address) -> Result<bool> {
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let enabled = contract.e3Programs(e3_program).call().await?;
         Ok(enabled)
     }
@@ -390,51 +390,51 @@ where
             proofAggregationEnabled: proof_aggregation_enabled,
         };
 
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let fee = contract.getE3Quote(e3_request).call().await?;
         Ok(fee)
     }
 
     async fn get_e3_stage(&self, e3_id: U256) -> Result<E3Stage> {
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let stage = contract.getE3Stage(e3_id).call().await?;
         Ok(stage)
     }
 
     async fn get_failure_reason(&self, e3_id: U256) -> Result<FailureReason> {
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let reason = contract.getFailureReason(e3_id).call().await?;
         Ok(reason)
     }
 
     async fn get_requester(&self, e3_id: U256) -> Result<Address> {
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let requester = contract.getRequester(e3_id).call().await?;
         Ok(requester)
     }
 
     async fn get_deadlines(&self, e3_id: U256) -> Result<E3Deadlines> {
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let deadlines = contract.getDeadlines(e3_id).call().await?;
         Ok(deadlines)
     }
 
     async fn get_timeout_config(&self) -> Result<E3TimeoutConfig> {
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let config = contract.getTimeoutConfig().call().await?;
         Ok(config)
     }
 
     async fn get_param_set_registry(&self, param_set: u8) -> Result<Bytes> {
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let params = contract.paramSetRegistry(param_set).call().await?;
         Ok(params)
     }
 }
 
-// Implement EnclaveWrite only for contracts with ReadWrite marker
+// Implement InterfoldWrite only for contracts with ReadWrite marker
 #[async_trait]
-impl EnclaveWrite for EnclaveContract<ReadWrite> {
+impl InterfoldWrite for InterfoldContract<ReadWrite> {
     async fn request_e3(
         &self,
         committee_size: CommitteeSize,
@@ -451,7 +451,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
             .ok_or_else(|| eyre::eyre!("No wallet address configured"))?;
         let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
 
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let e3_id = contract.nexte3Id().call().await?;
 
         let e3_request = E3RequestParams {
@@ -477,7 +477,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
             .ok_or_else(|| eyre::eyre!("No wallet address configured"))?;
         let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
 
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let builder = contract.enableE3Program(e3_program).nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;
 
@@ -496,7 +496,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
             .ok_or_else(|| eyre::eyre!("No wallet address configured"))?;
         let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
 
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let builder = contract
             .publishCiphertextOutput(e3_id, data, proof)
             .nonce(nonce);
@@ -517,7 +517,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
             .ok_or_else(|| eyre::eyre!("No wallet address configured"))?;
         let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
 
-        let contract = Enclave::new(self.contract_address, &self.provider);
+        let contract = Interfold::new(self.contract_address, &self.provider);
         let builder = contract
             .publishPlaintextOutput(e3_id, data, proof)
             .nonce(nonce);

@@ -9,7 +9,7 @@ import { VoteManagementContextType, VoteManagementProviderProps, VoteStatus } fr
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { VoteStateLite, VotingRound } from '@/model/vote.model'
-import { useEnclaveServer } from '@/hooks/enclave/useEnclaveServer'
+import { useInterfoldServer } from '@/hooks/interfold/useInterfoldServer'
 import { convertPollData, convertTimestampToDate } from '@/utils/methods'
 import { Poll, PollResult } from '@/model/poll.model'
 import { generatePoll } from '@/utils/generate-random-poll'
@@ -60,14 +60,14 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
    * Voting Management Methods
    **/
   const {
-    isLoading: enclaveLoading,
+    isLoading: interfoldLoading,
     getRoundStateLite: getRoundStateLiteRequest,
     getWebResultByRound,
     getWebResult,
     getCurrentRound,
     broadcastVote,
     getVoteStatus,
-  } = useEnclaveServer()
+  } = useInterfoldServer()
 
   const checkVoteStatus = useCallback(
     async (roundId: number, userAddress: string, forceRefresh: boolean = false): Promise<boolean> => {
@@ -162,7 +162,7 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
 
     if (fetchedRoundState?.committee_public_key.length === 1 && fetchedRoundState.committee_public_key[0] === 0) {
       handleGenericError('getRoundStateLite', {
-        message: 'Enclave server failed generating the necessary pk bytes',
+        message: 'Interfold server failed generating the necessary pk bytes',
         name: 'getRoundStateLite',
       })
     }
@@ -191,11 +191,11 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   }
 
   useEffect(() => {
-    if (enclaveLoading) {
+    if (interfoldLoading) {
       return setIsLoading(true)
     }
     setIsLoading(false)
-  }, [enclaveLoading])
+  }, [interfoldLoading])
 
   useEffect(() => {
     if (isConnected && address) {

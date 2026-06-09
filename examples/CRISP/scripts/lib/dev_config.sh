@@ -68,9 +68,9 @@ apply_crisp_dev_config_to_server_env() {
   _set_env_kv "$server_env" "E3_PROOF_AGGREGATION_ENABLED" "$CRISP_PROOF_AGGREGATION_ENABLED"
 }
 
-build_enclave_circuits_at_setup() {
+build_interfold_circuits_at_setup() {
   local committee="${CRISP_COMMITTEE:-micro}"
-  echo "Building enclave circuits (preset=${CRISP_BFV_PRESET}, committee=${committee})..."
+  echo "Building interfold circuits (preset=${CRISP_BFV_PRESET}, committee=${committee})..."
   (
     cd "${REPO_ROOT}" &&
       pnpm build:circuits \
@@ -80,13 +80,13 @@ build_enclave_circuits_at_setup() {
   )
 }
 
-sync_enclave_circuit_artifacts() {
+sync_interfold_circuit_artifacts() {
   local committee="${CRISP_COMMITTEE:-micro}"
   local src="${REPO_ROOT}/dist/circuits/${CRISP_BFV_PRESET}/${committee}"
-  local dst="${CRISP_ROOT}/.enclave/noir/circuits/${CRISP_BFV_PRESET}/${committee}"
+  local dst="${CRISP_ROOT}/.interfold/noir/circuits/${CRISP_BFV_PRESET}/${committee}"
 
   if [[ ! -f "${src}/recursive/dkg/pk/pk.json" ]]; then
-    echo "No built circuits at ${src}; run pnpm dev:setup first. Using enclave noir setup release layout."
+    echo "No built circuits at ${src}; run pnpm dev:setup first. Using interfold noir setup release layout."
     return 0
   fi
 
@@ -104,7 +104,7 @@ CRISP dev profile (${CRISP_ROOT}/crisp.dev.env):
   CRISP_PROOF_AGGREGATION_ENABLED=${CRISP_PROOF_AGGREGATION_ENABLED}
   ENABLE_ZK_VERIFICATION=${ENABLE_ZK_VERIFICATION:-false} (used at deploy via dev:up)
   server/.env E3_PROOF_AGGREGATION_ENABLED synced by dev:setup
-  Contract addresses synced by dev:up (deploy → server/.env, client/.env, enclave.config.yaml)
+  Contract addresses synced by dev:up (deploy → server/.env, client/.env, interfold.config.yaml)
 
 EOF
 }

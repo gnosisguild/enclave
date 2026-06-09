@@ -13,7 +13,7 @@ use actix::{Message, Recipient};
 use anyhow::{bail, Result};
 use e3_data::Repositories;
 use e3_events::{
-    AggregateConfig, BusHandle, CorrelationId, EffectsEnabled, EnclaveEvent, EnclaveEventData,
+    AggregateConfig, BusHandle, CorrelationId, EffectsEnabled, InterfoldEvent, InterfoldEventData,
     Event, EventPublisher, EventStoreQueryBy, EventStoreQueryResponse, EventSubscriber, EventType,
     EvmEventConfig, HistoricalEvmEventsReceived, HistoricalEvmSyncStart, HistoricalNetSyncStart,
     SeqAgg, SyncEnded, Unsequenced,
@@ -108,7 +108,7 @@ pub async fn sync(
     // keyshare / decryption share). What sync deliberately avoids is replaying *request* events.
     //
     // Detection of loose ends that cannot be locally re-driven is exposed offline and
-    // non-destructively via `enclave node validate`, which cross-checks the persisted committee
+    // non-destructively via `interfold node validate`, which cross-checks the persisted committee
     // slots against terminal events in the log and reports orphaned tickets. See
     // `crates/entrypoint/src/validate.rs`.
 
@@ -133,7 +133,7 @@ pub async fn sync(
     info!("Loading historical libp2p events...");
     let events_received = bus.wait_for(EventType::HistoricalNetSyncEventsReceived);
     bus.publish_without_context(HistoricalNetSyncStart::new(net_config.clone()))?;
-    let EnclaveEventData::HistoricalNetSyncEventsReceived(event) =
+    let InterfoldEventData::HistoricalNetSyncEventsReceived(event) =
         events_received.await?.into_data()
     else {
         bail!("failed to get HistoricalNetSyncEventsReceived");
@@ -196,7 +196,7 @@ async fn check_schema_version(repositories: &Repositories) -> Result<()> {
 pub async fn collect_historical_evm_events(
     mut receiver: Receiver<HistoricalEvmEventsReceived>,
     config: &EvmEventConfig,
-) -> Vec<EnclaveEvent<Unsequenced>> {
+) -> Vec<InterfoldEvent<Unsequenced>> {
     let mut collector = HistoricalEvmCollector::new(config);
     let progress_interval = Duration::from_secs(30);
 
@@ -255,7 +255,7 @@ mod tests {
     use crate::domain::SyncPlanner;
     use e3_ciphernode_builder::EventSystem;
     use e3_events::{
-        EffectsEnabled, EnclaveEvent, EnclaveEventData, Event, EventPublisher, EventSubscriber,
+        EffectsEnabled, InterfoldEvent, InterfoldEventData, Event, EventPublisher, EventSubscriber,
         EventType, EvmEventConfig, HistoricalEvmSyncStart, SyncEnded, TakeEvents, Unsequenced,
     };
 
@@ -272,24 +272,24 @@ mod tests {
         let bus = system.handle()?.enable("test-sync-replay");
         let history = bus.history();
 
-        let events: Vec<EnclaveEvent> = vec![
-            EnclaveEvent::<Unsequenced>::test_event("before")
+        let events: Vec<InterfoldEvent> = vec![
+            InterfoldEvent::<Unsequenced>::test_event("before")
                 .id(1)
                 .seq(1)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("sync")
+            InterfoldEvent::<Unsequenced>::test_event("sync")
                 .data(SyncEnded::new())
                 .seq(2)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("fx")
+            InterfoldEvent::<Unsequenced>::test_event("fx")
                 .data(EffectsEnabled::new())
                 .seq(3)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("evm")
+            InterfoldEvent::<Unsequenced>::test_event("evm")
                 .data(make_historical_evm_sync_start())
                 .seq(4)
                 .build(),
-            EnclaveEvent::<Unsequenced>::test_event("after")
+            InterfoldEvent::<Unsequenced>::test_event("after")
                 .id(2)
                 .seq(5)
                 .build(),
@@ -308,10 +308,10 @@ mod tests {
             .events
             .iter()
             .map(|e| match e.get_data() {
-                EnclaveEventData::TestEvent(_) => "TestEvent",
-                EnclaveEventData::SyncEnded(_) => "SyncEnded",
-                EnclaveEventData::EffectsEnabled(_) => "EffectsEnabled",
-                EnclaveEventData::HistoricalEvmSyncStart(_) => "HistoricalEvmSyncStart",
+                InterfoldEventData::TestEvent(_) => "TestEvent",
+                InterfoldEventData::SyncEnded(_) => "SyncEnded",
+                InterfoldEventData::EffectsEnabled(_) => "EffectsEnabled",
+                InterfoldEventData::HistoricalEvmSyncStart(_) => "HistoricalEvmSyncStart",
                 _ => "other",
             })
             .collect();
@@ -322,7 +322,7 @@ mod tests {
             .events
             .iter()
             .filter_map(|e| {
-                if let EnclaveEventData::TestEvent(t) = e.get_data() {
+                if let InterfoldEventData::TestEvent(t) = e.get_data() {
                     Some(t.msg.clone())
                 } else {
                     None
@@ -367,10 +367,10 @@ mod tests {
                 impl Actor for Counter {
                     type Context = Context<Self>;
                 }
-                impl Handler<EnclaveEvent> for Counter {
+                impl Handler<InterfoldEvent> for Counter {
                     type Result = ();
-                    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-                        if matches!(msg.get_data(), EnclaveEventData::TestEvent(_)) {
+                    fn handle(&mut self, msg: InterfoldEvent, _: &mut Self::Context) -> Self::Result {
+                        if matches!(msg.get_data(), InterfoldEventData::TestEvent(_)) {
                             self.0.fetch_add(1, Ordering::SeqCst);
                         }
                     }
@@ -385,7 +385,7 @@ mod tests {
 
         // 1. Publish a TestEvent BEFORE EffectsEnabled — should NOT be received
         bus.event_bus().try_send(
-            EnclaveEvent::<Unsequenced>::test_event("before-effects")
+            InterfoldEvent::<Unsequenced>::test_event("before-effects")
                 .id(1)
                 .seq(1)
                 .build(),
@@ -404,7 +404,7 @@ mod tests {
 
         // 3. Publish a TestEvent AFTER EffectsEnabled — should be received
         bus.event_bus().try_send(
-            EnclaveEvent::<Unsequenced>::test_event("after-effects")
+            InterfoldEvent::<Unsequenced>::test_event("after-effects")
                 .id(2)
                 .seq(2)
                 .build(),
@@ -447,10 +447,10 @@ mod tests {
         impl Actor for Counter {
             type Context = Context<Self>;
         }
-        impl Handler<EnclaveEvent> for Counter {
+        impl Handler<InterfoldEvent> for Counter {
             type Result = ();
-            fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-                if matches!(msg.get_data(), EnclaveEventData::TestEvent(_)) {
+            fn handle(&mut self, msg: InterfoldEvent, _: &mut Self::Context) -> Self::Result {
+                if matches!(msg.get_data(), InterfoldEventData::TestEvent(_)) {
                     self.0.fetch_add(1, Ordering::SeqCst);
                 }
             }
@@ -474,7 +474,7 @@ mod tests {
 
         // 1. Publish event BEFORE EffectsEnabled
         bus.event_bus().try_send(
-            EnclaveEvent::<Unsequenced>::test_event("during-replay")
+            InterfoldEvent::<Unsequenced>::test_event("during-replay")
                 .id(1)
                 .seq(1)
                 .build(),
@@ -498,7 +498,7 @@ mod tests {
 
         // 3. Publish event AFTER EffectsEnabled
         bus.event_bus().try_send(
-            EnclaveEvent::<Unsequenced>::test_event("after-effects")
+            InterfoldEvent::<Unsequenced>::test_event("after-effects")
                 .id(2)
                 .seq(2)
                 .build(),

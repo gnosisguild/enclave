@@ -18,11 +18,11 @@ use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     prelude::*, trap, CiphernodeAdded, CiphernodeRemoved, Committee, CommitteeFinalized,
     CommitteeMemberExpelled, CommitteePublished, ConfigurationUpdated, E3Failed, E3Requested,
-    E3Stage, E3StageChanged, EType, EnclaveEvent, EventContext, EventType,
+    E3Stage, E3StageChanged, EType, InterfoldEvent, EventContext, EventType,
     OperatorActivationChanged, PlaintextOutputPublished, Seed, Sequenced, TicketBalanceUpdated,
     TypedEvent,
 };
-use e3_events::{BusHandle, E3id, EnclaveEventData};
+use e3_events::{BusHandle, E3id, InterfoldEventData};
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use std::collections::HashMap;
 use tracing::{info, instrument, warn};
@@ -33,7 +33,7 @@ pub struct Sortition {
     backends: Persistable<HashMap<u64, SortitionBackend>>,
     /// Persistent map of `chain_id -> NodeStateStore`.
     node_state: Persistable<HashMap<u64, NodeStateStore>>,
-    /// Event bus for error reporting and enclave event subscription.
+    /// Event bus for error reporting and interfold event subscription.
     bus: BusHandle,
     /// Persistent map of finalized committees per E3
     finalized_committees: Persistable<HashMap<e3_events::E3id, Committee>>,
@@ -255,42 +255,42 @@ impl Actor for Sortition {
     }
 }
 
-impl Handler<EnclaveEvent> for Sortition {
+impl Handler<InterfoldEvent> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            EnclaveEventData::E3Requested(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
-            EnclaveEventData::CiphernodeAdded(data) => {
+            InterfoldEventData::E3Requested(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
+            InterfoldEventData::CiphernodeAdded(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::CiphernodeRemoved(data) => {
+            InterfoldEventData::CiphernodeRemoved(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::TicketBalanceUpdated(data) => {
+            InterfoldEventData::TicketBalanceUpdated(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::OperatorActivationChanged(data) => {
+            InterfoldEventData::OperatorActivationChanged(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ConfigurationUpdated(data) => {
+            InterfoldEventData::ConfigurationUpdated(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::CommitteePublished(data) => {
+            InterfoldEventData::CommitteePublished(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::PlaintextOutputPublished(data) => {
+            InterfoldEventData::PlaintextOutputPublished(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::CommitteeFinalized(data) => {
+            InterfoldEventData::CommitteeFinalized(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::CommitteeMemberExpelled(data) => {
+            InterfoldEventData::CommitteeMemberExpelled(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::E3Failed(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
-            EnclaveEventData::E3StageChanged(data) => {
+            InterfoldEventData::E3Failed(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
+            InterfoldEventData::E3StageChanged(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),

@@ -1,5 +1,5 @@
 {
-  "name": "enclave-example",
+  "name": "interfold-example",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -17,13 +17,13 @@
     "dev:frontend": "./scripts/dev_frontend.sh",
     "dev:program": "./scripts/dev_program.sh",
     "dev:server": "./scripts/dev_server.sh",
-    "predev:all": "[ ! -f './.enclave/generated/contracts/ImageID.sol' ] && enclave program compile || true",
+    "predev:all": "[ ! -f './.interfold/generated/contracts/ImageID.sol' ] && interfold program compile || true",
     "test": "hardhat test",
     "test:integration": "./scripts/test_integration.sh"
   },
   "dependencies": {
-    "@enclave-e3/contracts": "workspace:*",
-    "@enclave-e3/sdk": "workspace:*",
+    "@interfold/contracts": "workspace:*",
+    "@interfold/sdk": "workspace:*",
     "@types/yargs": "^17.0.33",
     "@zk-kit/lazy-imt.sol": "2.0.0-beta.12",
     "dotenv": "^16.4.5",
@@ -31,7 +31,7 @@
     "yargs": "^18.0.0"
   },
   "devDependencies": {
-    "@enclave-e3/config": "^0",
+    "@interfold/config": "^0",
     "eslint": "^9.39.1",
     "@nomicfoundation/hardhat-ethers": "4",
     "@nomicfoundation/hardhat-ethers-chai-matchers": "^3.0.0",

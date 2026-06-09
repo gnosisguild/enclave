@@ -41,7 +41,7 @@ pub async fn execute(
     let private_key = ask_for_private_key(private_key)?;
     let default_config_dir = dirs::config_dir()
         .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?
-        .join("enclave");
+        .join("interfold");
 
     let config_dir: PathBuf = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter config directory")
@@ -83,7 +83,7 @@ fn print_info(
 ) -> Result<()> {
     let abs_config = config.config_file().canonicalize()?;
 
-    log!(out, "\nEnclave configuration successfully created!");
+    log!(out, "\nInterfold configuration successfully created!");
     log!(
         out,
         "Editable configuration has been written to:\n\n {}",
@@ -108,7 +108,7 @@ fn print_info(
     log!(
         out,
         "You can start your node using:\n `{}`\n",
-        colorize("enclave start", Color::Yellow)
+        colorize("interfold start", Color::Yellow)
     );
     Ok(())
 }

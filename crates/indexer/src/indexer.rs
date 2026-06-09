@@ -16,7 +16,7 @@ use async_trait::async_trait;
 use e3_evm_helpers::{
     block_listener::BlockListener,
     contracts::{
-        EnclaveContract, EnclaveContractFactory, EnclaveRead, ProviderType, ReadOnly, ReadWrite,
+        InterfoldContract, InterfoldContractFactory, InterfoldRead, ProviderType, ReadOnly, ReadWrite,
     },
     event_listener::EventListener,
     events::{CiphertextOutputPublished, CommitteePublished, PlaintextOutputPublished},
@@ -153,13 +153,13 @@ impl<S: DataStore> DataStore for SharedStore<S> {
 }
 
 #[derive(Clone)]
-pub struct EnclaveIndexer<S: DataStore, R: ProviderType> {
+pub struct InterfoldIndexer<S: DataStore, R: ProviderType> {
     ctx: Arc<IndexerContext<S, R>>,
 }
 
-impl<S: DataStore, R: ProviderType> Drop for EnclaveIndexer<S, R> {
+impl<S: DataStore, R: ProviderType> Drop for InterfoldIndexer<S, R> {
     fn drop(&mut self) {
-        info!("EnclaveIndexer is DROPPED");
+        info!("InterfoldIndexer is DROPPED");
     }
 }
 
@@ -167,7 +167,7 @@ pub struct IndexerContext<S: DataStore, R: ProviderType> {
     store: SharedStore<S>,
     event_listener: EventListener,
     block_listener: BlockListener,
-    contract: EnclaveContract<R>,
+    contract: InterfoldContract<R>,
     contract_address: String,
     chain_id: u64,
     callbacks: CallbackQueue,
@@ -186,10 +186,10 @@ impl<S: DataStore, R: ProviderType> IndexerContext<S, R> {
         self.block_listener.clone()
     }
 
-    pub fn contract(&self) -> EnclaveContract<R> {
+    pub fn contract(&self) -> InterfoldContract<R> {
         self.contract.clone()
     }
-    pub fn enclave_address(&self) -> String {
+    pub fn interfold_address(&self) -> String {
         self.contract_address.clone()
     }
 
@@ -220,44 +220,44 @@ impl<S: DataStore, R: ProviderType> IndexerContext<S, R> {
     }
 }
 
-impl<R: ProviderType> EnclaveIndexer<InMemoryStore, R> {
+impl<R: ProviderType> InterfoldIndexer<InMemoryStore, R> {
     pub async fn new_with_in_mem_store(
         event_listener: EventListener,
-        contract: EnclaveContract<R>,
-    ) -> Result<EnclaveIndexer<InMemoryStore, R>> {
+        contract: InterfoldContract<R>,
+    ) -> Result<InterfoldIndexer<InMemoryStore, R>> {
         let store = InMemoryStore::new();
 
-        EnclaveIndexer::new(event_listener, contract, store).await
+        InterfoldIndexer::new(event_listener, contract, store).await
     }
 }
 
-impl EnclaveIndexer<InMemoryStore, ReadOnly> {
-    /// Creates an `EnclaveIndexer` with an in-memory store.
+impl InterfoldIndexer<InMemoryStore, ReadOnly> {
+    /// Creates an `InterfoldIndexer` with an in-memory store.
     ///
-    /// Note: `addresses[0]` must be the enclave contract address.
+    /// Note: `addresses[0]` must be the interfold contract address.
     pub async fn from_endpoint_address_in_mem(rpc_url: &str, addresses: &[&str]) -> Result<Self> {
         let event_listener = EventListener::create_contract_listener(rpc_url, addresses).await?;
-        let contract = EnclaveContractFactory::create_read(rpc_url, addresses[0]).await?;
-        EnclaveIndexer::<InMemoryStore, ReadOnly>::new_with_in_mem_store(event_listener, contract)
+        let contract = InterfoldContractFactory::create_read(rpc_url, addresses[0]).await?;
+        InterfoldIndexer::<InMemoryStore, ReadOnly>::new_with_in_mem_store(event_listener, contract)
             .await
     }
 
-    /// Creates an `EnclaveIndexer` with a provided in-memory store.
+    /// Creates an `InterfoldIndexer` with a provided in-memory store.
     ///
-    /// Note: `addresses[0]` must be the enclave contract address.
+    /// Note: `addresses[0]` must be the interfold contract address.
     pub async fn from_endpoint_address(
         rpc_url: &str,
         addresses: &[&str],
         store: InMemoryStore,
     ) -> Result<Self> {
         let event_listener = EventListener::create_contract_listener(rpc_url, addresses).await?;
-        let contract = EnclaveContractFactory::create_read(rpc_url, addresses[0]).await?;
-        EnclaveIndexer::new(event_listener, contract, store).await
+        let contract = InterfoldContractFactory::create_read(rpc_url, addresses[0]).await?;
+        InterfoldIndexer::new(event_listener, contract, store).await
     }
 }
 
-impl<S: DataStore> EnclaveIndexer<S, ReadWrite> {
-    /// Creates a new EnclaveIndexer with a writeable contract.
+impl<S: DataStore> InterfoldIndexer<S, ReadWrite> {
+    /// Creates a new InterfoldIndexer with a writeable contract.
     pub async fn new_with_write_contract(
         rpc_url: &str,
         addresses: &[&str], // First address must be contract_address
@@ -268,19 +268,19 @@ impl<S: DataStore> EnclaveIndexer<S, ReadWrite> {
             return Err(eyre::eyre!("No addresses provided"));
         };
         let event_listener = EventListener::create_contract_listener(rpc_url, addresses).await?;
-        EnclaveIndexer::new(
+        InterfoldIndexer::new(
             event_listener,
-            EnclaveContractFactory::create_write(rpc_url, contract_address, private_key).await?,
+            InterfoldContractFactory::create_write(rpc_url, contract_address, private_key).await?,
             store,
         )
         .await
     }
 }
 
-impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
+impl<S: DataStore, R: ProviderType> InterfoldIndexer<S, R> {
     pub async fn new(
         event_listener: EventListener,
-        contract: EnclaveContract<R>,
+        contract: InterfoldContract<R>,
         store: S,
     ) -> Result<Self> {
         let chain_id = contract.provider.get_chain_id().await?;
@@ -298,7 +298,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
             }),
         };
         instance.setup_listeners().await?;
-        info!("EnclaveIndexer has been configured");
+        info!("InterfoldIndexer has been configured");
         Ok(instance)
     }
 
@@ -339,7 +339,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
         self.add_event_handler(move |e: CommitteePublished, ctx| async move {
             let contract = ctx.contract();
             let db = ctx.store();
-            let enclave_address = ctx.enclave_address();
+            let interfold_address = ctx.interfold_address();
             let e3_id = u64_try_from(e.e3Id)?;
 
             info!(
@@ -365,7 +365,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
                 committee_public_key: e.publicKey.to_vec(),
                 custom_params: e3.customParams.to_vec(),
                 e3_params: e3_params.to_vec(),
-                enclave_address,
+                interfold_address,
                 encryption_scheme_id: e3.encryptionSchemeId.to_vec(),
                 id: e3_id,
                 plaintext_output: vec![],
@@ -446,7 +446,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
     }
 
     async fn setup_listeners(&mut self) -> Result<()> {
-        info!("Setting up listeners for EnclaveIndexer...");
+        info!("Setting up listeners for InterfoldIndexer...");
         self.register_committee_published().await?;
         self.register_ciphertext_output_published().await?;
         self.register_plaintext_output_published().await?;
@@ -456,7 +456,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
     }
 
     pub async fn listen(&self) -> Result<()> {
-        info!("Starting EnclaveIndexer listening...");
+        info!("Starting InterfoldIndexer listening...");
         loop {
             let res = tokio::select! {
                 res = self.ctx.event_listener.listen() => {

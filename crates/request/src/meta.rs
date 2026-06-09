@@ -8,7 +8,7 @@ use crate::{E3Context, E3ContextSnapshot, E3Extension, MetaRepositoryFactory, Ty
 use anyhow::*;
 use async_trait::async_trait;
 use e3_data::RepositoriesFactory;
-use e3_events::{E3Requested, EnclaveEvent, EnclaveEventData, Event, Seed};
+use e3_events::{E3Requested, InterfoldEvent, InterfoldEventData, Event, Seed};
 use e3_fhe_params::BfvPreset;
 use e3_utils::utility_types::ArcBytes;
 
@@ -35,8 +35,8 @@ impl E3MetaExtension {
 
 #[async_trait]
 impl E3Extension for E3MetaExtension {
-    fn on_event(&self, ctx: &mut crate::E3Context, event: &EnclaveEvent) {
-        let EnclaveEventData::E3Requested(data) = event.get_data() else {
+    fn on_event(&self, ctx: &mut crate::E3Context, event: &InterfoldEvent) {
+        let InterfoldEventData::E3Requested(data) = event.get_data() else {
             return;
         };
         let E3Requested {

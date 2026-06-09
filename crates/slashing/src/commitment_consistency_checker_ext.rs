@@ -14,7 +14,7 @@
 use crate::actors::commitment_consistency_checker::CommitmentConsistencyChecker;
 use anyhow::Result;
 use async_trait::async_trait;
-use e3_events::{BusHandle, CommitmentLink, EnclaveEvent, EnclaveEventData, Event};
+use e3_events::{BusHandle, CommitmentLink, InterfoldEvent, InterfoldEventData, Event};
 use e3_fhe_params::BfvPreset;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use tracing::{error, info};
@@ -41,8 +41,8 @@ impl CommitmentConsistencyCheckerExtension {
 
 #[async_trait]
 impl E3Extension for CommitmentConsistencyCheckerExtension {
-    fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
-        let EnclaveEventData::CommitteeFinalized(data) = evt.get_data() else {
+    fn on_event(&self, ctx: &mut E3Context, evt: &InterfoldEvent) {
+        let InterfoldEventData::CommitteeFinalized(data) = evt.get_data() else {
             return;
         };
 

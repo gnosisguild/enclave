@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 /// @todo this must be integrated inside Ciphernodes & Smart Contract
 /// instead of being a separate type in here. The pvss crate should import this and
-/// the default values that must be used and shared among the whole enclave repository.
+/// the default values that must be used and shared among the whole interfold repository.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CiphernodesCommitteeSize {
     /// Tiny committee size (for quick local testing with production parameters).

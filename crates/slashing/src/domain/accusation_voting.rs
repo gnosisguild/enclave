@@ -1342,7 +1342,7 @@ impl AccusationVoting {
 mod tests {
     use super::*;
     use alloy::primitives::FixedBytes;
-    use e3_events::{EnclaveEventData, Unsequenced};
+    use e3_events::{InterfoldEventData, Unsequenced};
 
     struct FixedClock(u64);
     impl Clock for FixedClock {
@@ -1363,7 +1363,7 @@ mod tests {
             deadline: 0,
             signature: ArcBytes::default(),
         };
-        EventContext::<Unsequenced>::from(EnclaveEventData::from(vote)).sequence(0)
+        EventContext::<Unsequenced>::from(InterfoldEventData::from(vote)).sequence(0)
     }
 
     const CHAIN_ID: u64 = 31337;

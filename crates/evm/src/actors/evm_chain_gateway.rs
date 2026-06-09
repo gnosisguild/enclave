@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::domain::chain_sync_state::SyncStatus;
-use crate::messages::EnclaveEvmEvent;
+use crate::messages::InterfoldEvmEvent;
 use crate::messages::HistoricalSyncComplete;
 use actix::{Actor, Handler};
 use actix::{Addr, Recipient};
@@ -13,7 +13,7 @@ use anyhow::Context;
 use anyhow::Result;
 use e3_events::EType;
 use e3_events::{
-    trap, BusHandle, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType,
+    trap, BusHandle, InterfoldEvent, InterfoldEventData, EventSubscriber, EventType,
     HistoricalEvmEventsReceived, HistoricalEvmSyncStart, SyncEnded, Unsequenced,
 };
 use e3_events::{Event, EventPublisher};
@@ -70,22 +70,22 @@ impl EvmChainGateway {
         Ok(())
     }
 
-    fn publish_evm_event(&mut self, msg: EnclaveEvent<Unsequenced>) -> Result<()> {
+    fn publish_evm_event(&mut self, msg: InterfoldEvent<Unsequenced>) -> Result<()> {
         self.bus.naked_dispatch(msg);
         Ok(())
     }
 
-    fn handle_evm_event(&mut self, msg: EnclaveEvmEvent) -> Result<()> {
+    fn handle_evm_event(&mut self, msg: InterfoldEvmEvent) -> Result<()> {
         match msg {
-            EnclaveEvmEvent::HistoricalSyncComplete(e) => {
+            InterfoldEvmEvent::HistoricalSyncComplete(e) => {
                 self.forward_historical_sync_complete(e)?;
                 Ok(())
             }
-            EnclaveEvmEvent::Event(event) => {
-                self.process_evm_event(event.into_enclave_event(&self.bus)?)?;
+            InterfoldEvmEvent::Event(event) => {
+                self.process_evm_event(event.into_interfold_event(&self.bus)?)?;
                 Ok(())
             }
-            _ => panic!("EvmChainGateway is only designed to receive EnclaveEvmEvent::HistoricalSyncComplete or EnclaveEvmEvent::Event events"),
+            _ => panic!("EvmChainGateway is only designed to receive InterfoldEvmEvent::HistoricalSyncComplete or InterfoldEvmEvent::Event events"),
         }
     }
 
@@ -113,7 +113,7 @@ impl EvmChainGateway {
         Ok(())
     }
 
-    fn process_evm_event(&mut self, msg: EnclaveEvent<Unsequenced>) -> Result<()> {
+    fn process_evm_event(&mut self, msg: InterfoldEvent<Unsequenced>) -> Result<()> {
         match &mut self.status {
             SyncStatus::Init { buffer, .. } => buffer.push(msg),
             SyncStatus::BufferUntilLive(buffer) => buffer.push(msg),
@@ -131,13 +131,13 @@ impl Actor for EvmChainGateway {
     }
 }
 
-impl Handler<EnclaveEvent> for EvmChainGateway {
+impl Handler<InterfoldEvent> for EvmChainGateway {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, _: &mut Self::Context) -> Self::Result {
         trap(EType::Evm, &self.bus.with_ec(msg.get_ctx()), || {
             match msg.into_data() {
-                EnclaveEventData::HistoricalEvmSyncStart(e) => self.handle_sync_start(e)?,
-                EnclaveEventData::SyncEnded(e) => self.handle_sync_ended(e)?,
+                InterfoldEventData::HistoricalEvmSyncStart(e) => self.handle_sync_start(e)?,
+                InterfoldEventData::SyncEnded(e) => self.handle_sync_ended(e)?,
                 _ => (),
             }
             Ok(())
@@ -145,9 +145,9 @@ impl Handler<EnclaveEvent> for EvmChainGateway {
     }
 }
 
-impl Handler<EnclaveEvmEvent> for EvmChainGateway {
+impl Handler<InterfoldEvmEvent> for EvmChainGateway {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvmEvent, _: &mut Self::Context) -> Self::Result {
         trap(EType::Evm, &self.bus.clone(), || self.handle_evm_event(msg))
     }
 }
@@ -215,10 +215,10 @@ mod tests {
         );
 
         // This will actually arrive earlier than HistoricalEvmSyncStart but aught to be buffered
-        addr.send(EnclaveEvmEvent::Event(evm_event)).await?;
+        addr.send(InterfoldEvmEvent::Event(evm_event)).await?;
 
         // HistoricalSyncComplete: ForwardToSyncActor -> BufferUntilLive
-        addr.send(EnclaveEvmEvent::HistoricalSyncComplete(
+        addr.send(InterfoldEvmEvent::HistoricalSyncComplete(
             HistoricalSyncComplete::new(chain_id, None),
         ))
         .await?;
@@ -238,7 +238,7 @@ mod tests {
             12346,
             chain_id,
         );
-        addr.send(EnclaveEvmEvent::Event(buffered_event)).await?;
+        addr.send(InterfoldEvmEvent::Event(buffered_event)).await?;
 
         // The Synchronizer will publish the SyncEnded event when it has all the information it needs
         // and has published everything to the bus
@@ -252,7 +252,7 @@ mod tests {
             chain_id,
         );
 
-        addr.send(EnclaveEvmEvent::Event(after_event)).await?;
+        addr.send(InterfoldEvmEvent::Event(after_event)).await?;
 
         let full = history_collector.send(TakeEvents::new(5)).await?;
 
@@ -260,7 +260,7 @@ mod tests {
             .events
             .iter()
             .filter_map(|e| {
-                if let EnclaveEventData::TestEvent(TestEvent { msg, .. }) = e.get_data() {
+                if let InterfoldEventData::TestEvent(TestEvent { msg, .. }) = e.get_data() {
                     Some(msg.to_string())
                 } else {
                     None

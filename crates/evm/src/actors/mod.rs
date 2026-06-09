@@ -9,8 +9,8 @@
 
 mod bonding_registry_sol;
 mod ciphernode_registry_sol;
-mod enclave_sol_reader;
-mod enclave_sol_writer;
+mod interfold_sol_reader;
+mod interfold_sol_writer;
 mod evm_chain_gateway;
 mod evm_hub;
 mod evm_parser;
@@ -27,8 +27,8 @@ pub use ciphernode_registry_sol::{
     fetch_accusation_vote_validity, fetch_dkg_fold_attestation_verifier, CiphernodeRegistrySol,
     CiphernodeRegistrySolReader, CiphernodeRegistrySolWriter,
 };
-pub use enclave_sol_reader::EnclaveSolReader;
-pub use enclave_sol_writer::EnclaveSolWriter;
+pub use interfold_sol_reader::InterfoldSolReader;
+pub use interfold_sol_writer::InterfoldSolWriter;
 pub use evm_chain_gateway::*;
 pub use evm_hub::*;
 pub use evm_parser::*;

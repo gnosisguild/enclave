@@ -7,8 +7,8 @@
 use actix::prelude::*;
 use e3_events::{
     prelude::*, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, E3Failed,
-    E3RequestComplete, E3Stage, E3StageChanged, EType, EffectsEnabled, EnclaveEvent,
-    EnclaveEventData, EventType, Shutdown, TicketGenerated, TypedEvent,
+    E3RequestComplete, E3Stage, E3StageChanged, EType, EffectsEnabled, InterfoldEvent,
+    InterfoldEventData, EventType, Shutdown, TicketGenerated, TypedEvent,
 };
 use e3_events::{E3id, EventContext, Sequenced};
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
@@ -167,22 +167,22 @@ impl Actor for CommitteeFinalizer {
     }
 }
 
-impl Handler<EnclaveEvent> for CommitteeFinalizer {
+impl Handler<InterfoldEvent> for CommitteeFinalizer {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            EnclaveEventData::CommitteeRequested(data) => {
+            InterfoldEventData::CommitteeRequested(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::EffectsEnabled(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::TicketGenerated(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::E3Failed(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
-            EnclaveEventData::E3RequestComplete(data) => {
+            InterfoldEventData::EffectsEnabled(data) => self.notify_sync(ctx, data),
+            InterfoldEventData::TicketGenerated(data) => self.notify_sync(ctx, data),
+            InterfoldEventData::Shutdown(data) => self.notify_sync(ctx, data),
+            InterfoldEventData::E3Failed(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
+            InterfoldEventData::E3RequestComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::E3StageChanged(data) => {
+            InterfoldEventData::E3StageChanged(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),

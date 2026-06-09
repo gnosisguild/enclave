@@ -10,7 +10,7 @@ use crate::actors::log_fetcher::{
 use crate::domain::backoff::Backoff;
 use crate::helpers::{EthProvider, ProviderFactory};
 use crate::messages::HistoricalSyncComplete;
-use crate::messages::{EnclaveEvmEvent, EvmEventProcessor};
+use crate::messages::{InterfoldEvmEvent, EvmEventProcessor};
 use actix::prelude::*;
 use alloy::eips::BlockNumberOrTag;
 use alloy::primitives::B256;
@@ -19,7 +19,7 @@ use alloy::rpc::types::Filter;
 use alloy_primitives::Address;
 use anyhow::anyhow;
 use e3_events::{
-    BusHandle, EType, EnclaveEvent, EnclaveEventData, ErrorDispatcher, Event, EventId,
+    BusHandle, EType, InterfoldEvent, InterfoldEventData, ErrorDispatcher, Event, EventId,
 };
 use e3_events::{EventSubscriber, EventType};
 use e3_utils::{retry_with_backoff, RetryError, MAILBOX_LIMIT};
@@ -90,7 +90,7 @@ impl Filters {
     }
 }
 
-/// Connects to Enclave.sol converting EVM events to EnclaveEvents
+/// Connects to Interfold.sol converting EVM events to InterfoldEvents
 pub struct EvmReadInterface<P> {
     /// The alloy provider
     provider: Option<EthProvider<P>>,
@@ -328,7 +328,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
         }
     };
 
-    next.do_send(EnclaveEvmEvent::HistoricalSyncComplete(
+    next.do_send(InterfoldEvmEvent::HistoricalSyncComplete(
         HistoricalSyncComplete::new(chain_id, last_id),
     ));
 
@@ -477,11 +477,11 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
     }
 }
 
-impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmReadInterface<P> {
+impl<P: Provider + Clone + 'static> Handler<InterfoldEvent> for EvmReadInterface<P> {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        if let EnclaveEventData::Shutdown(_) = msg.into_data() {
+    fn handle(&mut self, msg: InterfoldEvent, _: &mut Self::Context) -> Self::Result {
+        if let InterfoldEventData::Shutdown(_) = msg.into_data() {
             if let Some(shutdown) = self.shutdown_tx.take() {
                 let _ = shutdown.send(());
             }

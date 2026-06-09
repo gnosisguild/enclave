@@ -30,7 +30,7 @@ Deposit stablecoins to mint tickets:
 
 ```bash
 # Buy tickets worth 100 USDC
-enclave ciphernode tickets buy --amount 100
+interfold ciphernode tickets buy --amount 100
 ```
 
 This:
@@ -45,7 +45,7 @@ Withdraw the underlying stablecoin:
 
 ```bash
 # Burn tickets and withdraw 50 USDC worth
-enclave ciphernode tickets burn --amount 50
+interfold ciphernode tickets burn --amount 50
 ```
 
 > Burning tickets takes effect immediately. Dropping below the minimum ticket balance makes you
@@ -54,7 +54,7 @@ enclave ciphernode tickets burn --amount 50
 ### Check Balance
 
 ```bash
-enclave ciphernode status
+interfold ciphernode status
 ```
 
 Look for the "Ticket balance" and "available" fields in the output.

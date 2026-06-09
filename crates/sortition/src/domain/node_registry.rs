@@ -249,7 +249,7 @@ impl NodeRegistry {
     /// On a clean shutdown/restart this set should only contain genuinely
     /// in-flight E3s. If it contains an E3 that has already reached a terminal
     /// stage on-chain, the corresponding active-job slot is orphaned and should
-    /// be released (see `enclave node validate`). The returned `committee_key`
+    /// be released (see `interfold node validate`). The returned `committee_key`
     /// matches [`committee_key`] so callers can correlate it with an `E3id`.
     pub fn open_committees(store: &HashMap<u64, NodeStateStore>) -> Vec<OpenCommittee> {
         let mut out = Vec::new();

@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Addr, Handler, Recipient};
-use e3_events::{EnclaveEvent, EnclaveEventData, Event, HistoricalEvmSyncStart};
+use e3_events::{InterfoldEvent, InterfoldEventData, Event, HistoricalEvmSyncStart};
 use e3_utils::MAILBOX_LIMIT;
 
 pub struct SyncStartExtractor {
@@ -28,10 +28,10 @@ impl Actor for SyncStartExtractor {
     }
 }
 
-impl Handler<EnclaveEvent> for SyncStartExtractor {
+impl Handler<InterfoldEvent> for SyncStartExtractor {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        if let EnclaveEventData::HistoricalEvmSyncStart(evt) = msg.into_data() {
+    fn handle(&mut self, msg: InterfoldEvent, _: &mut Self::Context) -> Self::Result {
+        if let InterfoldEventData::HistoricalEvmSyncStart(evt) = msg.into_data() {
             self.dest.do_send(evt)
         }
     }

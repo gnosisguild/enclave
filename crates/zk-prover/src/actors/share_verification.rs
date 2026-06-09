@@ -29,7 +29,7 @@ use alloy::sol_types::SolValue;
 use e3_events::{
     BusHandle, CommitmentConsistencyCheckComplete, CommitmentConsistencyCheckRequested,
     ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind, CorrelationId, E3id,
-    EnclaveEvent, EnclaveEventData, EventContext, EventPublisher, EventSubscriber, EventType,
+    EventContext, EventPublisher, EventSubscriber, EventType, InterfoldEvent, InterfoldEventData,
     PartyVerificationResult, ProofType, ProofVerificationFailed, ProofVerificationPassed,
     Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed,
     SignedProofPayload, TypedEvent, VerificationKind, VerifyShareDecryptionProofsRequest,
@@ -570,22 +570,22 @@ impl Actor for ShareVerificationActor {
     type Context = Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for ShareVerificationActor {
+impl Handler<InterfoldEvent> for ShareVerificationActor {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            EnclaveEventData::ShareVerificationDispatched(data) => {
+            InterfoldEventData::ShareVerificationDispatched(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeResponse(data) => {
+            InterfoldEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeRequestError(data) => {
+            InterfoldEventData::ComputeRequestError(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::CommitmentConsistencyCheckComplete(data) => {
+            InterfoldEventData::CommitmentConsistencyCheckComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),

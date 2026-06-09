@@ -24,7 +24,7 @@ use crate::helpers::{ensure_hex_zeroizing, parse_zeroizing};
 
 #[derive(Debug, Args, Clone, Default, Serialize, Deserialize)]
 pub struct ChainArgs {
-    /// Chain name as defined in the enclave config (defaults to the first entry)
+    /// Chain name as defined in the interfold config (defaults to the first entry)
     #[arg(long = "chain")]
     pub chain: Option<String>,
 }
@@ -39,7 +39,7 @@ impl ChainArgs {
 pub enum CiphernodeCommands {
     /// Setup local ciphernode configuration
     Setup {
-        /// An rpc url for enclave to connect to
+        /// An rpc url for interfold to connect to
         #[arg(long = "rpc-url", short = 'r')]
         rpc_url: Option<String>,
 
@@ -167,7 +167,7 @@ pub async fn execute(out: Console, command: CiphernodeCommands, config: &AppConf
         }
         CiphernodeCommands::Setup { .. } => {
             bail!(
-                "Cannot run `enclave ciphernode setup` when a configuration already exists: {:?}",
+                "Cannot run `interfold ciphernode setup` when a configuration already exists: {:?}",
                 config.config_file()
             );
         }

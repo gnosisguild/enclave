@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use bloom::{BloomFilter, ASMS};
-use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData, Event, Unsequenced};
+use e3_events::{prelude::*, InterfoldEvent, InterfoldEventData, Event, Unsequenced};
 use tracing::{trace, warn};
 
 use crate::events::GossipData;
@@ -36,16 +36,16 @@ impl EventTranslationService {
 
     /// Function to determine which events are allowed to be automatically broadcast to the
     /// network. Static so the same rule can be reused elsewhere (e.g. sync responses).
-    pub fn is_forwardable_event(event: &EnclaveEvent) -> bool {
+    pub fn is_forwardable_event(event: &InterfoldEvent) -> bool {
         matches!(
             event.get_data(),
-            EnclaveEventData::DecryptionshareCreated(_)
-                | EnclaveEventData::DKGRecursiveAggregationComplete(_)
-                | EnclaveEventData::KeyshareCreated(_)
-                | EnclaveEventData::PlaintextAggregated(_)
-                | EnclaveEventData::PublicKeyAggregated(_)
-                | EnclaveEventData::ProofFailureAccusation(_)
-                | EnclaveEventData::AccusationVote(_)
+            InterfoldEventData::DecryptionshareCreated(_)
+                | InterfoldEventData::DKGRecursiveAggregationComplete(_)
+                | InterfoldEventData::KeyshareCreated(_)
+                | InterfoldEventData::PlaintextAggregated(_)
+                | InterfoldEventData::PublicKeyAggregated(_)
+                | InterfoldEventData::ProofFailureAccusation(_)
+                | InterfoldEventData::AccusationVote(_)
         )
     }
 
@@ -53,7 +53,7 @@ impl EventTranslationService {
     ///
     /// Returns `Some(GossipData)` to publish over the network, or `None` when the event is not
     /// forwardable or has already been broadcast.
-    pub fn prepare_outbound(&mut self, event: EnclaveEvent) -> Result<Option<GossipData>> {
+    pub fn prepare_outbound(&mut self, event: InterfoldEvent) -> Result<Option<GossipData>> {
         if !Self::is_forwardable_event(&event) {
             let id = event.event_id();
             trace!(evt_id=%id, "Local events should not be rebroadcast so ignoring");
@@ -74,8 +74,8 @@ impl EventTranslationService {
 
     /// Decode an inbound gossip payload into the internal event to publish locally, recording it
     /// for dedup so it is not later rebroadcast.
-    pub fn prepare_inbound(&mut self, data: GossipData) -> Result<EnclaveEvent<Unsequenced>> {
-        let event: EnclaveEvent<Unsequenced> = data.try_into()?;
+    pub fn prepare_inbound(&mut self, data: GossipData) -> Result<InterfoldEvent<Unsequenced>> {
+        let event: InterfoldEvent<Unsequenced> = data.try_into()?;
         let id = event.id();
         self.sent_events.insert(&id);
         Ok(event)
@@ -87,8 +87,8 @@ mod tests {
     use super::*;
     use e3_events::{EventConstructorWithTimestamp, EventSource, TestEvent};
 
-    fn local_test_event() -> EnclaveEvent {
-        let unsequenced: EnclaveEvent<Unsequenced> = EnclaveEvent::new_with_timestamp(
+    fn local_test_event() -> InterfoldEvent {
+        let unsequenced: InterfoldEvent<Unsequenced> = InterfoldEvent::new_with_timestamp(
             TestEvent::new("hello", 1).into(),
             None,
             42,
@@ -114,7 +114,7 @@ mod tests {
     #[test]
     fn inbound_gossip_round_trips_to_event() {
         let mut svc = EventTranslationService::new("topic");
-        let event: EnclaveEvent<Unsequenced> = EnclaveEvent::new_with_timestamp(
+        let event: InterfoldEvent<Unsequenced> = InterfoldEvent::new_with_timestamp(
             TestEvent::new("fish", 7).into(),
             None,
             99,

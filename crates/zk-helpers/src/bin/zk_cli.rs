@@ -10,13 +10,13 @@
 //! for use with the Noir prover. Use `--list_circuits` to see circuits and
 //! `--circuit <name> --preset insecure|secure|2|80` to generate artifacts.
 //!
-//! **Share-computation (C2) configs.nr:** set `ENCLAVE_CIRCUITS_ROOT` to the repo `circuits`
-//! directory (or run from the Enclave repo so it is auto-discovered). After `pnpm build:circuits`,
+//! **Share-computation (C2) configs.nr:** set `INTERFOLD_CIRCUITS_ROOT` to the repo `circuits`
+//! directory (or run from the Interfold repo so it is auto-discovered). After `pnpm build:circuits`,
 //! `circuits/bin/dkg/target/` contains `sk_share_computation.vk_recursive_hash` and
 //! `e_sm_share_computation.vk_recursive_hash` for the inner recursive circuits; the aggregation
 //! wrapper emits `share_computation.vk_recursive_hash` under
 //! `circuits/bin/recursive_aggregation/wrapper/dkg/share_computation/target/` (from
-//! `scripts/build-circuits.ts`). If `ENCLAVE_CIRCUITS_ROOT` is set and those files are missing,
+//! `scripts/build-circuits.ts`). If `INTERFOLD_CIRCUITS_ROOT` is set and those files are missing,
 //! codegen fails; if unset and artifacts are absent, the C2 literals are omitted from the generated
 //! fragment.
 

@@ -15,8 +15,8 @@ use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, Recipient};
 use alloy::primitives::{keccak256, Address, Bytes};
 use alloy::sol_types::SolValue;
 use e3_events::{
-    BusHandle, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated,
-    EncryptionKeyReceived, EventContext, EventPublisher, EventSubscriber, EventType, Proof,
+    BusHandle, E3id, EncryptionKey, EncryptionKeyCreated, EncryptionKeyReceived, EventContext,
+    EventPublisher, EventSubscriber, EventType, InterfoldEvent, InterfoldEventData, Proof,
     ProofType, ProofVerificationFailed, ProofVerificationPassed, Sequenced, SignedProofFailed,
     SignedProofPayload, TypedEvent,
 };
@@ -159,13 +159,13 @@ impl Actor for ProofVerificationActor {
     type Context = Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for ProofVerificationActor {
+impl Handler<InterfoldEvent> for ProofVerificationActor {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            EnclaveEventData::CiphernodeSelected(data) => {
+            InterfoldEventData::CiphernodeSelected(data) => {
                 match CiphernodesCommitteeSize::from_threshold(data.threshold_m, data.threshold_n) {
                     Ok(committee) => {
                         self.presets
@@ -181,7 +181,7 @@ impl Handler<EnclaveEvent> for ProofVerificationActor {
                     }
                 }
             }
-            EnclaveEventData::EncryptionKeyReceived(data) => {
+            InterfoldEventData::EncryptionKeyReceived(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),

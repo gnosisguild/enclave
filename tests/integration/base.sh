@@ -27,20 +27,20 @@ else
   pnpm evm:deploy
 fi
 
-heading "Sync tests/integration/enclave.config.yaml from deployed_contracts.json"
-(cd "$ROOT_DIR/packages/enclave-contracts" && pnpm utils:sync-integration-config)
+heading "Sync tests/integration/interfold.config.yaml from deployed_contracts.json"
+(cd "$ROOT_DIR/packages/interfold-contracts" && pnpm utils:sync-integration-config)
 
-enclave_wallet_set cn1 "$PRIVATE_KEY_CN1"
-enclave_wallet_set cn2 "$PRIVATE_KEY_CN2"
-enclave_wallet_set cn3 "$PRIVATE_KEY_CN3"
-enclave_wallet_set cn4 "$PRIVATE_KEY_CN4"
-enclave_wallet_set cn5 "$PRIVATE_KEY_CN5"
+interfold_wallet_set cn1 "$PRIVATE_KEY_CN1"
+interfold_wallet_set cn2 "$PRIVATE_KEY_CN2"
+interfold_wallet_set cn3 "$PRIVATE_KEY_CN3"
+interfold_wallet_set cn4 "$PRIVATE_KEY_CN4"
+interfold_wallet_set cn5 "$PRIVATE_KEY_CN5"
 
 heading "Setup ZK prover (bb binary; circuits staged in prebuild when proof aggregation is on)"
-$ENCLAVE_BIN noir setup
+$INTERFOLD_BIN noir setup
 
 # start swarm
-enclave_nodes_up
+interfold_nodes_up
 
 echo "waiting on binaries and utilities..."
 
@@ -99,8 +99,8 @@ daemon_query_events cn1 "$SCRIPT_DIR/output/events.txt"
 check_last_line "$SCRIPT_DIR/output/events.txt" '{"Next":10}'
 
 if [[ "$PROOF_AGGREGATION_ENABLED" == "true" ]]; then
-  heading "Wire MockE3Program → Enclave so publishInput triggers decryption"
-  pnpm e3-program:setMockEnclave --network localhost
+  heading "Wire MockE3Program → Interfold so publishInput triggers decryption"
+  pnpm e3-program:setMockInterfold --network localhost
 
   heading "Encrypt plaintext under the published committee pubkey"
   $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext "$PLAINTEXT" --params "$ENCODED_PARAMS"

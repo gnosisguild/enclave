@@ -14,8 +14,8 @@ use e3_config::BBPath;
 use e3_crypto::Cipher;
 use e3_events::{
     hlc::HlcTimestamp, prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized,
-    ComputeRequestKind, ComputeResponseKind, ConfigurationUpdated, E3Requested, E3id, EnclaveEvent,
-    EnclaveEventData, OperatorActivationChanged, PlaintextAggregated, ProofType, Seed, TakeEvents,
+    ComputeRequestKind, ComputeResponseKind, ConfigurationUpdated, E3Requested, E3id, InterfoldEvent,
+    InterfoldEventData, OperatorActivationChanged, PlaintextAggregated, ProofType, Seed, TakeEvents,
     TicketBalanceUpdated, VerificationKind, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::DEFAULT_BFV_PRESET;
@@ -930,9 +930,9 @@ async fn expect_node_events_with_timeouts(
     Ok(h)
 }
 
-fn project_history<F>(history: &[EnclaveEvent], mut projector: F) -> Vec<&'static str>
+fn project_history<F>(history: &[InterfoldEvent], mut projector: F) -> Vec<&'static str>
 where
-    F: FnMut(&EnclaveEventData) -> Option<&'static str>,
+    F: FnMut(&InterfoldEventData) -> Option<&'static str>,
 {
     history
         .iter()
@@ -946,13 +946,13 @@ fn count_projected_events(projected: &[&str], event_type: &str) -> usize {
 
 /// Wall seconds between first `start_when` and last `end_when` event in `history` (HLC physical time).
 fn history_wall_seconds_between<F1, F2>(
-    history: &[EnclaveEvent],
+    history: &[InterfoldEvent],
     start_when: F1,
     end_when: F2,
 ) -> Option<f64>
 where
-    F1: Fn(&EnclaveEventData) -> bool,
-    F2: Fn(&EnclaveEventData) -> bool,
+    F1: Fn(&InterfoldEventData) -> bool,
+    F2: Fn(&InterfoldEventData) -> bool,
 {
     let start = history.iter().find(|e| start_when(e.get_data()))?;
     let end = history.iter().rfind(|e| end_when(e.get_data()))?;
@@ -961,83 +961,83 @@ where
     (end_us >= start_us).then(|| (end_us - start_us) as f64 / 1_000_000.0)
 }
 
-fn publickey_aggregator_marker(data: &EnclaveEventData, e3_id: &E3id) -> Option<&'static str> {
+fn publickey_aggregator_marker(data: &InterfoldEventData, e3_id: &E3id) -> Option<&'static str> {
     match data {
-        EnclaveEventData::CommitteeFinalized(data) if data.e3_id == *e3_id => {
+        InterfoldEventData::CommitteeFinalized(data) if data.e3_id == *e3_id => {
             Some("CommitteeFinalized")
         }
-        EnclaveEventData::CiphernodeSelected(data) if data.e3_id == *e3_id => {
+        InterfoldEventData::CiphernodeSelected(data) if data.e3_id == *e3_id => {
             Some("CiphernodeSelected")
         }
-        EnclaveEventData::AggregatorChanged(data) if data.e3_id == *e3_id && data.is_aggregator => {
+        InterfoldEventData::AggregatorChanged(data) if data.e3_id == *e3_id && data.is_aggregator => {
             Some("AggregatorChanged")
         }
-        EnclaveEventData::KeyshareCreated(data) if data.e3_id == *e3_id => Some("KeyshareCreated"),
-        EnclaveEventData::ShareVerificationDispatched(data)
+        InterfoldEventData::KeyshareCreated(data) if data.e3_id == *e3_id => Some("KeyshareCreated"),
+        InterfoldEventData::ShareVerificationDispatched(data)
             if data.e3_id == *e3_id && data.kind == VerificationKind::PkGenerationProofs =>
         {
             Some("ShareVerificationDispatched")
         }
-        EnclaveEventData::CommitmentConsistencyCheckRequested(data)
+        InterfoldEventData::CommitmentConsistencyCheckRequested(data)
             if data.e3_id == *e3_id && data.kind == VerificationKind::PkGenerationProofs =>
         {
             Some("CommitmentConsistencyCheckRequested")
         }
-        EnclaveEventData::CommitmentConsistencyCheckComplete(data)
+        InterfoldEventData::CommitmentConsistencyCheckComplete(data)
             if data.e3_id == *e3_id && data.kind == VerificationKind::PkGenerationProofs =>
         {
             Some("CommitmentConsistencyCheckComplete")
         }
-        EnclaveEventData::ProofVerificationPassed(data)
+        InterfoldEventData::ProofVerificationPassed(data)
             if data.e3_id == *e3_id && data.proof_type == ProofType::C1PkGeneration =>
         {
             Some("ProofVerificationPassed")
         }
-        EnclaveEventData::ShareVerificationComplete(data)
+        InterfoldEventData::ShareVerificationComplete(data)
             if data.e3_id == *e3_id && data.kind == VerificationKind::PkGenerationProofs =>
         {
             Some("ShareVerificationComplete")
         }
-        EnclaveEventData::PkAggregationProofPending(data) if data.e3_id == *e3_id => {
+        InterfoldEventData::PkAggregationProofPending(data) if data.e3_id == *e3_id => {
             Some("PkAggregationProofPending")
         }
-        EnclaveEventData::PkAggregationProofSigned(data) if data.e3_id == *e3_id => {
+        InterfoldEventData::PkAggregationProofSigned(data) if data.e3_id == *e3_id => {
             Some("PkAggregationProofSigned")
         }
-        EnclaveEventData::DKGRecursiveAggregationComplete(data) if data.e3_id == *e3_id => {
+        InterfoldEventData::DKGRecursiveAggregationComplete(data) if data.e3_id == *e3_id => {
             Some("DKGRecursiveAggregationComplete")
         }
-        EnclaveEventData::PublicKeyAggregated(data) if data.e3_id == *e3_id => {
+        InterfoldEventData::PublicKeyAggregated(data) if data.e3_id == *e3_id => {
             Some("PublicKeyAggregated")
         }
         _ => None,
     }
 }
 
-fn plaintext_aggregator_marker(data: &EnclaveEventData, e3_id: &E3id) -> Option<&'static str> {
+fn plaintext_aggregator_marker(data: &InterfoldEventData, e3_id: &E3id) -> Option<&'static str> {
     match data {
-        EnclaveEventData::CiphertextOutputPublished(data) if data.e3_id == *e3_id => {
+        InterfoldEventData::CiphertextOutputPublished(data) if data.e3_id == *e3_id => {
             Some("CiphertextOutputPublished")
         }
-        EnclaveEventData::DecryptionshareCreated(data) if data.e3_id == *e3_id => {
+        InterfoldEventData::DecryptionshareCreated(data) if data.e3_id == *e3_id => {
             Some("DecryptionshareCreated")
         }
-        EnclaveEventData::ShareVerificationDispatched(data)
+        InterfoldEventData::ShareVerificationDispatched(data)
             if data.e3_id == *e3_id && data.kind == VerificationKind::ThresholdDecryptionProofs =>
         {
             Some("ShareVerificationDispatched")
         }
-        EnclaveEventData::CommitmentConsistencyCheckRequested(data)
+        InterfoldEventData::CommitmentConsistencyCheckRequested(data)
             if data.e3_id == *e3_id && data.kind == VerificationKind::ThresholdDecryptionProofs =>
         {
             Some("CommitmentConsistencyCheckRequested")
         }
-        EnclaveEventData::CommitmentConsistencyCheckComplete(data)
+        InterfoldEventData::CommitmentConsistencyCheckComplete(data)
             if data.e3_id == *e3_id && data.kind == VerificationKind::ThresholdDecryptionProofs =>
         {
             Some("CommitmentConsistencyCheckComplete")
         }
-        EnclaveEventData::ComputeRequest(data)
+        InterfoldEventData::ComputeRequest(data)
             if data.e3_id == *e3_id
                 && matches!(
                     &data.request,
@@ -1051,7 +1051,7 @@ fn plaintext_aggregator_marker(data: &EnclaveEventData, e3_id: &E3id) -> Option<
         {
             Some("ComputeRequest")
         }
-        EnclaveEventData::ComputeResponse(data)
+        InterfoldEventData::ComputeResponse(data)
             if data.e3_id == *e3_id
                 && matches!(
                     &data.response,
@@ -1067,23 +1067,23 @@ fn plaintext_aggregator_marker(data: &EnclaveEventData, e3_id: &E3id) -> Option<
         {
             Some("ComputeResponse")
         }
-        EnclaveEventData::ProofVerificationPassed(data)
+        InterfoldEventData::ProofVerificationPassed(data)
             if data.e3_id == *e3_id && data.proof_type == ProofType::C6ThresholdShareDecryption =>
         {
             Some("ProofVerificationPassed")
         }
-        EnclaveEventData::ShareVerificationComplete(data)
+        InterfoldEventData::ShareVerificationComplete(data)
             if data.e3_id == *e3_id && data.kind == VerificationKind::ThresholdDecryptionProofs =>
         {
             Some("ShareVerificationComplete")
         }
-        EnclaveEventData::AggregationProofPending(data) if data.e3_id == *e3_id => {
+        InterfoldEventData::AggregationProofPending(data) if data.e3_id == *e3_id => {
             Some("AggregationProofPending")
         }
-        EnclaveEventData::AggregationProofSigned(data) if data.e3_id == *e3_id => {
+        InterfoldEventData::AggregationProofSigned(data) if data.e3_id == *e3_id => {
             Some("AggregationProofSigned")
         }
-        EnclaveEventData::PlaintextAggregated(data) if data.e3_id == *e3_id => {
+        InterfoldEventData::PlaintextAggregated(data) if data.e3_id == *e3_id => {
             Some("PlaintextAggregated")
         }
         _ => None,
@@ -1303,7 +1303,7 @@ async fn test_trbfv_actor() -> Result<()> {
         rpc_url: "http://localhost:8545".into(),
         rpc_auth: Default::default(),
         contracts: e3_config::ContractAddresses {
-            enclave: e3_config::Contract::AddressOnly(
+            interfold: e3_config::Contract::AddressOnly(
                 "0x0000000000000000000000000000000000000000".into(),
             ),
             ciphernode_registry: e3_config::Contract::AddressOnly(
@@ -1554,14 +1554,14 @@ async fn test_trbfv_actor() -> Result<()> {
     let dkg_parties: HashSet<u64> = h
         .iter()
         .filter_map(|e| match e.get_data() {
-            EnclaveEventData::DKGRecursiveAggregationComplete(d) => Some(d.party_id),
+            InterfoldEventData::DKGRecursiveAggregationComplete(d) => Some(d.party_id),
             _ => None,
         })
         .collect();
     let ks_parties: HashSet<u64> = h
         .iter()
         .filter_map(|e| match e.get_data() {
-            EnclaveEventData::KeyshareCreated(d) => Some(d.party_id),
+            InterfoldEventData::KeyshareCreated(d) => Some(d.party_id),
             _ => None,
         })
         .collect();
@@ -1579,7 +1579,7 @@ async fn test_trbfv_actor() -> Result<()> {
         .iter()
         .rev()
         .find_map(|e| match e.get_data() {
-            EnclaveEventData::PublicKeyAggregated(d) => Some(d),
+            InterfoldEventData::PublicKeyAggregated(d) => Some(d),
             _ => None,
         })
         .expect("PublicKeyAggregated in history");
@@ -1643,10 +1643,10 @@ async fn test_trbfv_actor() -> Result<()> {
         |d| {
             matches!(
                 d,
-                EnclaveEventData::PkAggregationProofPending(data) if data.e3_id == e3_id
+                InterfoldEventData::PkAggregationProofPending(data) if data.e3_id == e3_id
             )
         },
-        |d| matches!(d, EnclaveEventData::PublicKeyAggregated(data) if data.e3_id == e3_id),
+        |d| matches!(d, InterfoldEventData::PublicKeyAggregated(data) if data.e3_id == e3_id),
     ) {
         report.push_wall(
             "Aggregator P2: PkAggregation pending -> PublicKeyAggregated (wall)",
@@ -1668,7 +1668,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // First we get the public key from the collector-visible gossip event.
     println!("Getting public key");
     let Some(pubkey_event) = h.iter().rev().find_map(|event| match event.get_data() {
-        EnclaveEventData::PublicKeyAggregated(data) => Some(data.clone()),
+        InterfoldEventData::PublicKeyAggregated(data) => Some(data.clone()),
         _ => None,
     }) else {
         panic!(
@@ -1758,7 +1758,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let unique_ds_parties: HashSet<u64> = h
         .iter()
         .filter_map(|e| match e.get_data() {
-            EnclaveEventData::DecryptionshareCreated(d) => Some(d.party_id),
+            InterfoldEventData::DecryptionshareCreated(d) => Some(d.party_id),
             _ => None,
         })
         .collect();
@@ -1804,11 +1804,11 @@ async fn test_trbfv_actor() -> Result<()> {
         .take_while(|e| {
             !matches!(
                 e.get_data(),
-                EnclaveEventData::ShareVerificationDispatched(_)
+                InterfoldEventData::ShareVerificationDispatched(_)
             )
         })
         .filter_map(|e| match e.get_data() {
-            EnclaveEventData::DecryptionshareCreated(d) if d.e3_id == e3_id => Some(d.party_id),
+            InterfoldEventData::DecryptionshareCreated(d) if d.e3_id == e3_id => Some(d.party_id),
             _ => None,
         })
         .collect();
@@ -1906,10 +1906,10 @@ async fn test_trbfv_actor() -> Result<()> {
         |d| {
             matches!(
                 d,
-                EnclaveEventData::AggregationProofPending(data) if data.e3_id == e3_id
+                InterfoldEventData::AggregationProofPending(data) if data.e3_id == e3_id
             )
         },
-        |d| matches!(d, EnclaveEventData::PlaintextAggregated(data) if data.e3_id == e3_id),
+        |d| matches!(d, InterfoldEventData::PlaintextAggregated(data) if data.e3_id == e3_id),
     ) {
         report.push_wall(
             "Aggregator P4: Aggregation pending -> PlaintextAggregated (wall)",
@@ -1926,7 +1926,7 @@ async fn test_trbfv_actor() -> Result<()> {
         .iter()
         .rev()
         .find_map(|e| {
-            if let EnclaveEventData::PlaintextAggregated(PlaintextAggregated {
+            if let InterfoldEventData::PlaintextAggregated(PlaintextAggregated {
                 decrypted_output,
                 decryption_aggregator_proofs,
                 ..
@@ -2152,7 +2152,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
 #[actix::test]
 async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
-    use e3_events::{CiphernodeSelected, EnclaveEvent, TakeEvents, Unsequenced};
+    use e3_events::{CiphernodeSelected, InterfoldEvent, TakeEvents, Unsequenced};
     use e3_net::events::GossipData;
     use e3_net::{events::NetEvent, NetEventTranslator};
     use std::sync::Arc;
@@ -2170,7 +2170,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     NetEventTranslator::setup(&bus, &cmd_tx, &event_rx, "my-topic");
 
     // Capture messages from output on msgs vec
-    let msgs: Arc<Mutex<Vec<EnclaveEventData>>> = Arc::new(Mutex::new(Vec::new()));
+    let msgs: Arc<Mutex<Vec<InterfoldEventData>>> = Arc::new(Mutex::new(Vec::new()));
 
     let msgs_loop = msgs.clone();
 
@@ -2185,7 +2185,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
                 _ => None,
             } {
                 if let GossipData::GossipBytes(_) = msg {
-                    let event: EnclaveEvent<Unsequenced> = msg.clone().try_into().unwrap();
+                    let event: InterfoldEvent<Unsequenced> = msg.clone().try_into().unwrap();
                     let (data, _) = event.split();
                     msgs_loop.lock().await.push(data);
                     event_tx.send(NetEvent::GossipData(msg)).unwrap();
@@ -2223,7 +2223,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     // check the history of the event bus
     let history = history_collector
-        .send(TakeEvents::<EnclaveEvent>::new(3))
+        .send(TakeEvents::<InterfoldEvent>::new(3))
         .await?;
 
     assert_eq!(
@@ -2276,7 +2276,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
 
     // check the history of the event bus
     let history = history_collector
-        .send(TakeEvents::<EnclaveEvent>::new(1))
+        .send(TakeEvents::<InterfoldEvent>::new(1))
         .await?;
 
     assert_eq!(
@@ -2284,7 +2284,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
             .events
             .into_iter()
             .map(|e| e.into_data())
-            .collect::<Vec<EnclaveEventData>>(),
+            .collect::<Vec<InterfoldEventData>>(),
         vec![event.into()]
     );
 
@@ -2402,7 +2402,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         let history_collector = cn1.history().unwrap();
         let error_collector = cn1.errors().unwrap();
         let history = history_collector
-            .send(TakeEvents::<e3_events::EnclaveEvent>::new(14))
+            .send(TakeEvents::<e3_events::InterfoldEvent>::new(14))
             .await?;
         let errors = error_collector.send(GetEvents::new()).await?;
 
@@ -2433,7 +2433,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 
     let bus = EventSystem::in_mem()
         .with_event_bus(
-            EventBus::<e3_events::EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start(),
+            EventBus::<e3_events::InterfoldEvent>::new(EventBusConfig { deduplicate: true }).start(),
         )
         .handle()?
         .enable("cn2");
@@ -2467,7 +2467,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .events
         .iter()
         .filter_map(|evt| match evt.get_data() {
-            EnclaveEventData::KeyshareCreated(data) => {
+            InterfoldEventData::KeyshareCreated(data) => {
                 PublicKeyShare::deserialize(&data.pubkey, &params, crpoly.clone()).ok()
             }
             _ => None,
@@ -2487,14 +2487,14 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     })?;
 
     let history = history_collector
-        .send(TakeEvents::<e3_events::EnclaveEvent>::new(5))
+        .send(TakeEvents::<e3_events::InterfoldEvent>::new(5))
         .await?;
 
     let actual = history
         .events
         .into_iter()
         .filter_map(|e| match e.into_data() {
-            EnclaveEventData::PlaintextAggregated(data) => Some(data),
+            InterfoldEventData::PlaintextAggregated(data) => Some(data),
             _ => None,
         })
         .collect::<Vec<_>>()
@@ -2651,11 +2651,11 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     )?)?;
     let history_collector = ciphernodes.last().unwrap().history().unwrap();
     let history = history_collector
-        .send(TakeEvents::<e3_events::EnclaveEvent>::new(28))
+        .send(TakeEvents::<e3_events::InterfoldEvent>::new(28))
         .await?;
 
     let actual_pubkey_agg_1 = match history.events.last().cloned().unwrap().into_data() {
-        e3_events::EnclaveEventData::PublicKeyAggregated(ev) => ev,
+        e3_events::InterfoldEventData::PublicKeyAggregated(ev) => ev,
         other => panic!("expected PublicKeyAggregated, got {other:?}"),
     };
     assert_eq!(
@@ -2695,11 +2695,11 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     )?)?;
 
     let history = history_collector
-        .send(TakeEvents::<e3_events::EnclaveEvent>::new(8))
+        .send(TakeEvents::<e3_events::InterfoldEvent>::new(8))
         .await?;
 
     let actual_pubkey_agg_2 = match history.events.last().cloned().unwrap().into_data() {
-        e3_events::EnclaveEventData::PublicKeyAggregated(ev) => ev,
+        e3_events::InterfoldEventData::PublicKeyAggregated(ev) => ev,
         other => panic!("expected PublicKeyAggregated, got {other:?}"),
     };
     assert_eq!(

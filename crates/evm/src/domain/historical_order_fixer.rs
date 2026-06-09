@@ -7,7 +7,7 @@
 //! Pure reordering service that holds a `HistoricalSyncComplete` marker back
 //! until the event it references has been observed.
 
-use crate::messages::{EnclaveEvmEvent, HistoricalSyncComplete};
+use crate::messages::{InterfoldEvmEvent, HistoricalSyncComplete};
 use bloom::{BloomFilter, ASMS};
 use e3_events::CorrelationId;
 use tracing::debug;
@@ -16,7 +16,7 @@ use tracing::debug;
 /// releases it once that event flows through. All other events are forwarded
 /// immediately while their ids are tracked in a bloom filter.
 pub(crate) struct HistoricalOrderFixer {
-    pending_sync_complete: Option<EnclaveEvmEvent>,
+    pending_sync_complete: Option<InterfoldEvmEvent>,
     seen_ids: BloomFilter,
 }
 
@@ -30,12 +30,12 @@ impl HistoricalOrderFixer {
 
     /// Process a single incoming event, returning the (possibly empty) ordered
     /// list of events that should be forwarded downstream as a result.
-    pub(crate) fn process(&mut self, msg: EnclaveEvmEvent) -> Vec<EnclaveEvmEvent> {
+    pub(crate) fn process(&mut self, msg: InterfoldEvmEvent) -> Vec<InterfoldEvmEvent> {
         let id = msg.get_id();
-        debug!("Receiving EnclaveEvmEvent event({})", id);
+        debug!("Receiving InterfoldEvmEvent event({})", id);
         let mut out = Vec::new();
         match msg {
-            none_hist @ EnclaveEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete {
+            none_hist @ InterfoldEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete {
                 prev_event: None,
                 ..
             }) => {
@@ -45,7 +45,7 @@ impl HistoricalOrderFixer {
                 );
                 out.push(none_hist);
             }
-            hist @ EnclaveEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete {
+            hist @ InterfoldEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete {
                 prev_event: Some(_),
                 ..
             }) => {
@@ -55,7 +55,7 @@ impl HistoricalOrderFixer {
                 );
                 self.pending_sync_complete = Some(hist);
             }
-            EnclaveEvmEvent::Processed(id) => self.track_id(id),
+            InterfoldEvmEvent::Processed(id) => self.track_id(id),
             other => {
                 debug!("Forwarding event({})", other.get_id());
                 self.track_id(other.get_id());
@@ -68,8 +68,8 @@ impl HistoricalOrderFixer {
         out
     }
 
-    fn take_ready_pending(&mut self) -> Option<EnclaveEvmEvent> {
-        if let Some(EnclaveEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete {
+    fn take_ready_pending(&mut self) -> Option<InterfoldEvmEvent> {
+        if let Some(InterfoldEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete {
             prev_event: Some(ref id),
             ..
         })) = self.pending_sync_complete
@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn test_forwards_sync_complete_without_prev_event_immediately() {
         let mut fixer = HistoricalOrderFixer::new();
-        let sync = EnclaveEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete::new(1, None));
+        let sync = InterfoldEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete::new(1, None));
         let out = fixer.process(sync.clone());
         assert_eq!(out, vec![sync]);
     }
@@ -105,11 +105,11 @@ mod tests {
     fn test_holds_sync_complete_until_referenced_event_seen() {
         let mut fixer = HistoricalOrderFixer::new();
 
-        let log_1 = EnclaveEvmEvent::Log(EvmLog::test_log(Address::ZERO, 1, 1));
-        let log_2 = EnclaveEvmEvent::Log(EvmLog::test_log(Address::ZERO, 2, 2));
-        let log_3 = EnclaveEvmEvent::Log(EvmLog::test_log(Address::ZERO, 3, 3));
+        let log_1 = InterfoldEvmEvent::Log(EvmLog::test_log(Address::ZERO, 1, 1));
+        let log_2 = InterfoldEvmEvent::Log(EvmLog::test_log(Address::ZERO, 2, 2));
+        let log_3 = InterfoldEvmEvent::Log(EvmLog::test_log(Address::ZERO, 3, 3));
 
-        let sync = EnclaveEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete::new(
+        let sync = InterfoldEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete::new(
             1,
             Some(log_3.get_id()),
         ));
@@ -127,14 +127,14 @@ mod tests {
     #[test]
     fn test_processed_events_track_ids_without_forwarding() {
         let mut fixer = HistoricalOrderFixer::new();
-        let log = EnclaveEvmEvent::Log(EvmLog::test_log(Address::ZERO, 9, 9));
+        let log = InterfoldEvmEvent::Log(EvmLog::test_log(Address::ZERO, 9, 9));
         let id = log.get_id();
 
         let sync =
-            EnclaveEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete::new(1, Some(id)));
+            InterfoldEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete::new(1, Some(id)));
         // Buffer the sync first
         assert!(fixer.process(sync.clone()).is_empty());
         // A Processed marker for the referenced id releases the sync but is not forwarded
-        assert_eq!(fixer.process(EnclaveEvmEvent::Processed(id)), vec![sync]);
+        assert_eq!(fixer.process(InterfoldEvmEvent::Processed(id)), vec![sync]);
     }
 }

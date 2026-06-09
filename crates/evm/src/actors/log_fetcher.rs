@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::messages::{EnclaveEvmEvent, EvmEventProcessor, EvmLog};
+use crate::messages::{InterfoldEvmEvent, EvmEventProcessor, EvmLog};
 use alloy::providers::Provider;
 use alloy::rpc::types::{Filter, Log};
 use anyhow::anyhow;
@@ -49,7 +49,7 @@ pub(crate) async fn process_log<L: LogProvider>(
     timestamp_tracker: &mut TimestampTracker,
 ) -> CorrelationId {
     let timestamp = timestamp_tracker.get(provider, log.block_number).await;
-    let evt = EnclaveEvmEvent::Log(EvmLog::new(log, chain_id, timestamp));
+    let evt = InterfoldEvmEvent::Log(EvmLog::new(log, chain_id, timestamp));
     let id = evt.get_id();
     debug!("Sending event({})", id);
     next.do_send(evt);
@@ -294,16 +294,16 @@ mod tests {
     }
 
     struct TestCollector {
-        tx: mpsc::UnboundedSender<EnclaveEvmEvent>,
+        tx: mpsc::UnboundedSender<InterfoldEvmEvent>,
     }
 
     impl Actor for TestCollector {
         type Context = Context<Self>;
     }
 
-    impl Handler<EnclaveEvmEvent> for TestCollector {
+    impl Handler<InterfoldEvmEvent> for TestCollector {
         type Result = ();
-        fn handle(&mut self, msg: EnclaveEvmEvent, _: &mut Self::Context) {
+        fn handle(&mut self, msg: InterfoldEvmEvent, _: &mut Self::Context) {
             let _ = self.tx.send(msg);
         }
     }
@@ -315,7 +315,7 @@ mod tests {
         }
     }
 
-    fn setup_collector() -> (EvmEventProcessor, mpsc::UnboundedReceiver<EnclaveEvmEvent>) {
+    fn setup_collector() -> (EvmEventProcessor, mpsc::UnboundedReceiver<InterfoldEvmEvent>) {
         let (tx, rx) = mpsc::unbounded_channel();
         let addr = TestCollector { tx }.start();
         (addr.recipient(), rx)

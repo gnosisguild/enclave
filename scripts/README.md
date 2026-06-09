@@ -1,6 +1,6 @@
 # Scripts
 
-This directory contains utility scripts for the Enclave project.
+This directory contains utility scripts for the Interfold project.
 
 ## Version Bumper
 
@@ -224,7 +224,7 @@ the generator would produce.
 - `--preset <name>` - Parameter preset: `insecure-512` (default), `secure-8192`, or `all`
 - `--committee <name>` - Committee size: `micro` (default), `small`, `medium`
 - `--skip-utils-patch` - Skip rewriting `BFV_DKG_H` / `BFV_THRESHOLD_T` in
-  `packages/enclave-contracts/scripts/utils.ts`
+  `packages/interfold-contracts/scripts/utils.ts`
 - `--group <groups>` - Circuit groups (comma-separated: dkg,threshold)
 - `--circuit <name>` - Build specific circuit(s)
 - `--skip-vk` - Skip verification key generation
@@ -278,7 +278,7 @@ Circuits are built locally and stored in a git branch:
 `generate-verifiers.ts` - Generates (or verifies) Solidity Honk verifier contracts from compiled
 Noir circuits.
 
-The generated `.sol` files under `packages/enclave-contracts/contracts/verifiers/bfv/honk/` are
+The generated `.sol` files under `packages/interfold-contracts/contracts/verifiers/bfv/honk/` are
 **committed to git** and correspond to **exactly one `(preset, committee)` pair**:
 `(insecure-512, micro)` (the development / CI / benchmark default). The Honk verifiers bake in the
 recursive VKs of `dkg_aggregator` / `decryption_aggregator`, which are preset- and committee-
@@ -353,7 +353,7 @@ Automates the full pipeline from Noir circuits to on-chain Solidity verifiers:
    - Replaces Apache-2.0 license header with LGPL-3.0-only
    - Runs `prettier-plugin-solidity` so on-disk format matches the rest of the repo (and so
      `--check` doesn't trip on whitespace differences vs. raw `bb` output)
-6. **Outputs / verifies** at `packages/enclave-contracts/contracts/verifiers/bfv/honk/`:
+6. **Outputs / verifies** at `packages/interfold-contracts/contracts/verifiers/bfv/honk/`:
    - In `--write` mode: overwrites the committed `.sol` files.
    - In `--check` mode: diffs the freshly generated content against the committed `.sol` and exits
      non-zero on any drift, printing the offending files and a fix recipe.
@@ -386,7 +386,7 @@ To fix:
 1. Verify your `nargo` / `bb` versions match `crates/zk-prover/versions.json`.
 2. Run `pnpm build:circuits --preset insecure-512`.
 3. Run `pnpm generate:verifiers --write`.
-4. Commit the resulting diff under `packages/enclave-contracts/contracts/verifiers/bfv/honk/`.
+4. Commit the resulting diff under `packages/interfold-contracts/contracts/verifiers/bfv/honk/`.
 
 ### Options
 
@@ -419,7 +419,7 @@ The `generate:verifiers` script in package.json passes `--circuits` with the on-
    ✓ recursive_aggregation/decryption_aggregator → DecryptionAggregatorVerifier.sol
 
 ✅ Generated 2 Solidity verifier(s) in:
-   packages/enclave-contracts/contracts/verifiers/bfv/honk/
+   packages/interfold-contracts/contracts/verifiers/bfv/honk/
 ```
 
 ### Integration

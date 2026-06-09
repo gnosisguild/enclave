@@ -18,7 +18,7 @@ use actix::prelude::*;
 use anyhow::Result;
 use e3_events::{
     prelude::*, trap, trap_fut, BusHandle, CiphernodeSelected, CorrelationId, DecryptionKeyShared,
-    DocumentReceived, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData,
+    DocumentReceived, E3RequestComplete, E3id, EType, InterfoldEvent, InterfoldEventData,
     EncryptionKeyCreated, EventSource, EventType, PartyId, PublishDocumentRequested,
     ThresholdShareCreated, TypedEvent,
 };
@@ -38,11 +38,11 @@ const KADEMLIA_GET_TIMEOUT: Duration = Duration::from_secs(30);
 const KADEMLIA_BROADCAST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// DocumentPublisher is an actor that monitors events from both the Libp2pNetInterface and the
-/// Enclave EventBus in order to manage document publishing interactions. The decision/state logic
+/// Interfold EventBus in order to manage document publishing interactions. The decision/state logic
 /// lives in [`DocumentPublishingService`]; this actor only wires events to that service and
 /// performs the resulting libp2p/Kademlia I/O.
 pub struct DocumentPublisher {
-    /// Enclave EventBus
+    /// Interfold EventBus
     bus: BusHandle,
     /// NetCommand sender to forward commands to the Libp2pNetInterface
     tx: mpsc::Sender<NetCommand>,
@@ -73,14 +73,14 @@ impl DocumentPublisher {
     }
 
     /// This is needed to create simulation libp2p event routers
-    pub fn is_document_publisher_event(event: &EnclaveEvent) -> bool {
+    pub fn is_document_publisher_event(event: &InterfoldEvent) -> bool {
         // Add a list of events with paylods for the DHT
         matches!(
             event.get_data(),
-            EnclaveEventData::PublishDocumentRequested(_)
-                | EnclaveEventData::ThresholdShareCreated(_)
-                | EnclaveEventData::EncryptionKeyCreated(_)
-                | EnclaveEventData::DecryptionKeyShared(_)
+            InterfoldEventData::PublishDocumentRequested(_)
+                | InterfoldEventData::ThresholdShareCreated(_)
+                | InterfoldEventData::EncryptionKeyCreated(_)
+                | InterfoldEventData::DecryptionKeyShared(_)
         )
     }
 
@@ -145,18 +145,18 @@ impl Actor for DocumentPublisher {
     }
 }
 
-impl Handler<EnclaveEvent> for DocumentPublisher {
+impl Handler<InterfoldEvent> for DocumentPublisher {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            EnclaveEventData::PublishDocumentRequested(data) => {
+            InterfoldEventData::PublishDocumentRequested(data) => {
                 ctx.notify(TypedEvent::new(data, ec))
             }
-            EnclaveEventData::CiphernodeSelected(data) => {
+            InterfoldEventData::CiphernodeSelected(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::E3RequestComplete(data) => {
+            InterfoldEventData::E3RequestComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),
@@ -458,21 +458,21 @@ impl Actor for EventConverter {
     type Context = actix::Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for EventConverter {
+impl Handler<InterfoldEvent> for EventConverter {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (data, ec) = msg.into_components();
         match data {
-            EnclaveEventData::ThresholdShareCreated(data) => {
+            InterfoldEventData::ThresholdShareCreated(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::EncryptionKeyCreated(data) => {
+            InterfoldEventData::EncryptionKeyCreated(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::DecryptionKeyShared(data) => {
+            InterfoldEventData::DecryptionKeyShared(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::DocumentReceived(data) => {
+            InterfoldEventData::DocumentReceived(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),
@@ -551,8 +551,8 @@ mod tests {
     use chrono::Utc;
     use e3_ciphernode_builder::EventSystem;
     use e3_events::{
-        BusHandle, CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError,
-        EnclaveEvent, GetEvents, HistoryCollector, PublishDocumentRequested, TakeEvents,
+        BusHandle, CiphernodeSelected, DocumentKind, DocumentMeta, E3id, InterfoldError,
+        InterfoldEvent, GetEvents, HistoryCollector, PublishDocumentRequested, TakeEvents,
     };
     use libp2p::kad::{GetRecordError, PutRecordError, RecordKey};
     use std::time::Instant;
@@ -570,8 +570,8 @@ mod tests {
         mpsc::Receiver<NetCommand>,
         broadcast::Sender<NetEvent>,
         Arc<broadcast::Receiver<NetEvent>>,
-        Addr<HistoryCollector<EnclaveEvent>>,
-        Addr<HistoryCollector<EnclaveEvent>>,
+        Addr<HistoryCollector<InterfoldEvent>>,
+        Addr<HistoryCollector<InterfoldEvent>>,
         Addr<DocumentPublisher>,
     )> {
         use tracing_subscriber::{fmt, EnvFilter};
@@ -588,10 +588,10 @@ mod tests {
         let (net_cmd_tx, net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
         let net_evt_rx = Arc::new(net_evt_rx);
-        let history = HistoryCollector::<EnclaveEvent>::new().start();
-        let error = HistoryCollector::<EnclaveEvent>::new().start();
+        let history = HistoryCollector::<InterfoldEvent>::new().start();
+        let error = HistoryCollector::<InterfoldEvent>::new().start();
         bus.subscribe(EventType::All, history.clone().recipient());
-        bus.subscribe(EventType::EnclaveError, error.clone().recipient());
+        bus.subscribe(EventType::InterfoldError, error.clone().recipient());
         let publisher = DocumentPublisher::setup(&bus, &net_cmd_tx, &net_evt_rx, "topic");
 
         Ok((
@@ -718,7 +718,7 @@ mod tests {
 
         // wait for events to settle
         let errors = errors.send(TakeEvents::new(1)).await?;
-        let error: EnclaveError = errors.events.first().unwrap().try_into()?;
+        let error: InterfoldError = errors.events.first().unwrap().try_into()?;
         assert_eq!(
             error.message,
             "Operation failed after 4 attempts. Last error: DHT get record failed: Timeout { key: Key(b\"\\xda-\\xe1\\xc0T\\x11$X\\x05\\xd1\\xd4\\xa6C\\x86\\x96\\xb7e\\xd9j\\x96\\x1bD\\xc8P#\\x0f\\\"\\xea A@b\") }"
@@ -775,7 +775,7 @@ mod tests {
 
         // Expect error to exist
         let errors = errors.send(TakeEvents::new(1)).await?;
-        let error: EnclaveError = errors.events.first().unwrap().try_into()?;
+        let error: InterfoldError = errors.events.first().unwrap().try_into()?;
         assert_eq!(
             error.message,
             "Operation failed after 4 attempts. Last error: DHT put record failed: PutRecordError(QuorumFailed { key: Key(b\"I got the secret\"), success: [], quorum: 1 })"
@@ -855,10 +855,10 @@ mod tests {
 
         // Check event was dispatched
         let events = history.send(GetEvents::new()).await?;
-        let Some(EnclaveEventData::DocumentReceived(DocumentReceived { value: doc, .. })) = events
+        let Some(InterfoldEventData::DocumentReceived(DocumentReceived { value: doc, .. })) = events
             .iter()
             // Filter out the error
-            .filter(|e| e.event_type() != "EnclaveError")
+            .filter(|e| e.event_type() != "InterfoldError")
             .last()
             .map(|e| e.get_data())
         else {
