@@ -889,6 +889,7 @@ impl ThresholdKeyshare {
             .collect::<Result<_>>()?;
 
         let plan = build_shares_generated_plan(
+            &self.multithread_cipher,
             &self.cipher,
             self.share_enc_preset,
             party_id,
