@@ -699,7 +699,7 @@ impl CiphernodeBuilder {
 
         // ── Threshold keyshare + ZK actors ──
         if let Some(KeyshareKind::Threshold) = self.keyshare {
-            let _ = self.ensure_multithread(bus);
+            let _ = self.ensure_multithread(bus, &store);
             let backend = self
                 .zk_backend
                 .as_ref()
@@ -721,7 +721,7 @@ impl CiphernodeBuilder {
             e3_builder = e3_builder.with(FheExtension::create(bus, &self.rng));
 
             info!("Setting up PublicKeyAggregationExtension");
-            let _ = self.ensure_multithread(bus);
+            let _ = self.ensure_multithread(bus, &store);
             e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(bus));
 
             if self.keyshare.is_none() {
@@ -738,7 +738,7 @@ impl CiphernodeBuilder {
         // ── Threshold plaintext aggregation ──
         if self.threshold_plaintext_agg {
             info!("Setting up ThresholdPlaintextAggregatorExtension");
-            let _ = self.ensure_multithread(bus);
+            let _ = self.ensure_multithread(bus, &store);
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
                 bus, sortition,
             ));
@@ -801,7 +801,11 @@ impl CiphernodeBuilder {
         }
     }
 
-    fn ensure_multithread(&mut self, bus: &BusHandle) -> Addr<Multithread> {
+    fn ensure_multithread(
+        &mut self,
+        bus: &BusHandle,
+        store: &e3_data::DataStore,
+    ) -> Addr<Multithread> {
         if let Some(cached) = self.multithread_cache.clone() {
             return cached;
         }
@@ -821,6 +825,7 @@ impl CiphernodeBuilder {
                 bus,
                 self.rng.clone(),
                 self.cipher.clone(),
+                store.clone(),
                 task_pool,
                 self.multithread_report.clone(),
                 backend,
@@ -830,6 +835,7 @@ impl CiphernodeBuilder {
                 bus,
                 self.rng.clone(),
                 self.cipher.clone(),
+                store.clone(),
                 task_pool,
                 self.multithread_report.clone(),
             )

@@ -61,10 +61,9 @@ pub(crate) struct SharesGeneratedPlan {
 /// requests for this party's freshly generated DKG share material.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn build_shares_generated_plan(
-    // Cipher for data sent to Multithread ZK workers (must match the master cipher held by Multithread).
-    transport_cipher: &Cipher,
-    // Cipher for actor-local at-rest storage (own_sk_share_raw, own_esi_shares_raw — never sent to Multithread).
-    local_cipher: &Cipher,
+    // Per-E3 forward-secrecy cipher. All `SensitiveBytes` here are either stored at rest or sent
+    // to the Multithread compute actor, which resolves the same per-E3 cipher by `e3_id`.
+    cipher: &Cipher,
     share_enc_preset: BfvPreset,
     party_id: u64,
     threshold_m: u64,
@@ -120,24 +119,22 @@ pub(crate) fn build_shares_generated_plan(
             )
         })?;
 
-    // Serialize for C2a/C2b proof requests (encrypted at rest).
-    // These go to Multithread ZK workers, so they must use the transport cipher.
+    // Serialize for C2a/C2b proof requests (encrypted at rest, decrypted by Multithread).
     let sk_sss_raw = SensitiveBytes::new(
         bincode::serialize(&decrypted_sk_sss)
             .map_err(|e| anyhow!("Failed to serialize sk_sss: {}", e))?,
-        transport_cipher,
+        cipher,
     )?;
     let esi_sss_raw: Vec<SensitiveBytes> = decrypted_esi_sss
         .iter()
         .map(|s| {
             let bytes =
                 bincode::serialize(s).map_err(|e| anyhow!("Failed to serialize esi_sss: {}", e))?;
-            SensitiveBytes::new(bytes, transport_cipher)
+            SensitiveBytes::new(bytes, cipher)
         })
         .collect::<Result<_>>()?;
 
     // Cache own plaintext share rows for C4 (no self-encryption); stored encrypted at rest.
-    // These stay in the actor — use the local (per-E3) cipher.
     let own_sk_shamir = decrypted_sk_sss.extract_party_share(party_id as usize)?;
     let own_sk_rows: Vec<Vec<u64>> = own_sk_shamir
         .rows()
@@ -147,7 +144,7 @@ pub(crate) fn build_shares_generated_plan(
     let own_sk_share_raw = SensitiveBytes::new(
         bincode::serialize(&own_sk_rows)
             .map_err(|e| anyhow!("Failed to serialize own sk share: {}", e))?,
-        local_cipher,
+        cipher,
     )?;
 
     let own_esi_shares_raw: Vec<SensitiveBytes> = decrypted_esi_sss
@@ -161,7 +158,7 @@ pub(crate) fn build_shares_generated_plan(
                 .collect();
             let bytes = bincode::serialize(&rows)
                 .map_err(|e| anyhow!("Failed to serialize own esi share: {}", e))?;
-            SensitiveBytes::new(bytes, local_cipher)
+            SensitiveBytes::new(bytes, cipher)
         })
         .collect::<Result<_>>()?;
 
@@ -247,13 +244,13 @@ pub(crate) fn build_shares_generated_plan(
                 share_row_raw: SensitiveBytes::new(
                     bincode::serialize(&witness.share_row)
                         .map_err(|e| anyhow!("Failed to serialize share_row: {}", e))?,
-                    transport_cipher,
+                    cipher,
                 )?,
                 ciphertext_raw: ArcBytes::from_bytes(&witness.ciphertext.to_bytes()),
                 recipient_pk_raw: ArcBytes::from_bytes(&recipient_pks[recipient_idx].to_bytes()),
-                u_rns_raw: SensitiveBytes::new(witness.u_rns.to_bytes(), transport_cipher)?,
-                e0_rns_raw: SensitiveBytes::new(witness.e0_rns.to_bytes(), transport_cipher)?,
-                e1_rns_raw: SensitiveBytes::new(witness.e1_rns.to_bytes(), transport_cipher)?,
+                u_rns_raw: SensitiveBytes::new(witness.u_rns.to_bytes(), cipher)?,
+                e0_rns_raw: SensitiveBytes::new(witness.e0_rns.to_bytes(), cipher)?,
+                e1_rns_raw: SensitiveBytes::new(witness.e1_rns.to_bytes(), cipher)?,
                 dkg_input_type: DkgInputType::SecretKey,
                 params_preset: threshold_preset,
                 committee_size: derived_committee_size,
@@ -277,15 +274,15 @@ pub(crate) fn build_shares_generated_plan(
                     share_row_raw: SensitiveBytes::new(
                         bincode::serialize(&witness.share_row)
                             .map_err(|e| anyhow!("Failed to serialize share_row: {}", e))?,
-                        transport_cipher,
+                        cipher,
                     )?,
                     ciphertext_raw: ArcBytes::from_bytes(&witness.ciphertext.to_bytes()),
                     recipient_pk_raw: ArcBytes::from_bytes(
                         &recipient_pks[recipient_idx].to_bytes(),
                     ),
-                    u_rns_raw: SensitiveBytes::new(witness.u_rns.to_bytes(), transport_cipher)?,
-                    e0_rns_raw: SensitiveBytes::new(witness.e0_rns.to_bytes(), transport_cipher)?,
-                    e1_rns_raw: SensitiveBytes::new(witness.e1_rns.to_bytes(), transport_cipher)?,
+                    u_rns_raw: SensitiveBytes::new(witness.u_rns.to_bytes(), cipher)?,
+                    e0_rns_raw: SensitiveBytes::new(witness.e0_rns.to_bytes(), cipher)?,
+                    e1_rns_raw: SensitiveBytes::new(witness.e1_rns.to_bytes(), cipher)?,
                     dkg_input_type: DkgInputType::SmudgingNoise,
                     params_preset: threshold_preset,
                     committee_size: derived_committee_size,
