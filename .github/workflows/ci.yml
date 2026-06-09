@@ -176,8 +176,8 @@ jobs:
     if: needs.detect_changes.outputs.rust_integration_tests == 'true'
     timeout-minutes: 45
     runs-on:
-      group: interfold-ci
-      labels: [interfold-ci-runner]
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
@@ -482,8 +482,8 @@ jobs:
     if: needs.detect_changes.outputs.ciphernode_e2e == 'true'
     timeout-minutes: 45
     runs-on:
-      group: interfold-ci
-      labels: [interfold-ci-runner]
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     strategy:
       matrix:
         test-suite: [base, persist]
@@ -551,8 +551,8 @@ jobs:
     if: needs.detect_changes.outputs.build_interfold_cli == 'true'
     timeout-minutes: 20
     runs-on:
-      group: interfold-ci
-      labels: [interfold-ci-runner]
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     permissions:
       contents: read
       actions: write
@@ -681,8 +681,8 @@ jobs:
     if: needs.detect_changes.outputs.crisp == 'true'
     timeout-minutes: 45
     runs-on:
-      group: interfold-ci
-      labels: [interfold-ci-runner]
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -1151,8 +1151,8 @@ jobs:
     if: needs.detect_changes.outputs.templates == 'true'
     timeout-minutes: 30
     runs-on:
-      group: interfold-ci
-      labels: [interfold-ci-runner]
+      group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
