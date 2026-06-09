@@ -20,7 +20,8 @@ use async_trait::async_trait;
 use e3_crypto::Cipher;
 use e3_data::{Repositories, RepositoriesFactory, Repository};
 use e3_events::{
-    E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, Event, FailureReason, StoreKeys,
+    E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, Event, EventConstructorWithTimestamp,
+    EventSource, FailureReason, StoreKeys, Unsequenced,
 };
 use std::sync::Arc;
 use tracing::{debug, info};
@@ -105,15 +106,18 @@ impl E3Extension for E3CipherExtension {
                             e3_id = %data.e3_id,
                             "failed to create E3 cipher: {e}; aborting round to preserve forward secrecy"
                         );
-                        let fail_evt = EnclaveEvent::new_stored_event(
+                        let fail_evt = EnclaveEvent::<Unsequenced>::new_with_timestamp(
                             EnclaveEventData::from(E3Failed {
                                 e3_id: data.e3_id.clone(),
                                 failed_at_stage: E3Stage::Requested,
                                 reason: FailureReason::None,
                             }),
+                            None,
                             0,
-                            0,
-                        );
+                            None,
+                            EventSource::Local,
+                        )
+                        .into_sequenced(0);
                         ctx.forward_message_now(&fail_evt);
                     }
                 }
