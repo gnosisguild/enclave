@@ -2269,7 +2269,7 @@ mod tests {
             EnclaveEventData::E3Failed(data)
                 if data.e3_id == failure.e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
-                    && data.reason == FailureReason::InsufficientCommitteeMembers
+                    && data.reason == FailureReason::DKGTimeout
         ));
 
         Ok(())
@@ -2300,7 +2300,7 @@ mod tests {
             EnclaveEventData::E3Failed(data)
                 if data.e3_id == failure.e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
-                    && data.reason == FailureReason::InsufficientCommitteeMembers
+                    && data.reason == FailureReason::DKGTimeout
         ));
 
         Ok(())
@@ -2323,7 +2323,7 @@ mod tests {
             EnclaveEventData::E3Failed(data)
                 if data.e3_id == failure.e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
-                    && data.reason == FailureReason::InsufficientCommitteeMembers
+                    && data.reason == FailureReason::DecryptionTimeout
         ));
 
         Ok(())
