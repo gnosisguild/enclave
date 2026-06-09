@@ -24,7 +24,7 @@ async function main() {
 
   // Mocks for local dev; skip on-chain ZK verifiers (needs pnpm compile:circuits).
   await deployInterfold(true, false)
-  await deployTemplate()
+  await deployTemplate(ethers)
 }
 
 main().catch((err) => {

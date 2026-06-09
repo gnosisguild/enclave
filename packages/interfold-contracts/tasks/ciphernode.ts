@@ -96,18 +96,18 @@ export const ciphernodeAdd = task(
 
       try {
         console.log("Step 1: Checking balances...");
-        const enclBalance = await licenseToken.balanceOf(signer.address);
+        const intfBalance = await licenseToken.balanceOf(signer.address);
         const usdcBalance = await usdcToken.balanceOf(signer.address);
 
-        console.log(`INTF balance: ${ethers.formatEther(enclBalance)}`);
+        console.log(`INTF balance: ${ethers.formatEther(intfBalance)}`);
         console.log(`USDC balance: ${ethers.formatUnits(usdcBalance, 6)}`);
 
         const licenseBondAmountBigInt = BigInt(licenseBondAmount);
         const ticketAmountBigInt = BigInt(ticketAmount);
 
-        if (enclBalance < licenseBondAmountBigInt) {
+        if (intfBalance < licenseBondAmountBigInt) {
           throw new Error(
-            `Insufficient INTF balance. Need: ${ethers.formatEther(licenseBondAmountBigInt)}, Have: ${ethers.formatEther(enclBalance)}`,
+            `Insufficient INTF balance. Need: ${ethers.formatEther(licenseBondAmountBigInt)}, Have: ${ethers.formatEther(intfBalance)}`,
           );
         }
 
@@ -234,7 +234,7 @@ export const ciphernodeMintTokens = task(
     defaultValue: ZeroAddress,
   })
   .addOption({
-    name: "enclAmount",
+    name: "intfAmount",
     description:
       "amount of INTF to mint (in ether units, e.g., 2000 for 2000 INTF)",
     defaultValue: "2000",
@@ -246,7 +246,7 @@ export const ciphernodeMintTokens = task(
     defaultValue: "1000",
   })
   .setAction(async () => ({
-    default: async ({ ciphernodeAddress, enclAmount, usdcAmount }, hre) => {
+    default: async ({ ciphernodeAddress, intfAmount, usdcAmount }, hre) => {
       const connection = await hre.network.connect();
       const { ethers } = connection;
 
@@ -275,14 +275,14 @@ export const ciphernodeMintTokens = task(
       try {
         console.log(`Minting tokens for: ${ciphernodeAddress}`);
 
-        console.log(`Minting ${enclAmount} INTF...`);
-        const enclTx = await interfoldTokenContract.mintAllocation(
+        console.log(`Minting ${intfAmount} INTF...`);
+        const intfTx = await interfoldTokenContract.mintAllocation(
           ciphernodeAddress,
-          ethers.parseEther(enclAmount),
+          ethers.parseEther(intfAmount),
           "Ciphernode allocation",
         );
-        await enclTx.wait();
-        console.log(`${enclAmount} INTF minted`);
+        await intfTx.wait();
+        console.log(`${intfAmount} INTF minted`);
 
         console.log(`Minting ${usdcAmount} USDC...`);
         const usdcTx = await mockUSDCContract.mint(
@@ -292,12 +292,12 @@ export const ciphernodeMintTokens = task(
         await usdcTx.wait();
         console.log(`${usdcAmount} USDC minted`);
 
-        const enclBalance =
+        const intfBalance =
           await interfoldTokenContract.balanceOf(ciphernodeAddress);
         const usdcBalance = await mockUSDCContract.balanceOf(ciphernodeAddress);
 
         console.log("\n=== Token Balances ===");
-        console.log(`INTF: ${ethers.formatEther(enclBalance)}`);
+        console.log(`INTF: ${ethers.formatEther(intfBalance)}`);
         console.log(`USDC: ${ethers.formatUnits(usdcBalance, 6)}`);
 
         const transfersRestricted =
@@ -415,12 +415,12 @@ export const ciphernodeAdminAdd = task(
 
         console.log("Step 1: Minting and transferring INTF to ciphernode...");
 
-        const enclTx = await interfoldTokenConnected.mintAllocation(
+        const intfTx = await interfoldTokenConnected.mintAllocation(
           adminWallet.address,
           licenseBondWei,
           "Admin allocation for ciphernode registration",
         );
-        await enclTx.wait();
+        await intfTx.wait();
 
         const transferTx = await interfoldTokenConnected.transfer(
           ciphernodeAddress,
