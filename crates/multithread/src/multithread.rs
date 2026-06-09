@@ -6,7 +6,9 @@
 
 #![allow(clippy::result_large_err)]
 
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
@@ -19,8 +21,11 @@ use actix::prelude::*;
 use actix::{Actor, Handler};
 use anyhow::Result;
 use e3_crypto::Cipher;
+use e3_data::DataStore;
 use e3_events::run_once;
 use e3_events::trap_fut;
+use e3_events::E3id;
+use e3_events::StoreKeys;
 
 use e3_events::EType;
 use e3_events::EffectsEnabled;
@@ -87,11 +92,73 @@ use num_bigint::BigInt;
 use rand::Rng;
 use tracing::{error, info};
 
+/// In-memory cache of per-E3 forward-secrecy ciphers, keyed by `E3id`.
+type E3CipherCache = Arc<Mutex<HashMap<E3id, Arc<Cipher>>>>;
+
+/// Resolve the cipher to use for decrypting a compute request's `SensitiveBytes`.
+///
+/// `SensitiveBytes` produced by the keyshare actor are encrypted with the round's per-E3
+/// forward-secrecy key. That key is persisted in the KV store **encrypted under the master
+/// cipher** by `E3CipherExtension`. Here we load it (caching the result), decrypt it under the
+/// master cipher and return the per-E3 `Cipher`.
+///
+/// `Ok(None)` from the store (no key stored) is the only case that falls back to the master
+/// cipher — that covers rounds with no per-E3 key (e.g. requests predating the forward-secrecy
+/// scheme). Once a key blob *exists*, a read or unwrap failure means this round is no longer
+/// recoverable (corrupt entry, or the wrong master key after a restart), so we fail fast rather
+/// than silently continuing under the wrong cipher assumption.
+async fn resolve_e3_cipher(
+    store: &DataStore,
+    master: &Arc<Cipher>,
+    cache: &E3CipherCache,
+    e3_id: &E3id,
+) -> Result<Arc<Cipher>> {
+    if let Some(found) = cache.lock().unwrap().get(e3_id).cloned() {
+        return Ok(found);
+    }
+
+    // `base` (absolute location), matching `E3CipherExtension`'s writer, so resolution is
+    // independent of whatever scope this store handle currently carries.
+    let scoped = store.base(StoreKeys::e3_key(e3_id));
+    let resolved = match scoped.read::<Vec<u8>>().await {
+        Ok(Some(encrypted_key)) => match master
+            .decrypt_data(&encrypted_key)
+            .and_then(|raw| Cipher::from_key_bytes(raw))
+        {
+            Ok(cipher) => Arc::new(cipher),
+            Err(e) => {
+                error!(e3_id = %e3_id, "failed to decrypt per-E3 cipher key: {e}");
+                anyhow::bail!("failed to unwrap per-E3 cipher for {e3_id}");
+            }
+        },
+        Ok(None) => {
+            // No per-E3 key stored for this round — use the master cipher.
+            return Ok(master.clone());
+        }
+        Err(e) => {
+            error!(e3_id = %e3_id, "failed to read per-E3 cipher key: {e}");
+            anyhow::bail!("failed to load per-E3 cipher for {e3_id}");
+        }
+    };
+
+    cache
+        .lock()
+        .unwrap()
+        .insert(e3_id.clone(), resolved.clone());
+    Ok(resolved)
+}
+
 /// Multithread actor
 pub struct Multithread {
     bus: BusHandle,
     rng: SharedRng,
-    cipher: Arc<Cipher>,
+    /// Node master cipher. Used to unwrap per-E3 keys from the store and as the fallback
+    /// cipher when a round has no per-E3 key.
+    master_cipher: Arc<Cipher>,
+    /// KV store handle used to load per-E3 forward-secrecy keys.
+    store: DataStore,
+    /// Cache of resolved per-E3 ciphers, evicted on round completion/failure.
+    e3_cipher_cache: E3CipherCache,
     task_pool: TaskPool,
     report: Option<Addr<MultithreadReport>>,
     zk_prover: Option<Arc<ZkProver>>,
@@ -102,13 +169,16 @@ impl Multithread {
         bus: BusHandle,
         rng: SharedRng,
         cipher: Arc<Cipher>,
+        store: DataStore,
         task_pool: TaskPool,
         report: Option<Addr<MultithreadReport>>,
     ) -> Self {
         Self {
             bus,
             rng,
-            cipher,
+            master_cipher: cipher,
+            store,
+            e3_cipher_cache: Arc::new(Mutex::new(HashMap::new())),
             task_pool,
             report,
             zk_prover: None,
@@ -134,10 +204,25 @@ impl Multithread {
         bus: &BusHandle,
         rng: SharedRng,
         cipher: Arc<Cipher>,
+        store: DataStore,
         task_pool: TaskPool,
         report: Option<Addr<MultithreadReport>>,
     ) -> Addr<Self> {
-        let addr = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report).start();
+        let addr = Self::new(
+            bus.clone(),
+            rng.clone(),
+            cipher.clone(),
+            store,
+            task_pool,
+            report,
+        )
+        .start();
+
+        // Evict cached per-E3 ciphers once a round reaches a terminal state.
+        bus.subscribe_all(
+            &[EventType::E3Failed, EventType::E3RequestComplete],
+            addr.clone().into(),
+        );
 
         // Gate ComputeRequest behind EffectsEnabled — proof generation should
         // not trigger during historical event replay.
@@ -162,13 +247,21 @@ impl Multithread {
         bus: &BusHandle,
         rng: SharedRng,
         cipher: Arc<Cipher>,
+        store: DataStore,
         task_pool: TaskPool,
         report: Option<Addr<MultithreadReport>>,
         zk_backend: &ZkBackend,
     ) -> Addr<Self> {
         let zk_prover = Arc::new(ZkProver::new(zk_backend));
-        let actor = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report)
-            .with_zk_prover(zk_prover);
+        let actor = Self::new(
+            bus.clone(),
+            rng.clone(),
+            cipher.clone(),
+            store,
+            task_pool,
+            report,
+        )
+        .with_zk_prover(zk_prover);
         let addr = actor.start();
         bus.subscribe_all(
             &[
@@ -212,8 +305,17 @@ impl Handler<EnclaveEvent> for Multithread {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         let (data, ec) = msg.into_components();
-        if let EnclaveEventData::ComputeRequest(data) = data {
-            ctx.notify(TypedEvent::new(data, ec))
+        match data {
+            EnclaveEventData::ComputeRequest(data) => ctx.notify(TypedEvent::new(data, ec)),
+            // Drop the cached per-E3 cipher once the round is terminal so the key does not
+            // linger in memory after it has been purged from the store (forward secrecy).
+            EnclaveEventData::E3RequestComplete(data) => {
+                self.e3_cipher_cache.lock().unwrap().remove(&data.e3_id);
+            }
+            EnclaveEventData::E3Failed(data) => {
+                self.e3_cipher_cache.lock().unwrap().remove(&data.e3_id);
+            }
+            _ => {}
         }
     }
 }
@@ -221,7 +323,9 @@ impl Handler<EnclaveEvent> for Multithread {
 impl Handler<TypedEvent<ComputeRequest>> for Multithread {
     type Result = ResponseFuture<()>;
     fn handle(&mut self, msg: TypedEvent<ComputeRequest>, _: &mut Self::Context) -> Self::Result {
-        let cipher = self.cipher.clone();
+        let master_cipher = self.master_cipher.clone();
+        let store = self.store.clone();
+        let cache = self.e3_cipher_cache.clone();
         let rng = self.rng.clone();
         let bus = self.bus.clone();
         let pool = self.task_pool.clone();
@@ -230,15 +334,47 @@ impl Handler<TypedEvent<ComputeRequest>> for Multithread {
         trap_fut(
             EType::Computation,
             &self.bus.clone(),
-            handle_compute_request_event(msg, bus, cipher, rng, pool, report, zk_prover),
+            handle_compute_request_event(
+                msg,
+                bus,
+                master_cipher,
+                store,
+                cache,
+                rng,
+                pool,
+                report,
+                zk_prover,
+            ),
         )
     }
 }
 
+/// Build the variant-matched [`ComputeRequestErrorKind`] for a failed request, tagging it with
+/// `msg`. Shared by the cipher-resolution and task-pool failure paths.
+fn compute_error_kind(request: &ComputeRequestKind, msg: String) -> ComputeRequestErrorKind {
+    match request {
+        ComputeRequestKind::Zk(_) => {
+            ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(msg))
+        }
+        ComputeRequestKind::TrBFV(trbfv_req) => ComputeRequestErrorKind::TrBFV(match trbfv_req {
+            TrBFVRequest::GenPkShareAndSkSss(_) => TrBFVError::GenPkShareAndSkSss(msg),
+            TrBFVRequest::GenEsiSss(_) => TrBFVError::GenEsiSss(msg),
+            TrBFVRequest::CalculateDecryptionKey(_) => TrBFVError::CalculateDecryptionKey(msg),
+            TrBFVRequest::CalculateDecryptionShare(_) => TrBFVError::CalculateDecryptionShare(msg),
+            TrBFVRequest::CalculateThresholdDecryption(_) => {
+                TrBFVError::CalculateThresholdDecryption(msg)
+            }
+        }),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn handle_compute_request_event(
     msg: TypedEvent<ComputeRequest>,
     bus: BusHandle,
-    cipher: Arc<Cipher>,
+    master_cipher: Arc<Cipher>,
+    store: DataStore,
+    cache: E3CipherCache,
     rng: SharedRng,
     pool: TaskPool,
     report: Option<Addr<MultithreadReport>>,
@@ -248,6 +384,25 @@ async fn handle_compute_request_event(
     let job_name = msg_string.clone();
     let (msg, ctx) = msg.into_components();
     let request_snapshot = msg.clone();
+
+    // Resolve the per-E3 forward-secrecy cipher for this round; all `SensitiveBytes` in the
+    // request were encrypted with it by the producing keyshare actor. An unrecoverable resolve
+    // failure aborts the request rather than proceeding under the wrong cipher assumption.
+    let cipher = match resolve_e3_cipher(&store, &master_cipher, &cache, &msg.e3_id).await {
+        Ok(cipher) => cipher,
+        Err(resolve_err) => {
+            error!(
+                "Could not resolve per-E3 cipher for compute request '{}': {resolve_err}",
+                msg_string
+            );
+            let error_kind = compute_error_kind(
+                &request_snapshot.request,
+                format!("Cipher error: {resolve_err}"),
+            );
+            bus.publish(ComputeRequestError::new(error_kind, request_snapshot), ctx)?;
+            return Ok(());
+        }
+    };
 
     let report_for_worker = report.clone();
     let pool_result = pool
@@ -263,27 +418,8 @@ async fn handle_compute_request_event(
                 "Task pool error for compute request '{}': {pool_err}",
                 msg_string
             );
-            let error_kind = match &request_snapshot.request {
-                ComputeRequestKind::Zk(_) => ComputeRequestErrorKind::Zk(
-                    ZkEventError::ProofGenerationFailed(format!("Pool error: {pool_err}")),
-                ),
-                ComputeRequestKind::TrBFV(ref trbfv_req) => {
-                    let msg = format!("Pool error: {pool_err}");
-                    ComputeRequestErrorKind::TrBFV(match trbfv_req {
-                        TrBFVRequest::GenPkShareAndSkSss(_) => TrBFVError::GenPkShareAndSkSss(msg),
-                        TrBFVRequest::GenEsiSss(_) => TrBFVError::GenEsiSss(msg),
-                        TrBFVRequest::CalculateDecryptionKey(_) => {
-                            TrBFVError::CalculateDecryptionKey(msg)
-                        }
-                        TrBFVRequest::CalculateDecryptionShare(_) => {
-                            TrBFVError::CalculateDecryptionShare(msg)
-                        }
-                        TrBFVRequest::CalculateThresholdDecryption(_) => {
-                            TrBFVError::CalculateThresholdDecryption(msg)
-                        }
-                    })
-                }
-            };
+            let error_kind =
+                compute_error_kind(&request_snapshot.request, format!("Pool error: {pool_err}"));
             bus.publish(ComputeRequestError::new(error_kind, request_snapshot), ctx)?;
             return Ok(());
         }

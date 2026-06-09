@@ -7,6 +7,7 @@
 mod actors;
 mod context;
 mod domain;
+mod e3_cipher;
 mod hetrogenous_map;
 mod meta;
 mod repo;
@@ -14,6 +15,7 @@ mod repo;
 pub use actors::*;
 pub use context::*;
 pub use domain::*;
+pub use e3_cipher::*;
 pub use hetrogenous_map::*;
 pub use meta::*;
 pub use repo::*;

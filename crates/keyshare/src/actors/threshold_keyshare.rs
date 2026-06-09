@@ -108,6 +108,8 @@ impl AllThresholdSharesCollected {
 
 pub struct ThresholdKeyshareParams {
     pub bus: BusHandle,
+    /// Per-E3 forward-secrecy cipher. `SensitiveBytes` sent to the shared `Multithread` compute
+    /// actor are decrypted there with the same per-E3 cipher, which it resolves by `e3_id`.
     pub cipher: Arc<Cipher>,
     pub state: Persistable<ThresholdKeyshareState>,
     pub share_enc_preset: BfvPreset,
@@ -873,7 +875,8 @@ impl ThresholdKeyshare {
             bail!("Invalid state - expected GeneratingThresholdShare with all data");
         };
 
-        // Decrypt our shares from local storage
+        // Decrypt our shares from local storage. sk_sss and esi_sss were produced by the
+        // Multithread compute actor under this round's per-E3 cipher.
         let decrypted_sk_sss: SharedSecret = sk_sss.decrypt(&self.cipher)?;
         let decrypted_esi_sss: Vec<SharedSecret> = esi_sss
             .into_iter()
@@ -2047,7 +2050,7 @@ impl Handler<EncryptionKeyCollectionFailed> for ThresholdKeyshare {
             self.bus.publish_without_context(E3Failed {
                 e3_id: msg.e3_id,
                 failed_at_stage: E3Stage::CommitteeFinalized,
-                reason: FailureReason::InsufficientCommitteeMembers,
+                reason: FailureReason::DKGTimeout,
             })?;
 
             // Stop this actor since we can't proceed without all encryption keys
@@ -2081,7 +2084,7 @@ impl Handler<ThresholdShareCollectionFailed> for ThresholdKeyshare {
             self.bus.publish_without_context(E3Failed {
                 e3_id: msg.e3_id,
                 failed_at_stage: E3Stage::CommitteeFinalized,
-                reason: FailureReason::InsufficientCommitteeMembers,
+                reason: FailureReason::DKGTimeout,
             })?;
 
             ctx.stop();
@@ -2129,7 +2132,7 @@ impl Handler<DecryptionKeySharedCollectionFailed> for ThresholdKeyshare {
             self.bus.publish_without_context(E3Failed {
                 e3_id: msg.e3_id.clone(),
                 failed_at_stage: E3Stage::CommitteeFinalized,
-                reason: FailureReason::InsufficientCommitteeMembers,
+                reason: FailureReason::DecryptionTimeout,
             })?;
 
             ctx.stop();
@@ -2217,9 +2220,10 @@ mod tests {
         E3id,
     )> {
         let (bus, history) = test_bus();
+        let cipher = Arc::new(Cipher::from_password("test-password").await?);
         let actor = ThresholdKeyshare::new(ThresholdKeyshareParams {
             bus,
-            cipher: Arc::new(Cipher::from_password("test-password").await?),
+            cipher,
             state: test_state(),
             share_enc_preset: DEFAULT_BFV_PRESET,
         })
@@ -2269,7 +2273,7 @@ mod tests {
             EnclaveEventData::E3Failed(data)
                 if data.e3_id == failure.e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
-                    && data.reason == FailureReason::InsufficientCommitteeMembers
+                    && data.reason == FailureReason::DKGTimeout
         ));
 
         Ok(())
@@ -2300,7 +2304,7 @@ mod tests {
             EnclaveEventData::E3Failed(data)
                 if data.e3_id == failure.e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
-                    && data.reason == FailureReason::InsufficientCommitteeMembers
+                    && data.reason == FailureReason::DKGTimeout
         ));
 
         Ok(())
@@ -2323,9 +2327,61 @@ mod tests {
             EnclaveEventData::E3Failed(data)
                 if data.e3_id == failure.e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
-                    && data.reason == FailureReason::InsufficientCommitteeMembers
+                    && data.reason == FailureReason::DecryptionTimeout
         ));
 
         Ok(())
+    }
+
+    // ── cipher boundary tests ────────────────────────────────────────────────
+    //
+    // Forward-secrecy contract: the keyshare actor encrypts ALL SensitiveBytes — both
+    // at-rest shares and data sent to the shared Multithread compute actor — with this
+    // round's per-E3 cipher. Multithread resolves the same per-E3 cipher by `e3_id`, so a
+    // single key must round-trip and any other key must fail. (Multithread holding a
+    // different key is exactly the cipher-mismatch class of bug these tests guard against.)
+
+    #[test]
+    fn per_e3_cipher_round_trips_compute_bound_shares() {
+        use e3_trbfv::shares::{Encrypted, SharedSecret};
+        use ndarray::Array2;
+
+        let per_e3 = Arc::new(Cipher::from_key_bytes(vec![0xAAu8; 32]).unwrap());
+        let other = Arc::new(Cipher::from_key_bytes(vec![0xBBu8; 32]).unwrap());
+
+        // sk_sss / esi_sss are encrypted by the actor with the per-E3 cipher and decrypted
+        // by Multithread with the per-E3 cipher it resolves for the same e3_id.
+        let secret = SharedSecret::new(vec![Array2::zeros((2, 4))]);
+        let encrypted = Encrypted::new(secret, &per_e3).unwrap();
+
+        assert!(
+            encrypted.clone().decrypt(&per_e3).is_ok(),
+            "the round's per-E3 cipher must decrypt compute-bound shares"
+        );
+        assert!(
+            encrypted.decrypt(&other).is_err(),
+            "a cipher for a different round must not decrypt these shares"
+        );
+    }
+
+    #[test]
+    fn per_e3_cipher_round_trips_own_shares() {
+        // own_sk_share_raw / own_esi_shares_raw are encrypted by the actor with the per-E3
+        // cipher (and later forwarded to Multithread C4 under the same key).
+        use e3_crypto::SensitiveBytes;
+
+        let per_e3 = Arc::new(Cipher::from_key_bytes(vec![0xAAu8; 32]).unwrap());
+        let other = Arc::new(Cipher::from_key_bytes(vec![0xBBu8; 32]).unwrap());
+
+        let own_share = SensitiveBytes::new(b"own share data".to_vec(), &per_e3).unwrap();
+
+        assert!(
+            own_share.clone().access(&per_e3).is_ok(),
+            "per-E3 cipher must decrypt own share data"
+        );
+        assert!(
+            own_share.access(&other).is_err(),
+            "a different cipher must not decrypt own share data"
+        );
     }
 }

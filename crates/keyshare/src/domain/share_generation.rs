@@ -61,6 +61,8 @@ pub(crate) struct SharesGeneratedPlan {
 /// requests for this party's freshly generated DKG share material.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn build_shares_generated_plan(
+    // Per-E3 forward-secrecy cipher. All `SensitiveBytes` here are either stored at rest or sent
+    // to the Multithread compute actor, which resolves the same per-E3 cipher by `e3_id`.
     cipher: &Cipher,
     share_enc_preset: BfvPreset,
     party_id: u64,
@@ -117,7 +119,7 @@ pub(crate) fn build_shares_generated_plan(
             )
         })?;
 
-    // Serialize for C2a/C2b proof requests (encrypted at rest)
+    // Serialize for C2a/C2b proof requests (encrypted at rest, decrypted by Multithread).
     let sk_sss_raw = SensitiveBytes::new(
         bincode::serialize(&decrypted_sk_sss)
             .map_err(|e| anyhow!("Failed to serialize sk_sss: {}", e))?,
