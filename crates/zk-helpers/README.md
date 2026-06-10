@@ -12,10 +12,14 @@ Generate `configs.nr` for a circuit; use `--toml` to also generate `Prover.toml`
 # List circuits
 cargo run -p e3-zk-helpers --bin zk_cli -- --list_circuits
 
-# Generate configs.nr only (default)
+# Generate configs.nr only (default; --committee defaults to micro)
 cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk --preset insecure
 cargo run -p e3-zk-helpers --bin zk_cli -- --circuit share-computation --preset insecure --inputs secret-key
 cargo run -p e3-zk-helpers --bin zk_cli -- --circuit share-computation --preset insecure --inputs smudging-noise
+
+# Medium or large committee (must match active circuits lib selection)
+cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk-generation --preset insecure --committee medium
+cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk-generation --preset insecure --committee large
 
 # Generate configs.nr and Prover.toml
 cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk --preset insecure --toml
@@ -26,12 +30,13 @@ cargo run -p e3-zk-helpers --bin zk_cli -- --circuit share-computation --preset 
 cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk --preset insecure --toml --no-configs
 ```
 
-| Flag               | Description                                                                                      |
-| ------------------ | ------------------------------------------------------------------------------------------------ |
-| `--list_circuits`  | List circuits and exit                                                                           |
-| `--circuit <name>` | Circuit name (e.g. `pk`, `share-computation`)                                                    |
-| `--preset <name>`  | Security preset: `insecure` (512) or `secure` (8192)                                             |
-| `--inputs <type>`  | Select the witness family when sample generation depends on it: `secret-key` or `smudging-noise` |
-| `--output <path>`  | Output dir (default: `output`)                                                                   |
-| `--toml`           | Also write Prover.toml (default: configs.nr only)                                                |
-| `--no-configs`     | With `--toml`: do not write configs.nr (e.g. for circuit benchmarks)                             |
+| Flag                 | Description                                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `--list_circuits`    | List circuits and exit                                                                                        |
+| `--circuit <name>`   | Circuit name (e.g. `pk`, `share-computation`)                                                                 |
+| `--preset <name>`    | Security preset: `insecure` (512) or `secure` (8192)                                                          |
+| `--committee <name>` | Committee size: `micro` (default), `small`, `medium`, or `large` — must match `circuits/lib` active committee |
+| `--inputs <type>`    | Select the witness family when sample generation depends on it: `secret-key` or `smudging-noise`              |
+| `--output <path>`    | Output dir (default: `output`)                                                                                |
+| `--toml`             | Also write Prover.toml (default: configs.nr only)                                                             |
+| `--no-configs`       | With `--toml`: do not write configs.nr (e.g. for circuit benchmarks)                                          |

@@ -17,7 +17,7 @@ content.
 Two orthogonal axes pick what gets compiled into `circuits/bin/`:
 
 - **Preset** (`--preset insecure-512` [default] | `secure-8192`): the BFV parameter set.
-- **Committee** (`--committee micro` [default] | `small` | `medium`): `(N, T, H)` for the
+- **Committee** (`--committee micro` [default] | `small` | `medium` | `large`): `(N, T, H)` for the
   secret-sharing committee. Mirrors `e3_zk_helpers::CiphernodesCommitteeSize`.
 
 The current selection is the single source of truth at three places that **must** stay in sync:
