@@ -340,6 +340,10 @@ jobs:
         working-directory: packages/interfold-react
         run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
 
+      - name: Publish @interfold/mcp
+        working-directory: packages/interfold-mcp
+        run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
+
   download-circuits:
     name: Download Circuit Artifacts
     runs-on: ubuntu-latest
