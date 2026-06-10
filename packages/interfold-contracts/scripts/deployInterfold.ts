@@ -82,13 +82,7 @@ export const deployInterfold = async (
   withMocks?: boolean,
   withZKVerification?: boolean,
 ) => {
-  const connection = await hre.network.connect();
-  const { ethers } = connection;
-
-  // Harden hre.network.connect to return the same connection for all subsequent
-  // calls, avoiding nonce collisions when each deploy function calls connect()
-  // independently (Hardhat 3 creates a new provider per call).
-  hre.network.connect = async () => connection as any;
+  const { ethers } = await hre.network.connect();
 
   // Auto-clean state for local networks to prevent stale state issues
   const networkName = hre.globalOptions.network ?? "localhost";

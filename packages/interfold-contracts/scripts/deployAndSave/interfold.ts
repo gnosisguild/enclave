@@ -7,11 +7,7 @@ import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
 import { Interfold, Interfold__factory as InterfoldFactory } from "../../types";
 import { getProxyAdmin, verifyProxyAdminOwner } from "../proxy";
-import {
-  getDeploymentChain,
-  readDeploymentArgs,
-  storeDeploymentArgs,
-} from "../utils";
+import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 
 /**
  * Timeout configuration for E3 stages
@@ -55,7 +51,7 @@ export const deployAndSaveInterfold = async ({
 
   const [signer] = await ethers.getSigners();
 
-  const chain = getDeploymentChain(hre);
+  const chain = hre.globalOptions.network;
   const preDeployedArgs = readDeploymentArgs("Interfold", chain);
 
   if (
@@ -165,7 +161,7 @@ export const upgradeAndSaveInterfold = async ({
 }): Promise<{ interfold: Interfold; implementationAddress: string }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = getDeploymentChain(hre);
+  const chain = hre.globalOptions.network;
 
   const preDeployedArgs = readDeploymentArgs("Interfold", chain);
   if (!preDeployedArgs?.address) {

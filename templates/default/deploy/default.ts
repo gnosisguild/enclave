@@ -19,9 +19,9 @@ const contractMapping: Record<string, string> = {
   MockUSDC: 'fee_token',
 }
 
-export const deployTemplate = async (sharedEthers?: any) => {
+export const deployTemplate = async () => {
   ensureTemplateCwd()
-  const { ethers } = sharedEthers ? { ethers: sharedEthers } : await hre.network.connect()
+  const { ethers } = await hre.network.connect()
   const [owner] = await ethers.getSigners()
 
   const chain = getDeploymentChain(hre)
@@ -67,6 +67,12 @@ export const deployTemplate = async (sharedEthers?: any) => {
   const programAddress = await e3Program.getAddress()
   const tx = await interfold.enableE3Program(programAddress)
   await tx.wait()
+
+  const allowed = await interfold.e3Programs(programAddress)
+  if (!allowed) {
+    throw new Error(`MyProgram ${programAddress} was not enabled on Interfold ${interfoldAddress}`)
+  }
+
   console.log("E3 Program enabled for Interfold's template")
 
   console.log(
