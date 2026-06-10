@@ -23,9 +23,9 @@ export const deployAndSaveBfvPkVerifier = async (
 ): Promise<{
   bfvPkVerifier: BfvPkVerifier;
 }> => {
-  const { ethers, networkName } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = networkName ?? "localhost";
+  const chain = hre.globalOptions.network ?? "localhost";
 
   const circuitVerifierArgs = readDeploymentArgs(
     "DkgAggregatorVerifier",

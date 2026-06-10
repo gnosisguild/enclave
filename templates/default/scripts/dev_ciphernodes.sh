@@ -61,11 +61,11 @@ if ! grep -q '"MyProgram"' deployed_contracts.json; then
   exit 1
 fi
 
-CN1=$(grep -A 1 'cn1:' interfold.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
-CN2=$(grep -A 1 'cn2:' interfold.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
-CN3=$(grep -A 1 'cn3:' interfold.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
-CN4=$(grep -A 1 'cn4:' interfold.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
-CN5=$(grep -A 1 'cn5:' interfold.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
+CN1=$(grep -A 1 'cn1:' interfold.config.yaml | grep 'address:' | sed "s/.*address: *['\"]//;s/['\"].*//")
+CN2=$(grep -A 1 'cn2:' interfold.config.yaml | grep 'address:' | sed "s/.*address: *['\"]//;s/['\"].*//")
+CN3=$(grep -A 1 'cn3:' interfold.config.yaml | grep 'address:' | sed "s/.*address: *['\"]//;s/['\"].*//")
+CN4=$(grep -A 1 'cn4:' interfold.config.yaml | grep 'address:' | sed "s/.*address: *['\"]//;s/['\"].*//")
+CN5=$(grep -A 1 'cn5:' interfold.config.yaml | grep 'address:' | sed "s/.*address: *['\"]//;s/['\"].*//")
 
 echo "Starting ciphernodes (post-deploy config)..."
 interfold nodes up -v &

@@ -100,13 +100,37 @@
       "blockNumber": 52,
       "address": "0x1291Be112d480055DaFd8a610b7d1e203891C274"
     },
+    "ZKTranscriptLib": {
+      "blockNumber": 54,
+      "address": "0xb7278A61aa25c888815aFC32Ad3cC52fF24fE575"
+    },
+    "DecryptionAggregatorVerifier": {
+      "blockNumber": 55,
+      "address": "0xCD8a1C3ba11CF5ECfa6267617243239504a98d90"
+    },
+    "DkgAggregatorVerifier": {
+      "blockNumber": 56,
+      "address": "0x82e01223d51Eb87e16A03E24687EDF0F294da6f1"
+    },
+    "BfvDecryptionVerifier": {
+      "blockNumber": 57,
+      "address": "0x2bdCC0de6bE1f7D2ee689a0342D76F52E8EFABa3"
+    },
+    "BfvPkVerifier": {
+      "blockNumber": 59,
+      "address": "0x7bc06c482DEAd17c0e297aFbC32f6e63d3846650"
+    },
+    "DkgFoldAttestationVerifier": {
+      "address": "0xFD471836031dc5108809D173A067e8486B9047A3",
+      "blockNumber": 61
+    },
     "ImageID": {
       "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-      "blockNumber": 7
+      "blockNumber": 9
     },
     "MyProgram": {
       "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-      "blockNumber": 9
+      "blockNumber": 11
     }
   },
   "undefined": {
