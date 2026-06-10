@@ -43,7 +43,7 @@ impl CiphernodesCommitteeSize {
             (1, 3) => Ok(Self::Micro),
             (2, 5) => Ok(Self::Small),
             (4, 10) => Ok(Self::Medium),
-            (7, 20) => Ok(Self::Large),
+            (9, 20) => Ok(Self::Large),
             _ => bail!(
                 "Unknown committee size for threshold ({}, {})",
                 threshold_m,
@@ -95,7 +95,7 @@ impl CiphernodesCommitteeSize {
             CiphernodesCommitteeSize::Large => CiphernodesCommittee {
                 n: 20,
                 h: 15,
-                threshold: 7,
+                threshold: 9,
             },
         }
     }

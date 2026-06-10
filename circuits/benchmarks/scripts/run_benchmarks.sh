@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # run_benchmarks.sh - Main orchestration script for benchmarking circuits
-# Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|secure] [--circuit <path>]
+# Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|secure]
+#   [--committee micro|small|medium|large] [--circuit <path>]
 #   [--skip-compile] [--bench-compile] [--clean] [--verbose]
 #   [--proof-aggregation on|off] [--multithread-jobs N]
 

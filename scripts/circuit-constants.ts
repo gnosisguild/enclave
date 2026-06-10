@@ -95,7 +95,7 @@ export const COMMITTEE_PARAMS: Record<CircuitCommittee, CommitteeParams> = {
   [CIRCUIT_COMMITTEES.MICRO]: { n: 3, t: 1, h: 3 },
   [CIRCUIT_COMMITTEES.SMALL]: { n: 5, t: 2, h: 5 },
   [CIRCUIT_COMMITTEES.MEDIUM]: { n: 10, t: 4, h: 8 },
-  [CIRCUIT_COMMITTEES.LARGE]: { n: 20, t: 7, h: 15 },
+  [CIRCUIT_COMMITTEES.LARGE]: { n: 20, t: 9, h: 15 },
 }
 
 /**

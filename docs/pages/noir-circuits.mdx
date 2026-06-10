@@ -80,9 +80,24 @@ interfold noir setup --force   # reinstall
 From the **repository root**:
 
 ```bash
-pnpm tsx scripts/build-circuits.ts   # compile, VKs, release artifacts (see script for scope)
-./scripts/lint-circuits.sh           # nargo fmt --check && nargo check (lib + bin areas)
-./scripts/test-circuits.sh         # nargo test on circuits/lib
+pnpm build:circuits                              # default: --preset insecure-512 --committee micro
+pnpm build:circuits --preset secure-8192 --committee large
+pnpm check:committee                             # verify active.nr, utils.ts, parity files agree
+./scripts/lint-circuits.sh                       # nargo fmt --check && nargo check (lib + bin areas)
+./scripts/test-circuits.sh                       # nargo test on circuits/lib
+```
+
+**Preset** (`insecure-512` | `secure-8192`) selects the BFV parameter set; **committee** (`micro` |
+`small` | `medium` | `large`) selects `(N, T, H)` for secret sharing. Always switch committee via
+`pnpm build:circuits --committee <name>` — see
+[`scripts/README.md`](https://github.com/gnosisguild/enclave/blob/main/scripts/README.md#circuit-builder)
+and
+[`circuits/benchmarks/README.md`](https://github.com/gnosisguild/enclave/blob/main/circuits/benchmarks/README.md).
+
+Generate per-circuit witness/config artifacts with `zk_cli` (must pass matching `--committee`):
+
+```bash
+cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk-generation --preset insecure --committee large --toml
 ```
 
 `lint-circuits.sh` and `test-circuits.sh` exit successfully when **nargo** is missing so
