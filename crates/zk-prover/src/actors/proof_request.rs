@@ -16,8 +16,8 @@ use e3_events::{
     ComputeRequestError, ComputeRequestErrorKind, ComputeResponse, ComputeResponseKind,
     CorrelationId, DKGInnerProofReady, DecryptionKeyShared, DecryptionShareProofSigned,
     DecryptionShareProofsPending, DecryptionshareCreated, DkgProofSigned, E3Failed, E3Stage, E3id,
-    EnclaveEvent, EnclaveEventData, EncryptionKeyCreated, EncryptionKeyPending, EventContext,
-    EventPublisher, EventSubscriber, EventType, FailureReason, PkAggregationProofPending,
+    EncryptionKeyCreated, EncryptionKeyPending, EventContext, EventPublisher, EventSubscriber,
+    EventType, FailureReason, InterfoldEvent, InterfoldEventData, PkAggregationProofPending,
     PkAggregationProofSigned, PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload,
     ProofType, ProofVerificationPassed, Sequenced, ShareDecryptionProofPending, SignedProofPayload,
     ThresholdShareCreated, ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
@@ -1210,35 +1210,35 @@ impl Actor for ProofRequestActor {
     type Context = Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for ProofRequestActor {
+impl Handler<InterfoldEvent> for ProofRequestActor {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
 
         match msg {
-            EnclaveEventData::EncryptionKeyPending(data) => {
+            InterfoldEventData::EncryptionKeyPending(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ThresholdSharePending(data) => {
+            InterfoldEventData::ThresholdSharePending(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeResponse(data) => {
+            InterfoldEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeRequestError(data) => {
+            InterfoldEventData::ComputeRequestError(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::DecryptionShareProofsPending(data) => {
+            InterfoldEventData::DecryptionShareProofsPending(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ShareDecryptionProofPending(data) => {
+            InterfoldEventData::ShareDecryptionProofPending(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::PkAggregationProofPending(data) => {
+            InterfoldEventData::PkAggregationProofPending(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::AggregationProofPending(data) => {
+            InterfoldEventData::AggregationProofPending(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),
@@ -1354,12 +1354,14 @@ mod tests {
     use e3_test_helpers::get_common_setup;
     use e3_utils::utility_types::ArcBytes;
 
-    fn test_ctx(data: impl Into<EnclaveEventData>) -> EventContext<Sequenced> {
+    fn test_ctx(data: impl Into<InterfoldEventData>) -> EventContext<Sequenced> {
         EventContext::<Unsequenced>::from(data.into()).sequence(0)
     }
 
-    async fn next_event(history: &Addr<HistoryCollector<EnclaveEvent>>) -> Result<EnclaveEvent> {
-        let mut result = history.send(TakeEvents::<EnclaveEvent>::new(1)).await?;
+    async fn next_event(
+        history: &Addr<HistoryCollector<InterfoldEvent>>,
+    ) -> Result<InterfoldEvent> {
+        let mut result = history.send(TakeEvents::<InterfoldEvent>::new(1)).await?;
         assert!(!result.timed_out, "timed out waiting for an event");
         Ok(result.events.pop().expect("expected one event"))
     }
@@ -1402,7 +1404,7 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
                     && data.reason == FailureReason::DKGInvalidShares
@@ -1431,7 +1433,7 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == e3_id
                     && data.failed_at_stage == E3Stage::CiphertextReady
                     && data.reason == FailureReason::DecryptionInvalidShares

@@ -40,7 +40,7 @@ fn get_remote_commit_hash() -> Option<String> {
     let output = Command::new("git")
         .args([
             "ls-remote",
-            "https://github.com/gnosisguild/enclave",
+            "https://github.com/gnosisguild/interfold",
             "refs/heads/main",
         ])
         .output()
@@ -71,7 +71,7 @@ fn generate_contract_deployments() -> std::io::Result<()> {
         .join("..")
         .join("..")
         .join("packages")
-        .join("enclave-contracts")
+        .join("interfold-contracts")
         .join("deployed_contracts.json");
 
     let mut contract_info = String::from(
@@ -121,6 +121,6 @@ fn generate_contract_deployments() -> std::io::Result<()> {
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("contract_deployments.rs");
     fs::write(dest_path, contract_info)?;
-    println!("cargo:rerun-if-changed=../../packages/enclave-contracts/deployed_contracts.json");
+    println!("cargo:rerun-if-changed=../../packages/interfold-contracts/deployed_contracts.json");
     Ok(())
 }

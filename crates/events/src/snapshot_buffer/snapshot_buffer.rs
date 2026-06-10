@@ -8,7 +8,7 @@ use super::{
     timelock_queue::{Clock, StartTimelock, SystemClock, Tick, TimelockQueue},
     AggregateConfig,
 };
-use crate::{EnclaveEvent, Insert, InsertBatch};
+use crate::{Insert, InsertBatch, InterfoldEvent};
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Result;
 use e3_utils::MAILBOX_LIMIT;
@@ -132,9 +132,9 @@ impl Handler<Insert> for SnapshotBuffer {
     }
 }
 
-impl Handler<EnclaveEvent> for SnapshotBuffer {
+impl Handler<InterfoldEvent> for SnapshotBuffer {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, _ctx: &mut Self::Context) -> Self::Result {
         if let Some(ref router) = self.router {
             router.do_send(msg);
         }
@@ -200,8 +200,8 @@ mod tests {
     use super::{mock_store, SnapshotBuffer};
     use crate::snapshot_buffer::timelock_queue::Tick;
     use crate::{
-        AggregateConfig, AggregateId, E3id, EnclaveEvent, EventContext, EventContextAccessors,
-        EventContextSeq, EventId, EventSource, Insert, InsertBatch, Sequenced, Shutdown, SyncEnded,
+        AggregateConfig, AggregateId, E3id, EventContext, EventContextAccessors, EventContextSeq,
+        EventId, EventSource, Insert, InsertBatch, InterfoldEvent, Sequenced, Shutdown, SyncEnded,
         TestEvent,
     };
     use actix::Actor;
@@ -223,8 +223,8 @@ mod tests {
         .sequence(seq)
     }
 
-    fn create_event(ec: &EventContext<Sequenced>) -> EnclaveEvent {
-        EnclaveEvent::<Sequenced>::from_data_ec(
+    fn create_event(ec: &EventContext<Sequenced>) -> InterfoldEvent {
+        InterfoldEvent::<Sequenced>::from_data_ec(
             TestEvent::new("hello", ec.seq())
                 .with_e3_id(E3id::new("1", *ec.aggregate_id() as u64))
                 .into(),
@@ -248,7 +248,7 @@ mod tests {
             SnapshotBuffer::with_clock(config, store.clone(), clock.clone(), None)?;
 
         buffer
-            .send(EnclaveEvent::from_data_ec(
+            .send(InterfoldEvent::from_data_ec(
                 SyncEnded::new().into(),
                 create_ec(0, 9),
             ))
@@ -258,7 +258,7 @@ mod tests {
         timelock.send(Tick).await?;
 
         let ec = create_ec(23, 10);
-        let enclave_10 = create_event(&ec);
+        let interfold_10 = create_event(&ec);
 
         let inserts_10 = [
             Insert::new_with_context("one", b"one".to_vec(), ec.clone()),
@@ -266,7 +266,7 @@ mod tests {
         ];
 
         let ec = create_ec(1, 11);
-        let enclave_11 = create_event(&ec);
+        let interfold_11 = create_event(&ec);
 
         let inserts_11 = [
             Insert::new_with_context("one", b"one".to_vec(), ec.clone()),
@@ -274,10 +274,10 @@ mod tests {
         ];
 
         let ec = create_ec(0, 12);
-        let enclave_12 = create_event(&ec);
+        let interfold_12 = create_event(&ec);
 
         // send event 10
-        buffer.send(enclave_10).await?;
+        buffer.send(interfold_10).await?;
 
         info!("TimelockQueue should hold all seq=9 inserts");
         timelock.send(Tick).await?;
@@ -287,7 +287,7 @@ mod tests {
 
         // send event 11
         info!("Sending event seq=11 this should start the timelock for all the seq=10 inserts");
-        buffer.send(enclave_11).await?;
+        buffer.send(interfold_11).await?;
 
         // send a late insert for 10
         buffer.send(inserts_10[1].clone()).await?;
@@ -298,7 +298,7 @@ mod tests {
 
         // send event 12
         info!("Sending event seq=12 this should start the timelock for all the seq=11 inserts");
-        buffer.send(enclave_12).await?;
+        buffer.send(interfold_12).await?;
 
         // Nothing happens as there has not been enough delay
         info!("Clock=1020 : Checking for events but there should be nothing that has flushed...");
@@ -356,7 +356,7 @@ mod tests {
 
         // Turn the buffer on (opens a batch for seq=1).
         buffer
-            .send(EnclaveEvent::from_data_ec(
+            .send(InterfoldEvent::from_data_ec(
                 SyncEnded::new().into(),
                 create_ec(0, 1),
             ))
@@ -376,7 +376,10 @@ mod tests {
 
         // Shutdown arrives: every open batch must be force-flushed.
         buffer
-            .send(EnclaveEvent::from_data_ec(Shutdown.into(), create_ec(7, 3)))
+            .send(InterfoldEvent::from_data_ec(
+                Shutdown.into(),
+                create_ec(7, 3),
+            ))
             .await?;
 
         let batches = store.send(GetEvts).await?;

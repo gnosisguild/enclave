@@ -280,6 +280,6 @@
   "test_exit_code": {
     "crisp": 1,
     "folded_export": 0,
-    "enclave_contracts": 0
+    "interfold_contracts": 0
   }
 }

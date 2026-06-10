@@ -4,14 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Pure translation of `CiphernodeRegistry.sol` logs into `EnclaveEventData`.
+//! Pure translation of `CiphernodeRegistry.sol` logs into `InterfoldEventData`.
 
 use crate::contracts::ICiphernodeRegistry;
 use alloy::{
     primitives::{LogData, B256},
     sol_types::SolEvent,
 };
-use e3_events::{CommitteeFinalized, E3id, EnclaveEventData, Seed};
+use e3_events::{CommitteeFinalized, E3id, InterfoldEventData, Seed};
 use tracing::{error, info, trace};
 
 struct CiphernodeAddedWithChainId(pub ICiphernodeRegistry::CiphernodeAdded, pub u64);
@@ -36,10 +36,10 @@ impl From<CiphernodeAddedWithChainId> for e3_events::CiphernodeAdded {
     }
 }
 
-impl From<CiphernodeAddedWithChainId> for EnclaveEventData {
+impl From<CiphernodeAddedWithChainId> for InterfoldEventData {
     fn from(value: CiphernodeAddedWithChainId) -> Self {
         let payload: e3_events::CiphernodeAdded = value.into();
-        EnclaveEventData::from(payload)
+        InterfoldEventData::from(payload)
     }
 }
 
@@ -64,10 +64,10 @@ impl From<CiphernodeRemovedWithChainId> for e3_events::CiphernodeRemoved {
     }
 }
 
-impl From<CiphernodeRemovedWithChainId> for EnclaveEventData {
+impl From<CiphernodeRemovedWithChainId> for InterfoldEventData {
     fn from(value: CiphernodeRemovedWithChainId) -> Self {
         let payload: e3_events::CiphernodeRemoved = value.into();
-        EnclaveEventData::from(payload)
+        InterfoldEventData::from(payload)
     }
 }
 
@@ -86,10 +86,10 @@ impl From<CommitteeRequestedWithChainId> for e3_events::CommitteeRequested {
     }
 }
 
-impl From<CommitteeRequestedWithChainId> for EnclaveEventData {
+impl From<CommitteeRequestedWithChainId> for InterfoldEventData {
     fn from(value: CommitteeRequestedWithChainId) -> Self {
         let payload: e3_events::CommitteeRequested = value.into();
-        EnclaveEventData::from(payload)
+        InterfoldEventData::from(payload)
     }
 }
 
@@ -116,10 +116,10 @@ impl From<CommitteeFinalizedWithChainId> for CommitteeFinalized {
     }
 }
 
-impl From<CommitteeFinalizedWithChainId> for EnclaveEventData {
+impl From<CommitteeFinalizedWithChainId> for InterfoldEventData {
     fn from(value: CommitteeFinalizedWithChainId) -> Self {
         let payload: e3_events::CommitteeFinalized = value.into();
-        EnclaveEventData::from(payload)
+        InterfoldEventData::from(payload)
     }
 }
 
@@ -137,10 +137,10 @@ impl From<TicketSubmittedWithChainId> for e3_events::TicketSubmitted {
     }
 }
 
-impl From<TicketSubmittedWithChainId> for EnclaveEventData {
+impl From<TicketSubmittedWithChainId> for InterfoldEventData {
     fn from(value: TicketSubmittedWithChainId) -> Self {
         let payload: e3_events::TicketSubmitted = value.into();
-        EnclaveEventData::from(payload)
+        InterfoldEventData::from(payload)
     }
 }
 
@@ -161,10 +161,10 @@ impl From<CommitteeMemberExpelledWithChainId> for e3_events::CommitteeMemberExpe
     }
 }
 
-impl From<CommitteeMemberExpelledWithChainId> for EnclaveEventData {
+impl From<CommitteeMemberExpelledWithChainId> for InterfoldEventData {
     fn from(value: CommitteeMemberExpelledWithChainId) -> Self {
         let payload: e3_events::CommitteeMemberExpelled = value.into();
-        EnclaveEventData::from(payload)
+        InterfoldEventData::from(payload)
     }
 }
 
@@ -172,14 +172,14 @@ pub(crate) fn extractor(
     data: &LogData,
     topics: &[B256],
     chain_id: u64,
-) -> Option<EnclaveEventData> {
+) -> Option<InterfoldEventData> {
     match topics.first() {
         Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {
             let Ok(event) = ICiphernodeRegistry::CiphernodeAdded::decode_log_data(data) else {
                 error!("Error parsing event CiphernodeAdded after topic was matched!");
                 return None;
             };
-            Some(EnclaveEventData::from(CiphernodeAddedWithChainId(
+            Some(InterfoldEventData::from(CiphernodeAddedWithChainId(
                 event, chain_id,
             )))
         }
@@ -188,7 +188,7 @@ pub(crate) fn extractor(
                 error!("Error parsing event CiphernodeRemoved after topic was matched!");
                 return None;
             };
-            Some(EnclaveEventData::from(CiphernodeRemovedWithChainId(
+            Some(InterfoldEventData::from(CiphernodeRemovedWithChainId(
                 event, chain_id,
             )))
         }
@@ -197,7 +197,7 @@ pub(crate) fn extractor(
                 error!("Error parsing event CommitteeRequested after topic was matched!");
                 return None;
             };
-            Some(EnclaveEventData::from(CommitteeRequestedWithChainId(
+            Some(InterfoldEventData::from(CommitteeRequestedWithChainId(
                 event, chain_id,
             )))
         }
@@ -207,7 +207,7 @@ pub(crate) fn extractor(
                 error!("Error parsing event SortitionCommitteeFinalized after topic was matched!");
                 return None;
             };
-            Some(EnclaveEventData::from(CommitteeFinalizedWithChainId(
+            Some(InterfoldEventData::from(CommitteeFinalizedWithChainId(
                 event, chain_id,
             )))
         }
@@ -216,7 +216,7 @@ pub(crate) fn extractor(
                 error!("Error parsing event TicketSubmitted after topic was matched!");
                 return None;
             };
-            Some(EnclaveEventData::from(TicketSubmittedWithChainId(
+            Some(InterfoldEventData::from(TicketSubmittedWithChainId(
                 event, chain_id,
             )))
         }
@@ -230,9 +230,9 @@ pub(crate) fn extractor(
                 "CommitteeMemberExpelled event received: e3_id={}, node={}, reason={:?}, active_count_after={}",
                 event.e3Id, event.node, event.reason, event.activeCountAfter
             );
-            Some(EnclaveEventData::from(CommitteeMemberExpelledWithChainId(
-                event, chain_id,
-            )))
+            Some(InterfoldEventData::from(
+                CommitteeMemberExpelledWithChainId(event, chain_id),
+            ))
         }
         _ => {
             trace!(
@@ -264,7 +264,7 @@ mod tests {
             10,
         );
         match out {
-            Some(EnclaveEventData::CiphernodeAdded(data)) => {
+            Some(InterfoldEventData::CiphernodeAdded(data)) => {
                 assert_eq!(data.index, 2);
                 assert_eq!(data.num_nodes, 5);
                 assert_eq!(data.chain_id, 10);

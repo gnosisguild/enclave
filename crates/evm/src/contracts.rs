@@ -15,12 +15,12 @@
 
 use alloy::sol;
 
-// ── IEnclave ───────────────────────────────────────────────────────────────
+// ── IInterfold ───────────────────────────────────────────────────────────────
 
 sol! {
     #[sol(rpc)]
     #[derive(Debug)]
-    interface IEnclave {
+    interface IInterfold {
         struct E3 {
             uint256 seed;
             uint8 committeeSize;

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_events::{E3Stage, E3id, EnclaveEvent, EnclaveEventData, Event};
+use e3_events::{E3Stage, E3id, Event, InterfoldEvent, InterfoldEventData};
 use std::collections::HashSet;
 
 /// The completion action a router should perform *after* running extension hooks and
@@ -38,14 +38,14 @@ pub enum RoutingDecision {
 
 /// Pure routing logic for the E3 request router.
 ///
-/// Classifies an incoming [`EnclaveEvent`] into a [`RoutingDecision`] based purely on the
+/// Classifies an incoming [`InterfoldEvent`] into a [`RoutingDecision`] based purely on the
 /// event data and the set of already-completed requests. This contains no actix, persistence
 /// or I/O concerns so it can be unit tested in isolation; the actor executes the decision.
 pub struct RequestRouter;
 
 impl RequestRouter {
     /// Decide how an incoming event should be routed given the set of completed requests.
-    pub fn route(msg: &EnclaveEvent, completed: &HashSet<E3id>) -> RoutingDecision {
+    pub fn route(msg: &InterfoldEvent, completed: &HashSet<E3id>) -> RoutingDecision {
         // Broadcast non-E3-scoped lifecycle signals to every active context:
         //   * `Shutdown` so children can tear themselves down, and
         //   * `EffectsEnabled` so a hydrated request can re-drive its own in-flight work
@@ -54,7 +54,7 @@ impl RequestRouter {
         // per-E3 child actors.
         if matches!(
             msg.get_data(),
-            EnclaveEventData::Shutdown(_) | EnclaveEventData::EffectsEnabled(_)
+            InterfoldEventData::Shutdown(_) | InterfoldEventData::EffectsEnabled(_)
         ) {
             return RoutingDecision::Broadcast;
         }
@@ -70,14 +70,14 @@ impl RequestRouter {
             // should be silently ignored rather than treated as an error.
             let is_late_terminal = match msg.get_data() {
                 // E3StageChanged(Complete) always lags local PlaintextAggregated completion.
-                EnclaveEventData::E3StageChanged(data)
+                InterfoldEventData::E3StageChanged(data)
                     if matches!(data.new_stage, E3Stage::Complete | E3Stage::Failed) =>
                 {
                     true
                 }
                 // E3Failed from on-chain markE3Failed may arrive after a local timeout already
                 // cleaned up the context.
-                EnclaveEventData::E3Failed(data) if data.reason.is_timeout() => true,
+                InterfoldEventData::E3Failed(data) if data.reason.is_timeout() => true,
                 _ => false,
             };
             if is_late_terminal {
@@ -89,8 +89,8 @@ impl RequestRouter {
         let post_forward = match msg.get_data() {
             // Receiving the PlaintextAggregated event means the request is complete and we can
             // notify everyone. This might change as we consider other completion factors.
-            EnclaveEventData::PlaintextAggregated(_) => PostForward::PublishComplete,
-            EnclaveEventData::E3StageChanged(data)
+            InterfoldEventData::PlaintextAggregated(_) => PostForward::PublishComplete,
+            InterfoldEventData::E3StageChanged(data)
                 if matches!(data.new_stage, E3Stage::Complete) =>
             {
                 PostForward::PublishComplete
@@ -98,10 +98,10 @@ impl RequestRouter {
             // Timeout failures have no accusation/slashing lifecycle, so the context can be
             // torn down immediately. Misbehaviour failures (DKGInvalidShares, etc.) still need
             // the accusation/slashing lifecycle to complete before teardown.
-            EnclaveEventData::E3Failed(data) if data.reason.is_timeout() => {
+            InterfoldEventData::E3Failed(data) if data.reason.is_timeout() => {
                 PostForward::PublishComplete
             }
-            EnclaveEventData::E3RequestComplete(_) => PostForward::Teardown,
+            InterfoldEventData::E3RequestComplete(_) => PostForward::Teardown,
             _ => PostForward::None,
         };
 
@@ -116,7 +116,7 @@ impl RequestRouter {
 mod tests {
     use super::*;
     use e3_events::{
-        E3Failed, E3RequestComplete, E3Stage, E3StageChanged, EnclaveEvent, FailureReason,
+        E3Failed, E3RequestComplete, E3Stage, E3StageChanged, FailureReason, InterfoldEvent,
         PlaintextAggregated, Sequenced, Shutdown,
     };
 
@@ -124,15 +124,15 @@ mod tests {
         E3id::new("1", 1)
     }
 
-    fn with_e3_id(label: &str, id: E3id) -> EnclaveEvent {
-        EnclaveEvent::<Sequenced>::test_event(label)
+    fn with_e3_id(label: &str, id: E3id) -> InterfoldEvent {
+        InterfoldEvent::<Sequenced>::test_event(label)
             .e3_id(id)
             .seq(1)
             .build()
     }
 
-    fn from_data(data: impl Into<EnclaveEventData>) -> EnclaveEvent {
-        EnclaveEvent::<Sequenced>::test_event("x")
+    fn from_data(data: impl Into<InterfoldEventData>) -> InterfoldEvent {
+        InterfoldEvent::<Sequenced>::test_event("x")
             .data(data)
             .seq(1)
             .build()
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn event_without_e3_id_is_ignored() {
-        let msg = EnclaveEvent::<Sequenced>::test_event("no-id")
+        let msg = InterfoldEvent::<Sequenced>::test_event("no-id")
             .seq(1)
             .build();
         assert_eq!(
@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn e3_request_complete_triggers_teardown() {
-        // EnclaveEventData::get_e3_id() now returns Some(e3_id) for E3RequestComplete,
+        // InterfoldEventData::get_e3_id() now returns Some(e3_id) for E3RequestComplete,
         // so the event reaches the Teardown arm of the router.
         let id = e3id();
         let msg = from_data(E3RequestComplete { e3_id: id.clone() });
@@ -299,7 +299,7 @@ mod tests {
 
     // --- timeout-triggered E3Failed tests ---
 
-    fn e3_failed(id: E3id, reason: FailureReason) -> EnclaveEvent {
+    fn e3_failed(id: E3id, reason: FailureReason) -> InterfoldEvent {
         from_data(E3Failed {
             e3_id: id,
             failed_at_stage: E3Stage::CommitteeFinalized,

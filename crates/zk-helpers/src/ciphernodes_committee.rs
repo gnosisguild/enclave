@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 /// @todo this must be integrated inside Ciphernodes & Smart Contract
 /// instead of being a separate type in here. The pvss crate should import this and
-/// the default values that must be used and shared among the whole enclave repository.
+/// the default values that must be used and shared among the whole interfold repository.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CiphernodesCommitteeSize {
     /// Tiny committee size (for quick local testing with production parameters).
@@ -43,7 +43,7 @@ impl CiphernodesCommitteeSize {
             (1, 3) => Ok(Self::Micro),
             (2, 5) => Ok(Self::Small),
             (4, 10) => Ok(Self::Medium),
-            (7, 20) => Ok(Self::Large),
+            (9, 20) => Ok(Self::Large),
             _ => bail!(
                 "Unknown committee size for threshold ({}, {})",
                 threshold_m,
@@ -95,7 +95,7 @@ impl CiphernodesCommitteeSize {
             CiphernodesCommitteeSize::Large => CiphernodesCommittee {
                 n: 20,
                 h: 15,
-                threshold: 7,
+                threshold: 9,
             },
         }
     }

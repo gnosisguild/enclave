@@ -4,14 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Pure translation of `SlashingManager.sol` logs into `EnclaveEventData`.
+//! Pure translation of `SlashingManager.sol` logs into `InterfoldEventData`.
 
 use crate::contracts::ISlashingManager;
 use alloy::{
     primitives::{LogData, B256, U256},
     sol_types::SolEvent,
 };
-use e3_events::{E3id, EnclaveEventData};
+use e3_events::{E3id, InterfoldEventData};
 use tracing::{error, info, trace};
 
 /// Convert a U256 to u128, returning None if the value overflows.
@@ -27,7 +27,7 @@ pub(crate) fn extractor(
     data: &LogData,
     topics: &[B256],
     chain_id: u64,
-) -> Option<EnclaveEventData> {
+) -> Option<InterfoldEventData> {
     match topics.first() {
         Some(&ISlashingManager::SlashExecuted::SIGNATURE_HASH) => {
             let Ok(event) = ISlashingManager::SlashExecuted::decode_log_data(data) else {
@@ -38,7 +38,7 @@ pub(crate) fn extractor(
                 "SlashExecuted event received: proposal_id={}, e3_id={}, operator={}, reason={:?}, ticket={}, license={}",
                 event.proposalId, event.e3Id, event.operator, event.reason, event.ticketAmount, event.licenseAmount
             );
-            Some(EnclaveEventData::from(e3_events::SlashExecuted {
+            Some(InterfoldEventData::from(e3_events::SlashExecuted {
                 e3_id: E3id::new(event.e3Id.to_string(), chain_id),
                 proposal_id: match safe_u256_to_u128(event.proposalId) {
                     Some(v) => v,

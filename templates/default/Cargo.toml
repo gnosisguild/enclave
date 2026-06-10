@@ -2,7 +2,7 @@
 resolver = "3"
 members = [
   "program",
-  ".enclave/support/dev"
+  ".interfold/support/dev"
 ]
 
 [workspace.dependencies]

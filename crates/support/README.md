@@ -8,8 +8,8 @@ proof request to Boundless, and sends the result back via webhook callback.
 ```mermaid
 graph TD
     subgraph N["e3-support-scripts"]
-        A["enclave program start"]
-        AA["./.enclave/support/ctl/start"]
+        A["interfold program start"]
+        AA["./.interfold/support/ctl/start"]
         A --> AA
     end
     M["E3 instigator (CRISP server)"] --"POST /run_compute (with callback_url)"--> D
@@ -78,9 +78,9 @@ This matches the format expected by CRISP and `E3ProgramServer` in `crates/progr
 3. **Pinata account** — for IPFS program uploads (get a JWT at https://pinata.cloud)
 4. **Boundless wallet** — an Ethereum private key with ETH (for gas) and ZKC (for collateral) on the
    Boundless-supported chain
-5. **Enclave CLI** — `cargo install --locked --path ./crates/cli --bin enclave -f`
+5. **Interfold CLI** — `cargo install --locked --path ./crates/cli --bin interfold -f`
 
-### Step 1: Configure `enclave.config.yaml`
+### Step 1: Configure `interfold.config.yaml`
 
 ```yaml
 program:
@@ -105,7 +105,7 @@ program:
 ### Step 2: Compile the RISC Zero Guest Program
 
 ```bash
-enclave program compile
+interfold program compile
 ```
 
 This builds the guest ELF binary inside the Docker container. Output goes to
@@ -114,21 +114,21 @@ This builds the guest ELF binary inside the Docker container. Output goes to
 ### Step 3: Upload Program to IPFS (Pinata)
 
 ```bash
-enclave program upload
+interfold program upload
 ```
 
 This uploads the compiled guest ELF to Pinata IPFS and caches the resulting URL at
-`./target/.program_url`. Copy this URL into your `enclave.config.yaml` as
+`./target/.program_url`. Copy this URL into your `interfold.config.yaml` as
 `program.risc0.boundless.program_url` to avoid re-uploading the program at runtime.
 
-### Step 4: Deploy Enclave Contracts + Start Ciphernodes
+### Step 4: Deploy Interfold Contracts + Start Ciphernodes
 
 ```bash
 # Deploy contracts to local Hardhat / testnet
 pnpm evm:deploy
 
 # Start the ciphernode network
-enclave start
+interfold start
 ```
 
 This boots the ciphernodes, which listen for E3 requests, perform DKG, and await ciphertext outputs.
@@ -136,7 +136,7 @@ This boots the ciphernodes, which listen for E3 requests, perform DKG, and await
 ### Step 5: Start the Program Server (Boundless-backed)
 
 ```bash
-enclave program start
+interfold program start
 ```
 
 This starts the Docker container running `e3-support-app` on port 13151. If Boundless config is
@@ -147,8 +147,8 @@ present, it will submit proofs to the Boundless market. Otherwise it falls back 
 The E3 request is submitted on-chain by the instigator (e.g., CRISP coordination server):
 
 ```solidity
-// On-chain: Enclave.request(params)
-enclave.request(E3RequestParams({
+// On-chain: Interfold.request(params)
+interfold.request(E3RequestParams({
     threshold: [M, N],
     inputWindow: [start, end],
     e3Program: crispProgramAddress,
@@ -195,7 +195,7 @@ The program server:
 The callback server (e.g., CRISP) receives the webhook and calls:
 
 ```solidity
-enclave.publishCiphertextOutput(e3Id, ciphertextOutput, proof);
+interfold.publishCiphertextOutput(e3Id, ciphertextOutput, proof);
 ```
 
 This transitions the E3 stage to `CiphertextReady`.
@@ -210,7 +210,7 @@ rewards distributed.
 
 ## Boundless Offer Parameters
 
-All parameters are configurable via environment variables (or `enclave.config.yaml`). Defaults:
+All parameters are configurable via environment variables (or `interfold.config.yaml`). Defaults:
 
 | Parameter    | Env Var                         | Default   | Description                  |
 | ------------ | ------------------------------- | --------- | ---------------------------- |
@@ -221,7 +221,7 @@ All parameters are configurable via environment variables (or `enclave.config.ya
 | Ramp-up      | `BOUNDLESS_RAMP_UP_SECS`        | `60`      | Price ramp-up period (sec)   |
 | Collateral   | `BOUNDLESS_LOCK_COLLATERAL_ZKC` | `2.0`     | ZKC locked per request       |
 
-These can also be set in `enclave.config.yaml` under `program.risc0.boundless`:
+These can also be set in `interfold.config.yaml` under `program.risc0.boundless`:
 
 ```yaml
 boundless:

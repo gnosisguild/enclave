@@ -7,7 +7,7 @@
 //! Pure reorg-safety primitive for EVM ingestion.
 //!
 //! The local event log is append-only and has no truncation primitive, so once
-//! a chain log is promoted to an `EnclaveEvent` and folded into state it cannot
+//! a chain log is promoted to an `InterfoldEvent` and folded into state it cannot
 //! be cleanly un-applied. The only sound defence against a chain reorg is
 //! therefore *prevention*: do not ingest a log until it is buried under enough
 //! confirmations that a reorg of that depth is infeasible.

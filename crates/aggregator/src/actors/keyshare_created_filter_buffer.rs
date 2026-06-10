@@ -6,7 +6,7 @@
 
 use actix::prelude::*;
 
-use e3_events::{prelude::*, AggregatorChanged, Die, EnclaveEvent, EnclaveEventData};
+use e3_events::{prelude::*, AggregatorChanged, Die, InterfoldEvent, InterfoldEventData};
 use e3_utils::MAILBOX_LIMIT;
 use std::collections::HashSet;
 use tracing::info;
@@ -17,7 +17,7 @@ use crate::PublicKeyAggregator;
 pub struct KeyshareCreatedFilterBuffer {
     dest: Addr<PublicKeyAggregator>,
     committee: Option<HashSet<String>>,
-    buffer: Vec<EnclaveEvent>,
+    buffer: Vec<InterfoldEvent>,
     expelled_nodes: HashSet<String>,
     is_aggregator: bool,
 }
@@ -41,16 +41,18 @@ impl KeyshareCreatedFilterBuffer {
         if let Some(ref committee) = self.committee {
             for event in self.buffer.drain(..) {
                 match event.get_data() {
-                    EnclaveEventData::KeyshareCreated(data)
+                    InterfoldEventData::KeyshareCreated(data)
                         if committee.contains(&data.node)
                             && !self.expelled_nodes.contains(&data.node) =>
                     {
                         self.dest.do_send(event);
                     }
-                    EnclaveEventData::CommitteeMemberExpelled(data) if data.party_id.is_none() => {
+                    InterfoldEventData::CommitteeMemberExpelled(data)
+                        if data.party_id.is_none() =>
+                    {
                         self.dest.do_send(event);
                     }
-                    EnclaveEventData::E3RequestComplete(_) | EnclaveEventData::Shutdown(_) => {
+                    InterfoldEventData::E3RequestComplete(_) | InterfoldEventData::Shutdown(_) => {
                         self.dest.do_send(event);
                     }
                     _ => {}
@@ -67,12 +69,12 @@ impl Actor for KeyshareCreatedFilterBuffer {
     }
 }
 
-impl Handler<EnclaveEvent> for KeyshareCreatedFilterBuffer {
+impl Handler<InterfoldEvent> for KeyshareCreatedFilterBuffer {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, _ctx: &mut Self::Context) -> Self::Result {
         match msg.get_data() {
-            EnclaveEventData::KeyshareCreated(data) => match &self.committee {
+            InterfoldEventData::KeyshareCreated(data) => match &self.committee {
                 Some(committee)
                     if self.is_aggregator
                         && committee.contains(&data.node)
@@ -91,11 +93,11 @@ impl Handler<EnclaveEvent> for KeyshareCreatedFilterBuffer {
                 }
                 _ => {}
             },
-            EnclaveEventData::CommitteeFinalized(data) => {
+            InterfoldEventData::CommitteeFinalized(data) => {
                 self.committee = Some(data.committee.iter().cloned().collect());
                 self.process_buffered_events();
             }
-            EnclaveEventData::CommitteeMemberExpelled(data) => {
+            InterfoldEventData::CommitteeMemberExpelled(data) => {
                 if data.party_id.is_some() {
                     return;
                 }
@@ -105,7 +107,7 @@ impl Handler<EnclaveEvent> for KeyshareCreatedFilterBuffer {
                 self.buffer.retain(|event| {
                     !matches!(
                         event.get_data(),
-                        EnclaveEventData::KeyshareCreated(share) if share.node == node_addr
+                        InterfoldEventData::KeyshareCreated(share) if share.node == node_addr
                     )
                 });
 
@@ -123,11 +125,11 @@ impl Handler<EnclaveEvent> for KeyshareCreatedFilterBuffer {
                     self.buffer.push(msg);
                 }
             }
-            EnclaveEventData::AggregatorChanged(AggregatorChanged { is_aggregator, .. }) => {
+            InterfoldEventData::AggregatorChanged(AggregatorChanged { is_aggregator, .. }) => {
                 self.is_aggregator = *is_aggregator;
                 self.process_buffered_events();
             }
-            EnclaveEventData::E3RequestComplete(_) | EnclaveEventData::Shutdown(_) => {
+            InterfoldEventData::E3RequestComplete(_) | InterfoldEventData::Shutdown(_) => {
                 self.dest.do_send(msg);
             }
             _ => {

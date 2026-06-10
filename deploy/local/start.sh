@@ -23,7 +23,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CRISP_ROOT="$REPO_ROOT/examples/CRISP"
 TMUX_SESSION="crisp-dev"
-READYFILE="$CRISP_ROOT/.enclave/ready"
+READYFILE="$CRISP_ROOT/.interfold/ready"
 
 # ── Node configuration ──────────────────────────────────────────────────────
 # Anvil test accounts #1–#5 (deterministic from the standard mnemonic)
@@ -89,10 +89,10 @@ check_deps() {
     fi
     ok "Core dependencies found (pnpm, anvil)"
 
-    # cargo is only needed if we have to install the enclave CLI.
-    # check_deps runs before install_enclave, so only warn here.
+    # cargo is only needed if we have to install the interfold CLI.
+    # check_deps runs before install_interfold, so only warn here.
     if ! command_exists cargo; then
-        warn "cargo not found — enclave CLI must be pre-installed (e.g. 'which enclave')"
+        warn "cargo not found — interfold CLI must be pre-installed (e.g. 'which interfold')"
     fi
 
     if ! command_exists tmux; then
@@ -104,28 +104,28 @@ check_deps() {
     return 0
 }
 
-# ── Install enclave CLI ─────────────────────────────────────────────────────
-install_enclave() {
-    if command_exists enclave; then
-        info "enclave CLI already installed ($(which enclave))"
+# ── Install interfold CLI ─────────────────────────────────────────────────────
+install_interfold() {
+    if command_exists interfold; then
+        info "interfold CLI already installed ($(which interfold))"
         return 0
     fi
     if ! command_exists cargo; then
-        err "enclave CLI not found and cargo is not available to install it."
-        err "Install Rust (https://rustup.rs) or pre-install the enclave binary."
+        err "interfold CLI not found and cargo is not available to install it."
+        err "Install Rust (https://rustup.rs) or pre-install the interfold binary."
         exit 1
     fi
-    step "Installing enclave CLI..."
+    step "Installing interfold CLI..."
     cd "$REPO_ROOT"
-    cargo install --locked --path ./crates/cli --bin enclave -f
-    ok "enclave CLI installed"
+    cargo install --locked --path ./crates/cli --bin interfold -f
+    ok "interfold CLI installed"
 }
 
 # ── Clean previous state ────────────────────────────────────────────────────
 clean_state() {
     step "Cleaning previous dev state..."
-    rm -rf "$CRISP_ROOT/.enclave/data"
-    rm -rf "$CRISP_ROOT/.enclave/config"
+    rm -rf "$CRISP_ROOT/.interfold/data"
+    rm -rf "$CRISP_ROOT/.interfold/config"
     rm -rf "$CRISP_ROOT/server/database"
     rm -f "$READYFILE"
     ok "Dev state cleaned"
@@ -146,12 +146,12 @@ setup_nodes() {
     # 1. Import wallet keys
     for i in "${!NODE_IDS[@]}"; do
         info "Importing wallet for ${NODE_IDS[$i]}..."
-        enclave wallet set --name "${NODE_IDS[$i]}" --private-key "${NODE_KEYS[$i]}"
+        interfold wallet set --name "${NODE_IDS[$i]}" --private-key "${NODE_KEYS[$i]}"
     done
 
     # 2. Generate ZK keys (noir setup)
-    info "Running enclave noir setup..."
-    enclave noir setup
+    info "Running interfold noir setup..."
+    interfold noir setup
 
     # 3. Register all ciphernodes in the on-chain registry
     for i in "${!NODE_IDS[@]}"; do
@@ -190,7 +190,7 @@ launch_tmux() {
     ok "Signal file created: /tmp/crisp-dev-daemon-ready"
     # ── Start the swarm daemon (no nodes yet — we start each individually)
     step "Starting swarm daemon (detached, all nodes excluded)..."
-    enclave nodes up --detach --exclude cn1,cn2,cn3,cn4,cn5
+    interfold nodes up --detach --exclude cn1,cn2,cn3,cn4,cn5
     sleep 3
     ok "Swarm daemon running"
 
@@ -198,7 +198,7 @@ launch_tmux() {
     local win=1
     for id in "${NODE_IDS[@]}"; do
         tmux new-window -t "$TMUX_SESSION" -n "$id" -c "$CRISP_ROOT" \
-            "enclave nodes start $id; echo '[${id} exited — press Enter to close]'; read"
+            "interfold nodes start $id; echo '[${id} exited — press Enter to close]'; read"
         info "Window $win: $id"
         win=$((win + 1))
     done
@@ -296,7 +296,7 @@ main() {
 
     check_deps && HAS_TMUX=true || HAS_TMUX=false
 
-    install_enclave
+    install_interfold
     clean_state
 
     if $HAS_TMUX; then

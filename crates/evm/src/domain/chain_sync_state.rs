@@ -15,12 +15,12 @@ use std::mem::take;
 
 use crate::messages::HistoricalSyncComplete;
 use anyhow::{bail, Result};
-use e3_events::{EnclaveEvent, Unsequenced};
+use e3_events::{InterfoldEvent, Unsequenced};
 
 #[derive(Clone, Debug)]
 pub(crate) struct ForwardToSyncActorData<S> {
     pub(crate) sender: Option<S>,
-    pub(crate) buffer: Vec<EnclaveEvent<Unsequenced>>,
+    pub(crate) buffer: Vec<InterfoldEvent<Unsequenced>>,
 }
 
 impl<S> Default for ForwardToSyncActorData<S> {
@@ -33,7 +33,7 @@ impl<S> Default for ForwardToSyncActorData<S> {
 }
 
 impl<S> ForwardToSyncActorData<S> {
-    pub(crate) fn add_event(&mut self, event: EnclaveEvent<Unsequenced>) {
+    pub(crate) fn add_event(&mut self, event: InterfoldEvent<Unsequenced>) {
         self.buffer.push(event);
     }
 }
@@ -43,14 +43,14 @@ impl<S> ForwardToSyncActorData<S> {
 pub(crate) enum SyncStatus<S> {
     /// Buffers events until `HistoricalEvmSyncStart` arrives.
     Init {
-        buffer: Vec<EnclaveEvent<Unsequenced>>,
+        buffer: Vec<InterfoldEvent<Unsequenced>>,
         pending_sync_complete: Option<HistoricalSyncComplete>,
     },
     /// Forward events to the sync actor for ordering.
     ForwardToSyncActor(ForwardToSyncActorData<S>),
     /// Once the chain has completed historical sync then we buffer all "live"
     /// events until sync is complete.
-    BufferUntilLive(Vec<EnclaveEvent<Unsequenced>>),
+    BufferUntilLive(Vec<InterfoldEvent<Unsequenced>>),
     /// Forward all events directly to the bus.
     Live,
 }
@@ -69,7 +69,7 @@ impl<S: std::fmt::Debug> SyncStatus<S> {
         &mut self,
         sender: S,
     ) -> Result<(
-        Vec<EnclaveEvent<Unsequenced>>,
+        Vec<InterfoldEvent<Unsequenced>>,
         Option<HistoricalSyncComplete>,
     )> {
         let Self::Init {
@@ -105,7 +105,7 @@ impl<S: std::fmt::Debug> SyncStatus<S> {
         Ok(state_data)
     }
 
-    pub(crate) fn live(&mut self) -> Result<Vec<EnclaveEvent<Unsequenced>>> {
+    pub(crate) fn live(&mut self) -> Result<Vec<InterfoldEvent<Unsequenced>>> {
         let Self::BufferUntilLive(buffer) = self else {
             bail!("Cannot change state to Live when state is {:?}", self);
         };

@@ -4,14 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Pure translation of `BondingRegistry.sol` logs into `EnclaveEventData`.
+//! Pure translation of `BondingRegistry.sol` logs into `InterfoldEventData`.
 
 use crate::contracts::IBondingRegistry;
 use alloy::{
     primitives::{LogData, B256},
     sol_types::SolEvent,
 };
-use e3_events::EnclaveEventData;
+use e3_events::InterfoldEventData;
 use tracing::{error, trace};
 
 struct TicketBalanceUpdatedWithChainId(pub IBondingRegistry::TicketBalanceUpdated, pub u64);
@@ -28,7 +28,7 @@ impl From<TicketBalanceUpdatedWithChainId> for e3_events::TicketBalanceUpdated {
     }
 }
 
-impl From<TicketBalanceUpdatedWithChainId> for EnclaveEventData {
+impl From<TicketBalanceUpdatedWithChainId> for InterfoldEventData {
     fn from(value: TicketBalanceUpdatedWithChainId) -> Self {
         let payload: e3_events::TicketBalanceUpdated = value.into();
         Self::from(payload)
@@ -58,7 +58,7 @@ impl From<ConfigurationUpdatedWithChainId> for e3_events::ConfigurationUpdated {
     }
 }
 
-impl From<ConfigurationUpdatedWithChainId> for EnclaveEventData {
+impl From<ConfigurationUpdatedWithChainId> for InterfoldEventData {
     fn from(value: ConfigurationUpdatedWithChainId) -> Self {
         let payload: e3_events::ConfigurationUpdated = value.into();
         Self::from(payload)
@@ -80,7 +80,7 @@ impl From<OperatorActivationChangedWithChainId> for e3_events::OperatorActivatio
     }
 }
 
-impl From<OperatorActivationChangedWithChainId> for EnclaveEventData {
+impl From<OperatorActivationChangedWithChainId> for InterfoldEventData {
     fn from(value: OperatorActivationChangedWithChainId) -> Self {
         let payload: e3_events::OperatorActivationChanged = value.into();
         Self::from(payload)
@@ -91,14 +91,14 @@ pub(crate) fn extractor(
     data: &LogData,
     topics: &[B256],
     chain_id: u64,
-) -> Option<EnclaveEventData> {
+) -> Option<InterfoldEventData> {
     match topics.first() {
         Some(&IBondingRegistry::TicketBalanceUpdated::SIGNATURE_HASH) => {
             let Ok(event) = IBondingRegistry::TicketBalanceUpdated::decode_log_data(data) else {
                 error!("Error parsing event TicketBalanceUpdated after topic was matched!");
                 return None;
             };
-            Some(EnclaveEventData::from(TicketBalanceUpdatedWithChainId(
+            Some(InterfoldEventData::from(TicketBalanceUpdatedWithChainId(
                 event, chain_id,
             )))
         }
@@ -108,7 +108,7 @@ pub(crate) fn extractor(
                 error!("Error parsing event OperatorActivationChanged after topic was matched!");
                 return None;
             };
-            Some(EnclaveEventData::from(
+            Some(InterfoldEventData::from(
                 OperatorActivationChangedWithChainId(event, chain_id),
             ))
         }
@@ -117,7 +117,7 @@ pub(crate) fn extractor(
                 error!("Error parsing event ConfigurationUpdated after topic was matched!");
                 return None;
             };
-            Some(EnclaveEventData::from(ConfigurationUpdatedWithChainId(
+            Some(InterfoldEventData::from(ConfigurationUpdatedWithChainId(
                 event, chain_id,
             )))
         }
@@ -149,7 +149,7 @@ mod tests {
             55,
         );
         match out {
-            Some(EnclaveEventData::OperatorActivationChanged(data)) => {
+            Some(InterfoldEventData::OperatorActivationChanged(data)) => {
                 assert!(data.active);
                 assert_eq!(data.chain_id, 55);
             }

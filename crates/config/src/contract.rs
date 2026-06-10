@@ -43,7 +43,7 @@ impl Contract {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ContractAddresses {
-    pub enclave: Contract,
+    pub interfold: Contract,
     pub ciphernode_registry: Contract,
     pub bonding_registry: Contract,
     pub e3_program: Option<Contract>,
@@ -55,7 +55,7 @@ pub struct ContractAddresses {
 impl ContractAddresses {
     pub fn contracts(&self) -> Vec<&Contract> {
         [
-            Some(&self.enclave),
+            Some(&self.interfold),
             Some(&self.ciphernode_registry),
             Some(&self.bonding_registry),
             self.e3_program.as_ref(),

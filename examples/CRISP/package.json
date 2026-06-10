@@ -34,7 +34,7 @@
     "setup:testnet": "bash ./scripts/setup_testnet.sh"
   },
   "devDependencies": {
-    "@enclave-e3/config": "^0",
+    "@interfold/config": "^0",
     "eslint": "^9.39.1",
     "@playwright/test": "1.52.0",
     "@synthetixio/synpress": "^4.1.0",

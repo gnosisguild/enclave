@@ -8,5 +8,5 @@
     "arm64-linux": "626d4b2b7c0895d9d4f1b6c74941685c14420f4c4d208fa19be670f486788fb7",
     "arm64-darwin": "7c9c3fd4a9a3bfe0541eaf99a1cd0eb60fb366353ac108b2d07bbe73beb0fcb0"
   },
-  "circuits_download_url": "https://github.com/gnosisguild/enclave/releases/download/v{version}/circuits-{version}.tar.gz"
+  "circuits_download_url": "https://github.com/gnosisguild/interfold/releases/download/v{version}/circuits-{version}.tar.gz"
 }

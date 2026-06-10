@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sync packages/enclave-contracts/test/fixtures/bfv_vk_binding/folded_artifacts.json
+# Sync packages/interfold-contracts/test/fixtures/bfv_vk_binding/folded_artifacts.json
 # from circuits/benchmarks/results_insecure_agg/integration_summary.json (.folded_artifacts).
 
 set -euo pipefail
@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 INTEGRATION_JSON="${1:-${REPO_ROOT}/circuits/benchmarks/results_insecure_agg/integration_summary.json}"
-FIXTURE="${REPO_ROOT}/packages/enclave-contracts/test/fixtures/bfv_vk_binding/folded_artifacts.json"
+FIXTURE="${REPO_ROOT}/packages/interfold-contracts/test/fixtures/bfv_vk_binding/folded_artifacts.json"
 
 if [ ! -f "${INTEGRATION_JSON}" ]; then
     echo "Skipping BFV VK binding fixture sync: ${INTEGRATION_JSON} not found"

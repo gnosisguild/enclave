@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! EVM integration for Enclave.
+//! EVM integration for Interfold.
 //!
 //! - [`domain`] holds pure, synchronous, unit-testable services (no actix /
 //!   `BusHandle` / provider types in their cores).

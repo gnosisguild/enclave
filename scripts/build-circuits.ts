@@ -69,7 +69,7 @@ interface BuildOptions {
   preset?: CircuitPreset | 'all'
   /** Active committee size — drives `committee/active.nr` and verifier H/T. Pass `'all'` to build every committee. */
   committee?: CircuitCommittee | 'all'
-  /** Skip writing BFV_DKG_H/T into `packages/enclave-contracts/scripts/utils.ts`. */
+  /** Skip writing BFV_DKG_H/T into `packages/interfold-contracts/scripts/utils.ts`. */
   skipUtilsPatch?: boolean
 }
 
@@ -245,7 +245,7 @@ class NoirCircuitBuilder {
   }
 
   /**
-   * Patch `packages/enclave-contracts/scripts/utils.ts` so `BFV_DKG_H` and `BFV_THRESHOLD_T`
+   * Patch `packages/interfold-contracts/scripts/utils.ts` so `BFV_DKG_H` and `BFV_THRESHOLD_T`
    * track the active committee. The gas-benchmark and verifier-deploy scripts pull from this
    * file at runtime, so any mismatch between the compiled circuit and the deployed verifier
    * surfaces as `InvalidPublicInputsLength()` on-chain.
@@ -253,7 +253,7 @@ class NoirCircuitBuilder {
   private patchUtilsTs(committee: CircuitCommittee): void {
     if (this.options.skipUtilsPatch) return
     const { h, t, n } = COMMITTEE_PARAMS[committee]
-    const path = join(this.rootDir, 'packages', 'enclave-contracts', 'scripts', 'utils.ts')
+    const path = join(this.rootDir, 'packages', 'interfold-contracts', 'scripts', 'utils.ts')
     if (!existsSync(path)) return // optional in minimal checkouts
     const before = readFileSync(path, 'utf-8')
     const cap = committee.charAt(0).toUpperCase() + committee.slice(1)
@@ -323,7 +323,7 @@ class NoirCircuitBuilder {
   /**
    * Records which BFV preset + committee last populated `circuits/bin/`. Read by:
    * - the benchmark gas-extraction pipeline (`scripts/benchmarkGasFromRaw.ts`)
-   * - the Rust integration tests (cross-checked against `ENCLAVE_COMMITTEE_SIZE`).
+   * - the Rust integration tests (cross-checked against `INTERFOLD_COMMITTEE_SIZE`).
    * A drift between this stamp and what the consumer expects fails fast.
    */
   private writeActiveBinPresetStamp(preset: string, sourceHash: string): void {
@@ -829,8 +829,8 @@ class NoirCircuitBuilder {
     try {
       const content = readFileSync(jsonFile, 'utf-8')
       const sanitized = content
-        .replace(/"path"\s*:\s*"[^"]*[/\\](enclave[/\\]circuits[/\\][^"]+)"/g, '"path":"$1"')
-        .replace(/"path"\s*:\s*"(?:\/[^"]*|[A-Za-z]:\\[^"]*)[/\\](circuits[/\\][^"]+)"/g, '"path":"enclave/$1"')
+        .replace(/"path"\s*:\s*"[^"]*[/\\](interfold[/\\]circuits[/\\][^"]+)"/g, '"path":"$1"')
+        .replace(/"path"\s*:\s*"(?:\/[^"]*|[A-Za-z]:\\[^"]*)[/\\](circuits[/\\][^"]+)"/g, '"path":"interfold/$1"')
       if (content !== sanitized) writeFileSync(jsonFile, sanitized)
     } catch {
       // Ignore errors
@@ -1064,7 +1064,7 @@ Options:
   --circuit <name>    Build specific circuit(s)
   --preset <preset>   Parameter preset: insecure-512 (default), secure-8192, or all
   --committee <name>  Committee size: micro (default), small, medium, large, or all
-  --skip-utils-patch  Don't rewrite BFV_DKG_H/T in packages/enclave-contracts/scripts/utils.ts
+  --skip-utils-patch  Don't rewrite BFV_DKG_H/T in packages/interfold-contracts/scripts/utils.ts
   --skip-vk           Skip verification key generation
   --skip-checksums    Skip checksum generation
   -o, --output <dir>  Output directory (default: dist/circuits)

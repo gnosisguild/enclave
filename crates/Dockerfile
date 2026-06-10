@@ -2,10 +2,10 @@ FROM node:22 AS evm-builder
 
 WORKDIR /build
 COPY crates/wasm/package.json ./crates/wasm/package.json
-COPY packages/enclave-react ./packages/enclave-react
-COPY packages/enclave-sdk ./packages/enclave-sdk
-COPY packages/enclave-config ./packages/enclave-config
-COPY packages/enclave-contracts ./packages/enclave-contracts
+COPY packages/interfold-react ./packages/interfold-react
+COPY packages/interfold-sdk ./packages/interfold-sdk
+COPY packages/interfold-config ./packages/interfold-config
+COPY packages/interfold-contracts ./packages/interfold-contracts
 COPY package.json .
 COPY pnpm-workspace.yaml .
 COPY pnpm-lock.yaml .
@@ -14,7 +14,7 @@ RUN npm install -g corepack
 RUN corepack enable
 
 # We just need the contracts to be compiled here
-RUN cd packages/enclave-contracts && pnpm install && pnpm compile:contracts
+RUN cd packages/interfold-contracts && pnpm install && pnpm compile:contracts
 
 # Build stage
 FROM rust:1.91 AS ciphernode-builder
@@ -39,8 +39,8 @@ COPY Cargo.toml ./Cargo.toml
 COPY ./rust-toolchain.toml .
 
 WORKDIR /build/crates
-COPY --from=evm-builder /build/packages/enclave-contracts/artifacts ../packages/enclave-contracts/artifacts
-COPY --from=evm-builder /build/packages/enclave-contracts/deployed_contracts.json ../packages/enclave-contracts/deployed_contracts.json
+COPY --from=evm-builder /build/packages/interfold-contracts/artifacts ../packages/interfold-contracts/artifacts
+COPY --from=evm-builder /build/packages/interfold-contracts/deployed_contracts.json ../packages/interfold-contracts/deployed_contracts.json
 
 # find crates/* -name "Cargo.toml" -not -path "*/support/*" -printf "COPY %p %p\n" | sed 's|COPY \(.*\) crates/|COPY \1 ./|'
 COPY crates/aggregator/Cargo.toml ./aggregator/Cargo.toml
@@ -53,7 +53,7 @@ COPY crates/config/Cargo.toml ./config/Cargo.toml
 COPY crates/console/Cargo.toml ./console/Cargo.toml
 COPY crates/crypto/Cargo.toml ./crypto/Cargo.toml
 COPY crates/data/Cargo.toml ./data/Cargo.toml
-COPY crates/enclaveup/Cargo.toml ./enclaveup/Cargo.toml
+COPY crates/interfoldup/Cargo.toml ./interfoldup/Cargo.toml
 COPY crates/entrypoint/Cargo.toml ./entrypoint/Cargo.toml
 COPY crates/events/Cargo.toml ./events/Cargo.toml
 COPY crates/evm/Cargo.toml ./evm/Cargo.toml
@@ -94,7 +94,7 @@ RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./e
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./cli/build.rs
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
-          if [ "$d" = "./cli/" ] || [ "$d" = "./enclaveup/" ]; then \
+          if [ "$d" = "./cli/" ] || [ "$d" = "./interfoldup/" ]; then \
             mkdir -p "$d/src" && \
             echo "fn main() {}" > "$d/src/main.rs"; \
           elif [ "$d" = "./utils-derive/" ]; then \
@@ -131,8 +131,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends iptables dnsuti
 RUN useradd -m -u 1000 -s /bin/bash ciphernode
 
 # Create necessary directories with proper permissions
-RUN mkdir -p /home/ciphernode/.config/enclave \
-    /home/ciphernode/.local/share/enclave \
+RUN mkdir -p /home/ciphernode/.config/interfold \
+    /home/ciphernode/.local/share/interfold \
     /run/secrets && \
     chown -R ciphernode:ciphernode /home/ciphernode /run/secrets
 
@@ -141,12 +141,12 @@ USER ciphernode
 WORKDIR /home/ciphernode
 
 # Copy binary from builder
-COPY --from=ciphernode-builder --chown=ciphernode:ciphernode /build/target/release/enclave /usr/local/bin/
+COPY --from=ciphernode-builder --chown=ciphernode:ciphernode /build/target/release/interfold /usr/local/bin/
 COPY --from=ciphernode-builder --chmod=755 --chown=ciphernode:ciphernode /build/crates/ciphernode-entrypoint.sh /usr/local/bin/
 
 # Environment variables for configuration
-ENV CONFIG_DIR=/home/ciphernode/.config/enclave
-ENV DATA_DIR=/home/ciphernode/.local/share/enclave
+ENV CONFIG_DIR=/home/ciphernode/.config/interfold
+ENV DATA_DIR=/home/ciphernode/.local/share/interfold
 
 # Add entrypoint script
 ENTRYPOINT ["ciphernode-entrypoint.sh"]

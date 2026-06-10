@@ -10,7 +10,7 @@
 #
 #   1. circuits/lib/src/configs/committee/active.nr  (Noir-side active committee)
 #   2. circuits/bin/.active-preset.json              (last `pnpm build:circuits` stamp)
-#   3. packages/enclave-contracts/scripts/utils.ts   (BFV_DKG_H / BFV_THRESHOLD_T)
+#   3. packages/interfold-contracts/scripts/utils.ts   (BFV_DKG_H / BFV_THRESHOLD_T)
 #   4. crates/zk-helpers/src/ciphernodes_committee.rs (committee enum values, single source)
 #
 # A drift between any two means the next `pnpm build:circuits` would silently produce
@@ -26,7 +26,7 @@ cd "$REPO_ROOT"
 
 ACTIVE_NR="circuits/lib/src/configs/committee/active.nr"
 STAMP="circuits/bin/.active-preset.json"
-UTILS_TS="packages/enclave-contracts/scripts/utils.ts"
+UTILS_TS="packages/interfold-contracts/scripts/utils.ts"
 COMMITTEE_RS="crates/zk-helpers/src/ciphernodes_committee.rs"
 RAN_STAMP_CHECK=false
 RAN_PARITY_CHECK=false

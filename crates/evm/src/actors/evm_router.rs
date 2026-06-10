@@ -4,14 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::messages::{EnclaveEvmEvent, EvmEventProcessor, EvmLog};
+use crate::messages::{EvmEventProcessor, EvmLog, InterfoldEvmEvent};
 use actix::{Actor, Handler};
 use alloy_primitives::Address;
 use e3_utils::MAILBOX_LIMIT;
 use std::collections::HashMap;
 use tracing::{debug, error, info};
 
-/// Directs EnclaveEvmEvent::Log events to the correct upstream processors. Drops all other event
+/// Directs InterfoldEvmEvent::Log events to the correct upstream processors. Drops all other event
 /// types
 pub struct EvmRouter {
     routing_table: HashMap<Address, EvmEventProcessor>,
@@ -54,12 +54,12 @@ impl Actor for EvmRouter {
     }
 }
 
-impl Handler<EnclaveEvmEvent> for EvmRouter {
+impl Handler<InterfoldEvmEvent> for EvmRouter {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvmEvent, _: &mut Self::Context) -> Self::Result {
         match msg.clone() {
             // Take all log events and route them
-            EnclaveEvmEvent::Log(EvmLog { log, .. }) => {
+            InterfoldEvmEvent::Log(EvmLog { log, .. }) => {
                 let address = log.address();
                 if let Some(dest) = self.routing_table.get(&address) {
                     debug!("Found address {address} in routing table forwarding to destination.");
@@ -101,9 +101,9 @@ mod tests {
         type Context = Context<Self>;
     }
 
-    impl Handler<EnclaveEvmEvent> for TestProcessor {
+    impl Handler<InterfoldEvmEvent> for TestProcessor {
         type Result = ();
-        fn handle(&mut self, _msg: EnclaveEvmEvent, _ctx: &mut Self::Context) {
+        fn handle(&mut self, _msg: InterfoldEvmEvent, _ctx: &mut Self::Context) {
             self.0.fetch_add(1, Ordering::SeqCst);
         }
     }
@@ -120,7 +120,7 @@ mod tests {
             .add_route(test_address, &processor_addr.recipient())
             .start();
 
-        router.do_send(EnclaveEvmEvent::Log(test_log));
+        router.do_send(InterfoldEvmEvent::Log(test_log));
 
         sleep(Duration::from_millis(10)).await;
 
@@ -141,7 +141,7 @@ mod tests {
             .add_route(router_addr, &processor_addr.recipient())
             .start();
 
-        router.do_send(EnclaveEvmEvent::Log(test_log));
+        router.do_send(InterfoldEvmEvent::Log(test_log));
 
         sleep(Duration::from_millis(10)).await;
 

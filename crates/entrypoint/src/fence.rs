@@ -15,7 +15,7 @@
 //! instance fails fast with a clear, actionable message.
 //!
 //! The lock is an exclusive advisory lock (`flock`-style, via stable
-//! [`std::fs::File::try_lock`]) on a dedicated `enclave.lock` file in the node's
+//! [`std::fs::File::try_lock`]) on a dedicated `interfold.lock` file in the node's
 //! data directory. The OS releases the lock automatically when the holding
 //! process exits (gracefully, by crash, or by kill), so there is no stale-lock
 //! recovery problem: a crashed node's lock is immediately reacquirable.
@@ -31,7 +31,7 @@ use anyhow::{bail, Context, Result};
 use tracing::info;
 
 /// The lock-file name placed in the node's data directory.
-const LOCK_FILE_NAME: &str = "enclave.lock";
+const LOCK_FILE_NAME: &str = "interfold.lock";
 
 /// A held cross-host fence. While this value is alive the process holds an
 /// exclusive advisory lock on the node's data directory. Dropping it (on exit)
@@ -81,7 +81,7 @@ impl ProcessFence {
             Ok(()) => {}
             Err(std::fs::TryLockError::WouldBlock) => {
                 bail!(
-                    "another enclave instance is already running for node '{node_name}' \
+                    "another interfold instance is already running for node '{node_name}' \
                      against this data directory (lock held at {lock_path:?}). Refusing to \
                      start a second instance, which would double-sign and corrupt state. \
                      Stop the other instance first."
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn lock_path_is_sibling_of_db_dir() {
         let p = lock_path_for(Path::new("/data/node1/db"));
-        assert_eq!(p, PathBuf::from("/data/node1/enclave.lock"));
+        assert_eq!(p, PathBuf::from("/data/node1/interfold.lock"));
     }
 
     #[test]
