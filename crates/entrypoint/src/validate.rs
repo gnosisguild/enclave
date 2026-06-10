@@ -6,7 +6,7 @@
 
 //! Offline node-state validation.
 //!
-//! Backs the `enclave node validate` CLI command. It opens a node's persisted
+//! Backs the `interfold node validate` CLI command. It opens a node's persisted
 //! stores **read-only** (no actors, no network, no chain writes) and answers the
 //! operator question: *"Is my on-disk state intact, internally consistent, free
 //! of loose ends, and will this binary be able to load it after an upgrade?"*
@@ -37,8 +37,8 @@ use e3_ciphernode_builder::global_eventstore_cache::EventStoreReader;
 use e3_config::AppConfig;
 use e3_data::Repositories;
 use e3_events::{
-    AggregateId, CorrelationId, E3Stage, EnclaveEvent, EnclaveEventData, Event,
-    EventContextAccessors, EventContextSeq, EventStoreQueryBy, EventStoreQueryResponse, SeqAgg,
+    AggregateId, CorrelationId, E3Stage, Event, EventContextAccessors, EventContextSeq,
+    EventStoreQueryBy, EventStoreQueryResponse, InterfoldEvent, InterfoldEventData, SeqAgg,
 };
 use e3_sortition::{committee_key, NodeRegistry, NodeStateRepositoryFactory, NodeStateStore};
 use e3_sync::SyncRepositoryFactory;
@@ -127,7 +127,7 @@ impl ValidationReport {
     /// Render the report as human-readable text.
     pub fn render(&self) -> String {
         let mut out = String::new();
-        out.push_str("Enclave node validation report\n");
+        out.push_str("Interfold node validation report\n");
         out.push_str("==============================\n");
         for c in &self.checks {
             out.push_str(&format!(
@@ -404,16 +404,16 @@ fn find_orphaned_committees(
 /// Mirrors the terminal-release dispatch in the `Sortition` actor: an E3 is
 /// terminal on `PlaintextOutputPublished`, `E3Failed`, or `E3StageChanged` to
 /// `Complete`/`Failed`.
-fn collect_terminal_keys(events: &[EnclaveEvent], out: &mut HashSet<String>) {
+fn collect_terminal_keys(events: &[InterfoldEvent], out: &mut HashSet<String>) {
     for event in events {
         match event.get_data() {
-            EnclaveEventData::PlaintextOutputPublished(d) => {
+            InterfoldEventData::PlaintextOutputPublished(d) => {
                 out.insert(committee_key(&d.e3_id));
             }
-            EnclaveEventData::E3Failed(d) => {
+            InterfoldEventData::E3Failed(d) => {
                 out.insert(committee_key(&d.e3_id));
             }
-            EnclaveEventData::E3StageChanged(d)
+            InterfoldEventData::E3StageChanged(d)
                 if matches!(d.new_stage, E3Stage::Complete | E3Stage::Failed) =>
             {
                 out.insert(committee_key(&d.e3_id));
@@ -428,9 +428,9 @@ fn collect_terminal_keys(events: &[EnclaveEvent], out: &mut HashSet<String>) {
 async fn read_all_events(
     eventstore: &EventStoreReader,
     aggregate: AggregateId,
-) -> Result<Vec<EnclaveEvent>> {
+) -> Result<Vec<InterfoldEvent>> {
     const PAGE: u64 = 1024;
-    let mut all: Vec<EnclaveEvent> = Vec::new();
+    let mut all: Vec<InterfoldEvent> = Vec::new();
     let mut since: u64 = 0;
     loop {
         let (addr, rx) = actix_toolbox::oneshot::<EventStoreQueryResponse>();

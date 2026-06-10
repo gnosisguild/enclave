@@ -54,7 +54,7 @@ use tokio::{
 };
 use tracing::{debug, error, info, trace, warn};
 
-const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/enclave/kad/1.0.0");
+const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/interfold/kad/1.0.0");
 const MAX_KADEMLIA_PAYLOAD_MB: usize = 100;
 const MAX_KADEMLIA_RECORD_MB: usize = 25; // Largest record: ~21MB ThresholdShare with prod params
 const DHT_MAX_RECORDS: usize = 4096;
@@ -250,7 +250,7 @@ fn create_behaviour(
     let peer_id = key.public().to_peer_id();
     let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
     let identify = IdentifyBehaviour::new(
-        IdentifyConfig::new("/enclave/0.0.1".into(), key.public())
+        IdentifyConfig::new("/interfold/0.0.1".into(), key.public())
             .with_interval(Duration::from_secs(60)),
     );
 
@@ -270,7 +270,7 @@ fn create_behaviour(
 
     let request_response = cbor::Behaviour::<Vec<u8>, ProtocolResponse>::new(
         [(
-            StreamProtocol::new("/enclave/sync/0.0.1"),
+            StreamProtocol::new("/interfold/sync/0.0.1"),
             ProtocolSupport::Full,
         )],
         request_response_config,

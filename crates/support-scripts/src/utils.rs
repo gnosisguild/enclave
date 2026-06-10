@@ -41,7 +41,7 @@ pub async fn run_bash_script(cwd: &PathBuf, script: &Path, args: &[&str]) -> Res
 
 pub async fn ensure_script_exists(script_path: &PathBuf) -> Result<()> {
     if !fs::try_exists(script_path).await? {
-        bail!("Invalid or corrupted project. This command can only be run from within a valid Enclave project.");
+        bail!("Invalid or corrupted project. This command can only be run from within a valid Interfold project.");
     }
     Ok(())
 }

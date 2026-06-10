@@ -6,7 +6,7 @@
 
 //! Pure, actor-free E3 lifecycle tracking service.
 //!
-//! The Enclave node is choreographed: each subsystem reacts to protocol events
+//! The Interfold node is choreographed: each subsystem reacts to protocol events
 //! independently. Historically there was no single, durable source of truth for
 //! "what stage is this E3 at?". [`E3LifecycleService`] fills that gap. It is a
 //! pure observer over the lifecycle-bearing events on the bus: it maintains a
@@ -17,7 +17,7 @@
 //! protocol events or drive subsystems — the owning actor decides what to do
 //! with the [`LifecycleDecision`] (persist, log, surface invalid transitions).
 
-use e3_events::{E3Stage, E3id, EnclaveEventData};
+use e3_events::{E3Stage, E3id, InterfoldEventData};
 use std::collections::HashMap;
 
 /// Outcome of observing a single event.
@@ -63,25 +63,29 @@ fn is_terminal(stage: &E3Stage) -> bool {
 }
 
 /// Maps an event to the `(e3_id, stage)` it implies, if any.
-fn implied(event: &EnclaveEventData) -> Option<(E3id, E3Stage)> {
+fn implied(event: &InterfoldEventData) -> Option<(E3id, E3Stage)> {
     match event {
-        EnclaveEventData::E3Requested(d) => Some((d.e3_id.clone(), E3Stage::Requested)),
-        EnclaveEventData::CommitteePublished(d) => {
+        InterfoldEventData::E3Requested(d) => Some((d.e3_id.clone(), E3Stage::Requested)),
+        InterfoldEventData::CommitteePublished(d) => {
             Some((d.e3_id.clone(), E3Stage::CommitteeFinalized))
         }
-        EnclaveEventData::CommitteeFinalized(d) => {
+        InterfoldEventData::CommitteeFinalized(d) => {
             Some((d.e3_id.clone(), E3Stage::CommitteeFinalized))
         }
-        EnclaveEventData::PublicKeyAggregated(d) => Some((d.e3_id.clone(), E3Stage::KeyPublished)),
-        EnclaveEventData::CiphertextOutputPublished(d) => {
+        InterfoldEventData::PublicKeyAggregated(d) => {
+            Some((d.e3_id.clone(), E3Stage::KeyPublished))
+        }
+        InterfoldEventData::CiphertextOutputPublished(d) => {
             Some((d.e3_id.clone(), E3Stage::CiphertextReady))
         }
-        EnclaveEventData::PlaintextAggregated(d) => Some((d.e3_id.clone(), E3Stage::Complete)),
-        EnclaveEventData::PlaintextOutputPublished(d) => Some((d.e3_id.clone(), E3Stage::Complete)),
-        EnclaveEventData::E3RequestComplete(d) => Some((d.e3_id.clone(), E3Stage::Complete)),
-        EnclaveEventData::E3Failed(d) => Some((d.e3_id.clone(), E3Stage::Failed)),
+        InterfoldEventData::PlaintextAggregated(d) => Some((d.e3_id.clone(), E3Stage::Complete)),
+        InterfoldEventData::PlaintextOutputPublished(d) => {
+            Some((d.e3_id.clone(), E3Stage::Complete))
+        }
+        InterfoldEventData::E3RequestComplete(d) => Some((d.e3_id.clone(), E3Stage::Complete)),
+        InterfoldEventData::E3Failed(d) => Some((d.e3_id.clone(), E3Stage::Failed)),
         // `E3StageChanged` carries the authoritative stage directly.
-        EnclaveEventData::E3StageChanged(d) => Some((d.e3_id.clone(), d.new_stage.clone())),
+        InterfoldEventData::E3StageChanged(d) => Some((d.e3_id.clone(), d.new_stage.clone())),
         _ => None,
     }
 }
@@ -122,7 +126,7 @@ impl E3LifecycleService {
     }
 
     /// Observes an event and updates the tracked stage monotonically.
-    pub fn observe(&mut self, event: &EnclaveEventData) -> LifecycleDecision {
+    pub fn observe(&mut self, event: &InterfoldEventData) -> LifecycleDecision {
         let Some((e3_id, implied_stage)) = implied(event) else {
             return LifecycleDecision::NotLifecycle;
         };
@@ -175,23 +179,23 @@ mod tests {
         E3id::new(n, 1)
     }
 
-    fn requested(n: &str) -> EnclaveEventData {
-        EnclaveEventData::E3Requested(E3Requested {
+    fn requested(n: &str) -> InterfoldEventData {
+        InterfoldEventData::E3Requested(E3Requested {
             e3_id: id(n),
             ..Default::default()
         })
     }
 
-    fn stage_changed(n: &str, from: E3Stage, to: E3Stage) -> EnclaveEventData {
-        EnclaveEventData::E3StageChanged(E3StageChanged {
+    fn stage_changed(n: &str, from: E3Stage, to: E3Stage) -> InterfoldEventData {
+        InterfoldEventData::E3StageChanged(E3StageChanged {
             e3_id: id(n),
             previous_stage: from,
             new_stage: to,
         })
     }
 
-    fn failed(n: &str, stage: E3Stage) -> EnclaveEventData {
-        EnclaveEventData::E3Failed(E3Failed {
+    fn failed(n: &str, stage: E3Stage) -> InterfoldEventData {
+        InterfoldEventData::E3Failed(E3Failed {
             e3_id: id(n),
             failed_at_stage: stage,
             reason: FailureReason::DKGTimeout,
@@ -300,7 +304,7 @@ mod tests {
     #[test]
     fn non_lifecycle_event_is_ignored() {
         let mut svc = E3LifecycleService::new();
-        let d = svc.observe(&EnclaveEventData::Shutdown(e3_events::Shutdown));
+        let d = svc.observe(&InterfoldEventData::Shutdown(e3_events::Shutdown));
         assert_eq!(LifecycleDecision::NotLifecycle, d);
     }
 

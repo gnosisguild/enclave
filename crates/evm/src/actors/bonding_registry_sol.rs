@@ -9,7 +9,7 @@ use crate::domain::bonding_registry_events::extractor;
 use crate::messages::EvmEventProcessor;
 use actix::{Actor, Addr};
 
-/// Connects to BondingRegistry.sol converting EVM events to EnclaveEvents
+/// Connects to BondingRegistry.sol converting EVM events to InterfoldEvents
 pub struct BondingRegistrySolReader;
 impl BondingRegistrySolReader {
     pub fn setup(next: &EvmEventProcessor) -> Addr<EvmParser> {

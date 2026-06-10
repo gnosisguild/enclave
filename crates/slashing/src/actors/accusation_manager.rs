@@ -17,7 +17,7 @@
 //!
 //! This file is a **thin actix shell**. All protocol logic lives in the plain,
 //! synchronous [`AccusationVoting`] service ([`crate::accusation_voting`]). The
-//! actor's only job is to translate inbound [`EnclaveEvent`]s into service
+//! actor's only job is to translate inbound [`InterfoldEvent`]s into service
 //! calls and to perform the I/O ([`VoteAction`]s) the service returns —
 //! publishing gossip events, dispatching ZK requests, and managing vote
 //! timeouts.
@@ -44,9 +44,9 @@ use alloy::primitives::{Address, Bytes};
 use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
     AccusationVote, BusHandle, CommitmentConsistencyViolation, ComputeRequestError,
-    ComputeResponse, E3id, EnclaveEvent, EnclaveEventData, EventPublisher, EventSubscriber,
-    EventType, ProofFailureAccusation, ProofType, ProofVerificationFailed, ProofVerificationPassed,
-    TypedEvent,
+    ComputeResponse, E3id, EventPublisher, EventSubscriber, EventType, InterfoldEvent,
+    InterfoldEventData, ProofFailureAccusation, ProofType, ProofVerificationFailed,
+    ProofVerificationPassed, TypedEvent,
 };
 use e3_utils::NotifySync;
 use tracing::error;
@@ -306,34 +306,34 @@ impl Actor for AccusationManager {
     type Context = Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for AccusationManager {
+impl Handler<InterfoldEvent> for AccusationManager {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            EnclaveEventData::ProofVerificationFailed(data) => {
+            InterfoldEventData::ProofVerificationFailed(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ProofVerificationPassed(data) => {
+            InterfoldEventData::ProofVerificationPassed(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ProofFailureAccusation(data) => {
+            InterfoldEventData::ProofFailureAccusation(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::AccusationVote(data) => {
+            InterfoldEventData::AccusationVote(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeResponse(data) => {
+            InterfoldEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeRequestError(data) => {
+            InterfoldEventData::ComputeRequestError(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::SlashExecuted(data) => {
+            InterfoldEventData::SlashExecuted(data) => {
                 self.voting.on_slash_executed(data);
             }
-            EnclaveEventData::CommitmentConsistencyViolation(data) => {
+            InterfoldEventData::CommitmentConsistencyViolation(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),

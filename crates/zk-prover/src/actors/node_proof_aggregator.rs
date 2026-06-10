@@ -15,8 +15,8 @@ use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind,
     CorrelationId, DKGInnerProofReady, DKGRecursiveAggregationComplete, DkgFoldAttestationPayload,
-    E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EventContext, EventPublisher,
-    EventSubscriber, EventType, FailureReason, Proof, Sequenced, SignedDkgFoldAttestation,
+    E3Failed, E3Stage, E3id, EventContext, EventPublisher, EventSubscriber, EventType,
+    FailureReason, InterfoldEvent, InterfoldEventData, Proof, Sequenced, SignedDkgFoldAttestation,
     ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::build_pair_for_preset;
@@ -363,22 +363,22 @@ impl Actor for NodeProofAggregator {
     type Context = Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for NodeProofAggregator {
+impl Handler<InterfoldEvent> for NodeProofAggregator {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, _ctx: &mut Self::Context) -> Self::Result {
         let (data, ec) = msg.into_components();
         match data {
-            EnclaveEventData::ThresholdSharePending(data) => {
+            InterfoldEventData::ThresholdSharePending(data) => {
                 self.handle_threshold_share_pending(TypedEvent::new(data, ec));
             }
-            EnclaveEventData::DKGInnerProofReady(data) => {
+            InterfoldEventData::DKGInnerProofReady(data) => {
                 self.handle_inner_proof_ready(TypedEvent::new(data, ec));
             }
-            EnclaveEventData::ComputeResponse(data) => {
+            InterfoldEventData::ComputeResponse(data) => {
                 self.handle_compute_response(TypedEvent::new(data, ec));
             }
-            EnclaveEventData::ComputeRequestError(data) => {
+            InterfoldEventData::ComputeRequestError(data) => {
                 self.handle_compute_request_error(TypedEvent::new(data, ec));
             }
             _ => {}
@@ -501,7 +501,7 @@ mod tests {
     use e3_test_helpers::get_common_setup;
     use e3_zk_helpers::CiphernodesCommitteeSize;
 
-    fn test_ctx(data: impl Into<EnclaveEventData>) -> EventContext<Sequenced> {
+    fn test_ctx(data: impl Into<InterfoldEventData>) -> EventContext<Sequenced> {
         EventContext::<Unsequenced>::from(data.into()).sequence(0)
     }
 
@@ -519,8 +519,10 @@ mod tests {
         )
     }
 
-    async fn next_event(history: &Addr<HistoryCollector<EnclaveEvent>>) -> Result<EnclaveEvent> {
-        let mut result = history.send(TakeEvents::<EnclaveEvent>::new(1)).await?;
+    async fn next_event(
+        history: &Addr<HistoryCollector<InterfoldEvent>>,
+    ) -> Result<InterfoldEvent> {
+        let mut result = history.send(TakeEvents::<InterfoldEvent>::new(1)).await?;
         assert!(!result.timed_out, "timed out waiting for an event");
         Ok(result.events.pop().expect("expected one event"))
     }
@@ -599,7 +601,7 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
                     && data.reason == FailureReason::DKGInvalidShares
@@ -692,7 +694,7 @@ mod tests {
 
         let event = next_event(&history).await?;
         match event.into_data() {
-            EnclaveEventData::ComputeRequest(request) => {
+            InterfoldEventData::ComputeRequest(request) => {
                 assert_eq!(request.e3_id, e3_id);
                 match request.request {
                     ComputeRequestKind::Zk(ZkRequest::NodeDkgFold(fold_request)) => {

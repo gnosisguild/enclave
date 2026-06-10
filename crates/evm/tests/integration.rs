@@ -16,9 +16,9 @@ use alloy::{
 use anyhow::Result;
 use e3_ciphernode_builder::{EventSystem, EvmSystemChainBuilder};
 use e3_events::{
-    prelude::*, trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, EvmEventConfig,
-    EvmEventConfigChain, GetEvents, HistoricalEvmEventsReceived, HistoricalEvmSyncStart, SyncEnded,
-    TestEvent,
+    prelude::*, trap, BusHandle, EType, EvmEventConfig, EvmEventConfigChain, GetEvents,
+    HistoricalEvmEventsReceived, HistoricalEvmSyncStart, InterfoldEvent, InterfoldEventData,
+    SyncEnded, TestEvent,
 };
 use e3_evm::{helpers::EthProvider, EvmEventProcessor, EvmParser};
 use std::{sync::Arc, time::Duration};
@@ -34,7 +34,7 @@ fn test_event_extractor(
     data: &LogData,
     topics: &[FixedBytes<32>],
     _chain_id: u64,
-) -> Option<EnclaveEventData> {
+) -> Option<InterfoldEventData> {
     match topics.first() {
         Some(&EmitLogs::ValueChanged::SIGNATURE_HASH) => {
             let Ok(event) = EmitLogs::ValueChanged::decode_log_data(data) else {
@@ -146,13 +146,13 @@ async fn evm_reader() -> Result<()> {
     sleep(Duration::from_secs(1)).await;
 
     let history = history_collector
-        .send(GetEvents::<EnclaveEvent>::new())
+        .send(GetEvents::<InterfoldEvent>::new())
         .await?;
 
     let msgs: Vec<_> = history
         .into_iter()
         .filter_map(|evt| match evt.into_data() {
-            EnclaveEventData::TestEvent(data) => Some(data.msg),
+            InterfoldEventData::TestEvent(data) => Some(data.msg),
             _ => None,
         })
         .collect();
@@ -220,13 +220,13 @@ async fn ensure_historical_events() -> Result<()> {
     let expected: Vec<_> = historical_msgs.into_iter().chain(live_events).collect();
 
     let history = history_collector
-        .send(GetEvents::<EnclaveEvent>::new())
+        .send(GetEvents::<InterfoldEvent>::new())
         .await?;
 
     let msgs: Vec<_> = history
         .into_iter()
         .filter_map(|evt| match evt.into_data() {
-            EnclaveEventData::TestEvent(data) => Some(data.msg),
+            InterfoldEventData::TestEvent(data) => Some(data.msg),
             _ => None,
         })
         .collect();

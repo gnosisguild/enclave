@@ -4109,23 +4109,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "enclaveup"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "clap",
- "directories 6.0.0",
- "flate2",
- "futures-util",
- "indicatif 0.17.11",
- "reqwest",
- "serde",
- "serde_json",
- "tar",
- "tokio",
-]
-
-[[package]]
 name = "encode_unicode"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5438,6 +5421,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "interfoldup"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "directories 6.0.0",
+ "flate2",
+ "futures-util",
+ "indicatif 0.17.11",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tar",
+ "tokio",
 ]
 
 [[package]]

@@ -18,7 +18,7 @@ impl ProgramSupportApi for ProgramSupportRisc0 {
     /// Run the docker container compile script
     async fn compile(&self) -> Result<()> {
         let cwd = env::current_dir()?;
-        let script = cwd.join(".enclave/support/ctl/compile");
+        let script = cwd.join(".interfold/support/ctl/compile");
         ensure_script_exists(&script).await?;
         run_bash_script(&cwd, &script, &[]).await?;
         Ok(())
@@ -27,7 +27,7 @@ impl ProgramSupportApi for ProgramSupportRisc0 {
     /// Run the docker container start script
     async fn start(&self) -> Result<()> {
         let cwd = env::current_dir()?;
-        let script = cwd.join(".enclave/support/ctl/start");
+        let script = cwd.join(".interfold/support/ctl/start");
         ensure_script_exists(&script).await?;
 
         let Some(risc0_config) = self.0.risc0() else {
@@ -88,7 +88,7 @@ impl ProgramSupportApi for ProgramSupportRisc0 {
     /// Upload the compiled program to Pinata IPFS
     async fn upload(&self) -> Result<()> {
         let cwd = env::current_dir()?;
-        let script = cwd.join(".enclave/support/ctl/upload");
+        let script = cwd.join(".interfold/support/ctl/upload");
         ensure_script_exists(&script).await?;
 
         let mut args = vec![];

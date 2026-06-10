@@ -15,7 +15,9 @@ use crate::server::models::{
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
 use alloy::sol_types::SolValue;
-use e3_sdk::evm_helpers::contracts::{CommitteeSize, EnclaveContract, EnclaveRead, EnclaveWrite};
+use e3_sdk::evm_helpers::contracts::{
+    CommitteeSize, InterfoldContract, InterfoldRead, InterfoldWrite,
+};
 use log::{error, info};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
@@ -172,10 +174,10 @@ pub async fn initialize_crisp_round(
     );
 
     // Continue with the existing E3 initialization
-    let contract = EnclaveContract::new(
+    let contract = InterfoldContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
-        &CONFIG.enclave_address,
+        &CONFIG.interfold_address,
     )
     .await?;
     let e3_program: Address = CONFIG.e3_program_address.parse()?;

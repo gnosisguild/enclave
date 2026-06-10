@@ -12,7 +12,7 @@ use std::{fmt::Display, future::Future};
 
 use crate::{
     event_context::{AggregateId, EventContext},
-    EnclaveEvent, EventId, EventSource, EventType, Sequenced, Unsequenced,
+    EventId, EventSource, EventType, InterfoldEvent, Sequenced, Unsequenced,
 };
 
 /// Trait that must be implemented by events used with EventBus
@@ -176,9 +176,9 @@ pub trait SequenceIndex: Unpin + 'static {
 /// Store and retrieve events from a write ahead log
 pub trait EventLog: Unpin + 'static {
     /// Append an event to the log, returning its sequence number
-    fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64>;
+    fn append(&mut self, event: &InterfoldEvent<Unsequenced>) -> Result<u64>;
     /// Read all events starting from the given sequence number (inclusive)
-    fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>>;
+    fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, InterfoldEvent<Unsequenced>)>>;
     /// The 1-indexed sequence number of the last appended event, or `0` if the log is empty.
     fn head(&self) -> u64;
 }

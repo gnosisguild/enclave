@@ -10,7 +10,7 @@ use actix::{Message, Recipient};
 use alloy::rpc::types::Log;
 use anyhow::Result;
 use e3_events::{
-    BusHandle, CorrelationId, EnclaveEvent, EnclaveEventData, EventFactory, EventSource,
+    BusHandle, CorrelationId, EventFactory, EventSource, InterfoldEvent, InterfoldEventData,
     Unsequenced,
 };
 use serde::{Deserialize, Serialize};
@@ -41,7 +41,7 @@ impl HistoricalSyncComplete {
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct EvmEvent {
-    data: EnclaveEventData,
+    data: InterfoldEventData,
     block: u64,
     chain_id: u64,
     ts: u128,
@@ -51,7 +51,7 @@ pub struct EvmEvent {
 impl EvmEvent {
     pub fn new(
         id: CorrelationId,
-        data: EnclaveEventData,
+        data: InterfoldEventData,
         block: u64,
         ts: u128,
         chain_id: u64,
@@ -65,7 +65,7 @@ impl EvmEvent {
         }
     }
 
-    pub fn split(self) -> (EnclaveEventData, u128, u64) {
+    pub fn split(self) -> (InterfoldEventData, u128, u64) {
         (self.data, self.ts, self.block)
     }
 
@@ -81,7 +81,7 @@ impl EvmEvent {
         self.ts
     }
 
-    pub fn into_enclave_event(self, bus: &BusHandle) -> Result<EnclaveEvent<Unsequenced>> {
+    pub fn into_interfold_event(self, bus: &BusHandle) -> Result<InterfoldEvent<Unsequenced>> {
         let data = self.data;
         let ts = self.ts;
         bus.event_from_remote_source(data, None, ts, Some(self.block), EventSource::Evm)
@@ -90,7 +90,7 @@ impl EvmEvent {
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub enum EnclaveEvmEvent {
+pub enum InterfoldEvmEvent {
     /// Signal that this reader has completed historical sync
     HistoricalSyncComplete(HistoricalSyncComplete),
     /// An actual event from the blockchain
@@ -102,13 +102,13 @@ pub enum EnclaveEvmEvent {
     Processed(CorrelationId),
 }
 
-impl EnclaveEvmEvent {
+impl InterfoldEvmEvent {
     pub fn get_id(&self) -> CorrelationId {
         match self {
-            EnclaveEvmEvent::HistoricalSyncComplete(e) => e.get_id(),
-            EnclaveEvmEvent::Log(e) => e.get_id(),
-            EnclaveEvmEvent::Event(e) => e.get_id(),
-            EnclaveEvmEvent::Processed(id) => id.to_owned(),
+            InterfoldEvmEvent::HistoricalSyncComplete(e) => e.get_id(),
+            InterfoldEvmEvent::Log(e) => e.get_id(),
+            InterfoldEvmEvent::Event(e) => e.get_id(),
+            InterfoldEvmEvent::Processed(id) => id.to_owned(),
         }
     }
 }
@@ -159,4 +159,4 @@ impl EvmLog {
     }
 }
 
-pub type EvmEventProcessor = Recipient<EnclaveEvmEvent>;
+pub type EvmEventProcessor = Recipient<InterfoldEvmEvent>;

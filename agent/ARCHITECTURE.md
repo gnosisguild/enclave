@@ -1,4 +1,4 @@
-# Enclave Ciphernode — Architecture & Contribution Guide
+# Interfold Ciphernode — Architecture & Contribution Guide
 
 > Read this **before** writing or modifying any Rust code in `crates/`. It defines the canonical
 > structure, the actor/service pattern, and the rules that keep the architecture from drifting. Also
@@ -9,7 +9,7 @@
 ## 1. The Core Principle: Actors are Transport, Services are Logic
 
 The ciphernode is an [actix](https://docs.rs/actix) actor system wired around a central pub/sub
-`EventBus<EnclaveEvent>`. The single most important architectural rule:
+`EventBus<InterfoldEvent>`. The single most important architectural rule:
 
 > **Actors do message passing ONLY. ALL business logic lives in plain, sync, actor-free service
 > structs.**
@@ -35,12 +35,12 @@ belong in the service.
 ### The shape of a thin actor handler
 
 ```rust
-impl Handler<EnclaveEvent> for ThresholdKeyshare {
+impl Handler<InterfoldEvent> for ThresholdKeyshare {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) {
         let (data, ec) = msg.into_components();
         match data {
-            EnclaveEventData::E3Requested(d) => {
+            InterfoldEventData::E3Requested(d) => {
                 // 1. call pure service -> decision
                 let outcome = self.state_service.on_e3_requested(d);
                 // 2. apply decision (I/O only)
@@ -127,17 +127,17 @@ break.
 
 ## 3. Where to Make Specific Modifications
 
-| You want to…                                              | Edit here                                                                                               |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Add/change a protocol state transition or validation rule | `domain/<service>.rs` (a pure method + a decision enum variant)                                         |
-| React to a new event type                                 | The actor's `Handler<EnclaveEvent>` match arm → delegate to a service method                            |
-| Add a new persisted state                                 | New `Repository` factory in `repo.rs` + a `StoreKeys::<name>()` in `crates/events/src/store_keys.rs`    |
-| Add a new cross-actor event                               | New variant in `EnclaveEventData` + struct in `crates/events/src/enclave_event/` + `EventType` entry    |
-| Add a new actor                                           | New file in `actors/`, register in `actors/mod.rs`, give it an `attach()` ctor, subscribe it on the bus |
-| Add a timeout/timer                                       | Schedule in the actor via `ctx.run_later`; compute the _policy_ (when/why) in a pure service            |
-| Change DKG/proof/aggregation math                         | The relevant `domain/` service; update `agent/flow-trace/04_*.md` same change                           |
-| Change committee/sortition selection                      | `crates/sortition/src/domain/`; update flow-trace `03_*.md`                                             |
-| Track E3 lifecycle stage                                  | `crates/request/src/domain/lifecycle.rs` (pure) + `actors/lifecycle_coordinator.rs` (thin)              |
+| You want to…                                              | Edit here                                                                                                |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Add/change a protocol state transition or validation rule | `domain/<service>.rs` (a pure method + a decision enum variant)                                          |
+| React to a new event type                                 | The actor's `Handler<InterfoldEvent>` match arm → delegate to a service method                           |
+| Add a new persisted state                                 | New `Repository` factory in `repo.rs` + a `StoreKeys::<name>()` in `crates/events/src/store_keys.rs`     |
+| Add a new cross-actor event                               | New variant in `InterfoldEventData` + struct in `crates/events/src/interfold_event/` + `EventType` entry |
+| Add a new actor                                           | New file in `actors/`, register in `actors/mod.rs`, give it an `attach()` ctor, subscribe it on the bus  |
+| Add a timeout/timer                                       | Schedule in the actor via `ctx.run_later`; compute the _policy_ (when/why) in a pure service             |
+| Change DKG/proof/aggregation math                         | The relevant `domain/` service; update `agent/flow-trace/04_*.md` same change                            |
+| Change committee/sortition selection                      | `crates/sortition/src/domain/`; update flow-trace `03_*.md`                                              |
+| Track E3 lifecycle stage                                  | `crates/request/src/domain/lifecycle.rs` (pure) + `actors/lifecycle_coordinator.rs` (thin)               |
 
 ---
 
@@ -196,8 +196,8 @@ sync/replay. **Do not invent a fresh context** for a write that is caused by an 
 
 ### 4.4 Snapshot vs. EventStore — two persistence mechanisms
 
-1. **EventStore** (append-only): every `EnclaveEvent` is logged. On restart the log is **replayed**
-   (with side-effects disabled) to rebuild state.
+1. **EventStore** (append-only): every `InterfoldEvent` is logged. On restart the log is
+   **replayed** (with side-effects disabled) to rebuild state.
 2. **Snapshot / Repository KV**: actors persist their current state so replay can start from the
    last snapshot instead of genesis.
 
@@ -217,9 +217,9 @@ snapshot. This is why services are pure and transitions monotonic — see §6.
 
 ## 5. Events & The Bus
 
-- `EventBus<EnclaveEvent>` is the single pub/sub fabric. Actors subscribe via
+- `EventBus<InterfoldEvent>` is the single pub/sub fabric. Actors subscribe via
   `bus.subscribe(EventType::X, addr.into())` or `bus.subscribe_all(&[...], addr)`.
-- `EnclaveEvent` wraps `EnclaveEventData` (the variant enum) + an `EventContext`. Use
+- `InterfoldEvent` wraps `InterfoldEventData` (the variant enum) + an `EventContext`. Use
   `msg.into_components()` to get `(data, ec)`.
 - **Events are facts, not commands.** They describe what happened. An actor decides for itself how
   to react. Do not use events as RPC.
@@ -230,9 +230,9 @@ snapshot. This is why services are pure and transitions monotonic — see §6.
 
 ### Adding an event
 
-1. Add struct in `crates/events/src/enclave_event/<name>.rs` (derive
+1. Add struct in `crates/events/src/interfold_event/<name>.rs` (derive
    `Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize`).
-2. Add a variant to `EnclaveEventData` and an `EventType` entry in `enclave_event/mod.rs`.
+2. Add a variant to `InterfoldEventData` and an `EventType` entry in `interfold_event/mod.rs`.
 3. Re-export from `mod.rs`.
 4. If it carries an E3, ensure `get_e3_id()` returns it.
 5. Update the relevant flow-trace doc.
@@ -245,7 +245,7 @@ The node is **choreographed** — no component "drives" the protocol. To still h
 to "what stage is each E3 at?", `e3-request` provides:
 
 - `domain/lifecycle.rs` — pure `E3LifecycleService { stages: HashMap<E3id, E3Stage> }`.
-  - `observe(&EnclaveEventData) -> LifecycleDecision`
+  - `observe(&InterfoldEventData) -> LifecycleDecision`
   - Stage advance is **monotonic / forward-only** (ranked).
   - Terminal stages (`Complete`, `Failed`) are **frozen**.
   - Out-of-order earlier-stage events return `Regressed` and are ignored.
@@ -360,9 +360,9 @@ The workspace baseline is **not** clippy-clean; only enforce clippy-clean on the
 | Runtime      | `events`, `data`, `sync`, `net`, `config`, `logger`, `fs`, `hamt`                                          |
 | Node         | `ciphernode-builder`, `entrypoint`, `cli`, `daemon-server`, `console`, `init`, `dashboard`                 |
 | Clients      | `sdk`, `wasm`, `program-server`                                                                            |
-| Tooling      | `enclaveup`, `utils`, `utils-derive`, `test-helpers`, `support`, `scripts`, `tests`                        |
+| Tooling      | `interfoldup`, `utils`, `utils-derive`, `test-helpers`, `support`, `scripts`, `tests`                      |
 
-All crates use the `e3-` package prefix except `enclaveup`.
+All crates use the `e3-` package prefix except `interfoldup`.
 
 ---
 

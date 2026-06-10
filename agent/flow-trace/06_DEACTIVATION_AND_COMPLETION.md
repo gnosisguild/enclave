@@ -13,7 +13,7 @@ slashable until claimed.
 ### Via Ticket Withdrawal
 
 ```
-User runs: enclave ciphernode deactivate --tickets 50
+User runs: interfold ciphernode deactivate --tickets 50
 │
 ├─ ChainContext::new() → loads config, decrypts wallet
 │
@@ -22,9 +22,9 @@ User runs: enclave ciphernode deactivate --tickets 50
     │  ┌─── ON-CHAIN (BondingRegistry.sol) ─────────────────────┐
     │  │                                                         │
     │  │  removeTicketBalance(50):                               │
-    │  │    1. require(amount != 0, registered, sufficient ETK)  │
+    │  │    1. require(amount != 0, registered, sufficient ITK)  │
     │  │    2. ticketToken.burnTickets(operator, amount)         │
-    │  │       → ETK destroyed, underlying becomes claimable      │
+    │  │       → ITK destroyed, underlying becomes claimable      │
     │  │    3. _exits.queueTicketsForExit(                       │
     │  │         operator, exitDelay, amount                      │
     │  │       )                                                  │
@@ -44,14 +44,14 @@ User runs: enclave ciphernode deactivate --tickets 50
 ### Via License Withdrawal
 
 ```
-User runs: enclave ciphernode deactivate --license 20000
+User runs: interfold ciphernode deactivate --license 20000
 │
 └─ BondingRegistryContract.unbondLicense(20000).send().await
     │
     │  ┌─── ON-CHAIN ───────────────────────────────────────────┐
     │  │                                                         │
     │  │  unbondLicense(20000):                                  │
-    │  │    1. require(amount != 0, sufficient bonded ENCL)      │
+    │  │    1. require(amount != 0, sufficient bonded INTF)      │
     │  │    2. operators[op].licenseBond -= 20000                │
     │  │    3. _exits.queueLicensesForExit(op, exitDelay, 20000)│
     │  │    4. _updateOperatorStatus(operator)                   │
@@ -68,7 +68,7 @@ User runs: enclave ciphernode deactivate --license 20000
 ### Combined Deactivation
 
 ```
-User runs: enclave ciphernode deactivate --tickets 50 --license 20000
+User runs: interfold ciphernode deactivate --tickets 50 --license 20000
 │
 ├─ Calls removeTicketBalance(50) first
 └─ Then calls unbondLicense(20000)
@@ -81,7 +81,7 @@ User runs: enclave ciphernode deactivate --tickets 50 --license 20000
 ## Full Deregistration
 
 ```
-User runs: enclave ciphernode deregister
+User runs: interfold ciphernode deregister
 │
 ├─ ChainContext::new()
 │
@@ -134,9 +134,9 @@ User runs: enclave ciphernode deregister
     │  └─────────────────────────────────────────────────────────┘
 │
 └─ After exitDelay seconds, operator can claim unlocked exits:
-    enclave ciphernode license claim
+    interfold ciphernode license claim
     # optional caps:
-    enclave ciphernode license claim --max-ticket X --max-license Y
+    interfold ciphernode license claim --max-ticket X --max-license Y
 ```
 
 ## E3 Completion (Happy Path)
@@ -196,7 +196,7 @@ publishPlaintextOutput() succeeds
 ## Rust-Side: Node Shutdown
 
 ```
-enclave start → running node
+interfold start → running node
 │
 ├─ Ctrl+C / SIGINT / SIGTERM
 │
@@ -276,8 +276,8 @@ Time ─────────────────────────
 │ or deactivate()  │   EXIT DELAY       │                  │
 │                  │  (configured)       │                  │
 │ Assets queued    │                    │ Assets claimable │
-│ ETK burned       │  Cannot cancel     │ USDC returned    │
-│ ENCL locked      │  Can be slashed!   │ ENCL returned    │
+│ ITK burned       │  Cannot cancel     │ USDC returned    │
+│ INTF locked      │  Can be slashed!   │ INTF returned    │
 │                  │                    │                  │
 
 IMPORTANT: Even during the exit delay, slashing can still

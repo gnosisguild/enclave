@@ -20,7 +20,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_data::{AutoPersist, Persistable, RepositoriesFactory};
 use e3_events::{prelude::*, CiphernodeSelected, E3id};
-use e3_events::{BusHandle, EType, EnclaveEvent, EnclaveEventData};
+use e3_events::{BusHandle, EType, InterfoldEvent, InterfoldEventData};
 use e3_fhe::ext::FHE_KEY;
 use e3_fhe::Fhe;
 use e3_fhe_params::BfvPreset;
@@ -52,9 +52,9 @@ const ERROR_PUBKEY_META_MISSING:&str = "Could not create PublicKeyAggregator bec
 
 #[async_trait]
 impl E3Extension for PublicKeyAggregatorExtension {
-    fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
+    fn on_event(&self, ctx: &mut E3Context, evt: &InterfoldEvent) {
         // Create the public-key aggregation pipeline only for finalized committee members.
-        let EnclaveEventData::CiphernodeSelected(data) = evt.get_data() else {
+        let InterfoldEventData::CiphernodeSelected(data) = evt.get_data() else {
             return;
         };
 
@@ -173,7 +173,7 @@ fn create_publickey_aggregator(
     sync_state: Persistable<PublicKeyAggregatorState>,
     params_preset: BfvPreset,
     committee_size: CiphernodesCommitteeSize,
-) -> Recipient<EnclaveEvent> {
+) -> Recipient<InterfoldEvent> {
     KeyshareCreatedFilterBuffer::new(
         PublicKeyAggregator::new(
             PublicKeyAggregatorParams {
@@ -250,8 +250,8 @@ fn load_honest_committee_addresses(ctx: &E3Context, e3_id: &E3id) -> Result<Vec<
 
 #[async_trait]
 impl E3Extension for ThresholdPlaintextAggregatorExtension {
-    fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
-        if let EnclaveEventData::PublicKeyAggregated(data) = evt.get_data() {
+    fn on_event(&self, ctx: &mut E3Context, evt: &InterfoldEvent) {
+        if let InterfoldEventData::PublicKeyAggregated(data) = evt.get_data() {
             let addrs = if !data.committee_addresses.is_empty() {
                 Ok(data.committee_addresses.clone())
             } else {
@@ -288,7 +288,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
         }
 
         // Save plaintext aggregator for finalized committee members.
-        let EnclaveEventData::CiphertextOutputPublished(data) = evt.get_data() else {
+        let InterfoldEventData::CiphertextOutputPublished(data) = evt.get_data() else {
             return;
         };
 

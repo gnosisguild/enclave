@@ -147,7 +147,7 @@ class VerifierGenerator {
   }
 
   private defaultVerifierDir(committee: CircuitCommittee): string {
-    const honkBase = join(this.rootDir, 'packages', 'enclave-contracts', 'contracts', 'verifiers', 'bfv', 'honk')
+    const honkBase = join(this.rootDir, 'packages', 'interfold-contracts', 'contracts', 'verifiers', 'bfv', 'honk')
     // Non-canonical committees go under honk/<committee>/ so canonical-committee verifiers
     // committed to git aren't clobbered.
     return committee !== CANONICAL_COMMITTEE ? join(honkBase, committee) : honkBase
@@ -410,11 +410,11 @@ class VerifierGenerator {
 
   /**
    * Format Solidity through prettier-plugin-solidity so output matches the
-   * project's standard formatting. Run from `packages/enclave-contracts` so
+   * project's standard formatting. Run from `packages/interfold-contracts` so
    * prettier picks up the local `.prettierrc` and plugin resolution.
    */
   private formatSolidity(content: string, outputPath: string): string {
-    const contractsDir = join(this.rootDir, 'packages', 'enclave-contracts')
+    const contractsDir = join(this.rootDir, 'packages', 'interfold-contracts')
     // Use prettier --stdin-filepath so plugin selection is by extension.
     const result = execFileSync('pnpm', ['exec', 'prettier', '--stdin-filepath', outputPath], {
       cwd: contractsDir,
@@ -731,7 +731,7 @@ function showHelp() {
 Usage: generate-verifiers [options]
 
 Generates (or verifies) Solidity Honk verifier contracts from compiled Noir
-circuits and places them in packages/enclave-contracts/contracts/verifiers/bfv/honk/.
+circuits and places them in packages/interfold-contracts/contracts/verifiers/bfv/honk/.
 
 The Solidity verifiers are committed to git. Test and benchmark flows run
 this script with --check so accidental drift between committed verifiers and

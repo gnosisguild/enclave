@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_events::{prelude::*, EnclaveEvent, EventSource, Unsequenced};
+use e3_events::{prelude::*, EventSource, InterfoldEvent, Unsequenced};
 
 use crate::domain::{
     event_translation::EventTranslationService,
@@ -88,7 +88,7 @@ pub enum SyncBatchOutcome {
     /// The request was malformed and should be rejected.
     BadRequest(String),
     /// The batch to return to the requesting peer.
-    Batch(EventBatch<EnclaveEvent<Unsequenced>>),
+    Batch(EventBatch<InterfoldEvent<Unsequenced>>),
 }
 
 /// Build a sync response batch from the events returned by the event store.
@@ -97,7 +97,7 @@ pub enum SyncBatchOutcome {
 /// (`Net`) and locally-produced events that are themselves gossip-forwardable. The cursor advances
 /// to the timestamp of the last returned event when the limit is reached.
 pub fn build_sync_batch(
-    all_events: Vec<EnclaveEvent>,
+    all_events: Vec<InterfoldEvent>,
     fetch: &FetchEventsSince,
 ) -> SyncBatchOutcome {
     let limit = fetch.limit();
@@ -109,7 +109,7 @@ pub fn build_sync_batch(
     // Include Net events (received via gossip) and Local events that are gossip-forwardable.
     // Without the Local check, a node's own gossip events would be excluded from sync responses,
     // causing syncing peers to miss them.
-    let events: Vec<EnclaveEvent<Unsequenced>> = all_events
+    let events: Vec<InterfoldEvent<Unsequenced>> = all_events
         .into_iter()
         .filter(|e| {
             e.source() == EventSource::Net
@@ -182,8 +182,8 @@ mod tests {
         assert_eq!(r.on_all_peers_dialed(0, 3), ReadinessDecision::PublishReady);
     }
 
-    fn net_event(ts: u128) -> EnclaveEvent {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(
+    fn net_event(ts: u128) -> InterfoldEvent {
+        InterfoldEvent::<Unsequenced>::new_with_timestamp(
             TestEvent::new("x", ts as u64).into(),
             None,
             ts,
@@ -193,8 +193,8 @@ mod tests {
         .into_sequenced(ts as u64)
     }
 
-    fn local_event(ts: u128) -> EnclaveEvent {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(
+    fn local_event(ts: u128) -> InterfoldEvent {
+        InterfoldEvent::<Unsequenced>::new_with_timestamp(
             TestEvent::new("y", ts as u64).into(),
             None,
             ts,

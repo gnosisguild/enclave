@@ -7,7 +7,7 @@
 use actix::{Actor, AsyncContext, Handler, Message};
 use anyhow::{anyhow, Result};
 use e3_events::{
-    trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, Event, EventSubscriber, EventType,
+    trap, BusHandle, EType, Event, EventSubscriber, EventType, InterfoldEvent, InterfoldEventData,
 };
 use tokio::sync::broadcast::{self, error::RecvError};
 
@@ -41,14 +41,14 @@ impl NetEventBuffer {
 
         let addr = actor.start();
 
-        // Subscribe to EnclaveEvent on the bus
+        // Subscribe to InterfoldEvent on the bus
         bus.subscribe(EventType::SyncEnded, addr.clone().recipient());
 
         output_rx
     }
 
-    fn handle_enclave_event(&mut self, msg: EnclaveEvent) -> Result<()> {
-        if let EnclaveEventData::SyncEnded(_) = msg.get_data() {
+    fn handle_interfold_event(&mut self, msg: InterfoldEvent) -> Result<()> {
+        if let InterfoldEventData::SyncEnded(_) = msg.get_data() {
             return self.process_sync_ended();
         }
         Ok(())
@@ -107,12 +107,12 @@ impl Handler<IncomingNetEvent> for NetEventBuffer {
     }
 }
 
-impl Handler<EnclaveEvent> for NetEventBuffer {
+impl Handler<InterfoldEvent> for NetEventBuffer {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, _: &mut Self::Context) -> Self::Result {
         trap(EType::Net, &self.bus.with_ec(msg.get_ctx()), || {
-            self.handle_enclave_event(msg)
+            self.handle_interfold_event(msg)
         })
     }
 }

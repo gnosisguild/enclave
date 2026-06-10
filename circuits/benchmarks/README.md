@@ -51,13 +51,9 @@ pnpm build:circuits --preset insecure-512 --committee medium
 pnpm check:committee
 #    → ✓ check:committee: medium (H=8, T=4) consistent across active.nr, utils.ts, .active-preset.json
 
-# 3. Run the benchmark. `--committee` sets ENCLAVE_COMMITTEE_SIZE for the Rust test;
-#    or set it explicitly when invoking scripts directly.
-./circuits/benchmarks/run_benchmarks.sh --mode insecure --committee medium
-#    ENCLAVE_COMMITTEE_SIZE=medium ./circuits/benchmarks/run_benchmarks.sh --mode insecure
-
-# 3b. Large committee (N=20, T=9, H=15) — expect long secure-mode runtimes.
-./circuits/benchmarks/run_benchmarks.sh --mode secure --committee large
+# 3. Run the benchmark. ENCLAVE_COMMITTEE_SIZE makes the Rust test pick the same committee
+#    and panic up-front if it disagrees with the stamp.
+ENCLAVE_COMMITTEE_SIZE=medium ./circuits/benchmarks/run_benchmarks.sh --mode insecure
 
 # 4. To go back to micro, run step 1 again with --committee micro.
 pnpm build:circuits --preset insecure-512 --committee micro
@@ -230,7 +226,7 @@ Split rows are deterministic:
 
 For `Π_DKG` and `Π_dec`, verifier gas is sourced from folded recursive-aggregation proofs exported
 by `cargo test -p e3-tests test_trbfv_actor` (via `BENCHMARK_FOLDED_OUTPUT`) and then replayed into
-EVM verifier `estimateGas` in `packages/enclave-contracts/scripts/benchmarkGasFromRaw.ts`.
+EVM verifier `estimateGas` in `packages/interfold-contracts/scripts/benchmarkGasFromRaw.ts`.
 
 `extract_crisp_verify_gas.sh` (and `replay_folded_verify_gas.sh --build <preset>`) call
 `ensure_circuit_preset_built.sh`, which runs

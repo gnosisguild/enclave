@@ -7,7 +7,7 @@ _template_dev_config_root() {
 
 load_template_dev_config() {
   TEMPLATE_ROOT="$(_template_dev_config_root)"
-  ENCLAVE_REPO_ROOT="$(cd "${TEMPLATE_ROOT}/../.." && pwd)"
+  INTERFOLD_REPO_ROOT="$(cd "${TEMPLATE_ROOT}/../.." && pwd)"
 
   BFV_PRESET="${BFV_PRESET:-insecure-512}"
   COMMITTEE="${COMMITTEE:-micro}"
@@ -20,22 +20,22 @@ load_template_dev_config() {
       ;;
   esac
 
-  export TEMPLATE_ROOT ENCLAVE_REPO_ROOT BFV_PRESET COMMITTEE
+  export TEMPLATE_ROOT INTERFOLD_REPO_ROOT BFV_PRESET COMMITTEE
 }
 
 template_monorepo_build_available() {
-  [[ -f "${ENCLAVE_REPO_ROOT}/scripts/build-circuits.ts" ]]
+  [[ -f "${INTERFOLD_REPO_ROOT}/scripts/build-circuits.ts" ]]
 }
 
-build_enclave_circuits_at_setup() {
+build_interfold_circuits_at_setup() {
   if ! template_monorepo_build_available; then
-    echo "Skipping circuit build (standalone template; use enclave noir setup release artifacts)."
+    echo "Skipping circuit build (standalone template; use interfold noir setup release artifacts)."
     return 0
   fi
 
-  echo "Building enclave circuits (preset=${BFV_PRESET}, committee=${COMMITTEE})..."
+  echo "Building interfold circuits (preset=${BFV_PRESET}, committee=${COMMITTEE})..."
   (
-    cd "${ENCLAVE_REPO_ROOT}" &&
+    cd "${INTERFOLD_REPO_ROOT}" &&
       pnpm build:circuits \
         --preset "${BFV_PRESET}" \
         --committee "${COMMITTEE}" \
@@ -43,16 +43,16 @@ build_enclave_circuits_at_setup() {
   )
 }
 
-sync_enclave_circuit_artifacts() {
+sync_interfold_circuit_artifacts() {
   if ! template_monorepo_build_available; then
     return 0
   fi
 
-  local src="${ENCLAVE_REPO_ROOT}/dist/circuits/${BFV_PRESET}/${COMMITTEE}"
-  local dst="${TEMPLATE_ROOT}/.enclave/noir/circuits/${BFV_PRESET}/${COMMITTEE}"
+  local src="${INTERFOLD_REPO_ROOT}/dist/circuits/${BFV_PRESET}/${COMMITTEE}"
+  local dst="${TEMPLATE_ROOT}/.interfold/noir/circuits/${BFV_PRESET}/${COMMITTEE}"
 
   if [[ ! -f "${src}/recursive/dkg/pk/pk.json" ]]; then
-    echo "No built circuits at ${src}; run pnpm dev:setup first. Using enclave noir setup release layout."
+    echo "No built circuits at ${src}; run pnpm dev:setup first. Using interfold noir setup release layout."
     return 0
   fi
 

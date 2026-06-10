@@ -4,7 +4,7 @@ set -eu  # Exit immediately if a command exits with a non-zero status
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 INTEGRATION_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-INTEGRATION_NOIR="${INTEGRATION_DIR}/.enclave/noir"
+INTEGRATION_NOIR="${INTEGRATION_DIR}/.interfold/noir"
 VERSIONS_JSON="${ROOT_DIR}/crates/zk-prover/versions.json"
 
 echo ""
@@ -20,7 +20,7 @@ if [[ "${PROOF_AGGREGATION_ENABLED:-false}" == "true" ]]; then
   echo "BUILDING ZK CIRCUITS + ON-CHAIN VERIFIERS (proof aggregation enabled)..."
   echo ""
 
-  # Nodes must prove with the same VKs as deployed Honk verifiers. `enclave noir setup`
+  # Nodes must prove with the same VKs as deployed Honk verifiers. `interfold noir setup`
   # otherwise installs the release tarball (crates/zk-prover/versions.json), which can
   # disagree with locally rebuilt circuits/verifiers after `build:circuits`.
   rm -rf "${INTEGRATION_NOIR}/circuits"
@@ -28,7 +28,7 @@ if [[ "${PROOF_AGGREGATION_ENABLED:-false}" == "true" ]]; then
 
   (cd "$ROOT_DIR" && pnpm build:circuits --preset insecure-512 -o "${INTEGRATION_NOIR}/circuits")
   # `--check`: verify the committed Honk Solidity verifiers in
-  # packages/enclave-contracts/contracts/verifiers/bfv/honk/ match the
+  # packages/interfold-contracts/contracts/verifiers/bfv/honk/ match the
   # freshly-built circuits' recursive VKs. Fails loudly on drift instead of
   # silently rewriting committed contracts mid-test. If this errors, run
   # `pnpm generate:verifiers --write` and commit the diff.

@@ -6,7 +6,7 @@
 
 //! Pure decoding of raw EVM revert data into human-readable contract errors.
 
-use crate::contracts::{ICiphernodeRegistry, IEnclave, ISlashingManager};
+use crate::contracts::{ICiphernodeRegistry, IInterfold, ISlashingManager};
 use alloy::sol_types::SolInterface;
 
 /// Try to decode raw revert data into a human-readable error string.
@@ -15,7 +15,7 @@ pub fn decode_error(data: &[u8]) -> Option<String> {
         return None;
     }
 
-    if let Ok(err) = IEnclave::IEnclaveErrors::abi_decode(data) {
+    if let Ok(err) = IInterfold::IInterfoldErrors::abi_decode(data) {
         return Some(format!("{err:?}"));
     }
     if let Ok(err) = ICiphernodeRegistry::ICiphernodeRegistryErrors::abi_decode(data) {
@@ -74,7 +74,7 @@ mod tests {
     #[test]
     fn test_decode_known_errors() {
         // CiphertextOutputNotPublished(uint256 e3Id) with e3Id = 1
-        let mut data = IEnclave::CiphertextOutputNotPublished::SELECTOR.to_vec();
+        let mut data = IInterfold::CiphertextOutputNotPublished::SELECTOR.to_vec();
         data.extend_from_slice(&[0u8; 31]);
         data.push(1); // e3Id = 1
         let decoded = decode_error(&data).unwrap();
@@ -95,7 +95,7 @@ mod tests {
     #[test]
     fn test_decode_from_error_string() {
         // Simulate an alloy error string containing hex revert data
-        let selector = hex::encode(IEnclave::CiphertextOutputNotPublished::SELECTOR);
+        let selector = hex::encode(IInterfold::CiphertextOutputNotPublished::SELECTOR);
         let param = "0000000000000000000000000000000000000000000000000000000000000001";
         let error_str = format!(
             "server returned an error response: error code 3: execution reverted, data: \"0x{selector}{param}\""

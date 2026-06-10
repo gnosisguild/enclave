@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_events::EnclaveEvent;
+use e3_events::InterfoldEvent;
 use std::collections::HashMap;
 
 /// Buffers events for downstream instances to handle out-of-order event delivery.
@@ -12,15 +12,15 @@ use std::collections::HashMap;
 /// to be processed.
 #[derive(Default)]
 pub struct EventBuffer {
-    buffer: HashMap<String, Vec<EnclaveEvent>>,
+    buffer: HashMap<String, Vec<InterfoldEvent>>,
 }
 
 impl EventBuffer {
-    pub fn add(&mut self, key: &str, event: EnclaveEvent) {
+    pub fn add(&mut self, key: &str, event: InterfoldEvent) {
         self.buffer.entry(key.to_string()).or_default().push(event)
     }
 
-    pub fn take(&mut self, key: &str) -> Vec<EnclaveEvent> {
+    pub fn take(&mut self, key: &str) -> Vec<InterfoldEvent> {
         self.buffer
             .get_mut(key)
             .map(std::mem::take)
@@ -31,10 +31,10 @@ impl EventBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use e3_events::{E3id, EnclaveEvent, Sequenced};
+    use e3_events::{E3id, InterfoldEvent, Sequenced};
 
-    fn event(label: &str) -> EnclaveEvent {
-        EnclaveEvent::<Sequenced>::test_event(label)
+    fn event(label: &str) -> InterfoldEvent {
+        InterfoldEvent::<Sequenced>::test_event(label)
             .e3_id(E3id::new("1", 1))
             .seq(1)
             .build()

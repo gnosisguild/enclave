@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 //! ABI encoding for `publishCommittee`'s `dkgAttestationBundle` argument.
-//! Must match `DkgFoldAttestationLib` structs in `packages/enclave-contracts`.
+//! Must match `DkgFoldAttestationLib` structs in `packages/interfold-contracts`.
 
 use alloy::primitives::{Address, Bytes, B256, U256};
 use alloy::sol_types::SolValue;

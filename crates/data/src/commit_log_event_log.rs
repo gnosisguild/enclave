@@ -8,7 +8,7 @@ use anyhow::Context;
 use anyhow::Result;
 use commitlog::message::MessageSet;
 use commitlog::{CommitLog, LogOptions, ReadLimit};
-use e3_events::{EnclaveEvent, EventLog, Unsequenced};
+use e3_events::{EventLog, InterfoldEvent, Unsequenced};
 use std::path::PathBuf;
 use tracing::error;
 
@@ -39,13 +39,13 @@ impl CommitLogEventLog {
 }
 
 impl EventLog for CommitLogEventLog {
-    fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64> {
+    fn append(&mut self, event: &InterfoldEvent<Unsequenced>) -> Result<u64> {
         let bytes = bincode::serialize(event)?;
         self.append_bytes(&bytes)
     }
 
     #[allow(clippy::while_let_loop)]
-    fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>> {
+    fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, InterfoldEvent<Unsequenced>)>> {
         // Convert 1-indexed sequence to 0-indexed offset
         let mut current_offset = from.saturating_sub(1);
         let mut events = Vec::new();
@@ -68,7 +68,7 @@ impl EventLog for CommitLogEventLog {
             let mut count = 0;
             for msg in message_buf.iter() {
                 let seq = msg.offset() + 1;
-                match bincode::deserialize::<EnclaveEvent<Unsequenced>>(msg.payload()) {
+                match bincode::deserialize::<InterfoldEvent<Unsequenced>>(msg.payload()) {
                     Ok(event) => {
                         if let Some(bad_seq) = corrupt_at {
                             // We already saw a corrupt entry and now found a valid one
@@ -113,7 +113,7 @@ impl EventLog for CommitLogEventLog {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use e3_events::{EnclaveEventData, EventConstructorWithTimestamp, EventSource, TestEvent};
+    use e3_events::{EventConstructorWithTimestamp, EventSource, InterfoldEventData, TestEvent};
     use tempfile::tempdir;
 
     // ── Event size reporting ─────────────────────────────────────────────────
@@ -153,7 +153,7 @@ mod tests {
             signature: ArcBytes::from_bytes(&[0u8; 65]),
         };
 
-        let events: Vec<(&str, EnclaveEventData)> = vec![
+        let events: Vec<(&str, InterfoldEventData)> = vec![
             // Registration / sortition
             (
                 "CiphernodeAdded",
@@ -398,8 +398,8 @@ mod tests {
         }
     }
 
-    fn event_from(data: impl Into<EnclaveEventData>) -> EnclaveEvent<Unsequenced> {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(
+    fn event_from(data: impl Into<InterfoldEventData>) -> InterfoldEvent<Unsequenced> {
+        InterfoldEvent::<Unsequenced>::new_with_timestamp(
             data.into(),
             None,
             123,

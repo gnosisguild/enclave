@@ -9,7 +9,7 @@ use crate::contracts::ICiphernodeRegistry;
 use crate::domain::ciphernode_registry_events::extractor;
 use crate::domain::error_decoder::{decode_error_from_str, format_evm_error};
 use crate::helpers::{encode_zk_proof, send_tx_with_retry, EthProvider};
-use crate::messages::{EnclaveEvmEvent, EvmEventProcessor};
+use crate::messages::{EvmEventProcessor, InterfoldEvmEvent};
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, B256, U256},
@@ -19,14 +19,14 @@ use alloy::{
 use anyhow::Result;
 use e3_events::{
     prelude::*, AggregatorChanged, BusHandle, CommitteeFinalizeRequested, E3RequestComplete, E3id,
-    EType, EffectsEnabled, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, Proof,
+    EType, EffectsEnabled, EventSubscriber, EventType, InterfoldEvent, InterfoldEventData, Proof,
     PublicKeyAggregated, Shutdown, TicketGenerated, TicketId,
 };
 use e3_utils::{ArcBytes, NotifySync, MAILBOX_LIMIT};
 use std::collections::{HashMap, HashSet};
 use tracing::{error, info};
 
-/// Connects to CiphernodeRegistry.sol converting EVM events to EnclaveEvents
+/// Connects to CiphernodeRegistry.sol converting EVM events to InterfoldEvents
 pub struct CiphernodeRegistrySolReader;
 
 impl CiphernodeRegistrySolReader {
@@ -99,34 +99,34 @@ impl<P: Provider + WalletProvider + Clone + 'static> Actor for CiphernodeRegistr
     }
 }
 
-impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<InterfoldEvent>
     for CiphernodeRegistrySolWriter<P>
 {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
-            EnclaveEventData::EffectsEnabled(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::AggregatorChanged(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::PublicKeyAggregated(data) => {
+            InterfoldEventData::EffectsEnabled(data) => self.notify_sync(ctx, data),
+            InterfoldEventData::AggregatorChanged(data) => self.notify_sync(ctx, data),
+            InterfoldEventData::PublicKeyAggregated(data) => {
                 // Only publish if the src and destination chains match
                 if self.provider.chain_id() == data.e3_id.chain_id() {
                     ctx.notify(data);
                 }
             }
-            EnclaveEventData::CommitteeFinalizeRequested(data) => {
+            InterfoldEventData::CommitteeFinalizeRequested(data) => {
                 if self.provider.chain_id() == data.e3_id.chain_id() {
                     ctx.notify(data);
                 }
             }
-            EnclaveEventData::TicketGenerated(data) => {
+            InterfoldEventData::TicketGenerated(data) => {
                 // Submit ticket if chain matches
                 if self.provider.chain_id() == data.e3_id.chain_id() {
                     ctx.notify(data);
                 }
             }
-            EnclaveEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
+            InterfoldEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
+            InterfoldEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }
@@ -565,7 +565,7 @@ pub async fn fetch_accusation_vote_validity<P: Provider + Clone>(
 pub struct CiphernodeRegistrySol;
 
 impl CiphernodeRegistrySol {
-    pub fn attach(processor: &Recipient<EnclaveEvmEvent>) -> Addr<EvmParser> {
+    pub fn attach(processor: &Recipient<InterfoldEvmEvent>) -> Addr<EvmParser> {
         CiphernodeRegistrySolReader::setup(processor)
     }
 

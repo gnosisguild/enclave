@@ -15,8 +15,8 @@ use e3_events::Sequenced;
 use e3_events::TypedEvent;
 use e3_events::{
     prelude::*, trap, AggregatorChanged, BusHandle, CiphernodeSelected, Committee,
-    CommitteeFinalized, CommitteeMemberExpelled, E3Requested, E3id, EType, EnclaveEvent,
-    EnclaveEventData, EventType, Shutdown, TicketGenerated, TicketId,
+    CommitteeFinalized, CommitteeMemberExpelled, E3Requested, E3id, EType, EventType,
+    InterfoldEvent, InterfoldEventData, Shutdown, TicketGenerated, TicketId,
 };
 use e3_request::E3Meta;
 use e3_utils::NotifySync;
@@ -144,22 +144,24 @@ impl CiphernodeSelector {
     }
 }
 
-impl Handler<EnclaveEvent> for CiphernodeSelector {
+impl Handler<InterfoldEvent> for CiphernodeSelector {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            EnclaveEventData::E3Requested(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
-            EnclaveEventData::E3RequestComplete(data) => {
+            InterfoldEventData::E3Requested(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::CommitteeFinalized(data) => {
+            InterfoldEventData::E3RequestComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::CommitteeMemberExpelled(data) => {
+            InterfoldEventData::CommitteeFinalized(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
+            InterfoldEventData::CommitteeMemberExpelled(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            InterfoldEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }

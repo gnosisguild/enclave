@@ -100,7 +100,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 fn select_environment() -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
     let selections = &["CRISP: Voting Protocol (ETH)", "More Coming Soon!"];
     Ok(FuzzySelect::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enclave (EEEE): Please choose the private execution environment you would like to run!")
+        .with_prompt("Interfold (EEEE): Please choose the private execution environment you would like to run!")
         .default(0)
         .items(&selections[..])
         .interact()?)

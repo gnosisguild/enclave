@@ -29,8 +29,8 @@ use e3_events::{
     ComputeResponse, DecryptedSharesAggregationProofRequest,
     DecryptedSharesAggregationProofResponse, DecryptionAggregationRequest,
     DecryptionAggregationResponse, DkgAggregationRequest, DkgAggregationResponse,
-    DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, EnclaveEvent,
-    EnclaveEventData, EventPublisher, EventSubscriber, EventType, NodeDkgFoldRequest,
+    DkgShareDecryptionProofRequest, DkgShareDecryptionProofResponse, EventPublisher,
+    EventSubscriber, EventType, InterfoldEvent, InterfoldEventData, NodeDkgFoldRequest,
     NodeDkgFoldResponse, NodesFoldStepRequest, NodesFoldStepResponse, PartyVerificationResult,
     PkAggregationProofRequest, PkAggregationProofResponse, PkBfvProofRequest, PkBfvProofResponse,
     PkGenerationProofRequest, PkGenerationProofResponse, Proof, ShareComputationProofRequest,
@@ -208,11 +208,11 @@ impl Actor for Multithread {
     }
 }
 
-impl Handler<EnclaveEvent> for Multithread {
+impl Handler<InterfoldEvent> for Multithread {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (data, ec) = msg.into_components();
-        if let EnclaveEventData::ComputeRequest(data) = data {
+        if let InterfoldEventData::ComputeRequest(data) = data {
             ctx.notify(TypedEvent::new(data, ec))
         }
     }

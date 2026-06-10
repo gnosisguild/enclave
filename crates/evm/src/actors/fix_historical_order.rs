@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::domain::historical_order_fixer::HistoricalOrderFixer;
-use crate::messages::{EnclaveEvmEvent, EvmEventProcessor};
+use crate::messages::{EvmEventProcessor, InterfoldEvmEvent};
 use actix::{Actor, Addr, Handler};
 use e3_utils::MAILBOX_LIMIT;
 use tracing::debug;
@@ -35,11 +35,11 @@ impl Actor for FixHistoricalOrder {
     }
 }
 
-impl Handler<EnclaveEvmEvent> for FixHistoricalOrder {
+impl Handler<InterfoldEvmEvent> for FixHistoricalOrder {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvmEvent, _ctx: &mut Self::Context) {
-        debug!("Receiving EnclaveEvmEvent event({})", msg.get_id());
+    fn handle(&mut self, msg: InterfoldEvmEvent, _ctx: &mut Self::Context) {
+        debug!("Receiving InterfoldEvmEvent event({})", msg.get_id());
         for event in self.fixer.process(msg) {
             self.dest.do_send(event);
         }
@@ -50,22 +50,22 @@ impl Handler<EnclaveEvmEvent> for FixHistoricalOrder {
 mod tests {
     use std::time::Duration;
 
-    use crate::messages::{EnclaveEvmEvent, EvmLog, HistoricalSyncComplete};
+    use crate::messages::{EvmLog, HistoricalSyncComplete, InterfoldEvmEvent};
 
     use super::*;
     use actix::prelude::*;
     use alloy_primitives::Address;
     use tokio::{sync::mpsc, time::sleep};
 
-    struct Collector(mpsc::UnboundedSender<EnclaveEvmEvent>);
+    struct Collector(mpsc::UnboundedSender<InterfoldEvmEvent>);
 
     impl Actor for Collector {
         type Context = Context<Self>;
     }
 
-    impl Handler<EnclaveEvmEvent> for Collector {
+    impl Handler<InterfoldEvmEvent> for Collector {
         type Result = ();
-        fn handle(&mut self, msg: EnclaveEvmEvent, _ctx: &mut Self::Context) {
+        fn handle(&mut self, msg: InterfoldEvmEvent, _ctx: &mut Self::Context) {
             let _ = self.0.send(msg);
         }
     }
@@ -75,11 +75,11 @@ mod tests {
         let (tx, mut rx) = mpsc::unbounded_channel();
         let fix = FixHistoricalOrder::setup(Collector(tx).start());
 
-        let log_1 = EnclaveEvmEvent::Log(EvmLog::test_log(Address::ZERO, 1, 1));
-        let log_2 = EnclaveEvmEvent::Log(EvmLog::test_log(Address::ZERO, 2, 2));
-        let log_3 = EnclaveEvmEvent::Log(EvmLog::test_log(Address::ZERO, 3, 3));
+        let log_1 = InterfoldEvmEvent::Log(EvmLog::test_log(Address::ZERO, 1, 1));
+        let log_2 = InterfoldEvmEvent::Log(EvmLog::test_log(Address::ZERO, 2, 2));
+        let log_3 = InterfoldEvmEvent::Log(EvmLog::test_log(Address::ZERO, 3, 3));
 
-        let sync_complete = EnclaveEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete::new(
+        let sync_complete = InterfoldEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete::new(
             1,
             Some(log_3.get_id()),
         ));

@@ -317,8 +317,8 @@ mod tests {
     use e3_zk_helpers::{computation::DkgInputType, CiphernodesCommitteeSize};
 
     fn ec() -> EventContext<Sequenced> {
-        use e3_events::{EnclaveEventData, TestEvent, Unsequenced};
-        EventContext::<Unsequenced>::from(EnclaveEventData::from(TestEvent::new("x", 0)))
+        use e3_events::{InterfoldEventData, TestEvent, Unsequenced};
+        EventContext::<Unsequenced>::from(InterfoldEventData::from(TestEvent::new("x", 0)))
             .sequence(0)
     }
 

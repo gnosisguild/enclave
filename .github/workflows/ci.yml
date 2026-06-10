@@ -49,7 +49,7 @@ jobs:
       build_circuits: ${{ steps.jobs.outputs.build_circuits }}
       integration_prebuild: ${{ steps.jobs.outputs.integration_prebuild }}
       zk_prover_integration: ${{ steps.jobs.outputs.zk_prover_integration }}
-      build_enclave_cli: ${{ steps.jobs.outputs.build_enclave_cli }}
+      build_interfold_cli: ${{ steps.jobs.outputs.build_interfold_cli }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: dorny/paths-filter@6852f92c20ea7fd3b0c25de3b5112db3a98da050 # v3
@@ -62,7 +62,7 @@ jobs:
               - 'Cargo.lock'
               - 'rust-toolchain.toml'
             contracts:
-              - 'packages/enclave-contracts/**'
+              - 'packages/interfold-contracts/**'
             circuits:
               - 'circuits/**'
               - 'scripts/*-circuits.sh'
@@ -71,9 +71,9 @@ jobs:
             templates:
               - 'templates/**'
             sdk:
-              - 'packages/enclave-sdk/**'
-              - 'packages/enclave-react/**'
-              - 'packages/enclave-config/**'
+              - 'packages/interfold-sdk/**'
+              - 'packages/interfold-react/**'
+              - 'packages/interfold-config/**'
               - 'crates/wasm/**'
             integration_tests:
               - 'tests/integration/**'
@@ -115,7 +115,7 @@ jobs:
           echo "build_circuits=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
           echo "integration_prebuild=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $INTEGRATION $CI)" >> $GITHUB_OUTPUT
           echo "zk_prover_integration=$(any $FORCE $RUST $CIRCUITS $CI)" >> $GITHUB_OUTPUT
-          echo "build_enclave_cli=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $INTEGRATION $TEMPLATES $CRISP $CI)" >> $GITHUB_OUTPUT
+          echo "build_interfold_cli=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $INTEGRATION $TEMPLATES $CRISP $CI)" >> $GITHUB_OUTPUT
 
   rust_unit_tests:
     needs: [detect_changes]
@@ -478,7 +478,7 @@ jobs:
       - run: bash ./scripts/nix-versions.sh # display bad versions when deps change
 
   ciphernode_integration_test:
-    needs: [detect_changes, integration_prebuild, build_enclave_cli, build_sdk]
+    needs: [detect_changes, integration_prebuild, build_interfold_cli, build_sdk]
     if: needs.detect_changes.outputs.ciphernode_e2e == 'true'
     timeout-minutes: 45
     runs-on:
@@ -513,10 +513,10 @@ jobs:
         with:
           name: build-artifacts
           path: target/debug/
-      - name: 'Download enclave binary'
+      - name: 'Download interfold binary'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: enclave-binary
+          name: interfold-binary
           path: ~/.cargo/bin/
       - name: 'Download SDK artifacts'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -528,17 +528,17 @@ jobs:
           echo "Checking for required artifacts:"
           ls -la target/debug/fake_encrypt || echo "fake_encrypt not found"
           ls -la target/debug/pack_e3_params || echo "pack_e3_params not found"
-          ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
-          ls -la packages/enclave-contracts/dist || echo "SDK dist not found"
+          ls -la ~/.cargo/bin/interfold || echo "interfold binary not found"
+          ls -la packages/interfold-contracts/dist || echo "SDK dist not found"
           ls -la crates/wasm/dist || echo "WASM dist not found"
       - name: 'Set executable permissions'
         run: |
           chmod +x target/debug/fake_encrypt
           chmod +x target/debug/pack_e3_params
-          chmod +x ~/.cargo/bin/enclave
+          chmod +x ~/.cargo/bin/interfold
       - name: 'Setup ZK prover'
         run: |
-          enclave noir setup
+          interfold noir setup
       - name: 'Run ${{ matrix.test-suite }} tests'
         run: 'pnpm test:integration ${{ matrix.test-suite }} --no-prebuild'
       - name: 'Add test summary'
@@ -546,9 +546,9 @@ jobs:
           echo "## Test results for ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
-  build_enclave_cli:
+  build_interfold_cli:
     needs: [detect_changes]
-    if: needs.detect_changes.outputs.build_enclave_cli == 'true'
+    if: needs.detect_changes.outputs.build_interfold_cli == 'true'
     timeout-minutes: 20
     runs-on:
       group: enclave-ci
@@ -575,14 +575,14 @@ jobs:
           && sudo apt-get update -y \
           && sudo apt-get install -y solc protobuf-compiler
 
-      - name: Build enclave CLI
-        run: cargo install --locked --path crates/cli --bin enclave
+      - name: Build interfold CLI
+        run: cargo install --locked --path crates/cli --bin interfold
 
-      - name: Upload enclave binary
+      - name: Upload interfold binary
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: enclave-binary
-          path: ~/.cargo/bin/enclave
+          name: interfold-binary
+          path: ~/.cargo/bin/interfold
           retention-days: 1
 
       - name: Cancel workflow on failure
@@ -660,7 +660,7 @@ jobs:
         working-directory: .
         run: pnpm install --frozen-lockfile
 
-      - name: Compile Enclave contracts
+      - name: Compile Interfold contracts
         if: matrix.test-suite == 'test:contracts'
         working-directory: .
         run: pnpm evm:build
@@ -677,7 +677,7 @@ jobs:
         run: ${{ matrix.command }}
 
   crisp_e2e:
-    needs: [detect_changes, build_enclave_cli, build_crisp_sdk]
+    needs: [detect_changes, build_interfold_cli, build_crisp_sdk]
     if: needs.detect_changes.outputs.crisp == 'true'
     timeout-minutes: 45
     runs-on:
@@ -731,7 +731,7 @@ jobs:
         working-directory: .
         run: pnpm install --frozen-lockfile
 
-      - name: Compile Enclave contracts
+      - name: Compile Interfold contracts
         working-directory: .
         run: pnpm evm:build
 
@@ -762,15 +762,15 @@ jobs:
         working-directory: ./examples/CRISP
         run: pnpm exec playwright install chromium
 
-      - name: Download enclave binary
+      - name: Download interfold binary
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: enclave-binary
+          name: interfold-binary
           path: ~/.cargo/bin/
 
       - name: Make binaries executable
         run: |
-          chmod +x ~/.cargo/bin/enclave
+          chmod +x ~/.cargo/bin/interfold
 
       - name: Install Nargo
         uses: noir-lang/noirup@7dbe69ccc78877f0200ffa5a40836c953d2cfd8f # v0.1.4
@@ -793,12 +793,12 @@ jobs:
           sudo mv "$BB_BIN" /usr/local/bin/bb
           chmod +x /usr/local/bin/bb
 
-      - name: Build enclave circuits
+      - name: Build interfold circuits
         run: pnpm build:circuits --preset insecure-512 --committee micro --skip-if-built
 
       - name: Setup ZK prover
         run: |
-          enclave noir setup
+          interfold noir setup
 
       - name: Run Playwright tests
         working-directory: ./examples/CRISP
@@ -1072,11 +1072,11 @@ jobs:
           name: sdk-artifacts
           include-hidden-files: true
           path: |
-            packages/enclave-sdk/dist
-            packages/enclave-contracts/dist
-            packages/enclave-contracts/artifacts
-            packages/enclave-contracts/cache
-            packages/enclave-contracts/types
+            packages/interfold-sdk/dist
+            packages/interfold-contracts/dist
+            packages/interfold-contracts/artifacts
+            packages/interfold-contracts/cache
+            packages/interfold-contracts/types
             crates/wasm/dist
             circuits/bin/.active-preset.json
             circuits/bin/recursive_aggregation/wrapper/threshold/target
@@ -1147,7 +1147,7 @@ jobs:
           if-no-files-found: warn
 
   template_integration:
-    needs: [detect_changes, build_enclave_cli, build_e3_support_dev, build_sdk]
+    needs: [detect_changes, build_interfold_cli, build_e3_support_dev, build_sdk]
     if: needs.detect_changes.outputs.templates == 'true'
     timeout-minutes: 30
     runs-on:
@@ -1180,10 +1180,10 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@c7450ba673e133f5ee30098b3b54f444d3a2ca2d # v1
 
-      - name: Download enclave binary
+      - name: Download interfold binary
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: enclave-binary
+          name: interfold-binary
           path: ~/.cargo/bin/
 
       - name: Download support scripts artifacts
@@ -1200,7 +1200,7 @@ jobs:
 
       - name: Make binaries executable
         run: |
-          chmod +x ~/.cargo/bin/enclave
+          chmod +x ~/.cargo/bin/interfold
           chmod +x templates/default/target/debug/e3-support-scripts-dev
 
       - name: Install Nargo
@@ -1224,19 +1224,19 @@ jobs:
           sudo mv "$BB_BIN" /usr/local/bin/bb
           chmod +x /usr/local/bin/bb
 
-      - name: Build enclave circuits
+      - name: Build interfold circuits
         run: pnpm build:circuits --preset insecure-512 --committee micro --skip-if-built
 
       - name: Setup ZK prover
         run: |
-          enclave noir setup
+          interfold noir setup
 
       - name: Verify downloaded artifacts
         run: |
           echo "Checking downloaded artifacts:"
-          ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
+          ls -la ~/.cargo/bin/interfold || echo "interfold binary not found"
           ls -la templates/default/target/debug/e3-support-scripts-dev || echo "support scripts not found"
-          ls -la packages/enclave-contracts/dist || echo "SDK dist not found"
+          ls -la packages/interfold-contracts/dist || echo "SDK dist not found"
           ls -la crates/wasm/dist || echo "WASM dist not found"
           test -f circuits/bin/.active-preset.json || (echo "ERROR: circuit preset stamp not found" && exit 1)
           echo "Support scripts permissions:"
@@ -1246,12 +1246,12 @@ jobs:
         run: |
           cd templates/default
           pnpm compile
-          chmod 755 .enclave/generated/contracts tests
-          chmod 644 .enclave/generated/contracts/ImageID.sol
+          chmod 755 .interfold/generated/contracts tests
+          chmod 644 .interfold/generated/contracts/ImageID.sol
           pnpm test:integration
 
-  test_enclave_init:
-    needs: [detect_changes, build_enclave_cli, build_e3_support_dev]
+  test_interfold_init:
+    needs: [detect_changes, build_interfold_cli, build_e3_support_dev]
     if: needs.detect_changes.outputs.init == 'true'
     timeout-minutes: 10
     runs-on: 'ubuntu-latest'
@@ -1269,25 +1269,25 @@ jobs:
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
-      - name: Download enclave binary
+      - name: Download interfold binary
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: enclave-binary
+          name: interfold-binary
           path: ~/.cargo/bin/
       - name: Make binaries executable
         run: |
-          chmod +x ~/.cargo/bin/enclave
+          chmod +x ~/.cargo/bin/interfold
       - name: Verify downloaded artifacts
         run: |
-          ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
-      - name: Enclave init
+          ls -la ~/.cargo/bin/interfold || echo "interfold binary not found"
+      - name: Interfold init
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BRANCH="${{ github.head_ref }}"
           else
             BRANCH="${{ github.ref_name }}"
           fi
-          enclave init mycitest --verbose --template=${{ github.server_url }}/${{ github.repository }}.git#${BRANCH}:templates/default
+          interfold init mycitest --verbose --template=${{ github.server_url }}/${{ github.repository }}.git#${BRANCH}:templates/default
 
   contrib-readme-job:
     timeout-minutes: 10

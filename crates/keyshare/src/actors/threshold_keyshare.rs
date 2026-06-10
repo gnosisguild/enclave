@@ -13,8 +13,8 @@ use e3_events::{
     CommitteeMemberExpelled, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
     DecryptionKeyShared, DecryptionShareProofSigned, DecryptionShareProofsPending, Die,
     DkgProofSigned, DkgShareDecryptionProofRequest, E3Failed, E3RequestComplete, E3Stage, EType,
-    EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed,
-    EncryptionKeyCreated, EncryptionKeyPending, EventContext, FailureReason, KeyshareCreated,
+    EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending,
+    EventContext, FailureReason, InterfoldEvent, InterfoldEventData, KeyshareCreated,
     PartyProofsToVerify, PartyShareDecryptionProofsToVerify, PkGenerationProofSigned, ProofType,
     Sequenced, ShareDecryptionProofPending, ShareVerificationComplete, ShareVerificationDispatched,
     SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated,
@@ -1634,7 +1634,7 @@ impl ThresholdKeyshare {
     ///
     /// Only states where the local result is already determined are re-driven. Earlier
     /// phases depend on peer gossip that cannot be reconstructed locally and are surfaced
-    /// (non-destructively) by `enclave node validate` instead of being force-re-driven.
+    /// (non-destructively) by `interfold node validate` instead of being force-re-driven.
     fn resume_in_flight_work(&mut self, ec: EventContext<Sequenced>) -> Result<()> {
         let Some(state) = self.state.get() else {
             return Ok(());
@@ -1644,7 +1644,7 @@ impl ThresholdKeyshare {
             // publishing KeyshareCreated. Re-publishing is idempotent at the aggregator, but
             // ReadyForDecryption is entered *before* C4 honest-set verification authorizes the
             // publish, so only re-drive when a prior authorized publish was recorded. An
-            // un-published ReadyForDecryption is a loose end surfaced by `enclave node validate`.
+            // un-published ReadyForDecryption is a loose end surfaced by `interfold node validate`.
             KeyshareState::ReadyForDecryption(_) if state.keyshare_published => {
                 info!(
                     e3_id = %state.e3_id,
@@ -1667,7 +1667,7 @@ impl ThresholdKeyshare {
                 trace!(
                     e3_id = %state.e3_id,
                     state = %other.variant_name(),
-                    "No locally re-drivable work on resume; loose ends are surfaced by `enclave node validate`"
+                    "No locally re-drivable work on resume; loose ends are surfaced by `interfold node validate`"
                 );
             }
         }
@@ -1772,47 +1772,47 @@ impl ThresholdKeyshare {
 }
 
 // Will only receive events that are for this specific e3_id
-impl Handler<EnclaveEvent> for ThresholdKeyshare {
+impl Handler<InterfoldEvent> for ThresholdKeyshare {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            EnclaveEventData::CiphernodeSelected(data) => {
+            InterfoldEventData::CiphernodeSelected(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::CiphertextOutputPublished(data) => {
+            InterfoldEventData::CiphertextOutputPublished(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::PublicKeyAggregated(data) => {
+            InterfoldEventData::PublicKeyAggregated(data) => {
                 let pk = ArcBytes::from_bytes(&data.pubkey);
                 let _ = self.state.try_mutate(&ec, |mut s| {
                     s.aggregated_pk = Some(pk);
                     Ok(s)
                 });
             }
-            EnclaveEventData::ThresholdShareCreated(data) => {
+            InterfoldEventData::ThresholdShareCreated(data) => {
                 let _ =
                     self.handle_threshold_share_created(TypedEvent::new(data, ec), ctx.address());
             }
-            EnclaveEventData::EncryptionKeyCreated(data) => {
+            InterfoldEventData::EncryptionKeyCreated(data) => {
                 let _ =
                     self.handle_encryption_key_created(TypedEvent::new(data, ec), ctx.address());
             }
-            EnclaveEventData::PkGenerationProofSigned(data) => {
+            InterfoldEventData::PkGenerationProofSigned(data) => {
                 let _ = self.handle_pk_generation_proof_signed(TypedEvent::new(data, ec));
             }
-            EnclaveEventData::DkgProofSigned(data) => {
+            InterfoldEventData::DkgProofSigned(data) => {
                 let _ = self.handle_share_computation_proof_signed(TypedEvent::new(data, ec));
             }
-            EnclaveEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::E3Failed(data) => {
+            InterfoldEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
+            InterfoldEventData::E3Failed(data) => {
                 warn!(
                     "E3 failed: {:?}. Shutting down ThresholdKeyshare for e3_id={}",
                     data.reason, data.e3_id
                 );
                 self.notify_sync(ctx, E3RequestComplete { e3_id: data.e3_id });
             }
-            EnclaveEventData::E3StageChanged(data) => {
+            InterfoldEventData::E3StageChanged(data) => {
                 use e3_events::E3Stage;
                 match &data.new_stage {
                     E3Stage::Complete | E3Stage::Failed => {
@@ -1828,7 +1828,7 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
                     }
                 }
             }
-            EnclaveEventData::DecryptionKeyShared(data) => {
+            InterfoldEventData::DecryptionKeyShared(data) => {
                 if data.external {
                     // Route based on current state
                     if let Some(state) = self.state.get() {
@@ -1894,19 +1894,19 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
                     }
                 }
             }
-            EnclaveEventData::DecryptionShareProofSigned(data) => {
+            InterfoldEventData::DecryptionShareProofSigned(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ShareVerificationComplete(data) => {
+            InterfoldEventData::ShareVerificationComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeResponse(data) => {
+            InterfoldEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::CommitteeMemberExpelled(data) => {
+            InterfoldEventData::CommitteeMemberExpelled(data) => {
                 self.handle_committee_member_expelled(data, ec);
             }
-            EnclaveEventData::EffectsEnabled(_) => {
+            InterfoldEventData::EffectsEnabled(_) => {
                 // Broadcast once at the end of boot sync. Re-drive any of this node's own
                 // in-flight work that a crash may have interrupted (idempotent downstream).
                 if let Err(err) = self.resume_in_flight_work(ec) {
@@ -2169,8 +2169,8 @@ mod tests {
     use e3_crypto::Cipher;
     use e3_data::{AutoPersist, DataStore, InMemStore, Persistable, Repository};
     use e3_events::{
-        hlc_factory::HlcFactory, BusHandle, E3Stage, E3id, EnclaveEvent, EnclaveEventData,
-        EventBus, EventBusConfig, FailureReason, HistoryCollector, Sequencer, StoreEventRequested,
+        hlc_factory::HlcFactory, BusHandle, E3Stage, E3id, EventBus, EventBusConfig, FailureReason,
+        HistoryCollector, InterfoldEvent, InterfoldEventData, Sequencer, StoreEventRequested,
         StoreEventResponse, TakeEvents,
     };
     use e3_fhe_params::DEFAULT_BFV_PRESET;
@@ -2196,8 +2196,9 @@ mod tests {
         }
     }
 
-    fn test_bus() -> (BusHandle, Addr<HistoryCollector<EnclaveEvent>>) {
-        let event_bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
+    fn test_bus() -> (BusHandle, Addr<HistoryCollector<InterfoldEvent>>) {
+        let event_bus =
+            EventBus::<InterfoldEvent>::new(EventBusConfig { deduplicate: true }).start();
         let store = TestEventStore::default().start();
         let sequencer = Sequencer::new(&event_bus, store.recipient()).start();
         let bus = BusHandle::new(event_bus, sequencer, HlcFactory::new()).enable("test-keyshare");
@@ -2213,7 +2214,7 @@ mod tests {
 
     async fn start_actor() -> Result<(
         Addr<ThresholdKeyshare>,
-        Addr<HistoryCollector<EnclaveEvent>>,
+        Addr<HistoryCollector<InterfoldEvent>>,
         E3id,
     )> {
         let (bus, history) = test_bus();
@@ -2228,17 +2229,21 @@ mod tests {
         Ok((actor, history, E3id::new("42", 1)))
     }
 
-    async fn next_event(history: &Addr<HistoryCollector<EnclaveEvent>>) -> Result<EnclaveEvent> {
-        let mut result = history.send(TakeEvents::<EnclaveEvent>::new(1)).await?;
+    async fn next_event(
+        history: &Addr<HistoryCollector<InterfoldEvent>>,
+    ) -> Result<InterfoldEvent> {
+        let mut result = history.send(TakeEvents::<InterfoldEvent>::new(1)).await?;
         assert!(!result.timed_out, "timed out waiting for an event");
         Ok(result.events.pop().expect("expected one event"))
     }
 
     async fn next_events(
-        history: &Addr<HistoryCollector<EnclaveEvent>>,
+        history: &Addr<HistoryCollector<InterfoldEvent>>,
         count: usize,
-    ) -> Result<Vec<EnclaveEvent>> {
-        let result = history.send(TakeEvents::<EnclaveEvent>::new(count)).await?;
+    ) -> Result<Vec<InterfoldEvent>> {
+        let result = history
+            .send(TakeEvents::<InterfoldEvent>::new(count))
+            .await?;
         assert!(!result.timed_out, "timed out waiting for events");
         assert_eq!(result.events.len(), count, "expected {count} events");
         Ok(result.events)
@@ -2260,13 +2265,13 @@ mod tests {
         let event = events.remove(0);
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::EncryptionKeyCollectionFailed(data) if data == failure
+            InterfoldEventData::EncryptionKeyCollectionFailed(data) if data == failure
         ));
 
         let event = events.remove(0);
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == failure.e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
                     && data.reason == FailureReason::InsufficientCommitteeMembers
@@ -2291,13 +2296,13 @@ mod tests {
         let event = events.remove(0);
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::ThresholdShareCollectionFailed(data) if data == failure
+            InterfoldEventData::ThresholdShareCollectionFailed(data) if data == failure
         ));
 
         let event = events.remove(0);
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == failure.e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
                     && data.reason == FailureReason::InsufficientCommitteeMembers
@@ -2320,7 +2325,7 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == failure.e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
                     && data.reason == FailureReason::InsufficientCommitteeMembers

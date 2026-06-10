@@ -9,8 +9,8 @@ use super::{
     AggregateConfig, UpdateDestination,
 };
 use crate::{
-    AggregateId, EnclaveEvent, EventContextAccessors, EventContextSeq, EventType, Insert,
-    InsertBatch, Sequenced, StoreKeys,
+    AggregateId, EventContextAccessors, EventContextSeq, EventType, Insert, InsertBatch,
+    InterfoldEvent, Sequenced, StoreKeys,
 };
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use e3_utils::MAILBOX_LIMIT;
@@ -134,9 +134,9 @@ impl Handler<Insert> for BatchRouter {
     }
 }
 
-impl Handler<EnclaveEvent<Sequenced>> for BatchRouter {
+impl Handler<InterfoldEvent<Sequenced>> for BatchRouter {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
         // On shutdown, force every still-open batch to disk before the process
         // exits. The batch that carries the Shutdown event itself is committed
         // by the normal path below; this drains any earlier debounced batches
