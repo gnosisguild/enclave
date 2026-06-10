@@ -15,15 +15,29 @@ From this directory:
 ./run_benchmarks.sh
 ./run_benchmarks.sh --mode secure --circuit dkg/pk
 ./run_benchmarks.sh --skip-compile
+./run_benchmarks.sh --mode secure --committee large
 ```
+
+| Flag / env                                | Effect                                                                                                                                                                                           |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--committee micro\|small\|medium\|large` | Benchmark a committee without rebuilding the Noir tree first (runs `pnpm build:circuits --committee` when needed). Overrides on-disk `active.nr` for output dir naming and integration-test env. |
+| `ENCLAVE_COMMITTEE_SIZE=<name>`           | Same committee for the Rust integration test (`test_trbfv_actor`); set automatically when using `--committee`.                                                                                   |
 
 Options and secure-only **config** circuit behavior are documented in the script and `config.json`.
 
-### Selecting committee size (micro / small / medium)
+### Selecting committee size (micro / small / medium / large)
 
 Benchmarks compile and run against whichever committee is **active** in the Noir tree. Default is
-`micro` (N=3, T=1, H=3). To benchmark with a different committee, switch it once at the build step
-and the Rust integration test, gas-extraction script, and report will all pick it up automatically.
+`micro` (N=3, T=1, H=3). To benchmark with a different committee, either pass `--committee` to
+`run_benchmarks.sh` or switch the active committee once at the build step — the Rust integration
+test, gas-extraction script, and report will all pick it up automatically.
+
+| Committee         | N   | T   | H   |
+| ----------------- | --- | --- | --- |
+| `micro` (default) | 3   | 1   | 3   |
+| `small`           | 5   | 2   | 5   |
+| `medium`          | 10  | 4   | 8   |
+| `large`           | 20  | 9   | 15  |
 
 **Step-by-step** (from repository root):
 
@@ -37,9 +51,13 @@ pnpm build:circuits --preset insecure-512 --committee medium
 pnpm check:committee
 #    → ✓ check:committee: medium (H=8, T=4) consistent across active.nr, utils.ts, .active-preset.json
 
-# 3. Run the benchmark. ENCLAVE_COMMITTEE_SIZE makes the Rust test pick the same committee
-#    and panic up-front if it disagrees with the stamp.
-ENCLAVE_COMMITTEE_SIZE=medium ./circuits/benchmarks/run_benchmarks.sh --mode insecure
+# 3. Run the benchmark. `--committee` sets ENCLAVE_COMMITTEE_SIZE for the Rust test;
+#    or set it explicitly when invoking scripts directly.
+./circuits/benchmarks/run_benchmarks.sh --mode insecure --committee medium
+#    ENCLAVE_COMMITTEE_SIZE=medium ./circuits/benchmarks/run_benchmarks.sh --mode insecure
+
+# 3b. Large committee (N=20, T=9, H=15) — expect long secure-mode runtimes.
+./circuits/benchmarks/run_benchmarks.sh --mode secure --committee large
 
 # 4. To go back to micro, run step 1 again with --committee micro.
 pnpm build:circuits --preset insecure-512 --committee micro

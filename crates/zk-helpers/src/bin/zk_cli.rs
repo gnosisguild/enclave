@@ -8,7 +8,7 @@
 //!
 //! This binary lists available circuits and generates Prover.toml and configs.nr
 //! for use with the Noir prover. Use `--list_circuits` to see circuits and
-//! `--circuit <name> --preset insecure|secure|2|80` to generate artifacts.
+//! `--circuit <name> --preset insecure|secure|2|80 [--committee micro|small|medium|large]` to generate artifacts.
 //!
 //! **Share-computation (C2) configs.nr:** set `ENCLAVE_CIRCUITS_ROOT` to the repo `circuits`
 //! directory (or run from the Enclave repo so it is auto-discovered). After `pnpm build:circuits`,
