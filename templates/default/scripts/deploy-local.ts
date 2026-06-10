@@ -23,7 +23,7 @@ async function main() {
   console.log('Account balance:', ethers.formatEther(await ethers.provider.getBalance(deployer.address)))
 
   // Mocks for local dev; skip on-chain ZK verifiers (needs pnpm compile:circuits).
-  await deployInterfold(true, true)
+  await deployInterfold(true, false)
   await deployTemplate()
 }
 

@@ -60,7 +60,7 @@
     "dotenv": "^16.4.5",
     "ethers": "^6.15.0",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4",
-    "hardhat": "^3.0.11",
+    "hardhat": "3.0.11",
     "hardhat-deploy": "^0.12.4",
     "hardhat-gas-reporter": "^1.0.8",
     "solidity-coverage": "^0.8.1",
