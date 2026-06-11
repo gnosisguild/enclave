@@ -88,11 +88,11 @@ User runs: interfold ciphernode license bond --amount 50000
 └─ OUTPUT: "Transaction hash: 0x..."
 ```
 
-### Locked ENCL bonding
+### Locked INTF bonding
 
-`BondingRegistry.totalBonded(account)` returns active ENCL license bond plus pending ENCL exits that
-remain slashable/not returned. `EnclaveToken` uses this view for pooled wallet-level locks, so
-locked ENCL can be self-bonded by the same account without becoming transferable. Delegated
+`BondingRegistry.totalBonded(account)` returns active INTF license bond plus pending INTF exits that
+remain slashable/not returned. `InterfoldToken` uses this view for pooled wallet-level locks, so
+locked INTF can be self-bonded by the same account without becoming transferable. Delegated
 source-aware bonding is not part of the pooled-lock model; license bonds are credited to
 `msg.sender` through `bondLicense(amount)`.
 
@@ -205,7 +205,7 @@ User runs: interfold ciphernode license unbond --amount 10000
 │     │  │    4. _exits.queueLicensesForExit(                   │
 │     │  │         msg.sender, exitDelay, amount                 │
 │     │  │       )                                               │
-│     │  │       → Pending ENCL still counts in totalBonded()    │
+│     │  │       → Pending INTF still counts in totalBonded()    │
 │     │  │         until claimed or slashed                      │
 │     │  │    5. _updateOperatorStatus(msg.sender)               │
 │     │  │       → May DEACTIVATE if bond drops below threshold  │

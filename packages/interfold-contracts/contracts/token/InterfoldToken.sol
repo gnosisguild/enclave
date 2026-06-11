@@ -49,8 +49,8 @@ import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
  *
  *      Token-level locks are pooled per account. For every non-mint/non-burn transfer, the sender
  *      must satisfy: balanceOf(sender) + BondingRegistry.totalBonded(sender) >= lockedFloorOf(sender).
- *      This lets locked holders use same-account ENCL as operator bond collateral while preserving
- *      the explicit product constraint that all ENCL in the same wallet is pooled for locks/slashing.
+ *      This lets locked holders use same-account INTF as operator bond collateral while preserving
+ *      the explicit product constraint that all INTF in the same wallet is pooled for locks/slashing.
  *
  *      Voting uses {block.timestamp} (EIP-6372 "mode=timestamp") so timepoints align with other
  *      Interfold contracts.
@@ -215,7 +215,7 @@ contract InterfoldToken is
     /// @notice Earliest timestamp at which {tge} may be called.
     uint64 public tgeEarliest;
 
-    /// @notice Registry queried for ENCL that still counts toward an account's locked floor.
+    /// @notice Registry queried for INTF that still counts toward an account's locked floor.
     IBondingRegistry public bondingRegistry;
 
     /// @notice Mapping of addresses permitted to transfer tokens when restrictions are active
@@ -226,7 +226,7 @@ contract InterfoldToken is
     /// @dev When true, only whitelisted addresses can transfer tokens
     bool public transfersRestricted;
 
-    /// @notice Approved CCA/auction claim sources whose outbound ENCL creates wallet-level locks.
+    /// @notice Approved CCA/auction claim sources whose outbound INTF creates wallet-level locks.
     mapping(address source => bool approved) public approvedClaimSources;
 
     /// @notice Relative CCA claim lock profile for each buyer/recipient.
@@ -589,7 +589,7 @@ contract InterfoldToken is
         return _lockSchedules[account][scheduleId];
     }
 
-    /// @notice Current amount that must remain controlled by an account's wallet plus bonded ENCL.
+    /// @notice Current amount that must remain controlled by an account's wallet plus bonded INTF.
     function lockedFloorOf(address account) public view returns (uint256) {
         return lockedFloorAt(account, uint64(block.timestamp));
     }
@@ -606,7 +606,7 @@ contract InterfoldToken is
         }
     }
 
-    /// @notice ENCL bonded by an account that still counts toward its locked floor.
+    /// @notice INTF bonded by an account that still counts toward its locked floor.
     function totalBondedOf(address account) public view returns (uint256) {
         IBondingRegistry registry = bondingRegistry;
         if (address(registry) == address(0)) return 0;

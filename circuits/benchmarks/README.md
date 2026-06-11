@@ -21,7 +21,7 @@ From this directory:
 | Flag / env                                | Effect                                                                                                                                                                                           |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `--committee micro\|small\|medium\|large` | Benchmark a committee without rebuilding the Noir tree first (runs `pnpm build:circuits --committee` when needed). Overrides on-disk `active.nr` for output dir naming and integration-test env. |
-| `ENCLAVE_COMMITTEE_SIZE=<name>`           | Same committee for the Rust integration test (`test_trbfv_actor`); set automatically when using `--committee`.                                                                                   |
+| `INTERFOLD_COMMITTEE_SIZE=<name>`         | Same committee for the Rust integration test (`test_trbfv_actor`); set automatically when using `--committee`.                                                                                   |
 
 Options and secure-only **config** circuit behavior are documented in the script and `config.json`.
 
@@ -51,9 +51,9 @@ pnpm build:circuits --preset insecure-512 --committee medium
 pnpm check:committee
 #    → ✓ check:committee: medium (H=8, T=4) consistent across active.nr, utils.ts, .active-preset.json
 
-# 3. Run the benchmark. ENCLAVE_COMMITTEE_SIZE makes the Rust test pick the same committee
+# 3. Run the benchmark. INTERFOLD_COMMITTEE_SIZE makes the Rust test pick the same committee
 #    and panic up-front if it disagrees with the stamp.
-ENCLAVE_COMMITTEE_SIZE=medium ./circuits/benchmarks/run_benchmarks.sh --mode insecure
+INTERFOLD_COMMITTEE_SIZE=medium ./circuits/benchmarks/run_benchmarks.sh --mode insecure
 
 # 4. To go back to micro, run step 1 again with --committee micro.
 pnpm build:circuits --preset insecure-512 --committee micro

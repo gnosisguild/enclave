@@ -94,15 +94,9 @@
     },
     "E3RefundManager": {
       "constructorArgs": {
-<<<<<<< HEAD
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "enclave": "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
-        "treasury": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-=======
         "owner": "0x8837e47c4Bb520ADE83AAB761C3B60679443af1B",
         "interfold": "0x670eFE043d1D340148037b4b76c4F9dfED294309",
         "treasury": "0x8837e47c4Bb520ADE83AAB761C3B60679443af1B"
->>>>>>> main
       },
       "proxyRecords": {
         "initData": "0xc0c53b8b000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb922660000000000000000000000000b306bf915c4d645ff596e518faf3f9669b97016000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266",
@@ -142,15 +136,9 @@
       "address": "0xFD471836031dc5108809D173A067e8486B9047A3",
       "blockNumber": 42,
       "constructorArgs": {
-<<<<<<< HEAD
-        "enclave": "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
-        "verifierAddress": "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0",
-        "honkVerifierAddress": "0xc351628EB244ec633d5f21fBD6621e1a683B1181",
-=======
         "interfold": "0x670eFE043d1D340148037b4b76c4F9dfED294309",
         "verifierAddress": "0x05c415E39AF18B2cc118fFC98258afe38636EAb0",
         "honkVerifierAddress": "0x70AA319AA8a305Eb65a78b0791b2526BE7193Cfa",
->>>>>>> main
         "imageId": "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
       }
     },

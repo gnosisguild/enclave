@@ -1228,7 +1228,7 @@ describe("BondingRegistry", function () {
       } = await loadFixture(setup);
 
       // Register and fund tickets so the generic ExitQueueLib ticket path is
-      // exercised directly alongside ENCL exits.
+      // exercised directly alongside INTF exits.
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)

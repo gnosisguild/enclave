@@ -214,9 +214,9 @@ interface IBondingRegistry {
     function getLicenseBond(address operator) external view returns (uint256);
 
     /**
-     * @notice Get ENCL that still counts toward an account's locked-floor collateral.
-     * @dev Includes active license bond plus pending ENCL exits that remain slashable/not returned.
-     * @param account Account/operator whose ENCL bond credit is queried
+     * @notice Get INTF that still counts toward an account's locked-floor collateral.
+     * @dev Includes active license bond plus pending INTF exits that remain slashable/not returned.
+     * @param account Account/operator whose INTF bond credit is queried
      * @return Active plus pending license-bond amount
      */
     function totalBonded(address account) external view returns (uint256);

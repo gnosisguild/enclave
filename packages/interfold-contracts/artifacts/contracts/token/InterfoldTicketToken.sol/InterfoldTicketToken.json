@@ -1485,11 +1485,6 @@
       }
     ]
   },
-<<<<<<< HEAD:packages/enclave-contracts/artifacts/contracts/token/EnclaveTicketToken.sol/EnclaveTicketToken.json
-  "inputSourceName": "project/contracts/token/EnclaveTicketToken.sol",
-  "buildInfoId": "solc-0_8_28-99196e36a88d1f8615dcb8a76e750e1cbdb201c4"
-=======
   "inputSourceName": "project/contracts/token/InterfoldTicketToken.sol",
-  "buildInfoId": "solc-0_8_28-8c071345fedd32f4664163cf658339e6750c8f10"
->>>>>>> main:packages/interfold-contracts/artifacts/contracts/token/InterfoldTicketToken.sol/InterfoldTicketToken.json
+  "buildInfoId": "solc-0_8_28-d96b1451d9af86253d4103fca7abd8920706ac94"
 }

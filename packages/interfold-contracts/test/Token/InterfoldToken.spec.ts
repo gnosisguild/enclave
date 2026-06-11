@@ -4,15 +4,15 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { expect } from "chai";
+
+import { InterfoldToken__factory as InterfoldTokenFactory } from "../../types";
 import {
   SEVEN_DAYS,
-  deployEnclaveSystem,
+  deployInterfoldSystem,
   ethers,
   networkHelpers,
 } from "../fixtures";
 
-import { InterfoldToken__factory as InterfoldTokenFactory } from "../../types";
-const { ethers, networkHelpers } = await network.connect();
 const { loadFixture, time } = networkHelpers;
 
 const GROUP_PRE_SEED = ethers.encodeBytes32String("PRE_SEED");
@@ -443,7 +443,7 @@ describe("InterfoldToken", function () {
       const signers = await ethers.getSigners();
       const [, beneficiary] = signers;
       const beneficiaryAddress = await beneficiary.getAddress();
-      const sys = await deployEnclaveSystem({
+      const sys = await deployInterfoldSystem({
         useMockCiphernodeRegistry: true,
         setupOperators: 0,
         mintUsdcTo: [],
@@ -506,7 +506,7 @@ describe("InterfoldToken", function () {
       const [, beneficiary, slasher] = signers;
       const beneficiaryAddress = await beneficiary.getAddress();
       const slasherAddress = await slasher.getAddress();
-      const sys = await deployEnclaveSystem({
+      const sys = await deployInterfoldSystem({
         useMockCiphernodeRegistry: true,
         setupOperators: 0,
         wireSlashingManager: false,
@@ -582,7 +582,7 @@ describe("InterfoldToken", function () {
       const beneficiaryAddress = await beneficiary.getAddress();
       const recipientAddress = await recipient.getAddress();
       const slasherAddress = await slasher.getAddress();
-      const sys = await deployEnclaveSystem({
+      const sys = await deployInterfoldSystem({
         useMockCiphernodeRegistry: true,
         setupOperators: 0,
         wireSlashingManager: false,

@@ -54,7 +54,7 @@ User runs: interfold ciphernode deactivate --license 20000
     │  │    1. require(amount != 0, sufficient bonded INTF)      │
     │  │    2. operators[op].licenseBond -= 20000                │
     │  │    3. _exits.queueLicensesForExit(op, exitDelay, 20000)│
-    │  │       → Pending ENCL remains in totalBonded(op) for     │
+    │  │       → Pending INTF remains in totalBonded(op) for     │
     │  │         token-level locked-floor accounting             │
     │  │    4. _updateOperatorStatus(operator)                   │
     │  │       → If licenseBond <                                │
@@ -75,7 +75,7 @@ User runs: interfold ciphernode deactivate --tickets 50 --license 20000
 ├─ Calls removeTicketBalance(50) first
 └─ Then calls unbondLicense(20000)
   → Tickets are queued in ExitQueueLib
-  → ENCL is queued in ExitQueueLib pending license exits and remains counted in totalBonded()
+  → INTF is queued in ExitQueueLib pending license exits and remains counted in totalBonded()
 ```
 
 ---

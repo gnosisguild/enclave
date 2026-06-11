@@ -103,7 +103,7 @@ function resolveInterfoldTgeTimestamp(
   }
 
   console.warn(
-    "[WARN] INTERFOLD_TGE_TIMESTAMP not set; using latest local block timestamp for ENCL token locks.",
+    "[WARN] INTERFOLD_TGE_TIMESTAMP not set; using latest local block timestamp for INTF token locks.",
   );
   return latestBlockTimestamp.toString();
 }

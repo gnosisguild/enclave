@@ -661,7 +661,7 @@ _executeSlash(proposalId):
 │     │
 │     │  ┌─── BondingRegistry.slashLicenseBond() ───────────────┐
 │     │  │                                                       │
-│     │  │  1. Compute active + pending ENCL source total        │
+│     │  │  1. Compute active + pending INTF source total        │
 │     │  │                                                       │
 │     │  │  2. _slashLicenseSourcesLifo(operator, amount):       │
 │     │  │     Compare newest active source sequence with        │
@@ -670,7 +670,7 @@ _executeSlash(proposalId):
 │     │  │     → Active slash decrements operators[op].licenseBond│
 │     │  │     → Pending slash decrements pending license totals │
 │     │  │     → totalBonded(op) drops immediately; if op has   │
-│     │  │       token-level locks, same-wallet ENCL may become │
+│     │  │       token-level locks, same-wallet INTF may become │
 │     │  │       encumbered until the locked floor decays/top-up │
 │     │  │     → Receiver callback gets (operator, amount,       │
 │     │  │       sourceId) when supported                        │

@@ -2426,11 +2426,6 @@
   "linkReferences": {},
   "deployedLinkReferences": {},
   "immutableReferences": {},
-<<<<<<< HEAD:packages/enclave-contracts/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json
-  "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-99196e36a88d1f8615dcb8a76e750e1cbdb201c4"
-=======
   "inputSourceName": "project/contracts/interfaces/IInterfold.sol",
-  "buildInfoId": "solc-0_8_28-8c071345fedd32f4664163cf658339e6750c8f10"
->>>>>>> main:packages/interfold-contracts/artifacts/contracts/interfaces/IInterfold.sol/IInterfold.json
+  "buildInfoId": "solc-0_8_28-b09c5d8313e36da17310e2043045396de2e05713"
 }
