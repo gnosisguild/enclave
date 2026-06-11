@@ -157,8 +157,13 @@ pub(crate) fn check_c1_keyshare_commitments(
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublicKeyAggregatorState {
     Collecting {
+        /// Live committee size after expulsions; used only to decide when enough keyshares arrived.
         threshold_n: usize,
         threshold_m: usize,
+        /// Canonical on-chain / circuit committee size N (unchanged after expulsion).
+        circuit_committee_n: usize,
+        /// Canonical honest-party count H for circuit public IO.
+        circuit_committee_h: usize,
         keyshares: OrderedSet<ArcBytes>,
         /// C1 proofs collected from KeyshareCreated events, indexed by insertion order
         /// (matches `submission_order`).
@@ -175,8 +180,10 @@ pub enum PublicKeyAggregatorState {
         /// Insertion-ordered (party_id, node, keyshare) triples from Collecting.
         submission_order: Vec<(u64, String, ArcBytes)>,
         threshold_m: usize,
-        /// On-chain committee size N (for `committee_h` lookup).
-        threshold_n: usize,
+        /// Canonical on-chain / circuit committee size N (for `committee_h` lookup).
+        circuit_committee_n: usize,
+        /// Canonical honest-party count H for circuit public IO.
+        circuit_committee_h: usize,
         /// C1 proofs in the same insertion order as `submission_order`.
         c1_proofs: Vec<Option<SignedProofPayload>>,
         /// Real party_ids that submitted no C1 proof — treated as dishonest.
@@ -258,9 +265,13 @@ impl PublicKeyAggregatorState {
     }
 
     pub fn init(threshold_n: usize, threshold_m: usize, seed: Seed) -> Self {
+        let circuit_committee_h = committee_h_for(threshold_m, threshold_n)
+            .unwrap_or_else(|e| panic!("invalid committee at init: {e}"));
         PublicKeyAggregatorState::Collecting {
             threshold_n,
             threshold_m,
+            circuit_committee_n: threshold_n,
+            circuit_committee_h,
             keyshares: OrderedSet::new(),
             c1_proofs: Vec::new(),
             seed,
@@ -305,6 +316,8 @@ impl PublicKeyAggregation {
         let PublicKeyAggregatorState::Collecting {
             threshold_n,
             threshold_m,
+            circuit_committee_n,
+            circuit_committee_h,
             keyshares,
             c1_proofs,
             nodes,
@@ -329,21 +342,23 @@ impl PublicKeyAggregation {
         submission_order.push((party_id, node, keyshare));
         let n = *threshold_n;
         let m = *threshold_m;
-        let committee_h = committee_h_for(m, n)?;
+        let committee_n = *circuit_committee_n;
+        let committee_h = *circuit_committee_h;
         let unique_parties = submission_order.len();
         info!(
-            "PublicKeyAggregator got keyshares {unique_parties}/{n} distinct parties (committee_h={committee_h})"
+            "PublicKeyAggregator got keyshares {unique_parties}/{n} distinct parties (circuit_n={committee_n}, committee_h={committee_h})"
         );
         // Collect all N committee keyshares before C1. C5 then requires exactly H honest
         // proofs afterward (micro had N=H so waiting for H was equivalent).
         if unique_parties >= n {
             info!(
-                "Collected keyshares from {unique_parties} distinct parties (>= committee_n={n}), transitioning to VerifyingC1..."
+                "Collected keyshares from {unique_parties} distinct parties (>= live_n={n}, circuit_n={committee_n}), transitioning to VerifyingC1..."
             );
             return Ok(PublicKeyAggregatorState::VerifyingC1 {
                 submission_order: std::mem::take(submission_order),
                 threshold_m: m,
-                threshold_n: n,
+                circuit_committee_n: committee_n,
+                circuit_committee_h: committee_h,
                 c1_proofs: std::mem::take(c1_proofs),
                 no_proof_parties: Vec::new(),
             });
@@ -458,6 +473,8 @@ impl PublicKeyAggregation {
         let PublicKeyAggregatorState::Collecting {
             threshold_n,
             threshold_m,
+            circuit_committee_n,
+            circuit_committee_h,
             keyshares,
             c1_proofs,
             nodes,
@@ -498,12 +515,14 @@ impl PublicKeyAggregation {
 
         if keyshares.len() == *threshold_n && *threshold_n > 0 {
             let m = *threshold_m;
-            let n = *threshold_n;
+            let committee_n = *circuit_committee_n;
+            let committee_h = *circuit_committee_h;
             info!("PublicKeyAggregator: enough keyshares after expulsion, transitioning to VerifyingC1");
             return Ok(PublicKeyAggregatorState::VerifyingC1 {
                 submission_order: std::mem::take(submission_order),
                 threshold_m: m,
-                threshold_n: n,
+                circuit_committee_n: committee_n,
+                circuit_committee_h: committee_h,
                 c1_proofs: std::mem::take(c1_proofs),
                 no_proof_parties: Vec::new(),
             });
@@ -575,12 +594,14 @@ mod tests {
         match state {
             PublicKeyAggregatorState::VerifyingC1 {
                 submission_order,
-                threshold_n,
+                circuit_committee_n,
+                circuit_committee_h,
                 threshold_m,
                 ..
             } => {
                 assert_eq!(submission_order.len(), 3);
-                assert_eq!(threshold_n, 3);
+                assert_eq!(circuit_committee_n, 3);
+                assert_eq!(circuit_committee_h, 2);
                 assert_eq!(threshold_m, 1);
             }
             _ => panic!("expected VerifyingC1"),
@@ -592,7 +613,8 @@ mod tests {
         let state = PublicKeyAggregatorState::VerifyingC1 {
             submission_order: vec![],
             threshold_m: 1,
-            threshold_n: 3,
+            circuit_committee_n: 3,
+            circuit_committee_h: 2,
             c1_proofs: vec![],
             no_proof_parties: vec![],
         };
@@ -699,6 +721,8 @@ mod tests {
         let state = PublicKeyAggregatorState::Collecting {
             threshold_n: 2,
             threshold_m: 1,
+            circuit_committee_n: 3,
+            circuit_committee_h: 2,
             keyshares: OrderedSet::from(vec![ks(10), ks(11)]),
             c1_proofs: vec![None, None],
             seed: Seed([0u8; 32]),
@@ -711,11 +735,13 @@ mod tests {
         let next = PublicKeyAggregation::handle_member_expelled(state, "node-0").unwrap();
         match next {
             PublicKeyAggregatorState::VerifyingC1 {
-                threshold_n,
+                circuit_committee_n,
+                circuit_committee_h,
                 submission_order,
                 ..
             } => {
-                assert_eq!(threshold_n, 1);
+                assert_eq!(circuit_committee_n, 3);
+                assert_eq!(circuit_committee_h, 2);
                 assert_eq!(submission_order.len(), 1);
             }
             _ => panic!("expected VerifyingC1"),
