@@ -16,15 +16,53 @@ Before a node can register, it must stake two types of collateral:
 ┌───────────────────────────────────────────────────────────┐
 │                    InterfoldToken (INTF)                     │
 │  ERC20 + ERC20Permit + ERC20Votes + AccessControl         │
+│  + Ownable2Step                                            │
 │                                                           │
 │  MAX_SUPPLY: 1,200,000,000 (1.2B with 18 decimals)       │
-│  Roles: MINTER_ROLE can mint via mintAllocation()         │
-│         LOCK_MANAGER_ROLE manages token-level locks       │
-│  Transfer restrictions: when transfersRestricted=true,    │
-│    only whitelisted addresses can transfer                │
-│  Lock invariant for normal transfers:                     │
-│    balanceOf(account) + totalBonded(account)              │
-│      >= lockedFloorOf(account)                            │
+│  Immutables: CCA_START, CCA_END, CLAIM_SOURCE,            │
+│              BONDING_REGISTRY (set at construction)        │
+│                                                           │
+│  Lifecycle phases (derived from CCA window + TGE):        │
+│    Virtual → PublicSale → Cooldown → Live                 │
+│    - Virtual: mint() + mintAllocations() allowed           │
+│    - PublicSale: CCA bidding window                        │
+│    - Cooldown: CCA ended, TGE not yet called               │
+│    - Live: TGE fired (permissionless after cooldown)       │
+│                                                           │
+│  Minting (Virtual phase only):                            │
+│    - mint(recipient, amount, label)                        │
+│      DEFAULT_ADMIN_ROLE — unlocked tokens                  │
+│    - mintAllocations(MintAllocation[])                     │
+│      MINTER_ROLE — tokens locked under a policy            │
+│                                                           │
+│  Pre-TGE transfer gate (phase-based, automatic):          │
+│    Allowed: bonding registry, claim source, whitelisted    │
+│    Blocked: all other transfers                            │
+│    Once TGE fires, all transfers unrestricted              │
+│                                                           │
+│  Lock system (wallet-level pooled enforcement):           │
+│    - createLockPolicy(id, LockPolicy) → write-once         │
+│      LOCK_MANAGER_ROLE                                     │
+│    - linkClaim(account, amount, policyId)                  │
+│      LOCK_MANAGER_ROLE                                     │
+│    - LockPolicy: { holdUntil, Curve { anchor, start,      │
+│        cliffDuration, vestDuration } }                     │
+│    - Anchor: Absolute (fixed start) | Tge (tgeTimestamp)   │
+│    - PENDING_LOCK_POLICY_ID for unclassified claims        │
+│    - Queued locks consumed by later claims (linkClaim)     │
+│                                                           │
+│  Lock invariant for transfers:                             │
+│    transferable = balance - max(0, lockedBalance -         │
+│      BONDING_REGISTRY.totalBonded(account))                │
+│    Transfer reverts with InsufficientUnlockedBalance       │
+│    if value > transferable                                 │
+│                                                           │
+│  Whitelisting:                                             │
+│    - setTransferWhitelisted(addr, bool)                    │
+│      WHITELIST_ROLE — pre-TGE transfer gate                │
+│    - setLockWhitelisted(addr, bool)                        │
+│      LOCK_MANAGER_ROLE — exempt from claim-source locks    │
+│                                                           │
 │  Used as: LICENSE BOND token                              │
 └───────────────────────────────────────────────────────────┘
 
@@ -389,20 +427,37 @@ The token contracts were hardened against the following audit findings. All chan
 - **M-29 — EIP-6372 timestamp clock.** `clock() = uint48(block.timestamp)`,
   `CLOCK_MODE() = "mode=timestamp"`.
 
-### InterfoldToken (INTF)
+### InterfoldToken (INTF) — Complete Rewrite
 
-- **H-15 — WHITELIST_ROLE separation + one-way disable.** New `WHITELIST_ROLE` gates
-  `toggleTransferWhitelist` and `whitelistContracts`, decoupling whitelist edits from `MINTER_ROLE`.
-  `disableTransferRestrictions` is `DEFAULT_ADMIN_ROLE` only and idempotent (silent no-op when
-  already disabled) so deployment/setup scripts can call it unconditionally.
-- **M-21 — per-epoch mint cap.** New rolling cap configured via
-  `setMintCap(epochLength, capPerEpoch)` (`ZeroEpochLength` on zero length). Both `mintAllocation`
-  and `batchMintAllocations` route through `_accountForMintAgainstCap`, which rolls the epoch
-  (`MintEpochRolled(newStart)`) and reverts `ExceedsMintCap` on overflow. Constructor defaults to a
-  30-day epoch with `cap = MAX_SUPPLY` so bootstrap deployments keep working; governance is expected
-  to tighten this before broad distribution.
-- **M-29 — EIP-6372 timestamp clock.** Same timestamp clock as ITK, aligning INTF voting checkpoints
-  with timepoints used elsewhere.
+The INTF token was rewritten to implement a CCA-auction-aligned lifecycle with wallet-level lock
+enforcement based on immutable policy curves. Key changes:
+
+- **Phase-based lifecycle.** The token derives its phase from immutable `CCA_START` / `CCA_END` and
+  the one-way `tge()` call: Virtual → PublicSale → Cooldown → Live. Minting is gated to Virtual
+  phase only; TGE is permissionless after `CCA_END + TGE_COOLDOWN` (45 days). The pre-TGE transfer
+  gate automatically lifts at TGE — no `disableTransferRestrictions` / `transfersRestricted` flag.
+- **Pre-TGE transfer gate.** Before TGE, only bonding-registry transfers, claim-source
+  distributions, and whitelisted addresses can transfer. Bonding is always allowed so operators can
+  stake during Virtual phase.
+- **Immutable constructor parameters.** `CCA_START`, `CCA_END`, `CLAIM_SOURCE`, and
+  `BONDING_REGISTRY` are set at construction and cannot change. The BondingRegistry must be deployed
+  first (or a placeholder used and fixed via `setLicenseToken`).
+- **Lock policy system.** `createLockPolicy(id, LockPolicy)` creates write-once policies with
+  `Curve { anchor (Absolute|Tge), start, cliffDuration, vestDuration }` and optional `holdUntil`.
+  `linkClaim(account, amount, policyId)` classifies pending claim-source tokens under a real policy.
+  `PENDING_LOCK_POLICY_ID` holds unclassified claim tokens until linked.
+- **Pooled wallet enforcement.** `lockedBalanceOf(account)` sums active locks (including PENDING).
+  `transferableBalanceOf(account) = balance - max(0, locked - BONDING_REGISTRY.totalBonded(account))`.
+  Transfers that exceed the transferable balance revert with `InsufficientUnlockedBalance`.
+- **Claim-source auto-lock.** Tokens arriving from `CLAIM_SOURCE` are automatically locked as
+  PENDING unless the recipient is in `lockWhitelist`. `linkClaim` moves PENDING to a real policy and
+  queues unfilled amounts for future claims.
+- **EIP-6372 timestamp clock.** `clock()` returns `block.timestamp`, `CLOCK_MODE()` is
+  `"mode=timestamp"`.
+- **Minting.** `mint(recipient, amount, label)` (DEFAULT_ADMIN_ROLE, unlocked) and
+  `mintAllocations(MintAllocation[])` (MINTER_ROLE, locked to a policy) are both Virtual-only.
+- **Ownership.** `renounceOwnership()` is disabled. Two-step ownership transfer via Ownable2Step
+  syncs all AccessControl roles atomically.
 
 ### Registry coordination
 
