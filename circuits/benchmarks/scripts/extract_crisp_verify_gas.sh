@@ -2,10 +2,10 @@
 
 # extract_crisp_verify_gas.sh - Runs CRISP verifier test with gas reporter and emits JSON.
 # Usage: ./extract_crisp_verify_gas.sh --output <json_file> [--mode insecure|secure]
-#        [--committee micro|small|medium|large] [--verbose] [--skip-build] [--force-build]
+#        [--committee minimum|micro|small] [--verbose] [--skip-build] [--force-build]
 #
 # Integration test env (also set by run_benchmarks.sh):
-#   BENCHMARK_PROOF_AGGREGATION=true|false  — recursive fold + folded Π_DKG/Π_dec (default: true)
+#   BENCHMARK_PROOF_AGGREGATION=true        — always enabled in the benchmark harness
 #   BENCHMARK_MULTITHREAD_JOBS=N            — Rayon concurrent ZK jobs (default: 1)
 #   BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER — EIP-712 verifying contract for fold attestations
 
@@ -31,9 +31,9 @@ while [[ $# -gt 0 ]]; do
         --committee)
             COMMITTEE="$2"
             case "$COMMITTEE" in
-                micro|small|medium|large) ;;
+                minimum|micro|small) ;;
                 *)
-                    echo "Error: --committee must be micro|small|medium|large (got: $COMMITTEE)"
+                    echo "Error: --committee must be minimum|micro|small (got: $COMMITTEE)"
                     exit 1
                     ;;
             esac
@@ -53,14 +53,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 --output <json_file> [--mode insecure|secure] [--committee micro|small|medium|large] [--verbose] [--skip-build] [--force-build]"
+            echo "Usage: $0 --output <json_file> [--mode insecure|secure] [--committee minimum|micro|small] [--verbose] [--skip-build] [--force-build]"
             exit 1
             ;;
     esac
 done
 
 if [ -z "$OUTPUT_JSON" ]; then
-    echo "Usage: $0 --output <json_file> [--mode insecure|secure] [--committee micro|small|medium|large] [--verbose] [--skip-build] [--force-build]"
+    echo "Usage: $0 --output <json_file> [--mode insecure|secure] [--committee minimum|micro|small] [--verbose] [--skip-build] [--force-build]"
     exit 1
 fi
 if [ "$SKIP_BUILD" = true ] && [ "$FORCE_BUILD" = true ]; then
@@ -165,12 +165,12 @@ echo "  [gas] Running CRISP verifier test for Pi_user gas..."
 CRISP_TEST_EXIT_CODE=${PIPESTATUS[0]}
 echo "  [gas] CRISP test completed (exit=${CRISP_TEST_EXIT_CODE})."
 require_preset_artifacts
-BENCHMARK_PROOF_AGGREGATION="${BENCHMARK_PROOF_AGGREGATION:-true}"
-echo "  [gas] Running integration test (test_trbfv_actor); proof_aggregation=${BENCHMARK_PROOF_AGGREGATION}, multithread_jobs=${BENCHMARK_MULTITHREAD_JOBS:-1}, profile=release..."
+BENCHMARK_PROOF_AGGREGATION=true
+echo "  [gas] Running integration test (test_trbfv_actor); proof_aggregation=true, multithread_jobs=${BENCHMARK_MULTITHREAD_JOBS:-1}, profile=release..."
 (
   cd "$REPO_ROOT" && \
   BENCHMARK_MODE="$MODE" \
-  BENCHMARK_PROOF_AGGREGATION="$BENCHMARK_PROOF_AGGREGATION" \
+  BENCHMARK_PROOF_AGGREGATION=true \
   BENCHMARK_FOLDED_OUTPUT="$TMP_JSON_FOLDED" \
   BENCHMARK_SUMMARY_OUTPUT="$TMP_JSON_SUMMARY" \
   cargo test --release -p e3-tests test_trbfv_actor -- --nocapture

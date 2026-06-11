@@ -1388,7 +1388,7 @@ mod tests {
                     ZkRequest::PkBfv(PkBfvProofRequest::new(
                         ArcBytes::from_bytes(&[1]),
                         e3_fhe_params::BfvPreset::InsecureThreshold512,
-                        e3_zk_helpers::CiphernodesCommitteeSize::Micro,
+                        e3_zk_helpers::CiphernodesCommitteeSize::Minimum,
                     )),
                     correlation_id,
                     e3_id.clone(),

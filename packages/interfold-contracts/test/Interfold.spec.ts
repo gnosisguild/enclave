@@ -430,7 +430,7 @@ describe("Interfold", function () {
     });
     it("reverts if committee size is not configured", async function () {
       const { interfold, request, usdcToken } = await loadFixture(setup);
-      // CommitteeSize.Large (3) is not configured in the fixture
+      // CommitteeSize index 3 is not configured in the fixture
       await expect(
         makeRequest(interfold, usdcToken, {
           committeeSize: 3,

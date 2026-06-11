@@ -53,9 +53,9 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       bfvParams: "large",
       timeoutConfig: LARGE_TIMEOUT_CONFIG,
       committeeThresholds: [
-        [0, [1, 3]], // Micro
-        [1, [2, 3]], // Small
-        [2, [2, 4]], // Medium
+        [0, [1, 3]], // Minimum
+        [1, [2, 4]], // test fixture: 4-node committee
+        [2, [4, 9]], // Micro
       ],
       deployCircuitVerifier: true,
       setupOperators: 0,
@@ -265,7 +265,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator2);
       await setupOperator(operator3);
 
-      await makeRequest(1); // Small: M=2, N=3
+      await makeRequest(1); // fixture: M=2, N=4
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -334,7 +334,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const SLASHER_ROLE = await slashingManager.SLASHER_ROLE();
       await slashingManager.grantRole(SLASHER_ROLE, await owner.getAddress());
 
-      await makeRequest(1); // Small: M=2, N=3
+      await makeRequest(1); // fixture: M=2, N=4
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -541,7 +541,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
       await setupOperator(operator4);
 
-      await makeRequest(2); // Medium: M=2, N=4
+      await makeRequest(1); // fixture: M=2, N=4
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -629,7 +629,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const SLASHER_ROLE = await slashingManager.SLASHER_ROLE();
       await slashingManager.grantRole(SLASHER_ROLE, await owner.getAddress());
 
-      await makeRequest(1); // Small: M=2, N=3
+      await makeRequest(1); // fixture: M=2, N=4
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -693,7 +693,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
       await setupOperator(operator4);
 
-      await makeRequest(2); // Medium: M=2, N=4
+      await makeRequest(1); // fixture: M=2, N=4
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,

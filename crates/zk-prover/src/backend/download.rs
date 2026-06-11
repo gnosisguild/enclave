@@ -20,7 +20,7 @@ use walkdir::WalkDir;
 use super::ZkBackend;
 
 /// Known committee subdirectories in per-committee circuit release layouts (v0.2.0+).
-const COMMITTEE_SUBDIRS: &[&str] = &["micro", "small", "medium", "large"];
+const COMMITTEE_SUBDIRS: &[&str] = &["minimum", "micro", "small"];
 
 /// Circuit artifact variant directories at `{preset}/{committee?}/{variant}/...`.
 const CIRCUIT_VARIANT_DIRS: &[&str] = &["default", "evm", "recursive"];
@@ -368,46 +368,46 @@ mod tests {
     async fn read_manifest_file_picks_committee_matching_checksum() {
         let temp = TempDir::new().unwrap();
         let circuits_dir = temp.path();
-        let micro = b"micro";
-        let large = b"large";
+        let minimum = b"minimum";
+        let small = b"small";
         write_file(
             circuits_dir,
-            "insecure-512/micro/default/dkg/pk/pk.json",
-            micro,
+            "insecure-512/minimum/default/dkg/pk/pk.json",
+            minimum,
         );
         write_file(
             circuits_dir,
-            "insecure-512/large/default/dkg/pk/pk.json",
-            large,
+            "insecure-512/small/default/dkg/pk/pk.json",
+            small,
         );
-        let large_hash = sha256_hex(large);
+        let small_hash = sha256_hex(small);
 
         let data = read_manifest_file(
             circuits_dir,
             "insecure-512/default/dkg/pk/pk.json",
-            &large_hash,
+            &small_hash,
         )
         .await
         .unwrap();
 
-        assert_eq!(data, large);
+        assert_eq!(data, small);
     }
 
     #[tokio::test]
     async fn read_manifest_file_accepts_committee_scoped_manifest_path() {
         let temp = TempDir::new().unwrap();
         let circuits_dir = temp.path();
-        let contents = b"micro";
+        let contents = b"minimum";
         write_file(
             circuits_dir,
-            "insecure-512/micro/default/dkg/pk/pk.json",
+            "insecure-512/minimum/default/dkg/pk/pk.json",
             contents,
         );
         let hash = sha256_hex(contents);
 
         let data = read_manifest_file(
             circuits_dir,
-            "insecure-512/micro/default/dkg/pk/pk.json",
+            "insecure-512/minimum/default/dkg/pk/pk.json",
             &hash,
         )
         .await

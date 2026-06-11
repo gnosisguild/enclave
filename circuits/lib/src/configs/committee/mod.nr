@@ -10,7 +10,6 @@
 //! for the currently selected committee.
 
 pub mod active;
+pub mod minimum;
 pub mod micro;
 pub mod small;
-pub mod medium;
-pub mod large;

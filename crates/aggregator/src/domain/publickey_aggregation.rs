@@ -527,7 +527,7 @@ mod tests {
 
     #[test]
     fn add_keyshare_below_threshold_stays_collecting() {
-        // micro committee maps (m=1, n=3) -> needs 3 parties.
+        // minimum committee maps (m=1, n=3) -> needs 3 parties.
         let state = collecting(3, 1);
         let next = PublicKeyAggregation::add_keyshare(state, ks(1), "node-0".into(), 0, None)
             .expect("add ok");

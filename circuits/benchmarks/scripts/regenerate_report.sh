@@ -3,7 +3,7 @@
 # Usage:
 #   ./regenerate_report.sh
 #   ./regenerate_report.sh --mode insecure
-#   ./regenerate_report.sh --mode insecure --no-proof-aggregation
+#   ./regenerate_report.sh --mode insecure --committee minimum
 #   MODE=secure ./regenerate_report.sh
 
 set -euo pipefail
@@ -17,7 +17,6 @@ source "${SCRIPT_DIR}/benchmark_output_dir.sh"
 source "${SCRIPT_DIR}/load_default_committee.sh"
 
 MODE="${MODE:-secure}"
-PROOF_AGGREGATION="${BENCHMARK_PROOF_AGGREGATION:-true}"
 COMMITTEE_OVERRIDE=""
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -29,26 +28,13 @@ while [[ $# -gt 0 ]]; do
             COMMITTEE_OVERRIDE="$2"
             shift 2
             ;;
-        --proof-aggregation)
-            PROOF_AGGREGATION="$2"
-            shift 2
-            ;;
-        --no-proof-aggregation)
-            PROOF_AGGREGATION=false
-            shift
-            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--mode insecure|secure] [--committee micro|small|medium|large] [--proof-aggregation on|off] [--no-proof-aggregation]"
+            echo "Usage: $0 [--mode insecure|secure] [--committee minimum|micro|small]"
             exit 1
             ;;
     esac
 done
-
-case "$(echo "$PROOF_AGGREGATION" | tr '[:upper:]' '[:lower:]')" in
-    0|false|no|off) PROOF_AGGREGATION=false ;;
-    *) PROOF_AGGREGATION=true ;;
-esac
 
 if [ "$MODE" != "insecure" ] && [ "$MODE" != "secure" ]; then
     echo "Error: mode must be insecure or secure"
@@ -57,9 +43,9 @@ fi
 
 if [ -n "$COMMITTEE_OVERRIDE" ]; then
     case "$COMMITTEE_OVERRIDE" in
-        micro|small|medium|large) ;;
+        minimum|micro|small) ;;
         *)
-            echo "Error: --committee must be one of micro|small|medium|large"
+            echo "Error: --committee must be one of minimum|micro|small"
             exit 1
             ;;
     esac
@@ -68,7 +54,7 @@ else
     load_default_committee "" "$REPO_ROOT"
     OUTPUT_COMMITTEE="$COMMITTEE_NAME"
 fi
-OUTPUT_DIR="$(benchmark_results_dir_path "$BENCHMARKS_DIR" "$MODE" "$PROOF_AGGREGATION" "$OUTPUT_COMMITTEE")"
+OUTPUT_DIR="$(benchmark_results_dir_path "$BENCHMARKS_DIR" "$MODE" "$OUTPUT_COMMITTEE")"
 # Backward compatibility: walk through legacy layouts (newest-first) if the committee-aware
 # dir doesn't exist on disk.
 if [ ! -d "${OUTPUT_DIR}/raw" ] && [ ! -f "${OUTPUT_DIR}/crisp_verify_gas.json" ]; then
@@ -79,7 +65,7 @@ if [ ! -d "${OUTPUT_DIR}/raw" ] && [ ! -f "${OUTPUT_DIR}/crisp_verify_gas.json" 
             OUTPUT_DIR="$LEGACY"
             break
         fi
-    done < <(benchmark_results_dir_legacy_basenames "$MODE" "$PROOF_AGGREGATION")
+    done < <(benchmark_results_dir_legacy_basenames "$MODE" "$OUTPUT_COMMITTEE")
 fi
 GIT_COMMIT=$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo "unknown")
 GIT_BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")

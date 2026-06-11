@@ -105,7 +105,7 @@ export interface DeployInterfoldSystemOptions {
   wireSlashingManager?: boolean;
   /**
    * Committee thresholds to install on the Interfold.
-   * Defaults to `[[0, [1, 3]], [1, [2, 5]]]` (Micro & Small).
+   * Defaults to `[[0, [1, 3]], [1, [4, 9]], [2, [9, 19]]]` (Minimum, Micro & Small).
    */
   committeeThresholds?: CommitteeThreshold[];
   /**
@@ -214,7 +214,8 @@ export async function deployInterfoldSystem(
     opts.committeeThresholds ??
     ([
       [0, [1, 3]],
-      [1, [2, 5]],
+      [1, [4, 9]],
+      [2, [9, 19]],
     ] as CommitteeThreshold[]);
 
   // ── Signers ────────────────────────────────────────────────────────────────
@@ -495,7 +496,7 @@ export async function deployInterfoldSystem(
   const now = await time.latest();
   const inputWindowDuration = 300;
   const request: IInterfold.E3RequestParamsStruct = {
-    committeeSize: 0, // Micro
+    committeeSize: 0, // Minimum
     inputWindow: [now + 10, now + inputWindowDuration] as [number, number],
     e3Program: await e3Program.getAddress(),
     paramSet: 0,

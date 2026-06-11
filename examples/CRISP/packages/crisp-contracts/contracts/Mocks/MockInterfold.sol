@@ -22,7 +22,7 @@ contract MockInterfold {
   function request(address program) external {
     e3s[nextE3Id] = E3({
       seed: 0,
-      committeeSize: IInterfold.CommitteeSize.Micro,
+      committeeSize: IInterfold.CommitteeSize.Minimum,
       requestBlock: 0,
       inputWindow: [uint256(0), uint256(0)],
       encryptionSchemeId: bytes32(0),
@@ -59,7 +59,7 @@ contract MockInterfold {
     return
       E3({
         seed: 0,
-        committeeSize: IInterfold.CommitteeSize.Micro,
+        committeeSize: IInterfold.CommitteeSize.Minimum,
         requestBlock: 0,
         inputWindow: [uint256(0), block.timestamp + 100],
         encryptionSchemeId: bytes32(0),

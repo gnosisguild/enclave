@@ -319,12 +319,15 @@ export const deployInterfold = async (
 
   // Initialize committee size thresholds [threshold, total]
   console.log("Setting committee thresholds...");
-  // Micro: threshold=1, total=3
+  // Minimum: threshold=1, total=3
   await interfold.setCommitteeThresholds(0, [1, 3]);
-  // Small: threshold=2, total=5
-  await interfold.setCommitteeThresholds(1, [2, 5]);
-  // Medium and Large can be set later as needed
-  console.log("Committee thresholds set (Micro=[1,3], Small=[2,5])");
+  // Micro: threshold=4, total=9
+  await interfold.setCommitteeThresholds(1, [4, 9]);
+  // Small: threshold=9, total=19
+  await interfold.setCommitteeThresholds(2, [9, 19]);
+  console.log(
+    "Committee thresholds set (Minimum=[1,3], Micro=[4,9], Small=[9,19])",
+  );
 
   // Register BFV param sets
   console.log("Registering BFV param sets...");

@@ -11,10 +11,9 @@ export interface ContractAddresses {
 }
 
 export enum CommitteeSize {
-  Micro = 0,
-  Small = 1,
-  Medium = 2,
-  Large = 3,
+  Minimum = 0,
+  Micro = 1,
+  Small = 2,
 }
 
 export enum ParamSet {

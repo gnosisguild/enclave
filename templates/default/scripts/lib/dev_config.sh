@@ -10,7 +10,7 @@ load_template_dev_config() {
   INTERFOLD_REPO_ROOT="$(cd "${TEMPLATE_ROOT}/../.." && pwd)"
 
   BFV_PRESET="${BFV_PRESET:-insecure-512}"
-  COMMITTEE="${COMMITTEE:-micro}"
+  COMMITTEE="${COMMITTEE:-minimum}"
 
   case "$BFV_PRESET" in
     insecure-512 | secure-8192) ;;

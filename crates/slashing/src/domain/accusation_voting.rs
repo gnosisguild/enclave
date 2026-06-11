@@ -1655,7 +1655,7 @@ mod tests {
         assert!(CiphernodesCommitteeSize::from_threshold(4, v.committee.len()).is_err());
         assert_eq!(
             CiphernodesCommitteeSize::from_threshold(v.threshold_m, v.committee_n).unwrap(),
-            CiphernodesCommitteeSize::Medium
+            CiphernodesCommitteeSize::Micro
         );
     }
 }

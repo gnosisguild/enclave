@@ -2,9 +2,9 @@
 
 # run_benchmarks.sh - Main orchestration script for benchmarking circuits
 # Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|secure]
-#   [--committee micro|small|medium|large] [--circuit <path>]
+#   [--committee minimum|micro|small] [--circuit <path>]
 #   [--skip-compile] [--bench-compile] [--clean] [--verbose]
-#   [--proof-aggregation on|off] [--multithread-jobs N]
+#   [--multithread-jobs N]
 
 set -e
 
@@ -21,8 +21,8 @@ BENCH_COMPILE=false
 CIRCUIT_FILTER=""
 VERBOSE=false
 PRESET_ARTIFACTS_READY=false
-PROOF_AGGREGATION="${BENCHMARK_PROOF_AGGREGATION:-true}"
 MULTITHREAD_JOBS="${BENCHMARK_MULTITHREAD_JOBS:-}"
+export BENCHMARK_PROOF_AGGREGATION=true
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -42,9 +42,9 @@ while [[ $# -gt 0 ]]; do
         --committee)
             COMMITTEE_OVERRIDE="$2"
             case "$COMMITTEE_OVERRIDE" in
-                micro|small|medium|large) ;;
+                minimum|micro|small) ;;
                 *)
-                    echo "Error: --committee must be micro|small|medium|large (got: $COMMITTEE_OVERRIDE)"
+                    echo "Error: --committee must be minimum|micro|small (got: $COMMITTEE_OVERRIDE)"
                     exit 1
                     ;;
             esac
@@ -70,34 +70,18 @@ while [[ $# -gt 0 ]]; do
             VERBOSE=true
             shift
             ;;
-        --proof-aggregation)
-            PROOF_AGGREGATION="$2"
-            shift 2
-            ;;
-        --no-proof-aggregation)
-            PROOF_AGGREGATION=false
-            shift
-            ;;
         --multithread-jobs)
             MULTITHREAD_JOBS="$2"
             shift 2
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--committee micro|small|medium|large] [--circuit <path>] [--skip-compile] [--bench-compile] [--clean] [--verbose] [--proof-aggregation on|off] [--no-proof-aggregation] [--multithread-jobs N]"
+            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--committee minimum|micro|small] [--circuit <path>] [--skip-compile] [--bench-compile] [--clean] [--verbose] [--multithread-jobs N]"
             exit 1
             ;;
     esac
 done
 
-case "$(echo "$PROOF_AGGREGATION" | tr '[:upper:]' '[:lower:]')" in
-    0|false|no|off) export BENCHMARK_PROOF_AGGREGATION=false ;;
-    1|true|yes|on|"") export BENCHMARK_PROOF_AGGREGATION=true ;;
-    *)
-        echo "Error: --proof-aggregation must be on or off (got: $PROOF_AGGREGATION)"
-        exit 1
-        ;;
-esac
 if [ -n "$MULTITHREAD_JOBS" ]; then
     if ! [[ "$MULTITHREAD_JOBS" =~ ^[1-9][0-9]*$ ]]; then
         echo "Error: --multithread-jobs must be a positive integer (got: $MULTITHREAD_JOBS)"
@@ -153,7 +137,7 @@ CIRCUITS_BASE_DIR="$(cd "${BENCHMARKS_DIR}/${BIN_DIR}" && pwd)"
 
 # Resolve the committee for the output dir name. Explicit --committee wins; otherwise we
 # read what's currently on disk (the build step below will respect that selection). Sourced
-# here so OUTPUT_DIR can include the committee axis (`results_<mode>_<agg|no_agg>_<name>`).
+# here so OUTPUT_DIR can include the committee axis (`results_<mode>_<name>`).
 # shellcheck source=load_default_committee.sh
 source "${SCRIPT_DIR}/load_default_committee.sh"
 
@@ -178,9 +162,9 @@ if [ "$SKIP_COMPILE" = true ] && [ -n "$COMMITTEE_OVERRIDE" ]; then
     assert_skip_compile_committee_matches_disk
 fi
 
-# results_<mode>_<agg|no_agg>_<committee> (see benchmark_output_dir.sh)
+# results_<mode>_<committee> (see benchmark_output_dir.sh)
 BENCHMARK_OUTPUT_DIR_BASE="$OUTPUT_DIR_BASE"
-OUTPUT_DIR="$(benchmark_results_dir_basename "$MODE" "$BENCHMARK_PROOF_AGGREGATION" "$OUTPUT_COMMITTEE")"
+OUTPUT_DIR="$(benchmark_results_dir_basename "$MODE" "$OUTPUT_COMMITTEE")"
 mkdir -p "${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw"
 
 # For secure mode, patch lib to use secure configs (restored at end)
@@ -219,7 +203,7 @@ fi
 if [ "$VERBOSE" = true ]; then
     echo "  Verbose Logging: Yes"
 fi
-echo "  Proof aggregation (integration): $BENCHMARK_PROOF_AGGREGATION"
+echo "  Proof aggregation (integration): enabled (always on in benchmarks)"
 if [ -n "$BENCHMARK_MULTITHREAD_JOBS" ]; then
     echo "  Multithread concurrent jobs: $BENCHMARK_MULTITHREAD_JOBS"
 fi
@@ -364,7 +348,7 @@ jq -n \
     --arg mode "$MODE" \
     --arg preset "$([ "$MODE" = "secure" ] && echo "secure-8192" || echo "insecure-512")" \
     --arg committee "$OUTPUT_COMMITTEE" \
-    --argjson proof_agg "$( [ "$BENCHMARK_PROOF_AGGREGATION" = "false" ] && echo false || echo true )" \
+    --argjson proof_agg true \
     --argjson multithread_jobs "$MT_JOBS_JSON" \
     --argjson verbose "$([ "$VERBOSE" = true ] && echo true || echo false)" \
     --argjson committee_size_n "$COMMITTEE_N" \

@@ -81,12 +81,12 @@ export const REPO_ROOT = resolveRepoRoot();
 
 /**
  * <generated-committee-doc>
- * Default insecure-512 / micro committee layout for BFV aggregator verifiers.
+ * Default insecure-512 / minimum committee layout for BFV aggregator verifiers.
  * Must match `lib::configs::default::{H, T}` in compiled circuits.
- * Micro committee: N=3, T=1, H=3.
+ * Minimum committee: N=3, T=1, H=2.
  * </generated-committee-doc>
  */
-export const BFV_DKG_H = 3;
+export const BFV_DKG_H = 2;
 export const BFV_THRESHOLD_T = 1;
 
 /** `dkg_aggregator` EVM public-input count for honest-set size `h`. */

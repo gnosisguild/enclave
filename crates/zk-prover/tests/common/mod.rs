@@ -9,17 +9,17 @@ mod helpers;
 #[allow(dead_code)]
 pub use helpers::*;
 
-/// Call at the top of any setup function that hard-codes `CiphernodesCommitteeSize::Micro`.
+/// Call at the top of any setup function that hard-codes `CiphernodesCommitteeSize::Minimum`.
 /// Returns `None` (causing the test to skip) when the compiled circuits were built for a
-/// non-micro committee — the Micro-sized samples would not satisfy the circuit ABI.
+/// non-minimum committee — the Minimum-sized samples would not satisfy the circuit ABI.
 #[allow(dead_code)]
-pub fn require_micro_circuits() -> Option<()> {
-    if circuits_compiled_for_micro() {
+pub fn require_minimum_circuits() -> Option<()> {
+    if circuits_compiled_for_minimum() {
         Some(())
     } else {
         println!(
-            "skipping: circuits not compiled for micro committee. \
-             Rebuild with `pnpm build:circuits --committee micro` to run this test."
+            "skipping: circuits not compiled for minimum committee. \
+             Rebuild with `pnpm build:circuits --committee minimum` to run this test."
         );
         None
     }

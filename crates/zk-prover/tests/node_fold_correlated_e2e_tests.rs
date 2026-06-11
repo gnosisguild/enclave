@@ -17,7 +17,7 @@ mod node_fold_witness;
 use std::path::PathBuf;
 
 use common::{
-    find_bb, require_micro_circuits, setup_compiled_circuit,
+    find_bb, require_minimum_circuits, setup_compiled_circuit,
     setup_recursive_aggregation_fold_circuit, setup_test_prover,
 };
 use e3_events::{CircuitName, Proof};
@@ -135,7 +135,7 @@ async fn node_fold_correlated_sparse_self_slot_proves_and_verifies() {
         return;
     };
 
-    if require_micro_circuits().is_none() {
+    if require_minimum_circuits().is_none() {
         return;
     }
 
@@ -152,7 +152,7 @@ async fn node_fold_correlated_sparse_self_slot_proves_and_verifies() {
         return;
     }
 
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let preset = BfvPreset::InsecureThreshold512;
 
     let (backend, temp) = setup_test_prover(&bb).await;

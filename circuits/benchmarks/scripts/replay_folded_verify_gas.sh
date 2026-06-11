@@ -35,9 +35,9 @@ while [[ $# -gt 0 ]]; do
         --committee)
             COMMITTEE="$2"
             case "$COMMITTEE" in
-                micro|small|medium|large) ;;
+                minimum|micro|small) ;;
                 *)
-                    echo "Error: --committee must be micro|small|medium|large (got: $COMMITTEE)"
+                    echo "Error: --committee must be minimum|micro|small (got: $COMMITTEE)"
                     exit 1
                     ;;
             esac

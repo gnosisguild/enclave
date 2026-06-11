@@ -1650,7 +1650,7 @@ mod tests {
         Addr<HistoryCollector<InterfoldEvent>>,
         E3id,
     )> {
-        build_public_key_aggregator_with_committee(initial_state, CiphernodesCommitteeSize::Micro)
+        build_public_key_aggregator_with_committee(initial_state, CiphernodesCommitteeSize::Minimum)
             .await
     }
 
@@ -1705,7 +1705,7 @@ mod tests {
         use fhe::mbfv::PublicKeyShare;
         use fhe_traits::Serialize;
 
-        let committee = CiphernodesCommitteeSize::Medium.values();
+        let committee = CiphernodesCommitteeSize::Micro.values();
         let threshold_n = committee.n;
         let threshold_m = committee.threshold;
         let circuit_h = committee.h;
@@ -1775,7 +1775,7 @@ mod tests {
                     .parse()
                     .expect("test address")],
                 params_preset: BfvPreset::InsecureThreshold512,
-                committee_size: CiphernodesCommitteeSize::Micro,
+                committee_size: CiphernodesCommitteeSize::Minimum,
             }),
             correlation_id,
             e3_id.clone(),
@@ -1925,7 +1925,7 @@ mod tests {
                 bus,
                 e3_id: e3_id.clone(),
                 params_preset: BfvPreset::InsecureThreshold512,
-                committee_size: CiphernodesCommitteeSize::Medium,
+                committee_size: CiphernodesCommitteeSize::Micro,
             },
             test_state(initial_state),
         );

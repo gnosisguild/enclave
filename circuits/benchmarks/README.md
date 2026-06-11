@@ -15,29 +15,28 @@ From this directory:
 ./run_benchmarks.sh
 ./run_benchmarks.sh --mode secure --circuit dkg/pk
 ./run_benchmarks.sh --skip-compile
-./run_benchmarks.sh --mode secure --committee large
+./run_benchmarks.sh --mode secure --committee small
 ```
 
-| Flag / env                                | Effect                                                                                                                                                                                           |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--committee micro\|small\|medium\|large` | Benchmark a committee without rebuilding the Noir tree first (runs `pnpm build:circuits --committee` when needed). Overrides on-disk `active.nr` for output dir naming and integration-test env. |
-| `ENCLAVE_COMMITTEE_SIZE=<name>`           | Same committee for the Rust integration test (`test_trbfv_actor`); set automatically when using `--committee`.                                                                                   |
+| Flag / env                          | Effect                                                                                                                                                                                           |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--committee minimum\|micro\|small` | Benchmark a committee without rebuilding the Noir tree first (runs `pnpm build:circuits --committee` when needed). Overrides on-disk `active.nr` for output dir naming and integration-test env. |
+| `ENCLAVE_COMMITTEE_SIZE=<name>`     | Same committee for the Rust integration test (`test_trbfv_actor`); set automatically when using `--committee`.                                                                                   |
 
 Options and secure-only **config** circuit behavior are documented in the script and `config.json`.
 
-### Selecting committee size (micro / small / medium / large)
+### Selecting committee size (minimum / micro / small)
 
 Benchmarks compile and run against whichever committee is **active** in the Noir tree. Default is
-`micro` (N=3, T=1, H=3). To benchmark with a different committee, either pass `--committee` to
+`minimum` (N=3, T=1, H=2). To benchmark with a different committee, either pass `--committee` to
 `run_benchmarks.sh` or switch the active committee once at the build step — the Rust integration
 test, gas-extraction script, and report will all pick it up automatically.
 
-| Committee         | N   | T   | H   |
-| ----------------- | --- | --- | --- |
-| `micro` (default) | 3   | 1   | 3   |
-| `small`           | 5   | 2   | 5   |
-| `medium`          | 10  | 4   | 8   |
-| `large`           | 20  | 9   | 15  |
+| Committee           | N   | T   | H   |
+| ------------------- | --- | --- | --- |
+| `minimum` (default) | 3   | 1   | 2   |
+| `micro`             | 9   | 4   | 5   |
+| `small`             | 19  | 9   | 10  |
 
 **Step-by-step** (from repository root):
 
@@ -45,18 +44,18 @@ test, gas-extraction script, and report will all pick it up automatically.
 # 1. Pick the committee. This regenerates committee/active.nr, default/mod.nr,
 #    and patches BFV_DKG_H / BFV_THRESHOLD_T in utils.ts atomically. It also writes
 #    the committee into circuits/bin/.active-preset.json.
-pnpm build:circuits --preset insecure-512 --committee medium
+pnpm build:circuits --preset insecure-512 --committee micro
 
 # 2. (Optional) Verify the four files agree.
 pnpm check:committee
-#    → ✓ check:committee: medium (H=8, T=4) consistent across active.nr, utils.ts, .active-preset.json
+#    → ✓ check:committee: micro (H=5, T=4) consistent across active.nr, utils.ts, .active-preset.json
 
 # 3. Run the benchmark. ENCLAVE_COMMITTEE_SIZE makes the Rust test pick the same committee
 #    and panic up-front if it disagrees with the stamp.
-ENCLAVE_COMMITTEE_SIZE=medium ./circuits/benchmarks/run_benchmarks.sh --mode insecure
+ENCLAVE_COMMITTEE_SIZE=micro ./circuits/benchmarks/run_benchmarks.sh --mode insecure
 
-# 4. To go back to micro, run step 1 again with --committee micro.
-pnpm build:circuits --preset insecure-512 --committee micro
+# 4. To go back to minimum, run step 1 again with --committee minimum.
+pnpm build:circuits --preset insecure-512 --committee minimum
 ```
 
 **All `(preset, committee)` pairs are supported.** The parity matrices in
@@ -72,34 +71,22 @@ switch; manual edits to those files will trip the check.
 
 ### Proof aggregation and folding (integration)
 
-The gas / integration stage runs `cargo test -p e3-tests test_trbfv_actor` with **proof aggregation
-enabled by default** (`E3Requested.proof_aggregation_enabled = true`): per-node `ZkNodeDkgFold`,
-fold attestations (EIP-712 against `DkgFoldAttestationVerifier`), and exported folded
-`dkg_aggregator` / `decryption_aggregator` proofs for Π_DKG / Π_dec on-chain gas.
+The gas / integration stage always runs `cargo test -p e3-tests test_trbfv_actor` with proof
+aggregation enabled (`E3Requested.proof_aggregation_enabled = true`): per-node `ZkNodeDkgFold`, fold
+attestations (EIP-712 against `DkgFoldAttestationVerifier`), and exported folded `dkg_aggregator` /
+`decryption_aggregator` proofs for Π_DKG / Π_dec on-chain gas.
 
 | Flag / env                                              | Effect                                                                               |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `--proof-aggregation on` (default)                      | Full fold + aggregator path; folded artifacts in report                              |
-| `--proof-aggregation off` / `--no-proof-aggregation`    | Baseline without node folds / folded export                                          |
-| `BENCHMARK_PROOF_AGGREGATION`                           | Same as above when calling `extract_crisp_verify_gas.sh` directly                    |
 | `BENCHMARK_MULTITHREAD_JOBS=N` / `--multithread-jobs N` | Rayon concurrent ZK jobs (default `1`)                                               |
 | `BENCHMARK_DKG_FOLD_ATTESTATION_VERIFIER=0x…`           | EIP-712 verifying contract for fold attestations (default: localhost deploy address) |
 
-**Default output directories** (under `circuits/benchmarks/`; aggregation on/off no longer
-overwrites the same folder):
+**Output directories** (under `circuits/benchmarks/`):
 
-| Mode       | Proof aggregation on (default) | Proof aggregation off (`--no-proof-aggregation`) |
-| ---------- | ------------------------------ | ------------------------------------------------ |
-| `insecure` | `results_insecure_agg/`        | `results_insecure_no_agg/`                       |
-| `secure`   | `results_secure_agg/`          | `results_secure_no_agg/`                         |
-
-**A/B comparison** (from `circuits/benchmarks`):
-
-```bash
-./run_benchmarks.sh --mode insecure --no-proof-aggregation
-./run_benchmarks.sh --mode insecure
-# Compare results_insecure_no_agg/report.md vs results_insecure_agg/report.md
-```
+| Mode       | Committee `minimum` (default) | Committee `micro`         | Committee `small`         |
+| ---------- | ----------------------------- | ------------------------- | ------------------------- |
+| `insecure` | `results_insecure_minimum/`   | `results_insecure_micro/` | `results_insecure_small/` |
+| `secure`   | `results_secure_minimum/`     | `results_secure_micro/`   | `results_secure_small/`   |
 
 `report.md` includes **Audit status**, **Measurement methodology** (metric kinds), labeled **Role /
 Phase** rows (`wall_clock` vs `isolated_nargo` vs `tracked_job_wall`), **NodeDkgFold sub-steps**,
@@ -108,19 +95,18 @@ and **Folded on-chain artifacts** when `integration_summary` is present. Verify 
 
 ### What gets stored (secure / insecure)
 
-A full `./run_benchmarks.sh --mode <mode>` run writes to `results_<mode>_agg/` or
-`results_<mode>_no_agg/` (see table above):
+A full `./run_benchmarks.sh --mode <mode>` run writes to `results_<mode>_<committee>/`:
 
 - `raw/*.json` — Nargo timing + artifact sizes (source for the **Circuit Benchmarks** table)
 - `crisp_verify_gas.json` — verify gas, calldata gas, artifact sizes, and **`integration_summary`**
   from `test_trbfv_actor` when gas extraction succeeds
 - `integration_summary.json` — snapshot of `integration_summary` (phase timings, folded proofs,
   multithread / operation timings)
-- `benchmark_run_meta.json` — CLI flags (mode, proof aggregation, multithread jobs, verbose)
+- `benchmark_run_meta.json` — CLI flags (mode, committee, multithread jobs, verbose)
 - `report.md` — rendered summary of all of the above
 
-Older runs used `results_<mode>/` without the `_agg` / `_no_agg` suffix; `regenerate_report.sh`
-still finds that layout as a fallback.
+Older runs used `results_<mode>_agg_<committee>/` or `results_<mode>_no_agg_<committee>/`;
+`regenerate_report.sh` still finds those layouts as a fallback.
 
 ### Regenerate `report.md` only (no integration re-run)
 
@@ -128,13 +114,13 @@ From this directory, after you already have `raw/` + `crisp_verify_gas.json`:
 
 ```bash
 ./regenerate_report.sh --mode insecure
-./regenerate_report.sh --mode insecure --no-proof-aggregation
+./regenerate_report.sh --mode insecure --committee minimum
 ```
 
 `crisp_verify_gas.json` embeds the integration timings; if you also keep `integration_summary.json`
 in the same folder, the script passes it explicitly (useful when gas JSON is missing a field but the
 snapshot is complete). `regenerate_report.sh` itself does not re-run `test_trbfv_actor`; it renders
-from the matching `results_<mode>_{agg|no_agg}/` directory.
+from the matching `results_<mode>_<committee>/` directory.
 
 ## Refresh after parameter changes
 
@@ -178,13 +164,13 @@ If `crisp_verify_gas.json` has `integration_summary: null` but you still have th
 
 ```bash
 ./circuits/benchmarks/scripts/generate_report.sh \
-  --input-dir "./circuits/benchmarks/results_secure_agg/raw" \
-  --output "./circuits/benchmarks/results_secure_agg/report.md" \
-  --gas-json "./circuits/benchmarks/results_secure_agg/crisp_verify_gas.json" \
+  --input-dir "./circuits/benchmarks/results_secure_minimum/raw" \
+  --output "./circuits/benchmarks/results_secure_minimum/report.md" \
+  --gas-json "./circuits/benchmarks/results_secure_minimum/crisp_verify_gas.json" \
   --integration-summary "/tmp/summary_secure.json"
 ```
 
-For secure mode, use `--mode secure` and the `results_secure_{agg|no_agg}/` directories.
+For secure mode, use `--mode secure` and the `results_secure_<committee>/` directories.
 
 ## Reported protocol tables
 
