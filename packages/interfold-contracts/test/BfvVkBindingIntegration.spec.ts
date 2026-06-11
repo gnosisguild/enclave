@@ -36,7 +36,7 @@ const COMMITTED_FOLDED_ARTIFACTS_FIXTURE = path.join(
 );
 const INSECURE_INTEGRATION_SUMMARY = path.join(
   repoRoot,
-  "circuits/benchmarks/results_insecure/integration_summary.json",
+  "circuits/benchmarks/results_insecure_minimum/integration_summary.json",
 );
 
 type FoldedArtifacts = {
@@ -117,6 +117,11 @@ const DKG_EXPECTED_PUBLIC_INPUT_LEN = bfvPkExpectedPublicInputsLen(BFV_DKG_H);
 const DEC_COMMITTEE_HASH_IDX = bfvDecCommitteeHashIndices();
 const DEC_EXPECTED_PUBLIC_INPUT_LEN =
   bfvDecExpectedPublicInputsLen(BFV_THRESHOLD_T);
+
+/** Headroom for Honk `verify` staticCalls (much higher under `--coverage`). */
+const HONK_VERIFY_GAS_LIMIT = 1_000_000_000n;
+
+const isCoverageRun = process.argv.includes("--coverage");
 
 function plaintextHashFromPublicInputs(publicInputs: string[]): string {
   const messageCoeffsCount = 100;
@@ -313,11 +318,20 @@ describe("BfvVkBindingIntegration", function () {
         decPublicInputs[DEC_COMMITTEE_HASH_IDX.lo],
       );
 
+      if (isCoverageRun) {
+        // Instrumented Honk verifiers can exceed any practical eth_call budget;
+        // VK hash binding is asserted above — skip the expensive on-chain verify.
+        return;
+      }
+
+      await networkHelpers.setBlockGasLimit(HONK_VERIFY_GAS_LIMIT);
+
       const { bfvPk, bfvDec } = await deployHonkAndBfv();
       const [testSigner] = await ethers.getSigners();
       const testE3Id = 1n;
       const testRoot = BigInt(ethers.id("test-root"));
       const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+      const verifyOverrides = { gasLimit: HONK_VERIFY_GAS_LIMIT };
 
       const dkgEncoded = abiCoder.encode(
         ["bytes", "bytes32[]"],
@@ -332,6 +346,7 @@ describe("BfvVkBindingIntegration", function () {
           pkCommitment,
           dkgCommitteeHash,
           dkgEncoded,
+          verifyOverrides,
         ),
       ).to.equal(true);
 
@@ -350,6 +365,7 @@ describe("BfvVkBindingIntegration", function () {
           plaintextHash,
           decCommitteeHash,
           decEncoded,
+          verifyOverrides,
         ),
       ).to.equal(true);
     },

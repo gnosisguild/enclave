@@ -57,6 +57,8 @@ import {
   ADDRESS_ONE,
   BFV_PARAMS_DEFAULT,
   BFV_PARAMS_LARGE,
+  COMMITTEE_SIZE_MINIMUM,
+  COMMITTEE_THRESHOLDS_DEFAULT,
   DEFAULT_TIMEOUT_CONFIG,
   ENCRYPTION_SCHEME_ID,
   LICENSE_REQUIRED_BOND,
@@ -105,7 +107,7 @@ export interface DeployInterfoldSystemOptions {
   wireSlashingManager?: boolean;
   /**
    * Committee thresholds to install on the Interfold.
-   * Defaults to `[[0, [1, 3]], [1, [4, 9]], [2, [9, 19]]]` (Minimum, Micro & Small).
+   * Defaults to {@link COMMITTEE_THRESHOLDS_DEFAULT} (Minimum, Micro & Small).
    */
   committeeThresholds?: CommitteeThreshold[];
   /**
@@ -212,11 +214,9 @@ export async function deployInterfoldSystem(
     opts.bfvParams === "large" ? BFV_PARAMS_LARGE : BFV_PARAMS_DEFAULT;
   const committeeThresholds: CommitteeThreshold[] =
     opts.committeeThresholds ??
-    ([
-      [0, [1, 3]],
-      [1, [4, 9]],
-      [2, [9, 19]],
-    ] as CommitteeThreshold[]);
+    (COMMITTEE_THRESHOLDS_DEFAULT.map(
+      ([size, [min, max]]) => [size, [min, max]] as CommitteeThreshold,
+    ) as CommitteeThreshold[]);
 
   // ── Signers ────────────────────────────────────────────────────────────────
   const signers = await ethers.getSigners();
@@ -496,7 +496,7 @@ export async function deployInterfoldSystem(
   const now = await time.latest();
   const inputWindowDuration = 300;
   const request: IInterfold.E3RequestParamsStruct = {
-    committeeSize: 0, // Minimum
+    committeeSize: COMMITTEE_SIZE_MINIMUM,
     inputWindow: [now + 10, now + inputWindowDuration] as [number, number],
     e3Program: await e3Program.getAddress(),
     paramSet: 0,

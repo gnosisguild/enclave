@@ -68,6 +68,43 @@ export const LARGE_TIMEOUT_CONFIG = {
   decryptionWindow: ONE_DAY,
 };
 
+// ── Committee sizes (matches `IInterfold.CommitteeSize`) ─────────────────────
+/** N=3, T=1 — default CI / dev committee. */
+export const COMMITTEE_SIZE_MINIMUM = 0;
+/** N=9, T=4. */
+export const COMMITTEE_SIZE_MICRO = 1;
+/** N=19, T=9. */
+export const COMMITTEE_SIZE_SMALL = 2;
+
+/**
+ * Production thresholds installed by default in {@link deployInterfoldSystem}:
+ * Minimum [1,3], Micro [4,9], Small [9,19].
+ */
+export const COMMITTEE_THRESHOLDS_DEFAULT: ReadonlyArray<
+  readonly [number, readonly [number, number]]
+> = [
+  [COMMITTEE_SIZE_MINIMUM, [1, 3]],
+  [COMMITTEE_SIZE_MICRO, [4, 9]],
+  [COMMITTEE_SIZE_SMALL, [9, 19]],
+];
+
+/**
+ * Fault-tolerance slashing tests: M=2 with N=3 (Minimum) or N=4 (Micro).
+ * CommitteeSize `3` and above remain unconfigured for negative-path tests.
+ */
+export const COMMITTEE_THRESHOLDS_FAULT_TOLERANCE: ReadonlyArray<
+  readonly [number, readonly [number, number]]
+> = [
+  [COMMITTEE_SIZE_MINIMUM, [2, 3]],
+  [COMMITTEE_SIZE_MICRO, [2, 4]],
+  [COMMITTEE_SIZE_SMALL, [9, 19]],
+];
+
+/** Single-size fixture used by sortition / pricing smoke tests. */
+export const COMMITTEE_THRESHOLDS_MINIMUM_ONLY: ReadonlyArray<
+  readonly [number, readonly [number, number]]
+> = [[COMMITTEE_SIZE_MINIMUM, [1, 3]]];
+
 // ── Bonding defaults (passed to BondingRegistry constructor) ─────────────────
 /** 10 USDC ticket price (6-decimal stable). */
 export const TICKET_PRICE = ethers.parseUnits("10", 6);

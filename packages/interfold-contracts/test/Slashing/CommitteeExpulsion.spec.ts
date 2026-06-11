@@ -18,6 +18,9 @@ import { expect } from "chai";
 import type { Signer } from "ethers";
 
 import {
+  COMMITTEE_SIZE_MICRO,
+  COMMITTEE_SIZE_MINIMUM,
+  COMMITTEE_THRESHOLDS_FAULT_TOLERANCE,
   LARGE_TIMEOUT_CONFIG,
   ONE_DAY,
   SORTITION_SUBMISSION_WINDOW,
@@ -52,11 +55,10 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     const sys = await deployInterfoldSystem({
       bfvParams: "large",
       timeoutConfig: LARGE_TIMEOUT_CONFIG,
-      committeeThresholds: [
-        [0, [1, 3]], // Minimum
-        [1, [2, 4]], // test fixture: 4-node committee
-        [2, [4, 9]], // Micro
-      ],
+      committeeThresholds: COMMITTEE_THRESHOLDS_FAULT_TOLERANCE.map(
+        ([size, [min, max]]) =>
+          [size, [min, max]] as [number, [number, number]],
+      ),
       deployCircuitVerifier: true,
       setupOperators: 0,
       slashedFundsTreasury: treasury,
@@ -127,7 +129,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await bondingRegistry.connect(operator).addTicketBalance(ticketAmount);
     }
 
-    async function makeRequest(committeeSize: number = 1) {
+    async function makeRequest(committeeSize: number = COMMITTEE_SIZE_MINIMUM) {
       const startTime = (await time.latest()) + 100;
       const requestParams = {
         committeeSize,
@@ -210,8 +212,8 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator2);
       await setupOperator(operator3);
 
-      // Small (committeeSize=1) means M=2, N=3
-      await makeRequest(1);
+      // Minimum → M=2, N=3
+      await makeRequest(COMMITTEE_SIZE_MINIMUM);
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -265,7 +267,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator2);
       await setupOperator(operator3);
 
-      await makeRequest(1); // fixture: M=2, N=4
+      await makeRequest(0); // M=2, N=3
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -334,7 +336,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const SLASHER_ROLE = await slashingManager.SLASHER_ROLE();
       await slashingManager.grantRole(SLASHER_ROLE, await owner.getAddress());
 
-      await makeRequest(1); // fixture: M=2, N=4
+      await makeRequest(0); // M=2, N=3
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -407,7 +409,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator2);
       await setupOperator(operator3);
 
-      await makeRequest(1);
+      await makeRequest(0);
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -471,7 +473,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator2);
       await setupOperator(operator3);
 
-      await makeRequest(1);
+      await makeRequest(0);
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -541,7 +543,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
       await setupOperator(operator4);
 
-      await makeRequest(1); // fixture: M=2, N=4
+      await makeRequest(COMMITTEE_SIZE_MICRO); // M=2, N=4
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -629,7 +631,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const SLASHER_ROLE = await slashingManager.SLASHER_ROLE();
       await slashingManager.grantRole(SLASHER_ROLE, await owner.getAddress());
 
-      await makeRequest(1); // fixture: M=2, N=4
+      await makeRequest(0); // M=2, N=3
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -693,7 +695,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
       await setupOperator(operator4);
 
-      await makeRequest(1); // fixture: M=2, N=4
+      await makeRequest(COMMITTEE_SIZE_MICRO); // M=2, N=4
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,
@@ -785,7 +787,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator2);
       await setupOperator(operator3);
 
-      await makeRequest(1);
+      await makeRequest(0);
       await finalizeCommitteeWithOperators(0, [
         operator1,
         operator2,

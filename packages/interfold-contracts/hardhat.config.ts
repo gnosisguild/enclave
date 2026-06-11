@@ -112,6 +112,8 @@ const config: HardhatUserConfig = {
       chainId: chainIds.hardhat,
       type: "edr-simulated",
       chainType: "l1",
+      // Honk aggregator verify is ~3–4M gas; raised for integration staticCalls.
+      blockGasLimit: 1_000_000_000,
     },
     localhost: {
       accounts: {
