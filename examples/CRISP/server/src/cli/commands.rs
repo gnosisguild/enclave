@@ -70,15 +70,29 @@ const ZERO_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
 /// `InsufficientCiphernodes(uint256,uint256)` on CiphernodeRegistry.
 const INSUFFICIENT_CIPHERNODES_SELECTOR: &str = "0x44ec930f";
 
+/// `(CommitteeSize label, total committee N)` for `CONFIG.e3_committee_size` (0=Minimum, 1=Micro, 2=Small).
+fn committee_size_n_required(e3_committee_size: u8) -> (&'static str, u32) {
+    match e3_committee_size {
+        0 => ("Minimum", 3),
+        1 => ("Micro", 9),
+        2 => ("Small", 19),
+        _ => ("unknown", 0),
+    }
+}
+
 fn format_request_e3_revert(err: impl std::fmt::Display) -> anyhow::Error {
     let msg = err.to_string();
     if msg.contains(INSUFFICIENT_CIPHERNODES_SELECTOR) {
+        let (label, n) = committee_size_n_required(CONFIG.e3_committee_size);
         return anyhow!(
-            "request_e3 reverted: InsufficientCiphernodes — the committee size needs N active \
-             operators (Micro N=3) but bondingRegistry.numActiveOperators() is 0. Register \
-             ciphernodes before init: run full `pnpm dev:up`, or from examples/CRISP run \
-             `pnpm ciphernode:add --ciphernode-address <addr> --network localhost` for at least \
-             three addresses in interfold.config.yaml (cn1–cn3)."
+            "request_e3 reverted: InsufficientCiphernodes — CommitteeSize::{label} (e3_committee_size={size}) \
+             requires at least {n} active operators (bondingRegistry.numActiveOperators() is too low). \
+             Register ciphernodes before init: run full `pnpm dev:up`, or from examples/CRISP run \
+             `pnpm ciphernode:add --ciphernode-address <addr> --network localhost` until at least {n} \
+             nodes are active. Default dev config uses Minimum (N=3, cn1–cn3 in interfold.config.yaml).",
+            label = label,
+            size = CONFIG.e3_committee_size,
+            n = n,
         );
     }
     anyhow!(

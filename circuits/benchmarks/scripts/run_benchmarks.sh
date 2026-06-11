@@ -394,7 +394,7 @@ if [ -f "${INTEGRATION_SNAPSHOT}" ]; then
 fi
 "${SCRIPT_DIR}/generate_report.sh" "${REPORT_ARGS[@]}"
 
-if [ "${OUTPUT_DIR}" = "results_insecure_agg" ] && [ -f "${INTEGRATION_SNAPSHOT}" ]; then
+if [[ "${OUTPUT_DIR}" =~ ^results_insecure_ ]] && [ -f "${INTEGRATION_SNAPSHOT}" ]; then
     "${SCRIPT_DIR}/sync_bfv_vk_binding_fixture.sh" "${INTEGRATION_SNAPSHOT}"
 fi
 

@@ -21,7 +21,7 @@ From this directory:
 | Flag / env                          | Effect                                                                                                                                                                                           |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `--committee minimum\|micro\|small` | Benchmark a committee without rebuilding the Noir tree first (runs `pnpm build:circuits --committee` when needed). Overrides on-disk `active.nr` for output dir naming and integration-test env. |
-| `ENCLAVE_COMMITTEE_SIZE=<name>`     | Same committee for the Rust integration test (`test_trbfv_actor`); set automatically when using `--committee`.                                                                                   |
+| `--committee` on child scripts      | `extract_crisp_verify_gas.sh`, `replay_folded_verify_gas.sh`, and `generate_report.sh` resolve `results_<mode>_<committee>/` from the same committee name.                                       |
 
 Options and secure-only **config** circuit behavior are documented in the script and `config.json`.
 
@@ -50,9 +50,8 @@ pnpm build:circuits --preset insecure-512 --committee micro
 pnpm check:committee
 #    → ✓ check:committee: micro (H=5, T=4) consistent across active.nr, utils.ts, .active-preset.json
 
-# 3. Run the benchmark. ENCLAVE_COMMITTEE_SIZE makes the Rust test pick the same committee
-#    and panic up-front if it disagrees with the stamp.
-ENCLAVE_COMMITTEE_SIZE=micro ./circuits/benchmarks/run_benchmarks.sh --mode insecure
+# 3. Run the benchmark (--committee must match step 1; test_trbfv_actor reads circuits/bin/.active-preset.json).
+./circuits/benchmarks/run_benchmarks.sh --mode insecure --committee micro
 
 # 4. To go back to minimum, run step 1 again with --committee minimum.
 pnpm build:circuits --preset insecure-512 --committee minimum
@@ -137,13 +136,13 @@ pnpm -C examples/CRISP/packages/crisp-sdk build
 
 # Extract on-chain verify gas from simulated verifier tests
 ./circuits/benchmarks/scripts/extract_crisp_verify_gas.sh \
-  --output "./circuits/benchmarks/results_insecure_agg/crisp_verify_gas.json"
+  --output "./circuits/benchmarks/results_insecure_minimum/crisp_verify_gas.json"
 
 # Regenerate report with gas values
 ./circuits/benchmarks/scripts/generate_report.sh \
-  --input-dir "./circuits/benchmarks/results_insecure_agg/raw" \
-  --output "./circuits/benchmarks/results_insecure_agg/report.md" \
-  --gas-json "./circuits/benchmarks/results_insecure_agg/crisp_verify_gas.json"
+  --input-dir "./circuits/benchmarks/results_insecure_minimum/raw" \
+  --output "./circuits/benchmarks/results_insecure_minimum/report.md" \
+  --gas-json "./circuits/benchmarks/results_insecure_minimum/crisp_verify_gas.json"
 ```
 
 If Π_DKG / Π_dec **verify gas** is `N/A` because `crisp_verify_gas.json` came from a failed extract,
@@ -154,8 +153,9 @@ step and merge **dkg** / **dec** into the gas file (no Rust re-run):
 # For secure folded proofs, align Solidity verifiers first (--build may take a while).
 ./circuits/benchmarks/scripts/replay_folded_verify_gas.sh \
   --summary "/tmp/summary_secure.json" \
-  --gas-json "./circuits/benchmarks/results_secure_agg/crisp_verify_gas.json" \
-  --build secure-8192
+  --gas-json "./circuits/benchmarks/results_secure_minimum/crisp_verify_gas.json" \
+  --build secure-8192 \
+  --committee minimum
 ```
 
 If `crisp_verify_gas.json` has `integration_summary: null` but you still have the JSON written by

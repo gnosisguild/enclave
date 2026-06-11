@@ -317,16 +317,16 @@ export const deployInterfold = async (
 
   // E3RefundManager already has correct interfold from deployment
 
-  // Initialize committee size thresholds [threshold, total]
+  // Initialize committee size thresholds [quorum, total] (H, N)
   console.log("Setting committee thresholds...");
-  // Minimum: threshold=1, total=3
-  await interfold.setCommitteeThresholds(0, [1, 3]);
-  // Micro: threshold=4, total=9
-  await interfold.setCommitteeThresholds(1, [4, 9]);
-  // Small: threshold=9, total=19
-  await interfold.setCommitteeThresholds(2, [9, 19]);
+  // Minimum: H=2, N=3 (T=1)
+  await interfold.setCommitteeThresholds(0, [2, 3]);
+  // Micro: H=5, N=9 (T=4)
+  await interfold.setCommitteeThresholds(1, [5, 9]);
+  // Small: H=10, N=19 (T=9)
+  await interfold.setCommitteeThresholds(2, [10, 19]);
   console.log(
-    "Committee thresholds set (Minimum=[1,3], Micro=[4,9], Small=[9,19])",
+    "Committee thresholds set (Minimum=[2,3], Micro=[5,9], Small=[10,19])",
   );
 
   // Register BFV param sets

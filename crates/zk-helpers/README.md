@@ -12,7 +12,7 @@ cargo run -p e3-zk-helpers --bin zk_cli -- --list_circuits
 cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk-generation --preset insecure --committee minimum
 
 # Micro or small committee (must match active circuits lib selection)
-cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk-generation --preset insecure --committee minimum
+cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk-generation --preset insecure --committee micro
 cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk-generation --preset insecure --committee small
 ```
 
