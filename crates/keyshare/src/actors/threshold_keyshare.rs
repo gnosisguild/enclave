@@ -2047,7 +2047,7 @@ impl Handler<EncryptionKeyCollectionFailed> for ThresholdKeyshare {
             self.bus.publish_without_context(E3Failed {
                 e3_id: msg.e3_id,
                 failed_at_stage: E3Stage::CommitteeFinalized,
-                reason: FailureReason::InsufficientCommitteeMembers,
+                reason: FailureReason::DKGTimeout,
             })?;
 
             // Stop this actor since we can't proceed without all encryption keys
@@ -2081,7 +2081,7 @@ impl Handler<ThresholdShareCollectionFailed> for ThresholdKeyshare {
             self.bus.publish_without_context(E3Failed {
                 e3_id: msg.e3_id,
                 failed_at_stage: E3Stage::CommitteeFinalized,
-                reason: FailureReason::InsufficientCommitteeMembers,
+                reason: FailureReason::DKGTimeout,
             })?;
 
             ctx.stop();
@@ -2129,7 +2129,7 @@ impl Handler<DecryptionKeySharedCollectionFailed> for ThresholdKeyshare {
             self.bus.publish_without_context(E3Failed {
                 e3_id: msg.e3_id.clone(),
                 failed_at_stage: E3Stage::CommitteeFinalized,
-                reason: FailureReason::InsufficientCommitteeMembers,
+                reason: FailureReason::DecryptionTimeout,
             })?;
 
             ctx.stop();
@@ -2274,7 +2274,7 @@ mod tests {
             InterfoldEventData::E3Failed(data)
                 if data.e3_id == failure.e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
-                    && data.reason == FailureReason::InsufficientCommitteeMembers
+                    && data.reason == FailureReason::DKGTimeout
         ));
 
         Ok(())
@@ -2305,7 +2305,7 @@ mod tests {
             InterfoldEventData::E3Failed(data)
                 if data.e3_id == failure.e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
-                    && data.reason == FailureReason::InsufficientCommitteeMembers
+                    && data.reason == FailureReason::DKGTimeout
         ));
 
         Ok(())
@@ -2328,7 +2328,7 @@ mod tests {
             InterfoldEventData::E3Failed(data)
                 if data.e3_id == failure.e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
-                    && data.reason == FailureReason::InsufficientCommitteeMembers
+                    && data.reason == FailureReason::DecryptionTimeout
         ));
 
         Ok(())

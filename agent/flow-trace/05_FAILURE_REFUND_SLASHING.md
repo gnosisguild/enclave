@@ -1059,11 +1059,17 @@ When CommitteeMemberExpelled event arrives from EVM:
 │   ├─ Only processes raw events (party_id: None)
 │   └─ Removes expelled node from committee filter set
 │
-└─ When E3Failed / E3StageChanged(Complete|Failed) arrives:
+└─ When E3Failed(timeout) / E3StageChanged(Complete) arrives:
     │
     ├─ E3Router (central cleanup orchestrator):
-    │   └─ Converts E3Failed / E3StageChanged(Complete|Failed) → E3RequestComplete
-    │       → Single cleanup signal for all per-E3 actors
+    │   ├─ E3Failed with a timeout reason (CommitteeFormationTimeout, DKGTimeout,
+    │   │   ComputeTimeout, DecryptionTimeout) → publishes E3RequestComplete
+    │   │   → Single cleanup signal for all per-E3 actors
+    │   │   NOTE: E3Failed with a misbehaviour reason (DKGInvalidShares, etc.) does
+    │   │   NOT trigger E3RequestComplete — the accusation/slashing lifecycle must
+    │   │   complete first.
+    │   └─ E3StageChanged(Failed) and E3Failed(timeout) arriving after context teardown
+    │       are silently ignored (expected on-chain lag)
     │
     ├─ CommitteeFinalizer (direct handler — semantic work):
     │   └─ Cancels any pending committee-finalization timer for this e3_id
