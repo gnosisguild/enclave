@@ -56,10 +56,10 @@ describe("BondingRegistry", function () {
 
     for (const address of [ownerAddress, operator1Address, operator2Address]) {
       await usdcToken.mint(address, USDC_AMOUNT);
-      await licenseToken.mintAllocation(
+      await licenseToken.mint(
         address,
         LICENSE_AMOUNT,
-        "Test allocation",
+        ethers.encodeBytes32String("Test allocation"),
       );
     }
 

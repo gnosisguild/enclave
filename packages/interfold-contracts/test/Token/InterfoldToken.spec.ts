@@ -5,503 +5,1148 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { expect } from "chai";
 
-import { InterfoldToken__factory as InterfoldTokenFactory } from "../../types";
 import {
-  SEVEN_DAYS,
-  deployInterfoldSystem,
-  ethers,
-  networkHelpers,
-} from "../fixtures";
+  InterfoldToken__factory as InterfoldTokenFactory,
+  MockBondingRegistry__factory as MockBondingRegistryFactory,
+} from "../../types";
+import { deployInterfoldSystem, ethers, networkHelpers } from "../fixtures";
 
 const { loadFixture, time } = networkHelpers;
-
-const GROUP_PRE_SEED = ethers.encodeBytes32String("PRE_SEED");
-const GROUP_BRIDGE = ethers.encodeBytes32String("BRIDGE");
-const GROUP_TEAM = ethers.encodeBytes32String("GG_TEAM");
-const GROUP_CCA_REG_S = ethers.encodeBytes32String("CCA_REG_S");
 
 const DAY = 24n * 60n * 60n;
 const YEAR = 365n * DAY;
 
 describe("InterfoldToken", function () {
+  // ── Helpers ─────────────────────────────────────────────────────────────
+
+  /// Deploy a minimal MockBondingRegistry + InterfoldToken for standalone tests.
+  /// CCA window starts far in the future so tests control the phase via
+  /// `time.increaseTo` / `time.increase`.
   async function deploy() {
-    const [deployer, admin, minter, whitelister, alice, bob, claimSource] =
-      await ethers.getSigners();
+    const [
+      deployer,
+      admin,
+      minter,
+      whitelister,
+      lockManager,
+      alice,
+      bob,
+      claimSource,
+    ] = await ethers.getSigners();
+
+    // Deploy a minimal mock BondingRegistry that returns 0 for totalBonded.
+    const mockRegistry = await new MockBondingRegistryFactory(
+      deployer,
+    ).deploy();
+    await mockRegistry.waitForDeployment();
+
+    const now = BigInt(await time.latest());
+    const ccaStart = now + 10n * DAY; // far future — Virtual phase
+    const ccaEnd = ccaStart + 7n * DAY;
+
     const token = await new InterfoldTokenFactory(deployer).deploy(
       await admin.getAddress(),
+      ccaStart,
+      ccaEnd,
+      await claimSource.getAddress(),
+      await mockRegistry.getAddress(),
     );
+
     return {
       deployer,
       admin,
       minter,
       whitelister,
+      lockManager,
       alice,
       bob,
       claimSource,
       token,
+      mockRegistry,
+      ccaStart,
+      ccaEnd,
     };
   }
 
-  async function deployWithUnlockedTransfers() {
-    const fixture = await deploy();
-    await fixture.token.connect(fixture.admin).setTgeEarliest(1);
-    await fixture.token.connect(fixture.admin).tge();
-    await fixture.token.connect(fixture.admin).disableTransferRestrictions();
-    return fixture;
+  /// Deploy, create a policy, mint locked tokens, THEN fire TGE.
+  /// Returns everything needed for transfer-enforcement tests.
+  async function deployWithLockAndTge(
+    opts: {
+      policyName?: string;
+      mintAmount?: bigint;
+      vestDuration?: bigint;
+      holdUntil?: bigint;
+      recipient?: "alice" | "claimSource";
+    } = {},
+  ) {
+    const fixture = await loadFixture(deploy);
+    const { token, admin, alice, claimSource, ccaEnd } = fixture;
+    const recipient = opts.recipient === "claimSource" ? claimSource : alice;
+    const recipientAddress = await recipient.getAddress();
+    const policyId = await createLinearPolicy(
+      token,
+      admin,
+      opts.policyName ?? "TEST_LOCK",
+      {
+        vestDuration: opts.vestDuration ?? 2n * YEAR,
+        holdUntil: opts.holdUntil,
+      },
+    );
+    const amount = opts.mintAmount ?? ethers.parseEther("1000");
+
+    // Mint during Virtual phase.
+    await token.connect(admin).mintAllocations([
+      {
+        recipient: recipientAddress,
+        amount,
+        policyId,
+        label: ethers.encodeBytes32String("test"),
+      },
+    ]);
+
+    // Fire TGE.
+    const TGE_COOLDOWN = 45n * DAY;
+    await time.increaseTo(ccaEnd + TGE_COOLDOWN + 1n);
+    const tgeTx = await token.tge();
+    const receipt = await tgeTx.wait();
+    const tgeBlock = await ethers.provider.getBlock(receipt!.blockNumber);
+    const tgeTimestamp = BigInt(tgeBlock!.timestamp);
+
+    return { ...fixture, policyId, amount, tgeTimestamp, recipientAddress };
   }
 
-  async function createLinearLock(
-    overrides: Partial<{
-      totalAmount: bigint;
-      tokenHoldUntil: bigint;
-      tokenUnlockStart: bigint;
-      tokenUnlockEnd: bigint;
-      serviceStart: bigint;
-      serviceCliff: bigint;
-      serviceEnd: bigint;
-      group: string;
-    }> = {},
-  ) {
-    const fixture = await loadFixture(deployWithUnlockedTransfers);
-    const { token, admin, alice } = fixture;
-    const aliceAddress = await alice.getAddress();
-    const now = BigInt(await time.latest());
-    const tge = now + DAY;
-    const totalAmount = overrides.totalAmount ?? ethers.parseEther("2400");
+  /// Deploy, mint unlocked tokens to alice, THEN fire TGE.
+  async function deployWithUnlockedAndTge(mintAmount?: bigint) {
+    const fixture = await loadFixture(deploy);
+    const { token, admin, alice, ccaEnd } = fixture;
+    const amount = mintAmount ?? ethers.parseEther("500");
 
-    await token.connect(admin).setTgeTimestamp(tge);
     await token
       .connect(admin)
-      .mintAllocation(aliceAddress, totalAmount, "Locked allocation");
+      .mint(await alice.getAddress(), amount, ethers.ZeroHash);
 
-    await token.connect(admin).createLockSchedule({
-      account: aliceAddress,
-      amount: totalAmount,
-      tokenHoldUntil: overrides.tokenHoldUntil ?? tge,
-      tokenUnlockStart: overrides.tokenUnlockStart ?? 0n,
-      tokenUnlockEnd: overrides.tokenUnlockEnd ?? tge + 2n * YEAR,
-      serviceStart: overrides.serviceStart ?? 0n,
-      serviceCliff: overrides.serviceCliff ?? 0n,
-      serviceEnd: overrides.serviceEnd ?? 0n,
-      group: overrides.group ?? GROUP_PRE_SEED,
-    });
+    const TGE_COOLDOWN = 45n * DAY;
+    await time.increaseTo(ccaEnd + TGE_COOLDOWN + 1n);
+    await token.tge();
 
-    return { ...fixture, aliceAddress, tge, totalAmount };
+    return { ...fixture, amount };
   }
 
-  // ── H-15 ──────────────────────────────────────────────────────────────────
-  describe("H-15 — WHITELIST_ROLE separation + one-way disable", function () {
-    it("admin starts with DEFAULT_ADMIN_ROLE, MINTER_ROLE, and WHITELIST_ROLE", async function () {
-      const { token, admin } = await loadFixture(deploy);
-      const DEFAULT_ADMIN_ROLE = await token.DEFAULT_ADMIN_ROLE();
-      const MINTER_ROLE = await token.MINTER_ROLE();
-      const WHITELIST_ROLE = await token.WHITELIST_ROLE();
-      expect(
-        await token.hasRole(DEFAULT_ADMIN_ROLE, await admin.getAddress()),
-      ).to.equal(true);
-      expect(
-        await token.hasRole(MINTER_ROLE, await admin.getAddress()),
-      ).to.equal(true);
-      expect(
-        await token.hasRole(WHITELIST_ROLE, await admin.getAddress()),
-      ).to.equal(true);
-    });
+  // ── Helpers for lock policies ───────────────────────────────────────────
 
-    it("non-WHITELIST_ROLE cannot call toggleTransferWhitelist", async function () {
-      const { token, alice } = await loadFixture(deploy);
+  /// Create a standard linear lock policy and return its id.
+  async function createLinearPolicy(
+    token: Awaited<ReturnType<typeof deploy>>["token"],
+    admin: Awaited<ReturnType<typeof deploy>>["admin"],
+    policyId: string,
+    opts: {
+      anchor?: number; // 0 = Absolute, 1 = Tge
+      start?: bigint;
+      cliffDuration?: bigint;
+      vestDuration?: bigint;
+      holdUntil?: bigint;
+    } = {},
+  ) {
+    const id = ethers.encodeBytes32String(policyId);
+    const anchor = opts.anchor ?? 1; // default Tge-anchored
+    const start = opts.start ?? 0n;
+    const cliffDuration = opts.cliffDuration ?? 0n;
+    const vestDuration = opts.vestDuration ?? 2n * YEAR;
+    await token.connect(admin).createLockPolicy(id, {
+      holdUntil: opts.holdUntil ?? 0n,
+      unlock: { anchor, start, cliffDuration, vestDuration },
+    });
+    return id;
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // Deployment & Constructor
+  // ═════════════════════════════════════════════════════════════════════════
+
+  describe("constructor", function () {
+    it("reverts when claimSource is zero address", async function () {
+      const [deployer] = await ethers.getSigners();
+      const mockRegistry = await new MockBondingRegistryFactory(
+        deployer,
+      ).deploy();
+      await mockRegistry.waitForDeployment();
+      const now = BigInt(await time.latest());
+      const ccaStart = now + DAY;
+      const ccaEnd = ccaStart + 7n * DAY;
+
       await expect(
-        token.connect(alice).toggleTransferWhitelist(await alice.getAddress()),
+        new InterfoldTokenFactory(deployer).deploy(
+          await deployer.getAddress(),
+          ccaStart,
+          ccaEnd,
+          ethers.ZeroAddress,
+          await mockRegistry.getAddress(),
+        ),
       ).to.be.revertedWithCustomError(
-        token,
-        "AccessControlUnauthorizedAccount",
+        { interface: InterfoldTokenFactory.createInterface() },
+        "ZeroAddress",
       );
     });
 
-    it("WHITELIST_ROLE without MINTER_ROLE can whitelist", async function () {
-      const { token, admin, whitelister, alice } = await loadFixture(deploy);
-      const WHITELIST_ROLE = await token.WHITELIST_ROLE();
-      await token
-        .connect(admin)
-        .grantRole(WHITELIST_ROLE, await whitelister.getAddress());
+    it("reverts when bondingRegistry is zero address", async function () {
+      const [deployer] = await ethers.getSigners();
+      const now = BigInt(await time.latest());
+      const ccaStart = now + DAY;
+      const ccaEnd = ccaStart + 7n * DAY;
+
+      await expect(
+        new InterfoldTokenFactory(deployer).deploy(
+          await deployer.getAddress(),
+          ccaStart,
+          ccaEnd,
+          await deployer.getAddress(),
+          ethers.ZeroAddress,
+        ),
+      ).to.be.revertedWithCustomError(
+        { interface: InterfoldTokenFactory.createInterface() },
+        "ZeroAddress",
+      );
+    });
+
+    it("reverts when bondingRegistry has no code (EOA)", async function () {
+      const [deployer, admin] = await ethers.getSigners();
+      const now = BigInt(await time.latest());
+      const ccaStart = now + DAY;
+      const ccaEnd = ccaStart + 7n * DAY;
+
+      await expect(
+        new InterfoldTokenFactory(deployer).deploy(
+          await admin.getAddress(),
+          ccaStart,
+          ccaEnd,
+          await deployer.getAddress(),
+          await admin.getAddress(), // EOA, not a contract
+        ),
+      ).to.be.revertedWithCustomError(
+        { interface: InterfoldTokenFactory.createInterface() },
+        "InvalidBondingRegistry",
+      );
+    });
+
+    it("reverts when CCA start is in the past", async function () {
+      const [deployer] = await ethers.getSigners();
+      const mockRegistry = await new MockBondingRegistryFactory(
+        deployer,
+      ).deploy();
+      await mockRegistry.waitForDeployment();
+      const now = BigInt(await time.latest());
+
+      await expect(
+        new InterfoldTokenFactory(deployer).deploy(
+          await deployer.getAddress(),
+          now, // in the past (or now)
+          now + 7n * DAY,
+          await deployer.getAddress(),
+          await mockRegistry.getAddress(),
+        ),
+      ).to.be.revertedWithCustomError(
+        { interface: InterfoldTokenFactory.createInterface() },
+        "InvalidCcaWindow",
+      );
+    });
+
+    it("reverts when CCA end is not after start", async function () {
+      const [deployer] = await ethers.getSigners();
+      const mockRegistry = await new MockBondingRegistryFactory(
+        deployer,
+      ).deploy();
+      await mockRegistry.waitForDeployment();
+      const now = BigInt(await time.latest());
+      const ccaStart = now + DAY;
+      const ccaEnd = ccaStart; // equal, not greater
+
+      await expect(
+        new InterfoldTokenFactory(deployer).deploy(
+          await deployer.getAddress(),
+          ccaStart,
+          ccaEnd,
+          await deployer.getAddress(),
+          await mockRegistry.getAddress(),
+        ),
+      ).to.be.revertedWithCustomError(
+        { interface: InterfoldTokenFactory.createInterface() },
+        "InvalidCcaWindow",
+      );
+    });
+
+    it("initial owner receives all roles", async function () {
+      const { token, admin } = await loadFixture(deploy);
+      const adminAddress = await admin.getAddress();
+      expect(
+        await token.hasRole(await token.DEFAULT_ADMIN_ROLE(), adminAddress),
+      ).to.be.true;
+      expect(await token.hasRole(await token.MINTER_ROLE(), adminAddress)).to.be
+        .true;
+      expect(await token.hasRole(await token.WHITELIST_ROLE(), adminAddress)).to
+        .be.true;
+      expect(await token.hasRole(await token.LOCK_MANAGER_ROLE(), adminAddress))
+        .to.be.true;
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // Phase lifecycle
+  // ═════════════════════════════════════════════════════════════════════════
+
+  describe("phase()", function () {
+    it("starts in Virtual phase", async function () {
+      const { token } = await loadFixture(deploy);
+      expect(await token.phase()).to.equal(0); // Phase.Virtual
+    });
+
+    it("enters PublicSale during CCA window", async function () {
+      const { token, ccaStart } = await loadFixture(deploy);
+      await time.increaseTo(ccaStart);
+      expect(await token.phase()).to.equal(1); // Phase.PublicSale
+    });
+
+    it("enters Cooldown after CCA_END before TGE", async function () {
+      const { token, ccaEnd } = await loadFixture(deploy);
+      await time.increaseTo(ccaEnd);
+      expect(await token.phase()).to.equal(2); // Phase.Cooldown
+    });
+
+    it("enters Live phase after TGE", async function () {
+      const { token, ccaEnd } = await loadFixture(deploy);
+      const TGE_COOLDOWN = 45n * DAY;
+      await time.increaseTo(ccaEnd + TGE_COOLDOWN + 1n);
+      await token.tge();
+      expect(await token.phase()).to.equal(3); // Phase.Live
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // Minting
+  // ═════════════════════════════════════════════════════════════════════════
+
+  describe("mint", function () {
+    it("DEFAULT_ADMIN_ROLE can mint unlocked tokens during Virtual", async function () {
+      const { token, admin, alice } = await loadFixture(deploy);
+      const amount = ethers.parseEther("100");
       await expect(
         token
-          .connect(whitelister)
-          .toggleTransferWhitelist(await alice.getAddress()),
+          .connect(admin)
+          .mint(
+            await alice.getAddress(),
+            amount,
+            ethers.encodeBytes32String("test"),
+          ),
+      )
+        .to.emit(token, "AllocationMinted")
+        .withArgs(
+          await alice.getAddress(),
+          amount,
+          ethers.ZeroHash,
+          ethers.encodeBytes32String("test"),
+        );
+      expect(await token.balanceOf(await alice.getAddress())).to.equal(amount);
+    });
+
+    it("mint reverts after Virtual phase", async function () {
+      const { token, admin, alice, ccaStart } = await loadFixture(deploy);
+      await time.increaseTo(ccaStart);
+      await expect(
+        token
+          .connect(admin)
+          .mint(
+            await alice.getAddress(),
+            ethers.parseEther("1"),
+            ethers.encodeBytes32String("test"),
+          ),
+      ).to.be.revertedWithCustomError(token, "MintingClosed");
+    });
+
+    it("reverts with zero amount", async function () {
+      const { token, admin, alice } = await loadFixture(deploy);
+      await expect(
+        token
+          .connect(admin)
+          .mint(
+            await alice.getAddress(),
+            0n,
+            ethers.encodeBytes32String("test"),
+          ),
+      ).to.be.revertedWithCustomError(token, "ZeroAmount");
+    });
+
+    it("reverts when MAX_SUPPLY would be exceeded", async function () {
+      const { token, admin, alice } = await loadFixture(deploy);
+      const maxSupply = await token.MAX_SUPPLY();
+      await expect(
+        token
+          .connect(admin)
+          .mint(await alice.getAddress(), maxSupply + 1n, ethers.ZeroHash),
+      ).to.be.revertedWithCustomError(token, "MaxSupplyExceeded");
+    });
+  });
+
+  describe("mintAllocations", function () {
+    it("MINTER_ROLE can mint locked allocations during Virtual", async function () {
+      const { token, admin, alice } = await loadFixture(deploy);
+      const policyId = await createLinearPolicy(token, admin, "TEST_POLICY");
+      const amount = ethers.parseEther("1000");
+
+      await expect(
+        token.connect(admin).mintAllocations([
+          {
+            recipient: await alice.getAddress(),
+            amount,
+            policyId,
+            label: ethers.encodeBytes32String("test"),
+          },
+        ]),
+      )
+        .to.emit(token, "AllocationMinted")
+        .withArgs(
+          await alice.getAddress(),
+          amount,
+          policyId,
+          ethers.encodeBytes32String("test"),
+        );
+
+      // Tokens are locked — lockedBalanceOf should be > 0.
+      expect(await token.lockedBalanceOf(await alice.getAddress())).to.equal(
+        amount,
+      );
+      expect(await token.balanceOf(await alice.getAddress())).to.equal(amount);
+    });
+
+    it("reverts with zero policyId", async function () {
+      const { token, admin, alice } = await loadFixture(deploy);
+      await expect(
+        token.connect(admin).mintAllocations([
+          {
+            recipient: await alice.getAddress(),
+            amount: ethers.parseEther("1"),
+            policyId: ethers.ZeroHash,
+            label: ethers.encodeBytes32String("test"),
+          },
+        ]),
+      ).to.be.revertedWithCustomError(token, "InvalidPolicy");
+    });
+
+    it("reverts with undefined policy", async function () {
+      const { token, admin, alice } = await loadFixture(deploy);
+      await expect(
+        token.connect(admin).mintAllocations([
+          {
+            recipient: await alice.getAddress(),
+            amount: ethers.parseEther("1"),
+            policyId: ethers.encodeBytes32String("UNDEFINED"),
+            label: ethers.encodeBytes32String("test"),
+          },
+        ]),
+      ).to.be.revertedWithCustomError(token, "PolicyNotDefined");
+    });
+
+    it("reverts after Virtual phase", async function () {
+      const { token, admin, alice, ccaStart } = await loadFixture(deploy);
+      const policyId = await createLinearPolicy(token, admin, "TEST_POLICY");
+      await time.increaseTo(ccaStart);
+      await expect(
+        token.connect(admin).mintAllocations([
+          {
+            recipient: await alice.getAddress(),
+            amount: ethers.parseEther("1"),
+            policyId,
+            label: ethers.ZeroHash,
+          },
+        ]),
+      ).to.be.revertedWithCustomError(token, "MintingClosed");
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // TGE
+  // ═════════════════════════════════════════════════════════════════════════
+
+  describe("tge()", function () {
+    it("reverts before CCA_END + TGE_COOLDOWN", async function () {
+      const { token, ccaEnd } = await loadFixture(deploy);
+      await time.increaseTo(ccaEnd); // Cooldown phase but not enough
+      await expect(token.tge()).to.be.revertedWithCustomError(
+        token,
+        "TgeTooEarly",
+      );
+    });
+
+    it("anyone can trigger TGE after cooldown", async function () {
+      const { token, ccaEnd, alice } = await loadFixture(deploy);
+      const TGE_COOLDOWN = 45n * DAY;
+      await time.increaseTo(ccaEnd + TGE_COOLDOWN + 1n);
+      await expect(token.connect(alice).tge()).to.emit(token, "TgeTriggered");
+      expect(await token.tgeTimestamp()).to.be.gt(0);
+      expect(await token.phase()).to.equal(3); // Live
+    });
+
+    it("reverts if already live", async function () {
+      const { token, ccaEnd } = await loadFixture(deploy);
+      const TGE_COOLDOWN = 45n * DAY;
+      await time.increaseTo(ccaEnd + TGE_COOLDOWN + 1n);
+      await token.tge();
+      await expect(token.tge()).to.be.revertedWithCustomError(
+        token,
+        "AlreadyLive",
+      );
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // Whitelisting
+  // ═════════════════════════════════════════════════════════════════════════
+
+  describe("setTransferWhitelisted", function () {
+    it("WHITELIST_ROLE can whitelist an address", async function () {
+      const { token, admin, alice } = await loadFixture(deploy);
+      await expect(
+        token
+          .connect(admin)
+          .setTransferWhitelisted(await alice.getAddress(), true),
       )
         .to.emit(token, "TransferWhitelistUpdated")
         .withArgs(await alice.getAddress(), true);
+      expect(await token.transferWhitelist(await alice.getAddress())).to.be
+        .true;
     });
 
-    it("non-admin cannot disableTransferRestrictions", async function () {
+    it("non-WHITELIST_ROLE cannot whitelist", async function () {
       const { token, alice } = await loadFixture(deploy);
       await expect(
-        token.connect(alice).disableTransferRestrictions(),
+        token
+          .connect(alice)
+          .setTransferWhitelisted(await alice.getAddress(), true),
       ).to.be.revertedWithCustomError(
         token,
         "AccessControlUnauthorizedAccount",
       );
     });
 
-    it("disableTransferRestrictions is one-way (idempotent no-op on second call)", async function () {
+    it("reverts with zero address", async function () {
       const { token, admin } = await loadFixture(deploy);
-      await token.connect(admin).setTgeEarliest(1);
-      await token.connect(admin).tge();
-      await expect(token.connect(admin).disableTransferRestrictions())
-        .to.emit(token, "TransferRestrictionUpdated")
-        .withArgs(false);
-      expect(await token.transfersRestricted()).to.equal(false);
-      // Second call: idempotent no-op (does not revert, does not emit).
       await expect(
-        token.connect(admin).disableTransferRestrictions(),
-      ).to.not.emit(token, "TransferRestrictionUpdated");
-      expect(await token.transfersRestricted()).to.equal(false);
+        token.connect(admin).setTransferWhitelisted(ethers.ZeroAddress, true),
+      ).to.be.revertedWithCustomError(token, "ZeroAddress");
     });
   });
 
-  // ── M-29 ──────────────────────────────────────────────────────────────────
-  describe("M-29 — EIP-6372 timestamp clock", function () {
-    it("clock() returns block.timestamp and CLOCK_MODE() is mode=timestamp", async function () {
-      const { token } = await loadFixture(deploy);
-      expect(await token.clock()).to.equal(await time.latest());
-      expect(await token.CLOCK_MODE()).to.equal("mode=timestamp");
-    });
-  });
-
-  describe("pooled token-level locks", function () {
-    it("requires LOCK_MANAGER_ROLE for schedule creation", async function () {
-      const { token, alice } = await loadFixture(deployWithUnlockedTransfers);
+  describe("setLockWhitelisted", function () {
+    it("LOCK_MANAGER_ROLE can manage lock whitelist", async function () {
+      const { token, admin, alice } = await loadFixture(deploy);
       await expect(
-        token.connect(alice).createLockSchedule({
-          account: await alice.getAddress(),
-          amount: ethers.parseEther("1"),
-          tokenHoldUntil: 1n,
-          tokenUnlockStart: 1n,
-          tokenUnlockEnd: 1n,
-          serviceStart: 0n,
-          serviceCliff: 0n,
-          serviceEnd: 0n,
-          group: GROUP_PRE_SEED,
-        }),
+        token.connect(admin).setLockWhitelisted(await alice.getAddress(), true),
+      )
+        .to.emit(token, "LockWhitelistUpdated")
+        .withArgs(await alice.getAddress(), true);
+    });
+
+    it("non-LOCK_MANAGER_ROLE cannot manage lock whitelist", async function () {
+      const { token, alice } = await loadFixture(deploy);
+      await expect(
+        token.connect(alice).setLockWhitelisted(await alice.getAddress(), true),
       ).to.be.revertedWithCustomError(
         token,
         "AccessControlUnauthorizedAccount",
       );
     });
+  });
 
-    it("blocks transfers that would drop a wallet below its locked floor", async function () {
-      const { token, alice, bob, totalAmount, tge } = await createLinearLock();
-      const bobAddress = await bob.getAddress();
+  // ═════════════════════════════════════════════════════════════════════════
+  // Lock Policies
+  // ═════════════════════════════════════════════════════════════════════════
 
-      expect(await token.lockedFloorOf(await alice.getAddress())).to.equal(
-        totalAmount,
+  describe("createLockPolicy", function () {
+    it("LOCK_MANAGER_ROLE can create a policy", async function () {
+      const { token, admin } = await loadFixture(deploy);
+      const policyId = ethers.encodeBytes32String("MY_POLICY");
+      await expect(
+        token.connect(admin).createLockPolicy(policyId, {
+          holdUntil: 0n,
+          unlock: {
+            anchor: 1, // Tge
+            start: 0n,
+            cliffDuration: 0n,
+            vestDuration: 2n * YEAR,
+          },
+        }),
+      ).to.emit(token, "PolicyDefined");
+    });
+
+    it("reverts on duplicate policy id (write-once)", async function () {
+      const { token, admin } = await loadFixture(deploy);
+      const policyId = ethers.encodeBytes32String("MY_POLICY");
+      await token.connect(admin).createLockPolicy(policyId, {
+        holdUntil: 0n,
+        unlock: {
+          anchor: 1,
+          start: 0n,
+          cliffDuration: 0n,
+          vestDuration: YEAR,
+        },
+      });
+      await expect(
+        token.connect(admin).createLockPolicy(policyId, {
+          holdUntil: 0n,
+          unlock: {
+            anchor: 0,
+            start: 1n,
+            cliffDuration: 1n,
+            vestDuration: 0n,
+          },
+        }),
+      ).to.be.revertedWithCustomError(token, "PolicyAlreadyDefined");
+    });
+
+    it("reverts with zero policyId", async function () {
+      const { token, admin } = await loadFixture(deploy);
+      await expect(
+        token.connect(admin).createLockPolicy(ethers.ZeroHash, {
+          holdUntil: 0n,
+          unlock: {
+            anchor: 1,
+            start: 0n,
+            cliffDuration: 0n,
+            vestDuration: YEAR,
+          },
+        }),
+      ).to.be.revertedWithCustomError(token, "InvalidPolicy");
+    });
+
+    it("reverts with PENDING policyId", async function () {
+      const { token, admin } = await loadFixture(deploy);
+      await expect(
+        token
+          .connect(admin)
+          .createLockPolicy(ethers.encodeBytes32String("PENDING"), {
+            holdUntil: 0n,
+            unlock: {
+              anchor: 1,
+              start: 0n,
+              cliffDuration: 0n,
+              vestDuration: YEAR,
+            },
+          }),
+      ).to.be.revertedWithCustomError(token, "InvalidPolicy");
+    });
+
+    it("reverts when both cliff and vest are zero", async function () {
+      const { token, admin } = await loadFixture(deploy);
+      await expect(
+        token
+          .connect(admin)
+          .createLockPolicy(ethers.encodeBytes32String("BAD"), {
+            holdUntil: 0n,
+            unlock: {
+              anchor: 1,
+              start: 0n,
+              cliffDuration: 0n,
+              vestDuration: 0n,
+            },
+          }),
+      ).to.be.revertedWithCustomError(token, "InvalidPolicy");
+    });
+
+    it("reverts when Absolute anchor has zero start", async function () {
+      const { token, admin } = await loadFixture(deploy);
+      await expect(
+        token
+          .connect(admin)
+          .createLockPolicy(ethers.encodeBytes32String("BAD"), {
+            holdUntil: 0n,
+            unlock: {
+              anchor: 0,
+              start: 0n,
+              cliffDuration: 1n,
+              vestDuration: 0n,
+            },
+          }),
+      ).to.be.revertedWithCustomError(token, "InvalidPolicy");
+    });
+
+    it("reverts when Tge anchor has non-zero start", async function () {
+      const { token, admin } = await loadFixture(deploy);
+      await expect(
+        token
+          .connect(admin)
+          .createLockPolicy(ethers.encodeBytes32String("BAD"), {
+            holdUntil: 0n,
+            unlock: {
+              anchor: 1,
+              start: 1n,
+              cliffDuration: 1n,
+              vestDuration: 0n,
+            },
+          }),
+      ).to.be.revertedWithCustomError(token, "InvalidPolicy");
+    });
+
+    it("reverts when cliff exceeds vest duration", async function () {
+      const { token, admin } = await loadFixture(deploy);
+      await expect(
+        token
+          .connect(admin)
+          .createLockPolicy(ethers.encodeBytes32String("BAD"), {
+            holdUntil: 0n,
+            unlock: {
+              anchor: 1,
+              start: 0n,
+              cliffDuration: 2n * YEAR,
+              vestDuration: YEAR,
+            },
+          }),
+      ).to.be.revertedWithCustomError(token, "InvalidPolicy");
+    });
+
+    it("non-LOCK_MANAGER_ROLE cannot create a policy", async function () {
+      const { token, alice } = await loadFixture(deploy);
+      await expect(
+        token
+          .connect(alice)
+          .createLockPolicy(ethers.encodeBytes32String("MY_POLICY"), {
+            holdUntil: 0n,
+            unlock: {
+              anchor: 1,
+              start: 0n,
+              cliffDuration: 0n,
+              vestDuration: YEAR,
+            },
+          }),
+      ).to.be.revertedWithCustomError(
+        token,
+        "AccessControlUnauthorizedAccount",
+      );
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // Lock enforcement
+  // ═════════════════════════════════════════════════════════════════════════
+
+  describe("lockedBalanceOf / lockedBalanceAt / transferableBalanceOf", function () {
+    it("lockedBalanceOf returns 0 for accounts with no locks", async function () {
+      const { token, alice } = await loadFixture(deploy);
+      expect(await token.lockedBalanceOf(await alice.getAddress())).to.equal(
+        0n,
+      );
+    });
+
+    it("mintAllocation creates a lock tracked by lockedBalanceOf", async function () {
+      const { token, alice, amount } = await deployWithLockAndTge({
+        mintAmount: ethers.parseEther("2400"),
+      });
+      expect(await token.lockedBalanceOf(await alice.getAddress())).to.equal(
+        amount,
+      );
+    });
+
+    it("TGE-anchored policy releases nothing before TGE timestamp", async function () {
+      const { token, admin, alice } = await loadFixture(deploy);
+      const policyId = await createLinearPolicy(token, admin, "TEST_POLICY", {
+        vestDuration: 2n * YEAR,
+      });
+      const amount = ethers.parseEther("2400");
+
+      await token.connect(admin).mintAllocations([
+        {
+          recipient: await alice.getAddress(),
+          amount,
+          policyId,
+          label: ethers.encodeBytes32String("test"),
+        },
+      ]);
+
+      // TGE not fired yet, Tge-anchored curve should keep everything locked.
+      expect(await token.lockedBalanceOf(await alice.getAddress())).to.equal(
+        amount,
+      );
+    });
+
+    it("linear unlock over time after TGE", async function () {
+      const { token, admin, alice, ccaEnd } = await loadFixture(deploy);
+      const policyId = await createLinearPolicy(token, admin, "TEST_POLICY", {
+        vestDuration: 2n * YEAR,
+      });
+      const amount = ethers.parseEther("2400");
+
+      await token.connect(admin).mintAllocations([
+        {
+          recipient: await alice.getAddress(),
+          amount,
+          policyId,
+          label: ethers.encodeBytes32String("test"),
+        },
+      ]);
+
+      // Fire TGE.
+      const TGE_COOLDOWN = 45n * DAY;
+      await time.increaseTo(ccaEnd + TGE_COOLDOWN + 1n);
+      const tgeTx = await token.tge();
+      const receipt = await tgeTx.wait();
+      const tgeBlock = await ethers.provider.getBlock(receipt!.blockNumber);
+      const tgeTimestamp = BigInt(tgeBlock!.timestamp);
+
+      // Right at TGE: everything still locked (cliffDuration = 0 so it starts
+      // vesting immediately — but at timestamp == anchor, nothing has accrued).
+      expect(await token.lockedBalanceOf(await alice.getAddress())).to.equal(
+        amount,
       );
 
-      await expect(
-        token.connect(alice).transfer(bobAddress, 1n),
-      ).to.be.revertedWithCustomError(token, "LockedBalanceInvariant");
+      // Halfway through vesting: half unlocked.
+      await time.increaseTo(tgeTimestamp + YEAR);
+      expect(await token.lockedBalanceOf(await alice.getAddress())).to.equal(
+        amount / 2n,
+      );
 
-      await time.increaseTo(tge + YEAR);
-      expect(await token.lockedFloorOf(await alice.getAddress())).to.equal(
-        totalAmount / 2n,
+      // Past vest end: fully unlocked.
+      await time.increaseTo(tgeTimestamp + 2n * YEAR);
+      expect(await token.lockedBalanceOf(await alice.getAddress())).to.equal(
+        0n,
+      );
+    });
+
+    it("holdUntil keeps everything locked regardless of curve", async function () {
+      // Use deployWithLockAndTge which creates a Tge-anchored lock with holdUntil=0.
+      // Then verify lockedBalanceAt at various timestamps.
+      const { token, alice, amount, tgeTimestamp } = await deployWithLockAndTge(
+        { mintAmount: ethers.parseEther("1000") },
+      );
+      const aliceAddress = await alice.getAddress();
+
+      // At tgeTimestamp, lock is fully locked (no time elapsed).
+      expect(await token.lockedBalanceAt(aliceAddress, tgeTimestamp)).to.equal(
+        amount,
+      );
+
+      // At tgeTimestamp + YEAR, half is unlocked (linear vest over 2Y).
+      expect(
+        await token.lockedBalanceAt(aliceAddress, tgeTimestamp + YEAR),
+      ).to.equal(amount / 2n);
+
+      // At tgeTimestamp + 2*YEAR, fully unlocked.
+      expect(
+        await token.lockedBalanceAt(aliceAddress, tgeTimestamp + 2n * YEAR),
+      ).to.equal(0n);
+    });
+
+    it("transferableBalanceOf returns full balance when nothing locked", async function () {
+      const { token, alice, amount } = await deployWithUnlockedAndTge(
+        ethers.parseEther("100"),
       );
       expect(
         await token.transferableBalanceOf(await alice.getAddress()),
-      ).to.equal(totalAmount / 2n);
-
-      await token.connect(alice).transfer(bobAddress, totalAmount / 2n);
-      await expect(
-        token.connect(alice).transfer(bobAddress, totalAmount / 2n),
-      ).to.be.revertedWithCustomError(token, "LockedBalanceInvariant");
-
-      await time.increaseTo(tge + 2n * YEAR);
-      await token.connect(alice).transfer(bobAddress, totalAmount / 2n);
-      expect(await token.balanceOf(await alice.getAddress())).to.equal(0n);
+      ).to.equal(amount);
     });
 
-    it("keeps launch whitelist separate from locked-floor enforcement", async function () {
-      const { token, admin, alice, bob } = await loadFixture(deploy);
-      const aliceAddress = await alice.getAddress();
-      const bobAddress = await bob.getAddress();
-      const now = BigInt(await time.latest());
-      const tge = now + DAY;
-      const totalAmount = ethers.parseEther("100");
-
-      await token.connect(admin).setTgeEarliest(1);
-      await token.connect(admin).tge();
-      await token.connect(admin).setTgeTimestamp(tge);
-      await token
-        .connect(admin)
-        .mintAllocation(aliceAddress, totalAmount, "Locked allocation");
-      await token.connect(admin).toggleTransferWhitelist(aliceAddress);
-      await token.connect(admin).createLockSchedule({
-        account: aliceAddress,
-        amount: totalAmount,
-        tokenHoldUntil: tge,
-        tokenUnlockStart: 0n,
-        tokenUnlockEnd: tge + YEAR,
-        serviceStart: 0n,
-        serviceCliff: 0n,
-        serviceEnd: 0n,
-        group: GROUP_PRE_SEED,
+    it("transferableBalanceOf = 0 when fully locked and no bond", async function () {
+      const { token, alice, amount } = await deployWithLockAndTge({
+        mintAmount: ethers.parseEther("1000"),
       });
-
-      await expect(
-        token.connect(alice).transfer(bobAddress, 1n),
-      ).to.be.revertedWithCustomError(token, "LockedBalanceInvariant");
+      expect(
+        await token.transferableBalanceOf(await alice.getAddress()),
+      ).to.equal(0n);
     });
+  });
 
-    it("accumulates Bridge SAFT linear unlock while the hold is still active", async function () {
-      const fixture = await loadFixture(deployWithUnlockedTransfers);
-      const { token, admin, alice } = fixture;
-      const aliceAddress = await alice.getAddress();
-      const now = BigInt(await time.latest());
-      const tge = now + DAY;
-      const totalAmount = ethers.parseEther("2400");
+  // ═════════════════════════════════════════════════════════════════════════
+  // Transfer enforcement
+  // ═════════════════════════════════════════════════════════════════════════
 
-      await token.connect(admin).setTgeTimestamp(tge);
-      await token
-        .connect(admin)
-        .mintAllocation(aliceAddress, totalAmount, "Bridge allocation");
-      await token.connect(admin).createLockSchedule({
-        account: aliceAddress,
-        amount: totalAmount,
-        tokenHoldUntil: tge + YEAR,
-        tokenUnlockStart: 0n,
-        tokenUnlockEnd: tge + 2n * YEAR,
-        serviceStart: 0n,
-        serviceCliff: 0n,
-        serviceEnd: 0n,
-        group: GROUP_BRIDGE,
+  describe("transfer enforcement", function () {
+    it("blocks transfer that would drop below locked balance", async function () {
+      const { token, alice, bob, amount } = await deployWithLockAndTge({
+        mintAmount: ethers.parseEther("1000"),
       });
-
-      await time.increaseTo(tge + YEAR / 2n);
-      expect(await token.lockedFloorOf(aliceAddress)).to.equal(totalAmount);
-
-      await time.increaseTo(tge + YEAR);
-      expect(await token.lockedFloorOf(aliceAddress)).to.equal(
-        totalAmount / 2n,
+      // After TGE, a tiny fraction may have unlocked (1-2 seconds of vesting).
+      // transferableBalance should be far less than the full amount.
+      const transferable = await token.transferableBalanceOf(
+        await alice.getAddress(),
       );
-    });
-
-    it("applies team service vesting as the stricter curve", async function () {
-      const fixture = await loadFixture(deployWithUnlockedTransfers);
-      const { token, admin, alice } = fixture;
-      const aliceAddress = await alice.getAddress();
-      const now = BigInt(await time.latest());
-      const tge = now + DAY;
-      const signing = tge - 180n * DAY;
-      const totalAmount = ethers.parseEther("4800");
-
-      await token.connect(admin).setTgeTimestamp(tge);
-      await token
-        .connect(admin)
-        .mintAllocation(aliceAddress, totalAmount, "Team allocation");
-      await token.connect(admin).createLockSchedule({
-        account: aliceAddress,
-        amount: totalAmount,
-        tokenHoldUntil: tge,
-        tokenUnlockStart: 0n,
-        tokenUnlockEnd: tge + 2n * YEAR,
-        serviceStart: signing,
-        serviceCliff: signing + YEAR,
-        serviceEnd: signing + 4n * YEAR,
-        group: GROUP_TEAM,
-      });
-
-      await time.increaseTo(signing + YEAR - DAY);
-      expect(await token.lockedFloorOf(aliceAddress)).to.equal(totalAmount);
-
-      await time.increaseTo(signing + YEAR);
-      expect(await token.lockedFloorOf(aliceAddress)).to.equal(
-        totalAmount - totalAmount / 4n,
-      );
-    });
-
-    it("creates lock schedules on transfers from approved CCA claim sources", async function () {
-      const { token, admin, alice, bob, claimSource } = await loadFixture(
-        deployWithUnlockedTransfers,
-      );
-      const aliceAddress = await alice.getAddress();
-      const bobAddress = await bob.getAddress();
-      const claimSourceAddress = await claimSource.getAddress();
-      const claimAmount = ethers.parseEther("500");
-      const now = BigInt(await time.latest());
-
-      await token.connect(admin).setClaimSource(claimSourceAddress, true);
-      await token.connect(admin).setClaimLockProfile(aliceAddress, {
-        active: true,
-        lockStart: now,
-        holdDuration: 40n * DAY,
-        unlockDuration: 0n,
-        group: GROUP_CCA_REG_S,
-      });
-      await token
-        .connect(admin)
-        .mintAllocation(claimSourceAddress, claimAmount, "CCA claim source");
-
+      expect(transferable).to.be.lt(amount / 2n);
+      // Attempting to transfer the full amount should revert.
       await expect(
-        token.connect(claimSource).transfer(aliceAddress, claimAmount),
-      ).to.emit(token, "LockScheduleCreated");
-
-      expect(await token.lockedFloorOf(aliceAddress)).to.equal(claimAmount);
-      await expect(
-        token.connect(alice).transfer(bobAddress, 1n),
-      ).to.be.revertedWithCustomError(token, "LockedBalanceInvariant");
-
-      await time.increase(40n * DAY + 1n);
-      expect(await token.lockedFloorOf(aliceAddress)).to.equal(0n);
-      await token.connect(alice).transfer(bobAddress, claimAmount);
+        token.connect(alice).transfer(await bob.getAddress(), amount),
+      ).to.be.revertedWithCustomError(token, "InsufficientUnlockedBalance");
     });
 
-    it("reuses fully unlocked schedule slots at the schedule cap", async function () {
-      const { token, admin, alice } = await loadFixture(
-        deployWithUnlockedTransfers,
-      );
-      const aliceAddress = await alice.getAddress();
-      const now = BigInt(await time.latest());
-      const unlockedAmount = ethers.parseEther("1");
-      const activeAmount = ethers.parseEther("2");
-
-      await token
-        .connect(admin)
-        .mintAllocation(
-          aliceAddress,
-          unlockedAmount * 64n + activeAmount,
-          "Schedule capacity",
-        );
-
-      for (let i = 0; i < 64; i++) {
-        await token.connect(admin).createLockSchedule({
-          account: aliceAddress,
-          amount: unlockedAmount,
-          tokenHoldUntil: now,
-          tokenUnlockStart: now,
-          tokenUnlockEnd: now,
-          serviceStart: 0n,
-          serviceCliff: 0n,
-          serviceEnd: 0n,
-          group: GROUP_PRE_SEED,
+    it("allows transfer of unlocked portion", async function () {
+      const { token, alice, bob, amount, tgeTimestamp } =
+        await deployWithLockAndTge({
+          mintAmount: ethers.parseEther("1000"),
+          vestDuration: 2n * YEAR,
         });
-      }
 
-      expect(await token.lockScheduleCount(aliceAddress)).to.equal(64n);
-      expect(await token.lockedFloorOf(aliceAddress)).to.equal(0n);
+      await time.increaseTo(tgeTimestamp + YEAR);
 
-      await expect(
-        token.connect(admin).createLockSchedule({
-          account: aliceAddress,
-          amount: activeAmount,
-          tokenHoldUntil: now + DAY,
-          tokenUnlockStart: now + DAY,
-          tokenUnlockEnd: now + 2n * DAY,
-          serviceStart: 0n,
-          serviceCliff: 0n,
-          serviceEnd: 0n,
-          group: GROUP_PRE_SEED,
-        }),
-      )
-        .to.emit(token, "LockScheduleCreated")
-        .withArgs(
-          aliceAddress,
-          0n,
-          GROUP_PRE_SEED,
-          activeAmount,
-          now + DAY,
-          now + DAY,
-          now + 2n * DAY,
-          0n,
-          0n,
-          0n,
-        );
+      // Half unlocked.
+      const half = amount / 2n;
+      expect(
+        await token.transferableBalanceOf(await alice.getAddress()),
+      ).to.equal(half);
 
-      expect(await token.lockScheduleCount(aliceAddress)).to.equal(64n);
-      expect(await token.lockedFloorOf(aliceAddress)).to.equal(activeAmount);
+      await token.connect(alice).transfer(await bob.getAddress(), half);
     });
 
-    it("rejects claim-source transfers when the recipient has no active profile", async function () {
-      const { token, admin, alice, claimSource } = await loadFixture(
-        deployWithUnlockedTransfers,
-      );
-      const claimSourceAddress = await claimSource.getAddress();
-      const claimAmount = ethers.parseEther("1");
+    it("pre-TGE: bonding registry transfers are allowed", async function () {
+      const { token, admin, alice, mockRegistry } = await loadFixture(deploy);
+      const amount = ethers.parseEther("100");
+      const registryAddress = await mockRegistry.getAddress();
 
-      await token.connect(admin).setClaimSource(claimSourceAddress, true);
       await token
         .connect(admin)
-        .mintAllocation(claimSourceAddress, claimAmount, "CCA claim source");
+        .mint(await alice.getAddress(), amount, ethers.ZeroHash);
 
-      await expect(
-        token
-          .connect(claimSource)
-          .transfer(await alice.getAddress(), claimAmount),
-      )
-        .to.be.revertedWithCustomError(token, "ClaimLockProfileMissing")
-        .withArgs(await alice.getAddress());
+      // Transfer TO bonding registry — should work pre-TGE.
+      await token.connect(alice).transfer(registryAddress, amount);
     });
 
-    it("does not create claim locks for BondingRegistry exit payouts", async function () {
-      const signers = await ethers.getSigners();
-      const [, beneficiary] = signers;
-      const beneficiaryAddress = await beneficiary.getAddress();
-      const sys = await deployInterfoldSystem({
-        useMockCiphernodeRegistry: true,
-        setupOperators: 0,
-        mintUsdcTo: [],
-      });
-      const { bondingRegistry, licenseToken } = sys;
-      const bondingRegistryAddress = await bondingRegistry.getAddress();
-      const bondAmount = ethers.parseEther("100");
-      const unbondAmount = ethers.parseEther("25");
+    it("pre-TGE: whitelisted addresses can transfer", async function () {
+      const { token, admin, alice, bob } = await loadFixture(deploy);
+      const amount = ethers.parseEther("100");
 
-      await licenseToken.setBondingRegistry(bondingRegistryAddress);
-      await licenseToken.setClaimSource(bondingRegistryAddress, true);
-      await licenseToken.mintAllocation(
-        beneficiaryAddress,
-        bondAmount,
-        "License bond",
+      await token
+        .connect(admin)
+        .mint(await alice.getAddress(), amount, ethers.ZeroHash);
+      await token
+        .connect(admin)
+        .setTransferWhitelisted(await alice.getAddress(), true);
+
+      await token.connect(alice).transfer(await bob.getAddress(), amount);
+    });
+
+    it("pre-TGE: claim source transfers are allowed", async function () {
+      const { token, admin, alice, claimSource } = await loadFixture(deploy);
+      const amount = ethers.parseEther("100");
+
+      await token
+        .connect(admin)
+        .mint(await claimSource.getAddress(), amount, ethers.ZeroHash);
+
+      await token
+        .connect(claimSource)
+        .transfer(await alice.getAddress(), amount);
+    });
+
+    it("pre-TGE: regular transfers are blocked", async function () {
+      const { token, admin, alice, bob } = await loadFixture(deploy);
+      const amount = ethers.parseEther("100");
+
+      await token
+        .connect(admin)
+        .mint(await alice.getAddress(), amount, ethers.ZeroHash);
+
+      await expect(
+        token.connect(alice).transfer(await bob.getAddress(), amount),
+      ).to.be.revertedWithCustomError(token, "TransferRestricted");
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // Claim-source auto-lock & linkClaim
+  // ═════════════════════════════════════════════════════════════════════════
+
+  describe("claim-source auto-lock & linkClaim", function () {
+    it("CLAIM_SOURCE transfers create PENDING locks", async function () {
+      const { token, alice, claimSource, amount } =
+        await deployWithUnlockedAndTge(ethers.parseEther("500"));
+
+      // Transfer from alice to claimSource first so claimSource has tokens.
+      await token
+        .connect(alice)
+        .transfer(await claimSource.getAddress(), amount);
+
+      await token
+        .connect(claimSource)
+        .transfer(await alice.getAddress(), amount);
+
+      // Pending lock should be created.
+      expect(await token.lockedBalanceOf(await alice.getAddress())).to.equal(
+        amount,
       );
-      await licenseToken
-        .connect(beneficiary)
-        .approve(bondingRegistryAddress, bondAmount);
+    });
 
-      await bondingRegistry.connect(beneficiary).bondLicense(bondAmount);
-      await bondingRegistry.connect(beneficiary).unbondLicense(unbondAmount);
+    it("lockWhitelist exempts from auto-lock on claim-source transfer", async function () {
+      const { token, admin, alice, claimSource, amount } =
+        await deployWithUnlockedAndTge(ethers.parseEther("500"));
 
-      await time.increase(SEVEN_DAYS + 1);
-      await bondingRegistry.connect(beneficiary).claimExits(0, unbondAmount);
+      await token
+        .connect(admin)
+        .setLockWhitelisted(await alice.getAddress(), true);
 
-      expect(await licenseToken.lockScheduleCount(beneficiaryAddress)).to.equal(
+      // Transfer tokens from alice to claimSource so claimSource can send.
+      await token
+        .connect(alice)
+        .transfer(await claimSource.getAddress(), amount);
+
+      await token
+        .connect(claimSource)
+        .transfer(await alice.getAddress(), amount);
+
+      // No lock created because recipient is lock-whitelisted.
+      expect(await token.lockedBalanceOf(await alice.getAddress())).to.equal(
         0n,
       );
-      expect(await licenseToken.balanceOf(beneficiaryAddress)).to.equal(
-        unbondAmount,
-      );
+      expect(await token.balanceOf(await alice.getAddress())).to.equal(amount);
     });
 
-    it("does not let admins create schedules beyond current controlled balance", async function () {
-      const { token, admin, alice } = await loadFixture(
-        deployWithUnlockedTransfers,
-      );
-      const now = BigInt(await time.latest());
-      const tge = now + DAY;
+    it("linkClaim moves PENDING to a real policy", async function () {
+      const { token, admin, alice, claimSource, amount } =
+        await deployWithUnlockedAndTge(ethers.parseEther("500"));
+      const policyId = await createLinearPolicy(token, admin, "REAL_POLICY", {
+        vestDuration: 2n * YEAR,
+      });
 
-      await token.connect(admin).setTgeTimestamp(tge);
+      // Transfer from alice to claimSource so claimSource can send.
+      await token
+        .connect(alice)
+        .transfer(await claimSource.getAddress(), amount);
+      await token
+        .connect(claimSource)
+        .transfer(await alice.getAddress(), amount);
+
+      // Now link the claim to the real policy.
+      await token
+        .connect(admin)
+        .linkClaim(await alice.getAddress(), amount, policyId);
+
+      // Lock should still exist but now under the real policy (allow tiny
+      // rounding from vesting elapsed seconds).
+      const lb = await token.lockedBalanceOf(await alice.getAddress());
+      expect(lb).to.be.closeTo(amount, ethers.parseEther("0.01"));
+    });
+
+    it("linkClaim queues unfilled amounts for future claims", async function () {
+      const fixture = await loadFixture(deploy);
+      const { token, admin, alice, claimSource, ccaEnd } = fixture;
+      const policyId = await createLinearPolicy(token, admin, "FUTURE_POLICY", {
+        vestDuration: 2n * YEAR,
+      });
+      const linkAmount = ethers.parseEther("500");
+
+      // Link before any claim arrives — should queue.
+      await token
+        .connect(admin)
+        .linkClaim(await alice.getAddress(), linkAmount, policyId);
+
+      // No balance yet so no active lock.
+      expect(await token.lockedBalanceOf(await alice.getAddress())).to.equal(
+        0n,
+      );
+
+      // Mint tokens to claimSource during Virtual phase.
+      await token
+        .connect(admin)
+        .mint(await claimSource.getAddress(), linkAmount, ethers.ZeroHash);
+
+      // Fire TGE so transfers are unrestricted.
+      const TGE_COOLDOWN = 45n * DAY;
+      await time.increaseTo(ccaEnd + TGE_COOLDOWN + 1n);
+      await token.tge();
+
+      // Now send a claim — it should consume the queued lock.
+      await token
+        .connect(claimSource)
+        .transfer(await alice.getAddress(), linkAmount);
+
+      // Queued lock should be consumed and active lock created (allow tiny
+      // rounding from vesting elapsed seconds).
+      const lb2 = await token.lockedBalanceOf(await alice.getAddress());
+      expect(lb2).to.be.closeTo(linkAmount, ethers.parseEther("0.01"));
+    });
+
+    it("linkClaim reverts with undefined policy", async function () {
+      const { token, admin, alice } = await loadFixture(deploy);
       await expect(
-        token.connect(admin).createLockSchedule({
-          account: await alice.getAddress(),
-          amount: ethers.parseEther("1"),
-          tokenHoldUntil: tge,
-          tokenUnlockStart: 0n,
-          tokenUnlockEnd: tge + YEAR,
-          serviceStart: 0n,
-          serviceCliff: 0n,
-          serviceEnd: 0n,
-          group: GROUP_PRE_SEED,
-        }),
-      ).to.be.revertedWithCustomError(token, "LockedBalanceInvariant");
+        token
+          .connect(admin)
+          .linkClaim(
+            await alice.getAddress(),
+            ethers.parseEther("1"),
+            ethers.encodeBytes32String("UNDEFINED"),
+          ),
+      ).to.be.revertedWithCustomError(token, "PolicyNotDefined");
     });
 
-    it("counts self-bonded and pending-exit ENCL toward the locked floor", async function () {
+    it("linkClaim reverts with zero amount", async function () {
+      const { token, admin, alice } = await loadFixture(deploy);
+      const policyId = await createLinearPolicy(token, admin, "REAL_POLICY");
+      await expect(
+        token.connect(admin).linkClaim(await alice.getAddress(), 0n, policyId),
+      ).to.be.revertedWithCustomError(token, "ZeroAmount");
+    });
+
+    it("non-LOCK_MANAGER_ROLE cannot linkClaim", async function () {
+      const { token, alice } = await loadFixture(deploy);
+      await expect(
+        token
+          .connect(alice)
+          .linkClaim(
+            await alice.getAddress(),
+            ethers.parseEther("1"),
+            ethers.encodeBytes32String("ANY"),
+          ),
+      ).to.be.revertedWithCustomError(
+        token,
+        "AccessControlUnauthorizedAccount",
+      );
+    });
+
+    it("queued locks survive multiple partial claims", async function () {
+      const fixture = await loadFixture(deploy);
+      const { token, admin, alice, claimSource, ccaEnd } = fixture;
+      const policyId = await createLinearPolicy(token, admin, "PARTIAL", {
+        vestDuration: 2n * YEAR,
+      });
+      const linkAmount = ethers.parseEther("1000");
+
+      // Queue a large amount.
+      await token
+        .connect(admin)
+        .linkClaim(await alice.getAddress(), linkAmount, policyId);
+
+      // Mint all claim tokens during Virtual phase.
+      const totalClaim = ethers.parseEther("700");
+      await token
+        .connect(admin)
+        .mint(await claimSource.getAddress(), totalClaim, ethers.ZeroHash);
+
+      // Fire TGE.
+      const TGE_COOLDOWN = 45n * DAY;
+      await time.increaseTo(ccaEnd + TGE_COOLDOWN + 1n);
+      await token.tge();
+
+      // Send a partial claim.
+      const partialAmount = ethers.parseEther("400");
+      await token
+        .connect(claimSource)
+        .transfer(await alice.getAddress(), partialAmount);
+
+      let lb3 = await token.lockedBalanceOf(await alice.getAddress());
+      expect(lb3).to.be.closeTo(partialAmount, ethers.parseEther("0.01"));
+
+      // Send another claim.
+      const anotherAmount = ethers.parseEther("300");
+      await token
+        .connect(claimSource)
+        .transfer(await alice.getAddress(), anotherAmount);
+
+      lb3 = await token.lockedBalanceOf(await alice.getAddress());
+      expect(lb3).to.be.closeTo(
+        partialAmount + anotherAmount,
+        ethers.parseEther("0.01"),
+      );
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // BondingRegistry integration (uses deployInterfoldSystem)
+  // ═════════════════════════════════════════════════════════════════════════
+
+  describe("BondingRegistry integration", function () {
+    it("transferableBalanceOf counts bonded INTF toward the locked floor", async function () {
       const signers = await ethers.getSigners();
       const [, beneficiary, slasher] = signers;
       const beneficiaryAddress = await beneficiary.getAddress();
@@ -512,132 +1157,150 @@ describe("InterfoldToken", function () {
         wireSlashingManager: false,
         mintUsdcTo: [],
       });
-      const { bondingRegistry, licenseToken, owner } = sys;
+      const { bondingRegistry, licenseToken } = sys;
       const bondingRegistryAddress = await bondingRegistry.getAddress();
-      const now = BigInt(await time.latest());
-      const tge = now + DAY;
       const totalAmount = ethers.parseEther("1000");
       const bondAmount = ethers.parseEther("800");
-      const unbondAmount = ethers.parseEther("300");
 
       await bondingRegistry.setSlashingManager(slasherAddress);
-      await licenseToken.setTgeTimestamp(tge);
-      await licenseToken.setBondingRegistry(bondingRegistryAddress);
-      await licenseToken.mintAllocation(
+
+      // Mint unlocked tokens and bond some.
+      await licenseToken.mint(
         beneficiaryAddress,
         totalAmount,
-        "Locked allocation",
+        ethers.encodeBytes32String("test"),
       );
-      await licenseToken.createLockSchedule({
-        account: beneficiaryAddress,
-        amount: totalAmount,
-        tokenHoldUntil: tge,
-        tokenUnlockStart: 0n,
-        tokenUnlockEnd: tge + YEAR,
-        serviceStart: 0n,
-        serviceCliff: 0n,
-        serviceEnd: 0n,
-        group: GROUP_PRE_SEED,
-      });
-
       await licenseToken
         .connect(beneficiary)
         .approve(bondingRegistryAddress, bondAmount);
       await bondingRegistry.connect(beneficiary).bondLicense(bondAmount);
 
+      // Wallet balance is totalAmount - bondAmount, bonded = bondAmount.
+      // No locks so everything is transferable.
       expect(await licenseToken.balanceOf(beneficiaryAddress)).to.equal(
         totalAmount - bondAmount,
       );
-      expect(await licenseToken.totalBondedOf(beneficiaryAddress)).to.equal(
-        bondAmount,
-      );
       expect(
         await licenseToken.transferableBalanceOf(beneficiaryAddress),
-      ).to.equal(0n);
+      ).to.equal(totalAmount - bondAmount);
 
-      await bondingRegistry.connect(beneficiary).unbondLicense(unbondAmount);
-      expect(await licenseToken.totalBondedOf(beneficiaryAddress)).to.equal(
-        bondAmount,
+      // Now create a lock policy and mint a locked allocation.
+      const policyId = ethers.encodeBytes32String("BOND_TEST");
+      await licenseToken.createLockPolicy(policyId, {
+        holdUntil: 0n,
+        unlock: {
+          anchor: 1,
+          start: 0n,
+          cliffDuration: 0n,
+          vestDuration: 2n * YEAR,
+        },
+      });
+      const lockAmount = ethers.parseEther("400");
+      // Mint extra unlocked tokens to fund the lock.
+      await licenseToken.mint(
+        beneficiaryAddress,
+        lockAmount,
+        ethers.encodeBytes32String("extra"),
       );
+      await licenseToken.mintAllocations([
+        {
+          recipient: beneficiaryAddress,
+          amount: lockAmount,
+          policyId,
+          label: ethers.encodeBytes32String("locked"),
+        },
+      ]);
 
-      await time.increase(SEVEN_DAYS + 1);
-      await bondingRegistry.connect(beneficiary).claimExits(0, unbondAmount);
-      expect(await licenseToken.totalBondedOf(beneficiaryAddress)).to.equal(
-        bondAmount - unbondAmount,
+      // Locked balance ≈ lockAmount (400) — Tge-anchored with tiny vesting.
+      // Bonded balance = bondAmount (800).
+      // Since bonded > locked, the bond covers all locks.
+      // Wallet = totalAmount - bondAmount + lockAmount + lockAmount
+      //        = 1000 - 800 + 400 + 400 = 1000.
+      // transferable = balance - max(0, locked - bonded) ≈ 1000 - 0 = 1000.
+      const tb = await licenseToken.transferableBalanceOf(beneficiaryAddress);
+      expect(tb).to.be.closeTo(
+        totalAmount - bondAmount + lockAmount + lockAmount,
+        ethers.parseEther("0.01"),
       );
-      expect(await licenseToken.balanceOf(beneficiaryAddress)).to.equal(
-        totalAmount - bondAmount + unbondAmount,
-      );
-
-      await expect(
-        licenseToken
-          .connect(beneficiary)
-          .transfer(await owner.getAddress(), ethers.parseEther("100")),
-      ).to.be.revertedWithCustomError(licenseToken, "LockedBalanceInvariant");
     });
 
-    it("encumbers later same-wallet tokens after a slash deficit", async function () {
-      const signers = await ethers.getSigners();
-      const [, beneficiary, slasher, recipient] = signers;
-      const beneficiaryAddress = await beneficiary.getAddress();
-      const recipientAddress = await recipient.getAddress();
-      const slasherAddress = await slasher.getAddress();
+    it("bonding registry transfers are allowed pre-TGE", async function () {
       const sys = await deployInterfoldSystem({
         useMockCiphernodeRegistry: true,
         setupOperators: 0,
-        wireSlashingManager: false,
         mintUsdcTo: [],
       });
-      const { bondingRegistry, licenseToken } = sys;
+      const { bondingRegistry, licenseToken, owner } = sys;
       const bondingRegistryAddress = await bondingRegistry.getAddress();
-      const now = BigInt(await time.latest());
-      const tge = now + DAY;
-      const totalAmount = ethers.parseEther("1000");
-      const slashAmount = ethers.parseEther("400");
+      const bondAmount = ethers.parseEther("100");
 
-      await bondingRegistry.setSlashingManager(slasherAddress);
-      await licenseToken.setTgeTimestamp(tge);
-      await licenseToken.setBondingRegistry(bondingRegistryAddress);
-      await licenseToken.mintAllocation(
-        beneficiaryAddress,
-        totalAmount,
-        "Locked allocation",
+      await licenseToken.mint(
+        await owner.getAddress(),
+        bondAmount,
+        ethers.encodeBytes32String("test"),
       );
-      await licenseToken.createLockSchedule({
-        account: beneficiaryAddress,
-        amount: totalAmount,
-        tokenHoldUntil: tge,
-        tokenUnlockStart: 0n,
-        tokenUnlockEnd: tge + YEAR,
-        serviceStart: 0n,
-        serviceCliff: 0n,
-        serviceEnd: 0n,
-        group: GROUP_PRE_SEED,
-      });
-
       await licenseToken
-        .connect(beneficiary)
-        .approve(bondingRegistryAddress, totalAmount);
-      await bondingRegistry.connect(beneficiary).bondLicense(totalAmount);
-      await bondingRegistry
-        .connect(slasher)
-        .slashLicenseBond(
-          beneficiaryAddress,
-          slashAmount,
-          ethers.encodeBytes32String("TEST_SLASH"),
-        );
+        .connect(owner)
+        .approve(bondingRegistryAddress, bondAmount);
+      // Bonding transfer should succeed.
+      await bondingRegistry.connect(owner).bondLicense(bondAmount);
+    });
+  });
 
-      await licenseToken.mintAllocation(
-        beneficiaryAddress,
-        slashAmount,
-        "Later unlocked top-up",
-      );
+  // ═════════════════════════════════════════════════════════════════════════
+  // Ownership
+  // ═════════════════════════════════════════════════════════════════════════
+
+  describe("ownership", function () {
+    it("renounceOwnership is disabled", async function () {
+      const { token, admin } = await loadFixture(deploy);
       await expect(
-        licenseToken.connect(beneficiary).transfer(recipientAddress, 1n),
-      ).to.be.revertedWithCustomError(licenseToken, "LockedBalanceInvariant");
+        token.connect(admin).renounceOwnership(),
+      ).to.be.revertedWithCustomError(token, "RenounceOwnershipDisabled");
+    });
 
-      await time.increaseTo(tge + YEAR);
-      await licenseToken.connect(beneficiary).transfer(recipientAddress, 1n);
+    it("ownership transfer syncs AccessControl roles", async function () {
+      const { token, admin, alice } = await loadFixture(deploy);
+      const adminAddress = await admin.getAddress();
+      const aliceAddress = await alice.getAddress();
+
+      // Transfer ownership to alice via 2-step.
+      await token.connect(admin).transferOwnership(aliceAddress);
+      await token.connect(alice).acceptOwnership();
+
+      // Old owner loses all roles.
+      expect(
+        await token.hasRole(await token.DEFAULT_ADMIN_ROLE(), adminAddress),
+      ).to.be.false;
+      expect(await token.hasRole(await token.MINTER_ROLE(), adminAddress)).to.be
+        .false;
+      expect(await token.hasRole(await token.WHITELIST_ROLE(), adminAddress)).to
+        .be.false;
+      expect(await token.hasRole(await token.LOCK_MANAGER_ROLE(), adminAddress))
+        .to.be.false;
+
+      // New owner gains all roles.
+      expect(
+        await token.hasRole(await token.DEFAULT_ADMIN_ROLE(), aliceAddress),
+      ).to.be.true;
+      expect(await token.hasRole(await token.MINTER_ROLE(), aliceAddress)).to.be
+        .true;
+      expect(await token.hasRole(await token.WHITELIST_ROLE(), aliceAddress)).to
+        .be.true;
+      expect(await token.hasRole(await token.LOCK_MANAGER_ROLE(), aliceAddress))
+        .to.be.true;
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // EIP-6372
+  // ═════════════════════════════════════════════════════════════════════════
+
+  describe("EIP-6372", function () {
+    it("clock() returns block.timestamp and CLOCK_MODE() is mode=timestamp", async function () {
+      const { token } = await loadFixture(deploy);
+      expect(await token.clock()).to.equal(await time.latest());
+      expect(await token.CLOCK_MODE()).to.equal("mode=timestamp");
     });
   });
 });

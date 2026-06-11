@@ -132,10 +132,6 @@ export const deployInterfold = async (
   if (!latestBlock) {
     throw new Error("Could not read latest block for local TGE timestamp");
   }
-  const interfoldTgeTimestamp = resolveInterfoldTgeTimestamp(
-    networkName,
-    latestBlock.timestamp,
-  );
 
   const encodedInsecure = encodeBfvParams(BFV_PARAMS.insecure512);
   const encodedSecure = encodeBfvParams(BFV_PARAMS.secure8192);
@@ -251,18 +247,12 @@ export const deployInterfold = async (
   const bondingRegistryAddress = await bondingRegistry.getAddress();
   console.log("BondingRegistry deployed to:", bondingRegistryAddress);
 
-  console.log("Configuring INTF pooled lock accounting...");
-  await (await interfoldToken.setTgeTimestamp(interfoldTgeTimestamp)).wait();
-  await (
-    await interfoldToken.setBondingRegistry(bondingRegistryAddress)
-  ).wait();
-
+  // BONDING_REGISTRY is immutable (set at construction).
+  // Bonding transfers are always allowed pre-TGE per the phase-based gate.
   console.log("Whitelisting BondingRegistry in INTF...");
-  const whitelistTx = await interfoldToken.whitelistContracts(
-    bondingRegistryAddress,
-    ethersLib.ZeroAddress,
-  );
-  await whitelistTx.wait();
+  await (
+    await interfoldToken.setTransferWhitelisted(bondingRegistryAddress, true)
+  ).wait();
 
   console.log("Deploying Interfold...");
   const { interfold } = await deployAndSaveInterfold({

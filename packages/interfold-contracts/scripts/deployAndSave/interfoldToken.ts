@@ -37,19 +37,18 @@ async function disableTransferRestrictionsForLocal(
   console.log("Contract address", await contract.getAddress());
 
   try {
-    const isRestricted = await contract.transfersRestricted();
-    if (isRestricted) {
-      const isLive = await contract.isLive();
-      if (!isLive) {
-        await (await contract.setTgeEarliest(1)).wait();
-        await (await contract.tge()).wait();
-      }
-      const tx = await contract.disableTransferRestrictions();
-      await tx.wait();
-      console.log("Transfer restrictions disabled for local development");
+    const tgeTs = await contract.tgeTimestamp();
+    if (tgeTs === 0n) {
+      // Attempt TGE — will succeed only if CCA_END + 45 days has passed.
+      // On local chains the deployer should advance time manually first.
+      await (await contract.tge()).wait();
+      console.log("TGE fired for local development");
     }
-  } catch (error) {
-    console.warn("Failed to disable transfer restrictions:", error);
+  } catch (error: any) {
+    console.warn(
+      "TGE not yet available (CCA cooldown may not have passed):",
+      error.reason ?? error.message ?? error,
+    );
   }
 }
 

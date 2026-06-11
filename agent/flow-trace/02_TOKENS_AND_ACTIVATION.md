@@ -356,7 +356,7 @@ active = registered
                               ───────────
                    After exitDelay seconds:
                    INTF → returned to source withdrawal address
-                   USDC → paid out from ETK.payableBalance
+                   USDC → paid out from ITK.payableBalance
 ```
 
 ---
