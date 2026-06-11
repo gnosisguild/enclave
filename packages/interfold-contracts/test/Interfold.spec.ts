@@ -7,7 +7,6 @@ import { expect } from "chai";
 
 import {
   ADDRESS_TWO as AddressTwo,
-  COMMITTEE_SIZE_MINIMUM,
   COMMITTEE_THRESHOLDS_DEFAULT,
   buildMockAggregationPublishArgs,
   deployInterfoldSystem,
