@@ -21,10 +21,9 @@ interface IInterfold {
 
     /// @notice Sizes of committees for E3 computations
     enum CommitteeSize {
+        Minimum,
         Micro,
-        Small,
-        Medium,
-        Large
+        Small
     }
 
     /// @notice BFV encryption parameter sets.

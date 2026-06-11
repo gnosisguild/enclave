@@ -190,7 +190,7 @@ mod tests {
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
         use crate::ciphernodes_committee::CiphernodesCommitteeSize;
-        let committee = CiphernodesCommitteeSize::Medium.values();
+        let committee = CiphernodesCommitteeSize::Micro.values();
         let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &committee).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 

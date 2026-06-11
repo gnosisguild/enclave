@@ -14,7 +14,7 @@ export type { BfvParams, ThresholdBfvParamsPresetName, VerifiableEncryptionResul
 export { ThresholdBfvParamsPresetNames } from './crypto/types'
 
 export type { ContractAddresses, E3, E3RequestParams } from './contracts/types'
-export { E3Stage, FailureReason, CommitteeSize } from './contracts/types'
+export { E3Stage, FailureReason, CommitteeSize, validateCommitteeSize } from './contracts/types'
 
 export { InterfoldEventType, RegistryEventType } from './events/types'
 

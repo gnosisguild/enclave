@@ -9,10 +9,10 @@ import userDataEncryptionCt0Circuit from '../../../../circuits/bin/threshold/tar
 import userDataEncryptionCt1Circuit from '../../../../circuits/bin/threshold/target/user_data_encryption_ct1.json'
 import userDataEncryptionCircuit from '../../../../circuits/bin/threshold/target/user_data_encryption.json'
 import { CompiledCircuit, Noir } from '@noir-lang/noir_js'
-import { assertSdkMicroCircuits } from '../circuits/assert-micro-circuits'
+import { assertSdkMinimumCircuits } from '../circuits/assert-minimum-circuits'
 import { proofToFields } from '../utils'
 
-assertSdkMicroCircuits()
+assertSdkMinimumCircuits()
 
 // Conversion to Noir types
 export type Field = string

@@ -85,10 +85,10 @@ const CANONICAL_PRESET = 'insecure-512'
  * `contracts/verifiers/bfv/honk/`. The committee determines `H` and `T` of the
  * `dkg_aggregator` / `decryption_aggregator` circuits — different committees compile
  * to different recursive VKs, so each committee's verifiers must land in a separate
- * directory to coexist on disk. `micro` is the development/CI default; other committees
+ * directory to coexist on disk. `minimum` is the development/CI default; other committees
  * generate under `honk/<committee>/`.
  */
-const CANONICAL_COMMITTEE: CircuitCommittee = CIRCUIT_COMMITTEES.MICRO
+const CANONICAL_COMMITTEE: CircuitCommittee = CIRCUIT_COMMITTEES.MINIMUM
 
 interface CircuitInfo {
   name: string
@@ -743,7 +743,7 @@ Options:
   --preset <name>        BFV preset for circuits/bin (insecure-512 | secure-8192).
                          Defaults to insecure-512. With --check and a non-insecure preset,
                          only verifies dist/ + circuits/bin alignment (no .sol diff).
-  --committee <name>     Committee size (micro | small | medium | large). When omitted, read from
+  --committee <name>     Committee size (minimum | micro | small). When omitted, read from
                          circuits/bin/.active-preset.json. Non-canonical committees write
                          to honk/<committee>/ so committed canonical files are not clobbered.
   --output-dir <path>    Write generated verifiers here instead of the committed honk/ dir.

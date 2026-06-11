@@ -91,7 +91,7 @@ export const requestCommittee = task(
   })
   .addOption({
     name: "committeeSize",
-    description: "committee size (0=Micro, 1=Small, 2=Medium, 3=Large)",
+    description: "committee size (0=Minimum, 1=Micro, 2=Small)",
     defaultValue: 0,
     type: ArgumentType.INT,
   })
@@ -151,9 +151,9 @@ export const requestCommittee = task(
       },
       hre,
     ) => {
-      if (![0, 1, 2, 3].includes(committeeSize)) {
+      if (![0, 1, 2].includes(committeeSize)) {
         throw new Error(
-          "Invalid committee size - expected 0 (Micro), 1 (Small), 2 (Medium), or 3 (Large).",
+          "Invalid committee size - expected 0 (Minimum), 1 (Micro), or 2 (Small).",
         );
       }
 

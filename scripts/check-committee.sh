@@ -40,7 +40,7 @@ fail() {
 if [[ ! -f "$ACTIVE_NR" ]]; then
   fail "missing $ACTIVE_NR"
 fi
-ACTIVE_COMMITTEE=$(grep -oE 'crate::configs::committee::(micro|small|medium|large)::N_PARTIES' "$ACTIVE_NR" \
+ACTIVE_COMMITTEE=$(grep -oE 'crate::configs::committee::(minimum|micro|small)::N_PARTIES' "$ACTIVE_NR" \
   | head -n1 \
   | sed -E 's|.*committee::([a-z]+)::N_PARTIES|\1|')
 if [[ -z "${ACTIVE_COMMITTEE:-}" ]]; then
@@ -169,12 +169,12 @@ if [[ -x "$GEN_BIN" ]]; then
     TMP=$(mktemp -d)
     trap 'rm -rf "$TMP"' EXIT
     # Mirror the committee dir layout so the bin can write into <tmp>/<committee>/.
-    for c in micro small medium; do
+    for c in minimum micro small; do
       if [[ -d "circuits/lib/src/configs/committee/$c" ]]; then
         mkdir -p "$TMP/$c"
       fi
     done
-    for c in micro small medium; do
+    for c in minimum micro small; do
       [[ -d "$TMP/$c" ]] || continue
       "$GEN_BIN" --committee "$c" --output-root "$TMP" >/dev/null
       format_parity_matrices_for_committee "$c" "$TMP"

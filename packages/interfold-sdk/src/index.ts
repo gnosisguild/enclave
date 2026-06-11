@@ -57,7 +57,15 @@ export type {
 } from './types'
 
 // Enums and constants
-export { InterfoldEventType, RegistryEventType, ThresholdBfvParamsPresetNames, E3Stage, FailureReason, CommitteeSize } from './types'
+export {
+  InterfoldEventType,
+  RegistryEventType,
+  ThresholdBfvParamsPresetNames,
+  E3Stage,
+  FailureReason,
+  CommitteeSize,
+  validateCommitteeSize,
+} from './types'
 export { DEFAULT_THRESHOLD_BFV_PARAMS_PRESET_NAME } from './constants'
 
 // Export utilities

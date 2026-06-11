@@ -10,8 +10,8 @@ import { fileURLToPath } from 'node:url'
 
 import { SDKError } from '../utils'
 
-/** Matches `IInterfold.CommitteeSize.Micro` and `DEFAULT_E3_CONFIG.committeeSize`. */
-export const SDK_CIRCUIT_COMMITTEE = 'micro'
+/** Matches `IInterfold.CommitteeSize.Minimum` and `DEFAULT_E3_CONFIG.committeeSize`. */
+export const SDK_CIRCUIT_COMMITTEE = 'minimum'
 
 function findActivePath(): string | null {
   if (!import.meta.url) return null
@@ -42,11 +42,11 @@ const ACTIVE_PRESET_PATH = findActivePath()
 let checked = false
 
 /**
- * SDK encryption artifacts are built for the micro committee preset by default.
+ * SDK encryption artifacts are built for the minimum committee preset by default.
  * Fail fast when `circuits/bin/.active-preset.json` points at another committee
  * (e.g. after benchmark runs with `--committee small`).
  */
-export function assertSdkMicroCircuits(): void {
+export function assertSdkMinimumCircuits(): void {
   if (checked) return
 
   if (ACTIVE_PRESET_PATH === null) {

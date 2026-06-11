@@ -212,6 +212,8 @@ jobs:
         run: 'pnpm install --frozen-lockfile'
 
       - name: Run Integration Tests
+        env:
+          BENCHMARK_PROOF_AGGREGATION: 'false'
         run: 'cargo test --test integration -- --nocapture'
 
   zk_prover_integration:
@@ -794,7 +796,7 @@ jobs:
           chmod +x /usr/local/bin/bb
 
       - name: Build interfold circuits
-        run: pnpm build:circuits --preset insecure-512 --committee micro --skip-if-built
+        run: pnpm build:circuits --preset insecure-512 --committee minimum --skip-if-built
 
       - name: Setup ZK prover
         run: |
@@ -1225,7 +1227,7 @@ jobs:
           chmod +x /usr/local/bin/bb
 
       - name: Build interfold circuits
-        run: pnpm build:circuits --preset insecure-512 --committee micro --skip-if-built
+        run: pnpm build:circuits --preset insecure-512 --committee minimum --skip-if-built
 
       - name: Setup ZK prover
         run: |

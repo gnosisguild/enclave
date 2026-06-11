@@ -87,25 +87,25 @@ fn select_benchmark_params() -> BenchmarkParams {
     };
 
     let committee = active_committee(preset_subdir);
-    let is_large_committee = committee == e3_zk_helpers::CiphernodesCommitteeSize::Large;
+    let is_small_committee = committee == e3_zk_helpers::CiphernodesCommitteeSize::Small;
 
-    let collection_timeout_secs = if is_secure_mode && is_large_committee {
-        Some((7_200, 46_000, 46_000)) // Large: threshold/dec kept > pubkey_flow
+    let collection_timeout_secs = if is_secure_mode && is_small_committee {
+        Some((7_200, 46_000, 46_000)) // Small: threshold/dec kept > pubkey_flow
     } else if is_secure_mode {
         Some((1_800, 7_200, 7_200))
     } else {
         None
     };
 
-    let pubkey_flow_timeout = if is_secure_mode && is_large_committee {
-        Duration::from_secs(45_000) // Large: conservative upper bound
+    let pubkey_flow_timeout = if is_secure_mode && is_small_committee {
+        Duration::from_secs(45_000) // Small: conservative upper bound
     } else if is_secure_mode {
         Duration::from_secs(15_000)
     } else {
         Duration::from_secs(5_000)
     };
-    let plaintext_flow_timeout = if is_secure_mode && is_large_committee {
-        Duration::from_secs(6_000) // Large: medium actual (366s) × 4 + margin; smaller than DKG
+    let plaintext_flow_timeout = if is_secure_mode && is_small_committee {
+        Duration::from_secs(6_000) // Small: conservative upper bound; smaller than DKG
     } else if is_secure_mode {
         Duration::from_secs(3_000)
     } else {
@@ -132,7 +132,7 @@ fn benchmark_participant_node_count(threshold_m: usize, threshold_n: usize) -> u
 
 /// Whether `test_trbfv_actor` runs the full recursive fold + aggregator path (default: on).
 ///
-/// Set `BENCHMARK_PROOF_AGGREGATION=false` for a baseline run without node folds / folded Π_DKG.
+/// Benchmark harness always enables proof aggregation (`run_benchmarks.sh` exports `true`).
 fn benchmark_proof_aggregation_enabled() -> bool {
     !matches!(
         std::env::var("BENCHMARK_PROOF_AGGREGATION")
@@ -208,8 +208,8 @@ fn resolve_preset_stamp_path(preset_subdir: &str, committee_str: &str) -> PathBu
 /// Reads the active committee from `circuits/bin/.active-preset.json`, which is written by every
 /// `pnpm build:circuits` invocation and is the canonical source for the new per-committee layout.
 ///
-/// Falls back to `Micro` (and warns) when the stamp is missing or pre-dates the `committee`
-/// field — same default as the build script, so a freshly cloned repo's micro circuits work
+/// Falls back to `Minimum` (and warns) when the stamp is missing or pre-dates the `committee`
+/// field — same default as the build script, so a freshly cloned repo's minimum circuits work
 /// out of the box.
 fn active_committee(_preset_subdir: &str) -> e3_zk_helpers::CiphernodesCommitteeSize {
     use std::str::FromStr;
@@ -221,7 +221,7 @@ fn active_committee(_preset_subdir: &str) -> e3_zk_helpers::CiphernodesCommittee
         .join("circuits")
         .join("bin")
         .join(".active-preset.json");
-    let fallback = e3_zk_helpers::CiphernodesCommitteeSize::Micro;
+    let fallback = e3_zk_helpers::CiphernodesCommitteeSize::Minimum;
 
     let Ok(raw) = std::fs::read_to_string(&stamp_path) else {
         eprintln!(
@@ -248,7 +248,7 @@ fn active_committee(_preset_subdir: &str) -> e3_zk_helpers::CiphernodesCommittee
     e3_zk_helpers::CiphernodesCommitteeSize::from_str(active).unwrap_or_else(|e| {
         panic!(
             "{} has unknown committee=\"{active}\": {e}. \
-             Expected micro|small|medium|large.",
+             Expected minimum|micro|small.",
             stamp_path.display()
         )
     })
@@ -942,6 +942,99 @@ where
 
 fn count_projected_events(projected: &[&str], event_type: &str) -> usize {
     projected.iter().filter(|seen| **seen == event_type).count()
+}
+
+/// Scan a node history for slashing, accusation, and protocol-fault signals that must not
+/// appear on an all-honest benchmark run. Catches regressions such as spurious C2→C4
+/// commitment mismatches when N > H that completion-only assertions would miss.
+fn collect_honest_run_faults(
+    history: &[InterfoldEvent],
+    e3_id: &E3id,
+    context: &str,
+) -> Vec<String> {
+    let mut faults = Vec::new();
+
+    for event in history {
+        match event.get_data() {
+            InterfoldEventData::CommitmentConsistencyCheckComplete(data)
+                if data.e3_id == *e3_id && !data.inconsistent_parties.is_empty() =>
+            {
+                faults.push(format!(
+                    "{context}: CommitmentConsistencyCheckComplete kind={:?} inconsistent_parties={:?}",
+                    data.kind, data.inconsistent_parties
+                ));
+            }
+            InterfoldEventData::CommitmentConsistencyViolation(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: CommitmentConsistencyViolation accused_party_id={} proof_type={:?}",
+                    data.accused_party_id, data.proof_type
+                ));
+            }
+            InterfoldEventData::ProofFailureAccusation(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: ProofFailureAccusation accuser={} accused_party_id={} proof_type={:?}",
+                    data.accuser, data.accused_party_id, data.proof_type
+                ));
+            }
+            InterfoldEventData::ProofVerificationFailed(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: ProofVerificationFailed accused_party_id={} proof_type={:?}",
+                    data.accused_party_id, data.proof_type
+                ));
+            }
+            InterfoldEventData::SignedProofFailed(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: SignedProofFailed faulting_node={} proof_type={:?}",
+                    data.faulting_node, data.proof_type
+                ));
+            }
+            InterfoldEventData::ShareVerificationComplete(data)
+                if data.e3_id == *e3_id && !data.dishonest_parties.is_empty() =>
+            {
+                faults.push(format!(
+                    "{context}: ShareVerificationComplete kind={:?} dishonest_parties={:?}",
+                    data.kind, data.dishonest_parties
+                ));
+            }
+            InterfoldEventData::AccusationVote(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: AccusationVote voter={} accusation_id={:?}",
+                    data.voter, data.accusation_id
+                ));
+            }
+            InterfoldEventData::CommitteeMemberExpelled(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: CommitteeMemberExpelled node={} party_id={:?}",
+                    data.node, data.party_id
+                ));
+            }
+            InterfoldEventData::E3Failed(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: E3Failed stage={:?} reason={:?}",
+                    data.failed_at_stage, data.reason
+                ));
+            }
+            InterfoldEventData::InterfoldError(data) => {
+                faults.push(format!(
+                    "{context}: InterfoldError {:?}: {}",
+                    data.err_type, data.message
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    faults
+}
+
+fn assert_honest_run_safeguards(history: &[InterfoldEvent], e3_id: &E3id, context: &str) {
+    let faults = collect_honest_run_faults(history, e3_id, context);
+    assert!(
+        faults.is_empty(),
+        "honest-run safeguard failures ({}):\n{}",
+        context,
+        faults.join("\n")
+    );
 }
 
 /// Wall seconds between first `start_when` and last `end_when` event in `history` (HLC physical time).
@@ -2012,6 +2105,19 @@ async fn test_trbfv_actor() -> Result<()> {
         println!("Tally {i} result = {res} / {exp}");
         assert_eq!(res, exp);
     }
+
+    // All-honest safeguard: scan every participant and the observer for spurious accusations,
+    // commitment mismatches (including C4 DecryptionProofs on ThresholdKeyshare), and traps.
+    for index in 1..=participant_count {
+        let history = nodes.get_history(index).await?;
+        assert_honest_run_safeguards(
+            &history,
+            &e3_id,
+            &format!("participant node {index} ({})", nodes[index].address()),
+        );
+    }
+    let observer_history = nodes.get_history(0).await?;
+    assert_honest_run_safeguards(&observer_history, &e3_id, "observer node 0");
 
     let mt_report = multithread_report.send(ToReport).await.unwrap();
     println!("{}", mt_report);

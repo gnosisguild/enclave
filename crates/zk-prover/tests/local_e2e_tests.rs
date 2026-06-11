@@ -21,8 +21,8 @@ use std::sync::Arc;
 use ark_bn254::Fr;
 use ark_ff::{BigInteger, PrimeField, Zero};
 use common::{
-    extract_field, extract_field_from_end, find_bb, require_micro_circuits, setup_compiled_circuit,
-    setup_test_prover,
+    extract_field, extract_field_from_end, find_bb, require_minimum_circuits,
+    setup_compiled_circuit, setup_test_prover,
 };
 use e3_events::CircuitName;
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
@@ -144,10 +144,10 @@ async fn setup_share_encryption_e_sm_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
-    require_micro_circuits()?;
+    require_minimum_circuits()?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
     let sd: e3_fhe_params::PresetSearchDefaults =
@@ -185,10 +185,10 @@ async fn setup_share_encryption_sk_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
-    require_micro_circuits()?;
+    require_minimum_circuits()?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
     let sd: e3_fhe_params::PresetSearchDefaults =
@@ -226,10 +226,10 @@ async fn setup_share_computation_sk_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
-    require_micro_circuits()?;
+    require_minimum_circuits()?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
     setup_compiled_circuit(&backend, "dkg", "sk_share_computation").await;
@@ -260,10 +260,10 @@ async fn setup_share_computation_e_sm_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
-    require_micro_circuits()?;
+    require_minimum_circuits()?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
     setup_compiled_circuit(&backend, "dkg", "sk_share_computation").await;
@@ -297,10 +297,10 @@ async fn setup_pk_generation_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
-    require_micro_circuits()?;
+    require_minimum_circuits()?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
     setup_compiled_circuit(&backend, "threshold", "pk_generation").await;
@@ -328,10 +328,10 @@ async fn setup_share_decryption_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
-    require_micro_circuits()?;
+    require_minimum_circuits()?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
     setup_compiled_circuit(&backend, "threshold", "share_decryption").await;
@@ -359,10 +359,10 @@ async fn setup_c4_c6_e2e_test() -> Option<(
     ThresholdShareDecryptionCircuitData,
     BfvPreset,
 )> {
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
-    require_micro_circuits()?;
+    require_minimum_circuits()?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
     setup_compiled_circuit(&backend, "dkg", "share_decryption").await;
@@ -389,10 +389,10 @@ async fn setup_pk_aggregation_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
-    require_micro_circuits()?;
+    require_minimum_circuits()?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
     setup_compiled_circuit(&backend, "threshold", "pk_aggregation").await;
@@ -420,10 +420,10 @@ async fn setup_decrypted_shares_aggregation_test() -> Option<(
     BfvPreset,
     &'static str,
 )> {
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
-    require_micro_circuits()?;
+    require_minimum_circuits()?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
     setup_compiled_circuit(&backend, "threshold", "decrypted_shares_aggregation").await;
@@ -476,7 +476,7 @@ macro_rules! e2e_proof_tests {
                         return;
                     };
 
-                    let artifacts_dir = preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
+                    let artifacts_dir = preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Minimum.as_str());
                     let proof = circuit
                         .prove_with_variant(&prover, &preset, &sample, e3_id, $variant, &artifacts_dir)
                         .expect("proof generation should succeed");
@@ -522,7 +522,7 @@ async fn test_pk_generation_commitment_consistency() {
     };
 
     let artifacts_dir =
-        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Minimum.as_str());
     let proof = circuit
         .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("proof generation should succeed");
@@ -568,7 +568,7 @@ async fn test_pk_bfv_commitment_consistency() {
     };
 
     let artifacts_dir =
-        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Minimum.as_str());
     let proof = circuit
         .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("proof generation should succeed");
@@ -608,7 +608,7 @@ async fn test_share_computation_sk_commitment_consistency() {
     };
 
     let artifacts_dir =
-        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Minimum.as_str());
     let proof = circuit
         .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("inner sk_share_computation proof should succeed");
@@ -642,7 +642,7 @@ async fn test_share_computation_e_sm_commitment_consistency() {
     };
 
     let artifacts_dir =
-        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Minimum.as_str());
     let proof = circuit
         .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("inner e_sm_share_computation proof should succeed");
@@ -676,7 +676,7 @@ async fn test_pk_aggregation_commitment_consistency() {
     };
 
     let artifacts_dir =
-        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Minimum.as_str());
     let proof = circuit
         .prove_with_variant(
             &prover,
@@ -728,7 +728,7 @@ async fn test_threshold_share_decryption_commitment_consistency() {
     };
 
     let artifacts_dir =
-        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Minimum.as_str());
     let proof = circuit
         .prove_with_variant(
             &prover,
@@ -772,7 +772,7 @@ async fn test_c4_sk_commitment_is_c6_expected_sk_input_e2e() {
     let e3_id_c4 = "c4-e2e";
     let e3_id_c6 = "c6-e2e";
     let artifacts_dir =
-        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Minimum.as_str());
 
     let c4_proof = DkgShareDecryptionCircuit
         .prove_with_variant(
@@ -847,7 +847,7 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
         return;
     };
 
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
     let ctx = threshold_params.context_at_level(0).unwrap();
     let moduli = threshold_params.moduli();
@@ -877,7 +877,7 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
     let e3_id_c4 = "c4-align";
     let e3_id_c6 = "c6-align";
     let artifacts_dir =
-        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Minimum.as_str());
 
     let c4_proof = DkgShareDecryptionCircuit
         .prove_with_variant(
@@ -949,7 +949,7 @@ async fn test_decrypted_shares_aggregation_commitment_consistency() {
     };
 
     let artifacts_dir =
-        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Minimum.as_str());
     let proof = circuit
         .prove_with_variant(
             &prover,

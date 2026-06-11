@@ -190,7 +190,7 @@ describe('Integration', () => {
   it('should run an integration test', async () => {
     const { waitForEvent } = await setupEventListeners(sdk, store)
 
-    const committeeSize = CommitteeSize.Micro
+    const committeeSize = CommitteeSize.Minimum
     // Input window length (seconds); also used as vitest wait budget per phase.
     const duration = 120
     const inputWindow = await calculateInputWindow(publicClient, duration)

@@ -23,7 +23,7 @@ fn circuits_build_root() -> PathBuf {
 }
 
 pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_name: &str) {
-    setup_compiled_circuit_for_committee(backend, group, circuit_name, "micro").await;
+    setup_compiled_circuit_for_committee(backend, group, circuit_name, "minimum").await;
 }
 
 pub async fn setup_compiled_circuit_for_committee(
@@ -162,7 +162,7 @@ pub async fn setup_recursive_aggregation_fold_circuit(backend: &ZkBackend, circu
         vk_recursive_path.display()
     );
 
-    let preset_dir = backend.circuits_dir.join("insecure-512").join("micro");
+    let preset_dir = backend.circuits_dir.join("insecure-512").join("minimum");
     let default_dir = preset_dir.join("default").join(circuit.group()).join(pkg);
     fs::create_dir_all(&default_dir).await.unwrap();
     fs::copy(&json_path, default_dir.join(format!("{pkg}.json")))
@@ -223,7 +223,7 @@ pub async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, TempDir) {
 }
 
 /// Reads `circuits/bin/.active-preset.json` (written by `scripts/build-circuits.ts`) and
-/// returns the `committee` field, normalised to lower-case (e.g. `"micro"`, `"medium"`).
+/// returns the `committee` field, normalised to lower-case (e.g. `"minimum"`, `"micro"`).
 /// Returns `None` when the stamp is absent or malformed — callers must treat that as a
 /// "circuits not built yet" condition rather than as a specific committee.
 pub fn active_bin_committee() -> Option<String> {
@@ -233,17 +233,17 @@ pub fn active_bin_committee() -> Option<String> {
     v.get("committee")?.as_str().map(|s| s.to_lowercase())
 }
 
-/// Returns `true` when the compiled `pk_aggregation` (C5) circuit was built for the **micro**
-/// committee (H=3): `expected_threshold_pk_commitments` array length == 3.
+/// Returns `true` when the compiled `pk_aggregation` (C5) circuit was built for the **minimum**
+/// committee (H=2): `expected_threshold_pk_commitments` array length == 2.
 ///
-/// Tests that hard-code `CiphernodesCommitteeSize::Micro` samples should call this and skip
-/// when it returns `false` — the Micro samples will not satisfy the compiled circuit's ABI.
+/// Tests that hard-code `CiphernodesCommitteeSize::Minimum` samples should call this and skip
+/// when it returns `false` — the Minimum samples will not satisfy the compiled circuit's ABI.
 ///
 /// Prefers `.active-preset.json` (cheap stamp check) and falls back to ABI introspection of
 /// `pk_aggregation.json` for older builds that pre-date the stamp's `committee` field.
-pub fn circuits_compiled_for_micro() -> bool {
+pub fn circuits_compiled_for_minimum() -> bool {
     if let Some(committee) = active_bin_committee() {
-        return committee == "micro";
+        return committee == "minimum";
     }
 
     let path = circuits_build_root()
@@ -252,7 +252,7 @@ pub fn circuits_compiled_for_micro() -> bool {
         .join("target")
         .join("pk_aggregation.json");
     let Ok(raw) = std::fs::read_to_string(&path) else {
-        return false; // artifact absent → can't tell, assume not micro
+        return false; // artifact absent → can't tell, assume not minimum
     };
     let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) else {
         return false;
@@ -270,7 +270,7 @@ pub fn circuits_compiled_for_micro() -> bool {
                 })
                 .and_then(|p| p.get("type")?.get("length")?.as_u64())
         })
-        .is_some_and(|len| len == 3) // micro H == 3
+        .is_some_and(|len| len == 2) // minimum H == 2
 }
 
 /// Lightweight backend for tests that need to override config (e.g. inject bad checksums).

@@ -21,7 +21,8 @@ const EXPECTED_NODES_FOLD_KEY_HASH = ethers.id("nodes_fold");
 const EXPECTED_C5_KEY_HASH = ethers.id("c5");
 /** Must match `BfvPkVerifier.h` / default circuit `H`. */
 const H = BFV_DKG_H;
-const DKG_RETURN_FIELD_COUNT = 8;
+/** Aggregator return slots after committee hash: `2*H + 1` padding + `pkCommitment`. */
+const DKG_RETURN_FIELD_COUNT = 2 * H + 2;
 
 /** Exact `publicInputs.length` for the configured H. */
 const EXPECTED_PUBLIC_INPUTS_LEN = bfvPkExpectedPublicInputsLen(H);

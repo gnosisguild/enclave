@@ -341,7 +341,7 @@ mod tests {
             secret_sss_raw: sensitive(),
             dkg_input_type: DkgInputType::SecretKey,
             params_preset: BfvPreset::default(),
-            committee_size: CiphernodesCommitteeSize::Medium,
+            committee_size: CiphernodesCommitteeSize::Micro,
         }
     }
 
@@ -352,7 +352,7 @@ mod tests {
             eek: sensitive(),
             e_sm: sensitive(),
             params_preset: BfvPreset::default(),
-            committee_size: CiphernodesCommitteeSize::Medium,
+            committee_size: CiphernodesCommitteeSize::Micro,
         }
     }
 
@@ -370,7 +370,7 @@ mod tests {
             e1_rns_raw: sensitive(),
             dkg_input_type: DkgInputType::SecretKey,
             params_preset: BfvPreset::default(),
-            committee_size: CiphernodesCommitteeSize::Medium,
+            committee_size: CiphernodesCommitteeSize::Micro,
             recipient_party_id,
             row_index,
             esi_index,
@@ -387,7 +387,7 @@ mod tests {
             own_share_raw: sensitive(),
             dkg_input_type: DkgInputType::SecretKey,
             params_preset: BfvPreset::default(),
-            committee_size: CiphernodesCommitteeSize::Medium,
+            committee_size: CiphernodesCommitteeSize::Micro,
         }
     }
 
