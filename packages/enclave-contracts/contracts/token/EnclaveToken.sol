@@ -18,7 +18,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
-import {IBondingRegistry} from "../interfaces/IBondingRegistry.sol";
+import {IBondingRegistry} from "./interfaces/IBondingRegistry.sol";
 
 /**
  * @title EnclaveToken
@@ -69,6 +69,7 @@ contract EnclaveToken is
 
     /// @param holdUntil Optional absolute timestamp before which nothing is
     ///        transferable, whatever the unlock curve has accrued;
+    /// @param unlock Unlock curve.
     struct LockPolicy {
         uint64 holdUntil;
         Curve unlock;
@@ -101,8 +102,8 @@ contract EnclaveToken is
     error MaxSupplyExceeded();
 
     /// @notice The transfer is not one of the movements allowed pre-TGE:
-    ///         bonding (the registry on either side, any phase) or a CCA
-    ///         claim ({CLAIM_SOURCE} sending while PublicSale).
+    ///         bonding (the registry on either side) or a CCA distribution
+    ///         ({CLAIM_SOURCE} sending, any phase).
     error TransferRestricted(address from, address to);
 
     /// @notice {mint} or {mintAllocations} was called after the Virtual phase; the
@@ -190,12 +191,13 @@ contract EnclaveToken is
     mapping(address account => bool whitelisted) public lockWhitelist;
 
     /// @notice Write-once lock policies by id.
-    mapping(bytes32 policyId => LockPolicy policy) public lockPolicies;
+    mapping(bytes32 policyId => LockPolicy policy) internal lockPolicies;
 
     /// @notice Active locks by account.
     mapping(address account => Lock[] entries) public locks;
 
-    /// @notice Links that arrived before their exact-size claim.
+    /// @notice Policy buckets for links that arrived before enough claim
+    ///         balance existed to classify them.
     mapping(address account => Lock[] entries) public queuedLocks;
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -272,20 +274,21 @@ contract EnclaveToken is
     // Minting
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * @notice Plain vanilla mint: ENCL with no lock attached. Callable only
-     *         while Virtual
-     */
+    /// @notice Plain vanilla admin mint: ENCL with no lock attached. Only
+    ///         allowed during the Virtual phase.
     function mint(
         address recipient,
         uint256 amount,
         bytes32 label
-    ) external onlyRole(MINTER_ROLE) {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (phase() != Phase.Virtual) revert MintingClosed();
         _mintTokens(recipient, amount);
         emit AllocationMinted(recipient, amount, bytes32(0), label);
     }
 
+    /// @notice Mints allocations locked under their policies; the path the
+    ///         minter role uses to distribute vested supply. Only allowed
+    ///         during the Virtual phase.
     function mintAllocations(
         MintAllocation[] calldata allocations
     ) external onlyRole(MINTER_ROLE) {
@@ -300,7 +303,7 @@ contract EnclaveToken is
     // Launch lifecycle
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
+   /**
      * @notice Sets {tgeTimestamp} to the current block timestamp, exactly once.
      * @dev Permissionless: anyone may trigger the TGE once {CCA_END} +
      *      {TGE_COOLDOWN} has passed, so launch cannot be stalled by an idle
@@ -474,7 +477,7 @@ contract EnclaveToken is
             revert TransferRestricted(from, to);
         }
 
-        if (!isMint) {
+        if (!isMint && !transferWhitelist[to] && !transferWhitelist[from]) {
             uint256 transferable = transferableBalanceOf(from);
             if (value > transferable) {
                 revert InsufficientUnlockedBalance(from, transferable, value);
@@ -504,12 +507,12 @@ contract EnclaveToken is
 
         address registry = address(BONDING_REGISTRY);
         bool isBonding = from == registry || to == registry;
-        uint64 current = uint64(block.timestamp);
-        bool isCcaClaim = from == CLAIM_SOURCE &&
-            current >= CCA_START &&
-            current < CCA_END;
+        // The claim source is trusted in any phase: the CCA enforces its own
+        // (block-based) claim timing. Every distribution still lands in a
+        // lock via {_claim}.
+        bool isCcaDistribution = from == CLAIM_SOURCE;
         bool isWhitelisted = transferWhitelist[from] || transferWhitelist[to];
-        return !isBonding && !isCcaClaim && !isWhitelisted;
+        return !isBonding && !isCcaDistribution && !isWhitelisted;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -528,12 +531,12 @@ contract EnclaveToken is
         }
 
         _mintTokens(allocation.recipient, allocation.amount);
-        uint256 total = _addOrIncrementLock(
+        _addOrIncrementLock(
+            allocation.recipient,
             locks[allocation.recipient],
             allocation.policyId,
             allocation.amount
         );
-        emit LockUpdated(allocation.recipient, allocation.policyId, total);
         emit AllocationMinted(
             allocation.recipient,
             allocation.amount,
@@ -554,37 +557,43 @@ contract EnclaveToken is
 
     /// @dev Claim behavior:
     ///
-    ///      - When a claim arrives, scan queuedLocks[account].
-    ///      - If there is an entry with exactly the same amount, remove it
-    ///        from queuedLocks and add/increment that { policyId, amount }
-    ///        in locks.
-    ///      - If no exact queued match exists, add/increment
-    ///        { PENDING_LOCK_POLICY_ID, amount } in locks.
+    ///      - When a claim arrives, greedily fill queued policy buckets until
+    ///        the claim amount is exhausted.
+    ///      - Each consumed portion is moved into active locks under the
+    ///        bucket's policyId. A claim may fully consume a bucket or
+    ///        partially consume the current bucket.
+    ///      - Any claim amount left after all queued buckets are consumed
+    ///        lands as { PENDING_LOCK_POLICY_ID }.
     ///
     ///      Note: no order guarantees on claims and links.
     function _claim(address account, uint256 amount) private {
-        bytes32 policyId = PENDING_LOCK_POLICY_ID;
+        uint256 remaining = amount;
+        while (remaining != 0) {
+            (uint256 consumed, bytes32 policyId) = _consumeLock(
+                account,
+                queuedLocks[account],
+                bytes32(0),
+                remaining
+            );
 
-        Lock[] storage queued = queuedLocks[account];
-        (bool found, uint256 index) = _indexOfLockByAmount(queued, amount);
-        if (found) {
-            policyId = queued[index].policyId;
-            _removeLockAt(queued, index);
+            if (consumed == 0) {
+                policyId = PENDING_LOCK_POLICY_ID;
+                consumed = remaining;
+            }
+
+            _addOrIncrementLock(account, locks[account], policyId, consumed);
+            remaining -= consumed;
         }
-
-        uint256 total = _addOrIncrementLock(locks[account], policyId, amount);
-        emit LockUpdated(account, policyId, total);
     }
 
     /// @dev Link behavior:
     ///
-    ///      - When linking a claim amount to a real policyId, scan
-    ///        locks[account] for PENDING_LOCK_POLICY_ID.
-    ///      - If pending has enough amount, deduct the linked amount from
-    ///        pending (dropping the entry at zero) and add/increment
-    ///        { policyId, amount } in locks.
-    ///      - If there is not enough pending, add/increment
-    ///        { policyId, amount } in queuedLocks.
+    ///      - When linking a claim amount to a real policyId, consume as much
+    ///        active pending balance as possible.
+    ///      - The consumed portion moves from {PENDING_LOCK_POLICY_ID} into
+    ///        an active lock under {policyId}.
+    ///      - Any unfilled remainder increments that policy's queued bucket
+    ///        for future claims to consume.
     ///
     ///      Note: no order guarantees on claims and links.
     function _linkClaim(
@@ -592,57 +601,69 @@ contract EnclaveToken is
         uint256 amount,
         bytes32 policyId
     ) private {
-        Lock[] storage active = locks[account];
-        (bool found, uint256 index) = _indexOfLockByPolicyId(
-            active,
-            PENDING_LOCK_POLICY_ID
+        (uint256 consumed, ) = _consumeLock(
+            account,
+            locks[account],
+            PENDING_LOCK_POLICY_ID,
+            amount
         );
-        if (found && active[index].amount >= amount) {
-            uint256 pendingLeft = _decrementLockAt(active, index, amount);
-            emit LockUpdated(account, PENDING_LOCK_POLICY_ID, pendingLeft);
-            uint256 total = _addOrIncrementLock(active, policyId, amount);
-            emit LockUpdated(account, policyId, total);
-        } else {
-            _addOrIncrementLock(queuedLocks[account], policyId, amount);
+        uint256 remaining = amount - consumed;
+
+        // if we consumed from PENDING policy, add the real thing
+        if (consumed != 0) {
+            _addOrIncrementLock(account, locks[account], policyId, consumed);
+        }
+
+        // Whatever is left queues under the target policy.
+        if (remaining != 0) {
+            _addOrIncrementLock(
+                account,
+                queuedLocks[account],
+                policyId,
+                remaining
+            );
         }
     }
 
-    /// @dev Index of the first entry holding exactly `amount`.
-    function _indexOfLockByAmount(
+    function _consumeLock(
+        address account,
         Lock[] storage entries,
+        bytes32 filterPolicyId,
         uint256 amount
-    ) private view returns (bool found, uint256 index) {
+    ) internal returns (uint256 consumed, bytes32 consumedPolicyId) {
         uint256 len = entries.length;
-        for (uint256 i = 0; i < len; i++) {
-            if (entries[i].amount == amount) return (true, i);
-        }
-    }
+        uint256 i;
 
-    /// @dev Index of the first entry under `policyId`.
-    function _indexOfLockByPolicyId(
-        Lock[] storage entries,
-        bytes32 policyId
-    ) private view returns (bool found, uint256 index) {
-        uint256 len = entries.length;
-        for (uint256 i = 0; i < len; i++) {
-            if (entries[i].policyId == policyId) return (true, i);
+        if (filterPolicyId != bytes32(0)) {
+            for (; i < len; i++) {
+                if (entries[i].policyId == filterPolicyId) {
+                    break;
+                }
+            }
+            if (i == len) return (0, bytes32(0));
+        } else if (len == 0) {
+            return (0, bytes32(0));
         }
-    }
 
-    function _decrementLockAt(
-        Lock[] storage entries,
-        uint256 index,
-        uint256 amount
-    ) private returns (uint256 remaining) {
-        remaining = entries[index].amount - amount;
+        consumedPolicyId = entries[i].policyId;
+        consumed = entries[i].amount;
+        assert(consumed > 0);
+        if (consumed > amount) {
+            consumed = amount;
+        }
+
+        uint256 remaining = entries[i].amount - consumed;
         if (remaining == 0) {
-            _removeLockAt(entries, index);
+            _removeLockAt(entries, i);
         } else {
-            entries[index].amount = remaining;
+            entries[i].amount = remaining;
         }
+
+        emit LockUpdated(account, consumedPolicyId, remaining);
     }
 
     function _addOrIncrementLock(
+        address account,
         Lock[] storage entries,
         bytes32 policyId,
         uint256 amount
@@ -651,10 +672,13 @@ contract EnclaveToken is
         for (uint256 i = 0; i < len; i++) {
             if (entries[i].policyId == policyId) {
                 entries[i].amount += amount;
-                return entries[i].amount;
+                newAmount = entries[i].amount;
+                emit LockUpdated(account, policyId, newAmount);
+                return newAmount;
             }
         }
-        entries.push(Lock({policyId: policyId, amount: amount}));
+        entries.push(Lock(policyId, amount));
+        emit LockUpdated(account, policyId, amount);
         return amount;
     }
 
@@ -663,8 +687,6 @@ contract EnclaveToken is
         entries.pop();
     }
 
-    /// @dev A defined policy always has a present unlock curve ({createLockPolicy}
-    ///      enforces it), so this doubles as existence check.
     function _policyDefined(bytes32 policyId) internal view returns (bool) {
         Curve storage unlock = lockPolicies[policyId].unlock;
         return unlock.cliffDuration != 0 || unlock.vestDuration != 0;
@@ -694,7 +716,7 @@ contract EnclaveToken is
     ///      before {LockPolicy.holdUntil}; the unlock curve's remainder
     ///      after (the curve accrues through the hold, so the accrued
     ///      portion catches up the moment the hold lapses). Fails closed:
-    ///      TGE-anchored curves release nothing while TGE is unset.
+    ///      A TGE-anchored curve releases nothing while TGE is unset.
     function _lockedAmount(
         LockPolicy storage policy,
         uint256 amount,
