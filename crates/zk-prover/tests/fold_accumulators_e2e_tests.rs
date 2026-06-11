@@ -196,7 +196,7 @@ async fn recursive_aggregation_default_artifacts_staged() {
     let base = backend
         .circuits_dir
         .join("insecure-512")
-        .join("micro")
+        .join("minimum")
         .join("default")
         .join(CircuitName::C3Fold.dir_path());
     let pkg = CircuitName::C3Fold.as_str();
@@ -233,7 +233,7 @@ async fn recursive_aggregation_c6_fold_kernel_artifacts_staged() {
     let base = backend
         .circuits_dir
         .join("insecure-512")
-        .join("micro")
+        .join("minimum")
         .join("default")
         .join(CircuitName::C6FoldKernel.dir_path());
     let pkg = CircuitName::C6FoldKernel.as_str();
@@ -274,7 +274,7 @@ async fn node_fold_pipeline_recursive_aggregation_artifacts_staged() {
     let preset_base = backend
         .circuits_dir
         .join("insecure-512")
-        .join("micro")
+        .join("minimum")
         .join("default");
     for &c in NODE_FOLD_PIPELINE {
         let base = preset_base.join(c.dir_path());
@@ -303,7 +303,7 @@ async fn setup_c3_fold_with_inner_share_encryption() -> Option<(
     ShareEncryptionCircuitData,
     BfvPreset,
 )> {
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
@@ -343,10 +343,10 @@ async fn setup_c3_fold_with_inner_share_encryption() -> Option<(
     ))
 }
 
-/// Expected C3 fold slot count when circuits are compiled for the micro committee (N=3, T=1).
-const MICRO_C3_FOLD_SLOTS: usize = 2;
-/// Expected C6 fold slot count when circuits are compiled for the micro committee (N=3, T=1).
-const MICRO_C6_FOLD_SLOTS: usize = 2;
+/// Expected C3 fold slot count when circuits are compiled for the minimum committee (N=3, T=1).
+const MINIMUM_C3_FOLD_SLOTS: usize = 2;
+/// Expected C6 fold slot count when circuits are compiled for the minimum committee (N=3, T=1).
+const MINIMUM_C6_FOLD_SLOTS: usize = 2;
 
 #[tokio::test]
 async fn c3_fold_sequential_proves_and_verifies() {
@@ -358,16 +358,16 @@ async fn c3_fold_sequential_proves_and_verifies() {
     };
 
     let total_slots = c3_fold_total_slots_from_compiled_json();
-    if total_slots != MICRO_C3_FOLD_SLOTS {
+    if total_slots != MINIMUM_C3_FOLD_SLOTS {
         println!(
             "skipping c3_fold_sequential_proves_and_verifies: circuits compiled for \
-             non-micro committee (total_slots={total_slots}, expected {MICRO_C3_FOLD_SLOTS}). \
-             Rebuild with `pnpm build:circuits --committee micro` to run this test."
+             non-minimum committee (total_slots={total_slots}, expected {MINIMUM_C3_FOLD_SLOTS}). \
+             Rebuild with `pnpm build:circuits --committee minimum` to run this test."
         );
         return;
     }
 
-    let artifacts_dir = preset.artifacts_dir_for_committee("micro");
+    let artifacts_dir = preset.artifacts_dir_for_committee("minimum");
     let inner_e3_a = "e3-c3fold-inner-0";
     let inner_e3_b = "e3-c3fold-inner-1";
     let fold_e3 = "e3-c3fold-step";
@@ -436,7 +436,7 @@ async fn setup_c6_fold_with_inner_threshold_share_decryption() -> Option<(
     ShareDecryptionCircuitData,
     BfvPreset,
 )> {
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let preset = BfvPreset::InsecureThreshold512;
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
@@ -470,15 +470,15 @@ async fn c6_fold_sequential_proves_and_verifies() {
     };
 
     let total_slots = c6_fold_total_slots_from_compiled_json();
-    if total_slots != MICRO_C6_FOLD_SLOTS {
+    if total_slots != MINIMUM_C6_FOLD_SLOTS {
         println!(
             "skipping c6_fold_sequential_proves_and_verifies: circuits compiled for \
-             non-micro committee (total_slots={total_slots}, expected {MICRO_C6_FOLD_SLOTS}). \
-             Rebuild with `pnpm build:circuits --committee micro` to run this test."
+             non-minimum committee (total_slots={total_slots}, expected {MINIMUM_C6_FOLD_SLOTS}). \
+             Rebuild with `pnpm build:circuits --committee minimum` to run this test."
         );
         return;
     }
-    let artifacts_dir = preset.artifacts_dir_for_committee("micro");
+    let artifacts_dir = preset.artifacts_dir_for_committee("minimum");
     let inner_e3_a = "e3-c6fold-inner-0";
     let inner_e3_b = "e3-c6fold-inner-1";
     let fold_e3 = "e3-c6fold-step";

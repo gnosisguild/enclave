@@ -41,10 +41,9 @@ where
 sol! {
     #[derive(Debug, Serialize, Deserialize)]
     enum CommitteeSize {
+        Minimum,
         Micro,
         Small,
-        Medium,
-        Large,
     }
 
     #[derive(Debug)]

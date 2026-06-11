@@ -55,16 +55,26 @@ pub struct CommitmentConsistencyChecker {
 }
 
 impl CommitmentConsistencyChecker {
-    pub fn new(bus: &BusHandle, e3_id: E3id, links: Vec<Box<dyn CommitmentLink>>) -> Self {
+    pub fn new(
+        bus: &BusHandle,
+        e3_id: E3id,
+        links: Vec<Box<dyn CommitmentLink>>,
+        committee_h: usize,
+    ) -> Self {
         Self {
             bus: bus.clone(),
             e3_id: e3_id.clone(),
-            consistency: CommitmentConsistency::new(e3_id, links),
+            consistency: CommitmentConsistency::new(e3_id, links, committee_h),
         }
     }
 
-    pub fn setup(bus: &BusHandle, e3_id: E3id, links: Vec<Box<dyn CommitmentLink>>) -> Addr<Self> {
-        let actor = Self::new(bus, e3_id, links);
+    pub fn setup(
+        bus: &BusHandle,
+        e3_id: E3id,
+        links: Vec<Box<dyn CommitmentLink>>,
+        committee_h: usize,
+    ) -> Addr<Self> {
+        let actor = Self::new(bus, e3_id, links, committee_h);
         let addr = actor.start();
         bus.subscribe(
             EventType::CommitmentConsistencyCheckRequested,

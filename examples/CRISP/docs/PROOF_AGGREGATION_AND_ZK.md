@@ -79,7 +79,7 @@ CRISP_PROOF_AGGREGATION_ENABLED=true
 ```
 
 CRISP `requestE3` still uses on-chain `param_set = 0` (`InsecureThreshold512`) unless you change the
-server — keep `CRISP_BFV_PRESET=insecure-512` for the default Micro committee.
+server — keep `CRISP_BFV_PRESET=insecure-512` for the default Minimum committee.
 
 ### Steps
 

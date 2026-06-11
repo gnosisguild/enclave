@@ -68,6 +68,64 @@ export const LARGE_TIMEOUT_CONFIG = {
   decryptionWindow: ONE_DAY,
 };
 
+// ── Committee sizes (matches `IInterfold.CommitteeSize`) ─────────────────────
+/** N=3, T=1 — default CI / dev committee. */
+export const COMMITTEE_SIZE_MINIMUM = 0;
+/** N=9, T=4. */
+export const COMMITTEE_SIZE_MICRO = 1;
+/** N=19, T=9. */
+export const COMMITTEE_SIZE_SMALL = 2;
+
+/**
+ * Default thresholds for {@link deployInterfoldSystem} when `committeeThresholds`
+ * is not overridden: `[T, N]` (Shamir reconstruction threshold, committee size).
+ *
+ * Matches what {@link InterfoldPricing.quote} uses as `m` / `n` and what most
+ * pricing / sortition / lifecycle specs assert against. **Not** the same as
+ * {@link COMMITTEE_THRESHOLDS_ONCHAIN} (production deploy uses `[H, N]`).
+ */
+export const COMMITTEE_THRESHOLDS_DEFAULT: ReadonlyArray<
+  readonly [number, readonly [number, number]]
+> = [
+  [COMMITTEE_SIZE_MINIMUM, [1, 3]],
+  [COMMITTEE_SIZE_MICRO, [4, 9]],
+  [COMMITTEE_SIZE_SMALL, [9, 19]],
+];
+
+/**
+ * Production `setCommitteeThresholds` values from `scripts/deployInterfold.ts`:
+ * `[H, N]` (minimum honest roster, committee size). On-chain `threshold[0]`
+ * is registry viability **M** (`activeCount >= M`); production sets M = H.
+ *
+ * Pass via `deployInterfoldSystem({ committeeThresholds: [...] })` when a
+ * spec exercises post-expulsion viability with production semantics.
+ */
+export const COMMITTEE_THRESHOLDS_ONCHAIN: ReadonlyArray<
+  readonly [number, readonly [number, number]]
+> = [
+  [COMMITTEE_SIZE_MINIMUM, [2, 3]],
+  [COMMITTEE_SIZE_MICRO, [5, 9]],
+  [COMMITTEE_SIZE_SMALL, [10, 19]],
+];
+
+/**
+ * Slashing expulsion harness: low M with small N so specs can reach / breach
+ * viability without a full Micro/Small committee. Micro uses N=4 (not 9).
+ * CommitteeSize `3` and above stay unconfigured for negative-path tests.
+ */
+export const COMMITTEE_THRESHOLDS_FAULT_TOLERANCE: ReadonlyArray<
+  readonly [number, readonly [number, number]]
+> = [
+  [COMMITTEE_SIZE_MINIMUM, [2, 3]],
+  [COMMITTEE_SIZE_MICRO, [2, 4]],
+  [COMMITTEE_SIZE_SMALL, [9, 19]],
+];
+
+/** Single-size fixture used by sortition / pricing smoke tests. */
+export const COMMITTEE_THRESHOLDS_MINIMUM_ONLY: ReadonlyArray<
+  readonly [number, readonly [number, number]]
+> = [[COMMITTEE_SIZE_MINIMUM, [1, 3]]];
+
 // ── Bonding defaults (passed to BondingRegistry constructor) ─────────────────
 /** 10 USDC ticket price (6-decimal stable). */
 export const TICKET_PRICE = ethers.parseUnits("10", 6);

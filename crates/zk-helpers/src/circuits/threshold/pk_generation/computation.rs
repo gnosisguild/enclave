@@ -396,7 +396,7 @@ mod tests {
     fn test_bound_and_bits_computation_consistency() {
         let preset = BfvPreset::InsecureThreshold512;
         use crate::ciphernodes_committee::CiphernodesCommitteeSize;
-        let committee = CiphernodesCommitteeSize::Medium.values();
+        let committee = CiphernodesCommitteeSize::Micro.values();
         let bounds = Bounds::compute(preset, &committee).unwrap();
         let bits = Bits::compute(preset, &bounds).unwrap();
 
@@ -409,7 +409,7 @@ mod tests {
 
     #[test]
     fn test_constants_json_roundtrip() {
-        let committee = crate::ciphernodes_committee::CiphernodesCommitteeSize::Medium.values();
+        let committee = crate::ciphernodes_committee::CiphernodesCommitteeSize::Micro.values();
         let constants = Configs::compute(BfvPreset::InsecureThreshold512, &committee).unwrap();
 
         let json = constants.to_json().unwrap();

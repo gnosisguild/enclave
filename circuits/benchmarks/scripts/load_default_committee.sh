@@ -4,7 +4,7 @@
 #
 #   1. circuits/bin/.active-preset.json::committee  (canonical, written by build-circuits)
 #   2. circuits/lib/src/configs/committee/active.nr (fallback for stamp-less builds)
-#   3. "micro" (final fallback so a fresh clone has sane defaults)
+#   3. "minimum" (final fallback so a fresh clone has sane defaults)
 #
 # Sets: COMMITTEE_NAME, COMMITTEE_N, COMMITTEE_T, COMMITTEE_H
 
@@ -71,7 +71,7 @@ print(m.group(1) if m else "")
 PY
 )
     fi
-    [ -z "$COMMITTEE_NAME" ] && COMMITTEE_NAME="micro"
+    [ -z "$COMMITTEE_NAME" ] && COMMITTEE_NAME="minimum"
 
     _load_committee_nt_h "$repo_root"
 }

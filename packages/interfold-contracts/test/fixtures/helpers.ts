@@ -9,7 +9,10 @@ import type { ContractTransactionResponse, Signer } from "ethers";
 import type { IInterfold, Interfold } from "../../types/contracts/Interfold";
 import type { MockUSDC } from "../../types/contracts/test/MockStableToken.sol/MockUSDC";
 import { ethers, networkHelpers } from "./connection";
-import { SORTITION_SUBMISSION_WINDOW } from "./constants";
+import {
+  COMMITTEE_SIZE_MINIMUM,
+  SORTITION_SUBMISSION_WINDOW,
+} from "./constants";
 
 const { time } = networkHelpers;
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
@@ -81,7 +84,7 @@ export const makeRequest = async (
 
 /** Options for {@link buildRequestParams}. */
 export interface BuildRequestParamsOptions {
-  /** `CommitteeSize` enum value. Defaults to `0` (Micro). */
+  /** `CommitteeSize` enum value. Defaults to {@link COMMITTEE_SIZE_MINIMUM}. */
   committeeSize?: number;
   /** Seconds added to `time.latest()` for `inputWindow[0]`. Defaults to `10`. */
   startOffset?: number;
@@ -114,7 +117,7 @@ export const buildRequestParams = async (
       ? decryptionVerifier
       : await decryptionVerifier.getAddress();
   return {
-    committeeSize: opts.committeeSize ?? 0,
+    committeeSize: opts.committeeSize ?? COMMITTEE_SIZE_MINIMUM,
     inputWindow: [now + startOffset, now + windowDuration] as [number, number],
     e3Program: e3ProgramAddr,
     paramSet: opts.paramSet ?? 0,

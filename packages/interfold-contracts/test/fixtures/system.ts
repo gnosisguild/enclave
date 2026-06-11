@@ -57,6 +57,8 @@ import {
   ADDRESS_ONE,
   BFV_PARAMS_DEFAULT,
   BFV_PARAMS_LARGE,
+  COMMITTEE_SIZE_MINIMUM,
+  COMMITTEE_THRESHOLDS_DEFAULT,
   DEFAULT_TIMEOUT_CONFIG,
   ENCRYPTION_SCHEME_ID,
   LICENSE_REQUIRED_BOND,
@@ -78,7 +80,13 @@ export interface TimeoutConfig {
   decryptionWindow: number;
 }
 
-/** `[CommitteeSize enum value, [min, max]]`. */
+/**
+ * `[CommitteeSize enum value, [M, N]]` passed to `Interfold.setCommitteeThresholds`.
+ * On-chain: `threshold[0]` = viability quorum M (registry `thresholdM`, pricing `m`);
+ * `threshold[1]` = committee size N. See {@link COMMITTEE_THRESHOLDS_DEFAULT}
+ * (`[T, N]`, test/pricing default) vs {@link COMMITTEE_THRESHOLDS_ONCHAIN} (`[H, N]`,
+ * production deploy).
+ */
 export type CommitteeThreshold = [number, [number, number]];
 
 /** Options accepted by {@link deployInterfoldSystem}. All optional. */
@@ -104,8 +112,11 @@ export interface DeployInterfoldSystemOptions {
    */
   wireSlashingManager?: boolean;
   /**
-   * Committee thresholds to install on the Interfold.
-   * Defaults to `[[0, [1, 3]], [1, [2, 5]]]` (Micro & Small).
+   * `setCommitteeThresholds` pairs to install before operators are onboarded.
+   * Defaults to {@link COMMITTEE_THRESHOLDS_DEFAULT} — `[T, N]` for pricing /
+   * lifecycle specs. Override with {@link COMMITTEE_THRESHOLDS_ONCHAIN} for
+   * production `[H, N]` viability, or {@link COMMITTEE_THRESHOLDS_FAULT_TOLERANCE}
+   * for slashing expulsion harnesses.
    */
   committeeThresholds?: CommitteeThreshold[];
   /**
@@ -198,7 +209,13 @@ export interface InterfoldSystem {
 /**
  * Deploy a fully-wired Interfold system and return typed handles. Call from a
  * spec's `setup()` and add only file-specific extras (extra signers,
- * additional thresholds, custom wiring, etc.).
+ * custom `committeeThresholds`, custom wiring, etc.).
+ *
+ * Committee thresholds: installs `committeeThresholds` (default
+ * {@link COMMITTEE_THRESHOLDS_DEFAULT}) via `setCommitteeThresholds` before
+ * operator onboarding. The default `[T, N]` pair aligns pricing formula tests;
+ * production deploy (`scripts/deployInterfold.ts`) uses `[H, N]` instead — same
+ * storage slot, different first component for Minimum (T=1 vs H=2).
  */
 export async function deployInterfoldSystem(
   opts: DeployInterfoldSystemOptions = {},
@@ -212,10 +229,9 @@ export async function deployInterfoldSystem(
     opts.bfvParams === "large" ? BFV_PARAMS_LARGE : BFV_PARAMS_DEFAULT;
   const committeeThresholds: CommitteeThreshold[] =
     opts.committeeThresholds ??
-    ([
-      [0, [1, 3]],
-      [1, [2, 5]],
-    ] as CommitteeThreshold[]);
+    (COMMITTEE_THRESHOLDS_DEFAULT.map(
+      ([size, [min, max]]) => [size, [min, max]] as CommitteeThreshold,
+    ) as CommitteeThreshold[]);
 
   // ── Signers ────────────────────────────────────────────────────────────────
   const signers = await ethers.getSigners();
@@ -460,9 +476,9 @@ export async function deployInterfoldSystem(
     await pkVerifier.getAddress(),
   );
 
-  // ── Committee thresholds ──────────────────────────────────────────────────
-  for (const [size, [min, max]] of committeeThresholds) {
-    await interfold.setCommitteeThresholds(size, [min, max]);
+  // ── Committee thresholds ([M, N] per CommitteeSize) ─────────────────────
+  for (const [size, [m, n]] of committeeThresholds) {
+    await interfold.setCommitteeThresholds(size, [m, n]);
   }
 
   // ── Operators ─────────────────────────────────────────────────────────────
@@ -495,7 +511,7 @@ export async function deployInterfoldSystem(
   const now = await time.latest();
   const inputWindowDuration = 300;
   const request: IInterfold.E3RequestParamsStruct = {
-    committeeSize: 0, // Micro
+    committeeSize: COMMITTEE_SIZE_MINIMUM,
     inputWindow: [now + 10, now + inputWindowDuration] as [number, number],
     e3Program: await e3Program.getAddress(),
     paramSet: 0,

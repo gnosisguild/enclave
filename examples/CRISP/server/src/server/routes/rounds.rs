@@ -206,10 +206,9 @@ pub async fn initialize_crisp_round(
 
     info!("Requesting E3...");
     let committee_size = match CONFIG.e3_committee_size {
-        0 => CommitteeSize::Micro,
-        1 => CommitteeSize::Small,
-        2 => CommitteeSize::Medium,
-        3 => CommitteeSize::Large,
+        0 => CommitteeSize::Minimum,
+        1 => CommitteeSize::Micro,
+        2 => CommitteeSize::Small,
         _ => return Err(format!("Invalid committee size: {}", CONFIG.e3_committee_size).into()),
     };
 

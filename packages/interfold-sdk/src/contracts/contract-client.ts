@@ -20,6 +20,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 
 import { CiphernodeRegistryOwnable__factory, Interfold__factory, InterfoldToken__factory } from '@interfold/contracts/types'
 import type { ContractAddresses, E3, E3RequestParams, E3Stage, FailureReason } from './types'
+import { validateCommitteeSize } from './types'
 import { SDKError, isValidAddress } from '../utils'
 
 export interface ContractClientConfig {
@@ -143,13 +144,15 @@ export class ContractClient {
         throw new SDKError('No account connected', 'NO_ACCOUNT')
       }
 
+      const committeeSize = validateCommitteeSize(params.committeeSize)
+
       const { request } = await this.publicClient.simulateContract({
         address: this.contracts.interfold,
         abi: Interfold__factory.abi,
         functionName: 'request',
         args: [
           {
-            committeeSize: params.committeeSize,
+            committeeSize,
             inputWindow: params.inputWindow,
             e3Program: params.e3Program,
             paramSet: params.paramSet,
@@ -216,13 +219,15 @@ export class ContractClient {
 
   public async getE3Quote(requestParams: E3RequestParams): Promise<bigint> {
     try {
+      const committeeSize = validateCommitteeSize(requestParams.committeeSize)
+
       return this.publicClient.readContract({
         address: this.contracts.interfold,
         abi: Interfold__factory.abi,
         functionName: 'getE3Quote',
         args: [
           {
-            committeeSize: requestParams.committeeSize,
+            committeeSize,
             inputWindow: requestParams.inputWindow,
             e3Program: requestParams.e3Program,
             paramSet: requestParams.paramSet,

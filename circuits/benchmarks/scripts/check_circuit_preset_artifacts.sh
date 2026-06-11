@@ -2,13 +2,13 @@
 # Verify dist + circuits/bin artifacts exist for a benchmark preset.
 # Exit 0 if ready, 1 if not (prints missing paths on stderr).
 #
-# Usage: ./check_circuit_preset_artifacts.sh <insecure-512|secure-8192> [--committee micro|small|medium|large]
+# Usage: ./check_circuit_preset_artifacts.sh <insecure-512|secure-8192> [--committee minimum|micro|small]
 
 set -e
 
 PRESET="${1:-}"
 if [ -z "$PRESET" ]; then
-    echo "Usage: $0 <insecure-512|secure-8192> [--committee micro|small|medium|large]" >&2
+    echo "Usage: $0 <insecure-512|secure-8192> [--committee minimum|micro|small]" >&2
     exit 1
 fi
 if [ "$PRESET" != "insecure-512" ] && [ "$PRESET" != "secure-8192" ]; then
@@ -33,9 +33,9 @@ BIN="${REPO_ROOT}/circuits/bin"
 if [ -z "$COMMITTEE" ]; then
     ACTIVE_PRESET="${BIN}/.active-preset.json"
     if [ -f "$ACTIVE_PRESET" ]; then
-        COMMITTEE=$(jq -r '.committee // "micro"' "$ACTIVE_PRESET" 2>/dev/null || echo "micro")
+        COMMITTEE=$(jq -r '.committee // "minimum"' "$ACTIVE_PRESET" 2>/dev/null || echo "minimum")
     else
-        COMMITTEE="micro"
+        COMMITTEE="minimum"
     fi
 fi
 

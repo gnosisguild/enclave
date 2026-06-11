@@ -25,10 +25,9 @@ impl E3RequestedWithChainId {
     fn try_into_e3_requested(self) -> anyhow::Result<e3_events::E3Requested> {
         // Derive threshold values from committee size enum
         let committee_size = match self.0.e3.committeeSize {
-            0 => CiphernodesCommitteeSize::Micro,
-            1 => CiphernodesCommitteeSize::Small,
-            2 => CiphernodesCommitteeSize::Medium,
-            3 => CiphernodesCommitteeSize::Large,
+            0 => CiphernodesCommitteeSize::Minimum,
+            1 => CiphernodesCommitteeSize::Micro,
+            2 => CiphernodesCommitteeSize::Small,
             other => anyhow::bail!(
                 "Unsupported committee size enum value {} — this node's binary does not recognize \
                  it (likely a version skew with the on-chain contracts). Upgrade the ciphernode to \

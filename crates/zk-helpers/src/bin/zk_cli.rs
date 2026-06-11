@@ -8,7 +8,7 @@
 //!
 //! This binary lists available circuits and generates Prover.toml and configs.nr
 //! for use with the Noir prover. Use `--list_circuits` to see circuits and
-//! `--circuit <name> --preset insecure|secure|2|80 [--committee micro|small|medium|large]` to generate artifacts.
+//! `--circuit <name> --preset insecure|secure|2|80 [--committee minimum|micro|small]` to generate artifacts.
 //!
 //! **Share-computation (C2) configs.nr:** set `INTERFOLD_CIRCUITS_ROOT` to the repo `circuits`
 //! directory (or run from the Interfold repo so it is auto-discovered). After `pnpm build:circuits`,
@@ -176,8 +176,8 @@ struct Cli {
     /// Select the witness family when sample generation depends on it.
     #[arg(long)]
     inputs: Option<String>,
-    /// Committee size: micro, small, medium, or large (must match circuits lib default).
-    #[arg(long, default_value = "micro")]
+    /// Committee size: minimum, micro, or small (must match circuits lib default).
+    #[arg(long, default_value = "minimum")]
     committee: String,
     /// Output directory for generated artifacts.
     #[arg(long, default_value = "output")]

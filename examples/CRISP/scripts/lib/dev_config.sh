@@ -69,7 +69,7 @@ apply_crisp_dev_config_to_server_env() {
 }
 
 build_interfold_circuits_at_setup() {
-  local committee="${CRISP_COMMITTEE:-micro}"
+  local committee="${CRISP_COMMITTEE:-minimum}"
   echo "Building interfold circuits (preset=${CRISP_BFV_PRESET}, committee=${committee})..."
   (
     cd "${REPO_ROOT}" &&
@@ -81,7 +81,7 @@ build_interfold_circuits_at_setup() {
 }
 
 sync_interfold_circuit_artifacts() {
-  local committee="${CRISP_COMMITTEE:-micro}"
+  local committee="${CRISP_COMMITTEE:-minimum}"
   local src="${REPO_ROOT}/dist/circuits/${CRISP_BFV_PRESET}/${committee}"
   local dst="${CRISP_ROOT}/.interfold/noir/circuits/${CRISP_BFV_PRESET}/${committee}"
 
