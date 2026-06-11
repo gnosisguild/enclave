@@ -944,6 +944,99 @@ fn count_projected_events(projected: &[&str], event_type: &str) -> usize {
     projected.iter().filter(|seen| **seen == event_type).count()
 }
 
+/// Scan a node history for slashing, accusation, and protocol-fault signals that must not
+/// appear on an all-honest benchmark run. Catches regressions such as spurious C2→C4
+/// commitment mismatches when N > H that completion-only assertions would miss.
+fn collect_honest_run_faults(
+    history: &[InterfoldEvent],
+    e3_id: &E3id,
+    context: &str,
+) -> Vec<String> {
+    let mut faults = Vec::new();
+
+    for event in history {
+        match event.get_data() {
+            InterfoldEventData::CommitmentConsistencyCheckComplete(data)
+                if data.e3_id == *e3_id && !data.inconsistent_parties.is_empty() =>
+            {
+                faults.push(format!(
+                    "{context}: CommitmentConsistencyCheckComplete kind={:?} inconsistent_parties={:?}",
+                    data.kind, data.inconsistent_parties
+                ));
+            }
+            InterfoldEventData::CommitmentConsistencyViolation(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: CommitmentConsistencyViolation accused_party_id={} proof_type={:?}",
+                    data.accused_party_id, data.proof_type
+                ));
+            }
+            InterfoldEventData::ProofFailureAccusation(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: ProofFailureAccusation accuser={} accused_party_id={} proof_type={:?}",
+                    data.accuser, data.accused_party_id, data.proof_type
+                ));
+            }
+            InterfoldEventData::ProofVerificationFailed(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: ProofVerificationFailed accused_party_id={} proof_type={:?}",
+                    data.accused_party_id, data.proof_type
+                ));
+            }
+            InterfoldEventData::SignedProofFailed(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: SignedProofFailed faulting_node={} proof_type={:?}",
+                    data.faulting_node, data.proof_type
+                ));
+            }
+            InterfoldEventData::ShareVerificationComplete(data)
+                if data.e3_id == *e3_id && !data.dishonest_parties.is_empty() =>
+            {
+                faults.push(format!(
+                    "{context}: ShareVerificationComplete kind={:?} dishonest_parties={:?}",
+                    data.kind, data.dishonest_parties
+                ));
+            }
+            InterfoldEventData::AccusationVote(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: AccusationVote voter={} accusation_id={:?}",
+                    data.voter, data.accusation_id
+                ));
+            }
+            InterfoldEventData::CommitteeMemberExpelled(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: CommitteeMemberExpelled node={} party_id={:?}",
+                    data.node, data.party_id
+                ));
+            }
+            InterfoldEventData::E3Failed(data) if data.e3_id == *e3_id => {
+                faults.push(format!(
+                    "{context}: E3Failed stage={:?} reason={:?}",
+                    data.failed_at_stage, data.reason
+                ));
+            }
+            InterfoldEventData::InterfoldError(data) => {
+                faults.push(format!(
+                    "{context}: InterfoldError {:?}: {}",
+                    data.err_type, data.message
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    faults
+}
+
+fn assert_honest_run_safeguards(history: &[InterfoldEvent], e3_id: &E3id, context: &str) {
+    let faults = collect_honest_run_faults(history, e3_id, context);
+    assert!(
+        faults.is_empty(),
+        "honest-run safeguard failures ({}):\n{}",
+        context,
+        faults.join("\n")
+    );
+}
+
 /// Wall seconds between first `start_when` and last `end_when` event in `history` (HLC physical time).
 fn history_wall_seconds_between<F1, F2>(
     history: &[InterfoldEvent],
@@ -2012,6 +2105,19 @@ async fn test_trbfv_actor() -> Result<()> {
         println!("Tally {i} result = {res} / {exp}");
         assert_eq!(res, exp);
     }
+
+    // All-honest safeguard: scan every participant and the observer for spurious accusations,
+    // commitment mismatches (including C4 DecryptionProofs on ThresholdKeyshare), and traps.
+    for index in 1..=participant_count {
+        let history = nodes.get_history(index).await?;
+        assert_honest_run_safeguards(
+            &history,
+            &e3_id,
+            &format!("participant node {index} ({})", nodes[index].address()),
+        );
+    }
+    let observer_history = nodes.get_history(0).await?;
+    assert_honest_run_safeguards(&observer_history, &e3_id, "observer node 0");
 
     let mt_report = multithread_report.send(ToReport).await.unwrap();
     println!("{}", mt_report);
