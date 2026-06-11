@@ -9,8 +9,8 @@ use super::{
     AggregateConfig, UpdateDestination,
 };
 use crate::{
-    AggregateId, EnclaveEvent, EventContextAccessors, EventContextSeq, EventType, Insert,
-    InsertBatch, Sequenced, StoreKeys,
+    AggregateId, EventContextAccessors, EventContextSeq, EventType, Insert, InsertBatch,
+    InterfoldEvent, Sequenced, StoreKeys,
 };
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use e3_utils::MAILBOX_LIMIT;
@@ -47,6 +47,7 @@ impl Actor for BatchRouter {
 }
 
 impl BatchRouter {
+    #[allow(dead_code)]
     pub fn new(
         config: &AggregateConfig,
         timelock_queue: impl Into<Recipient<StartTimelock>>,
@@ -133,9 +134,9 @@ impl Handler<Insert> for BatchRouter {
     }
 }
 
-impl Handler<EnclaveEvent<Sequenced>> for BatchRouter {
+impl Handler<InterfoldEvent<Sequenced>> for BatchRouter {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
         // On shutdown, force every still-open batch to disk before the process
         // exits. The batch that carries the Shutdown event itself is committed
         // by the normal path below; this drains any earlier debounced batches
@@ -175,17 +176,17 @@ impl Handler<EnclaveEvent<Sequenced>> for BatchRouter {
             self.db.clone(),
             vec![
                 Insert::new_with_context(
-                    &StoreKeys::aggregate_seq(agg_id),
+                    StoreKeys::aggregate_seq(agg_id),
                     encode_u64(ec.seq()),
                     ec.clone(),
                 ),
                 Insert::new_with_context(
-                    &StoreKeys::aggregate_block(agg_id),
+                    StoreKeys::aggregate_block(agg_id),
                     encode_u64(highest_block),
                     ec.clone(),
                 ),
                 Insert::new_with_context(
-                    &StoreKeys::aggregate_ts(agg_id),
+                    StoreKeys::aggregate_ts(agg_id),
                     encode_u128(ec.ts()),
                     ec.clone(),
                 ),

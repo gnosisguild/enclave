@@ -270,6 +270,7 @@ impl Computation for Inputs {
         cyclo[n as usize] = BigInt::from(1u64); // x^N term
 
         // Perform the main computation logic
+        #[allow(clippy::type_complexity)]
         let mut results: Vec<(
             usize,
             Polynomial,
@@ -481,9 +482,9 @@ mod tests {
             }
         }
         let ctx = threshold_params.context_at_level(0).unwrap();
-        let mut poly = Poly::<PowerBasis>::zero(&ctx);
+        let mut poly = Poly::<PowerBasis>::zero(ctx);
         poly.set_coefficients(arr);
-        let poly_rt = Poly::<PowerBasis>::from_bytes(&poly.to_bytes(), &ctx).unwrap();
+        let poly_rt = Poly::<PowerBasis>::from_bytes(&poly.to_bytes(), ctx).unwrap();
         let crt_rt = CrtPolynomial::from_fhe_polynomial(&poly_rt);
         let from_bytes = compute_threshold_decryption_share_commitment(
             &crt_rt,

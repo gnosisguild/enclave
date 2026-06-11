@@ -15,17 +15,19 @@ use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse,
     ComputeResponseKind, CorrelationId, DKGRecursiveAggregationComplete, Die,
-    DkgAggregationRequest, E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EventContext,
-    FailureReason, KeyshareCreated, OrderedSet, PkAggregationProofPending,
-    PkAggregationProofRequest, PkAggregationProofSigned, Proof, ProofType, PublicKeyAggregated,
-    Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed,
-    SignedProofPayload, TypedEvent, VerificationKind, ZkRequest, ZkResponse,
+    DkgAggregationRequest, E3Failed, E3Stage, E3id, EventContext, FailureReason, InterfoldEvent,
+    InterfoldEventData, KeyshareCreated, NodesFoldStepRequest, OrderedSet,
+    PkAggregationProofPending, PkAggregationProofRequest, PkAggregationProofSigned, Proof,
+    ProofType, PublicKeyAggregated, Sequenced, ShareVerificationComplete,
+    ShareVerificationDispatched, SignedProofFailed, SignedProofPayload, TypedEvent,
+    VerificationKind, ZkRequest, ZkResponse,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_fhe_params::BfvPreset;
 use e3_utils::NotifySync;
 use e3_utils::{ArcBytes, MAILBOX_LIMIT};
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{error, info, warn};
@@ -41,6 +43,7 @@ pub struct PublicKeyAggregator {
     e3_id: E3id,
     state: Persistable<PublicKeyAggregatorState>,
     params_preset: BfvPreset,
+    committee_size: CiphernodesCommitteeSize,
     /// DKG recursive aggregation events received before entering GeneratingC5Proof.
     early_dkg_proofs: Vec<TypedEvent<DKGRecursiveAggregationComplete>>,
 }
@@ -50,6 +53,7 @@ pub struct PublicKeyAggregatorParams {
     pub bus: BusHandle,
     pub e3_id: E3id,
     pub params_preset: BfvPreset,
+    pub committee_size: CiphernodesCommitteeSize,
 }
 
 /// Aggregate PublicKey for a committee of nodes. This actor listens for KeyshareCreated events
@@ -66,6 +70,7 @@ impl PublicKeyAggregator {
             e3_id: params.e3_id,
             state,
             params_preset: params.params_preset,
+            committee_size: params.committee_size,
             early_dkg_proofs: Vec::new(),
         }
     }
@@ -134,6 +139,7 @@ impl PublicKeyAggregator {
                 decryption_proofs: vec![],
                 pre_dishonest: no_proof_parties.into_iter().collect(),
                 params_preset: self.params_preset,
+                committee_size: self.committee_size,
             },
             ec,
         )?;
@@ -295,12 +301,10 @@ impl PublicKeyAggregator {
                     keyshare_bytes: keyshare_bytes.clone(),
                     aggregated_pk_bytes: pubkey.clone(),
                     params_preset: self.params_preset,
-                    // C5 aggregates the H honest keyshares only; the circuit witness and prover
-                    // path use `committee_h` (see pk_aggregation/computation.rs). N is not needed
-                    // here — set both fields to H so downstream validation stays consistent.
-                    committee_n: committee_h,
+                    // C5 witness uses `committee_h` keyshares; artifact lookup needs canonical (N, H, T).
+                    committee_n: threshold_n,
                     committee_h,
-                    committee_threshold: 0,
+                    committee_threshold: threshold_m,
                 },
                 public_key: pubkey.clone(),
                 nodes: honest_nodes_set.clone(),
@@ -337,6 +341,9 @@ impl PublicKeyAggregator {
                 dkg_aggregated_proof: None,
                 c5_proof_pending: None,
                 last_ec: Some(ec.clone()),
+                nodes_fold_accumulator: None,
+                nodes_fold_completed_slots: 0,
+                nodes_fold_step_correlation: None,
             })
         })?;
 
@@ -387,6 +394,9 @@ impl PublicKeyAggregator {
                 circuit_committee_h,
                 dkg_aggregation_correlation,
                 dkg_aggregated_proof,
+                nodes_fold_accumulator,
+                nodes_fold_completed_slots,
+                nodes_fold_step_correlation,
                 ..
             } = state
             else {
@@ -407,6 +417,9 @@ impl PublicKeyAggregator {
                 dkg_aggregated_proof,
                 c5_proof_pending: Some(c5_proof),
                 last_ec: Some(ec.clone()),
+                nodes_fold_accumulator,
+                nodes_fold_completed_slots,
+                nodes_fold_step_correlation,
             })
         })?;
         self.try_publish_complete()
@@ -533,6 +546,9 @@ impl PublicKeyAggregator {
                 dkg_aggregation_correlation,
                 dkg_aggregated_proof,
                 c5_proof_pending,
+                nodes_fold_accumulator,
+                nodes_fold_completed_slots,
+                nodes_fold_step_correlation,
                 last_ec: _,
             } = state
             else {
@@ -557,13 +573,211 @@ impl PublicKeyAggregator {
                 dkg_aggregated_proof,
                 c5_proof_pending,
                 last_ec: Some(ec.clone()),
+                nodes_fold_accumulator,
+                nodes_fold_completed_slots,
+                nodes_fold_step_correlation,
             })
         })?;
 
-        self.try_dispatch_dkg_aggregation(&ec)
+        self.try_dispatch_nodes_fold_step(&ec)
     }
 
-    /// Dispatch [`ZkRequest::DkgAggregation`] once C5 and all honest NodeFold proofs are ready.
+    /// Dispatch the next [`ZkRequest::NodesFoldStep`] if the next slot's proof is buffered
+    /// and no step is currently in flight. When all H slots are done, calls
+    /// [`try_dispatch_dkg_aggregation`].
+    fn try_dispatch_nodes_fold_step(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
+        let state = self.state.get();
+        let Some(PublicKeyAggregatorState::GeneratingC5Proof {
+            dkg_node_proofs,
+            honest_party_ids,
+            nodes_fold_accumulator,
+            nodes_fold_completed_slots,
+            nodes_fold_step_correlation,
+            dkg_aggregation_correlation,
+            dkg_aggregated_proof,
+            ..
+        }) = state.as_ref()
+        else {
+            return Ok(());
+        };
+
+        if nodes_fold_step_correlation.is_some()
+            || dkg_aggregation_correlation.is_some()
+            || dkg_aggregated_proof.is_some()
+        {
+            return Ok(());
+        }
+
+        let next_slot = *nodes_fold_completed_slots;
+        let total_slots = honest_party_ids.len();
+
+        if next_slot as usize >= total_slots {
+            return self.try_dispatch_dkg_aggregation(ec);
+        }
+
+        let Some(&party_id) = honest_party_ids.iter().nth(next_slot as usize) else {
+            return Ok(());
+        };
+
+        let Some(Some(inner_proof)) = dkg_node_proofs.get(&party_id) else {
+            return Ok(());
+        };
+
+        let inner_proof = inner_proof.clone();
+        let prior_accumulator = nodes_fold_accumulator.clone();
+
+        let corr = CorrelationId::new();
+        self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::NodesFoldStep(NodesFoldStepRequest {
+                    inner_proof,
+                    prior_accumulator,
+                    slot_index: next_slot,
+                    total_slots,
+                    e3_id: self.e3_id.to_string(),
+                    params_preset: self.params_preset,
+                    committee_size: self.committee_size,
+                }),
+                corr,
+                self.e3_id.clone(),
+            ),
+            ec.clone(),
+        )?;
+
+        info!(
+            "PublicKeyAggregator: dispatched NodesFoldStep slot={}/{} for E3 {}",
+            next_slot, total_slots, self.e3_id
+        );
+
+        self.state.try_mutate(ec, |state| {
+            let PublicKeyAggregatorState::GeneratingC5Proof {
+                public_key,
+                keyshare_bytes,
+                nodes,
+                party_nodes,
+                dkg_node_proofs,
+                dkg_fold_attestations,
+                honest_party_ids,
+                dishonest_parties,
+                circuit_committee_n,
+                circuit_committee_h,
+                dkg_aggregation_correlation,
+                dkg_aggregated_proof,
+                c5_proof_pending,
+                last_ec,
+                nodes_fold_accumulator,
+                nodes_fold_completed_slots,
+                nodes_fold_step_correlation: _,
+            } = state
+            else {
+                return Ok(state);
+            };
+            Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                public_key,
+                keyshare_bytes,
+                nodes,
+                party_nodes,
+                dkg_node_proofs,
+                dkg_fold_attestations,
+                honest_party_ids,
+                dishonest_parties,
+                circuit_committee_n,
+                circuit_committee_h,
+                dkg_aggregation_correlation,
+                dkg_aggregated_proof,
+                c5_proof_pending,
+                last_ec,
+                nodes_fold_accumulator,
+                nodes_fold_completed_slots,
+                nodes_fold_step_correlation: Some(corr),
+            })
+        })?;
+        Ok(())
+    }
+
+    /// Handle a completed [`ZkResponse::NodesFoldStep`]: advance the accumulator and dispatch
+    /// the next fold step (or the final DkgAggregation when all H slots are done).
+    fn handle_nodes_fold_step_response(
+        &mut self,
+        correlation_id: CorrelationId,
+        accumulator_proof: Proof,
+    ) -> Result<()> {
+        let state = self.state.get();
+        let Some(PublicKeyAggregatorState::GeneratingC5Proof {
+            nodes_fold_step_correlation,
+            nodes_fold_completed_slots,
+            last_ec,
+            ..
+        }) = state.as_ref()
+        else {
+            return Ok(());
+        };
+
+        if nodes_fold_step_correlation.as_ref() != Some(&correlation_id) {
+            return Ok(());
+        }
+
+        let completed = nodes_fold_completed_slots + 1;
+        let Some(ec) = last_ec.clone() else {
+            return Err(anyhow::anyhow!(
+                "No EventContext for NodesFoldStep response"
+            ));
+        };
+
+        info!(
+            "PublicKeyAggregator: NodesFoldStep complete (slot {} done) for E3 {}",
+            completed - 1,
+            self.e3_id
+        );
+
+        self.state.try_mutate_without_context(|state| {
+            let PublicKeyAggregatorState::GeneratingC5Proof {
+                public_key,
+                keyshare_bytes,
+                nodes,
+                party_nodes,
+                dkg_node_proofs,
+                dkg_fold_attestations,
+                honest_party_ids,
+                dishonest_parties,
+                circuit_committee_n,
+                circuit_committee_h,
+                dkg_aggregation_correlation,
+                dkg_aggregated_proof,
+                c5_proof_pending,
+                last_ec,
+                nodes_fold_step_correlation: _,
+                ..
+            } = state
+            else {
+                return Ok(state);
+            };
+            Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                public_key,
+                keyshare_bytes,
+                nodes,
+                party_nodes,
+                dkg_node_proofs,
+                dkg_fold_attestations,
+                honest_party_ids,
+                dishonest_parties,
+                circuit_committee_n,
+                circuit_committee_h,
+                dkg_aggregation_correlation,
+                dkg_aggregated_proof,
+                c5_proof_pending,
+                last_ec,
+                nodes_fold_accumulator: Some(accumulator_proof),
+                nodes_fold_completed_slots: completed,
+                nodes_fold_step_correlation: None,
+            })
+        })?;
+
+        self.try_dispatch_nodes_fold_step(&ec)
+    }
+
+    /// Dispatch [`ZkRequest::DkgAggregation`] once C5, all honest NodeFold proofs, and the
+    /// streaming nodes_fold are all ready.
     fn try_dispatch_dkg_aggregation(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
         let state = self.state.get();
         let Some(PublicKeyAggregatorState::GeneratingC5Proof {
@@ -575,6 +789,8 @@ impl PublicKeyAggregator {
             dkg_aggregated_proof,
             circuit_committee_n,
             circuit_committee_h,
+            nodes_fold_accumulator,
+            nodes_fold_completed_slots,
             ..
         }) = state.as_ref()
         else {
@@ -639,6 +855,9 @@ impl PublicKeyAggregator {
                     dkg_aggregated_proof,
                     c5_proof_pending: _,
                     last_ec,
+                    nodes_fold_accumulator,
+                    nodes_fold_completed_slots,
+                    nodes_fold_step_correlation,
                 } = state
                 else {
                     return Ok(state);
@@ -659,6 +878,9 @@ impl PublicKeyAggregator {
                     dkg_aggregated_proof,
                     c5_proof_pending: None,
                     last_ec,
+                    nodes_fold_accumulator,
+                    nodes_fold_completed_slots,
+                    nodes_fold_step_correlation,
                 })
             })?;
             return Ok(());
@@ -693,6 +915,13 @@ impl PublicKeyAggregator {
             return Ok(());
         }
 
+        // Streaming fold must be complete before dispatching the final aggregation.
+        let fold_complete = *nodes_fold_completed_slots == honest_party_ids.len() as u32;
+        if !fold_complete {
+            return Ok(());
+        }
+        let precomputed_fold = nodes_fold_accumulator.clone();
+
         // Build the FULL committee address vector (length N) in ascending party_id order.
         // The DKG aggregator circuit's `committee_members: [Field; N_PARTIES]` is the
         // committee-hash preimage; passing only the H honest subset would silently
@@ -720,10 +949,12 @@ impl PublicKeyAggregator {
             ComputeRequest::zk(
                 ZkRequest::DkgAggregation(DkgAggregationRequest {
                     node_fold_proofs,
+                    nodes_fold_proof: precomputed_fold,
                     c5_proof: c5_proof.clone(),
                     party_ids,
                     committee_addresses,
                     params_preset: self.params_preset,
+                    committee_size: self.committee_size,
                 }),
                 corr,
                 self.e3_id.clone(),
@@ -747,6 +978,9 @@ impl PublicKeyAggregator {
                 dkg_aggregated_proof,
                 c5_proof_pending,
                 last_ec,
+                nodes_fold_accumulator,
+                nodes_fold_completed_slots,
+                nodes_fold_step_correlation,
             } = state
             else {
                 return Ok(state);
@@ -766,6 +1000,9 @@ impl PublicKeyAggregator {
                 dkg_aggregated_proof,
                 c5_proof_pending,
                 last_ec,
+                nodes_fold_accumulator,
+                nodes_fold_completed_slots,
+                nodes_fold_step_correlation,
             })
         })?;
         Ok(())
@@ -895,42 +1132,27 @@ impl PublicKeyAggregator {
 
     fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
         let (msg, _ec) = msg.into_components();
-        if let ComputeResponseKind::Zk(ZkResponse::DkgAggregation(resp)) = msg.response {
-            if msg.e3_id != self.e3_id {
-                return Ok(());
+        if msg.e3_id != self.e3_id {
+            return Ok(());
+        }
+        match msg.response {
+            ComputeResponseKind::Zk(ZkResponse::NodesFoldStep(resp)) => {
+                self.handle_nodes_fold_step_response(msg.correlation_id, resp.accumulator_proof)?;
             }
-            let state = self.state.get();
-            let Some(PublicKeyAggregatorState::GeneratingC5Proof { last_ec, .. }) = state.as_ref()
-            else {
-                return Ok(());
-            };
-            let Some(_ec) = last_ec.clone() else {
-                return Err(anyhow::anyhow!(
-                    "No EventContext for DkgAggregation response"
-                ));
-            };
-            self.state.try_mutate_without_context(|state| {
-                let PublicKeyAggregatorState::GeneratingC5Proof {
-                    public_key,
-                    keyshare_bytes,
-                    nodes,
-                    party_nodes,
-                    dkg_node_proofs,
-                    dkg_fold_attestations,
-                    honest_party_ids,
-                    dishonest_parties,
-                    circuit_committee_n,
-                    circuit_committee_h,
-                    dkg_aggregation_correlation,
-                    dkg_aggregated_proof,
-                    c5_proof_pending,
-                    last_ec,
-                } = state
+            ComputeResponseKind::Zk(ZkResponse::DkgAggregation(resp)) => {
+                let state = self.state.get();
+                let Some(PublicKeyAggregatorState::GeneratingC5Proof { last_ec, .. }) =
+                    state.as_ref()
                 else {
-                    return Ok(state);
+                    return Ok(());
                 };
-                if dkg_aggregation_correlation.as_ref() != Some(&msg.correlation_id) {
-                    return Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                let Some(_ec) = last_ec.clone() else {
+                    return Err(anyhow::anyhow!(
+                        "No EventContext for DkgAggregation response"
+                    ));
+                };
+                self.state.try_mutate_without_context(|state| {
+                    let PublicKeyAggregatorState::GeneratingC5Proof {
                         public_key,
                         keyshare_bytes,
                         nodes,
@@ -945,8 +1167,112 @@ impl PublicKeyAggregator {
                         dkg_aggregated_proof,
                         c5_proof_pending,
                         last_ec,
-                    });
-                }
+                        nodes_fold_accumulator,
+                        nodes_fold_completed_slots,
+                        nodes_fold_step_correlation,
+                    } = state
+                    else {
+                        return Ok(state);
+                    };
+                    if dkg_aggregation_correlation.as_ref() != Some(&msg.correlation_id) {
+                        return Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                            public_key,
+                            keyshare_bytes,
+                            nodes,
+                            party_nodes,
+                            dkg_node_proofs,
+                            dkg_fold_attestations,
+                            honest_party_ids,
+                            dishonest_parties,
+                            circuit_committee_n,
+                            circuit_committee_h,
+                            dkg_aggregation_correlation,
+                            dkg_aggregated_proof,
+                            c5_proof_pending,
+                            last_ec,
+                            nodes_fold_accumulator,
+                            nodes_fold_completed_slots,
+                            nodes_fold_step_correlation,
+                        });
+                    }
+                    Ok(PublicKeyAggregatorState::GeneratingC5Proof {
+                        public_key,
+                        keyshare_bytes,
+                        nodes,
+                        party_nodes,
+                        dkg_node_proofs,
+                        dkg_fold_attestations,
+                        honest_party_ids,
+                        dishonest_parties,
+                        circuit_committee_n,
+                        circuit_committee_h,
+                        dkg_aggregation_correlation: None,
+                        dkg_aggregated_proof: Some(resp.proof.clone()),
+                        c5_proof_pending,
+                        last_ec,
+                        nodes_fold_accumulator,
+                        nodes_fold_completed_slots,
+                        nodes_fold_step_correlation,
+                    })
+                })?;
+                self.try_publish_complete()?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn handle_compute_request_error(&mut self, msg: TypedEvent<ComputeRequestError>) -> Result<()> {
+        let (msg, ec) = msg.into_components();
+        if msg.request().e3_id != self.e3_id {
+            return Ok(());
+        }
+
+        let matched_nodes_fold_step = matches!(
+            self.state.get(),
+            Some(PublicKeyAggregatorState::GeneratingC5Proof {
+                nodes_fold_step_correlation,
+                ..
+            }) if nodes_fold_step_correlation.as_ref() == Some(msg.correlation_id())
+        );
+
+        if matched_nodes_fold_step {
+            error!(
+                "PublicKeyAggregator: NodesFoldStep failed for E3 {}: {:?}",
+                self.e3_id,
+                msg.get_err()
+            );
+            self.bus.publish(
+                E3Failed {
+                    e3_id: self.e3_id.clone(),
+                    failed_at_stage: E3Stage::CommitteeFinalized,
+                    reason: FailureReason::DKGInvalidShares,
+                },
+                ec.clone(),
+            )?;
+            self.state.try_mutate(&ec, |state| {
+                let PublicKeyAggregatorState::GeneratingC5Proof {
+                    public_key,
+                    keyshare_bytes,
+                    nodes,
+                    party_nodes,
+                    dkg_node_proofs,
+                    dkg_fold_attestations,
+                    honest_party_ids,
+                    dishonest_parties,
+                    circuit_committee_n,
+                    circuit_committee_h,
+                    dkg_aggregation_correlation,
+                    dkg_aggregated_proof,
+                    c5_proof_pending: _,
+                    last_ec,
+                    nodes_fold_accumulator,
+                    nodes_fold_completed_slots,
+                    nodes_fold_step_correlation: _,
+                } = state
+                else {
+                    return Ok(state);
+                };
                 Ok(PublicKeyAggregatorState::GeneratingC5Proof {
                     public_key,
                     keyshare_bytes,
@@ -958,24 +1284,19 @@ impl PublicKeyAggregator {
                     dishonest_parties,
                     circuit_committee_n,
                     circuit_committee_h,
-                    dkg_aggregation_correlation: None,
-                    dkg_aggregated_proof: Some(resp.proof.clone()),
-                    c5_proof_pending,
+                    dkg_aggregation_correlation,
+                    dkg_aggregated_proof,
+                    c5_proof_pending: None,
                     last_ec,
+                    nodes_fold_accumulator,
+                    nodes_fold_completed_slots,
+                    nodes_fold_step_correlation: None,
                 })
             })?;
-            self.try_publish_complete()?;
-        }
-        Ok(())
-    }
-
-    fn handle_compute_request_error(&mut self, msg: TypedEvent<ComputeRequestError>) -> Result<()> {
-        let (msg, ec) = msg.into_components();
-        if msg.request().e3_id != self.e3_id {
             return Ok(());
         }
 
-        let matched_correlation = matches!(
+        let matched_dkg_aggregation = matches!(
             self.state.get(),
             Some(PublicKeyAggregatorState::GeneratingC5Proof {
                 dkg_aggregation_correlation,
@@ -983,7 +1304,7 @@ impl PublicKeyAggregator {
             }) if dkg_aggregation_correlation.as_ref() == Some(msg.correlation_id())
         );
 
-        if !matched_correlation {
+        if !matched_dkg_aggregation {
             return Ok(());
         }
 
@@ -1018,6 +1339,9 @@ impl PublicKeyAggregator {
                 dkg_aggregated_proof,
                 c5_proof_pending: _,
                 last_ec,
+                nodes_fold_accumulator,
+                nodes_fold_completed_slots,
+                nodes_fold_step_correlation,
             } = state
             else {
                 return Ok(state);
@@ -1038,6 +1362,9 @@ impl PublicKeyAggregator {
                 dkg_aggregated_proof,
                 c5_proof_pending: None,
                 last_ec,
+                nodes_fold_accumulator,
+                nodes_fold_completed_slots,
+                nodes_fold_step_correlation,
             })
         })?;
 
@@ -1062,31 +1389,31 @@ impl Actor for PublicKeyAggregator {
     }
 }
 
-impl Handler<EnclaveEvent> for PublicKeyAggregator {
+impl Handler<InterfoldEvent> for PublicKeyAggregator {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            EnclaveEventData::KeyshareCreated(data) => {
+            InterfoldEventData::KeyshareCreated(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ShareVerificationComplete(data) => {
+            InterfoldEventData::ShareVerificationComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::PkAggregationProofSigned(data) => {
+            InterfoldEventData::PkAggregationProofSigned(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::DKGRecursiveAggregationComplete(data) => {
+            InterfoldEventData::DKGRecursiveAggregationComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeResponse(data) => {
+            InterfoldEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeRequestError(data) => {
+            InterfoldEventData::ComputeRequestError(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
-            EnclaveEventData::CommitteeMemberExpelled(data) => {
+            InterfoldEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
+            InterfoldEventData::CommitteeMemberExpelled(data) => {
                 // Only process raw events from chain (party_id not yet resolved).
                 if data.party_id.is_some() {
                     return;
@@ -1267,12 +1594,13 @@ mod tests {
     use super::*;
     use e3_data::{AutoPersist, DataStore, InMemStore, Repository};
     use e3_events::{
-        CircuitName, ComputeRequestErrorKind, HistoryCollector, TakeEvents, Unsequenced, ZkError,
+        CircuitName, ComputeRequestErrorKind, HistoryCollector, ProofPayload, ProofType,
+        TakeEvents, Unsequenced, ZkError,
     };
     use e3_test_helpers::get_common_setup;
     use std::collections::BTreeSet;
 
-    fn test_ctx(data: impl Into<EnclaveEventData>) -> EventContext<Sequenced> {
+    fn test_ctx(data: impl Into<InterfoldEventData>) -> EventContext<Sequenced> {
         EventContext::<Unsequenced>::from(data.into()).sequence(0)
     }
 
@@ -1309,6 +1637,9 @@ mod tests {
             dkg_aggregated_proof: None,
             c5_proof_pending: Some(dummy_proof(CircuitName::PkAggregation)),
             last_ec: None,
+            nodes_fold_accumulator: None,
+            nodes_fold_completed_slots: 0,
+            nodes_fold_step_correlation: None,
         }
     }
 
@@ -1316,7 +1647,19 @@ mod tests {
         initial_state: PublicKeyAggregatorState,
     ) -> Result<(
         PublicKeyAggregator,
-        Addr<HistoryCollector<EnclaveEvent>>,
+        Addr<HistoryCollector<InterfoldEvent>>,
+        E3id,
+    )> {
+        build_public_key_aggregator_with_committee(initial_state, CiphernodesCommitteeSize::Micro)
+            .await
+    }
+
+    async fn build_public_key_aggregator_with_committee(
+        initial_state: PublicKeyAggregatorState,
+        committee_size: CiphernodesCommitteeSize,
+    ) -> Result<(
+        PublicKeyAggregator,
+        Addr<HistoryCollector<InterfoldEvent>>,
         E3id,
     )> {
         let (bus, rng, _seed, params, crp, _errors, history) =
@@ -1329,6 +1672,7 @@ mod tests {
                 bus,
                 e3_id: e3_id.clone(),
                 params_preset: BfvPreset::InsecureThreshold512,
+                committee_size,
             },
             test_state(initial_state),
         );
@@ -1336,8 +1680,81 @@ mod tests {
         Ok((aggregator, history, e3_id))
     }
 
-    async fn next_event(history: &Addr<HistoryCollector<EnclaveEvent>>) -> Result<EnclaveEvent> {
-        let mut result = history.send(TakeEvents::<EnclaveEvent>::new(1)).await?;
+    fn c1_proof_with_pk_commitment(e3_id: &E3id, pk_commitment: [u8; 32]) -> SignedProofPayload {
+        let mut signals = vec![0u8; 96];
+        signals[32..64].copy_from_slice(&pk_commitment);
+        SignedProofPayload {
+            payload: ProofPayload {
+                e3_id: e3_id.clone(),
+                proof_type: ProofType::C1PkGeneration,
+                proof: Proof::new(
+                    CircuitName::PkGeneration,
+                    ArcBytes::from_bytes(&[1]),
+                    ArcBytes::from_bytes(&signals),
+                ),
+            },
+            signature: ArcBytes::from_bytes(&[0u8; 65]),
+        }
+    }
+
+    fn verifying_c1_non_square_state(
+        fhe: &Fhe,
+        e3_id: &E3id,
+    ) -> Result<(PublicKeyAggregatorState, usize, usize, usize)> {
+        use fhe::bfv::SecretKey;
+        use fhe::mbfv::PublicKeyShare;
+        use fhe_traits::Serialize;
+
+        let committee = CiphernodesCommitteeSize::Medium.values();
+        let threshold_n = committee.n;
+        let threshold_m = committee.threshold;
+        let circuit_h = committee.h;
+        assert_ne!(
+            threshold_n, circuit_h,
+            "test requires a non-square committee (N != H)"
+        );
+
+        let mut submission_order = Vec::with_capacity(threshold_n);
+        let mut c1_proofs = Vec::with_capacity(threshold_n);
+        let mut rng = rand::rng();
+
+        for party_id in 0..threshold_n as u64 {
+            let node = format!("0x{:040x}", party_id + 1);
+            if party_id < circuit_h as u64 {
+                let sk = SecretKey::random(&fhe.params, &mut rng);
+                let pk_share = PublicKeyShare::new(&sk, fhe.crp.clone(), &mut rng)?;
+                let ks_bytes = ArcBytes::from_bytes(&pk_share.to_bytes());
+                let commitment = e3_zk_helpers::compute_pk_commitment_from_keyshare_bytes(
+                    &ks_bytes,
+                    &fhe.params,
+                    &fhe.crp,
+                )?;
+                submission_order.push((party_id, node, ks_bytes));
+                c1_proofs.push(Some(c1_proof_with_pk_commitment(e3_id, commitment)));
+            } else {
+                submission_order.push((party_id, node, ArcBytes::from_bytes(&[party_id as u8])));
+                c1_proofs.push(None);
+            }
+        }
+
+        Ok((
+            PublicKeyAggregatorState::VerifyingC1 {
+                submission_order,
+                threshold_m,
+                threshold_n,
+                c1_proofs,
+                no_proof_parties: vec![],
+            },
+            threshold_n,
+            threshold_m,
+            circuit_h,
+        ))
+    }
+
+    async fn next_event(
+        history: &Addr<HistoryCollector<InterfoldEvent>>,
+    ) -> Result<InterfoldEvent> {
+        let mut result = history.send(TakeEvents::<InterfoldEvent>::new(1)).await?;
         assert!(!result.timed_out, "timed out waiting for an event");
         Ok(result.events.pop().expect("expected one event"))
     }
@@ -1351,12 +1768,14 @@ mod tests {
         let request = ComputeRequest::zk(
             ZkRequest::DkgAggregation(DkgAggregationRequest {
                 node_fold_proofs: vec![dummy_proof(CircuitName::PkAggregation)],
+                nodes_fold_proof: None,
                 c5_proof: dummy_proof(CircuitName::PkAggregation),
                 party_ids: vec![0],
                 committee_addresses: vec!["0x0000000000000000000000000000000000000001"
                     .parse()
                     .expect("test address")],
                 params_preset: BfvPreset::InsecureThreshold512,
+                committee_size: CiphernodesCommitteeSize::Micro,
             }),
             correlation_id,
             e3_id.clone(),
@@ -1377,7 +1796,7 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
                     && data.reason == FailureReason::DKGInvalidShares
@@ -1427,7 +1846,7 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == e3_id
                     && data.failed_at_stage == E3Stage::CommitteeFinalized
                     && data.reason == FailureReason::DKGInvalidShares
@@ -1487,6 +1906,54 @@ mod tests {
             panic!("expected GeneratingC5Proof state");
         };
         assert!(!dkg_node_proofs.contains_key(&2));
+
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn pk_aggregation_proof_pending_carries_canonical_committee_dims() -> Result<()> {
+        let (bus, rng, _seed, params, crp, _errors, history) =
+            get_common_setup(Some(BfvPreset::InsecureThreshold512.into()))?;
+        let e3_id = E3id::new("42", 1);
+        let fhe = Arc::new(Fhe::new(params, crp, rng));
+        let (initial_state, threshold_n, threshold_m, circuit_h) =
+            verifying_c1_non_square_state(&fhe, &e3_id)?;
+
+        let mut aggregator = PublicKeyAggregator::new(
+            PublicKeyAggregatorParams {
+                fhe,
+                bus,
+                e3_id: e3_id.clone(),
+                params_preset: BfvPreset::InsecureThreshold512,
+                committee_size: CiphernodesCommitteeSize::Medium,
+            },
+            test_state(initial_state),
+        );
+
+        let dishonest: BTreeSet<u64> = (circuit_h as u64..threshold_n as u64).collect();
+        aggregator.handle_c1_verification_complete(TypedEvent::new(
+            ShareVerificationComplete {
+                e3_id: e3_id.clone(),
+                kind: VerificationKind::PkGenerationProofs,
+                dishonest_parties: dishonest,
+            },
+            test_ctx(ShareVerificationComplete {
+                e3_id: e3_id.clone(),
+                kind: VerificationKind::PkGenerationProofs,
+                dishonest_parties: BTreeSet::new(),
+            }),
+        ))?;
+
+        let event = next_event(&history).await?;
+        assert!(matches!(
+            event.into_data(),
+            InterfoldEventData::PkAggregationProofPending(data)
+                if data.e3_id == e3_id
+                    && data.proof_request.committee_n == threshold_n
+                    && data.proof_request.committee_h == circuit_h
+                    && data.proof_request.committee_threshold == threshold_m
+                    && data.proof_request.keyshare_bytes.len() == circuit_h
+        ));
 
         Ok(())
     }

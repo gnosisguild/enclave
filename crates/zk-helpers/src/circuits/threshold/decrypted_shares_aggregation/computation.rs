@@ -244,8 +244,7 @@ impl Computation for Inputs {
         // u^{(l)} per modulus via Lagrange at zero
         let reconstructing_parties = &data.reconstructing_parties;
         let mut u_per_modulus: Vec<Vec<u64>> = Vec::new();
-        for m in 0..num_moduli {
-            let modulus = moduli[m];
+        for (m, &modulus) in moduli.iter().enumerate().take(num_moduli) {
             let mut u_modulus_coeffs = Vec::with_capacity(degree);
             for coeff_idx in 0..degree {
                 let shares: Vec<BigInt> = (0..=threshold)
@@ -265,9 +264,7 @@ impl Computation for Inputs {
         // u_global per coefficient via CRT reconstruction
         let mut u_global_vec: Vec<BigInt> = Vec::with_capacity(degree);
         for coeff_idx in 0..degree {
-            let rests: Vec<u64> = (0..num_moduli)
-                .map(|m| u_per_modulus[m][coeff_idx])
-                .collect();
+            let rests: Vec<u64> = u_per_modulus.iter().map(|row| row[coeff_idx]).collect();
             let u_global_coeff = utils::crt_reconstruct(&rests, moduli)?;
             u_global_vec.push(BigInt::from(u_global_coeff));
         }

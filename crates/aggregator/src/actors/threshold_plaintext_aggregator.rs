@@ -21,7 +21,7 @@ use e3_events::{
     CommitteeMemberExpelled, ComputeRequest, ComputeRequestError, ComputeResponse,
     ComputeResponseKind, CorrelationId, DecryptedSharesAggregationProofRequest,
     DecryptionAggregationRequest, DecryptionshareCreated, Die, E3Failed, E3Stage, E3id, EType,
-    EnclaveEvent, EnclaveEventData, EventContext, FailureReason, PlaintextAggregated, Proof,
+    EventContext, FailureReason, InterfoldEvent, InterfoldEventData, PlaintextAggregated, Proof,
     Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofPayload,
     TypedEvent, VerificationKind, ZkRequest, ZkResponse,
 };
@@ -33,6 +33,7 @@ use e3_trbfv::{
 };
 use e3_utils::NotifySync;
 use e3_utils::{utility_types::ArcBytes, MAILBOX_LIMIT};
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use tracing::{debug, info, trace, warn};
 
 /// Env var overriding the decryption-share collection timeout (seconds).
@@ -77,6 +78,7 @@ pub struct ThresholdPlaintextAggregator {
     sortition: Addr<Sortition>,
     e3_id: E3id,
     params_preset: BfvPreset,
+    committee_size: CiphernodesCommitteeSize,
     proof_aggregation_enabled: bool,
     state: Persistable<ThresholdPlaintextAggregatorState>,
     /// Honest parties' C6 inner proofs (sorted by party id) for [`ZkRequest::DecryptionAggregation`].
@@ -110,6 +112,7 @@ pub struct ThresholdPlaintextAggregatorParams {
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
     pub params_preset: BfvPreset,
+    pub committee_size: CiphernodesCommitteeSize,
     pub proof_aggregation_enabled: bool,
     /// Full committee from `PublicKeyAggregated.committee_addresses` (length `N`).
     /// Used for `committee_hash_*` payload binding to on-chain `topNodes`.
@@ -129,6 +132,7 @@ impl ThresholdPlaintextAggregator {
             sortition: params.sortition,
             e3_id: params.e3_id,
             params_preset: params.params_preset,
+            committee_size: params.committee_size,
             proof_aggregation_enabled: params.proof_aggregation_enabled,
             state,
             honest_c6_proofs_for_agg: None,
@@ -208,6 +212,7 @@ impl ThresholdPlaintextAggregator {
                 decryption_proofs: vec![],
                 pre_dishonest: BTreeSet::new(),
                 params_preset: self.params_preset,
+                committee_size: self.committee_size,
             },
             ec,
         )?;
@@ -366,6 +371,7 @@ impl ThresholdPlaintextAggregator {
                     params_preset: self.params_preset,
                     threshold_m,
                     threshold_n,
+                    committee_size: self.committee_size,
                 },
                 plaintext,
                 shares,
@@ -508,6 +514,7 @@ impl ThresholdPlaintextAggregator {
                     jobs,
                     committee_addresses: self.committee_addresses.clone(),
                     params_preset: self.params_preset,
+                    committee_size: self.committee_size,
                 }),
                 corr,
                 self.e3_id.clone(),
@@ -759,26 +766,28 @@ impl Handler<DecryptionCollectionTimeout> for ThresholdPlaintextAggregator {
     }
 }
 
-impl Handler<EnclaveEvent> for ThresholdPlaintextAggregator {
+impl Handler<InterfoldEvent> for ThresholdPlaintextAggregator {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            EnclaveEventData::DecryptionshareCreated(data) => ctx.notify(TypedEvent::new(data, ec)),
-            EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
-            EnclaveEventData::ComputeResponse(data) => {
+            InterfoldEventData::DecryptionshareCreated(data) => {
+                ctx.notify(TypedEvent::new(data, ec))
+            }
+            InterfoldEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
+            InterfoldEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeRequestError(data) => {
+            InterfoldEventData::ComputeRequestError(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::CommitteeMemberExpelled(data) => {
+            InterfoldEventData::CommitteeMemberExpelled(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ShareVerificationComplete(data) => {
+            InterfoldEventData::ShareVerificationComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::AggregationProofSigned(data) => {
+            InterfoldEventData::AggregationProofSigned(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),
@@ -989,7 +998,7 @@ mod tests {
     use e3_test_helpers::get_common_setup;
     use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-    fn test_ctx(data: impl Into<EnclaveEventData>) -> EventContext<Sequenced> {
+    fn test_ctx(data: impl Into<InterfoldEventData>) -> EventContext<Sequenced> {
         EventContext::<Unsequenced>::from(data.into()).sequence(0)
     }
 
@@ -1087,7 +1096,7 @@ mod tests {
         proof_aggregation_enabled: bool,
     ) -> Result<(
         ThresholdPlaintextAggregator,
-        Addr<HistoryCollector<EnclaveEvent>>,
+        Addr<HistoryCollector<InterfoldEvent>>,
         E3id,
     )> {
         let (bus, _rng, _seed, _params, _crp, _errors, history) =
@@ -1099,6 +1108,7 @@ mod tests {
                 sortition: start_sortition(&bus),
                 e3_id: e3_id.clone(),
                 params_preset: BfvPreset::InsecureThreshold512,
+                committee_size: CiphernodesCommitteeSize::Micro,
                 proof_aggregation_enabled,
                 committee_addresses: vec![test_committee_address()],
                 honest_committee_addresses: vec![test_committee_address()],
@@ -1109,8 +1119,10 @@ mod tests {
         Ok((aggregator, history, e3_id))
     }
 
-    async fn next_event(history: &Addr<HistoryCollector<EnclaveEvent>>) -> Result<EnclaveEvent> {
-        let mut result = history.send(TakeEvents::<EnclaveEvent>::new(1)).await?;
+    async fn next_event(
+        history: &Addr<HistoryCollector<InterfoldEvent>>,
+    ) -> Result<InterfoldEvent> {
+        let mut result = history.send(TakeEvents::<InterfoldEvent>::new(1)).await?;
         assert!(!result.timed_out, "timed out waiting for an event");
         Ok(result.events.pop().expect("expected one event"))
     }
@@ -1133,7 +1145,7 @@ mod tests {
         assert!(
             matches!(
                 event.into_data(),
-                EnclaveEventData::E3Failed(data)
+                InterfoldEventData::E3Failed(data)
                     if data.reason == FailureReason::DecryptionTimeout
             ),
             "expected E3Failed with DecryptionTimeout when collection window elapses"
@@ -1175,7 +1187,7 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == e3_id
                     && data.failed_at_stage == E3Stage::CiphertextReady
                     && data.reason == FailureReason::DecryptionInvalidShares
@@ -1206,7 +1218,7 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == e3_id
                     && data.failed_at_stage == E3Stage::CiphertextReady
                     && data.reason == FailureReason::DecryptionInvalidShares
@@ -1238,6 +1250,7 @@ mod tests {
                 jobs: Vec::new(),
                 committee_addresses: vec![test_committee_address()],
                 params_preset: BfvPreset::InsecureThreshold512,
+                committee_size: CiphernodesCommitteeSize::Micro,
             }),
             correlation_id,
             e3_id.clone(),
@@ -1258,7 +1271,7 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == e3_id
                     && data.failed_at_stage == E3Stage::CiphertextReady
                     && data.reason == FailureReason::DecryptionInvalidShares
@@ -1289,7 +1302,7 @@ mod tests {
         let event = next_event(&history).await?;
         assert!(matches!(
             event.into_data(),
-            EnclaveEventData::E3Failed(data)
+            InterfoldEventData::E3Failed(data)
                 if data.e3_id == e3_id
                     && data.failed_at_stage == E3Stage::CiphertextReady
                     && data.reason == FailureReason::DecryptionInvalidShares

@@ -13,7 +13,7 @@ echo "Deploying CRISP contracts..."
 
 export PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 export USE_MOCKS=true
-export DEPLOY_ENCLAVE=true
+export DEPLOY_INTERFOLD=true
 
 cd "${CRISP_ROOT}/packages/crisp-contracts"
 

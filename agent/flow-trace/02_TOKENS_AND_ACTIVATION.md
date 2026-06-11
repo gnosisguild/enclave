@@ -4,9 +4,9 @@
 
 Before a node can register, it must stake two types of collateral:
 
-1. **ENCL tokens** (license bond) — governance/utility token, staked directly
-2. **Stablecoin via ETK tickets** (ticket collateral) — USDC wrapped into non-transferable
-   EnclaveTicketToken
+1. **INTF tokens** (license bond) — governance/utility token, staked directly
+2. **Stablecoin via ITK tickets** (ticket collateral) — USDC wrapped into non-transferable
+   InterfoldTicketToken
 
 ---
 
@@ -14,7 +14,7 @@ Before a node can register, it must stake two types of collateral:
 
 ```
 ┌───────────────────────────────────────────────────────────┐
-│                    EnclaveToken (ENCL)                     │
+│                    InterfoldToken (INTF)                     │
 │  ERC20 + ERC20Permit + ERC20Votes + AccessControl         │
 │                                                           │
 │  MAX_SUPPLY: 1,200,000,000 (1.2B with 18 decimals)       │
@@ -29,7 +29,7 @@ Before a node can register, it must stake two types of collateral:
 └───────────────────────────────────────────────────────────┘
 
 ┌───────────────────────────────────────────────────────────┐
-│              EnclaveTicketToken (ETK)                      │
+│              InterfoldTicketToken (ITK)                      │
 │  ERC20Wrapper over stablecoin (e.g. USDC)                 │
 │                                                           │
 │  NON-TRANSFERABLE: _update() reverts on transfer          │
@@ -37,10 +37,10 @@ Before a node can register, it must stake two types of collateral:
 │  NO APPROVALS: approve() reverts                          │
 │                                                           │
 │  Only BondingRegistry (registry role) can:                │
-│    depositFor()  → wrap USDC, mint ETK to operator        │
-│    depositFrom() → pull USDC from X, mint ETK to Y       │
-│    burnTickets() → burn ETK, NO underlying returned       │
-│    withdrawTo()  → burn ETK, return underlying USDC       │
+│    depositFor()  → wrap USDC, mint ITK to operator        │
+│    depositFrom() → pull USDC from X, mint ITK to Y       │
+│    burnTickets() → burn ITK, NO underlying returned       │
+│    withdrawTo()  → burn ITK, return underlying USDC       │
 │    payout()      → send underlying from payableBalance    │
 │                                                           │
 │  Used as: TICKET COLLATERAL token                         │
@@ -49,19 +49,19 @@ Before a node can register, it must stake two types of collateral:
 
 ---
 
-## Step 1: Bond License (`enclave ciphernode license bond`)
+## Step 1: Bond License (`interfold ciphernode license bond`)
 
 **File:** `crates/cli/src/ciphernode/license.rs`
 
 ```
-User runs: enclave ciphernode license bond --amount 50000
+User runs: interfold ciphernode license bond --amount 50000
 │
 ├─ 1. ChainContext::new()
 │     └─ Loads config, decrypts wallet, connects to BondingRegistry
 │
-├─ 2. Approve ENCL spend:
-│     └─ EnclaveToken.approve(bondingRegistry, 50000)
-│        → Allows BondingRegistry to pull ENCL tokens
+├─ 2. Approve INTF spend:
+│     └─ InterfoldToken.approve(bondingRegistry, 50000)
+│        → Allows BondingRegistry to pull INTF tokens
 │
 ├─ 3. BondingRegistryContract.bondLicense(50000).send().await
 │     │
@@ -76,9 +76,9 @@ User runs: enclave ciphernode license bond --amount 50000
 │     │  │         address(this), // to BondingRegistry         │
 │     │  │         amount                                       │
 │     │  │       )                                              │
-│     │  │       → ENCL _update can see the pre-recorded bond   │
+│     │  │       → INTF _update can see the pre-recorded bond   │
 │     │  │         and enforce locked-floor accounting          │
-│     │  │       → ENCL tokens move from operator → contract    │
+│     │  │       → INTF tokens move from operator → contract    │
 │     │  │    4. _updateOperatorStatus(msg.sender)              │
 │     │  │       → May activate if all conditions now met       │
 │     │  │    5. Emit LicenseBondUpdated(msg.sender, newBond)   │
@@ -106,7 +106,7 @@ _updateOperatorStatus(operator):
     operators[operator].registered == true
     AND operators[operator].licenseBond >= (licenseRequiredBond * licenseActiveBps / 10000)
         // Default: licenseActiveBps = 8000 (80%)
-        // So if licenseRequiredBond = 50000, need >= 40000 ENCL
+        // So if licenseRequiredBond = 50000, need >= 40000 INTF
     AND ticketToken.balanceOf(operator) / ticketPrice >= minTicketBalance
   )
 
@@ -123,7 +123,7 @@ _updateOperatorStatus(operator):
 
 ---
 
-## Step 2: Buy Tickets (`enclave ciphernode tickets buy`)
+## Step 2: Buy Tickets (`interfold ciphernode tickets buy`)
 
 **File:** `crates/cli/src/ciphernode/tickets.rs`
 
@@ -134,7 +134,7 @@ _updateOperatorStatus(operator):
 > multiply the deposit amount.
 
 ```
-User runs: enclave ciphernode tickets buy --amount 100
+User runs: interfold ciphernode tickets buy --amount 100
 │
 ├─ 1. ChainContext::new()
 │
@@ -156,16 +156,16 @@ User runs: enclave ciphernode tickets buy --amount 100
 │     │  │    3. modifier: require(!exitInProgress(msg.sender)) │
 │     │  │    4. ticketToken.depositFrom(                       │
 │     │  │         msg.sender,  // pull USDC from operator      │
-│     │  │         msg.sender,  // mint ETK to operator         │
+│     │  │         msg.sender,  // mint ITK to operator         │
 │     │  │         amount       // RAW stablecoin units         │
 │     │  │       )              // NO ticketPrice multiplication│
 │     │  │       │                                              │
-│     │  │       │  ┌─ EnclaveTicketToken.depositFrom() ────┐  │
+│     │  │       │  ┌─ InterfoldTicketToken.depositFrom() ────┐  │
 │     │  │       │  │  1. underlying.transferFrom(           │  │
 │     │  │       │  │       from, address(this), amount)     │  │
-│     │  │       │  │     → USDC moves: operator → ETK       │  │
+│     │  │       │  │     → USDC moves: operator → ITK       │  │
 │     │  │       │  │  2. _mint(to, amount)                  │  │
-│     │  │       │  │     → ETK minted 1:1 with USDC         │  │
+│     │  │       │  │     → ITK minted 1:1 with USDC         │  │
 │     │  │       │  │  3. Auto-delegate to self on first     │  │
 │     │  │       │  │     deposit (for voting power tracking)│  │
 │     │  │       │  └────────────────────────────────────────┘  │
@@ -180,7 +180,7 @@ User runs: enclave ciphernode tickets buy --amount 100
 
 ### Why tickets are non-transferable:
 
-ETK tokens cannot be transferred between addresses. This ensures:
+ITK tokens cannot be transferred between addresses. This ensures:
 
 - An operator's collateral can't be moved to avoid slashing
 - The ticket balance is always attributable to the specific operator
@@ -188,10 +188,10 @@ ETK tokens cannot be transferred between addresses. This ensures:
 
 ---
 
-## Step 3: Unbond License (`enclave ciphernode license unbond`)
+## Step 3: Unbond License (`interfold ciphernode license unbond`)
 
 ```
-User runs: enclave ciphernode license unbond --amount 10000
+User runs: interfold ciphernode license unbond --amount 10000
 │
 ├─ BondingRegistryContract.unbondLicense(10000).send().await
 │     │
@@ -218,14 +218,14 @@ User runs: enclave ciphernode license unbond --amount 10000
 
 ---
 
-## Step 4: Burn Tickets (`enclave ciphernode tickets burn`)
+## Step 4: Burn Tickets (`interfold ciphernode tickets burn`)
 
-> **IMPORTANT:** Like `addTicketBalance`, the `amount` here is in **raw stablecoin base units** (ETK
+> **IMPORTANT:** Like `addTicketBalance`, the `amount` here is in **raw stablecoin base units** (ITK
 > units, which are 1:1 with underlying). There is NO `ticketPrice` multiplication. The CLI parses
 > the user's amount using the ticket token's decimals.
 
 ```
-User runs: enclave ciphernode tickets burn --amount 50
+User runs: interfold ciphernode tickets burn --amount 50
 │
 ├─ CLI parses "50" using ticket token decimals → raw units
 │
@@ -241,11 +241,11 @@ User runs: enclave ciphernode tickets burn --amount 50
 │     │  │    4. ticketToken.burnTickets(msg.sender, amount)     │
 │     │  │       │  (NO ticketPrice multiplication — raw units)  │
 │     │  │       │                                               │
-│     │  │       │  ┌─ EnclaveTicketToken ───────────────────┐  │
+│     │  │       │  ┌─ InterfoldTicketToken ───────────────────┐  │
 │     │  │       │  │  burnTickets(operator, amount):        │  │
 │     │  │       │  │    payableBalance += amount             │  │
 │     │  │       │  │    _burn(operator, amount)             │  │
-│     │  │       │  │    → ETK destroyed                     │  │
+│     │  │       │  │    → ITK destroyed                     │  │
 │     │  │       │  │    → Underlying USDC NOT returned yet  │  │
 │     │  │       │  │    → Tracked in payableBalance for     │  │
 │     │  │       │  │      later payout()                    │  │
@@ -264,10 +264,10 @@ User runs: enclave ciphernode tickets burn --amount 50
 
 ---
 
-## Step 5: Claim Exits (`enclave ciphernode license claim`)
+## Step 5: Claim Exits (`interfold ciphernode license claim`)
 
 ```
-User runs: enclave ciphernode license claim [--max-ticket 50] [--max-license 10000]
+User runs: interfold ciphernode license claim [--max-ticket 50] [--max-license 10000]
 │
 ├─ BondingRegistryContract.claimExits(50, 10000).send().await
 │     │
@@ -293,7 +293,7 @@ User runs: enclave ciphernode license claim [--max-ticket 50] [--max-license 100
 │     │  │    2. if ticketAmount > 0:                            │
 │     │  │       ticketToken.payout(msg.sender, ticketAmount)    │
 │     │  │       │                                               │
-│     │  │       │  ┌─ EnclaveTicketToken.payout() ──────────┐  │
+│     │  │       │  ┌─ InterfoldTicketToken.payout() ──────────┐  │
 │     │  │       │  │  Transfers underlying USDC from        │  │
 │     │  │       │  │  payableBalance to operator             │  │
 │     │  │       │  │  payableBalance -= amount               │  │
@@ -303,15 +303,15 @@ User runs: enclave ciphernode license claim [--max-ticket 50] [--max-license 100
 │     │  │    3. licenseAmount = _claimLicenseExits(             │
 │     │  │         msg.sender, maxLicense                        │
 │     │  │       )                                               │
-│     │  │       → Each ENCL source pays its withdrawalAddress   │
+│     │  │       → Each INTF source pays its withdrawalAddress   │
 │     │  │       → Receiver callback gets (operator, amount,     │
 │     │  │         sourceId) when supported                      │
-│     │  │       → Pending ENCL is removed from totalBonded()    │
-│     │  │         as returned ENCL reaches the wallet           │
+│     │  │       → Pending INTF is removed from totalBonded()    │
+│     │  │         as returned INTF reaches the wallet           │
 │     │  │  }                                                    │
 │     │  └───────────────────────────────────────────────────────┘
 │
-└─ Operator receives back USDC; ENCL goes to each source's withdrawal address
+└─ Operator receives back USDC; INTF goes to each source's withdrawal address
 ```
 
 ---
@@ -320,7 +320,7 @@ User runs: enclave ciphernode license claim [--max-ticket 50] [--max-license 100
 
 | Requirement           | Default             | Description                                |
 | --------------------- | ------------------- | ------------------------------------------ |
-| `licenseRequiredBond` | Configured by owner | Min ENCL to register                       |
+| `licenseRequiredBond` | Configured by owner | Min INTF to register                       |
 | `licenseActiveBps`    | 8000 (80%)          | % of required bond to stay active          |
 | `minTicketBalance`    | Configured by owner | Min tickets for active status              |
 | `ticketPrice`         | Configured by owner | Stablecoin cost per ticket (in base units) |
@@ -342,20 +342,20 @@ active = registered
                 BOND LICENSE                          BUY TICKETS
                 ────────────                          ───────────
   Operator                                 Operator
-  ENCL wallet ──→ BondingRegistry          USDC wallet ──→ EnclaveTicketToken
-                  (licenseBond++)                          (wraps USDC → mints ETK)
-                                                           ETK → Operator balance
+  INTF wallet ──→ BondingRegistry          USDC wallet ──→ InterfoldTicketToken
+                  (licenseBond++)                          (wraps USDC → mints ITK)
+                                                           ITK → Operator balance
 
                UNBOND LICENSE                         BURN TICKETS
                ──────────────                         ────────────
-  licenseBond -= amount                    ETK burned from operator
-  amount → ExitQueue (locked)              USDC stays in ETK contract (payableBalance)
+  licenseBond -= amount                    ITK burned from operator
+  amount → ExitQueue (locked)              USDC stays in ITK contract (payableBalance)
                                            amount → ExitQueue (locked)
 
                               CLAIM EXITS
                               ───────────
                    After exitDelay seconds:
-                   ENCL → returned to source withdrawal address
+                   INTF → returned to source withdrawal address
                    USDC → paid out from ETK.payableBalance
 ```
 
@@ -364,9 +364,9 @@ active = registered
 ## Audit Cluster 2 Changes (Tokens)
 
 The token contracts were hardened against the following audit findings. All changes are covered by
-`packages/enclave-contracts/test/Token/` and have no runtime impact outside the touched contracts.
+`packages/interfold-contracts/test/Token/` and have no runtime impact outside the touched contracts.
 
-### EnclaveTicketToken (ETK)
+### InterfoldTicketToken (ITK)
 
 - **H-02 — registry initialization.** The constructor now takes
   `(IERC20 baseToken, address registry_, address initialOwner_)` and assigns `registry = registry_`
@@ -389,7 +389,7 @@ The token contracts were hardened against the following audit findings. All chan
 - **M-29 — EIP-6372 timestamp clock.** `clock() = uint48(block.timestamp)`,
   `CLOCK_MODE() = "mode=timestamp"`.
 
-### EnclaveToken (ENCL)
+### InterfoldToken (INTF)
 
 - **H-15 — WHITELIST_ROLE separation + one-way disable.** New `WHITELIST_ROLE` gates
   `toggleTransferWhitelist` and `whitelistContracts`, decoupling whitelist edits from `MINTER_ROLE`.
@@ -401,7 +401,7 @@ The token contracts were hardened against the following audit findings. All chan
   (`MintEpochRolled(newStart)`) and reverts `ExceedsMintCap` on overflow. Constructor defaults to a
   30-day epoch with `cap = MAX_SUPPLY` so bootstrap deployments keep working; governance is expected
   to tighten this before broad distribution.
-- **M-29 — EIP-6372 timestamp clock.** Same timestamp clock as ETK, aligning ENCL voting checkpoints
+- **M-29 — EIP-6372 timestamp clock.** Same timestamp clock as ITK, aligning INTF voting checkpoints
   with timepoints used elsewhere.
 
 ### Registry coordination
@@ -410,4 +410,4 @@ The token contracts were hardened against the following audit findings. All chan
   field names are preserved for backwards compatibility). All callers — including
   `BondingRegistry.getTicketBalanceAtBlock(node, c.requestBlock - 1)` — pass the value through
   unchanged; the parameter is now a timepoint per EIP-6372 rather than a block number, which is
-  required for the ETK timestamp clock to be valid.
+  required for the ITK timestamp clock to be valid.

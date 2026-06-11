@@ -13,6 +13,8 @@
 
 use std::collections::BTreeMap;
 
+use e3_zk_helpers::CiphernodesCommitteeSize;
+
 use e3_events::{
     CorrelationId, EventContext, NodeDkgFoldRequest, Proof, Sequenced, ShareEncryptionProofRequest,
 };
@@ -29,6 +31,7 @@ pub(crate) struct NodeDkgFoldMeta {
     pub(crate) committee_h: usize,
     pub(crate) n_moduli: usize,
     pub(crate) params_preset: e3_fhe_params::BfvPreset,
+    pub(crate) committee_size: CiphernodesCommitteeSize,
 }
 
 impl NodeDkgFoldMeta {
@@ -124,6 +127,7 @@ impl DkgProofCollectionState {
             c3_total_slots,
             party_id: meta.party_id,
             params_preset: meta.params_preset,
+            committee_size: meta.committee_size,
         }
     }
 }
@@ -146,6 +150,7 @@ mod tests {
             committee_h: 2,
             n_moduli: 2,
             params_preset: e3_fhe_params::BfvPreset::InsecureThreshold512,
+            committee_size: CiphernodesCommitteeSize::Micro,
         }
     }
 
@@ -158,8 +163,8 @@ mod tests {
     }
 
     fn ec() -> EventContext<Sequenced> {
-        use e3_events::{EnclaveEventData, TestEvent, Unsequenced};
-        EventContext::<Unsequenced>::from(EnclaveEventData::from(TestEvent::new("x", 0)))
+        use e3_events::{InterfoldEventData, TestEvent, Unsequenced};
+        EventContext::<Unsequenced>::from(InterfoldEventData::from(TestEvent::new("x", 0)))
             .sequence(0)
     }
 

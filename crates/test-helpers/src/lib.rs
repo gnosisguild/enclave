@@ -16,8 +16,8 @@ use alloy::primitives::Address;
 use anyhow::Result;
 use e3_ciphernode_builder::{CiphernodeHandle, EventSystem};
 use e3_events::{
-    BusHandle, CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
-    EventPublisher, EventType, HistoryCollector, Seed, Subscribe,
+    BusHandle, CiphernodeAdded, EventBus, EventBusConfig, EventPublisher, EventType,
+    HistoryCollector, InterfoldEvent, InterfoldEventData, Seed, Subscribe,
 };
 use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::DEFAULT_BFV_PRESET;
@@ -64,7 +64,7 @@ pub async fn find_bb() -> Option<PathBuf> {
         for path in [
             format!("{}/.bb/bb", home),
             format!("{}/.nargo/bin/bb", home),
-            format!("{}/.enclave/noir/bin/bb", home),
+            format!("{}/.interfold/noir/bin/bb", home),
         ] {
             if std::path::Path::new(&path).exists() {
                 return Some(PathBuf::from(path));
@@ -126,6 +126,7 @@ pub fn create_crp_bytes_params(
     (crp.to_bytes(), params)
 }
 
+#[allow(clippy::type_complexity)]
 pub fn get_common_setup(
     param_set: Option<BfvParamSet>,
 ) -> Result<(
@@ -134,15 +135,15 @@ pub fn get_common_setup(
     Seed,
     Arc<BfvParameters>,
     CommonRandomPoly,
-    Addr<HistoryCollector<EnclaveEvent>>,
-    Addr<HistoryCollector<EnclaveEvent>>,
+    Addr<HistoryCollector<InterfoldEvent>>,
+    Addr<HistoryCollector<InterfoldEvent>>,
 )> {
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
-    let errors = HistoryCollector::<EnclaveEvent>::new().start();
-    let history = HistoryCollector::<EnclaveEvent>::new().start();
+    let bus = EventBus::<InterfoldEvent>::new(EventBusConfig { deduplicate: true }).start();
+    let errors = HistoryCollector::<InterfoldEvent>::new().start();
+    let history = HistoryCollector::<InterfoldEvent>::new().start();
     bus.do_send(Subscribe::new(EventType::All, history.clone().recipient()));
     bus.do_send(Subscribe::new(
-        EventType::EnclaveError,
+        EventType::InterfoldError,
         errors.clone().recipient(),
     ));
 
@@ -195,7 +196,7 @@ impl AddToCommittee {
             count: 0,
         }
     }
-    pub async fn add(&mut self, address: &str) -> Result<EnclaveEventData> {
+    pub async fn add(&mut self, address: &str) -> Result<InterfoldEventData> {
         let evt = CiphernodeAdded {
             chain_id: self.chain_id,
             address: address.to_owned(),
@@ -219,14 +220,14 @@ pub fn encrypt_ciphertext(
     let mut rng = ChaCha20Rng::seed_from_u64(42);
     let plaintext: Vec<_> = raw_plaintext
         .into_iter()
-        .map(|raw| Ok(Plaintext::try_encode(&raw, Encoding::poly(), &params)?))
+        .map(|raw| Ok(Plaintext::try_encode(&raw, Encoding::poly(), params)?))
         .collect::<Result<_>>()?;
 
     let ciphertext = plaintext
         .iter()
         .map(|pt| {
             pubkey
-                .try_encrypt(&pt, &mut rng)
+                .try_encrypt(pt, &mut rng)
                 .map_err(|e| anyhow::anyhow!("{e}"))
         })
         .collect::<Result<Vec<Ciphertext>>>()?;

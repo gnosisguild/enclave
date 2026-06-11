@@ -21,15 +21,19 @@ use anyhow::anyhow;
 use crisp::config::CONFIG;
 use crisp::deployments;
 use e3_fhe_params::build_bfv_params_from_set_arc;
-use e3_sdk::evm_helpers::contracts::{CommitteeSize, EnclaveContract, EnclaveRead, EnclaveWrite};
+use e3_sdk::evm_helpers::contracts::{
+    CommitteeSize, InterfoldContract, InterfoldRead, InterfoldWrite,
+};
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
     Serialize as FheSerialize,
 };
-use rand::thread_rng;
+use rand::rng;
 use std::sync::Arc;
 
+// Legacy interactive CLI flows; kept for revival alongside the HTTP server path.
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Serialize)]
 struct FHEParams {
     params: Vec<u8>,
@@ -44,12 +48,14 @@ struct ComputeProviderParams {
     batch_size: u32,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Serialize)]
 struct PKRequest {
     round_id: u64,
     pk_bytes: Vec<u8>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Serialize)]
 struct CTRequest {
     round_id: u64,
@@ -72,7 +78,7 @@ fn format_request_e3_revert(err: impl std::fmt::Display) -> anyhow::Error {
              operators (Micro N=3) but bondingRegistry.numActiveOperators() is 0. Register \
              ciphernodes before init: run full `pnpm dev:up`, or from examples/CRISP run \
              `pnpm ciphernode:add --ciphernode-address <addr> --network localhost` for at least \
-             three addresses in enclave.config.yaml (cn1–cn3)."
+             three addresses in interfold.config.yaml (cn1–cn3)."
         );
     }
     anyhow!(
@@ -113,6 +119,7 @@ fn resolve_voting_token(
     .into())
 }
 
+#[allow(dead_code)]
 async fn ensure_e3_program_deployed(
     e3_program: Address,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -155,7 +162,7 @@ pub async fn check_committee_key_published(
     e3_id: u64,
 ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
     let contract =
-        EnclaveContract::read_only(&CONFIG.http_rpc_url, &CONFIG.enclave_address).await?;
+        InterfoldContract::read_only(&CONFIG.http_rpc_url, &CONFIG.interfold_address).await?;
     let e3_stage: E3Stage = contract.get_e3_stage(U256::from(e3_id)).await?;
 
     Ok(e3_stage == E3Stage::KeyPublished)
@@ -165,10 +172,10 @@ pub async fn initialize_crisp_round(
     token_address: &str,
     balance_threshold: &str,
 ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
-    let contract = EnclaveContract::new(
+    let contract = InterfoldContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
-        &CONFIG.enclave_address,
+        &CONFIG.interfold_address,
     )
     .await?;
     let e3_program: Address = CONFIG.e3_program_address.parse()?;
@@ -198,7 +205,7 @@ pub async fn initialize_crisp_round(
     );
 
     let token_address: Address = token_address_str.parse()?;
-    let balance_threshold = U256::from_str_radix(&balance_threshold, 10)?;
+    let balance_threshold = U256::from_str_radix(balance_threshold, 10)?;
     // We default to two options for the main CRISP app
     let num_options = U256::from(2);
     // The credit mode is constant for the CRISP app (everyone gets the same credits)
@@ -254,7 +261,7 @@ pub async fn initialize_crisp_round(
 
     let fee_amount = contract
         .get_e3_quote(
-            committee_size.clone(),
+            committee_size,
             input_window,
             e3_program,
             param_set,
@@ -269,14 +276,14 @@ pub async fn initialize_crisp_round(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
         &CONFIG.fee_token_address,
-        &CONFIG.enclave_address,
+        &CONFIG.interfold_address,
         fee_amount,
     )
     .await?;
 
     current_timestamp = get_current_timestamp().await?;
 
-    info!("Requesting E3 on contract: {}", CONFIG.enclave_address);
+    info!("Requesting E3 on contract: {}", CONFIG.interfold_address);
 
     info!("Debug - committee_size: {:?}", committee_size);
     info!("Debug - input_window: {:?}", input_window);
@@ -324,6 +331,7 @@ pub async fn initialize_crisp_round(
     Ok(e3_id_u64)
 }
 
+#[allow(dead_code)]
 pub async fn participate_in_existing_round(
     client: &Client,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -333,7 +341,7 @@ pub async fn participate_in_existing_round(
 
     let url = format!(
         "{}/rounds/public-key",
-        CONFIG.enclave_server_url_for_clients()
+        CONFIG.interfold_server_url_for_clients()
     );
     let resp = client
         .post(&url)
@@ -354,7 +362,7 @@ pub async fn participate_in_existing_round(
         let contract = CRISPContract::new(
             &CONFIG.http_rpc_url,
             &CONFIG.private_key,
-            &CONFIG.enclave_address,
+            &CONFIG.interfold_address,
         )
         .await?;
         let res = contract
@@ -366,6 +374,7 @@ pub async fn participate_in_existing_round(
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn decrypt_and_publish_result(
     client: &Client,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -373,7 +382,7 @@ pub async fn decrypt_and_publish_result(
         .with_prompt("Enter CRISP round ID.")
         .interact_text()?;
 
-    let url = format!("{}/rounds/ciphertext", CONFIG.enclave_address);
+    let url = format!("{}/rounds/ciphertext", CONFIG.interfold_address);
     let resp = client
         .post(&url)
         .json(&CTRequest {
@@ -400,10 +409,10 @@ pub async fn decrypt_and_publish_result(
 
     let proof = Bytes::from(vec![0]);
 
-    let contract = EnclaveContract::new(
+    let contract = InterfoldContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
-        &CONFIG.enclave_address,
+        &CONFIG.interfold_address,
     )
     .await?;
     let res = contract
@@ -418,17 +427,20 @@ pub async fn decrypt_and_publish_result(
     Ok(())
 }
 
+#[allow(dead_code)]
 fn generate_bfv_parameters() -> Arc<BfvParameters> {
     build_bfv_params_from_set_arc(default_param_set())
 }
 
+#[allow(dead_code)]
 fn generate_keys(params: &Arc<BfvParameters>) -> (SecretKey, PublicKey) {
-    let mut rng = thread_rng();
+    let mut rng = rng();
     let sk = SecretKey::random(params, &mut rng);
     let pk = PublicKey::new(&sk, &mut rng);
     (sk, pk)
 }
 
+#[allow(dead_code)]
 fn get_user_vote() -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
     let selections = &["Abstain.", "Vote yes.", "Vote no."];
     let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
@@ -445,11 +457,12 @@ fn get_user_vote() -> Result<Option<u64>, Box<dyn std::error::Error + Send + Syn
     }
 }
 
+#[allow(dead_code)]
 fn encrypt_vote(
     vote: u64,
     public_key: &PublicKey,
     params: &std::sync::Arc<BfvParameters>,
 ) -> Result<Ciphertext, Box<dyn std::error::Error + Send + Sync>> {
     let pt = Plaintext::try_encode(&[vote], Encoding::poly(), params)?;
-    Ok(public_key.try_encrypt(&pt, &mut thread_rng())?)
+    Ok(public_key.try_encrypt(&pt, &mut rng())?)
 }

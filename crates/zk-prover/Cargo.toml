@@ -3,7 +3,7 @@ name = "e3-zk-prover"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "ZK proof generation for Enclave ciphernodes"
+description = "ZK proof generation for Interfold ciphernodes"
 repository.workspace = true
 
 [dependencies]
@@ -36,6 +36,7 @@ indicatif = "0.17"
 nargo = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.16" }
 noirc_abi = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.16" }
 num-bigint.workspace = true
+rayon.workspace = true
 reqwest = { workspace = true, features = ["json", "stream"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

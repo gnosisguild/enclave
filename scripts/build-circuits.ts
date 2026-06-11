@@ -34,6 +34,7 @@ interface CompiledCircuit {
   name: string
   group: CircuitGroup
   preset: string
+  committee: CircuitCommittee
   artifacts: {
     json?: string
     vk?: string
@@ -66,9 +67,9 @@ interface BuildOptions {
   hydrateBinOnly?: boolean
   dryRun?: boolean
   preset?: CircuitPreset | 'all'
-  /** Active committee size — drives `committee/active.nr` and verifier H/T. */
-  committee?: CircuitCommittee
-  /** Skip writing BFV_DKG_H/T into `packages/enclave-contracts/scripts/utils.ts`. */
+  /** Active committee size — drives `committee/active.nr` and verifier H/T. Pass `'all'` to build every committee. */
+  committee?: CircuitCommittee | 'all'
+  /** Skip writing BFV_DKG_H/T into `packages/interfold-contracts/scripts/utils.ts`. */
   skipUtilsPatch?: boolean
 }
 
@@ -106,7 +107,7 @@ class NoirCircuitBuilder {
       ...options,
     }
 
-    if (this.options.preset !== 'all' && this.options.committee) {
+    if (this.options.preset !== 'all' && this.options.committee && this.options.committee !== 'all') {
       if (!isPresetCommitteeSupported(this.options.preset as CircuitPreset, this.options.committee)) {
         throw new Error(
           `Unsupported preset/committee pair (${this.options.preset}, ${this.options.committee}). ` +
@@ -119,8 +120,10 @@ class NoirCircuitBuilder {
   async buildAll(): Promise<BuildResult> {
     const result: BuildResult = { success: true, compiled: [], errors: [] }
     const presets: CircuitPreset[] = this.options.preset === 'all' ? ALL_PRESETS : [this.options.preset!]
+    const committees: CircuitCommittee[] =
+      this.options.committee === 'all' ? ALL_COMMITTEES : [this.options.committee ?? CIRCUIT_COMMITTEES.MICRO]
 
-    console.log(`🔮 Building Noir circuits for preset(s): ${presets.join(', ')}...`)
+    console.log(`🔮 Building Noir circuits for preset(s): ${presets.join(', ')}, committee(s): ${committees.join(', ')}...`)
 
     const modNrPath = join(this.rootDir, 'circuits', 'lib', 'src', 'configs', 'default', 'mod.nr')
 
@@ -135,11 +138,13 @@ class NoirCircuitBuilder {
     mkdirSync(this.options.outputDir!, { recursive: true })
 
     for (const preset of presets) {
-      const presetResult = await this.buildForPreset(preset, modNrPath)
-      result.compiled.push(...presetResult.compiled)
-      result.errors.push(...presetResult.errors)
-      if (!presetResult.success) result.success = false
-      if (presetResult.sourceHash && !result.sourceHash) result.sourceHash = presetResult.sourceHash
+      for (const committee of committees) {
+        const presetResult = await this.buildForPreset(preset, committee, modNrPath)
+        result.compiled.push(...presetResult.compiled)
+        result.errors.push(...presetResult.errors)
+        if (!presetResult.success) result.success = false
+        if (presetResult.sourceHash && !result.sourceHash) result.sourceHash = presetResult.sourceHash
+      }
     }
 
     if (!this.options.skipChecksums && result.compiled.length > 0) {
@@ -240,7 +245,7 @@ class NoirCircuitBuilder {
   }
 
   /**
-   * Patch `packages/enclave-contracts/scripts/utils.ts` so `BFV_DKG_H` and `BFV_THRESHOLD_T`
+   * Patch `packages/interfold-contracts/scripts/utils.ts` so `BFV_DKG_H` and `BFV_THRESHOLD_T`
    * track the active committee. The gas-benchmark and verifier-deploy scripts pull from this
    * file at runtime, so any mismatch between the compiled circuit and the deployed verifier
    * surfaces as `InvalidPublicInputsLength()` on-chain.
@@ -248,7 +253,7 @@ class NoirCircuitBuilder {
   private patchUtilsTs(committee: CircuitCommittee): void {
     if (this.options.skipUtilsPatch) return
     const { h, t, n } = COMMITTEE_PARAMS[committee]
-    const path = join(this.rootDir, 'packages', 'enclave-contracts', 'scripts', 'utils.ts')
+    const path = join(this.rootDir, 'packages', 'interfold-contracts', 'scripts', 'utils.ts')
     if (!existsSync(path)) return // optional in minimal checkouts
     const before = readFileSync(path, 'utf-8')
     const cap = committee.charAt(0).toUpperCase() + committee.slice(1)
@@ -290,12 +295,12 @@ class NoirCircuitBuilder {
     }
   }
 
-  private presetStampPath(preset: string): string {
-    return join(this.options.outputDir!, preset, '.build-stamp.json')
+  private presetStampPath(preset: string, committee: string): string {
+    return join(this.options.outputDir!, preset, committee, '.build-stamp.json')
   }
 
-  private readPresetStamp(preset: string): PresetBuildStamp | null {
-    const stampPath = this.presetStampPath(preset)
+  private readPresetStamp(preset: string, committee: string): PresetBuildStamp | null {
+    const stampPath = this.presetStampPath(preset, committee)
     if (!existsSync(stampPath)) return null
     try {
       return JSON.parse(readFileSync(stampPath, 'utf-8')) as PresetBuildStamp
@@ -304,21 +309,21 @@ class NoirCircuitBuilder {
     }
   }
 
-  private writePresetStamp(preset: string, sourceHash: string): void {
+  private writePresetStamp(preset: string, committee: string, sourceHash: string): void {
     const stamp: PresetBuildStamp = {
       preset,
-      committee: this.options.committee,
+      committee: committee as CircuitCommittee,
       sourceHash,
       builtAt: new Date().toISOString(),
     }
-    mkdirSync(join(this.options.outputDir!, preset), { recursive: true })
-    writeFileSync(this.presetStampPath(preset), JSON.stringify(stamp, null, 2) + '\n')
+    mkdirSync(join(this.options.outputDir!, preset, committee), { recursive: true })
+    writeFileSync(this.presetStampPath(preset, committee), JSON.stringify(stamp, null, 2) + '\n')
   }
 
   /**
    * Records which BFV preset + committee last populated `circuits/bin/`. Read by:
    * - the benchmark gas-extraction pipeline (`scripts/benchmarkGasFromRaw.ts`)
-   * - the Rust integration tests (cross-checked against `ENCLAVE_COMMITTEE_SIZE`).
+   * - the Rust integration tests (cross-checked against `INTERFOLD_COMMITTEE_SIZE`).
    * A drift between this stamp and what the consumer expects fails fast.
    */
   private writeActiveBinPresetStamp(preset: string, sourceHash: string): void {
@@ -336,8 +341,8 @@ class NoirCircuitBuilder {
    * Used when dist is fresh but bin still holds another preset (common after --mode insecure
    * then --mode secure benchmark runs).
    */
-  private hydrateBinFromDist(preset: string, sourceHash: string): void {
-    const distRoot = join(this.options.outputDir!, preset)
+  private hydrateBinFromDist(preset: string, committee: string, sourceHash: string): void {
+    const distRoot = join(this.options.outputDir!, preset, committee)
     const circuits = this.discoverCircuits()
     let copied = 0
 
@@ -370,8 +375,8 @@ class NoirCircuitBuilder {
     this.writeActiveBinPresetStamp(preset, sourceHash)
   }
 
-  private requiredDistMarkers(preset: string): string[] {
-    const dist = join(this.options.outputDir!, preset)
+  private requiredDistMarkers(preset: string, committee: string): string[] {
+    const dist = join(this.options.outputDir!, preset, committee)
     return [
       join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.AGGREGATION, 'dkg_aggregator', 'dkg_aggregator.json'),
       join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.AGGREGATION, 'decryption_aggregator', 'decryption_aggregator.json'),
@@ -401,29 +406,26 @@ class NoirCircuitBuilder {
     }
   }
 
-  private isDistPresetUpToDate(preset: string, sourceHash: string): boolean {
-    const stamp = this.readPresetStamp(preset)
+  private isDistPresetUpToDate(preset: string, committee: string, sourceHash: string): boolean {
+    const stamp = this.readPresetStamp(preset, committee)
     if (!stamp?.sourceHash || stamp.sourceHash !== sourceHash) return false
-    return this.requiredDistMarkers(preset).every((path) => existsSync(path))
+    return this.requiredDistMarkers(preset, committee).every((path) => existsSync(path))
   }
 
-  private isBinReadyForPreset(preset: string, sourceHash: string): boolean {
+  private isBinReadyForPreset(preset: string, committee: string, sourceHash: string): boolean {
     const active = this.readActiveBinPreset()
     if (!active || active.preset !== preset || active.sourceHash !== sourceHash) return false
-    // Committee mismatch is also a cache miss: the same circuit sources can compile to
-    // different bytecode under a different committee, which the source hash captures, but
-    // we double-check the stamp field for clearer diagnostics when --skip-if-built kicks in.
-    if (this.options.committee && active.committee && active.committee !== this.options.committee) return false
+    if (active.committee && active.committee !== committee) return false
     return this.requiredBinMarkers().every((path) => existsSync(path))
   }
 
-  private isPresetUpToDate(preset: string, sourceHash: string): boolean {
-    return this.isDistPresetUpToDate(preset, sourceHash) && this.isBinReadyForPreset(preset, sourceHash)
+  private isPresetUpToDate(preset: string, committee: string, sourceHash: string): boolean {
+    return this.isDistPresetUpToDate(preset, committee, sourceHash) && this.isBinReadyForPreset(preset, committee, sourceHash)
   }
 
-  private logSkipIfBuiltBlocked(preset: string, sourceHash: string): void {
-    const stamp = this.readPresetStamp(preset)
-    const stampPath = this.presetStampPath(preset)
+  private logSkipIfBuiltBlocked(preset: string, committee: string, sourceHash: string): void {
+    const stamp = this.readPresetStamp(preset, committee)
+    const stampPath = this.presetStampPath(preset, committee)
     if (!stamp?.sourceHash) {
       console.log(`   ℹ️  --skip-if-built: no stamp at ${stampPath}`)
       return
@@ -434,7 +436,7 @@ class NoirCircuitBuilder {
           `Run without --skip-if-built or \`pnpm build:circuits --preset ${preset}\` once to refresh.`,
       )
     }
-    const missing = [...this.requiredDistMarkers(preset), ...this.requiredBinMarkers()].filter((path) => !existsSync(path))
+    const missing = [...this.requiredDistMarkers(preset, committee), ...this.requiredBinMarkers()].filter((path) => !existsSync(path))
     if (missing.length > 0) {
       console.log(`   ℹ️  --skip-if-built: missing ${missing.length} marker artifact(s), e.g. ${missing[0]}`)
     }
@@ -453,11 +455,11 @@ class NoirCircuitBuilder {
     }
   }
 
-  private async buildForPreset(preset: CircuitPreset, modNrPath?: string): Promise<BuildResult> {
+  private async buildForPreset(preset: CircuitPreset, committee: CircuitCommittee, modNrPath?: string): Promise<BuildResult> {
     const result: BuildResult = { success: true, compiled: [], errors: [] }
-    const presetOutputDir = join(this.options.outputDir!, preset)
+    const presetOutputDir = join(this.options.outputDir!, preset, committee)
 
-    console.log(`\n🔮 Building preset: ${preset}...`)
+    console.log(`\n🔮 Building preset: ${preset}, committee: ${committee}...`)
 
     try {
       this.checkTool('nargo --version', 'nargo')
@@ -480,39 +482,40 @@ class NoirCircuitBuilder {
       result.sourceHash = sourceHash
 
       if (modNrPath) {
-        this.syncPresetAndCommittee(modNrPath, preset, this.options.committee)
+        this.syncPresetAndCommittee(modNrPath, preset, committee)
       }
 
       if (this.options.hydrateBinOnly) {
-        if (!this.isDistPresetUpToDate(preset, sourceHash)) {
+        if (!this.isDistPresetUpToDate(preset, committee, sourceHash)) {
           throw new Error(
-            `Cannot hydrate circuits/bin: dist/circuits/${preset} is missing or stale. ` + `Run: pnpm build:circuits --preset ${preset}`,
+            `Cannot hydrate circuits/bin: dist/circuits/${preset}/${committee} is missing or stale. ` +
+              `Run: pnpm build:circuits --preset ${preset} --committee ${committee}`,
           )
         }
-        console.log(`   💧 Hydrating circuits/bin from dist/circuits/${preset} (no nargo compile)...`)
-        this.hydrateBinFromDist(preset, sourceHash)
-        console.log(`\n✅ Hydrated circuits/bin for preset: ${preset}`)
+        console.log(`   💧 Hydrating circuits/bin from dist/circuits/${preset}/${committee} (no nargo compile)...`)
+        this.hydrateBinFromDist(preset, committee, sourceHash)
+        console.log(`\n✅ Hydrated circuits/bin for preset: ${preset}/${committee}`)
         return result
       }
 
       if (this.options.skipIfBuilt) {
-        if (this.isPresetUpToDate(preset, sourceHash)) {
+        if (this.isPresetUpToDate(preset, committee, sourceHash)) {
           console.log(
-            `   ⏭️  Skipping preset ${preset} (dist + circuits/bin up to date; source_hash=${sourceHash}). ` +
+            `   ⏭️  Skipping preset ${preset}/${committee} (dist + circuits/bin up to date; source_hash=${sourceHash}). ` +
               `Use a full rebuild without --skip-if-built to refresh.`,
           )
           return result
         }
-        if (this.isDistPresetUpToDate(preset, sourceHash)) {
+        if (this.isDistPresetUpToDate(preset, committee, sourceHash)) {
           console.log(
-            `   💧 dist/circuits/${preset} is current; hydrating circuits/bin from dist ` +
+            `   💧 dist/circuits/${preset}/${committee} is current; hydrating circuits/bin from dist ` +
               `(fast — avoids a full ~50m secure recompile when switching presets).`,
           )
-          this.hydrateBinFromDist(preset, sourceHash)
-          console.log(`\n✅ Hydrated circuits/bin for preset: ${preset}`)
+          this.hydrateBinFromDist(preset, committee, sourceHash)
+          console.log(`\n✅ Hydrated circuits/bin for preset: ${preset}/${committee}`)
           return result
         }
-        this.logSkipIfBuiltBlocked(preset, sourceHash)
+        this.logSkipIfBuiltBlocked(preset, committee, sourceHash)
       }
 
       if (!this.options.noCleanTargets) {
@@ -522,19 +525,19 @@ class NoirCircuitBuilder {
 
       for (const circuit of circuits) {
         try {
-          result.compiled.push(this.buildCircuit(circuit, preset))
+          result.compiled.push(this.buildCircuit(circuit, preset, committee))
         } catch (error: any) {
-          result.errors.push(`${preset}/${circuit.name}: ${error.message}`)
+          result.errors.push(`${preset}/${committee}/${circuit.name}: ${error.message}`)
           result.success = false
         }
       }
 
       this.copyArtifacts(result.compiled, presetOutputDir, preset)
       if (result.errors.length === 0) {
-        this.writePresetStamp(preset, sourceHash)
+        this.writePresetStamp(preset, committee, sourceHash)
         this.writeActiveBinPresetStamp(preset, sourceHash)
       }
-      console.log(`\n✅ Built ${result.compiled.length} circuits for preset: ${preset}`)
+      console.log(`\n✅ Built ${result.compiled.length} circuits for preset: ${preset}/${committee}`)
       if (result.errors.length > 0) {
         console.error('\n❌ Failed circuits:')
         for (const err of result.errors) console.error(`   ${err}`)
@@ -635,12 +638,13 @@ class NoirCircuitBuilder {
     return dirs
   }
 
-  private buildCircuit(circuit: CircuitInfo, preset: string): CompiledCircuit {
+  private buildCircuit(circuit: CircuitInfo, preset: string, committee: CircuitCommittee): CompiledCircuit {
     const packageName = this.getPackageName(circuit.path)
     const result: CompiledCircuit = {
       name: circuit.name,
       group: circuit.group,
       preset,
+      committee,
       artifacts: {},
       checksums: {},
     }
@@ -825,8 +829,8 @@ class NoirCircuitBuilder {
     try {
       const content = readFileSync(jsonFile, 'utf-8')
       const sanitized = content
-        .replace(/"path"\s*:\s*"[^"]*[/\\](enclave[/\\]circuits[/\\][^"]+)"/g, '"path":"$1"')
-        .replace(/"path"\s*:\s*"(?:\/[^"]*|[A-Za-z]:\\[^"]*)[/\\](circuits[/\\][^"]+)"/g, '"path":"enclave/$1"')
+        .replace(/"path"\s*:\s*"[^"]*[/\\](interfold[/\\]circuits[/\\][^"]+)"/g, '"path":"$1"')
+        .replace(/"path"\s*:\s*"(?:\/[^"]*|[A-Za-z]:\\[^"]*)[/\\](circuits[/\\][^"]+)"/g, '"path":"interfold/$1"')
       if (content !== sanitized) writeFileSync(jsonFile, sanitized)
     } catch {
       // Ignore errors
@@ -846,7 +850,7 @@ class NoirCircuitBuilder {
 
       // evm/ variant checksums (only for circuits that have an evm VK)
       if (c.checksums.vk && c.artifacts.vk) {
-        const evmPrefix = `${c.preset}/${CIRCUIT_VARIANTS.EVM}/${c.group}/${c.name}`
+        const evmPrefix = `${c.preset}/${c.committee}/${CIRCUIT_VARIANTS.EVM}/${c.group}/${c.name}`
         if (c.checksums.json && c.artifacts.json) {
           const f = `${evmPrefix}/${basename(c.artifacts.json)}`
           checksums[f] = c.checksums.json
@@ -863,7 +867,7 @@ class NoirCircuitBuilder {
       }
 
       // default/ variant checksums
-      const defaultPrefix = `${c.preset}/${CIRCUIT_VARIANTS.DEFAULT}/${c.group}/${c.name}`
+      const defaultPrefix = `${c.preset}/${c.committee}/${CIRCUIT_VARIANTS.DEFAULT}/${c.group}/${c.name}`
       if (c.checksums.json && c.artifacts.json) {
         const f = `${defaultPrefix}/${basename(c.artifacts.json)}`
         checksums[f] = c.checksums.json
@@ -883,7 +887,7 @@ class NoirCircuitBuilder {
       }
       // recursive/ variant checksums (noir-recursive VKs for inner proofs)
       if (c.checksums.vkNoir && c.artifacts.vkNoir) {
-        const recursivePrefix = `${c.preset}/${CIRCUIT_VARIANTS.RECURSIVE}/${c.group}/${c.name}`
+        const recursivePrefix = `${c.preset}/${c.committee}/${CIRCUIT_VARIANTS.RECURSIVE}/${c.group}/${c.name}`
         if (c.checksums.json && c.artifacts.json) {
           const f = `${recursivePrefix}/${basename(c.artifacts.json)}`
           checksums[f] = c.checksums.json
@@ -1026,11 +1030,11 @@ async function main() {
       options.preset = val as CircuitPreset | 'all'
     } else if (arg === '--committee') {
       const val = args[++i]
-      if (!ALL_COMMITTEES.includes(val as CircuitCommittee)) {
-        console.error(`Unknown committee: ${val}. Valid values: ${ALL_COMMITTEES.join(', ')}`)
+      if (val !== 'all' && !ALL_COMMITTEES.includes(val as CircuitCommittee)) {
+        console.error(`Unknown committee: ${val}. Valid values: ${ALL_COMMITTEES.join(', ')}, all`)
         process.exit(1)
       }
-      options.committee = val as CircuitCommittee
+      options.committee = val as CircuitCommittee | 'all'
     } else if (arg === '--skip-utils-patch') options.skipUtilsPatch = true
     else if (['hash', 'build'].includes(arg)) command = arg
   }
@@ -1059,8 +1063,8 @@ Options:
   --group <groups>    Circuit groups (comma-separated: dkg,threshold)
   --circuit <name>    Build specific circuit(s)
   --preset <preset>   Parameter preset: insecure-512 (default), secure-8192, or all
-  --committee <name>  Committee size: micro (default), small, medium, large
-  --skip-utils-patch  Don't rewrite BFV_DKG_H/T in packages/enclave-contracts/scripts/utils.ts
+  --committee <name>  Committee size: micro (default), small, medium, large, or all
+  --skip-utils-patch  Don't rewrite BFV_DKG_H/T in packages/interfold-contracts/scripts/utils.ts
   --skip-vk           Skip verification key generation
   --skip-checksums    Skip checksum generation
   -o, --output <dir>  Output directory (default: dist/circuits)

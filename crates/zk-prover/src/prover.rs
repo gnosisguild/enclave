@@ -7,6 +7,7 @@
 use crate::backend::ZkBackend;
 use crate::error::ZkError;
 use e3_events::{CircuitName, CircuitVariant, Proof};
+use e3_fhe_params::BfvPreset;
 use e3_utils::utility_types::ArcBytes;
 use std::fs;
 use std::path::PathBuf;
@@ -40,6 +41,10 @@ impl ZkProver {
 
     pub fn circuits_dir(&self, variant: CircuitVariant, artifacts_dir: &str) -> PathBuf {
         self.circuits_dir.join(artifacts_dir).join(variant.as_str())
+    }
+
+    pub fn resolve_artifacts_dir(&self, preset: BfvPreset, committee: &str) -> String {
+        preset.artifacts_dir_for_committee(committee)
     }
 
     pub fn work_dir(&self) -> &PathBuf {
@@ -238,6 +243,8 @@ impl ZkProver {
             e3_id
         );
 
+        let _ = fs::remove_dir_all(&job_dir);
+
         Ok(Proof::new(
             circuit,
             ArcBytes::from_bytes(&proof_data),
@@ -309,6 +316,7 @@ impl ZkProver {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn verify_proof_impl(
         &self,
         circuit: CircuitName,
@@ -387,6 +395,8 @@ impl ZkProver {
                 stdout
             );
         }
+
+        let _ = fs::remove_dir_all(&job_dir);
 
         Ok(output.status.success())
     }

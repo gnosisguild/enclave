@@ -151,7 +151,7 @@ jobs:
             experimental-features = nix-command flakes
       - uses: cachix/cachix-action@v15
         with:
-          name: enclave
+          name: interfold
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         # if the following fails it means some of our git dependencies or bb has updated
         # to fix this basically what you need to do here is copy the actual hashes
@@ -201,11 +201,11 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: brew install solidity
 
-      - name: Build enclave binary
-        run: cargo build --locked --release --target ${{ matrix.target }} --bin enclave
+      - name: Build interfold binary
+        run: cargo build --locked --release --target ${{ matrix.target }} --bin interfold
 
-      - name: Build enclaveup binary
-        run: cargo build --locked --release --target ${{ matrix.target }} --bin enclaveup
+      - name: Build interfoldup binary
+        run: cargo build --locked --release --target ${{ matrix.target }} --bin interfoldup
 
       - name: Create release archives
         shell: bash
@@ -219,20 +219,20 @@ jobs:
             EXT=""
           fi
 
-          # Create enclave archive
-          cp "target/${{ matrix.target }}/release/enclave${EXT}" "./enclave${EXT}"
-          tar -czf "dist/enclave-${{ matrix.os_name }}-${{ matrix.arch }}.tar.gz" "enclave${EXT}"
-          rm "enclave${EXT}"
+          # Create interfold archive
+          cp "target/${{ matrix.target }}/release/interfold${EXT}" "./interfold${EXT}"
+          tar -czf "dist/interfold-${{ matrix.os_name }}-${{ matrix.arch }}.tar.gz" "interfold${EXT}"
+          rm "interfold${EXT}"
 
-          # Create enclaveup archive
-          cp "target/${{ matrix.target }}/release/enclaveup${EXT}" "./enclaveup${EXT}"
-          tar -czf "dist/enclaveup-${{ matrix.os_name }}-${{ matrix.arch }}.tar.gz" "enclaveup${EXT}"
-          rm "enclaveup${EXT}"
+          # Create interfoldup archive
+          cp "target/${{ matrix.target }}/release/interfoldup${EXT}" "./interfoldup${EXT}"
+          tar -czf "dist/interfoldup-${{ matrix.os_name }}-${{ matrix.arch }}.tar.gz" "interfoldup${EXT}"
+          rm "interfoldup${EXT}"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: enclave-binaries-${{ matrix.os_name }}-${{ matrix.arch }}
+          name: interfold-binaries-${{ matrix.os_name }}-${{ matrix.arch }}
           path: dist/
 
   publish-rust-crates:
@@ -293,7 +293,7 @@ jobs:
         uses: pnpm/action-setup@v4
 
       # `pnpm build:ts` builds the SDK, whose prebuild compiles the threshold
-      # circuits via `nargo` (packages/enclave-sdk/scripts/compile-circuits.sh).
+      # circuits via `nargo` (packages/interfold-sdk/scripts/compile-circuits.sh).
       # Without nargo on PATH the build fails with "nargo is not installed".
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
@@ -320,24 +320,28 @@ jobs:
             echo "📦 Publishing with 'latest' tag for stable release"
           fi
 
-      - name: Publish @enclave-e3/config
-        working-directory: packages/enclave-config
+      - name: Publish @interfold/config
+        working-directory: packages/interfold-config
         run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
 
-      - name: Publish @enclave-e3/contracts
-        working-directory: packages/enclave-contracts
+      - name: Publish @interfold/contracts
+        working-directory: packages/interfold-contracts
         run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
 
-      - name: Publish @enclave-e3/wasm
+      - name: Publish @interfold/wasm
         working-directory: crates/wasm
         run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
 
-      - name: Publish @enclave-e3/sdk
-        working-directory: packages/enclave-sdk
+      - name: Publish @interfold/sdk
+        working-directory: packages/interfold-sdk
         run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
 
-      - name: Publish @enclave-e3/react
-        working-directory: packages/enclave-react
+      - name: Publish @interfold/react
+        working-directory: packages/interfold-react
+        run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
+
+      - name: Publish @interfold/mcp
+        working-directory: packages/interfold-mcp
         run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
 
   download-circuits:
@@ -463,16 +467,16 @@ jobs:
 
           ## 📦 Installation
 
-          ### Install via enclaveup (Recommended)
+          ### Install via interfoldup (Recommended)
 
           Install the installer:
           \`\`\`bash
-          curl -fsSL https://raw.githubusercontent.com/gnosisguild/enclave/main/install | bash
+          curl -fsSL https://raw.githubusercontent.com/gnosisguild/interfold/main/install | bash
           \`\`\`
 
-          Then use it to install enclave:
+          Then use it to install interfold:
           \`\`\`bash
-          enclaveup install
+          interfoldup install
           \`\`\`
 
           ### NPM Packages
@@ -483,20 +487,20 @@ jobs:
             cat >> release_notes.md << EOF
           \`\`\`bash
           # Install pre-release versions
-          npm install @enclave/sdk@next
-          npm install @enclave/contracts@next
-          npm install @enclave/config@next
-          npm install @enclave/react@next
+          npm install @interfold/sdk@next
+          npm install @interfold/contracts@next
+          npm install @interfold/config@next
+          npm install @interfold/react@next
           \`\`\`
           EOF
           else
             cat >> release_notes.md << EOF
           \`\`\`bash
           # Install stable versions
-          npm install @enclave/sdk@latest
-          npm install @enclave/contracts@latest
-          npm install @enclave/config@latest
-          npm install @enclave/react@latest
+          npm install @interfold/sdk@latest
+          npm install @interfold/contracts@latest
+          npm install @interfold/config@latest
+          npm install @interfold/react@latest
           \`\`\`
           EOF
           fi
@@ -509,7 +513,7 @@ jobs:
 
           \`\`\`toml
           [dependencies]
-          enclave = "${VERSION}"
+          interfold = "${VERSION}"
           \`\`\`
           EOF
           fi
@@ -519,8 +523,8 @@ jobs:
 
           ## 💾 Binary Assets
 
-          - \`enclave-*\`: The main Enclave CLI binary
-          - \`enclaveup-*\`: The installer/version manager binary
+          - \`interfold-*\`: The main Interfold CLI binary
+          - \`interfoldup-*\`: The installer/version manager binary
 
           ### Supported Platforms
           - Linux (x86_64)

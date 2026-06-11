@@ -21,7 +21,7 @@ fn generate_git_sha() {
         sha
     } else {
         let output = Command::new("git")
-            .args(&["rev-parse", "--short=9", "HEAD"])
+            .args(["rev-parse", "--short=9", "HEAD"])
             .output();
         match output {
             Ok(output) if output.status.success() => String::from_utf8(output.stdout)
@@ -38,9 +38,9 @@ fn generate_git_sha() {
 
 fn get_remote_commit_hash() -> Option<String> {
     let output = Command::new("git")
-        .args(&[
+        .args([
             "ls-remote",
-            "https://github.com/gnosisguild/enclave",
+            "https://github.com/gnosisguild/interfold",
             "refs/heads/main",
         ])
         .output()
@@ -71,7 +71,7 @@ fn generate_contract_deployments() -> std::io::Result<()> {
         .join("..")
         .join("..")
         .join("packages")
-        .join("enclave-contracts")
+        .join("interfold-contracts")
         .join("deployed_contracts.json");
 
     let mut contract_info = String::from(
@@ -121,6 +121,6 @@ fn generate_contract_deployments() -> std::io::Result<()> {
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("contract_deployments.rs");
     fs::write(dest_path, contract_info)?;
-    println!("cargo:rerun-if-changed=../../packages/enclave-contracts/deployed_contracts.json");
+    println!("cargo:rerun-if-changed=../../packages/interfold-contracts/deployed_contracts.json");
     Ok(())
 }

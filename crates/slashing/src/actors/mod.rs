@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Thin actix shells that translate [`EnclaveEvent`]s into pure-domain calls
+//! Thin actix shells that translate [`InterfoldEvent`]s into pure-domain calls
 //! and perform the I/O those domain services request.
 //!
-//! [`EnclaveEvent`]: e3_events::EnclaveEvent
+//! [`InterfoldEvent`]: e3_events::InterfoldEvent
 
 pub mod accusation_manager;
 pub mod commitment_consistency_checker;

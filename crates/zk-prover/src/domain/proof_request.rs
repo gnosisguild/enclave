@@ -192,6 +192,7 @@ impl PendingDecryptionProofs {
 #[derive(Clone, Debug)]
 pub(crate) struct PendingPkAggregationProof {
     pub(crate) ec: EventContext<Sequenced>,
+    #[allow(dead_code)]
     pub(crate) request: PkAggregationProofRequest,
 }
 
@@ -316,8 +317,8 @@ mod tests {
     use e3_zk_helpers::{computation::DkgInputType, CiphernodesCommitteeSize};
 
     fn ec() -> EventContext<Sequenced> {
-        use e3_events::{EnclaveEventData, TestEvent, Unsequenced};
-        EventContext::<Unsequenced>::from(EnclaveEventData::from(TestEvent::new("x", 0)))
+        use e3_events::{InterfoldEventData, TestEvent, Unsequenced};
+        EventContext::<Unsequenced>::from(InterfoldEventData::from(TestEvent::new("x", 0)))
             .sequence(0)
     }
 
@@ -386,6 +387,7 @@ mod tests {
             own_share_raw: sensitive(),
             dkg_input_type: DkgInputType::SecretKey,
             params_preset: BfvPreset::default(),
+            committee_size: CiphernodesCommitteeSize::Medium,
         }
     }
 

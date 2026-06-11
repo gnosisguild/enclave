@@ -294,13 +294,13 @@ async fn node_fold_correlated_sparse_self_slot_proves_and_verifies() {
         .expect("c2ab_fold proof");
 
     let (_dkg_th, dkg_dkg) = e3_fhe_params::build_pair_for_preset(preset).expect("pair");
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let dkg_sk = fhe::bfv::SecretKey::random(&dkg_dkg, &mut rng);
     let dkg_pk = fhe::bfv::PublicKey::new(&dkg_sk, &mut rng);
 
     let total_slots = c3_fold_total_slots_from_compiled_json();
     assert_eq!(total_slots, 6, "Micro / insecure preset uses 3×2 C3 slots");
-    let slots_per_party = total_slots / committee.n as usize;
+    let slots_per_party = total_slots / committee.n;
     let own_party_id = 0usize;
 
     let mut c3a_inners = Vec::new();

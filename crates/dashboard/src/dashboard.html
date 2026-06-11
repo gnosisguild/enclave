@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Enclave Node Dashboard</title>
+    <title>Interfold Node Dashboard</title>
     <style>
       :root,
       [data-theme='dark'] {
@@ -287,7 +287,7 @@
   <body>
     <div class="header">
       <div class="dot" id="status-dot"></div>
-      <h1>Enclave Node Dashboard</h1>
+      <h1>Interfold Node Dashboard</h1>
       <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">&#9790;</button>
     </div>
     <div class="tabs">
@@ -374,7 +374,7 @@
     <script>
       // Theme
       function getTheme() {
-        return localStorage.getItem('enclave-theme') || 'dark'
+        return localStorage.getItem('interfold-theme') || 'dark'
       }
       function applyTheme(t) {
         document.documentElement.setAttribute('data-theme', t)
@@ -382,7 +382,7 @@
       }
       function toggleTheme() {
         const t = getTheme() === 'dark' ? 'light' : 'dark'
-        localStorage.setItem('enclave-theme', t)
+        localStorage.setItem('interfold-theme', t)
         applyTheme(t)
       }
       applyTheme(getTheme())
@@ -527,7 +527,7 @@
       }
 
       var ERROR_TYPES = [
-        'EnclaveError',
+        'InterfoldError',
         'E3Failed',
         'ProofVerificationFailed',
         'SignedProofFailed',

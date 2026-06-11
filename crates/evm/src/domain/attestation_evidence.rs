@@ -34,7 +34,7 @@ pub fn encode_attestation_evidence(data: &AccusationQuorumReached) -> Option<Vec
     let proof_type = U256::from(data.proof_type as u8);
     let voters: Vec<Address> = votes.iter().map(|v| v.voter).collect();
     let data_hashes: Vec<[u8; 32]> = votes.iter().map(|v| v.data_hash).collect();
-    let evidence = Bytes::from(data.evidence.clone());
+    let evidence = data.evidence.clone();
     // All voters signed the same deadline (enforced off-chain by AccusationManager);
     // pick any one — the first vote suffices.
     let deadline = U256::from(votes[0].deadline);

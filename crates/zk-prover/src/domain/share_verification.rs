@@ -22,6 +22,7 @@ use e3_events::{
     PartyVerificationResult, ProofType, Sequenced, SignedProofPayload, VerificationKind,
 };
 use e3_utils::utility_types::ArcBytes;
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use tracing::{info, warn};
 
 /// Trait for party types whose signed proofs can be ECDSA-validated and ZK-verified.
@@ -99,7 +100,11 @@ pub(crate) struct PendingVerification {
     /// Parallel to `party_public_signals` — raw `proof.data` per (party, proof_type).
     pub(crate) party_proof_data: HashMap<u64, Vec<(ProofType, ArcBytes)>>,
     /// BFV preset for circuit artifact resolution.
+    #[allow(dead_code)]
     pub(crate) params_preset: e3_fhe_params::BfvPreset,
+    /// Committee size for per-committee circuit artifact resolution.
+    #[allow(dead_code)]
+    pub(crate) committee_size: CiphernodesCommitteeSize,
 }
 
 /// Pending consistency check — stored between ECDSA pass and ZK dispatch.
@@ -125,6 +130,8 @@ pub(crate) struct PendingConsistencyCheck {
     pub(crate) ecdsa_passed_decryption_proofs: Vec<PartyShareDecryptionProofsToVerify>,
     /// BFV preset for circuit artifact resolution.
     pub(crate) params_preset: e3_fhe_params::BfvPreset,
+    /// Committee size for per-committee circuit artifact resolution.
+    pub(crate) committee_size: CiphernodesCommitteeSize,
 }
 
 /// Filter out inconsistent parties and collect dispatched party IDs.
@@ -141,7 +148,7 @@ pub(crate) fn filter_consistent<P>(
     if passed.is_empty() {
         return None;
     }
-    let ids = passed.iter().map(|p| party_id_of(p)).collect();
+    let ids = passed.iter().map(party_id_of).collect();
     Some((passed, ids))
 }
 

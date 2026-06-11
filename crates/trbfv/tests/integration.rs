@@ -118,15 +118,12 @@ async fn test_trbfv_isolation() -> Result<()> {
         .map(|a| decode_bytes_to_vec_u64(&a.extract_bytes()).unwrap())
         .collect::<Vec<Vec<u64>>>();
 
-    let results: Vec<u64> = results
-        .into_iter()
-        .map(|r| r.first().unwrap().clone())
-        .collect();
+    let results: Vec<u64> = results.into_iter().map(|r| *r.first().unwrap()).collect();
 
     // Show summation result
     let plaintext_modulus = params_raw.clone().plaintext();
 
-    let mut expected_result = vec![0u64; 3];
+    let mut expected_result = [0u64; 3];
     for vals in &numbers {
         for j in 0..num_votes_per_voter {
             expected_result[j] = (expected_result[j] + vals[j]) % plaintext_modulus;

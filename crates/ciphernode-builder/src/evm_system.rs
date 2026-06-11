@@ -4,8 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::mem::replace;
-
 use actix::Actor;
 use alloy::{primitives::Address, providers::Provider};
 use e3_events::{run_once, BusHandle, EventSubscriber, EventType, HistoricalEvmSyncStart};
@@ -72,7 +70,7 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
             let chain_id = self.chain_id;
 
             // Only gets consumed once so fine to use replace to clean out route_factories
-            let route_factories = replace(&mut self.route_factories, Vec::new());
+            let route_factories = std::mem::take(&mut self.route_factories);
 
             // The event is defined here
             move |msg| {

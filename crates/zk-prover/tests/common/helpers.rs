@@ -6,6 +6,7 @@
 
 use e3_config::BBPath;
 use e3_events::CircuitName;
+#[allow(unused_imports)]
 pub use e3_test_helpers::{find_anvil, find_bb};
 use e3_zk_prover::{ZkBackend, ZkConfig};
 use std::{env, path::PathBuf};
@@ -22,6 +23,15 @@ fn circuits_build_root() -> PathBuf {
 }
 
 pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_name: &str) {
+    setup_compiled_circuit_for_committee(backend, group, circuit_name, "micro").await;
+}
+
+pub async fn setup_compiled_circuit_for_committee(
+    backend: &ZkBackend,
+    group: &str,
+    circuit_name: &str,
+    committee: &str,
+) {
     let target_dir = circuits_build_root().join(group).join("target");
     let json_path = target_dir.join(format!("{circuit_name}.json"));
     let vk_evm_path = target_dir.join(format!("{circuit_name}.vk"));
@@ -42,8 +52,8 @@ pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_na
         vk_evm_path.display()
     );
 
-    // Tests use insecure params — fixtures go under insecure-512/
-    let preset_dir = backend.circuits_dir.join("insecure-512");
+    // Tests use insecure params — fixtures go under insecure-512/{committee}/
+    let preset_dir = backend.circuits_dir.join("insecure-512").join(committee);
 
     // Set up the evm variant directory (keccak VK + hash)
     let evm_dir = preset_dir.join("evm").join(group).join(circuit_name);
@@ -152,7 +162,7 @@ pub async fn setup_recursive_aggregation_fold_circuit(backend: &ZkBackend, circu
         vk_recursive_path.display()
     );
 
-    let preset_dir = backend.circuits_dir.join("insecure-512");
+    let preset_dir = backend.circuits_dir.join("insecure-512").join("micro");
     let default_dir = preset_dir.join("default").join(circuit.group()).join(pkg);
     fs::create_dir_all(&default_dir).await.unwrap();
     fs::copy(&json_path, default_dir.join(format!("{pkg}.json")))

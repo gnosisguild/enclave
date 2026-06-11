@@ -68,12 +68,14 @@ pub unconstrained fn __inv_mod_u64(val: Field, m: u64) -> u64 {
 
 #[test]
 fn test_reduce_witness_u64_basic() {
+    // Safety: test-only call to unconstrained witness helper; no circuit constraints apply.
     let result = unsafe { __reduce_witness_u64(250, 100) };
     assert(result == 2);
 }
 
 #[test]
 fn test_reduce_witness_u64_exact() {
+    // Safety: test-only call to unconstrained witness helper; no circuit constraints apply.
     let result = unsafe { __reduce_witness_u64(300, 100) };
     assert(result == 3);
 }
@@ -81,12 +83,14 @@ fn test_reduce_witness_u64_exact() {
 #[test]
 fn test_mul_mod_witness_u64() {
     // 12 * 15 = 180; floor(180 / 100) = 1
+    // Safety: test-only call to unconstrained witness helper; no circuit constraints apply.
     let result = unsafe { __mul_mod_witness_u64(12, 15, 100) };
     assert(result == 1);
 }
 
 #[test]
 fn test_sub_with_underflow_u64_no_underflow() {
+    // Safety: test-only call to unconstrained witness helper; no circuit constraints apply.
     let (res, underflow) = unsafe { __sub_with_underflow_u64(50, 30, 100) };
     assert(res == 20);
     assert(!underflow);
@@ -94,6 +98,7 @@ fn test_sub_with_underflow_u64_no_underflow() {
 
 #[test]
 fn test_sub_with_underflow_u64_underflow() {
+    // Safety: test-only call to unconstrained witness helper; no circuit constraints apply.
     let (res, underflow) = unsafe { __sub_with_underflow_u64(30, 50, 100) };
     assert(res == 80); // 30 - 50 + 100
     assert(underflow);
@@ -101,12 +106,14 @@ fn test_sub_with_underflow_u64_underflow() {
 
 #[test]
 fn test_neg_u64_nonzero() {
+    // Safety: test-only call to unconstrained witness helper; no circuit constraints apply.
     let result = unsafe { __neg_u64(30, 100) };
     assert(result == 70);
 }
 
 #[test]
 fn test_neg_u64_zero() {
+    // Safety: test-only call to unconstrained witness helper; no circuit constraints apply.
     let result = unsafe { __neg_u64(0, 100) };
     assert(result == 0);
 }
@@ -114,6 +121,7 @@ fn test_neg_u64_zero() {
 #[test]
 fn test_inv_mod_u64_simple() {
     // 3^(-1) mod 11 = 4 (since 3*4 = 12 = 1 mod 11)
+    // Safety: test-only call to unconstrained witness helper; no circuit constraints apply.
     let result = unsafe { __inv_mod_u64(3, 11) };
     assert(result == 4);
 }
@@ -121,6 +129,7 @@ fn test_inv_mod_u64_simple() {
 #[test]
 fn test_pow_mod_u64() {
     // 2^10 mod 97 = 1024 mod 97 = 927 % 97 = 927 - 9*97 = 927 - 873 = 54
+    // Safety: test-only call to unconstrained witness helper; no circuit constraints apply.
     let result = unsafe { __pow_mod_u64(2, 10, 97) };
     assert(result == 54);
 }

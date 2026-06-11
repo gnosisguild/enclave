@@ -6,8 +6,8 @@
 
 use crate::{
     events::{StoreEventRequested, StoreEventResponse},
-    EnclaveEvent, EventContextAccessors, EventLog, EventStoreFilter, EventStoreQueryBy,
-    EventStoreQueryResponse, Seq, SequenceIndex, Sequenced, Ts, Unsequenced,
+    EventContextAccessors, EventLog, EventStoreFilter, EventStoreQueryBy, EventStoreQueryResponse,
+    InterfoldEvent, Seq, SequenceIndex, Sequenced, Ts, Unsequenced,
 };
 use actix::{Actor, Handler};
 use anyhow::{bail, Result};
@@ -26,10 +26,10 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
     /// `None` if the event was a duplicate, or an error on failure.
     pub fn store_event(
         &mut self,
-        event: EnclaveEvent<Unsequenced>,
-    ) -> Result<Option<EnclaveEvent<Sequenced>>> {
+        event: InterfoldEvent<Unsequenced>,
+    ) -> Result<Option<InterfoldEvent<Sequenced>>> {
         let ts = event.ts();
-        if let Some(_) = self.index.get(ts)? {
+        if self.index.get(ts)?.is_some() {
             warn!("Event already stored at timestamp {ts}! This might happen when recovering from a snapshot. Skipping storage");
             self.storage_errors += 1;
             if self.storage_errors > MAX_STORAGE_ERRORS {
@@ -47,10 +47,10 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
 
     fn collect_events(
         &self,
-        iter: Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>>,
+        iter: Box<dyn Iterator<Item = (u64, InterfoldEvent<Unsequenced>)>>,
         filter: Option<EventStoreFilter>,
         limit: Option<u64>,
-    ) -> Vec<EnclaveEvent<Sequenced>> {
+    ) -> Vec<InterfoldEvent<Sequenced>> {
         let iter = iter.map(|(s, e)| e.into_sequenced(s));
 
         match filter {
@@ -74,7 +74,7 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         query: u128,
         filter: Option<EventStoreFilter>,
         limit: Option<u64>,
-    ) -> Result<Vec<EnclaveEvent<Sequenced>>> {
+    ) -> Result<Vec<InterfoldEvent<Sequenced>>> {
         let Some(seq) = self.index.seek(query)? else {
             return Ok(vec![]);
         };
@@ -89,7 +89,7 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         query: u64,
         filter: Option<EventStoreFilter>,
         limit: Option<u64>,
-    ) -> Vec<EnclaveEvent<Sequenced>> {
+    ) -> Vec<InterfoldEvent<Sequenced>> {
         // H7: the replay cursor must never point past the log head. The snapshot
         // cursor is committed atomically with its snapshot data, so a cursor ahead
         // of the log can only happen if the two unsynchronised flush timers
@@ -252,7 +252,7 @@ mod tests {
     // ---------------------------------------------------------------------------
     // Mock EventLog backed by Vec
     // ---------------------------------------------------------------------------
-    struct MockLog(Vec<EnclaveEvent<Unsequenced>>);
+    struct MockLog(Vec<InterfoldEvent<Unsequenced>>);
 
     impl MockLog {
         fn new() -> Self {
@@ -261,7 +261,7 @@ mod tests {
     }
 
     impl EventLog for MockLog {
-        fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64> {
+        fn append(&mut self, event: &InterfoldEvent<Unsequenced>) -> Result<u64> {
             let seq = self.0.len() as u64;
             self.0.push(event.clone());
             Ok(seq)
@@ -270,7 +270,7 @@ mod tests {
         fn read_from(
             &self,
             from: u64,
-        ) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>> {
+        ) -> Box<dyn Iterator<Item = (u64, InterfoldEvent<Unsequenced>)>> {
             let items: Vec<_> = self
                 .0
                 .iter()
@@ -289,8 +289,8 @@ mod tests {
     // ---------------------------------------------------------------------------
     // Test helpers
     // ---------------------------------------------------------------------------
-    fn make_event(ts: u128, source: EventSource) -> EnclaveEvent<Unsequenced> {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(
+    fn make_event(ts: u128, source: EventSource) -> InterfoldEvent<Unsequenced> {
+        InterfoldEvent::<Unsequenced>::new_with_timestamp(
             TestEvent::new("test", 1).into(),
             None,
             ts,
@@ -299,11 +299,11 @@ mod tests {
         )
     }
 
-    fn make_local_event(ts: u128) -> EnclaveEvent<Unsequenced> {
+    fn make_local_event(ts: u128) -> InterfoldEvent<Unsequenced> {
         make_event(ts, EventSource::Local)
     }
 
-    fn make_network_event(ts: u128) -> EnclaveEvent<Unsequenced> {
+    fn make_network_event(ts: u128) -> InterfoldEvent<Unsequenced> {
         make_event(ts, EventSource::Net)
     }
 
@@ -311,7 +311,7 @@ mod tests {
         EventStore::new(MockIndex::new(), MockLog::new())
     }
 
-    fn populated_store(events: &[EnclaveEvent<Unsequenced>]) -> EventStore<MockIndex, MockLog> {
+    fn populated_store(events: &[InterfoldEvent<Unsequenced>]) -> EventStore<MockIndex, MockLog> {
         let mut store = new_store();
         for event in events {
             store.store_event(event.clone()).unwrap();

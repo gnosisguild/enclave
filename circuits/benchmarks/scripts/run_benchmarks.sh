@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # run_benchmarks.sh - Main orchestration script for benchmarking circuits
-# Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|secure] [--circuit <path>]
+# Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|secure]
+#   [--committee micro|small|medium|large] [--circuit <path>]
 #   [--skip-compile] [--bench-compile] [--clean] [--verbose]
 #   [--proof-aggregation on|off] [--multithread-jobs N]
 
@@ -41,9 +42,9 @@ while [[ $# -gt 0 ]]; do
         --committee)
             COMMITTEE_OVERRIDE="$2"
             case "$COMMITTEE_OVERRIDE" in
-                micro|small|medium) ;;
+                micro|small|medium|large) ;;
                 *)
-                    echo "Error: --committee must be micro|small|medium (got: $COMMITTEE_OVERRIDE)"
+                    echo "Error: --committee must be micro|small|medium|large (got: $COMMITTEE_OVERRIDE)"
                     exit 1
                     ;;
             esac
@@ -83,7 +84,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--committee micro|small|medium] [--circuit <path>] [--skip-compile] [--bench-compile] [--clean] [--verbose] [--proof-aggregation on|off] [--no-proof-aggregation] [--multithread-jobs N]"
+            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--committee micro|small|medium|large] [--circuit <path>] [--skip-compile] [--bench-compile] [--clean] [--verbose] [--proof-aggregation on|off] [--no-proof-aggregation] [--multithread-jobs N]"
             exit 1
             ;;
     esac
@@ -113,7 +114,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 echo "╔════════════════════════════════════════════════╗"
-echo "║       Enclave ZK Circuit Benchmark Suite       ║"
+echo "║       Interfold ZK Circuit Benchmark Suite       ║"
 echo "╚════════════════════════════════════════════════╝"
 echo ""
 
@@ -243,7 +244,7 @@ if [ "$SKIP_COMPILE" = false ]; then
         ENSURE_ARGS+=(--verbose)
     fi
     "${SCRIPT_DIR}/ensure_circuit_preset_built.sh" "${ENSURE_ARGS[@]}"
-    if "${SCRIPT_DIR}/check_circuit_preset_artifacts.sh" "$PRESET_NAME"; then
+    if "${SCRIPT_DIR}/check_circuit_preset_artifacts.sh" "$PRESET_NAME" --committee "$OUTPUT_COMMITTEE"; then
         PRESET_ARTIFACTS_READY=true
     fi
     echo "Preflight build complete."

@@ -29,7 +29,7 @@ use fhe_traits::FheEncoder;
 use ndarray::Array2;
 use num_bigint::BigInt;
 use num_traits::{Signed, ToPrimitive};
-use rand::thread_rng;
+use rand::rng;
 use std::ops::Deref;
 
 /// Same as [`PkGenerationCircuitData::generate_sample`], plus smudging coefficients for C2b.
@@ -44,7 +44,7 @@ pub fn pk_generation_sample_with_esi(
     let (threshold_params, _) = build_pair_for_preset(preset)
         .map_err(|e| CircuitsErrors::Sample(format!("Failed to build pair for preset: {:?}", e)))?;
 
-    let mut rng = thread_rng();
+    let mut rng = rng();
 
     let secret_key = SecretKey::random(&threshold_params, &mut rng);
     let crp = create_deterministic_crp_from_default_seed(&threshold_params);
@@ -106,11 +106,11 @@ pub fn share_computation_sk_from_pk(
 ) -> Result<ShareComputationCircuitData, CircuitsErrors> {
     let (threshold_params, _) = build_pair_for_preset(preset)
         .map_err(|e| CircuitsErrors::Sample(format!("Failed to build pair for preset: {:?}", e)))?;
-    let mut rng = thread_rng();
+    let mut rng = rng();
 
     let parity_matrix =
         compute_parity_matrix(threshold_params.moduli(), committee.n, committee.threshold)
-            .map_err(|e| CircuitsErrors::Sample(e))?;
+            .map_err(CircuitsErrors::Sample)?;
 
     let mut share_manager =
         ShareManager::new(committee.n, committee.threshold, threshold_params.clone());
@@ -147,11 +147,11 @@ pub fn share_computation_esm_from_esi(
 ) -> Result<ShareComputationCircuitData, CircuitsErrors> {
     let (threshold_params, _) = build_pair_for_preset(preset)
         .map_err(|e| CircuitsErrors::Sample(format!("Failed to build pair for preset: {:?}", e)))?;
-    let mut rng = thread_rng();
+    let mut rng = rng();
 
     let parity_matrix =
         compute_parity_matrix(threshold_params.moduli(), committee.n, committee.threshold)
-            .map_err(|e| CircuitsErrors::Sample(e))?;
+            .map_err(CircuitsErrors::Sample)?;
 
     let mut share_manager =
         ShareManager::new(committee.n, committee.threshold, threshold_params.clone());
@@ -212,7 +212,7 @@ pub fn share_encryption_for_slot(
         share_row.push(u);
     }
 
-    let mut rng = thread_rng();
+    let mut rng = rng();
     let pt = Plaintext::try_encode(&share_row, Encoding::poly(), &dkg_params)
         .map_err(|e| CircuitsErrors::Sample(format!("encode plaintext: {:?}", e)))?;
 

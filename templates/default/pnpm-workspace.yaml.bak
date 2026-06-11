@@ -5,7 +5,7 @@ packages:
 # explicitly allowed. pnpm 11 goes further: strictDepBuilds defaults to true, so
 # ignored build scripts abort `pnpm install` with ERR_PNPM_IGNORED_BUILDS rather
 # than just warning. Allow the build scripts this template actually needs so
-# `enclave init` can install non-interactively on any pnpm >= 10.
+# `interfold init` can install non-interactively on any pnpm >= 10.
 #
 # `onlyBuiltDependencies` is the pnpm 10 key; pnpm 11 removed it in favour of
 # `allowBuilds`. Both are declared so the install succeeds regardless of which

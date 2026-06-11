@@ -7,7 +7,7 @@
 use actix::{Actor, Addr, Handler};
 use e3_utils::MAILBOX_LIMIT;
 
-use crate::messages::{EnclaveEvmEvent, EvmEventProcessor};
+use crate::messages::{EvmEventProcessor, InterfoldEvmEvent};
 
 pub struct EvmHub {
     nexts: Vec<EvmEventProcessor>,
@@ -19,8 +19,7 @@ impl EvmHub {
     }
 
     pub fn setup(nexts: Vec<EvmEventProcessor>) -> Addr<Self> {
-        let addr = Self::new(nexts).start();
-        addr
+        Self::new(nexts).start()
     }
 }
 
@@ -31,10 +30,10 @@ impl Actor for EvmHub {
     }
 }
 
-impl Handler<EnclaveEvmEvent> for EvmHub {
+impl Handler<InterfoldEvmEvent> for EvmHub {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
-        let EnclaveEvmEvent::Log { .. } = msg.clone() else {
+    fn handle(&mut self, msg: InterfoldEvmEvent, _: &mut Self::Context) -> Self::Result {
+        let InterfoldEvmEvent::Log { .. } = msg.clone() else {
             return;
         };
 
@@ -75,7 +74,7 @@ mod tests {
             processor2.clone().recipient(),
         ]);
 
-        let log_event = EnclaveEvmEvent::Log(EvmLog::test_log(
+        let log_event = InterfoldEvmEvent::Log(EvmLog::test_log(
             address!("0x1111111111111111111111111111111111111111"),
             1,
             0,
@@ -97,10 +96,10 @@ mod tests {
         type Context = Context<Self>;
     }
 
-    impl Handler<EnclaveEvmEvent> for TestProcessor {
+    impl Handler<InterfoldEvmEvent> for TestProcessor {
         type Result = ();
 
-        fn handle(&mut self, _msg: EnclaveEvmEvent, _ctx: &mut Self::Context) {
+        fn handle(&mut self, _msg: InterfoldEvmEvent, _ctx: &mut Self::Context) {
             self.call_count.fetch_add(1, Ordering::SeqCst);
         }
     }

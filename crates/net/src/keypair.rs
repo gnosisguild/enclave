@@ -23,8 +23,7 @@ impl Libp2pKeypair {
     }
 
     pub fn try_from_bytes(bytes: &mut [u8]) -> Result<Self> {
-        let keypair: libp2p::identity::Keypair =
-            ed25519::Keypair::try_from_bytes(bytes)?.try_into()?;
+        let keypair: libp2p::identity::Keypair = ed25519::Keypair::try_from_bytes(bytes)?.into();
         Ok(Self { keypair })
     }
 

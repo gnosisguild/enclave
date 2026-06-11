@@ -84,8 +84,7 @@ mod tests {
         let inputs = Inputs::compute(preset, &sample).unwrap();
 
         assert_eq!(inputs.pk0.len(), sample.committee.h);
-        assert_eq!(inputs.pk1.len(), sample.committee.h);
         assert_eq!(inputs.pk0_agg.limbs.len(), configs.l);
-        assert_eq!(inputs.pk1_agg.limbs.len(), configs.l);
+        assert_eq!(inputs.crp.limbs.len(), configs.l);
     }
 }

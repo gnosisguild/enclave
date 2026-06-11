@@ -4,16 +4,16 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { getDeploymentChain, readDeploymentArgs, storeDeploymentArgs, updateE3Config } from '@enclave-e3/contracts/scripts'
-import { Enclave__factory as EnclaveFactory } from '@enclave-e3/contracts/types'
-import { ensureTemplateCwd, ENCLAVE_CONFIG_FILE } from '../scripts/template-paths'
+import { getDeploymentChain, readDeploymentArgs, storeDeploymentArgs, updateE3Config } from '@interfold/contracts/scripts'
+import { Interfold__factory as InterfoldFactory } from '@interfold/contracts/types'
+import { ensureTemplateCwd, INTERFOLD_CONFIG_FILE } from '../scripts/template-paths'
 import { MyProgram__factory as MyProgramFactory } from '../types/factories/contracts'
 import hre from 'hardhat'
 
 // Map contract names to config keys
 const contractMapping: Record<string, string> = {
   MyProgram: 'e3_program',
-  Enclave: 'enclave',
+  Interfold: 'interfold',
   CiphernodeRegistryOwnable: 'ciphernode_registry',
   BondingRegistry: 'bonding_registry',
   MockUSDC: 'fee_token',
@@ -26,11 +26,11 @@ export const deployTemplate = async () => {
 
   const chain = getDeploymentChain(hre)
 
-  const enclaveAddress = readDeploymentArgs('Enclave', chain)?.address
-  if (!enclaveAddress) {
-    throw new Error('Enclave address not found, it must be deployed first')
+  const interfoldAddress = readDeploymentArgs('Interfold', chain)?.address
+  if (!interfoldAddress) {
+    throw new Error('Interfold address not found, it must be deployed first')
   }
-  const enclave = EnclaveFactory.connect(enclaveAddress, owner)
+  const interfold = InterfoldFactory.connect(interfoldAddress, owner)
 
   const poseidonT3Address = readDeploymentArgs('PoseidonT3', chain)?.address
   if (!poseidonT3Address) {
@@ -61,19 +61,19 @@ export const deployTemplate = async () => {
     }),
     owner,
   )
-  const e3Program = await e3ProgramFactory.deploy(await enclave.getAddress(), await verifier.getAddress(), programId)
+  const e3Program = await e3ProgramFactory.deploy(await interfold.getAddress(), await verifier.getAddress(), programId)
   await e3Program.waitForDeployment()
 
   const programAddress = await e3Program.getAddress()
-  const tx = await enclave.enableE3Program(programAddress)
+  const tx = await interfold.enableE3Program(programAddress)
   await tx.wait()
 
-  const allowed = await enclave.e3Programs(programAddress)
+  const allowed = await interfold.e3Programs(programAddress)
   if (!allowed) {
-    throw new Error(`MyProgram ${programAddress} was not enabled on Enclave ${enclaveAddress}`)
+    throw new Error(`MyProgram ${programAddress} was not enabled on Interfold ${interfoldAddress}`)
   }
 
-  console.log("E3 Program enabled for Enclave's template")
+  console.log("E3 Program enabled for Interfold's template")
 
   console.log(
     `
@@ -91,5 +91,5 @@ export const deployTemplate = async () => {
     chain,
   )
 
-  updateE3Config(chain, ENCLAVE_CONFIG_FILE, contractMapping)
+  updateE3Config(chain, INTERFOLD_CONFIG_FILE, contractMapping)
 }

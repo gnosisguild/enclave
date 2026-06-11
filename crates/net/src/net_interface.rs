@@ -54,7 +54,7 @@ use tokio::{
 };
 use tracing::{debug, error, info, trace, warn};
 
-const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/enclave/kad/1.0.0");
+const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/interfold/kad/1.0.0");
 const MAX_KADEMLIA_PAYLOAD_MB: usize = 100;
 const MAX_KADEMLIA_RECORD_MB: usize = 25; // Largest record: ~21MB ThresholdShare with prod params
 const DHT_MAX_RECORDS: usize = 4096;
@@ -139,7 +139,7 @@ impl Libp2pNetInterface {
             .with_quic()
             .with_dns()
             .map_err(|e| anyhow::anyhow!("Failed to enable DNS: {e}"))?
-            .with_behaviour(|key| create_behaviour(key))?
+            .with_behaviour(create_behaviour)?
             .build();
 
         // TODO: Use topics to manage network traffic instead of just using a single topic
@@ -201,7 +201,7 @@ impl Libp2pNetInterface {
                 let total = peers.len();
                 let connected = dial_peers(&cmd_tx, &event_tx, &peers).await?;
                 event_tx.send(NetEvent::AllPeersDialed { connected, total })?;
-                return anyhow::Ok(());
+                anyhow::Ok(())
             }
         });
 
@@ -250,7 +250,7 @@ fn create_behaviour(
     let peer_id = key.public().to_peer_id();
     let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
     let identify = IdentifyBehaviour::new(
-        IdentifyConfig::new("/enclave/0.0.1".into(), key.public())
+        IdentifyConfig::new("/interfold/0.0.1".into(), key.public())
             .with_interval(Duration::from_secs(60)),
     );
 
@@ -259,7 +259,7 @@ fn create_behaviour(
         .max_transmit_size(MAX_GOSSIP_MSG_SIZE_KB * 1024)
         .validation_mode(gossipsub::ValidationMode::Strict)
         .build()
-        .map_err(|msg| Error::new(std::io::ErrorKind::Other, msg))?;
+        .map_err(Error::other)?;
 
     let gossipsub = gossipsub::Behaviour::new(
         gossipsub::MessageAuthenticity::Signed(key.clone()),
@@ -270,7 +270,7 @@ fn create_behaviour(
 
     let request_response = cbor::Behaviour::<Vec<u8>, ProtocolResponse>::new(
         [(
-            StreamProtocol::new("/enclave/sync/0.0.1"),
+            StreamProtocol::new("/interfold/sync/0.0.1"),
             ProtocolSupport::Full,
         )],
         request_response_config,
@@ -520,9 +520,8 @@ async fn process_swarm_event(
             },
         )) => {
             debug!("Incoming request received (id={})", request_id);
-            let responder =
-                DirectResponder::new(request_id, ChannelType::Channel(channel), &cmd_tx)
-                    .with_request(request);
+            let responder = DirectResponder::new(request_id, ChannelType::Channel(channel), cmd_tx)
+                .with_request(request);
 
             // received a request for events
             event_tx.send(NetEvent::IncomingRequest(IncomingRequest { responder }))?;
@@ -786,7 +785,7 @@ fn prune_expired_dht_records(swarm: &mut Swarm<NodeBehaviour>) {
     let now = Instant::now();
     let store = swarm.behaviour_mut().kademlia.store_mut();
     let before = store.records().count();
-    store.retain(|_, r| r.expires.map_or(true, |e| e > now));
+    store.retain(|_, r| r.expires.is_none_or(|e| e > now));
     let after = store.records().count();
     if before != after {
         info!(
@@ -908,7 +907,7 @@ fn handle_outgoing_request(
     let peer = match target {
         PeerTarget::Random => swarm
             .connected_peers()
-            .choose(&mut rand::thread_rng())
+            .choose(&mut rand::rng())
             .copied()
             .context("No connected peers available")?,
         PeerTarget::Specific(peer_id) => peer_id,
@@ -985,7 +984,7 @@ mod tests {
         );
 
         let now = Instant::now();
-        store.retain(|_, r| r.expires.map_or(true, |e| e > now));
+        store.retain(|_, r| r.expires.is_none_or(|e| e > now));
 
         assert_eq!(
             store.records().count(),
@@ -1038,7 +1037,7 @@ mod tests {
         assert_eq!(store.records().count(), 5);
 
         let now = Instant::now();
-        store.retain(|_, r| r.expires.map_or(true, |e| e > now));
+        store.retain(|_, r| r.expires.is_none_or(|e| e > now));
 
         assert_eq!(
             store.records().count(),

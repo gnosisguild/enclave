@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::prelude::*;
-use e3_events::{prelude::*, AggregatorChanged, Die, EnclaveEvent, EnclaveEventData};
+use e3_events::{prelude::*, AggregatorChanged, Die, InterfoldEvent, InterfoldEventData};
 use e3_utils::MAILBOX_LIMIT;
 use std::collections::HashSet;
 
@@ -13,7 +13,7 @@ use crate::ThresholdPlaintextAggregator;
 
 pub struct DecryptionshareCreatedBuffer {
     dest: Addr<ThresholdPlaintextAggregator>,
-    buffer: Vec<EnclaveEvent>,
+    buffer: Vec<InterfoldEvent>,
     expelled_parties: HashSet<u64>,
     is_aggregator: bool,
 }
@@ -35,15 +35,15 @@ impl DecryptionshareCreatedBuffer {
 
         for event in self.buffer.drain(..) {
             match event.get_data() {
-                EnclaveEventData::DecryptionshareCreated(data)
+                InterfoldEventData::DecryptionshareCreated(data)
                     if !self.expelled_parties.contains(&data.party_id) =>
                 {
                     self.dest.do_send(event);
                 }
-                EnclaveEventData::CommitteeMemberExpelled(data) if data.party_id.is_some() => {
+                InterfoldEventData::CommitteeMemberExpelled(data) if data.party_id.is_some() => {
                     self.dest.do_send(event);
                 }
-                EnclaveEventData::E3RequestComplete(_) | EnclaveEventData::Shutdown(_) => {
+                InterfoldEventData::E3RequestComplete(_) | InterfoldEventData::Shutdown(_) => {
                     self.dest.do_send(event);
                 }
                 _ => {}
@@ -60,12 +60,12 @@ impl Actor for DecryptionshareCreatedBuffer {
     }
 }
 
-impl Handler<EnclaveEvent> for DecryptionshareCreatedBuffer {
+impl Handler<InterfoldEvent> for DecryptionshareCreatedBuffer {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, _ctx: &mut Self::Context) -> Self::Result {
         match msg.get_data() {
-            EnclaveEventData::DecryptionshareCreated(data) => {
+            InterfoldEventData::DecryptionshareCreated(data) => {
                 if self.expelled_parties.contains(&data.party_id) {
                     return;
                 }
@@ -76,7 +76,7 @@ impl Handler<EnclaveEvent> for DecryptionshareCreatedBuffer {
                     self.buffer.push(msg);
                 }
             }
-            EnclaveEventData::CommitteeMemberExpelled(data) => {
+            InterfoldEventData::CommitteeMemberExpelled(data) => {
                 let Some(party_id) = data.party_id else {
                     return;
                 };
@@ -85,7 +85,7 @@ impl Handler<EnclaveEvent> for DecryptionshareCreatedBuffer {
                 self.buffer.retain(|event| {
                     !matches!(
                         event.get_data(),
-                        EnclaveEventData::DecryptionshareCreated(share)
+                        InterfoldEventData::DecryptionshareCreated(share)
                             if share.party_id == party_id
                     )
                 });
@@ -96,11 +96,11 @@ impl Handler<EnclaveEvent> for DecryptionshareCreatedBuffer {
                     self.buffer.push(msg);
                 }
             }
-            EnclaveEventData::AggregatorChanged(AggregatorChanged { is_aggregator, .. }) => {
+            InterfoldEventData::AggregatorChanged(AggregatorChanged { is_aggregator, .. }) => {
                 self.is_aggregator = *is_aggregator;
                 self.flush();
             }
-            EnclaveEventData::E3RequestComplete(_) | EnclaveEventData::Shutdown(_) => {
+            InterfoldEventData::E3RequestComplete(_) | InterfoldEventData::Shutdown(_) => {
                 self.dest.do_send(msg);
             }
             _ => {

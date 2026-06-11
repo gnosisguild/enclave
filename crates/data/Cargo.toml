@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "E3 - Ciphernode Data persistence"
-repository = "https://github.com/gnosisguild/enclave/crates/data"
+repository = "https://github.com/gnosisguild/interfold/crates/data"
 
 [dependencies]
 actix = { workspace = true }
@@ -21,3 +21,6 @@ async-trait = { workspace = true }
 once_cell = { workspace = true }
 tempfile = { workspace = true }
 commitlog = { workspace = true }
+
+[dev-dependencies]
+alloy-primitives = { workspace = true }

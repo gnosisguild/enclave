@@ -29,7 +29,7 @@ use alloy::sol_types::SolValue;
 use e3_events::{
     BusHandle, CommitmentConsistencyCheckComplete, CommitmentConsistencyCheckRequested,
     ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind, CorrelationId, E3id,
-    EnclaveEvent, EnclaveEventData, EventContext, EventPublisher, EventSubscriber, EventType,
+    EventContext, EventPublisher, EventSubscriber, EventType, InterfoldEvent, InterfoldEventData,
     PartyVerificationResult, ProofType, ProofVerificationFailed, ProofVerificationPassed,
     Sequenced, ShareVerificationComplete, ShareVerificationDispatched, SignedProofFailed,
     SignedProofPayload, TypedEvent, VerificationKind, VerifyShareDecryptionProofsRequest,
@@ -95,6 +95,7 @@ impl ShareVerificationActor {
         );
 
         let params_preset = msg.params_preset;
+        let committee_size = msg.committee_size;
         match msg.kind {
             VerificationKind::ShareProofs
             | VerificationKind::ThresholdDecryptionProofs
@@ -107,6 +108,7 @@ impl ShareVerificationActor {
                     msg.pre_dishonest,
                     ec,
                     params_preset,
+                    committee_size,
                     |pending, passed| {
                         pending.ecdsa_passed_share_proofs = passed;
                     },
@@ -120,6 +122,7 @@ impl ShareVerificationActor {
                     msg.pre_dishonest,
                     ec,
                     params_preset,
+                    committee_size,
                     |pending, passed| {
                         pending.ecdsa_passed_decryption_proofs = passed;
                     },
@@ -133,6 +136,7 @@ impl ShareVerificationActor {
     /// After ECDSA validation, publishes [`CommitmentConsistencyCheckRequested`]
     /// and stores a [`PendingConsistencyCheck`]. ZK verification is deferred
     /// until the consistency check response arrives.
+    #[allow(clippy::too_many_arguments)]
     fn verify_proofs<P: VerifiableParty>(
         &mut self,
         e3_id: E3id,
@@ -141,6 +145,7 @@ impl ShareVerificationActor {
         pre_dishonest: BTreeSet<u64>,
         ec: EventContext<Sequenced>,
         params_preset: e3_fhe_params::BfvPreset,
+        committee_size: e3_zk_helpers::CiphernodesCommitteeSize,
         store_passed_proofs: impl FnOnce(&mut PendingConsistencyCheck, Vec<P>),
     ) {
         let e3_id_str = e3_id.to_string();
@@ -184,6 +189,7 @@ impl ShareVerificationActor {
             ecdsa_passed_share_proofs: Vec::new(),
             ecdsa_passed_decryption_proofs: Vec::new(),
             params_preset,
+            committee_size,
         };
         store_passed_proofs(&mut pending, outcome.ecdsa_passed_parties);
         self.pending_consistency.insert(correlation_id, pending);
@@ -271,6 +277,7 @@ impl ShareVerificationActor {
                     ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
                         party_proofs: passed,
                         params_preset: pending.params_preset,
+                        committee_size: pending.committee_size,
                     }),
                     zk_correlation_id,
                     pending.e3_id.clone(),
@@ -295,6 +302,7 @@ impl ShareVerificationActor {
                     ZkRequest::VerifyShareDecryptionProofs(VerifyShareDecryptionProofsRequest {
                         party_proofs: passed,
                         params_preset: pending.params_preset,
+                        committee_size: pending.committee_size,
                     }),
                     zk_correlation_id,
                     pending.e3_id.clone(),
@@ -343,6 +351,7 @@ impl ShareVerificationActor {
                 party_public_signals,
                 party_proof_data,
                 params_preset: pending.params_preset,
+                committee_size: pending.committee_size,
             },
         );
 
@@ -561,22 +570,22 @@ impl Actor for ShareVerificationActor {
     type Context = Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for ShareVerificationActor {
+impl Handler<InterfoldEvent> for ShareVerificationActor {
     type Result = ();
 
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InterfoldEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            EnclaveEventData::ShareVerificationDispatched(data) => {
+            InterfoldEventData::ShareVerificationDispatched(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeResponse(data) => {
+            InterfoldEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ComputeRequestError(data) => {
+            InterfoldEventData::ComputeRequestError(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::CommitmentConsistencyCheckComplete(data) => {
+            InterfoldEventData::CommitmentConsistencyCheckComplete(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),

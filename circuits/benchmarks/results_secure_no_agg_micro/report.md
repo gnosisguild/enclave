@@ -1,4 +1,4 @@
-# Enclave ZK Circuit Benchmarks
+# Interfold ZK Circuit Benchmarks
 
 **Generated:** 2026-05-27 15:16:58 UTC
 

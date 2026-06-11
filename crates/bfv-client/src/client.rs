@@ -105,7 +105,7 @@ where
         DEFAULT_BFV_PRESET,
         &UserDataEncryptionCircuitData {
             public_key: pk,
-            plaintext: plaintext,
+            plaintext,
         },
     )?;
 
@@ -204,7 +204,7 @@ mod tests {
 
         let num = [1u64];
         let encrypted_data =
-            bfv_encrypt(num, pk.to_bytes(), degree, plaintext_modulus, &moduli).unwrap();
+            bfv_encrypt(num, pk.to_bytes(), degree, plaintext_modulus, moduli).unwrap();
 
         let ct = Ciphertext::from_bytes(&encrypted_data, &params).unwrap();
         let pt = sk.try_decrypt(&ct).unwrap();
@@ -233,7 +233,7 @@ mod tests {
             pk.to_bytes(),
             degree,
             plaintext_modulus,
-            &moduli,
+            moduli,
         )
         .unwrap();
 

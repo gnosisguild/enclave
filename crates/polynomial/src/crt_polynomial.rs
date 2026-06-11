@@ -64,7 +64,7 @@ impl CrtPolynomial {
     ///
     /// * `coeffs` - Polynomial coefficients mod Q (Q>>128).
     /// * `moduli` - One modulus per limb.
-    pub fn from_mod_q_polynomial(poly: &Vec<BigInt>, moduli: &[u64]) -> Self {
+    pub fn from_mod_q_polynomial(poly: &[BigInt], moduli: &[u64]) -> Self {
         let limbs: Vec<Vec<BigInt>> = moduli
             .iter()
             .map(|&qi| {
@@ -128,7 +128,7 @@ impl CrtPolynomial {
             )));
         }
         let mut data = Vec::with_capacity(l * degree);
-        for i in 0..l {
+        for (i, &qi) in moduli.iter().enumerate().take(l) {
             let coeffs = self.limb(i).coefficients();
             if coeffs.len() != degree {
                 return Err(fhe_math::Error::Default(format!(
@@ -136,8 +136,8 @@ impl CrtPolynomial {
                     coeffs.len()
                 )));
             }
-            for j in 0..degree {
-                let u = bigint_to_u64_mod(&coeffs[j], moduli[i])?;
+            for coeff in coeffs.iter().take(degree) {
+                let u = bigint_to_u64_mod(coeff, qi)?;
                 data.push(u);
             }
         }
@@ -213,7 +213,7 @@ impl CrtPolynomial {
     /// * `modulus` - The modulus applied to every limb.
     pub fn reduce_uniform(&mut self, modulus: &BigInt) {
         for limb in &mut self.limbs {
-            limb.reduce(&modulus);
+            limb.reduce(modulus);
         }
     }
 

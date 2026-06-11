@@ -42,9 +42,9 @@ pub struct NodeDefinition {
     pub key_file: PathBuf,
     /// The name for the logfile
     pub log_file: PathBuf,
-    /// The data dir for enclave defaults to `~/.local/share/enclave/{name}`
+    /// The data dir for interfold defaults to `~/.local/share/interfold/{name}`
     pub data_dir: PathBuf,
-    /// Override the base folder for enclave configuration defaults to `~/.config/enclave/{name}` on linux
+    /// Override the base folder for interfold configuration defaults to `~/.config/interfold/{name}` on linux
     pub config_dir: PathBuf,
     /// If a net key has not been set autogenerate one on start
     pub autonetkey: bool,
@@ -73,11 +73,11 @@ impl Default for NodeDefinition {
             address: None,
             quic_port: 9091,
             ctrl_port: 50505,
-            key_file: PathBuf::from("key"), // ~/.config/enclave/key
-            db_file: PathBuf::from("db"),   // ~/.config/enclave/db
-            log_file: PathBuf::from("log"), // ~/.config/enclave/log
-            config_dir: std::path::PathBuf::new(), // ~/.config/enclave
-            data_dir: std::path::PathBuf::new(), // ~/.config/enclave
+            key_file: PathBuf::from("key"), // ~/.config/interfold/key
+            db_file: PathBuf::from("db"),   // ~/.config/interfold/db
+            log_file: PathBuf::from("log"), // ~/.config/interfold/log
+            config_dir: std::path::PathBuf::new(), // ~/.config/interfold
+            data_dir: std::path::PathBuf::new(), // ~/.config/interfold
             autonetkey: false,
             autopassword: false,
             autowallet: false,
@@ -137,8 +137,8 @@ impl BBPath {
 
     /// Check the environment variable and if found use that otherwise use the given path
     pub fn check(default_path: PathBuf) -> Result<Self> {
-        let bb_path = if let Some(bb_path) = env::var("E3_CUSTOM_BB").ok() {
-            BBPath::Custom(bb_path.try_into()?)
+        let bb_path = if let Ok(bb_path) = env::var("E3_CUSTOM_BB") {
+            BBPath::Custom(bb_path.into())
         } else {
             BBPath::Default(default_path)
         };
@@ -171,11 +171,11 @@ impl AppConfig {
 
         let config_dir_override = (node.config_dir != PathBuf::new())
             .then_some(&node.config_dir)
-            .or_else(|| config.config_dir.as_ref());
+            .or(config.config_dir.as_ref());
 
         let data_dir_override = (node.data_dir != PathBuf::new())
             .then_some(&node.data_dir)
-            .or_else(|| config.data_dir.as_ref());
+            .or(config.data_dir.as_ref());
 
         let paths = PathsEngine::new(
             name,
@@ -255,10 +255,9 @@ impl AppConfig {
     fn node_def(&self) -> &NodeDefinition {
         // NOTE: on creation an invariant we have is that our node name is an extant key in our
         // nodes datastructure so expect here is ok and we dont have to clone the NodeDefinition
-        self.nodes.get(&self.name).expect(&format!(
-            "Could not find node definition for node '{}'.",
-            &self.name
-        ))
+        self.nodes
+            .get(&self.name)
+            .unwrap_or_else(|| panic!("Could not find node definition for node '{}'.", &self.name))
     }
 
     /// Use the in-memory store
@@ -311,7 +310,7 @@ impl AppConfig {
 
     /// Get the node's address
     pub fn address(&self) -> Option<Address> {
-        self.node_def().address.clone()
+        self.node_def().address
     }
 
     /// Get a collection containing all the node definitions from the configuration
@@ -355,19 +354,19 @@ impl AppConfig {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct UnscopedAppConfig {
     /// The chains config
     chains: Vec<ChainConfig>,
-    /// The base folder for enclave configuration defaults to `~/.config/enclave` on linux
+    /// The base folder for interfold configuration defaults to `~/.config/interfold` on linux
     config_dir: Option<PathBuf>,
-    /// The data dir for enclave defaults to `~/.local/share/enclave`
+    /// The data dir for interfold defaults to `~/.local/share/interfold`
     data_dir: Option<PathBuf>,
     /// The config file as found before initialization this is for testing purposes and you should
     /// not use this in your configurations
     found_config_file: Option<PathBuf>, // This is set regardless as the file is resolved
-    /// The default node that runs during commands like `enclave start` without supplying the
+    /// The default node that runs during commands like `interfold start` without supplying the
     /// `--name` argument.
     node: NodeDefinition,
     /// The `nodes` key in configuration
@@ -382,32 +381,16 @@ pub struct UnscopedAppConfig {
     custom_bb: Option<PathBuf>,
 }
 
-impl Default for UnscopedAppConfig {
-    fn default() -> Self {
-        Self {
-            chains: vec![],
-            config_dir: None,
-            data_dir: None,
-            node: NodeDefinition::default(),
-            found_config_file: None,
-            otel: None,
-            nodes: HashMap::new(),
-            program: None,
-            custom_bb: None,
-        }
-    }
-}
-
 impl UnscopedAppConfig {
     /// Convert to a scoped configuration using local OS based default configuration
     pub fn into_scoped(self, name: &str) -> Result<AppConfig> {
-        Ok(AppConfig::try_from_unscoped(
+        AppConfig::try_from_unscoped(
             name,
             self,
             &OsDirs::data_dir(),
             &OsDirs::config_dir(),
             &env::current_dir()?,
-        )?)
+        )
     }
 
     /// Convert to a scoped configuration passing in some injected configuration
@@ -418,13 +401,7 @@ impl UnscopedAppConfig {
         default_config_dir: &PathBuf,
         cwd: &PathBuf,
     ) -> Result<AppConfig> {
-        Ok(AppConfig::try_from_unscoped(
-            name,
-            self,
-            default_data_dir,
-            default_config_dir,
-            cwd,
-        )?)
+        AppConfig::try_from_unscoped(name, self, default_data_dir, default_config_dir, cwd)
     }
 }
 
@@ -447,7 +424,7 @@ pub fn load_config(
         find_in_parent,            // finding strategy
         env::current_dir()?,       // cwd
         OsDirs::config_dir(),      // default config folder
-        DEFAULT_CONFIG_NAME,       // hardcoded now to enclave.config.yaml
+        DEFAULT_CONFIG_NAME,       // hardcoded now to interfold.config.yaml
         found_config_file.clone(), // config file we have found to exist
     );
 
@@ -466,24 +443,24 @@ pub fn load_config(
             .extract()
             .context("Could not parse configuration")?;
 
-    Ok(config.into_scoped(name).context(format!(
+    config.into_scoped(name).context(format!(
         "Could not apply scope '{}' to configuration.",
         name
-    ))?)
+    ))
 }
 
 pub struct OsDirs;
 impl OsDirs {
     pub fn config_dir() -> PathBuf {
         dirs::config_dir()
-            .expect("Enclave may only be run on an OS that can provide a config dir. See https://docs.rs/dirs for more information.")
-            .join("enclave")
+            .expect("Interfold may only be run on an OS that can provide a config dir. See https://docs.rs/dirs for more information.")
+            .join("interfold")
     }
 
     pub fn data_dir() -> PathBuf {
         dirs::data_local_dir()
-            .expect("Enclave may only be run on an OS that can provide a data dir. See https://docs.rs/dirs for more information.")
-            .join("enclave")
+            .expect("Interfold may only be run on an OS that can provide a data dir. See https://docs.rs/dirs for more information.")
+            .join("interfold")
     }
 }
 
@@ -506,8 +483,8 @@ mod tests {
     #[test]
     fn test_deserialization() -> Result<()> {
         let config_str = r#"
-data_dir: "/mydata/enclave"
-config_dir: "/myconfig/enclave"
+data_dir: "/mydata/interfold"
+config_dir: "/myconfig/interfold"
 chains:
   - name: "hardhat"
     rpc_url: "ws://localhost:8545"
@@ -517,7 +494,7 @@ chains:
         username: "testUser"
         password: "testPassword"
     contracts:
-      enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      interfold: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
       ciphernode_registry:
         address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
         deploy_block: 1764352873645
@@ -553,7 +530,7 @@ nodes:
                 .unwrap();
             assert_eq!(
                 config.db_file(),
-                PathBuf::from("/mydata/enclave/_default/foo")
+                PathBuf::from("/mydata/interfold/_default/foo")
             );
             assert_eq!(
                 config.key_file(),
@@ -589,10 +566,13 @@ nodes:
             assert_eq!(config.peers(), vec!["one", "two"]);
             assert_eq!(
                 config.config_file(),
-                PathBuf::from("/default/config/enclave.config.yaml")
+                PathBuf::from("/default/config/interfold.config.yaml")
             );
-            assert_eq!(config.db_file(), PathBuf::from("/mydata/enclave/ag/db"));
-            assert_eq!(config.key_file(), PathBuf::from("/myconfig/enclave/ag/key"));
+            assert_eq!(config.db_file(), PathBuf::from("/mydata/interfold/ag/db"));
+            assert_eq!(
+                config.key_file(),
+                PathBuf::from("/myconfig/interfold/ag/key")
+            );
         };
         Ok(())
     }
@@ -623,7 +603,7 @@ nodes:
 
             assert_eq!(
                 config.config_file(),
-                expected_config_dir.join("enclave.config.yaml")
+                expected_config_dir.join("interfold.config.yaml")
             );
 
             Ok(())
@@ -649,10 +629,10 @@ nodes:
         Jail::expect_with(|jail| {
             let home = format!("{}", jail.directory().to_string_lossy());
             jail.set_env("HOME", &home);
-            jail.set_env("XDG_CONFIG_HOME", &format!("{}/.config", home));
+            jail.set_env("XDG_CONFIG_HOME", format!("{}/.config", home));
 
             let expected_config_dir = OsDirs::config_dir();
-            let filename = expected_config_dir.join("enclave.config.yaml");
+            let filename = expected_config_dir.join("interfold.config.yaml");
             jail.create_dir(&expected_config_dir)?;
             jail.create_file(
                 filename.clone(),
@@ -666,7 +646,7 @@ chains:
         username: "testUser"
         password: "testPassword"
     contracts:
-      enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      interfold: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
       ciphernode_registry:
         address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
         deploy_block: 1764352873645
@@ -681,7 +661,7 @@ chains:
             assert_eq!(chain.name, "hardhat");
             assert_eq!(chain.rpc_url, "ws://localhost:8545");
             assert_eq!(
-                chain.contracts.enclave.address_str(),
+                chain.contracts.interfold.address_str(),
                 "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
             );
             assert_eq!(
@@ -695,7 +675,7 @@ chains:
                     password: "testPassword".to_string(),
                 }
             );
-            assert_eq!(chain.contracts.enclave.deploy_block(), None);
+            assert_eq!(chain.contracts.interfold.deploy_block(), None);
             assert_eq!(
                 chain.contracts.ciphernode_registry.deploy_block(),
                 Some(1764352873645)
@@ -708,7 +688,7 @@ chains:
   - name: "hardhat"
     rpc_url: "ws://localhost:8545"
     contracts:
-      enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      interfold: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
       ciphernode_registry:
         address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
         deploy_block: 1764352873645
@@ -730,7 +710,7 @@ chains:
       type: "Bearer"
       credentials: "testToken"
     contracts:
-      enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      interfold: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
       ciphernode_registry:
         address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
         deploy_block: 1764352873645
@@ -770,7 +750,7 @@ node:
         Jail::expect_with(|jail| {
             let home = format!("{}", jail.directory().to_string_lossy());
             jail.set_env("HOME", &home);
-            jail.set_env("XDG_CONFIG_HOME", &format!("{}/.config", home));
+            jail.set_env("XDG_CONFIG_HOME", format!("{}/.config", home));
             jail.set_env("TEST_RPC_URL_PORT", "8545");
             jail.set_env("TEST_USERNAME", "envUser");
             jail.set_env("TEST_PASSWORD", "envPassword");
@@ -780,7 +760,7 @@ node:
             );
 
             let expected_config_dir = OsDirs::config_dir();
-            let filename = expected_config_dir.join("enclave.config.yaml");
+            let filename = expected_config_dir.join("interfold.config.yaml");
             jail.create_dir(&expected_config_dir)?;
             jail.create_file(
                 filename,
@@ -794,7 +774,7 @@ chains:
         username: "${TEST_USERNAME}"
         password: "${TEST_PASSWORD}"
     contracts:
-      enclave: "${TEST_CONTRACT_ADDRESS}"
+      interfold: "${TEST_CONTRACT_ADDRESS}"
       ciphernode_registry:
         address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
         deploy_block: 1764352873645
@@ -815,7 +795,7 @@ chains:
                 }
             );
             assert_eq!(
-                chain.contracts.enclave.address_str(),
+                chain.contracts.interfold.address_str(),
                 "0x1234567890123456789012345678901234567890"
             );
 

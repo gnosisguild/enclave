@@ -8,7 +8,7 @@ use anyhow::Context;
 use anyhow::Result;
 use commitlog::message::MessageSet;
 use commitlog::{CommitLog, LogOptions, ReadLimit};
-use e3_events::{EnclaveEvent, EventLog, Unsequenced};
+use e3_events::{EventLog, InterfoldEvent, Unsequenced};
 use std::path::PathBuf;
 use tracing::error;
 
@@ -31,7 +31,7 @@ impl CommitLogEventLog {
     fn append_bytes(&mut self, bytes: &[u8]) -> Result<u64> {
         let offset = self
             .log
-            .append_msg(&bytes)
+            .append_msg(bytes)
             .context("Failed to append to event log")?;
         // Return 1-indexed sequence number
         Ok(offset + 1)
@@ -39,12 +39,13 @@ impl CommitLogEventLog {
 }
 
 impl EventLog for CommitLogEventLog {
-    fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64> {
+    fn append(&mut self, event: &InterfoldEvent<Unsequenced>) -> Result<u64> {
         let bytes = bincode::serialize(event)?;
         self.append_bytes(&bytes)
     }
 
-    fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>> {
+    #[allow(clippy::while_let_loop)]
+    fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, InterfoldEvent<Unsequenced>)>> {
         // Convert 1-indexed sequence to 0-indexed offset
         let mut current_offset = from.saturating_sub(1);
         let mut events = Vec::new();
@@ -67,7 +68,7 @@ impl EventLog for CommitLogEventLog {
             let mut count = 0;
             for msg in message_buf.iter() {
                 let seq = msg.offset() + 1;
-                match bincode::deserialize::<EnclaveEvent<Unsequenced>>(msg.payload()) {
+                match bincode::deserialize::<InterfoldEvent<Unsequenced>>(msg.payload()) {
                     Ok(event) => {
                         if let Some(bad_seq) = corrupt_at {
                             // We already saw a corrupt entry and now found a valid one
@@ -112,12 +113,294 @@ impl EventLog for CommitLogEventLog {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use e3_events::{EnclaveEventData, EventConstructorWithTimestamp, EventSource, TestEvent};
+    use e3_events::{EventConstructorWithTimestamp, EventSource, InterfoldEventData, TestEvent};
     use tempfile::tempdir;
 
-    fn event_from(data: impl Into<EnclaveEventData>) -> EnclaveEvent<Unsequenced> {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(
-            data.into().into(),
+    // ── Event size reporting ─────────────────────────────────────────────────
+    //
+    // Run with `cargo test -p e3-data report_event_sizes -- --nocapture` to see
+    // the full size table. Sizes are for minimal (empty-bytes) instances, so
+    // they represent structural overhead only; real events with proof/key
+    // payloads will be larger.
+
+    #[allow(clippy::too_many_lines)]
+    #[test]
+    fn report_event_sizes() {
+        use alloy_primitives::{Address, Bytes};
+        use e3_events::{
+            AccusationOutcome, AccusationQuorumReached, AccusationVote, AggregatorChanged,
+            CiphernodeAdded, CiphernodeRemoved, CiphernodeSelected, CiphertextOutputPublished,
+            CircuitName, CommitteeFinalizeRequested, CommitteeFinalized, CommitteePublished,
+            CommitteeRequested, DecryptionKeyShared, DecryptionshareCreated, E3Failed,
+            E3RequestComplete, E3Requested, E3Stage, E3id, FailureReason, KeyshareCreated,
+            PlaintextAggregated, PlaintextOutputPublished, Proof, ProofPayload, ProofType,
+            PublicKeyAggregated, Seed, SignedProofPayload, TicketGenerated, TicketId,
+            TicketSubmitted,
+        };
+        use e3_utils::ArcBytes;
+
+        let e3_id = E3id::new("1", 1);
+        let empty = ArcBytes::from_bytes(&[]);
+        let node = "0x0000000000000000000000000000000000000001".to_string();
+
+        let empty_proof = Proof::new(CircuitName::PkBfv, empty.clone(), empty.clone());
+        let empty_signed_proof = SignedProofPayload {
+            payload: ProofPayload {
+                e3_id: e3_id.clone(),
+                proof_type: ProofType::C1PkGeneration,
+                proof: empty_proof.clone(),
+            },
+            signature: ArcBytes::from_bytes(&[0u8; 65]),
+        };
+
+        let events: Vec<(&str, InterfoldEventData)> = vec![
+            // Registration / sortition
+            (
+                "CiphernodeAdded",
+                CiphernodeAdded {
+                    address: node.clone(),
+                    index: 0,
+                    num_nodes: 1,
+                    chain_id: 1,
+                }
+                .into(),
+            ),
+            (
+                "CiphernodeRemoved",
+                CiphernodeRemoved {
+                    address: node.clone(),
+                    index: 0,
+                    num_nodes: 0,
+                    chain_id: 1,
+                }
+                .into(),
+            ),
+            // Committee formation
+            (
+                "CommitteeRequested",
+                CommitteeRequested {
+                    e3_id: e3_id.clone(),
+                    seed: Seed([0u8; 32]),
+                    threshold: [2, 3],
+                    request_block: 0,
+                    committee_deadline: 0,
+                    chain_id: 1,
+                }
+                .into(),
+            ),
+            ("CiphernodeSelected", CiphernodeSelected::default().into()),
+            (
+                "TicketGenerated",
+                TicketGenerated {
+                    e3_id: e3_id.clone(),
+                    ticket_id: TicketId::Score(0),
+                    node: node.clone(),
+                    party_index: Some(0),
+                }
+                .into(),
+            ),
+            (
+                "TicketSubmitted",
+                TicketSubmitted {
+                    e3_id: e3_id.clone(),
+                    node: node.clone(),
+                    ticket_id: 0,
+                    score: "0".into(),
+                    chain_id: 1,
+                }
+                .into(),
+            ),
+            (
+                "CommitteeFinalized",
+                CommitteeFinalized {
+                    e3_id: e3_id.clone(),
+                    committee: vec![node.clone()],
+                    scores: vec!["0".into()],
+                    chain_id: 1,
+                }
+                .into(),
+            ),
+            // E3 lifecycle
+            ("E3Requested", E3Requested::default().into()),
+            (
+                "CommitteeFinalizeRequested",
+                CommitteeFinalizeRequested {
+                    e3_id: e3_id.clone(),
+                }
+                .into(),
+            ),
+            // DKG
+            (
+                "KeyshareCreated",
+                KeyshareCreated {
+                    pubkey: empty.clone(),
+                    e3_id: e3_id.clone(),
+                    node: node.clone(),
+                    party_id: 0,
+                    signed_pk_generation_proof: None,
+                }
+                .into(),
+            ),
+            (
+                "KeyshareCreated (with proof)",
+                KeyshareCreated {
+                    pubkey: empty.clone(),
+                    e3_id: e3_id.clone(),
+                    node: node.clone(),
+                    party_id: 0,
+                    signed_pk_generation_proof: Some(empty_signed_proof.clone()),
+                }
+                .into(),
+            ),
+            (
+                "PublicKeyAggregated",
+                PublicKeyAggregated {
+                    pubkey: empty.clone(),
+                    e3_id: e3_id.clone(),
+                    nodes: Default::default(),
+                    committee_addresses: vec![Address::ZERO],
+                    honest_committee_addresses: vec![Address::ZERO],
+                    pk_commitment: [0u8; 32],
+                    dkg_aggregator_proof: None,
+                    dkg_attestation_bundle: None,
+                }
+                .into(),
+            ),
+            (
+                "CommitteePublished",
+                CommitteePublished {
+                    e3_id: e3_id.clone(),
+                    nodes: vec![node.clone()],
+                    public_key: empty.clone(),
+                    proof: empty.clone(),
+                }
+                .into(),
+            ),
+            // Computation / decryption
+            (
+                "CiphertextOutputPublished",
+                CiphertextOutputPublished {
+                    e3_id: e3_id.clone(),
+                    ciphertext_output: vec![empty.clone()],
+                }
+                .into(),
+            ),
+            (
+                "DecryptionKeyShared",
+                DecryptionKeyShared {
+                    e3_id: e3_id.clone(),
+                    party_id: 0,
+                    node: node.clone(),
+                    signed_sk_decryption_proof: empty_signed_proof.clone(),
+                    signed_e_sm_decryption_proofs: vec![],
+                    external: false,
+                }
+                .into(),
+            ),
+            (
+                "DecryptionshareCreated",
+                DecryptionshareCreated {
+                    party_id: 0,
+                    decryption_share: vec![empty.clone()],
+                    e3_id: e3_id.clone(),
+                    node: node.clone(),
+                    signed_decryption_proofs: vec![],
+                }
+                .into(),
+            ),
+            (
+                "PlaintextAggregated",
+                PlaintextAggregated {
+                    e3_id: e3_id.clone(),
+                    decrypted_output: vec![empty.clone()],
+                    decryption_aggregator_proofs: vec![],
+                }
+                .into(),
+            ),
+            (
+                "PlaintextOutputPublished",
+                PlaintextOutputPublished {
+                    e3_id: e3_id.clone(),
+                    plaintext_output: empty.clone(),
+                    proof: empty.clone(),
+                }
+                .into(),
+            ),
+            // Aggregator
+            (
+                "AggregatorChanged",
+                AggregatorChanged {
+                    e3_id: e3_id.clone(),
+                    is_aggregator: true,
+                }
+                .into(),
+            ),
+            // Accusation / slashing
+            (
+                "AccusationVote",
+                AccusationVote {
+                    e3_id: e3_id.clone(),
+                    accusation_id: [0u8; 32],
+                    voter: Address::ZERO,
+                    data_hash: [0u8; 32],
+                    deadline: 0,
+                    signature: empty.clone(),
+                }
+                .into(),
+            ),
+            (
+                "AccusationQuorumReached",
+                AccusationQuorumReached {
+                    e3_id: e3_id.clone(),
+                    accuser: Address::ZERO,
+                    accused: Address::ZERO,
+                    proof_type: ProofType::C1PkGeneration,
+                    votes_for: vec![],
+                    outcome: AccusationOutcome::AccusedFaulted,
+                    evidence: Bytes::new(),
+                }
+                .into(),
+            ),
+            // Completion / failure
+            (
+                "E3RequestComplete",
+                E3RequestComplete {
+                    e3_id: e3_id.clone(),
+                }
+                .into(),
+            ),
+            (
+                "E3Failed",
+                E3Failed {
+                    e3_id: e3_id.clone(),
+                    failed_at_stage: E3Stage::None,
+                    reason: FailureReason::None,
+                }
+                .into(),
+            ),
+        ];
+
+        let mut rows: Vec<(&str, usize)> = events
+            .iter()
+            .map(|(name, data)| {
+                let event = event_from(data.clone());
+                let bytes = bincode::serialize(&event).expect("serialize");
+                (*name, bytes.len())
+            })
+            .collect();
+
+        rows.sort_by(|a, b| b.1.cmp(&a.1));
+
+        println!("\n{:<50} {:>10}", "Event variant", "Bytes");
+        println!("{}", "-".repeat(62));
+        for (name, size) in &rows {
+            println!("{:<50} {:>10}", name, size);
+        }
+    }
+
+    fn event_from(data: impl Into<InterfoldEventData>) -> InterfoldEvent<Unsequenced> {
+        InterfoldEvent::<Unsequenced>::new_with_timestamp(
+            data.into(),
             None,
             123,
             None,

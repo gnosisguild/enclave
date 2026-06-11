@@ -14,14 +14,14 @@
 `crisp_deploy.sh` sets `ENABLE_ZK_VERIFICATION` from the same file.
 
 After changing `crisp.dev.env`, re-run `pnpm dev:setup` and a fresh `pnpm dev:up` (wipe
-`.enclave/data` when switching modes).
+`.interfold/data` when switching modes).
 
 Lower-level switches (kept in sync by the scripts):
 
-| Switch                         | Where                                                | Effect                        |
-| ------------------------------ | ---------------------------------------------------- | ----------------------------- |
-| `E3_PROOF_AGGREGATION_ENABLED` | `server/.env` (managed by setup)                     | Passed to `Enclave.requestE3` |
-| `ENABLE_ZK_VERIFICATION`       | Set at deploy from `CRISP_PROOF_AGGREGATION_ENABLED` | Real vs mock BFV verifiers    |
+| Switch                         | Where                                                | Effect                          |
+| ------------------------------ | ---------------------------------------------------- | ------------------------------- |
+| `E3_PROOF_AGGREGATION_ENABLED` | `server/.env` (managed by setup)                     | Passed to `Interfold.requestE3` |
+| `ENABLE_ZK_VERIFICATION`       | Set at deploy from `CRISP_PROOF_AGGREGATION_ENABLED` | Real vs mock BFV verifiers      |
 
 Misalignment causes `publishCommittee` to revert with **`VkHashMismatch()`** (`0x0c260259`).
 
@@ -87,7 +87,7 @@ server — keep `CRISP_BFV_PRESET=insecure-512` for the default Micro committee.
 cd examples/CRISP
 # Edit crisp.dev.env (or crisp.dev.env.example → crisp.dev.env) as above
 pnpm dev:setup    # builds DKG circuits + syncs server/.env
-rm -rf .enclave/data   # required when switching from Mode A
+rm -rf .interfold/data   # required when switching from Mode A
 pnpm dev:up       # deploy with ENABLE_ZK_VERIFICATION=true
 pnpm cli init
 ```
@@ -106,17 +106,17 @@ proving).
 - Logs: `loaded dkgFoldAttestationVerifier`, `NodeDkgFold complete`, `zk_dkg_aggregation`, then
   `Publishing PublicKeyAggregated (dkg_evm_proof=present)`
 - On-chain: `publishCommittee` succeeds (no `VkHashMismatch`)
-- Registry / Enclave transition to key published; CRISP indexer can serve `/rounds/current`
+- Registry / Interfold transition to key published; CRISP indexer can serve `/rounds/current`
 
 ---
 
 ## Invalid combinations
 
-| Deploy                                   | `E3_PROOF_AGGREGATION_ENABLED` | Result                                                                                                                                                                                                                                                                                                                                                                                        |
-| ---------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mock (`ENABLE_ZK_VERIFICATION` unset)    | `true`                         | Ciphernodes generate real aggregation proofs, but `Enclave.pkVerifier` is `MockPkVerifier`. Attestation path may still run if a previous ZK deploy left `DkgFoldAttestationVerifier` on the registry from stale `deployed_contracts.json` on a **fresh** Anvil — always use `clean:deployments` + fresh chain. Prefer wiping `.enclave/data` and setting aggregation `false` for mock deploy. |
-| ZK (`ENABLE_ZK_VERIFICATION=true`)       | `false`                        | Valid but skips on-chain DKG proof verification; committee publication uses empty proof bytes.                                                                                                                                                                                                                                                                                                |
-| ZK, circuits recompiled **after** deploy | `true`                         | **`VkHashMismatch()`** at `publishCommittee` — redeploy `BfvPkVerifier` (full ZK deploy) after `pnpm compile:circuits`.                                                                                                                                                                                                                                                                       |
+| Deploy                                   | `E3_PROOF_AGGREGATION_ENABLED` | Result                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mock (`ENABLE_ZK_VERIFICATION` unset)    | `true`                         | Ciphernodes generate real aggregation proofs, but `Interfold.pkVerifier` is `MockPkVerifier`. Attestation path may still run if a previous ZK deploy left `DkgFoldAttestationVerifier` on the registry from stale `deployed_contracts.json` on a **fresh** Anvil — always use `clean:deployments` + fresh chain. Prefer wiping `.interfold/data` and setting aggregation `false` for mock deploy. |
+| ZK (`ENABLE_ZK_VERIFICATION=true`)       | `false`                        | Valid but skips on-chain DKG proof verification; committee publication uses empty proof bytes.                                                                                                                                                                                                                                                                                                    |
+| ZK, circuits recompiled **after** deploy | `true`                         | **`VkHashMismatch()`** at `publishCommittee` — redeploy `BfvPkVerifier` (full ZK deploy) after `pnpm compile:circuits`.                                                                                                                                                                                                                                                                           |
 
 ---
 
@@ -124,9 +124,9 @@ proving).
 
 `pnpm dev:up` runs deploy then automatically updates:
 
-- `enclave.config.yaml` (ciphernode contract watches)
-- `server/.env` (`ENCLAVE_ADDRESS`, `E3_PROGRAM_ADDRESS`, `CRISP_VOTING_TOKEN`, registry, fee token,
-  mock refs, `E3_PROOF_AGGREGATION_ENABLED` from `crisp.dev.env`)
+- `interfold.config.yaml` (ciphernode contract watches)
+- `server/.env` (`INTERFOLD_ADDRESS`, `E3_PROGRAM_ADDRESS`, `CRISP_VOTING_TOKEN`, registry, fee
+  token, mock refs, `E3_PROOF_AGGREGATION_ENABLED` from `crisp.dev.env`)
 - `client/.env` (`VITE_CRISP_TOKEN`)
 
 No manual copy from `deployed_contracts.json` is required. Stale addresses only happen if you skip
@@ -145,7 +145,7 @@ deploy).
 **Fix:**
 
 1. Set `CRISP_PROOF_AGGREGATION_ENABLED=true` in `crisp.dev.env` (and matching `CRISP_BFV_PRESET`)
-2. `pnpm dev:setup` then `rm -rf .enclave/data && pnpm dev:up`
+2. `pnpm dev:setup` then `rm -rf .interfold/data && pnpm dev:up`
 3. `pnpm cli init`
 
 ### `POST /rounds/current` → 500
@@ -162,8 +162,8 @@ RPC is running. Harmless for CRISP-on-Anvil.
 ### After changing mode
 
 1. Fresh deploy (`clean:deployments` + deploy script for chosen mode)
-2. Sync `.env` / `enclave.config.yaml`
-3. `rm -rf .enclave/data`
+2. Sync `.env` / `interfold.config.yaml`
+3. `rm -rf .interfold/data`
 4. Restart stack + `pnpm cli init`
 
 ---
@@ -175,6 +175,6 @@ RPC is running. Harmless for CRISP-on-Anvil.
 | `pnpm dev:setup` | Skips `build:circuits`; sets aggregation `false` in `server/.env` | `pnpm build:circuits --preset …`; sets aggregation `true` |
 | `pnpm dev:up`    | Mock BFV verifiers                                                | `ENABLE_ZK_VERIFICATION=true` + prints env vars           |
 
-See also: `packages/enclave-contracts/scripts/deployEnclave.ts`,
-`packages/enclave-contracts/contracts/verifiers/bfv/BfvPkVerifier.sol`, and
+See also: `packages/interfold-contracts/scripts/deployInterfold.ts`,
+`packages/interfold-contracts/contracts/verifiers/bfv/BfvPkVerifier.sol`, and
 `agent/flow-trace/04_DKG_AND_COMPUTATION.md` for the full DKG publication flow.

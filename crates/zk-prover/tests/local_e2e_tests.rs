@@ -29,7 +29,6 @@ use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
-use e3_zk_helpers::circuits::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;
 use e3_zk_helpers::circuits::{
     commitments::{
         compute_aggregated_shares_commitment, compute_dkg_pk_commitment,
@@ -57,7 +56,6 @@ use e3_zk_helpers::threshold::{
     },
 };
 use e3_zk_helpers::CiphernodesCommitteeSize;
-use e3_zk_helpers::Computation;
 use e3_zk_helpers::{
     compute_pk_aggregation_commitment, compute_share_computation_sk_commitment,
     compute_threshold_pk_commitment,
@@ -78,8 +76,8 @@ fn aggregate_dkg_decrypted_shares_to_crt(
         let mut coeffs = vec![num_bigint::BigInt::from(0u64); n];
         for coeff_idx in 0..n {
             let mut sum = Fr::zero();
-            for party in 0..h {
-                let bytes = bigint_to_field_bytes32(&decrypted_shares[party][mod_idx][coeff_idx]);
+            for share in decrypted_shares.iter().take(h) {
+                let bytes = bigint_to_field_bytes32(&share[mod_idx][coeff_idx]);
                 sum += Fr::from_be_bytes_mod_order(&bytes);
             }
             coeffs[coeff_idx] = fr_to_bigint(sum);
@@ -133,7 +131,7 @@ fn fr_to_bigint(f: Fr) -> num_bigint::BigInt {
 fn public_signals_to_fields(signals: &[u8]) -> Vec<Fr> {
     signals
         .chunks(32)
-        .map(|chunk| Fr::from_be_bytes_mod_order(chunk))
+        .map(Fr::from_be_bytes_mod_order)
         .collect()
 }
 
@@ -478,7 +476,7 @@ macro_rules! e2e_proof_tests {
                         return;
                     };
 
-                    let artifacts_dir = preset.artifacts_dir();
+                    let artifacts_dir = preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
                     let proof = circuit
                         .prove_with_variant(&prover, &preset, &sample, e3_id, $variant, &artifacts_dir)
                         .expect("proof generation should succeed");
@@ -523,7 +521,8 @@ async fn test_pk_generation_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("proof generation should succeed");
@@ -539,11 +538,8 @@ async fn test_pk_generation_commitment_consistency() {
         &computation_output.inputs.sk,
         computation_output.bits.sk_bit,
     );
-    let (threshold_params, _) = build_pair_for_preset(preset).expect("preset pair");
-    let a = deterministic_crp_crt_polynomial(&threshold_params).expect("crp polynomial");
     let pk_commitment_expected = compute_threshold_pk_commitment(
         &computation_output.inputs.pk0is,
-        &a,
         computation_output.bits.pk_bit,
     );
 
@@ -571,7 +567,8 @@ async fn test_pk_bfv_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("proof generation should succeed");
@@ -610,7 +607,8 @@ async fn test_share_computation_sk_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("inner sk_share_computation proof should succeed");
@@ -643,7 +641,8 @@ async fn test_share_computation_e_sm_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove(&prover, &preset, &sample, e3_id, &artifacts_dir)
         .expect("inner e_sm_share_computation proof should succeed");
@@ -676,7 +675,8 @@ async fn test_pk_aggregation_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove_with_variant(
             &prover,
@@ -706,7 +706,7 @@ async fn test_pk_aggregation_commitment_consistency() {
 
     let expected_final_commitment = compute_pk_aggregation_commitment(
         &computation_output.inputs.pk0_agg,
-        &computation_output.inputs.pk1_agg,
+        &computation_output.inputs.crp,
         computation_output.bits.pk_bit,
     );
     let final_commitment_from_proof = extract_field_from_end(&proof.public_signals, 0);
@@ -727,7 +727,8 @@ async fn test_threshold_share_decryption_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove_with_variant(
             &prover,
@@ -770,7 +771,8 @@ async fn test_c4_sk_commitment_is_c6_expected_sk_input_e2e() {
 
     let e3_id_c4 = "c4-e2e";
     let e3_id_c6 = "c6-e2e";
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
 
     let c4_proof = DkgShareDecryptionCircuit
         .prove_with_variant(
@@ -854,12 +856,12 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
     let agg_sk = aggregate_dkg_decrypted_shares_to_crt(&dkg_out.inputs.decrypted_shares);
 
     let sk_poly = agg_sk
-        .to_fhe_polynomial(&ctx, moduli)
+        .to_fhe_polynomial(ctx, moduli)
         .expect("agg_sk -> Poly")
         .into_ntt();
     let es_poly = c6_sample
         .e
-        .to_fhe_polynomial(&ctx, moduli)
+        .to_fhe_polynomial(ctx, moduli)
         .expect("e -> Poly");
 
     let trbfv =
@@ -874,7 +876,8 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
 
     let e3_id_c4 = "c4-align";
     let e3_id_c6 = "c6-align";
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
 
     let c4_proof = DkgShareDecryptionCircuit
         .prove_with_variant(
@@ -945,7 +948,8 @@ async fn test_decrypted_shares_aggregation_commitment_consistency() {
         return;
     };
 
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir =
+        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Micro.as_str());
     let proof = circuit
         .prove_with_variant(
             &prover,

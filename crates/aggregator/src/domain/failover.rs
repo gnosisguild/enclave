@@ -30,6 +30,7 @@ use std::time::Duration;
 
 /// The progress an aggregator round can be waiting on. Used to scope which
 /// absence of progress should arm the failover timer.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AggregatorPhase {
     /// Waiting for the public key to be published on-chain (DKG output).
@@ -42,6 +43,7 @@ pub enum AggregatorPhase {
 
 /// Policy parameters for failover. A single wall-clock budget governs how long
 /// the active aggregator may be silent before the next standby is promoted.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub struct FailoverPolicy {
     /// How long the expected on-chain progress may be absent before the active
@@ -49,6 +51,7 @@ pub struct FailoverPolicy {
     timeout: Duration,
 }
 
+#[allow(dead_code)]
 impl FailoverPolicy {
     pub fn new(timeout: Duration) -> Self {
         Self { timeout }
@@ -60,6 +63,7 @@ impl FailoverPolicy {
 }
 
 /// The outcome of a liveness evaluation for one E3.
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FailoverDecision {
     /// The round is settled or making progress within budget; do nothing.
@@ -90,6 +94,7 @@ pub enum FailoverDecision {
 ///   `standbys[0].0` when present.
 ///
 /// Deterministic and clock-free.
+#[allow(dead_code)]
 pub fn decide_failover(
     policy: &FailoverPolicy,
     phase: AggregatorPhase,

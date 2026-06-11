@@ -41,11 +41,7 @@ impl HlcState {
     }
 
     pub fn is_ready(&self) -> bool {
-        if let HlcState::Init = self {
-            false
-        } else {
-            true
-        }
+        !matches!(self, HlcState::Init)
     }
 }
 
@@ -73,6 +69,12 @@ impl HlcMethods for HlcState {
 #[derive(Clone)]
 pub struct HlcFactory {
     hlc: Arc<Mutex<HlcState>>,
+}
+
+impl Default for HlcFactory {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl HlcFactory {

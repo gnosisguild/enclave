@@ -19,6 +19,7 @@ use crate::witness::{CompiledCircuit, WitnessGenerator};
 use alloy::primitives::Address;
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use e3_fhe_params::BfvPreset;
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use serde::Serialize;
 use std::time::Instant;
 
@@ -162,7 +163,10 @@ fn push_step(timings: &mut Vec<FoldProveStepTiming>, step: &str, started: Instan
     });
 }
 
-/// Run C2abFold → C3 folds → C3abFold → C4abFold → NodeFold; returns a [`CircuitName::NodeFold`] proof.
+/// Run C2abFold || (C3a fold || C3b fold) → C3abFold → C4abFold → NodeFold; returns a [`CircuitName::NodeFold`] proof.
+///
+/// C2abFold and the two C3 fold chains are mutually independent and run concurrently via
+/// `rayon::join`. C3a and C3b are also independent of each other and run as a nested join.
 pub fn prove_node_dkg_fold(
     prover: &ZkProver,
     input: &NodeDkgFoldInput,
@@ -189,37 +193,67 @@ pub fn prove_node_dkg_fold(
         c2a_key_hash: c2a_vk.key_hash.clone(),
         c2b_key_hash: c2b_vk.key_hash.clone(),
     };
-    let t = Instant::now();
-    let c2ab_proof = build_and_prove_recursive_bin(
-        prover,
-        CircuitName::C2abFold,
-        &c2ab,
-        &format!("{e3_id}-c2ab"),
-        artifacts_dir,
-    )?;
-    push_step(&mut step_timings, "c2ab_fold", t);
 
-    let t = Instant::now();
-    let c3a_folded = generate_sequential_c3_fold(
-        prover,
-        input.c3a_inner_proofs,
-        input.c3_slot_indices_a,
-        input.c3_total_slots,
-        &format!("{e3_id}-c3a"),
-        artifacts_dir,
-    )?;
-    push_step(&mut step_timings, "c3a_fold", t);
+    // c2ab_fold is independent of the c3 chains; c3a and c3b are independent of each other.
+    // Run all three concurrently: c2ab || (c3a || c3b).
+    let ((c2ab_result, c2ab_elapsed), ((c3a_result, c3a_elapsed), (c3b_result, c3b_elapsed))) =
+        rayon::join(
+            || {
+                let t = Instant::now();
+                let r = build_and_prove_recursive_bin(
+                    prover,
+                    CircuitName::C2abFold,
+                    &c2ab,
+                    &format!("{e3_id}-c2ab"),
+                    artifacts_dir,
+                );
+                (r, t.elapsed())
+            },
+            || {
+                rayon::join(
+                    || {
+                        let t = Instant::now();
+                        let r = generate_sequential_c3_fold(
+                            prover,
+                            input.c3a_inner_proofs,
+                            input.c3_slot_indices_a,
+                            input.c3_total_slots,
+                            &format!("{e3_id}-c3a"),
+                            artifacts_dir,
+                        );
+                        (r, t.elapsed())
+                    },
+                    || {
+                        let t = Instant::now();
+                        let r = generate_sequential_c3_fold(
+                            prover,
+                            input.c3b_inner_proofs,
+                            input.c3_slot_indices_b,
+                            input.c3_total_slots,
+                            &format!("{e3_id}-c3b"),
+                            artifacts_dir,
+                        );
+                        (r, t.elapsed())
+                    },
+                )
+            },
+        );
 
-    let t = Instant::now();
-    let c3b_folded = generate_sequential_c3_fold(
-        prover,
-        input.c3b_inner_proofs,
-        input.c3_slot_indices_b,
-        input.c3_total_slots,
-        &format!("{e3_id}-c3b"),
-        artifacts_dir,
-    )?;
-    push_step(&mut step_timings, "c3b_fold", t);
+    let c2ab_proof = c2ab_result?;
+    step_timings.push(FoldProveStepTiming {
+        step: "c2ab_fold".to_string(),
+        seconds: c2ab_elapsed.as_secs_f64(),
+    });
+    let c3a_folded = c3a_result?;
+    step_timings.push(FoldProveStepTiming {
+        step: "c3a_fold".to_string(),
+        seconds: c3a_elapsed.as_secs_f64(),
+    });
+    let c3b_folded = c3b_result?;
+    step_timings.push(FoldProveStepTiming {
+        step: "c3b_fold".to_string(),
+        seconds: c3b_elapsed.as_secs_f64(),
+    });
 
     let c3_fold_vk = vk::load_vk_artifacts(
         &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
@@ -335,6 +369,8 @@ pub fn prove_node_dkg_fold(
 /// Inputs for [`prove_dkg_aggregation`].
 pub struct DkgAggregationInput<'a> {
     pub node_fold_proofs: &'a [Proof],
+    /// Pre-computed nodes_fold accumulator. When `Some`, the sequential fold is skipped.
+    pub nodes_fold_proof: Option<&'a Proof>,
     pub c5_proof: &'a Proof,
     /// Honest party ids in the same order as `node_fold_proofs` (e.g. sorted ascending).
     pub party_ids: &'a [u64],
@@ -365,8 +401,9 @@ pub fn prove_dkg_aggregation(
     input: &DkgAggregationInput,
     e3_id: &str,
     preset: BfvPreset,
+    committee: CiphernodesCommitteeSize,
 ) -> Result<Proof, ZkError> {
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir = prover.resolve_artifacts_dir(preset, committee.as_str());
     let artifacts_dir = artifacts_dir.as_str();
     if input.node_fold_proofs.len() != input.party_ids.len() {
         return Err(ZkError::InvalidInput(
@@ -395,15 +432,19 @@ pub fn prove_dkg_aggregation(
             "DkgAggregator honest-set H must equal registered committee size until expulsion enables H < N"
         );
     }
-    let slot_indices: Vec<u32> = (0u32..h as u32).collect();
-    let nodes_fold_proof = generate_sequential_nodes_fold(
-        prover,
-        input.node_fold_proofs,
-        &slot_indices,
-        h,
-        &format!("{e3_id}-nodesfold"),
-        artifacts_dir,
-    )?;
+    let nodes_fold_proof = if let Some(precomputed) = input.nodes_fold_proof {
+        precomputed.clone()
+    } else {
+        let slot_indices: Vec<u32> = (0u32..h as u32).collect();
+        generate_sequential_nodes_fold(
+            prover,
+            input.node_fold_proofs,
+            &slot_indices,
+            h,
+            &format!("{e3_id}-nodesfold"),
+            artifacts_dir,
+        )?
+    };
 
     let nodes_fold_vk = vk::load_vk_artifacts(
         &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
@@ -495,8 +536,9 @@ pub fn prove_decryption_aggregation_jobs(
     committee_addresses: &[Address],
     e3_id: &str,
     preset: BfvPreset,
+    committee: CiphernodesCommitteeSize,
 ) -> Result<Vec<Proof>, ZkError> {
-    let artifacts_dir = preset.artifacts_dir();
+    let artifacts_dir = prover.resolve_artifacts_dir(preset, committee.as_str());
     let artifacts_dir = artifacts_dir.as_str();
     // VKs and the compiled circuit are job-independent: load once, reuse per ciphertext.
     let c6_fold_vk = vk::load_vk_artifacts(
