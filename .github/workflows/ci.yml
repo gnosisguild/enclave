@@ -212,6 +212,8 @@ jobs:
         run: 'pnpm install --frozen-lockfile'
 
       - name: Run Integration Tests
+        env:
+          BENCHMARK_PROOF_AGGREGATION: 'false'
         run: 'cargo test --test integration -- --nocapture'
 
   zk_prover_integration:
