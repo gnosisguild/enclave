@@ -1639,10 +1639,11 @@ mod tests {
     #[test]
     fn committee_size_unchanged_after_slash() {
         let me = signer(1);
-        let committee: Vec<Address> = (1..=10u8).map(|b| signer(b).address()).collect();
+        // Micro committee (T=4, N=9) — canonical pair in `from_threshold`.
+        let committee: Vec<Address> = (1..=9u8).map(|b| signer(b).address()).collect();
         let mut v = voting_with(&me, committee.clone(), 4);
 
-        let slashed = committee[9];
+        let slashed = committee[8];
         v.on_slash_executed(SlashExecuted {
             e3_id: v.e3_id.clone(),
             proposal_id: 1,
@@ -1651,8 +1652,10 @@ mod tests {
             ticket_amount: 0,
             license_amount: 0,
         });
-        assert_eq!(v.committee.len(), 9);
-        assert!(CiphernodesCommitteeSize::from_threshold(4, v.committee.len()).is_err());
+        assert_eq!(v.committee.len(), 8);
+        assert_eq!(v.committee_n, 9);
+        // Shrunken roster must not drive circuit resolution.
+        assert!(CiphernodesCommitteeSize::from_threshold(v.threshold_m, v.committee.len()).is_err());
         assert_eq!(
             CiphernodesCommitteeSize::from_threshold(v.threshold_m, v.committee_n).unwrap(),
             CiphernodesCommitteeSize::Micro
