@@ -38,7 +38,7 @@ contract FakeInterfold {
   function getE3(uint256 _e3Id) external view returns (E3 memory e3) {
     e3 = E3({
       seed: 123456789012,
-      committeeSize: CommitteeSize.Micro,
+      committeeSize: CommitteeSize.Minimum,
       requestBlock: 18750000,
       inputWindow: [uint256(18750100), uint256(18750200)],
       encryptionSchemeId: bytes32(keccak256("AES-256-GCM")),
@@ -56,10 +56,9 @@ contract FakeInterfold {
 }
 
 enum CommitteeSize {
+  Minimum,
   Micro,
-  Small,
-  Medium,
-  Large
+  Small
 }
 
 struct E3 {

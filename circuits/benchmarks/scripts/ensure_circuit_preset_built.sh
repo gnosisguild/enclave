@@ -2,7 +2,7 @@
 # Ensure Noir circuit artifacts exist for a benchmark preset (insecure-512 | secure-8192).
 #
 # Usage (from repo root):
-#   ./circuits/benchmarks/scripts/ensure_circuit_preset_built.sh <preset> [--committee micro|small|medium|large] [--force-build] [--verbose]
+#   ./circuits/benchmarks/scripts/ensure_circuit_preset_built.sh <preset> [--committee minimum|micro|small] [--force-build] [--verbose]
 #
 # Default: pnpm build:circuits --skip-if-built --no-clean --no-clean-targets (fast re-runs).
 # --force-build: full rebuild (wipes dist/circuits and circuits/bin targets via build:circuits).
@@ -15,7 +15,7 @@ FORCE_BUILD=false
 VERBOSE=false
 
 usage() {
-    echo "Usage: $0 <insecure-512|secure-8192> [--committee micro|small|medium|large] [--force-build] [--verbose]"
+    echo "Usage: $0 <insecure-512|secure-8192> [--committee minimum|micro|small] [--force-build] [--verbose]"
 }
 
 require_arg_value() {
@@ -34,9 +34,9 @@ while [[ $# -gt 0 ]]; do
             require_arg_value "$1" "${2:-}"
             COMMITTEE="$2"
             case "$COMMITTEE" in
-                micro|small|medium|large) ;;
+                minimum|micro|small) ;;
                 *)
-                    echo "Error: --committee must be micro|small|medium|large (got: $COMMITTEE)"
+                    echo "Error: --committee must be minimum|micro|small (got: $COMMITTEE)"
                     usage
                     exit 1
                     ;;

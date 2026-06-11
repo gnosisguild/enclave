@@ -6,8 +6,8 @@
 
 use crate::domain::committee::committee_addresses_in_party_order;
 use crate::domain::publickey_aggregation::{
-    check_c1_keyshare_commitments, committee_h_for, extract_pk_commitment,
-    verify_dkg_fold_attestation, C1Dispatch, HonestSelection, PublicKeyAggregation,
+    check_c1_keyshare_commitments, extract_pk_commitment, verify_dkg_fold_attestation, C1Dispatch,
+    HonestSelection, PublicKeyAggregation,
 };
 use actix::prelude::*;
 use anyhow::Result;
@@ -163,7 +163,8 @@ impl PublicKeyAggregator {
         let PublicKeyAggregatorState::VerifyingC1 {
             submission_order,
             threshold_m,
-            threshold_n,
+            circuit_committee_n,
+            circuit_committee_h,
             c1_proofs,
             ..
         } = self
@@ -178,7 +179,7 @@ impl PublicKeyAggregator {
 
         let mut dishonest_parties = msg.dishonest_parties.clone();
         let collected = submission_order.len();
-        let circuit_h = committee_h_for(threshold_m, threshold_n)?;
+        let circuit_h = circuit_committee_h;
 
         // Retain full N committee roster (party_id → node address) for the DKG aggregator
         // `committee_members` input, which must cover all `topNodes` regardless of honesty.
@@ -302,7 +303,7 @@ impl PublicKeyAggregator {
                     aggregated_pk_bytes: pubkey.clone(),
                     params_preset: self.params_preset,
                     // C5 witness uses `committee_h` keyshares; artifact lookup needs canonical (N, H, T).
-                    committee_n: threshold_n,
+                    committee_n: circuit_committee_n,
                     committee_h,
                     committee_threshold: threshold_m,
                 },
@@ -323,7 +324,7 @@ impl PublicKeyAggregator {
             .map(|(pid, node, _)| (*pid, node.clone()))
             .collect();
 
-        let circuit_committee_n = threshold_n;
+        let circuit_committee_n = circuit_committee_n;
         let circuit_committee_h = circuit_h;
         self.state.try_mutate(&ec, |_| {
             Ok(PublicKeyAggregatorState::GeneratingC5Proof {
@@ -1650,7 +1651,7 @@ mod tests {
         Addr<HistoryCollector<InterfoldEvent>>,
         E3id,
     )> {
-        build_public_key_aggregator_with_committee(initial_state, CiphernodesCommitteeSize::Micro)
+        build_public_key_aggregator_with_committee(initial_state, CiphernodesCommitteeSize::Minimum)
             .await
     }
 
@@ -1705,7 +1706,7 @@ mod tests {
         use fhe::mbfv::PublicKeyShare;
         use fhe_traits::Serialize;
 
-        let committee = CiphernodesCommitteeSize::Medium.values();
+        let committee = CiphernodesCommitteeSize::Micro.values();
         let threshold_n = committee.n;
         let threshold_m = committee.threshold;
         let circuit_h = committee.h;
@@ -1741,7 +1742,8 @@ mod tests {
             PublicKeyAggregatorState::VerifyingC1 {
                 submission_order,
                 threshold_m,
-                threshold_n,
+                circuit_committee_n: threshold_n,
+                circuit_committee_h: circuit_h,
                 c1_proofs,
                 no_proof_parties: vec![],
             },
@@ -1775,7 +1777,7 @@ mod tests {
                     .parse()
                     .expect("test address")],
                 params_preset: BfvPreset::InsecureThreshold512,
-                committee_size: CiphernodesCommitteeSize::Micro,
+                committee_size: CiphernodesCommitteeSize::Minimum,
             }),
             correlation_id,
             e3_id.clone(),
@@ -1925,7 +1927,7 @@ mod tests {
                 bus,
                 e3_id: e3_id.clone(),
                 params_preset: BfvPreset::InsecureThreshold512,
-                committee_size: CiphernodesCommitteeSize::Medium,
+                committee_size: CiphernodesCommitteeSize::Micro,
             },
             test_state(initial_state),
         );

@@ -336,7 +336,7 @@ emit_measurement_methodology() {
 | **isolated_nargo** | `benchmark_circuit.sh` per circuit | Single `bb prove` on oracle witness, one circuit at a time | Full protocol pipeline (different witness path) |
 | **tracked_job_wall** | `MultithreadReport` per `ComputeRequest` | Wall time of each job on the shared Rayon pool (≤ `BENCHMARK_MULTITHREAD_JOBS` concurrent) | End-to-end time — **sums exceed wall clock** when jobs overlap |
 
-**Harness limits (integration):** all ciphernodes share one process and bus (`network_model: in_process_bus`); sortition registers extra nodes; `testmode_*` enabled. Compare runs only with the same `benchmark_mode`, proof-aggregation flag, `BENCHMARK_MULTITHREAD_JOBS`, commit, and hardware.
+**Harness limits (integration):** all ciphernodes share one process and bus (`network_model: in_process_bus`); sortition registers extra nodes; `testmode_*` enabled; proof aggregation always enabled. Compare runs only with the same `benchmark_mode`, committee, `BENCHMARK_MULTITHREAD_JOBS`, commit, and hardware.
 
 ---
 EOF
@@ -544,8 +544,6 @@ emit_run_configuration_section() {
         echo "| CPU cores (host) | $cores_avail |"
         if [ -n "$fold_verifier" ] && [ "$fold_verifier" != "null" ]; then
             echo "| \`dkg_fold_attestation_verifier\` (EIP-712) | \`$fold_verifier\` |"
-        elif [ "$proof_agg" = "false" ]; then
-            echo "| \`dkg_fold_attestation_verifier\` | _(disabled — proof aggregation off)_ |"
         fi
         if [ -n "$entire_test_sec" ] && [ "$entire_test_sec" != "null" ]; then
             echo "| Integration wall clock (\`Entire Test\`) | $(format_s "$entire_test_sec") s |"
@@ -800,14 +798,6 @@ if [ -n "$INTEGRATION_BLOB" ]; then
                 echo "| $step | $(format_s "$avgr") | $runs | $(format_s "$tot") |" >> "$OUTPUT_FILE"
             done <<<"$fold_rows"
         fi
-    fi
-
-    # NOTE: cannot use `// true` here — jq's `//` treats `false` as null and
-    # would incorrectly return `true` when aggregation is explicitly disabled.
-    agg_enabled=$(jq -r 'if .proof_aggregation_enabled == false then "false" else "true" end' <<<"$INTEGRATION_BLOB")
-    if [ "$agg_enabled" = "false" ]; then
-        echo "" >> "$OUTPUT_FILE"
-        echo "_Baseline run: node DKG folds and folded Π_DKG / Π_dec export are disabled. Compare with \`BENCHMARK_PROOF_AGGREGATION=true\` (default)._" >> "$OUTPUT_FILE"
     fi
 
     if jq -e '(.operation_timings | type == "array") and (.operation_timings | length > 0)' <<<"$INTEGRATION_BLOB" >/dev/null 2>&1; then

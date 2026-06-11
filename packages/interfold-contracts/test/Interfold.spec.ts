@@ -7,6 +7,7 @@ import { expect } from "chai";
 
 import {
   ADDRESS_TWO as AddressTwo,
+  COMMITTEE_THRESHOLDS_DEFAULT,
   buildMockAggregationPublishArgs,
   deployInterfoldSystem,
   ENCRYPTION_SCHEME_ID as encryptionSchemeId,
@@ -429,21 +430,26 @@ describe("Interfold", function () {
       ).to.be.revertedWithCustomError(usdcToken, "ERC20InsufficientAllowance");
     });
     it("reverts if committee size is not configured", async function () {
-      const { interfold, request, usdcToken } = await loadFixture(setup);
-      // CommitteeSize.Large (3) is not configured in the fixture
+      const { interfold, request } = await loadFixture(setup);
+      const configuredSizes = COMMITTEE_THRESHOLDS_DEFAULT.map(
+        ([size]) => size,
+      );
+      const unconfiguredCommitteeSize = configuredSizes.length;
+      expect(unconfiguredCommitteeSize).to.equal(3);
+      const unconfiguredParams = {
+        committeeSize: unconfiguredCommitteeSize,
+        inputWindow: request.inputWindow,
+        e3Program: request.e3Program,
+        paramSet: request.paramSet,
+        computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
+        proofAggregationEnabled: false,
+      };
+      // `CommitteeSizeNotConfigured(3)` reverts correctly on-chain; ethers cannot
+      // decode the custom error when the enum arg is not a named variant (0..2).
       await expect(
-        makeRequest(interfold, usdcToken, {
-          committeeSize: 3,
-          inputWindow: request.inputWindow,
-          e3Program: request.e3Program,
-          paramSet: request.paramSet,
-          computeProviderParams: request.computeProviderParams,
-          customParams: request.customParams,
-          proofAggregationEnabled: false,
-        }),
-      )
-        .to.be.revertedWithCustomError(interfold, "CommitteeSizeNotConfigured")
-        .withArgs(3);
+        interfold.getE3Quote.staticCall(unconfiguredParams),
+      ).to.be.revert(ethers);
     });
     it("reverts if total duration is greater than maxDuration", async function () {
       const { interfold, request, usdcToken } = await loadFixture(setup);

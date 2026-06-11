@@ -104,7 +104,7 @@ describe("E3 Pricing", function () {
       const { interfold, request, ciphernodeRegistryContract } =
         await loadFixture(setup);
 
-      // Get the resolved threshold for Micro (committeeSize = 0) → [1, 3]
+      // Get the resolved threshold for Minimum (committeeSize = 0) → [1, 3]
       const n = 3n; // total committee
       const m = 1n; // quorum
 
@@ -148,18 +148,18 @@ describe("E3 Pricing", function () {
     it("fee increases with larger committee size", async function () {
       const { interfold, request } = await loadFixture(setup);
 
-      const microFee = await interfold.getE3Quote(request);
+      const minimumFee = await interfold.getE3Quote(request);
 
-      // Build request with Small committee (larger)
+      // Build request with Micro committee (larger)
       const now = await time.latest();
-      const smallRequest = {
+      const microRequest = {
         ...request,
-        committeeSize: 1, // Small → [2, 5]
+        committeeSize: 1, // Micro → [4, 9]
         inputWindow: [now + 10, now + inputWindowDuration] as [number, number],
       };
-      const smallFee = await interfold.getE3Quote(smallRequest);
+      const microFee = await interfold.getE3Quote(microRequest);
 
-      expect(smallFee).to.be.gt(microFee);
+      expect(microFee).to.be.gt(minimumFee);
     });
 
     it("fee increases with longer input window", async function () {

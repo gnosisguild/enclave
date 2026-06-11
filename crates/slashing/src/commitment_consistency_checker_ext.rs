@@ -17,6 +17,7 @@ use async_trait::async_trait;
 use e3_events::{BusHandle, CommitmentLink, Event, InterfoldEvent, InterfoldEventData};
 use e3_fhe_params::BfvPreset;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use tracing::{error, info};
 
 type LinksFactory = Box<dyn Fn(BfvPreset) -> Vec<Box<dyn CommitmentLink>> + Send + Sync>;
@@ -63,7 +64,12 @@ impl E3Extension for CommitmentConsistencyCheckerExtension {
         info!("Starting CommitmentConsistencyChecker for E3 {}", e3_id);
 
         let links = (self.links_factory)(meta.params_preset);
-        let addr = CommitmentConsistencyChecker::setup(&self.bus, e3_id, links);
+        let committee_h =
+            CiphernodesCommitteeSize::from_threshold(meta.threshold_m, meta.threshold_n)
+                .expect("committee size must be canonical at CommitteeFinalized")
+                .values()
+                .h;
+        let addr = CommitmentConsistencyChecker::setup(&self.bus, e3_id, links, committee_h);
 
         ctx.set_event_recipient("commitment_consistency_checker", Some(addr.into()));
     }

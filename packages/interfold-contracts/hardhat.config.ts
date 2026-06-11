@@ -112,6 +112,11 @@ const config: HardhatUserConfig = {
       chainId: chainIds.hardhat,
       type: "edr-simulated",
       chainType: "l1",
+      // Honk aggregator verify.staticCall uses ~3–4M gas in normal runs. The 1B limit is
+      // artificial Hardhat headroom (not a mainnet constraint) so BfvVkBindingIntegration
+      // can set block + tx gas via HONK_VERIFY_GAS_LIMIT / networkHelpers.setBlockGasLimit.
+      // Under --coverage those on-chain verifies are skipped (instrumented verifiers OOG).
+      blockGasLimit: 1_000_000_000,
     },
     localhost: {
       accounts: {

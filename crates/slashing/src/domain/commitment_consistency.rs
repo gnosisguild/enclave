@@ -71,16 +71,24 @@ pub(crate) struct PreZkOutcome {
 pub(crate) struct CommitmentConsistency {
     e3_id: E3id,
     links: Vec<Box<dyn CommitmentLink>>,
+    /// Canonical honest-party count H. C4 `expected_commitments` only bind the lowest H
+    /// senders; C2 proofs from `party_id >= H` are outside the circuit roster.
+    committee_h: usize,
     /// Verified proof outputs: `(address, proof_type) → data`.
     /// Multiple proofs per key are supported (e.g. N-1 C3a proofs per sender).
     verified: HashMap<(Address, ProofType), Vec<VerifiedProofData>>,
 }
 
 impl CommitmentConsistency {
-    pub(crate) fn new(e3_id: E3id, links: Vec<Box<dyn CommitmentLink>>) -> Self {
+    pub(crate) fn new(
+        e3_id: E3id,
+        links: Vec<Box<dyn CommitmentLink>>,
+        committee_h: usize,
+    ) -> Self {
         Self {
             e3_id,
             links,
+            committee_h,
             verified: HashMap::new(),
         }
     }
@@ -170,6 +178,9 @@ impl CommitmentConsistency {
                         continue;
                     }
                     for src in srcs {
+                        if self.skip_c2_to_c4_source(src_type, src.party_id) {
+                            continue;
+                        }
                         let vals = link.extract_source_values(&src.public_signals);
                         if vals.is_empty() {
                             continue;
@@ -220,6 +231,9 @@ impl CommitmentConsistency {
                         continue;
                     }
                     for src in srcs {
+                        if self.skip_c2_to_c4_source(src_type, src.party_id) {
+                            continue;
+                        }
                         let vals = link.extract_source_values(&src.public_signals);
                         if vals.is_empty() {
                             continue;
@@ -247,6 +261,14 @@ impl CommitmentConsistency {
                 mismatches
             }
         }
+    }
+
+    /// C4 circuits only witness `expected_commitments` for the lowest `H` senders.
+    fn skip_c2_to_c4_source(&self, proof_type: ProofType, party_id: u64) -> bool {
+        matches!(
+            proof_type,
+            ProofType::C2aSkShareComputation | ProofType::C2bESmShareComputation
+        ) && party_id as usize >= self.committee_h
     }
 
     /// Build the [`CommitmentConsistencyViolation`] for a mismatch, computing
@@ -504,7 +526,7 @@ mod tests {
 
     #[test]
     fn consistent_same_party_proofs_emit_no_violation() {
-        let mut svc = CommitmentConsistency::new(e3(), vec![same_party_link()]);
+        let mut svc = CommitmentConsistency::new(e3(), vec![same_party_link()], 2);
         let a = addr(1);
 
         // Target first (C2) so the source check has something to compare to.
@@ -532,7 +554,7 @@ mod tests {
 
     #[test]
     fn mismatched_same_party_proofs_emit_violation() {
-        let mut svc = CommitmentConsistency::new(e3(), vec![same_party_link()]);
+        let mut svc = CommitmentConsistency::new(e3(), vec![same_party_link()], 2);
         let a = addr(2);
 
         svc.on_proof_verified(passed(
@@ -571,7 +593,7 @@ mod tests {
 
     #[test]
     fn zero_data_hash_mismatch_is_skipped() {
-        let mut svc = CommitmentConsistency::new(e3(), vec![same_party_link()]);
+        let mut svc = CommitmentConsistency::new(e3(), vec![same_party_link()], 2);
         let a = addr(3);
 
         svc.on_proof_verified(passed(
@@ -598,7 +620,7 @@ mod tests {
 
     #[test]
     fn foreign_e3_id_is_ignored() {
-        let mut svc = CommitmentConsistency::new(e3(), vec![same_party_link()]);
+        let mut svc = CommitmentConsistency::new(e3(), vec![same_party_link()], 2);
         let other = E3id::new("999", 31337);
         let a = addr(4);
 
@@ -626,7 +648,7 @@ mod tests {
 
     #[test]
     fn pre_zk_check_flags_and_evicts_inconsistent_party() {
-        let mut svc = CommitmentConsistency::new(e3(), vec![same_party_link()]);
+        let mut svc = CommitmentConsistency::new(e3(), vec![same_party_link()], 2);
         let honest = addr(5);
         let faulty = addr(6);
 
@@ -697,5 +719,37 @@ mod tests {
             signals(0x42),
         ));
         assert!(v.is_empty(), "evicted faulty party must not resurface");
+    }
+
+    #[test]
+    fn c2_sender_at_or_above_h_skips_c4_cross_check() {
+        let link = Box::new(TestLink {
+            scope: LinkScope::SourceMustExistInTargets,
+            source: ProofType::C2aSkShareComputation,
+            target: ProofType::C4aSkShareDecryption,
+        });
+        let mut svc = CommitmentConsistency::new(e3(), vec![link], 2);
+
+        // Party 2 (>= H) C2 cannot appear in C4 rows; must not be faulted.
+        svc.on_proof_verified(passed(
+            e3(),
+            2,
+            addr(0x22),
+            ProofType::C2aSkShareComputation,
+            [0xc2; 32],
+            signals(0x22),
+        ));
+        let violations = svc.on_proof_verified(passed(
+            e3(),
+            1,
+            addr(0x11),
+            ProofType::C4aSkShareDecryption,
+            [0xc4; 32],
+            signals(0x11),
+        ));
+        assert!(
+            violations.is_empty(),
+            "party_id >= H must be outside C4 expected_commitments roster"
+        );
     }
 }

@@ -20,8 +20,8 @@ use sha2::{Digest, Sha256};
 use std::env;
 use std::path::Path;
 
-/// Default committee for downloaded release artifacts (micro matches dev/CI convention).
-const RELEASE_COMMITTEE: CiphernodesCommitteeSize = CiphernodesCommitteeSize::Micro;
+/// Default committee for downloaded release artifacts (minimum matches dev/CI convention).
+const RELEASE_COMMITTEE: CiphernodesCommitteeSize = CiphernodesCommitteeSize::Minimum;
 
 fn preset_committee_dir(circuits_dir: &Path, preset: &BfvPreset) -> std::path::PathBuf {
     circuits_dir.join(preset.artifacts_dir_for_committee(RELEASE_COMMITTEE.as_str()))

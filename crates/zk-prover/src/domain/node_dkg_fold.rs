@@ -150,7 +150,7 @@ mod tests {
             committee_h: 2,
             n_moduli: 2,
             params_preset: e3_fhe_params::BfvPreset::InsecureThreshold512,
-            committee_size: CiphernodesCommitteeSize::Micro,
+            committee_size: CiphernodesCommitteeSize::Minimum,
         }
     }
 

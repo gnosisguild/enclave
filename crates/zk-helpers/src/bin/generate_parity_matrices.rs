@@ -11,7 +11,7 @@
 //!
 //! Usage:
 //!     cargo run --release --bin generate_parity_matrices -- \
-//!         --committee <micro|small|medium|large> \
+//!         --committee <minimum|micro|small> \
 //!         [--output-root <path-to-circuits/lib/src/configs/committee>]
 //!
 //! The Noir literal is produced by
@@ -34,7 +34,7 @@ use e3_zk_helpers::circuits::dkg::share_computation::utils::parity_matrix_consta
     about = "Regenerate parity_{insecure,secure}.nr for a committee."
 )]
 struct Args {
-    /// Committee name (`micro`, `small`, `medium`, `large`). Determines `(N, T)`.
+    /// Committee name (`minimum`, `micro`, `small`). Determines `(N, T)`.
     #[arg(long)]
     committee: String,
 
