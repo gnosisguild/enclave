@@ -4,16 +4,30 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+import { SDKError } from '../utils'
+
 export interface ContractAddresses {
   interfold: `0x${string}`
   ciphernodeRegistry: `0x${string}`
   feeToken: `0x${string}`
 }
 
+/** On-chain `IInterfold.CommitteeSize`: Minimum (N=3), Micro (N=9), Small (N=19). */
 export enum CommitteeSize {
   Minimum = 0,
   Micro = 1,
   Small = 2,
+}
+
+/** Fail fast on out-of-range committee sizes before they hit the contract. */
+export function validateCommitteeSize(value: number | CommitteeSize): CommitteeSize {
+  if (!Number.isInteger(value) || value < CommitteeSize.Minimum || value > CommitteeSize.Small) {
+    throw new SDKError(
+      `Invalid committeeSize ${value}. Use CommitteeSize.Minimum (0), CommitteeSize.Micro (1), or CommitteeSize.Small (2).`,
+      'INVALID_COMMITTEE_SIZE',
+    )
+  }
+  return value
 }
 
 export enum ParamSet {
