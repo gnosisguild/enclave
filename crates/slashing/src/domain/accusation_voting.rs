@@ -1655,7 +1655,9 @@ mod tests {
         assert_eq!(v.committee.len(), 8);
         assert_eq!(v.committee_n, 9);
         // Shrunken roster must not drive circuit resolution.
-        assert!(CiphernodesCommitteeSize::from_threshold(v.threshold_m, v.committee.len()).is_err());
+        assert!(
+            CiphernodesCommitteeSize::from_threshold(v.threshold_m, v.committee.len()).is_err()
+        );
         assert_eq!(
             CiphernodesCommitteeSize::from_threshold(v.threshold_m, v.committee_n).unwrap(),
             CiphernodesCommitteeSize::Micro
