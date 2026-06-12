@@ -1057,6 +1057,106 @@ describe("InterfoldToken", function () {
       expect(lb2).to.be.closeTo(linkAmount, ethers.parseEther("0.01"));
     });
 
+    it("linkClaim partly consumes PENDING and queues the remainder", async function () {
+      const { token, admin, alice, claimSource, amount } =
+        await deployWithUnlockedAndTge(ethers.parseEther("300"));
+      const aliceAddress = await alice.getAddress();
+      const policyId = await createLinearPolicy(token, admin, "PART_QUEUE", {
+        vestDuration: 2n * YEAR,
+      });
+
+      await token
+        .connect(alice)
+        .transfer(await claimSource.getAddress(), amount);
+
+      expect(await token.lockCount(aliceAddress)).to.equal(0n);
+      expect(await token.queuedLockCount(aliceAddress)).to.equal(0n);
+
+      await token.connect(claimSource).transfer(aliceAddress, amount);
+
+      const linkAmount = ethers.parseEther("1000");
+      await token.connect(admin).linkClaim(aliceAddress, linkAmount, policyId);
+
+      expect(await token.lockCount(aliceAddress)).to.equal(1n);
+      expect(await token.queuedLockCount(aliceAddress)).to.equal(1n);
+
+      const activeLock = await token.locks(aliceAddress, 0);
+      expect(activeLock.policyId).to.equal(policyId);
+      expect(activeLock.amount).to.equal(amount);
+
+      const queuedLock = await token.queuedLocks(aliceAddress, 0);
+      expect(queuedLock.policyId).to.equal(policyId);
+      expect(queuedLock.amount).to.equal(linkAmount - amount);
+    });
+
+    it("claim after link consumes the queued link", async function () {
+      const fixture = await loadFixture(deploy);
+      const { token, admin, alice, claimSource, ccaEnd } = fixture;
+      const aliceAddress = await alice.getAddress();
+      const policyId = await createLinearPolicy(token, admin, "CLAIM_LINK", {
+        vestDuration: 2n * YEAR,
+      });
+      const linkAmount = ethers.parseEther("500");
+
+      await token.connect(admin).linkClaim(aliceAddress, linkAmount, policyId);
+      expect(await token.queuedLockCount(aliceAddress)).to.equal(1n);
+
+      await token
+        .connect(admin)
+        .mint(await claimSource.getAddress(), linkAmount, ethers.ZeroHash);
+
+      const TGE_COOLDOWN = 45n * DAY;
+      await time.increaseTo(ccaEnd + TGE_COOLDOWN + 1n);
+      await token.tge();
+
+      await token.connect(claimSource).transfer(aliceAddress, linkAmount);
+
+      expect(await token.queuedLockCount(aliceAddress)).to.equal(0n);
+      expect(await token.lockCount(aliceAddress)).to.equal(1n);
+
+      const activeLock = await token.locks(aliceAddress, 0);
+      expect(activeLock.policyId).to.equal(policyId);
+      expect(activeLock.amount).to.equal(linkAmount);
+    });
+
+    it("claim after link fully consumes queued link and adds excess as PENDING", async function () {
+      const fixture = await loadFixture(deploy);
+      const { token, admin, alice, claimSource, ccaEnd } = fixture;
+      const aliceAddress = await alice.getAddress();
+      const policyId = await createLinearPolicy(token, admin, "LINK_PENDING", {
+        vestDuration: 2n * YEAR,
+      });
+      const linkAmount = ethers.parseEther("500");
+      const claimAmount = ethers.parseEther("700");
+      const pendingPolicyId = await token.PENDING_LOCK_POLICY_ID();
+
+      await token.connect(admin).linkClaim(aliceAddress, linkAmount, policyId);
+      await token
+        .connect(admin)
+        .mint(await claimSource.getAddress(), claimAmount, ethers.ZeroHash);
+
+      const TGE_COOLDOWN = 45n * DAY;
+      await time.increaseTo(ccaEnd + TGE_COOLDOWN + 1n);
+      await token.tge();
+
+      await token.connect(claimSource).transfer(aliceAddress, claimAmount);
+
+      expect(await token.queuedLockCount(aliceAddress)).to.equal(0n);
+      expect(await token.lockCount(aliceAddress)).to.equal(2n);
+
+      const firstLock = await token.locks(aliceAddress, 0);
+      const secondLock = await token.locks(aliceAddress, 1);
+      const locksByPolicy = new Map([
+        [firstLock.policyId, firstLock.amount],
+        [secondLock.policyId, secondLock.amount],
+      ]);
+
+      expect(locksByPolicy.get(policyId)).to.equal(linkAmount);
+      expect(locksByPolicy.get(pendingPolicyId)).to.equal(
+        claimAmount - linkAmount,
+      );
+    });
+
     it("linkClaim reverts with undefined policy", async function () {
       const { token, admin, alice } = await loadFixture(deploy);
       await expect(
