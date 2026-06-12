@@ -534,20 +534,20 @@ describe("InterfoldToken", function () {
     });
   });
 
-  describe("setLockWhitelisted", function () {
-    it("LOCK_MANAGER_ROLE can manage lock whitelist", async function () {
+  describe("setClaimLockExempt", function () {
+    it("LOCK_MANAGER_ROLE can manage claim-lock exemption", async function () {
       const { token, admin, alice } = await loadFixture(deploy);
       await expect(
-        token.connect(admin).setLockWhitelisted(await alice.getAddress(), true),
+        token.connect(admin).setClaimLockExempt(await alice.getAddress(), true),
       )
-        .to.emit(token, "LockWhitelistUpdated")
+        .to.emit(token, "ClaimLockExemptUpdated")
         .withArgs(await alice.getAddress(), true);
     });
 
-    it("non-LOCK_MANAGER_ROLE cannot manage lock whitelist", async function () {
+    it("non-LOCK_MANAGER_ROLE cannot manage claim-lock exemption", async function () {
       const { token, alice } = await loadFixture(deploy);
       await expect(
-        token.connect(alice).setLockWhitelisted(await alice.getAddress(), true),
+        token.connect(alice).setClaimLockExempt(await alice.getAddress(), true),
       ).to.be.revertedWithCustomError(
         token,
         "AccessControlUnauthorizedAccount",
@@ -968,13 +968,13 @@ describe("InterfoldToken", function () {
       );
     });
 
-    it("lockWhitelist exempts from auto-lock on claim-source transfer", async function () {
+    it("claimLockExempt exempts from auto-lock on claim-source transfer", async function () {
       const { token, admin, alice, claimSource, amount } =
         await deployWithUnlockedAndTge(ethers.parseEther("500"));
 
       await token
         .connect(admin)
-        .setLockWhitelisted(await alice.getAddress(), true);
+        .setClaimLockExempt(await alice.getAddress(), true);
 
       // Transfer tokens from alice to claimSource so claimSource can send.
       await token
@@ -985,7 +985,7 @@ describe("InterfoldToken", function () {
         .connect(claimSource)
         .transfer(await alice.getAddress(), amount);
 
-      // No lock created because recipient is lock-whitelisted.
+      // No lock created because recipient is claim-lock exempt.
       expect(await token.lockedBalanceOf(await alice.getAddress())).to.equal(
         0n,
       );

@@ -159,7 +159,8 @@ contract InterfoldToken is
     /// @notice Role authorized to manage the pre-TGE transfer whitelist.
     bytes32 public constant WHITELIST_ROLE = keccak256("WHITELIST_ROLE");
 
-    /// @notice Role authorized to create lock policies, manage the lock whitelist
+    /// @notice Role authorized to create lock policies and manage claim-lock
+    ///         exemptions.
     bytes32 public constant LOCK_MANAGER_ROLE = keccak256("LOCK_MANAGER_ROLE");
 
     /// @notice Minimum time between {CCA_END} and {tge}.
@@ -190,7 +191,7 @@ contract InterfoldToken is
     mapping(address account => bool whitelisted) public transferWhitelist;
 
     /// @notice Addresses exempt from automatic claim-source lock creation.
-    mapping(address account => bool whitelisted) public lockWhitelist;
+    mapping(address account => bool exempt) public claimLockExempt;
 
     /// @notice Write-once lock policies by id.
     mapping(bytes32 policyId => LockPolicy policy) internal lockPolicies;
@@ -220,8 +221,8 @@ contract InterfoldToken is
     /// @notice Emitted when an account's transfer whitelist status changes.
     event TransferWhitelistUpdated(address indexed account, bool whitelisted);
 
-    /// @notice Emitted when an account's lock whitelist status changes.
-    event LockWhitelistUpdated(address indexed account, bool whitelisted);
+    /// @notice Emitted when an account's claim-lock exemption status changes.
+    event ClaimLockExemptUpdated(address indexed account, bool exempt);
 
     /// @notice Emitted whenever the amount `account` holds locked under
     ///         `policyId` changes; `amount` is the new total.
@@ -335,7 +336,7 @@ contract InterfoldToken is
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Whitelistig
+    // Whitelisting
     // ─────────────────────────────────────────────────────────────────────────
 
     function setTransferWhitelisted(
@@ -347,13 +348,15 @@ contract InterfoldToken is
         emit TransferWhitelistUpdated(account, whitelisted);
     }
 
-    function setLockWhitelisted(
+    /// @notice Sets whether `account` is exempt from automatic claim-lock
+    ///         creation when receiving tokens from {CLAIM_SOURCE}.
+    function setClaimLockExempt(
         address account,
-        bool whitelisted
+        bool exempt
     ) external onlyRole(LOCK_MANAGER_ROLE) {
         if (account == address(0)) revert ZeroAddress();
-        lockWhitelist[account] = whitelisted;
-        emit LockWhitelistUpdated(account, whitelisted);
+        claimLockExempt[account] = exempt;
+        emit ClaimLockExemptUpdated(account, exempt);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -459,6 +462,24 @@ contract InterfoldToken is
         return balance > mustRetain ? balance - mustRetain : 0;
     }
 
+    /// @notice Returns the full lock policy for `policyId`, or an empty
+    ///         struct if the policy has not been defined.
+    function lockPolicyOf(
+        bytes32 policyId
+    ) external view returns (LockPolicy memory) {
+        return lockPolicies[policyId];
+    }
+
+    /// @notice Number of distinct lock policy entries for `account`.
+    function lockCount(address account) external view returns (uint256) {
+        return locks[account].length;
+    }
+
+    /// @notice Number of distinct queued lock policy entries for `account`.
+    function queuedLockCount(address account) external view returns (uint256) {
+        return queuedLocks[account].length;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Transfer hook
     // ─────────────────────────────────────────────────────────────────────────
@@ -469,7 +490,7 @@ contract InterfoldToken is
      *      2. The lock check, the sender can move at most its transferable
      *         balance
      *      3. The transfer itself, via parent contract
-     *      4. Claim-lock creation, unless the recipient is in lockWhitelist.
+     *      4. Claim-lock creation, unless the recipient is claim-lock exempt.
      */
     function _update(
         address from,
@@ -483,7 +504,7 @@ contract InterfoldToken is
             revert TransferRestricted(from, to);
         }
 
-        if (!isMint && !transferWhitelist[to] && !transferWhitelist[from]) {
+        if (!isMint) {
             uint256 transferable = transferableBalanceOf(from);
             if (value > transferable) {
                 revert InsufficientUnlockedBalance(from, transferable, value);
@@ -494,7 +515,10 @@ contract InterfoldToken is
 
         // from == CLAIM_SOURCE implies neither mint nor an unset claim source.
         if (
-            !isBurn && value != 0 && from == CLAIM_SOURCE && !lockWhitelist[to]
+            !isBurn &&
+            value != 0 &&
+            from == CLAIM_SOURCE &&
+            !claimLockExempt[to]
         ) {
             _claim(to, value);
         }
