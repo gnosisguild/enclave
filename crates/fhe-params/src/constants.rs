@@ -39,14 +39,14 @@ pub mod secure_8192 {
     /// Threshold BFV parameters
     pub mod threshold {
         pub const PLAINTEXT_MODULUS: u64 = 1000000;
-        pub const MODULI: &[u64] = &[0x02000000015a0001, 0x0200000001460001, 0x0200000001210001];
+        pub const MODULI: &[u64] = &[0x0100000000ed0001, 0x0100000000dd0001, 0x0100000000cf0001];
         pub const ERROR1_VARIANCE: &str = "18148392902450051384713312396360971277653333";
     }
 
     /// DKG parameters
     pub mod dkg {
         pub const PLAINTEXT_MODULUS: u64 = 144115188098531329;
-        pub const MODULI: &[u64] = &[0x0800000000004001, 0x0800000000044001];
+        pub const MODULI: &[u64] = &[0x0400000000270001, 0x0400000000350001];
         pub const ERROR1_VARIANCE: &str = "10";
     }
 }
