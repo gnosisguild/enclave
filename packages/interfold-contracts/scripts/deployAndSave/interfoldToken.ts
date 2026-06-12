@@ -20,6 +20,10 @@ import {
  */
 export interface InterfoldTokenArgs {
   owner?: string;
+  ccaStart?: bigint;
+  ccaEnd?: bigint;
+  claimSource?: string;
+  bondingRegistry?: string;
   hre: HardhatRuntimeEnvironment;
 }
 
@@ -36,19 +40,13 @@ async function disableTransferRestrictionsForLocal(
   console.log("Disabling transfer restrictions for chain", chain);
   console.log("Contract address", await contract.getAddress());
 
-  try {
-    const tgeTs = await contract.tgeTimestamp();
-    if (tgeTs === 0n) {
-      // Attempt TGE — will succeed only if CCA_END + 45 days has passed.
-      // On local chains the deployer should advance time manually first.
-      await (await contract.tge()).wait();
-      console.log("TGE fired for local development");
-    }
-  } catch (error: any) {
+  const tgeTs = await contract.tgeTimestamp();
+  if (tgeTs === 0n) {
     console.warn(
-      "TGE not yet available (CCA cooldown may not have passed):",
-      error.reason ?? error.message ?? error,
+      "TGE not yet fired — call tge() after advancing time past CCA_END + 45 days.",
     );
+  } else {
+    console.log("Token is already Live (TGE timestamp:", tgeTs.toString(), ")");
   }
 }
 
@@ -59,6 +57,10 @@ async function disableTransferRestrictionsForLocal(
  */
 export const deployAndSaveInterfoldToken = async ({
   owner,
+  ccaStart,
+  ccaEnd,
+  claimSource,
+  bondingRegistry,
   hre,
 }: InterfoldTokenArgs): Promise<{
   interfoldToken: InterfoldToken;
@@ -69,7 +71,14 @@ export const deployAndSaveInterfoldToken = async ({
 
   const preDeployedArgs = readDeploymentArgs("InterfoldToken", chain);
 
-  if (!owner || preDeployedArgs?.constructorArgs?.owner === owner) {
+  if (
+    !owner ||
+    ccaStart === undefined ||
+    ccaEnd === undefined ||
+    !claimSource ||
+    !bondingRegistry ||
+    preDeployedArgs?.constructorArgs?.owner === owner
+  ) {
     if (!preDeployedArgs?.address) {
       throw new Error(
         "InterfoldToken address not found, it must be deployed first",
@@ -87,7 +96,13 @@ export const deployAndSaveInterfoldToken = async ({
 
   const interfoldTokenFactory =
     await ethers.getContractFactory("InterfoldToken");
-  const interfoldToken = await interfoldTokenFactory.deploy(owner);
+  const interfoldToken = await interfoldTokenFactory.deploy(
+    owner,
+    ccaStart,
+    ccaEnd,
+    claimSource,
+    bondingRegistry,
+  );
 
   await interfoldToken.waitForDeployment();
 
@@ -99,6 +114,10 @@ export const deployAndSaveInterfoldToken = async ({
     {
       constructorArgs: {
         owner,
+        ccaStart: ccaStart.toString(),
+        ccaEnd: ccaEnd.toString(),
+        claimSource,
+        bondingRegistry,
       },
       blockNumber,
       address: interfoldTokenAddress,

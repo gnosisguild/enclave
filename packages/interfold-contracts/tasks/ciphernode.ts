@@ -279,7 +279,7 @@ export const ciphernodeMintTokens = task(
         const intfTx = await interfoldTokenContract.mint(
           ciphernodeAddress,
           ethers.parseEther(intfAmount),
-          ethers.encodeBytes32String("Ciphernode allocation"),
+          ethers.encodeBytes32String("cn-alloc"),
         );
         await intfTx.wait();
         console.log(`${intfAmount} INTF minted`);
@@ -422,9 +422,7 @@ export const ciphernodeAdminAdd = task(
         const intfTx = await interfoldTokenConnected.mint(
           adminWallet.address,
           licenseBondWei,
-          ethers.encodeBytes32String(
-            "Admin allocation for ciphernode registration",
-          ),
+          ethers.encodeBytes32String("admin-cn-reg"),
         );
         await intfTx.wait();
 

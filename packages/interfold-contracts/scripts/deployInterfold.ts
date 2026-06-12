@@ -137,6 +137,7 @@ export const deployInterfold = async (
   const encodedSecure = encodeBfvParams(BFV_PARAMS.secure8192);
 
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
+  const SEVEN_DAYS_IN_SECONDS = 60 * 60 * 24 * 7;
   const SORTITION_SUBMISSION_WINDOW = 10;
   const addressOne = "0x0000000000000000000000000000000000000001";
 
@@ -187,21 +188,25 @@ export const deployInterfold = async (
     );
   }
 
-  console.log("Deploying INTF token...");
-  const { interfoldToken } = await deployAndSaveInterfoldToken({
-    owner: ownerAddress,
-    hre,
-  });
-  const interfoldTokenAddress = await interfoldToken.getAddress();
-  console.log("InterfoldToken deployed to:", interfoldTokenAddress);
-
-  if (interfoldTokenAddress.toLowerCase() === feeTokenAddress.toLowerCase()) {
+  // ── CCA window ──────────────────────────────────────────────────────────
+  // For local dev the CCA window starts soon after deployment and runs for
+  // 7 days.  Production deployments must set INTERFOLD_CCA_START.
+  const ccaStartEnv = process.env.INTERFOLD_CCA_START;
+  let ccaStart: bigint;
+  if (ccaStartEnv?.trim()) {
+    ccaStart = parseRequiredUint64(ccaStartEnv.trim(), "INTERFOLD_CCA_START");
+  } else if (isLocalDeploymentChain(networkName)) {
+    const now = BigInt(latestBlock.timestamp);
+    ccaStart = now + 3600n; // 1 hour from now
+    console.warn(
+      `[WARN] INTERFOLD_CCA_START not set; using ${ccaStart} (block.timestamp + 1h) for local deployment.`,
+    );
+  } else {
     throw new Error(
-      "MockUSDC and InterfoldToken resolved to the same address. " +
-        "Start a fresh Anvil on http://127.0.0.1:8545 (e.g. `anvil --chain-id 31337`) " +
-        "and rerun deploy so token nonces advance separately.",
+      "INTERFOLD_CCA_START must be set for non-local token-lock deployment",
     );
   }
+  const ccaEnd = ccaStart + BigInt(SEVEN_DAYS_IN_SECONDS);
 
   console.log("Deploying InterfoldTicketToken...");
   const { interfoldTicketToken } = await deployAndSaveInterfoldTicketToken({
@@ -231,11 +236,14 @@ export const deployInterfold = async (
   const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
   console.log("CiphernodeRegistry deployed to:", ciphernodeRegistryAddress);
 
+  // BondingRegistry is deployed before INTF so its address can be passed to
+  // the token constructor.  The license token is set to address(0) temporarily
+  // and fixed after INTF is deployed via setLicenseToken().
   console.log("Deploying BondingRegistry...");
   const { bondingRegistry } = await deployAndSaveBondingRegistry({
     owner: ownerAddress,
     ticketToken: interfoldTicketTokenAddress,
-    licenseToken: interfoldTokenAddress,
+    licenseToken: ethers.ZeroAddress,
     registry: ciphernodeRegistryAddress,
     slashedFundsTreasury: ownerAddress,
     ticketPrice: ethers.parseUnits("10", 6).toString(),
@@ -247,8 +255,35 @@ export const deployInterfold = async (
   const bondingRegistryAddress = await bondingRegistry.getAddress();
   console.log("BondingRegistry deployed to:", bondingRegistryAddress);
 
-  // BONDING_REGISTRY is immutable (set at construction).
-  // Bonding transfers are always allowed pre-TGE per the phase-based gate.
+  // INTF is deployed with BondingRegistry's real address.  claimSource uses
+  // the deployer as a placeholder; the actual Interfold protocol contract is
+  // deployed later (its address is not known at this point).  CLAIM_SOURCE is
+  // immutable, so local deployments use the deployer as the claim source.
+  console.log("Deploying INTF token...");
+  const { interfoldToken } = await deployAndSaveInterfoldToken({
+    owner: ownerAddress,
+    ccaStart,
+    ccaEnd,
+    claimSource: ownerAddress,
+    bondingRegistry: bondingRegistryAddress,
+    hre,
+  });
+  const interfoldTokenAddress = await interfoldToken.getAddress();
+  console.log("InterfoldToken deployed to:", interfoldTokenAddress);
+
+  // Fix up BondingRegistry's license token now that INTF exists.
+  console.log("Setting license token in BondingRegistry...");
+  await (await bondingRegistry.setLicenseToken(interfoldTokenAddress)).wait();
+
+  if (interfoldTokenAddress.toLowerCase() === feeTokenAddress.toLowerCase()) {
+    throw new Error(
+      "MockUSDC and InterfoldToken resolved to the same address. " +
+        "Start a fresh Anvil on http://127.0.0.1:8545 (e.g. `anvil --chain-id 31337`) " +
+        "and rerun deploy so token nonces advance separately.",
+    );
+  }
+
+  // Whitelist BondingRegistry so bonded transfers work pre-TGE.
   console.log("Whitelisting BondingRegistry in INTF...");
   await (
     await interfoldToken.setTransferWhitelisted(bondingRegistryAddress, true)
