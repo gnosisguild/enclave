@@ -407,18 +407,16 @@ async fn process_swarm_event(
 
                         // Redial the node under its actual identity — a direct dial
                         // doesn't propagate the address, so no loopback filtering is
-                        // needed. Only on the first mismatch: repeats mean the stale
-                        // entry was re-learned from neighbours and we are already
-                        // connected (or connecting) to the real peer.
-                        if mismatch_count == 1 {
-                            let opts = DialOpts::peer_id(obtained)
-                                .addresses(vec![corrected_addr])
-                                .build();
-                            if let Err(e) = swarm.dial(opts) {
-                                debug!(
-                                    "Redial of {obtained} after peer ID replacement failed: {e}"
-                                );
-                            }
+                        // needed. The default dial condition (DisconnectedAndNotDialing)
+                        // makes this a no-op while we are already connected or
+                        // connecting to the real peer, so repeated mismatches cause no
+                        // churn — while a dropped connection is re-attempted on any
+                        // later mismatch (recovery is not one-shot).
+                        let opts = DialOpts::peer_id(obtained)
+                            .addresses(vec![corrected_addr])
+                            .build();
+                        if let Err(e) = swarm.dial(opts) {
+                            debug!("Redial of {obtained} after peer ID replacement skipped: {e}");
                         }
                     }
 
