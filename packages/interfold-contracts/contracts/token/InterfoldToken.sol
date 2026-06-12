@@ -41,12 +41,12 @@ contract InterfoldToken is
     // ─────────────────────────────────────────────────────────────────────────
 
     /// @notice Global token lifecycle phase, derived from the immutable CCA
-    ///         window and the TGE: Virtual (pre-sale), PublicSale (CCA
+    ///         window and the TGE: Virtual (pre-sale), CCA (CCA
     ///         bidding window), Cooldown (sale ended, TGE not yet fired),
     ///         Live (TGE fired).
     enum Phase {
         Virtual,
-        PublicSale,
+        CCA,
         Cooldown,
         Live
     }
@@ -69,6 +69,10 @@ contract InterfoldToken is
         uint64 vestDuration;
     }
 
+    /// @notice Token-level lock policy with a single unlock curve.
+    /// @dev This token enforces token unlock schedules only. Service vesting
+    ///      schedules that continue after TGE may live in a separate vesting
+    ///      contract.
     /// @param holdUntil Optional absolute timestamp before which nothing is
     ///        transferable, whatever the unlock curve has accrued;
     /// @param unlock Unlock curve.
@@ -125,6 +129,18 @@ contract InterfoldToken is
     /// @notice Policy parameters are internally inconsistent.
     error InvalidPolicy();
 
+    /// @notice The requested relink amount exceeds the amount available under
+    ///         the source policy.
+    error RelinkAmountExceeded();
+
+    /// @notice An account has reached the maximum number of active lock
+    ///         policy entries.
+    error TooManyLocks();
+
+    /// @notice An account has reached the maximum number of queued lock
+    ///         policy entries.
+    error TooManyQueuedLocks();
+
     /// @notice The policy id is already defined; policies are write-once.
     error PolicyAlreadyDefined(bytes32 policyId);
 
@@ -167,6 +183,14 @@ contract InterfoldToken is
     uint64 public constant TGE_COOLDOWN = 45 days;
 
     bytes32 public constant PENDING_LOCK_POLICY_ID = "PENDING";
+
+    /// @notice Maximum number of distinct active lock policies an account may
+    ///         hold. Protects against unbounded gas costs in {_update}.
+    uint256 public constant MAX_LOCKS_PER_ACCOUNT = 8;
+
+    /// @notice Maximum number of distinct queued lock policies an account may
+    ///         hold.
+    uint256 public constant MAX_QUEUED_LOCKS_PER_ACCOUNT = 8;
 
     /// @notice Start of the CCA auction window, fixed at deployment.
     uint64 public immutable CCA_START;
@@ -240,6 +264,15 @@ contract InterfoldToken is
         uint256 amount
     );
 
+    /// @notice Emitted when an active lock is moved from one policy to
+    ///         another via {relinkActiveLock}.
+    event ActiveLockRelinked(
+        address indexed account,
+        bytes32 indexed fromPolicyId,
+        bytes32 indexed toPolicyId,
+        uint256 amount
+    );
+
     /// @notice Emitted once, when {tge} fires.
     event TgeTriggered(uint64 timestamp);
 
@@ -304,6 +337,9 @@ contract InterfoldToken is
     /// @notice Mints allocations locked under their policies; the path the
     ///         minter role uses to distribute vested supply. Only allowed
     ///         during the Virtual phase.
+    /// @dev Team / GG "vested as of TGE" amounts must be calculated
+    ///      off-chain using the expected TGE date, since {tgeTimestamp} is
+    ///      not known when Virtual minting closes at {CCA_START}.
     function mintAllocations(
         MintAllocation[] calldata allocations
     ) external onlyRole(MINTER_ROLE) {
@@ -337,9 +373,10 @@ contract InterfoldToken is
     ///         earlier phases derive from the immutable CCA window.
     function phase() public view returns (Phase) {
         if (tgeTimestamp != 0) return Phase.Live;
+
         uint64 current = uint64(block.timestamp);
         if (current < CCA_START) return Phase.Virtual;
-        if (current < CCA_END) return Phase.PublicSale;
+        if (current < CCA_END) return Phase.CCA;
         return Phase.Cooldown;
     }
 
@@ -404,6 +441,12 @@ contract InterfoldToken is
      *         linkClaim. {_claim} and {_linkClaim} manipulate {locks} and
      *         {queuedLocks} to link balances to policies in a resilient
      *         way: it doesn't matter who calls what first.
+     *
+     *         Each wallet is expected to have at most one CCA policy bucket.
+     *         If a wallet has multiple queued CCA policies, claim matching
+     *         is not business-order aware and should be treated as
+     *         undefined. The importer must not create multiple queued CCA
+     *         buckets for the same wallet.
      */
     function linkClaim(
         address account,
@@ -415,6 +458,60 @@ contract InterfoldToken is
         if (!_policyDefined(policyId)) revert PolicyNotDefined(policyId);
 
         _linkClaim(account, amount, policyId);
+    }
+
+    /**
+     * @notice Corrects an active lock that was incorrectly linked to the
+     *         wrong policy. Only allowed before TGE (Live phase).
+     * @dev This is a safety hatch for admin mistakes during lock import;
+     *      it is not intended for routine use. The {PENDING_LOCK_POLICY_ID}
+     *      policy cannot be used as source or target.
+     */
+    function relinkActiveLock(
+        address account,
+        bytes32 fromPolicyId,
+        bytes32 toPolicyId,
+        uint256 amount
+    ) external onlyRole(LOCK_MANAGER_ROLE) {
+        if (tgeTimestamp != 0) revert AlreadyLive();
+        if (account == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (fromPolicyId == bytes32(0) || toPolicyId == bytes32(0)) {
+            revert InvalidPolicy();
+        }
+        if (fromPolicyId == toPolicyId) revert InvalidPolicy();
+        if (
+            fromPolicyId == PENDING_LOCK_POLICY_ID ||
+            toPolicyId == PENDING_LOCK_POLICY_ID
+        ) revert InvalidPolicy();
+        if (!_policyDefined(fromPolicyId)) {
+            revert PolicyNotDefined(fromPolicyId);
+        }
+        if (!_policyDefined(toPolicyId)) {
+            revert PolicyNotDefined(toPolicyId);
+        }
+
+        if (_activeLockAmount(account, fromPolicyId) < amount) {
+            revert RelinkAmountExceeded();
+        }
+
+        (uint256 consumed, ) = _consumeLock(
+            account,
+            locks[account],
+            fromPolicyId,
+            amount,
+            true
+        );
+
+        _addOrIncrementLock(
+            account,
+            locks[account],
+            toPolicyId,
+            consumed,
+            true
+        );
+
+        emit ActiveLockRelinked(account, fromPolicyId, toPolicyId, consumed);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -741,6 +838,10 @@ contract InterfoldToken is
                 return newAmount;
             }
         }
+        if (isActive && len >= MAX_LOCKS_PER_ACCOUNT) revert TooManyLocks();
+        if (!isActive && len >= MAX_QUEUED_LOCKS_PER_ACCOUNT) {
+            revert TooManyQueuedLocks();
+        }
         entries.push(Lock(policyId, amount));
         if (isActive) {
             emit ActiveLockUpdated(account, policyId, amount);
@@ -758,6 +859,21 @@ contract InterfoldToken is
     function _policyDefined(bytes32 policyId) internal view returns (bool) {
         Curve storage unlock = lockPolicies[policyId].unlock;
         return unlock.cliffDuration != 0 || unlock.vestDuration != 0;
+    }
+
+    /// @dev Returns the active lock amount for `account` under `policyId`,
+    ///      or zero if no such lock exists.
+    function _activeLockAmount(
+        address account,
+        bytes32 policyId
+    ) internal view returns (uint256) {
+        Lock[] storage accountLocks = locks[account];
+        for (uint256 i = 0; i < accountLocks.length; i++) {
+            if (accountLocks[i].policyId == policyId) {
+                return accountLocks[i].amount;
+            }
+        }
+        return 0;
     }
 
     /// @dev Validates the unlock curve: it must lock something and be

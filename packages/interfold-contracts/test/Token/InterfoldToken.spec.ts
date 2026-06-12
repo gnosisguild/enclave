@@ -299,10 +299,10 @@ describe("InterfoldToken", function () {
       expect(await token.phase()).to.equal(0); // Phase.Virtual
     });
 
-    it("enters PublicSale during CCA window", async function () {
+    it("enters CCA during CCA window", async function () {
       const { token, ccaStart } = await loadFixture(deploy);
       await time.increaseTo(ccaStart);
-      expect(await token.phase()).to.equal(1); // Phase.PublicSale
+      expect(await token.phase()).to.equal(1); // Phase.CCA
     });
 
     it("enters Cooldown after CCA_END before TGE", async function () {
