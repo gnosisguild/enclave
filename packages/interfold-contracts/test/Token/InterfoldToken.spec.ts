@@ -1245,6 +1245,274 @@ describe("InterfoldToken", function () {
       // Bonding transfer should succeed.
       await bondingRegistry.connect(owner).bondLicense(bondAmount);
     });
+
+    it("locked tokens can be bonded (pre-credit visible to token)", async function () {
+      const signers = await ethers.getSigners();
+      const [, beneficiary, slasher] = signers;
+      const beneficiaryAddress = await beneficiary.getAddress();
+      const slasherAddress = await slasher.getAddress();
+      const sys = await deployInterfoldSystem({
+        useMockCiphernodeRegistry: true,
+        setupOperators: 0,
+        wireSlashingManager: false,
+        mintUsdcTo: [],
+      });
+      const { bondingRegistry, licenseToken } = sys;
+      const bondingRegistryAddress = await bondingRegistry.getAddress();
+
+      await bondingRegistry.setSlashingManager(slasherAddress);
+
+      // Create a lock policy and mint locked tokens.
+      const policyId = ethers.encodeBytes32String("LOCKED_BOND");
+      await licenseToken.createLockPolicy(policyId, {
+        holdUntil: 0n,
+        unlock: {
+          anchor: 1, // Tge-anchored
+          start: 0n,
+          cliffDuration: 0n,
+          vestDuration: 2n * YEAR,
+        },
+      });
+      const lockAmount = ethers.parseEther("1000");
+      // Mint locked allocation directly (balance = locked).
+      await licenseToken.mintAllocations([
+        {
+          recipient: beneficiaryAddress,
+          amount: lockAmount,
+          policyId,
+          label: ethers.encodeBytes32String("locked"),
+        },
+      ]);
+
+      // Before bonding: balance = 1000, locked ≈ 1000, bonded = 0.
+      // transferable ≈ 0 (Tge-anchored, no time has passed).
+      const tbBefore =
+        await licenseToken.transferableBalanceOf(beneficiaryAddress);
+      expect(tbBefore).to.be.lt(ethers.parseEther("0.01"));
+
+      // Bond all locked tokens. Should succeed because BondingRegistry
+      // pre-credits `operators[beneficiary].licenseBond` before calling
+      // `safeTransferFrom`, so the token sees bonded = lockAmount during
+      // `_update()`.
+      await licenseToken
+        .connect(beneficiary)
+        .approve(bondingRegistryAddress, lockAmount);
+      await bondingRegistry.connect(beneficiary).bondLicense(lockAmount);
+
+      // After bonding: wallet = 0, locked ≈ 1000, bonded = 1000.
+      // Bond covers lock, so no mustRetain.
+      expect(await licenseToken.balanceOf(beneficiaryAddress)).to.equal(0n);
+      expect(await bondingRegistry.totalBonded(beneficiaryAddress)).to.equal(
+        lockAmount,
+      );
+    });
+
+    it("after bonding locked tokens, cannot transfer below locked floor", async function () {
+      const signers = await ethers.getSigners();
+      const [, beneficiary, slasher] = signers;
+      const beneficiaryAddress = await beneficiary.getAddress();
+      const slasherAddress = await slasher.getAddress();
+      const sys = await deployInterfoldSystem({
+        useMockCiphernodeRegistry: true,
+        setupOperators: 0,
+        wireSlashingManager: false,
+        mintUsdcTo: [],
+      });
+      const { bondingRegistry, licenseToken } = sys;
+      const bondingRegistryAddress = await bondingRegistry.getAddress();
+
+      await bondingRegistry.setSlashingManager(slasherAddress);
+
+      const policyId = ethers.encodeBytes32String("LOCKED_FLOOR");
+      await licenseToken.createLockPolicy(policyId, {
+        holdUntil: 0n,
+        unlock: {
+          anchor: 1,
+          start: 0n,
+          cliffDuration: 0n,
+          vestDuration: 2n * YEAR,
+        },
+      });
+      const lockAmount = ethers.parseEther("1000");
+      await licenseToken.mintAllocations([
+        {
+          recipient: beneficiaryAddress,
+          amount: lockAmount,
+          policyId,
+          label: ethers.encodeBytes32String("locked"),
+        },
+      ]);
+
+      // Bond 600 out of 1000 locked.
+      const bondAmount = ethers.parseEther("600");
+      await licenseToken
+        .connect(beneficiary)
+        .approve(bondingRegistryAddress, bondAmount);
+      await bondingRegistry.connect(beneficiary).bondLicense(bondAmount);
+
+      // Wallet = 400, locked ≈ 1000, bonded = 600.
+      // mustRetain = max(0, 1000 - 600) = 400.
+      // transferable = max(0, 400 - 400) = 0.
+      const tb = await licenseToken.transferableBalanceOf(beneficiaryAddress);
+      expect(tb).to.equal(0n);
+    });
+
+    it("slashing does not reduce locked balance", async function () {
+      const signers = await ethers.getSigners();
+      const [, beneficiary, slasher] = signers;
+      const beneficiaryAddress = await beneficiary.getAddress();
+      const slasherAddress = await slasher.getAddress();
+      const sys = await deployInterfoldSystem({
+        useMockCiphernodeRegistry: true,
+        setupOperators: 0,
+        wireSlashingManager: false,
+        mintUsdcTo: [],
+      });
+      const { bondingRegistry, licenseToken } = sys;
+      const bondingRegistryAddress = await bondingRegistry.getAddress();
+
+      await bondingRegistry.setSlashingManager(slasherAddress);
+
+      const policyId = ethers.encodeBytes32String("SLASH_LOCK");
+      await licenseToken.createLockPolicy(policyId, {
+        holdUntil: 0n,
+        unlock: {
+          anchor: 1,
+          start: 0n,
+          cliffDuration: 0n,
+          vestDuration: 2n * YEAR,
+        },
+      });
+      const lockAmount = ethers.parseEther("1000");
+      await licenseToken.mintAllocations([
+        {
+          recipient: beneficiaryAddress,
+          amount: lockAmount,
+          policyId,
+          label: ethers.encodeBytes32String("locked"),
+        },
+      ]);
+
+      // Bond everything.
+      await licenseToken
+        .connect(beneficiary)
+        .approve(bondingRegistryAddress, lockAmount);
+      await bondingRegistry.connect(beneficiary).bondLicense(lockAmount);
+
+      const lockedBefore =
+        await licenseToken.lockedBalanceOf(beneficiaryAddress);
+      expect(lockedBefore).to.be.closeTo(lockAmount, ethers.parseEther("0.01"));
+
+      // Slash 500 license bond.
+      const slashAmount = ethers.parseEther("500");
+      await bondingRegistry
+        .connect(slasher)
+        .slashLicenseBond(
+          beneficiaryAddress,
+          slashAmount,
+          ethers.encodeBytes32String("SLASH"),
+        );
+
+      // Bonded is now 500.
+      expect(await bondingRegistry.totalBonded(beneficiaryAddress)).to.equal(
+        lockAmount - slashAmount,
+      );
+
+      // Locked balance must NOT change due to slashing.
+      const lockedAfter =
+        await licenseToken.lockedBalanceOf(beneficiaryAddress);
+      expect(lockedAfter).to.equal(lockedBefore);
+    });
+
+    it("after slashing, incoming tokens are retained by lock-floor invariant", async function () {
+      const signers = await ethers.getSigners();
+      const [, beneficiary, slasher] = signers;
+      const beneficiaryAddress = await beneficiary.getAddress();
+      const slasherAddress = await slasher.getAddress();
+      const sys = await deployInterfoldSystem({
+        useMockCiphernodeRegistry: true,
+        setupOperators: 0,
+        wireSlashingManager: false,
+        mintUsdcTo: [],
+      });
+      const { bondingRegistry, licenseToken, owner } = sys;
+      const bondingRegistryAddress = await bondingRegistry.getAddress();
+
+      await bondingRegistry.setSlashingManager(slasherAddress);
+
+      const policyId = ethers.encodeBytes32String("SLASH_FLOOR");
+      await licenseToken.createLockPolicy(policyId, {
+        holdUntil: 0n,
+        unlock: {
+          anchor: 1,
+          start: 0n,
+          cliffDuration: 0n,
+          vestDuration: 2n * YEAR,
+        },
+      });
+      const lockAmount = ethers.parseEther("1000");
+      await licenseToken.mintAllocations([
+        {
+          recipient: beneficiaryAddress,
+          amount: lockAmount,
+          policyId,
+          label: ethers.encodeBytes32String("locked"),
+        },
+      ]);
+
+      // Bond everything, then slash half.
+      await licenseToken
+        .connect(beneficiary)
+        .approve(bondingRegistryAddress, lockAmount);
+      await bondingRegistry.connect(beneficiary).bondLicense(lockAmount);
+      const slashAmount = ethers.parseEther("500");
+      await bondingRegistry
+        .connect(slasher)
+        .slashLicenseBond(
+          beneficiaryAddress,
+          slashAmount,
+          ethers.encodeBytes32String("SLASH"),
+        );
+
+      // Now: wallet = 0, locked ≈ 1000, bonded = 500.
+      // mustRetain = 1000 - 500 = 500. Wallet is 500 below floor.
+      expect(
+        await licenseToken.transferableBalanceOf(beneficiaryAddress),
+      ).to.equal(0n);
+
+      // Send 200 unlocked tokens to beneficiary. They should be retained
+      // (non-transferable) because wallet is still below floor.
+      await licenseToken
+        .connect(owner)
+        .mint(beneficiaryAddress, ethers.parseEther("200"), ethers.ZeroHash);
+      expect(await licenseToken.balanceOf(beneficiaryAddress)).to.equal(
+        ethers.parseEther("200"),
+      );
+      expect(
+        await licenseToken.transferableBalanceOf(beneficiaryAddress),
+      ).to.equal(0n);
+
+      // Send enough to fill the floor gap (300 more = 500 total).
+      await licenseToken
+        .connect(owner)
+        .mint(beneficiaryAddress, ethers.parseEther("300"), ethers.ZeroHash);
+      expect(await licenseToken.balanceOf(beneficiaryAddress)).to.equal(
+        ethers.parseEther("500"),
+      );
+      // Now wallet = 500, locked ≈ 1000, bonded = 500 → transferable = 0.
+      expect(
+        await licenseToken.transferableBalanceOf(beneficiaryAddress),
+      ).to.equal(0n);
+
+      // Send one more wei above the floor.
+      await licenseToken
+        .connect(owner)
+        .mint(beneficiaryAddress, 1n, ethers.ZeroHash);
+      // Now wallet = 500 + 1, mustRetain = 500 → transferable = 1.
+      expect(
+        await licenseToken.transferableBalanceOf(beneficiaryAddress),
+      ).to.equal(1n);
+    });
   });
 
   // ═════════════════════════════════════════════════════════════════════════

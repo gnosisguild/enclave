@@ -224,9 +224,17 @@ contract InterfoldToken is
     /// @notice Emitted when an account's claim-lock exemption status changes.
     event ClaimLockExemptUpdated(address indexed account, bool exempt);
 
-    /// @notice Emitted whenever the amount `account` holds locked under
-    ///         `policyId` changes; `amount` is the new total.
-    event LockUpdated(
+    /// @notice Emitted whenever an active lock amount changes; `amount` is
+    ///         the new total under `policyId`.
+    event ActiveLockUpdated(
+        address indexed account,
+        bytes32 indexed policyId,
+        uint256 amount
+    );
+
+    /// @notice Emitted whenever a queued lock amount changes; `amount` is
+    ///         the new remaining queued total under `policyId`.
+    event QueuedLockUpdated(
         address indexed account,
         bytes32 indexed policyId,
         uint256 amount
@@ -565,7 +573,8 @@ contract InterfoldToken is
             allocation.recipient,
             locks[allocation.recipient],
             allocation.policyId,
-            allocation.amount
+            allocation.amount,
+            true
         );
         emit AllocationMinted(
             allocation.recipient,
@@ -603,7 +612,8 @@ contract InterfoldToken is
                 account,
                 queuedLocks[account],
                 bytes32(0),
-                remaining
+                remaining,
+                false
             );
 
             if (consumed == 0) {
@@ -611,7 +621,13 @@ contract InterfoldToken is
                 consumed = remaining;
             }
 
-            _addOrIncrementLock(account, locks[account], policyId, consumed);
+            _addOrIncrementLock(
+                account,
+                locks[account],
+                policyId,
+                consumed,
+                true
+            );
             remaining -= consumed;
         }
     }
@@ -635,13 +651,20 @@ contract InterfoldToken is
             account,
             locks[account],
             PENDING_LOCK_POLICY_ID,
-            amount
+            amount,
+            true
         );
         uint256 remaining = amount - consumed;
 
         // if we consumed from PENDING policy, add the real thing
         if (consumed != 0) {
-            _addOrIncrementLock(account, locks[account], policyId, consumed);
+            _addOrIncrementLock(
+                account,
+                locks[account],
+                policyId,
+                consumed,
+                true
+            );
         }
 
         // Whatever is left queues under the target policy.
@@ -650,7 +673,8 @@ contract InterfoldToken is
                 account,
                 queuedLocks[account],
                 policyId,
-                remaining
+                remaining,
+                false
             );
         }
     }
@@ -659,7 +683,8 @@ contract InterfoldToken is
         address account,
         Lock[] storage entries,
         bytes32 filterPolicyId,
-        uint256 amount
+        uint256 amount,
+        bool isActive
     ) internal returns (uint256 consumed, bytes32 consumedPolicyId) {
         uint256 len = entries.length;
         uint256 i;
@@ -689,26 +714,39 @@ contract InterfoldToken is
             entries[i].amount = remaining;
         }
 
-        emit LockUpdated(account, consumedPolicyId, remaining);
+        if (isActive) {
+            emit ActiveLockUpdated(account, consumedPolicyId, remaining);
+        } else {
+            emit QueuedLockUpdated(account, consumedPolicyId, remaining);
+        }
     }
 
     function _addOrIncrementLock(
         address account,
         Lock[] storage entries,
         bytes32 policyId,
-        uint256 amount
+        uint256 amount,
+        bool isActive
     ) internal returns (uint256 newAmount) {
         uint256 len = entries.length;
         for (uint256 i = 0; i < len; i++) {
             if (entries[i].policyId == policyId) {
                 entries[i].amount += amount;
                 newAmount = entries[i].amount;
-                emit LockUpdated(account, policyId, newAmount);
+                if (isActive) {
+                    emit ActiveLockUpdated(account, policyId, newAmount);
+                } else {
+                    emit QueuedLockUpdated(account, policyId, newAmount);
+                }
                 return newAmount;
             }
         }
         entries.push(Lock(policyId, amount));
-        emit LockUpdated(account, policyId, amount);
+        if (isActive) {
+            emit ActiveLockUpdated(account, policyId, amount);
+        } else {
+            emit QueuedLockUpdated(account, policyId, amount);
+        }
         return amount;
     }
 
