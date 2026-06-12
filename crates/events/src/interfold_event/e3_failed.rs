@@ -27,6 +27,21 @@ pub enum FailureReason {
     VerificationFailed,
 }
 
+impl FailureReason {
+    /// Returns true when the failure was caused purely by a deadline expiring rather
+    /// than by a node acting maliciously. Timeout failures have no associated
+    /// accusation/slashing lifecycle, so their E3 context can be torn down immediately.
+    pub fn is_timeout(&self) -> bool {
+        matches!(
+            self,
+            Self::CommitteeFormationTimeout
+                | Self::DKGTimeout
+                | Self::ComputeTimeout
+                | Self::DecryptionTimeout
+        )
+    }
+}
+
 /// E3 lifecycle stage
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum E3Stage {
