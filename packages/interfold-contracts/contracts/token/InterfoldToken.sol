@@ -474,23 +474,7 @@ contract InterfoldToken is
         uint256 amount
     ) external onlyRole(LOCK_MANAGER_ROLE) {
         if (tgeTimestamp != 0) revert AlreadyLive();
-        if (account == address(0)) revert ZeroAddress();
-        if (amount == 0) revert ZeroAmount();
-        if (fromPolicyId == bytes32(0) || toPolicyId == bytes32(0)) {
-            revert InvalidPolicy();
-        }
-        if (fromPolicyId == toPolicyId) revert InvalidPolicy();
-        if (
-            fromPolicyId == PENDING_LOCK_POLICY_ID ||
-            toPolicyId == PENDING_LOCK_POLICY_ID
-        ) revert InvalidPolicy();
-        if (!_policyDefined(fromPolicyId)) {
-            revert PolicyNotDefined(fromPolicyId);
-        }
-        if (!_policyDefined(toPolicyId)) {
-            revert PolicyNotDefined(toPolicyId);
-        }
-
+        _validateRelinkParams(account, fromPolicyId, toPolicyId, amount);
         if (_activeLockAmount(account, fromPolicyId) < amount) {
             revert RelinkAmountExceeded();
         }
@@ -776,6 +760,25 @@ contract InterfoldToken is
         }
     }
 
+    /// @dev Finds the index of `filterPolicyId` in `entries`. Returns
+    ///      (0, false) when not found, or when `filterPolicyId` is zero
+    ///      and `entries` is empty.
+    function _findLockIndex(
+        Lock[] storage entries,
+        bytes32 filterPolicyId
+    ) internal view returns (uint256 index, bool found) {
+        uint256 len = entries.length;
+        if (filterPolicyId != bytes32(0)) {
+            for (uint256 i = 0; i < len; i++) {
+                if (entries[i].policyId == filterPolicyId) {
+                    return (i, true);
+                }
+            }
+            return (0, false);
+        }
+        return (0, len > 0);
+    }
+
     function _consumeLock(
         address account,
         Lock[] storage entries,
@@ -783,19 +786,8 @@ contract InterfoldToken is
         uint256 amount,
         bool isActive
     ) internal returns (uint256 consumed, bytes32 consumedPolicyId) {
-        uint256 len = entries.length;
-        uint256 i;
-
-        if (filterPolicyId != bytes32(0)) {
-            for (; i < len; i++) {
-                if (entries[i].policyId == filterPolicyId) {
-                    break;
-                }
-            }
-            if (i == len) return (0, bytes32(0));
-        } else if (len == 0) {
-            return (0, bytes32(0));
-        }
+        (uint256 i, bool found) = _findLockIndex(entries, filterPolicyId);
+        if (!found) return (0, bytes32(0));
 
         consumedPolicyId = entries[i].policyId;
         consumed = entries[i].amount;
@@ -859,6 +851,32 @@ contract InterfoldToken is
     function _policyDefined(bytes32 policyId) internal view returns (bool) {
         Curve storage unlock = lockPolicies[policyId].unlock;
         return unlock.cliffDuration != 0 || unlock.vestDuration != 0;
+    }
+
+    /// @dev Validates {relinkActiveLock} parameters. Extracted to keep the
+    ///      external function below the solhint cyclomatic-complexity cap.
+    function _validateRelinkParams(
+        address account,
+        bytes32 fromPolicyId,
+        bytes32 toPolicyId,
+        uint256 amount
+    ) internal view {
+        if (account == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (fromPolicyId == bytes32(0) || toPolicyId == bytes32(0)) {
+            revert InvalidPolicy();
+        }
+        if (fromPolicyId == toPolicyId) revert InvalidPolicy();
+        if (
+            fromPolicyId == PENDING_LOCK_POLICY_ID ||
+            toPolicyId == PENDING_LOCK_POLICY_ID
+        ) revert InvalidPolicy();
+        if (!_policyDefined(fromPolicyId)) {
+            revert PolicyNotDefined(fromPolicyId);
+        }
+        if (!_policyDefined(toPolicyId)) {
+            revert PolicyNotDefined(toPolicyId);
+        }
     }
 
     /// @dev Returns the active lock amount for `account` under `policyId`,
