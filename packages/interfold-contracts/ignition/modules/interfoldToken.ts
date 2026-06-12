@@ -7,8 +7,18 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 export default buildModule("InterfoldToken", (m) => {
   const owner = m.getParameter("owner");
+  const ccaStart = m.getParameter("ccaStart");
+  const ccaEnd = m.getParameter("ccaEnd");
+  const claimSource = m.getParameter("claimSource");
+  const bondingRegistry = m.getParameter("bondingRegistry");
 
-  const interfoldToken = m.contract("InterfoldToken", [owner]);
+  const interfoldToken = m.contract("InterfoldToken", [
+    owner,
+    ccaStart,
+    ccaEnd,
+    claimSource,
+    bondingRegistry,
+  ]);
 
   return { interfoldToken };
 }) as any;

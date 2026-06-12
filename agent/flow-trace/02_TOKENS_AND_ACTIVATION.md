@@ -16,11 +16,53 @@ Before a node can register, it must stake two types of collateral:
 ┌───────────────────────────────────────────────────────────┐
 │                    InterfoldToken (INTF)                     │
 │  ERC20 + ERC20Permit + ERC20Votes + AccessControl         │
+│  + Ownable2Step                                            │
 │                                                           │
 │  MAX_SUPPLY: 1,200,000,000 (1.2B with 18 decimals)       │
-│  Roles: MINTER_ROLE can mint via mintAllocation()         │
-│  Transfer restrictions: when transfersRestricted=true,    │
-│    only whitelisted addresses can transfer                │
+│  Immutables: CCA_START, CCA_END, CLAIM_SOURCE,            │
+│              BONDING_REGISTRY (set at construction)        │
+│                                                           │
+│  Lifecycle phases (derived from CCA window + TGE):        │
+│    Virtual → PublicSale → Cooldown → Live                 │
+│    - Virtual: mint() + mintAllocations() allowed           │
+│    - PublicSale: CCA bidding window                        │
+│    - Cooldown: CCA ended, TGE not yet called               │
+│    - Live: TGE fired (permissionless after cooldown)       │
+│                                                           │
+│  Minting (Virtual phase only):                            │
+│    - mint(recipient, amount, label)                        │
+│      DEFAULT_ADMIN_ROLE — unlocked tokens                  │
+│    - mintAllocations(MintAllocation[])                     │
+│      MINTER_ROLE — tokens locked under a policy            │
+│                                                           │
+│  Pre-TGE transfer gate (phase-based, automatic):          │
+│    Allowed: bonding registry, claim source, whitelisted    │
+│    Blocked: all other transfers                            │
+│    Once TGE fires, all transfers unrestricted              │
+│                                                           │
+│  Lock system (wallet-level pooled enforcement):           │
+│    - createLockPolicy(id, LockPolicy) → write-once         │
+│      LOCK_MANAGER_ROLE                                     │
+│    - linkClaim(account, amount, policyId)                  │
+│      LOCK_MANAGER_ROLE                                     │
+│    - LockPolicy: { holdUntil, Curve { anchor, start,      │
+│        cliffDuration, vestDuration } }                     │
+│    - Anchor: Absolute (fixed start) | Tge (tgeTimestamp)   │
+│    - PENDING_LOCK_POLICY_ID for unclassified claims        │
+│    - Queued locks consumed by later claims (linkClaim)     │
+│                                                           │
+│  Lock invariant for transfers:                             │
+│    transferable = balance - max(0, lockedBalance -         │
+│      BONDING_REGISTRY.totalBonded(account))                │
+│    Transfer reverts with InsufficientUnlockedBalance       │
+│    if value > transferable                                 │
+│                                                           │
+│  Whitelisting:                                             │
+│    - setTransferWhitelisted(addr, bool)                    │
+│      WHITELIST_ROLE — pre-TGE transfer gate                │
+│    - setLockWhitelisted(addr, bool)                        │
+│      LOCK_MANAGER_ROLE — exempt from claim-source locks    │
+│                                                           │
 │  Used as: LICENSE BOND token                              │
 └───────────────────────────────────────────────────────────┘
 
@@ -65,13 +107,16 @@ User runs: interfold ciphernode license bond --amount 50000
 │     │  │                                                      │
 │     │  │  bondLicense(uint256 amount) {                       │
 │     │  │    1. require(amount > 0)                            │
-│     │  │    2. licenseToken.safeTransferFrom(                 │
+│     │  │    2. operators[msg.sender].licenseBond += amount    │
+│     │  │       → totalBonded(msg.sender) now includes amount  │
+│     │  │    3. licenseToken.safeTransferFrom(                 │
 │     │  │         msg.sender,   // from operator               │
 │     │  │         address(this), // to BondingRegistry         │
 │     │  │         amount                                       │
 │     │  │       )                                              │
+│     │  │       → INTF _update can see the pre-recorded bond   │
+│     │  │         and enforce locked-floor accounting          │
 │     │  │       → INTF tokens move from operator → contract    │
-│     │  │    3. operators[msg.sender].licenseBond += amount    │
 │     │  │    4. _updateOperatorStatus(msg.sender)              │
 │     │  │       → May activate if all conditions now met       │
 │     │  │    5. Emit LicenseBondUpdated(msg.sender, newBond)   │
@@ -80,6 +125,14 @@ User runs: interfold ciphernode license bond --amount 50000
 │     │
 └─ OUTPUT: "Transaction hash: 0x..."
 ```
+
+### Locked INTF bonding
+
+`BondingRegistry.totalBonded(account)` returns active INTF license bond plus pending INTF exits that
+remain slashable/not returned. `InterfoldToken` uses this view for pooled wallet-level locks, so
+locked INTF can be self-bonded by the same account without becoming transferable. Delegated
+source-aware bonding is not part of the pooled-lock model; license bonds are credited to
+`msg.sender` through `bondLicense(amount)`.
 
 ### Activation check after bonding:
 
@@ -190,17 +243,8 @@ User runs: interfold ciphernode license unbond --amount 10000
 │     │  │    4. _exits.queueLicensesForExit(                   │
 │     │  │         msg.sender, exitDelay, amount                 │
 │     │  │       )                                               │
-│     │  │       │                                               │
-│     │  │       │  ┌─ ExitQueueLib ─────────────────────────┐  │
-│     │  │       │  │  Creates ExitTranche {                 │  │
-│     │  │       │  │    unlockTimestamp: now + exitDelay,    │  │
-│     │  │       │  │    ticketAmount: 0,                    │  │
-│     │  │       │  │    licenseAmount: 10000                │  │
-│     │  │       │  │  }                                     │  │
-│     │  │       │  │  Merges into last tranche if same      │  │
-│     │  │       │  │  unlock time, else appends new tranche │  │
-│     │  │       │  │  Updates pendingTotals                 │  │
-│     │  │       │  └────────────────────────────────────────┘  │
+│     │  │       → Pending INTF still counts in totalBonded()    │
+│     │  │         until claimed or slashed                      │
 │     │  │    5. _updateOperatorStatus(msg.sender)               │
 │     │  │       → May DEACTIVATE if bond drops below threshold  │
 │     │  │    6. Emit LicenseBondUpdated(msg.sender, newBond)    │
@@ -268,9 +312,9 @@ User runs: interfold ciphernode license claim [--max-ticket 50] [--max-license 1
 │     │  ┌─── ON-CHAIN ─────────────────────────────────────────┐
 │     │  │                                                       │
 │     │  │  claimExits(maxTicket, maxLicense) {                  │
-│     │  │    1. (ticketAmount, licenseAmount) =                 │
+│     │  │    1. (ticketAmount, _) =                             │
 │     │  │       _exits.claimAssets(                             │
-│     │  │         msg.sender, maxTicket, maxLicense             │
+│     │  │         msg.sender, maxTicket, 0                      │
 │     │  │       )                                               │
 │     │  │       │                                               │
 │     │  │       │  ┌─ ExitQueueLib.claimAssets() ───────────┐  │
@@ -278,7 +322,7 @@ User runs: interfold ciphernode license claim [--max-ticket 50] [--max-license 1
 │     │  │       │  │  for each tranche where                │  │
 │     │  │       │  │    block.timestamp >= unlockTimestamp:  │  │
 │     │  │       │  │      take min(wanted, available)       │  │
-│     │  │       │  │      from ticketAmount & licenseAmount  │  │
+│     │  │       │  │      from ticketAmount                  │  │
 │     │  │       │  │  Skip locked tranches (future unlock)  │  │
 │     │  │       │  │  Clean up empty tranches               │  │
 │     │  │       │  │  Update pendingTotals                  │  │
@@ -294,15 +338,18 @@ User runs: interfold ciphernode license claim [--max-ticket 50] [--max-license 1
 │     │  │       │  │  underlying.safeTransfer(to, amount)    │  │
 │     │  │       │  └────────────────────────────────────────┘  │
 │     │  │                                                       │
-│     │  │    3. if licenseAmount > 0:                           │
-│     │  │       licenseToken.safeTransfer(                      │
-│     │  │         msg.sender, licenseAmount                     │
+│     │  │    3. licenseAmount = _claimLicenseExits(             │
+│     │  │         msg.sender, maxLicense                        │
 │     │  │       )                                               │
-│     │  │       → INTF tokens returned to operator              │
+│     │  │       → Each INTF source pays its withdrawalAddress   │
+│     │  │       → Receiver callback gets (operator, amount,     │
+│     │  │         sourceId) when supported                      │
+│     │  │       → Pending INTF is removed from totalBonded()    │
+│     │  │         as returned INTF reaches the wallet           │
 │     │  │  }                                                    │
 │     │  └───────────────────────────────────────────────────────┘
 │
-└─ Operator receives back their USDC and/or INTF tokens
+└─ Operator receives back USDC; INTF goes to each source's withdrawal address
 ```
 
 ---
@@ -346,7 +393,7 @@ active = registered
                               CLAIM EXITS
                               ───────────
                    After exitDelay seconds:
-                   INTF → returned from ExitQueue
+                   INTF → returned to source withdrawal address
                    USDC → paid out from ITK.payableBalance
 ```
 
@@ -380,20 +427,37 @@ The token contracts were hardened against the following audit findings. All chan
 - **M-29 — EIP-6372 timestamp clock.** `clock() = uint48(block.timestamp)`,
   `CLOCK_MODE() = "mode=timestamp"`.
 
-### InterfoldToken (INTF)
+### InterfoldToken (INTF) — Complete Rewrite
 
-- **H-15 — WHITELIST_ROLE separation + one-way disable.** New `WHITELIST_ROLE` gates
-  `toggleTransferWhitelist` and `whitelistContracts`, decoupling whitelist edits from `MINTER_ROLE`.
-  `disableTransferRestrictions` is `DEFAULT_ADMIN_ROLE` only and idempotent (silent no-op when
-  already disabled) so deployment/setup scripts can call it unconditionally.
-- **M-21 — per-epoch mint cap.** New rolling cap configured via
-  `setMintCap(epochLength, capPerEpoch)` (`ZeroEpochLength` on zero length). Both `mintAllocation`
-  and `batchMintAllocations` route through `_accountForMintAgainstCap`, which rolls the epoch
-  (`MintEpochRolled(newStart)`) and reverts `ExceedsMintCap` on overflow. Constructor defaults to a
-  30-day epoch with `cap = MAX_SUPPLY` so bootstrap deployments keep working; governance is expected
-  to tighten this before broad distribution.
-- **M-29 — EIP-6372 timestamp clock.** Same timestamp clock as ITK, aligning INTF voting checkpoints
-  with timepoints used elsewhere.
+The INTF token was rewritten to implement a CCA-auction-aligned lifecycle with wallet-level lock
+enforcement based on immutable policy curves. Key changes:
+
+- **Phase-based lifecycle.** The token derives its phase from immutable `CCA_START` / `CCA_END` and
+  the one-way `tge()` call: Virtual → PublicSale → Cooldown → Live. Minting is gated to Virtual
+  phase only; TGE is permissionless after `CCA_END + TGE_COOLDOWN` (45 days). The pre-TGE transfer
+  gate automatically lifts at TGE — no `disableTransferRestrictions` / `transfersRestricted` flag.
+- **Pre-TGE transfer gate.** Before TGE, only bonding-registry transfers, claim-source
+  distributions, and whitelisted addresses can transfer. Bonding is always allowed so operators can
+  stake during Virtual phase.
+- **Immutable constructor parameters.** `CCA_START`, `CCA_END`, `CLAIM_SOURCE`, and
+  `BONDING_REGISTRY` are set at construction and cannot change. The BondingRegistry must be deployed
+  first (or a placeholder used and fixed via `setLicenseToken`).
+- **Lock policy system.** `createLockPolicy(id, LockPolicy)` creates write-once policies with
+  `Curve { anchor (Absolute|Tge), start, cliffDuration, vestDuration }` and optional `holdUntil`.
+  `linkClaim(account, amount, policyId)` classifies pending claim-source tokens under a real policy.
+  `PENDING_LOCK_POLICY_ID` holds unclassified claim tokens until linked.
+- **Pooled wallet enforcement.** `lockedBalanceOf(account)` sums active locks (including PENDING).
+  `transferableBalanceOf(account) = balance - max(0, locked - BONDING_REGISTRY.totalBonded(account))`.
+  Transfers that exceed the transferable balance revert with `InsufficientUnlockedBalance`.
+- **Claim-source auto-lock.** Tokens arriving from `CLAIM_SOURCE` are automatically locked as
+  PENDING unless the recipient is in `lockWhitelist`. `linkClaim` moves PENDING to a real policy and
+  queues unfilled amounts for future claims.
+- **EIP-6372 timestamp clock.** `clock()` returns `block.timestamp`, `CLOCK_MODE()` is
+  `"mode=timestamp"`.
+- **Minting.** `mint(recipient, amount, label)` (DEFAULT_ADMIN_ROLE, unlocked) and
+  `mintAllocations(MintAllocation[])` (MINTER_ROLE, locked to a policy) are both Virtual-only.
+- **Ownership.** `renounceOwnership()` is disabled. Two-step ownership transfer via Ownable2Step
+  syncs all AccessControl roles atomically.
 
 ### Registry coordination
 
