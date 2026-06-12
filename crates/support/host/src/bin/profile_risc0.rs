@@ -9,7 +9,7 @@ use e3_fhe_params::{build_bfv_params_from_set_arc, encode_bfv_params, BfvPreset}
 use e3_support_host::run_risc0_compute;
 use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
-use rand::thread_rng;
+use rand::rng;
 
 fn main() {
     println!("Starting RISC0 profiling with mock ciphertexts...");
@@ -42,7 +42,7 @@ fn main() {
     );
 
     // Generate keys
-    let mut rng = thread_rng();
+    let mut rng = rng();
     let secret_key = SecretKey::random(&params, &mut rng);
     let public_key = PublicKey::new(&secret_key, &mut rng);
 
