@@ -921,11 +921,6 @@ contract InterfoldToken is
         return 0;
     }
 
-    /// @dev Earliest possible TGE timestamp.
-    function _earliestTge() internal view returns (uint256) {
-        return uint256(CCA_END) + TGE_COOLDOWN;
-    }
-
     /// @dev Ensures the policy cannot keep anything locked past the lock
     ///      sunset. Ending exactly at the sunset is allowed: the curve has
     ///      fully released and the hold has lapsed at that moment, which is
@@ -939,7 +934,7 @@ contract InterfoldToken is
             : curve.vestDuration;
 
         uint256 policyEnd = curve.anchor == Anchor.Tge
-            ? _earliestTge() + curveEnd
+            ? uint256(CCA_END) + TGE_COOLDOWN + curveEnd
             : curve.start + curveEnd;
 
         if (policyEnd > NO_MORE_LOCKS) {
