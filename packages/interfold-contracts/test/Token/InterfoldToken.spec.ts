@@ -972,7 +972,7 @@ describe("InterfoldToken", function () {
     });
 
     it("transferableBalanceOf = 0 when fully locked and no bond", async function () {
-      const { token, alice, amount } = await deployWithLockAndTge({
+      const { token, alice } = await deployWithLockAndTge({
         mintAmount: ethers.parseEther("1000"),
       });
       expect(

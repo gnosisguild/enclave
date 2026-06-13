@@ -84,30 +84,6 @@ function parseRequiredUint64(value: string, label: string): bigint {
   return parsed;
 }
 
-function resolveInterfoldTgeTimestamp(
-  networkName: string,
-  latestBlockTimestamp: number,
-): string {
-  const configured = process.env.INTERFOLD_TGE_TIMESTAMP;
-  if (configured?.trim()) {
-    return parseRequiredUint64(
-      configured.trim(),
-      "INTERFOLD_TGE_TIMESTAMP",
-    ).toString();
-  }
-
-  if (!isLocalDeploymentChain(networkName)) {
-    throw new Error(
-      "INTERFOLD_TGE_TIMESTAMP must be set for non-local token-lock deployment",
-    );
-  }
-
-  console.warn(
-    "[WARN] INTERFOLD_TGE_TIMESTAMP not set; using latest local block timestamp for INTF token locks.",
-  );
-  return latestBlockTimestamp.toString();
-}
-
 /** Circuit names required for BFV ZK verification in this script */
 const DKG_AGGREGATOR_VERIFIER = "DkgAggregatorVerifier";
 const DECRYPTION_AGGREGATOR_VERIFIER = "DecryptionAggregatorVerifier";
