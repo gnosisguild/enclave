@@ -317,6 +317,32 @@ describe("InterfoldToken", function () {
       );
     });
 
+    it("reverts when noMoreLocks is not after the earliest TGE", async function () {
+      const [deployer] = await ethers.getSigners();
+      const mockRegistry = await new MockBondingRegistryFactory(
+        deployer,
+      ).deploy();
+      await mockRegistry.waitForDeployment();
+      const now = BigInt(await time.latest());
+      const ccaStart = now + DAY;
+      const ccaEnd = ccaStart + 7n * DAY;
+      const earliestTge = ccaEnd + TGE_COOLDOWN;
+
+      await expect(
+        new InterfoldTokenFactory(deployer).deploy(
+          await deployer.getAddress(),
+          ccaStart,
+          ccaEnd,
+          earliestTge, // must be strictly after
+          await deployer.getAddress(),
+          await mockRegistry.getAddress(),
+        ),
+      ).to.be.revertedWithCustomError(
+        { interface: InterfoldTokenFactory.createInterface() },
+        "InvalidNoMoreLocks",
+      );
+    });
+
     it("initial owner receives all roles", async function () {
       const { token, admin } = await loadFixture(deploy);
       const adminAddress = await admin.getAddress();

@@ -927,7 +927,9 @@ contract InterfoldToken is
     }
 
     /// @dev Ensures the policy cannot keep anything locked past the lock
-    ///      sunset.
+    ///      sunset. Ending exactly at the sunset is allowed: the curve has
+    ///      fully released and the hold has lapsed at that moment, which is
+    ///      also when the sunset takes effect.
     function _validatePolicyMaturity(LockPolicy calldata policy) internal view {
         Curve calldata curve = policy.unlock;
         // The curve validation guarantees cliff <= vest when vest != 0, so
@@ -940,10 +942,10 @@ contract InterfoldToken is
             ? _earliestTge() + curveEnd
             : curve.start + curveEnd;
 
-        if (policyEnd >= NO_MORE_LOCKS) {
+        if (policyEnd > NO_MORE_LOCKS) {
             revert InvalidPolicy();
         }
-        if (policy.holdUntil >= NO_MORE_LOCKS) {
+        if (policy.holdUntil > NO_MORE_LOCKS) {
             revert InvalidPolicy();
         }
     }
