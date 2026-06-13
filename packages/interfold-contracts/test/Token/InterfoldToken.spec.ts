@@ -15,6 +15,12 @@ const { loadFixture, time } = networkHelpers;
 
 const DAY = 24n * 60n * 60n;
 const YEAR = 365n * DAY;
+const NO_MORE_LOCKS_DELAY = 4n * YEAR;
+const TGE_COOLDOWN = 45n * DAY;
+
+function noMoreLocksFor(ccaEnd: bigint) {
+  return ccaEnd + TGE_COOLDOWN + NO_MORE_LOCKS_DELAY;
+}
 
 describe("InterfoldToken", function () {
   // ── Helpers ─────────────────────────────────────────────────────────────
@@ -43,11 +49,13 @@ describe("InterfoldToken", function () {
     const now = BigInt(await time.latest());
     const ccaStart = now + 10n * DAY; // far future — Virtual phase
     const ccaEnd = ccaStart + 7n * DAY;
+    const noMoreLocks = noMoreLocksFor(ccaEnd);
 
     const token = await new InterfoldTokenFactory(deployer).deploy(
       await admin.getAddress(),
       ccaStart,
       ccaEnd,
+      noMoreLocks,
       await claimSource.getAddress(),
       await mockRegistry.getAddress(),
     );
@@ -65,6 +73,7 @@ describe("InterfoldToken", function () {
       mockRegistry,
       ccaStart,
       ccaEnd,
+      noMoreLocks,
     };
   }
 
@@ -173,12 +182,14 @@ describe("InterfoldToken", function () {
       const now = BigInt(await time.latest());
       const ccaStart = now + DAY;
       const ccaEnd = ccaStart + 7n * DAY;
+      const noMoreLocks = noMoreLocksFor(ccaEnd);
 
       await expect(
         new InterfoldTokenFactory(deployer).deploy(
           await deployer.getAddress(),
           ccaStart,
           ccaEnd,
+          noMoreLocks,
           ethers.ZeroAddress,
           await mockRegistry.getAddress(),
         ),
@@ -193,12 +204,14 @@ describe("InterfoldToken", function () {
       const now = BigInt(await time.latest());
       const ccaStart = now + DAY;
       const ccaEnd = ccaStart + 7n * DAY;
+      const noMoreLocks = noMoreLocksFor(ccaEnd);
 
       await expect(
         new InterfoldTokenFactory(deployer).deploy(
           await deployer.getAddress(),
           ccaStart,
           ccaEnd,
+          noMoreLocks,
           await deployer.getAddress(),
           ethers.ZeroAddress,
         ),
@@ -213,12 +226,14 @@ describe("InterfoldToken", function () {
       const now = BigInt(await time.latest());
       const ccaStart = now + DAY;
       const ccaEnd = ccaStart + 7n * DAY;
+      const noMoreLocks = noMoreLocksFor(ccaEnd);
 
       await expect(
         new InterfoldTokenFactory(deployer).deploy(
           await admin.getAddress(),
           ccaStart,
           ccaEnd,
+          noMoreLocks,
           await deployer.getAddress(),
           await admin.getAddress(), // EOA, not a contract
         ),
@@ -241,6 +256,7 @@ describe("InterfoldToken", function () {
           await deployer.getAddress(),
           now, // in the past (or now)
           now + 7n * DAY,
+          noMoreLocksFor(now + 7n * DAY),
           await deployer.getAddress(),
           await mockRegistry.getAddress(),
         ),
@@ -259,18 +275,45 @@ describe("InterfoldToken", function () {
       const now = BigInt(await time.latest());
       const ccaStart = now + DAY;
       const ccaEnd = ccaStart; // equal, not greater
+      const noMoreLocks = noMoreLocksFor(ccaEnd);
 
       await expect(
         new InterfoldTokenFactory(deployer).deploy(
           await deployer.getAddress(),
           ccaStart,
           ccaEnd,
+          noMoreLocks,
           await deployer.getAddress(),
           await mockRegistry.getAddress(),
         ),
       ).to.be.revertedWithCustomError(
         { interface: InterfoldTokenFactory.createInterface() },
         "InvalidCcaWindow",
+      );
+    });
+
+    it("reverts when noMoreLocks is zero", async function () {
+      const [deployer] = await ethers.getSigners();
+      const mockRegistry = await new MockBondingRegistryFactory(
+        deployer,
+      ).deploy();
+      await mockRegistry.waitForDeployment();
+      const now = BigInt(await time.latest());
+      const ccaStart = now + DAY;
+      const ccaEnd = ccaStart + 7n * DAY;
+
+      await expect(
+        new InterfoldTokenFactory(deployer).deploy(
+          await deployer.getAddress(),
+          ccaStart,
+          ccaEnd,
+          0n,
+          await deployer.getAddress(),
+          await mockRegistry.getAddress(),
+        ),
+      ).to.be.revertedWithCustomError(
+        { interface: InterfoldTokenFactory.createInterface() },
+        "ZeroAmount",
       );
     });
 
@@ -720,6 +763,93 @@ describe("InterfoldToken", function () {
         "AccessControlUnauthorizedAccount",
       );
     });
+
+    it("reverts when Tge-anchored vest outlasts noMoreLocks", async function () {
+      const { token, admin } = await loadFixture(deploy);
+      await expect(
+        token
+          .connect(admin)
+          .createLockPolicy(ethers.encodeBytes32String("TOO_LONG"), {
+            holdUntil: 0n,
+            unlock: {
+              anchor: 1,
+              start: 0n,
+              cliffDuration: 0n,
+              vestDuration: NO_MORE_LOCKS_DELAY + 1n,
+            },
+          }),
+      ).to.be.revertedWithCustomError(token, "InvalidPolicy");
+    });
+
+    it("reverts when Tge-anchored cliff-only release outlasts noMoreLocks", async function () {
+      const { token, admin } = await loadFixture(deploy);
+      await expect(
+        token
+          .connect(admin)
+          .createLockPolicy(ethers.encodeBytes32String("TOO_LONG"), {
+            holdUntil: 0n,
+            unlock: {
+              anchor: 1,
+              start: 0n,
+              cliffDuration: NO_MORE_LOCKS_DELAY + 1n,
+              vestDuration: 0n,
+            },
+          }),
+      ).to.be.revertedWithCustomError(token, "InvalidPolicy");
+    });
+
+    it("accepts Tge-anchored vest of exactly noMoreLocks", async function () {
+      const { token, admin } = await loadFixture(deploy);
+      await expect(
+        token
+          .connect(admin)
+          .createLockPolicy(ethers.encodeBytes32String("FULL_TAIL"), {
+            holdUntil: 0n,
+            unlock: {
+              anchor: 1,
+              start: 0n,
+              cliffDuration: 0n,
+              vestDuration: NO_MORE_LOCKS_DELAY,
+            },
+          }),
+      ).to.emit(token, "PolicyDefined");
+    });
+
+    it("reverts when Absolute curve ends past the earliest sunset", async function () {
+      const { token, admin, ccaEnd } = await loadFixture(deploy);
+      const earliestMaturity = noMoreLocksFor(ccaEnd);
+      await expect(
+        token
+          .connect(admin)
+          .createLockPolicy(ethers.encodeBytes32String("TOO_LONG"), {
+            holdUntil: 0n,
+            unlock: {
+              anchor: 0,
+              start: earliestMaturity - YEAR,
+              cliffDuration: 0n,
+              vestDuration: YEAR + 1n,
+            },
+          }),
+      ).to.be.revertedWithCustomError(token, "InvalidPolicy");
+    });
+
+    it("reverts when holdUntil is past the earliest sunset", async function () {
+      const { token, admin, ccaEnd } = await loadFixture(deploy);
+      const earliestMaturity = noMoreLocksFor(ccaEnd);
+      await expect(
+        token
+          .connect(admin)
+          .createLockPolicy(ethers.encodeBytes32String("TOO_LONG"), {
+            holdUntil: earliestMaturity + 1n,
+            unlock: {
+              anchor: 1,
+              start: 0n,
+              cliffDuration: 0n,
+              vestDuration: YEAR,
+            },
+          }),
+      ).to.be.revertedWithCustomError(token, "InvalidPolicy");
+    });
   });
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -941,6 +1071,79 @@ describe("InterfoldToken", function () {
       await expect(
         token.connect(alice).transfer(await bob.getAddress(), amount),
       ).to.be.revertedWithCustomError(token, "TransferRestricted");
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // Lock sunset
+  // ═════════════════════════════════════════════════════════════════════════
+
+  describe("lock sunset", function () {
+    it("NO_MORE_LOCKS is fixed at deployment", async function () {
+      const { token, noMoreLocks } = await loadFixture(deploy);
+      expect(await token.NO_MORE_LOCKS()).to.equal(noMoreLocks);
+    });
+
+    it("locked balance becomes fully transferable at the sunset", async function () {
+      const { token, alice, bob, amount, noMoreLocks } =
+        await deployWithLockAndTge({ mintAmount: ethers.parseEther("1000") });
+      const aliceAddress = await alice.getAddress();
+
+      await time.increaseTo(noMoreLocks);
+
+      expect(await token.lockedBalanceOf(aliceAddress)).to.equal(0n);
+      expect(await token.transferableBalanceOf(aliceAddress)).to.equal(amount);
+      await token.connect(alice).transfer(await bob.getAddress(), amount);
+    });
+
+    it("unlinked PENDING locks sunset too", async function () {
+      const { token, alice, bob, claimSource, amount } =
+        await deployWithUnlockedAndTge(ethers.parseEther("500"));
+      const aliceAddress = await alice.getAddress();
+
+      await token
+        .connect(alice)
+        .transfer(await claimSource.getAddress(), amount);
+      await token.connect(claimSource).transfer(aliceAddress, amount);
+      expect(await token.lockedBalanceOf(aliceAddress)).to.equal(amount);
+
+      await time.increaseTo(await token.NO_MORE_LOCKS());
+
+      expect(await token.lockedBalanceOf(aliceAddress)).to.equal(0n);
+      await token.connect(alice).transfer(await bob.getAddress(), amount);
+    });
+
+    it("lockedBalanceAt reports 0 from the sunset onwards", async function () {
+      const { token, alice, claimSource, amount } =
+        await deployWithUnlockedAndTge(ethers.parseEther("500"));
+      const aliceAddress = await alice.getAddress();
+
+      await token
+        .connect(alice)
+        .transfer(await claimSource.getAddress(), amount);
+      await token.connect(claimSource).transfer(aliceAddress, amount);
+
+      const maturity = await token.NO_MORE_LOCKS();
+      expect(await token.lockedBalanceAt(aliceAddress, maturity - 1n)).to.equal(
+        amount,
+      );
+      expect(await token.lockedBalanceAt(aliceAddress, maturity)).to.equal(0n);
+    });
+
+    it("CLAIM_SOURCE transfers past the sunset create no locks", async function () {
+      const { token, alice, claimSource, amount } =
+        await deployWithUnlockedAndTge(ethers.parseEther("500"));
+      const aliceAddress = await alice.getAddress();
+
+      await token
+        .connect(alice)
+        .transfer(await claimSource.getAddress(), amount);
+
+      await time.increaseTo(await token.NO_MORE_LOCKS());
+
+      await token.connect(claimSource).transfer(aliceAddress, amount);
+      expect(await token.lockCount(aliceAddress)).to.equal(0n);
+      expect(await token.lockedBalanceOf(aliceAddress)).to.equal(0n);
     });
   });
 

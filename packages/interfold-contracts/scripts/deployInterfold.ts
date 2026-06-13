@@ -138,6 +138,8 @@ export const deployInterfold = async (
 
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
   const SEVEN_DAYS_IN_SECONDS = 60 * 60 * 24 * 7;
+  const TGE_COOLDOWN_SECONDS = 60 * 60 * 24 * 45;
+  const FOUR_YEARS_IN_SECONDS = 60 * 60 * 24 * 365 * 4;
   const SORTITION_SUBMISSION_WINDOW = 10;
   const addressOne = "0x0000000000000000000000000000000000000001";
 
@@ -266,6 +268,7 @@ export const deployInterfold = async (
     ccaEnd,
     claimSource: ownerAddress,
     bondingRegistry: bondingRegistryAddress,
+    noMoreLocks: ccaEnd + BigInt(TGE_COOLDOWN_SECONDS + FOUR_YEARS_IN_SECONDS),
     hre,
   });
   const interfoldTokenAddress = await interfoldToken.getAddress();
