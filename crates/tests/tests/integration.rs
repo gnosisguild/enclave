@@ -1663,10 +1663,17 @@ async fn test_trbfv_actor() -> Result<()> {
             _ => None,
         })
         .collect();
-    assert_eq!(
-        dkg_parties.len(),
-        threshold_n,
-        "node 0: expected one DKGRecursiveAggregationComplete per committee member (N={threshold_n}), got parties {dkg_parties:?}"
+    // Unlike KeyshareCreated (cheap, gossiped early — all N arrive before aggregation), the
+    // per-node recursive fold proof (DKGRecursiveAggregationComplete) is expensive and late.
+    // `PublicKeyAggregated` fires once the aggregator selects and aggregates the honest set, so
+    // only the H honest folds are guaranteed to have reached node 0 by this barrier; the extra
+    // N-H members' folds race against it (and may land afterward). Assert the guaranteed floor
+    // and that every observed fold party is a committee member, not the racy `== N`.
+    assert!(
+        dkg_parties.len() >= committee_h
+            && dkg_parties.len() <= threshold_n
+            && dkg_parties.iter().all(|p| (*p as usize) < threshold_n),
+        "node 0: expected DKGRecursiveAggregationComplete from {committee_h}..={threshold_n} committee members before PublicKeyAggregated (only the H honest folds are guaranteed by this barrier), got parties {dkg_parties:?}"
     );
     assert_eq!(
         ks_parties.len(),
