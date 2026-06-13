@@ -1371,7 +1371,8 @@ async fn test_trbfv_actor() -> Result<()> {
     let nodes_spawned = participant_count + 1; // +1 non-registered observer collector
                                                // Statistical security parameter λ used for smudging bound / error_size.
                                                // Comes from the selected BFV preset metadata to avoid mixing parameter families.
-    let lambda = benchmark_params.lambda;
+                                               // Lambda is secure or insecure depending on the selected preset's security tier.
+    let lambda = benchmark_params.bfv_preset.lambda()?;
 
     let seed = create_seed_from_u64(123);
     let error_size = ArcBytes::from_bytes(&BigUint::to_bytes_be(&calculate_error_size(

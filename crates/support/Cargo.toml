@@ -41,7 +41,7 @@ serde_json = "=1.0.141"
 # NOTE: untagged on purpose. e3-compute-provider/e3-fhe-params at interfold
 # v0.2.0 declare fhe.rs without a tag. A tag here would be a different Cargo
 # source than theirs, yielding two incompatible copies of `fhe`. Keep this bare
-# so it unifies with them; the v0.2.1 commit is pinned via Cargo.lock.
+# so it unifies with them; the v0.2.2 commit is pinned via Cargo.lock.
 fhe = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
