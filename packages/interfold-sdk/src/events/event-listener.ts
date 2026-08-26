@@ -458,3 +458,4 @@ export class EventListener implements SDKEventEmitter {
       }
     }
   }
+}
