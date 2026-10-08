@@ -1391,27 +1391,25 @@ artifact guard checks the minimum committee and a supported local preset; the ac
 does not select the bundle. `zk_cli --circuit user-data-encryption` generates this raw witness. The
 shared builder, not one Noir circuit, uses the witness to produce the recursive tree.
 
-Each ciphertext leg uses these stages:
+Each ciphertext leg uses five proofs:
 
-1. Round A proves one ZK leaf. The leaf range-checks all private coefficients and outputs one
-   commitment for each polynomial.
-2. A separate ZK circuit range-checks the ciphertext limbs to their centered residues and commits
-   them. It passes the public-key commitment through without hashing the key; step 6 binds it to
-   the key that Round B evaluates.
-3. The `*_chunk_gamma` circuit verifies the leaf and commitment proofs, rebuilds the polynomial
-   roots, and derives the Fiat-Shamir challenge from them.
-4. Round B proves one ZK leaf at that challenge. It re-derives the Round A commitments and
-   evaluates its polynomials.
-5. A separate ZK circuit re-derives the public-key and ciphertext commitments, evaluates the
-   ciphertext, and evaluates `pk * u mod X^N + 1` through `negacyclic_kernel`. It also outputs the
-   `u` root. The `*_eval_chunk_identity` circuit verifies both Round B proofs, requires that `u` root
-   to equal the leaf's, and checks the reduced encryption identity.
-6. `user_data_encryption_ct0` or `user_data_encryption_ct1` verifies the Round A and Round B final
-   proofs. It requires equal commitments, roots, and batching coefficients. It also commits every
-   child VK to the leg manifest.
+1. The leaf (`*_chunk_main`, ZK) range-checks every private coefficient and commits each
+   polynomial. It derives the Fiat-Shamir challenge from those commitments and the public-key and
+   ciphertext commitments, then evaluates its polynomials at the challenge. The challenge is
+   derived after every input is committed, so one circuit can both commit and evaluate.
+2. The ciphertext circuit (`*_pk_ct_commit`, ZK) range-checks the ciphertext limbs to their
+   centered residues, commits them, and evaluates them at the leaf's challenge.
+3. The public-key circuit (`*_eval_pk_ct`, ZK) commits the public key, outputs the `u` root, and
+   evaluates `pk * u mod X^N + 1` through `negacyclic_kernel`.
+4. The identity circuit (`*_eval_chunk_identity`) verifies the leaf and the public-key proofs. It
+   requires the public-key commitment, `u` root and challenge to be the leaf's, and evaluates the
+   batched right-hand side of the reduced identity.
+5. `user_data_encryption_ct0` or `user_data_encryption_ct1` verifies the identity and ciphertext
+   proofs. It requires the ciphertext commitment and challenge to be the leaf's, checks the batched
+   identity, and commits every child VK to the leg manifest.
 
 The ct0 top-level circuit also receives the complete `k1` polynomial. It rebuilds the `k1` chunk
-root and compares it with both rounds. It then outputs the whole-polynomial commitment under
+root and compares it with the leaf's. It then outputs the whole-polynomial commitment under
 `DS_USER_DATA_ENCRYPTION_COMMITMENT`. This output matches the commitment that the CRISP ballot
 circuit computes. The ct0 top-level proof uses the ZK recursive target because its witness contains
 the private `k1` polynomial. The ct1 top-level proof remains non-ZK because it receives only proofs

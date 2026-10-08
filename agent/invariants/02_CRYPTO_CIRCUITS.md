@@ -704,10 +704,10 @@ every section.
   dispatch, or applies an immutable sealed set. Persisted V1 candidate sets of `H..=N` remain valid;
   all new V1 candidate sets contain exactly `H`. — `flow-trace/04`
 - **Complete user-data-encryption recursive VK binding:** each ciphertext leg is a tree of
-  circuits, and every VK in the tree must reach an anchor. Each round circuit (`*_chunk_gamma`,
-  `*_eval_chunk_identity`) verifies one leaf and one pk/ct circuit and outputs their key hashes
-  first. Each top-level circuit (`user_data_encryption_ct0/ct1`) folds those four values and its
-  own two child key hashes into `compute_ude_vk_manifest`. The `user_data_encryption` wrapper outputs
+  circuits, and every VK in the tree must reach an anchor. The identity circuit
+  (`*_eval_chunk_identity`) verifies the leaf and the public-key circuit and outputs their key
+  hashes first. Each top-level circuit (`user_data_encryption_ct0/ct1`) folds the identity, leaf,
+  public-key and ciphertext key hashes, in that order, into `compute_ude_vk_manifest`. The `user_data_encryption` wrapper outputs
   `compute_ude_vk_chain(top_key_hash, manifest)` per leg, in the positions that held the bare ct0
   and ct1 key hashes. The verifier must compare both chain values to anchors. Do not drop a key hash
   at any layer: a key hash that no layer passes up lets a prover replace that circuit with any
