@@ -1380,9 +1380,11 @@ deadlines, recovery flow, and remaining trust.
 ### User-data encryption proof tree (P3)
 
 The client gets one raw BFV witness from Rust or WASM. The shared proof-tree builder at
-`packages/user-data-encryption-prover/src/index.ts` divides that witness into two coefficient
-chunks. It adds the required leading zero to the degree-`N-2` and degree-`2N-2` polynomials before
-it divides them. Both the Interfold SDK and the CRISP SDK use this builder. `e3-bfv-client`
+`packages/user-data-encryption-prover/src/index.ts` passes the whole witness to one leaf per
+round. Each leg's identity is checked reduced modulo `X^N + 1`, so the witness has no cyclotomic
+quotient and its modulus-switch quotients (`r1is`, `p1is`) have `N` coefficients. The Interfold SDK
+uses this builder. The CRISP SDK still builds the earlier two-chunk tree and must be updated before
+CRISP uses these circuits. `e3-bfv-client`
 serializes witness integers outside JavaScript's safe range as decimal strings. This preserves exact
 coefficients when WASM returns JSON to the SDK. The SDK selects its proof bundle by BFV degree. Its
 artifact guard checks the minimum committee and a supported local preset; the active local preset
@@ -1391,19 +1393,20 @@ shared builder, not one Noir circuit, uses the witness to produce the recursive 
 
 Each ciphertext leg uses these stages:
 
-1. Round A proves two ZK chunk leaves. The leaves range-check all private coefficients and output
-   one commitment for each polynomial group.
-2. A non-ZK root verifies both leaves under one leaf VK and computes the polynomial roots.
-3. A separate ZK circuit range-checks the ciphertext limbs to their centered residues and commits
-   them. It passes the public-key commitment through without hashing the key; step 7 binds it to
+1. Round A proves one ZK leaf. The leaf range-checks all private coefficients and outputs one
+   commitment for each polynomial.
+2. A separate ZK circuit range-checks the ciphertext limbs to their centered residues and commits
+   them. It passes the public-key commitment through without hashing the key; step 6 binds it to
    the key that Round B evaluates.
-4. The `*_chunk_gamma` circuit verifies the root and commitment proofs. It derives the Fiat-Shamir
-   challenge from their commitments.
-5. Round B proves two ZK evaluation leaves at that challenge. A non-ZK root verifies the leaves,
-   rebuilds the Round A roots, and combines the partial polynomial evaluations.
-6. A separate ZK circuit evaluates the public-key and ciphertext limbs. The `*_eval_chunk_identity`
-   circuit verifies both Round B branches and checks the encryption identity.
-7. `user_data_encryption_ct0` or `user_data_encryption_ct1` verifies the Round A and Round B final
+3. The `*_chunk_gamma` circuit verifies the leaf and commitment proofs, rebuilds the polynomial
+   roots, and derives the Fiat-Shamir challenge from them.
+4. Round B proves one ZK leaf at that challenge. It re-derives the Round A commitments and
+   evaluates its polynomials.
+5. A separate ZK circuit re-derives the public-key and ciphertext commitments, evaluates the
+   ciphertext, and evaluates `pk * u mod X^N + 1` through `negacyclic_kernel`. It also outputs the
+   `u` root. The `*_eval_chunk_identity` circuit verifies both Round B proofs, requires that `u` root
+   to equal the leaf's, and checks the reduced encryption identity.
+6. `user_data_encryption_ct0` or `user_data_encryption_ct1` verifies the Round A and Round B final
    proofs. It requires equal commitments, roots, and batching coefficients. It also commits every
    child VK to the leg manifest.
 
