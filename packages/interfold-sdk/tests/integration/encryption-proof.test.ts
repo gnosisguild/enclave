@@ -33,8 +33,7 @@ describe('real encryption proof', () => {
     publicKeyCommitment = bytesToBigInt(await sdk.computePublicKeyCommitment(publicKey))
     ciphertextCommitment = bytesToBigInt(await sdk.computeCiphertextCommitment(encryptedData))
 
-    api = await Barretenberg.new()
-    await api.initSRSChonk(2 ** 21)
+    api = await Barretenberg.new({ srsSize: 2 ** 21 })
     verificationKey = await new UltraHonkBackend(circuit.bytecode, api).getVerificationKey(options)
     verifier = new UltraHonkVerifierBackend(api)
   })
