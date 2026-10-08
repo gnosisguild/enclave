@@ -705,9 +705,9 @@ every section.
   all new V1 candidate sets contain exactly `H`. — `flow-trace/04`
 - **Complete user-data-encryption recursive VK binding:** each ciphertext leg is a tree of
   circuits, and every VK in the tree must reach an anchor. The identity circuit
-  (`*_eval_chunk_identity`) verifies the leaf and the public-key circuit and outputs their key
-  hashes first. Each top-level circuit (`user_data_encryption_ct0/ct1`) folds the identity, leaf,
-  public-key and ciphertext key hashes, in that order, into `compute_ude_vk_manifest`. The `user_data_encryption` wrapper outputs
+  (`*_eval_chunk_identity`) verifies the leaf and outputs its key hash first. Each top-level
+  circuit (`user_data_encryption_ct0/ct1`) folds the identity, leaf and ciphertext key hashes, in
+  that order, into `compute_ude_vk_manifest`. The `user_data_encryption` wrapper outputs
   `compute_ude_vk_chain(top_key_hash, manifest)` per leg, in the positions that held the bare ct0
   and ct1 key hashes. The verifier must compare both chain values to anchors. Do not drop a key hash
   at any layer: a key hash that no layer passes up lets a prover replace that circuit with any
@@ -715,7 +715,8 @@ every section.
   wrapper also asserts that ct0 and ct1 share one `u` root. The ct0 top-level circuit rebuilds the
   `k1` chunk root from the complete polynomial before it outputs the whole-polynomial commitment
   that CRISP checks. Its proof must use the ZK recursive target because that circuit receives the
-  private `k1` polynomial directly. Each SDK proof request must use the circuit bundle compiled for
+  private `k1` polynomial directly. The identity proofs must use the ZK recursive target too,
+  because each receives the private `u` polynomial to open it and evaluate `pk * u`. Each SDK proof request must use the circuit bundle compiled for
   the witness's BFV preset and polynomial degree. —
   `lib::core::threshold::user_data_encryption_chunk`, `examples/CRISP/scripts/compute_vk_hash.sh`
 - Circuit soundness fixes to preserve: `ModU64::div_mod` verifies

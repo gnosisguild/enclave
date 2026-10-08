@@ -1391,7 +1391,7 @@ artifact guard checks the minimum committee and a supported local preset; the ac
 does not select the bundle. `zk_cli --circuit user-data-encryption` generates this raw witness. The
 shared builder, not one Noir circuit, uses the witness to produce the recursive tree.
 
-Each ciphertext leg uses five proofs:
+Each ciphertext leg uses four proofs:
 
 1. The leaf (`*_chunk_main`, ZK) range-checks every private coefficient and commits each
    polynomial. It derives the Fiat-Shamir challenge from those commitments and the public-key and
@@ -1399,12 +1399,11 @@ Each ciphertext leg uses five proofs:
    derived after every input is committed, so one circuit can both commit and evaluate.
 2. The ciphertext circuit (`*_pk_ct_commit`, ZK) range-checks the ciphertext limbs to their
    centered residues, commits them, and evaluates them at the leaf's challenge.
-3. The public-key circuit (`*_eval_pk_ct`, ZK) commits the public key, outputs the `u` root, and
-   evaluates `pk * u mod X^N + 1` through `negacyclic_kernel`.
-4. The identity circuit (`*_eval_chunk_identity`) verifies the leaf and the public-key proofs. It
-   requires the public-key commitment, `u` root and challenge to be the leaf's, and evaluates the
+3. The identity circuit (`*_eval_chunk_identity`, ZK) verifies the leaf. It opens the public key
+   against the leaf's public-key commitment and `u` against the leaf's `u` root, evaluates
+   `pk * u mod X^N + 1` at the leaf's challenge through `negacyclic_kernel`, and evaluates the
    batched right-hand side of the reduced identity.
-5. `user_data_encryption_ct0` or `user_data_encryption_ct1` verifies the identity and ciphertext
+4. `user_data_encryption_ct0` or `user_data_encryption_ct1` verifies the identity and ciphertext
    proofs. It requires the ciphertext commitment and challenge to be the leaf's, checks the batched
    identity, and commits every child VK to the leg manifest.
 
@@ -1425,8 +1424,8 @@ The Interfold SDK stages a complete proof bundle for each BFV preset. It selects
 requested preset and verifies that the raw witness has the matching polynomial degree. The preset
 modules are separate build entries, so an ESM client loads only the selected circuit bundle.
 
-The complete tree has 22 leg proofs plus the wrapper proof. Release validation and CRISP preset
-staging require all 16 child circuit artifacts, the two top-level circuit artifacts, and the wrapper
+The complete tree has 8 leg proofs plus the wrapper proof. Release validation and CRISP preset
+staging require all 6 child circuit artifacts, the two top-level circuit artifacts, and the wrapper
 artifact. A child-circuit source change also invalidates the CRISP preset digest and starts the
 CRISP CI jobs.
 
