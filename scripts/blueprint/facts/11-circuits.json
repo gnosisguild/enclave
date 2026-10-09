@@ -1014,7 +1014,7 @@
       "kind": "circuit",
       "path": "circuits/lib",
       "one_line": "Shared Noir package with the math, commitments, presets and core circuit bodies that every bin package imports.",
-      "explain": "Every package under bin/ depends on this library, so field and polynomial arithmetic, the SAFE sponge hash, domain-separated commitments and checked packing are written once. The core modules hold the body of each DKG and threshold circuit, and configs/default selects the preset (this snapshot's generated default is insecure-512). Without it, each binary would repeat these checks and could drift apart.",
+      "explain": "Every package under bin/ depends on this library, so field and polynomial arithmetic, the SAFE sponge hash, domain-separated commitments and checked packing are written once. The core modules hold the body of each DKG and threshold circuit, and configs/default selects the preset (this snapshot's generated default is insecure-64). Without it, each binary would repeat these checks and could drift apart.",
       "analogy": "A shared toolbox of calibrated instruments: each inspector has its own checklist, but the rulers, scales and seals all come from one box.",
       "actors": [],
       "consumes": [],
