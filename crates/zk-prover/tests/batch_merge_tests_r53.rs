@@ -129,6 +129,7 @@ async fn r53_m1_merge_e2e_equivalence() {
     let ad = preset.artifacts_dir_for_committee(COMMITTEE);
 
     let circuit = ShareEncryptionCircuit;
+    let t_inners = Instant::now();
     let inners: Vec<Proof> = (0..N_INNERS)
         .map(|i| {
             let sample = ShareEncryptionCircuitData::generate_sample(
@@ -150,7 +151,6 @@ async fn r53_m1_merge_e2e_equivalence() {
                 .unwrap_or_else(|e| panic!("inner {i} ZK prove failed: {e}"))
         })
         .collect();
-    let t_inners = Instant::now();
     let inners_done = secs(&t_inners);
 
     let slots: Vec<u32> = (0..N_INNERS).collect();

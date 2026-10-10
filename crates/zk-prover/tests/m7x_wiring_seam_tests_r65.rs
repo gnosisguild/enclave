@@ -8,7 +8,7 @@
 //!       geometry of node P=1 (W_1 = {0..57}\{3,4,5}, anchor W_1[0]=0; C3_SLOTS=57):
 //!         c3b arm = `generate_c3_merge_m7x`  -> circuit C3FoldBatchMergeM7x (the M7x
 //!                 8-top-level-prove merge; 175 c3_fold-EXACT public fields)
-//!         c3a arm = `generate_sequential_c3_fold` over a same-size 39-slot fan-out
+//!         c3a arm = `generate_sequential_c3_fold` over a same-size 30-slot fan-out
 //!                 -> circuit C3Fold (the unchanged legacy arm)
 //!   (2) THE C3AB SEAM (the r35 claim, un-verified until now): build the c3ab witness
 //!       EXACTLY as the production `C3abFoldWitness` does (`node_dkg_fold.rs`) and pin
@@ -345,7 +345,7 @@ async fn r65_c3ab_wiring_seam_m7x_c3b_c3fold_c3a() {
         "c3a public field count"
     );
     println!(
-        "  c3a arm sequential (1 kernel + 38 c3_fold steps) wall = {c3a_wall:.1}s  fields = 175  circuit = c3_fold  RAN"
+        "  c3a arm sequential (1 kernel + 29 c3_fold steps) wall = {c3a_wall:.1}s  fields = 175  circuit = c3_fold  RAN"
     );
 
     // --- THE R35 SEAM: production-shape c3ab witness with c3b pinned to the M7x VK ---

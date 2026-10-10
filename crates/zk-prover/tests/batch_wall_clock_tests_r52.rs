@@ -145,6 +145,7 @@ async fn r52_b10_prove_and_equivalence() {
 
     // 11 shared real FHE inner proofs (insecure-512, minimum std — committee-consistent).
     let circuit = ShareEncryptionCircuit;
+    let t_inners = Instant::now();
     let inners: Vec<Proof> = (0..N_INNERS)
         .map(|i| {
             let sample = ShareEncryptionCircuitData::generate_sample(
@@ -166,7 +167,6 @@ async fn r52_b10_prove_and_equivalence() {
                 .unwrap_or_else(|e| panic!("inner {i} ZK prove failed: {e}"))
         })
         .collect();
-    let t_inners = Instant::now();
     let inners_done = secs(&t_inners);
 
     let slots: Vec<u32> = (0..N_INNERS).collect();

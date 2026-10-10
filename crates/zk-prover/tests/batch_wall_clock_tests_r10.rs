@@ -154,6 +154,6 @@ async fn r10_chained_b2_batch_equivalence() {
         100.0 * save / seq_wall
     );
     println!(
-        "  Gates: serial = 6 x (kernel/1 c3_fold step); serial step 1,448,866, b2 gate 2,215,183 (RAN r9) -> batched fold-layer = kernel + 2 x b2; serial fold-layer = kernel + 5 x c3_fold (RAN anchor). Net top-level prove reduction = 3."
+        "  Gates: serial step 1,448,866, b2 gate 2,215,183 (RAN r9) -> batched fold-layer = kernel + 2 x b2; serial fold-layer = kernel + 4 x c3_fold. Net top-level prove reduction = 2 (5 -> 3)."
     );
 }

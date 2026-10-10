@@ -268,8 +268,8 @@ async fn r70_c3a_arm_m7x_vs_serial_byte_identity_plus_both_m7x_seam() {
     let t0 = Instant::now();
     let mut inners: Vec<Proof> = Vec::with_capacity(c3b_count + c3a_count);
     for (tag, dkg_type, n) in [
-        ("c3b", DkgInputType::SecretKey, c3b_count),
-        ("c3a", DkgInputType::SmudgingNoise, c3a_count),
+        ("c3b", DkgInputType::SmudgingNoise, c3b_count),
+        ("c3a", DkgInputType::SecretKey, c3a_count),
     ] {
         for j in 0..n {
             let sample = ShareEncryptionCircuitData::generate_sample(

@@ -166,6 +166,19 @@ fn push_step(timings: &mut Vec<FoldProveStepTiming>, step: &str, started: Instan
     });
 }
 
+/// True when the caller's `c3_*_inner_proofs` / `c3_slot_indices_*` explain a shape that
+/// `generate_c3_merge_m7x` accepts: exactly 54 inners, exactly 54 slots, and
+/// `c3_total_slots == 57` (`N_PARTIES * L_THRESHOLD` at N=19, L=3 — production shape).
+///
+/// Used in BOTH the router (c3a/c3b arms) and the c3ab witness (arm final VK choice),
+/// so the shape used for prover routing can no longer drift from the VK pinned
+/// against that arm's final `c3ab` public. A 54/54 arm with any other `total_slots`
+/// falls through to the sequential `c3_fold` arm instead of erroring inside
+/// `m7x_gate_over_genesis`.
+fn c3_arm_uses_m7x(inners: &[Proof], slots: &[u32], total_slots: usize) -> bool {
+    inners.len() == 54 && slots.len() == 54 && total_slots == 57
+}
+
 /// Run C2abFold || (C3a fold || C3b fold) → C3abFold → C4abFold → NodeFold; returns a [`CircuitName::NodeFold`] proof.
 ///
 /// C2abFold and the two C3 fold chains are mutually independent and run concurrently via
@@ -216,9 +229,11 @@ pub fn prove_node_dkg_fold(
                 rayon::join(
                     || {
                         let t = Instant::now();
-                        let r = if input.c3a_inner_proofs.len() == 54
-                            && input.c3_slot_indices_a.len() == 54
-                        {
+                        let r = if c3_arm_uses_m7x(
+                            input.c3a_inner_proofs,
+                            input.c3_slot_indices_a,
+                            input.c3_total_slots,
+                        ) {
                             // Production N=19 C3a geometry (N=19, L=3): mirrors the C3b M7x
                             // branch above. The r70 leg RAN-proved this exact shape at
                             // production counts: c3a M7x 495.8 s vs the c3a serial oracle
@@ -250,9 +265,11 @@ pub fn prove_node_dkg_fold(
                     },
                     || {
                         let t = Instant::now();
-                        let r = if input.c3b_inner_proofs.len() == 54
-                            && input.c3_slot_indices_b.len() == 54
-                        {
+                        let r = if c3_arm_uses_m7x(
+                            input.c3b_inner_proofs,
+                            input.c3_slot_indices_b,
+                            input.c3_total_slots,
+                        ) {
                             // Production N=19 C3b geometry (N=19, L=3): the batched M7x merge
                             // (1 kernel + 5 x B10 + 1 x B3 sub-gates + 1 M7x merge = 8
                             // top-level proves) replaces the 54-step c3_fold chain with a
@@ -315,8 +332,11 @@ pub fn prove_node_dkg_fold(
     // inputs, exactly like the prior-accumulator verify in the batch gates, r9 `c3_batch`)
     // => c3ab_fold needs no recompile: this wiring is the "VK-rebuild-only" drop-in (r35
     // pattern). Any other geometry folds that arm sequentially (c3_fold VK).
-    let c3a_arm_used_m7x =
-        input.c3a_inner_proofs.len() == 54 && input.c3_slot_indices_a.len() == 54;
+    let c3a_arm_used_m7x = c3_arm_uses_m7x(
+        input.c3a_inner_proofs,
+        input.c3_slot_indices_a,
+        input.c3_total_slots,
+    );
     let c3a_final_vk = if c3a_arm_used_m7x {
         vk::load_vk_artifacts(
             &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),
@@ -345,8 +365,11 @@ pub fn prove_node_dkg_fold(
             input.c3_slot_indices_a.len()
         )));
     }
-    let c3b_arm_used_m7x =
-        input.c3b_inner_proofs.len() == 54 && input.c3_slot_indices_b.len() == 54;
+    let c3b_arm_used_m7x = c3_arm_uses_m7x(
+        input.c3b_inner_proofs,
+        input.c3_slot_indices_b,
+        input.c3_total_slots,
+    );
     let c3b_final_vk = if c3b_arm_used_m7x {
         vk::load_vk_artifacts(
             &prover.circuits_dir(CircuitVariant::Default, artifacts_dir),

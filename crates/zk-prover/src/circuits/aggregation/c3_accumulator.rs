@@ -480,7 +480,7 @@ fn generate_c3_fold_batch_gate(
 /// Production-ABI batched C3 fold over `c3_fold_batch_b2` gates — a drop-in alternative to
 /// [`generate_sequential_c3_fold`] for ODD inner counts 3..=5.
 ///
-/// `inner_proofs[0]` anchors slot 0 via a fresh `C3FoldKernel` genesis; the remaining inners are
+/// `inner_proofs[0]` anchors `slot_indices[0]` via a fresh `C3FoldKernel` genesis; the remaining inners are
 /// paired into `c3_fold_batch_b2` gates, each covering two distinct fresh slots and re-verifying
 /// the prior (non-ZK) accumulator once — the one-time ~700K-gate non-ZK anchor that
 /// `generate_sequential_c3_fold` re-pays EVERY step (see I5). With 6 inners this replaces 5
@@ -534,15 +534,18 @@ pub fn generate_batched_c3_fold_b2(
         seen[idx] = true;
     }
     let vks = C3FoldBatchVks::load(prover, artifacts_dir, CircuitName::C3FoldBatchB2)?;
-    // Genesis: anchor inner 0 in slot 0 (kernel).
-    let acc = generate_c3_fold_kernel_genesis_proof(
+    // Kernel genesis anchored at `slot_indices[0]` — the explicit-slot form the M7x path
+    // already uses (r60). The old `_proof` wrapper stamped slot 0; at the production
+    // scatter genesis in `slot_indices[0]` is a real scatter value and the paired gate
+    // slot for `inner_proofs[0]`, so the anchor must follow the caller.
+    let acc = generate_c3_fold_kernel_genesis_at(
         prover,
         &inner_proofs[0],
         total_slots,
         artifacts_dir,
         &format!("{e3_id}-kernel"),
+        slot_indices[0],
     )?;
-    // Pair inners[1..] into (n-1)/2 chained b2 gates, each over the running accumulator.
     // Gate 0 anchors the kernel genesis (kernel VK); gate b>=1 anchors gate b-1's b2 proof
     // (b2 VK) — the anchor VK always follows the anchor proof's circuit.
     let n_gates = inner_proofs.len() / 2;
@@ -623,12 +626,13 @@ pub fn generate_batched_c3_fold_b3(
         seen[idx] = true;
     }
     let vks = C3FoldBatchVks::load(prover, artifacts_dir, CircuitName::C3FoldBatchB3)?;
-    let acc = generate_c3_fold_kernel_genesis_proof(
+    let acc = generate_c3_fold_kernel_genesis_at(
         prover,
         &inner_proofs[0],
         total_slots,
         artifacts_dir,
         &format!("{e3_id}-kernel"),
+        slot_indices[0],
     )?;
     // Triple inners[1..] into (n-1)/3 chained b3 gates over the running accumulator.
     // Gate b covers inners 1+3b, 2+3b, 3+3b. Gate 0 anchors the kernel genesis (kernel VK);
@@ -714,14 +718,18 @@ pub fn generate_batched_c3_fold_b10(
         }
         seen[idx] = true;
     }
-    let acc = generate_c3_fold_kernel_genesis_proof(
+    // Kernel genesis anchored at `slot_indices[0]` (CR-2 / r60): the b10 gate's slot vector
+    // reads `slot_indices[1..]` for its covered rows, so the anchor slot must be `slot_indices[0]`
+    // not hard-stamped 0 — the `_proof` wrapper would put the leaf at slot 0 whether or not
+    // the caller asked for that.
+    let acc = generate_c3_fold_kernel_genesis_at(
         prover,
         &inner_proofs[0],
         total_slots,
         artifacts_dir,
         &format!("{e3_id}-kernel"),
+        slot_indices[0],
     )?;
-    // Single b10 gate over the kernel genesis: inners 1..=10 inside one 8.34M-gate circuit.
     let mut inners_refs: Vec<&Proof> = Vec::with_capacity(10);
     for p in &inner_proofs[1..] {
         inners_refs.push(p);
@@ -782,12 +790,13 @@ pub fn generate_batched_c3_fold_b6(
         }
         seen[idx] = true;
     }
-    let acc = generate_c3_fold_kernel_genesis_proof(
+    let acc = generate_c3_fold_kernel_genesis_at(
         prover,
         &inner_proofs[0],
         total_slots,
         artifacts_dir,
         &format!("{e3_id}-kernel"),
+        slot_indices[0],
     )?;
     let mut inners_refs: Vec<&Proof> = Vec::with_capacity(6);
     for p in &inner_proofs[1..] {
@@ -1035,13 +1044,16 @@ pub fn generate_c3_merge_m1(
             "generate_c3_merge_m1: total_slots must be >= 7 (b6 covers 6 fresh slots + the kernel slot), got {total_slots}"
         )));
     }
-    // Kernel genesis anchors inner 0 at slot_indices[0].
-    let acc = generate_c3_fold_kernel_genesis_proof(
+    // Kernel genesis anchors inner 0 at slot_indices[0] (explict-slot form): the b6 sub-gate
+    // then reads slot_indices[1..=6] for its covered rows, so the genesis must stamp the
+    // same anchor slot — not the legacy hard-stamped slot 0.
+    let acc = generate_c3_fold_kernel_genesis_at(
         prover,
         &inner_proofs[0],
         total_slots,
         artifacts_dir,
         &format!("{e3_id}-kernel"),
+        slot_indices[0],
     )?;
     // b6 sub-gate over the kernel genesis: inners 1..=6 cover slot_indices[1..=6].
     let mut inners_refs: Vec<&Proof> = Vec::with_capacity(6);
@@ -1377,10 +1389,20 @@ pub fn generate_c3_merge_m7(
             slot_indices.len()
         )));
     }
-    if cover_start > total_slots - 54 {
+    if cover_start + 54 > total_slots {
         return Err(ZkError::InvalidInput(format!(
             "generate_c3_merge_m7: cover_start+54 ({}) exceeds total_slots {total_slots}",
             cover_start + 54
+        )));
+    }
+    // The M7 circuit hard-pins covered rows relative to `cover_start` (five 10-slot B10
+    // blocks + two 2-slot B2 tail at `cover_start + 50/52`); only `cover_start == 1`
+    // actually covers the right block boundaries, so reject every other value up-front —
+    // the previous form would build the whole kernel genesis proof before the outer
+    // `m7_gate_over_genesis` rejected the input.
+    if cover_start != 1 {
+        return Err(ZkError::InvalidInput(format!(
+            "generate_c3_merge_m7: cover_start must be 1 (anchor + 54 covered), got {cover_start}"
         )));
     }
     // Kernel genesis anchoring inner 0 at slot_indices[0].
