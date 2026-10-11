@@ -33,7 +33,8 @@ pub use presets::{
     PresetMetadata, PresetSearchDefaults, SecurityTier, DEFAULT_BFV_PRESET,
 };
 pub use prf_key::{
-    pack_prf_key, pack_share_coefficient, prf_key_bit_len, prf_key_bits, prf_key_modulus,
+    pack_prf_key, pack_share_coefficient, prf_key_bit_len, prf_key_bits, prf_key_limb_index,
+    prf_key_modulus,
     unpack_prf_key, zero_prf_key,
     unpack_share_coefficient, PrfKeyPackError,
 };

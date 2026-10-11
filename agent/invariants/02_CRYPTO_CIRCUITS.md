@@ -85,8 +85,10 @@ every section.
 - Plaintext collection starts verification at **T+1** distinct accepted-roster shares, not at H.
   Every selected raw share must match its C6 commitment for each ciphertext output. Bad early shares
   must not prevent a new share round while T+1 roster parties remain possible. The new round
-  uses new shares for the new decryptor set. A local C6
-  result authorizes only its exact dispatch batch. Share admission checks the signed sender, E3,
+  uses new shares for the new decryptor set. A party that already signed a share recomputes
+  when a later round includes that party. Expulsion of a designated decryptor during
+  collection starts that round. `FreshDecryptionRound` is forwarded to the other committee
+  nodes. A local C6 result authorizes only its exact dispatch batch. Share admission checks the signed sender, E3,
   proof type, raw bytes, and ciphertext position before reserving a party slot. — `flow-trace/04`
 
 - SK splits into N shares; exactly **T+1** shares feed the recursive decryption proof. —

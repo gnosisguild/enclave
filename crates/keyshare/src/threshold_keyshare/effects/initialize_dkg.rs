@@ -197,7 +197,7 @@ impl ThresholdKeyshare {
             | KeyshareState::ReadyForDecryption(_)
             | KeyshareState::Decrypting(_)
             | KeyshareState::GeneratingDecryptionProof(_)
-            | KeyshareState::Completed
+            | KeyshareState::Completed(_)
             | KeyshareState::Failed { .. } => {
                 info!(
                     state = state.variant_name(),

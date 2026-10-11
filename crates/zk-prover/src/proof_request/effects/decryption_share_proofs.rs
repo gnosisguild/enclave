@@ -13,12 +13,21 @@ impl ProofRequestActor {
         let (msg, ec) = msg.into_components();
         let e3_id = msg.e3_id.clone();
 
-        if self.pending_share_decryption.contains_key(&e3_id) {
-            warn!(
-                "Duplicate ShareDecryptionProofPending for E3 {} — ignoring",
+        if let Some(existing) = self.pending_share_decryption.get(&e3_id) {
+            if existing.decryptors == msg.proof_request.decryptors {
+                warn!(
+                    "Duplicate ShareDecryptionProofPending for E3 {} — ignoring",
+                    e3_id
+                );
+                return;
+            }
+            info!(
+                "Replacing the C6 proof for E3 {} with a new decryptor set",
                 e3_id
             );
-            return;
+            self.share_decryption_correlation
+                .retain(|_, pending_e3| pending_e3 != &e3_id);
+            self.pending_share_decryption.remove(&e3_id);
         }
 
         self.pending_share_decryption.insert(
@@ -107,7 +116,7 @@ impl ProofRequestActor {
                 e3_id: e3_id.clone(),
                 decryption_share: pending.decryption_share,
                 signed_decryption_proofs: signed_proofs,
-                decryptors: pending.decryptors,
+                decryptors: pending.decryptors.clone(),
             },
             ec.clone(),
         ) {
@@ -115,6 +124,7 @@ impl ProofRequestActor {
                 if let Err(err) = self.bus.publish(
                     DecryptionShareProofSigned {
                         e3_id: e3_id.clone(),
+                        decryptors: pending.decryptors.clone(),
                     },
                     ec,
                 ) {

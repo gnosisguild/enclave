@@ -157,6 +157,13 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32, let BIT_AGG: u32, let
     /// Rust witness (which operates on sk coefficients already reduced to `[0, q_l)`
     /// and then applies `.reverse()` and `.center(&qi)` before hashing).
     pub fn execute(self, moduli: [Field; L]) -> Field {
+        // Limb 0 holds the PRF key. That limb must be a largest threshold modulus.
+        for i in 1..L {
+            assert(
+                (moduli[0] as u128) >= (moduli[i] as u128),
+                "PRF key limb is not the largest modulus",
+            );
+        }
         // Step 1: Strip key bits from limb 0, then match the residue commitments from C2.
         let shares = self.stripped_shares(moduli[0]);
         self.verify_commitments(shares);

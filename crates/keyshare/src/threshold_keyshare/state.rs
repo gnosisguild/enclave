@@ -114,6 +114,21 @@ pub struct GeneratingDecryptionProof {
     pub(crate) decryptors: Vec<u32>,
 }
 
+/// A signed share. The inputs stay so a later decryptor set can be recomputed.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Completed {
+    pub(crate) pk_share: ArcBytes,
+    pub(crate) ciphertext_output: Vec<ArcBytes>,
+    pub(crate) sk_poly_sum: SensitiveBytes,
+    pub(crate) signed_pk_generation_proof: Option<SignedProofPayload>,
+    pub(crate) signed_sk_share_computation_proof: Option<SignedProofPayload>,
+    pub(crate) signed_sk_share_encryption_proofs: Vec<SignedProofPayload>,
+    pub(crate) outgoing_prf_keys: Vec<SensitiveBytes>,
+    pub(crate) incoming_prf_keys: Vec<SensitiveBytes>,
+    /// 1-based decryptor ids for the share that was signed.
+    pub(crate) decryptors: Vec<u32>,
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum KeyshareState {
     // Before anything
@@ -130,8 +145,8 @@ pub enum KeyshareState {
     Decrypting(Decrypting),
     // Generating C6 proof of correct decryption
     GeneratingDecryptionProof(GeneratingDecryptionProof),
-    // Finished
-    Completed,
+    // Finished for the current decryptor set. Inputs remain for a later round.
+    Completed(Completed),
     // This terminal state preserves the failure across a restart.
     Failed {
         failed_at_stage: E3Stage,
@@ -151,7 +166,7 @@ impl KeyshareState {
             } else if mem::discriminant(self) == mem::discriminant(&new_state) {
                 true
             } else if matches!(&new_state, K::Failed { .. }) {
-                !matches!(self, K::Completed)
+                !matches!(self, K::Completed(_))
             } else {
                 matches!(
                     (self, &new_state),
@@ -168,7 +183,8 @@ impl KeyshareState {
                         | (K::ReadyForDecryption(_), K::Decrypting(_))
                         | (K::Decrypting(_), K::GeneratingDecryptionProof(_))
                         | (K::GeneratingDecryptionProof(_), K::Decrypting(_))
-                        | (K::GeneratingDecryptionProof(_), K::Completed)
+                        | (K::GeneratingDecryptionProof(_), K::Completed(_))
+                        | (K::Completed(_), K::Decrypting(_))
                 )
             }
         };
@@ -192,7 +208,7 @@ impl KeyshareState {
             Self::ReadyForDecryption(_) => "ReadyForDecryption",
             Self::Decrypting(_) => "Decrypting",
             Self::GeneratingDecryptionProof(_) => "GeneratingDecryptionProof",
-            Self::Completed => "Completed",
+            Self::Completed(_) => "Completed",
             Self::Failed { .. } => "Failed",
         }
     }

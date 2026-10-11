@@ -189,12 +189,9 @@ pub(crate) fn build_decryption_key_plan(
         .threshold_counterpart()
         .ok_or_else(|| anyhow!("No threshold counterpart for {:?}", share_enc_preset))?;
     let (threshold_params, _) = build_pair_for_preset(threshold_preset)?;
-    let key_modulus = e3_fhe_params::prf_key_modulus(threshold_preset);
-    let key_limb = threshold_params
-        .moduli()
-        .iter()
-        .position(|modulus| *modulus == key_modulus)
-        .ok_or_else(|| anyhow!("PRF key modulus is not a threshold modulus"))?;
+    let key_limb = e3_fhe_params::prf_key_limb_index(threshold_params.moduli())
+        .map_err(|error| anyhow!(error))?;
+    let key_modulus = threshold_params.moduli()[key_limb];
     let mut incoming_keys = vec![e3_fhe_params::zero_prf_key(threshold_preset); committee.n];
     let mut slot_keys = Vec::with_capacity(num_honest);
     let mut sk_sss_collected: Vec<ShamirShare> = external_for_c4

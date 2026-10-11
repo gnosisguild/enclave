@@ -17,7 +17,8 @@ pub use actors::{
     THRESHOLD_KEYSHARE_RECOVERY_SCHEMA_VERSION,
 };
 pub use domain::{
-    AggregatingDecryptionKey, CollectingEncryptionKeysData, Decrypting, GeneratingDecryptionProof,
+    AggregatingDecryptionKey, CollectingEncryptionKeysData, Completed, Decrypting,
+    GeneratingDecryptionProof,
     GeneratingThresholdShareData, KeyshareState, LbfvGenerationStateV1, ProofRequestData,
     ReadyForDecryption, ThresholdKeyshareState, LBFV_GENERATION_SCHEMA_VERSION,
 };

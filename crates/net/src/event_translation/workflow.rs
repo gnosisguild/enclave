@@ -56,6 +56,7 @@ impl EventTranslationService {
         matches!(
             event.get_data(),
             InterfoldEventData::DecryptionshareCreated(_)
+                | InterfoldEventData::FreshDecryptionRound(_)
                 | InterfoldEventData::DkgCoordination(_)
                 | InterfoldEventData::DKGRecursiveAggregationComplete(_)
                 | InterfoldEventData::KeyshareCreated(_)

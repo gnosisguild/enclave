@@ -10,4 +10,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DecryptionShareProofSigned {
     pub e3_id: E3id,
+    /// 1-based decryptor ids for the share this proof signed.
+    pub decryptors: Vec<u32>,
 }

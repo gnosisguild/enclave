@@ -28,7 +28,7 @@ impl ThresholdKeyshare {
                     );
                     return self.issue_decryption_share_request(ec);
                 }
-                KeyshareState::GeneratingDecryptionProof(_) | KeyshareState::Completed => {
+                KeyshareState::GeneratingDecryptionProof(_) | KeyshareState::Completed(_) => {
                     info!(
                         e3_id = %state.e3_id,
                         state = %state.variant_name(),
@@ -286,17 +286,36 @@ impl ThresholdKeyshare {
                     let KeyshareState::GeneratingDecryptionProof(current) = s.state.clone() else {
                         bail!("expected GeneratingDecryptionProof");
                     };
-                    s.new_state(KeyshareState::Decrypting(Decrypting {
-                        pk_share: current.pk_share,
-                        sk_poly_sum: current.sk_poly_sum,
-                        ciphertext_output: current.ciphertext_output,
-                        signed_pk_generation_proof: current.signed_pk_generation_proof,
-                        signed_sk_share_computation_proof: current.signed_sk_share_computation_proof,
-                        signed_sk_share_encryption_proofs: current.signed_sk_share_encryption_proofs,
-                        outgoing_prf_keys: current.outgoing_prf_keys,
-                        incoming_prf_keys: current.incoming_prf_keys,
-                        decryptors: msg.decryptors.clone(),
-                    }))
+                    s.new_state(KeyshareState::Decrypting(decrypting_for_round(
+                        current.pk_share,
+                        current.sk_poly_sum,
+                        current.ciphertext_output,
+                        current.signed_pk_generation_proof,
+                        current.signed_sk_share_computation_proof,
+                        current.signed_sk_share_encryption_proofs,
+                        current.outgoing_prf_keys,
+                        current.incoming_prf_keys,
+                        msg.decryptors.clone(),
+                    )))
+                })?;
+                self.issue_decryption_share_request(ec)
+            }
+            KeyshareState::Completed(_) => {
+                self.state.try_mutate(&ec, |s| {
+                    let KeyshareState::Completed(current) = s.state.clone() else {
+                        bail!("expected Completed");
+                    };
+                    s.new_state(KeyshareState::Decrypting(decrypting_for_round(
+                        current.pk_share,
+                        current.sk_poly_sum,
+                        current.ciphertext_output,
+                        current.signed_pk_generation_proof,
+                        current.signed_sk_share_computation_proof,
+                        current.signed_sk_share_encryption_proofs,
+                        current.outgoing_prf_keys,
+                        current.incoming_prf_keys,
+                        msg.decryptors.clone(),
+                    )))
                 })?;
                 self.issue_decryption_share_request(ec)
             }
@@ -308,15 +327,64 @@ impl ThresholdKeyshare {
         &mut self,
         msg: TypedEvent<DecryptionShareProofSigned>,
     ) -> Result<()> {
-        let (_msg, ec) = msg.into_components();
+        let (msg, ec) = msg.into_components();
+        let state = self.state.try_get()?;
+        if msg.e3_id != state.e3_id {
+            return Ok(());
+        }
+        let KeyshareState::GeneratingDecryptionProof(current) = &state.state else {
+            return Ok(());
+        };
+        if current.decryptors != msg.decryptors {
+            return Ok(());
+        }
 
         self.state.try_mutate(&ec, |s| {
-            use KeyshareState as K;
+            let KeyshareState::GeneratingDecryptionProof(current) = s.state.clone() else {
+                bail!("expected GeneratingDecryptionProof");
+            };
+            if current.decryptors != msg.decryptors {
+                bail!("the signed proof belongs to a different decryptor set");
+            }
             info!("Decryption share sending process is complete");
-            s.new_state(K::Completed)
+            s.new_state(KeyshareState::Completed(Completed {
+                pk_share: current.pk_share,
+                ciphertext_output: current.ciphertext_output,
+                sk_poly_sum: current.sk_poly_sum,
+                signed_pk_generation_proof: current.signed_pk_generation_proof,
+                signed_sk_share_computation_proof: current.signed_sk_share_computation_proof,
+                signed_sk_share_encryption_proofs: current.signed_sk_share_encryption_proofs,
+                outgoing_prf_keys: current.outgoing_prf_keys,
+                incoming_prf_keys: current.incoming_prf_keys,
+                decryptors: current.decryptors,
+            }))
         })?;
 
         Ok(())
+    }
+}
+
+fn decrypting_for_round(
+    pk_share: e3_utils::utility_types::ArcBytes,
+    sk_poly_sum: e3_crypto::SensitiveBytes,
+    ciphertext_output: Vec<e3_utils::utility_types::ArcBytes>,
+    signed_pk_generation_proof: Option<e3_events::SignedProofPayload>,
+    signed_sk_share_computation_proof: Option<e3_events::SignedProofPayload>,
+    signed_sk_share_encryption_proofs: Vec<e3_events::SignedProofPayload>,
+    outgoing_prf_keys: Vec<e3_crypto::SensitiveBytes>,
+    incoming_prf_keys: Vec<e3_crypto::SensitiveBytes>,
+    decryptors: Vec<u32>,
+) -> Decrypting {
+    Decrypting {
+        pk_share,
+        sk_poly_sum,
+        ciphertext_output,
+        signed_pk_generation_proof,
+        signed_sk_share_computation_proof,
+        signed_sk_share_encryption_proofs,
+        outgoing_prf_keys,
+        incoming_prf_keys,
+        decryptors,
     }
 }
 

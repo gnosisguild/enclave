@@ -288,6 +288,35 @@ async fn a_bad_share_for_the_second_ciphertext_does_not_reserve_a_slot() -> Resu
     Ok(())
 }
 
+#[actix::test]
+async fn expulsion_of_a_designated_decryptor_starts_a_fresh_round() -> Result<()> {
+    let (mut aggregator, history, _) = small_aggregator().await?;
+    let ec = test_ctx(EffectsEnabled::new());
+    aggregator.state.try_mutate(&ec, |mut state| {
+        let ThresholdPlaintextAggregatorState::Collecting(collecting) = &mut state else {
+            bail!("expected Collecting");
+        };
+        collecting.expected_decryptors = (6u32..=15).collect();
+        collecting.shares.insert(6, vec![ArcBytes::from_bytes(&[1])]);
+        Ok(state)
+    })?;
+    aggregator.handle_member_expelled(5, &ec)?;
+    let collecting = Collecting::try_from(aggregator.state.try_get()?)?;
+    assert!(collecting.shares.is_empty());
+    assert!(collecting.rejected_parties.contains(&5));
+    assert_eq!(
+        collecting.expected_decryptors,
+        (7u32..=16).collect::<Vec<_>>()
+    );
+    actix::clock::sleep(std::time::Duration::from_millis(20)).await;
+    let events = history.send(GetEvents::<InterfoldEvent>::new()).await?;
+    assert!(events.iter().any(|event| matches!(
+        event.get_data(),
+        InterfoldEventData::FreshDecryptionRound(_)
+    )));
+    Ok(())
+}
+
 async fn deliver_resume(
     aggregator: &mut ThresholdPlaintextAggregator,
     history: &Addr<HistoryCollector<InterfoldEvent>>,

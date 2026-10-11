@@ -315,7 +315,7 @@ preset default chunk size. Rust groups the chunk proofs into fixed recursive bat
 all batches in a type-bound terminal circuit. The terminal circuit reconstructs a root commitment
 for the secret and for each recipient share. The terminal also publishes one PRF-key commitment
 per recipient. That commitment is the 0-based recipient and the key reduced modulo the circuit
-scalar. The key bits stay binary, and C3 still packs those bits into the largest threshold limb.
+scalar. The key bits stay binary, and C3 still packs those bits into limb 0. Limb 0 must be a largest threshold modulus. C3 and C4 reject a list whose first prime is smaller than a later prime.
 `C2ChunkBatch` binds the ordered chunk
 indices and chunk commitments. C3 checks the encrypted limb-0 plaintext against the share
 commitment and the key commitment. C4 removes those bits before the aggregate commitment. C6
@@ -1435,6 +1435,10 @@ InterfoldSolReader decodes CiphertextOutputPublished event
   │   └─ After a failed proof or raw-share commitment check, drop every share and proof
   │       The new set is the lowest T+1 honest party ids that remain
   │       FreshDecryptionRound asks those parties to compute new shares for that set
+  │       The event is gossiped and is part of history sync
+  │       A party that already signed a share recomputes when the new set includes that party
+  │       Expulsion of a designated decryptor during collection starts the same round
+  │       A proof completion names its decryptor set and does not finish a different round
   │       Old shares are not opened under the new set
 │
   ├─ C6 VERIFICATION (per-share, active aggregator only):

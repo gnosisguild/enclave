@@ -73,9 +73,58 @@ impl ThresholdPlaintextAggregator {
         party_id: u64,
         ec: &EventContext<Sequenced>,
     ) -> Result<()> {
+        let designated = match self.state.try_get()? {
+            ThresholdPlaintextAggregatorState::Collecting(collecting) => {
+                party_is_designated(party_id, &collecting.expected_decryptors)
+            }
+            _ => false,
+        };
+        if designated {
+            return self.restart_collection_after_expulsion(party_id, ec);
+        }
         self.state.try_mutate(ec, |state| {
             ThresholdPlaintextAggregation::handle_member_expelled(state, party_id)
         })
+    }
+
+    /// Drop shares bound to the old decryptor set and ask the next set to compute.
+    fn restart_collection_after_expulsion(
+        &mut self,
+        party_id: u64,
+        ec: &EventContext<Sequenced>,
+    ) -> Result<()> {
+        let ThresholdPlaintextAggregatorState::Collecting(mut collecting) = self.state.try_get()?
+        else {
+            bail!("a designated decryptor can be replaced only while collecting");
+        };
+        collecting.rejected_parties.insert(party_id);
+        collecting.shares.clear();
+        collecting.c6_proofs.clear();
+        let decryptors = ThresholdPlaintextAggregation::fresh_decryptor_ids(
+            &self.committee_addresses,
+            &self.honest_committee_addresses,
+            &collecting.rejected_parties,
+            collecting.threshold_m,
+        );
+        let Ok(decryptors) = decryptors else {
+            collecting.expected_decryptors.clear();
+            self.state.try_mutate(ec, |_| {
+                Ok(ThresholdPlaintextAggregatorState::Collecting(collecting))
+            })?;
+            return self.fail_decryption_round(ec.clone());
+        };
+        collecting.expected_decryptors = decryptors.clone();
+        self.state.try_mutate(ec, |_| {
+            Ok(ThresholdPlaintextAggregatorState::Collecting(collecting))
+        })?;
+        self.bus.publish(
+            FreshDecryptionRound {
+                e3_id: self.e3_id.clone(),
+                decryptors,
+            },
+            ec.clone(),
+        )?;
+        Ok(())
     }
 
     pub(in crate::actors::threshold_plaintext_aggregator) fn c6_verification_request(
@@ -366,4 +415,12 @@ impl ThresholdPlaintextAggregator {
         self.pending.threshold_decryption_correlation = Some(correlation_id);
         Ok(())
     }
+}
+
+fn party_is_designated(party_id: u64, expected: &[u32]) -> bool {
+    !expected.is_empty()
+        && u32::try_from(party_id)
+            .ok()
+            .and_then(|id| id.checked_add(1))
+            .is_some_and(|id| expected.contains(&id))
 }

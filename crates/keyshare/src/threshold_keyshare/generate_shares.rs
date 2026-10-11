@@ -211,11 +211,12 @@ fn pack_outgoing_keys(
     preset: BfvPreset,
     moduli: &[u64],
 ) -> Result<SharedSecret> {
-    let key_modulus = e3_fhe_params::prf_key_modulus(preset);
-    let limb = moduli
-        .iter()
-        .position(|modulus| *modulus == key_modulus)
-        .ok_or_else(|| anyhow!("PRF key modulus is not a threshold modulus"))?;
+    let limb = e3_fhe_params::prf_key_limb_index(moduli)
+        .map_err(|error| anyhow!(error))?;
+    let key_modulus = moduli[limb];
+    if key_modulus != e3_fhe_params::prf_key_modulus(preset) {
+        bail!("share modulus list does not start with the PRF key modulus");
+    }
     let mut data = secret.moduli_data().clone();
     let rows = data
         .get(limb)

@@ -42,6 +42,9 @@ pub enum PrfKeyPackError {
     /// A coefficient past the key prefix carries a key bit.
     #[error("coefficient {index} must not carry a key bit")]
     UnexpectedKeyBit { index: usize },
+    /// Limb 0 is missing or a later limb is larger.
+    #[error("PRF key limb 0 must hold the largest threshold modulus")]
+    KeyLimbNotFirst,
 }
 
 /// Return the number of PRF-key bits stored in one encrypted share.
@@ -75,6 +78,19 @@ pub fn prf_key_bits(key: &[u8]) -> Vec<u8> {
         }
     }
     bits
+}
+
+/// Return limb 0 when it holds the largest modulus.
+///
+/// C3 and C4 open the key from limb 0. A later larger prime is rejected.
+pub fn prf_key_limb_index(moduli: &[u64]) -> Result<usize, PrfKeyPackError> {
+    let Some(&first) = moduli.first() else {
+        return Err(PrfKeyPackError::KeyLimbNotFirst);
+    };
+    if first == 0 || moduli.iter().any(|modulus| *modulus > first) {
+        return Err(PrfKeyPackError::KeyLimbNotFirst);
+    }
+    Ok(0)
 }
 
 /// Return the largest threshold modulus. The PRF key is packed into this limb.
@@ -218,6 +234,12 @@ mod tests {
             assert!(dkg.moduli().iter().all(|qi| u128::from(*qi) > two_t));
             assert!(prf_key_bit_len(preset) <= threshold.degree());
             assert_eq!(prf_key_modulus(preset), max_q);
+            assert_eq!(prf_key_limb_index(threshold.moduli()).unwrap(), 0);
+            let mut reversed = threshold.moduli().to_vec();
+            reversed.reverse();
+            if reversed.first().copied() != Some(max_q) {
+                assert!(prf_key_limb_index(&reversed).is_err());
+            }
         }
     }
 

@@ -220,6 +220,9 @@ impl Computation for Inputs {
         let share_bit = threshold_params.moduli().iter().fold(0u32, |acc, qi| {
             acc.max(crate::calculate_bit_width(BigInt::from(*qi - 1)))
         });
+        e3_fhe_params::prf_key_limb_index(threshold_params.moduli()).map_err(|error| {
+            CircuitsErrors::Other(error.to_string())
+        })?;
         let key_modulus = e3_fhe_params::prf_key_modulus(preset);
         let slot_keys =
             crate::circuits::prf::resolve_keys(&data.prf_keys, data.honest_ciphertexts.len())

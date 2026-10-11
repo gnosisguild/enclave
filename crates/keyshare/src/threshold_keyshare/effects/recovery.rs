@@ -438,7 +438,7 @@ impl ThresholdKeyshare {
                 }
                 self.issue_decryption_share_request(ec)
             }
-            KeyshareState::GeneratingDecryptionProof(_) | KeyshareState::Completed => {
+            KeyshareState::GeneratingDecryptionProof(_) => {
                 let pending = recovery.share_decryption_proof_pending.ok_or_else(|| {
                     anyhow!(
                         "missing C6 proof request while resuming threshold-keyshare for E3 {}",
@@ -448,6 +448,8 @@ impl ThresholdKeyshare {
                 let (pending, pending_ec) = pending.into_components();
                 self.bus.publish(pending, pending_ec)
             }
+            // A signed share waits for a fresh decryptor set. Restart does not prove it again.
+            KeyshareState::Completed(_) => Ok(()),
             KeyshareState::Failed { .. } => unreachable!("failed state returned before recovery"),
         }
     }

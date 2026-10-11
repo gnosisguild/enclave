@@ -34,6 +34,13 @@ fn main(
     p1is: [Polynomial<(2 * N) - 1>; L],
     p2is: [Polynomial<N - 1>; L],
 ) -> pub Field {
+    // The key is packed at limb 0. That limb must be a largest threshold modulus.
+    for i in 1..QIS_THRESHOLD.len() {
+        assert(
+            (QIS_THRESHOLD[0] as u128) >= (QIS_THRESHOLD[i] as u128),
+            "PRF key limb is not the largest modulus",
+        );
+    }
     let share_encryption: ShareEncryption<N, L, SHARE_ENCRYPTION_BIT_PK, SHARE_ENCRYPTION_BIT_CT, SHARE_ENCRYPTION_BIT_U, SHARE_ENCRYPTION_BIT_E0, SHARE_ENCRYPTION_BIT_E1, SHARE_ENCRYPTION_BIT_MSG, SHARE_ENCRYPTION_BIT_R1, SHARE_ENCRYPTION_BIT_R2, SHARE_ENCRYPTION_BIT_P1, SHARE_ENCRYPTION_BIT_P2, SHARE_COMPUTATION_N_CHUNKS, SHARE_COMPUTATION_CHUNK_SIZE, SHARE_COMPUTATION_BIT_SHARE, PRF_KEY_BITS> = ShareEncryption::new(
         SHARE_ENCRYPTION_CONFIGS,
         expected_pk_commitment,
