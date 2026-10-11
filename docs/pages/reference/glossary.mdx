@@ -324,6 +324,12 @@ The libp2p identity of a ciphernode. The node derives it from its wallet private
 A set of BFV parameters. `insecure-512` is for development and CI only, and `secure-8192` is for
 production. Mainnet accepts only `secure-8192`. See [Cryptography](/learn/cryptography).
 
+### PRF key
+
+A private key that one dealer gives to one recipient inside an encrypted Shamir share. Decryption
+uses the keys in the decryptor set to build a mask that cancels in pairs. See
+[PRF keys](/internals/prf-keys).
+
 ### protocol_version
 
 A release counter that increases when contracts, events, cryptography, or protocol behavior become

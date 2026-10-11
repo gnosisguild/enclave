@@ -34,7 +34,7 @@ full cryptographic specification, see the
 | **Public key share**            | The BFV public key corresponding to a secret key contribution                                                 |
 | **Secret key share**            | A ciphernode's _Shamir_ share of the threshold secret key (received from other nodes, aggregated locally)     |
 | **Threshold public key**        | The jointly generated BFV public key; no single party holds the corresponding secret key                      |
-| **PRF key**                     | A private key packed into the encrypted Shamir share. Decryption uses it to mask the partial share            |
+| **PRF key**                     | A private key packed into the encrypted Shamir share. Decryption uses it to mask the partial share. See [PRF keys](/internals/prf-keys) |
 | **Partial decryption**          | A ciphernode's share over a decrypted value, computed before the rounding step                                |
 | **Committee size (N)**          | The number of ciphernodes finalized on-chain for the E3                                                       |
 | **Decryption threshold (T)**    | The maximum polynomial degree; decryption requires `T+1` valid shares                                         |
@@ -225,7 +225,9 @@ times `q`. The circuit verifies two commitment links simultaneously:
 - The **recipient's individual public key** matches the commitment from C0
 
 Together these checks guarantee that the correct share is encrypted under the correct recipient's
-key — without exposing the share in plaintext. The BFV encryption equations are verified via
+key — without exposing the share in plaintext. The packed key is one bit per coefficient of limb 0.
+[PRF keys](/internals/prf-keys) describes generation, delivery, and the decryption mask. The BFV
+encryption equations are verified via
 Schwartz-Zippel at a Fiat-Shamir challenge point (same technique as C1).
 
 C3 produces no new commitments — its role is purely to verify correct encryption. A participating
@@ -331,7 +333,8 @@ p_i[ℓ] = λ_i[ℓ] · ct1[ℓ] · sk[ℓ] + e_i[ℓ] + r_i[ℓ] + r₂[ℓ] ·
 ```
 
 `λ_i` is the Lagrange coefficient of this party in the public decryptor set. It multiplies only
-`ct1·sk`. `e_i` is fresh noise sampled at decryption time. `r_i` is the PRF mask. `ct0` is added
+`ct1·sk`. `e_i` is fresh noise sampled at decryption time. `r_i` is the PRF mask from
+[PRF keys](/internals/prf-keys). `ct0` is added
 once in C7. C6 checks `sk` against the C4a commitment. The decryption equation is verified via
 Schwartz-Zippel at a Fiat-Shamir challenge point.
 

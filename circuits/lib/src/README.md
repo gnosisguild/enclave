@@ -61,4 +61,5 @@ preset defines `N`, `L`, `QIS`, bounds, `PARITY_MATRIX`, per-circuit `Configs`, 
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | Binary packages, `CircuitName`, build and test | [`circuits/README.md`](../../README.md)                                                                                    |
 | Phases, PV-TBFV, circuit identifiers           | [Cryptography](https://docs.theinterfold.com/learn/cryptography) · [source](../../../docs/pages/learn/cryptography.mdx)    |
+| PRF key generation, delivery, and the mask     | [PRF keys](https://docs.theinterfold.com/internals/prf-keys) · [source](../../../docs/pages/internals/prf-keys.mdx)       |
 | Toolchain, `interfold noir`, compile scripts   | [Noir Circuits](https://docs.theinterfold.com/build/noir-circuits) · [source](../../../docs/pages/build/noir-circuits.mdx) |

@@ -5,6 +5,9 @@
   "dkg": {
     "title": "PVDKG & ZK Proofs"
   },
+  "prf-keys": {
+    "title": "PRF keys"
+  },
   "commitment-consistency": {
     "title": "Commitment Consistency"
   }

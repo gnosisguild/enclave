@@ -70,7 +70,9 @@ decrypts after homomorphic evaluation.
 - **P1 — Distributed key generation** is the heavy chapter. Each ciphernode builds its **secret key
   contribution** and matching **public key share**, splits the sensitive parts into **Shamir**
   shares, and sends those shares encrypted under each peer’s **individual** BFV public key—because
-  shares must not travel in the clear. Each share also carries one bit of a PRF key. Proofs accompany
+  shares must not travel in the clear. Each share also carries that recipient's PRF key, one bit in
+  each of the first coefficients. [PRF keys](/internals/prf-keys) describes how those keys are made,
+  sent, and used. Proofs accompany
   generation, share computation, encryption, and the local sum of received residues. After at
   least H mutually ready dealer contributions exist, the active aggregator proposes the fixed roster
   `S` that all later DKG proofs use.
