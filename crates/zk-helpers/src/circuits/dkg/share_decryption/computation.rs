@@ -501,9 +501,12 @@ mod tests {
             ShareDecryptionCircuitData::generate_sample(preset, committee, DkgInputType::SecretKey)
                 .unwrap();
 
-        let (threshold_params, dkg_params) = build_pair_for_preset(preset).unwrap();
+        let (threshold_params, _dkg_params) = build_pair_for_preset(preset).unwrap();
         let threshold_l = threshold_params.moduli().len();
-        let msg_bit = compute_msg_bit(&dkg_params);
+        let share_bit = threshold_params.moduli().iter().fold(0u32, |acc, qi| {
+            acc.max(crate::calculate_bit_width(BigInt::from(*qi - 1)))
+        });
+        let key_modulus = e3_fhe_params::prf_key_modulus(preset);
 
         let inputs = Inputs::compute(preset, &sample).unwrap();
         assert_eq!(
@@ -513,7 +516,7 @@ mod tests {
 
         for (party_idx, slot) in sample.honest_ciphertexts.iter().enumerate() {
             for mod_idx in 0..threshold_l {
-                let share_coeffs = match slot {
+                let mut share_coeffs = match slot {
                     Some(party_cts) => {
                         let decrypted_pt =
                             sample.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
@@ -521,6 +524,18 @@ mod tests {
                     }
                     None => sample.own_plaintext_share[mod_idx].clone(),
                 };
+                // Limb 0 of an external share still carries the PRF key bits.
+                // Inputs::compute removes those bits before the commitment.
+                if slot.is_some() {
+                    share_coeffs = limb_residues(
+                        &share_coeffs,
+                        mod_idx,
+                        &sample.prf_keys[party_idx],
+                        preset,
+                        key_modulus,
+                    )
+                    .unwrap();
+                }
                 // Reverse to match Inputs::compute, which reverses before committing to align
                 // with C2's commit_to_party_shares (highest-degree-first convention).
                 let mut reversed = share_coeffs.clone();
@@ -529,7 +544,7 @@ mod tests {
                     inputs.recipient_party_idx as usize,
                     mod_idx,
                     &Polynomial::from_u64_vector(reversed),
-                    msg_bit,
+                    share_bit,
                     sample.chunk_size as usize,
                 );
                 assert_eq!(

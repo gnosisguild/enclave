@@ -694,7 +694,7 @@ mod tests {
                 fields: SHARE_ENCRYPTION_INPUTS
             }
             .field_count(),
-            Some(4)
+            Some(5)
         );
         assert_eq!(CircuitInputLayout::None.field_count(), Some(0));
     }

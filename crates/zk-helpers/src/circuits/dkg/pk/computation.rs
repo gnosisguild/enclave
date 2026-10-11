@@ -180,7 +180,7 @@ mod tests {
         let bits = Bits::compute(BfvPreset::InsecureThreshold, &()).unwrap();
         let expected_bits = compute_modulus_bit(&dkg_params);
 
-        assert_eq!(bounds.pk_bound, BigUint::from(72057594037914240u128));
+        assert_eq!(bounds.pk_bound, BigUint::from(144115188077592576u128));
         assert_eq!(bits.pk_bit, expected_bits);
     }
 
