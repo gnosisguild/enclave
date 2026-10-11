@@ -786,8 +786,8 @@ async fn test_c4_sk_commitment_is_c6_expected_sk_input_e2e() {
 
 /// Wires the same aggregated SK (`agg_sk`) into C6: DKG aggregate → `s` + TRBFV `decryption_share` for new `d_share`.
 ///
-/// C4 hashes the aggregate with `SHARE_DECRYPTION_BIT_AGG` (Rust `dkg_out.bits.agg_bit`); C6 uses the same width for `sk`.
-/// Per-share C4 checks hash residues with `SHARE_COMPUTATION_BIT_SHARE`, the same width C2 uses.
+/// C4 commits the aggregate at coefficient width `SHARE_DECRYPTION_BIT_AGG` (Rust `dkg_out.bits.agg_bit`). C6 uses the same width for `sk`.
+/// Per-share C4 checks use `SHARE_COMPUTATION_BIT_SHARE`, the same width C2 uses.
 #[tokio::test]
 async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
     let Some((_backend, _temp, prover, dkg_sample, mut c6_sample, preset)) =
@@ -884,7 +884,7 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
         compute_aggregated_shares_commitment(&agg_sk_normalized, dkg_out.bits.agg_bit);
     assert_eq!(
         c4_big, expected_c4_hash,
-        "C4 commitment must match hash(normalized agg_sk) with DKG agg_bit (BIT_AGG)"
+        "C4 commitment must match the aggregate commitment at DKG agg_bit (BIT_AGG)"
     );
 
     let c6_out = ThresholdShareDecryptionCircuit::compute(preset, &c6_sample).unwrap();
@@ -896,7 +896,7 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
     assert_eq!(
         dkg_out.bits.agg_bit,
         c6_out.bits.sk_bit,
-        "DKG bits.agg_bit (compute_modulus_bit on threshold) must match C6 bits.sk_bit for aggregate hashing"
+        "DKG bits.agg_bit (compute_modulus_bit on threshold) must match C6 bits.sk_bit for the aggregate commitment"
     );
 
     prover.cleanup(e3_id_c4).unwrap();

@@ -15,9 +15,10 @@
 //!   `[0, t)` so the bound is `t − 1`. Matches C2 share-encryption
 //!   `compute_share_encryption_commitment_from_message` on per-share plaintexts. Emitted as
 //!   `SHARE_DECRYPTION_BIT_MSG` in codegen.
-//! - **`agg_bit`** — [`crate::compute_modulus_bit`] on the **threshold** BFV params: same as C6
-//!   aggregate hashing. Emitted as `SHARE_DECRYPTION_BIT_AGG`; the Noir C4 circuit uses it for
-//!   `compute_aggregated_shares_commitment` on the sum (per-share verification still uses `BIT_MSG`).
+//! - **`agg_bit`** — [`crate::compute_modulus_bit`] on the **threshold** BFV params. This is the
+//!   coefficient width for the CRT aggregate commitment. C6 uses the same width. Emitted as
+//!   `SHARE_DECRYPTION_BIT_AGG`. The Noir C4 circuit passes it to
+//!   `compute_aggregated_shares_commitment` on the sum. Per-share verification uses `BIT_MSG`.
 
 use crate::circuits::commitments::compute_sc_party_share_root_commitment;
 use crate::dkg::share_decryption::ShareDecryptionCircuit;

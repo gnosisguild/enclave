@@ -236,7 +236,14 @@ pub fn compute_prf_key_commitment<let KEY_BITS: u32>(
     recipient_party_idx: Field,
     bits: [Field; KEY_BITS],
 ) -> Field {
-    compute_commitment([recipient_party_idx, prf_key_field(bits)].as_vector(), DS_PRF_KEY)
+    compute_packed_prf_key_commitment(recipient_party_idx, prf_key_field(bits))
+}
+
+/// Commit one packed PRF key.
+///
+/// `recipient_party_idx` is 0-based. `key` is the packed key field.
+pub fn compute_packed_prf_key_commitment(recipient_party_idx: Field, key: Field) -> Field {
+    compute_commitment([recipient_party_idx, key].as_vector(), DS_PRF_KEY)
 }
 
 pub fn compute_single_polynomial_commitment<let N: u32, let BIT: u32>(

@@ -48,7 +48,7 @@ impl<let L: u32> Configs<L> {
 /// **Consumes:** `expected_sk_commitment` (C4a) and `ct_commitment`.
 ///
 /// **Produces:** Truncated-`d` commitment for C7, and the `c0` prefix commitment C7 adds.
-pub struct ShareDecryption<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32, let BIT_D_NATIVE: u32, let KEY_BITS: u32, let N_PARTIES: u32, let H: u32> {
+pub struct ShareDecryption<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32, let BIT_D_NATIVE: u32, let N_PARTIES: u32, let H: u32> {
     /// Circuit parameters including bounds and cryptographic constants
     configs: Configs<L>,
 
@@ -91,13 +91,15 @@ pub struct ShareDecryption<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: 
     party_idx: u32,
     /// Strictly increasing 1-based decryptor ids.
     decryptors: [Field; H],
-    outgoing_key_bits: [[Field; KEY_BITS]; N_PARTIES],
-    incoming_key_bits: [[Field; KEY_BITS]; N_PARTIES],
+    /// Packed outgoing PRF key for each party.
+    outgoing_keys: [Field; N_PARTIES],
+    /// Packed incoming PRF key for each party.
+    incoming_keys: [Field; N_PARTIES],
     outgoing_key_commitments: [Field; N_PARTIES],
     incoming_key_commitments: [Field; N_PARTIES],
 }
 
-impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32, let BIT_D_NATIVE: u32, let KEY_BITS: u32, let N_PARTIES: u32, let H: u32> ShareDecryption<N, MAX_MSG_NON_ZERO_COEFFS, L, BIT_CT, BIT_SK, BIT_E_SM, BIT_R1, BIT_R2, BIT_D, BIT_D_NATIVE, KEY_BITS, N_PARTIES, H> {
+impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32, let BIT_D_NATIVE: u32, let N_PARTIES: u32, let H: u32> ShareDecryption<N, MAX_MSG_NON_ZERO_COEFFS, L, BIT_CT, BIT_SK, BIT_E_SM, BIT_R1, BIT_R2, BIT_D, BIT_D_NATIVE, N_PARTIES, H> {
     pub fn new(
         configs: Configs<L>,
         expected_sk_commitment: Field,
@@ -113,8 +115,8 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         d_native_trunc: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
         party_idx: u32,
         decryptors: [Field; H],
-        outgoing_key_bits: [[Field; KEY_BITS]; N_PARTIES],
-        incoming_key_bits: [[Field; KEY_BITS]; N_PARTIES],
+        outgoing_keys: [Field; N_PARTIES],
+        incoming_keys: [Field; N_PARTIES],
         outgoing_key_commitments: [Field; N_PARTIES],
         incoming_key_commitments: [Field; N_PARTIES],
     ) -> Self {
@@ -134,8 +136,8 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
             d_native_trunc,
             party_idx,
             decryptors,
-            outgoing_key_bits,
-            incoming_key_bits,
+            outgoing_keys,
+            incoming_keys,
             outgoing_key_commitments,
             incoming_key_commitments,
         }
@@ -246,12 +248,12 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
             self.d_native_trunc,
         );
 
-        // Step 5: Generate Fiat-Shamir challenge from the transcript
+        // Build the PRF decryption mask.
         let mask = prf_decryption_mask(
             self.party_idx,
             self.decryptors,
-            self.outgoing_key_bits,
-            self.incoming_key_bits,
+            self.outgoing_keys,
+            self.incoming_keys,
             self.outgoing_key_commitments,
             self.incoming_key_commitments,
             self.ct0,
@@ -259,6 +261,7 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
             self.configs.qis,
         );
 
+        // Squeeze the Fiat-Shamir challenge from the transcript.
         let gamma = self.generate_challenge();
 
         // Step 6: Verify decryption share computation for each CRT basis.

@@ -4583,6 +4583,7 @@ dependencies = [
  "fhe-traits",
  "ndarray",
  "num-bigint 0.5.1",
+ "num-traits",
  "petname",
  "rand 0.9.4",
  "rand_chacha 0.9.0",

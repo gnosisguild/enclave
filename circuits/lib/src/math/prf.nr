@@ -10,7 +10,7 @@
 //! ciphertext coefficients are absorbed low degree first. Circuit polynomials
 //! store the highest degree first.
 
-use crate::math::commitments::{compute_prf_key_commitment, prf_key_field};
+use crate::math::commitments::compute_packed_prf_key_commitment;
 use crate::math::modulo::U64::ModU64;
 use crate::math::polynomial::Polynomial;
 use crate::math::safe::SafeSponge;
@@ -142,11 +142,11 @@ fn add_mask_difference<let N: u32, let L: u32>(
 ///
 /// Outgoing key `k_ij` is committed under recipient `j`. Incoming key `k_ji` is
 /// committed under recipient `i`.
-pub fn prf_decryption_mask<let N: u32, let L: u32, let KEY_BITS: u32, let N_PARTIES: u32, let H: u32>(
+pub fn prf_decryption_mask<let N: u32, let L: u32, let N_PARTIES: u32, let H: u32>(
     party_idx: u32,
     decryptors: [Field; H],
-    outgoing_bits: [[Field; KEY_BITS]; N_PARTIES],
-    incoming_bits: [[Field; KEY_BITS]; N_PARTIES],
+    outgoing_keys: [Field; N_PARTIES],
+    incoming_keys: [Field; N_PARTIES],
     outgoing_commitments: [Field; N_PARTIES],
     incoming_commitments: [Field; N_PARTIES],
     ct0: [Polynomial<N>; L],
@@ -165,17 +165,17 @@ pub fn prf_decryption_mask<let N: u32, let L: u32, let KEY_BITS: u32, let N_PART
         let other_id = (other + 1) as Field;
         if (other != party_idx) & party_in_set(decryptors, other_id) {
             assert(
-                compute_prf_key_commitment(other as Field, outgoing_bits[other])
+                compute_packed_prf_key_commitment(other as Field, outgoing_keys[other])
                     == outgoing_commitments[other],
                 "Outgoing PRF key commitment mismatch",
             );
             assert(
-                compute_prf_key_commitment(party_idx as Field, incoming_bits[other])
+                compute_packed_prf_key_commitment(party_idx as Field, incoming_keys[other])
                     == incoming_commitments[other],
                 "Incoming PRF key commitment mismatch",
             );
-            let outgoing = prf_evaluate(prf_key_field(outgoing_bits[other]), digest, qis);
-            let incoming = prf_evaluate(prf_key_field(incoming_bits[other]), digest, qis);
+            let outgoing = prf_evaluate(outgoing_keys[other], digest, qis);
+            let incoming = prf_evaluate(incoming_keys[other], digest, qis);
             mask = add_mask_difference(mask, outgoing, incoming, qis);
         }
     }

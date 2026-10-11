@@ -19,8 +19,8 @@ use crate::math::polynomial::Polynomial;
 /// Consumes the per-party share commitments from C2a.
 /// Produces `commit(agg_sk)` for C6.
 ///
-/// `BIT_MSG` hashes per-share plaintexts (aligned with C2). `BIT_AGG` hashes the CRT aggregate
-/// (`compute_aggregated_shares_commitment`) and must match threshold C6 `BIT_SK`.
+/// `BIT_MSG` is the coefficient width for each per-share plaintext commitment. C2 uses this width.
+/// `BIT_AGG` is the coefficient width for the CRT aggregate commitment. C6 `BIT_SK` uses this width.
 pub struct ShareDecryption<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32, let BIT_AGG: u32, let N_CHUNKS: u32, let CHUNK_SIZE: u32, let KEY_BITS: u32> {
     /// Expected commitments to the share polynomials, produced in C2a.
     /// Organised as [party_idx][mod_idx], covering all H honest parties and L CRT moduli.
@@ -69,7 +69,6 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32, let BIT_AGG: u32, let
                 let mut bit = 0;
                 if i < KEY_BITS {
                     bit = self.key_bits[party_idx][i];
-                    assert(bit * (bit - 1) == 0, "PRF key bit is not binary");
                 }
                 let residue = packed.coefficients[i] - (bit * key_modulus);
                 residue.assert_max_bit_size::<64>();

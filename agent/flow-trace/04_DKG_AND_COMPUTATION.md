@@ -319,7 +319,7 @@ scalar. The key bits stay binary, and C3 still packs those bits into the largest
 `C2ChunkBatch` binds the ordered chunk
 indices and chunk commitments. C3 checks the encrypted limb-0 plaintext against the share
 commitment and the key commitment. C4 removes those bits before the aggregate commitment. C6
-evaluates the same keys in the decryption equation.
+opens each packed key field and evaluates that field in the decryption equation.
 
 The chunk size is one value across the DKG pipeline: it threads from the sample into the C2 (share
 computation), C3 (share encryption), and C4 (share decryption) witness computation and into the

@@ -180,6 +180,14 @@ pub fn prf_key_commitment_bigint(recipient_party_idx: u32, key: &[u8]) -> BigInt
     BigInt::from_bytes_le(Sign::Plus, &field.into_bigint().to_bytes_le())
 }
 
+/// Packed PRF key as a decimal field string.
+///
+/// Bit 0 of the first byte is the least significant bit. The value matches Noir `prf_key_field`.
+pub fn prf_key_field_json(key: &[u8]) -> String {
+    let field = Field::from_le_bytes_mod_order(key);
+    BigInt::from_bytes_le(Sign::Plus, &field.into_bigint().to_bytes_le()).to_string()
+}
+
 /// Key bits as JSON numbers. Bit 0 is the least significant bit of the first byte.
 pub fn prf_key_bits_json(key: &[u8]) -> Vec<serde_json::Value> {
     e3_fhe_params::prf_key_bits(key)

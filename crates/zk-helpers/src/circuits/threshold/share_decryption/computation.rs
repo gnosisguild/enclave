@@ -483,15 +483,15 @@ impl Computation for Inputs {
                 crate::circuits::prf::prf_key_commitment_bigint(self.party_idx, key).to_string()
             })
             .collect::<Vec<_>>();
-        let outgoing_key_bits = self
+        let outgoing_keys = self
             .outgoing_prf_keys
             .iter()
-            .map(|key| crate::circuits::prf::prf_key_bits_json(key))
+            .map(|key| crate::circuits::prf::prf_key_field_json(key))
             .collect::<Vec<_>>();
-        let incoming_key_bits = self
+        let incoming_keys = self
             .incoming_prf_keys
             .iter()
-            .map(|key| crate::circuits::prf::prf_key_bits_json(key))
+            .map(|key| crate::circuits::prf::prf_key_field_json(key))
             .collect::<Vec<_>>();
 
         let json = serde_json::json!({
@@ -512,8 +512,8 @@ impl Computation for Inputs {
             "decryptors": self.decryptors,
             "outgoing_key_commitments": outgoing_key_commitments,
             "incoming_key_commitments": incoming_key_commitments,
-            "outgoing_key_bits": outgoing_key_bits,
-            "incoming_key_bits": incoming_key_bits,
+            "outgoing_keys": outgoing_keys,
+            "incoming_keys": incoming_keys,
         });
 
         Ok(json)
