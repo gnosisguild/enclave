@@ -33,7 +33,7 @@ impl ZkBackend {
         };
 
         let circuits_ok = version_info.circuits_match(&self.config.required_circuits_version)
-            && self.circuits_dir.exists();
+            && self.circuits_files_exist(&version_info);
 
         match (bb_ok, circuits_ok) {
             (true, true) => SetupStatus::Ready,
@@ -65,7 +65,8 @@ impl ZkBackend {
             return (false, None);
         };
         let version = self.verify_bb().await.ok();
-        let bb_ok = version_info.bb_matches(&self.config.required_bb_version);
+        let bb_ok = version_info.bb_matches(&self.config.required_bb_version)
+            && version.as_deref() == Some(self.config.required_bb_version.as_str());
         (bb_ok, version)
     }
 

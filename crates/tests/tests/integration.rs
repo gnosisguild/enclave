@@ -37,7 +37,7 @@ use e3_trbfv::{TrBFVRequest, TrBFVResponse};
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::{colorize, rand_eth_addr, Color};
 use e3_zk_prover::test_utils::get_tempdir;
-use e3_zk_prover::{VersionInfo, ZkBackend};
+use e3_zk_prover::{CircuitInfo, VersionInfo, ZkBackend};
 use fhe::bfv::PublicKey;
 use fhe_traits::{DeserializeParametrized, Serialize};
 use num_bigint::BigUint;
@@ -45,7 +45,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{fs, path::Path, path::PathBuf, sync::Arc};
 use tokio::{sync::mpsc, time::sleep};
 
 #[derive(Debug, Clone, Copy)]
@@ -357,6 +357,46 @@ async fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> Res
         }
     }
     Ok(())
+}
+
+fn collect_circuit_files(circuits_dir: &Path) -> Result<HashMap<String, CircuitInfo>> {
+    fn collect(dir: &Path, root: &Path, circuits: &mut HashMap<String, CircuitInfo>) -> Result<()> {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if entry.file_type()?.is_dir() {
+                collect(&path, root, circuits)?;
+                continue;
+            }
+            if !entry.file_type()?.is_file() {
+                continue;
+            }
+
+            let relative = path
+                .strip_prefix(root)?
+                .to_string_lossy()
+                .replace('\\', "/");
+            if matches!(
+                relative.as_str(),
+                "checksums.json" | "SHA256SUMS" | "SOURCE_HASH"
+            ) || entry.file_name() == ".build-stamp.json"
+            {
+                continue;
+            }
+            circuits.insert(
+                relative.clone(),
+                CircuitInfo {
+                    file: relative,
+                    checksum: String::new(),
+                },
+            );
+        }
+        Ok(())
+    }
+
+    let mut circuits = HashMap::new();
+    collect(circuits_dir, circuits_dir, &mut circuits)?;
+    Ok(circuits)
 }
 
 /// Create a ZkBackend for integration tests.
@@ -765,13 +805,22 @@ async fn setup_test_zk_backend(
         }
 
         let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
+        let circuits = collect_circuit_files(&backend.circuits_dir)?;
+        if circuits.is_empty() {
+            bail!(
+                "no circuit artifacts found in ZK integration fixture at {}",
+                backend.circuits_dir.display()
+            );
+        }
 
         // `CiphernodeBuilder` calls `ensure_installed()`, which deletes `circuits_dir` and downloads
         // the release tarball whenever `version.json` does not record the pinned bb/circuits
-        // versions. That would wipe the fixture tree we just copied from `circuits/bin/`.
+        // versions and circuit artifacts. That would wipe the fixture tree we just copied from
+        // `circuits/bin/`.
         let version_info = VersionInfo {
             bb_version: Some(backend.config.required_bb_version.clone()),
             circuits_version: Some(backend.config.required_circuits_version.clone()),
+            circuits,
             ..Default::default()
         };
         version_info

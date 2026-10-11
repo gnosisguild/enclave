@@ -97,6 +97,20 @@ async fn locate_manifest_artifact(
 }
 
 impl ZkBackend {
+    /// Check that every artifact recorded for the installed circuit set still exists.
+    pub(super) fn circuits_files_exist(&self, version_info: &VersionInfo) -> bool {
+        !version_info.circuits.is_empty()
+            && version_info.circuits.keys().all(|rel_path| {
+                !rel_path.is_empty()
+                    && Path::new(rel_path)
+                        .components()
+                        .all(|part| matches!(part, Component::Normal(_)))
+                    && circuit_manifest_candidates(&self.circuits_dir, rel_path)
+                        .iter()
+                        .any(|candidate| candidate.is_file())
+            })
+    }
+
     /// Resolve a `checksums.json` entry to an on-disk path (legacy flat or per-committee layout).
     pub async fn locate_manifest_artifact(
         &self,
@@ -736,17 +750,23 @@ mod tests {
     }
 
     async fn seed_installation(backend: &ZkBackend) -> Vec<u8> {
+        let mut circuits = HashMap::new();
         for configuration in ["insecure-512/minimum", "secure-8192/small"] {
-            write_file(
-                &backend.circuits_dir,
-                &format!("{configuration}/default/dkg/pk/pk.json"),
-                b"previous-circuit",
+            let file = format!("{configuration}/default/dkg/pk/pk.json");
+            write_file(&backend.circuits_dir, &file, b"previous-circuit");
+            circuits.insert(
+                file.clone(),
+                CircuitInfo {
+                    file,
+                    checksum: "fixture-checksum".into(),
+                },
             );
         }
         write_file(&backend.circuits_dir, "installed.txt", b"installed");
         VersionInfo {
             bb_version: Some("5.1.0".into()),
             circuits_version: Some("previous".into()),
+            circuits,
             last_updated: Some("previous-installation".into()),
             ..Default::default()
         }

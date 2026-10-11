@@ -62,17 +62,39 @@ fi
 
 REQUIRED_BB="$(jq -r '.required_bb_version' "$VERSIONS_JSON")"
 REQUIRED_CIRCUITS="$(jq -r '.required_circuits_version' "$VERSIONS_JSON")"
+source "$SCRIPT_DIR/utils.sh"
+CIRCUITS_MAP="$(
+  cd "${INTEGRATION_NOIR}/circuits"
+  find . -type f \
+    ! -path './checksums.json' \
+    ! -path './SHA256SUMS' \
+    ! -path './SOURCE_HASH' \
+    ! -name '.build-stamp.json' \
+    -print |
+    LC_ALL=C sort |
+    while IFS= read -r file; do
+      relative="${file#./}"
+      checksum="$(sha256_of_stdin <"$file")"
+      jq -n --arg file "$relative" --arg checksum "$checksum" \
+        '{key: $file, value: {file: $file, checksum: $checksum}}'
+    done |
+    jq -s 'map({(.key): .value}) | add // {}'
+)"
+if [[ "$(jq 'length' <<<"$CIRCUITS_MAP")" -eq 0 ]]; then
+  echo "no circuit artifacts found for integration ZK fixtures" >&2
+  exit 1
+fi
 jq -n \
   --arg bb "$REQUIRED_BB" \
   --arg circuits "$REQUIRED_CIRCUITS" \
-  '{bb_version: $bb, circuits_version: $circuits}' \
+  --argjson circuit_files "$CIRCUITS_MAP" \
+  '{bb_version: $bb, circuits_version: $circuits, circuits: $circuit_files}' \
   > "${INTEGRATION_NOIR}/version.json"
 cp "$(command -v bb)" "${INTEGRATION_NOIR}/bin/bb"
 chmod +x "${INTEGRATION_NOIR}/bin/bb"
 
 # The upgrade reset scenario keeps this output for the candidate. The stamp lets it refuse a noir
 # folder that a released binary's setup replaced.
-source "$SCRIPT_DIR/utils.sh"
 noir_digest "$INTEGRATION_NOIR" >"${INTEGRATION_DIR}/.interfold/prebuild-noir.sha256"
 
 echo "Staged source-aligned integration circuits under ${INTEGRATION_NOIR}/circuits"
