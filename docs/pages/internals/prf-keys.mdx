@@ -1,0 +1,102 @@
+---
+title: 'PRF keys'
+description:
+  'How a dealer samples PRF keys, sends them inside encrypted Shamir shares, and how a decryptor
+  uses them to mask a partial decryption share.'
+---
+
+# PRF keys
+
+A PRF key is a private value that one dealer gives to one recipient. Decryption uses those keys to
+build a mask. The masks of a decryptor set cancel in pairs. This page covers generation, delivery,
+and use. The surrounding proof pipeline is in [PVDKG & ZK Proofs](/internals/dkg).
+
+## What the mask does
+
+Each dealer samples one key for every committee member. At decryption, party `i` adds
+`F(k_ij) - F(k_ji)` for every other decryptor `j`. Party `j` adds the opposite difference. Across
+the decryptor set, each pair appears once in each direction, so the masks sum to zero. The secret
+share and the fresh noise stay in that sum.
+
+`k_ij` is the key that party `i` generated for recipient `j`. `k_ji` is the key that party `j`
+generated for recipient `i`. `F` is the Poseidon2 evaluation below.
+
+## Generation
+
+Share generation samples the keys. The dealer draws one key for every committee slot, including its
+own slot. The insecure preset stores 32 bits. Both secure presets store 256 bits. The polynomial degree is
+at least that bit length, so limb 0 has one coefficient for every bit. The dealer fills those
+bytes from the operating-system random source.
+
+The node keeps every outgoing key. The stored bytes stay encrypted at rest.
+
+## Commitment
+
+C2 commits each key under its recipient. The recipient index in that commitment is 0-based. The hash
+input is that index and the packed key. Bit 0 of the packed key is the least significant bit of the
+first byte. The hash uses the domain separator `PRF_KEY_FIELD`.
+
+## Delivery
+
+The dealer writes the key into limb 0 of that recipient's Shamir share. Limb 0 must hold a largest
+threshold modulus. Coefficient `i` stores `residue + bit_i · q`. Coefficients after the key prefix
+stay equal to the residue.
+
+The share-encryption plaintext modulus is `2·q`. Each packed coefficient fits in that modulus. The
+dealer encrypts the packed share under the recipient individual public key from C0. C3 proves that
+this ciphertext matches the C2 share commitment and the C2 key commitment.
+
+The dealer signs C1, C2, and every C3 proof before it publishes `ThresholdShareCreated`. Gossip
+carries the event. The recipient keeps the copy whose target party id is its own.
+
+The own slot stays in plaintext on the dealer. C2 binds that slot. C4 consumes it locally.
+
+## Recovery
+
+The recipient decrypts each incoming share with its individual BFV secret key. It splits limb 0 into
+the share residue and the PRF key. C4 checks that opened key against the C2 commitment. C4 removes
+the key bits before it commits the aggregated secret share.
+
+A selected dealer inserts its own plaintext share at its own row. A recipient outside the selected
+roster decrypts every dealer share in the roster. That recipient keeps each dealer row as a
+decrypted share.
+
+The node stores each recovered key as the incoming key from that sender. It also stores the outgoing
+key it sampled for itself in its own incoming slot. The mask loop skips that self slot.
+
+## Use at decryption
+
+The decryptor set `S` is the lowest `T+1` honest party ids. The PRF reads those ids as 1-based
+values in increasing order. The context digest absorbs the length of `S`, the ids in `S`, and both
+ciphertext polynomials. Coefficients enter low degree first as residues in `[0, q)`. This digest
+uses the domain separator `fhe.rs/trbfv/prf/poseidon2/ctx`.
+
+For each other party `j` in `S`, party `i` evaluates `k_ij` and `k_ji` on that digest. The
+evaluation uses the domain separator `fhe.rs/trbfv/prf/poseidon2/eval`. The function squeezes one
+field per coefficient. It then reduces that field into the matching CRT residue.
+
+The mask is the sum of the outgoing evaluations minus the incoming evaluations. The partial share is
+the Lagrange coefficient times `c1` times the secret share, plus fresh noise, plus this mask. C7
+adds `c0` to the sum of the partial shares.
+
+A later decryptor set changes the digest. Each party in the new set computes a new mask. The node
+keeps the outgoing keys and the incoming keys after it signs a share, so that later mask can be
+built.
+
+C6 checks each opened key against the commitment for that recipient. The DKG proof stores the C2 key
+matrix. The decryption verifier checks the opened keys against that matrix.
+
+A key that enters the mask must be present. That key must contain a non-zero byte. A slot for a
+party outside `S` can stay zero. A missing key stops the decryption share. A key the node cannot
+decrypt also stops that share.
+
+## Code
+
+| Step                     | Location                                                                 |
+| ------------------------ | ------------------------------------------------------------------------ |
+| Sample and pack          | `crates/keyshare/src/threshold_keyshare/generate_shares.rs`              |
+| Pack and unpack one limb | `crates/fhe-params/src/prf_key.rs`                                       |
+| Recover incoming keys    | `crates/keyshare/src/threshold_keyshare/derive_decryption_key.rs`        |
+| Circuit mask             | `circuits/lib/src/math/prf.nr`                                           |
+| Rust mask                | `crates/zk-helpers/src/circuits/prf.rs`                                  |
+| Key commitment           | `circuits/lib/src/math/commitments.nr`                                   |
