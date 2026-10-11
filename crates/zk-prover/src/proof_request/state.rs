@@ -142,6 +142,8 @@ pub(crate) struct PendingShareDecryptionProof {
     pub(crate) party_id: u64,
     pub(crate) node: String,
     pub(crate) decryption_share: Vec<ArcBytes>,
+    /// 1-based decryptor ids bound to this share.
+    pub(crate) decryptors: Vec<u32>,
     pub(crate) ec: EventContext<Sequenced>,
 }
 

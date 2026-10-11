@@ -10,7 +10,7 @@ use crate::math::commitments::{
     compute_threshold_share_decryption_challenge,
 };
 use crate::math::modulo::U64::ModU64;
-use crate::math::prf::prf_decryption_mask;
+use crate::math::prf::{native_residue, prf_decryption_mask};
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
 
@@ -71,8 +71,12 @@ pub struct ShareDecryption<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: 
     /// Aggregated sum of sk shares (secret witness)
     sk: [Polynomial<N>; L],
 
-    /// Fresh smudging noise. Not scaled by `λ` and not a DKG secret.
+    /// Fresh smudging noise residues, one centered residue per CRT limb.
     e_fresh: [Polynomial<N>; L],
+    /// One signed fresh-noise coefficient per degree. The same integer reduces into every limb.
+    e_signed: Polynomial<N>,
+    /// Quotient `e_signed = e_quot * q + e_fresh` for each CRT limb.
+    e_quot: [Polynomial<N>; L],
 
     /// Quotient polynomials for lifting to Z (secret witnesses)
     r1: [Polynomial<2 * N - 1>; L],
@@ -109,6 +113,8 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         ct1: [Polynomial<N>; L],
         sk: [Polynomial<N>; L],
         e_fresh: [Polynomial<N>; L],
+        e_signed: Polynomial<N>,
+        e_quot: [Polynomial<N>; L],
         r1: [Polynomial<2 * N - 1>; L],
         r2: [Polynomial<N - 1>; L],
         d: [Polynomial<N>; L],
@@ -130,6 +136,8 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
             ct1,
             sk,
             e_fresh,
+            e_signed,
+            e_quot,
             r1,
             r2,
             d,
@@ -187,7 +195,10 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
         for limb in 0..L {
             let mut coeffs = [0; MAX_MSG_NON_ZERO_COEFFS];
             for j in 0..MAX_MSG_NON_ZERO_COEFFS {
-                coeffs[j] = self.ct0[limb].coefficients[N - 1 - j];
+                coeffs[j] = native_residue(
+                    self.ct0[limb].coefficients[N - 1 - j],
+                    self.configs.qis[limb],
+                );
             }
             limbs[limb] = Polynomial::new(coeffs);
         }
@@ -296,20 +307,51 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
     /// attacks where malicious provers provide out-of-range values that could break the
     /// security properties of the Threshold scheme.
     ///
-    /// Note: `sk` / `e_sm` coefficients are not range-checked again here:
-    /// - `verify_agg_sk_commitment` / `verify_agg_e_sm_commitment` bind to the C4 aggregate commitments.
-    /// - C4 formed those aggregates from per-party shares verified against C2 in `dkg/share_decryption`.
-    /// - This step only range-checks fresh quotient witnesses `r1`, `r2`.
+    /// `sk` is bound by its aggregate commitment. This step range-checks `r1`, `r2`, and the
+    /// signed fresh-noise coefficient. Each limb residue must be the centered remainder of that
+    /// coefficient.
     ///
     /// # Panics
     /// This function will cause the circuit to fail if any quotient coefficient is
     /// outside its expected bounds.
+    /// Bind every limb residue to one signed coefficient `e` with `|e| <= B`.
+    ///
+    /// `B` must fit in 234 bits. The quotient fits in 188 bits, so `quotient * q + residue`
+    /// stays below the scalar field and the field equation is an integer equation.
+    fn check_fresh_noise(self) {
+        let bound = self.configs.e_fresh_bound;
+        bound.assert_max_bit_size::<234>();
+        let span = bound + bound;
+        // 2^188. An honest quotient is about B / q.
+        let quot_bound: Field = 392318858461667547739736838950479151006397215279002157056;
+        let quot_span = quot_bound + quot_bound;
+        for j in 0..N {
+            let coeff = self.e_signed.coefficients[j];
+            let shifted = coeff + bound;
+            shifted.assert_max_bit_size::<235>();
+            (span - shifted).assert_max_bit_size::<235>();
+            for limb in 0..L {
+                let q = self.configs.qis[limb];
+                let half = (q - 1) / 2;
+                let residue = self.e_fresh[limb].coefficients[j];
+                let residue_shift = residue + half;
+                residue_shift.assert_max_bit_size::<64>();
+                ((q - 1) - residue_shift).assert_max_bit_size::<64>();
+                let quot = self.e_quot[limb].coefficients[j];
+                let quot_shift = quot + quot_bound;
+                quot_shift.assert_max_bit_size::<190>();
+                (quot_span - quot_shift).assert_max_bit_size::<190>();
+                assert(
+                    coeff == quot * q + residue,
+                    "Fresh noise residue does not match the signed coefficient",
+                );
+            }
+        }
+    }
+
     fn check_range_bounds(self) {
+        self.check_fresh_noise();
         for basis_idx in 0..L {
-            self.e_fresh[basis_idx].range_check_2bounds::<BIT_E_SM>(
-                self.configs.e_fresh_bound,
-                self.configs.e_fresh_bound,
-            );
             // r_1 quotients can be negative (modulus quotients)
             self.r1[basis_idx].range_check_2bounds::<BIT_R1>(
                 self.configs.r1_bounds[basis_idx],
@@ -401,8 +443,8 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
 
 /// Lagrange coefficients `L_i(0)` for a designated decryptor set.
 ///
-/// `party_ids` are 1-based Shamir points. The result is one coefficient per
-/// party, reduced modulo each CRT prime. C6 multiplies only `c1 * sh` by `L_i(0)`.
+/// `party_ids` are 1-based Shamir points. The result is one centered coefficient per
+/// party, in `(-q/2, q/2]`. C6 multiplies only `c1 * sh` by `L_i(0)`.
 pub fn lagrange_coeffs_for_set<let SET: u32, let L: u32>(
     qis: [Field; L],
     party_ids: [Field; SET],
@@ -440,7 +482,9 @@ pub fn lagrange_coeffs_for_set<let SET: u32, let L: u32>(
             let result_abs = m.div_mod(numerator_abs, denominator_abs);
             let should_negate = numerator_sign_negative != denom_sign_negative;
             let result = if should_negate { m.reduce_mod(q_l - result_abs) } else { result_abs };
-            lagrange_coeffs[basis_idx][party_idx] = result;
+            let half = (q_l - 1) / 2;
+            let centered = if (result as u128) > (half as u128) { result - q_l } else { result };
+            lagrange_coeffs[basis_idx][party_idx] = centered;
         }
     }
 

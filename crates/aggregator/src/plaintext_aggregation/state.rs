@@ -53,6 +53,8 @@ pub struct Collecting {
     pub(crate) ciphertext_output: Vec<ArcBytes>,
     pub(crate) params: ArcBytes,
     pub(crate) rejected_parties: BTreeSet<u64>,
+    /// 1-based decryptor ids for this collection. Empty skips the round check.
+    pub(crate) expected_decryptors: Vec<u32>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -180,6 +182,7 @@ impl ThresholdPlaintextAggregatorState {
             ciphertext_output,
             params,
             rejected_parties: BTreeSet::new(),
+            expected_decryptors: Vec::new(),
         })
     }
 }

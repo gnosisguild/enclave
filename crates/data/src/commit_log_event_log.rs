@@ -986,6 +986,7 @@ mod tests {
                     e3_id: e3_id.clone(),
                     node: node.clone(),
                     signed_decryption_proofs: vec![],
+                    decryptors: vec![1],
                 }
                 .into(),
             ),

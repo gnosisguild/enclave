@@ -6,11 +6,9 @@
 
 //! Threshold share decryption circuit.
 //!
-//! Proves correct computation of a BFV decryption share: the prover shows that their
-//! share `d` satisfies the lifted relation
-//! `d = c_0 + c_1 * s + e + r_2 * (X^N + 1) + r_1 * q_i` with committed `s` and `e`,
-//! and produces Prover.toml and configs.nr for the Noir prover. See [`ShareDecryptionCircuit`]
-//! and [`ShareDecryptionCircuitInput`].
+//! Proves one partial decryption share. The share is `λ·c1·sh + e_fresh + mask`.
+//! `λ` is the centered Lagrange coefficient. `e_fresh` is one signed coefficient reduced
+//! into each CRT limb. The witness produces Prover.toml and configs.nr for the Noir prover.
 
 pub mod circuit;
 pub mod codegen;

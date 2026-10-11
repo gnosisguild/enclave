@@ -48,13 +48,13 @@ async fn forged_share_cannot_reserve_an_honest_partys_slot() -> Result<()> {
             }
         }
         let ec = test_ctx(EffectsEnabled::new());
-        aggregator.add_share(0, shares, proofs, &ec)?;
+        aggregator.add_share(0, shares, proofs, &[], &ec)?;
         let state = Collecting::try_from(aggregator.state.try_get()?)?;
         assert!(state.shares.is_empty(), "{forgery:?} reserved a slot");
         assert!(state.rejected_parties.is_empty());
         for party in 0..2 {
             let (shares, proofs) = share_with_matching_commitment(&e3_id, party, ciphertexts);
-            aggregator.add_share(party, shares, proofs, &ec)?;
+            aggregator.add_share(party, shares, proofs, &[], &ec)?;
         }
         assert!(matches!(
             aggregator.state.get(),
@@ -79,11 +79,11 @@ async fn valid_proofs_cannot_be_reordered_between_ciphertexts() -> Result<()> {
     shares.swap(0, 1);
     proofs.swap(0, 1);
     let ec = test_ctx(EffectsEnabled::new());
-    aggregator.add_share(0, shares, proofs, &ec)?;
+    aggregator.add_share(0, shares, proofs, &[], &ec)?;
     let state = Collecting::try_from(aggregator.state.try_get()?)?;
     assert!(state.shares.is_empty());
     let (shares, proofs) = share_with_matching_commitment(&e3_id, 0, &ciphertexts);
-    aggregator.add_share(0, shares, proofs, &ec)?;
+    aggregator.add_share(0, shares, proofs, &[], &ec)?;
     let state = Collecting::try_from(aggregator.state.try_get()?)?;
     assert!(state.shares.contains_key(&0));
     Ok(())

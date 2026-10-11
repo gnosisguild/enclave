@@ -7,7 +7,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use e3_bfv_client::decode_bytes_to_vec_u64;
-use e3_crypto::Cipher;
+use e3_crypto::{Cipher, SensitiveBytes};
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::{zero_prf_key, DEFAULT_BFV_PRESET};
 
@@ -99,11 +99,11 @@ async fn test_trbfv_isolation() -> Result<()> {
     for party_id in [1, 4, 2] {
         let sk_poly_sum = decryption_keys.get(&party_id).unwrap();
         let outgoing_prf_keys = (0..threshold_n)
-            .map(|other| pair_prf_key(party_id, other))
-            .collect();
+            .map(|other| SensitiveBytes::new(pair_prf_key(party_id, other), &cipher))
+            .collect::<Result<Vec<_>>>()?;
         let incoming_prf_keys = (0..threshold_n)
-            .map(|other| pair_prf_key(other, party_id))
-            .collect();
+            .map(|other| SensitiveBytes::new(pair_prf_key(other, party_id), &cipher))
+            .collect::<Result<Vec<_>>>()?;
         println!("calculate_decryption_share for party_id={}", party_id);
         let CalculateDecryptionShareResponse {
             d_share_poly,

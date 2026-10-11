@@ -116,13 +116,6 @@ pub fn decryption_mask_low_degree(
     if outgoing_keys.iter().chain(incoming_keys).any(Vec::is_empty) {
         return Err("PRF key is empty".into());
     }
-    if outgoing_keys
-        .iter()
-        .chain(incoming_keys)
-        .any(|key| key.iter().all(|byte| *byte == 0))
-    {
-        return Err("PRF key is all zeros".into());
-    }
     let degree = ct0.first().map(|poly| poly.coefficients().len()).unwrap_or(0);
     let h = decryptors.len();
     let mut input = Vec::new();
@@ -141,6 +134,9 @@ pub fn decryption_mask_low_degree(
     for (other, (outgoing, incoming)) in outgoing_keys.iter().zip(incoming_keys).enumerate() {
         let other_id = (other + 1) as u32;
         if other != party_idx && decryptors.contains(&other_id) {
+            if outgoing.iter().all(|byte| *byte == 0) || incoming.iter().all(|byte| *byte == 0) {
+                return Err("PRF key is all zeros".into());
+            }
             let positive = evaluate(outgoing, &digest, moduli, degree);
             let negative = evaluate(incoming, &digest, moduli, degree);
             add_rows(&mut mask, &positive, &negative, moduli);
@@ -250,14 +246,32 @@ mod tests {
     }
 
     #[test]
-    fn all_zero_prf_key_is_rejected() {
+    fn unused_zero_key_is_allowed() {
         let limb = Polynomial::from_u64_vector(vec![1, 2, 3, 4]);
         let zeros = vec![0u8; 4];
+        let mask = decryption_mask_low_degree(
+            0,
+            &[1],
+            &[zeros.clone(), zeros.clone(), zeros.clone()],
+            &[zeros.clone(), zeros.clone(), zeros],
+            &[limb.clone()],
+            &[limb],
+            &[97],
+        )
+        .unwrap();
+        assert!(mask[0].iter().all(|coeff| *coeff == 0));
+    }
+
+    #[test]
+    fn zero_key_for_another_decryptor_is_rejected() {
+        let limb = Polynomial::from_u64_vector(vec![1, 2, 3, 4]);
+        let zeros = vec![0u8; 4];
+        let live = vec![1, 0, 0, 0];
         let error = decryption_mask_low_degree(
             0,
             &[1, 2],
-            &[zeros.clone(), vec![1, 0, 0, 0]],
-            &[zeros, vec![2, 0, 0, 0]],
+            &[live.clone(), zeros.clone()],
+            &[live, zeros],
             &[limb.clone()],
             &[limb],
             &[97],

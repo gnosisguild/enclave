@@ -1373,6 +1373,7 @@ async fn restart_redrives_a_decryption_share_compute_request() -> Result<()> {
         signed_sk_share_encryption_proofs: Vec::new(),
         outgoing_prf_keys: Vec::new(),
         incoming_prf_keys: Vec::new(),
+        decryptors: vec![1],
     };
     let (actor, history, e3_id, _) =
         start_actor_with_state(KeyshareState::Decrypting(decrypting)).await?;
@@ -1410,6 +1411,11 @@ async fn a_replayed_decryption_share_response_does_not_fault_after_the_state_adv
         signed_pk_generation_proof: None,
         signed_sk_share_computation_proof: None,
         signed_sk_share_encryption_proofs: Vec::new(),
+        ciphertext_output: Vec::new(),
+        sk_poly_sum: SensitiveBytes::from_encrypted(&[]),
+        outgoing_prf_keys: Vec::new(),
+        incoming_prf_keys: Vec::new(),
+        decryptors: Vec::new(),
     };
     let (actor, history, e3_id, repo) =
         start_actor_with_state(KeyshareState::GeneratingDecryptionProof(generating)).await?;
@@ -1429,6 +1435,7 @@ async fn a_replayed_decryption_share_response_does_not_fault_after_the_state_adv
                 TrBFVResponse::CalculateDecryptionShare(CalculateDecryptionShareResponse {
                     d_share_poly: vec![ArcBytes::from_bytes(&[3])],
                     e_fresh: vec![SensitiveBytes::from_encrypted(&[4])],
+                    e_signed: vec![SensitiveBytes::from_encrypted(&[5])],
                     context_digest: [0u8; 32],
                 }),
                 CorrelationId::new(),

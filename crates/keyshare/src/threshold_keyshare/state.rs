@@ -94,6 +94,8 @@ pub struct Decrypting {
     pub(crate) outgoing_prf_keys: Vec<SensitiveBytes>,
     /// Incoming PRF keys indexed by sender. Empty selects the zero key.
     pub(crate) incoming_prf_keys: Vec<SensitiveBytes>,
+    /// 1-based decryptor ids for the active share round.
+    pub(crate) decryptors: Vec<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -103,6 +105,13 @@ pub struct GeneratingDecryptionProof {
     pub(crate) signed_pk_generation_proof: Option<SignedProofPayload>,
     pub(crate) signed_sk_share_computation_proof: Option<SignedProofPayload>,
     pub(crate) signed_sk_share_encryption_proofs: Vec<SignedProofPayload>,
+    /// Ciphertext and key material kept so a fresh decryptor set can be recomputed.
+    pub(crate) ciphertext_output: Vec<ArcBytes>,
+    pub(crate) sk_poly_sum: SensitiveBytes,
+    pub(crate) outgoing_prf_keys: Vec<SensitiveBytes>,
+    pub(crate) incoming_prf_keys: Vec<SensitiveBytes>,
+    /// 1-based decryptor ids for the share that is being proved.
+    pub(crate) decryptors: Vec<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -158,6 +167,7 @@ impl KeyshareState {
                         | (K::AggregatingDecryptionKey(_), K::ReadyForDecryption(_))
                         | (K::ReadyForDecryption(_), K::Decrypting(_))
                         | (K::Decrypting(_), K::GeneratingDecryptionProof(_))
+                        | (K::GeneratingDecryptionProof(_), K::Decrypting(_))
                         | (K::GeneratingDecryptionProof(_), K::Completed)
                 )
             }

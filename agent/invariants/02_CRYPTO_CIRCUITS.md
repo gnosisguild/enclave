@@ -84,7 +84,8 @@ every section.
 
 - Plaintext collection starts verification at **T+1** distinct accepted-roster shares, not at H.
   Every selected raw share must match its C6 commitment for each ciphertext output. Bad early shares
-  must not prevent the use of valid backups while T+1 roster parties remain possible. A local C6
+  must not prevent a new share round while T+1 roster parties remain possible. The new round
+  uses new shares for the new decryptor set. A local C6
   result authorizes only its exact dispatch batch. Share admission checks the signed sender, E3,
   proof type, raw bytes, and ciphertext position before reserving a party slot. — `flow-trace/04`
 
@@ -134,7 +135,9 @@ every section.
 - Proof multiplicity: one C2a per recipient; C3a follows the configured Shamir multiplicity.
   DKG does not produce C2b, C3b, or C4b. Witness dimensions come from the **active preset**, never
   incidental vector sizes. — `ARCHITECTURE.md`; `CRATES_ARCHITECTURE.md`
-- The decryption set is the lowest `T+1` honest party ids. C6 computes the Lagrange coefficient
+- The decryption set is the lowest `T+1` honest party ids. After a rejected share, the set is
+  the lowest `T+1` honest party ids that remain, and those parties compute new shares. Old shares
+  are not opened under the new set. C6 computes the Lagrange coefficient
   from that public set and multiplies only `c1·sh`. C7 adds `c0` to the sum and does not apply
   Lagrange again. The DKG proof stores the C2 PRF-key matrix, and the decryption verifier checks
   each decryptor's opened keys against that matrix. — `flow-trace/04`

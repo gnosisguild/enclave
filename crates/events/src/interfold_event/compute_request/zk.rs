@@ -917,6 +917,8 @@ pub struct ThresholdShareDecryptionProofRequest {
     pub sk_poly_sum: SensitiveBytes,
     /// Fresh noise polynomials used in the partial shares, one per output index.
     pub e_fresh: Vec<SensitiveBytes>,
+    /// Signed coefficients of each fresh-noise polynomial, low degree first.
+    pub e_signed: Vec<SensitiveBytes>,
     /// Computed decryption share polynomials, one per output index.
     pub d_share_bytes: Vec<ArcBytes>,
     /// Stable E3 context cryptographically bound into every C6 proof.

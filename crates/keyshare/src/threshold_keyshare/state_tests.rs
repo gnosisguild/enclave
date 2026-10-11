@@ -189,6 +189,7 @@ fn decrypting() -> Decrypting {
         signed_sk_share_encryption_proofs: Vec::new(),
         outgoing_prf_keys: Vec::new(),
         incoming_prf_keys: Vec::new(),
+        decryptors: Vec::new(),
     }
 }
 
@@ -199,5 +200,10 @@ fn gdp() -> GeneratingDecryptionProof {
         signed_pk_generation_proof: None,
         signed_sk_share_computation_proof: None,
         signed_sk_share_encryption_proofs: Vec::new(),
+        ciphertext_output: Vec::new(),
+        sk_poly_sum: sens(),
+        outgoing_prf_keys: Vec::new(),
+        incoming_prf_keys: Vec::new(),
+        decryptors: Vec::new(),
     }
 }

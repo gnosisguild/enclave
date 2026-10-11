@@ -16,6 +16,13 @@ impl Handler<InterfoldEvent> for ThresholdKeyshare {
             InterfoldEventData::CiphertextOutputPublished(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
+            InterfoldEventData::FreshDecryptionRound(data) => {
+                if let Err(error) =
+                    self.handle_fresh_decryption_round(TypedEvent::new(data, ec))
+                {
+                    warn!("Could not start a fresh decryption round: {error}");
+                }
+            }
             InterfoldEventData::PublicKeyAggregated(data) => {
                 let committee_hash =
                     e3_committee_hash::hash_committee_addresses(&data.committee_addresses);

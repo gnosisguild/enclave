@@ -234,12 +234,8 @@ impl ShareDecryptionCircuitData {
                 .map(|row| row.iter().copied().map(num_bigint::BigInt::from).collect())
                 .collect(),
         );
-        let es_crt = CrtPolynomial::from_bigint_vectors(
-            es_sum_matrix
-                .outer_iter()
-                .map(|row| row.iter().copied().map(num_bigint::BigInt::from).collect())
-                .collect(),
-        );
+        let (es_crt, e_signed) =
+            consistent_signed_noise(&es_sum_matrix, threshold_params.moduli());
         let decryptors: Vec<u32> = (1..=(committee.threshold as u32 + 1)).collect();
         let prf_keys = nonzero_prf_keys(preset, committee.n);
         let ct0 = CrtPolynomial::from_fhe_polynomial(&ciphertext[0]);
@@ -258,6 +254,7 @@ impl ShareDecryptionCircuitData {
             public_key,
             s: sk_crt,
             e: es_crt,
+            e_signed,
             d_share,
             domain_hi: 1,
             domain_lo: 2,
@@ -268,6 +265,47 @@ impl ShareDecryptionCircuitData {
             incoming_prf_keys: prf_keys,
         })
     }
+}
+
+/// Use limb 0 as the signed integer and store each limb as its centered residue.
+fn consistent_signed_noise(
+    summed: &ndarray::Array2<u64>,
+    moduli: &[u64],
+) -> (CrtPolynomial, Vec<num_bigint::BigInt>) {
+    let q0 = num_bigint::BigInt::from(moduli[0]);
+    let half0 = (&q0 - num_bigint::BigInt::from(1)) / num_bigint::BigInt::from(2);
+    let mut signed = Vec::with_capacity(summed.ncols());
+    for column in 0..summed.ncols() {
+        let mut value = num_bigint::BigInt::from(summed[[0, column]]);
+        if value > half0 {
+            value -= &q0;
+        }
+        signed.push(value);
+    }
+    let mut limbs = Vec::with_capacity(moduli.len());
+    for modulus in moduli {
+        let q = num_bigint::BigInt::from(*modulus);
+        let half = (&q - num_bigint::BigInt::from(1)) / num_bigint::BigInt::from(2);
+        let negative_half = num_bigint::BigInt::from(0) - &half;
+        let coeffs = signed
+            .iter()
+            .map(|value| {
+                let mut residue = value % &q;
+                if &residue > &half {
+                    residue -= &q;
+                } else if &residue < &negative_half {
+                    residue += &q;
+                }
+                if residue.sign() == num_bigint::Sign::Minus {
+                    residue + &q
+                } else {
+                    residue
+                }
+            })
+            .collect();
+        limbs.push(Polynomial::new(coeffs));
+    }
+    (CrtPolynomial::new(limbs), signed)
 }
 
 fn nonzero_prf_keys(preset: BfvPreset, count: usize) -> Vec<Vec<u8>> {

@@ -74,18 +74,18 @@ fn duplicate_shares_do_not_count_or_replace_an_in_flight_batch() {
 }
 
 #[test]
-fn rejected_share_uses_queued_replacement_after_restart() {
+fn rejected_share_starts_a_fresh_round() {
     let state = add(add(add(collecting(1, 5), 0), 2), 4);
     let restored = bincode::deserialize(&bincode::serialize(&state).unwrap()).unwrap();
     let ThresholdPlaintextAggregatorState::VerifyingC6(batch) = restored else {
         panic!()
     };
     let next = ThresholdPlaintextAggregation::retry_collection(batch, BTreeSet::from([0]));
-    let ThresholdPlaintextAggregatorState::VerifyingC6(batch) = next else {
+    let ThresholdPlaintextAggregatorState::Collecting(batch) = next else {
         panic!()
     };
-    assert_eq!(batch.shares.keys().copied().collect::<Vec<_>>(), [2, 4]);
-    assert_eq!(batch.c6_proofs.keys().copied().collect::<Vec<_>>(), [2, 4]);
+    assert!(batch.shares.is_empty());
+    assert!(batch.c6_proofs.is_empty());
     assert!(batch.rejected_parties.contains(&0));
 }
 
@@ -100,8 +100,8 @@ fn rejected_party_cannot_reenter_while_waiting_for_replacement() {
     let ThresholdPlaintextAggregatorState::Collecting(ref c) = state else {
         panic!()
     };
-    assert_eq!(c.shares.keys().copied().collect::<Vec<_>>(), [2]);
-    let state = add(state, 4);
+    assert!(c.shares.is_empty());
+    let state = add(add(state, 2), 4);
     assert!(matches!(
         state,
         ThresholdPlaintextAggregatorState::VerifyingC6(_)
@@ -124,7 +124,7 @@ fn expulsion_does_not_change_in_flight_batch_identity() {
     let ThresholdPlaintextAggregatorState::Collecting(c) = next else {
         panic!()
     };
-    assert_eq!(c.shares.keys().copied().collect::<Vec<_>>(), [1]);
+    assert!(c.shares.is_empty());
     assert_eq!(c.rejected_parties, BTreeSet::from([0, 2]));
 }
 

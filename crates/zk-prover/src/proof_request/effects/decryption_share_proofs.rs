@@ -27,6 +27,7 @@ impl ProofRequestActor {
                 party_id: msg.party_id,
                 node: msg.node,
                 decryption_share: msg.decryption_share,
+                decryptors: msg.proof_request.decryptors.clone(),
                 ec: ec.clone(),
             },
         );
@@ -106,6 +107,7 @@ impl ProofRequestActor {
                 e3_id: e3_id.clone(),
                 decryption_share: pending.decryption_share,
                 signed_decryption_proofs: signed_proofs,
+                decryptors: pending.decryptors,
             },
             ec.clone(),
         ) {

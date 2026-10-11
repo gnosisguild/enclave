@@ -115,7 +115,10 @@ fn computing_state() -> ThresholdPlaintextAggregatorState {
     ThresholdPlaintextAggregatorState::Computing(Computing {
         threshold_m: 1,
         threshold_n: 2,
-        shares: vec![(0, vec![ArcBytes::from_bytes(&[7])])],
+        shares: vec![
+            (0, vec![ArcBytes::from_bytes(&[7])]),
+            (1, vec![ArcBytes::from_bytes(&[8])]),
+        ],
         ciphertext_output: vec![ArcBytes::from_bytes(&[8])],
         params: test_params(),
     })
@@ -158,6 +161,7 @@ fn collecting_state() -> ThresholdPlaintextAggregatorState {
         ciphertext_output: test_ciphertexts()[..1].to_vec(),
         params: test_params(),
         rejected_parties: BTreeSet::new(),
+        expected_decryptors: Vec::new(),
     })
 }
 
@@ -339,7 +343,7 @@ async fn standby_persists_and_resumes_plaintext_work() -> Result<()> {
     for party in 0..2 {
         let (shares, proofs) =
             share_with_matching_commitment(&e3_id, party, &test_ciphertexts()[..1]);
-        aggregator.add_share(party, shares, proofs, &ec)?;
+        aggregator.add_share(party, shares, proofs, &[], &ec)?;
     }
     aggregator.publish_inputs_ready(ec)?;
 
@@ -380,6 +384,7 @@ async fn decryption_share_after_collection_closed_is_ignored() -> Result<()> {
         0,
         vec![ArcBytes::from_bytes(&[7])],
         vec![dummy_signed_c6_proof(&e3_id)],
+        &[],
         &test_ctx(EffectsEnabled::new()),
     )?;
 

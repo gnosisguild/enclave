@@ -384,6 +384,7 @@ pub enum InterfoldEventData {
     OperatorActivationChangedAt(OperatorActivationChangedAt),
     ConfigurationUpdatedAt(ConfigurationUpdatedAt),
     PlaintextVerificationResumed(PlaintextVerificationResumed),
+    FreshDecryptionRound(FreshDecryptionRound),
 }
 
 impl InterfoldEventData {
@@ -800,6 +801,7 @@ impl InterfoldEventData {
             InterfoldEventData::AggregationProofPending(ref data) => Some(data.e3_id.clone()),
             InterfoldEventData::AggregationProofSigned(ref data) => Some(data.e3_id.clone()),
             InterfoldEventData::PlaintextVerificationResumed(ref data) => Some(data.e3_id.clone()),
+            InterfoldEventData::FreshDecryptionRound(ref data) => Some(data.e3_id.clone()),
             InterfoldEventData::DKGRecursiveAggregationComplete(ref data) => {
                 Some(data.e3_id.clone())
             }
@@ -973,7 +975,8 @@ impl_event_types!(
     TicketBalanceUpdatedAt,
     OperatorActivationChangedAt,
     ConfigurationUpdatedAt,
-    PlaintextVerificationResumed
+    PlaintextVerificationResumed,
+    FreshDecryptionRound
 );
 
 impl TryFrom<&InterfoldEvent<Sequenced>> for InterfoldError {

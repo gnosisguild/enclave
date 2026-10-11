@@ -319,7 +319,10 @@ scalar. The key bits stay binary, and C3 still packs those bits into the largest
 `C2ChunkBatch` binds the ordered chunk
 indices and chunk commitments. C3 checks the encrypted limb-0 plaintext against the share
 commitment and the key commitment. C4 removes those bits before the aggregate commitment. C6
-opens each packed key field and evaluates that field in the decryption equation.
+opens each packed key field and evaluates that field in the decryption equation. The PRF
+digest and the `c0` prefix absorb native residues in `[0, q)`. C6 centers `L_i(0)` and
+bounds the modulus quotient with that centered coefficient. Fresh noise is one signed
+coefficient. Each CRT residue is the centered remainder of that coefficient.
 
 The chunk size is one value across the DKG pipeline: it threads from the sample into the C2 (share
 computation), C3 (share encryption), and C4 (share decryption) witness computation and into the
@@ -1429,8 +1432,10 @@ InterfoldSolReader decodes CiphertextOutputPublished event
   ├─ Shares that arrive during C6 verification remain in a durable backup queue:
   │   ├─ The in-flight batch stays unchanged
   │   ├─ Reject duplicate parties and previously excluded parties
-  │   └─ After a failed proof or raw-share commitment check, use backups and verify again
-  │       Wait for replacements if at least T+1 roster parties can still provide valid shares
+  │   └─ After a failed proof or raw-share commitment check, drop every share and proof
+  │       The new set is the lowest T+1 honest party ids that remain
+  │       FreshDecryptionRound asks those parties to compute new shares for that set
+  │       Old shares are not opened under the new set
 │
   ├─ C6 VERIFICATION (per-share, active aggregator only):
 │   ShareVerificationActor receives C6 signed proofs

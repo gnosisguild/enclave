@@ -593,13 +593,29 @@ impl ThresholdPlaintextAggregatorExtension {
         let initial_is_aggregator = load_is_active_aggregator(ctx);
 
         let repo = ctx.repositories().trbfv_plaintext(&e3_id);
-        let sync_state = repo.send(Some(ThresholdPlaintextAggregatorState::init(
+        let mut initial = ThresholdPlaintextAggregatorState::init(
             meta.threshold_m as u64,
             meta.threshold_n as u64,
             meta.seed,
             data.ciphertext_output.clone(),
             meta.params.clone(),
-        )));
+        );
+        let Ok(decryptors) = crate::workflow::threshold_plaintext_aggregation::ThresholdPlaintextAggregation::fresh_decryptor_ids(
+            &committee_addresses,
+            &honest_committee_addresses,
+            &std::collections::BTreeSet::new(),
+            meta.threshold_m as u64,
+        ) else {
+            tracing::warn!(
+                e3_id = %e3_id,
+                "Deferring ThresholdPlaintextAggregator creation: not enough honest decryptors"
+            );
+            return false;
+        };
+        if let ThresholdPlaintextAggregatorState::Collecting(collecting) = &mut initial {
+            collecting.expected_decryptors = decryptors;
+        }
+        let sync_state = repo.send(Some(initial));
         let recovery = ctx
             .repositories()
             .trbfv_plaintext_recovery(&e3_id)

@@ -16,6 +16,7 @@ use e3_fhe_params::{fresh_smudging_inputs, sample_fresh_smudging_error, BfvPrese
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_utils::utility_types::ArcBytes;
 use e3_zk_helpers::circuits::prf::decryption_mask_low_degree;
+use e3_zk_helpers::circuits::threshold::share_decryption::encode_signed_coefficients;
 use e3_zk_helpers::circuits::threshold::decrypted_shares_aggregation::utils::lagrange_coeff_at_zero;
 use fhe::bfv::Ciphertext;
 use fhe_math::rq::{Poly, PowerBasis};
@@ -38,10 +39,10 @@ pub struct CalculateDecryptionShareRequest {
     pub party_idx: u32,
     /// Strictly increasing 1-based decryptor ids.
     pub decryptors: Vec<u32>,
-    /// Outgoing PRF keys indexed by recipient.
-    pub outgoing_prf_keys: Vec<Vec<u8>>,
-    /// Incoming PRF keys indexed by sender.
-    pub incoming_prf_keys: Vec<Vec<u8>>,
+    /// Outgoing PRF keys indexed by recipient. Encrypted at rest.
+    pub outgoing_prf_keys: Vec<SensitiveBytes>,
+    /// Incoming PRF keys indexed by sender. Encrypted at rest.
+    pub incoming_prf_keys: Vec<SensitiveBytes>,
 }
 
 struct InnerRequest {
@@ -86,6 +87,8 @@ pub struct CalculateDecryptionShareResponse {
     pub d_share_poly: Vec<ArcBytes>,
     /// Fresh noise used in each share. The C6 witness must reuse these bytes.
     pub e_fresh: Vec<SensitiveBytes>,
+    /// Signed coefficients of each fresh-noise polynomial, low degree first.
+    pub e_signed: Vec<SensitiveBytes>,
     /// Digest of the sorted decryptor ids and the ciphertext bytes this share opens.
     pub context_digest: [u8; 32],
 }
@@ -93,6 +96,7 @@ pub struct CalculateDecryptionShareResponse {
 struct InnerResponse {
     pub d_share_poly: Vec<Poly<PowerBasis>>,
     pub e_fresh: Vec<Poly<PowerBasis>>,
+    pub e_signed: Vec<Vec<num_bigint::BigInt>>,
     pub context_digest: [u8; 32],
 }
 
@@ -108,6 +112,11 @@ impl InnerResponse {
                 .e_fresh
                 .into_iter()
                 .map(|p| SensitiveBytes::new(p.to_bytes(), cipher))
+                .collect::<Result<Vec<_>>>()?,
+            e_signed: self
+                .e_signed
+                .into_iter()
+                .map(|coeffs| SensitiveBytes::new(encode_signed_coefficients(&coeffs), cipher))
                 .collect::<Result<Vec<_>>>()?,
             context_digest: self.context_digest,
         })
@@ -128,8 +137,8 @@ pub fn calculate_decryption_share(
     }
     let party_idx = req.party_idx as usize;
     let decryptors = req.decryptors.clone();
-    let outgoing_prf_keys = req.outgoing_prf_keys.clone();
-    let incoming_prf_keys = req.incoming_prf_keys.clone();
+    let outgoing_prf_keys = open_prf_keys(cipher, &req.outgoing_prf_keys)?;
+    let incoming_prf_keys = open_prf_keys(cipher, &req.incoming_prf_keys)?;
     let mut digest_ids = decryptors.clone();
     digest_ids.sort_unstable();
     let context_digest = crate::calculate_threshold_decryption::decryption_context_digest(
@@ -149,6 +158,7 @@ pub fn calculate_decryption_share(
         .map_err(|error| anyhow!(error))?;
     let sk = CrtPolynomial::from_fhe_polynomial(&req.sk_poly_sum);
     let mut e_fresh = Vec::with_capacity(req.ciphertexts.len());
+    let mut e_signed = Vec::with_capacity(req.ciphertexts.len());
     for _ in 0..req.ciphertexts.len() {
         let coeffs = sample_fresh_smudging_error(
             params.clone(),
@@ -158,6 +168,7 @@ pub fn calculate_decryption_share(
             noise.lambda,
         )?;
         let polynomial = Poly::<PowerBasis>::from_bigints(&coeffs, params.context_at_level(0)?)?;
+        e_signed.push(coeffs);
         e_fresh.push(polynomial.deref().clone());
     }
 
@@ -186,9 +197,19 @@ pub fn calculate_decryption_share(
     InnerResponse {
         d_share_poly,
         e_fresh,
+        e_signed,
         context_digest,
     }
     .encrypt(cipher)
+}
+
+fn open_prf_keys(cipher: &Cipher, keys: &[SensitiveBytes]) -> Result<Vec<Vec<u8>>> {
+    keys.iter()
+        .map(|key| {
+            key.access_raw(cipher)
+                .map_err(|error| anyhow!("cannot decrypt a PRF key: {error}"))
+        })
+        .collect()
 }
 
 fn partial_decryption_share(

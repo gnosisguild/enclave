@@ -27,6 +27,8 @@ pub struct ShareDecryptionCircuitData {
     pub public_key: PublicKey,
     pub s: CrtPolynomial,
     pub e: CrtPolynomial,
+    /// Signed fresh-noise coefficients, low degree first. Each CRT residue is this integer mod q.
+    pub e_signed: Vec<num_bigint::BigInt>,
     pub d_share: CrtPolynomial,
     /// High and low 128-bit limbs of the E3 decryption domain.
     pub domain_hi: u128,

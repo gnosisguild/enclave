@@ -19,6 +19,7 @@ use crate::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_C
 use crate::compute_modulus_bit;
 use crate::compute_native_crt_coeff_bit;
 use crate::crt_polynomial_to_toml_json;
+use crate::polynomial_to_toml_json;
 use crate::decompose_residue;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuit;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuitData;
@@ -125,6 +126,10 @@ pub struct Inputs {
     pub ct1: CrtPolynomial,
     pub sk: CrtPolynomial,
     pub e_fresh: CrtPolynomial,
+    /// Signed fresh-noise coefficients in circuit order (highest degree first).
+    pub e_signed: Polynomial,
+    /// Quotients for `e_signed = e_quot * q + e_fresh`, one limb per CRT prime.
+    pub e_quot: CrtPolynomial,
     pub r1: CrtPolynomial,
     pub r2: CrtPolynomial,
     pub d: CrtPolynomial,
@@ -226,11 +231,13 @@ impl Computation for Bounds {
             // r_2j bounds: [- (q_j-1)/2 , (q_j-1)/2] (cyclotomic quotients)
             r2_bounds.push(qi_bound.clone());
 
-            // r_1j upper bound: (((q_j-1)/2)^2 * n + 4 * (q_j-1)/2) / q_j
-            // Symmetric lower bound used by range_check_2bounds. Variables: qi_bound = (q_j-1)/2,
-            // qi_bigint = q_j, n = degree.
+            // r_1j upper bound:
+            // (λ_max * ((q_j-1)/2)^2 * n + 4 * (q_j-1)/2) / q_j
+            // λ_max is (q_j-1)/2 because C6 centers L_i(0). The slack stays unscaled:
+            // fresh noise and the PRF mask are added after λ multiplies c1·sh.
+            let lambda_max = qi_bound.clone();
             r1_bounds.push(
-                (&qi_bound.clone() * &qi_bound.clone() * &n + BigInt::from(4) * &qi_bound.clone())
+                (&lambda_max * &qi_bound * &qi_bound * &n + BigInt::from(4) * &qi_bound)
                     / &qi_bigint,
             );
         }
@@ -378,12 +385,16 @@ impl Computation for Inputs {
             let d_share_hat = {
                 let ct1_s_times = ct1.mul(&s);
                 assert_eq!((ct1_s_times.coefficients().len() as u64) - 1, 2 * (n - 1));
-                let lambda = &lambdas[i];
+                let mut lambda = lambdas[i].clone();
+                let half = (&qi - BigInt::from(1)) / BigInt::from(2);
+                if lambda > half {
+                    lambda -= &qi;
+                }
                 let scaled = Polynomial::new(
                     ct1_s_times
                         .coefficients()
                         .iter()
-                        .map(|coeff| coeff * lambda)
+                        .map(|coeff| coeff * &lambda)
                         .collect(),
                 );
                 scaled.add(&e).add(&mask[i])
@@ -416,6 +427,31 @@ impl Computation for Inputs {
             d.add_limb(d_sharei);
         }
 
+        if data.e_signed.len() != n as usize {
+            return Err(CircuitsErrors::Other(format!(
+                "signed fresh noise has {} coefficients and the degree is {n}",
+                data.e_signed.len()
+            )));
+        }
+        let mut signed_coeffs = data.e_signed.clone();
+        signed_coeffs.reverse();
+        let e_signed = Polynomial::new(signed_coeffs);
+        let mut e_quot = CrtPolynomial::new(vec![]);
+        for (limb_idx, limb) in e_fresh.limbs.iter().enumerate() {
+            let q = &moduli[limb_idx];
+            let mut quot_coeffs = Vec::with_capacity(n as usize);
+            for (coeff, residue) in e_signed.coefficients().iter().zip(limb.coefficients()) {
+                let diff = coeff - residue;
+                if !(&diff % q).is_zero() {
+                    return Err(CircuitsErrors::Other(
+                        "Fresh noise residue does not match the signed coefficient".into(),
+                    ));
+                }
+                quot_coeffs.push(&diff / q);
+            }
+            e_quot.add_limb(Polynomial::new(quot_coeffs));
+        }
+
         // Compute commitments to s and e (matches circuit's commitment functions)
         let modulus_bit = compute_modulus_bit(&threshold_params);
         let expected_sk_commitment = compute_aggregated_shares_commitment(&sk, modulus_bit);
@@ -438,6 +474,8 @@ impl Computation for Inputs {
             ct1,
             sk,
             e_fresh,
+            e_signed,
+            e_quot,
             r1,
             r2,
             d,
@@ -459,6 +497,8 @@ impl Computation for Inputs {
         let ct1 = crt_polynomial_to_toml_json(&self.ct1);
         let sk = crt_polynomial_to_toml_json(&self.sk);
         let e_fresh = crt_polynomial_to_toml_json(&self.e_fresh);
+        let e_signed = polynomial_to_toml_json(&self.e_signed);
+        let e_quot = crt_polynomial_to_toml_json(&self.e_quot);
         let r1 = crt_polynomial_to_toml_json(&self.r1);
         let r2 = crt_polynomial_to_toml_json(&self.r2);
         let d = crt_polynomial_to_toml_json(&self.d);
@@ -499,6 +539,8 @@ impl Computation for Inputs {
             "ct1": ct1,
             "sk": sk,
             "e_fresh": e_fresh,
+            "e_signed": e_signed,
+            "e_quot": e_quot,
             "r1": r1,
             "r2": r2,
             "d": d,
@@ -520,11 +562,69 @@ impl Computation for Inputs {
     }
 }
 
+/// Encode signed coefficients as a length-prefixed list of little-endian two's-complement bytes.
+pub fn encode_signed_coefficients(coeffs: &[BigInt]) -> Vec<u8> {
+    let mut out = Vec::new();
+    let count = u32::try_from(coeffs.len()).expect("signed noise coefficient count fits u32");
+    out.extend_from_slice(&count.to_le_bytes());
+    for coeff in coeffs {
+        let bytes = coeff.to_signed_bytes_le();
+        let len = u32::try_from(bytes.len()).expect("signed noise coefficient length fits u32");
+        out.extend_from_slice(&len.to_le_bytes());
+        out.extend_from_slice(&bytes);
+    }
+    out
+}
+
+/// Decode coefficients written by [`encode_signed_coefficients`].
+pub fn decode_signed_coefficients(bytes: &[u8]) -> Result<Vec<BigInt>, String> {
+    if bytes.len() < 4 {
+        return Err("signed noise encoding is too short".into());
+    }
+    let count = u32::from_le_bytes(bytes[0..4].try_into().expect("4 bytes")) as usize;
+    let mut offset = 4;
+    let mut coeffs = Vec::with_capacity(count);
+    for _ in 0..count {
+        if offset + 4 > bytes.len() {
+            return Err("signed noise encoding ended early".into());
+        }
+        let len = u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("4 bytes")) as usize;
+        offset += 4;
+        if offset + len > bytes.len() {
+            return Err("signed noise coefficient ended early".into());
+        }
+        coeffs.push(BigInt::from_signed_bytes_le(&bytes[offset..offset + len]));
+        offset += len;
+    }
+    if offset != bytes.len() {
+        return Err("signed noise encoding has trailing bytes".into());
+    }
+    Ok(coeffs)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use e3_fhe_params::DEFAULT_BFV_PRESET;
+
+    #[test]
+    fn r1_bound_includes_centered_lagrange() {
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold, &()).unwrap();
+        let bits = Bits::compute(BfvPreset::InsecureThreshold, &bounds).unwrap();
+        assert!(
+            bits.r1_bit > 100,
+            "centered Lagrange must widen the r1 bound, got {} bits",
+            bits.r1_bit
+        );
+    }
+
+    #[test]
+    fn signed_noise_encoding_round_trips() {
+        let coeffs = vec![BigInt::from(0), BigInt::from(-3), BigInt::from(1) << 80];
+        let decoded = decode_signed_coefficients(&encode_signed_coefficients(&coeffs)).unwrap();
+        assert_eq!(decoded, coeffs);
+    }
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {

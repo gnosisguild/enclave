@@ -7,8 +7,8 @@
 //! Poseidon2 PRF used by synchronized decryption.
 //!
 //! The absorb order matches `fhe.rs` `trbfv::prf`: party ids are 1-based, and
-//! ciphertext coefficients are absorbed low degree first. Circuit polynomials
-//! store the highest degree first.
+//! ciphertext coefficients are absorbed low degree first as residues in `[0, q)`.
+//! Circuit polynomials store the highest degree first and use centered residues.
 
 use crate::math::commitments::compute_packed_prf_key_commitment;
 use crate::math::modulo::U64::ModU64;
@@ -33,15 +33,23 @@ pub global DS_PRF_EVAL: [u8; 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
+/// Map a centered residue in `(-q/2, q/2]` to the native residue in `[0, q)`.
+pub fn native_residue(centered: Field, q: Field) -> Field {
+    let half = (q - 1) / 2;
+    let shifted = centered + half;
+    if (shifted as u128) < (half as u128) { centered + q } else { centered }
+}
+
 fn append_ciphertext_poly<let N: u32, let L: u32>(
     mut input: [Field],
     poly: [Polynomial<N>; L],
+    qis: [Field; L],
 ) -> [Field] {
     input = input.push_back(L as Field);
     input = input.push_back(N as Field);
     for row in 0..L {
         for col in 0..N {
-            input = input.push_back(poly[row].coefficients[N - 1 - col]);
+            input = input.push_back(native_residue(poly[row].coefficients[N - 1 - col], qis[row]));
         }
     }
     input
@@ -52,6 +60,7 @@ pub fn prf_context_digest<let N: u32, let L: u32, let H: u32>(
     decryptors: [Field; H],
     ct0: [Polynomial<N>; L],
     ct1: [Polynomial<N>; L],
+    qis: [Field; L],
 ) -> [Field; 2] {
     let absorb_len: u32 = H + 7 + (2 * L * N);
     let mut input: [Field] = [H as Field].as_vector();
@@ -60,8 +69,8 @@ pub fn prf_context_digest<let N: u32, let L: u32, let H: u32>(
     }
     input = input.push_back(0);
     input = input.push_back(2);
-    input = append_ciphertext_poly(input, ct0);
-    input = append_ciphertext_poly(input, ct1);
+    input = append_ciphertext_poly(input, ct0, qis);
+    input = append_ciphertext_poly(input, ct1, qis);
     assert(input.len() as u32 == absorb_len, "PRF context length mismatch");
 
     let mut sponge = SafeSponge::start([ABSORB_FLAG | absorb_len, 2], DS_PRF_CTX);
@@ -158,7 +167,7 @@ pub fn prf_decryption_mask<let N: u32, let L: u32, let N_PARTIES: u32, let H: u3
     let self_id = (party_idx + 1) as Field;
     assert(party_in_set(decryptors, self_id), "Party is outside the decryptor set");
 
-    let digest = prf_context_digest(decryptors, ct0, ct1);
+    let digest = prf_context_digest(decryptors, ct0, ct1, qis);
     let mut mask: [Polynomial<N>; L] = [Polynomial::new([0; N]); L];
 
     for other in 0..N_PARTIES {

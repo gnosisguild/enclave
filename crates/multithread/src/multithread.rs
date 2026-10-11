@@ -1295,6 +1295,22 @@ fn handle_threshold_share_decryption_proof(
         )
         .map_err(|e| make_zk_error(&request, format!("e_fresh[{i}] decrypt: {e}")))?;
         let e = CrtPolynomial::from_fhe_polynomial(&noise);
+        if req.e_signed.len() < num_indices {
+            return Err(make_zk_error(
+                &request,
+                format!(
+                    "e_signed too short: {} < {num_indices}",
+                    req.e_signed.len()
+                ),
+            ));
+        }
+        let signed_bytes = req.e_signed[i]
+            .access_raw(cipher)
+            .map_err(|e| make_zk_error(&request, format!("e_signed[{i}] decrypt: {e}")))?;
+        let e_signed = e3_zk_helpers::circuits::threshold::share_decryption::decode_signed_coefficients(
+            &signed_bytes,
+        )
+        .map_err(|e| make_zk_error(&request, format!("e_signed[{i}] decode: {e}")))?;
 
         // Deserialize d_share → Poly → CrtPolynomial
         let d_share_poly = try_poly_pb_from_bytes(&req.d_share_bytes[i], &threshold_params)
@@ -1313,6 +1329,7 @@ fn handle_threshold_share_decryption_proof(
             public_key: public_key.clone(),
             s: s.clone(),
             e,
+            e_signed,
             d_share,
             domain_hi: domain.hi,
             domain_lo: domain.lo,
