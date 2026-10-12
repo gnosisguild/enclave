@@ -353,24 +353,23 @@ mod tests {
     /// ever tightened beyond it, this test fails.
     #[test]
     fn test_secure_16384_smudging_bound_feasible() {
-        use fhe::trbfv::{SmudgingConfig, SmudgingNoiseGenerator};
-        use num_traits::Zero;
+        use fhe::trbfv::{Lambda, SmudgingBoundCalculator, SmudgingBoundCalculatorConfig};
 
         let preset = BfvPreset::SecureThreshold16384;
         let params = build_bfv_params_from_set_arc(BfvParamSet::from(preset));
         let defaults = preset.search_defaults().unwrap();
 
-        let mut config = SmudgingConfig::new(
-            params.clone(),
+        let config = SmudgingBoundCalculatorConfig::new_multiplicative(
+            params,
             defaults.n as usize,
             defaults.z as usize,
-            defaults.lambda as usize,
+            defaults.mult_depth,
+            Lambda::insecure(defaults.lambda as usize),
         )
         .expect("config construction should succeed");
-        config.mult_depth = defaults.mult_depth;
-        let generator = SmudgingNoiseGenerator::new(config)
+        let bound = SmudgingBoundCalculator::new(config)
+            .calculate_sm_bound()
             .expect("2*(B_C + n*B_sm) < Delta must hold at the configured depth");
-        let bound = generator.smudging_bound();
-        assert!(!bound.is_zero());
+        assert!(bound > num_bigint::BigUint::from(0u32));
     }
 }

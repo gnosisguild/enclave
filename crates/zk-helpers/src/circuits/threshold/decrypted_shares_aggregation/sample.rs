@@ -19,13 +19,14 @@ use crate::{
 };
 use e3_fhe_params::{
     build_pair_for_preset, create_deterministic_crp_from_default_seed, generate_smudging_error,
-    BfvPreset,
+    smudging_noise_from_signed_coefficients, BfvPreset,
 };
 use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::{AggregateIter, PublicKeyShare};
-use fhe::trbfv::{
-    AggregatedSecretKeyShare, AggregatedSmudgingShare, SecretKeyShare, ShareManager, SmudgingShare,
+use fhe::trbfv::synchronized::{
+    PartyPrfKeyTransport, PartyPrfKeys, SynchronizedDecryptor,
 };
+use fhe::trbfv::ShareManager;
 use fhe_math::rq::{Poly, PowerBasis};
 use fhe_traits::FheDecoder;
 use fhe_traits::{FheEncoder, FheEncrypter};
@@ -35,11 +36,8 @@ use std::sync::Arc;
 struct Party {
     pk_share: PublicKeyShare,
     sk_sss: Vec<Array2<u64>>,
-    esi_sss: Vec<Array2<u64>>,
     sk_sss_collected: Vec<Array2<u64>>,
-    es_sss_collected: Vec<Array2<u64>>,
-    sk_aggregate: Option<AggregatedSecretKeyShare>,
-    esi_aggregate: Option<AggregatedSmudgingShare>,
+    sk_aggregate: Option<Poly<PowerBasis>>,
 }
 
 impl DecryptedSharesAggregationCircuitData {
@@ -82,7 +80,7 @@ impl DecryptedSharesAggregationCircuitData {
                         ))
                     })?;
 
-                let share_manager = ShareManager::new(
+                let mut share_manager = ShareManager::new(
                     num_parties,
                     threshold,
                     threshold_params.clone(),
@@ -100,49 +98,17 @@ impl DecryptedSharesAggregationCircuitData {
                     })?;
 
                 let sk_sss = share_manager
-                    .generate_secret_key_shares(sk_poly, &mut rng)
-                    .map(|shares| shares.into_transport())
+                    .generate_secret_shares_from_poly(sk_poly, &mut rng)
                     .map_err(|e| {
                         CircuitsErrors::Sample(format!("Failed to generate secret shares: {:?}", e))
                     })?;
 
-                let esi_coeffs = generate_smudging_error(
-                    threshold_params.clone(),
-                    num_parties,
-                    sd.z as usize,
-                    sd.mult_depth,
-                    lambda,
-                    &mut rng,
-                )
-                .map_err(|e| {
-                    CircuitsErrors::Sample(format!("Failed to generate smudging error: {:?}", e))
-                })?;
-                let esi_poly = Poly::from_bigints(
-                    &esi_coeffs,
-                    threshold_params.context_at_level(0).map_err(|e| {
-                        CircuitsErrors::Sample(format!("Failed to get BFV context: {:?}", e))
-                    })?,
-                )
-                .map_err(|e| {
-                    CircuitsErrors::Sample(format!("Failed to convert error to poly: {:?}", e))
-                })?;
-                let esi_sss = share_manager
-                    .generate_secret_key_shares(esi_poly, &mut rng)
-                    .map(|shares| shares.into_transport())
-                    .map_err(|e| {
-                        CircuitsErrors::Sample(format!("Failed to generate error shares: {:?}", e))
-                    })?;
-
                 let sk_sss_collected = Vec::with_capacity(num_parties);
-                let es_sss_collected = Vec::with_capacity(num_parties);
                 Ok(Party {
                     pk_share,
                     sk_sss,
-                    esi_sss,
                     sk_sss_collected,
-                    es_sss_collected,
                     sk_aggregate: None,
-                    esi_aggregate: None,
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -169,25 +135,6 @@ impl DecryptedSharesAggregationCircuitData {
                 .map_err(|e| {
                     CircuitsErrors::Sample(format!("Failed to collect sk_sss_collected: {:?}", e))
                 })?;
-            parties[i].es_sss_collected = (0..num_parties)
-                .map(|j| {
-                    let data: Vec<u64> = (0..num_moduli)
-                        .flat_map(|m| {
-                            parties[j].esi_sss[m]
-                                .row(i)
-                                .iter()
-                                .copied()
-                                .collect::<Vec<_>>()
-                        })
-                        .collect();
-                    Array2::from_shape_vec((num_moduli, degree), data).map_err(|e| {
-                        CircuitsErrors::Sample(format!("es_sss_collected shape: {:?}", e))
-                    })
-                })
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| {
-                    CircuitsErrors::Sample(format!("Failed to collect es_sss_collected: {:?}", e))
-                })?;
         }
 
         // Aggregate collected shares to get sk_poly_sum and es_poly_sum per party
@@ -198,29 +145,7 @@ impl DecryptedSharesAggregationCircuitData {
                 })?;
             party.sk_aggregate = Some(
                 share_manager
-                    .aggregate_secret_key_shares(
-                        party
-                            .sk_sss_collected
-                            .drain(..)
-                            .map(SecretKeyShare::from_transport)
-                            .collect(),
-                    )
-                    .map_err(|e| {
-                        CircuitsErrors::Sample(format!(
-                            "Failed to aggregate collected shares: {:?}",
-                            e
-                        ))
-                    })?,
-            );
-            party.esi_aggregate = Some(
-                share_manager
-                    .aggregate_smudging_shares(
-                        party
-                            .es_sss_collected
-                            .drain(..)
-                            .map(SmudgingShare::from_transport)
-                            .collect(),
-                    )
+                    .aggregate_collected_shares(&party.sk_sss_collected)
                     .map_err(|e| {
                         CircuitsErrors::Sample(format!(
                             "Failed to aggregate collected shares: {:?}",
@@ -262,45 +187,67 @@ impl DecryptedSharesAggregationCircuitData {
 
         // Decryption shares from T+1 parties (1-based party IDs)
         let honest_parties = threshold + 1;
-        let mut d_share_polys: Vec<Poly<PowerBasis>> = Vec::with_capacity(honest_parties);
-
-        for party in parties.iter_mut().take(honest_parties) {
-            let share_manager = ShareManager::new(num_parties, threshold, threshold_params.clone())
-                .map_err(|e| {
-                    CircuitsErrors::Sample(format!("Failed to create ShareManager: {:?}", e))
-                })?;
-            let d_share = share_manager
+        let decryptor_ids: Vec<usize> = (1..=honest_parties).collect();
+        let decryptor =
+            SynchronizedDecryptor::new(num_parties, threshold, threshold_params.clone()).map_err(
+                |e| CircuitsErrors::Sample(format!("Failed to create decryptor: {:?}", e)),
+            )?;
+        let mut decryption_shares = Vec::with_capacity(honest_parties);
+        for (offset, party) in parties.iter().take(honest_parties).enumerate() {
+            let party_id = offset + 1;
+            let prf_keys = sample_prf_keys(party_id, num_parties).map_err(|e| {
+                CircuitsErrors::Sample(format!("Failed to build PRF keys: {:?}", e))
+            })?;
+            let sk = party.sk_aggregate.as_ref().ok_or_else(|| {
+                CircuitsErrors::Sample("missing aggregated secret-key share".into())
+            })?;
+            let coeffs = generate_smudging_error(
+                threshold_params.clone(),
+                num_parties,
+                sd.z as usize,
+                sd.mult_depth,
+                lambda,
+                &mut rng,
+            )
+            .map_err(|e| {
+                CircuitsErrors::Sample(format!("Failed to generate smudging error: {:?}", e))
+            })?;
+            let noise = smudging_noise_from_signed_coefficients(
+                threshold_params.clone(),
+                num_parties,
+                sd.z as usize,
+                sd.mult_depth,
+                lambda,
+                &coeffs,
+            )
+            .map_err(|e| {
+                CircuitsErrors::Sample(format!("Failed to wrap smudging noise: {:?}", e))
+            })?;
+            let share = decryptor
                 .decryption_share(
-                    Arc::clone(&ciphertext),
-                    party.sk_aggregate.as_ref().ok_or_else(|| {
-                        CircuitsErrors::Sample("missing aggregated secret-key share".into())
-                    })?,
-                    party.esi_aggregate.take().ok_or_else(|| {
-                        CircuitsErrors::Sample("missing aggregated smudging share".into())
-                    })?,
+                    &ciphertext,
+                    &sk.clone().into_ntt(),
+                    party_id,
+                    &decryptor_ids,
+                    noise,
+                    &prf_keys,
                 )
                 .map_err(|e| {
                     CircuitsErrors::Sample(format!("Failed to compute decryption share: {:?}", e))
                 })?;
-            d_share_polys.push(d_share);
+            decryption_shares.push(share);
         }
 
-        let reconstructing_parties: Vec<usize> = (1..=honest_parties).collect();
-
-        // Threshold decrypt to obtain message (verify)
-        let share_manager = ShareManager::new(num_parties, threshold, threshold_params.clone())
-            .map_err(|e| {
-                CircuitsErrors::Sample(format!("Failed to create ShareManager: {:?}", e))
-            })?;
-        let plaintext = share_manager
-            .decrypt_from_shares(
-                d_share_polys.clone(),
-                reconstructing_parties.clone(),
-                Arc::clone(&ciphertext),
-            )
+        let reconstructing_parties: Vec<usize> = decryptor_ids.clone();
+        let plaintext = decryptor
+            .decrypt_from_shares(&decryption_shares, &ciphertext)
             .map_err(|e| {
                 CircuitsErrors::Sample(format!("Failed to decrypt from shares: {:?}", e))
             })?;
+        let d_share_polys: Vec<Poly<PowerBasis>> = decryption_shares
+            .into_iter()
+            .map(|share| share.into_parts().0)
+            .collect();
 
         let message_vec = Vec::<u64>::try_decode(&plaintext, Encoding::poly())
             .map_err(|e| CircuitsErrors::Sample(format!("Failed to decode plaintext: {:?}", e)))?;
@@ -313,6 +260,28 @@ impl DecryptedSharesAggregationCircuitData {
             ct0: ciphertext[0].clone().into_power_basis(),
         })
     }
+}
+
+fn sample_prf_keys(party_id: usize, committee_size: usize) -> Result<PartyPrfKeys, fhe::Error> {
+    let directed = |from: usize, to: usize| {
+        let mut key = [0u8; 32];
+        key[0] = u8::try_from(from).unwrap_or(255);
+        key[1] = u8::try_from(to).unwrap_or(255);
+        key[2] = 1;
+        key
+    };
+    let keys_i_j = (1..=committee_size)
+        .map(|peer| directed(party_id, peer))
+        .collect();
+    let keys_j_i = (1..=committee_size)
+        .map(|peer| directed(peer, party_id))
+        .collect();
+    PartyPrfKeys::from_transport(PartyPrfKeyTransport::new(
+        party_id,
+        committee_size,
+        keys_i_j,
+        keys_j_i,
+    )?)
 }
 
 #[cfg(test)]

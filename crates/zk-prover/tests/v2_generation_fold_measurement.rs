@@ -27,7 +27,7 @@ use e3_zk_prover::{
     Provable, ZkBackend, ZkProver,
 };
 use fhe::bfv::{CommonRandomPolyVec, SecretKey};
-use fhe::trlbfv::{PublicKeyShare, RelinKeyShare};
+use e3_zk_helpers::unsupported_lbfv::{PublicKeyShare, RelinKeyShare};
 
 const ARTIFACT_ROOT_ENV: &str = "INTERFOLD_SECURE_16384_ARTIFACTS";
 const ARTIFACTS_DIR: &str = "secure-16384/minimum";

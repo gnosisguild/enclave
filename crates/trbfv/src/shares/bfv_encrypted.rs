@@ -122,9 +122,12 @@ impl BfvEncryptedShare {
             let pt = Plaintext::try_encode(&share_vec, Encoding::poly(), params)
                 .context("Failed to encode share as plaintext")?;
 
-            let (ct, u_rns, e0_rns, e1_rns) = recipient_pk
-                .try_encrypt_extended(&pt, rng)
+            let (ct, intermediates) = recipient_pk
+                .try_encrypt_with_intermediates(&pt, rng)
                 .context("Failed to encrypt share (extended)")?;
+            let u_rns = intermediates.randomness().clone();
+            let e0_rns = intermediates.error_0().clone();
+            let e1_rns = intermediates.error_1().clone();
 
             ciphertexts.push(ArcBytes::from_bytes(&ct.to_bytes()));
             witnesses.push(BfvEncryptionWitness {

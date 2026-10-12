@@ -19,8 +19,6 @@ use e3_fhe_params::{
 use e3_polynomial::CrtPolynomial;
 use fhe::bfv::SecretKey;
 use fhe::mbfv::PublicKeyShare;
-use fhe_math::rq::{Poly, PowerBasis};
-use std::ops::Deref;
 
 impl PkGenerationCircuitData {
     pub fn generate_sample(
@@ -36,10 +34,13 @@ impl PkGenerationCircuitData {
         let secret_key = SecretKey::random(&threshold_params, &mut rng);
         let crp = create_deterministic_crp_from_default_seed(&threshold_params);
 
-        let (pk0_share, _, sk, e) =
-            PublicKeyShare::new_extended(&secret_key, crp.clone(), &mut rng).map_err(|e| {
-                CircuitsErrors::Sample(format!("Failed to create public key share: {:?}", e))
-            })?;
+        let (pk_share, intermediates) =
+            PublicKeyShare::new_with_intermediates(&secret_key, crp.clone(), &mut rng).map_err(
+                |e| CircuitsErrors::Sample(format!("Failed to create public key share: {:?}", e)),
+            )?;
+        let pk0_share = pk_share.p0_share().clone();
+        let sk = intermediates.secret_key().clone();
+        let e = intermediates.error().clone();
 
         let num_parties = committee.n;
 

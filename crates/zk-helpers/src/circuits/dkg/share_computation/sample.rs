@@ -34,7 +34,7 @@ impl ShareComputationCircuitData {
         })?;
         let mut rng = rand::rng();
 
-        let share_manager =
+        let mut share_manager =
             ShareManager::new(committee.n, committee.threshold, threshold_params.clone()).map_err(
                 |e| CircuitsErrors::Sample(format!("Failed to create ShareManager: {:?}", e)),
             )?;
@@ -59,8 +59,7 @@ impl ShareComputationCircuitData {
                     })?;
 
                 let sk_sss_u64 = share_manager
-                    .generate_secret_key_shares(sk_poly.clone(), &mut rng)
-                    .map(|shares| shares.into_transport())
+                    .generate_secret_shares_from_poly(sk_poly, &mut rng)
                     .map_err(|e| {
                         CircuitsErrors::Sample(format!("Failed to generate secret shares: {:?}", e))
                     })?;
@@ -102,19 +101,20 @@ impl ShareComputationCircuitData {
                     CircuitsErrors::Sample(format!("Failed to generate smudging error: {:?}", e))
                 })
                 .unwrap();
-                let esi_poly =
-                    Poly::from_bigints(&esi_coeffs, threshold_params.context_at_level(0).unwrap())
-                        .unwrap();
-                let esi_sss_u64 = share_manager
-                    .generate_secret_key_shares(esi_poly.clone(), &mut rng)
-                    .map(|shares| shares.into_transport())
-                    .map_err(|e| {
-                        CircuitsErrors::Sample(format!("Failed to generate error shares: {:?}", e))
+                let esi_poly = Poly::<fhe_math::rq::PowerBasis>::from_bigints(
+                    &esi_coeffs,
+                    threshold_params.context_at_level(0).unwrap(),
+                )
+                .unwrap();
+                let secret_sss: SecretShares = esi_poly
+                    .coefficients()
+                    .outer_iter()
+                    .map(|row| {
+                        let values = row.to_vec();
+                        let matrix = ndarray::Array2::from_shape_vec((1, values.len()), values)
+                            .expect("noise row matches its length");
+                        array2_u64_to_bigint(&matrix)
                     })
-                    .unwrap();
-                let secret_sss: SecretShares = esi_sss_u64
-                    .into_iter()
-                    .map(|arr| array2_u64_to_bigint(&arr))
                     .collect();
 
                 let mut secret_crt =

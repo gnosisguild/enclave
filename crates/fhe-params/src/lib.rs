@@ -40,5 +40,5 @@ pub use prf_key::{
 };
 pub use smudging::{
     calculate_smudging_bound, fresh_smudging_inputs, generate_smudging_error,
-    sample_fresh_smudging_error, FreshSmudgingInputs,
+    sample_fresh_smudging_error, smudging_noise_from_signed_coefficients, FreshSmudgingInputs,
 };

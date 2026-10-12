@@ -19,11 +19,9 @@ use fhe::{
     mbfv::{CommonRandomPoly, PublicKeyShare},
     trbfv::ShareManager,
 };
-use fhe_math::rq::{Poly, PowerBasis};
 use fhe_traits::Serialize as FheSerialize;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
 use tracing::info;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -126,26 +124,21 @@ pub fn gen_pk_share_and_sk_sss<R: RngCore + CryptoRng>(
         num_ciphernodes, threshold
     );
     let sk_share = SecretKey::random(&params, rng);
-    let (pk0_share, _, _, eek) = PublicKeyShare::new_extended(&sk_share, crp.clone(), rng)?;
-
-    let pk_share = PublicKeyShare::deserialize(&pk0_share.to_bytes(), &params, crp.clone())?;
+    let (pk_share, intermediates) =
+        PublicKeyShare::new_with_intermediates(&sk_share, crp.clone(), rng)?;
     let _ = (req.lambda, req.num_ciphertexts, req.mult_depth);
 
-    let pk0_share_raw = ArcBytes::from_bytes(&pk0_share.to_bytes());
-    let eek_raw = ArcBytes::from_bytes(&eek.to_bytes());
+    let pk0_share_raw = ArcBytes::from_bytes(&pk_share.p0_share().to_bytes());
+    let eek_raw = ArcBytes::from_bytes(&intermediates.error().to_bytes());
 
-    let share_manager =
+    let mut share_manager =
         ShareManager::new(num_ciphernodes as usize, threshold as usize, params.clone())?;
 
     let sk_poly = share_manager.coeffs_to_poly_level0(sk_share.coeffs.clone().as_ref())?;
     let sk_raw = ArcBytes::from_bytes(&sk_poly.to_bytes());
 
-    info!("gen_pk_share_and_sk_sss:generate_secret_key_shares...");
-    let sk_sss = SharedSecret::from(
-        share_manager
-            .generate_secret_key_shares(sk_poly, rng)?
-            .into_transport(),
-    );
+    info!("gen_pk_share_and_sk_sss:generate_secret_shares_from_poly...");
+    let sk_sss = SharedSecret::from(share_manager.generate_secret_shares_from_poly(sk_poly, rng)?);
 
     (
         InnerResponse {

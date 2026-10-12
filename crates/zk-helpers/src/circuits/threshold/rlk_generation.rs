@@ -22,7 +22,7 @@ use e3_committee_hash::LbfvProofDomainContext;
 use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, lbfv_urs_seed, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use fhe::bfv::{BfvParameters, CommonRandomPolyVec, SecretKey};
-use fhe::trlbfv::{PublicKeyShare, RelinKeyShare, RlkWitness};
+use crate::unsupported_lbfv::{PublicKeyShare, RelinKeyShare, RlkWitness};
 use fhe_math::rns::RnsContext;
 use fhe_math::rq::Context;
 use num_bigint::{BigInt, BigUint};
@@ -924,9 +924,9 @@ mod tests {
     use crate::CiphernodesCommitteeSize;
     use fhe::aggregate::AggregateIter;
     use fhe::bfv::{BfvParametersBuilder, Encoding, Plaintext};
-    use fhe::trlbfv::{aggregate_relinearization_key, LBFVPublicKey, PublicKeyShare};
+    use crate::unsupported_lbfv::{aggregate_relinearization_key, LBFVPublicKey, PublicKeyShare};
     use fhe_traits::{
-        DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter, Serialize,
+        FheDecoder, FheDecrypter, FheEncoder,
     };
     use rand::rng;
 

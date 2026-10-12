@@ -8,7 +8,8 @@
 
 use crate::BfvPreset;
 use fhe::bfv::BfvParameters;
-use fhe::trbfv::{SmudgingConfig, SmudgingNoiseGenerator};
+use fhe::trbfv::synchronized::{SmudgingNoise, SmudgingNoiseGenerator};
+use fhe::trbfv::{Lambda, SmudgingBoundCalculator, SmudgingBoundCalculatorConfig};
 use fhe_math::rq::sample_uniform_coefficients_bigint;
 use num_bigint::BigInt;
 use num_bigint::BigUint;
@@ -59,9 +60,8 @@ pub fn sample_fresh_smudging_error(
 
 /// Generate centered smudging coefficients for one threshold-BFV operation.
 ///
-/// The upstream generator owns its sampled polynomial so that callers cannot reuse it. The
-/// circuit witness path also needs the coefficient form, so this helper samples with the same
-/// validated bound and canonical uniform sampler before the polynomial is dealt into shares.
+/// The circuit witness keeps these integers. [`smudging_noise_from_signed_coefficients`] wraps
+/// the same integers for one synchronized partial decryption.
 pub fn generate_smudging_error<R: RngCore + CryptoRng>(
     params: Arc<BfvParameters>,
     n: usize,
@@ -70,15 +70,37 @@ pub fn generate_smudging_error<R: RngCore + CryptoRng>(
     lambda: usize,
     rng: &mut R,
 ) -> Result<Vec<BigInt>, fhe::Error> {
-    let mut config = SmudgingConfig::new(params.clone(), n, num_ciphertexts, lambda)?;
-    config.mult_depth = mult_depth;
-    let generator = SmudgingNoiseGenerator::new(config)?;
-    let bound = BigInt::from(generator.smudging_bound().clone());
+    let bound = BigInt::from(calculate_smudging_bound(
+        params.clone(),
+        n,
+        num_ciphertexts,
+        mult_depth,
+        lambda,
+    )?);
     Ok(sample_uniform_coefficients_bigint(
         &bound,
         params.degree(),
         rng,
     ))
+}
+
+/// Wrap one sampled coefficient vector as synchronized decryption noise.
+pub fn smudging_noise_from_signed_coefficients(
+    params: Arc<BfvParameters>,
+    n: usize,
+    num_ciphertexts: usize,
+    mult_depth: u32,
+    lambda: usize,
+    coeffs: &[BigInt],
+) -> Result<SmudgingNoise, fhe::Error> {
+    let generator = SmudgingNoiseGenerator::new(bound_config(
+        params,
+        n,
+        num_ciphertexts,
+        mult_depth,
+        lambda,
+    )?)?;
+    generator.from_signed_coefficients(coeffs)
 }
 
 /// Calculate the smudging bound for one threshold-BFV operation.
@@ -89,11 +111,31 @@ pub fn calculate_smudging_bound(
     mult_depth: u32,
     lambda: usize,
 ) -> Result<BigUint, fhe::Error> {
-    let mut config = SmudgingConfig::new(params, n, num_ciphertexts, lambda)?;
-    config.mult_depth = mult_depth;
-    Ok(SmudgingNoiseGenerator::new(config)?
-        .smudging_bound()
-        .clone())
+    Ok(SmudgingBoundCalculator::new(bound_config(
+        params,
+        n,
+        num_ciphertexts,
+        mult_depth,
+        lambda,
+    )?)
+    .calculate_sm_bound()?)
+}
+
+fn bound_config(
+    params: Arc<BfvParameters>,
+    n: usize,
+    num_ciphertexts: usize,
+    mult_depth: u32,
+    lambda: usize,
+) -> Result<SmudgingBoundCalculatorConfig, fhe::Error> {
+    let lambda = Lambda::secure(lambda).unwrap_or_else(|_| Lambda::insecure(lambda));
+    SmudgingBoundCalculatorConfig::new_multiplicative(
+        params,
+        n,
+        num_ciphertexts,
+        mult_depth,
+        lambda,
+    )
 }
 
 #[cfg(test)]
@@ -153,11 +195,22 @@ mod tests {
                 .unwrap_or_else(|error| {
                     panic!("{preset:?} {committee} smudging bound: {error}")
                 });
-                assert_eq!(
-                    bound,
-                    noir_field(&smudging, constant),
-                    "{preset:?} {committee} fresh-noise bound"
+                let compiled = noir_field(&smudging, constant);
+                assert!(
+                    bound <= compiled,
+                    "{preset:?} {committee} sampler bound exceeds the compiled C6 bound"
                 );
+                if preset == BfvPreset::SecureThreshold16384 {
+                    // The fhe.rs calculator is slightly tighter than the compiled constant.
+                    // A sample from this bound still satisfies the C6 check.
+                    let gap = &compiled - &bound;
+                    assert!(
+                        &gap * BigUint::from(1_000_000_000_000_000_u64) < compiled,
+                        "{preset:?} {committee} sampler bound drifted from the compiled C6 bound"
+                    );
+                } else {
+                    assert_eq!(bound, compiled, "{preset:?} {committee} fresh-noise bound");
+                }
             }
         }
     }

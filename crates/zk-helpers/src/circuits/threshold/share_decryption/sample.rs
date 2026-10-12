@@ -15,8 +15,6 @@
 //! `xi must equal xi_hat reduced into R_qi`. `test_d_commitment_matches_inputs_compute`
 //! fails when the sample stores that polynomial.
 
-use std::sync::Arc;
-
 use crate::{
     threshold::share_decryption::ShareDecryptionCircuitData, CiphernodesCommittee, CircuitsErrors,
 };
@@ -91,7 +89,7 @@ impl ShareDecryptionCircuitData {
         // - Party 0 collects shares from other parties (including themselves)
         // - When party 0 computes a decryption share, they aggregate all collected shares
 
-        let share_manager = ShareManager::new(num_parties, threshold, threshold_params.clone())
+        let mut share_manager = ShareManager::new(num_parties, threshold, threshold_params.clone())
             .map_err(|e| {
                 CircuitsErrors::Sample(format!("Failed to create ShareManager: {:?}", e))
             })?;
@@ -99,7 +97,6 @@ impl ShareDecryptionCircuitData {
         // Generate shares for each party's secret key
         // In reality, each party would do this independently
         let mut all_party_sk_shares = Vec::new(); // [party][modulus][receiver][coefficient]
-        let mut all_party_esi_shares = Vec::new(); // [party][modulus][receiver][coefficient]
 
         for party_sk in party_secret_keys.iter().take(num_parties) {
             let sk = &party_sk;
@@ -109,52 +106,19 @@ impl ShareDecryptionCircuitData {
                     CircuitsErrors::Sample(format!("Failed to convert SK coeffs to poly: {:?}", e))
                 })?;
 
-            let sk_sss = share_manager
-                .generate_secret_key_shares(sk_poly, &mut rng)
-                .map(|shares| shares.into_transport())
-                .map_err(|e| {
-                    CircuitsErrors::Sample(format!("Failed to generate SK shares: {:?}", e))
-                })?;
+            let sk_sss = share_manager.generate_secret_shares_from_poly(sk_poly, &mut rng).map_err(
+                |e| CircuitsErrors::Sample(format!("Failed to generate SK shares: {:?}", e)),
+            )?;
 
             all_party_sk_shares.push(sk_sss);
-
-            let esi_coeffs = generate_smudging_error(
-                threshold_params.clone(),
-                num_parties,
-                num_ciphertexts,
-                sd.mult_depth,
-                lambda,
-                &mut rng,
-            )
-            .map_err(|e| {
-                CircuitsErrors::Sample(format!("Failed to generate smudging error: {:?}", e))
-            })?;
-            let esi_poly = Poly::from_bigints(
-                &esi_coeffs,
-                threshold_params.context_at_level(0).map_err(|e| {
-                    CircuitsErrors::Sample(format!("Failed to get BFV context: {:?}", e))
-                })?,
-            )
-            .map_err(|e| {
-                CircuitsErrors::Sample(format!("Failed to convert error to poly: {:?}", e))
-            })?;
-            let esi_sss = share_manager
-                .generate_secret_key_shares(esi_poly, &mut rng)
-                .map(|shares| shares.into_transport())
-                .map_err(|e| {
-                    CircuitsErrors::Sample(format!("Failed to generate error shares: {:?}", e))
-                })?;
-            all_party_esi_shares.push(esi_sss);
         }
 
         // Simulate party 0 collecting shares from other parties
         let honest_parties = threshold + 1;
         let mut sk_sss_collected = Vec::new();
-        let mut es_sss_collected = Vec::new();
 
         for modulus_idx in 0..threshold_params.moduli().len() {
             let mut sk_collected = ndarray::Array2::<u64>::zeros((0, threshold_params.degree()));
-            let mut es_collected = ndarray::Array2::<u64>::zeros((0, threshold_params.degree()));
 
             // Party 0 collects shares from honest parties
             // For each party i, party 0 collects the share that party i sent to party 0
@@ -169,15 +133,6 @@ impl ShareDecryptionCircuitData {
                         all_party_sk_shares[party_idx].len()
                     )));
                 }
-                if modulus_idx >= all_party_esi_shares[party_idx].len() {
-                    return Err(CircuitsErrors::Sample(format!(
-                        "Modulus index {} out of bounds for party {} error shares (has {} moduli)",
-                        modulus_idx,
-                        party_idx,
-                        all_party_esi_shares[party_idx].len()
-                    )));
-                }
-
                 // Collect the share that party_idx sent to party 0
                 let sk_share_row = all_party_sk_shares[party_idx][modulus_idx].row(0);
                 let sk_share_vec = sk_share_row.to_vec();
@@ -187,17 +142,9 @@ impl ShareDecryptionCircuitData {
                         CircuitsErrors::Sample(format!("Failed to push SK share row: {:?}", e))
                     })?;
 
-                let es_share_row = all_party_esi_shares[party_idx][modulus_idx].row(0);
-                let es_share_vec = es_share_row.to_vec();
-                es_collected
-                    .push_row(ArrayView::from(&es_share_vec))
-                    .map_err(|e| {
-                        CircuitsErrors::Sample(format!("Failed to push ES share row: {:?}", e))
-                    })?;
             }
 
             sk_sss_collected.push(sk_collected);
-            es_sss_collected.push(es_collected);
         }
 
         // Aggregate collected shares to get s and e polynomials.
@@ -209,8 +156,6 @@ impl ShareDecryptionCircuitData {
         // Sum across parties for each modulus to create [num_moduli, degree] matrices
         let mut sk_sum_matrix =
             ndarray::Array2::<u64>::zeros((num_moduli, threshold_params.degree()));
-        let mut es_sum_matrix =
-            ndarray::Array2::<u64>::zeros((num_moduli, threshold_params.degree()));
 
         for modulus_idx in 0..num_moduli {
             // Sum across parties (rows) for this modulus
@@ -219,10 +164,6 @@ impl ShareDecryptionCircuitData {
                     sk_sum_matrix[[modulus_idx, coeff_idx]] = (sk_sum_matrix
                         [[modulus_idx, coeff_idx]]
                         + sk_sss_collected[modulus_idx][[party_idx, coeff_idx]])
-                        % ctx.moduli()[modulus_idx];
-                    es_sum_matrix[[modulus_idx, coeff_idx]] = (es_sum_matrix
-                        [[modulus_idx, coeff_idx]]
-                        + es_sss_collected[modulus_idx][[party_idx, coeff_idx]])
                         % ctx.moduli()[modulus_idx];
                 }
             }
@@ -234,8 +175,21 @@ impl ShareDecryptionCircuitData {
                 .map(|row| row.iter().copied().map(num_bigint::BigInt::from).collect())
                 .collect(),
         );
-        let (es_crt, e_signed) =
-            consistent_signed_noise(&es_sum_matrix, threshold_params.moduli());
+        let e_signed = generate_smudging_error(
+            threshold_params.clone(),
+            num_parties,
+            num_ciphertexts,
+            sd.mult_depth,
+            lambda,
+            &mut rng,
+        )
+        .map_err(|e| {
+            CircuitsErrors::Sample(format!("Failed to generate smudging error: {:?}", e))
+        })?;
+        let es_poly = Poly::<fhe_math::rq::PowerBasis>::from_bigints(&e_signed, ctx).map_err(|e| {
+            CircuitsErrors::Sample(format!("Failed to convert error to poly: {:?}", e))
+        })?;
+        let es_crt = CrtPolynomial::from_fhe_polynomial(&*es_poly);
         let decryptors: Vec<u32> = (1..=(committee.threshold as u32 + 1)).collect();
         let prf_keys = nonzero_prf_keys(preset, committee.n);
         let ct0 = CrtPolynomial::from_fhe_polynomial(&ciphertext[0]);
@@ -265,47 +219,6 @@ impl ShareDecryptionCircuitData {
             incoming_prf_keys: prf_keys,
         })
     }
-}
-
-/// Use limb 0 as the signed integer and store each limb as its centered residue.
-fn consistent_signed_noise(
-    summed: &ndarray::Array2<u64>,
-    moduli: &[u64],
-) -> (CrtPolynomial, Vec<num_bigint::BigInt>) {
-    let q0 = num_bigint::BigInt::from(moduli[0]);
-    let half0 = (&q0 - num_bigint::BigInt::from(1)) / num_bigint::BigInt::from(2);
-    let mut signed = Vec::with_capacity(summed.ncols());
-    for column in 0..summed.ncols() {
-        let mut value = num_bigint::BigInt::from(summed[[0, column]]);
-        if value > half0 {
-            value -= &q0;
-        }
-        signed.push(value);
-    }
-    let mut limbs = Vec::with_capacity(moduli.len());
-    for modulus in moduli {
-        let q = num_bigint::BigInt::from(*modulus);
-        let half = (&q - num_bigint::BigInt::from(1)) / num_bigint::BigInt::from(2);
-        let negative_half = num_bigint::BigInt::from(0) - &half;
-        let coeffs = signed
-            .iter()
-            .map(|value| {
-                let mut residue = value % &q;
-                if &residue > &half {
-                    residue -= &q;
-                } else if &residue < &negative_half {
-                    residue += &q;
-                }
-                if residue.sign() == num_bigint::Sign::Minus {
-                    residue + &q
-                } else {
-                    residue
-                }
-            })
-            .collect();
-        limbs.push(Polynomial::new(coeffs));
-    }
-    (CrtPolynomial::new(limbs), signed)
 }
 
 fn nonzero_prf_keys(preset: BfvPreset, count: usize) -> Vec<Vec<u8>> {

@@ -104,7 +104,9 @@ use e3_zk_prover::{
 };
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
-use fhe::trlbfv::{PublicKeyShare as LbfvPublicKeyShare, RelinKeyShare, RlkWitness};
+use e3_zk_helpers::unsupported_lbfv::{
+    PublicKeyShare as LbfvPublicKeyShare, RelinKeyShare, RlkWitness,
+};
 use fhe_math::rq::{NttShoup, Poly, PowerBasis};
 use fhe_traits::{DeserializeParametrized, DeserializeWithContext, FheEncoder};
 use ndarray::Array2;

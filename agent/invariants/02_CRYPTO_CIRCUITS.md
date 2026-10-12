@@ -275,7 +275,9 @@ every section.
 - **Client PK commitment binding (C-01):** Serialized PK event bytes are an untrusted transport
   hint. Legacy consumers decode the bytes with the request-time threshold BFV parameters.
   Secure-16384 consumers decode the version-3 l-BFV key envelope, reconstruct its complete public
-  key from the RLK, and validate both keys against the fixed CRS and URS. Consumers store the key
+  key from the RLK, and validate both keys against the fixed CRS and URS. The current `fhe.rs` pin
+  has no `fhe::trlbfv` module, so that decode returns an error and secure-16384 key publication
+  fails closed. Consumers store the key
   only when the recomputed legacy or envelope commitment equals the on-chain proof value.
   Proof-backed committee publication rejects unbound or commitment-mismatched key bytes. Public-key
   candidates are bounded and gated to request-time committee members while the E3 remains in

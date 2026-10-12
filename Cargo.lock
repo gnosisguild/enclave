@@ -924,7 +924,7 @@ dependencies = [
  "alloy-rlp",
  "alloy-serde",
  "alloy-sol-types",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "serde",
  "serde_json",
  "serde_with",
@@ -3817,6 +3817,7 @@ dependencies = [
  "ark-ff 0.4.2",
  "e3-bfv-client",
  "e3-fhe-params",
+ "e3-zk-helpers",
  "fhe",
  "fhe-traits",
  "hex",
@@ -4303,6 +4304,7 @@ dependencies = [
  "e3-events",
  "e3-fhe-params",
  "e3-utils",
+ "e3-zk-helpers",
  "fhe",
  "fhe-traits",
  "futures",
@@ -4374,6 +4376,19 @@ dependencies = [
  "e3-utils",
  "serde",
  "tracing",
+]
+
+[[package]]
+name = "e3-safe"
+version = "0.17.0"
+source = "git+https://github.com/theinterfold/interfold?rev=fb5f14198c6ec812b23020079024695043fa6ee5#fb5f14198c6ec812b23020079024695043fa6ee5"
+dependencies = [
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
+ "hex",
+ "risc0-bigint2",
+ "sha3",
+ "taceo-poseidon2",
 ]
 
 [[package]]
@@ -4650,7 +4665,7 @@ dependencies = [
  "e3-fhe-params",
  "e3-parity-matrix",
  "e3-polynomial",
- "e3-safe",
+ "e3-safe 0.18.0",
  "fhe",
  "fhe-math",
  "fhe-traits",
@@ -5027,10 +5042,13 @@ dependencies = [
 
 [[package]]
 name = "fhe"
-version = "0.3.0"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dev#375cfc68fbb1dbd27c5fd204706e2dfee6086229"
+version = "0.4.1"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=feat%2Fsmudging-from-signed-coefficients#ab48b27d367feec6061b77d42211280ef1f62f7f"
 dependencies = [
+ "ark-ff 0.5.0",
+ "bincode",
  "doc-comment",
+ "e3-safe 0.17.0",
  "fhe-math",
  "fhe-traits",
  "fhe-util",
@@ -5039,6 +5057,7 @@ dependencies = [
  "num-bigint 0.5.1",
  "num-traits",
  "prost 0.14.4",
+ "prost-build",
  "rand 0.9.4",
  "rand_chacha 0.9.0",
  "rand_distr",
@@ -5051,8 +5070,8 @@ dependencies = [
 
 [[package]]
 name = "fhe-math"
-version = "0.3.0"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dev#375cfc68fbb1dbd27c5fd204706e2dfee6086229"
+version = "0.4.1"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=feat%2Fsmudging-from-signed-coefficients#ab48b27d367feec6061b77d42211280ef1f62f7f"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -5063,6 +5082,7 @@ dependencies = [
  "num-bigint-dig",
  "num-traits",
  "prost 0.14.4",
+ "prost-build",
  "pulp",
  "rand 0.9.4",
  "rand_chacha 0.9.0",
@@ -5074,16 +5094,16 @@ dependencies = [
 
 [[package]]
 name = "fhe-traits"
-version = "0.3.0"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dev#375cfc68fbb1dbd27c5fd204706e2dfee6086229"
+version = "0.4.1"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=feat%2Fsmudging-from-signed-coefficients#ab48b27d367feec6061b77d42211280ef1f62f7f"
 dependencies = [
  "rand 0.9.4",
 ]
 
 [[package]]
 name = "fhe-util"
-version = "0.3.0"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dev#375cfc68fbb1dbd27c5fd204706e2dfee6086229"
+version = "0.4.1"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=feat%2Fsmudging-from-signed-coefficients#ab48b27d367feec6061b77d42211280ef1f62f7f"
 dependencies = [
  "num-bigint-dig",
  "num-traits",
@@ -7471,6 +7491,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "multimap"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
+
+[[package]]
 name = "multistream-select"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8420,7 +8446,7 @@ checksum = "9cd31dcfdbbd7431a807ef4df6edd6473228e94d5c805e8cf671227a21bad068"
 dependencies = [
  "anyhow",
  "clap",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "rand 0.8.5",
@@ -8652,6 +8678,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "prettyplease"
+version = "0.2.37"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b"
+dependencies = [
+ "proc-macro2",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "prime_factorization"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8829,13 +8865,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-build"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03da047801ff44bb6a4d407d4860c05fd70bb81714e6b2f3812603d5b145b042"
+dependencies = [
+ "heck",
+ "itertools 0.14.0",
+ "log",
+ "multimap",
+ "petgraph",
+ "prettyplease",
+ "prost 0.14.4",
+ "prost-types",
+ "regex",
+ "syn 2.0.117",
+ "tempfile",
+]
+
+[[package]]
 name = "prost-derive"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -8848,10 +8903,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b570b25f7617e43d59005d0990ccb79e950a423952cea19671b7a876da390adf"
 dependencies = [
  "anyhow",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f94967dc7688f3054c7fac87473ffae4cc4c3904800e2d9f5b857246d8963b0a"
+dependencies = [
+ "prost 0.14.4",
 ]
 
 [[package]]

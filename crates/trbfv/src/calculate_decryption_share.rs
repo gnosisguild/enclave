@@ -12,17 +12,17 @@ use crate::helpers::try_poly_from_sensitive_bytes;
 use crate::TrBFVConfig;
 use anyhow::*;
 use e3_crypto::{Cipher, SensitiveBytes};
-use e3_fhe_params::{fresh_smudging_inputs, sample_fresh_smudging_error, BfvPreset};
-use e3_polynomial::{CrtPolynomial, Polynomial};
+use e3_fhe_params::{
+    fresh_smudging_inputs, sample_fresh_smudging_error, smudging_noise_from_signed_coefficients,
+    BfvPreset,
+};
 use e3_utils::utility_types::ArcBytes;
-use e3_zk_helpers::circuits::prf::decryption_mask_low_degree;
 use e3_zk_helpers::circuits::threshold::share_decryption::encode_signed_coefficients;
-use e3_zk_helpers::circuits::threshold::decrypted_shares_aggregation::utils::lagrange_coeff_at_zero;
 use fhe::bfv::Ciphertext;
+use fhe::trbfv::synchronized::{PartyPrfKeyTransport, PartyPrfKeys, SynchronizedDecryptor};
 use fhe_math::rq::{Poly, PowerBasis};
 use fhe_traits::DeserializeParametrized;
 use fhe_traits::Serialize;
-use num_traits::ToPrimitive;
 use tracing::info;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -156,7 +156,7 @@ pub fn calculate_decryption_share(
     .context("threshold parameters do not match a supported preset")?;
     let noise = fresh_smudging_inputs(preset, req.trbfv_config.num_parties() as usize)
         .map_err(|error| anyhow!(error))?;
-    let sk = CrtPolynomial::from_fhe_polynomial(&req.sk_poly_sum);
+    let sk_ntt = req.sk_poly_sum.clone().into_ntt();
     let mut e_fresh = Vec::with_capacity(req.ciphertexts.len());
     let mut e_signed = Vec::with_capacity(req.ciphertexts.len());
     for _ in 0..req.ciphertexts.len() {
@@ -172,26 +172,46 @@ pub fn calculate_decryption_share(
         e_fresh.push(polynomial.deref().clone());
     }
 
+    let committee_size = req.trbfv_config.num_parties() as usize;
+    let party_id = party_idx + 1;
+    let decryptor = SynchronizedDecryptor::new(
+        committee_size,
+        req.trbfv_config.threshold() as usize,
+        params.clone(),
+    )?;
+    let decryptor_ids: Vec<usize> = decryptors.iter().map(|id| *id as usize).collect();
+    let prf_keys = party_prf_keys(
+        party_id,
+        committee_size,
+        &outgoing_prf_keys,
+        &incoming_prf_keys,
+    )?;
     info!("Calculating d_share_poly...");
-    let d_share_poly = req
-        .ciphertexts
-        .iter()
-        .zip(e_fresh.iter())
-        .enumerate()
-        .map(|(index, (ciphertext, noise))| {
-            info!("Create decryption share for ct index {}...", index);
-            partial_decryption_share(
-                ciphertext,
-                &sk,
-                noise,
-                party_idx,
-                &decryptors,
-                &outgoing_prf_keys,
-                &incoming_prf_keys,
-                params.moduli(),
-            )
-        })
-        .collect::<Result<Vec<Poly<PowerBasis>>>>()?;
+    let mut d_share_poly = Vec::with_capacity(req.ciphertexts.len());
+    for (index, ciphertext) in req.ciphertexts.iter().enumerate() {
+        info!("Create decryption share for ct index {}...", index);
+        let coeffs = e_signed
+            .get(index)
+            .context("fresh noise is missing for this ciphertext")?;
+        let noise = smudging_noise_from_signed_coefficients(
+            params.clone(),
+            noise.num_parties,
+            noise.num_ciphertexts,
+            noise.mult_depth,
+            noise.lambda,
+            coeffs,
+        )?;
+        let share = decryptor.decryption_share(
+            ciphertext,
+            &sk_ntt,
+            party_id,
+            &decryptor_ids,
+            noise,
+            &prf_keys,
+        )?;
+        let (poly, _, _) = share.into_parts();
+        d_share_poly.push(poly);
+    }
     info!("Returning successful result...");
 
     InnerResponse {
@@ -212,65 +232,33 @@ fn open_prf_keys(cipher: &Cipher, keys: &[SensitiveBytes]) -> Result<Vec<Vec<u8>
         .collect()
 }
 
-fn partial_decryption_share(
-    ciphertext: &Ciphertext,
-    sk: &CrtPolynomial,
-    noise: &Poly<PowerBasis>,
-    party_idx: usize,
-    decryptors: &[u32],
+fn party_prf_keys(
+    party_id: usize,
+    committee_size: usize,
     outgoing_keys: &[Vec<u8>],
     incoming_keys: &[Vec<u8>],
-    moduli: &[u64],
-) -> Result<Poly<PowerBasis>> {
-    let ct0 = CrtPolynomial::from_fhe_polynomial(&ciphertext[0]);
-    let ct1 = CrtPolynomial::from_fhe_polynomial(&ciphertext[1]);
-    let reverse_limbs = |poly: &CrtPolynomial| -> Vec<Polynomial> {
-        poly.limbs
-            .iter()
-            .map(|limb| {
-                let mut reversed = limb.clone();
-                reversed.reverse();
-                reversed
-            })
-            .collect()
-    };
-    let low_mask = decryption_mask_low_degree(
-        party_idx,
-        decryptors,
-        outgoing_keys,
-        incoming_keys,
-        &reverse_limbs(&ct0),
-        &reverse_limbs(&ct1),
-        moduli,
-    )
-    .map_err(|error| anyhow!(error))?;
-    let c1 = ciphertext[1].clone().into_power_basis();
-    let ctx = c1.ctx().clone();
-    let sk_poly = sk
-        .to_fhe_polynomial(&ctx, moduli)
-        .context("cannot encode the secret share for NTT multiplication")?;
-    // One negacyclic product for every CRT limb. Scaling by λ stays outside the NTT.
-    let product = (&c1.into_ntt() * &sk_poly.into_ntt()).into_power_basis();
-    let product_coeffs = product.coefficients();
-    let noise_coeffs = noise.coefficients();
-    let mut coeffs = noise_coeffs.to_owned();
-    for (limb, modulus) in moduli.iter().enumerate() {
-        let q = u128::from(*modulus);
-        let lambda = lagrange_coeff_at_zero(decryptors, (party_idx as u32) + 1, *modulus)
-            .map_err(|error| anyhow!(error.to_string()))?;
-        let lambda = u128::from(
-            lambda
-                .to_u64()
-                .context("Lagrange coefficient does not fit u64")?,
+) -> Result<PartyPrfKeys> {
+    let keys_i_j = pad_prf_keys(outgoing_keys, committee_size)?;
+    let keys_j_i = pad_prf_keys(incoming_keys, committee_size)?;
+    let transport = PartyPrfKeyTransport::new(party_id, committee_size, keys_i_j, keys_j_i)?;
+    Ok(PartyPrfKeys::from_transport(transport)?)
+}
+
+fn pad_prf_keys(keys: &[Vec<u8>], committee_size: usize) -> Result<Vec<[u8; 32]>> {
+    if keys.len() != committee_size {
+        bail!(
+            "PRF key count {} must equal the committee size {committee_size}",
+            keys.len()
         );
-        for column in 0..product_coeffs.ncols() {
-            let scaled = (u128::from(product_coeffs[[limb, column]]) * lambda) % q;
-            let fresh = u128::from(noise_coeffs[[limb, column]]);
-            let mask = u128::from(low_mask[limb][column]);
-            coeffs[[limb, column]] = ((scaled + fresh + mask) % q) as u64;
-        }
     }
-    let mut share = noise.clone();
-    share.set_coefficients(coeffs);
-    Ok(share)
+    keys.iter().map(|key| pad_prf_key(key)).collect()
+}
+
+fn pad_prf_key(key: &[u8]) -> Result<[u8; 32]> {
+    if key.len() > 32 {
+        bail!("PRF key is longer than 32 bytes");
+    }
+    let mut padded = [0u8; 32];
+    padded[..key.len()].copy_from_slice(key);
+    Ok(padded)
 }

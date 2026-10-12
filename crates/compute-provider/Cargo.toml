@@ -22,6 +22,7 @@ e3-bfv-client = { workspace = true }
 fhe = { workspace = true }
 fhe-traits = { workspace = true }
 e3-fhe-params = { workspace = true, features = ["abi-encoding"] }
+e3-zk-helpers = { workspace = true }
 thiserror = { workspace = true }
 rayon = { version = "=1.10.0", optional = true }
 

@@ -226,8 +226,9 @@ impl ThresholdFailure {
             TE::NonInvertibleShares => (K::NonInvertibleShares, None),
             TE::SmudgingBoundInfeasible { .. } => (K::SmudgingBoundInfeasible, None),
             TE::PartyCountExceedsModulus { .. } => (K::PartyCountExceedsModulus, None),
-            TE::InvalidShamirThreshold { .. } => (K::InvalidThreshold, None),
-            TE::EmptyBatchInversion => (K::NonInvertibleShares, None),
+            // Lambda::secure rejects values below the fhe.rs minimum. Report that as an
+            // invalid threshold. The failure message keeps the fhe.rs text.
+            TE::InsecureLambda { .. } => (K::InvalidThreshold, None),
         };
         Self {
             kind,

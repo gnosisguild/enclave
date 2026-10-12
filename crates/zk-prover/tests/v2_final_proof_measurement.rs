@@ -45,7 +45,7 @@ use e3_zk_prover::{
 };
 use fhe::bfv::{Ciphertext, CommonRandomPolyVec, PublicKey, SecretKey};
 use fhe::mbfv::{AggregateIter, PublicKeyShare as MbfvPublicKeyShare};
-use fhe::trlbfv::{PublicKeyShare as LbfvPublicKeyShare, RelinKeyShare};
+use e3_zk_helpers::unsupported_lbfv::{PublicKeyShare as LbfvPublicKeyShare, RelinKeyShare};
 use num_bigint::BigInt;
 use num_traits::{Signed, ToPrimitive};
 use rand::rng;
@@ -243,7 +243,7 @@ fn prove_generation_fold(
     secret_key: &SecretKey,
     lbfv_pk_share: &LbfvPublicKeyShare,
     rlk_share: &RelinKeyShare,
-    rlk_witness: &fhe::trlbfv::RlkWitness,
+    rlk_witness: &e3_zk_helpers::unsupported_lbfv::RlkWitness,
     artifacts_dir: &str,
     label: &str,
 ) -> Proof {

@@ -174,7 +174,7 @@ ThresholdKeyshare receives AllEncryptionKeysCollected
 │   │  │     → pk_share is the public contribution               │
 │   │  │                                                         │
 │   │  │  2. Create Shamir Secret Shares of sk (sk_sss):        │
-│   │  │     ShareManager::create_shares(sk, T, N)               │
+│   │  │     ShareManager::generate_secret_shares_from_poly(sk)  │
 │   │  │     → Splits sk into N shares; T+1 reconstruct         │
 │   │  │     → One share per committee member                    │
 │   │  │                                                         │
@@ -939,6 +939,8 @@ only that failure. It does not resume row, fold, final V2 proof, or publication 
 │       }
 │         → forwarded to peers so every committee member can bind C6 proofs to the aggregated key
 │
+The current `fhe.rs` pin is `feat/smudging-from-signed-coefficients`. That pin has no `fhe::trlbfv` module. `gen_lbfv_key_shares`, l-BFV aggregation, and l-BFV key decode return an error. The persisted `GenLbfvKeyShares` request and the l-BFV event variants stay in place, so the bincode layout and schema version 16 do not change.
+
 ### l-BFV contribution-wire cutoff
 
 The protocol-4 l-BFV release uses the contribution envelopes emitted by the typed fhe.rs APIs:
@@ -1354,8 +1356,11 @@ InterfoldSolReader decodes CiphertextOutputPublished event
 │   │  │    - PRF mask from the C2 keys                      │
 │   │  │                                                     │
 │   │  │  Compute:                                           │
+│   │  │    SynchronizedDecryptor::decryption_share          │
 │   │  │    p = lambda * c1 * sk + fresh noise + PRF mask    │
 │   │  │    → lambda comes from the public decryptor set     │
+│   │  │    → fresh noise is one local polynomial            │
+│   │  │    → the same signed coefficients go to C6          │
 │   │  │    → c0 is not in the partial share                 │
 │   │  │    → Share alone reveals NOTHING about plaintext    │
     │   │  │                                                     │
@@ -1398,7 +1403,7 @@ InterfoldSolReader decodes CiphertextOutputPublished event
     └─ State: Decrypting → Completed
 ```
 
-`Inputs::compute` checks that witness with `decompose_residue`. Each coefficient of `d` must equal the partial-decryption product reduced into `R_qi`. The failure text is `xi must equal xi_hat reduced into R_qi`. fhe.rs `ShareManager::decryption_share` does not build that polynomial. A C6 sample that stores it fails `test_d_commitment_matches_inputs_compute` inside `Inputs::compute`. The sample in `crates/zk-helpers/src/circuits/threshold/share_decryption/sample.rs` builds `d` with the same product, Lagrange scale, fresh noise, and PRF mask, and stores the power-basis residues low degree first.
+`Inputs::compute` checks that witness with `decompose_residue`. Each coefficient of `d` must equal the partial-decryption product reduced into `R_qi`. The failure text is `xi must equal xi_hat reduced into R_qi`. The published share is `SynchronizedDecryptor::decryption_share`. That share is `lambda * c1 * sk + e + r`. It does not contain `c0`. The node samples the signed noise once, keeps those integers for the C6 witness, and wraps the same integers with `SmudgingNoise::from_signed_coefficients`. `ShareManager::decryption_share` still adds `c0` and a Shamir noise share. A C6 sample that stores that older polynomial fails `test_d_commitment_matches_inputs_compute`. The sample in `crates/zk-helpers/src/circuits/threshold/share_decryption/sample.rs` builds `d` with the circuit product and stores the power-basis residues low degree first.
 
 ---
 

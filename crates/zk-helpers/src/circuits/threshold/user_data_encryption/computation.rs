@@ -370,9 +370,12 @@ impl Computation for Inputs {
         let cyclo = cyclotomic_polynomial(n);
 
         // Encrypt using the provided public key to ensure ciphertext matches the key.
-        let (ct, u, e0, e1) = data
+        let (ct, intermediates) = data
             .public_key
-            .try_encrypt_extended(&data.plaintext, &mut rand::rng())?;
+            .try_encrypt_with_intermediates(&data.plaintext, &mut rand::rng())?;
+        let u_poly = intermediates.randomness().clone();
+        let e0 = intermediates.error_0().clone();
+        let e1_poly = intermediates.error_1().clone();
 
         // Reconstruct e0 coefficients mod Q (CRT) for e0_quotient computation.
         let mut e0_mod_q = Polynomial::from_fhe_polynomial(&e0);
@@ -392,8 +395,8 @@ impl Computation for Inputs {
         k1.reverse();
 
         // Reconstruct u and e1 as polynomials (only the first limb is needed)
-        let mut u = CrtPolynomial::from_fhe_polynomial(&u).limb(0).clone();
-        let mut e1 = CrtPolynomial::from_fhe_polynomial(&e1).limb(0).clone();
+        let mut u = CrtPolynomial::from_fhe_polynomial(&u_poly).limb(0).clone();
+        let mut e1 = CrtPolynomial::from_fhe_polynomial(&e1_poly).limb(0).clone();
 
         u.center(&BigInt::from(moduli[0]));
         u.reverse();

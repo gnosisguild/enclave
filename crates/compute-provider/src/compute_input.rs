@@ -12,8 +12,7 @@ use e3_bfv_client::client::compute_ct_commitment;
 use e3_bfv_client::client::compute_ct_commitment_with_params;
 use e3_fhe_params::decode_bfv_params_arc;
 use fhe::bfv::BfvParameters;
-use fhe::trlbfv::LBFVRelinearizationKey;
-use fhe_traits::DeserializeParametrized;
+use e3_zk_helpers::unsupported_lbfv::LBFVRelinearizationKey;
 use sha3::{Digest, Keccak256};
 use std::sync::Arc;
 
@@ -260,11 +259,12 @@ mod tests {
     };
     use fhe::aggregate::AggregateIter;
     use fhe::bfv::{Ciphertext, CommonRandomPolyVec, Encoding, Plaintext, PublicKey, SecretKey};
-    use fhe::trlbfv::{
+    use e3_zk_helpers::unsupported_lbfv::{
         aggregate_relinearization_key, LBFVPublicKey, PublicKeyShare, RelinKeyShare,
     };
     use fhe_traits::{
-        FheDecoder, FheDecrypter, FheEncoder, FheEncrypter, Serialize as FheSerialize,
+        DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
+        Serialize as FheSerialize,
     };
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;

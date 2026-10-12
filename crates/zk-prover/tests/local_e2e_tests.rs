@@ -16,8 +16,6 @@
 
 mod common;
 
-use std::sync::Arc;
-
 use ark_bn254::Fr;
 use ark_ff::{BigInteger, PrimeField, Zero};
 use common::{
@@ -25,7 +23,9 @@ use common::{
     setup_compiled_circuit, setup_recursive_aggregation_fold_circuit, setup_test_prover,
 };
 use e3_events::CircuitName;
-use e3_fhe_params::{build_pair_for_preset, BfvPreset};
+use e3_fhe_params::{
+    build_pair_for_preset, fresh_smudging_inputs, smudging_noise_from_signed_coefficients, BfvPreset,
+};
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
@@ -58,7 +58,7 @@ use e3_zk_helpers::threshold::{
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_helpers::{compute_pk_aggregation_commitment, compute_threshold_pk_commitment};
 use e3_zk_prover::{CircuitVariant, Provable, ZkBackend, ZkProver};
-use fhe::trbfv::{SecretKeyShare, ShareManager, SmudgingShare};
+use fhe::trbfv::synchronized::{PartyPrfKeyTransport, PartyPrfKeys, SynchronizedDecryptor};
 
 /// Sum per-modulus decrypted shares across honest parties (matches C4 `compute_aggregated_shares`).
 /// Coefficients are summed in the BN254 field, not reduced mod each CRT modulus (see `share_decryption.nr`).
@@ -784,7 +784,18 @@ async fn test_c4_sk_commitment_is_c6_expected_sk_input_e2e() {
     prover.cleanup(e3_id_c6).unwrap();
 }
 
-/// Wires the same aggregated SK (`agg_sk`) into C6: DKG aggregate → `s` + TRBFV `decryption_share` for new `d_share`.
+fn pad_prf_keys(keys: &[Vec<u8>]) -> Vec<[u8; 32]> {
+    keys.iter()
+        .map(|key| {
+            let mut padded = [0u8; 32];
+            let copy = key.len().min(32);
+            padded[..copy].copy_from_slice(&key[..copy]);
+            padded
+        })
+        .collect()
+}
+
+/// Wires the same aggregated SK (`agg_sk`) into C6: DKG aggregate → `s` + synchronized PartDec for new `d_share`.
 ///
 /// C4 commits the aggregate at coefficient width `SHARE_DECRYPTION_BIT_AGG` (Rust `dkg_out.bits.agg_bit`). C6 uses the same width for `sk`.
 /// Per-share C4 checks use `SHARE_COMPUTATION_BIT_SHARE`, the same width C2 uses.
@@ -808,32 +819,50 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
     let sk_poly = agg_sk
         .to_fhe_polynomial(ctx, moduli)
         .expect("agg_sk -> Poly");
-    let es_poly = c6_sample
-        .e
-        .to_fhe_polynomial(ctx, moduli)
-        .expect("e -> Poly");
-
-    let share_manager =
-        ShareManager::new(committee.n, committee.threshold, threshold_params.clone())
-            .expect("ShareManager::new");
-    let sk_aggregate = share_manager
-        .aggregate_secret_key_shares(vec![SecretKeyShare::from_transport(
-            sk_poly.coefficients().to_owned(),
-        )])
-        .expect("aggregate secret key share");
-    let es_aggregate = share_manager
-        .aggregate_smudging_shares(vec![SmudgingShare::from_transport(
-            es_poly.coefficients().to_owned(),
-        )])
-        .expect("aggregate smudging share");
-
-    let d_share_rns = share_manager
-        .decryption_share(
-            Arc::new(c6_sample.ciphertext.clone()),
-            &sk_aggregate,
-            es_aggregate,
+    let noise_inputs = fresh_smudging_inputs(preset, committee.n).expect("smudging inputs");
+    let party_id = c6_sample.party_idx as usize + 1;
+    let decryptor_ids: Vec<usize> = c6_sample
+        .decryptors
+        .iter()
+        .map(|id| *id as usize)
+        .collect();
+    let prf_keys = PartyPrfKeys::from_transport(
+        PartyPrfKeyTransport::new(
+            party_id,
+            committee.n,
+            pad_prf_keys(&c6_sample.outgoing_prf_keys),
+            pad_prf_keys(&c6_sample.incoming_prf_keys),
         )
-        .expect("decryption_share");
+        .expect("PRF transport"),
+    )
+    .expect("PRF keys");
+    let noise = smudging_noise_from_signed_coefficients(
+        threshold_params.clone(),
+        noise_inputs.num_parties,
+        noise_inputs.num_ciphertexts,
+        noise_inputs.mult_depth,
+        noise_inputs.lambda,
+        &c6_sample.e_signed,
+    )
+    .expect("fresh noise");
+    let decryptor = SynchronizedDecryptor::new(
+        committee.n,
+        committee.threshold,
+        threshold_params.clone(),
+    )
+    .expect("SynchronizedDecryptor::new");
+    let d_share_rns = decryptor
+        .decryption_share(
+            &c6_sample.ciphertext,
+            &sk_poly.into_ntt(),
+            party_id,
+            &decryptor_ids,
+            noise,
+            &prf_keys,
+        )
+        .expect("decryption_share")
+        .into_parts()
+        .0;
 
     c6_sample.s = agg_sk.clone();
     c6_sample.d_share = CrtPolynomial::from_fhe_polynomial(&d_share_rns);

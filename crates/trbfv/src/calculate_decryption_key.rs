@@ -12,9 +12,8 @@ use anyhow::Result;
 /// This module defines event payloads that will generate the decryption key material to create a decryption share
 use anyhow::*;
 use e3_crypto::{Cipher, SensitiveBytes};
-use fhe::trbfv::{SecretKeyShare, ShareManager};
+use fhe::trbfv::ShareManager;
 use fhe_math::rq::{Poly, PowerBasis};
-use fhe_math::zq::Modulus;
 use fhe_traits::Serialize;
 use ndarray::Array2;
 use tracing::info;
@@ -104,56 +103,11 @@ pub fn calculate_decryption_key(
     (cipher, InnerResponse { sk_poly_sum }).try_into()
 }
 
-/// Validate secret-key shares with fhe.rs, then materialize the legacy polynomial transport used
-/// by the circuit and decryption-share messages.
+/// Sum the collected secret-key shares into this party's decryption polynomial.
 fn aggregate_secret_key_to_poly(
     manager: &ShareManager,
     shares: &[ShamirShare],
 ) -> Result<Poly<PowerBasis>> {
     let transport = shares.to_array_data();
-    manager.aggregate_secret_key_shares(
-        transport
-            .iter()
-            .cloned()
-            .map(SecretKeyShare::from_transport)
-            .collect(),
-    )?;
-    sum_validated_transport(manager, &transport)
-}
-
-fn sum_validated_transport(
-    manager: &ShareManager,
-    transport: &[Array2<u64>],
-) -> Result<Poly<PowerBasis>> {
-    let params = manager.params();
-    let ctx = params.context_at_level(0)?;
-    let shape = (params.moduli().len(), params.degree());
-    let mut sum = Array2::<u64>::zeros(shape);
-    for share in transport {
-        if share.dim() != shape {
-            bail!(
-                "share matrix has shape {:?}, expected {shape:?}",
-                share.dim()
-            );
-        }
-        for (row, mut target) in sum.outer_iter_mut().enumerate() {
-            let modulus = Modulus::new(
-                *params
-                    .moduli()
-                    .get(row)
-                    .ok_or_else(|| anyhow!("missing modulus for share row {row}"))?,
-            )?;
-            let target = target
-                .as_slice_mut()
-                .ok_or_else(|| anyhow!("share accumulator is not contiguous"))?;
-            let source_row = share.row(row);
-            let source = source_row
-                .as_slice()
-                .ok_or_else(|| anyhow!("share row is not contiguous"))?;
-            modulus.add_vec(target, source);
-        }
-    }
-    let mut poly = Poly::zero(ctx);
-    poly.set_coefficients(sum);
-    Ok(poly)
+    Ok(manager.aggregate_collected_shares(&transport)?)
 }

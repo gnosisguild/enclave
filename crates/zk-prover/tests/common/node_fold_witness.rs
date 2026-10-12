@@ -27,14 +27,13 @@ use fhe::mbfv::PublicKeyShare;
 use fhe::trbfv::ShareManager;
 use fhe::{bfv::Plaintext, bfv::PublicKey};
 use fhe_traits::FheEncoder;
-use fhe_traits::Serialize;
 use ndarray::Array2;
 use num_bigint::BigInt;
 use num_traits::{Signed, ToPrimitive};
 use rand::rng;
 /// Same as [`PkGenerationCircuitData::generate_sample`], plus smudging coefficients for C2b.
 ///
-/// Returns the [`SecretKey`] used for [`PublicKeyShare::new_extended`] so correlated C2a shares can
+/// Returns the [`SecretKey`] used for [`PublicKeyShare::new_with_intermediates`] so correlated C2a shares can
 /// be built with [`ShareComputationCircuitData::generate_sample`]-compatible
 /// `coeffs_to_poly_level0(secret_key.coeffs)` (not a round-trip through `pk.sk` limb 0).
 #[allow(dead_code)]
@@ -67,14 +66,12 @@ pub fn pk_generation_sample_with_esi_and_share(
     let secret_key = SecretKey::random(&threshold_params, &mut rng);
     let crp = create_deterministic_crp_from_default_seed(&threshold_params);
 
-    let (pk0_share, _, _sk_fhe, e) =
-        PublicKeyShare::new_extended(&secret_key, crp.clone(), &mut rng).map_err(|e| {
-            CircuitsErrors::Sample(format!("Failed to create public key share: {:?}", e))
-        })?;
-    let public_key_share =
-        PublicKeyShare::deserialize(&pk0_share.to_bytes(), &threshold_params, crp).map_err(
-            |e| CircuitsErrors::Sample(format!("Failed to retain public key share: {:?}", e)),
+    let (public_key_share, intermediates) =
+        PublicKeyShare::new_with_intermediates(&secret_key, crp.clone(), &mut rng).map_err(
+            |e| CircuitsErrors::Sample(format!("Failed to create public key share: {:?}", e)),
         )?;
+    let pk0_share = public_key_share.p0_share().clone();
+    let e = intermediates.error().clone();
 
     let sk_coeffs: Vec<BigInt> = secret_key.coeffs.iter().map(|&c| BigInt::from(c)).collect();
     let mut sk_crt = CrtPolynomial::from_mod_q_polynomial(&sk_coeffs, threshold_params.moduli());
@@ -129,7 +126,7 @@ pub fn share_computation_sk_from_pk(
         compute_parity_matrix(threshold_params.moduli(), committee.n, committee.threshold)
             .map_err(CircuitsErrors::Sample)?;
 
-    let share_manager =
+    let mut share_manager =
         ShareManager::new(committee.n, committee.threshold, threshold_params.clone()).map_err(
             |e| CircuitsErrors::Sample(format!("Failed to create ShareManager: {:?}", e)),
         )?;
@@ -138,9 +135,8 @@ pub fn share_computation_sk_from_pk(
         .coeffs_to_poly_level0(secret_key.coeffs.clone().as_ref())
         .map_err(|e| CircuitsErrors::Sample(format!("coeffs_to_poly_level0: {:?}", e)))?;
     let sk_sss_u64 = share_manager
-        .generate_secret_key_shares(sk_poly, &mut rng)
-        .map(|shares| shares.into_transport())
-        .map_err(|e| CircuitsErrors::Sample(format!("generate_secret_key_shares: {:?}", e)))?;
+        .generate_secret_shares_from_poly(sk_poly, &mut rng)
+        .map_err(|e| CircuitsErrors::Sample(format!("generate_secret_shares_from_poly: {:?}", e)))?;
     let secret_sss: Vec<Array2<BigInt>> = sk_sss_u64
         .into_iter()
         .map(|a| a.mapv(BigInt::from))
@@ -196,9 +192,12 @@ pub fn share_encryption_for_slot(
     let pt = Plaintext::try_encode(&share_row, Encoding::poly(), &dkg_params)
         .map_err(|e| CircuitsErrors::Sample(format!("encode plaintext: {:?}", e)))?;
 
-    let (_ct, u_rns, e0_rns, e1_rns) = dkg_pk
-        .try_encrypt_extended(&pt, &mut rng)
+    let (_ct, intermediates) = dkg_pk
+        .try_encrypt_with_intermediates(&pt, &mut rng)
         .map_err(|e| CircuitsErrors::Sample(format!("encrypt: {:?}", e)))?;
+    let u_rns = intermediates.randomness().clone();
+    let e0_rns = intermediates.error_0().clone();
+    let e1_rns = intermediates.error_1().clone();
 
     Ok(ShareEncryptionCircuitData {
         plaintext: pt,

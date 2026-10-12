@@ -15,9 +15,9 @@ use e3_zk_helpers::{
     compute_rlk_aggregation_commitment, fhe_poly_to_crt_centered_checked,
 };
 use fhe::bfv::{CommonRandomPolyVec, PublicKey};
-use fhe::trlbfv::{LBFVPublicKey, LBFVRelinearizationKey};
+use e3_zk_helpers::unsupported_lbfv::{LBFVPublicKey, LBFVRelinearizationKey};
 use fhe_math::rq::{Ntt, NttShoup, Poly};
-use fhe_traits::{DeserializeParametrized, Serialize as FheSerialize};
+use fhe_traits::Serialize as FheSerialize;
 use num_bigint::{BigInt, Sign};
 
 const MAGIC: [u8; 8] = *b"IFLBFVKE";
@@ -352,7 +352,10 @@ mod tests {
     use e3_zk_helpers::{CiphernodesCommitteeSize, Computation};
     use fhe::aggregate::AggregateIter;
     use fhe::bfv::SecretKey;
-    use fhe::trlbfv::{aggregate_relinearization_key, PublicKeyShare, RelinKeyShare};
+    use fhe_traits::DeserializeParametrized;
+    use e3_zk_helpers::unsupported_lbfv::{
+        aggregate_relinearization_key, PublicKeyShare, RelinKeyShare,
+    };
 
     type OperationalKeyMaterial = (
         BfvPreset,

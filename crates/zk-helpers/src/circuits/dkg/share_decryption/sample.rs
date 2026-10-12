@@ -39,7 +39,7 @@ impl ShareDecryptionCircuitData {
         let dkg_secret_key = SecretKey::random(&dkg_params, &mut rng);
         let dkg_public_key = PublicKey::new(&dkg_secret_key, &mut rng);
 
-        let share_manager =
+        let mut share_manager =
             ShareManager::new(committee.n, committee.threshold, threshold_params.clone()).map_err(
                 |e| CircuitsErrors::Sample(format!("Failed to create ShareManager: {:?}", e)),
             )?;
@@ -73,8 +73,7 @@ impl ShareDecryptionCircuitData {
                             })?;
 
                         let sk_sss_u64 = share_manager
-                            .generate_secret_key_shares(sk_poly.clone(), &mut rng)
-                            .map(|shares| shares.into_transport())
+                            .generate_secret_shares_from_poly(sk_poly, &mut rng)
                             .map_err(|e| {
                                 CircuitsErrors::Sample(format!(
                                     "Failed to generate secret shares: {:?}",
@@ -105,7 +104,7 @@ impl ShareDecryptionCircuitData {
                                 e
                             ))
                         })?;
-                        let esi_poly = Poly::from_bigints(
+                        let esi_poly = Poly::<fhe_math::rq::PowerBasis>::from_bigints(
                             &esi_coeffs,
                             threshold_params.context_at_level(0).map_err(|e| {
                                 CircuitsErrors::Sample(format!(
@@ -120,23 +119,7 @@ impl ShareDecryptionCircuitData {
                                 e
                             ))
                         })?;
-                        let esi_sss_u64 = share_manager
-                            .generate_secret_key_shares(esi_poly.clone(), &mut rng.clone())
-                            .map(|shares| shares.into_transport())
-                            .map_err(|e| {
-                                CircuitsErrors::Sample(format!(
-                                    "Failed to generate error shares: {:?}",
-                                    e
-                                ))
-                            })
-                            .map_err(|e| {
-                                CircuitsErrors::Sample(format!(
-                                    "Failed to generate error shares: {:?}",
-                                    e
-                                ))
-                            })?;
-
-                        esi_sss_u64[0].row(0).to_vec()
+                        esi_poly.coefficients().row(0).to_vec()
                     }
                 };
 

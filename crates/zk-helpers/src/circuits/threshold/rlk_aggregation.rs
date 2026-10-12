@@ -20,7 +20,7 @@ use e3_committee_hash::LbfvProofDomainContext;
 use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, lbfv_urs_seed, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use fhe::bfv::{CommonRandomPolyVec, SecretKey};
-use fhe::trlbfv::RelinKeyShare;
+use crate::unsupported_lbfv::RelinKeyShare;
 use num_bigint::BigInt;
 
 /// Row-level l-BFV relinearization-key aggregation circuit.
