@@ -39,9 +39,9 @@ every section.
   `protocol/deployContracts.ts`; `BfvPkVerifierRouter.sol`
 - Parity matrices (`parity_{insecure,secure}.nr`) are derived artifacts regenerated from preset
   `QIS` + committee `(N, T)`. Do not hand-edit them. `scripts/check-committee.sh` regenerates and
-  diffs them only when `target/release/generate_parity_matrices` and `nargo` exist; the Agent
-  Harness CI job skips that step. The CI circuits job catches edits to the committed selection
-  through its rebuild diff.
+  diffs them only when `target/release/zk-artifacts` and `nargo` exist; the Agent Harness CI job
+  skips that step. The CI circuits job catches edits to the committed selection through its rebuild
+  diff.
 - The C1 and C2 bound globals (`PK_GENERATION_*`, `SHARE_COMPUTATION_*`) are derived artifacts of
   the preset and committee. The build regenerates them for the selected pair and replaces each whole
   declaration, array bounds included. It rejects a declaration with its config file's prefix that
@@ -107,7 +107,7 @@ every section.
   It normalizes the active preset selector because each pair already identifies its preset. A
   library-only change invalidates every affected pair. Rebuild and push those pairs before release.
 - The pair source hash ignores generated C1/C2 bound values and includes the Rust sources that
-  generate them, including `fhe-params`, `committee`, `polynomial/src`, and
+  generate them, including `zk/cli`, `fhe-params`, `committee`, `polynomial/src`, and
   `polynomial/fhe-adapter/src`, without their `#[cfg(test)]` modules. Switching the active committee
   or editing a test module must not change another pair's source hash.
 - The source hash reads `Cargo.lock` for external crate pins only: name, version, source, and
