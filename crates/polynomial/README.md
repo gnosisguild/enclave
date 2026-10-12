@@ -38,9 +38,8 @@ requires exactly `2N-1` descending coefficients. Scalar residue and inverse oper
 
 ```bash
 cargo test -p e3-polynomial --all-features
-cargo bench -p e3-polynomial
 ```
 
 Tests compare bounded integer multiplication with an independent arithmetic reference and pin signed
 division, limb routing, and centering boundaries. ZK folding tests retain an independent test-only
-long-division reference. Benchmarks cover coefficient arithmetic, not ZK witness helpers.
+long-division reference.

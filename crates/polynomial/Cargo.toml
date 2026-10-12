@@ -13,9 +13,6 @@ num-integer = { workspace = true }
 serde = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
-[dev-dependencies]
-criterion = "0.5"
-
 [features]
 default = []
 serde = ["dep:serde", "num-bigint/serde"]
