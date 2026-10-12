@@ -11,7 +11,6 @@
 //! and parameter validation.
 use std::collections::BTreeMap;
 
-use crate::derived::{compute_delta, compute_q_mod_t};
 use crate::search::constants::{D_POW2_MAX, K_MAX};
 use crate::search::errors::{BfvParamsResult, SearchError, ValidationError};
 use crate::search::prime::PrimeItem;
@@ -20,6 +19,7 @@ use crate::search::prime::{
 };
 use crate::search::utils::{approx_bits_from_log2, big_shift_pow2, log2_big};
 use num_bigint::BigUint;
+use num_integer::Integer;
 use num_traits::ToPrimitive;
 use num_traits::Zero;
 use std::collections::HashSet;
@@ -206,7 +206,7 @@ pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSea
                 // [min_log2_q, log2_q_limit].
                 for start in 0..=(bucket.len() - num_primes) {
                     let sel: Vec<PrimeItem> = bucket[start..start + num_primes].to_vec();
-                    let q = sel.iter().map(|pi| pi.value.clone()).product::<BigUint>();
+                    let q = sel.iter().map(|pi| &pi.value).product::<BigUint>();
                     let q_bits = log2_big(&q);
                     let max_qi_log2 = sel.iter().map(|p| p.log2).fold(0.0_f64, f64::max);
 
@@ -314,20 +314,14 @@ pub fn finalize_bfv_candidate(
     d: u64,
     chosen: Vec<PrimeItem>,
 ) -> Option<BfvSearchResult> {
-    let q_bfv = chosen
-        .iter()
-        .map(|pi| pi.value.clone())
-        .product::<BigUint>();
+    let q_bfv = chosen.iter().map(|pi| &pi.value).product::<BigUint>();
 
     // Compute plaintext space: max of user-defined k and z
     let k_plain_eff: u128 = bfv_search_config.k.max(bfv_search_config.z);
 
-    // r_k(q) = q mod k
-    let rkq_big = compute_q_mod_t(&q_bfv, k_plain_eff);
+    // Compute delta = floor(q / k) and r_k(q) without repeating the division.
+    let (delta, rkq_big) = q_bfv.div_rem(&BigUint::from(k_plain_eff));
     let rkq: u128 = rkq_big.to_u128().unwrap_or(0);
-
-    // Δ = floor(q / k)
-    let delta = compute_delta(&q_bfv, k_plain_eff);
 
     // Eq2: 2 d n B B_chi ≤ B_Enc * 2^{-λ}  =>  B_Enc ≥ (2 d n B B_chi) * 2^{λ}
     let two_pow_lambda = big_shift_pow2(bfv_search_config.lambda);
@@ -389,10 +383,7 @@ pub fn refine_from_initial(
     initial_sel: Vec<PrimeItem>,
 ) -> Option<BfvSearchResult> {
     // Determine initial bits and then decrease by 2 bits per step.
-    let initial_q = initial_sel
-        .iter()
-        .map(|pi| pi.value.clone())
-        .product::<BigUint>();
+    let initial_q = initial_sel.iter().map(|pi| &pi.value).product::<BigUint>();
     let mut current_bits = approx_bits_from_log2(log2_big(&initial_q));
 
     // Start with the initial feasible result
@@ -499,7 +490,7 @@ pub fn construct_qi_for_target_bits(
     // Pick selection closest to target bits and test exactly once
     let mut best: Option<(f64, Vec<PrimeItem>)> = None;
     for sel in tried {
-        let q = sel.iter().map(|pi| pi.value.clone()).product::<BigUint>();
+        let q = sel.iter().map(|pi| &pi.value).product::<BigUint>();
         let qbits = log2_big(&q);
         let diff = (qbits - target_f).abs();
         if let Some((best_diff, _)) = &best {
@@ -648,7 +639,7 @@ pub fn bfv_search_second_param(
             // same CRT count, so keep trying before abandoning the bucket.
             for start in 0..=(valid.len() - num_primes) {
                 let sel: Vec<PrimeItem> = valid[start..start + num_primes].to_vec();
-                let q = sel.iter().map(|pi| pi.value.clone()).product::<BigUint>();
+                let q = sel.iter().map(|pi| &pi.value).product::<BigUint>();
                 let q_bits = log2_big(&q);
                 let min_selected = sel.iter().map(|p| &p.value).min().unwrap();
                 let gap_bits = log2_big(&(min_selected - &max_qi_first));
@@ -710,10 +701,7 @@ pub fn refine_second_param_at_d(
         return None;
     }
 
-    let initial_q = initial_sel
-        .iter()
-        .map(|pi| pi.value.clone())
-        .product::<BigUint>();
+    let initial_q = initial_sel.iter().map(|pi| &pi.value).product::<BigUint>();
     let mut current_bits = approx_bits_from_log2(log2_big(&initial_q));
     let mut all_passing: Vec<BfvSearchResult> = Vec::new();
 
@@ -822,7 +810,7 @@ pub fn construct_qi_second_param(
     // old behaviour of taking the smallest valid primes in the smallest bucket.
     let mut best: Option<(f64, Vec<PrimeItem>)> = None;
     for sel in tried {
-        let q = sel.iter().map(|pi| pi.value.clone()).product::<BigUint>();
+        let q = sel.iter().map(|pi| &pi.value).product::<BigUint>();
         let qbits = log2_big(&q);
         if let Some((best_qbits, _)) = &best {
             if qbits < *best_qbits {
@@ -859,13 +847,9 @@ pub fn finalize_second_param(
         }
     }
 
-    let q_bfv = chosen
-        .iter()
-        .map(|pi| pi.value.clone())
-        .product::<BigUint>();
-    let rkq_big = compute_q_mod_t(&q_bfv, k_plain);
+    let q_bfv = chosen.iter().map(|pi| &pi.value).product::<BigUint>();
+    let (delta, rkq_big) = q_bfv.div_rem(&k_big);
     let rkq: u128 = rkq_big.to_u128().unwrap_or(0);
-    let delta = compute_delta(&q_bfv, k_plain);
 
     // For second set: B_Enc = B (simpler), B_fresh = B_Enc + d*B*B_chi + d*B*B_chi
     let benc = BigUint::from(bfv_search_config.b);
@@ -922,6 +906,55 @@ mod tests {
     }
 
     #[test]
+    fn finalizers_preserve_plaintext_moduli_above_u64() {
+        let k = u128::from(u64::MAX) + 2;
+        let config = BfvSearchConfig {
+            n: 1,
+            z: 1,
+            k,
+            lambda: 0,
+            b: 1,
+            b_chi: 1,
+            min_margin: 0.0,
+            verbose: false,
+        };
+        // Prime selection checks NTT suitability before finalization; these primes isolate
+        // the finalizers' full-precision arithmetic and pass the second set's 2*k gap.
+        let chosen: Vec<_> = [127u8, 89]
+            .into_iter()
+            .map(|bits| {
+                let value = (BigUint::from(1u32) << usize::from(bits)) - 1u32;
+                PrimeItem {
+                    bitlen: bits,
+                    log2: f64::from(bits),
+                    hex: value.to_str_radix(16),
+                    value,
+                }
+            })
+            .collect();
+        for result in [
+            finalize_bfv_candidate(&config, 8, chosen.clone()).unwrap(),
+            finalize_second_param(&config, 8, chosen, k).unwrap(),
+        ] {
+            assert_eq!(result.k_plain_eff, k);
+            assert_eq!(
+                result.q_bfv,
+                BigUint::parse_bytes(
+                    b"105312291668557186697918027513529248857806893649219117400977309697",
+                    10
+                )
+                .unwrap()
+            );
+            assert_eq!(
+                result.delta,
+                BigUint::parse_bytes(b"5708990770823839523923658858753263439934652416", 10)
+                    .unwrap()
+            );
+            assert_eq!(result.rkq, 9223372036871553025);
+        }
+    }
+
+    #[test]
     fn test_bfv_search_result_qi_values() {
         let primes = build_prime_items();
         assert!(!primes.is_empty());
@@ -930,7 +963,7 @@ mod tests {
         let result = BfvSearchResult {
             d: 512,
             k_plain_eff: 1000,
-            q_bfv: test_primes.iter().map(|p| p.value.clone()).product(),
+            q_bfv: test_primes.iter().map(|p| &p.value).product(),
             selected_primes: test_primes.clone(),
             rkq: 0,
             delta: BigUint::one(),
@@ -1045,7 +1078,7 @@ mod tests {
             let expected_q = res
                 .selected_primes
                 .iter()
-                .map(|p| p.value.clone())
+                .map(|p| &p.value)
                 .product::<BigUint>();
             assert_eq!(res.q_bfv, expected_q);
 

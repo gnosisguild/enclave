@@ -51,14 +51,14 @@ Functions to construct `BfvParameters` instances:
 
 ### Derived arithmetic (`derived`)
 
-This module owns BFV scaling, Q residues and inverses, `k0_i`, and coefficient widths. Circuit
-computations and parameter search use its exact integer division and residue functions. Search
-plaintext moduli retain their full `u128` precision. Plaintext decoding uses
-`fhe_traits::FheDecoder` directly; it is not parameter-derived arithmetic.
+This module owns CRT products, centered Q residues, Q inverses, `k0_i`, and coefficient widths.
+Callers use standard integer operations for division and residues. Parameter search computes both
+with `Integer::div_rem`; plaintext moduli retain their full `u128` precision. Plaintext decoding
+uses `fhe_traits::FheDecoder` directly; it is not parameter-derived arithmetic.
 
-Centered Q residues retain the raw helper's full positive `u64` modulus domain. They use
-arbitrary-precision floor-modulus arithmetic, not the FHE primitive's restricted 62-bit constructor.
-This scalar derivation does not depend on polynomial coefficient transforms.
+Centered Q residues use the caller's reduced residue and retain the full positive `u64` modulus
+domain. They use arbitrary-precision floor-modulus arithmetic, not the FHE primitive's restricted
+62-bit constructor. This scalar derivation does not depend on polynomial coefficient transforms.
 
 ### Search (`search`)
 

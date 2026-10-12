@@ -167,7 +167,7 @@ impl Computation for Bits {
         // One width covers every limb's `r`, so take the widest bound.
         let mut r_bit = 0;
         for bound in data.r_bounds.iter() {
-            r_bit = r_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            r_bit = r_bit.max(calculate_bit_width(&BigInt::from(bound.clone())));
         }
 
         let (threshold_params, _) =
@@ -435,7 +435,7 @@ mod tests {
         let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
 
         let max_q = *threshold_params.moduli().iter().max().unwrap();
-        let expected_bit = calculate_bit_width((BigInt::from(max_q) - BigInt::from(1)) / 2);
+        let expected_bit = calculate_bit_width(&((BigInt::from(max_q) - BigInt::from(1)) / 2));
 
         assert_eq!(bits.d_bit, expected_bit);
         assert_eq!(bits.ct_bit, expected_bit);

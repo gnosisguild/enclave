@@ -135,19 +135,19 @@ impl Computation for Bits {
 
     fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         // Calculate bit widths for each bound type
-        let eek_bit = calculate_bit_width(BigInt::from(data.eek_bound.clone()));
-        let sk_bit = calculate_bit_width(BigInt::from(data.sk_bound.clone()));
+        let eek_bit = calculate_bit_width(&BigInt::from(data.eek_bound.clone()));
+        let sk_bit = calculate_bit_width(&BigInt::from(data.sk_bound.clone()));
         // e_sm limbs are centered residues, so they share the pk/modulus width. The lifted value
         // carries the smudging bound and needs its own, much wider, window.
-        let e_sm_lifted_bit = calculate_bit_width(BigInt::from(data.e_sm_bound.clone()));
+        let e_sm_lifted_bit = calculate_bit_width(&BigInt::from(data.e_sm_bound.clone()));
         let mut e_sm_bit = 0;
         for bound in &data.e_sm_limb_bounds {
-            e_sm_bit = e_sm_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            e_sm_bit = e_sm_bit.max(calculate_bit_width(&BigInt::from(bound.clone())));
         }
         let mut e_sm_quotient_bit = 0;
         for bound in &data.e_sm_quotient_bounds {
             e_sm_quotient_bit =
-                e_sm_quotient_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+                e_sm_quotient_bit.max(calculate_bit_width(&BigInt::from(bound.clone())));
         }
 
         // pk_bit: centered representation uses (max(qi) - 1) / 2 as the bound,
@@ -159,7 +159,7 @@ impl Computation for Bits {
         // One width covers every limb's `r`, so take the widest bound.
         let mut r_bit = 0;
         for bound in &data.r_bounds {
-            r_bit = r_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            r_bit = r_bit.max(calculate_bit_width(&BigInt::from(bound.clone())));
         }
 
         Ok(Bits {

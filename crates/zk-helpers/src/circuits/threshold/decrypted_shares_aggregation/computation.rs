@@ -23,7 +23,7 @@ use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::derived::calculate_bit_width;
-use e3_fhe_params::derived::compute_q_mod_t;
+use e3_fhe_params::derived::compute_native_crt_coeff_bit;
 use e3_fhe_params::derived::compute_q_mod_t_centered;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::{CrtPolynomial, Polynomial};
@@ -126,8 +126,8 @@ impl Computation for Bounds {
         let moduli = threshold_params.moduli();
         let t = threshold_params.plaintext();
         let q = e3_fhe_params::derived::compute_q_product(moduli);
-        let delta = e3_fhe_params::derived::compute_delta(&q, t);
-        let delta_half = e3_fhe_params::derived::compute_delta_half(&delta);
+        let delta = &q / t;
+        let delta_half = &delta >> 1usize;
         Ok(Bounds { delta, delta_half })
     }
 }
@@ -138,17 +138,16 @@ impl Computation for Bits {
     type Error = CircuitsErrors;
 
     fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
-        let noise_bit = calculate_bit_width(BigInt::from(data.delta_half.clone()));
+        let noise_bit = calculate_bit_width(&BigInt::from(data.delta_half.clone()));
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let ctx = threshold_params
             .context_at_level(0)
             .map_err(|e| CircuitsErrors::Other(format!("context_at_level: {:?}", e)))?;
-        let mut d_native_bit = 0u32;
+        let d_native_bit = compute_native_crt_coeff_bit(threshold_params.moduli());
         let mut modulus_product = BigInt::from(1u32);
         for qi in ctx.moduli_operators() {
             let q = BigInt::from(**qi);
-            d_native_bit = d_native_bit.max(calculate_bit_width(q.clone() - 1));
             modulus_product *= q;
         }
         // A residue fits `bits(q_l - 1)`; `d_native_bit` is already that maximum.
@@ -156,8 +155,8 @@ impl Computation for Bits {
         // Reduction quotients: the widest reduced input is the interpolation sum, under `H * q^2`,
         // so its quotient is under `H * q`. Six spare bits cover any committee up to 64 parties.
         let k_bit = q_bit + 6;
-        let t_bit = calculate_bit_width(BigInt::from(threshold_params.plaintext()));
-        let q_total_bit = calculate_bit_width(modulus_product.clone());
+        let t_bit = calculate_bit_width(&BigInt::from(threshold_params.plaintext()));
+        let q_total_bit = calculate_bit_width(&modulus_product);
         Ok(Bits {
             noise_bit,
             d_native_bit,
@@ -180,8 +179,8 @@ impl Computation for Configs {
         let moduli = threshold_params.moduli().to_vec();
         let t = threshold_params.plaintext();
         let q = e3_fhe_params::derived::compute_q_product(&moduli);
-        let q_mod_t = compute_q_mod_t(&q, t);
-        let q_mod_t_centered = compute_q_mod_t_centered(&moduli, t);
+        let q_mod_t = &q % t;
+        let q_mod_t_centered = compute_q_mod_t_centered(&q_mod_t, t);
         let q_inverse_mod_t = e3_fhe_params::derived::compute_q_inverse_mod_t(&q, t)?;
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;

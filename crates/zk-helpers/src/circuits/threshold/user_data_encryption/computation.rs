@@ -154,26 +154,26 @@ impl Computation for Bits {
     fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let max_pk_bound = data.pk_bounds.iter().max().unwrap();
 
-        let pk_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
+        let pk_bit = calculate_bit_width(&BigInt::from(max_pk_bound.clone()));
         // We can safely assume that the ct bound is the same as the pk bound.
-        let ct_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
-        let u_bit = calculate_bit_width(BigInt::from(data.u_bound.clone()));
-        let e0_bit = calculate_bit_width(BigInt::from(data.e0_bound.clone()));
-        let e1_bit = calculate_bit_width(BigInt::from(data.e1_bound.clone()));
+        let ct_bit = calculate_bit_width(&BigInt::from(max_pk_bound.clone()));
+        let u_bit = calculate_bit_width(&BigInt::from(data.u_bound.clone()));
+        let e0_bit = calculate_bit_width(&BigInt::from(data.e0_bound.clone()));
+        let e1_bit = calculate_bit_width(&BigInt::from(data.e1_bound.clone()));
 
         // For k1, use the maximum of low and up bounds
-        let k1_low_bit = calculate_bit_width(BigInt::from(data.k1_low_bound.clone()));
-        let k1_up_bit = calculate_bit_width(BigInt::from(data.k1_up_bound.clone()));
+        let k1_low_bit = calculate_bit_width(&BigInt::from(data.k1_low_bound.clone()));
+        let k1_up_bit = calculate_bit_width(&BigInt::from(data.k1_up_bound.clone()));
         let k_bit = k1_low_bit.max(k1_up_bit);
 
         // Each `r` is two-sided, so take the widest bound across the CRT bases.
         let mut ct0_r_bit = 0;
         for bound in &data.ct0_r_bounds {
-            ct0_r_bit = ct0_r_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            ct0_r_bit = ct0_r_bit.max(calculate_bit_width(&BigInt::from(bound.clone())));
         }
         let mut ct1_r_bit = 0;
         for bound in &data.ct1_r_bounds {
-            ct1_r_bit = ct1_r_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            ct1_r_bit = ct1_r_bit.max(calculate_bit_width(&BigInt::from(bound.clone())));
         }
 
         Ok(Bits {
@@ -564,7 +564,7 @@ mod tests {
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
         let max_pk_bound = bounds.pk_bounds.iter().max().unwrap();
-        let expected_bits = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
+        let expected_bits = calculate_bit_width(&BigInt::from(max_pk_bound.clone()));
 
         assert_eq!(max_pk_bound.clone(), BigUint::from(34359701504u64));
         assert_eq!(bits.pk_bit, expected_bits);

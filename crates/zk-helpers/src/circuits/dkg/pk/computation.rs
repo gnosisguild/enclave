@@ -15,7 +15,6 @@ use crate::crt_polynomial_to_toml_json;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
-use e3_fhe_params::derived::compute_max_modulus;
 use e3_fhe_params::derived::compute_modulus_bit;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
@@ -129,7 +128,7 @@ impl Computation for Bounds {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
         let moduli = dkg_params.moduli();
-        let max_mod = compute_max_modulus(moduli);
+        let max_mod = moduli.iter().copied().max().unwrap();
         let pk_bound = (BigUint::from(max_mod) - 1u32) / 2u32;
 
         Ok(Bounds { pk_bound })

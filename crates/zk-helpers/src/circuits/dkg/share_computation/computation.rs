@@ -21,7 +21,9 @@ use crate::CircuitsErrors;
 use crate::{crt_polynomial_to_toml_json, poly_coefficients_to_toml_json};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
-use e3_fhe_params::derived::{calculate_bit_width, compute_modulus_bit};
+use e3_fhe_params::derived::{
+    calculate_bit_width, compute_modulus_bit, compute_native_crt_coeff_bit,
+};
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use fhe::bfv::SecretKey;
@@ -132,15 +134,10 @@ impl Computation for Bits {
         let (threshold_params, _) = build_pair_for_preset(preset)
             .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
-        let mut bit_share = 0;
-        for &qi in threshold_params.moduli() {
-            let share_bound = BigUint::from(qi - 1);
-            let bit_width = calculate_bit_width(BigInt::from(share_bound));
-            bit_share = bit_share.max(bit_width);
-        }
+        let bit_share = compute_native_crt_coeff_bit(threshold_params.moduli());
 
         Ok(Bits {
-            bit_sk_secret: calculate_bit_width(BigInt::from(data.sk_bound.clone())),
+            bit_sk_secret: calculate_bit_width(&BigInt::from(data.sk_bound.clone())),
             // The e_sm secret is held as centered CRT residues, so it shares the modulus width
             // with C1's committed limbs. C1 range-checks the smudging bound on its lifted
             // witness; that bound exceeds every q_i and is not the width of what is hashed here.
@@ -316,7 +313,7 @@ mod tests {
         .unwrap();
         let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
-        let expected_sk_bits = calculate_bit_width(BigInt::from(bounds.sk_bound.clone()));
+        let expected_sk_bits = calculate_bit_width(&BigInt::from(bounds.sk_bound.clone()));
 
         assert_eq!(bits.bit_sk_secret, expected_sk_bits);
     }
