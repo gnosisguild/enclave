@@ -6,7 +6,6 @@
 
 #![allow(clippy::result_large_err)]
 
-use e3_polynomial_fhe::FromFhePolynomial as _;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -48,6 +47,7 @@ use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
 use e3_trbfv::calculate_decryption_share::calculate_decryption_share;
 use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;

@@ -6,7 +6,7 @@
 
 //! Error types for circuit and codegen operations.
 
-use crate::utils::ZkHelpersUtilsError;
+use crate::encoding::ZkHelpersUtilsError;
 use e3_fhe_params::utils::K0Error;
 use e3_polynomial::CrtPolynomialError;
 use thiserror::Error;

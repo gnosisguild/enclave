@@ -9,13 +9,13 @@
 //! Produces a random BFV ciphertext, aggregated secret and smudging-error shares (s, e),
 //! and the corresponding decryption share (d_share) for use in codegen and tests.
 
-use e3_polynomial_fhe::FromFhePolynomial as _;
 use std::sync::Arc;
 
 use crate::{threshold::share_decryption::ShareDecryptionCircuitData, CircuitsErrors};
 use e3_committee::CiphernodesCommittee;
 use e3_fhe_params::{build_pair_for_preset, create_deterministic_crp_from_default_seed, BfvPreset};
 use e3_polynomial::CrtPolynomial;
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe::{
     bfv::{Encoding, Plaintext, PublicKey},
     mbfv::{AggregateIter, PublicKeyShare},

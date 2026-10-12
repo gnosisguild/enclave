@@ -60,6 +60,7 @@ flowchart TD
         Logger[e3-logger]
     end
 
+
     subgraph Vocabulary[Protocol vocabulary and deterministic rules]
         Events[e3-events]
         Config[e3-config]
@@ -171,12 +172,12 @@ flowchart TD
     Events --> Trbfv
     Events --> ZkHelpers
     Events --> Committee
+    ZkHelpers --> Committee
     ZkHelpers --> FheParams
     ZkHelpers --> Poly
     ZkHelpers --> PolyFhe
     ZkHelpers --> Matrix
     ZkHelpers --> Safe
-    ZkHelpers --> Committee
     PolyFhe --> Poly
     Crypto --> Utils
     Utils --> UtilsDerive

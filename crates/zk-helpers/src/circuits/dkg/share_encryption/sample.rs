@@ -123,7 +123,6 @@ mod tests {
     use crate::computation::DkgInputType;
     use e3_committee::CiphernodesCommitteeSize;
     use e3_fhe_params::BfvPreset;
-    use fhe::bfv::Encoding;
     use fhe_traits::FheDecoder;
 
     #[test]

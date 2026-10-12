@@ -9,9 +9,9 @@
 //! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
 //! and (for input) public key shares and aggregated public key. They implement [`Computation`] and are used by codegen.
 
-use crate::bigint_1d_to_json_values;
 use crate::compute_threshold_pk_commitment;
-use crate::crt_polynomial_to_toml_json;
+use crate::encoding::bigint_1d_to_json_values;
+use crate::encoding::crt_polynomial_to_toml_json;
 use crate::threshold::pk_aggregation::circuit::PkAggregationCircuit;
 use crate::threshold::pk_aggregation::circuit::PkAggregationCircuitData;
 use crate::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;

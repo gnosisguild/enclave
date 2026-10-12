@@ -15,7 +15,7 @@ use crate::circuits::dkg::share_decryption::ShareDecryptionOutput;
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
 use crate::computation::Computation;
-use crate::registry::Circuit;
+use crate::metadata::Circuit;
 use e3_fhe_params::BfvPreset;
 
 /// Implementation of [`CircuitCodegen`] for [`ShareDecryptionCircuit`].

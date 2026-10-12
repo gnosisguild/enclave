@@ -3702,7 +3702,6 @@ dependencies = [
  "e3-support-scripts",
  "e3-trbfv",
  "e3-utils",
- "e3-zk-helpers",
  "e3-zk-prover",
  "hex",
  "opentelemetry",

@@ -14,16 +14,16 @@ use crate::circuits::commitments::{
     compute_aggregated_shares_commitment, compute_ciphertext_commitment,
 };
 use crate::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
-use crate::crt_polynomial_to_toml_json;
+use crate::encoding::crt_polynomial_to_toml_json;
 use crate::negacyclic::fold_negacyclic;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuit;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuitData;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
-use e3_fhe_params::utils::calculate_bit_width;
-use e3_fhe_params::utils::compute_modulus_bit;
-use e3_fhe_params::utils::compute_native_crt_coeff_bit;
+use e3_fhe_params::utils::{
+    calculate_bit_width, compute_modulus_bit, compute_native_crt_coeff_bit,
+};
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;

@@ -6,8 +6,7 @@
 
 //! Bounds, configs, bits, and input computation for the Decryption Share Aggregation TRBFV circuit.
 //!
-//! Uses [`crate::threshold::decrypted_shares_aggregation::utils`] for Q/delta, modular inverses,
-//! Lagrange-at-zero recovery, and scalar CRT reconstruction. Decryption shares are normalized
+//! Uses [`e3_fhe_params::utils`] for centered residues and coefficient widths. Decryption shares are normalized
 //! with [`e3_polynomial::CrtPolynomial::reduce`]; all input coefficients are reduced to
 //! [0, zkp_modulus) with [`num_integer::Integer::mod_floor`] inside [`Inputs::compute`].
 
@@ -15,16 +14,16 @@
 pub const MAX_MSG_NON_ZERO_COEFFS: usize = 50;
 
 use crate::circuits::commitments::compute_threshold_decryption_share_commitment;
-use crate::get_zkp_modulus;
+use crate::encoding::get_zkp_modulus;
 use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuit;
 use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuitData;
 use crate::threshold::decrypted_shares_aggregation::utils;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
-use e3_fhe_params::utils::calculate_bit_width;
-use e3_fhe_params::utils::compute_native_crt_coeff_bit;
-use e3_fhe_params::utils::compute_q_mod_t_centered;
+use e3_fhe_params::utils::{
+    calculate_bit_width, compute_native_crt_coeff_bit, compute_q_mod_t_centered,
+};
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_polynomial_fhe::FromFhePolynomial as _;
@@ -335,9 +334,9 @@ impl Computation for Inputs {
     }
 
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
-        use crate::bigint_1d_to_json_values;
-        use crate::crt_polynomial_to_toml_json;
-        use crate::polynomial_to_toml_json;
+        use crate::encoding::bigint_1d_to_json_values;
+        use crate::encoding::crt_polynomial_to_toml_json;
+        use crate::encoding::polynomial_to_toml_json;
 
         let decryption_shares_json: Vec<Vec<serde_json::Value>> = self
             .decryption_shares

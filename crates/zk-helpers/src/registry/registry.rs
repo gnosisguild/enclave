@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::computation::DkgInputType;
+use crate::metadata::Circuit;
 use e3_fhe_params::ParameterType;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -15,30 +16,6 @@ use thiserror::Error;
 pub enum RegistryError {
     #[error("Unknown circuit: {name}")]
     UnknownCircuit { name: String },
-}
-
-/// Trait for circuit metadata.
-pub trait Circuit: Send + Sync {
-    const NAME: &'static str;
-    const PREFIX: &'static str;
-    const SUPPORTED_PARAMETER: ParameterType;
-    const DKG_INPUT_TYPE: Option<DkgInputType>;
-
-    fn name(&self) -> &'static str {
-        Self::NAME
-    }
-
-    fn prefix(&self) -> &'static str {
-        Self::PREFIX
-    }
-
-    fn supported_parameter(&self) -> ParameterType {
-        Self::SUPPORTED_PARAMETER
-    }
-
-    fn dkg_input_type(&self) -> Option<DkgInputType> {
-        Self::DKG_INPUT_TYPE
-    }
 }
 
 pub trait CircuitMetadata: Send + Sync {

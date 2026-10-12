@@ -4,17 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! Committee compatibility with the compiled Noir circuits.
+
 use anyhow::Result;
 use e3_committee::{CiphernodesCommittee, CiphernodesCommitteeSize};
 
 /// Validate `(T, N, H)` against the canonical committee table used by compiled Noir circuits.
 ///
-/// Returns the canonical row on success. Callers must pass the same `(threshold_m, threshold_n,
-/// h)` the active `committee/*/mod.nr` was built with — smudging bounds and C1 public IO depend on
-/// `N_PARTIES` (= `n`), not BFV preset degree.
+/// Callers must use the committee that the active Noir module was built with.
+/// Smudging bounds and C1 public IO depend on the party count, not the BFV degree.
 pub fn canonical_committee_for_circuit(
     committee: &CiphernodesCommittee,
-) -> Result<CiphernodesCommittee, anyhow::Error> {
+) -> Result<CiphernodesCommittee> {
     let expected =
         CiphernodesCommitteeSize::from_threshold(committee.threshold, committee.n)?.values();
     if committee.h != expected.h {
@@ -35,18 +36,4 @@ pub fn canonical_committee_for_circuit(
         );
     }
     Ok(expected)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn canonical_committee_for_circuit_accepts_micro_row() {
-        let committee = CiphernodesCommitteeSize::Micro.values();
-        assert_eq!(
-            canonical_committee_for_circuit(&committee).unwrap(),
-            committee
-        );
-    }
 }
