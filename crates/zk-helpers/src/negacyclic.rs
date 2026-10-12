@@ -6,9 +6,7 @@
 
 //! Negacyclic folding with descending coefficients.
 
-use crate::Polynomial;
-#[cfg(test)]
-use crate::{center, reduce};
+use e3_polynomial::Polynomial;
 #[cfg(test)]
 use num_bigint::BigInt;
 #[cfg(test)]
@@ -21,16 +19,12 @@ use num_traits::Zero;
 /// `j`: its low part is `poly[N-1+j]` and the high part that wraps onto it is `poly[j-1]`. Index
 /// `j = 0` is degree `N-1`, whose partner would be degree `2N-1` and so does not exist.
 ///
-/// Callers that only need the reduced value do not pay for [`Polynomial::reduce_by_cyclotomic`].
-/// That routine goes through
-/// generic long division, whose inner loop runs over all `N+1` divisor coefficients including the
-/// `N-1` zeros of `x^N + 1` — about `N^2` BigInt multiply-subtracts, 67 million at `N = 8192`, for a
-/// result this computes in `N` subtractions. `fold_matches_generic_reduction` pins the two together.
+/// The tests compare this linear fold with independent polynomial long division.
 ///
 /// # Panics
 ///
 /// Panics when `poly` does not have exactly `2N-1` coefficients.
-pub fn fold_negacyclic(poly: &Polynomial, n: usize) -> Polynomial {
+pub(crate) fn fold_negacyclic(poly: &Polynomial, n: usize) -> Polynomial {
     let c = poly.coefficients();
     assert_eq!(c.len(), 2 * n - 1, "fold_negacyclic expects degree 2(N-1)");
 
@@ -45,6 +39,12 @@ pub fn fold_negacyclic(poly: &Polynomial, n: usize) -> Polynomial {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[should_panic(expected = "fold_negacyclic expects degree 2(N-1)")]
+    fn fold_rejects_extra_coefficients() {
+        fold_negacyclic(&Polynomial::new(vec![BigInt::zero(); 8]), 4);
+    }
 
     fn cyclotomic_polynomial(n: u64) -> Vec<BigInt> {
         let mut cyclo = vec![BigInt::from(0u64); (n + 1) as usize];
@@ -74,24 +74,16 @@ mod tests {
 
             // `pk0` is `hat` reduced into R_qi.
             let folded = fold_negacyclic(&hat, n);
-            let pk0 = Polynomial::new(
-                folded
-                    .coefficients()
-                    .iter()
-                    .map(|c| center(&reduce(c, &qi), &qi))
-                    .collect::<Vec<BigInt>>(),
-            );
+            let mut pk0 = folded.clone();
+            pk0.reduce(&qi);
+            pk0.center(&qi);
 
             // Independent long division.
             let (r1, _r2) = decompose_residue_reference(&pk0, &hat, &qi, &cyclo, n as u64);
-            let old = r1.reduce_by_cyclotomic(&cyclo).unwrap();
+            let old = reduce_reference(&r1, &cyclo);
 
             // Production route: fold once, then an exact scalar division.
-            let (new, remainder) = pk0
-                .sub(&folded)
-                .div(&Polynomial::constant(qi.clone()))
-                .unwrap();
-            assert!(remainder.is_zero(), "division must be exact at N = {n}");
+            let new = pk0.sub(&folded).div_exact(&qi).unwrap();
 
             assert_eq!(
                 old.coefficients(),
@@ -101,11 +93,7 @@ mod tests {
         }
     }
 
-    /// The O(N) fold must agree with generic long division, coefficient for coefficient.
-    ///
-    /// This is the whole licence for skipping `reduce_by_cyclotomic`: the fast path is only safe
-    /// while it produces the same polynomial. Sizes are odd and even, and the inputs include
-    /// negative coefficients and a high half that wraps onto every position.
+    /// Verify odd/even sizes and signed high coefficients against long division.
     #[test]
     fn fold_matches_generic_reduction() {
         for n in [2usize, 3, 4, 8, 17] {
@@ -124,7 +112,7 @@ mod tests {
             let poly = Polynomial::new(coefficients);
 
             let fast = fold_negacyclic(&poly, n);
-            let generic = poly.reduce_by_cyclotomic(&cyclo).unwrap();
+            let generic = reduce_reference(&poly, &cyclo);
             assert_eq!(
                 fast.coefficients(),
                 generic.coefficients(),
@@ -173,8 +161,7 @@ mod tests {
         let cyclo_poly = Polynomial::new(cyclo.to_vec());
         let qi_poly = Polynomial::new(vec![qi_bigint.clone()]);
 
-        let mut xi_hat_mod_rqi = xi_hat.clone();
-        xi_hat_mod_rqi = xi_hat_mod_rqi.reduce_by_cyclotomic(cyclo).unwrap();
+        let mut xi_hat_mod_rqi = reduce_reference(xi_hat, cyclo);
         xi_hat_mod_rqi.reduce(qi_bigint);
         xi_hat_mod_rqi.center(qi_bigint);
         assert_eq!(xi, &xi_hat_mod_rqi);
@@ -186,7 +173,7 @@ mod tests {
         num_mod_zqi.reduce(qi_bigint);
         num_mod_zqi.center(qi_bigint);
 
-        let (r2_poly, r2_rem_poly) = num_mod_zqi.clone().div(&cyclo_poly).unwrap();
+        let (r2_poly, r2_rem_poly) = divide_reference(&num_mod_zqi, &cyclo_poly);
         assert!(r2_rem_poly.coefficients().iter().all(|c| c.is_zero()));
         assert_eq!((r2_poly.coefficients().len() as u64) - 1, n - 2);
 
@@ -198,9 +185,42 @@ mod tests {
 
         let num_poly = Polynomial::new(num_coeffs);
         let r1_num = num_poly.sub(&r2_times_cyclo);
-        let (r1_poly, r1_rem_poly) = r1_num.div(&qi_poly).unwrap();
+        let (r1_poly, r1_rem_poly) = divide_reference(&r1_num, &qi_poly);
         assert!(r1_rem_poly.coefficients().iter().all(|c| c.is_zero()));
 
         (r1_poly, r2_poly)
+    }
+
+    /// Independent integer long division for the monic and scalar test divisors.
+    fn divide_reference(numerator: &Polynomial, divisor: &Polynomial) -> (Polynomial, Polynomial) {
+        let d = divisor.coefficients();
+        let mut remainder = numerator.coefficients().to_vec();
+        if remainder.len() < d.len() {
+            return (Polynomial::new(vec![BigInt::zero()]), numerator.clone());
+        }
+        let mut quotient = vec![BigInt::zero(); remainder.len() - d.len() + 1];
+        for i in 0..quotient.len() {
+            assert!((&remainder[i] % &d[0]).is_zero());
+            quotient[i] = &remainder[i] / &d[0];
+            for j in 0..d.len() {
+                remainder[i + j] -= &quotient[i] * &d[j];
+            }
+        }
+        let first = remainder
+            .iter()
+            .position(|c| !c.is_zero())
+            .unwrap_or(remainder.len());
+        (
+            Polynomial::new(quotient),
+            Polynomial::new(remainder[first..].to_vec()),
+        )
+    }
+
+    fn reduce_reference(poly: &Polynomial, cyclo: &[BigInt]) -> Polynomial {
+        let (_, remainder) = divide_reference(poly, &Polynomial::new(cyclo.to_vec()));
+        let mut coefficients = vec![BigInt::zero(); cyclo.len() - 1];
+        let start = coefficients.len() - remainder.coefficients().len();
+        coefficients[start..].clone_from_slice(remainder.coefficients());
+        Polynomial::new(coefficients)
     }
 }

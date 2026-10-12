@@ -18,13 +18,13 @@ use crate::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_C
 use crate::compute_modulus_bit;
 use crate::compute_native_crt_coeff_bit;
 use crate::crt_polynomial_to_toml_json;
+use crate::negacyclic::fold_negacyclic;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuit;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuitData;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
-use e3_polynomial::fold_negacyclic;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
 use e3_polynomial_fhe::FromFhePolynomial as _;
@@ -316,24 +316,18 @@ impl Computation for Inputs {
             //   d = (ct0 + ct1 * s + e mod X^N + 1) + q * r
             // so folding the `d_share_hat` already computed above and dividing by q gives it.
             //
-            // All O(N). Going via `decompose_residue` and `reduce_by_cyclotomic` would recompute the
-            // ct1 * s product and run generic long division over a divisor whose N-1 interior
-            // coefficients are zero -- see 9a35e2e1, where that cost C1 5.09s against 0.92s.
+            // Fold the existing product in O(N), without recomputing the convolution.
             let reduced_hat = fold_negacyclic(&d_share_hat, n as usize);
 
-            // Exact division is the identity: `div` rejects any coefficient of `d - reduced_hat`
+            // Exact division rejects any coefficient of `d - reduced_hat`
             // that is not a multiple of qi, so a successful division proves an integer `r` closes
             // the reduced equation, and a wrong fold surfaces as a divisibility failure.
-            let (r, remainder) = d_share
+            let r = d_share
                 .sub(&reduced_hat)
-                .div(&Polynomial::constant(qi.clone()))
+                .div_exact(&qi)
                 .expect("d - (ct0 + ct1 * s + e mod X^N + 1) must be divisible by qi");
-            assert!(
-                remainder.is_zero(),
-                "reduced decryption-share identity must divide exactly by qi"
-            );
 
-            // Restate the identity on the derived witness. Cheap at O(N), independent of `div`.
+            // Check the derived witness against the integer identity.
             assert!(
                 d_share.sub(&reduced_hat.add(&r.scalar_mul(&qi))).is_zero(),
                 "reduced identity must hold: d == ct0 + ct1 * sk + e_sm + qi * r (mod X^N + 1)"

@@ -17,7 +17,7 @@
 
 mod common;
 
-use e3_polynomial_fhe::{FromFhePolynomial as _, ToFhePolynomial as _};
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use std::sync::Arc;
 
 use ark_bn254::Fr;
@@ -86,7 +86,7 @@ fn aggregate_dkg_decrypted_shares_to_crt(
         }
         limb_vecs.push(coeffs);
     }
-    CrtPolynomial::from_bigint_vectors(limb_vecs)
+    CrtPolynomial::new(limb_vecs.into_iter().map(Polynomial::new).collect())
 }
 
 /// Normalize an aggregated DKG CrtPolynomial to match C4's output representation.
@@ -704,14 +704,26 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
     let dkg_out = DkgShareDecryptionCircuit::compute(preset, &dkg_sample).unwrap();
     let agg_sk = aggregate_dkg_decrypted_shares_to_crt(&dkg_out.inputs.decrypted_shares);
 
-    let sk_poly = agg_sk
-        .to_fhe_polynomial(ctx, moduli)
-        .expect("agg_sk -> Poly")
-        .into_ntt();
-    let es_poly = c6_sample
-        .e
-        .to_fhe_polynomial(ctx, moduli)
-        .expect("e -> Poly");
+    // Rebuild the native FHE inputs for this cross-circuit transcript fixture.
+    let to_fhe = |crt: &CrtPolynomial| {
+        use fhe_math::rq::{traits::TryConvertFrom, Poly, PowerBasis};
+        use num_integer::Integer;
+        use num_traits::ToPrimitive;
+        let coefficients: Vec<u64> = crt
+            .limbs
+            .iter()
+            .zip(moduli)
+            .flat_map(|(limb, &qi)| {
+                let qi = num_bigint::BigInt::from(qi);
+                limb.coefficients()
+                    .iter()
+                    .map(move |c| c.mod_floor(&qi).to_u64().unwrap())
+            })
+            .collect();
+        Poly::<PowerBasis>::try_convert_from(coefficients, ctx, false).unwrap()
+    };
+    let sk_poly = to_fhe(&agg_sk).into_ntt();
+    let es_poly = to_fhe(&c6_sample.e);
 
     let trbfv =
         TRBFV::new(committee.n, committee.threshold, threshold_params.clone()).expect("TRBFV::new");

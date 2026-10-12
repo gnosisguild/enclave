@@ -7,7 +7,6 @@
 //! BFV parameter arithmetic for ZK circuit computations.
 
 use crate::CircuitsErrors;
-use e3_polynomial::center;
 use fhe::bfv::{Encoding, Plaintext};
 use fhe_math::zq::Modulus;
 use fhe_traits::FheDecoder;
@@ -75,7 +74,9 @@ pub fn compute_q_mod_t_centered(moduli: &[u64], t: u64) -> BigInt {
     let q = compute_q_product(moduli);
     let q_mod_t_uint = compute_q_mod_t(&q, t);
     let t_bn = BigInt::from(t);
-    center(&BigInt::from(q_mod_t_uint), &t_bn)
+    // Preserve the raw helper's full u64 domain; zq::Modulus is limited to 62 bits.
+    let half = &t_bn / 2u32;
+    (BigInt::from(q_mod_t_uint) + &half).mod_floor(&t_bn) - half
 }
 
 /// t^{-1} mod Q (for CRT / scaling). Fails if gcd(Q, t) != 1.
@@ -135,6 +136,35 @@ mod tests {
         let moduli = [3u64, 5, 7];
         let q = compute_q_product(&moduli);
         assert_eq!(q, BigUint::from(105u64));
+    }
+
+    #[test]
+    fn centered_q_residues_preserve_small_and_full_width_moduli() {
+        for (moduli, t, expected) in [
+            (vec![3], 5, BigInt::from(-2)),
+            (vec![2], 5, BigInt::from(2)),
+            (vec![3], 6, BigInt::from(-3)),
+            (vec![1], 1, BigInt::from(0)),
+            (vec![1 << 61], 1 << 62, -BigInt::from(1u64 << 61)),
+            (vec![u64::MAX / 2], u64::MAX, BigInt::from(u64::MAX / 2)),
+            (
+                vec![(u64::MAX - 1) / 2],
+                u64::MAX - 1,
+                -BigInt::from((u64::MAX - 1) / 2),
+            ),
+            (vec![u64::MAX - 1], u64::MAX, BigInt::from(-1)),
+        ] {
+            assert_eq!(compute_q_mod_t_centered(&moduli, t), expected);
+        }
+        for t in [100, 0xffffee001, 17000000, 576460752317792257] {
+            let modulus = Modulus::new(t).unwrap();
+            for residue in [0, (t - 1) / 2, t / 2 + 1, t - 1] {
+                assert_eq!(
+                    compute_q_mod_t_centered(&[residue], t),
+                    BigInt::from(modulus.center(residue)),
+                );
+            }
+        }
     }
 
     #[test]

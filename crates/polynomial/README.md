@@ -1,32 +1,46 @@
-# Polynomial crates
+# Integer polynomial arithmetic
 
-This folder holds two workspace members:
+This folder is the `e3-polynomial` package. Its child `fhe-adapter/` is the separate
+`e3-polynomial-fhe` package. Both are direct members of the root workspace; there is no nested
+workspace.
 
-- `core/` — the `e3-polynomial` crate. Polynomials with `num-bigint` coefficients, CRT limb
-  containers, modular arithmetic and range checks, negacyclic folding, and coefficient
-  representation helpers. This crate has no `fhe-math` dependency.
-- `fhe-adapter/` — the `e3-polynomial-fhe` crate. Extension traits and functions that convert
-  between the core types and the `fhe-math` RNS polynomial types (`Poly<PowerBasis>`,
-  `Poly<Ntt>`, `Poly<NttShoup>`).
+- `e3-polynomial` owns exact signed-integer coefficient arithmetic and CRT limb containers.
+  `Polynomial` owns coefficient reversal, reduction, and centering. `CrtPolynomial` delegates these
+  transforms to its ordered limbs. Neither type depends on FHE, circuits, or actors.
+- `fhe-adapter/` (`e3-polynomial-fhe`) reads fhe.rs polynomials as native ascending coefficients,
+  either per CRT limb or reconstructed modulo Q. Import `FromFhePolynomial` to use these
+  conversions.
 
-This folder is not a Cargo package and not a nested workspace. Both crates are direct members of
-the root workspace. Depend on the crate that owns what you need:
+The main consumers construct ZK witnesses. They need integer quotients that modular FHE arithmetic
+discards. For example, `div_exact(&q)` returns the coefficient-wise quotient and rejects any nonzero
+remainder. Generic polynomial long division is a private test reference, not a public API.
 
-- Only core polynomial arithmetic: depend on `e3-polynomial`.
-- Conversions to or from FHE ciphertext polynomials: depend on `e3-polynomial-fhe` (it
-  re-exports nothing from the core crate, so depend on both crates and import the
-  `FromFhePolynomial`, `ToFhePolynomial`, and `ToPowerBasisPoly` traits).
+Arithmetic uses descending coefficients. Constructors retain input order and padding; conversion
+from fhe.rs retains its native ascending order. Callers reverse coefficients explicitly before
+descending-order arithmetic. The optional `serde` feature preserves coefficient and limb shapes.
 
-## Testing
+Circuit-specific reversal, centering, packing, and JSON encoding belong to `e3-zk-helpers`. The
+adapter performs no witness encoding and exposes no test-only reverse conversion.
+
+Production consumers are ZK circuit computations, runtime proof-input preparation, raw-share
+commitment verification, and CRISP ciphertext-addition witnesses. Integer arithmetic belongs below
+the ZK layer because these consumers need its exact coefficient values, not a witness encoding API.
+
+Each CRT limb is one residue polynomial for its modulus. The `limbs` field retains its serialized
+name, vector order, and coefficient padding. It is not a machine-word representation of one
+coefficient.
+
+The circuit-specific `fold_negacyclic` helper belongs to `e3-zk-helpers`. It is crate-private and
+requires exactly `2N-1` descending coefficients. Scalar residue and inverse operations use
+`num_integer::Integer::mod_floor` and `num_bigint::BigInt::modinv` directly.
+
+## Verification
 
 ```bash
-cargo test -p e3-polynomial
-```
-
-## Benchmarks
-
-The core crate keeps the criterion benchmarks:
-
-```bash
+cargo test -p e3-polynomial --all-features
 cargo bench -p e3-polynomial
 ```
+
+Tests compare bounded integer multiplication with an independent arithmetic reference and pin signed
+division, limb routing, and centering boundaries. ZK folding tests retain an independent test-only
+long-division reference. Benchmarks cover coefficient arithmetic, not ZK witness helpers.

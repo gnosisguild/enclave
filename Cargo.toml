@@ -32,7 +32,7 @@ members = [
   "crates/openvm-host",
   "crates/openvm-types",
   "crates/parity-matrix",
-  "crates/polynomial/core",
+  "crates/polynomial",
   "crates/polynomial/fhe-adapter",
   "crates/program-server",
   "crates/request",
@@ -118,7 +118,7 @@ e3-openvm-types = { version = "0.19.0", path = "./crates/openvm-types" }
 e3-sortition = { version = "0.19.0", path = "./crates/sortition" }
 e3-daemon-server = { version = "0.19.0", path = "./crates/daemon-server" }
 e3-program-server = { version = "0.19.0", path = "./crates/program-server" }
-e3-polynomial = { version = "0.19.0", path = "./crates/polynomial/core" }
+e3-polynomial = { version = "0.19.0", path = "./crates/polynomial" }
 e3-polynomial-fhe = { version = "0.19.0", path = "./crates/polynomial/fhe-adapter" }
 e3-support-scripts = { version = "0.19.0", path = "./crates/support-scripts" }
 e3-sync = { version = "0.19.0", path = "./crates/sync" }

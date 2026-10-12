@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::utils::fhe_poly_to_crt_centered;
 use crate::utils::{compute_modulus_bit, ZkHelpersUtilsError};
 use e3_polynomial::{CrtPolynomial, CrtPolynomialError};
-use e3_polynomial_fhe::fhe_poly_to_crt_centered;
 use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe::bfv::{BfvParameters, Ciphertext, PublicKey};
 

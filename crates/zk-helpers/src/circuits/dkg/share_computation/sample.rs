@@ -14,7 +14,6 @@ use crate::CircuitsErrors;
 use e3_committee::CiphernodesCommittee;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
-use e3_polynomial::array2_u64_to_bigint;
 use e3_polynomial::CrtPolynomial;
 use fhe::bfv::SecretKey;
 use fhe::trbfv::{ShareManager, TRBFV};
@@ -68,7 +67,7 @@ impl ShareComputationCircuitData {
 
                 let secret_sss: SecretShares = sk_sss_u64
                     .into_iter()
-                    .map(|arr| array2_u64_to_bigint(&arr))
+                    .map(|arr| arr.mapv(BigInt::from))
                     .collect();
 
                 let sk_coeffs: Vec<BigInt> = threshold_secret_key
@@ -106,7 +105,7 @@ impl ShareComputationCircuitData {
                     .unwrap();
                 let secret_sss: SecretShares = esi_sss_u64
                     .into_iter()
-                    .map(|arr| array2_u64_to_bigint(&arr))
+                    .map(|arr| arr.mapv(BigInt::from))
                     .collect();
 
                 let mut secret_crt =

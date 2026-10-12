@@ -229,9 +229,9 @@ pub fn compute_dkg_pk_commitment_from_public_key_bytes(
         .get(1)
         .ok_or_else(|| crate::CircuitsErrors::Other("PublicKey is missing pk1".to_string()))?;
     let moduli = dkg_params.moduli();
-    let pk0 = e3_polynomial_fhe::fhe_poly_to_crt_centered(pk0, moduli)
+    let pk0 = crate::utils::fhe_poly_to_crt_centered(pk0, moduli)
         .map_err(|e| crate::CircuitsErrors::Other(format!("pk0 conversion: {e}")))?;
-    let pk1 = e3_polynomial_fhe::fhe_poly_to_crt_centered(pk1, moduli)
+    let pk1 = crate::utils::fhe_poly_to_crt_centered(pk1, moduli)
         .map_err(|e| crate::CircuitsErrors::Other(format!("pk1 conversion: {e}")))?;
     let commitment = compute_dkg_pk_commitment(&pk0, &pk1, crate::compute_modulus_bit(&dkg_params));
 
@@ -663,8 +663,14 @@ mod tests {
     #[test]
     fn compute_ciphertext_commitment_matches_manual_payload() {
         let bit_ct = 4;
-        let ct0 = CrtPolynomial::from_bigint_vectors(vec![vec![BigInt::from(1), BigInt::from(2)]]);
-        let ct1 = CrtPolynomial::from_bigint_vectors(vec![vec![BigInt::from(3), BigInt::from(4)]]);
+        let ct0 = CrtPolynomial::new(vec![Polynomial::new(vec![
+            BigInt::from(1),
+            BigInt::from(2),
+        ])]);
+        let ct1 = CrtPolynomial::new(vec![Polynomial::new(vec![
+            BigInt::from(3),
+            BigInt::from(4),
+        ])]);
 
         let mut payload0 = Vec::new();
         payload0 = flatten(payload0, &ct0.limbs, bit_ct);

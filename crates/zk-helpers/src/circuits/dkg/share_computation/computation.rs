@@ -25,10 +25,11 @@ use crate::{
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
-use e3_polynomial::{reduce, CrtPolynomial};
+use e3_polynomial::CrtPolynomial;
 use fhe::bfv::SecretKey;
 use fhe::trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig};
 use num_bigint::{BigInt, BigUint};
+use num_integer::Integer;
 use serde::{Deserialize, Serialize};
 
 /// Output of [`CircuitComputation::compute`] for [`ShareComputationCircuit`]: bounds, bit widths, and input.
@@ -221,7 +222,7 @@ impl Computation for Inputs {
                 y_mod.push(secret_crt.limb(mod_idx).coefficients()[coeff_idx].clone());
                 for party_idx in 0..n_parties {
                     let share_value = &sss[mod_idx][[party_idx, coeff_idx]];
-                    y_mod.push(reduce(share_value, &q_j));
+                    y_mod.push(share_value.mod_floor(&q_j));
                 }
                 y_coeff.push(y_mod);
             }

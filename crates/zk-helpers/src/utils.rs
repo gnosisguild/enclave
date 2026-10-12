@@ -18,6 +18,7 @@ use ark_bn254::Fr as FieldElement;
 use ark_ff::BigInteger;
 use ark_ff::PrimeField;
 use e3_polynomial::{CrtPolynomial, Polynomial};
+use e3_polynomial_fhe::{FromFhePolynomial as _, ToPowerBasisPoly};
 use e3_safe::SafeSponge;
 use fhe::bfv::BfvParameters;
 use num_bigint::BigInt;
@@ -26,6 +27,17 @@ use num_traits::{ToPrimitive, Zero};
 use std::fmt::Display;
 use std::str::FromStr;
 use thiserror::Error as ThisError;
+
+/// Prepare descending, centered CRT coefficients for Noir witnesses.
+pub fn fhe_poly_to_crt_centered(
+    poly: &impl ToPowerBasisPoly,
+    moduli: &[u64],
+) -> std::result::Result<CrtPolynomial, e3_polynomial::CrtPolynomialError> {
+    let mut crt = CrtPolynomial::from_fhe_polynomial(poly);
+    crt.reverse();
+    crt.center(moduli)?;
+    Ok(crt)
+}
 
 #[derive(ThisError, Debug)]
 pub enum ZkHelpersUtilsError {

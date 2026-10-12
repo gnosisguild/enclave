@@ -197,6 +197,13 @@ and rich protocol payloads that depend on cryptographic/FHE types. Protocol work
 depend directly on Actix and concrete repositories. These are real constraints in the current code
 and are not papered over with empty port traits.
 
+`crates/polynomial` is the `e3-polynomial` package. `Polynomial` owns exact integer coefficient
+arithmetic and transforms; `CrtPolynomial` routes transforms to its ordered residue limbs. The child
+FHE adapter is a separate root-workspace member and reads native ascending coefficients. The ZK
+helper layer owns crate-private negacyclic folding, witness reversal/centering, packing, and JSON
+encoding. Prover test fixtures reconstruct native FHE inputs locally, without a production
+reverse-conversion API in the adapter.
+
 The resulting workflow/actor/effect separation is module-level rather than a clean crate boundary.
 On disk, those roles are grouped by protocol capability; the labels in this diagram describe
 responsibilities, not top-level source directories:

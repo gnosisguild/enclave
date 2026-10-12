@@ -4,6 +4,9 @@ ZK circuit helpers and artifact generation. `e3-committee` owns shared committee
 parameter values. The public-key aggregation workflow owns honest-roster selection.
 
 Polynomial arithmetic belongs to `e3-polynomial`; FHE conversion belongs to `e3-polynomial-fhe`.
+Circuit-specific reversal, centering, packing, and JSON encoding stay in this crate. The
+crate-private `negacyclic` module owns descending witness folding and its independent reference
+tests.
 
 ## zk_cli
 
