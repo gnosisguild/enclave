@@ -19,16 +19,16 @@ pnpm --filter @interfold/dashboard dev
 
 Opens at `http://localhost:5173`.
 
-## On-chain backend (Sepolia)
+## On-chain backend
 
-The dashboard reads live data from the Sepolia deployment of Interfold
-(`packages/interfold-contracts/deployed_contracts.json`). ABIs come from the canonical typechain
-factories in `@interfold/contracts/types` so they cannot drift from the deployed contracts. The
-`E3Stage` enum is mirrored locally in `src/lib/chain.ts` (matching `IInterfold.E3Stage`).
+The dashboard reads live data from one Interfold deployment: Sepolia or Ethereum mainnet. ABIs come
+from the canonical typechain factories in `@interfold/contracts/types` so they cannot drift from the
+deployed contracts. The `E3Stage` enum is mirrored locally in `src/lib/chain.ts` (matching
+`IInterfold.E3Stage`).
 
-Addresses are **not** repeated here — they go stale. The live values are the defaults in
-`src/lib/chain.ts` (`CONTRACTS`), each overridable by its `VITE_*` variable. Cross-check them
-against `packages/interfold-contracts/deployed_contracts.json` for the target network.
+Addresses are **not** repeated here — they go stale. The live values are the network profiles in
+`src/lib/networks.ts` (`NETWORKS`), each overridable by its `VITE_<NETWORK>_*` variable. Cross-check
+them against `deployments/manifest.json` for the target network.
 
 - `Interfold` proxy — `E3Requested`, `E3Failed`, `PlaintextOutputPublished`, and
   `RewardsDistributed`, plus the `getE3`, `getE3Stage`, `getFailureReason`, and `e3Payments` view
@@ -74,17 +74,32 @@ They use numeric option labels.
 
 ### Configuration
 
-All deployment-specific values are env-overridable (prefix `VITE_`) so the dashboard can point at a
-different deployment without code changes. See `.env.example`; unset values fall back to the current
-Sepolia deployment defined in `src/lib/chain.ts`:
+Each build contains every network profile in `src/lib/networks.ts`. The page selects one profile
+when it loads:
 
-- `VITE_SEPOLIA_RPC` — RPC endpoint (defaults to a public node; use Alchemy/Infura for production).
-- `VITE_INTERFOLD_ADDRESS`, `VITE_CIPHERNODE_REGISTRY_ADDRESS`, `VITE_CRISP_PROGRAM_ADDRESS` —
-  contracts.
-- `VITE_BONDING_REGISTRY_ADDRESS` — bonding registry behind the operator guide.
-- `VITE_FAUCET_ADDRESS` — testnet faucet, used only on a test network. Set it to the zero address to
-  hide the "Get test tokens" action on a testnet too.
-- `VITE_DEPLOY_BLOCK` — first block to scan from (the Interfold deploy block).
+1. `VITE_NETWORK_HOSTS` maps hostnames to networks, as comma-separated `host=network` pairs (for
+   example `dashboard.theinterfold.com=mainnet,testnet.example.com=sepolia`). With this map, one
+   deployment serves mainnet and testnet on two domains.
+2. A hostname that is not in the map (preview URLs, `localhost`) uses `VITE_NETWORK` (`sepolia` or
+   `mainnet`).
+3. When `VITE_NETWORK` is not set, the page uses `sepolia`.
+
+Each profile value has an optional override, `VITE_<NETWORK>_<SETTING>`. An override changes only
+its network, so a mainnet RPC never reaches the testnet domain. See `.env.example` for each name and
+default:
+
+- `RPC_URL` — RPC endpoint (defaults to a public node; use Alchemy/Infura for production).
+- `INTERFOLD_ADDRESS`, `CIPHERNODE_REGISTRY_ADDRESS`, `CRISP_PROGRAM_ADDRESS` — contracts.
+- `BONDING_REGISTRY_ADDRESS` — bonding registry behind the operator guide.
+- `FAUCET_ADDRESS` — testnet faucet, used only on a test network. Set it to the zero address to hide
+  the "Get test tokens" action on a testnet too.
+- `FEE_TOKEN_SYMBOL`, `FEE_TOKEN_DECIMALS` — fee token display.
+- `DEPLOY_BLOCK` — first block to scan from (the Interfold deploy block).
+- `COMPUTE_WINDOW`, `DECRYPTION_WINDOW` — E3 timeout windows in seconds.
+
+`vite.config.ts` stops the build when an override has no network scope (for example `VITE_RPC_URL`),
+or when `VITE_NETWORK` or `VITE_NETWORK_HOSTS` names an unknown network. Without this check, an
+unscoped override would have no effect, and the page would use the profile default.
 
 The fetchers chunk `getLogs` calls to 9_500 blocks per request so they work against the stricter
 free-tier providers.
@@ -112,7 +127,17 @@ This is a separate Vercel **Project** from the CRISP client, both pointing at th
    - installs the whole pnpm workspace (`cd ../.. && pnpm install`),
    - builds `@interfold/contracts` first (typechain ABIs the dashboard imports), then the dashboard,
    - serves `dist/`.
-3. Optionally set `VITE_SEPOLIA_RPC` in the project's Environment Variables.
+3. Set `VITE_NETWORK` in the project's Environment Variables. Optionally set an RPC per network, for
+   example `VITE_MAINNET_RPC_URL`.
+
+To serve the testnet dashboard from the same project:
+
+1. In **Settings → Domains**, add the testnet domain to the project. Do not assign it to a Git
+   branch, so it serves the production deployment.
+2. Set `VITE_NETWORK_HOSTS` for the Production environment, for example
+   `dashboard.theinterfold.com=mainnet,testnet.example.com=sepolia`.
+3. Optionally set `VITE_SEPOLIA_RPC_URL`.
+4. Redeploy. Vite reads the variables at build time.
 
 > No "Ignored Build Step" is configured, so every push to the deployed branch builds. If you want to
 > skip builds when the dashboard/contracts are untouched, add a `git diff` against

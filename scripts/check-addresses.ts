@@ -68,7 +68,7 @@ const FILES: Record<string, Role> = {
   'docs/pages/build/tutorials/deploy-to-testnet.mdx': 'consumer',
   'docs/pages/reference/contracts.mdx': 'consumer',
   'packages/interfold-dashboard/.env.example': 'consumer',
-  'packages/interfold-dashboard/src/lib/chain.ts': 'consumer',
+  'packages/interfold-dashboard/src/lib/networks.ts': 'consumer',
   'examples/CRISP/interfold.config.yaml': 'consumer',
   'dappnode/docker-compose.yml': 'consumer',
 }

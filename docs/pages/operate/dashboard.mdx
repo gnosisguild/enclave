@@ -232,9 +232,9 @@ You can make checks for other values with the same method:
 
 The hosted dashboard at `https://dashboard.theinterfold.com` reads contract events and views
 directly from the chain. It does not connect to your ciphernode, so it cannot show peers, logs, or
-the local state of your node. Each build reads one network. The source selects it with the
-`VITE_NETWORK` build variable (`sepolia` or `mainnet`, default `sepolia`), and the page shows the
-network name.
+the local state of your node. Each page reads one network, and the page shows the network name. The
+`VITE_NETWORK_HOSTS` build variable maps each domain to a network (`sepolia` or `mainnet`). Other
+hosts use the `VITE_NETWORK` build variable, default `sepolia`.
 
 It has three views:
 
