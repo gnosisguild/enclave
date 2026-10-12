@@ -153,9 +153,9 @@ pnpm test:integration --no-prebuild
 			</td>
 			<td align="center">
 				<a href="https://github.com/0xjei">
-					<img src="https://avatars.githubusercontent.com/u/340530727?v=4" width="100;" alt="0xjei"/>
+					<img src="https://avatars.githubusercontent.com/u/20580910?v=4" width="100;" alt="0xjei"/>
 					<br />
-					<sub><b>0xjei</b></sub>
+					<sub><b>Giacomo</b></sub>
 				</a>
 			</td>
 		</tr>
