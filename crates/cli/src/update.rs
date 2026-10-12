@@ -199,20 +199,31 @@ async fn download_with_progress(client: &reqwest::Client, url: &str) -> Result<V
     Ok(bytes)
 }
 
-/// Extract the binary from a release archive and put it at `target`. The binary goes to a temporary
-/// file next to `target` first, and a rename replaces `target`. A running process keeps the file
-/// that it started from, and a failed extraction leaves `target` as it was.
+/// Extract the binary from a release archive and put it at `target`. The binary goes to a new
+/// temporary file with a random name next to `target`, and a rename replaces `target`. The temporary
+/// file is never an existing file or link, so the update cannot write through a planted symlink. A
+/// running process keeps the file that it started from, and a failed extraction leaves `target` as
+/// it was and removes the temporary file.
 fn replace_binary(archive: &[u8], target: &Path) -> Result<()> {
-    let temporary = target.with_file_name(format!(".{BINARY_NAME}-update-{}", std::process::id()));
-    let result = extract_binary(archive, &temporary)
-        .and_then(|()| fs::rename(&temporary, target).map_err(|error| write_error(error, target)));
-    if result.is_err() {
-        let _ = fs::remove_file(&temporary);
+    let folder = target.parent().unwrap_or(Path::new("."));
+    let mut temporary = tempfile::Builder::new()
+        .prefix(&format!(".{BINARY_NAME}-update-"))
+        .tempfile_in(folder)
+        .map_err(|error| write_error(error, target))?;
+    extract_binary(archive, temporary.as_file_mut())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o755))
+            .context("Failed to set executable permissions")?;
     }
-    result
+    temporary
+        .persist(target)
+        .map_err(|error| write_error(error.error, target))?;
+    Ok(())
 }
 
-fn extract_binary(archive: &[u8], destination: &Path) -> Result<()> {
+fn extract_binary(archive: &[u8], destination: &mut fs::File) -> Result<()> {
     let mut archive = Archive::new(GzDecoder::new(archive));
     for entry in archive
         .entries()
@@ -223,15 +234,7 @@ fn extract_binary(archive: &[u8], destination: &Path) -> Result<()> {
         if path.file_name() != Some(std::ffi::OsStr::new(BINARY_NAME)) {
             continue;
         }
-        let mut file =
-            fs::File::create(destination).map_err(|error| write_error(error, destination))?;
-        io::copy(&mut entry, &mut file).context("Failed to extract the binary")?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(destination, fs::Permissions::from_mode(0o755))
-                .context("Failed to set executable permissions")?;
-        }
+        io::copy(&mut entry, destination).context("Failed to extract the binary")?;
         return Ok(());
     }
     bail!("The release archive does not contain the {BINARY_NAME} binary")

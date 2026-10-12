@@ -57,6 +57,7 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tar = "0.4"
+tempfile = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
@@ -71,4 +72,3 @@ serde_json = { workspace = true }
 [dev-dependencies]
 opentelemetry_sdk = { workspace = true, features = ["testing"] }
 serde_yaml = { workspace = true }
-tempfile = { workspace = true }
