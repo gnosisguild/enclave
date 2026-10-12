@@ -317,7 +317,7 @@ export function committeeBoundUpdates(rootDir: string, preset: CircuitPreset, co
           '--circuit',
           source.circuit,
           '--preset',
-          tier,
+          preset,
           '--committee',
           committee,
           '--output',
