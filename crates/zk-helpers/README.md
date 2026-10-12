@@ -8,6 +8,9 @@ Circuit-specific reversal, centering, packing, and JSON encoding stay in this cr
 crate-private `negacyclic` module owns descending witness folding and its independent reference
 tests.
 
+`e3-fhe-params::derived` owns BFV scaling, modulus arithmetic, and coefficient widths. Plaintext
+decoding calls `fhe_traits::FheDecoder` directly.
+
 ## zk_cli
 
 ```bash

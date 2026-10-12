@@ -49,6 +49,17 @@ Functions to construct `BfvParameters` instances:
 - `build_bfv_params_from_set()` / `build_bfv_params_from_set_arc()`: Build from preset metadata
 - `build_pair_for_preset()`: Build both threshold and DKG parameter pairs for a preset
 
+### Derived arithmetic (`derived`)
+
+This module owns BFV scaling, Q residues and inverses, `k0_i`, and coefficient widths. Circuit
+computations and parameter search use its exact integer division and residue functions. Search
+plaintext moduli retain their full `u128` precision. Plaintext decoding uses
+`fhe_traits::FheDecoder` directly; it is not parameter-derived arithmetic.
+
+Centered Q residues retain the raw helper's full positive `u64` modulus domain. They use
+arbitrary-precision floor-modulus arithmetic, not the FHE primitive's restricted 62-bit constructor.
+This scalar derivation does not depend on polynomial coefficient transforms.
+
 ### Search (`search`)
 
 A comprehensive module for searching optimal BFV parameters that satisfy security constraints.

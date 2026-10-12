@@ -6,7 +6,6 @@
 
 pub mod ciphernodes_committee;
 pub mod circuits;
-pub mod math;
 mod negacyclic;
 pub mod packing;
 pub mod registry;
@@ -14,7 +13,6 @@ pub mod utils;
 
 pub use ciphernodes_committee::canonical_committee_for_circuit;
 pub use circuits::*;
-pub use math::*;
 pub use packing::*;
 pub use registry::*;
 pub use utils::*;

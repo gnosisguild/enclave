@@ -9,11 +9,13 @@
 //! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
 //! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
-use crate::calculate_bit_width;
 use crate::get_zkp_modulus;
-use crate::math::compute_k0is;
-use crate::math::plaintext_poly_u64;
 use crate::negacyclic::fold_negacyclic;
+use e3_fhe_params::derived::calculate_bit_width;
+use e3_fhe_params::derived::compute_k0is;
+use fhe::bfv::Encoding;
+use fhe_traits::FheDecoder;
+
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
 use crate::CircuitsErrors;
@@ -323,7 +325,7 @@ impl Computation for Inputs {
         e0_mod_q.center(&modulus_q);
 
         // Reconstruct k1 from plaintext polynomial.
-        let mut k1_u64 = plaintext_poly_u64(&pt)?; // m
+        let mut k1_u64 = Vec::<u64>::try_decode(&pt, Encoding::poly())?; // m
 
         Modulus::new(t)
             .map_err(|e| CircuitsErrors::Fhe(fhe::Error::from(e)))?

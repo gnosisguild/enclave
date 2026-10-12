@@ -14,10 +14,7 @@
 /// Max message coefficients in the C7 circuit (matches Noir's MAX_MSG_NON_ZERO_COEFFS).
 pub const MAX_MSG_NON_ZERO_COEFFS: usize = 50;
 
-use crate::calculate_bit_width;
 use crate::circuits::commitments::compute_threshold_decryption_share_commitment;
-use crate::compute_q_mod_t;
-use crate::compute_q_mod_t_centered;
 use crate::get_zkp_modulus;
 use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuit;
 use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuitData;
@@ -25,6 +22,9 @@ use crate::threshold::decrypted_shares_aggregation::utils;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::derived::calculate_bit_width;
+use e3_fhe_params::derived::compute_q_mod_t;
+use e3_fhe_params::derived::compute_q_mod_t_centered;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_polynomial_fhe::FromFhePolynomial as _;
@@ -125,9 +125,9 @@ impl Computation for Bounds {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let moduli = threshold_params.moduli();
         let t = threshold_params.plaintext();
-        let q = utils::compute_q_product(moduli);
-        let delta = utils::compute_delta(&q, t);
-        let delta_half = utils::compute_delta_half(&delta);
+        let q = e3_fhe_params::derived::compute_q_product(moduli);
+        let delta = e3_fhe_params::derived::compute_delta(&q, t);
+        let delta_half = e3_fhe_params::derived::compute_delta_half(&delta);
         Ok(Bounds { delta, delta_half })
     }
 }
@@ -179,10 +179,10 @@ impl Computation for Configs {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let moduli = threshold_params.moduli().to_vec();
         let t = threshold_params.plaintext();
-        let q = utils::compute_q_product(&moduli);
+        let q = e3_fhe_params::derived::compute_q_product(&moduli);
         let q_mod_t = compute_q_mod_t(&q, t);
         let q_mod_t_centered = compute_q_mod_t_centered(&moduli, t);
-        let q_inverse_mod_t = utils::compute_q_inverse_mod_t(&q, t)?;
+        let q_inverse_mod_t = e3_fhe_params::derived::compute_q_inverse_mod_t(&q, t)?;
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
         Ok(Configs {

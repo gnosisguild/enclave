@@ -15,15 +15,19 @@ use crate::circuits::commitments::{
 };
 use crate::dkg::share_encryption::ShareEncryptionCircuit;
 use crate::dkg::share_encryption::ShareEncryptionCircuitData;
-use crate::math::{compute_k0is, compute_q_mod_t_centered, plaintext_poly_u64};
 use crate::negacyclic::fold_negacyclic;
+use e3_fhe_params::derived::{compute_k0is, compute_q_mod_t_centered};
+use fhe::bfv::Encoding;
+use fhe_traits::FheDecoder;
+
+use crate::crt_polynomial_to_toml_json;
 use crate::polynomial_to_toml_json;
-use crate::utils::{compute_modulus_bit, compute_msg_bit};
 use crate::CircuitsErrors;
-use crate::{calculate_bit_width, crt_polynomial_to_toml_json};
-use crate::{compute_q_mod_t, compute_q_product};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::derived::calculate_bit_width;
+use e3_fhe_params::derived::{compute_modulus_bit, compute_msg_bit};
+use e3_fhe_params::derived::{compute_q_mod_t, compute_q_product};
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
@@ -574,7 +578,7 @@ impl Computation for Inputs {
         e0_mod_q.reverse();
         e0_mod_q.center(&modulus_q);
 
-        let mut k1_u64 = plaintext_poly_u64(&pt)?;
+        let mut k1_u64 = Vec::<u64>::try_decode(&pt, Encoding::poly())?;
         Modulus::new(t)
             .map_err(|e| CircuitsErrors::Fhe(fhe::Error::from(e)))?
             .scalar_mul_vec(&mut k1_u64, q_mod_t);
@@ -582,7 +586,8 @@ impl Computation for Inputs {
         let mut k1 = Polynomial::from_u64_vector(k1_u64);
         k1.reverse();
 
-        let mut message = Polynomial::from_u64_vector(plaintext_poly_u64(&pt)?);
+        let mut message =
+            Polynomial::from_u64_vector(Vec::<u64>::try_decode(&pt, Encoding::poly())?);
         message.reverse();
 
         let mut u = CrtPolynomial::from_fhe_polynomial(u).limb(0).clone();
@@ -856,8 +861,9 @@ mod tests {
         let inputs = Inputs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         // inputs.message is plaintext coefficients (reversed, as used in circuit)
-        let expected_message =
-            Polynomial::from_u64_vector(plaintext_poly_u64(&sample.plaintext).unwrap());
+        let expected_message = Polynomial::from_u64_vector(
+            Vec::<u64>::try_decode(&sample.plaintext, Encoding::poly()).unwrap(),
+        );
         let mut expected = expected_message;
         expected.reverse();
 
@@ -893,8 +899,8 @@ mod tests {
 mod scaled_quotient_tests {
     use super::*;
     use crate::computation::DkgInputType;
-    use crate::{compute_k0is, compute_q_mod_t, compute_q_product};
     use e3_committee::CiphernodesCommitteeSize;
+    use e3_fhe_params::derived::{compute_k0is, compute_q_mod_t, compute_q_product};
     use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 
     fn derive_for(preset: BfvPreset) -> (ScaledQuotient, Vec<u64>, u64) {

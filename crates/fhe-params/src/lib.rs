@@ -4,11 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Preset definitions and builders for BFV FHE parameters.
+//! Preset definitions, builders, and derived arithmetic for BFV FHE parameters.
 
 pub mod builder;
 pub mod constants;
 pub mod crp;
+pub mod derived;
 #[cfg(feature = "abi-encoding")]
 pub mod encoding;
 pub mod presets;

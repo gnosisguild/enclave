@@ -6,21 +6,12 @@
 
 //! Utilities for Decryption Share Aggregation TRBFV circuit.
 //!
-//! **Generic BFV math** lives in [`crate::math`] and is re-exported here for convenience.
-//! **This module** adds only Shamir + scalar CRT helpers: [`lagrange_recover_at_zero`] and
-//! [`crt_reconstruct`]. Coefficient reduction uses [`num_integer::Integer::mod_floor`] in
-//! [`Inputs::compute`](super::computation::Inputs).
+//! Shamir recovery and scalar CRT reconstruction for decryption-share aggregation.
 
-use crate::math;
 use crate::CircuitsErrors;
-use num_bigint::{BigInt, BigUint};
+use num_bigint::BigInt;
+use num_bigint::BigUint;
 use num_traits::{ToPrimitive, Zero};
-
-// Re-export so callers can use decrypted_shares_aggregation::utils for one-stop.
-pub use math::{
-    compute_delta, compute_delta_half, compute_q_inverse_mod_t, compute_q_mod_t, compute_q_product,
-    compute_t_inv_mod_q,
-};
 
 /// Lagrange interpolation at 0: given shares (party_id, value) mod modulus, returns the recovered secret.
 /// Party IDs are 1-based (1, 2, ..., T+1). Formula: f(0) = sum_i y_i * L_i(0) with
@@ -81,7 +72,7 @@ pub fn crt_reconstruct(residues: &[u64], moduli: &[u64]) -> Result<BigUint, Circ
             moduli.len()
         )));
     }
-    let q: BigUint = crate::math::compute_q_product(moduli);
+    let q: BigUint = e3_fhe_params::derived::compute_q_product(moduli);
     let mut result = BigUint::zero();
     for (i, &r_i) in residues.iter().enumerate() {
         let m_i = BigUint::from(moduli[i]);
