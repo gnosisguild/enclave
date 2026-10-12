@@ -14,14 +14,13 @@ use alloy::{
     sol_types::SolEvent,
 };
 use anyhow::Result;
-use e3_ciphernode_builder::EvmSystemChainBuilder;
 use e3_event_system::EventSystem;
 use e3_events::{
     prelude::*, trap, BusHandle, EType, EvmEventConfig, EvmEventConfigChain, GetEvents,
     HistoricalEvmEventsReceived, HistoricalEvmSyncStart, InterfoldEvent, InterfoldEventData,
     SyncEnded, TestEvent,
 };
-use e3_evm::{helpers::EthProvider, EvmEventProcessor, EvmParser};
+use e3_evm::{helpers::EthProvider, EvmEventProcessor, EvmParser, EvmSystemChainBuilder};
 use std::{sync::Arc, time::Duration};
 use tokio::time::sleep;
 

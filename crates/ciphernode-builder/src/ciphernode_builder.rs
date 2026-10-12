@@ -9,7 +9,7 @@ use crate::{
     recovery::{
         backfill_restart_state, reconcile_committee_snapshots, recovered_ciphernode_selections,
     },
-    CiphernodeHandle, EvmSystemChainBuilder, NetInterfaceKind, ProviderCache, WriteEnabled,
+    CiphernodeHandle, NetInterfaceKind,
 };
 use actix::{Actor, Addr};
 use alloy::primitives::Address;
@@ -35,9 +35,10 @@ use e3_evm::{
     fetch_slashing_manager, ingestion_heartbeat_files, read_canonical_dkg_timing,
     BondingRegistrySolReader, CiphernodeRegistrySol, CiphernodeRegistrySolReader,
     DataAvailabilityCoordinator, DataAvailabilityRepositoryFactory, EvmChainGatewayHandle,
-    GatewayFailureReceiver, IngestionProgressSink, InterfoldSolReader, InterfoldSolWriter,
-    ProviderConfig, RandomnessProviderSolReader, SlashingManagerSolReader,
-    SlashingManagerSolWriter, SlashingWriterRepositoryFactory,
+    EvmSystemChainBuilder, GatewayFailureReceiver, IngestionProgressSink, InterfoldSolReader,
+    InterfoldSolWriter, ProviderCache, ProviderConfig, RandomnessProviderSolReader,
+    SlashingManagerSolReader, SlashingManagerSolWriter, SlashingWriterRepositoryFactory,
+    WriteEnabled,
 };
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::ThresholdKeyshareExtension;
