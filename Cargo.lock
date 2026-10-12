@@ -3548,15 +3548,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "directories"
-version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16f5094c54661b38d03bd7e50df373292118db60b585c08a411c6d840017fe7d"
-dependencies = [
- "dirs-sys 0.5.0",
-]
-
-[[package]]
 name = "dirs"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3778,7 +3769,9 @@ dependencies = [
  "e3-utils",
  "e3-zk-helpers",
  "e3-zk-prover",
+ "flate2",
  "hex",
+ "indicatif 0.17.11",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-stdout",
@@ -3791,6 +3784,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "tar",
  "tempfile",
  "tokio",
  "toml",
@@ -4726,7 +4720,7 @@ dependencies = [
  "bincode",
  "bn254_blackbox_solver",
  "chrono",
- "directories 5.0.1",
+ "directories",
  "e3-bfv-client",
  "e3-ciphernode-builder",
  "e3-committee-hash",
@@ -6340,23 +6334,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "interfoldup"
-version = "0.19.0"
-dependencies = [
- "anyhow",
- "clap",
- "directories 6.0.0",
- "flate2",
- "futures-util",
- "indicatif 0.17.11",
- "reqwest",
- "serde",
- "serde_json",
- "tar",
- "tokio",
 ]
 
 [[package]]

@@ -13,10 +13,10 @@ jointly generate a threshold BFV key (DKG), compute over encrypted inputs, and t
 output — every step backed by ZK proofs verified on-chain.
 
 - Docs: https://docs.theinterfold.com · License: LGPL-3.0-only
-- Canonical repository: `theinterfold/interfold`. Release assets, the `install` script, the
-  `interfoldup` installer, the zk-prover circuit download, and the `init` templates all resolve
-  against this repository. The `gnosisguild/interfold` name is the former location. Keep the
-  separate `gnosisguild` repositories (`fhe.rs`, `risc0-ethereum`, `CRISP`) as they are.
+- Canonical repository: `theinterfold/interfold`. Release assets, the `install` script,
+  `interfold update`, the zk-prover circuit download, and the `init` templates all resolve against
+  this repository. The `gnosisguild/interfold` name is the former location. Keep the separate
+  `gnosisguild` repositories (`fhe.rs`, `risc0-ethereum`, `CRISP`) as they are.
 - Interfold workspace crates and core `@interfold/*` packages share one release version. CRISP is
   versioned and released separately.
 - Reference app: **CRISP** (`examples/CRISP`, excluded from the workspace)
@@ -172,8 +172,8 @@ node that fetches the asset, and the node then syncs an address that emits no ev
 - **Release channels:** a stable tag publishes to `latest`, a pre-release tag (`vX.Y.Z-<pre>`, by
   convention `-dev.N`) to `dev` (`releaseChannel` in `scripts/release/version.mjs`): npm dist-tag
   and `ciphernode` / `e3-support` image alias. A stable release also moves the `dev` image aliases,
-  and `interfoldup install --version dev` (or `update`) installs the most recently published GitHub
-  release, stable or pre-release. The npm tag `dev` changes only with a pre-release.
+  and `interfold update --version dev` installs the most recently published GitHub release, stable
+  or pre-release. The npm tag `dev` changes only with a pre-release.
 - **Pre-push hook (husky):** `pnpm lint`, `check:pnpm`, `check:license`, `check:committee`,
   `check:docs` (harness-doc drift gate — a watched file is exempt automatically when neither its
   changed lines nor the declarations that enclose them name an identifier the `agent/` docs mention,

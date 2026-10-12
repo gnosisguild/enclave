@@ -354,8 +354,8 @@ commit and starts the release workflow.
 
 For a dev release, use a pre-release version. Every pre-release publishes to the `dev` channel: the
 npm tag `dev` and the `ciphernode:dev` and `e3-support:dev` images. It does not change `latest`. A
-stable release moves the `dev` images and `interfoldup --version dev` to itself too, so they are
-never older than `latest`. The npm tag `dev` changes only with a pre-release.
+stable release moves the `dev` images and `interfold update --version dev` to itself too, so they
+are never older than `latest`. The npm tag `dev` changes only with a pre-release.
 
 ```bash
 pnpm bump:versions 1.0.0-dev.1
@@ -396,8 +396,8 @@ The Interfold follows [Semantic Versioning](https://semver.org/):
 Use stable versions only:
 
 ```bash
-interfoldup install                     # Latest release
-interfoldup install --version v1.0.0    # Specific stable version
+curl -fsSL https://raw.githubusercontent.com/theinterfold/interfold/main/install | bash   # Latest release
+interfold update --version v1.0.0    # Change to a specific stable version
 ```
 
 #### For Testing (Testnet)
@@ -405,8 +405,8 @@ interfoldup install --version v1.0.0    # Specific stable version
 You can use pre-release versions. `install` without `--version` always selects the latest release:
 
 ```bash
-interfoldup install --version dev           # Most recently published release, stable or pre-release
-interfoldup install --version v1.0.0-dev.1  # Specific pre-release
+interfold update --version dev           # Most recently published release, stable or pre-release
+interfold update --version v1.0.0-dev.1  # Specific pre-release
 ```
 
 #### For Development
