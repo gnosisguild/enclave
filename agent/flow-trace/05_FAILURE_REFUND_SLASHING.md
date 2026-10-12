@@ -1261,7 +1261,8 @@ Lane A reason keys and stable runtime categories:
   │ RlkAggregation                   │ E3_BAD_RLK_AGGREGATION_PROOF    │
   └──────────────────────────────────┴─────────────────────────────────┘
 
-  `RlkGenerationLimb` is not externally signed and has no ProofType.
+  The retired `RlkGenerationLimb` and `LbfvPkGenerationLimb` circuits are never produced and have
+  no ProofType.
 ```
 
 ### End-to-End: Proof Failure → On-Chain Slash

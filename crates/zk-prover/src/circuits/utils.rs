@@ -79,25 +79,6 @@ pub fn prove_recursive_circuit(
     )
 }
 
-/// Prove a recursive circuit from an already-derived Noir input map.
-pub(crate) fn prove_recursive_input_map(
-    prover: &ZkProver,
-    circuit_name: CircuitName,
-    input_map: InputMap,
-    e3_id: &str,
-    artifacts_dir: &str,
-) -> Result<Proof, ZkError> {
-    let witness =
-        generate_recursive_witness_from_input_map(prover, circuit_name, input_map, artifacts_dir)?;
-    prover.generate_proof_with_variant(
-        circuit_name,
-        &witness,
-        e3_id,
-        CircuitVariant::Recursive,
-        artifacts_dir,
-    )
-}
-
 /// Shared helper: load compiled circuit from Recursive dir, serialize input, generate witness.
 #[allow(dead_code)]
 fn generate_recursive_witness(

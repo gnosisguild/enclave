@@ -211,13 +211,12 @@ persistence · opentelemetry/tracing.
 - **Threshold** (`circuits/bin/threshold/`): C1 `pk_generation` · C5 `pk_aggregation` · P3
   `user_data_encryption_ct0/ct1` (+ wrapper) · C6 `share_decryption` · C7
   `decrypted_shares_aggregation` · secure-16384 l-BFV row proofs `lbfv_pk_generation`
-  (`CircuitName::LbfvPkGeneration = 29`), `lbfv_pk_generation_limb`
-  (`CircuitName::LbfvPkGenerationLimb = 40`), `lbfv_pk_aggregation`
+  (`CircuitName::LbfvPkGeneration = 29`), `lbfv_pk_aggregation`
   (`CircuitName::LbfvPkAggregation = 30`), `rlk_generation` (`CircuitName::RlkGeneration = 27`),
-  `rlk_generation_limb` (`CircuitName::RlkGenerationLimb = 31`), and `rlk_aggregation`
-  (`CircuitName::RlkAggregation = 28`). The `lbfv_pk_generation_limb` and `rlk_generation_limb`
-  circuits each prove one CRT limb. Their terminal circuits recursively finalize all limbs for one
-  row. These circuits have helper and prover boundaries. Runtime handlers use stable operation IDs
+  and `rlk_aggregation` (`CircuitName::RlkAggregation = 28`). `lbfv_pk_generation` and
+  `rlk_generation` each prove all CRT limbs of one key row in one proof, without recursion.
+  `CircuitName::RlkGenerationLimb = 31` and `CircuitName::LbfvPkGenerationLimb = 40` are retired:
+  nothing produces them, and they stay declared so that later variants keep their encoding. These circuits have helper and prover boundaries. Runtime handlers use stable operation IDs
   for deterministic row-proof retries. Generation verification accepts C1 followed by complete
   five-row public-key and RLK families; aggregation accepts the two row families without C1. For
   secure-16384, the per-E3 keyshare actor durably produces and publishes its local bundle. Each
@@ -233,12 +232,11 @@ persistence · opentelemetry/tracing.
   binds both keys and replaces the legacy published-key commitment output. The active aggregator
   also persists and redrives a secure-16384 `LbfvPublicKeyAggregated` publication intent. The
   registry writer adapts that local intent to the existing replay-safe publication gate and submits
-  the V2 proof and attestation bundle. The `secure-16384/minimum` PK and RLK tests each generate
-  five recursive limb proofs and one terminal row proof. The PK terminal has seven public fields.
-  The RLK terminal has nine public fields. Both finalizers bind the checksum-verified leaf VK hash.
-  The measured RLK compilation used 26,388,774,912 bytes maximum RSS for the limb and 8,039,219,200
-  bytes for the terminal. The prior equation-wide RLK circuit did not complete compilation after
-  more than 31 minutes.
+  the V2 proof and attestation bundle. The `secure-16384/minimum` PK test generates one row proof
+  with six public fields. The RLK test generates one row proof with eight public fields.
+  At secure-16384 the PK row circuit compiles in about 8 GB and the RLK row circuit in about 15 GB
+  maximum RSS; both use `Polynomial::dot_materialized` to keep the compiler from holding each
+  16,384-term dot product as one expression.
 - **Recursive aggregation** (`circuits/bin/recursive_aggregation/`): fold kernels
   (`c2ab_chunk_fold`, `c3_fold`, `c6_fold`, `node_fold`, `nodes_fold`, …) and the top-level
   `dkg_aggregator` / `decryption_aggregator`, which produce the on-chain Honk verifiers. A separate

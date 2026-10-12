@@ -22,12 +22,14 @@ every section.
   `build_circuits`, which reads each supported preset and committee pair directly from
   `dist/circuits` and compares it without changing active circuit selectors or targets. A drift
   means a deployed verifier accepts a different circuit from the tree.
-- Complete artifact pairs include `nodes_fold.vk_tree_hash` and `c6_fold.vk_tree_hash`. The builder
-  derives them from the recursive leaf VKs and non-ZK fold VKs after a complete build with keys.
+- Complete artifact pairs include `c6_fold.vk_tree_hash`, and `nodes_fold.vk_tree_hash` when the
+  pair builds the trBFV path (secure-16384 builds only the l-BFV path and has no
+  `nodes_fold.vk_tree_hash`). The builder derives them from the recursive leaf VKs and non-ZK fold
+  VKs after a complete build with keys.
   Every other build (a `--group` or `--circuit` subset, `--skip-vk`, or a failed circuit) removes
-  both files from the pair and from `circuits/bin/`, because an old anchor can hash a key that the
-  build replaced. Hydration copies both files into `circuits/bin/`. Build-cache markers and release
-  validation require both files. Deployment uses them as public-input-zero pins and retains the
+  these files from the pair and from `circuits/bin/`, because an old anchor can hash a key that the
+  build replaced. Hydration copies them into `circuits/bin/`. Build-cache markers and release
+  validation require every file the pair carries. Deployment uses them as public-input-zero pins and retains the
   separate C5/C7 VK pins. The C7 pin is per path: the l-BFV decryption routes pin
   `decrypted_shares_aggregation_wide`, and the router accepts a route only for the E3's parameter
   set. — `scripts/build-circuits.ts`; `scripts/circuit-artifacts.ts`;

@@ -598,7 +598,6 @@ export function getBfvV2VkBindingHashPaths(config?: ActiveBfvConfig) {
     ),
     pathFor(recursive, "threshold", "lbfv_pk_generation"),
     pathFor(recursive, "threshold", "rlk_generation"),
-    pathFor(recursive, "threshold", "rlk_generation_limb"),
     pathFor(defaultVariant, "recursive_aggregation", "lbfv_aggregation_fold"),
     pathFor(
       defaultVariant,
@@ -607,7 +606,6 @@ export function getBfvV2VkBindingHashPaths(config?: ActiveBfvConfig) {
     ),
     pathFor(recursive, "threshold", "lbfv_pk_aggregation"),
     pathFor(recursive, "threshold", "rlk_aggregation"),
-    pathFor(recursive, "threshold", "lbfv_pk_generation_limb"),
   ] as const;
 }
 

@@ -233,7 +233,7 @@ every section.
   committee matrix. At request time `t_req`, N cannot exceed the active-operator checkpoint at
   `t_req − 1`, and `committeeOwnerCapacity(t_req − 1)` must be at least N. — `flow-trace/03`
 - A BFV PK verifier router must contain one concrete route for each supported parameter-set and
-  committee pair. The `secure-16384/minimum` pair must use `BfvPkVerifierV2`, its 64-field public
+  committee pair. The `secure-16384/minimum` pair must use `BfvPkVerifierV2`, its 62-field public
   statement, and its `DkgAggregatorV2` and `NodesFoldV2` anchors. Before dispatch, the router reads
   the E3 parameter set through its immutable registry and requires a route with the same parameter
   set, public-input length, and VK anchors. The router must not also expose the legacy verifier for

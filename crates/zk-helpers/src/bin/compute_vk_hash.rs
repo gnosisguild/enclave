@@ -28,6 +28,9 @@ struct Args {
     /// Artifact-pair directory with the complete BFV recursive verification-key tree.
     #[arg(long)]
     bfv_tree: Option<PathBuf>,
+    /// Hash only the C6 tree. An l-BFV-only pair (secure-16384) has no trBFV DKG tree.
+    #[arg(long, requires = "bfv_tree")]
+    decryption_tree_only: bool,
 }
 
 fn field_from_vk_hash_file(path: &std::path::Path) -> Result<Fr> {
@@ -56,16 +59,19 @@ fn field_to_padded_be_hex(fr: Fr) -> String {
     format!("0x{}", hex::encode(out))
 }
 
-fn bfv_tree_hashes(root: &std::path::Path) -> Result<(Fr, Fr)> {
-    let load = |variant: &str, group: &str, name: &str| {
-        field_from_vk_hash_file(
-            &root
-                .join(variant)
-                .join(group)
-                .join(name)
-                .join(format!("{name}.vk_hash")),
-        )
-    };
+fn load_tree_key(root: &std::path::Path, variant: &str, group: &str, name: &str) -> Result<Fr> {
+    field_from_vk_hash_file(
+        &root
+            .join(variant)
+            .join(group)
+            .join(name)
+            .join(format!("{name}.vk_hash")),
+    )
+}
+
+/// The `nodes_fold` anchor: the trBFV DKG tree.
+fn nodes_fold_tree_hash(root: &std::path::Path) -> Result<Fr> {
+    let load = |variant: &str, group: &str, name: &str| load_tree_key(root, variant, group, name);
     let fold = |name| load("default", "recursive_aggregation", name);
     let c2_tree = compute_vk_hash(vec![
         load("recursive", "dkg", "sk_share_computation")?,
@@ -89,31 +95,39 @@ fn bfv_tree_hashes(root: &std::path::Path) -> Result<(Fr, Fr)> {
         fold("c4ab_fold")?,
         c4_tree,
     ]);
-    let nodes_tree = compute_vk_hash(vec![
+    Ok(compute_vk_hash(vec![
         fold("nodes_fold")?,
         fold("nodes_fold_kernel")?,
         fold("node_fold")?,
         node_tree,
-    ]);
-    let c6_tree = compute_vk_hash(vec![
+    ]))
+}
+
+/// The `c6_fold` anchor: the C6 decryption tree, which both protocol paths use.
+fn c6_fold_tree_hash(root: &std::path::Path) -> Result<Fr> {
+    let fold = |name| load_tree_key(root, "default", "recursive_aggregation", name);
+    Ok(compute_vk_hash(vec![
         fold("c6_fold")?,
         fold("c6_fold_kernel")?,
-        load("recursive", "threshold", "share_decryption")?,
-    ]);
-    Ok((nodes_tree, c6_tree))
+        load_tree_key(root, "recursive", "threshold", "share_decryption")?,
+    ]))
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
     if let Some(root) = args.bfv_tree {
-        let (nodes_fold, c6_fold) = bfv_tree_hashes(&root)?;
-        println!(
-            "{}",
-            serde_json::json!({
-                "nodes_fold": field_to_padded_be_hex(nodes_fold),
-                "c6_fold": field_to_padded_be_hex(c6_fold),
-            })
+        let mut anchors = serde_json::Map::new();
+        if !args.decryption_tree_only {
+            anchors.insert(
+                "nodes_fold".into(),
+                field_to_padded_be_hex(nodes_fold_tree_hash(&root)?).into(),
+            );
+        }
+        anchors.insert(
+            "c6_fold".into(),
+            field_to_padded_be_hex(c6_fold_tree_hash(&root)?).into(),
         );
+        println!("{}", serde_json::Value::Object(anchors));
         return Ok(());
     }
     let mut fields = Vec::with_capacity(args.vk_hash_files.len());
@@ -148,6 +162,10 @@ mod tests {
         ("default", "recursive_aggregation", "c6_fold_kernel"),
         ("recursive", "threshold", "share_decryption"),
     ];
+
+    fn bfv_tree_hashes(root: &std::path::Path) -> Result<(Fr, Fr)> {
+        Ok((nodes_fold_tree_hash(root)?, c6_fold_tree_hash(root)?))
+    }
 
     fn key_path(root: &std::path::Path, index: usize) -> PathBuf {
         let (variant, group, name) = KEYS[index];
@@ -198,6 +216,20 @@ mod tests {
             }
             write_field(&path, *key);
         }
+    }
+
+    #[test]
+    fn c6_tree_needs_no_dkg_keys() {
+        let temp = tempfile::tempdir().unwrap();
+        let keys: Vec<_> = (1..=KEYS.len()).map(|i| Fr::from(i as u64)).collect();
+        for (i, key) in keys.iter().enumerate().skip(14) {
+            write_field(&key_path(temp.path(), i), *key);
+        }
+        assert!(nodes_fold_tree_hash(temp.path()).is_err());
+        assert_eq!(
+            c6_fold_tree_hash(temp.path()).unwrap(),
+            compute_vk_hash(vec![keys[14], keys[15], keys[16]])
+        );
     }
 
     #[test]

@@ -43,14 +43,7 @@ const CIRCUIT_VERSION = 'interfold-bfv-v4'
 // On-chain index of the insecure parameters on the l-BFV path (`BfvPreset::InsecureThresholdLbfv`).
 const INSECURE_LBFV_PARAM_SET = 4
 
-const LBFV_THRESHOLD_CIRCUITS = new Set([
-  'lbfv_pk_generation',
-  'lbfv_pk_generation_limb',
-  'lbfv_pk_aggregation',
-  'rlk_generation',
-  'rlk_generation_limb',
-  'rlk_aggregation',
-])
+const LBFV_THRESHOLD_CIRCUITS = new Set(['lbfv_pk_generation', 'lbfv_pk_aggregation', 'rlk_generation', 'rlk_aggregation'])
 
 const SECURE_16384_ONLY_RECURSIVE_CIRCUITS = new Set([
   'lbfv_generation_fold',
@@ -91,6 +84,40 @@ const ALL_LBFV_CIRCUITS = new Set([
   ...SECURE_16384_ONLY_RECURSIVE_CIRCUITS,
   ...LBFV_PATH_LEAF_CIRCUITS.map(({ name }) => name),
   ...LBFV_PATH_FOLD_CIRCUITS,
+])
+
+// Circuits that both paths use. Secure-16384 runs only the l-BFV path, so it builds these and
+// ALL_LBFV_CIRCUITS, and no trBFV-only circuit. Keys are `group/name`: `share_decryption` names
+// C4 in `dkg` (trBFV only) and C6 in `threshold` (both paths).
+const LBFV_SHARED_CIRCUITS = new Set([
+  // C0: `node_fold_chunked` verifies it, and `dkg_aggregator_v2` binds its VK.
+  `${CIRCUIT_GROUPS.DKG}/pk`,
+  // C5: the l-BFV aggregator proves it, and `dkg_aggregator_v2` pins its VK hash.
+  `${CIRCUIT_GROUPS.THRESHOLD}/pk_aggregation`,
+  // C6 and its fold chain. The decryption aggregator verifies them, and `c6_fold.vk_tree_hash`
+  // anchors them.
+  `${CIRCUIT_GROUPS.THRESHOLD}/share_decryption`,
+  `${CIRCUIT_GROUPS.AGGREGATION}/c6_fold`,
+  `${CIRCUIT_GROUPS.AGGREGATION}/c6_fold_kernel`,
+  `${CIRCUIT_GROUPS.AGGREGATION}/decryption_aggregator`,
+  // `node_fold_chunked` folds C4 with `c4ab_fold`. `dkg_aggregator_v2` binds the VKs of
+  // `c4ab_fold` and `nodes_fold_kernel`.
+  `${CIRCUIT_GROUPS.AGGREGATION}/c4ab_fold`,
+  `${CIRCUIT_GROUPS.AGGREGATION}/nodes_fold_kernel`,
+  // Every route deploys a `DkgAggregatorVerifier`, generated from this circuit's EVM VK.
+  `${CIRCUIT_GROUPS.AGGREGATION}/dkg_aggregator`,
+  // The SDK proves user data encryption with the chunked ct0/ct1 pipeline on every preset.
+  ...[
+    'ct0_chunk_main',
+    'ct0_pk_ct_commit',
+    'ct0_eval_chunk_identity',
+    'user_data_encryption_ct0_chunked',
+    'ct1_chunk_main',
+    'ct1_pk_ct_commit',
+    'ct1_eval_chunk_identity',
+    'user_data_encryption_ct1_chunked',
+    'user_data_encryption_chunked',
+  ].map((name) => `${CIRCUIT_GROUPS.THRESHOLD}/${name}`),
 ])
 
 const LBFV_THRESHOLD_ARTIFACT_CIRCUITS = [...LBFV_THRESHOLD_CIRCUITS].map((name) => ({
@@ -1246,7 +1273,7 @@ library ActiveCryptoConfig {
         !this.options.skipVk &&
         !this.options.circuits &&
         ALL_GROUPS.every((group) => this.options.groups?.includes(group))
-      this.refreshVkTreeHashes(presetOutputDir, complete)
+      this.refreshVkTreeHashes(presetOutputDir, preset, complete)
       if (result.errors.length === 0) {
         if (this.hasCompleteCircuitSelection()) {
           this.writePresetStamp(preset, committee, sourceHash)
@@ -1329,8 +1356,11 @@ library ActiveCryptoConfig {
   }
 
   private isCircuitEnabledForPreset(circuit: CircuitInfo, preset: CircuitPreset): boolean {
-    if (preset === CIRCUIT_PRESETS.SECURE_16384) return true
+    // Insecure serves both paths (parameter sets 0 and 4).
     if (preset === CIRCUIT_PRESETS.INSECURE) return true
+    if (preset === CIRCUIT_PRESETS.SECURE_16384) {
+      return ALL_LBFV_CIRCUITS.has(circuit.name) || LBFV_SHARED_CIRCUITS.has(`${circuit.group}/${circuit.name}`)
+    }
     return !ALL_LBFV_CIRCUITS.has(circuit.name)
   }
 
@@ -1338,7 +1368,18 @@ library ActiveCryptoConfig {
     if (preset === CIRCUIT_PRESETS.SECURE_8192 && this.options.circuits?.some((circuit) => ALL_LBFV_CIRCUITS.has(circuit))) {
       throw new Error(`l-BFV circuits require preset ${CIRCUIT_PRESETS.INSECURE} or ${CIRCUIT_PRESETS.SECURE_16384}`)
     }
-    return circuits.filter((circuit) => this.isCircuitEnabledForPreset(circuit, preset))
+    const enabled = circuits.filter((circuit) => this.isCircuitEnabledForPreset(circuit, preset))
+    if (preset === CIRCUIT_PRESETS.SECURE_16384) {
+      const trbfvOnly = (this.options.circuits ?? []).filter(
+        (name) => circuits.some((circuit) => circuit.name === name) && !enabled.some((circuit) => circuit.name === name),
+      )
+      if (trbfvOnly.length > 0) {
+        throw new Error(
+          `trBFV circuits require preset ${CIRCUIT_PRESETS.INSECURE} or ${CIRCUIT_PRESETS.SECURE_8192}: ${trbfvOnly.join(', ')}`,
+        )
+      }
+    }
+    return enabled
   }
 
   private findCircuitsInDir(dir: string, relativePath: string, group: CircuitGroup, out: CircuitInfo[]): void {
@@ -1591,7 +1632,7 @@ library ActiveCryptoConfig {
    * removes the anchors until the next complete build: an old anchor can hash a key that the pair
    * no longer holds.
    */
-  private refreshVkTreeHashes(pairDir: string, complete: boolean): void {
+  private refreshVkTreeHashes(pairDir: string, preset: CircuitPreset, complete: boolean): void {
     const anchors = ['nodes_fold', 'c6_fold'].map((name) => ({
       name,
       paths: [
@@ -1602,14 +1643,29 @@ library ActiveCryptoConfig {
     for (const { paths } of anchors) for (const path of paths) rmSync(path, { force: true })
     if (!complete) return
 
+    // Secure-16384 does not build the trBFV DKG tree, so it has only the C6 anchor.
+    const decryptionOnly = preset === CIRCUIT_PRESETS.SECURE_16384
     const hashes = JSON.parse(
       execFileSync(
         'cargo',
-        ['run', '--quiet', '--locked', '--release', '-p', 'e3-zk-helpers', '--bin', 'compute-vk-hash', '--', '--bfv-tree', pairDir],
+        [
+          'run',
+          '--quiet',
+          '--locked',
+          '--release',
+          '-p',
+          'e3-zk-helpers',
+          '--bin',
+          'compute-vk-hash',
+          '--',
+          '--bfv-tree',
+          pairDir,
+          ...(decryptionOnly ? ['--decryption-tree-only'] : []),
+        ],
         { cwd: this.rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] },
       ),
     ) as Record<string, string>
-    for (const { name, paths } of anchors) {
+    for (const { name, paths } of anchors.filter(({ name }) => !decryptionOnly || name === 'c6_fold')) {
       const hash = hashes[name]
       if (typeof hash !== 'string' || !/^0x[0-9a-f]{64}$/.test(hash)) {
         throw new Error(`Invalid recursive VK-tree hash for ${name}`)

@@ -84,8 +84,10 @@ every section.
   or `install_circuits_archive_for_configurations`. The CLI accepts repeated
   `--circuits-configuration` options only with `--circuits-archive`. Required pairs never depend on
   archive contents. Each required or included pair must contain every path in
-  `crates/zk-prover/required-artifacts.json`, with a verified manifest entry. The release tooling's
-  `requiredArtifactMarkers` uses that same inventory. Root manifests, `SOURCE_HASH`, and build
+  `crates/zk-prover/required-artifacts.json` (shared), plus `required-artifacts-trbfv.json` when the
+  pair serves the trBFV path and `required-artifacts-lbfv.json` when it serves the l-BFV path, each
+  with a verified manifest entry. Secure-16384 serves only the l-BFV path; insecure serves both. The
+  release tooling's `requiredArtifactMarkers` uses the same rule. Root manifests, `SOURCE_HASH`, and build
   stamps are metadata, not required prover artifacts. Validation failure preserves the installed
   circuits and `version.json`. Installation errors trigger best-effort rollback and remain the
   returned error even if rollback fails. Each rollback failure logs its source and target paths. If
@@ -252,9 +254,9 @@ every section.
   because `verify_pk_for_basis` pins it only modulo `q_l`. — `flow-trace/04`
 - Every prover-chosen modular quotient needs a bound. This includes C1's `e_sm` CRT lift, the
   reduced encryption quotients in ct0, ct1, and C3, and the reduced key quotients `r` of
-  `lbfv_pk_generation_limb` and `rd0`/`rd2` of `rlk_generation_limb`. Bounds on the other operands
+  `lbfv_pk_generation` and `rd0`/`rd2` of `rlk_generation`. Bounds on the other operands
   must also prevent field wraparound. — `flow-trace/04`
-- `rlk_generation_limb` uses `delta = (row_index == limb_index)` in place of the row's Garner
+- `rlk_generation` uses `delta_l = (row_index == l)` for limb `l` in place of the row's Garner
   coefficient. This is correct only because each Garner coefficient is `1 mod q_row` and `0 mod`
   every other modulus; `garner_coefficient_is_the_crt_unit_vector` checks this for each l-BFV
   preset. — `crates/zk-helpers/src/circuits/threshold/rlk_generation.rs`
@@ -632,12 +634,12 @@ every section.
   proof and the terminal generation fold. It requires the l-BFV SK commitment to equal the C1 SK
   root that the legacy fold exports, and preserves the legacy node statement as a prefix. `dkg_aggregator_v2` preserves the legacy DKG statement as a
   prefix and appends the l-BFV statement. Its V2 VK manifest binds the generation and aggregation
-  folds, both kernels, both row circuits, both limb circuits, `node_fold_v2`, and both
+  folds, both kernels, both row circuits, `node_fold_v2`, and both
   `nodes_fold_v2` circuits. Legacy recursive circuits and ABIs remain unchanged. The V2 DKG circuit
   recomputes the accepted-set hash from its canonical party IDs. It binds the outer `NodeFoldV2` and
   `NodesFoldV2` VK slots separately from the embedded legacy `NodeFold` anchor. A `NodeFoldV2` proof
   has four verifier-prefix fields and 86 returned fields. Its 90-field statement takes the session
-  limbs from generation-fold fields 9 and 10. `DkgAggregatorV2` does not verify a C5 proof. It keeps
+  limbs from generation-fold fields 8 and 9. `DkgAggregatorV2` does not verify a C5 proof. It keeps
   `c5_key_hash` as a pinned public input, and `legacy_key_hash` and `v2_key_hash` still fold it in,
   so the statement layout and `BfvPkVerifierV2` anchors are unchanged; the anchor attests to no
   verified proof. `DkgAggregatorV2` binds the legacy and V2 recursive VK
@@ -671,14 +673,16 @@ every section.
   for the proof session. Aggregation requires exactly `H` unique ascending parties, and every public
   expected-commitment array must match the accepted PK, RLK D0, and RLK D2 generation commitments.
   PK and RLK aggregation rows use the same accepted-set hash. Before heavy verification, the
-  verifier rejects a missing or incompatible context, a mixed identity, or a terminal generation
-  proof whose public limb VK hash differs from the checksum-verified staged artifact.
-- **l-BFV generation rows use limb proofs:** each PK or RLK terminal verifies exactly `L` recursive
-  limb proofs in canonical order. Every limb binds the proof session, party, row, limb index, shared
-  secret commitments, and its public polynomial commitments. The terminal commits the row as a hash of
-  the verified limb commitments and exposes the leaf VK hash. Aggregation opens a row by recomputing
-  its checked limb commitments, which carries the limbs' centered bounds. PK and RLK leaf VK hashes are separate trusted
-  inputs to the generation fold and separate entries in the V2 VK manifest.
+  verifier rejects a missing or incompatible context or a mixed identity.
+- **l-BFV generation rows:** the PK row proof (`lbfv_pk_generation`) proves all `L` limbs of one
+  row directly. It must open its CRS row against `LBFV_CRS_ROW_COMMITMENTS[row]` with checked
+  packing, so that the prover cannot substitute another `a`. It must absorb `sk`, `eek`, `r` and
+  `pk0` (directly or through binding commitments) before it derives the challenge. The RLK row
+  proof (`rlk_generation`) proves both identities of all `L` limbs directly. It must open its URS
+  and CRS rows against `LBFV_URS_ROW_COMMITMENTS[row]` and `LBFV_CRS_ROW_COMMITMENTS[row]` with
+  checked packing, and absorb `sk`, `r`, `e0`, `e2`, `rd0`, `rd2`, `d0` and `d2` before it derives
+  the challenge. Each row proof commits the row as a hash of its limb commitments. Aggregation opens
+  a row by recomputing its checked limb commitments, which carries the centered bounds.
 - **l-BFV recursive row folds are bounded:** each generation and aggregation kernel accepts row 0.
   Each fold accepts only the next row. `node_fold_v2` and `dkg_aggregator_v2` require terminal
   row 4. Therefore, each terminal fold contains exactly five ordered proof pairs. `nodes_fold_v2`

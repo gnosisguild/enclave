@@ -458,7 +458,7 @@ C6 tree    = hash(c6_fold, c6_fold_kernel, C6)
 ```
 
 The builder derives `nodes_fold.vk_tree_hash` and `c6_fold.vk_tree_hash` from each complete artifact
-pair. `dkg_aggregator` requires every folded node row to carry the same node-tree hash. Both final
+pair that builds the trBFV path; an l-BFV-only pair (secure-16384) carries only `c6_fold.vk_tree_hash`. `dkg_aggregator` requires every folded node row to carry the same node-tree hash. Both final
 aggregators expose their complete tree anchor at public input zero. The immutable wrapper pin comes
 from the matching tree-hash file, not the immediate fold VK. Public input one retains the separate
 C5 or C7 non-ZK recursive VK hash. The final EVM public-input layouts do not change.
@@ -626,27 +626,35 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │                                      the commitment stored at ciphertext publication. Keccak(raw output) remains separate.
 │   │   │
 │   │   ├─ NOTE: Production C1 still proves one summation-only public-key share per party. The
-│   │   │   `lbfv_pk_generation_limb` circuit proves one CRT limb of one fixed public-key row. The
-│   │   │   `lbfv_pk_generation` terminal verifies all `L` limb proofs in canonical order. It
-│   │   │   commits the row as a hash of the verified limb commitments
-│   │   │   (`compute_lbfv_pk_row_commitment`) and exposes the PK leaf VK hash. The row takes no
-│   │   │   coefficient witness; an opener recomputes the checked limb commitments.
+│   │   │   `lbfv_pk_generation` circuit proves all `L` CRT limbs of one fixed public-key row in one
+│   │   │   proof, without recursion. It takes the row's CRS polynomials as a witness and opens
+│   │   │   them against `LBFV_CRS_ROW_COMMITMENTS[row]` with checked packing. It binds `sk` and
+│   │   │   `eek` once for the row and checks each limb's reduced identity at one Fiat-Shamir
+│   │   │   challenge. It commits the row as a hash of the limb commitments
+│   │   │   (`compute_lbfv_pk_row_commitment`); an opener recomputes the checked limb commitments.
+│   │   │   At secure-16384 the circuit has 3,198,941 gates (2^22). Native proving took 10.7 s
+│   │   │   per row, against 31.3 s for the earlier five limb proofs and their recursive
+│   │   │   finalizer.
 │   │   │   The `lbfv_pk_aggregation` circuit
 │   │   │   aggregates exactly `H` generation-bound rows. It uses the generated commitment of the
 │   │   │   fixed CRS row (`LBFV_CRS_ROW_COMMITMENTS`) instead of hashing the row. Both
 │   │   │   aggregation circuits bind the proof session, aggregator party, accepted-party-set hash,
 │   │   │   and row. The legacy C5 ABI remains unchanged. Remote contribution collection verifies
 │   │   │   the generation rows. The separate V2 recursive family consumes these proofs.
-│   │   │   RLK generation uses one reusable `rlk_generation_limb` circuit for each CRT limb. Its
-│   │   │   row finalizer verifies exactly `L` ZK leaf proofs in canonical limb order, commits D0 and
-│   │   │   D2 as hashes of the limb commitments (`compute_rlk_row_commitment_from_limbs`), and
-│   │   │   exposes the bound leaf VK hash at the
-│   │   │   public-statement tail. `CircuitName::RlkGeneration`, `CircuitName::RlkAggregation`, and
+│   │   │   `rlk_generation` proves both reduced RLK identities of all `L` CRT limbs of one row in
+│   │   │   one proof, without recursion. It takes the row's URS (`d1`) and CRS (`a`) polynomials as
+│   │   │   witnesses and opens them against `LBFV_URS_ROW_COMMITMENTS[row]` and
+│   │   │   `LBFV_CRS_ROW_COMMITMENTS[row]` with checked packing. It commits D0 and D2 as hashes of
+│   │   │   the limb commitments (`compute_rlk_row_commitment_from_limbs`). At secure-16384 the
+│   │   │   circuit has 6,427,102 gates (2^23). Native proving took 22.5 s per row with a 13.6 GB
+│   │   │   peak, against 63.2 s and 6.6 GB for the earlier five limb proofs and their recursive
+│   │   │   finalizer. `CircuitName::RlkGeneration`, `CircuitName::RlkAggregation`, and
 │   │   │   `CircuitName::LbfvPkGeneration` use appended discriminants 27, 28, and 29.
-│   │   │   `CircuitName::LbfvPkAggregation` and `CircuitName::RlkGenerationLimb` use appended
-│   │   │   discriminants 30 and 31. `CircuitName::LbfvPkGenerationLimb` uses appended discriminant
-│   │   │   40. The externally signed row proof families use append-only `ProofType` discriminants
-│   │   │   11 through 14. Both limb proof families remain local and have no `ProofType`.
+│   │   │   `CircuitName::LbfvPkAggregation` uses appended discriminant 30.
+│   │   │   `CircuitName::RlkGenerationLimb` (31) and `CircuitName::LbfvPkGenerationLimb` (40) are
+│   │   │   retired: nothing produces them, and they stay declared so that later variants keep their
+│   │   │   encoding. The externally signed row proof families use append-only `ProofType`
+│   │   │   discriminants 11 through 14.
 │   │   │   Append-only TrBFV compute variants generate local public-key and RLK
 │   │   │   shares from the C1 secret contribution. The response encrypts the RLK witness at rest.
 │   │   │   Append-only `ZkRequest` handlers build and prove each row. Each handler recomputes the
@@ -658,9 +666,8 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │   l-BFV SK commitment against C1. Verification also checks exact public-input shape and
 │   │   │   uses the versioned dispatch context as the authoritative session. Aggregation requires
 │   │   │   exactly `H` unique ascending parties, one accepted-set hash for both families, and PK,
-│   │   │   RLK D0, and RLK D2 input commitments that match accepted generation results. Before
-│   │   │   generic ZK verification, each terminal PK or RLK proof's limb VK hash must match its
-│   │   │   checksum-verified staged artifact. Versioned DHT transport stores each party's public-key
+│   │   │   RLK D0, and RLK D2 input commitments that match accepted generation results.
+│   │   │   Versioned DHT transport stores each party's public-key
 │   │   │   contribution and RLK contribution in separate `LbfvKeyShareDocument` records. The PK
 │   │   │   document carries C1 and five signed PK row proofs. The RLK document carries five signed
 │   │   │   terminal RLK row proofs. A compact `SignedLbfvKeyShareManifest` binds the complete proof
@@ -686,7 +693,7 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │   fetch requests. The pure document boundary decodes the exact V1 PK and RLK share bytes. It
 │   │   │   accepts `LbfvAcceptedPartyCommitments` only when all five ordered PK, D0, and D2
 │   │   │   commitments match the fixed-shape row statements.
-│   │   │   `lbfv_generation_fold` verifies five ordered PK/RLK pairs and binds both leaf VK hashes.
+│   │   │   `lbfv_generation_fold` verifies five ordered PK/RLK row-proof pairs.
 │   │   │   `node_fold_v2` verifies a
 │   │   │   legacy `NodeFold` proof and the terminal generation fold. The legacy fold exports C1's
 │   │   │   SK root; `node_fold_v2` requires the generation SK commitment to equal it and returns
@@ -702,13 +709,10 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │   and operational key storage are wired. The active aggregator persists and redrives a
 │   │   │   secure-16384 `LbfvPublicKeyAggregated` publication intent. The registry writer adapts the
 │   │   │   local intent to the existing public-key submission gate and passes the V2 proof and
-│   │   │   attestation bundle to `publishCommittee`. Secure-16384 tests prove and verify five
-│   │   │   recursive limbs and one row finalizer for each generation family. The PK test checks four
-│   │   │   identity fields and three outputs. The RLK test checks four identity fields and five
-│   │   │   outputs. Both finalizers bind the checksum-verified leaf VK hash. Both limb circuits
-│   │   │   check the identity reduced modulo X^N + 1, and select their CRS/URS row with
-│   │   │   `select_constant_dot` instead of a runtime table index. Earlier time and memory
-│   │   │   measurements predate these changes and were not repeated.
+│   │   │   attestation bundle to `publishCommittee`. Secure-16384 tests prove and verify one PK
+│   │   │   row proof and one RLK row proof. The PK test checks four identity fields and two
+│   │   │   outputs. The RLK test checks four identity fields and four outputs. Both circuits check
+│   │   │   their identities reduced modulo X^N + 1.
 │   │   │
 │   │   ├─ On mismatch: publishes CommitmentConsistencyViolation
 │   │   │   → AccusationManager initiates accusation quorum (see Part 5)
@@ -1256,7 +1260,7 @@ this incompatible byte-codec boundary.
         │  │             ([2+H], [3+H]) vs committeeHash         │
         │  │           ◦ last PI == pkCommitment                 │
         │  │         • secure-16384/minimum: `BfvPkVerifierV2`   │
-        │  │         • V2 requires exactly 64 public inputs      │
+        │  │         • V2 requires exactly 62 public inputs      │
         │  │         • V2 checks both independent VK manifests   │
         │  │         • V2 checks session, accepted set, registry,│
         │  │           committee, and key-envelope commitment    │
