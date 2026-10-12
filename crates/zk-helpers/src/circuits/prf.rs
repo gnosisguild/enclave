@@ -279,4 +279,67 @@ mod tests {
         .unwrap_err();
         assert!(error.contains("all zeros"));
     }
+
+    #[test]
+    fn decryption_mask_matches_synchronized_party_prf() {
+        use e3_polynomial::CrtPolynomial;
+        use fhe::bfv::{BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey};
+        use fhe::trbfv::synchronized::{PartyPrfKeyTransport, PartyPrfKeys};
+        use fhe_traits::{FheEncoder, FheEncrypter};
+
+        let params = BfvParametersBuilder::new()
+            .set_degree(8)
+            .set_plaintext_modulus(17)
+            .set_moduli(&[65537, 114689])
+            .build_arc()
+            .unwrap();
+        let mut rng = rand::rng();
+        let secret_key = SecretKey::random(&params, &mut rng);
+        let public_key = PublicKey::new(&secret_key, &mut rng);
+        let plaintext = Plaintext::try_encode(&[1u64, 2, 3, 4], Encoding::poly(), &params).unwrap();
+        let ciphertext = public_key.try_encrypt(&plaintext, &mut rng).unwrap();
+        let party_id = 1usize;
+        let outgoing: Vec<[u8; 32]> = (1..=3).map(|peer| [(party_id * 10 + peer) as u8; 32]).collect();
+        let incoming: Vec<[u8; 32]> = (1..=3).map(|peer| [(peer * 10 + party_id) as u8; 32]).collect();
+        let keys = PartyPrfKeys::from_transport(
+            PartyPrfKeyTransport::new(party_id, 3, outgoing.clone(), incoming.clone()).unwrap(),
+        )
+        .unwrap();
+        let decryptors = [1u32, 3];
+        let fhe_mask = keys
+            .mask(
+                &decryptors.map(|id| id as usize),
+                &ciphertext,
+            )
+            .unwrap();
+        let reverse_limbs = |component: &fhe_math::rq::Poly<fhe_math::rq::Ntt>| {
+            CrtPolynomial::from_fhe_polynomial(component)
+                .limbs
+                .into_iter()
+                .map(|mut limb| {
+                    limb.reverse();
+                    limb
+                })
+                .collect::<Vec<_>>()
+        };
+        let twin = decryption_mask_low_degree(
+            party_id - 1,
+            &decryptors,
+            &outgoing.iter().map(|key| key.to_vec()).collect::<Vec<_>>(),
+            &incoming.iter().map(|key| key.to_vec()).collect::<Vec<_>>(),
+            &reverse_limbs(&ciphertext[0]),
+            &reverse_limbs(&ciphertext[1]),
+            params.moduli(),
+        )
+        .unwrap();
+        let coefficients = fhe_mask.coefficients();
+        for (row, twin_row) in twin.iter().enumerate() {
+            for (column, coefficient) in twin_row.iter().enumerate() {
+                assert_eq!(
+                    coefficients[(row, column)], *coefficient,
+                    "mask residue row {row} column {column}"
+                );
+            }
+        }
+    }
 }

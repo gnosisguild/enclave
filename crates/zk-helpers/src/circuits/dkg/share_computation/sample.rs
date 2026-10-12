@@ -5,7 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 //! Sample data generation for the share-computation circuit: committee, DKG public key,
-//! secret (SK or smudging noise) in CRT form, Shamir shares, and parity matrices.
+//! secret (SK or smudging noise) in CRT form, Shamir shares of the secret key, and parity
+//! matrices. Smudging noise has no shares.
 
 use crate::circuits::dkg::share_computation::utils::compute_parity_matrix;
 use crate::computation::DkgInputType;
@@ -17,7 +18,6 @@ use e3_fhe_params::{build_pair_for_preset, generate_smudging_error, BfvPreset};
 use e3_polynomial::CrtPolynomial;
 use fhe::bfv::SecretKey;
 use fhe::trbfv::ShareManager;
-use fhe_math::rq::Poly;
 use num_bigint::BigInt;
 
 pub type SecretShares = Vec<ndarray::Array2<BigInt>>;
@@ -101,27 +101,11 @@ impl ShareComputationCircuitData {
                     CircuitsErrors::Sample(format!("Failed to generate smudging error: {:?}", e))
                 })
                 .unwrap();
-                let esi_poly = Poly::<fhe_math::rq::PowerBasis>::from_bigints(
-                    &esi_coeffs,
-                    threshold_params.context_at_level(0).unwrap(),
-                )
-                .unwrap();
-                let secret_sss: SecretShares = esi_poly
-                    .coefficients()
-                    .outer_iter()
-                    .map(|row| {
-                        let values = row.to_vec();
-                        let matrix = ndarray::Array2::from_shape_vec((1, values.len()), values)
-                            .expect("noise row matches its length");
-                        array2_u64_to_bigint(&matrix)
-                    })
-                    .collect();
-
                 let mut secret_crt =
                     CrtPolynomial::from_mod_q_polynomial(&esi_coeffs, threshold_params.moduli());
                 secret_crt.center(threshold_params.moduli()).unwrap();
 
-                (secret_crt, secret_sss)
+                (secret_crt, Vec::new())
             }
         };
 
@@ -173,7 +157,7 @@ mod tests {
         assert_eq!(sample.n_parties, committee.n as u32);
         assert_eq!(sample.threshold, committee.threshold as u32);
         assert_eq!(sample.dkg_input_type, DkgInputType::SmudgingNoise);
-        assert_eq!(sample.secret_sss.len(), 3);
+        assert!(sample.secret_sss.is_empty());
         assert_eq!(sample.secret.limbs.len(), 3);
     }
 }

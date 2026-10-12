@@ -6,9 +6,10 @@
 
 //! Computation types for the share-computation circuit: constants, bounds, bit widths, and input.
 //!
-//! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
-//! and (for input) secret plus shares. Input values are normalized to [0, q_j) per modulus
-//! and then to the ZKP field modulus so the Noir circuit's range check and parity check succeed.
+//! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters.
+//! Secret-key input also carries Shamir shares. Smudging-noise input is the polynomial
+//! alone. Input values are normalized to [0, q_j) per modulus and then to the ZKP field
+//! modulus so the Noir circuit's range check and parity check succeed.
 
 use crate::bigint_3d_to_json_values;
 use crate::circuits::commitments::{
@@ -217,7 +218,8 @@ impl Computation for Inputs {
                 .map_err(|e| CircuitsErrors::Sample(format!("secret_crt center: {:?}", e)))?;
         }
 
-        // y[coeff_idx][mod_idx][0] = secret_crt[mod_idx][coeff_idx] (already in [0, q_j)); y[coeff_idx][mod_idx][1+party] = share in [0, q_j).
+        // y[coeff_idx][mod_idx][0] is the secret in [0, q_j). Secret-key rows then
+        // append one Shamir share per party. Smudging-noise rows stop after the secret.
         let mut y: Vec<Vec<Vec<BigInt>>> = Vec::with_capacity(degree);
         for coeff_idx in 0..degree {
             let mut y_coeff: Vec<Vec<BigInt>> = Vec::with_capacity(num_moduli);
@@ -225,9 +227,12 @@ impl Computation for Inputs {
                 let q_j = BigInt::from(moduli[mod_idx]);
                 let mut y_mod: Vec<BigInt> = Vec::with_capacity(1 + n_parties);
                 y_mod.push(secret_crt.limb(mod_idx).coefficients()[coeff_idx].clone());
-                for party_idx in 0..n_parties {
-                    let share_value = &sss[mod_idx][[party_idx, coeff_idx]];
-                    y_mod.push(reduce(share_value, &q_j));
+                // Smudging noise is one local polynomial. It has no party shares.
+                if data.dkg_input_type == DkgInputType::SecretKey {
+                    for party_idx in 0..n_parties {
+                        let share_value = &sss[mod_idx][[party_idx, coeff_idx]];
+                        y_mod.push(reduce(share_value, &q_j));
+                    }
                 }
                 y_coeff.push(y_mod);
             }
