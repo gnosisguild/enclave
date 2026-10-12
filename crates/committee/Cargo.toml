@@ -3,7 +3,7 @@ name = "e3-committee"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Shared committee configurations and honest-party selection"
+description = "Shared committee configurations and canonical parameter values"
 repository.workspace = true
 
 [dependencies]

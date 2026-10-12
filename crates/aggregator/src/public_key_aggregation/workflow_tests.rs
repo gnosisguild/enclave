@@ -183,6 +183,17 @@ fn select_honest_set_fails_below_circuit_h() {
 }
 
 #[test]
+fn cap_honest_party_ids_handles_short_and_duplicate_rosters() {
+    let capped = cap_honest_party_ids(8, [2u64, 0, 1]);
+    assert_eq!(capped, BTreeSet::from([0, 1, 2]));
+    assert_eq!(
+        cap_honest_party_ids(2, [7, 2, 2, 1, 7]),
+        BTreeSet::from([1, 2])
+    );
+    assert!(cap_honest_party_ids(0, [1, 2]).is_empty());
+}
+
+#[test]
 fn select_honest_set_caps_to_circuit_h_and_sorts() {
     let e3_id = E3id::new("1", 1);
     // 4 honest, circuit_h = 3 -> cap to lowest-3 party_ids {0,1,2}, sorted ascending.

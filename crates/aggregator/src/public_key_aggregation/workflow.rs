@@ -14,7 +14,6 @@
 
 use alloy::primitives::Address;
 use anyhow::{anyhow, ensure, Context as _, Result};
-use e3_committee::cap_honest_party_ids;
 use e3_committee::CiphernodesCommitteeSize;
 use e3_events::{
     CircuitName, E3id, OrderedSet, PartyProofsToVerify, Proof, Seed, SignedDkgFoldAttestation,
@@ -25,6 +24,21 @@ use e3_utils::ArcBytes;
 use e3_zk_prover::extract_node_fold_agg_commits;
 use std::collections::{BTreeSet, HashMap};
 use tracing::{error, info, warn};
+
+/// Keep the lowest distinct party IDs for the C5 circuit's `H` slots.
+/// The caller supplies parties that have already passed C1 verification.
+fn cap_honest_party_ids(
+    committee_h: usize,
+    party_ids: impl IntoIterator<Item = u64>,
+) -> BTreeSet<u64> {
+    let mut ids: Vec<u64> = party_ids.into_iter().collect();
+    ids.sort_unstable();
+    ids.dedup();
+    if ids.len() > committee_h {
+        ids.truncate(committee_h);
+    }
+    ids.into_iter().collect()
+}
 
 #[path = "state.rs"]
 mod state;

@@ -4,9 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Shared committee configurations and canonical honest-party selection.
+//! Shared committee configurations and canonical parameter values.
 
-use std::collections::BTreeSet;
 use std::fmt;
 use std::str::FromStr;
 
@@ -114,24 +113,6 @@ impl fmt::Display for CiphernodesCommitteeSize {
     }
 }
 
-/// Select the canonical honest roster of size at most `committee_h`: ascending `party_id`,
-/// truncated to the lowest `H` when the candidate set is larger.
-///
-/// Used by the public-key aggregator (C5 / NodeFold) and threshold keyshare (C4) so both sides
-/// agree on which parties occupy the circuit's `H` slots when `H < N`.
-pub fn cap_honest_party_ids(
-    committee_h: usize,
-    party_ids: impl IntoIterator<Item = u64>,
-) -> BTreeSet<u64> {
-    let mut ids: Vec<u64> = party_ids.into_iter().collect();
-    ids.sort_unstable();
-    ids.dedup();
-    if ids.len() > committee_h {
-        ids.truncate(committee_h);
-    }
-    ids.into_iter().collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,22 +158,5 @@ mod tests {
         }
         assert!(CiphernodesCommitteeSize::from_threshold(2, 3).is_err());
         assert!(CiphernodesCommitteeSize::from_n_h(3, 3).is_err());
-    }
-
-    #[test]
-    fn cap_honest_party_ids_keeps_lowest_h() {
-        let capped = cap_honest_party_ids(8, 0..10);
-        assert_eq!(capped, BTreeSet::from([0, 1, 2, 3, 4, 5, 6, 7]));
-    }
-
-    #[test]
-    fn cap_honest_party_ids_noop_when_at_most_h() {
-        let capped = cap_honest_party_ids(8, [2u64, 0, 1]);
-        assert_eq!(capped, BTreeSet::from([0, 1, 2]));
-        assert_eq!(
-            cap_honest_party_ids(2, [7, 2, 2, 1, 7]),
-            BTreeSet::from([1, 2])
-        );
-        assert!(cap_honest_party_ids(0, [1, 2]).is_empty());
     }
 }

@@ -1,7 +1,7 @@
 # e3-zk-helpers
 
-ZK circuit helpers and artifact generation. `e3-committee` owns shared committee types, values, and
-honest-roster selection.
+ZK circuit helpers and artifact generation. `e3-committee` owns shared committee types and canonical
+parameter values. The public-key aggregation workflow owns honest-roster selection.
 
 ## zk_cli
 

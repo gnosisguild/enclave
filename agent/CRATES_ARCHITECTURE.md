@@ -185,6 +185,10 @@ flowchart TD
     TestHelpers --> SDK
 ```
 
+`e3-committee` owns committee configurations and their canonical parameter values. Public-key
+aggregation owns the selection of the lowest distinct verified party IDs for C5's `H` slots, in
+`crates/aggregator/src/public_key_aggregation/workflow.rs`.
+
 The most important current boundary debt is that `e3-events` contains both neutral event transport
 and rich protocol payloads that depend on cryptographic/FHE types. Protocol workflow crates also
 depend directly on Actix and concrete repositories. These are real constraints in the current code
