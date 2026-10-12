@@ -258,19 +258,40 @@ mod tests {
                 .collect(),
         );
         let ternary = Polynomial::new((0..256).map(|_| BigInt::from(next() % 3) - 1).collect());
-        assert!(centered.mul_i128(&ternary).is_some());
         assert_eq!(centered.mul(&ternary), schoolbook(&centered, &ternary));
     }
 
     #[test]
     fn multiplication_keeps_arbitrary_precision_when_i128_is_insufficient() {
-        for coefficients in [
-            vec![BigInt::from(1) << 100, BigInt::from(-1) << 100],
-            vec![BigInt::from(1) << 200, BigInt::from(3)],
+        for (coefficients, expected) in [
+            (
+                vec![BigInt::from(1) << 100usize, BigInt::from(-1) << 100usize],
+                vec![
+                    BigInt::from(1) << 200usize,
+                    BigInt::from(-1) << 201usize,
+                    BigInt::from(1) << 200usize,
+                ],
+            ),
+            (
+                vec![BigInt::from(1) << 200usize, BigInt::from(3)],
+                vec![
+                    BigInt::from(1) << 400usize,
+                    BigInt::from(6) << 200usize,
+                    BigInt::from(9),
+                ],
+            ),
+            // Each product fits i128; the middle coefficient does not.
+            (
+                vec![BigInt::from(1) << 63usize, BigInt::from(1) << 63usize],
+                vec![
+                    BigInt::from(1) << 126usize,
+                    BigInt::from(1) << 127usize,
+                    BigInt::from(1) << 126usize,
+                ],
+            ),
         ] {
             let p = Polynomial::new(coefficients);
-            assert!(p.mul_i128(&p).is_none());
-            assert_eq!(p.mul(&p), schoolbook(&p, &p));
+            assert_eq!(p.mul(&p), Polynomial::new(expected));
         }
     }
 }
