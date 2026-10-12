@@ -77,7 +77,7 @@ pub global {}_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS);
 mod tests {
     use super::*;
 
-    use crate::CiphernodesCommitteeSize;
+    use e3_committee::CiphernodesCommitteeSize;
 
     #[test]
     fn test_toml_generation_and_structure() {

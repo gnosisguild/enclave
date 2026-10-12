@@ -817,8 +817,8 @@ impl Computation for Inputs {
 mod tests {
     use super::*;
 
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_fhe_params::BfvPreset;
 
     #[test]
@@ -903,9 +903,9 @@ mod tests {
 #[cfg(test)]
 mod scaled_quotient_tests {
     use super::*;
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
     use crate::{compute_k0is, compute_q_mod_t, compute_q_product};
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 
     fn derive_for(preset: BfvPreset) -> (ScaledQuotient, Vec<u64>, u64) {

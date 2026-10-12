@@ -1514,6 +1514,7 @@ library ActiveCryptoConfig {
       'circuits/lib/src/core',
       'circuits/lib/src/math',
       'crates/zk-helpers/src',
+      'crates/committee/src',
       'crates/fhe-params/src',
       'crates/fhe/src',
       'crates/polynomial/src',

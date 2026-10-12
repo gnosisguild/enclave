@@ -1,6 +1,7 @@
 # e3-zk-helpers
 
-ZK circuit helpers, artifact generation, and committee-size definitions.
+ZK circuit helpers and artifact generation. `e3-committee` owns shared committee types, values, and
+honest-roster selection.
 
 ## zk_cli
 

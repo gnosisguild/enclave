@@ -10,7 +10,6 @@
 //! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
 use crate::calculate_bit_width;
-use crate::ciphernodes_committee::CiphernodesCommittee;
 use crate::crt_polynomial_to_toml_json;
 use crate::math::fold_negacyclic;
 use crate::polynomial_to_toml_json;
@@ -19,6 +18,7 @@ use crate::threshold::pk_generation::circuit::PkGenerationCircuitData;
 use crate::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
+use e3_committee::CiphernodesCommittee;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
@@ -446,7 +446,7 @@ impl Computation for Inputs {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CiphernodesCommittee;
+    use e3_committee::CiphernodesCommittee;
     use e3_fhe_params::BfvPreset;
 
     #[test]
@@ -478,7 +478,7 @@ mod tests {
     #[test]
     fn test_bound_and_bits_computation_consistency() {
         let preset = BfvPreset::InsecureThreshold512;
-        use crate::ciphernodes_committee::CiphernodesCommitteeSize;
+        use e3_committee::CiphernodesCommitteeSize;
         let committee = CiphernodesCommitteeSize::Micro.values();
         let bounds = Bounds::compute(preset, &committee).unwrap();
         let bits = Bits::compute(preset, &bounds).unwrap();

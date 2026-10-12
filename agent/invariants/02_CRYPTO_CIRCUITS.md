@@ -14,10 +14,9 @@ every section.
 
 - Committee `(N, T, H)` and each complete BFV parameter tuple must stay synchronized.
   `scripts/check-committee.sh` fails when these copies disagree: committee values in
-  `circuits/lib/src/configs/committee/<name>/mod.nr`,
-  `crates/zk-helpers/src/ciphernodes_committee.rs`, `ActiveCryptoConfig.sol`, and
-  `packages/interfold-contracts/scripts/utils.ts`; the threshold BFV tuple in
-  `packages/interfold-contracts/scripts/protocol/constants.ts`,
+  `circuits/lib/src/configs/committee/<name>/mod.nr`, `crates/committee/src/lib.rs`,
+  `ActiveCryptoConfig.sol`, and `packages/interfold-contracts/scripts/utils.ts`; the threshold BFV
+  tuple in `packages/interfold-contracts/scripts/protocol/constants.ts`,
   `crates/fhe-params/src/constants.rs`, and
   `circuits/lib/src/configs/{insecure,secure}/threshold.nr`; and the configuration IDs in
   `utils.ts`, `ActiveCryptoConfig.sol`, `tasks/interfold.ts`, `packages/interfold-sdk/src/utils.ts`,
@@ -108,8 +107,8 @@ every section.
   It normalizes the active preset selector because each pair already identifies its preset. A
   library-only change invalidates every affected pair. Rebuild and push those pairs before release.
 - The pair source hash ignores generated C1/C2 bound values and includes the Rust sources that
-  generate them, without their `#[cfg(test)]` modules. Switching the active committee or editing a
-  test module must not change another pair's source hash.
+  generate them, including `committee`, without their `#[cfg(test)]` modules. Switching the active
+  committee or editing a test module must not change another pair's source hash.
 - The source hash reads `Cargo.lock` for external crate pins only: name, version, source, and
   checksum. A workspace version bump or a dependency edit inside the workspace must not make the
   published artifact matrix stale. — `scripts/build-circuits.ts`

@@ -22,8 +22,8 @@
 
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser};
+use e3_committee::CiphernodesCommitteeSize;
 use e3_fhe_params::{BfvPreset, ParameterType};
-use e3_zk_helpers::ciphernodes_committee::CiphernodesCommitteeSize;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
 use e3_zk_helpers::circuits::dkg::share_computation::circuit::{
     ShareComputationCircuit, ShareComputationCircuitData,

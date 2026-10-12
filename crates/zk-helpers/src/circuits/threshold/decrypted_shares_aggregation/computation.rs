@@ -359,7 +359,7 @@ impl Computation for Inputs {
 mod tests {
     use super::*;
     use crate::threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitData;
-    use crate::CiphernodesCommitteeSize;
+    use e3_committee::CiphernodesCommitteeSize;
 
     #[test]
     fn test_bounds_and_bits_consistency() {
