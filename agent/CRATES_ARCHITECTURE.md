@@ -72,6 +72,7 @@ flowchart TD
     subgraph Foundations[Foundation crates]
         Crypto[e3-crypto]
         Poly[e3-polynomial]
+        PolyFhe[e3-polynomial-fhe]
         Matrix[e3-parity-matrix]
         Safe[e3-safe]
         Hamt[e3-hamt]
@@ -172,9 +173,11 @@ flowchart TD
     Events --> ZkHelpers
     Events --> Committee
     ZkHelpers --> Poly
+    ZkHelpers --> PolyFhe
     ZkHelpers --> Matrix
     ZkHelpers --> Safe
     ZkHelpers --> Committee
+    PolyFhe --> Poly
     Crypto --> Utils
     Utils --> UtilsDerive
 

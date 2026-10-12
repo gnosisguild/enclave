@@ -17,6 +17,7 @@
 
 mod common;
 
+use e3_polynomial_fhe::{FromFhePolynomial as _, ToFhePolynomial as _};
 use std::sync::Arc;
 
 use ark_bn254::Fr;

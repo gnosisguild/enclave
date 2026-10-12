@@ -1,93 +1,32 @@
-# Polynomial Library
+# Polynomial crates
 
-A polynomial library with big integer coefficients designed for cryptographic applications,
-particularly lattice-based cryptography and homomorphic encryption schemes.
+This folder holds two workspace members:
 
-## Features
+- `core/` — the `e3-polynomial` crate. Polynomials with `num-bigint` coefficients, CRT limb
+  containers, modular arithmetic and range checks, negacyclic folding, and coefficient
+  representation helpers. This crate has no `fhe-math` dependency.
+- `fhe-adapter/` — the `e3-polynomial-fhe` crate. Extension traits and functions that convert
+  between the core types and the `fhe-math` RNS polynomial types (`Poly<PowerBasis>`,
+  `Poly<Ntt>`, `Poly<NttShoup>`).
 
-- Uses `num-bigint` for coefficient representation.
-- Addition, subtraction, multiplication, division reduction modulo cyclotomic polynomials and prime
-  moduli.
-- Utilities for coefficient range validation.
-- Optional serde support for polynomial serialization.
+This folder is not a Cargo package and not a nested workspace. Both crates are direct members of
+the root workspace. Depend on the crate that owns what you need:
 
-### Mathematical Background
+- Only core polynomial arithmetic: depend on `e3-polynomial`.
+- Conversions to or from FHE ciphertext polynomials: depend on `e3-polynomial-fhe` (it
+  re-exports nothing from the core crate, so depend on both crates and import the
+  `FromFhePolynomial`, `ToFhePolynomial`, and `ToPowerBasisPoly` traits).
 
-This library implements polynomial arithmetic over the ring of integers, with support for modular
-reduction operations commonly used in:
-
-- **Lattice-based cryptography**: Polynomial rings over cyclotomic fields
-- **Homomorphic encryption**: BFV, BGV, and CKKS schemes
-- **Zero-knowledge proofs**: Polynomial commitment schemes
-
-### Performance
-
-The library is optimized for cryptographic workloads with:
-
-- Efficient coefficient storage and manipulation
-- Optimized modular reduction algorithms
-- Minimal memory allocations
-- Horner's method for polynomial evaluation
-
-## Usage
-
-### Installation
-
-Add this to your `Cargo.toml`:
-
-```toml
-[dependencies]
-polynomial = { git = "https://github.com/theinterfold/interfold", path = "crates/polynomial" }
-```
-
-For serialization support, enable the `serde` feature:
-
-```toml
-[dependencies]
-polynomial = { git = "https://github.com/theinterfold/interfold", path = "crates/polynomial", features = ["serde"] }
-```
-
-### Testing
-
-Run the test suite:
+## Testing
 
 ```bash
-cargo test
+cargo test -p e3-polynomial
 ```
 
-Run tests with verbose output:
+## Benchmarks
+
+The core crate keeps the criterion benchmarks:
 
 ```bash
-cargo test -- --nocapture
-```
-
-### Benchmarks
-
-Run benchmarks:
-
-```bash
-cargo bench
-```
-
-### Quick Start
-
-```rust
-use polynomial::Polynomial;
-use num_bigint::BigInt;
-
-// Create polynomials
-let poly1 = Polynomial::new(vec![BigInt::from(1), BigInt::from(2), BigInt::from(3)]);
-let poly2 = Polynomial::new(vec![BigInt::from(1), BigInt::from(1)]);
-
-// Perform arithmetic
-let sum = poly1.add(&poly2);
-let product = poly1.mul(&poly2);
-
-// Modular reduction
-let modulus = BigInt::from(7);
-let reduced = poly1.reduce_and_center(&modulus);
-
-println!("Sum: {}", sum);
-println!("Product: {}", product);
-println!("Reduced: {}", reduced);
+cargo bench -p e3-polynomial
 ```

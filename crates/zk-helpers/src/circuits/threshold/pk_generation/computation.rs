@@ -11,7 +11,6 @@
 
 use crate::calculate_bit_width;
 use crate::crt_polynomial_to_toml_json;
-use crate::math::fold_negacyclic;
 use crate::polynomial_to_toml_json;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuit;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuitData;
@@ -21,6 +20,7 @@ use crate::{CircuitComputation, Computation};
 use e3_committee::CiphernodesCommittee;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
+use e3_polynomial::fold_negacyclic;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
 use fhe::bfv::SecretKey;

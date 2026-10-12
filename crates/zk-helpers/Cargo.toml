@@ -13,6 +13,7 @@ ark-bn254 = { workspace = true }
 clap = { workspace = true }
 ark-ff = { workspace = true }
 e3-polynomial = { workspace = true, features = ["serde"] }
+e3-polynomial-fhe = { workspace = true }
 e3-safe = { workspace = true }
 e3-fhe-params = { workspace = true }
 fhe = { workspace = true }

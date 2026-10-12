@@ -3,6 +3,8 @@
 ZK circuit helpers and artifact generation. `e3-committee` owns shared committee types and canonical
 parameter values. The public-key aggregation workflow owns honest-roster selection.
 
+Polynomial arithmetic belongs to `e3-polynomial`; FHE conversion belongs to `e3-polynomial-fhe`.
+
 ## zk_cli
 
 ```bash

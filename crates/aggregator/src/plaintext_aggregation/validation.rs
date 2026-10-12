@@ -3,6 +3,7 @@
 //! Bind raw decryption shares to their C6 proof commitments.
 
 use super::*;
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use e3_zk_helpers::{
     circuits::commitments::compute_threshold_decryption_share_commitment,
     circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS,

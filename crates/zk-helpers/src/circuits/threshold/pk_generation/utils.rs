@@ -10,6 +10,7 @@ use crate::utils::bigint_to_field;
 use crate::CircuitsErrors;
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_polynomial::CrtPolynomial;
+use e3_polynomial_fhe::FromFhePolynomial as _;
 
 /// Returns the deterministic CRP (common random polynomial) as a CRT polynomial with limbs
 /// reversed and coefficients centered per modulus, matching the representation used in the circuit.

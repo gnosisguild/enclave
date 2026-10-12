@@ -3678,6 +3678,7 @@ dependencies = [
  "e3-keyshare",
  "e3-multithread",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-request",
  "e3-sortition",
  "e3-sync",
@@ -4293,6 +4294,7 @@ dependencies = [
  "e3-events",
  "e3-fhe-params",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-request",
  "e3-trbfv",
  "e3-utils",
@@ -4382,11 +4384,22 @@ version = "0.19.0"
 dependencies = [
  "bincode",
  "criterion",
- "fhe-math",
+ "ndarray",
  "num-bigint 0.5.1",
+ "num-integer",
  "num-traits",
  "serde",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "e3-polynomial-fhe"
+version = "0.19.0"
+dependencies = [
+ "e3-polynomial",
+ "fhe-math",
+ "num-bigint 0.5.1",
+ "num-traits",
 ]
 
 [[package]]
@@ -4710,6 +4723,7 @@ dependencies = [
  "e3-fhe-params",
  "e3-parity-matrix",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-safe",
  "fhe",
  "fhe-math",
@@ -4759,6 +4773,7 @@ dependencies = [
  "e3-layout-lock",
  "e3-net",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-request",
  "e3-slashing",
  "e3-sortition",

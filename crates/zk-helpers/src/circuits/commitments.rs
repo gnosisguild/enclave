@@ -17,6 +17,7 @@ use ark_ff::BigInteger;
 use ark_ff::PrimeField;
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe::bfv::PublicKey;
 use fhe_math::rq::{Poly, PowerBasis};
 use fhe_traits::DeserializeParametrized;
@@ -228,9 +229,9 @@ pub fn compute_dkg_pk_commitment_from_public_key_bytes(
         .get(1)
         .ok_or_else(|| crate::CircuitsErrors::Other("PublicKey is missing pk1".to_string()))?;
     let moduli = dkg_params.moduli();
-    let pk0 = crate::math::fhe_poly_to_crt_centered(pk0, moduli)
+    let pk0 = e3_polynomial_fhe::fhe_poly_to_crt_centered(pk0, moduli)
         .map_err(|e| crate::CircuitsErrors::Other(format!("pk0 conversion: {e}")))?;
-    let pk1 = crate::math::fhe_poly_to_crt_centered(pk1, moduli)
+    let pk1 = e3_polynomial_fhe::fhe_poly_to_crt_centered(pk1, moduli)
         .map_err(|e| crate::CircuitsErrors::Other(format!("pk1 conversion: {e}")))?;
     let commitment = compute_dkg_pk_commitment(&pk0, &pk1, crate::compute_modulus_bit(&dkg_params));
 

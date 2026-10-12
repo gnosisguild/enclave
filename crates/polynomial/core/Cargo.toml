@@ -9,10 +9,11 @@ repository.workspace = true
 [dependencies]
 num-bigint = { workspace = true, features = ["rand_0_9", "serde"] }
 num-traits = { workspace = true }
+num-integer = { workspace = true }
+ndarray = { workspace = true }
 serde = { workspace = true, optional = true, features = ["rc"] }
 bincode = { workspace = true, optional = true }
 thiserror = { workspace = true }
-fhe-math = { workspace = true }
 
 [dev-dependencies]
 criterion = "0.5"

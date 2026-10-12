@@ -15,7 +15,6 @@ use crate::circuits::commitments::{
 };
 use crate::dkg::share_encryption::ShareEncryptionCircuit;
 use crate::dkg::share_encryption::ShareEncryptionCircuitData;
-use crate::math::fold_negacyclic;
 use crate::math::{compute_k0is, compute_q_mod_t_centered, plaintext_poly_u64};
 use crate::polynomial_to_toml_json;
 use crate::utils::{compute_modulus_bit, compute_msg_bit};
@@ -25,8 +24,10 @@ use crate::{compute_q_mod_t, compute_q_product};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
+use e3_polynomial::fold_negacyclic;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe::bfv::SecretKey;
 use fhe_math::zq::Modulus;
 use itertools::izip;

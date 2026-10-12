@@ -28,6 +28,7 @@ use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::reduce;
 use e3_polynomial::{CrtPolynomial, Polynomial};
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe_math::rq::{Poly, PowerBasis};
 use num_bigint::{BigInt, BigUint};
 use num_traits::Zero;

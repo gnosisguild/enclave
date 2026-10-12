@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
 use e3_zk_helpers::crt_polynomial_to_toml_json;

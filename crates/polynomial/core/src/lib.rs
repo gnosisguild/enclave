@@ -16,6 +16,9 @@
 //! - Range Checking: Utilities for coefficient range validation.
 //! - Serialization: Optional serde support for polynomial serialization with bincode integration.
 //!
+//! Conversions to and from `fhe-math` RNS polynomials live in the `e3-polynomial-fhe`
+//! adapter crate, so this crate stays independent of any FHE backend.
+//!
 //! ## Mathematical Background
 //!
 //! This library implements polynomial arithmetic over the ring of integers,
@@ -26,11 +29,13 @@
 //! - Zero-knowledge proofs: Polynomial commitment schemes.
 
 pub mod crt_polynomial;
-mod fhe_poly;
+pub mod math;
+pub mod negacyclic;
 pub mod polynomial;
-pub mod utils;
+pub mod representation;
 
 pub use crt_polynomial::{CrtPolynomial, CrtPolynomialError};
-pub use fhe_poly::ToPowerBasisPoly;
+pub use math::*;
+pub use negacyclic::fold_negacyclic;
 pub use polynomial::{Polynomial, PolynomialError};
-pub use utils::*;
+pub use representation::array2_u64_to_bigint;

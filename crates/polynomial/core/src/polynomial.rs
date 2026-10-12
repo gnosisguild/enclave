@@ -6,9 +6,8 @@
 
 //! Polynomial arithmetic implementation.
 
-use crate::fhe_poly::ToPowerBasisPoly;
-use crate::utils::{center, reduce};
-use num_bigint::{BigInt, BigUint, ToBigInt};
+use crate::math::{center, reduce};
+use num_bigint::BigInt;
 use num_traits::{One, ToPrimitive, Zero};
 use std::fmt;
 use thiserror::Error;
@@ -125,19 +124,6 @@ impl Polynomial {
         let coefficients = coefficients.iter().map(|&c| BigInt::from(c)).collect();
 
         Self { coefficients }
-    }
-
-    /// Creates a new polynomial from a fhe-math `Poly` (CRT-reconstructed mod Q).
-    pub fn from_fhe_polynomial(p: &impl ToPowerBasisPoly) -> Self {
-        let p = p.to_power_basis_poly();
-
-        let coefficients: Vec<BigUint> = Vec::<BigUint>::from(&p);
-        let bigints: Vec<BigInt> = coefficients
-            .iter()
-            .map(|c| c.to_bigint().unwrap())
-            .collect();
-
-        Self::new(bigints)
     }
 
     /// Reverses coefficient order in-place.

@@ -19,7 +19,7 @@ use num_traits::{ToPrimitive, Zero};
 // Re-export so callers can use decrypted_shares_aggregation::utils for one-stop.
 pub use math::{
     compute_delta, compute_delta_half, compute_q_inverse_mod_t, compute_q_mod_t, compute_q_product,
-    compute_t_inv_mod_q, mod_inverse_bigint,
+    compute_t_inv_mod_q,
 };
 
 /// Lagrange interpolation at 0: given shares (party_id, value) mod modulus, returns the recovered secret.
@@ -53,7 +53,7 @@ pub fn lagrange_recover_at_zero(
                 let x_j_b = BigInt::from(x_j);
                 let num = BigInt::from(0) - &x_j_b;
                 let den = &x_i_b - &x_j_b;
-                let den_inv = crate::math::mod_inverse_bigint(&den, &m)
+                let den_inv = e3_polynomial::mod_inverse_bigint(&den, &m)
                     .ok_or_else(|| CircuitsErrors::Other("lagrange: den not invertible".into()))?;
                 lambda_i = (&lambda_i * &num % &m * &den_inv % &m + &m) % &m;
             }
@@ -87,7 +87,7 @@ pub fn crt_reconstruct(residues: &[u64], moduli: &[u64]) -> Result<BigUint, Circ
         let m_i_bigint = BigInt::from(m_i.clone());
         let q_i = &q / &m_i;
         let q_i_bigint = BigInt::from(q_i.clone());
-        let inv = crate::math::mod_inverse_bigint(&q_i_bigint, &m_i_bigint).ok_or_else(|| {
+        let inv = e3_polynomial::mod_inverse_bigint(&q_i_bigint, &m_i_bigint).ok_or_else(|| {
             CircuitsErrors::Other("crt_reconstruct: q_i not invertible mod m_i".into())
         })?;
         let c_i = (BigInt::from(r_i) * &inv) % &m_i_bigint;

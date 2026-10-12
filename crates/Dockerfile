@@ -77,8 +77,9 @@ COPY crates/openvm-host/Cargo.toml ./openvm-host/Cargo.toml
 COPY crates/openvm-types/Cargo.toml ./openvm-types/Cargo.toml
 COPY crates/parity-matrix/Cargo.toml ./parity-matrix/Cargo.toml
 COPY crates/zk-prover/Cargo.toml ./zk-prover/Cargo.toml
-COPY crates/polynomial/Cargo.toml ./polynomial/Cargo.toml
-COPY crates/polynomial/benches ./polynomial/benches
+COPY crates/polynomial/core/Cargo.toml ./polynomial/core/Cargo.toml
+COPY crates/polynomial/core/benches ./polynomial/core/benches
+COPY crates/polynomial/fhe-adapter/Cargo.toml ./polynomial/fhe-adapter/Cargo.toml
 COPY crates/program-server/Cargo.toml ./program-server/Cargo.toml
 COPY crates/request/Cargo.toml ./request/Cargo.toml
 COPY crates/safe/Cargo.toml ./safe/Cargo.toml
@@ -99,7 +100,7 @@ COPY crates/zk-helpers/Cargo.toml ./zk-helpers/Cargo.toml
 
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./cli/build.rs
-RUN for d in ./*/ ; do \
+RUN for d in ./*/ ./*/*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
           if [ "$d" = "./cli/" ] || [ "$d" = "./interfoldup/" ]; then \
             mkdir -p "$d/src" && \
