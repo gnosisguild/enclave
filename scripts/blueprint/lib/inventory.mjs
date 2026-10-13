@@ -11,12 +11,13 @@
 //   node scripts/blueprint/lib/inventory.mjs    prints the inventory
 import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
-import { join, relative, dirname } from 'node:path'
+import { join, relative, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-// The blueprint reads the checked-out repository: scripts/blueprint/lib -> the repository root.
-export const ROOT = join(HERE, '..', '..', '..')
+// The blueprint reads the checked-out repository (scripts/blueprint/lib -> the repository root), or
+// the tree in BLUEPRINT_ROOT, which diff.mjs sets to read another version of the code.
+export const ROOT = process.env.BLUEPRINT_ROOT ? resolve(process.env.BLUEPRINT_ROOT) : join(HERE, '..', '..', '..')
 const git = (...args) => {
   try {
     return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
@@ -146,26 +147,27 @@ function rustFacts(dir) {
 // The build skips them, and check.mjs lists them.
 export const MISSING = []
 
-export function crates() {
+// The workspace crates under crates/, as the root Cargo.toml lists them.
+export function members() {
+  const toml = existsSync(join(ROOT, 'Cargo.toml')) ? readFileSync(join(ROOT, 'Cargo.toml'), 'utf8') : ''
+  const list = (toml.match(/members\s*=\s*\[([\s\S]*?)\]/) || ['', ''])[1]
+  return [...list.matchAll(/"crates\/([^"]+)"/g)].map((m) => m[1])
+}
+
+// With `unmapped`, the workspace crates that LAYERS does not name come too, so diff.mjs sees a crate
+// that a pull request adds before LAYERS lists it.
+export function crates({ unmapped = false } = {}) {
   const out = []
-  for (const [layer, names] of Object.entries(LAYERS)) {
-    for (const short of names) {
-      const dir = join(ROOT, 'crates', short)
-      if (!existsSync(join(dir, 'Cargo.toml'))) {
-        MISSING.push(`crates/${short}`)
-        continue
-      }
-      const f = rustFacts(dir)
-      out.push({
-        id: cargoName(dir),
-        short,
-        kind: 'crate',
-        layer,
-        path: `crates/${short}`,
-        deps: cargoDeps(dir),
-        ...f,
-      })
+  const named = Object.values(LAYERS).flat()
+  const entries = Object.entries(LAYERS).flatMap(([layer, names]) => names.map((short) => [layer, short]))
+  if (unmapped) for (const short of members()) if (!named.includes(short)) entries.push(['unmapped', short])
+  for (const [layer, short] of entries) {
+    const dir = join(ROOT, 'crates', short)
+    if (!existsSync(join(dir, 'Cargo.toml'))) {
+      MISSING.push(`crates/${short}`)
+      continue
     }
+    out.push({ id: cargoName(dir), short, kind: 'crate', layer, path: `crates/${short}`, deps: cargoDeps(dir), ...rustFacts(dir) })
   }
   return out
 }
@@ -306,12 +308,12 @@ export function apps() {
   ].filter(Boolean)
 }
 
-export function inventory() {
+export function inventory({ unmapped = false } = {}) {
   MISSING.length = 0
   return {
     sha: git('rev-parse', '--short=9', 'HEAD'),
     tag: git('describe', '--tags', '--always') || 'working tree',
-    crates: crates(),
+    crates: crates({ unmapped }),
     contracts: contracts(),
     circuits: circuits(),
     apps: apps(),
