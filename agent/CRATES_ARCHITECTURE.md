@@ -281,9 +281,9 @@ sequenceDiagram
     EP-->>CLI: ready node
 ```
 
-`interfold start --bootstrap` builds a bootstrap node with the same builder and
-`with_bootstrap_role()`. It enables persistence, the Interfold contract reader, and the libp2p
-interface. It has no compute scheduler (so no prover-memory check), TrBFV keyshare, ZK prover,
+`interfold start --bootstrap` builds a bootstrap node with `CiphernodeBuilder::bootstrap`. It
+enables persistence, the Interfold contract reader, and the libp2p interface. It has no compute
+scheduler (so no prover-memory check), TrBFV keyshare, ZK prover,
 aggregators, registry or bonding readers, or contract writers, and `setup_extensions` installs no
 `AccusationManager` or `CommitmentConsistencyChecker`, so it signs no votes. The parts that the
 builder runs for every node still run: sortition, the request router with the aggregator-role
@@ -305,11 +305,12 @@ one whose schema marker this startup wrote. A directory that existed before this
 role marker counts as a full node's. Releases without the marker ran only full nodes, and their
 directories halt at the schema check before the role check. At schema 8, only a start that stopped
 between the schema stamp and the role stamp leaves such a directory. No reader ran before that stop,
-so the directory holds no chain cursors. A node refuses a directory of the other role, and
-`ensure_role_components` rejects a bootstrap builder that also enables keyshare, aggregation,
-registry, or contract-writer components. A bootstrap node advances the per-chain block cursor with
-only the Interfold reader. A full node started on its directory would therefore skip earlier
-registry events. A bootstrap node started on a full node's directory would restore that node's
+so the directory holds no chain cursors. A node refuses a directory of the other role. The builder
+has only two profiles, `CiphernodeBuilder::full` and `CiphernodeBuilder::bootstrap`, so a bootstrap
+node cannot enable keyshare, aggregation, registry, or contract-writer components. A bootstrap node
+advances the per-chain block cursor with only the Interfold reader. A full node started on its
+directory would therefore skip earlier registry events. A bootstrap node started on a full node's
+directory would restore that node's
 committees. The marker is read with `read_checked`, so a storage error cannot pass as an unmarked
 directory. A release without the marker check uses schema 7 or earlier, so it halts on a schema-8
 directory (`crates/sync/src/sync/preflight.rs`). A schema-7 directory that a development build wrote
