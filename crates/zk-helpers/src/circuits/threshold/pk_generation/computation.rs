@@ -9,9 +9,9 @@
 //! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
 //! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
-use crate::crt_polynomial_to_toml_json;
+use crate::encoding::crt_polynomial_to_toml_json;
+use crate::encoding::polynomial_to_toml_json;
 use crate::negacyclic::fold_negacyclic;
-use crate::polynomial_to_toml_json;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuit;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuitData;
 use crate::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;
@@ -182,7 +182,7 @@ impl Computation for Bounds {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
-        let committee = crate::ciphernodes_committee::canonical_committee_for_circuit(committee)
+        let committee = crate::committee::canonical_committee_for_circuit(committee)
             .map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let committee_n = committee.n;
 

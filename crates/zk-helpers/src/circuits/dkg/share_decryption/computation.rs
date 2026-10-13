@@ -22,17 +22,15 @@
 use crate::circuits::commitments::compute_share_encryption_commitment_from_message;
 use crate::dkg::share_decryption::ShareDecryptionCircuit;
 use crate::dkg::share_decryption::ShareDecryptionCircuitData;
-use fhe::bfv::Encoding;
-use fhe_traits::FheDecoder;
-
+use crate::encoding::{bigint_2d_to_json_values, poly_coefficients_to_toml_json};
 use crate::CircuitsErrors;
-use crate::{bigint_2d_to_json_values, poly_coefficients_to_toml_json};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::utils::{compute_modulus_bit, compute_msg_bit};
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::Polynomial;
-use fhe_traits::FheDecrypter;
+use fhe::bfv::Encoding;
+use fhe_traits::{FheDecoder, FheDecrypter};
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 /// Output of [`CircuitComputation::compute`] for [`ShareDecryptionCircuit`]: bounds, bit widths, and input.
@@ -113,7 +111,7 @@ impl Computation for Configs {
 
     fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, CircuitsErrors> {
         let (_, dkg_params) = build_pair_for_preset(preset)
-            .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
+            .map_err(|e| crate::encoding::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
         let n = dkg_params.degree();
         let l = dkg_params.moduli().len();
@@ -135,11 +133,11 @@ impl Computation for Configs {
 impl Computation for Bits {
     type Preset = BfvPreset;
     type Data = Bounds;
-    type Error = crate::utils::ZkHelpersUtilsError;
+    type Error = crate::encoding::ZkHelpersUtilsError;
 
     fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, dkg_params) = build_pair_for_preset(preset)
-            .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
+            .map_err(|e| crate::encoding::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
         Ok(Bits {
             msg_bit: compute_msg_bit(&dkg_params),

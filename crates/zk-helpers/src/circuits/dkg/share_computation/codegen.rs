@@ -14,7 +14,7 @@ use crate::circuits::dkg::share_computation::{
 };
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
-use crate::registry::Circuit;
+use crate::metadata::Circuit;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 

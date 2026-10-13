@@ -9,11 +9,11 @@
 use e3_fhe_params::BfvPreset;
 
 use crate::circuits::computation::Computation;
+use crate::encoding::join_display;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuit;
 use crate::threshold::pk_generation::computation::{Configs, Inputs};
 use crate::threshold::pk_generation::utils::crp_matrix_constant_string;
 use crate::threshold::pk_generation::PkGenerationCircuitData;
-use crate::utils::join_display;
 use crate::CircuitCodegen;
 use crate::CircuitsErrors;
 use crate::{Artifacts, CodegenToml};

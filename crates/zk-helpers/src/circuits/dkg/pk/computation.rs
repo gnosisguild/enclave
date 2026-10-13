@@ -11,7 +11,7 @@
 
 use crate::circuits::dkg::pk::circuit::PkCircuit;
 use crate::circuits::dkg::pk::circuit::PkCircuitData;
-use crate::crt_polynomial_to_toml_json;
+use crate::encoding::crt_polynomial_to_toml_json;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
@@ -145,8 +145,8 @@ impl Computation for Inputs {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let moduli = dkg_params.moduli();
 
-        let pk0is = crate::utils::fhe_poly_to_crt_centered(&data.public_key.c[0], moduli)?;
-        let pk1is = crate::utils::fhe_poly_to_crt_centered(&data.public_key.c[1], moduli)?;
+        let pk0is = crate::encoding::fhe_poly_to_crt_centered(&data.public_key.c[0], moduli)?;
+        let pk1is = crate::encoding::fhe_poly_to_crt_centered(&data.public_key.c[1], moduli)?;
 
         Ok(Inputs { pk0is, pk1is })
     }

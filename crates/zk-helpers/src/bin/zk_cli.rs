@@ -35,7 +35,8 @@ use e3_zk_helpers::dkg::share_decryption::{
     ShareDecryptionCircuitData as DkgShareDecryptionCircuitData,
 };
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
-use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
+use e3_zk_helpers::metadata::Circuit;
+use e3_zk_helpers::registry::CircuitRegistry;
 use e3_zk_helpers::threshold::decrypted_shares_aggregation::{
     DecryptedSharesAggregationCircuit, DecryptedSharesAggregationCircuitData,
 };

@@ -7,11 +7,11 @@
 //! Code generation for the threshold share decryption circuit: Prover.toml and configs.nr.
 
 use crate::circuits::computation::Computation;
+use crate::encoding::join_display;
 use crate::threshold::share_decryption::computation::Inputs;
 use crate::threshold::share_decryption::{
     Configs, ShareDecryptionCircuit, ShareDecryptionCircuitData,
 };
-use crate::utils::join_display;
 use crate::Circuit;
 use crate::CircuitCodegen;
 use crate::CircuitsErrors;

@@ -16,23 +16,23 @@ use crate::circuits::commitments::{
 use crate::dkg::share_encryption::ShareEncryptionCircuit;
 use crate::dkg::share_encryption::ShareEncryptionCircuitData;
 use crate::negacyclic::fold_negacyclic;
-use e3_fhe_params::utils::{compute_k0is, compute_q_mod_t_centered};
-use fhe::bfv::Encoding;
-use fhe_traits::FheDecoder;
 
-use crate::crt_polynomial_to_toml_json;
-use crate::polynomial_to_toml_json;
+use crate::encoding::crt_polynomial_to_toml_json;
+use crate::encoding::polynomial_to_toml_json;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
-use e3_fhe_params::utils::calculate_bit_width;
-use e3_fhe_params::utils::{compute_modulus_bit, compute_msg_bit};
+use e3_fhe_params::utils::{
+    calculate_bit_width, compute_k0is, compute_modulus_bit, compute_msg_bit,
+    compute_q_mod_t_centered,
+};
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
 use e3_polynomial_fhe::FromFhePolynomial as _;
-use fhe::bfv::SecretKey;
+use fhe::bfv::{Encoding, SecretKey};
 use fhe_math::zq::Modulus;
+use fhe_traits::FheDecoder;
 use itertools::izip;
 use num_bigint::ToBigInt;
 use num_bigint::{BigInt, BigUint};
@@ -203,6 +203,7 @@ pub struct ScaledQuotient {
 
 impl ScaledQuotient {
     /// Derives the constants, or returns `available: false` when the parameter set cannot use them.
+    #[allow(clippy::too_many_arguments)]
     pub fn derive(
         moduli: &[u64],
         t: u64,
@@ -417,7 +418,7 @@ impl Computation for Configs {
 impl Computation for Bits {
     type Preset = BfvPreset;
     type Data = Bounds;
-    type Error = crate::utils::ZkHelpersUtilsError;
+    type Error = crate::encoding::ZkHelpersUtilsError;
 
     fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let max_pk_bound = data.pk_bounds.iter().max().unwrap();

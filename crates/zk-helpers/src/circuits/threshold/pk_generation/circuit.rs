@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::computation::DkgInputType;
-use crate::registry::Circuit;
+use crate::metadata::Circuit;
 use e3_committee::CiphernodesCommittee;
 use e3_fhe_params::ParameterType;
 use e3_polynomial::{CrtPolynomial, Polynomial};

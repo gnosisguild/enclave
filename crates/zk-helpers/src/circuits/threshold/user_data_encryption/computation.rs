@@ -9,24 +9,22 @@
 //! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
 //! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
-use crate::get_zkp_modulus;
+use crate::encoding::get_zkp_modulus;
 use crate::negacyclic::fold_negacyclic;
-use e3_fhe_params::utils::calculate_bit_width;
-use e3_fhe_params::utils::compute_k0is;
-use fhe::bfv::Encoding;
-use fhe_traits::FheDecoder;
 
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::utils::{calculate_bit_width, compute_k0is};
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
 use e3_polynomial_fhe::FromFhePolynomial as _;
-use fhe::bfv::SecretKey;
+use fhe::bfv::{Encoding, SecretKey};
 use fhe_math::zq::Modulus;
+use fhe_traits::FheDecoder;
 use fhe_traits::Serialize as FheSerialize;
 use itertools::izip;
 use num_bigint::BigInt;
@@ -519,8 +517,8 @@ impl Computation for Inputs {
 
     // Used as input for Nargo execution. Coefficients are JSON numbers when they fit in i64, else strings.
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
-        use crate::crt_polynomial_to_toml_json;
-        use crate::polynomial_to_toml_json;
+        use crate::encoding::crt_polynomial_to_toml_json;
+        use crate::encoding::polynomial_to_toml_json;
 
         let pk0is = crt_polynomial_to_toml_json(&self.pk0is);
         let pk1is = crt_polynomial_to_toml_json(&self.pk1is);
