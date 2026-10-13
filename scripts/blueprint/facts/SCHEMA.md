@@ -30,7 +30,7 @@ A reference is one string: `path@line@token`
 - `token`: an exact substring of that line. Use a distinctive identifier, for example
   `impl Handler<E3Requested> for Sortition` or `pub struct ThresholdKeyshare`. It must not contain
   `@`. The build accepts the token up to three lines from the cited line, uses the nearest copy of
-  the token when the line moved further, and drops the reference when the token is gone.
+  the token when the line moved further, and drops the entry with a warning when the token is gone.
   `check.mjs --fix` rewrites the line number to the exact line.
 
 ## Output

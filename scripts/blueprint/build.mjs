@@ -22,7 +22,7 @@ import { CURATED } from './curated.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const draft = process.argv.includes('--draft')
-const { inv, units } = loadData()
+const { inv, units, report } = loadData()
 const raw = readWiring(inv)
 
 // ---- code store ----------------------------------------------------------------------------
@@ -67,7 +67,12 @@ let curatedRefs = 0
 let missing = 0
 const testRefs = []
 // Code drift does not stop the build: each problem becomes a warning, and check.mjs lists them.
-const warnings = MISSING.map((p) => `${p} is on the map (lib/inventory.mjs) but no longer exists, so the build skipped it`)
+const warnings = [
+  ...MISSING.map((p) => `${p} is on the map (lib/inventory.mjs) but no longer exists, so the build skipped it`),
+  ...report.bad.map((r) => `facts/${r.file}, ${r.unit}: ${r.raw} is broken (${r.why}), so the build dropped that fact`),
+  ...report.moved.map((r) => `facts/${r.file}, ${r.unit}: ${r.path} line ${r.was} moved to ${r.line}`),
+  ...report.unmatched.map((u) => `facts/${u.file}: ${u.id} matches no unit on the map, so the build skipped it`),
+]
 for (const make of CURATED) {
   const d = make({ units, tag: inv.tag })
   for (const n of d.nodes) {
@@ -162,7 +167,7 @@ writeFileSync(file, html)
 const counts = Object.values(diagrams).reduce((a, d) => ((a[d.id.split(':')[0]] = (a[d.id.split(':')[0]] || 0) + 1), a), {})
 if (warnings.length)
   console.warn(
-    `blueprint: ${warnings.length} warning(s). The page is built. node scripts/blueprint/check.mjs lists them, and --fix rewrites moved lines:\n  ${warnings.join('\n  ')}`,
+    `blueprint: ${warnings.length} warning(s). The page is built. node scripts/blueprint/check.mjs lists them all, and --fix rewrites moved lines:\n  ${warnings.slice(0, 20).join('\n  ')}${warnings.length > 20 ? `\n  … and ${warnings.length - 20} more` : ''}`,
   )
 if (testRefs.length)
   console.warn(`blueprint: ${testRefs.length} hand-drawn edge reference(s) point into test code:\n  ${testRefs.join('\n  ')}`)

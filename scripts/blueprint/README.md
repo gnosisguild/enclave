@@ -33,7 +33,7 @@ current branch.
 
 ```bash
 node scripts/blueprint/check.mjs                   # moved and broken references, and crates missing from the map or gone
-node scripts/blueprint/check.mjs --fix             # rewrite the moved line numbers
+node scripts/blueprint/check.mjs --fix             # rewrite the moved line numbers, then check again
 node scripts/blueprint/check.mjs --since v0.19.0   # also list the hand-drawn arrows whose code changed
 ```
 
@@ -46,7 +46,7 @@ node scripts/blueprint/check.mjs --since v0.19.0   # also list the hand-drawn ar
   the nearest copy can be the wrong line. `--fix` lists those references: read their lines.
 - When you add a crate, add its path under `crates/` (for example `zk/cli`) to `LAYERS` in
   `lib/inventory.mjs`. When you remove or rename a crate, a contract or a circuit, change it there
-  too. The check lists both cases.
+  too, and move or remove its facts in `facts/`. The check lists all of these cases.
 
 ## Add or change a hand-drawn arrow
 

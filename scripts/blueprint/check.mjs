@@ -100,6 +100,10 @@ say('Facts references that moved (--fix rewrites them) or broke (the build drops
 ])
 say('Crates that the blueprint does not show (add them to LAYERS in lib/inventory.mjs)', unmapped)
 say('Paths on the map that are gone (remove or rename them in lib/inventory.mjs)', MISSING)
+say(
+  'Facts for units that the map no longer has (move or remove them in facts/)',
+  report.unmatched.map((u) => `facts/${u.file}: ${u.id}`),
+)
 if (since) {
   const changed = new Set(execFileSync('git', ['diff', '--name-only', since], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean))
   const recheck = [
@@ -132,7 +136,10 @@ function rewrite(file, text, raw, line) {
     const from = JSON.stringify(raw)
     return { text: text.split(from).join(JSON.stringify(`${path}@${line}@${token}`)), n: text.split(from).length - 1 }
   }
-  const consts = Object.fromEntries([...text.matchAll(/const ([A-Z_]+) = '([^']+)'/g)].map((m) => [m[1], m[2]]))
+  // A constant defined twice with different values stays unresolved, so its references go to "by hand".
+  const consts = {}
+  for (const [, name, value] of text.matchAll(/const ([A-Z_]+) = '([^']+)'/g))
+    consts[name] = name in consts && consts[name] !== value ? null : value
   const resolve = (expr) => expr.replace(/\$\{([A-Z_]+)\}/g, (x, name) => consts[name] ?? x)
   let n = 0
   for (const q of ["'", '"', '`']) {
@@ -184,8 +191,10 @@ if (fix && (moved.length || factsMoved.length)) {
       `Read these fixed lines. Their token has other copies in the file, so the fix can pick the wrong one:\n  ${twins.join('\n  ')}`,
     )
   if (byHand.length) console.log(`Fix these by hand (their form is not a string, a path template or H()):\n  ${byHand.join('\n  ')}`)
-  const after = tryBuild()
-  console.log(`Build after the fix: ${after.ok ? 'passes' : 'FAILS'}. ${after.text}`)
-  process.exit(after.ok && !broken.length && !report.bad.length && !unmapped.length && !MISSING.length ? 0 : 1)
+  // A fresh check reads the rewritten files, so it also finds a copy that the fix could not rewrite.
+  console.log('\nThe check again, after the fix:')
+  const again = spawnSync(process.execPath, [fileURLToPath(import.meta.url), ...(since ? ['--since', since] : [])], { stdio: 'inherit' })
+  process.exit(again.status ?? 1)
 }
-process.exit(broken.length || report.bad.length || unmapped.length || MISSING.length || !build.ok ? 1 : 0)
+const problems = [moved, factsMoved, broken, report.bad, report.unmatched, unmapped, MISSING].reduce((n, list) => n + list.length, 0)
+process.exit(problems || !build.ok ? 1 : 0)

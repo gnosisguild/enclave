@@ -141,6 +141,7 @@ function checkUnit(u, report) {
           return null
         }
         report.refs[r.status]++
+        if (r.status === 'moved') report.moved.push({ unit: u.id, file: u._file, ...r })
         return { ...item, ref: { path: r.path, line: r.line, token: r.token } }
       })
       .filter(Boolean)
@@ -164,7 +165,7 @@ function checkUnit(u, report) {
 
 // ---- merge ----------------------------------------------------------------------------------
 export function loadData() {
-  const report = { files: {}, refs: { ok: 0, moved: 0, bad: 0 }, bad: [], unmatched: [] }
+  const report = { files: {}, refs: { ok: 0, moved: 0, bad: 0 }, bad: [], moved: [], unmatched: [] }
   const inv = inventory()
   const units = {}
   const asRef = (s) => {
