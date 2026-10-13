@@ -1081,25 +1081,26 @@ checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
 name = "e3-bfv-client"
-version = "0.17.0"
-source = "git+https://github.com/theinterfold/interfold?rev=0134d1bbce2204b894033ddf1aa35820deda8e8f#0134d1bbce2204b894033ddf1aa35820deda8e8f"
+version = "0.18.0"
+source = "git+https://github.com/theinterfold/interfold?rev=f342b4ef0593a5e4cd94d0920bed9a90e8473504#f342b4ef0593a5e4cd94d0920bed9a90e8473504"
 dependencies = [
  "anyhow",
  "e3-fhe-params",
  "e3-polynomial",
  "e3-zk-helpers",
- "fhe 0.3.0",
- "fhe-math 0.3.0",
- "fhe-traits 0.3.0",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
  "num-bigint 0.5.1",
  "rand 0.9.4",
+ "serde_json",
  "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "e3-committee-hash"
-version = "0.17.0"
-source = "git+https://github.com/theinterfold/interfold?rev=0134d1bbce2204b894033ddf1aa35820deda8e8f#0134d1bbce2204b894033ddf1aa35820deda8e8f"
+version = "0.18.0"
+source = "git+https://github.com/theinterfold/interfold?rev=f342b4ef0593a5e4cd94d0920bed9a90e8473504#f342b4ef0593a5e4cd94d0920bed9a90e8473504"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -1109,15 +1110,16 @@ dependencies = [
 
 [[package]]
 name = "e3-compute-provider"
-version = "0.17.0"
-source = "git+https://github.com/theinterfold/interfold?rev=0134d1bbce2204b894033ddf1aa35820deda8e8f#0134d1bbce2204b894033ddf1aa35820deda8e8f"
+version = "0.18.0"
+source = "git+https://github.com/theinterfold/interfold?rev=f342b4ef0593a5e4cd94d0920bed9a90e8473504#f342b4ef0593a5e4cd94d0920bed9a90e8473504"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
  "e3-bfv-client",
  "e3-fhe-params",
- "fhe 0.3.0",
- "fhe-traits 0.3.0",
+ "e3-zk-helpers",
+ "fhe",
+ "fhe-traits",
  "hex",
  "lean-imt",
  "light-poseidon",
@@ -1132,15 +1134,15 @@ dependencies = [
 
 [[package]]
 name = "e3-fhe-params"
-version = "0.17.0"
-source = "git+https://github.com/theinterfold/interfold?rev=0134d1bbce2204b894033ddf1aa35820deda8e8f#0134d1bbce2204b894033ddf1aa35820deda8e8f"
+version = "0.18.0"
+source = "git+https://github.com/theinterfold/interfold?rev=f342b4ef0593a5e4cd94d0920bed9a90e8473504#f342b4ef0593a5e4cd94d0920bed9a90e8473504"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
  "anyhow",
  "clap",
- "fhe 0.3.0",
- "fhe-math 0.3.0",
+ "fhe",
+ "fhe-math",
  "num-bigint 0.5.1",
  "num-traits",
  "rand 0.9.4",
@@ -1151,8 +1153,8 @@ dependencies = [
 
 [[package]]
 name = "e3-parity-matrix"
-version = "0.17.0"
-source = "git+https://github.com/theinterfold/interfold?rev=0134d1bbce2204b894033ddf1aa35820deda8e8f#0134d1bbce2204b894033ddf1aa35820deda8e8f"
+version = "0.18.0"
+source = "git+https://github.com/theinterfold/interfold?rev=f342b4ef0593a5e4cd94d0920bed9a90e8473504#f342b4ef0593a5e4cd94d0920bed9a90e8473504"
 dependencies = [
  "num-bigint 0.5.1",
  "num-traits",
@@ -1162,10 +1164,10 @@ dependencies = [
 
 [[package]]
 name = "e3-polynomial"
-version = "0.17.0"
-source = "git+https://github.com/theinterfold/interfold?rev=0134d1bbce2204b894033ddf1aa35820deda8e8f#0134d1bbce2204b894033ddf1aa35820deda8e8f"
+version = "0.18.0"
+source = "git+https://github.com/theinterfold/interfold?rev=f342b4ef0593a5e4cd94d0920bed9a90e8473504#f342b4ef0593a5e4cd94d0920bed9a90e8473504"
 dependencies = [
- "fhe-math 0.3.0",
+ "fhe-math",
  "num-bigint 0.5.1",
  "num-traits",
  "serde",
@@ -1175,7 +1177,7 @@ dependencies = [
 [[package]]
 name = "e3-safe"
 version = "0.17.0"
-source = "git+https://github.com/theinterfold/interfold?rev=0134d1bbce2204b894033ddf1aa35820deda8e8f#0134d1bbce2204b894033ddf1aa35820deda8e8f"
+source = "git+https://github.com/theinterfold/interfold?rev=fb5f14198c6ec812b23020079024695043fa6ee5#fb5f14198c6ec812b23020079024695043fa6ee5"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -1187,8 +1189,8 @@ dependencies = [
 
 [[package]]
 name = "e3-safe"
-version = "0.17.0"
-source = "git+https://github.com/theinterfold/interfold?rev=fb5f14198c6ec812b23020079024695043fa6ee5#fb5f14198c6ec812b23020079024695043fa6ee5"
+version = "0.18.0"
+source = "git+https://github.com/theinterfold/interfold?rev=f342b4ef0593a5e4cd94d0920bed9a90e8473504#f342b4ef0593a5e4cd94d0920bed9a90e8473504"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -1217,16 +1219,16 @@ version = "0.1.0"
 dependencies = [
  "e3-compute-provider",
  "e3-fhe-params",
- "fhe 0.4.1",
- "fhe-traits 0.4.1",
+ "fhe",
+ "fhe-traits",
  "sha2",
  "sha3",
 ]
 
 [[package]]
 name = "e3-zk-helpers"
-version = "0.17.0"
-source = "git+https://github.com/theinterfold/interfold?rev=0134d1bbce2204b894033ddf1aa35820deda8e8f#0134d1bbce2204b894033ddf1aa35820deda8e8f"
+version = "0.18.0"
+source = "git+https://github.com/theinterfold/interfold?rev=f342b4ef0593a5e4cd94d0920bed9a90e8473504#f342b4ef0593a5e4cd94d0920bed9a90e8473504"
 dependencies = [
  "alloy-primitives",
  "anyhow",
@@ -1237,10 +1239,10 @@ dependencies = [
  "e3-fhe-params",
  "e3-parity-matrix",
  "e3-polynomial",
- "e3-safe 0.17.0 (git+https://github.com/theinterfold/interfold?rev=0134d1bbce2204b894033ddf1aa35820deda8e8f)",
- "fhe 0.3.0",
- "fhe-math 0.3.0",
- "fhe-traits 0.3.0",
+ "e3-safe 0.18.0",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
  "hex",
  "itertools 0.14.0",
  "ndarray",
@@ -1419,40 +1421,16 @@ dependencies = [
 
 [[package]]
 name = "fhe"
-version = "0.3.0"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dev#375cfc68fbb1dbd27c5fd204706e2dfee6086229"
-dependencies = [
- "doc-comment",
- "fhe-math 0.3.0",
- "fhe-traits 0.3.0",
- "fhe-util 0.3.0",
- "itertools 0.15.0",
- "ndarray",
- "num-bigint 0.5.1",
- "num-traits",
- "prost",
- "rand 0.9.4",
- "rand_chacha 0.9.0",
- "rand_distr",
- "rayon",
- "serde",
- "thiserror 2.0.20",
- "zeroize",
- "zeroize_derive",
-]
-
-[[package]]
-name = "fhe"
 version = "0.4.1"
 source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Ftrbfv-synchronized-consolidation#6967373997b4295c26cf9490af883a69f0218104"
 dependencies = [
  "ark-ff 0.5.0",
  "bincode",
  "doc-comment",
- "e3-safe 0.17.0 (git+https://github.com/theinterfold/interfold?rev=fb5f14198c6ec812b23020079024695043fa6ee5)",
- "fhe-math 0.4.1",
- "fhe-traits 0.4.1",
- "fhe-util 0.4.1",
+ "e3-safe 0.17.0",
+ "fhe-math",
+ "fhe-traits",
+ "fhe-util",
  "itertools 0.15.0",
  "ndarray",
  "num-bigint 0.5.1",
@@ -1471,35 +1449,12 @@ dependencies = [
 
 [[package]]
 name = "fhe-math"
-version = "0.3.0"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dev#375cfc68fbb1dbd27c5fd204706e2dfee6086229"
-dependencies = [
- "ethnum",
- "fhe-traits 0.3.0",
- "fhe-util 0.3.0",
- "itertools 0.15.0",
- "ndarray",
- "num-bigint 0.5.1",
- "num-bigint-dig",
- "num-traits",
- "prost",
- "pulp",
- "rand 0.9.4",
- "rand_chacha 0.9.0",
- "serde",
- "sha2",
- "thiserror 2.0.20",
- "zeroize",
-]
-
-[[package]]
-name = "fhe-math"
 version = "0.4.1"
 source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Ftrbfv-synchronized-consolidation#6967373997b4295c26cf9490af883a69f0218104"
 dependencies = [
  "ethnum",
- "fhe-traits 0.4.1",
- "fhe-util 0.4.1",
+ "fhe-traits",
+ "fhe-util",
  "itertools 0.15.0",
  "ndarray",
  "num-bigint 0.5.1",
@@ -1518,31 +1473,10 @@ dependencies = [
 
 [[package]]
 name = "fhe-traits"
-version = "0.3.0"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dev#375cfc68fbb1dbd27c5fd204706e2dfee6086229"
-dependencies = [
- "rand 0.9.4",
-]
-
-[[package]]
-name = "fhe-traits"
 version = "0.4.1"
 source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Ftrbfv-synchronized-consolidation#6967373997b4295c26cf9490af883a69f0218104"
 dependencies = [
  "rand 0.9.4",
-]
-
-[[package]]
-name = "fhe-util"
-version = "0.3.0"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dev#375cfc68fbb1dbd27c5fd204706e2dfee6086229"
-dependencies = [
- "num-bigint-dig",
- "num-traits",
- "prime_factorization",
- "rand 0.9.4",
- "rand_distr",
- "rayon",
 ]
 
 [[package]]

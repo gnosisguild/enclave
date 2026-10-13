@@ -1905,6 +1905,10 @@ regenerate `crates/support/contracts/ImageID.sol` before the support image is pu
 `pnpm support:build:guest` runs the pinned Docker guest build locally. The host and guest
 manifests must name the same published Interfold revision. Their lockfiles must resolve
 the program and compute provider to the same FHE crate versions before the build starts.
+The standalone host and guest pin Interfold revision
+`f342b4ef0593a5e4cd94d0920bed9a90e8473504`, which uses the consolidated threshold API.
+The guest builder pins its Rust base and extraction image by digest, and pins the Linux
+`protoc` archive by SHA-256 for FHE protobuf generation.
 `pnpm support:test:guest` executes the embedded guest, compares every journal field with
 the native host result, and checks its image ID against the generated Solidity constant.
 
