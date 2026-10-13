@@ -354,11 +354,11 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
                     - self.configs.qis[i] * self.ct1_r[i].coefficients[j];
             }
             assert(
-                Polynomial::new(ct0_residual).eval(x) == self.pk0is[i].dot(kernel),
+                Polynomial::new(ct0_residual).eval(x) == self.pk0is[i].dot_for_degree(kernel),
                 "ct0 encryption check failed",
             );
             assert(
-                Polynomial::new(ct1_residual).eval(x) == self.pk1is[i].dot(kernel),
+                Polynomial::new(ct1_residual).eval(x) == self.pk1is[i].dot_for_degree(kernel),
                 "ct1 encryption check failed",
             );
         }
@@ -521,11 +521,11 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
                     - self.configs.qis[i] * self.ct1_r[i].coefficients[j];
             }
             assert(
-                Polynomial::new(ct0_residual).eval(x) == self.pk0is[i].dot(kernel),
+                Polynomial::new(ct0_residual).eval(x) == self.pk0is[i].dot_for_degree(kernel),
                 "ct0 encryption check failed",
             );
             assert(
-                Polynomial::new(ct1_residual).eval(x) == self.pk1is[i].dot(kernel),
+                Polynomial::new(ct1_residual).eval(x) == self.pk1is[i].dot_for_degree(kernel),
                 "ct1 encryption check failed",
             );
         }

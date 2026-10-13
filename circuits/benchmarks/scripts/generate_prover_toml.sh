@@ -112,9 +112,15 @@ if [ "$CIRCUIT_PATH" = "dkg/sk_share_computation_chunk" ] || [ "$CIRCUIT_PATH" =
     trap 'rm -rf "$TEMP_DIR"' EXIT
     echo "  Generating a representative C2 chunk witness..."
     generate_raw_toml "$TEMP_DIR"
+    # Mirrors e3_zk_helpers::circuits::dkg::share_computation::c2_chunk_size.
     CHUNK_SIZE=512
     if [ "${BENCHMARK_PRESET:-insecure}" = "insecure" ]; then
         CHUNK_SIZE=128
+    elif [ "${BENCHMARK_PRESET:-}" = "secure-16384" ]; then
+        case "$COMMITTEE_NAME" in
+            minimum) CHUNK_SIZE=8192 ;;
+            micro) CHUNK_SIZE=1024 ;;
+        esac
     fi
     python3 "${SCRIPT_DIR}/extract_share_computation_chunk.py" \
         "$TEMP_DIR/Prover.toml" "$OUTPUT_DIR/Prover.toml" "$CIRCUIT_PATH" "$CHUNK_SIZE"
