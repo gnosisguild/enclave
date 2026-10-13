@@ -4,9 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-// Store the pictures and the page of a pull request on the blueprint-previews branch, or remove
-// them. A comment shows an image only from a URL, and GitHub Pages serves the branch. The Blueprint
-// Diff workflow runs it.
+// Store the page of a pull request on the blueprint-previews branch, or remove it. GitHub Pages
+// serves the branch. The Blueprint Diff workflow runs it.
 //
 //   node scripts/blueprint/diff/previews.mjs <remote> <folder> <name> <file>...
 //   node scripts/blueprint/diff/previews.mjs <remote> <folder> --remove
@@ -52,7 +51,7 @@ try {
       tryGit('rm', '-q', '-r', '-f', '--cached', '.')
       writeFileSync(
         join(work, 'README.md'),
-        'Pictures and pages for the Blueprint Diff comments on pull requests, one folder per pull request.\nWritten by `.github/workflows/blueprint-diff.yml`, which also publishes this branch on GitHub Pages.\nNothing else uses it.\n',
+        'Pages for the Blueprint Diff comments on pull requests, one folder per pull request.\nWritten by `.github/workflows/blueprint-diff.yml`, which also publishes this branch on GitHub Pages.\nNothing else uses it.\n',
       )
     }
     if (remove && !existsSync(join(work, folder))) {

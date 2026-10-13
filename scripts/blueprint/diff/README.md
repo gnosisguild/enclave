@@ -24,17 +24,20 @@ box and arrow of the diagrams. Each version is read with its own `scripts/bluepr
 ## On pull requests
 
 The `Blueprint Diff` workflow (`.github/workflows/blueprint-diff.yml`) runs on every pull request
-from this repository and keeps one comment up to date: pictures of the changed diagrams, the counts,
-every change, and a link to the page on GitHub Pages
-(`https://theinterfold.github.io/interfold/pr-<number>/<commit>/`). A comment shows an image only
-from a URL, so `previews.mjs` stores the pictures and the page on the `blueprint-previews` branch,
-one folder per pull request, and Pages serves that branch. The branch keeps no history: it holds
-only the latest pictures and page of each open pull request, about 3 MB each.
+from this repository and keeps one comment up to date: the counts, every change, and a link to the
+page on GitHub Pages (`https://theinterfold.github.io/interfold/pr-<number>/<commit>/`). Each push
+updates the same comment and replaces the page. `previews.mjs` stores the page on the
+`blueprint-previews` branch, one folder per pull request, and Pages serves that branch. The branch
+keeps no history: it holds only the latest page of each open pull request, about 2.5 MB each.
 
 When the pull request closes, merged or not, its folder goes from the branch and from Pages, and the
-comment keeps the counts and the list but says that the pictures and the page were removed. A pull
-request without an architecture change gets no comment. A pull request from a fork gets none: its
-token can neither store the pictures nor post the comment.
+comment keeps the counts and the list but says that the page was removed. A pull request without an
+architecture change gets no comment. A pull request from a fork gets none: its token can neither
+store the page nor post the comment.
+
+Each run takes about 45 seconds on a GitHub-hosted runner, which costs nothing for a public
+repository, and so does GitHub Pages. The time depends on the size of the code, not of the change:
+it reads both versions whole.
 
 It needs two settings: Settings → Pages → Source: **GitHub Actions**, and Settings → Environments →
 `github-pages` → Deployment branches and tags: **No restriction**, because the workflow publishes
@@ -57,8 +60,7 @@ Variables). The workflow then skips every pull request. Delete the variable to t
 ## Remove it
 
 1. Delete this folder and `.github/workflows/blueprint-diff.yml`.
-2. Delete the pictures and the pages: `git push origin --delete blueprint-previews`. The pictures in
-   old pull request comments then go blank.
+2. Delete the pages: `git push origin --delete blueprint-previews`.
 3. Turn off GitHub Pages: Settings → Pages → Unpublish site, then set the source to None (or
    `gh api -X DELETE repos/theinterfold/interfold/pages`).
 4. Set the `github-pages` environment back to the `main` branch only, or delete it (Settings →
@@ -71,6 +73,6 @@ These stay and are safe to keep: `lib/page.mjs` (the build uses it), the `BLUEPR
 
 ## Files
 
-- `diff.mjs`: reads two versions, compares them, and writes the page, the pictures and the comment.
+- `diff.mjs`: reads two versions, compares them, and writes the page and the comment.
 - `view.js` and `view.css`: the change view on the blueprint page.
-- `previews.mjs`: stores or removes the pictures and the page on the `blueprint-previews` branch.
+- `previews.mjs`: stores or removes the page on the `blueprint-previews` branch.

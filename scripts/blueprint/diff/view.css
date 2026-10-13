@@ -70,8 +70,7 @@ body[data-theme='dark'] {
   font-size: 15px;
   font-weight: 700;
 }
-.dlegend,
-#dshot {
+.dlegend {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -79,7 +78,6 @@ body[data-theme='dark'] {
   white-space: nowrap;
 }
 .dlegend i,
-#dshot i,
 #dchanges i {
   display: inline-block;
   flex: none;
@@ -89,16 +87,16 @@ body[data-theme='dark'] {
   border: 2px solid;
   border-radius: 3px;
 }
-:is(.dlegend, #dshot, #dchanges) i.a {
+:is(.dlegend, #dchanges) i.a {
   border-color: var(--d-add);
   background: var(--d-add-fill);
 }
-:is(.dlegend, #dshot, #dchanges) i.r {
+:is(.dlegend, #dchanges) i.r {
   border-color: var(--d-del);
   border-style: dashed;
   background: var(--d-del-fill);
 }
-:is(.dlegend, #dshot, #dchanges) i.c {
+:is(.dlegend, #dchanges) i.c {
   border-color: var(--d-chg);
   background: var(--d-chg-fill);
 }
@@ -159,24 +157,6 @@ body[data-theme='dark'] {
     'SF Mono',
     Menlo,
     monospace;
-}
-body.shot #bar,
-body.shot #help,
-body.shot #dchanges {
-  display: none;
-}
-body.shot #stage {
-  inset: 0;
-}
-#dshot {
-  position: absolute;
-  top: 18px;
-  right: 22px;
-  font-size: 13px;
-}
-#dshot b {
-  margin-right: 6px;
-  color: var(--ink);
 }
 #d-list,
 .dswitch button {
