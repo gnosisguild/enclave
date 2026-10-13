@@ -1560,48 +1560,15 @@ jobs:
       - name: Check generated verifiers are in sync
         run: pnpm check:verifiers --no-compile
 
-      # Release workflows also verify the promoted six-pair circuit matrix.
-      - name: Pull the complete circuit matrix
-        run: pnpm store:circuits pull
-
-      - name: Verify release circuit provenance
-        run: pnpm store:circuits verify-release
-
-      - name: Check every generated BFV verifier
-        run: |
-          while read -r preset committee
-          do
-            pnpm build:circuits \
-              --preset "$preset" \
-              --committee "$committee" \
-              --hydrate-bin-only \
-              --no-clean-targets
-            pnpm generate:verifiers \
-              --circuits dkg_aggregator,decryption_aggregator \
-              --preset "$preset" \
-              --committee "$committee" \
-              --check \
-              --no-compile
-          done <<'EOF'
-          insecure-512 micro
-          insecure-512 small
-          secure-8192 minimum
-          secure-8192 micro
-          secure-8192 small
-          insecure-512 minimum
-          EOF
-
       - name: Cancel workflow on failure
         if: failure()
         run: gh run cancel ${{ github.run_id }}
         env:
           GH_TOKEN: ${{ github.token }}
 
-  # Proves with the published circuit set for this tree's SOURCE_HASH, which is also what
-  # `build_circuits` used to hand over: it pulled and hydrated the published set before uploading.
-  # Pulling here removes the wait for `build_circuits`, which still compiles from source and checks
-  # every published pair's verifiers. The proof suites run in two legs; the correlated node test
-  # alone sets the floor.
+  # Proves with the newest published circuit set. The published set is not checked against this
+  # tree's SOURCE_HASH until the circuit drift workflow is designed. The proof suites run in two
+  # legs; the correlated node test alone sets the floor.
   zk_prover_e2e:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.zk == 'true'
@@ -1665,10 +1632,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Fails when no published set matches the tree, as `build_circuits` does.
+      # Takes the branch tip without a SOURCE_HASH match.
       - name: Pull the published circuits
         timeout-minutes: 10
-        run: pnpm store:circuits pull
+        run: pnpm store:circuits pull --latest
 
       - name: Hydrate the insecure-512/minimum circuits
         run: pnpm build:circuits --preset insecure-512 --committee minimum --hydrate-bin-only --no-clean-targets

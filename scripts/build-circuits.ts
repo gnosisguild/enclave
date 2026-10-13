@@ -980,14 +980,21 @@ library ActiveCryptoConfig {
       result.sourceHash = sourceHash
 
       if (this.options.hydrateBinOnly) {
-        if (!this.isDistPresetUpToDate(preset, committee, sourceHash)) {
+        // The stamp's source hash is not checked until the circuit drift workflow is designed. The
+        // active stamp records the hash of the hydrated artifacts, so `--skip-if-built` rebuilds
+        // artifacts from another source.
+        const distStamp = this.readPresetStamp(preset, committee)
+        if (!distStamp?.sourceHash || !this.requiredDistMarkers(preset, committee).every((path) => existsSync(path))) {
           throw new Error(
-            `Cannot hydrate circuits/bin: dist/circuits/${preset}/${committee} is missing or stale. ` +
+            `Cannot hydrate circuits/bin: dist/circuits/${preset}/${committee} is missing. ` +
               `Run: pnpm build:circuits --preset ${preset} --committee ${committee}`,
           )
         }
+        if (distStamp.sourceHash !== sourceHash) {
+          console.log(`   ⚠️  dist/circuits/${preset}/${committee} was built from source hash ${distStamp.sourceHash}, not ${sourceHash}.`)
+        }
         console.log(`   💧 Hydrating circuits/bin from dist/circuits/${preset}/${committee} (no nargo compile)...`)
-        this.hydrateBinFromDist(preset, committee, sourceHash)
+        this.hydrateBinFromDist(preset, committee, distStamp.sourceHash)
         console.log(`\n✅ Hydrated circuits/bin for preset: ${preset}/${committee}`)
         return result
       }

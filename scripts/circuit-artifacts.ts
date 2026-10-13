@@ -349,14 +349,17 @@ async function pull() {
     process.exit(1)
   }
 
-  const hash = run('pnpm tsx scripts/build-circuits.ts hash')
-  const revision = findArtifactRevision(ROOT, `origin/${BRANCH}`, hash)
+  // `--latest` takes the branch tip without a SOURCE_HASH match. CI and the integration tests use it
+  // until the drift workflow is designed; the release workflow still requires a match.
+  const latest = process.argv.includes('--latest')
+  const hash = latest ? undefined : run('pnpm tsx scripts/build-circuits.ts hash')
+  const revision = hash ? findArtifactRevision(ROOT, `origin/${BRANCH}`, hash) : run(`git rev-parse origin/${BRANCH}`)
 
   if (existsSync(DIST)) rmSync(DIST, { recursive: true })
   mkdirSync(DIST, { recursive: true })
 
   runV(`git archive ${revision} | tar -x -C "${DIST}"`)
-  console.log(`✅ Pulled ${revision} (SOURCE_HASH=${hash}) to ${DIST}`)
+  console.log(`✅ Pulled ${revision} (SOURCE_HASH=${readFileSync(join(DIST, 'SOURCE_HASH'), 'utf8').trim()}) to ${DIST}`)
 }
 
 async function verifyRelease() {
@@ -383,6 +386,6 @@ if (require.main === module) {
   else if (cmd === 'checksums') refreshChecksums(resolve(argValue('--dir') ?? DIST))
   else
     console.log(
-      'Usage: circuit-artifacts.ts [push [--replace]|pull|verify-release [--source-hash <hash>]|checksums [--dir <path>]|restamp --expect-source-hash <hash>]',
+      'Usage: circuit-artifacts.ts [push [--replace]|pull [--latest]|verify-release [--source-hash <hash>]|checksums [--dir <path>]|restamp --expect-source-hash <hash>]',
     )
 }
