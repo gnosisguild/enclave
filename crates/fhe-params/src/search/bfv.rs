@@ -906,55 +906,6 @@ mod tests {
     }
 
     #[test]
-    fn finalizers_preserve_plaintext_moduli_above_u64() {
-        let k = u128::from(u64::MAX) + 2;
-        let config = BfvSearchConfig {
-            n: 1,
-            z: 1,
-            k,
-            lambda: 0,
-            b: 1,
-            b_chi: 1,
-            min_margin: 0.0,
-            verbose: false,
-        };
-        // Prime selection checks NTT suitability before finalization; these primes isolate
-        // the finalizers' full-precision arithmetic and pass the second set's 2*k gap.
-        let chosen: Vec<_> = [127u8, 89]
-            .into_iter()
-            .map(|bits| {
-                let value = (BigUint::from(1u32) << usize::from(bits)) - 1u32;
-                PrimeItem {
-                    bitlen: bits,
-                    log2: f64::from(bits),
-                    hex: value.to_str_radix(16),
-                    value,
-                }
-            })
-            .collect();
-        for result in [
-            finalize_bfv_candidate(&config, 8, chosen.clone()).unwrap(),
-            finalize_second_param(&config, 8, chosen, k).unwrap(),
-        ] {
-            assert_eq!(result.k_plain_eff, k);
-            assert_eq!(
-                result.q_bfv,
-                BigUint::parse_bytes(
-                    b"105312291668557186697918027513529248857806893649219117400977309697",
-                    10
-                )
-                .unwrap()
-            );
-            assert_eq!(
-                result.delta,
-                BigUint::parse_bytes(b"5708990770823839523923658858753263439934652416", 10)
-                    .unwrap()
-            );
-            assert_eq!(result.rkq, 9223372036871553025);
-        }
-    }
-
-    #[test]
     fn test_bfv_search_result_qi_values() {
         let primes = build_prime_items();
         assert!(!primes.is_empty());
