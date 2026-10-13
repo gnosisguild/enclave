@@ -142,6 +142,7 @@ jobs:
             if (!old || !/!\[|\[Open this change in the blueprint\]/.test(old.body)) return
             const body = old.body
               .replace(/^!\[.*\]\(.*\)\n?/gm, '')
+              .replace(/^Green is new, red is removed.*\n?/m, '')
               .replace(/\[Open this change in the blueprint\]\([^)]*\)[^\n]*/, 'The pictures and the page were removed when this pull request closed.')
             await github.rest.issues.updateComment({ owner, repo, comment_id: old.id, body })
 
