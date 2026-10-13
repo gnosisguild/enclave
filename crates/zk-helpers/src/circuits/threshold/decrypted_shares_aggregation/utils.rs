@@ -72,7 +72,7 @@ pub fn crt_reconstruct(residues: &[u64], moduli: &[u64]) -> Result<BigUint, Circ
             moduli.len()
         )));
     }
-    let q: BigUint = e3_fhe_params::derived::compute_q_product(moduli);
+    let q: BigUint = moduli.iter().map(|&m| BigUint::from(m)).product();
     let mut result = BigUint::zero();
     for (i, &r_i) in residues.iter().enumerate() {
         let m_i = BigUint::from(moduli[i]);
@@ -106,6 +106,11 @@ mod tests {
         let residues = [2u64, 4, 3]; // x ≡ 2 mod 3, ≡ 4 mod 5, ≡ 3 mod 7
         let x = crt_reconstruct(&residues, &moduli).unwrap();
         assert_eq!(x, BigUint::from(59u64)); // 59 mod 3=2, mod 5=4, mod 7=3
+        assert_eq!(crt_reconstruct(&[], &[]).unwrap(), BigUint::from(0u32));
+        assert_eq!(
+            crt_reconstruct(&[u64::MAX - 1, u64::MAX - 2], &[u64::MAX, u64::MAX - 1]).unwrap(),
+            BigUint::parse_bytes(b"340282366920938463408034375210639556609", 10).unwrap(),
+        );
         let error = crt_reconstruct(&[1, 1], &[3, 6]).unwrap_err();
         assert_eq!(
             error.to_string(),

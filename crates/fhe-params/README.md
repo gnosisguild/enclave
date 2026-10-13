@@ -49,12 +49,14 @@ Functions to construct `BfvParameters` instances:
 - `build_bfv_params_from_set()` / `build_bfv_params_from_set_arc()`: Build from preset metadata
 - `build_pair_for_preset()`: Build both threshold and DKG parameter pairs for a preset
 
-### Derived arithmetic (`derived`)
+### Parameter utilities (`utils`)
 
-This module owns CRT products, centered Q residues, Q inverses, `k0_i`, and coefficient widths.
-Callers use standard integer operations for division and residues. Parameter search computes both
-with `Integer::div_rem`; plaintext moduli retain their full `u128` precision. Plaintext decoding
-uses `fhe_traits::FheDecoder` directly; it is not parameter-derived arithmetic.
+This module owns centered Q residues, `k0_i`, and coefficient widths. Bound widths borrow unsigned
+integers and use at least one bit. BFV callers borrow Q from the full level-zero context; C7
+computes its Q inverse with `BigUint::modinv`. Callers use standard integer operations for division
+and residues. Parameter search computes both with `Integer::div_rem`; plaintext moduli retain their
+full `u128` precision. Plaintext decoding uses `fhe_traits::FheDecoder` directly; it is not
+parameter-derived arithmetic.
 
 Centered Q residues use the caller's reduced residue and retain the full positive `u64` modulus
 domain. They use arbitrary-precision floor-modulus arithmetic, not the FHE primitive's restricted

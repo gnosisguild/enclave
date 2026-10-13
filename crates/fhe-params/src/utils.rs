@@ -4,48 +4,23 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Scaling, modular arithmetic, and coefficient widths derived from BFV parameters.
+//! Centered residues, batch inverses, and coefficient widths for BFV parameters.
 
 use fhe::bfv::BfvParameters;
 use fhe_math::zq::Modulus;
 use num_bigint::{BigInt, BigUint};
 use num_integer::Integer;
-use num_traits::ToPrimitive;
 use thiserror::Error;
 
-/// Errors from BFV parameter-derived arithmetic.
+/// Errors from computing the k0_i batch of modular inverses.
 #[derive(Error, Debug)]
-pub enum DerivedError {
+pub enum K0Error {
     #[error("BFV error: {0}")]
     Fhe(#[from] fhe::Error),
     #[error("Sample error: {0}")]
     Sample(String),
     #[error("Unexpected error: {0}")]
     Other(String),
-}
-
-/// Return the product Q = q_0 * q_1 * ... * q_{L-1} of CRT moduli.
-pub fn compute_q_product(moduli: &[u64]) -> BigUint {
-    moduli.iter().map(|&m| BigUint::from(m)).product()
-}
-
-/// Return Q^{-1} mod t for BFV decoding. Fail if gcd(Q, t) != 1.
-pub fn compute_q_inverse_mod_t(q: &BigUint, t: u64) -> Result<u64, DerivedError> {
-    let modulus = BigUint::from(t);
-    // Q=1, t=0 has division-by-zero semantics; other zero-modulus inputs return a gcd error.
-    if t == 0 && q == &BigUint::from(1u32) {
-        let _ = q % &modulus;
-    }
-    let inverse = if t == 0 { None } else { q.modinv(&modulus) };
-    let inverse = inverse.ok_or_else(|| {
-        DerivedError::Other(format!(
-            "Q and t are not coprime, gcd = {}",
-            q.gcd(&modulus)
-        ))
-    })?;
-    Ok(inverse
-        .to_u64()
-        .expect("inverse below a u64 modulus must fit u64"))
 }
 
 /// Center an already-computed Q residue in [0, t) for a positive u64 plaintext modulus.
@@ -57,19 +32,18 @@ pub fn compute_q_mod_t_centered(q_mod_t: &BigUint, t: u64) -> BigInt {
 }
 
 /// Return k0_i = (-t)^{-1} mod q_i for each CRT modulus.
-pub fn compute_k0is(moduli: &[u64], plaintext_modulus: u64) -> Result<Vec<u64>, DerivedError> {
+pub fn compute_k0is(moduli: &[u64], plaintext_modulus: u64) -> Result<Vec<u64>, K0Error> {
     let mut k0is = Vec::with_capacity(moduli.len());
     for &qi in moduli {
-        let m = Modulus::new(qi).map_err(|e| {
-            DerivedError::Sample(format!("Failed to create modulus for k0is: {:?}", e))
-        })?;
+        let m = Modulus::new(qi)
+            .map_err(|e| K0Error::Sample(format!("Failed to create modulus for k0is: {:?}", e)))?;
         if plaintext_modulus >= qi {
-            return Err(DerivedError::Other(format!(
+            return Err(K0Error::Other(format!(
                 "plaintext modulus {plaintext_modulus} must be smaller than CRT modulus {qi}"
             )));
         }
         let neg_t = m.neg(plaintext_modulus);
-        let k0qi = m.inv(neg_t).ok_or(DerivedError::Fhe(fhe::Error::MathError(
+        let k0qi = m.inv(neg_t).ok_or(K0Error::Fhe(fhe::Error::MathError(
             fhe_math::Error::NonInvertible {
                 value: neg_t,
                 modulus: qi,
@@ -81,12 +55,8 @@ pub fn compute_k0is(moduli: &[u64], plaintext_modulus: u64) -> Result<Vec<u64>, 
 }
 
 /// Return the bit width of a bound, with a minimum of one bit.
-pub fn calculate_bit_width(bound: &BigInt) -> u32 {
-    if bound <= &BigInt::from(0) {
-        return 1;
-    }
-
-    bound.bits() as u32
+pub fn calculate_bit_width(bound: &BigUint) -> u32 {
+    bound.bits().max(1) as u32
 }
 
 /// Return the bit width of centered ring coefficients.
@@ -114,18 +84,6 @@ pub fn compute_msg_bit(params: &BfvParameters) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn q_product_preserves_full_precision_and_empty_product() {
-        let moduli = [3u64, 5, 7];
-        let q = compute_q_product(&moduli);
-        assert_eq!(q, BigUint::from(105u64));
-        assert_eq!(compute_q_product(&[]), BigUint::from(1u64));
-        assert_eq!(
-            compute_q_product(&[u64::MAX, u64::MAX]),
-            BigUint::parse_bytes(b"340282366920938463426481119284349108225", 10).unwrap(),
-        );
-    }
 
     #[test]
     fn centered_q_residues_preserve_small_and_full_width_moduli() {
@@ -161,56 +119,40 @@ mod tests {
     }
 
     #[test]
-    fn compute_k0is_requires_plaintext_modulus_below_each_crt_modulus() {
+    fn compute_k0is_rejects_invalid_moduli_and_plaintext() {
         assert_eq!(compute_k0is(&[17], 5).unwrap(), vec![10]);
-        assert!(compute_k0is(&[17], 17).is_err());
-        assert!(compute_k0is(&[17], 18).is_err());
+        for (moduli, t, expected) in [
+            (
+                [17],
+                17,
+                "Unexpected error: plaintext modulus 17 must be smaller than CRT modulus 17",
+            ),
+            (
+                [17],
+                18,
+                "Unexpected error: plaintext modulus 18 must be smaller than CRT modulus 17",
+            ),
+            (
+                [1],
+                0,
+                "Sample error: Failed to create modulus for k0is: InvalidModulus(1)",
+            ),
+            (
+                [15],
+                5,
+                "BFV error: Math library error: Value 10 is not invertible modulo 15.",
+            ),
+        ] {
+            assert_eq!(compute_k0is(&moduli, t).unwrap_err().to_string(), expected);
+        }
     }
 
     #[test]
     fn calculate_bit_width_handles_zero_and_positive_bounds() {
-        for (bound, expected) in [(0, 1), (1, 1), (2, 2), (3, 2), (4, 3), (7, 3), (8, 4)] {
-            assert_eq!(calculate_bit_width(&BigInt::from(bound)), expected);
+        for (bound, expected) in [(0u32, 1), (1, 1), (2, 2), (3, 2), (4, 3), (7, 3), (8, 4)] {
+            assert_eq!(calculate_bit_width(&BigUint::from(bound)), expected);
         }
-        assert_eq!(calculate_bit_width(&(BigInt::from(1) << 128usize)), 129);
-    }
-
-    #[test]
-    fn calculate_bit_width_handles_negative_bounds() {
-        for bound in [
-            BigInt::from(-1),
-            BigInt::from(-8),
-            -BigInt::from(1) << 128usize,
-        ] {
-            assert_eq!(calculate_bit_width(&bound), 1);
-        }
-    }
-
-    #[test]
-    fn q_inverse_preserves_coprime_unit_and_failure_contracts() {
-        for (q, t, expected) in [
-            (BigUint::from(105u32), 17, 6),
-            ((BigUint::from(1u32) << 128usize) + 1u32, 17, 9),
-            (BigUint::from(0u32), 1, 0),
-            (BigUint::from(105u32), 1, 0),
-            (BigUint::from(u64::MAX - 1), u64::MAX, u64::MAX - 1),
-        ] {
-            assert_eq!(compute_q_inverse_mod_t(&q, t).unwrap(), expected);
-        }
-        for (q, t, gcd) in [(21u32, 7, 7), (0, 17, 17), (6, 0, 6), (0, 0, 0)] {
-            let error = compute_q_inverse_mod_t(&BigUint::from(q), t).unwrap_err();
-            assert!(matches!(error, DerivedError::Other(_)));
-            assert_eq!(
-                error.to_string(),
-                format!("Unexpected error: Q and t are not coprime, gcd = {gcd}")
-            );
-        }
-    }
-
-    #[test]
-    #[should_panic(expected = "attempt to divide by zero")]
-    fn unit_q_with_zero_plaintext_modulus_keeps_division_by_zero_semantics() {
-        let _ = compute_q_inverse_mod_t(&BigUint::from(1u32), 0);
+        assert_eq!(calculate_bit_width(&(BigUint::from(1u32) << 128usize)), 129);
     }
 
     #[test]

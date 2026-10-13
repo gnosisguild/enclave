@@ -22,16 +22,16 @@ use crate::threshold::decrypted_shares_aggregation::utils;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
-use e3_fhe_params::derived::calculate_bit_width;
-use e3_fhe_params::derived::compute_native_crt_coeff_bit;
-use e3_fhe_params::derived::compute_q_mod_t_centered;
+use e3_fhe_params::utils::calculate_bit_width;
+use e3_fhe_params::utils::compute_native_crt_coeff_bit;
+use e3_fhe_params::utils::compute_q_mod_t_centered;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe_math::rq::{Poly, PowerBasis};
 use num_bigint::{BigInt, BigUint};
 use num_integer::Integer;
-use num_traits::Zero;
+use num_traits::{ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
 /// Output of [`CircuitComputation::compute`] for [`DecryptedSharesAggregationCircuit`].
 #[derive(Debug)]
@@ -123,10 +123,9 @@ impl Computation for Bounds {
     fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
-        let moduli = threshold_params.moduli();
         let t = threshold_params.plaintext();
-        let q = e3_fhe_params::derived::compute_q_product(moduli);
-        let delta = &q / t;
+        let q = threshold_params.context_at_level(0)?.modulus();
+        let delta = q / t;
         let delta_half = &delta >> 1usize;
         Ok(Bounds { delta, delta_half })
     }
@@ -138,25 +137,20 @@ impl Computation for Bits {
     type Error = CircuitsErrors;
 
     fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
-        let noise_bit = calculate_bit_width(&BigInt::from(data.delta_half.clone()));
+        let noise_bit = calculate_bit_width(&data.delta_half);
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let ctx = threshold_params
             .context_at_level(0)
             .map_err(|e| CircuitsErrors::Other(format!("context_at_level: {:?}", e)))?;
         let d_native_bit = compute_native_crt_coeff_bit(threshold_params.moduli());
-        let mut modulus_product = BigInt::from(1u32);
-        for qi in ctx.moduli_operators() {
-            let q = BigInt::from(**qi);
-            modulus_product *= q;
-        }
         // A residue fits `bits(q_l - 1)`; `d_native_bit` is already that maximum.
         let q_bit = d_native_bit;
         // Reduction quotients: the widest reduced input is the interpolation sum, under `H * q^2`,
         // so its quotient is under `H * q`. Six spare bits cover any committee up to 64 parties.
         let k_bit = q_bit + 6;
-        let t_bit = calculate_bit_width(&BigInt::from(threshold_params.plaintext()));
-        let q_total_bit = calculate_bit_width(&modulus_product);
+        let t_bit = calculate_bit_width(&BigUint::from(threshold_params.plaintext()));
+        let q_total_bit = calculate_bit_width(ctx.modulus());
         Ok(Bits {
             noise_bit,
             d_native_bit,
@@ -178,10 +172,17 @@ impl Computation for Configs {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let moduli = threshold_params.moduli().to_vec();
         let t = threshold_params.plaintext();
-        let q = e3_fhe_params::derived::compute_q_product(&moduli);
-        let q_mod_t = &q % t;
+        let q = threshold_params.context_at_level(0)?.modulus();
+        let q_mod_t = q % t;
         let q_mod_t_centered = compute_q_mod_t_centered(&q_mod_t, t);
-        let q_inverse_mod_t = e3_fhe_params::derived::compute_q_inverse_mod_t(&q, t)?;
+        let t_big = BigUint::from(t);
+        let q_inverse_mod_t = q
+            .modinv(&t_big)
+            .ok_or_else(|| {
+                CircuitsErrors::Other(format!("Q and t are not coprime, gcd = {}", q.gcd(&t_big)))
+            })?
+            .to_u64()
+            .expect("inverse below a u64 modulus must fit u64");
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
         Ok(Configs {
@@ -379,11 +380,21 @@ mod tests {
 
     #[test]
     fn test_configs_compute() {
-        let preset = BfvPreset::InsecureThreshold512;
-        let configs = Configs::compute(preset, &()).unwrap();
-
-        assert_eq!(configs.moduli.len(), configs.l);
-        assert!(configs.q_inverse_mod_t > 0);
+        for preset in [
+            BfvPreset::InsecureThreshold512,
+            BfvPreset::SecureThreshold8192,
+        ] {
+            let configs = Configs::compute(preset, &()).unwrap();
+            // Full CRT product is independent of the cached context used by the computation.
+            let q: BigUint = configs.moduli.iter().map(|&m| BigUint::from(m)).product();
+            let t = configs.plaintext_modulus;
+            assert_eq!(configs.moduli.len(), configs.l);
+            assert_eq!((&q * configs.q_inverse_mod_t) % t, BigUint::from(1u32));
+            assert_eq!(configs.q_mod_t, &q % t);
+            assert_eq!(configs.bounds.delta, &q / t);
+            assert_eq!(configs.bounds.delta_half, &configs.bounds.delta / 2u32);
+            assert_eq!(configs.bits.q_total_bit, q.bits() as u32);
+        }
     }
 
     #[test]

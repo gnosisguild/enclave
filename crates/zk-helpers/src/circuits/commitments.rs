@@ -236,7 +236,7 @@ pub fn compute_dkg_pk_commitment_from_public_key_bytes(
     let commitment = compute_dkg_pk_commitment(
         &pk0,
         &pk1,
-        e3_fhe_params::derived::compute_modulus_bit(&dkg_params),
+        e3_fhe_params::utils::compute_modulus_bit(&dkg_params),
     );
 
     let (_, be_bytes) = commitment.to_bytes_be();
@@ -287,7 +287,7 @@ pub fn compute_pk_commitment_from_keyshare_bytes(
     params: &std::sync::Arc<fhe::bfv::BfvParameters>,
     crp: &fhe::mbfv::CommonRandomPoly,
 ) -> Result<[u8; 32], crate::CircuitsErrors> {
-    let bit_pk = e3_fhe_params::derived::compute_modulus_bit(params);
+    let bit_pk = e3_fhe_params::utils::compute_modulus_bit(params);
     let moduli = params.moduli();
 
     let pk_share = fhe::mbfv::PublicKeyShare::deserialize(keyshare_bytes, params, crp.clone())
@@ -731,7 +731,7 @@ mod tests {
             compute_pk_commitment_from_keyshare_bytes(&ks_bytes, &params, &crp).unwrap();
 
         // Compute commitment manually (same steps as PkAggInputs::compute)
-        let bit_pk = e3_fhe_params::derived::compute_modulus_bit(&params);
+        let bit_pk = e3_fhe_params::utils::compute_modulus_bit(&params);
         let mut pk0 = CrtPolynomial::from_fhe_polynomial(&pk_share.p0_share());
         pk0.reverse();
         pk0.center(params.moduli()).unwrap();

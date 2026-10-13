@@ -18,7 +18,7 @@ use crate::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
-use e3_fhe_params::derived::compute_modulus_bit;
+use e3_fhe_params::utils::compute_modulus_bit;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial_fhe::FromFhePolynomial as _;

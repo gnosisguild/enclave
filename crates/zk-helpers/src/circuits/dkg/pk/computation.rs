@@ -15,7 +15,7 @@ use crate::crt_polynomial_to_toml_json;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
-use e3_fhe_params::derived::compute_modulus_bit;
+use e3_fhe_params::utils::compute_modulus_bit;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use num_bigint::BigUint;
