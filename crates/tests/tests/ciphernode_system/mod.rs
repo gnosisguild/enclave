@@ -390,7 +390,6 @@ mod tests {
             aggregate_ids: vec![],
             persistence_health: event_system.failure_receiver(),
             gateway_failures: vec![],
-            errors: None,
         })
     }
 

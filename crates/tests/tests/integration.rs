@@ -1522,23 +1522,19 @@ async fn test_trbfv_actor() -> Result<()> {
                 .transpose()?;
             println!("Building collector {}!", addr);
             {
-                let mut b = CiphernodeBuilder::new(node_rng.clone(), cipher.clone())
-                    .with_history_collector()
-                    .with_shared_taskpool(&task_pool)
-                    .with_multithread_concurrent_jobs(concurrent_jobs)
-                    .with_shared_multithread_report(&multithread_report)
-                    .with_trbfv()
-                    .with_zkproof(zk_backend.clone())
-                    .with_signer(signer.clone())
-                    .with_pubkey_aggregation()
-                    .with_sortition_score()
-                    .with_threshold_plaintext_aggregation()
-                    .with_eventstore_aggregate_config_for_testing(
-                        benchmark_aggregate_config.clone(),
-                    )
-                    .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
-                    .with_chains(std::slice::from_ref(&bench_chain_config))
-                    .with_logging();
+                let mut b =
+                    CiphernodeBuilder::full(node_rng.clone(), cipher.clone(), zk_backend.clone())
+                        .with_history_collector()
+                        .with_shared_taskpool(&task_pool)
+                        .with_multithread_concurrent_jobs(concurrent_jobs)
+                        .with_shared_multithread_report(&multithread_report)
+                        .with_signer(signer.clone())
+                        .with_eventstore_aggregate_config_for_testing(
+                            benchmark_aggregate_config.clone(),
+                        )
+                        .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
+                        .with_chains(std::slice::from_ref(&bench_chain_config))
+                        .with_logging();
                 if !proof_aggregation_enabled {
                     b = b.with_proof_aggregation_disabled_for_testing();
                 }
@@ -1577,23 +1573,22 @@ async fn test_trbfv_actor() -> Result<()> {
                     .transpose()?;
                 println!("Building normal {}", &addr);
                 {
-                    let mut b = CiphernodeBuilder::new(node_rng.clone(), cipher.clone())
-                        .with_history_collector()
-                        .with_shared_taskpool(&task_pool)
-                        .with_multithread_concurrent_jobs(concurrent_jobs)
-                        .with_shared_multithread_report(&multithread_report)
-                        .with_trbfv()
-                        .with_zkproof(zk_backend.clone())
-                        .with_signer(signer.clone())
-                        .with_pubkey_aggregation()
-                        .with_sortition_score()
-                        .with_threshold_plaintext_aggregation()
-                        .with_eventstore_aggregate_config_for_testing(
-                            benchmark_aggregate_config.clone(),
-                        )
-                        .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
-                        .with_chains(std::slice::from_ref(&bench_chain_config))
-                        .with_logging();
+                    let mut b = CiphernodeBuilder::full(
+                        node_rng.clone(),
+                        cipher.clone(),
+                        zk_backend.clone(),
+                    )
+                    .with_history_collector()
+                    .with_shared_taskpool(&task_pool)
+                    .with_multithread_concurrent_jobs(concurrent_jobs)
+                    .with_shared_multithread_report(&multithread_report)
+                    .with_signer(signer.clone())
+                    .with_eventstore_aggregate_config_for_testing(
+                        benchmark_aggregate_config.clone(),
+                    )
+                    .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
+                    .with_chains(std::slice::from_ref(&bench_chain_config))
+                    .with_logging();
                     if !proof_aggregation_enabled {
                         b = b.with_proof_aggregation_disabled_for_testing();
                     }
@@ -1933,24 +1928,20 @@ async fn test_trbfv_actor() -> Result<()> {
             .restart_node(
                 node_index,
                 Box::pin(async {
-                    let mut builder = CiphernodeBuilder::new(identity.rng, cipher.clone())
-                        .with_history_collector()
-                        .with_shared_taskpool(&task_pool)
-                        .with_multithread_concurrent_jobs(concurrent_jobs)
-                        .with_shared_multithread_report(&multithread_report)
-                        .with_trbfv()
-                        .with_zkproof(zk_backend.clone())
-                        .with_signer(identity.signer)
-                        .with_pubkey_aggregation()
-                        .with_sortition_score()
-                        .with_threshold_plaintext_aggregation()
-                        .with_eventstore_aggregate_config_for_testing(
-                            benchmark_aggregate_config.clone(),
-                        )
-                        .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
-                        .with_chains(std::slice::from_ref(&bench_chain_config))
-                        .with_persistence(&identity.log_path, &identity.kv_path)
-                        .with_logging();
+                    let mut builder =
+                        CiphernodeBuilder::full(identity.rng, cipher.clone(), zk_backend.clone())
+                            .with_history_collector()
+                            .with_shared_taskpool(&task_pool)
+                            .with_multithread_concurrent_jobs(concurrent_jobs)
+                            .with_shared_multithread_report(&multithread_report)
+                            .with_signer(identity.signer)
+                            .with_eventstore_aggregate_config_for_testing(
+                                benchmark_aggregate_config.clone(),
+                            )
+                            .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
+                            .with_chains(std::slice::from_ref(&bench_chain_config))
+                            .with_persistence(&identity.log_path, &identity.kv_path)
+                            .with_logging();
                     if !proof_aggregation_enabled {
                         builder = builder.with_proof_aggregation_disabled_for_testing();
                     }
@@ -2388,24 +2379,20 @@ async fn test_trbfv_actor() -> Result<()> {
             .restart_node(
                 node_index,
                 Box::pin(async {
-                    let mut builder = CiphernodeBuilder::new(identity.rng, cipher.clone())
-                        .with_history_collector()
-                        .with_shared_taskpool(&task_pool)
-                        .with_multithread_concurrent_jobs(concurrent_jobs)
-                        .with_shared_multithread_report(&multithread_report)
-                        .with_trbfv()
-                        .with_zkproof(zk_backend.clone())
-                        .with_signer(identity.signer)
-                        .with_pubkey_aggregation()
-                        .with_sortition_score()
-                        .with_threshold_plaintext_aggregation()
-                        .with_eventstore_aggregate_config_for_testing(
-                            benchmark_aggregate_config.clone(),
-                        )
-                        .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
-                        .with_chains(std::slice::from_ref(&bench_chain_config))
-                        .with_persistence(&identity.log_path, &identity.kv_path)
-                        .with_logging();
+                    let mut builder =
+                        CiphernodeBuilder::full(identity.rng, cipher.clone(), zk_backend.clone())
+                            .with_history_collector()
+                            .with_shared_taskpool(&task_pool)
+                            .with_multithread_concurrent_jobs(concurrent_jobs)
+                            .with_shared_multithread_report(&multithread_report)
+                            .with_signer(identity.signer)
+                            .with_eventstore_aggregate_config_for_testing(
+                                benchmark_aggregate_config.clone(),
+                            )
+                            .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
+                            .with_chains(std::slice::from_ref(&bench_chain_config))
+                            .with_persistence(&identity.log_path, &identity.kv_path)
+                            .with_logging();
                     if !proof_aggregation_enabled {
                         builder = builder.with_proof_aggregation_disabled_for_testing();
                     }

@@ -61,9 +61,6 @@ pub struct CiphernodeHandle {
     /// Optional event history collector. Populated when the builder is configured
     /// with [`CiphernodeBuilder::with_history_collector`].
     pub history: Option<Addr<HistoryCollector<InterfoldEvent>>>,
-    /// Optional error event collector. Populated when the builder is configured
-    /// with [`CiphernodeBuilder::with_error_collector`].
-    pub errors: Option<Addr<HistoryCollector<InterfoldEvent>>>,
     pub peer_id: PeerId,
     pub net_interface: NetInterfaceKind,
     pub network_status: NetworkStatus,
@@ -88,10 +85,6 @@ impl CiphernodeHandle {
 
     pub fn history(&self) -> Option<Addr<HistoryCollector<InterfoldEvent>>> {
         self.history.clone()
-    }
-
-    pub fn errors(&self) -> Option<Addr<HistoryCollector<InterfoldEvent>>> {
-        self.errors.clone()
     }
 
     pub fn address(&self) -> String {
