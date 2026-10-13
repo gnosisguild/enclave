@@ -287,6 +287,9 @@ contract Interfold is
     ////////////////////////////////////////////////////////////
 
     /// @inheritdoc IInterfold
+    /// Blueprint diff demo: a fake event, and setMaxDuration renamed. Do not merge.
+    event BlueprintProbeHappened(uint256 id);
+
     function request(
         E3RequestParams calldata requestParams
     ) external nonReentrant returns (uint256 e3Id, E3 memory e3) {
@@ -531,7 +534,7 @@ contract Interfold is
     ////////////////////////////////////////////////////////////
 
     /// @inheritdoc IInterfold
-    function setMaxDuration(uint256 _maxDuration) public onlyOwner {
+    function setMaxRunTime(uint256 _maxDuration) public onlyOwner {
         require(
             _maxDuration > 0 && _maxDuration <= MAX_DURATION_CAP,
             InvalidDuration(_maxDuration)
