@@ -182,4 +182,3 @@ fn short_or_empty_signals() {
     assert!(!link.check_consistency(&[], &[0u8; 256], 0, 0));
     assert!(!link.check_consistency(&[make_field(1)], &[0u8; 16], 0, 0));
 }
-

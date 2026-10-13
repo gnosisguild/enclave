@@ -136,7 +136,9 @@ pub fn share_computation_sk_from_pk(
         .map_err(|e| CircuitsErrors::Sample(format!("coeffs_to_poly_level0: {:?}", e)))?;
     let sk_sss_u64 = share_manager
         .generate_secret_shares_from_poly(sk_poly, &mut rng)
-        .map_err(|e| CircuitsErrors::Sample(format!("generate_secret_shares_from_poly: {:?}", e)))?;
+        .map_err(|e| {
+            CircuitsErrors::Sample(format!("generate_secret_shares_from_poly: {:?}", e))
+        })?;
     let secret_sss: Vec<Array2<BigInt>> = sk_sss_u64
         .into_iter()
         .map(|a| a.mapv(BigInt::from))

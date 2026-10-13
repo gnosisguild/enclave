@@ -9,13 +9,13 @@
 use anyhow::{anyhow, ensure, Context, Result};
 use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, lbfv_urs_seed, BfvPreset};
 use e3_polynomial::CrtPolynomial;
+use e3_zk_helpers::unsupported_lbfv::{LBFVPublicKey, LBFVRelinearizationKey};
 use e3_zk_helpers::{
     compute_lbfv_key_envelope_commitment, compute_lbfv_public_key_commitment,
     compute_lbfv_rlk_commitment, compute_modulus_bit, compute_pk_aggregation_commitment,
     compute_rlk_aggregation_commitment, fhe_poly_to_crt_centered_checked,
 };
 use fhe::bfv::{CommonRandomPolyVec, PublicKey};
-use e3_zk_helpers::unsupported_lbfv::{LBFVPublicKey, LBFVRelinearizationKey};
 use fhe_math::rq::{Ntt, NttShoup, Poly};
 use fhe_traits::Serialize as FheSerialize;
 use num_bigint::{BigInt, Sign};
@@ -349,13 +349,13 @@ mod tests {
     use e3_zk_helpers::circuits::threshold::rlk_aggregation::{
         RlkAggregationCircuitData, RlkAggregationInputs,
     };
+    use e3_zk_helpers::unsupported_lbfv::{
+        aggregate_relinearization_key, PublicKeyShare, RelinKeyShare,
+    };
     use e3_zk_helpers::{CiphernodesCommitteeSize, Computation};
     use fhe::aggregate::AggregateIter;
     use fhe::bfv::SecretKey;
     use fhe_traits::DeserializeParametrized;
-    use e3_zk_helpers::unsupported_lbfv::{
-        aggregate_relinearization_key, PublicKeyShare, RelinKeyShare,
-    };
 
     type OperationalKeyMaterial = (
         BfvPreset,

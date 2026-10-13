@@ -20,8 +20,7 @@ pub global C6_PUBLIC_LEN: u32 = 7 + DECRYPTOR_COUNT + (2 * N_PARTIES);
 /// Same shape as `c6_fold`: 4 pub parameters + the common domain limbs +
 /// 4 columns of `T + 1` party slots each.
 pub global C6_KEY_SLOTS: u32 = (T + 1) * N_PARTIES;
-pub global C6_FOLD_PUBLIC_LEN: u32 =
-    6 + (4 * (T + 1)) + (2 * C6_KEY_SLOTS) + DECRYPTOR_COUNT;
+pub global C6_FOLD_PUBLIC_LEN: u32 = 6 + (4 * (T + 1)) + (2 * C6_KEY_SLOTS) + DECRYPTOR_COUNT;
 
 fn main(
     inner_vk: UltraHonkVerificationKey,
@@ -34,7 +33,7 @@ fn main(
     acc_key_hash: pub Field,
     is_first_step: pub bool,
     slot_index: pub u32,
-) -> pub (Field, Field, [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; C6_KEY_SLOTS], [Field; C6_KEY_SLOTS], [Field; DECRYPTOR_COUNT]) {
+    ) -> pub (Field, Field, [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; C6_KEY_SLOTS], [Field; C6_KEY_SLOTS], [Field; DECRYPTOR_COUNT]) {
     assert(slot_index < T + 1);
 
     verify_honk_proof(inner_vk, inner_proof, c6_public_inputs, inner_key_hash);

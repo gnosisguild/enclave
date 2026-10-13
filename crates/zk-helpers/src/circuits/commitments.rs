@@ -11,6 +11,7 @@
 //! All functions match the corresponding Noir circuit implementations exactly.
 
 use crate::packing::flatten;
+use crate::unsupported_lbfv::{PublicKeyShare as LbfvPublicKeyShare, RelinKeyShare};
 use crate::utils::compute_safe;
 use alloy_primitives::B256;
 use ark_bn254::Fr as Field;
@@ -19,7 +20,6 @@ use ark_ff::PrimeField;
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use fhe::bfv::PublicKey;
-use crate::unsupported_lbfv::{PublicKeyShare as LbfvPublicKeyShare, RelinKeyShare};
 use fhe_traits::DeserializeParametrized;
 use num_bigint::BigInt;
 use std::slice::from_ref;
@@ -1290,9 +1290,9 @@ pub fn compute_threshold_share_decryption_challenge(payload: Vec<Field>) -> BigI
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::unsupported_lbfv::{PublicKeyShare as LbfvPublicKeyShare, RelinKeyShare};
     use e3_polynomial::CrtPolynomial;
     use fhe::bfv::{BfvParametersBuilder, CommonRandomPolyVec, SecretKey};
-    use crate::unsupported_lbfv::{PublicKeyShare as LbfvPublicKeyShare, RelinKeyShare};
 
     const LBFV_SHARE_ROW_COUNT: usize = 5;
 

@@ -18,8 +18,7 @@ use lib::math::committee_hash::committee_hash_limbs;
 
 pub use lib::configs::default::threshold::L as LBFV_ROWS;
 
-pub global NODE_FOLD_PUBLIC_LEN: u32 =
-    12 + (2 * N_PARTIES) + H + ((N_PARTIES + H) * L_THRESHOLD);
+pub global NODE_FOLD_PUBLIC_LEN: u32 = 12 + (2 * N_PARTIES) + H + ((N_PARTIES + H) * L_THRESHOLD);
 pub global NODE_FOLD_V2_APPEND_LEN: u32 = 3 + (3 * LBFV_ROWS);
 pub global NODE_FOLD_V2_PREFIX_LEN: u32 = 4;
 pub global NODE_FOLD_V2_PUBLIC_LEN: u32 =

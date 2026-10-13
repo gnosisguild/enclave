@@ -15,6 +15,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "aho-corasick"
+version = "1.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c982642fa9e8606056828ee9a8505737230110bb1099153c79efe865c59d12ba"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1079,9 +1088,9 @@ dependencies = [
  "e3-fhe-params",
  "e3-polynomial",
  "e3-zk-helpers",
- "fhe",
- "fhe-math",
- "fhe-traits",
+ "fhe 0.3.0",
+ "fhe-math 0.3.0",
+ "fhe-traits 0.3.0",
  "num-bigint 0.5.1",
  "rand 0.9.4",
  "thiserror 1.0.69",
@@ -1107,8 +1116,8 @@ dependencies = [
  "ark-ff 0.4.2",
  "e3-bfv-client",
  "e3-fhe-params",
- "fhe",
- "fhe-traits",
+ "fhe 0.3.0",
+ "fhe-traits 0.3.0",
  "hex",
  "lean-imt",
  "light-poseidon",
@@ -1130,8 +1139,8 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "clap",
- "fhe",
- "fhe-math",
+ "fhe 0.3.0",
+ "fhe-math 0.3.0",
  "num-bigint 0.5.1",
  "num-traits",
  "rand 0.9.4",
@@ -1156,7 +1165,7 @@ name = "e3-polynomial"
 version = "0.17.0"
 source = "git+https://github.com/theinterfold/interfold?rev=0134d1bbce2204b894033ddf1aa35820deda8e8f#0134d1bbce2204b894033ddf1aa35820deda8e8f"
 dependencies = [
- "fhe-math",
+ "fhe-math 0.3.0",
  "num-bigint 0.5.1",
  "num-traits",
  "serde",
@@ -1167,6 +1176,19 @@ dependencies = [
 name = "e3-safe"
 version = "0.17.0"
 source = "git+https://github.com/theinterfold/interfold?rev=0134d1bbce2204b894033ddf1aa35820deda8e8f#0134d1bbce2204b894033ddf1aa35820deda8e8f"
+dependencies = [
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
+ "hex",
+ "risc0-bigint2",
+ "sha3",
+ "taceo-poseidon2",
+]
+
+[[package]]
+name = "e3-safe"
+version = "0.17.0"
+source = "git+https://github.com/theinterfold/interfold?rev=fb5f14198c6ec812b23020079024695043fa6ee5#fb5f14198c6ec812b23020079024695043fa6ee5"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -1195,8 +1217,8 @@ version = "0.1.0"
 dependencies = [
  "e3-compute-provider",
  "e3-fhe-params",
- "fhe",
- "fhe-traits",
+ "fhe 0.4.1",
+ "fhe-traits 0.4.1",
  "sha2",
  "sha3",
 ]
@@ -1215,10 +1237,10 @@ dependencies = [
  "e3-fhe-params",
  "e3-parity-matrix",
  "e3-polynomial",
- "e3-safe",
- "fhe",
- "fhe-math",
- "fhe-traits",
+ "e3-safe 0.17.0 (git+https://github.com/theinterfold/interfold?rev=0134d1bbce2204b894033ddf1aa35820deda8e8f)",
+ "fhe 0.3.0",
+ "fhe-math 0.3.0",
+ "fhe-traits 0.3.0",
  "hex",
  "itertools 0.14.0",
  "ndarray",
@@ -1401,9 +1423,9 @@ version = "0.3.0"
 source = "git+https://github.com/gnosisguild/fhe.rs?branch=dev#375cfc68fbb1dbd27c5fd204706e2dfee6086229"
 dependencies = [
  "doc-comment",
- "fhe-math",
- "fhe-traits",
- "fhe-util",
+ "fhe-math 0.3.0",
+ "fhe-traits 0.3.0",
+ "fhe-util 0.3.0",
  "itertools 0.15.0",
  "ndarray",
  "num-bigint 0.5.1",
@@ -1420,19 +1442,71 @@ dependencies = [
 ]
 
 [[package]]
+name = "fhe"
+version = "0.4.1"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Ftrbfv-synchronized-consolidation#6967373997b4295c26cf9490af883a69f0218104"
+dependencies = [
+ "ark-ff 0.5.0",
+ "bincode",
+ "doc-comment",
+ "e3-safe 0.17.0 (git+https://github.com/theinterfold/interfold?rev=fb5f14198c6ec812b23020079024695043fa6ee5)",
+ "fhe-math 0.4.1",
+ "fhe-traits 0.4.1",
+ "fhe-util 0.4.1",
+ "itertools 0.15.0",
+ "ndarray",
+ "num-bigint 0.5.1",
+ "num-traits",
+ "prost",
+ "prost-build",
+ "rand 0.9.4",
+ "rand_chacha 0.9.0",
+ "rand_distr",
+ "rayon",
+ "serde",
+ "thiserror 2.0.20",
+ "zeroize",
+ "zeroize_derive",
+]
+
+[[package]]
 name = "fhe-math"
 version = "0.3.0"
 source = "git+https://github.com/gnosisguild/fhe.rs?branch=dev#375cfc68fbb1dbd27c5fd204706e2dfee6086229"
 dependencies = [
  "ethnum",
- "fhe-traits",
- "fhe-util",
+ "fhe-traits 0.3.0",
+ "fhe-util 0.3.0",
  "itertools 0.15.0",
  "ndarray",
  "num-bigint 0.5.1",
  "num-bigint-dig",
  "num-traits",
  "prost",
+ "pulp",
+ "rand 0.9.4",
+ "rand_chacha 0.9.0",
+ "serde",
+ "sha2",
+ "thiserror 2.0.20",
+ "zeroize",
+]
+
+[[package]]
+name = "fhe-math"
+version = "0.4.1"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Ftrbfv-synchronized-consolidation#6967373997b4295c26cf9490af883a69f0218104"
+dependencies = [
+ "ethnum",
+ "fhe-traits 0.4.1",
+ "fhe-util 0.4.1",
+ "itertools 0.15.0",
+ "ndarray",
+ "num-bigint 0.5.1",
+ "num-bigint-dig",
+ "num-traits",
+ "prost",
+ "prost-build",
  "pulp",
  "rand 0.9.4",
  "rand_chacha 0.9.0",
@@ -1451,9 +1525,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "fhe-traits"
+version = "0.4.1"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Ftrbfv-synchronized-consolidation#6967373997b4295c26cf9490af883a69f0218104"
+dependencies = [
+ "rand 0.9.4",
+]
+
+[[package]]
 name = "fhe-util"
 version = "0.3.0"
 source = "git+https://github.com/gnosisguild/fhe.rs?branch=dev#375cfc68fbb1dbd27c5fd204706e2dfee6086229"
+dependencies = [
+ "num-bigint-dig",
+ "num-traits",
+ "prime_factorization",
+ "rand 0.9.4",
+ "rand_distr",
+ "rayon",
+]
+
+[[package]]
+name = "fhe-util"
+version = "0.4.1"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Ftrbfv-synchronized-consolidation#6967373997b4295c26cf9490af883a69f0218104"
 dependencies = [
  "num-bigint-dig",
  "num-traits",
@@ -1480,6 +1575,12 @@ dependencies = [
  "rustc-hex",
  "static_assertions",
 ]
+
+[[package]]
+name = "fixedbitset"
+version = "0.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
 
 [[package]]
 name = "fnv"
@@ -1888,6 +1989,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "multimap"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
+
+[[package]]
 name = "ndarray"
 version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2100,6 +2207,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "petgraph"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8701b58ea97060d5e5b155d383a69952a60943f0e6dfe30b04c287beb0b27455"
+dependencies = [
+ "fixedbitset",
+ "hashbrown 0.15.5",
+ "indexmap",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2149,6 +2267,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
+]
+
+[[package]]
+name = "prettyplease"
+version = "0.2.37"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b"
+dependencies = [
+ "proc-macro2",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2243,6 +2371,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-build"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03da047801ff44bb6a4d407d4860c05fd70bb81714e6b2f3812603d5b145b042"
+dependencies = [
+ "heck",
+ "itertools 0.10.5",
+ "log",
+ "multimap",
+ "petgraph",
+ "prettyplease",
+ "prost",
+ "prost-types",
+ "regex",
+ "syn 2.0.119",
+ "tempfile",
+]
+
+[[package]]
 name = "prost-derive"
 version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2253,6 +2400,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f94967dc7688f3054c7fac87473ffae4cc4c3904800e2d9f5b857246d8963b0a"
+dependencies = [
+ "prost",
 ]
 
 [[package]]
@@ -2425,6 +2581,29 @@ name = "reborrow"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03251193000f4bd3b042892be858ee50e8b3719f2b08e5833ac4353724632430"
+
+[[package]]
+name = "regex"
+version = "1.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e10754a14b9137dd7b1e3e5b0493cc9171fdd105e0ab477f51b72e7f3ac0e276"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-automata"
+version = "0.4.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-syntax",
+]
 
 [[package]]
 name = "regex-syntax"

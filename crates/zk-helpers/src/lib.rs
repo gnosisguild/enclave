@@ -5,11 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 pub mod ciphernodes_committee;
-pub mod unsupported_lbfv;
 pub mod circuits;
 pub mod math;
 pub mod packing;
 pub mod registry;
+pub mod unsupported_lbfv;
 pub mod utils;
 
 pub use ciphernodes_committee::*;

@@ -62,9 +62,7 @@ pub fn generate_shares_hash_map(
     let mut shares_hash_map = HashMap::new();
     for party_id in 0u64..threshold_n as u64 {
         let GenPkShareAndSkSssResponse {
-            sk_sss,
-            pk_share,
-            ..
+            sk_sss, pk_share, ..
         } = {
             let mut rng_guard = rng.lock().unwrap();
             gen_pk_share_and_sk_sss(

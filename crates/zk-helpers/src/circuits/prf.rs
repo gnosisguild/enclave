@@ -46,7 +46,10 @@ fn key_field(key: &[u8]) -> Field {
 }
 
 fn push_ciphertext(input: &mut Vec<Field>, limbs: &[Polynomial]) {
-    let degree = limbs.first().map(|poly| poly.coefficients().len()).unwrap_or(0);
+    let degree = limbs
+        .first()
+        .map(|poly| poly.coefficients().len())
+        .unwrap_or(0);
     input.push(Field::from(limbs.len() as u64));
     input.push(Field::from(degree as u64));
     for limb in limbs {
@@ -116,7 +119,10 @@ pub fn decryption_mask_low_degree(
     if outgoing_keys.iter().chain(incoming_keys).any(Vec::is_empty) {
         return Err("PRF key is empty".into());
     }
-    let degree = ct0.first().map(|poly| poly.coefficients().len()).unwrap_or(0);
+    let degree = ct0
+        .first()
+        .map(|poly| poly.coefficients().len())
+        .unwrap_or(0);
     let h = decryptors.len();
     let mut input = Vec::new();
     input.push(Field::from(h as u64));
@@ -284,7 +290,7 @@ mod tests {
     fn decryption_mask_matches_synchronized_party_prf() {
         use e3_polynomial::CrtPolynomial;
         use fhe::bfv::{BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey};
-        use fhe::trbfv::synchronized::{PartyPrfKeyTransport, PartyPrfKeys};
+        use fhe::trbfv::{PartyPrfKeyTransport, PartyPrfKeys};
         use fhe_traits::{FheEncoder, FheEncrypter};
 
         let params = BfvParametersBuilder::new()
@@ -299,18 +305,19 @@ mod tests {
         let plaintext = Plaintext::try_encode(&[1u64, 2, 3, 4], Encoding::poly(), &params).unwrap();
         let ciphertext = public_key.try_encrypt(&plaintext, &mut rng).unwrap();
         let party_id = 1usize;
-        let outgoing: Vec<[u8; 32]> = (1..=3).map(|peer| [(party_id * 10 + peer) as u8; 32]).collect();
-        let incoming: Vec<[u8; 32]> = (1..=3).map(|peer| [(peer * 10 + party_id) as u8; 32]).collect();
+        let outgoing: Vec<[u8; 32]> = (1..=3)
+            .map(|peer| [(party_id * 10 + peer) as u8; 32])
+            .collect();
+        let incoming: Vec<[u8; 32]> = (1..=3)
+            .map(|peer| [(peer * 10 + party_id) as u8; 32])
+            .collect();
         let keys = PartyPrfKeys::from_transport(
             PartyPrfKeyTransport::new(party_id, 3, outgoing.clone(), incoming.clone()).unwrap(),
         )
         .unwrap();
         let decryptors = [1u32, 3];
         let fhe_mask = keys
-            .mask(
-                &decryptors.map(|id| id as usize),
-                &ciphertext,
-            )
+            .mask(&decryptors.map(|id| id as usize), &ciphertext)
             .unwrap();
         let reverse_limbs = |component: &fhe_math::rq::Poly<fhe_math::rq::Ntt>| {
             CrtPolynomial::from_fhe_polynomial(component)
@@ -336,7 +343,8 @@ mod tests {
         for (row, twin_row) in twin.iter().enumerate() {
             for (column, coefficient) in twin_row.iter().enumerate() {
                 assert_eq!(
-                    coefficients[(row, column)], *coefficient,
+                    coefficients[(row, column)],
+                    *coefficient,
                     "mask residue row {row} column {column}"
                 );
             }

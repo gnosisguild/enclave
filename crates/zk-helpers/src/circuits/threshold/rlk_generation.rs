@@ -13,6 +13,7 @@ use crate::math::{
 use crate::threshold::lbfv_proof_domain::{
     lbfv_proof_session, sample_lbfv_proof_domain, validate_lbfv_generation_party_id,
 };
+use crate::unsupported_lbfv::{PublicKeyShare, RelinKeyShare, RlkWitness};
 use crate::utils::{validate_crt_shape, verify_crt_shapes};
 use crate::{
     calculate_bit_width, polynomial_to_toml_json, Artifacts, CiphernodesCommittee, Circuit,
@@ -22,7 +23,6 @@ use e3_committee_hash::LbfvProofDomainContext;
 use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, lbfv_urs_seed, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use fhe::bfv::{BfvParameters, CommonRandomPolyVec, SecretKey};
-use crate::unsupported_lbfv::{PublicKeyShare, RelinKeyShare, RlkWitness};
 use fhe_math::rns::RnsContext;
 use fhe_math::rq::Context;
 use num_bigint::{BigInt, BigUint};
@@ -921,13 +921,11 @@ impl RlkGenerationLimbCircuitData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::unsupported_lbfv::{aggregate_relinearization_key, LBFVPublicKey, PublicKeyShare};
     use crate::CiphernodesCommitteeSize;
     use fhe::aggregate::AggregateIter;
     use fhe::bfv::{BfvParametersBuilder, Encoding, Plaintext};
-    use crate::unsupported_lbfv::{aggregate_relinearization_key, LBFVPublicKey, PublicKeyShare};
-    use fhe_traits::{
-        FheDecoder, FheDecrypter, FheEncoder,
-    };
+    use fhe_traits::{FheDecoder, FheDecrypter, FheEncoder};
     use rand::rng;
 
     #[test]

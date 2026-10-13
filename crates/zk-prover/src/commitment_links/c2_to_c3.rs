@@ -206,5 +206,4 @@ mod tests {
         // C2 signals too short to have any share commitments after skipping first field.
         assert!(!link.check_signals(&[make_field(1)], &[0u8; 32]));
     }
-
 }

@@ -106,9 +106,11 @@ impl ShareDecryptionCircuitData {
                     CircuitsErrors::Sample(format!("Failed to convert SK coeffs to poly: {:?}", e))
                 })?;
 
-            let sk_sss = share_manager.generate_secret_shares_from_poly(sk_poly, &mut rng).map_err(
-                |e| CircuitsErrors::Sample(format!("Failed to generate SK shares: {:?}", e)),
-            )?;
+            let sk_sss = share_manager
+                .generate_secret_shares_from_poly(sk_poly, &mut rng)
+                .map_err(|e| {
+                    CircuitsErrors::Sample(format!("Failed to generate SK shares: {:?}", e))
+                })?;
 
             all_party_sk_shares.push(sk_sss);
         }
@@ -141,7 +143,6 @@ impl ShareDecryptionCircuitData {
                     .map_err(|e| {
                         CircuitsErrors::Sample(format!("Failed to push SK share row: {:?}", e))
                     })?;
-
             }
 
             sk_sss_collected.push(sk_collected);
@@ -186,9 +187,10 @@ impl ShareDecryptionCircuitData {
         .map_err(|e| {
             CircuitsErrors::Sample(format!("Failed to generate smudging error: {:?}", e))
         })?;
-        let es_poly = Poly::<fhe_math::rq::PowerBasis>::from_bigints(&e_signed, ctx).map_err(|e| {
-            CircuitsErrors::Sample(format!("Failed to convert error to poly: {:?}", e))
-        })?;
+        let es_poly =
+            Poly::<fhe_math::rq::PowerBasis>::from_bigints(&e_signed, ctx).map_err(|e| {
+                CircuitsErrors::Sample(format!("Failed to convert error to poly: {:?}", e))
+            })?;
         let es_crt = CrtPolynomial::from_fhe_polynomial(&*es_poly);
         let decryptors: Vec<u32> = (1..=(committee.threshold as u32 + 1)).collect();
         let prf_keys = nonzero_prf_keys(preset, committee.n);

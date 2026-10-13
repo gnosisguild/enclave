@@ -11,8 +11,8 @@ use crate::policy::InputPolicy;
 use e3_bfv_client::client::compute_ct_commitment;
 use e3_bfv_client::client::compute_ct_commitment_with_params;
 use e3_fhe_params::decode_bfv_params_arc;
-use fhe::bfv::BfvParameters;
 use e3_zk_helpers::unsupported_lbfv::LBFVRelinearizationKey;
+use fhe::bfv::BfvParameters;
 use sha3::{Digest, Keccak256};
 use std::sync::Arc;
 
@@ -257,11 +257,11 @@ mod tests {
     use e3_fhe_params::{
         build_pair_for_preset, encode_bfv_params, lbfv_crs_seed, lbfv_urs_seed, BfvPreset,
     };
-    use fhe::aggregate::AggregateIter;
-    use fhe::bfv::{Ciphertext, CommonRandomPolyVec, Encoding, Plaintext, PublicKey, SecretKey};
     use e3_zk_helpers::unsupported_lbfv::{
         aggregate_relinearization_key, LBFVPublicKey, PublicKeyShare, RelinKeyShare,
     };
+    use fhe::aggregate::AggregateIter;
+    use fhe::bfv::{Ciphertext, CommonRandomPolyVec, Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::{
         DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
         Serialize as FheSerialize,

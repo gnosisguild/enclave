@@ -19,7 +19,7 @@ use e3_fhe_params::{
 use e3_utils::utility_types::ArcBytes;
 use e3_zk_helpers::circuits::threshold::share_decryption::encode_signed_coefficients;
 use fhe::bfv::Ciphertext;
-use fhe::trbfv::synchronized::{PartyPrfKeyTransport, PartyPrfKeys, SynchronizedDecryptor};
+use fhe::trbfv::{PartyPrfKeyTransport, PartyPrfKeys, SynchronizedDecryptor};
 use fhe_math::rq::{Poly, PowerBasis};
 use fhe_traits::DeserializeParametrized;
 use fhe_traits::Serialize;
@@ -148,12 +148,9 @@ pub fn calculate_decryption_share(
     let req: InnerRequest = (cipher, req).try_into()?;
 
     let params = req.trbfv_config.params();
-    let preset = BfvPreset::from_threshold_parameters(
-        params.degree(),
-        params.plaintext(),
-        params.moduli(),
-    )
-    .context("threshold parameters do not match a supported preset")?;
+    let preset =
+        BfvPreset::from_threshold_parameters(params.degree(), params.plaintext(), params.moduli())
+            .context("threshold parameters do not match a supported preset")?;
     let noise = fresh_smudging_inputs(preset, req.trbfv_config.num_parties() as usize)
         .map_err(|error| anyhow!(error))?;
     let sk_ntt = req.sk_poly_sum.clone().into_ntt();

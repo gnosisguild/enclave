@@ -141,8 +141,8 @@ patch.
 
 The order matters:
 
-1. Merge the change to `crates/compute-provider`, then push.
-2. Bump every Interfold pin to the merge commit. There are three, and they must all name the same
+1. Commit and push the dependency changes to the integration branch so the build can fetch their exact revision.
+2. Bump every Interfold pin to that commit. There are three, and they must all name the same
    revision — the guest and host workspaces have to compile the same sources:
    - `e3-fhe-params` in `crates/support/Cargo.toml`
    - `e3-compute-provider` in `crates/support/Cargo.toml`
@@ -154,10 +154,12 @@ The order matters:
 
 3. Update the `crates/support` call sites that track the crate's API — the compiler will point at
    them, since they built against the old revision until now.
-4. Rebuild the guest against the pinned code with `RISC0_USE_DOCKER=1`. The pinned Docker builder
-   regenerates `crates/support/contracts/ImageID.sol`; ordinary native builds deliberately do not
-   touch that production trust anchor.
-5. Redeploy `Risc0BfvCiphertextVerifier`, and every E3 program that stores its own image ID.
+4. Run `pnpm support:build:guest` from the repository root. It builds the guest with `RISC0_USE_DOCKER=1`. The pinned Docker builder
+    regenerates `crates/support/contracts/ImageID.sol`; ordinary native builds deliberately do not
+    touch that production trust anchor.
+    Run `pnpm support:test:guest` to execute the embedded guest and compare all journal fields
+    with the native host computation. The test also checks the generated Solidity image ID.
+5. When deploying this guest, redeploy `Risc0BfvCiphertextVerifier` and every E3 program that stores its own image ID.
 
 Skipping step 4 leaves a deployed verifier that accepts a guest that does not match this tree. The
 provenance manifest records the committed image ID and compares it with a deployed verifier. It does

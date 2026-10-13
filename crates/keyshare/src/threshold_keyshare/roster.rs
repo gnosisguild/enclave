@@ -30,10 +30,8 @@ pub(crate) fn dealer_identity(
                 .contains(&c2a.payload.proof.circuit),
         "dealer proof does not match the E3, C2 proof type, and circuit"
     );
-    let contribution_hash: [u8; 32] = keccak256(
-        (keccak256(&**pk_share), c2a.payload.statement_digest()?).abi_encode(),
-    )
-    .into();
+    let contribution_hash: [u8; 32] =
+        keccak256((keccak256(&**pk_share), c2a.payload.statement_digest()?).abi_encode()).into();
     Ok(DkgDealer {
         party_id,
         contribution_hash,

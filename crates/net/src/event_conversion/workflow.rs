@@ -295,8 +295,8 @@ mod tests {
         LbfvRelinearizationKeyShareDocumentV1, Proof, ProofPayload, ProofType, SignedProofPayload,
     };
     use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, lbfv_urs_seed, BfvPreset};
-    use fhe::bfv::{CommonRandomPolyVec, SecretKey};
     use e3_zk_helpers::unsupported_lbfv::{PublicKeyShare, RelinKeyShare};
+    use fhe::bfv::{CommonRandomPolyVec, SecretKey};
     use rand::rng;
     use std::sync::Arc;
 

@@ -141,5 +141,4 @@ mod tests {
         // C2 target too short
         assert!(!link.check_signals(&[make_field(1)], &[0u8; 10]));
     }
-
 }

@@ -13,8 +13,7 @@ use lib::configs::default::dkg::L_THRESHOLD;
 use lib::configs::default::{H, N_PARTIES};
 
 /// Must match `node_fold::NODE_FOLD_PUBLIC_LEN`.
-pub global NODE_FOLD_PUBLIC_LEN: u32 =
-    12 + (2 * N_PARTIES) + H + ((N_PARTIES + H) * L_THRESHOLD);
+pub global NODE_FOLD_PUBLIC_LEN: u32 = 12 + (2 * N_PARTIES) + H + ((N_PARTIES + H) * L_THRESHOLD);
 
 /// Same shape as `nodes_fold`: 6 pub parameters + `H` full `node_fold` public rows (flattened).
 pub global NODES_FOLD_PUBLIC_LEN: u32 = 6 + (H * NODE_FOLD_PUBLIC_LEN);

@@ -297,7 +297,9 @@ async fn expulsion_of_a_designated_decryptor_starts_a_fresh_round() -> Result<()
             bail!("expected Collecting");
         };
         collecting.expected_decryptors = (6u32..=15).collect();
-        collecting.shares.insert(6, vec![ArcBytes::from_bytes(&[1])]);
+        collecting
+            .shares
+            .insert(6, vec![ArcBytes::from_bytes(&[1])]);
         Ok(state)
     })?;
     aggregator.handle_member_expelled(5, &ec)?;

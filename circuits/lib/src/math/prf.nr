@@ -37,7 +37,11 @@ pub global DS_PRF_EVAL: [u8; 64] = [
 pub fn native_residue(centered: Field, q: Field) -> Field {
     let half = (q - 1) / 2;
     let shifted = centered + half;
-    if (shifted as u128) < (half as u128) { centered + q } else { centered }
+    if (shifted as u128) < (half as u128) {
+        centered + q
+    } else {
+        centered
+    }
 }
 
 fn append_ciphertext_poly<let N: u32, let L: u32>(

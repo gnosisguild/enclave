@@ -9,10 +9,10 @@ use crate::math::commitments::{
     compute_partial_decryption_c0_commitment, compute_threshold_decryption_share_commitment,
     compute_threshold_share_decryption_challenge,
 };
-use crate::math::modulo::U64::ModU64;
-use crate::math::prf::{native_residue, prf_decryption_mask};
 use crate::math::helpers::flatten;
+use crate::math::modulo::U64::ModU64;
 use crate::math::polynomial::Polynomial;
+use crate::math::prf::{native_residue, prf_decryption_mask};
 
 /// Parameters for threshold share decryption (C6).
 pub struct Configs<let L: u32> {
@@ -222,10 +222,8 @@ impl<let N: u32, let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let BIT_CT: u32, 
     /// The list binds `party_idx`, the decryptor ids, and every polynomial in the share
     /// equation, including `e_fresh`. `sk` enters as `expected_sk_commitment`.
     fn payload(self) -> [Field] {
-        let mut inputs = [
-            self.expected_sk_commitment, self.ct_commitment, self.c0_commitment,
-        ]
-            .as_vector();
+        let mut inputs =
+            [self.expected_sk_commitment, self.ct_commitment, self.c0_commitment].as_vector();
         inputs = inputs.push_back(self.party_idx as Field);
         for i in 0..H {
             inputs = inputs.push_back(self.decryptors[i]);
@@ -481,9 +479,17 @@ pub fn lagrange_coeffs_for_set<let SET: u32, let L: u32>(
             let denom_sign_negative = (num_greater % 2) == 1;
             let result_abs = m.div_mod(numerator_abs, denominator_abs);
             let should_negate = numerator_sign_negative != denom_sign_negative;
-            let result = if should_negate { m.reduce_mod(q_l - result_abs) } else { result_abs };
+            let result = if should_negate {
+                m.reduce_mod(q_l - result_abs)
+            } else {
+                result_abs
+            };
             let half = (q_l - 1) / 2;
-            let centered = if (result as u128) > (half as u128) { result - q_l } else { result };
+            let centered = if (result as u128) > (half as u128) {
+                result - q_l
+            } else {
+                result
+            };
             lagrange_coeffs[basis_idx][party_idx] = centered;
         }
     }

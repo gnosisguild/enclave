@@ -23,10 +23,7 @@ use e3_fhe_params::{
 };
 use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::{AggregateIter, PublicKeyShare};
-use fhe::trbfv::synchronized::{
-    PartyPrfKeyTransport, PartyPrfKeys, SynchronizedDecryptor,
-};
-use fhe::trbfv::ShareManager;
+use fhe::trbfv::{PartyPrfKeyTransport, PartyPrfKeys, ShareManager, SynchronizedDecryptor};
 use fhe_math::rq::{Poly, PowerBasis};
 use fhe_traits::FheDecoder;
 use fhe_traits::{FheEncoder, FheEncrypter};

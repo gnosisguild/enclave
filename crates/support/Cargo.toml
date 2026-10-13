@@ -59,10 +59,10 @@ sha3 = "=0.10.8"
 # files and no Rust at all, so crates/compute-provider and the guest were outside its scope, and
 # outside the mitigation review at c64bcfb8 as well. See packages/interfold-contracts/audits/README.md.
 # Holding the old audit pin bought reproducibility rather than assurance while excluding real fixes
-# to the code the guest runs. This pin tracks fhe.rs feat/smudging-from-signed-coefficients.
-fhe = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "feat/smudging-from-signed-coefficients", features = ["experimental-mbfv", "synchronized-decryption"] }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feat/smudging-from-signed-coefficients" }
-fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feat/smudging-from-signed-coefficients" }
+# to the code the guest runs. This pin tracks fhe.rs refactor/trbfv-synchronized-consolidation.
+fhe = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "refactor/trbfv-synchronized-consolidation", features = ["experimental-mbfv", "threshold-decryption"] }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "refactor/trbfv-synchronized-consolidation" }
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", branch = "refactor/trbfv-synchronized-consolidation" }
 e3-compute-provider = { git = "https://github.com/theinterfold/interfold", rev = "0134d1bbce2204b894033ddf1aa35820deda8e8f" }
 tokio = { version = "=1.46.1", features = ["full"] }
 rand = { version = "=0.9.4" }

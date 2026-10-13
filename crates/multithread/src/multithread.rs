@@ -88,6 +88,9 @@ use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::threshold::rlk_aggregation::{RlkAggregationCircuit, RlkAggregationCircuitData};
 use e3_zk_helpers::threshold::rlk_generation::{RlkGenerationAdapter, RlkGenerationCircuitData};
+use e3_zk_helpers::unsupported_lbfv::{
+    PublicKeyShare as LbfvPublicKeyShare, RelinKeyShare, RlkWitness,
+};
 use e3_zk_helpers::CiphernodesCommittee;
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_prover::DEFAULT_C2_CHUNK_SIZE;
@@ -104,9 +107,6 @@ use e3_zk_prover::{
 };
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::PublicKeyShare;
-use e3_zk_helpers::unsupported_lbfv::{
-    PublicKeyShare as LbfvPublicKeyShare, RelinKeyShare, RlkWitness,
-};
 use fhe_math::rq::{NttShoup, Poly, PowerBasis};
 use fhe_traits::{DeserializeParametrized, DeserializeWithContext, FheEncoder};
 use ndarray::Array2;
@@ -1245,10 +1245,7 @@ fn handle_threshold_share_decryption_proof(
     if req.e_fresh.len() < num_indices {
         return Err(make_zk_error(
             &request,
-            format!(
-                "e_fresh too short: {} < {num_indices}",
-                req.e_fresh.len()
-            ),
+            format!("e_fresh too short: {} < {num_indices}", req.e_fresh.len()),
         ));
     }
     if req.d_share_bytes.len() < num_indices {
@@ -1271,14 +1268,15 @@ fn handle_threshold_share_decryption_proof(
             format!("invalid numeric E3 id for decryption domain: {e}"),
         )
     })?;
-    let decrypt_keys = |keys: &[e3_crypto::SensitiveBytes]| -> Result<Vec<Vec<u8>>, ComputeRequestError> {
-        keys.iter()
-            .map(|key| {
-                key.access_raw(cipher)
-                    .map_err(|e| make_zk_error(&request, format!("prf key decrypt: {e}")))
-            })
-            .collect()
-    };
+    let decrypt_keys =
+        |keys: &[e3_crypto::SensitiveBytes]| -> Result<Vec<Vec<u8>>, ComputeRequestError> {
+            keys.iter()
+                .map(|key| {
+                    key.access_raw(cipher)
+                        .map_err(|e| make_zk_error(&request, format!("prf key decrypt: {e}")))
+                })
+                .collect()
+        };
     let outgoing_prf_keys = decrypt_keys(&req.outgoing_prf_keys)?;
     let incoming_prf_keys = decrypt_keys(&req.incoming_prf_keys)?;
 
@@ -1290,29 +1288,24 @@ fn handle_threshold_share_decryption_proof(
             })?;
 
         // Decrypt the fresh noise polynomial reused by the C6 witness.
-        let noise = try_poly_from_sensitive_bytes(
-            req.e_fresh[i].clone(),
-            threshold_params.clone(),
-            cipher,
-        )
-        .map_err(|e| make_zk_error(&request, format!("e_fresh[{i}] decrypt: {e}")))?;
+        let noise =
+            try_poly_from_sensitive_bytes(req.e_fresh[i].clone(), threshold_params.clone(), cipher)
+                .map_err(|e| make_zk_error(&request, format!("e_fresh[{i}] decrypt: {e}")))?;
         let e = CrtPolynomial::from_fhe_polynomial(&noise);
         if req.e_signed.len() < num_indices {
             return Err(make_zk_error(
                 &request,
-                format!(
-                    "e_signed too short: {} < {num_indices}",
-                    req.e_signed.len()
-                ),
+                format!("e_signed too short: {} < {num_indices}", req.e_signed.len()),
             ));
         }
         let signed_bytes = req.e_signed[i]
             .access_raw(cipher)
             .map_err(|e| make_zk_error(&request, format!("e_signed[{i}] decrypt: {e}")))?;
-        let e_signed = e3_zk_helpers::circuits::threshold::share_decryption::decode_signed_coefficients(
-            &signed_bytes,
-        )
-        .map_err(|e| make_zk_error(&request, format!("e_signed[{i}] decode: {e}")))?;
+        let e_signed =
+            e3_zk_helpers::circuits::threshold::share_decryption::decode_signed_coefficients(
+                &signed_bytes,
+            )
+            .map_err(|e| make_zk_error(&request, format!("e_signed[{i}] decode: {e}")))?;
 
         // Deserialize d_share → Poly → CrtPolynomial
         let d_share_poly = try_poly_pb_from_bytes(&req.d_share_bytes[i], &threshold_params)

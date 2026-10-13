@@ -211,8 +211,7 @@ fn pack_outgoing_keys(
     preset: BfvPreset,
     moduli: &[u64],
 ) -> Result<SharedSecret> {
-    let limb = e3_fhe_params::prf_key_limb_index(moduli)
-        .map_err(|error| anyhow!(error))?;
+    let limb = e3_fhe_params::prf_key_limb_index(moduli).map_err(|error| anyhow!(error))?;
     let key_modulus = moduli[limb];
     if key_modulus != e3_fhe_params::prf_key_modulus(preset) {
         bail!("share modulus list does not start with the PRF key modulus");

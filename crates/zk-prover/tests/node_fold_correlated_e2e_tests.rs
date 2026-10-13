@@ -37,8 +37,7 @@ use e3_zk_prover::{
     generate_sequential_c3_fold, CircuitVariant, NodeDkgFoldInput, Provable, ZkProver,
 };
 use node_fold_witness::{
-    pk_generation_sample_with_esi, share_computation_sk_from_pk,
-    share_encryption_for_slot,
+    pk_generation_sample_with_esi, share_computation_sk_from_pk, share_encryption_for_slot,
 };
 
 fn recursive_aggregation_compiled_json_path(circuit: CircuitName) -> PathBuf {
@@ -137,8 +136,8 @@ async fn run_node_fold_correlated_sparse_self_slot(preset: BfvPreset) {
         setup_recursive_aggregation_fold_circuit_for_preset(&backend, c, preset, "minimum").await;
     }
 
-    let (pk_gen, _esi, pk_secret_key) = pk_generation_sample_with_esi(preset, committee.clone())
-        .expect("pk correlated sample");
+    let (pk_gen, _esi, pk_secret_key) =
+        pk_generation_sample_with_esi(preset, committee.clone()).expect("pk correlated sample");
     let share_sk = share_computation_sk_from_pk(preset, committee.clone(), &pk_gen, &pk_secret_key)
         .expect("correlated C2a data");
 

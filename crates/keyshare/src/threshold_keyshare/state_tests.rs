@@ -86,7 +86,9 @@ fn backwards_transition_is_rejected() {
 #[test]
 fn a_signed_share_can_decrypt_for_a_new_round() {
     let completed = KeyshareState::Completed(completed());
-    assert!(completed.next(KeyshareState::Decrypting(decrypting())).is_ok());
+    assert!(completed
+        .next(KeyshareState::Decrypting(decrypting()))
+        .is_ok());
 }
 
 #[test]

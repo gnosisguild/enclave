@@ -35,6 +35,7 @@ use e3_zk_helpers::threshold::pk_aggregation::{PkAggregationCircuit, PkAggregati
 use e3_zk_helpers::threshold::pk_generation::{LbfvPkGenerationAdapter, PkGenerationCircuit};
 use e3_zk_helpers::threshold::rlk_aggregation::{RlkAggregationCircuit, RlkAggregationCircuitData};
 use e3_zk_helpers::threshold::rlk_generation::RlkGenerationAdapter;
+use e3_zk_helpers::unsupported_lbfv::{PublicKeyShare as LbfvPublicKeyShare, RelinKeyShare};
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_prover::{
     load_staged_lbfv_pk_generation_limb_vk_hash, load_staged_rlk_generation_limb_vk_hash,
@@ -45,7 +46,6 @@ use e3_zk_prover::{
 };
 use fhe::bfv::{Ciphertext, CommonRandomPolyVec, PublicKey, SecretKey};
 use fhe::mbfv::{AggregateIter, PublicKeyShare as MbfvPublicKeyShare};
-use e3_zk_helpers::unsupported_lbfv::{PublicKeyShare as LbfvPublicKeyShare, RelinKeyShare};
 use num_bigint::BigInt;
 use num_traits::{Signed, ToPrimitive};
 use rand::rng;

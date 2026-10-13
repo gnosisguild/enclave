@@ -19,8 +19,8 @@ use crate::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_C
 use crate::compute_modulus_bit;
 use crate::compute_native_crt_coeff_bit;
 use crate::crt_polynomial_to_toml_json;
-use crate::polynomial_to_toml_json;
 use crate::decompose_residue;
+use crate::polynomial_to_toml_json;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuit;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuitData;
 use crate::CircuitsErrors;
@@ -285,11 +285,9 @@ impl Computation for Inputs {
         )
         .map_err(|e| CircuitsErrors::Other(format!("C6 CRT shape mismatch: {e}")))?;
 
-        let outgoing_prf_keys = crate::circuits::prf::resolve_keys(
-            &data.outgoing_prf_keys,
-            data.committee.n,
-        )
-        .map_err(CircuitsErrors::Other)?;
+        let outgoing_prf_keys =
+            crate::circuits::prf::resolve_keys(&data.outgoing_prf_keys, data.committee.n)
+                .map_err(CircuitsErrors::Other)?;
         let incoming_prf_keys =
             crate::circuits::prf::resolve_keys(&data.incoming_prf_keys, data.committee.n)
                 .map_err(CircuitsErrors::Other)?;
@@ -588,7 +586,8 @@ pub fn decode_signed_coefficients(bytes: &[u8]) -> Result<Vec<BigInt>, String> {
         if offset + 4 > bytes.len() {
             return Err("signed noise encoding ended early".into());
         }
-        let len = u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("4 bytes")) as usize;
+        let len =
+            u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("4 bytes")) as usize;
         offset += 4;
         if offset + len > bytes.len() {
             return Err("signed noise coefficient ended early".into());

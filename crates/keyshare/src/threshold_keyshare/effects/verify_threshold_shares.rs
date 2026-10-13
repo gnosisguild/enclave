@@ -65,8 +65,8 @@ impl ThresholdKeyshare {
                 continue;
             }
 
-            let has_any_proof = proofs.signed_c2a_proof.is_some()
-                || !proofs.signed_c3a_proofs.is_empty();
+            let has_any_proof =
+                proofs.signed_c2a_proof.is_some() || !proofs.signed_c3a_proofs.is_empty();
 
             if !has_any_proof {
                 no_proof_parties.insert(share.party_id);
@@ -76,8 +76,8 @@ impl ThresholdKeyshare {
             // Validate proof set completeness against trusted expected counts.
             // A malicious sender could omit proofs that would fail verification,
             // so we must check that all expected proofs are present.
-            let is_complete = proofs.signed_c2a_proof.is_some()
-                && proofs.signed_c3a_proofs.len() == expected_c3a;
+            let is_complete =
+                proofs.signed_c2a_proof.is_some() && proofs.signed_c3a_proofs.len() == expected_c3a;
 
             if !is_complete {
                 warn!(
@@ -92,8 +92,8 @@ impl ThresholdKeyshare {
             }
 
             let recipient_key_matches = proofs.signed_c3a_proofs.iter().all(|signed| {
-                    c3_targets_public_key(&signed.payload.proof.public_signals, &own_pk_commitment)
-                });
+                c3_targets_public_key(&signed.payload.proof.public_signals, &own_pk_commitment)
+            });
             if !recipient_key_matches {
                 warn!(
                     "Party {} encrypted its DKG share for a different recipient key; excluding it from this node's readiness set",

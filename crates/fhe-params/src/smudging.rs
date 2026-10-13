@@ -8,8 +8,10 @@
 
 use crate::BfvPreset;
 use fhe::bfv::BfvParameters;
-use fhe::trbfv::synchronized::{SmudgingNoise, SmudgingNoiseGenerator};
-use fhe::trbfv::{Lambda, SmudgingBoundCalculator, SmudgingBoundCalculatorConfig};
+use fhe::trbfv::{
+    Lambda, SmudgingBoundCalculator, SmudgingBoundCalculatorConfig, SmudgingNoise,
+    SmudgingNoiseGenerator,
+};
 use fhe_math::rq::sample_uniform_coefficients_bigint;
 use num_bigint::BigInt;
 use num_bigint::BigUint;
@@ -39,7 +41,10 @@ pub fn fresh_smudging_inputs(
     Ok(FreshSmudgingInputs {
         num_parties,
         num_ciphertexts: usize::try_from(defaults.z).map_err(|_| {
-            format!("{preset:?} ciphertext count {} does not fit usize", defaults.z)
+            format!(
+                "{preset:?} ciphertext count {} does not fit usize",
+                defaults.z
+            )
         })?,
         mult_depth: defaults.mult_depth,
         lambda,
@@ -100,7 +105,7 @@ pub fn smudging_noise_from_signed_coefficients(
         mult_depth,
         lambda,
     )?)?;
-    generator.from_signed_coefficients(coeffs)
+    generator.wrap_signed_coefficients(coeffs)
 }
 
 /// Calculate the smudging bound for one threshold-BFV operation.
@@ -164,15 +169,12 @@ mod tests {
 
     #[test]
     fn fresh_noise_bound_matches_compiled_c6_bound() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../circuits/lib/src/configs/committee");
+        let root =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../circuits/lib/src/configs/committee");
         let presets = [
             (BfvPreset::InsecureThreshold, "INSECURE_E_SM_BOUND"),
             (BfvPreset::SecureThreshold8192, "SECURE_8192_E_SM_BOUND"),
-            (
-                BfvPreset::SecureThreshold16384,
-                "SECURE_16384_E_SM_BOUND",
-            ),
+            (BfvPreset::SecureThreshold16384, "SECURE_16384_E_SM_BOUND"),
         ];
         for committee in ["minimum", "micro", "small"] {
             let dir = root.join(committee);
@@ -192,9 +194,7 @@ mod tests {
                     inputs.mult_depth,
                     inputs.lambda,
                 )
-                .unwrap_or_else(|error| {
-                    panic!("{preset:?} {committee} smudging bound: {error}")
-                });
+                .unwrap_or_else(|error| panic!("{preset:?} {committee} smudging bound: {error}"));
                 let compiled = noir_field(&smudging, constant);
                 assert!(
                     bound <= compiled,

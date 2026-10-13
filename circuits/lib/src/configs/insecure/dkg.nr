@@ -14,10 +14,8 @@ use crate::core::dkg::share_encryption::Configs as ShareEncryptionConfigs;
 // Global configs for DKG insecure preset
 pub global N: u32 = 128;
 pub global L: u32 = 2;
-/// Key bits packed into the largest threshold limb. Degree 128 cannot hold 256 bits.
 pub global PRF_KEY_BITS: u32 = 32;
-pub global QIS: [Field; L] = [288230376154267649, 288230376154791937];
-/// Twice the largest threshold modulus, so one coefficient holds a residue and one key bit.
+pub global QIS: [Field; L] = [288230376154267649, 288230376155185153];
 pub global PLAINTEXT_MODULUS: Field = 144115188075826178;
 pub global Q_MOD_T: Field = 9239299264521;
 pub global Q_MOD_T_CENTERED: Field = 9239299264521;
@@ -115,5 +113,5 @@ share_decryption_e_sm (CIRCUIT 4b - BFV DECRYPTION E_SM)
 -------------------------------------
 ************************************/
 
-pub global SHARE_DECRYPTION_BIT_MSG: u32 = 56;
+pub global SHARE_DECRYPTION_BIT_MSG: u32 = 57;
 // SHARE_DECRYPTION_BIT_AGG: see `pub use` of `THRESHOLD_SHARE_DECRYPTION_BIT_SK` (C6 `BIT_SK`).

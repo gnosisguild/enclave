@@ -98,13 +98,7 @@ fn proof(seed: u8) -> Proof {
 }
 
 fn pending(sk: usize) -> PendingThresholdProofs {
-    PendingThresholdProofs::new(
-        E3id::new("1", 1),
-        full_share(),
-        ec(),
-        sk,
-        vec![1, 2, 3],
-    )
+    PendingThresholdProofs::new(E3id::new("1", 1), full_share(), ec(), sk, vec![1, 2, 3])
 }
 
 #[test]

@@ -19,14 +19,13 @@ fn main(
     key_bits: [[Field; PRF_KEY_BITS]; H],
     recipient_party_idx: u32,
 ) -> pub Field {
-    let share_decryption: ShareDecryption<N, L_THRESHOLD, H, SHARE_COMPUTATION_BIT_SHARE, SHARE_DECRYPTION_BIT_AGG, SHARE_COMPUTATION_N_CHUNKS, SHARE_COMPUTATION_CHUNK_SIZE, PRF_KEY_BITS> =
-        ShareDecryption::new(
-            expected_commitments,
-            expected_key_commitments,
-            decrypted_shares,
-            key_bits,
-            recipient_party_idx,
-        );
+    let share_decryption: ShareDecryption<N, L_THRESHOLD, H, SHARE_COMPUTATION_BIT_SHARE, SHARE_DECRYPTION_BIT_AGG, SHARE_COMPUTATION_N_CHUNKS, SHARE_COMPUTATION_CHUNK_SIZE, PRF_KEY_BITS> = ShareDecryption::new(
+        expected_commitments,
+        expected_key_commitments,
+        decrypted_shares,
+        key_bits,
+        recipient_party_idx,
+    );
 
     share_decryption.execute(QIS_THRESHOLD)
 }

@@ -24,7 +24,8 @@ use common::{
 };
 use e3_events::CircuitName;
 use e3_fhe_params::{
-    build_pair_for_preset, fresh_smudging_inputs, smudging_noise_from_signed_coefficients, BfvPreset,
+    build_pair_for_preset, fresh_smudging_inputs, smudging_noise_from_signed_coefficients,
+    BfvPreset,
 };
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
@@ -58,7 +59,7 @@ use e3_zk_helpers::threshold::{
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_helpers::{compute_pk_aggregation_commitment, compute_threshold_pk_commitment};
 use e3_zk_prover::{CircuitVariant, Provable, ZkBackend, ZkProver};
-use fhe::trbfv::synchronized::{PartyPrfKeyTransport, PartyPrfKeys, SynchronizedDecryptor};
+use fhe::trbfv::{PartyPrfKeyTransport, PartyPrfKeys, SynchronizedDecryptor};
 
 /// Sum per-modulus decrypted shares across honest parties (matches C4 `compute_aggregated_shares`).
 /// Coefficients are summed in the BN254 field, not reduced mod each CRT modulus (see `share_decryption.nr`).
@@ -821,11 +822,7 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
         .expect("agg_sk -> Poly");
     let noise_inputs = fresh_smudging_inputs(preset, committee.n).expect("smudging inputs");
     let party_id = c6_sample.party_idx as usize + 1;
-    let decryptor_ids: Vec<usize> = c6_sample
-        .decryptors
-        .iter()
-        .map(|id| *id as usize)
-        .collect();
+    let decryptor_ids: Vec<usize> = c6_sample.decryptors.iter().map(|id| *id as usize).collect();
     let prf_keys = PartyPrfKeys::from_transport(
         PartyPrfKeyTransport::new(
             party_id,
@@ -845,12 +842,9 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
         &c6_sample.e_signed,
     )
     .expect("fresh noise");
-    let decryptor = SynchronizedDecryptor::new(
-        committee.n,
-        committee.threshold,
-        threshold_params.clone(),
-    )
-    .expect("SynchronizedDecryptor::new");
+    let decryptor =
+        SynchronizedDecryptor::new(committee.n, committee.threshold, threshold_params.clone())
+            .expect("SynchronizedDecryptor::new");
     let d_share_rns = decryptor
         .decryption_share(
             &c6_sample.ciphertext,

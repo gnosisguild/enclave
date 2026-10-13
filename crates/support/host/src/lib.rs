@@ -123,14 +123,11 @@ fn fake_prove(
 
     // Execute the program with the input. The policy is the caller's, so dev mode computes the same
     // result the guest would rather than silently falling back to the default.
-    let processed = match input.process_bound(
-        fhe_processor,
-        policy,
-        domain.committee_public_key_hash,
-    ) {
-        Ok(processed) => processed,
-        Err(error) => return to_output_error(Error::from(error)),
-    };
+    let processed =
+        match input.process_bound(fhe_processor, policy, domain.committee_public_key_hash) {
+            Ok(processed) => processed,
+            Err(error) => return to_output_error(Error::from(error)),
+        };
 
     let result = match ComputeJournal::new(domain.clone(), processed) {
         Ok(result) => result,
@@ -760,6 +757,93 @@ mod tests {
             "Guest execution matches all host journal fields; input root: {}",
             hex::encode(expected.merkle_root)
         );
+    }
+
+    #[test]
+    #[ignore = "requires the pinned Docker guest and a RISC Zero executor"]
+    fn embedded_guest_matches_host_journal() {
+        use e3_fhe_params::{build_pair_for_preset, encode_bfv_params, BfvPreset};
+        use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
+        use fhe_traits::{FheEncoder, FheEncrypter, Serialize as FheSerialize};
+        use rand::{rngs::StdRng, SeedableRng};
+
+        let (params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold).unwrap();
+        let mut rng = StdRng::seed_from_u64(289);
+        let secret_key = SecretKey::random(&params, &mut rng);
+        let public_key = PublicKey::new(&secret_key, &mut rng);
+        let params_bytes = encode_bfv_params(&params);
+        let mut ciphertexts = Vec::new();
+        let mut published = Vec::new();
+        for (index, value) in [3u64, 5].into_iter().enumerate() {
+            let plaintext = Plaintext::try_encode(&[value], Encoding::poly(), &params).unwrap();
+            let ciphertext = public_key
+                .try_encrypt(&plaintext, &mut rng)
+                .unwrap()
+                .to_bytes();
+            // A one-input sum supplies that ciphertext's published commitment.
+            let single = ComputeInput {
+                fhe_inputs: FHEInputs {
+                    ciphertexts: vec![(ciphertext.clone(), 0)],
+                    params: params_bytes.clone(),
+                    committee_key: Vec::new(),
+                },
+                published: Vec::new(),
+            };
+            let commitment = single
+                .process(fhe_processor, InputPolicy::default())
+                .unwrap()
+                .ciphertext_commitment
+                .try_into()
+                .unwrap();
+            let mut metadata = vec![0u8; 25];
+            metadata[19] = index as u8 + 1;
+            published.push(PublishedData {
+                commitment: Some(commitment),
+                metadata,
+            });
+            ciphertexts.push((ciphertext, index as u64));
+        }
+        let input = ComputeGuestInput {
+            domain: ComputeDomain::new(
+                31_337,
+                "0x1111111111111111111111111111111111111111",
+                "289",
+                alloy_primitives::keccak256(b"fhe.rs:BFV").as_slice(),
+                alloy_primitives::keccak256(public_key.to_bytes()).as_slice(),
+            )
+            .unwrap(),
+            input: ComputeInput {
+                fhe_inputs: FHEInputs {
+                    ciphertexts,
+                    params: params_bytes,
+                    committee_key: Vec::new(),
+                },
+                published,
+            },
+        };
+        let expected = ComputeJournal::new(
+            input.domain.clone(),
+            input
+                .input
+                .process_bound(
+                    fhe_processor,
+                    policy(),
+                    input.domain.committee_public_key_hash,
+                )
+                .unwrap(),
+        )
+        .unwrap();
+
+        let image_id = risc0_zkvm::compute_image_id(PROGRAM_ELF).unwrap();
+        assert_eq!(image_id, risc0_zkvm::sha::Digest::from(methods::PROGRAM_ID));
+        assert!(include_str!("../../contracts/ImageID.sol").contains(&image_id.to_string()));
+        let stdin = encode_guest_input(&input).unwrap();
+        let env = ExecutorEnv::builder().write_slice(&stdin).build().unwrap();
+        let session = risc0_zkvm::default_executor()
+            .execute(env, PROGRAM_ELF)
+            .unwrap();
+        assert_eq!(session.journal.bytes, encode_journal(&expected).unwrap());
+        println!("Guest {image_id} matches every host journal field");
     }
 
     #[test]

@@ -22,8 +22,7 @@ pub global C6_KEY_SLOTS: u32 = (T + 1) * N_PARTIES;
 
 /// Four columns of `T + 1` slots, then the outgoing and incoming PRF-key
 /// commitments opened by each C6 leaf.
-pub global C6_FOLD_PUBLIC_LEN: u32 =
-    6 + (4 * (T + 1)) + (2 * C6_KEY_SLOTS) + DECRYPTOR_COUNT;
+pub global C6_FOLD_PUBLIC_LEN: u32 = 6 + (4 * (T + 1)) + (2 * C6_KEY_SLOTS) + DECRYPTOR_COUNT;
 
 pub global C6_FOLD_PREFIX_LEN: u32 = 6;
 
@@ -38,7 +37,7 @@ fn main(
     acc_key_hash: pub Field,
     is_first_step: pub bool,
     slot_index: pub u32,
-) -> pub (Field, Field, [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; C6_KEY_SLOTS], [Field; C6_KEY_SLOTS], [Field; DECRYPTOR_COUNT]) {
+    ) -> pub (Field, Field, [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; C6_KEY_SLOTS], [Field; C6_KEY_SLOTS], [Field; DECRYPTOR_COUNT]) {
     assert(slot_index < T + 1);
 
     verify_honk_proof(inner_vk, inner_proof, c6_public_inputs, inner_key_hash);
@@ -112,9 +111,8 @@ fn main(
                 let prior_keys = C6_FOLD_PREFIX_LEN + (4 * (T + 1)) + (i * N_PARTIES);
                 for k in 0..N_PARTIES {
                     out_outgoing[i * N_PARTIES + k] = acc_public_inputs[prior_keys + k];
-                    out_incoming[i * N_PARTIES + k] = acc_public_inputs[prior_keys
-                        + C6_KEY_SLOTS
-                        + k];
+                    out_incoming[i * N_PARTIES + k] =
+                        acc_public_inputs[prior_keys + C6_KEY_SLOTS + k];
                 }
             }
         }

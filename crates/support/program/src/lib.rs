@@ -33,7 +33,7 @@ pub fn fhe_processor(fhe_inputs: &FHEProcessorInput<'_>) -> Vec<u8> {
 /// Both are specific to this program and its contract. They live here, beside the `CRISPProgram`
 /// they must agree with, rather than in `e3-compute-provider`, which every E3 program shares.
 pub mod policy {
-    use e3_compute_provider::policy::{leaf_from_digest, PublishedInput};
+    use e3_compute_provider::policy::{PublishedInput, leaf_from_digest};
     use e3_compute_provider::{ComputeError, InputPolicy};
     use sha2::{Digest, Sha256};
     use sha3::Keccak256;

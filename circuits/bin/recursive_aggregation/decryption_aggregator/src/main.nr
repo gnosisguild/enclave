@@ -76,7 +76,7 @@ fn main(
     domain_hi: pub Field,
     domain_lo: pub Field,
     ciphertext_commitment: pub Field,
-) -> pub (Field, [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; MAX_MSG_NON_ZERO_COEFFS], [Field; C6_KEY_SLOTS], [Field; C6_KEY_SLOTS]) {
+    ) -> pub (Field, [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; MAX_MSG_NON_ZERO_COEFFS], [Field; C6_KEY_SLOTS], [Field; C6_KEY_SLOTS]) {
     let (expected_hi, expected_lo) = committee_hash_limbs(committee_members);
     assert(expected_hi == committee_hash_hi);
     assert(expected_lo == committee_hash_lo);
@@ -96,9 +96,7 @@ fn main(
         assert(
             c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_CT_COL_OFFSET + i] == ciphertext_commitment,
         );
-        assert(
-            c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_C0_COL_OFFSET + i] == c0_commitment,
-        );
+        assert(c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_C0_COL_OFFSET + i] == c0_commitment);
     }
 
     // Cross-circuit C6 to C7: each folded `d_commitment` column entry must match `c7_public[i]`
@@ -150,9 +148,7 @@ fn main(
         assert(c6_fold_public[decryptor_base + i] == party_ids[i]);
     }
 
-    (
-        key_hash, party_ids, expected_sk, expected_c0, message, outgoing_keys, incoming_keys,
-    )
+    (key_hash, party_ids, expected_sk, expected_c0, message, outgoing_keys, incoming_keys)
 }
 
 // ------------------------------ TESTS ------------------------------

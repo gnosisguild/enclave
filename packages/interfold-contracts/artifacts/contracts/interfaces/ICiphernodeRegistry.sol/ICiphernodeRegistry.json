@@ -1513,6 +1513,25 @@
           "type": "uint256"
         }
       ],
+      "name": "getDkgPrfKeyCommitments",
+      "outputs": [
+        {
+          "internalType": "bytes32[]",
+          "name": "keyCommitments",
+          "type": "bytes32[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
       "name": "getSortitionRequest",
       "outputs": [
         {
@@ -2041,5 +2060,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-a5b28ad54249cff7b694c1d645c831fda502261b"
+  "buildInfoId": "solc-0_8_28-76d6283635a49f992b5a2ca5d97f222fa2647a0b"
 }

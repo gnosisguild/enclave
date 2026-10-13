@@ -30,8 +30,8 @@ use e3_events::{
 };
 use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, lbfv_urs_seed, BfvPreset};
 use e3_utils::ArcBytes;
-use fhe::bfv::{CommonRandomPolyVec, SecretKey};
 use e3_zk_helpers::unsupported_lbfv::{PublicKeyShare, RelinKeyShare};
+use fhe::bfv::{CommonRandomPolyVec, SecretKey};
 use libp2p::kad::{GetRecordError, PutRecordError, RecordKey};
 use std::time::Instant;
 use tokio::{

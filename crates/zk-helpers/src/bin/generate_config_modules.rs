@@ -682,13 +682,20 @@ fn render_dkg(preset: BfvPreset) -> Result<String> {
     .context("ShareEncryptionCircuitData::generate_sample failed")?;
     let sh_enc = ShareEncryptionConfigs::compute(preset, &se_sample)
         .context("ShareEncryptionConfigs::compute failed")?;
-    let (_, dkg_params) = build_pair_for_preset(preset)
+    let (threshold_params, dkg_params) = build_pair_for_preset(preset)
         .with_context(|| format!("build_pair_for_preset({preset:?}) failed"))?;
 
     let cfg_dir = preset.config_dir();
     let slug = preset.noir_config_module();
     let dkg_plaintext = dkg_params.plaintext();
     let msg_bit = compute_msg_bit(&dkg_params);
+    // C2 commits unpacked residues; C3 plaintexts also carry the PRF-key bit.
+    let share_bit = threshold_params
+        .moduli()
+        .iter()
+        .map(|&qi| e3_zk_helpers::calculate_bit_width(BigInt::from(qi - 1)))
+        .max()
+        .context("threshold moduli are empty")?;
     let (chunk_size, n_chunks, chunks_per_batch, n_batches) = c2_chunking(dkg_pk.n as u32);
     let parity_flag = slug.to_uppercase();
 
@@ -704,6 +711,7 @@ use crate::core::dkg::share_encryption::Configs as ShareEncryptionConfigs;
 // Global configs for DKG {slug} preset
 pub global N: u32 = {};
 pub global L: u32 = {};
+pub global PRF_KEY_BITS: u32 = {};
 pub global QIS: [Field; L] = [{}];
 pub global PLAINTEXT_MODULUS: Field = {};
 pub global Q_MOD_T: Field = {};
@@ -716,6 +724,7 @@ pub use crate::configs::committee::active::PARITY_MATRIX_{parity_flag} as PARITY
 \n",
         dkg_pk.n,
         dkg_pk.l,
+        e3_fhe_params::prf_key_bit_len(preset),
         moduli_str(&sh_enc.moduli),
         dkg_plaintext,
         sh_enc.q_mod_t,
@@ -744,7 +753,7 @@ pub global SHARE_COMPUTATION_N_BATCHES: u32 = {};
 
 pub global SHARE_COMPUTATION_SK_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
     ShareComputationConfigs::new(QIS_THRESHOLD);",
-            msg_bit, 1u32, chunk_size, n_chunks, chunks_per_batch, n_batches,
+            share_bit, 1u32, chunk_size, n_chunks, chunks_per_batch, n_batches,
         ),
     );
 
@@ -841,6 +850,19 @@ fn render_mod(preset: BfvPreset) -> String {
         ""
     };
     format!("{LICENSE}\npub mod dkg;\n{lbfv}pub mod threshold;\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generated_dkg_config_distinguishes_key_share_and_packed_message_widths() {
+        let config = render_dkg(BfvPreset::InsecureThreshold).unwrap();
+        assert!(config.contains("pub global PRF_KEY_BITS: u32 = 32;"));
+        assert!(config.contains("pub global SHARE_COMPUTATION_BIT_SHARE: u32 = 56;"));
+        assert!(config.contains("pub global SHARE_DECRYPTION_BIT_MSG: u32 = 57;"));
+    }
 }
 
 fn main() -> Result<()> {

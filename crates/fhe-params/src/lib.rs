@@ -34,9 +34,7 @@ pub use presets::{
 };
 pub use prf_key::{
     pack_prf_key, pack_share_coefficient, prf_key_bit_len, prf_key_bits, prf_key_limb_index,
-    prf_key_modulus,
-    unpack_prf_key, zero_prf_key,
-    unpack_share_coefficient, PrfKeyPackError,
+    prf_key_modulus, unpack_prf_key, unpack_share_coefficient, zero_prf_key, PrfKeyPackError,
 };
 pub use smudging::{
     calculate_smudging_bound, fresh_smudging_inputs, generate_smudging_error,

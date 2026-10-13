@@ -74,6 +74,8 @@ Run from repo root via pnpm scripts — not raw cargo/nargo/hardhat.
 | DAppNode hardening tests    | `bash dappnode/tests/test-hardening.sh` (needs `jq` and `envsubst`)                                                                                |
 | Lint / format               | `pnpm lint` · `pnpm format` / `pnpm format:check`                                                                                                  |
 | Build circuits              | `pnpm build:circuits [--preset …] [--committee …]` (needs `nargo` + `bb`; `interfold noir setup` installs them)                                    |
+| Build the pinned RISC Zero guest | `pnpm support:build:guest` (local Docker build; regenerates `crates/support/contracts/ImageID.sol`) |
+| Verify the embedded guest | `pnpm support:test:guest` (executes the guest and compares its journal and image ID with the host artifacts) |
 | Generate Solidity verifiers | `pnpm generate:verifiers [--check\|--write]`                                                                                                       |
 | Circuit artifact cache      | `pnpm store:circuits push\|pull` (orphan branch `circuit-artifacts`)                                                                               |
 | Consistency checks          | `pnpm check:committee` · `check:docs` · `check:addresses` · `check:invariants` · `check:license` · `check:verifiers` · `check:pnpm` · `check:size` |

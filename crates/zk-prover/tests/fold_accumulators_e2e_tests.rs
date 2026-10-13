@@ -87,9 +87,7 @@ fn c3_fold_total_slots_from_compiled_json() -> usize {
                 .and_then(|p| p.get("type")?.get("length")?.as_u64())
         })
         .expect("c3_fold.json: abi.parameters.acc_public_inputs.length") as usize;
-    let n_parties = e3_zk_helpers::CiphernodesCommitteeSize::Minimum
-        .values()
-        .n;
+    let n_parties = e3_zk_helpers::CiphernodesCommitteeSize::Minimum.values().n;
     assert!(
         len >= 6 + n_parties && (len - 6 - n_parties).is_multiple_of(3),
         "unexpected acc_public_inputs length {len} (expected 6 + 3 * slots + {n_parties})"

@@ -10,6 +10,7 @@ use crate::threshold::lbfv_proof_domain::{
     lbfv_accepted_party_set, lbfv_proof_session, sample_lbfv_proof_domain,
     validate_lbfv_generation_party_id,
 };
+use crate::unsupported_lbfv::RelinKeyShare;
 use crate::{
     bigint_1d_to_json_values, compute_modulus_bit, compute_rlk_d0_commitment,
     compute_rlk_d2_commitment, crt_polynomial_to_toml_json, Artifacts, CiphernodesCommittee,
@@ -20,7 +21,6 @@ use e3_committee_hash::LbfvProofDomainContext;
 use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, lbfv_urs_seed, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use fhe::bfv::{CommonRandomPolyVec, SecretKey};
-use crate::unsupported_lbfv::RelinKeyShare;
 use num_bigint::BigInt;
 
 /// Row-level l-BFV relinearization-key aggregation circuit.

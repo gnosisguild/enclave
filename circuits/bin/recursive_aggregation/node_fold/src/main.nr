@@ -26,8 +26,7 @@ pub global C2_SHARE_START: u32 = 2;
 pub global C2_KEY_START: u32 = 2 + (N_PARTIES * L_THRESHOLD);
 
 /// Six public parameters, then the return tuple.
-pub global NODE_FOLD_PUBLIC_LEN: u32 =
-    12 + (2 * N_PARTIES) + H + ((N_PARTIES + H) * L_THRESHOLD);
+pub global NODE_FOLD_PUBLIC_LEN: u32 = 12 + (2 * N_PARTIES) + H + ((N_PARTIES + H) * L_THRESHOLD);
 pub global NODE_VK_MANIFEST_IDX: u32 = NODE_FOLD_PUBLIC_LEN - 1;
 
 fn main(
@@ -52,27 +51,25 @@ fn main(
     c2_key_hash: pub Field,
     c3_key_hash: pub Field,
     c4_key_hash: pub Field,
-) -> pub (Field, Field, Field, Field, [Field; N_PARTIES], [[Field; L_THRESHOLD]; N_PARTIES], [[Field; L_THRESHOLD]; H], Field, [Field; N_PARTIES], [Field; H], Field) {
+    ) -> pub (Field, Field, Field, Field, [Field; N_PARTIES], [[Field; L_THRESHOLD]; N_PARTIES], [[Field; L_THRESHOLD]; H], Field, [Field; N_PARTIES], [Field; H], Field) {
     verify_honk_proof(c0_vk, c0_proof, c0_public, c0_key_hash);
     verify_honk_proof(c1_vk, c1_proof, c1_public, c1_key_hash);
     verify_honk_proof_non_zk(c2_vk, c2_proof, c2_public, c2_key_hash);
     verify_honk_proof_non_zk(c3_vk, c3_proof, c3_public, c3_key_hash);
     verify_honk_proof(c4_vk, c4_proof, c4_public, c4_key_hash);
 
-    let key_hash = compute_vk_hash(
-        [
-            c0_key_hash,
-            c1_key_hash,
-            c2_key_hash,
-            c3_key_hash,
-            c4_key_hash,
-            c2_public[0],
-            c2_public[C2_FINALIZED_PUBLIC_LEN - 1],
-            c3_public[0],
-            c3_public[4],
-        ]
-            .as_vector(),
-    );
+    let key_hash = compute_vk_hash([
+        c0_key_hash,
+        c1_key_hash,
+        c2_key_hash,
+        c3_key_hash,
+        c4_key_hash,
+        c2_public[0],
+        c2_public[C2_FINALIZED_PUBLIC_LEN - 1],
+        c3_public[0],
+        c3_public[4],
+    ]
+        .as_vector());
     let c0_pk = c0_public[0];
     let c1_pk = c1_public[1];
     assert(c1_public[0] == c2_public[C2_SECRET_IDX]);

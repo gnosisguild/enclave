@@ -316,6 +316,10 @@ all batches in a type-bound terminal circuit. The terminal circuit reconstructs 
 for the secret and for each recipient share. The terminal also publishes one PRF-key commitment
 per recipient. That commitment is the 0-based recipient and the key reduced modulo the circuit
 scalar. The key bits stay binary, and C3 still packs those bits into limb 0. Limb 0 must be a largest threshold modulus. C3 and C4 reject a list whose first prime is smaller than a later prime.
+Each C2 chunk calls `check_range_bounds` to constrain recipient shares to `[0, q_j)` and
+`verify_parity_check` to enforce the Reed–Solomon parity relation in every CRT limb.
+`generate_config_modules` derives `PRF_KEY_BITS` from the preset for the C2, C3, and C4
+witness dimensions: 32 bits for the insecure preset and 256 bits for the secure presets.
 `C2ChunkBatch` binds the ordered chunk
 indices and chunk commitments. C3 checks the encrypted limb-0 plaintext against the share
 commitment and the key commitment. C4 removes those bits before the aggregate commitment. C6
@@ -939,7 +943,7 @@ only that failure. It does not resume row, fold, final V2 proof, or publication 
 │       }
 │         → forwarded to peers so every committee member can bind C6 proofs to the aggregated key
 │
-The current `fhe.rs` pin is `feat/smudging-from-signed-coefficients`. That pin has no `fhe::trlbfv` module. `gen_lbfv_key_shares`, l-BFV aggregation, and l-BFV key decode return an error. The persisted `GenLbfvKeyShares` request and the l-BFV event variants stay in place, so the bincode layout and schema version 16 do not change.
+The `fhe.rs` dependency uses `refactor/trbfv-synchronized-consolidation`. Its `threshold-decryption` feature exposes the decryption and noise types directly from `fhe::trbfv`. That dependency has no `fhe::trlbfv` module. `gen_lbfv_key_shares`, l-BFV aggregation, and l-BFV key decode return an error. The persisted `GenLbfvKeyShares` request and the l-BFV event variants retain their bincode layout under schema version 16.
 
 ### l-BFV contribution-wire cutoff
 
@@ -1403,7 +1407,7 @@ InterfoldSolReader decodes CiphertextOutputPublished event
     └─ State: Decrypting → Completed
 ```
 
-`Inputs::compute` checks that witness with `decompose_residue`. Each coefficient of `d` must equal the partial-decryption product reduced into `R_qi`. The failure text is `xi must equal xi_hat reduced into R_qi`. The published share is `SynchronizedDecryptor::decryption_share`. That share is `lambda * c1 * sk + e + r`. It does not contain `c0`. The node samples the signed noise once, keeps those integers for the C6 witness, and wraps the same integers with `SmudgingNoise::from_signed_coefficients`. `ShareManager::decryption_share` still adds `c0` and a Shamir noise share. A C6 sample that stores that older polynomial fails `test_d_commitment_matches_inputs_compute`. The sample in `crates/zk-helpers/src/circuits/threshold/share_decryption/sample.rs` builds `d` with the circuit product and stores the power-basis residues low degree first.
+`Inputs::compute` checks that witness with `decompose_residue`. Each coefficient of `d` must equal the partial-decryption product reduced into `R_qi`. The failure text is `xi must equal xi_hat reduced into R_qi`. The published share is `fhe::trbfv::SynchronizedDecryptor::decryption_share`. That share is `lambda * c1 * sk + e + r`. It does not contain `c0`. The node samples the signed noise once and keeps those integers for the C6 witness. `smudging_noise_from_signed_coefficients` wraps the same integers through `SmudgingNoiseGenerator::wrap_signed_coefficients`, which uses the generator's parameters, committee size, and calculated bound. `test_d_commitment_matches_inputs_compute` checks the sample's partial-decryption relation and commitment. The sample in `crates/zk-helpers/src/circuits/threshold/share_decryption/sample.rs` builds `d` with the circuit product and stores the power-basis residues low degree first. The PRF context digest also absorbs power-basis ciphertext residues, in the order used by the circuit.
 
 ---
 
@@ -1897,6 +1901,12 @@ commitment and every input is computed over — and matches the starter template
 The published support image embeds the CRISP guest from `crates/support/program`. The reference app
 keeps the same guest in `examples/CRISP/program`. A CRISP policy change must update both copies and
 regenerate `crates/support/contracts/ImageID.sol` before the support image is published.
+
+`pnpm support:build:guest` runs the pinned Docker guest build locally. The host and guest
+manifests must name the same published Interfold revision. Their lockfiles must resolve
+the program and compute provider to the same FHE crate versions before the build starts.
+`pnpm support:test:guest` executes the embedded guest, compares every journal field with
+the native host result, and checks its image ID against the generated Solidity constant.
 
 The guest links `risc0-zkvm` with `heap-embedded-alloc`. The default bump allocator never frees, so
 each input's temporary Greco form stayed allocated and a secure-preset round aborted out of memory

@@ -4934,7 +4934,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5043,7 +5043,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.4.1"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=feat%2Fsmudging-from-signed-coefficients#ab48b27d367feec6061b77d42211280ef1f62f7f"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Ftrbfv-synchronized-consolidation#6967373997b4295c26cf9490af883a69f0218104"
 dependencies = [
  "ark-ff 0.5.0",
  "bincode",
@@ -5071,7 +5071,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.4.1"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=feat%2Fsmudging-from-signed-coefficients#ab48b27d367feec6061b77d42211280ef1f62f7f"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Ftrbfv-synchronized-consolidation#6967373997b4295c26cf9490af883a69f0218104"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -5095,7 +5095,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.4.1"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=feat%2Fsmudging-from-signed-coefficients#ab48b27d367feec6061b77d42211280ef1f62f7f"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Ftrbfv-synchronized-consolidation#6967373997b4295c26cf9490af883a69f0218104"
 dependencies = [
  "rand 0.9.4",
 ]
@@ -5103,7 +5103,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.4.1"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=feat%2Fsmudging-from-signed-coefficients#ab48b27d367feec6061b77d42211280ef1f62f7f"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Ftrbfv-synchronized-consolidation#6967373997b4295c26cf9490af883a69f0218104"
 dependencies = [
  "num-bigint-dig",
  "num-traits",
@@ -6399,7 +6399,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -8446,7 +8446,7 @@ checksum = "9cd31dcfdbbd7431a807ef4df6edd6473228e94d5c805e8cf671227a21bad068"
 dependencies = [
  "anyhow",
  "clap",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "proc-macro2",
  "quote",
  "rand 0.8.5",
@@ -9613,7 +9613,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -9671,7 +9671,7 @@ dependencies = [
  "security-framework 3.6.0",
  "security-framework-sys",
  "webpki-root-certs 0.26.11",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -11070,7 +11070,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
