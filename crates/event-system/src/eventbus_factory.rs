@@ -7,34 +7,29 @@
 use actix::Actor;
 use actix::Addr;
 use e3_events::Disabled;
-use e3_events::EventType;
-use once_cell::sync::Lazy;
 use std::any::Any;
 use std::any::TypeId;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 use std::sync::Mutex;
 
 use e3_events::BusHandle;
 use e3_events::Event;
 use e3_events::EventBus;
-use e3_events::HistoryCollector;
 use e3_events::InterfoldEvent;
-use e3_events::Subscribe;
 
 use crate::EventSystem;
 
-// The singleton factory using once_cell
+/// Process-wide cache of one event bus per event type.
 pub struct EventBusFactory {
     event_bus_cache: Mutex<HashMap<TypeId, Box<dyn Any + Send + Sync>>>,
-    error_collector_cache: Mutex<HashMap<TypeId, Box<dyn Any + Send + Sync>>>,
 }
 
 impl EventBusFactory {
     // Get the singleton instance of the factory
     pub fn instance() -> &'static EventBusFactory {
-        static INSTANCE: Lazy<EventBusFactory> = Lazy::new(|| EventBusFactory {
+        static INSTANCE: LazyLock<EventBusFactory> = LazyLock::new(|| EventBusFactory {
             event_bus_cache: Mutex::new(HashMap::new()),
-            error_collector_cache: Mutex::new(HashMap::new()),
         });
 
         &INSTANCE
@@ -64,40 +59,10 @@ impl EventBusFactory {
 
         event_bus
     }
-
-    pub fn get_error_collector<E: Event>(&self) -> Addr<HistoryCollector<E>> {
-        let type_id = TypeId::of::<E>();
-        let mut error_collector_cache = self.error_collector_cache.lock().unwrap();
-
-        // If we already have this type of ErrorCollector, return it
-        if let Some(instance) = error_collector_cache.get(&type_id) {
-            return instance
-                .downcast_ref::<Addr<HistoryCollector<E>>>()
-                .expect("Type mismatch in EventBusFactory")
-                .clone();
-        }
-
-        // Create a new EventBus for this event type
-        let error_collector = HistoryCollector::<E>::new().start();
-        // Importantly subscribe to events
-        let bus = self.get_event_bus::<E>();
-        bus.do_send(Subscribe::new(
-            EventType::All,
-            error_collector.clone().recipient(),
-        ));
-        // Store it in our HashMap
-        error_collector_cache.insert(type_id, Box::new(error_collector.clone()));
-
-        error_collector
-    }
 }
 
 pub fn get_interfold_event_bus() -> Addr<EventBus<InterfoldEvent>> {
     EventBusFactory::instance().get_event_bus()
-}
-
-pub fn get_error_collector() -> Addr<HistoryCollector<InterfoldEvent>> {
-    EventBusFactory::instance().get_error_collector()
 }
 
 pub fn get_interfold_bus_handle() -> anyhow::Result<BusHandle<Disabled>> {

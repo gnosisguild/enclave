@@ -2,7 +2,7 @@
 
 use super::*;
 use actix::{Actor, Handler, ResponseFuture};
-use e3_ciphernode_builder::EventSystem;
+use e3_event_system::EventSystem;
 use e3_events::{
     AggregateConfig, EventConstructorWithTimestamp, StoreEventRequested, StoreEventResponse,
     TestEvent, Unsequenced,

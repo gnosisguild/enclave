@@ -110,7 +110,7 @@ impl Handler<InterfoldEvent> for NetEventBuffer {
 mod tests {
     use super::*;
     use crate::events::GossipData;
-    use e3_ciphernode_builder::EventSystem;
+    use e3_event_system::EventSystem;
     use std::time::Duration;
 
     #[actix::test]

@@ -8,8 +8,8 @@
 //! the targets.
 
 use anyhow::{anyhow, bail, Result};
-use e3_ciphernode_builder::get_interfold_bus_handle;
 use e3_data::{RepositoriesFactory, SledDb};
+use e3_event_system::get_interfold_bus_handle;
 use e3_events::StoreKeys;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};

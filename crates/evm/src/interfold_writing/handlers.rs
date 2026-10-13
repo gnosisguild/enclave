@@ -709,7 +709,7 @@ mod tests {
         network::EthereumWallet, providers::ProviderBuilder, signers::local::PrivateKeySigner,
         sol_types::SolValue, transports::mock::Asserter,
     };
-    use e3_ciphernode_builder::EventSystem;
+    use e3_event_system::EventSystem;
     use e3_events::TakeEvents;
 
     #[actix::test]

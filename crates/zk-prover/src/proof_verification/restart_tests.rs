@@ -2,8 +2,8 @@
 
 use super::*;
 use crate::{setup_zk_actors, ZkActorRecovery};
-use e3_ciphernode_builder::{EventStoreAddrs, EventSystem};
 use e3_data::RepositoriesFactory;
+use e3_event_system::{EventStoreAddrs, EventSystem};
 use e3_events::{
     AggregateConfig, AggregateId, DocumentReceived, Event, EventConstructorWithTimestamp,
     EventContextSeq, EventSource, EvmEventConfig, EvmEventConfigChain, FlushPendingSnapshots,

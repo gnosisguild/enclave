@@ -4,13 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{libp2p_mock::Libp2pMock, simulate_libp2p_net};
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::Event;
 use e3_events::{GetEvents, InterfoldEvent, ResetHistory, TakeEvents};
+use e3_test_helpers::libp2p_mock::Libp2pMock;
 use std::time::Instant;
 use std::{future::Future, ops::Deref, pin::Pin, time::Duration};
 use tokio::time::timeout;
@@ -99,6 +99,17 @@ impl<'a> CiphernodeSystemBuilder<'a> {
     }
 }
 
+/// Simulate libp2p by taking output net commands and converting them to net events sending them to
+/// the other nodes
+async fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) -> Libp2pMock {
+    let mock = Libp2pMock::new();
+    for node in nodes.iter() {
+        let interface = node.channel_bridge().unwrap();
+        mock.add_node(node.peer_id, interface).await;
+    }
+    mock
+}
+
 pub struct CiphernodeSystem {
     nodes: Vec<CiphernodeHandle>,
     network_mock: Option<Libp2pMock>,
@@ -145,22 +156,6 @@ impl CiphernodeSystem {
             .as_ref()
             .context("ciphernode system has no simulated network")?;
         mock.disconnect_node(node.peer_id).await;
-        Ok(())
-    }
-
-    pub async fn reconnect_node(&self, index: usize) -> Result<()> {
-        let node = self
-            .nodes
-            .get(index)
-            .context("ciphernode index is out of range")?;
-        let mock = self
-            .network_mock
-            .as_ref()
-            .context("ciphernode system has no simulated network")?;
-        let bridge = node
-            .channel_bridge()
-            .context("ciphernode has no network bridge")?;
-        mock.reconnect_node(node.peer_id, bridge).await;
         Ok(())
     }
 
@@ -349,10 +344,9 @@ impl Deref for CiphernodeHistory {
 mod tests {
     use super::*;
     use actix::prelude::*;
-    use e3_ciphernode_builder::{
-        global_eventstore_cache::EventStoreReader, EventSystem, NetInterfaceKind,
-    };
+    use e3_ciphernode_builder::NetInterfaceKind;
     use e3_data::InMemStore;
+    use e3_event_system::{global_eventstore_cache::EventStoreReader, EventSystem};
     use e3_events::{EventBus, EventBusConfig, EventStoreQueryBy, SeqAgg, TsAgg};
     use e3_net::NetworkStatus;
     use libp2p::PeerId;
@@ -376,7 +370,6 @@ mod tests {
         let store = InMemStore::new(true).start();
         let bus = EventBus::<InterfoldEvent>::new(EventBusConfig { deduplicate: true }).start();
         let history = EventBus::<InterfoldEvent>::history(&bus);
-        let errors = EventBus::<InterfoldEvent>::error(&bus);
 
         let event_system = EventSystem::new().with_event_bus(bus);
         let bus = event_system.handle()?.enable("test");
@@ -390,7 +383,6 @@ mod tests {
             store: (&store).into(),
             bus,
             history: Some(history),
-            errors: Some(errors),
             peer_id: PeerId::random(),
             net_interface: NetInterfaceKind::Libp2p,
             network_status: NetworkStatus::default(),
@@ -398,6 +390,7 @@ mod tests {
             aggregate_ids: vec![],
             persistence_health: event_system.failure_receiver(),
             gateway_failures: vec![],
+            errors: None,
         })
     }
 

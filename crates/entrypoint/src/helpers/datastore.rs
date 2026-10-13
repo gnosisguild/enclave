@@ -6,12 +6,12 @@
 
 use actix::Actor;
 use anyhow::Result;
-use e3_ciphernode_builder::global_eventstore_cache::{get_shared_eventstore, EventStoreReader};
-use e3_ciphernode_builder::global_store_cache::get_cached_store;
-use e3_ciphernode_builder::{get_interfold_bus_handle, EventSystem};
 use e3_config::AppConfig;
 use e3_data::{DataStore, InMemStore, SledDb, SledStore};
 use e3_data::{Repositories, RepositoriesFactory};
+use e3_event_system::global_eventstore_cache::{get_shared_eventstore, EventStoreReader};
+use e3_event_system::global_store_cache::get_cached_store;
+use e3_event_system::{get_interfold_bus_handle, EventSystem};
 use e3_events::{BusHandle, Disabled};
 use std::path::PathBuf;
 

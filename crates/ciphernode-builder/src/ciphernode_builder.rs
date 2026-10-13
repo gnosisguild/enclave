@@ -9,8 +9,7 @@ use crate::{
     recovery::{
         backfill_restart_state, reconcile_committee_snapshots, recovered_ciphernode_selections,
     },
-    CiphernodeHandle, EventSystem, EvmSystemChainBuilder, NetInterfaceKind, ProviderCache,
-    WriteEnabled,
+    CiphernodeHandle, EvmSystemChainBuilder, NetInterfaceKind, ProviderCache, WriteEnabled,
 };
 use actix::{Actor, Addr};
 use alloy::primitives::Address;
@@ -24,7 +23,8 @@ use e3_aggregator::{
 };
 use e3_config::{chain_config::ChainConfig, NetworkProfile};
 use e3_crypto::Cipher;
-use e3_data::{InMemStore, RepositoriesFactory};
+use e3_data::RepositoriesFactory;
+use e3_event_system::EventSystem;
 use e3_events::{hlc::Hlc, DkgFoldAttestationContext};
 use e3_events::{
     AggregateConfig, AggregateId, BusHandle, E3Stage, E3id, EventBus, EventBusConfig,
@@ -114,7 +114,6 @@ pub struct CiphernodeBuilder {
     event_system: EventSystemType,
     /// Directory of the ingestion heartbeat files, one per chain, for a local health check.
     ingestion_heartbeat_dir: Option<PathBuf>,
-    in_mem_store: Option<Addr<InMemStore>>,
     keyshare: Option<KeyshareKind>,
     logging: bool,
     max_buffered_evm_events: usize,
@@ -193,7 +192,6 @@ impl CiphernodeBuilder {
             cipher,
             contract_components: ContractComponents::default(),
             event_system: EventSystemType::InMem,
-            in_mem_store: None,
             keyshare: None,
             logging: false,
             max_buffered_evm_events: 100_000,
@@ -255,12 +253,6 @@ impl CiphernodeBuilder {
     /// Use the TrBFV feature
     pub fn with_trbfv(mut self) -> Self {
         self.keyshare = Some(KeyshareKind::Threshold);
-        self
-    }
-
-    /// Use the given in-mem datastore. This is useful for injecting a store dump.
-    pub fn with_in_mem_datastore(mut self, store: &Addr<InMemStore>) -> Self {
-        self.in_mem_store = Some(store.to_owned());
         self
     }
 
@@ -1039,13 +1031,7 @@ impl CiphernodeBuilder {
             EventSystemType::Persisted { kv_path, log_path } => {
                 EventSystem::persisted(log_path, kv_path)
             }
-            EventSystemType::InMem => {
-                if let Some(ref store) = self.in_mem_store {
-                    EventSystem::in_mem_from_store(store)
-                } else {
-                    EventSystem::in_mem()
-                }
-            }
+            EventSystemType::InMem => EventSystem::in_mem(),
         };
         base.with_event_bus(bus)
             .with_aggregate_config(aggregate_config.clone())
@@ -2123,7 +2109,7 @@ mod tests {
         };
         use e3_sortition::{SortitionRecoveryRepositoryFactory, SortitionRecoveryState};
 
-        let system = crate::EventSystem::new().with_fresh_bus();
+        let system = e3_event_system::EventSystem::new().with_fresh_bus();
         let bus = system.handle()?.enable("sortition-upgrade");
         let errors = bus.errors();
         let repos = e3_data::Repositories::from(system.store()?);
@@ -2200,7 +2186,7 @@ mod tests {
 
         for before_snapshot in [true, false] {
             let aggregate = AggregateId::from_chain_id(Some(1));
-            let system = crate::EventSystem::new()
+            let system = e3_event_system::EventSystem::new()
                 .with_fresh_bus()
                 .with_aggregate_config(AggregateConfig::new(HashMap::from([(
                     aggregate,
@@ -2324,7 +2310,7 @@ mod tests {
 
         for before_snapshot in [true, false] {
             let aggregate = AggregateId::from_chain_id(Some(1));
-            let system = crate::EventSystem::new()
+            let system = e3_event_system::EventSystem::new()
                 .with_fresh_bus()
                 .with_aggregate_config(AggregateConfig::new(HashMap::from([
                     (aggregate, Duration::ZERO),
@@ -2734,7 +2720,7 @@ mod tests {
                 Ok(())
             }
         }
-        let system = crate::EventSystem::new().with_fresh_bus();
+        let system = e3_event_system::EventSystem::new().with_fresh_bus();
         let bus = system.handle()?.enable("bootstrap-routing");
         let store = system.store()?;
         let cipher =

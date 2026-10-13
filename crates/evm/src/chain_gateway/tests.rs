@@ -7,7 +7,7 @@
 use crate::{EvmEvent, EvmLogRejected};
 
 use super::*;
-use e3_ciphernode_builder::EventSystem;
+use e3_event_system::EventSystem;
 
 use e3_events::{CorrelationId, EvmEventConfig, EvmEventConfigChain, TakeEvents, TestEvent};
 use tokio::sync::mpsc;
