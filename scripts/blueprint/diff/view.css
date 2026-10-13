@@ -178,3 +178,7 @@ body.shot #stage {
   margin-right: 6px;
   color: var(--ink);
 }
+#d-list,
+.dswitch button {
+  white-space: nowrap;
+}
