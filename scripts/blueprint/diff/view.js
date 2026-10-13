@@ -8,9 +8,6 @@
 // arrows that changed, puts the number of changes inside on each box that opens a diagram, switches
 // between the code before and after the change (B), and lists every change (C). It works through
 // the renderer's API, window.blueprint, so it loads after renderer.js.
-//
-// With ?shot=before&d=<diagram> or ?shot=after&d=<diagram> in the address, the page shows that
-// diagram for a picture: no header, and a legend in the corner.
 ;(() => {
   const B = window.BLUEPRINT
   const X = B.diff
@@ -27,7 +24,6 @@
   const afterCode = B.code
   // The after version of each diagram that changed, or null when the change removed it.
   const afterOf = Object.fromEntries(Object.keys(X.before).map((id) => [id, D[id] || null]))
-  const shot = new URLSearchParams(location.search).get('shot')
   let mode = 'after'
 
   function setMode(m) {
@@ -142,16 +138,6 @@
 
   // ---- start ---------------------------------------------------------------------------------
   bp.hooks.push(decorate)
-  if (shot) {
-    document.body.classList.add('shot')
-    const legend = document.createElement('div')
-    legend.id = 'dshot'
-    legend.innerHTML = `<b>${shot === 'before' ? 'Before' : 'After'} the change</b><i class="a"></i>new<i class="r"></i>removed<i class="c"></i>changed`
-    document.getElementById('head').appendChild(legend)
-    const target = new URLSearchParams(location.search).get('d') || decodeURIComponent((location.hash.match(/#d=(.+)$/) || [])[1] || B.root)
-    show(target, shot === 'before' ? 'before' : 'after')
-  } else {
-    setMode('after')
-    decorate(bp.current)
-  }
+  setMode('after')
+  decorate(bp.current)
 })()
