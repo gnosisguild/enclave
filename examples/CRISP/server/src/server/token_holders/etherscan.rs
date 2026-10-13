@@ -23,6 +23,7 @@ use e3_sdk::evm_helpers::retry::call_with_retry;
 use eyre::{ensure, eyre, Context, Result};
 use serde::{de::DeserializeOwned, Deserialize};
 use std::collections::{HashMap, HashSet};
+use std::future::Future;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration, Instant};
 
@@ -151,8 +152,12 @@ const MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(500);
 /// How many times a failed request is retried before giving up.
 const RATE_LIMIT_RETRIES: u32 = 5;
 
-/// The `offset` of a `getLogs` page; a shorter page ends the scan.
-const PAGE_SIZE: usize = 10_000;
+/// The most logs one Etherscan `getLogs` request returns, whatever `offset` asks for.
+const PAGE_SIZE: usize = 1_000;
+
+/// Etherscan refuses a `getLogs` page when `page × offset` exceeds 10,000. A scan that reaches
+/// this page starts a new block range.
+const MAX_PAGES: u32 = 10;
 
 /// Pause between `getPastVotes` reads.
 const VERIFY_PACING: Duration = Duration::from_millis(50);
@@ -234,7 +239,7 @@ impl EtherscanClient {
         })
     }
 
-    /// Fetch every log of one `topic0` from one contract, paging until a short page.
+    /// Fetch every log of one `topic0` from one contract.
     async fn get_logs(
         &self,
         address: Address,
@@ -242,31 +247,24 @@ impl EtherscanClient {
         from_block: u64,
         to_block: u64,
     ) -> Result<Vec<Log>> {
-        let mut all_logs = Vec::new();
-        for page in 1u32.. {
+        scan_logs(from_block, |from, page| async move {
             let params = [
                 ("module", "logs".to_string()),
                 ("action", "getLogs".to_string()),
                 ("address", address.to_string()),
-                ("fromBlock", from_block.to_string()),
+                ("fromBlock", from.to_string()),
                 ("toBlock", to_block.to_string()),
                 ("topic0", format!("{topic0:#x}")),
                 ("page", page.to_string()),
                 ("offset", PAGE_SIZE.to_string()),
             ];
-            let logs: Vec<Log> = self
+            Ok(self
                 .fetch(&params, "logs")
                 .await
-                .with_context(|| format!("Logs page {page} for {address}"))?
-                .unwrap_or_default();
-
-            let page_len = logs.len();
-            all_logs.extend(logs);
-            if page_len < PAGE_SIZE {
-                break;
-            }
-        }
-        Ok(all_logs)
+                .with_context(|| format!("Logs page {page} from block {from} for {address}"))?
+                .unwrap_or_default())
+        })
+        .await
     }
 
     /// Fetch one Etherscan result, retrying transport failures, 429, 5xx and in-band rate limits
@@ -903,6 +901,55 @@ fn compute_balances_from_logs(logs: &[Log]) -> HashMap<Address, U256> {
     balances
 }
 
+/// Every log from `from_block` on, read through `fetch_page(from, page)`: one Etherscan `getLogs`
+/// page, in ascending block order.
+///
+/// Etherscan returns at most `PAGE_SIZE` logs per page and refuses pages after `MAX_PAGES`. A
+/// shorter page ends the scan. When the last page that Etherscan permits is full, the scan starts
+/// a new range at the block of its last log. The current range can end inside that block, so the
+/// scan drops the logs of that block here and the new range reads all of them again.
+async fn scan_logs<F, Fut>(from_block: u64, mut fetch_page: F) -> Result<Vec<Log>>
+where
+    F: FnMut(u64, u32) -> Fut,
+    Fut: Future<Output = Result<Vec<Log>>>,
+{
+    let block = |log: &Log| {
+        parse_block_number(&log.block_number)
+            .ok_or_else(|| eyre!("Unparsable log block '{}'", log.block_number))
+    };
+    let mut all_logs = Vec::new();
+    let mut from = from_block;
+    loop {
+        let mut range = Vec::new();
+        for page in 1..=MAX_PAGES {
+            let logs = fetch_page(from, page).await?;
+            let full = logs.len() >= PAGE_SIZE;
+            range.extend(logs);
+            if !full {
+                all_logs.extend(range);
+                return Ok(all_logs);
+            }
+        }
+
+        let last = block(
+            range
+                .last()
+                .ok_or_else(|| eyre!("A full page holds no logs"))?,
+        )?;
+        ensure!(
+            last > from,
+            "Block {from} holds more than {} logs, which Etherscan cannot page through",
+            PAGE_SIZE * MAX_PAGES as usize
+        );
+        for log in range {
+            if block(&log)? < last {
+                all_logs.push(log);
+            }
+        }
+        from = last;
+    }
+}
+
 /// The distinct, non-zero addresses carried by topic `index` of each log.
 fn topic_addresses<'a>(logs: impl IntoIterator<Item = &'a Log>, index: usize) -> HashSet<Address> {
     logs.into_iter()
@@ -1131,6 +1178,44 @@ mod tests {
                 HashSet::from([first, second])
             );
         }
+    }
+
+    /// A popular token has more logs than one Etherscan query can return. The fake keeps
+    /// Etherscan's limits: at most 1,000 logs per page, and no page past 10,000 logs. Three logs
+    /// per block put the 10,000th log inside a block, so a new range must read that block again
+    /// without a duplicate or a gap.
+    #[tokio::test]
+    async fn a_scan_reads_every_log_past_the_etherscan_result_window() {
+        const ETHERSCAN_MAX_PER_PAGE: usize = 1_000;
+        const ETHERSCAN_WINDOW: usize = 10_000;
+        let chain: Vec<(u64, usize)> = (0..12_000).map(|id| (1 + id as u64 / 3, id)).collect();
+
+        let logs = scan_logs(1, |from, page| {
+            let chain = &chain;
+            async move {
+                let skip = (page as usize - 1) * PAGE_SIZE;
+                ensure!(
+                    skip + PAGE_SIZE <= ETHERSCAN_WINDOW,
+                    "Result window is too large"
+                );
+                Ok(chain
+                    .iter()
+                    .filter(|(block, _)| *block >= from)
+                    .skip(skip)
+                    .take(PAGE_SIZE.min(ETHERSCAN_MAX_PER_PAGE))
+                    .map(|(block, id)| Log {
+                        topics: Vec::new(),
+                        data: id.to_string(),
+                        block_number: format!("{block:#x}"),
+                    })
+                    .collect())
+            }
+        })
+        .await
+        .unwrap();
+
+        let ids: Vec<usize> = logs.iter().map(|log| log.data.parse().unwrap()).collect();
+        assert_eq!(ids, (0..12_000).collect::<Vec<_>>());
     }
 
     /// The census snapshot is in the token's clock: one second before the request for a
