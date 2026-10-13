@@ -51,7 +51,7 @@
         {
           "pattern": "enum-match",
           "note": "metadata() maps each preset to its degree, modulus count, party count and security tier",
-          "ref": "crates/fhe-params/src/presets.rs@388@match self {"
+          "ref": "crates/fhe-params/src/presets.rs@387@pub fn metadata(&self) -> PresetMetadata"
         },
         {
           "pattern": "thiserror-enum",

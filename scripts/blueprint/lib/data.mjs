@@ -56,34 +56,6 @@ export function checkRef(raw) {
   return { status: 'bad', why: 'token not in file', raw, path }
 }
 
-// A reference into the harness docs (`agent/*.md`), for the reasons behind a design. Checked the
-// same way as a code reference; kept apart so code facts never cite prose.
-export function checkDocRef(raw) {
-  if (typeof raw !== 'string' || !raw.startsWith('agent/') || !/\.md@/.test(raw))
-    return { status: 'bad', why: 'not an agent/*.md reference', raw }
-  const [path, lineStr, ...rest] = raw.split('@')
-  const line = Number(lineStr)
-  const token = rest.join('@').trim()
-  const L = fileLines(path)
-  if (!L) return { status: 'bad', why: 'no such file', raw }
-  for (let d = 0; d <= WINDOW; d++)
-    for (const l of [line - d, line + d])
-      if (l >= 1 && l <= L.length && L[l - 1].includes(token)) return { status: 'ok', path, line: l, token }
-  let best = -1
-  L.forEach((text, i) => {
-    if (text.includes(token) && (best < 0 || Math.abs(i + 1 - line) < Math.abs(best - line))) best = i + 1
-  })
-  if (best > 0) return { status: 'moved', path, line: best, token, was: line }
-  return { status: 'bad', why: 'token not in that doc', raw }
-}
-// check.mjs sets BLUEPRINT_ACCEPT_MOVED to try the build before it fixes moved line numbers.
-const acceptMoved = (c) => c.status === 'moved' && !!process.env.BLUEPRINT_ACCEPT_MOVED
-export function strictDocRef(raw, where) {
-  const c = checkDocRef(raw)
-  if (c.status !== 'ok' && !acceptMoved(c)) throw new Error(`${where}: ${raw} -> ${c.why || 'moved to line ' + c.line}`)
-  return { path: c.path, line: c.line, token: c.token }
-}
-
 // Whether a line is test code: a file whose path says test, or a line inside an inline
 // `#[cfg(test)] mod name { … }` block or a `#[test]`-style function. Braces are counted per line,
 // as in the inventory, which is enough for this codebase.
@@ -123,10 +95,15 @@ export function inTestCode(path, line) {
   return !!testLines.get(path)[line - 1]
 }
 
-// For hand-written material (the curated diagrams): anything but `ok` stops the build.
-export function strictRef(raw, where) {
+// For the build: a moved reference uses its new line, and a broken one is dropped. Both go to
+// `warnings`, so the page still builds after a code change, and check.mjs lists what to fix.
+export function softRef(raw, where, warnings) {
   const c = checkRef(raw)
-  if (c.status !== 'ok' && !acceptMoved(c)) throw new Error(`${where}: ${raw} -> ${c.status} ${c.why || 'line ' + c.line}`)
+  if (c.status === 'bad') {
+    warnings.push(`${where}: ${raw} is broken (${c.why}), so the build dropped it`)
+    return null
+  }
+  if (c.status === 'moved') warnings.push(`${where}: ${c.path} line ${c.was} moved to ${c.line}`)
   return { path: c.path, line: c.line, token: c.token }
 }
 

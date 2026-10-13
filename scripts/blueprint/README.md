@@ -22,33 +22,38 @@ current branch.
 
 ## Generated and hand-drawn parts
 
-| Part                                                                 | Source                                                        | When the code changes                                                                        |
-| -------------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| The five top diagrams: system, contracts, circuits, ciphernode, apps | `curated.mjs` (hand-drawn)                                    | Each arrow cites code as `path@line@token`. The build stops when a reference does not match. |
-| Crate, contract, circuit, app and actor diagrams                     | `generate.mjs`, from `lib/inventory.mjs` and `lib/wiring.mjs` | They follow the code.                                                                        |
-| Descriptions, state and outputs in the generated diagrams            | `facts/*.json`                                                | The build uses the new line of a moved reference and drops a broken reference.               |
-| Evidence for the hand-drawn arrows                                   | `refs/*.json`                                                 | The build checks it like the arrows.                                                         |
+| Part                                                                 | Source                                                        | When the code changes                                                                                                      |
+| -------------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| The five top diagrams: system, contracts, circuits, ciphernode, apps | `curated.mjs` (hand-drawn)                                    | Each arrow cites code as `path@line@token`. The build uses the new line of a moved reference and drops a broken reference. |
+| Crate, contract, circuit, app and actor diagrams                     | `generate.mjs`, from `lib/inventory.mjs` and `lib/wiring.mjs` | They follow the code.                                                                                                      |
+| Descriptions, state and outputs in the generated diagrams            | `facts/*.json`                                                | The build uses the new line of a moved reference and drops a broken reference.                                             |
+| Evidence for the hand-drawn arrows                                   | `refs/*.json`                                                 | The build checks it like the arrows.                                                                                       |
 
 ## Keep it current
 
 ```bash
-node scripts/blueprint/check.mjs                   # moved and broken references, and crates that the map does not show
+node scripts/blueprint/check.mjs                   # moved and broken references, and crates missing from the map or gone
 node scripts/blueprint/check.mjs --fix             # rewrite the moved line numbers
 node scripts/blueprint/check.mjs --since v0.19.0   # also list the hand-drawn arrows whose code changed
 ```
 
+- The build does not stop when the code changes. It uses the new line of a moved reference, drops a
+  broken reference, skips a crate that is gone, and prints a warning for each. The check is strict:
+  it lists every problem and fails.
 - No CI job runs these commands, so a moved line never blocks a pull request. Run the check before a
   release, and fix what it reports in a small pull request.
-- The check finds a moved reference again by its token. For a common token, the nearest copy can be
-  the wrong line. Read each fixed line once.
+- The check finds a moved reference again by its token. When the token has other copies in the file,
+  the nearest copy can be the wrong line. `--fix` lists those references: read their lines.
 - When you add a crate, add its path under `crates/` (for example `zk/cli`) to `LAYERS` in
-  `lib/inventory.mjs`. The check lists the workspace crates that `LAYERS` does not name.
+  `lib/inventory.mjs`. When you remove one, remove it there too. The check lists both.
 
 ## Add or change a hand-drawn arrow
 
 1. Find the line of code with `grep -n`.
-2. Add `path@line@token` to the arrow in `curated.mjs`. The token is an exact part of that line.
-3. Run `node scripts/blueprint/build.mjs`. The build stops on a reference that does not match.
+2. Add `path@line@token` to the arrow in `curated.mjs`. The token is an exact part of that line, and
+   it appears nowhere else in the file.
+3. Run `node scripts/blueprint/check.mjs`. It fails on a reference that does not match. The build
+   only warns.
 
 ## Files
 

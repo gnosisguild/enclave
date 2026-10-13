@@ -5,15 +5,17 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 // Build the blueprint: flat architecture diagrams that open into each other, down to the code.
-// Hand-drawn top levels (curated.mjs: every edge carries a checked code reference; a bad one stops
-// the build) + generated deeper levels (generate.mjs: from the inventory, wiring and facts).
+// Hand-drawn top levels (curated.mjs: every edge carries a checked code reference) + generated
+// deeper levels (generate.mjs: from the inventory, wiring and facts). Code drift does not stop the
+// build: it uses the new line of a moved reference, drops a broken one, and prints a warning.
 //
 //   node scripts/blueprint/build.mjs           writes scripts/blueprint/out/interfold-blueprint.html
 //   node scripts/blueprint/build.mjs --draft   allows hand-drawn edges without references
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { loadData, checkRef, strictRef, inTestCode, fileLines, OUT, ROOT } from './lib/data.mjs'
+import { loadData, checkRef, softRef, inTestCode, fileLines, OUT, ROOT } from './lib/data.mjs'
+import { MISSING_CRATES } from './lib/inventory.mjs'
 import { wiring as readWiring } from './lib/wiring.mjs'
 import { generate, actorDiagrams } from './generate.mjs'
 import { CURATED } from './curated.mjs'
@@ -64,15 +66,19 @@ const diagrams = { ...generate({ units, wiring, codeFor, windowFor }), ...actorD
 let curatedRefs = 0
 let missing = 0
 const testRefs = []
+// Code drift does not stop the build: each problem becomes a warning, and check.mjs lists them.
+const warnings = MISSING_CRATES.map((c) => `crates/${c} is in LAYERS (lib/inventory.mjs) but no longer exists, so the build skipped it`)
 for (const make of CURATED) {
   const d = make({ units, tag: inv.tag })
   for (const n of d.nodes) {
     if (n.ref) {
-      const r = strictRef(n.ref, `${d.id} node ${n.id}`)
-      n.code = windowFor(r)
-      n.focus = r.line
+      const r = softRef(n.ref, `${d.id} diagram, box ${n.id}`, warnings)
+      if (r) {
+        n.code = windowFor(r)
+        n.focus = r.line
+        curatedRefs++
+      }
       delete n.ref
-      curatedRefs++
     }
     if (n.drill && !n.drill.includes(':') && !CURATED.some((m) => m.id === n.drill)) {
       if (!draft) throw new Error(`${d.id}: node ${n.id} opens ${n.drill}, which does not exist`)
@@ -86,12 +92,15 @@ for (const make of CURATED) {
       if (!draft) throw new Error(`${d.id}: edge ${e.from} -> ${e.to} (${e.label || ''}) has no code reference`)
       continue
     }
-    e.refs = e.refs.map((s) => {
-      const r = strictRef(s, `${d.id} edge ${e.from} -> ${e.to}`)
-      if (inTestCode(r.path, r.line)) testRefs.push(`${d.id} edge ${e.from} -> ${e.to}: ${r.path}:${r.line}`)
-      curatedRefs++
-      return { code: windowFor(r), focus: r.line }
-    })
+    e.refs = e.refs
+      .map((s) => {
+        const r = softRef(s, `${d.id} diagram, arrow ${e.from} -> ${e.to}`, warnings)
+        if (!r) return null
+        if (inTestCode(r.path, r.line)) testRefs.push(`${d.id} edge ${e.from} -> ${e.to}: ${r.path}:${r.line}`)
+        curatedRefs++
+        return { code: windowFor(r), focus: r.line }
+      })
+      .filter(Boolean)
   }
   diagrams[d.id] = d
 }
@@ -109,7 +118,7 @@ for (const d of Object.values(diagrams)) {
 for (const d of Object.values(diagrams))
   for (const n of d.nodes || [])
     if (n.drill && !diagrams[n.drill]) {
-      if (!draft) throw new Error(`${d.id}: ${n.id} opens missing diagram ${n.drill}`)
+      warnings.push(`${d.id} diagram, box ${n.id}: opens ${n.drill}, which no longer exists, so the box opens nothing`)
       delete n.drill
     }
 
@@ -151,6 +160,10 @@ mkdirSync(OUT, { recursive: true })
 const file = join(OUT, 'interfold-blueprint.html')
 writeFileSync(file, html)
 const counts = Object.values(diagrams).reduce((a, d) => ((a[d.id.split(':')[0]] = (a[d.id.split(':')[0]] || 0) + 1), a), {})
+if (warnings.length)
+  console.warn(
+    `blueprint: ${warnings.length} warning(s). The page is built. node scripts/blueprint/check.mjs lists them, and --fix rewrites moved lines:\n  ${warnings.join('\n  ')}`,
+  )
 if (testRefs.length)
   console.warn(`blueprint: ${testRefs.length} hand-drawn edge reference(s) point into test code:\n  ${testRefs.join('\n  ')}`)
 console.log(

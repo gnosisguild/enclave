@@ -133,12 +133,20 @@ function rustFacts(dir) {
   return { loc, tests, files: files.length, actors, handlers }
 }
 
+// Crates that LAYERS names but the repository no longer has. The build skips them, and check.mjs
+// lists them.
+export const MISSING_CRATES = []
+
 export function crates() {
   const out = []
+  MISSING_CRATES.length = 0
   for (const [layer, names] of Object.entries(LAYERS)) {
     for (const short of names) {
       const dir = join(ROOT, 'crates', short)
-      if (!existsSync(join(dir, 'Cargo.toml'))) throw new Error(`missing crate ${short}`)
+      if (!existsSync(join(dir, 'Cargo.toml'))) {
+        MISSING_CRATES.push(short)
+        continue
+      }
       const f = rustFacts(dir)
       out.push({
         id: cargoName(dir),

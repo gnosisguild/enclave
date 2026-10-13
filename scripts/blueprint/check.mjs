@@ -6,22 +6,22 @@
 
 // Check the blueprint against the checked-out code.
 //
-//   node scripts/blueprint/check.mjs                 moved and broken references, crates not on the map
+//   node scripts/blueprint/check.mjs                 moved and broken references, crates missing or gone
 //   node scripts/blueprint/check.mjs --fix           also rewrite the moved line numbers
 //   node scripts/blueprint/check.mjs --since <ref>   also list the hand-drawn arrows whose code changed
 //
 // The generated diagrams follow the code by themselves. The hand-drawn diagrams (curated.mjs, with
 // the evidence in refs/) and the facts in facts/ cite code as `path@line@token`. A reference moved
 // when its token is now on another line of the same file, and it broke when the token is gone.
-// A moved line is found again by its token: for a common token the nearest copy can be the wrong
-// one, so read each fixed line once.
+// A moved line is found again by its token. When the token has other copies in the file, the
+// nearest copy can be the wrong one, so --fix lists those references for a read.
 import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { checkRef, loadData, ROOT } from './lib/data.mjs'
-import { LAYERS } from './lib/inventory.mjs'
+import { checkRef, fileLines, loadData, ROOT } from './lib/data.mjs'
+import { LAYERS, MISSING_CRATES } from './lib/inventory.mjs'
 import { CURATED } from './curated.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -62,8 +62,8 @@ const members = (readFileSync(join(ROOT, 'Cargo.toml'), 'utf8').match(/members\s
 const mapped = new Set(Object.values(LAYERS).flat())
 const unmapped = [...members.matchAll(/"crates\/([^"]+)"/g)].map((m) => m[1]).filter((d) => !mapped.has(d))
 
-// ---- the build, with moved lines accepted, in a temporary folder ---------------------------
-function tryBuild(env) {
+// ---- the build, in a temporary folder ------------------------------------------------------
+function tryBuild(env = {}) {
   const out = mkdtempSync(join(tmpdir(), 'blueprint-check-'))
   const r = spawnSync(process.execPath, [join(HERE, 'build.mjs')], {
     encoding: 'utf8',
@@ -75,7 +75,7 @@ function tryBuild(env) {
     text: (r.status === 0 ? r.stdout.split('\n')[0] : (r.stderr.match(/^Error: .*$/m) || [r.stderr.trim().split('\n').pop()])[0]).trim(),
   }
 }
-const build = tryBuild({ BLUEPRINT_ACCEPT_MOVED: '1' })
+const build = tryBuild()
 
 // ---- report ---------------------------------------------------------------------------------
 const say = (title, items) => {
@@ -88,7 +88,7 @@ console.log(
 )
 say(
   'Broken hand-drawn references (fix by hand)',
-  broken.map((r) => `${r.where}: ${r.raw}`),
+  broken.map((r) => `${r.where}: ${r.raw} (${r.why})`),
 )
 say(
   'Moved hand-drawn references (--fix rewrites the line)',
@@ -99,6 +99,7 @@ say('Facts references that moved (--fix rewrites them) or broke (the build drops
   ...report.bad.map((b) => `broken: ${b.unit}: ${b.raw}`),
 ])
 say('Crates that the blueprint does not show (add them to LAYERS in lib/inventory.mjs)', unmapped)
+say('Crates in LAYERS that are gone (remove them from LAYERS in lib/inventory.mjs)', MISSING_CRATES)
 if (since) {
   const changed = new Set(execFileSync('git', ['diff', '--name-only', since], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean))
   const recheck = [
@@ -106,9 +107,51 @@ if (since) {
   ]
   say(`Hand-drawn arrows whose code changed since ${since} (read them again)`, recheck)
 }
-console.log(`\nBuild with the moved lines accepted: ${build.ok ? 'passes' : 'FAILS'}. ${build.text}`)
+console.log(`\nBuild: ${build.ok ? 'passes' : 'FAILS'}. ${build.text}`)
 
 // ---- fix --------------------------------------------------------------------------------------
+// A JSON file holds a reference as a plain string. curated.mjs writes one as a string, as a
+// template on a path constant (`${SOL}/…`), or as H(path, line, token). rewrite() finds each form
+// by its path and token, and changes only the line number.
+const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const jsEsc = {
+  "'": (s) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'"),
+  '"': (s) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"'),
+  '`': (s) => s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${'),
+}
+const unEsc = (s) => s.replace(/\\(.)/g, '$1')
+const parts = (raw) => {
+  const at1 = raw.indexOf('@')
+  const at2 = raw.indexOf('@', at1 + 1)
+  return { path: raw.slice(0, at1), old: raw.slice(at1 + 1, at2), token: raw.slice(at2 + 1) }
+}
+function rewrite(file, text, raw, line) {
+  const { path, old: cited, token } = parts(raw)
+  const old = reEsc(cited)
+  if (file.endsWith('.json')) {
+    const from = JSON.stringify(raw)
+    return { text: text.split(from).join(JSON.stringify(`${path}@${line}@${token}`)), n: text.split(from).length - 1 }
+  }
+  const consts = Object.fromEntries([...text.matchAll(/const ([A-Z_]+) = '([^']+)'/g)].map((m) => [m[1], m[2]]))
+  const resolve = (expr) => expr.replace(/\$\{([A-Z_]+)\}/g, (x, name) => consts[name] ?? x)
+  let n = 0
+  for (const q of ["'", '"', '`']) {
+    const literal = new RegExp(`${reEsc(q)}([^${q}\\n]*?)@${old}@${reEsc(jsEsc[q](token))}${reEsc(q)}`, 'g')
+    text = text.replace(literal, (m, prefix) => {
+      if (resolve(prefix) !== path) return m
+      n++
+      return `${q}${prefix}@${line}@${jsEsc[q](token)}${q}`
+    })
+  }
+  // prettier wraps a long H() call over several lines and adds a trailing comma.
+  const helper = new RegExp(`H\\(\\s*(['"\`])(.*?)\\1\\s*,\\s*${old}\\s*,\\s*(['"\`])((?:\\\\.|(?!\\3).)*)\\3\\s*,?\\s*\\)`, 'g')
+  text = text.replace(helper, (m, q1, p, q2, t) => {
+    if (resolve(p) !== path || unEsc(t) !== token) return m
+    n++
+    return m.replace(new RegExp(`,(\\s*)${old}(\\s*),`), `,$1${line}$2,`)
+  })
+  return { text, n }
+}
 if (fix && (moved.length || factsMoved.length)) {
   const files = [
     join(HERE, 'curated.mjs'),
@@ -118,27 +161,31 @@ if (fix && (moved.length || factsMoved.length)) {
     ...factFiles.map((f) => join(HERE, 'facts', f)),
   ]
   const text = new Map(files.map((f) => [f, readFileSync(f, 'utf8')]))
-  const quoted = (s) => [`'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`, JSON.stringify(s)]
   const byHand = []
+  const twins = []
   // One rewrite per reference: the same reference can appear more than once.
   const unique = new Map([...moved.map((m) => [m.raw, m.line]), ...factsMoved.map((m) => [m.raw, m.line])])
   for (const [raw, line] of unique) {
-    const r = { raw, line }
-    const fixed = r.raw.replace(/@\d+@/, `@${r.line}@`)
-    let done = false
-    for (const [f, t] of text)
-      for (const [from, to] of quoted(r.raw).map((q, i) => [q, quoted(fixed)[i]]))
-        if (text.get(f).includes(from)) {
-          text.set(f, text.get(f).split(from).join(to))
-          done = true
-        }
-    if (!done) byHand.push(r.raw)
+    let n = 0
+    for (const [f, t] of text) {
+      const r = rewrite(f, t, raw, line)
+      text.set(f, r.text)
+      n += r.n
+    }
+    if (!n) byHand.push(raw)
+    const { path, token } = parts(raw)
+    const lines = fileLines(path.replace(/^\.?\//, '')) || []
+    if (n && lines.filter((l) => l.includes(token.trim())).length > 1) twins.push(`${path}:${line} (${token})`)
   }
   for (const [f, t] of text) if (t !== readFileSync(f, 'utf8')) writeFileSync(f, t)
   console.log(`\nRewrote ${unique.size - byHand.length} moved reference(s).`)
-  if (byHand.length) console.log(`Fix these by hand (built from a template string):\n  ${byHand.join('\n  ')}`)
-  const after = tryBuild({})
+  if (twins.length)
+    console.log(
+      `Read these fixed lines. Their token has other copies in the file, so the fix can pick the wrong one:\n  ${twins.join('\n  ')}`,
+    )
+  if (byHand.length) console.log(`Fix these by hand (their form is not a string, a path template or H()):\n  ${byHand.join('\n  ')}`)
+  const after = tryBuild()
   console.log(`Build after the fix: ${after.ok ? 'passes' : 'FAILS'}. ${after.text}`)
-  process.exit(after.ok && !broken.length && !report.bad.length ? 0 : 1)
+  process.exit(after.ok && !broken.length && !report.bad.length && !unmapped.length && !MISSING_CRATES.length ? 0 : 1)
 }
-process.exit(broken.length || report.bad.length || !build.ok ? 1 : 0)
+process.exit(broken.length || report.bad.length || unmapped.length || MISSING_CRATES.length || !build.ok ? 1 : 0)

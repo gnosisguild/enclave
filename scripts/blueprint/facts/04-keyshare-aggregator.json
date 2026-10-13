@@ -316,7 +316,7 @@
         {
           "name": "ShareVerificationDispatched (C6)",
           "by": "ThresholdPlaintextAggregator",
-          "ref": "crates/aggregator/src/plaintext_aggregation/effects/verify_decryption_shares.rs@71@ShareVerificationDispatched {"
+          "ref": "crates/aggregator/src/plaintext_aggregation/effects/verify_decryption_shares.rs@67@fn c6_verification_request("
         },
         {
           "name": "ComputeRequest (TrBFV CalculateThresholdDecryption)",

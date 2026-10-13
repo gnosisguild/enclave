@@ -185,7 +185,7 @@
         },
         {
           "why": "publishing: BusHandle stamps a local event with the HLC and hands it to the Sequencer",
-          "ref": "crates/events/src/bus_handle.rs@325@self.sequencer.do_send(evt);"
+          "ref": "crates/events/src/bus_handle.rs@318@fn publish_local("
         },
         {
           "why": "sequencing: the Sequencer receives each unsequenced event and asks the store router to persist it",

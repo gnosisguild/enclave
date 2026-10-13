@@ -362,7 +362,7 @@
         {
           "name": "private: ct0is, ct1is",
           "by": "main",
-          "ref": "examples/CRISP/circuits/bin/crisp/src/main.nr@72@ct0is: [Polynomial<N>; L],"
+          "ref": "examples/CRISP/circuits/bin/crisp/src/main.nr@71@// User Data Encryption Section."
         },
         { "name": "private: k1", "by": "main", "ref": "examples/CRISP/circuits/bin/crisp/src/main.nr@74@k1: Polynomial<N>," },
         {
