@@ -133,18 +133,17 @@ function rustFacts(dir) {
   return { loc, tests, files: files.length, actors, handlers }
 }
 
-// Crates that LAYERS names but the repository no longer has. The build skips them, and check.mjs
-// lists them.
-export const MISSING_CRATES = []
+// Paths that the map names (LAYERS, CONTRACTS, CIRCUITS, apps) but the repository no longer has.
+// The build skips them, and check.mjs lists them.
+export const MISSING = []
 
 export function crates() {
   const out = []
-  MISSING_CRATES.length = 0
   for (const [layer, names] of Object.entries(LAYERS)) {
     for (const short of names) {
       const dir = join(ROOT, 'crates', short)
       if (!existsSync(join(dir, 'Cargo.toml'))) {
-        MISSING_CRATES.push(short)
+        MISSING.push(`crates/${short}`)
         continue
       }
       const f = rustFacts(dir)
@@ -222,13 +221,18 @@ export function contracts() {
     else if (c.dir) files = walk(join(base, c.dir), ['.sol']).filter((f) => !/\/honk\/.+\//.test(rel(f).replace(/^.*verifiers\//, '/')))
     else if (c.glob) files = c.glob.map((g) => join(base, g))
     else
-      files = readdirSync(join(base, 'lib'))
+      files = (existsSync(join(base, 'lib')) ? readdirSync(join(base, 'lib')) : [])
         .filter((n) => n.startsWith('Bonding'))
         .map((n) => join(base, 'lib', n))
-    for (const f of files) if (!existsSync(f)) throw new Error(`missing contract file ${f}`)
     const path = c.file ? rel(files[0]) : c.dir ? rel(join(base, c.dir)) : rel(join(base, 'lib'))
+    MISSING.push(...files.filter((f) => !existsSync(f)).map(rel))
+    files = files.filter((f) => existsSync(f))
+    if (!files.length) {
+      if (!c.file && !c.glob) MISSING.push(c.dir ? path : `${rel(join(base, c.prefix))}*`)
+      return null
+    }
     return { id: c.id, kind: 'contract', role: c.role, path, files: files.map(rel), ...solFacts(files) }
-  })
+  }).filter(Boolean)
 }
 
 export const CIRCUITS = [
@@ -254,6 +258,9 @@ export const CIRCUITS = [
 
 export function circuits() {
   return CIRCUITS.map((c) => {
+    const gone = [c.path, ...(c.extra || [])].filter((p) => !existsSync(join(ROOT, p)))
+    MISSING.push(...gone)
+    if (gone.includes(c.path)) return null
     const files = [c.path, ...(c.extra || [])].flatMap((p) => walk(join(ROOT, p), ['.nr']))
     let loc = 0
     let main = null
@@ -266,12 +273,16 @@ export function circuits() {
       }
     }
     return { id: c.id, kind: 'circuit', phase: c.phase, path: c.path, loc, files: files.length, main }
-  })
+  }).filter(Boolean)
 }
 
 // Client and app units outside the Rust workspace.
 export function apps() {
   const unit = (id, kind, path, exts) => {
+    if (!existsSync(join(ROOT, path))) {
+      MISSING.push(path)
+      return null
+    }
     const files = walk(join(ROOT, path), exts)
     const loc = files.reduce((n, f) => n + lines(f).length, 0)
     return { id, kind, path, loc, files: files.length }
@@ -283,10 +294,11 @@ export function apps() {
     unit('CRISP circuits', 'circuit', 'examples/CRISP/circuits', ['.nr']),
     unit('CRISP server', 'package', 'examples/CRISP/server', ['.rs']),
     unit('CRISP crates', 'crate', 'examples/CRISP/crates', ['.rs']),
-  ]
+  ].filter(Boolean)
 }
 
 export function inventory() {
+  MISSING.length = 0
   return {
     sha: git('rev-parse', '--short=9', 'HEAD'),
     tag: git('describe', '--tags', '--always') || 'working tree',

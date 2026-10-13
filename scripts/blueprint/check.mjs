@@ -21,7 +21,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checkRef, fileLines, loadData, ROOT } from './lib/data.mjs'
-import { LAYERS, MISSING_CRATES } from './lib/inventory.mjs'
+import { LAYERS, MISSING } from './lib/inventory.mjs'
 import { CURATED } from './curated.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -99,7 +99,7 @@ say('Facts references that moved (--fix rewrites them) or broke (the build drops
   ...report.bad.map((b) => `broken: ${b.unit}: ${b.raw}`),
 ])
 say('Crates that the blueprint does not show (add them to LAYERS in lib/inventory.mjs)', unmapped)
-say('Crates in LAYERS that are gone (remove them from LAYERS in lib/inventory.mjs)', MISSING_CRATES)
+say('Paths on the map that are gone (remove or rename them in lib/inventory.mjs)', MISSING)
 if (since) {
   const changed = new Set(execFileSync('git', ['diff', '--name-only', since], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean))
   const recheck = [
@@ -186,6 +186,6 @@ if (fix && (moved.length || factsMoved.length)) {
   if (byHand.length) console.log(`Fix these by hand (their form is not a string, a path template or H()):\n  ${byHand.join('\n  ')}`)
   const after = tryBuild()
   console.log(`Build after the fix: ${after.ok ? 'passes' : 'FAILS'}. ${after.text}`)
-  process.exit(after.ok && !broken.length && !report.bad.length && !unmapped.length && !MISSING_CRATES.length ? 0 : 1)
+  process.exit(after.ok && !broken.length && !report.bad.length && !unmapped.length && !MISSING.length ? 0 : 1)
 }
-process.exit(broken.length || report.bad.length || unmapped.length || MISSING_CRATES.length || !build.ok ? 1 : 0)
+process.exit(broken.length || report.bad.length || unmapped.length || MISSING.length || !build.ok ? 1 : 0)

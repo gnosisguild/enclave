@@ -15,7 +15,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadData, checkRef, softRef, inTestCode, fileLines, OUT, ROOT } from './lib/data.mjs'
-import { MISSING_CRATES } from './lib/inventory.mjs'
+import { MISSING } from './lib/inventory.mjs'
 import { wiring as readWiring } from './lib/wiring.mjs'
 import { generate, actorDiagrams } from './generate.mjs'
 import { CURATED } from './curated.mjs'
@@ -67,7 +67,7 @@ let curatedRefs = 0
 let missing = 0
 const testRefs = []
 // Code drift does not stop the build: each problem becomes a warning, and check.mjs lists them.
-const warnings = MISSING_CRATES.map((c) => `crates/${c} is in LAYERS (lib/inventory.mjs) but no longer exists, so the build skipped it`)
+const warnings = MISSING.map((p) => `${p} is on the map (lib/inventory.mjs) but no longer exists, so the build skipped it`)
 for (const make of CURATED) {
   const d = make({ units, tag: inv.tag })
   for (const n of d.nodes) {

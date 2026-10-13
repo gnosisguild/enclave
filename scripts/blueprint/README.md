@@ -38,14 +38,15 @@ node scripts/blueprint/check.mjs --since v0.19.0   # also list the hand-drawn ar
 ```
 
 - The build does not stop when the code changes. It uses the new line of a moved reference, drops a
-  broken reference, skips a crate that is gone, and prints a warning for each. The check is strict:
-  it lists every problem and fails.
+  broken reference, skips a crate, contract or circuit that is gone, and prints a warning for each.
+  The check is strict: it lists every problem and fails.
 - No CI job runs these commands, so a moved line never blocks a pull request. Run the check before a
   release, and fix what it reports in a small pull request.
 - The check finds a moved reference again by its token. When the token has other copies in the file,
   the nearest copy can be the wrong line. `--fix` lists those references: read their lines.
 - When you add a crate, add its path under `crates/` (for example `zk/cli`) to `LAYERS` in
-  `lib/inventory.mjs`. When you remove one, remove it there too. The check lists both.
+  `lib/inventory.mjs`. When you remove or rename a crate, a contract or a circuit, change it there
+  too. The check lists both cases.
 
 ## Add or change a hand-drawn arrow
 
