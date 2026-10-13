@@ -36,12 +36,13 @@ sol! {
         event DelegateVotesChanged(address indexed delegate, uint256 previousVotes, uint256 newVotes);
     }
 
-    /// The `BondedVotes` adapter sums wallet voting power and bonded collateral. Its weight comes
-    /// from contracts that it only reads, so discovery follows these references to the contracts
-    /// that emit. The adapter itself emits only `BondedDelegateChanged`.
+    /// The `BondedVotes` adapter sums escrow or wallet voting power with bonded collateral. Its
+    /// weight comes from contracts that it only reads, so discovery follows these references to
+    /// the contracts that emit. The adapter itself emits only `BondedDelegateChanged`.
     #[sol(rpc)]
     contract BondedVotes {
         function token() external view returns (address);
+        function votesSource() external view returns (address);
         function checkpoints() external view returns (address);
         function registry() external view returns (address);
         function escrow() external view returns (address);
@@ -59,6 +60,15 @@ sol! {
 
     contract BondedCheckpoints {
         event BondedCheckpointed(address indexed bondOwner, uint48 indexed timepoint, uint256 amount);
+    }
+
+    /// The escrow's IVotes adapter. Locked votes delegate here, not on the token.
+    contract EscrowIVotesAdapter {
+        event DelegateChanged(
+            address indexed delegator,
+            address indexed fromDelegate,
+            address indexed toDelegate
+        );
     }
 
     #[sol(rpc)]
@@ -82,6 +92,10 @@ struct VotingPowerSources {
     /// `BondedVotes.getPastVotes` sums wallet votes, bonded collateral AND escrow-locked balance,
     /// so a holder whose power is all escrow-locked appears in no other source.
     escrow_lock_nft: Option<Address>,
+    /// The escrow IVotes adapter whose `DelegateChanged` logs name every escrow delegate. A
+    /// delegate can hold escrow votes with no lock NFT and no token log, so no other source names
+    /// it. `None` when the votes source is the token itself, whose logs are already scanned.
+    escrow_votes_adapter: Option<Address>,
 }
 
 /// Which unit a census token's `getPastVotes` timepoint is denominated in (EIP-6372). The token
@@ -418,32 +432,29 @@ impl EtherscanClient {
         Ok(escrow_holders_from_logs(&logs))
     }
 
-    /// Every delegate that a `BondedVotes` adapter named through `BondedDelegateChanged`.
+    /// Every delegate named as `toDelegate` by `event_topic` logs of `emitter`.
     ///
-    /// A Safe that cannot sign a ballot moves its bonded weight to a key. That key can hold the
-    /// weight with no token log, no bond and no escrow position, so no other source finds it and
-    /// the census would drop the weight. An adapter that predates bonded delegation emits nothing
-    /// and finds nobody.
-    async fn get_bonded_delegate_candidates(
+    /// Two delegations hold weight that no other source names. A Safe that cannot sign a ballot
+    /// gives its bonded weight to a key through `BondedVotes.BondedDelegateChanged`, and a lock
+    /// owner gives its escrow votes to a key through the escrow adapter's `DelegateChanged`. That
+    /// key can hold the weight with no token log, no bond and no escrow position, so without this
+    /// scan the census would drop the weight. A contract that predates the event finds nobody.
+    async fn get_delegate_candidates(
         &self,
-        adapter: Address,
+        emitter: Address,
+        event_topic: B256,
         from_block: u64,
         to_block: u64,
     ) -> Result<HashSet<Address>> {
         let logs = self
-            .get_logs(
-                adapter,
-                BondedVotes::BondedDelegateChanged::SIGNATURE_HASH,
-                from_block,
-                to_block,
-            )
+            .get_logs(emitter, event_topic, from_block, to_block)
             .await
-            .with_context(|| format!("Bonded delegation logs for {adapter}"))?;
-        Ok(bonded_delegates_from_logs(&logs))
+            .with_context(|| format!("Delegation logs for {emitter}"))?;
+        Ok(new_delegates_from_logs(&logs))
     }
 
     /// Every candidate for a round: wallet holders and delegates from the token's logs, plus, for
-    /// an adapter, bond owners, bonded delegates and escrow holders.
+    /// an adapter, bond owners, bonded delegates, escrow holders and escrow delegates.
     async fn discover_candidates(
         &self,
         round_token: Address,
@@ -495,9 +506,14 @@ impl EtherscanClient {
                 .context("Failed to fetch bond owner candidates")?,
             );
             extra.extend(
-                self.get_bonded_delegate_candidates(round_token, start_block, snapshot_block)
-                    .await
-                    .context("Failed to fetch bonded delegate candidates")?,
+                self.get_delegate_candidates(
+                    round_token,
+                    BondedVotes::BondedDelegateChanged::SIGNATURE_HASH,
+                    start_block,
+                    snapshot_block,
+                )
+                .await
+                .context("Failed to fetch bonded delegate candidates")?,
             );
         }
         if let Some(lock_nft) = sources.escrow_lock_nft {
@@ -505,6 +521,18 @@ impl EtherscanClient {
                 self.get_escrow_holder_candidates(lock_nft, start_block, snapshot_block)
                     .await
                     .context("Failed to fetch escrow holder candidates")?,
+            );
+        }
+        if let Some(adapter) = sources.escrow_votes_adapter {
+            extra.extend(
+                self.get_delegate_candidates(
+                    adapter,
+                    EscrowIVotesAdapter::DelegateChanged::SIGNATURE_HASH,
+                    start_block,
+                    snapshot_block,
+                )
+                .await
+                .context("Failed to fetch escrow delegate candidates")?,
             );
         }
         voters.extend(
@@ -633,11 +661,11 @@ fn is_rate_limited(detail: &str) -> bool {
 
 /// Resolve where a round's voting power is emitted from.
 ///
-/// A `BondedVotes` adapter exposes `token()`, `registry()`, `checkpoints()` and `escrow()`, so
-/// probing them tells whether bonded collateral is in play without configuring which deployment
-/// is the governance one. A plain ERC20Votes token answers none and is scanned alone. Only a
-/// metadata revert is an answer: a transport failure is an error, because treating it as a plain
-/// token would build a census silently missing every bonded and escrow-only holder.
+/// A `BondedVotes` adapter exposes `token()`, `registry()`, `checkpoints()`, `escrow()` and
+/// `votesSource()`, so probing them tells whether bonded collateral is in play without configuring
+/// which deployment is the governance one. A plain ERC20Votes token answers none and is scanned
+/// alone. Only a metadata revert is an answer: a transport failure is an error, because treating
+/// it as a plain token would build a census silently missing every bonded and escrow-only holder.
 async fn resolve_voting_power_sources(
     provider: &DynProvider,
     round_token: Address,
@@ -648,6 +676,7 @@ async fn resolve_voting_power_sources(
         registry: None,
         checkpoints: None,
         escrow_lock_nft: None,
+        escrow_votes_adapter: None,
     };
 
     let Some(underlying) = optional(adapter.token().call().await, "token()")? else {
@@ -667,6 +696,10 @@ async fn resolve_voting_power_sources(
         )?,
         None => None,
     };
+    // An adapter from before the lock-to-vote model has no `votesSource()`. A votes source that is
+    // the token itself emits the token logs that are already scanned.
+    let escrow_votes_adapter = optional(adapter.votesSource().call().await, "votesSource()")?
+        .filter(|source| *source != underlying);
 
     Ok(VotingPowerSources {
         token: underlying,
@@ -675,6 +708,7 @@ async fn resolve_voting_power_sources(
         // still names every bond owner.
         checkpoints: optional(adapter.checkpoints().call().await, "checkpoints()")?,
         escrow_lock_nft,
+        escrow_votes_adapter,
     })
 }
 
@@ -886,9 +920,10 @@ fn escrow_holders_from_logs(logs: &[Log]) -> HashSet<Address> {
     topic_addresses(logs.iter().filter(|log| log.topics.len() >= 4), 2)
 }
 
-/// Delegates of `BondedDelegateChanged(owner, fromDelegate, toDelegate)` logs: `toDelegate` is
-/// topic 3. A delegation that ends names the zero address, which never becomes a candidate.
-fn bonded_delegates_from_logs(logs: &[Log]) -> HashSet<Address> {
+/// Delegates of `BondedDelegateChanged(owner, fromDelegate, toDelegate)` and of the escrow
+/// adapter's `DelegateChanged(delegator, fromDelegate, toDelegate)`: `toDelegate` is topic 3 in
+/// both. A delegation that ends names the zero address, which never becomes a candidate.
+fn new_delegates_from_logs(logs: &[Log]) -> HashSet<Address> {
     topic_addresses(logs, 3)
 }
 
@@ -984,6 +1019,10 @@ mod tests {
                 ERC20Votes::DelegateVotesChanged::SIGNATURE_HASH,
                 "0xdec2bacdd2f05b59de34da9b523dff8be42e5e38e818c82fdb0bae774387a724",
             ),
+            (
+                EscrowIVotesAdapter::DelegateChanged::SIGNATURE_HASH,
+                "0x3134e8a2e6d97e929a7e54011ea5485d7d196dd5f0ba4d4ef95803e8e3fc257f",
+            ),
         ] {
             assert_eq!(format!("{actual:#x}"), expected);
         }
@@ -1042,40 +1081,56 @@ mod tests {
         );
     }
 
-    /// The census must find the key that an owner, such as a Safe, gave its bonded weight to. That
-    /// key can have no other log at all. The topics come from the ABI, so a wrong index fails here.
+    /// The census must find the key that an owner, such as a Safe, gave its bonded weight or its
+    /// escrow votes to. That key can have no other log at all. The topics come from the ABI, so a
+    /// wrong index fails here.
     #[test]
-    fn bonded_delegation_names_each_delegate_and_never_the_zero_address() {
+    fn delegation_names_each_delegate_and_never_the_zero_address() {
         let owner = Address::repeat_byte(0xaa);
         let first = Address::repeat_byte(0xbb);
         let second = Address::repeat_byte(0xcc);
-        let log = |from: Address, to: Address| Log {
-            topics: BondedVotes::BondedDelegateChanged {
-                owner,
-                fromDelegate: from,
-                toDelegate: to,
-            }
-            .encode_log_data()
-            .topics()
-            .iter()
-            .map(|topic| format!("{topic:#x}"))
-            .collect(),
+        let as_log = |topics: &[B256]| Log {
+            topics: topics.iter().map(|topic| format!("{topic:#x}")).collect(),
             data: String::new(),
             block_number: String::new(),
         };
+        let bonded = |from: Address, to: Address| {
+            as_log(
+                BondedVotes::BondedDelegateChanged {
+                    owner,
+                    fromDelegate: from,
+                    toDelegate: to,
+                }
+                .encode_log_data()
+                .topics(),
+            )
+        };
+        let escrow = |from: Address, to: Address| {
+            as_log(
+                EscrowIVotesAdapter::DelegateChanged {
+                    delegator: owner,
+                    fromDelegate: from,
+                    toDelegate: to,
+                }
+                .encode_log_data()
+                .topics(),
+            )
+        };
 
-        // `first` accepts. The owner then moves on, which ends the delegation before `second`
-        // accepts.
-        let logs = [
-            log(Address::ZERO, first),
-            log(first, Address::ZERO),
-            log(Address::ZERO, second),
-        ];
+        for log in [&bonded as &dyn Fn(Address, Address) -> Log, &escrow] {
+            // `first` takes the weight. The owner then moves on, which ends the delegation before
+            // `second` takes it.
+            let logs = [
+                log(Address::ZERO, first),
+                log(first, Address::ZERO),
+                log(Address::ZERO, second),
+            ];
 
-        assert_eq!(
-            bonded_delegates_from_logs(&logs),
-            HashSet::from([first, second])
-        );
+            assert_eq!(
+                new_delegates_from_logs(&logs),
+                HashSet::from([first, second])
+            );
+        }
     }
 
     /// The census snapshot is in the token's clock: one second before the request for a
