@@ -301,9 +301,9 @@ impl Computation for Inputs {
 mod tests {
     use super::*;
 
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
     use crate::dkg::share_computation::ShareComputationCircuitData;
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_fhe_params::BfvPreset;
 
     #[test]

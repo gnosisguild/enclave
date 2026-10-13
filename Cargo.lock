@@ -3667,6 +3667,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "e3-bfv-client",
+ "e3-committee",
  "e3-committee-hash",
  "e3-config",
  "e3-data",
@@ -3799,6 +3800,16 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "zeroize",
+]
+
+[[package]]
+name = "e3-committee"
+version = "0.19.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4021,6 +4032,7 @@ dependencies = [
  "chrono",
  "derivative",
  "e3-ciphernode-builder",
+ "e3-committee",
  "e3-committee-hash",
  "e3-crypto",
  "e3-data",
@@ -4058,6 +4070,7 @@ dependencies = [
  "bloom",
  "e3-bfv-client",
  "e3-ciphernode-builder",
+ "e3-committee",
  "e3-config",
  "e3-crypto",
  "e3-data",
@@ -4212,6 +4225,7 @@ dependencies = [
  "bincode",
  "e3-bfv-client",
  "e3-ciphernode-builder",
+ "e3-committee",
  "e3-committee-hash",
  "e3-config",
  "e3-crypto",
@@ -4272,6 +4286,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "e3-bfv-client",
+ "e3-committee",
  "e3-committee-hash",
  "e3-crypto",
  "e3-data",
@@ -4403,6 +4418,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "e3-bfv-client",
+ "e3-committee",
  "e3-committee-hash",
  "e3-config",
  "e3-crypto",
@@ -4453,6 +4469,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "chrono",
+ "e3-committee",
  "e3-data",
  "e3-events",
  "e3-fhe-params",
@@ -4570,6 +4587,7 @@ dependencies = [
  "e3-aggregator",
  "e3-bfv-client",
  "e3-ciphernode-builder",
+ "e3-committee",
  "e3-config",
  "e3-crypto",
  "e3-data",
@@ -4688,6 +4706,7 @@ dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
  "clap",
+ "e3-committee",
  "e3-fhe-params",
  "e3-parity-matrix",
  "e3-polynomial",
@@ -4729,6 +4748,7 @@ dependencies = [
  "directories 5.0.1",
  "e3-bfv-client",
  "e3-ciphernode-builder",
+ "e3-committee",
  "e3-committee-hash",
  "e3-config",
  "e3-crypto",

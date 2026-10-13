@@ -279,8 +279,8 @@ impl Computation for Inputs {
 mod tests {
     use super::*;
 
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_fhe_params::BfvPreset;
     use fhe::bfv::{Encoding, Plaintext, PublicKey};
     use fhe_traits::{FheEncoder, FheEncrypter};

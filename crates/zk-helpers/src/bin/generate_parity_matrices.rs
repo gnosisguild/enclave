@@ -24,8 +24,8 @@ use std::str::FromStr;
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
-use e3_zk_helpers::ciphernodes_committee::CiphernodesCommitteeSize;
 use e3_zk_helpers::circuits::dkg::share_computation::utils::parity_matrix_constant_string;
 
 #[derive(Parser, Debug)]

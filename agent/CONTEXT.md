@@ -63,6 +63,8 @@ Run from repo root via pnpm scripts — not raw cargo/nargo/hardhat.
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Install / build all         | `pnpm i` · `pnpm build`                                                                                                                            |
 | Build Rust                  | `pnpm rust:build` (cargo `--locked --release`; prebuilds EVM fixtures)                                                                             |
+| Build ZK helpers            | `pnpm rust:build:zk [--release]` (no EVM fixture prebuild)                                                                                         |
+| Rust formatting / Clippy    | `pnpm rust:format` · `pnpm rust:lint` · `pnpm rust:clippy [-- -D warnings]`                                                                        |
 | Test everything             | `pnpm test` (EVM, Rust, required proof/slashing suites, SDK, Noir)                                                                                 |
 | Test one layer              | `pnpm evm:test` · `pnpm rust:test` · `pnpm sdk:test` · `pnpm noir:test`                                                                            |
 | SDK proof verification      | `pnpm sdk:test:proofs` (prepare circuits, generate one proof, verify bindings and reject tampering)                                                |
@@ -101,7 +103,7 @@ Two independent settings select what `pnpm build:circuits` compiles into `circui
 
 - **Preset** (`--preset insecure-512` [default] | `secure-8192`): the BFV parameter set.
 - **Committee** (`--committee minimum` [default] | `micro` | `small`): `(N, T, H)` for the
-  secret-sharing committee. Mirrors `e3_zk_helpers::CiphernodesCommitteeSize`.
+  secret-sharing committee. Mirrors `e3_committee::CiphernodesCommitteeSize`.
 
 `scripts/build-circuits.ts` writes the selection. Never hand-edit the values that it writes:
 

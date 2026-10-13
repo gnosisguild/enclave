@@ -231,7 +231,8 @@ mod tests {
     use crate::circuits::dkg::share_encryption::{Bounds, ShareEncryptionCircuitData};
     use crate::computation::Computation;
     use crate::computation::DkgInputType;
-    use crate::{CiphernodesCommitteeSize, Circuit};
+    use crate::Circuit;
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_fhe_params::BfvPreset;
 
     #[test]

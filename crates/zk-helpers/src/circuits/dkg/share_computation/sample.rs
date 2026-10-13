@@ -11,8 +11,8 @@ use crate::circuits::dkg::share_computation::utils::compute_parity_matrix;
 use crate::computation::DkgInputType;
 use crate::dkg::share_computation::ShareComputationCircuitData;
 use crate::math::array2_u64_to_bigint;
-use crate::CiphernodesCommittee;
 use crate::CircuitsErrors;
+use e3_committee::CiphernodesCommittee;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
@@ -130,9 +130,9 @@ impl ShareComputationCircuitData {
 
 #[cfg(test)]
 mod tests {
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
     use crate::dkg::share_computation::ShareComputationCircuitData;
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_fhe_params::BfvPreset;
 
     #[test]

@@ -11,7 +11,7 @@ pub mod packing;
 pub mod registry;
 pub mod utils;
 
-pub use ciphernodes_committee::*;
+pub use ciphernodes_committee::canonical_committee_for_circuit;
 pub use circuits::*;
 pub use math::*;
 pub use packing::*;

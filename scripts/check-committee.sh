@@ -13,7 +13,7 @@
 #   3. circuits/lib/src/configs/{insecure,secure}/threshold.nr (circuit parameters)
 #   4. circuits/lib/src/configs/committee/active.nr (Noir-side active committee)
 #   5. packages/interfold-contracts/scripts/utils.ts (deployment hashes and committee values)
-#   6. crates/zk-helpers/src/ciphernodes_committee.rs (committee enum values)
+#   6. crates/committee/src/lib.rs (committee enum values)
 #   7. packages/interfold-contracts/contracts/lib/ActiveCryptoConfig.sol
 #
 # `circuits/bin/.active-preset.json` is only a local hydrated cache. It can point at Sepolia's
@@ -34,7 +34,7 @@ STAMP="circuits/bin/.active-preset.json"
 UTILS_TS="packages/interfold-contracts/scripts/utils.ts"
 PROTOCOL_CONSTANTS_TS="packages/interfold-contracts/scripts/protocol/constants.ts"
 FHE_CONSTANTS_RS="crates/fhe-params/src/constants.rs"
-COMMITTEE_RS="crates/zk-helpers/src/ciphernodes_committee.rs"
+COMMITTEE_RS="crates/committee/src/lib.rs"
 ACTIVE_SOL="packages/interfold-contracts/contracts/lib/ActiveCryptoConfig.sol"
 TASKS_TS="packages/interfold-contracts/tasks/interfold.ts"
 SDK_UTILS_TS="packages/interfold-sdk/src/utils.ts"

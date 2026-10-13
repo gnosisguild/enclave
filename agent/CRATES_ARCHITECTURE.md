@@ -64,6 +64,7 @@ flowchart TD
         Events[e3-events]
         Config[e3-config]
         FheParams[e3-fhe-params]
+        Committee[e3-committee]
         ZkHelpers[e3-zk-helpers]
         CommitteeHash[e3-committee-hash]
     end
@@ -126,15 +127,21 @@ flowchart TD
     Aggregator --> Prover
     Aggregator --> Evm
     Aggregator --> CommitteeHash
+    Aggregator --> Committee
     Keyshare --> Fhe
     Keyshare --> Multi
     Keyshare --> Trbfv
+    Keyshare --> Committee
     Slashing --> Request
     Slashing --> ZkHelpers
+    Slashing --> Committee
     Prover --> Slashing
     Prover --> ZkHelpers
+    Prover --> Committee
     Multi --> Prover
     Multi --> Trbfv
+    Multi --> Committee
+    Request --> Committee
     Fhe --> BfvClient
     Trbfv --> BfvClient
     BfvClient --> FheParams
@@ -145,6 +152,7 @@ flowchart TD
     Evm --> Data
     Evm --> DataAvailability
     Evm --> Events
+    Evm --> Committee
     Net --> Config
     Net --> Data
     Net --> Events
@@ -162,9 +170,11 @@ flowchart TD
     Events --> FheParams
     Events --> Trbfv
     Events --> ZkHelpers
+    Events --> Committee
     ZkHelpers --> Poly
     ZkHelpers --> Matrix
     ZkHelpers --> Safe
+    ZkHelpers --> Committee
     Crypto --> Utils
     Utils --> UtilsDerive
 
@@ -174,6 +184,10 @@ flowchart TD
     TestHelpers --> Builder
     TestHelpers --> SDK
 ```
+
+`e3-committee` owns committee configurations and their canonical parameter values. Public-key
+aggregation owns the selection of the lowest distinct verified party IDs for C5's `H` slots, in
+`crates/aggregator/src/public_key_aggregation/workflow.rs`.
 
 The most important current boundary debt is that `e3-events` contains both neutral event transport
 and rich protocol payloads that depend on cryptographic/FHE types. Protocol workflow crates also

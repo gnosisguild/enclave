@@ -105,7 +105,7 @@ mod tests {
     use crate::codegen::write_artifacts;
     use crate::threshold::share_decryption::computation::{Bits, Bounds};
     use crate::threshold::share_decryption::ShareDecryptionCircuitData;
-    use crate::CiphernodesCommitteeSize;
+    use e3_committee::CiphernodesCommitteeSize;
 
     use e3_fhe_params::BfvPreset;
     use tempfile::TempDir;

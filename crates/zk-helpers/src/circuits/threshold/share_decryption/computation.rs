@@ -465,7 +465,7 @@ mod tests {
     fn test_d_commitment_matches_inputs_compute() {
         use crate::circuits::commitments::compute_threshold_decryption_share_commitment;
         use crate::threshold::share_decryption::ShareDecryptionCircuitData;
-        use crate::CiphernodesCommitteeSize;
+        use e3_committee::CiphernodesCommitteeSize;
         use fhe_math::rq::{Poly, PowerBasis};
         use fhe_traits::{DeserializeWithContext, Serialize as FheSer};
         use num_traits::ToPrimitive;
