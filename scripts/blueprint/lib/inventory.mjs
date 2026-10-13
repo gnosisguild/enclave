@@ -122,8 +122,17 @@ function rustFacts(dir) {
       const test = testFile || inTest[i]
       const a = line.match(/impl(?:<[^>]*>)?\s+(?:actix::)?Actor\s+for\s+([A-Za-z0-9_]+)/)
       if (a) actors.push({ name: a[1], test, ref: `${rel(f)}@${i + 1}@Actor for ${a[1]}` })
-      const h = line.match(/impl(?:<[^>]*>)?\s+(?:actix::)?Handler<(.+?)>\s+for\s+([A-Za-z0-9_]+)/)
-      if (h) handlers.push({ actor: h[2], msg: h[1].replace(/\s+/g, ''), test, ref: `${rel(f)}@${i + 1}@for ${h[2]}` })
+      // A long header puts `for Actor` on the next line: read the two lines together, and cite the
+      // first one, where the impl block starts.
+      const split = /\bHandler</.test(line) && !/\sfor\s/.test(line)
+      const h = (split ? `${line} ${L[i + 1] || ''}` : line).match(/impl(?:<[^>]*>)?\s+(?:actix::)?Handler<(.+?)>\s+for\s+([A-Za-z0-9_]+)/)
+      if (h)
+        handlers.push({
+          actor: h[2],
+          msg: h[1].replace(/\s+/g, ''),
+          test,
+          ref: `${rel(f)}@${i + 1}@${split ? `Handler<${h[1]}>` : `for ${h[2]}`}`,
+        })
     })
   }
   // Tests in a crate's tests/ folder count too.
